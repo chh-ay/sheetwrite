@@ -19,18 +19,22 @@ import {
 } from "../src/formula-bench.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
+import { expectRejections, must } from "./gate-fixtures.js";
 
 const COMMIT = "0".repeat(40);
 const SOURCE_HASH = "a".repeat(64);
+const RETAINED_BYTES = 1024;
 
-function formulaFixture(mode: "full" | "smoke" = "smoke"): CompleteFormulaBenchmarkResult {
+type Fixture = CompleteFormulaBenchmarkResult;
+
+function formulaFixture(mode: "full" | "smoke" = "smoke"): Fixture {
   const sampleCount = mode === "smoke" ? 2 : 5;
   const samples = Array.from({ length: sampleCount }, () => 1);
-  const allocationSamples = Array.from({ length: sampleCount }, () => ({
-    retainedBytes: 1024,
+  const allocation = {
+    retainedBytes: RETAINED_BYTES,
     peakTransientBytes: 0,
     transientAllocations: 0,
-  }));
+  };
   const files = Object.fromEntries(FORMULA_SOURCE_FILES.map((path) => [path, SOURCE_HASH]));
   const sourceDigest = formulaSourceDigest(COMMIT, files);
   return {
@@ -57,12 +61,7 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): CompleteFormulaBenchm
       concurrency: 1,
       gc: "Bun.gc(true) before every measured sample",
     },
-    source: {
-      protocol: FORMULA_PROTOCOL,
-      commit: COMMIT,
-      files,
-      digest: sourceDigest,
-    },
+    source: { protocol: FORMULA_PROTOCOL, commit: COMMIT, files, digest: sourceDigest },
     methodology: {
       warmupSamples: 1,
       measuredSamples: sampleCount,
@@ -71,250 +70,197 @@ function formulaFixture(mode: "full" | "smoke" = "smoke"): CompleteFormulaBenchm
       correctness: CORRECTNESS_METHOD,
     },
     workloads: expectedFormulaWorkloadKeys(mode).map((key) => {
-      const match = /^workload=(.*);size=(\d+)$/u.exec(key);
-      if (!match) throw new Error(`invalid fixture key ${key}`);
-      const id = match[1]!;
-      const size = Number(match[2]);
+      const [, id = "", size = ""] = must(/^workload=(.*);size=(\d+)$/u.exec(key), key);
       return {
         id,
-        size,
+        size: Number(size),
         samplesMs: [...samples],
         stat: summarize(samples),
-        allocationSamples: structuredClone(allocationSamples),
+        allocationSamples: samples.map(() => ({ ...allocation })),
         allocationStat: {
-          retainedBytes: summarize(allocationSamples.map((sample) => sample.retainedBytes)),
-          peakTransientBytes: summarize(
-            allocationSamples.map((sample) => sample.peakTransientBytes),
-          ),
-          transientAllocations: summarize(
-            allocationSamples.map((sample) => sample.transientAllocations),
-          ),
+          retainedBytes: summarize(samples.map(() => allocation.retainedBytes)),
+          peakTransientBytes: summarize(samples.map(() => allocation.peakTransientBytes)),
+          transientAllocations: summarize(samples.map(() => allocation.transientAllocations)),
         },
-        output: expectedFormulaOutput(id, size),
+        output: expectedFormulaOutput(id, Number(size)),
       };
     }),
     blockedWorkloads: [],
     memory: expectedFormulaMemoryKeys(mode).map((key) => ({
       formulas: Number(key.slice("memory=formulas=".length)),
-      wasmDeltaBytes: 1024,
+      wasmDeltaBytes: RETAINED_BYTES,
     })),
     gates: {
       passed: true,
       tolerance: FORMULA_GATE_TOLERANCE,
-      regression: {
-        status: "passed",
-        baselineCommit: COMMIT,
-        baselineSourceDigest: sourceDigest,
-      },
+      regression: { status: "passed", baselineCommit: COMMIT, baselineSourceDigest: sourceDigest },
     },
   };
 }
+
+const firstWorkload = (result: Fixture) => must(result.workloads[0], "workload");
+
+/** A full capture whose first workload has `samples` as its timings. */
+function withSamples(samples: number[]): Fixture {
+  const result = formulaFixture("full");
+  firstWorkload(result).samplesMs = samples;
+  firstWorkload(result).stat = summarize(samples);
+  return result;
+}
+
 describe("formula benchmark schema", () => {
-  it("rejects missing, duplicate, unexpected, and malformed workload identities", () => {
-    const named = { id: "independent-parse-load", size: 1_000 } as const;
-    const key = `workload=${named.id};size=${named.size}`;
-    const matchesNamed = (entry: CompleteFormulaBenchmarkResult["workloads"][number]) =>
-      entry.id === named.id && entry.size === named.size;
-
-    const missing = formulaFixture();
-    missing.workloads = missing.workloads.filter((entry) => !matchesNamed(entry));
-    expect(() => validateFormulaBenchmark(missing, "smoke")).toThrow(`missing ${key}`);
-
-    const duplicate = formulaFixture();
-    duplicate.workloads.push(structuredClone(duplicate.workloads.find(matchesNamed)!));
-    expect(() => validateFormulaBenchmark(duplicate, "smoke")).toThrow(`duplicate ${key}`);
-
-    const unexpected = formulaFixture();
-    const extra = structuredClone(unexpected.workloads[0]!);
-    extra.id = "not-declared";
-    extra.size = 7;
-    unexpected.workloads.push(extra);
-    expect(() => validateFormulaBenchmark(unexpected, "smoke")).toThrow(
-      "unexpected workload=not-declared;size=7",
-    );
-
-    const malformed = formulaFixture();
-    Object.defineProperty(malformed.workloads.find(matchesNamed)!, "size", { value: "1000" });
-    expect(() => validateFormulaBenchmark(malformed, "smoke")).toThrow(
-      "formula workload contains a malformed identity",
-    );
-  });
-
-  it("fails closed for missing raw samples and forged summaries", () => {
-    const missingTiming = formulaFixture();
-    missingTiming.workloads[0]!.samplesMs = [];
-    expect(() => validateFormulaBenchmark(missingTiming)).toThrow(
-      "must contain 2 post-warmup raw samples",
-    );
-
-    const missingAllocation = formulaFixture();
-    missingAllocation.workloads[0]!.allocationSamples = [];
-    expect(() => validateFormulaBenchmark(missingAllocation)).toThrow(
-      "allocationSamples must contain 2 raw samples",
-    );
-
-    const forgedTiming = formulaFixture();
-    forgedTiming.workloads[0]!.stat = { ...forgedTiming.workloads[0]!.stat, stddev: 0.1 };
-    expect(() => validateFormulaBenchmark(forgedTiming)).toThrow("does not match raw samples");
-
-    const forgedAllocation = formulaFixture();
-    forgedAllocation.workloads[0]!.allocationStat.retainedBytes = {
-      ...forgedAllocation.workloads[0]!.allocationStat.retainedBytes,
-      stddev: 0.1,
-    };
-    expect(() => validateFormulaBenchmark(forgedAllocation)).toThrow("does not match raw samples");
-  });
-
-  it("rejects malformed or internally inconsistent runner/source provenance", () => {
-    const commit = formulaFixture();
-    commit.meta.commit = "A".repeat(40);
-    expect(() => validateFormulaBenchmark(commit)).toThrow("lowercase Git SHA");
-
-    const command = formulaFixture();
-    command.runner.command.push("--invented");
-    expect(() => validateFormulaBenchmark(command)).toThrow("command does not match");
-
-    const fileHash = formulaFixture();
-    fileHash.source.files[FORMULA_SOURCE_FILES[0]!] = "short";
-    expect(() => validateFormulaBenchmark(fileHash)).toThrow("must be a SHA-256 digest");
-
-    const digest = formulaFixture();
-    digest.source.digest = "b".repeat(64);
-    expect(() => validateFormulaBenchmark(digest)).toThrow("digest does not match");
-
-    const extraFile = formulaFixture();
-    extraFile.source.files.unbounded = SOURCE_HASH;
-    expect(() => validateFormulaBenchmark(extraFile)).toThrow("must contain exactly");
+  it("rejects drifted workload identities, raw samples, summaries and provenance", () => {
+    const named = (result: Fixture) =>
+      must(
+        result.workloads.find(
+          (entry) => entry.id === "independent-parse-load" && entry.size === 1_000,
+        ),
+        "named workload",
+      );
+    const key = "workload=independent-parse-load;size=1000";
+    expectRejections(formulaFixture, (result) => validateFormulaBenchmark(result, "smoke"), [
+      [
+        "missing",
+        (result) => result.workloads.splice(result.workloads.indexOf(named(result)), 1),
+        `missing ${key}`,
+      ],
+      [
+        "duplicate",
+        (result) => result.workloads.push(structuredClone(named(result))),
+        `duplicate ${key}`,
+      ],
+      [
+        "unexpected",
+        (result) =>
+          result.workloads.push({
+            ...structuredClone(firstWorkload(result)),
+            id: "not-declared",
+            size: 7,
+          }),
+        "unexpected workload=not-declared;size=7",
+      ],
+      [
+        "malformed",
+        (result) => Object.defineProperty(named(result), "size", { value: "1000" }),
+        "formula workload contains a malformed identity",
+      ],
+      [
+        "timings",
+        (result) => (firstWorkload(result).samplesMs = []),
+        "must contain 2 post-warmup raw samples",
+      ],
+      [
+        "allocations",
+        (result) => (firstWorkload(result).allocationSamples = []),
+        "allocationSamples must contain 2 raw samples",
+      ],
+      [
+        "timing summary",
+        (result) => (firstWorkload(result).stat = { ...firstWorkload(result).stat, stddev: 0.1 }),
+        "does not match raw samples",
+      ],
+      [
+        "allocation summary",
+        (result) => {
+          const stat = firstWorkload(result).allocationStat;
+          stat.retainedBytes = { ...stat.retainedBytes, stddev: 0.1 };
+        },
+        "does not match raw samples",
+      ],
+      ["commit", (result) => (result.meta.commit = "A".repeat(40)), "lowercase Git SHA"],
+      ["command", (result) => result.runner.command.push("--invented"), "command does not match"],
+      [
+        "file hash",
+        (result) => (result.source.files[must(FORMULA_SOURCE_FILES[0], "source file")] = "short"),
+        "must be a SHA-256 digest",
+      ],
+      ["digest", (result) => (result.source.digest = "b".repeat(64)), "digest does not match"],
+      [
+        "extra file",
+        (result) => (result.source.files.unbounded = SOURCE_HASH),
+        "must contain exactly",
+      ],
+    ]);
   });
 });
 
 describe("formula regression gate", () => {
-  it("gates median and p95 from raw samples", () => {
-    const baseline = formulaFixture("full");
-
-    const median = formulaFixture("full");
-    median.workloads[0]!.samplesMs = [1.3, 1.3, 1.3, 1.3, 1.3];
-    median.workloads[0]!.stat = summarize(median.workloads[0]!.samplesMs);
-    expect(() => validateFormulaRegression(median, baseline)).toThrow(".median regression");
-
-    const p95 = formulaFixture("full");
-    p95.workloads[0]!.samplesMs = [1, 1, 1, 1, 1.4];
-    p95.workloads[0]!.stat = summarize(p95.workloads[0]!.samplesMs);
-    expect(() => validateFormulaRegression(p95, baseline)).toThrow(".p95 regression");
-  });
-
-  it("gives sub-millisecond workloads a 0.3 ms median floor and no p95 check", () => {
-    const withSamples = (samples: number[]) => {
-      const result = formulaFixture("full");
-      result.workloads[0]!.samplesMs = samples;
-      result.workloads[0]!.stat = summarize(samples);
-      return result;
-    };
+  it("gates median and p95 from raw samples, with a 0.3 ms median floor below 1 ms", () => {
     const subMillisecond = withSamples([0.5, 0.5, 0.5, 0.5, 0.5]);
     const millisecond = withSamples([1, 1, 1, 1, 1]);
-
-    expect(() =>
-      validateFormulaRegression(withSamples([0.5, 0.5, 0.5, 0.5, 3]), subMillisecond),
-    ).not.toThrow();
-    expect(() =>
-      validateFormulaRegression(withSamples([0.75, 0.75, 0.75, 0.75, 0.75]), subMillisecond),
-    ).not.toThrow();
-    expect(() =>
-      validateFormulaRegression(withSamples([0.85, 0.85, 0.85, 0.85, 0.85]), subMillisecond),
-    ).toThrow(".median regression: baseline 0.5, candidate 0.85, limit 0.8");
-
-    expect(() =>
-      validateFormulaRegression(withSamples([1.24, 1.24, 1.24, 1.24, 1.24]), millisecond),
-    ).not.toThrow();
-    expect(() =>
-      validateFormulaRegression(withSamples([1.3, 1.3, 1.3, 1.3, 1.3]), millisecond),
-    ).toThrow(".median regression: baseline 1, candidate 1.3, limit 1.25");
-    expect(() => validateFormulaRegression(withSamples([1, 1, 1, 1, 1.4]), millisecond)).toThrow(
-      ".p95 regression",
-    );
+    for (const [baseline, samples, error] of [
+      [subMillisecond, [0.5, 0.5, 0.5, 0.5, 3], null],
+      [subMillisecond, [0.75, 0.75, 0.75, 0.75, 0.75], null],
+      [
+        subMillisecond,
+        [0.85, 0.85, 0.85, 0.85, 0.85],
+        ".median regression: baseline 0.5, candidate 0.85, limit 0.8",
+      ],
+      [millisecond, [1.24, 1.24, 1.24, 1.24, 1.24], null],
+      [
+        millisecond,
+        [1.3, 1.3, 1.3, 1.3, 1.3],
+        ".median regression: baseline 1, candidate 1.3, limit 1.25",
+      ],
+      [millisecond, [1, 1, 1, 1, 1.4], ".p95 regression"],
+    ] as const) {
+      const check = () => validateFormulaRegression(withSamples([...samples]), baseline);
+      if (error === null) expect(check).not.toThrow();
+      else expect(check).toThrow(error);
+    }
   });
 
   it("gates attributed per-workload allocation and aggregate WASM allocation", () => {
     const baseline = formulaFixture("full");
-
-    const attributed = formulaFixture();
-    for (const sample of attributed.workloads[0]!.allocationSamples) sample.retainedBytes++;
-    attributed.workloads[0]!.allocationStat.retainedBytes = summarize(
-      attributed.workloads[0]!.allocationSamples.map((sample) => sample.retainedBytes),
-    );
-    expect(() => validateFormulaRegression(attributed, baseline)).toThrow(
-      ".allocation.retainedBytes.median regression",
-    );
-
-    const aggregate = formulaFixture();
-    aggregate.memory[0]!.wasmDeltaBytes++;
-    expect(() => validateFormulaRegression(aggregate, baseline)).toThrow(
-      "wasmDeltaBytes regression",
-    );
+    expectRejections(formulaFixture, (result) => validateFormulaRegression(result, baseline), [
+      [
+        "attributed",
+        (result) => {
+          const workload = firstWorkload(result);
+          for (const sample of workload.allocationSamples) sample.retainedBytes++;
+          workload.allocationStat.retainedBytes = summarize(
+            workload.allocationSamples.map((sample) => sample.retainedBytes),
+          );
+        },
+        ".allocation.retainedBytes.median regression",
+      ],
+      [
+        "aggregate",
+        (result) => must(result.memory[0], "memory").wasmDeltaBytes++,
+        "wasmDeltaBytes regression",
+      ],
+    ]);
   });
 
   it("binds a candidate to the exact baseline source provenance", () => {
     const baseline = formulaFixture("full");
     const candidate = formulaFixture();
-    (candidate.gates.regression as { baselineSourceDigest: string }).baselineSourceDigest =
-      "b".repeat(64);
-    expect(() => validateFormulaRegression(candidate, baseline)).toThrow(
-      "not bound to the supplied baseline provenance",
-    );
-    expect(() => validateFormulaCapture(candidate, baseline)).toThrow(
-      "not bound to the supplied baseline provenance",
-    );
+    Reflect.set(candidate.gates.regression, "baselineSourceDigest", "b".repeat(64));
+    const unbound = "not bound to the supplied baseline provenance";
+    expect(() => validateFormulaRegression(candidate, baseline)).toThrow(unbound);
+    expect(() => validateFormulaCapture(candidate, baseline)).toThrow(unbound);
   });
 
-  it("compares a smoke candidate with the compatible workloads in the legacy full baseline", () => {
-    const expanded = new Set([
-      "spill-filter-resize",
-      "sumproduct-vector-edit",
-      "sumproduct-matrix-edit",
-      "criteria-multi-range-edit",
-      "unicode-text-date-edit",
-      "percentile-covariance",
-      "let-reuse-edit",
-      "let-many",
-      "round-many",
-      "concat-many",
-      "offset-many",
-      "indirect-many",
-      "let-calls",
-      "iterative-finance",
-      "incremental-dependency-closure-edit",
-      "spill-sequence-admission",
-    ]);
+  it("compares a smoke candidate with the compatible workloads of a legacy full baseline", () => {
     const baseline = formulaFixture("full");
-    baseline.workloads = baseline.workloads.filter((workload) => !expanded.has(workload.id));
-    const candidate = formulaFixture("smoke");
-
-    expect(() => validateFormulaRegression(candidate, baseline)).not.toThrow();
+    // A legacy baseline predates the newer workloads; the gate compares the ones both ran.
+    baseline.workloads = baseline.workloads.slice(0, baseline.workloads.length / 2);
+    expect(() => validateFormulaRegression(formulaFixture("smoke"), baseline)).not.toThrow();
   });
 });
 
-describe("formula capture on standard output", () => {
-  it("writes one JSON capture that keys engine hashes by the loaded package", () => {
-    const child = Bun.spawnSync(
-      ["bun", "run", "src/formula-bench.ts", "--smoke", "--output", "-"],
-      {
-        cwd: new URL("..", import.meta.url).pathname,
-        env: { ...process.env, SHEETWRITE_BENCH_ENGINE: "full" },
-        stdout: "pipe",
-        stderr: "pipe",
-      },
-    );
-    if (child.exitCode !== 0) throw new Error(child.stderr.toString());
-
-    const capture = JSON.parse(child.stdout.toString()) as CompleteFormulaBenchmarkResult;
-
-    expect(capture.mode).toBe("smoke");
-    expect(Object.keys(capture.source.files)).toContain(
-      "packages/formulas/pkg/sheetwrite_wasm_bg.wasm",
-    );
-    expect(Object.keys(capture.source.files)).not.toContain(
-      "packages/wasm/pkg/sheetwrite_wasm_bg.wasm",
-    );
-    expect(() => validateFormulaCapture(capture)).not.toThrow();
+it("writes one JSON capture to standard output that keys engine hashes by the loaded package", () => {
+  const child = Bun.spawnSync(["bun", "run", "src/formula-bench.ts", "--smoke", "--output", "-"], {
+    cwd: new URL("..", import.meta.url).pathname,
+    env: { ...process.env, SHEETWRITE_BENCH_ENGINE: "full" },
+    stdout: "pipe",
+    stderr: "pipe",
   });
+  if (child.exitCode !== 0) throw new Error(child.stderr.toString());
+  const capture = JSON.parse(child.stdout.toString()) as Fixture;
+  expect(capture.mode).toBe("smoke");
+  const files = Object.keys(capture.source.files);
+  expect(files).toContain("packages/formulas/pkg/sheetwrite_wasm_bg.wasm");
+  expect(files).not.toContain("packages/wasm/pkg/sheetwrite_wasm_bg.wasm");
+  expect(() => validateFormulaCapture(capture)).not.toThrow();
 });

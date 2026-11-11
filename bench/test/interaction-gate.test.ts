@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import { coldTaskDurations, type TraceEvent } from "../src/interaction-bench.js";
 import {
@@ -15,6 +15,7 @@ import {
   validateInteractionArtifact,
 } from "../src/interaction-gate.js";
 import { summarize } from "../src/stats.js";
+import { expectRejections, type Rejection } from "./gate-fixtures.js";
 
 const TEST_COMMIT = "1".repeat(40);
 const TEST_TIMESTAMP = "2026-10-07T00:00:00.000Z";
@@ -40,295 +41,181 @@ const SMOKE_SAMPLES: InteractionSamples = {
 };
 
 function valuesOf(samples: InteractionSamples): InteractionValues {
-  return {
-    lookupMedianNs: summarize(samples.lookupMedianNs),
-    lookupP95Ns: summarize(samples.lookupP95Ns),
-    inverseIndexBytes: summarize(samples.inverseIndexBytes),
-    dirty100Bytes: summarize(samples.dirty100Bytes),
-    ownedColdLongTaskMs: summarize(samples.ownedColdLongTaskMs),
-    unattributedColdLongTaskMs: summarize(samples.unattributedColdLongTaskMs),
-    usableMs: summarize(samples.usableMs),
-  };
+  return Object.fromEntries(
+    Object.entries(samples).map(([key, values]) => [key, summarize(values)]),
+  ) as InteractionValues;
 }
 
-const TEST_RUNNER = {
-  runtime: "Bun test on linux x64",
-  browser: "Chromium test",
-  cpu: "test cpu",
-};
-
-const TEST_METHOD = {
-  lookup: "test lookup method",
-  dirty: "test dirty method",
-  coldRoute: "test cold-route method",
-  attribution: "test attribution method",
-  previous: "test previous-capture method",
-};
-
-interface FixtureEdits {
-  readonly protocolVersion?: number;
-  readonly matrixId?: string;
-  readonly mode?: string;
-  readonly rows?: number;
-  readonly metadata?: { readonly commit?: string; readonly dirty?: unknown };
-  readonly samples?: Partial<InteractionSamples>;
-  readonly values?: InteractionValues;
-  readonly ceilings?: Partial<Record<InteractionCeilingMetric, number>>;
-  readonly previous?: unknown;
-}
-
-/**
- * A valid artifact with the requested hand-edit-style changes. Values derive
- * from the samples of the same fixture, so only the edit under test can make a
- * case invalid.
- */
-function fixture(edits: FixtureEdits = {}): unknown {
-  const samples: InteractionSamples = { ...FULL_SAMPLES, ...edits.samples };
+/** A valid full artifact as a writable record; values derive from its own samples. */
+function fixture(samples: InteractionSamples = FULL_SAMPLES) {
   return {
-    protocolVersion: edits.protocolVersion ?? INTERACTION_PROTOCOL_VERSION,
-    matrixId: edits.matrixId ?? INTERACTION_MATRIX_ID,
-    mode: edits.mode ?? "full",
+    protocolVersion: INTERACTION_PROTOCOL_VERSION as number,
+    matrixId: INTERACTION_MATRIX_ID as string,
+    mode: "full" as string,
     metadata: {
-      commit: edits.metadata?.commit ?? TEST_COMMIT,
-      dirty: edits.metadata?.dirty ?? false,
+      commit: TEST_COMMIT,
+      dirty: false as unknown,
       timestamp: TEST_TIMESTAMP,
-      engineVersions: { sheetwrite: "0.4.0" },
+      engineVersions: { sheetwrite: "0.4.0" as string | undefined },
     },
-    runner: TEST_RUNNER,
-    method: TEST_METHOD,
-    rows: edits.rows ?? INTERACTION_ROWS,
+    runner: { runtime: "Bun test on linux x64", browser: "Chromium test", cpu: "test cpu" },
+    method: {
+      lookup: "test lookup method",
+      dirty: "test dirty method",
+      coldRoute: "test cold-route method",
+      attribution: "test attribution method",
+      previous: "test previous-capture method",
+    },
+    rows: INTERACTION_ROWS as number,
     lookupsPerRun: INTERACTION_LOOKUPS_PER_RUN,
     samples,
-    values: edits.values ?? valuesOf(samples),
-    previous: edits.previous === undefined ? null : edits.previous,
-    ceilings: { ...INTERACTION_CEILINGS, ...edits.ceilings },
+    values: valuesOf(samples),
+    previous: null as unknown,
+    ceilings: { ...INTERACTION_CEILINGS },
   };
 }
+type Fixture = ReturnType<typeof fixture>;
 
-/** The base samples of `key`, three of them just above the ceiling. */
-function aboveCeiling(key: InteractionCeilingMetric): Partial<InteractionSamples> {
-  const samples = [...FULL_SAMPLES[key]];
-  for (const index of [0, 1, 2]) samples[index] = INTERACTION_CEILINGS[key] + 1;
-  return { [key]: samples };
-}
+const PREVIOUS = {
+  matrixId: INTERACTION_MATRIX_ID,
+  mode: "full",
+  commit: TEST_COMMIT,
+  timestamp: TEST_TIMESTAMP,
+  values: valuesOf(FULL_SAMPLES),
+};
 
-describe("interaction performance artifact", () => {
-  test("accepts a full capture and a smoke rehearsal of the published schema", () => {
-    expect(() => validateInteractionArtifact(fixture())).not.toThrow();
-    expect(() =>
-      validateInteractionArtifact(fixture({ mode: "smoke", samples: SMOKE_SAMPLES })),
-    ).not.toThrow();
-    const previous = fixture({
-      previous: {
-        matrixId: INTERACTION_MATRIX_ID,
-        mode: "full",
-        commit: TEST_COMMIT,
-        timestamp: TEST_TIMESTAMP,
-        values: valuesOf(FULL_SAMPLES),
-      },
-    });
-    const artifact = validateInteractionArtifact(previous);
-    expect(artifact.previous?.commit).toBe(TEST_COMMIT);
-    expect(artifact.values.usableMs.median).toBe(220);
-  });
-
-  test("rejects a different protocol, matrix, mode, or workload", () => {
-    expect(() => validateInteractionArtifact(fixture({ protocolVersion: 3 }))).toThrow(
-      "stale protocol: expected 2",
-    );
-    expect(() => validateInteractionArtifact(fixture({ matrixId: "interaction-full-v1" }))).toThrow(
-      "stale matrix",
-    );
-    expect(() => validateInteractionArtifact(fixture({ mode: "rehearsal" }))).toThrow(
-      "must be full or smoke",
-    );
-    expect(() => validateInteractionArtifact(fixture({ mode: "smoke" }))).toThrow(
-      "lookupMedianNs requires 2 raw samples",
-    );
-    expect(() =>
-      validateInteractionArtifact(fixture({ mode: "smoke", samples: SMOKE_SAMPLES, rows: 1_000 })),
-    ).toThrow("workload changed");
-  });
-
-  test("requires the measured Sheetwrite semantic version", () => {
-    const valid = validateInteractionArtifact(fixture());
-    for (const version of [undefined, "", "0.4", "^0.4.0"]) {
-      expect(() =>
-        validateInteractionArtifact({
-          ...valid,
-          metadata: { ...valid.metadata, engineVersions: { sheetwrite: version } },
-        }),
-      ).toThrow("engineVersions.sheetwrite");
-    }
-  });
-
-  test("rejects incomplete or dirty capture provenance", () => {
-    expect(() => validateInteractionArtifact(fixture({ metadata: { commit: "" } }))).toThrow(
-      "metadata.commit must be a non-empty string",
-    );
-    expect(() => validateInteractionArtifact(fixture({ metadata: { dirty: "false" } }))).toThrow(
-      "metadata.dirty must be a boolean",
-    );
-  });
-
-  test("rejects a value that is not the summary of its samples", () => {
-    const values = valuesOf(FULL_SAMPLES);
-    const notDerived = {
-      ...values,
-      // Internally consistent, but not the summary of the samples above.
-      lookupMedianNs: { median: 40, p95: 45, mean: 40, stddev: 2, min: 38, max: 45, iters: 5 },
-    };
-    expect(() => validateInteractionArtifact(fixture({ values: notDerived }))).toThrow(
-      "values.lookupMedianNs.stat.median does not match raw samples",
-    );
-  });
-
-  test("rejects a sample above any release ceiling", () => {
-    for (const key of INTERACTION_SAMPLE_CEILING_KEYS) {
-      expect(() => validateInteractionArtifact(fixture({ samples: aboveCeiling(key) }))).toThrow(
-        `${key} sample ${INTERACTION_CEILINGS[key] + 1} exceeds the release ceiling`,
-      );
-    }
-    expect(() =>
-      validateInteractionArtifact(fixture({ samples: aboveCeiling("lookupP95Ns") })),
-    ).toThrow(
-      `lookupP95Ns median ${INTERACTION_CEILINGS.lookupP95Ns + 1} exceeds the release ceiling`,
-    );
-  });
-
-  test("rejects a weakened release ceiling", () => {
-    for (const key of INTERACTION_CEILING_KEYS) {
-      expect(() =>
-        validateInteractionArtifact(
-          fixture({ ceilings: { [key]: INTERACTION_CEILINGS[key] * 2 } }),
-        ),
-      ).toThrow(`ceilings.${key} is not the release ceiling`);
-    }
-  });
-
-  test("rejects a previous capture of another schema", () => {
-    expect(() =>
-      validateInteractionArtifact(
-        fixture({
-          previous: {
-            matrixId: "interaction-full-v1",
-            mode: "full",
-            commit: TEST_COMMIT,
-            timestamp: TEST_TIMESTAMP,
-            values: valuesOf(FULL_SAMPLES),
-          },
-        }),
-      ),
-    ).toThrow("previous must be a capture of the same schema");
-  });
+test("accepts a full capture, its smoke rehearsal and a previous capture", () => {
+  const smoke = { ...fixture(SMOKE_SAMPLES), mode: "smoke" };
+  expect(() => validateInteractionArtifact(smoke)).not.toThrow();
+  const artifact = validateInteractionArtifact({ ...fixture(), previous: PREVIOUS });
+  expect(artifact.previous?.commit).toBe(TEST_COMMIT);
+  expect(artifact.values.usableMs.median).toBe(220);
 });
 
-function task(ts: number, durationMs: number, overrides: Partial<TraceEvent> = {}): TraceEvent {
-  return {
-    name: "RunTask",
-    ph: "X",
-    ts,
-    dur: durationMs * 1_000,
-    pid: 1,
-    tid: 1,
-    url: undefined,
-    profile: undefined,
-    ...overrides,
+test("rejects drifted identity, provenance, values, ceilings and previous captures", () => {
+  const aboveCeiling = (key: InteractionCeilingMetric) => (artifact: Fixture) => {
+    const samples = [...FULL_SAMPLES[key]];
+    samples.fill(INTERACTION_CEILINGS[key] + 1, 0, 3);
+    artifact.samples = { ...FULL_SAMPLES, [key]: samples };
+    artifact.values = valuesOf(artifact.samples);
   };
-}
+  const rejections: Rejection<Fixture>[] = [
+    ["protocol", (artifact) => (artifact.protocolVersion = 3), "stale protocol: expected 2"],
+    ["matrix", (artifact) => (artifact.matrixId = "interaction-full-v1"), "stale matrix"],
+    ["mode", (artifact) => (artifact.mode = "rehearsal"), "must be full or smoke"],
+    [
+      "smoke size",
+      (artifact) => (artifact.mode = "smoke"),
+      "lookupMedianNs requires 2 raw samples",
+    ],
+    ["workload", (artifact) => (artifact.rows = 1_000), "workload changed"],
+    [
+      "version",
+      (artifact) => (artifact.metadata.engineVersions.sheetwrite = "0.4"),
+      "engineVersions.sheetwrite",
+    ],
+    [
+      "commit",
+      (artifact) => (artifact.metadata.commit = ""),
+      "metadata.commit must be a non-empty",
+    ],
+    [
+      "dirty",
+      (artifact) => (artifact.metadata.dirty = "false"),
+      "metadata.dirty must be a boolean",
+    ],
+    [
+      "values",
+      (artifact) => (artifact.values = { ...artifact.values, lookupMedianNs: summarize([40, 45]) }),
+      "values.lookupMedianNs.stat.median does not match raw samples",
+    ],
+    [
+      "lookup median",
+      aboveCeiling("lookupP95Ns"),
+      `lookupP95Ns median ${INTERACTION_CEILINGS.lookupP95Ns + 1} exceeds the release ceiling`,
+    ],
+    ...INTERACTION_SAMPLE_CEILING_KEYS.map((key): Rejection<Fixture> => [
+      `${key} sample`,
+      aboveCeiling(key),
+      `${key} sample ${INTERACTION_CEILINGS[key] + 1} exceeds the release ceiling`,
+    ]),
+    ...INTERACTION_CEILING_KEYS.map((key): Rejection<Fixture> => [
+      `${key} ceiling`,
+      (artifact) => (artifact.ceilings[key] = INTERACTION_CEILINGS[key] * 2),
+      `ceilings.${key} is not the release ceiling`,
+    ]),
+    [
+      "previous schema",
+      (artifact) => (artifact.previous = { ...PREVIOUS, matrixId: "interaction-full-v1" }),
+      "previous must be a capture of the same schema",
+    ],
+  ];
+  expectRejections(fixture, validateInteractionArtifact, rejections);
+});
 
 const PACKAGE_URL = "http://127.0.0.1:5197/@fs/repo/packages/core/dist/canvas-paint.js";
 const SHELL_URL = "http://127.0.0.1:5197/node_modules/.vite/deps/react-dom_client.js";
 const PROFILE_INTERVAL_US = 1_000;
+const MS_US = 1_000;
 
-function profileEvent(startUs: number, urls: readonly string[]): TraceEvent {
+function task(startMs: number, durationMs: number): TraceEvent {
+  const event = { name: "RunTask", ph: "X", ts: startMs * MS_US, dur: durationMs * MS_US };
+  return { ...event, pid: 1, tid: 1, url: undefined, profile: undefined };
+}
+
+/** `count` profiled samples of one URL, one millisecond apart from `startMs`. */
+function samples(startMs: number, url: string, count: number, tid = 1): TraceEvent {
   const nodes = [
     { id: 1, url: PACKAGE_URL },
     { id: 2, url: SHELL_URL },
-    { id: 3, url: undefined },
   ];
-  const nodeIdOf = (url: string): number => (url === PACKAGE_URL ? 1 : url === SHELL_URL ? 2 : 3);
-  return {
-    name: "ProfileChunk",
-    ph: "P",
-    ts: startUs,
-    dur: undefined,
-    pid: 1,
-    tid: 1,
-    url: undefined,
-    profile: {
-      startTime: startUs,
-      nodes,
-      samples: urls.map(nodeIdOf),
-      timeDeltas: urls.map((_, index) => (index === 0 ? 0 : PROFILE_INTERVAL_US)),
-    },
-  };
-}
-
-/** `count` profiled samples of one URL, one millisecond apart from `ts`. */
-function scriptSamples(
-  ts: number,
-  url: string,
-  count: number,
-  overrides: Partial<TraceEvent> = {},
-): TraceEvent {
-  return {
-    ...profileEvent(
-      ts,
-      Array.from({ length: count }, () => url),
+  const profile = {
+    startTime: startMs * MS_US,
+    nodes,
+    samples: Array.from({ length: count }, () => (url === PACKAGE_URL ? 1 : 2)),
+    timeDeltas: Array.from({ length: count }, (_, index) =>
+      index === 0 ? 0 : PROFILE_INTERVAL_US,
     ),
-    ...overrides,
   };
+  const event = { name: "ProfileChunk", ph: "P", ts: startMs * MS_US, dur: undefined };
+  return { ...event, pid: 1, tid, url: undefined, profile };
 }
 
-describe("cold-route long-task attribution", () => {
-  test("charges a long task that mostly runs package frames to Sheetwrite", () => {
-    const events = [
-      task(0, 60),
-      scriptSamples(1_000, PACKAGE_URL, 50),
-      scriptSamples(51_000, SHELL_URL, 5),
-    ];
-    expect(coldTaskDurations(events)).toEqual({ ownedMs: 60, unattributedMs: 0 });
-  });
-
-  test("reports a long task that mostly runs other code as unattributed", () => {
-    const events = [
-      task(0, 60),
-      scriptSamples(1_000, PACKAGE_URL, 20),
-      scriptSamples(21_000, SHELL_URL, 40),
-    ];
-    expect(coldTaskDurations(events)).toEqual({ ownedMs: 0, unattributedMs: 60 });
-  });
-
-  test("reports a long task the profile does not cover as unattributed", () => {
-    expect(coldTaskDurations([task(0, 60)])).toEqual({ ownedMs: 0, unattributedMs: 60 });
-  });
-
-  test("ignores tasks below the long-task threshold", () => {
-    expect(coldTaskDurations([task(0, 49), scriptSamples(1_000, PACKAGE_URL, 60)])).toEqual({
-      ownedMs: 0,
-      unattributedMs: 0,
-    });
-  });
-
-  test("does not attribute samples of another thread or outside the task window", () => {
-    const otherThread = scriptSamples(1_000, PACKAGE_URL, 50, { tid: 2 });
-    const afterTask = scriptSamples(90_000, PACKAGE_URL, 50);
-    expect(coldTaskDurations([task(0, 60), otherThread, afterTask])).toEqual({
-      ownedMs: 0,
-      unattributedMs: 60,
-    });
-  });
-
-  test("reports the longest owned and unattributed task of a sample", () => {
-    const events = [
-      task(0, 55),
-      scriptSamples(1_000, PACKAGE_URL, 50),
-      task(200_000, 70),
-      scriptSamples(201_000, PACKAGE_URL, 65),
-      task(400_000, 80),
-      scriptSamples(401_000, SHELL_URL, 75),
-    ];
-    expect(coldTaskDurations(events)).toEqual({ ownedMs: 70, unattributedMs: 80 });
-  });
+test.each([
+  [
+    "charges a long task that mostly runs package frames to Sheetwrite",
+    [task(0, 60), samples(1, PACKAGE_URL, 50), samples(51, SHELL_URL, 5)],
+    { ownedMs: 60, unattributedMs: 0 },
+  ],
+  [
+    "reports a long task that mostly runs other code as unattributed",
+    [task(0, 60), samples(1, PACKAGE_URL, 20), samples(21, SHELL_URL, 40)],
+    { ownedMs: 0, unattributedMs: 60 },
+  ],
+  [
+    "reports a long task the profile does not cover as unattributed",
+    [task(0, 60)],
+    { ownedMs: 0, unattributedMs: 60 },
+  ],
+  [
+    "ignores tasks below the long-task threshold",
+    [task(0, 49), samples(1, PACKAGE_URL, 60)],
+    { ownedMs: 0, unattributedMs: 0 },
+  ],
+  [
+    "does not attribute samples of another thread or outside the task window",
+    [task(0, 60), samples(1, PACKAGE_URL, 50, 2), samples(90, PACKAGE_URL, 50)],
+    { ownedMs: 0, unattributedMs: 60 },
+  ],
+  [
+    "reports the longest owned and unattributed task of a sample",
+    [
+      ...[task(0, 55), samples(1, PACKAGE_URL, 50)],
+      ...[task(200, 70), samples(201, PACKAGE_URL, 65)],
+      ...[task(400, 80), samples(401, SHELL_URL, 75)],
+    ],
+    { ownedMs: 70, unattributedMs: 80 },
+  ],
+])("%s", (_name, events, expected) => {
+  expect(coldTaskDurations(events)).toEqual(expected);
 });

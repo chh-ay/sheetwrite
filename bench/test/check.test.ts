@@ -1,9 +1,13 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, spyOn, test } from "bun:test";
 import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { CONTROLLED_SAMPLING_FINGERPRINT, compareControlledRender } from "../src/check.js";
+import {
+  CONTROLLED_SAMPLING_FINGERPRINT,
+  compareControlledRender,
+  runCheck,
+} from "../src/check.js";
 import {
   buildControlledBaseline,
   CONTROLLED_COMPARISON_POLICY,
@@ -13,17 +17,21 @@ import {
 } from "../src/controlled-baseline.js";
 import { computeHarnessFingerprint, MATRIX_IDS } from "../src/gate-protocol.js";
 import {
-  type FailedScenario,
-  type RenderBenchmarkArtifact,
-  summarizeCompleteness,
-} from "../src/render-protocol.js";
-import { makeRenderArtifact, TEST_HARNESS, TEST_RUNNER } from "./gate-fixtures.js";
+  type DeepMutable,
+  expectRejections,
+  makeRenderArtifact,
+  must,
+  mutableCopy,
+  TEST_HARNESS,
+  TEST_RUNNER,
+} from "./gate-fixtures.js";
 
 const REPOSITORY_ROOT = resolve(import.meta.dir, "../..");
+const ROUNDS = 10;
 
 function baselineFixture(): ControlledRenderBaseline {
   return buildControlledBaseline(
-    makeRenderArtifact({ rounds: 10 }),
+    makeRenderArtifact({ rounds: ROUNDS }),
     TEST_HARNESS,
     TEST_RUNNER,
     "bench/results/render-results.json",
@@ -31,102 +39,80 @@ function baselineFixture(): ControlledRenderBaseline {
   );
 }
 
+function compare(samples: (round: number) => number, overrides: { rounds?: number } = {}) {
+  return compareControlledRender({
+    baseline: baselineFixture(),
+    fresh: makeRenderArtifact({
+      rounds: overrides.rounds ?? ROUNDS,
+      samples: (round) => [samples(round), samples(round), samples(round)],
+    }),
+    harness: TEST_HARNESS,
+    runner: TEST_RUNNER,
+  });
+}
+
 describe("controlled zero-regression comparison", () => {
-  test("uses every repeated sample, so one lucky round cannot mask a material slowdown", () => {
-    const rows = compareControlledRender({
-      baseline: baselineFixture(),
-      fresh: makeRenderArtifact({
-        rounds: 10,
-        samples: (round) => Array.from({ length: 3 }, () => (round === 1 ? 1 : 20)),
-      }),
-      harness: TEST_HARNESS,
-      runner: TEST_RUNNER,
-    });
+  test("uses every repeated sample, so one lucky round cannot mask a slowdown", () => {
+    const rows = compare((round) => (round === 1 ? 1 : 20));
     expect(rows.every((row) => row.freshMedian === 20 && row.regression)).toBe(true);
   });
 
-  test("uses a zero slowdown threshold while reproducible equality and improvement pass", () => {
-    const baseline = baselineFixture();
-    const unchanged = compareControlledRender({
-      baseline,
-      fresh: makeRenderArtifact({ rounds: 10, samples: () => [10, 10, 10] }),
-      harness: TEST_HARNESS,
-      runner: TEST_RUNNER,
-    });
-    expect(unchanged.every((row) => !row.regression && row.lowerConfidenceBoundMs === 0)).toBe(
-      true,
-    );
-
-    const improved = compareControlledRender({
-      baseline,
-      fresh: makeRenderArtifact({ rounds: 10, samples: () => [9, 9, 9] }),
-      harness: TEST_HARNESS,
-      runner: TEST_RUNNER,
-    });
-    expect(improved.every((row) => !row.regression && row.lowerConfidenceBoundMs === -1)).toBe(
-      true,
-    );
-
-    const slowed = compareControlledRender({
-      baseline,
-      fresh: makeRenderArtifact({ rounds: 10, samples: () => [10.01, 10.01, 10.01] }),
-      harness: TEST_HARNESS,
-      runner: TEST_RUNNER,
-    });
-    expect(slowed.every((row) => row.regression && row.lowerConfidenceBoundMs > 0)).toBe(true);
+  test("passes equality and improvement and fails any reproducible slowdown", () => {
+    const cases: [sampleMs: number, isRegression: boolean, lowerBound?: number][] = [
+      [10, false, 0],
+      [9, false, -1],
+      [10.01, true],
+    ];
+    for (const [sampleMs, isRegression, lowerBound] of cases) {
+      for (const row of compare(() => sampleMs)) {
+        expect(row.regression).toBe(isRegression);
+        if (lowerBound === undefined) expect(row.lowerConfidenceBoundMs).toBeGreaterThan(0);
+        else expect(row.lowerConfidenceBoundMs).toBe(lowerBound);
+      }
+    }
   });
 
-  test("fails closed on missing or mismatched runner metadata and incomplete fresh sampling", () => {
-    const baseline = baselineFixture();
+  test("fails closed on an unmatched runner or a different number of rounds", () => {
     expect(() =>
       compareControlledRender({
-        baseline,
-        fresh: makeRenderArtifact({ rounds: 10 }),
+        baseline: baselineFixture(),
+        fresh: makeRenderArtifact({ rounds: ROUNDS }),
         harness: TEST_HARNESS,
         runner: { ...TEST_RUNNER, cpu: "different cpu" },
       }),
     ).toThrow("uncontrolled/unmatched runner");
-    const missingRunner = structuredClone(baseline) as unknown as {
-      runner: { cpu?: string };
-    };
-    delete missingRunner.runner.cpu;
-    expect(() => parseControlledBaseline(missingRunner)).toThrow("missing cpu");
-    expect(() =>
-      compareControlledRender({
-        baseline,
-        fresh: makeRenderArtifact({ rounds: 9 }),
-        harness: TEST_HARNESS,
-        runner: TEST_RUNNER,
-      }),
-    ).toThrow("fresh rounds must match baseline");
+    expect(() => compare(() => 10, { rounds: ROUNDS - 1 })).toThrow(
+      "fresh rounds must match baseline",
+    );
   });
 
-  test("rejects missing raw samples and any attempt to raise the fixed threshold", () => {
-    const missingSamples = structuredClone(baselineFixture()) as unknown as {
-      cells: Array<{ samplesMs?: number[] }>;
-    };
-    delete missingSamples.cells[0]!.samplesMs;
-    expect(() => parseControlledBaseline(missingSamples)).toThrow("samplesMs");
-
-    const raised = structuredClone(baselineFixture()) as unknown as {
-      comparison: { maximumRegressionMs: number };
-    };
-    raised.comparison.maximumRegressionMs = 1;
-    expect(() => parseControlledBaseline(raised)).toThrow(
-      `maximumRegressionMs must be ${CONTROLLED_COMPARISON_POLICY.maximumRegressionMs}`,
-    );
-
-    const injectedLegacyFloor = structuredClone(baselineFixture()) as unknown as {
-      cells: Array<Record<string, unknown>>;
-    };
-    injectedLegacyFloor.cells[0]!.absoluteFloorMs = 100;
-    expect(() => parseControlledBaseline(injectedLegacyFloor)).toThrow(
-      "unexpected absoluteFloorMs",
+  test("rejects a baseline without runner or raw samples, or with a raised threshold", () => {
+    expectRejections<DeepMutable<ControlledRenderBaseline>>(
+      () => mutableCopy(baselineFixture()),
+      parseControlledBaseline,
+      [
+        ["runner cpu", (baseline) => Reflect.deleteProperty(baseline.runner, "cpu"), "missing cpu"],
+        [
+          "raw samples",
+          (baseline) => Reflect.deleteProperty(must(baseline.cells[0], "cell"), "samplesMs"),
+          "samplesMs",
+        ],
+        [
+          "threshold",
+          (baseline) => Reflect.set(baseline.comparison, "maximumRegressionMs", 1),
+          `maximumRegressionMs must be ${CONTROLLED_COMPARISON_POLICY.maximumRegressionMs}`,
+        ],
+        [
+          "legacy floor",
+          (baseline) => Reflect.set(must(baseline.cells[0], "cell"), "absoluteFloorMs", 100),
+          "unexpected absoluteFloorMs",
+        ],
+      ],
     );
   });
 });
 
-describe("strict benchmark check CLI", () => {
+describe("strict benchmark check command", () => {
   let directory = "";
   let baselinePath = "";
   let rawPath = "";
@@ -136,22 +122,15 @@ describe("strict benchmark check CLI", () => {
     const candidateRoot = resolve(REPOSITORY_ROOT, "bench/results/candidates");
     mkdirSync(candidateRoot, { recursive: true });
     directory = mkdtempSync(resolve(candidateRoot, "check-"));
-    const git = Bun.spawnSync(["git", "rev-parse", "HEAD"], {
-      cwd: REPOSITORY_ROOT,
-      stdout: "pipe",
-    });
-    head = git.stdout.toString().trim();
-    const rawBaseline = makeRenderArtifact({ rounds: 10, commit: head });
+    head = Bun.spawnSync(["git", "rev-parse", "HEAD"], { cwd: REPOSITORY_ROOT })
+      .stdout.toString()
+      .trim();
+    const rawBytes = `${JSON.stringify(makeRenderArtifact({ rounds: ROUNDS, commit: head }), null, 2)}\n`;
     rawPath = resolve(directory, "raw.json");
-    const rawBytes = `${JSON.stringify(rawBaseline, null, 2)}\n`;
     writeFileSync(rawPath, rawBytes);
-    const harness = computeHarnessFingerprint(
-      MATRIX_IDS.render.full,
-      CONTROLLED_SAMPLING_FINGERPRINT,
-    );
     const baseline = buildControlledBaseline(
-      rawBaseline,
-      harness,
+      makeRenderArtifact({ rounds: ROUNDS, commit: head }),
+      computeHarnessFingerprint(MATRIX_IDS.render.full, CONTROLLED_SAMPLING_FINGERPRINT),
       TEST_RUNNER,
       relative(REPOSITORY_ROOT, rawPath),
       createHash("sha256").update(rawBytes).digest("hex"),
@@ -162,14 +141,28 @@ describe("strict benchmark check CLI", () => {
 
   afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
-  function runCli(freshContent: string, extraArgs: readonly string[] = []) {
+  function freshJson(sampleMs = 10, timestamp = new Date().toISOString()): string {
+    const fresh = makeRenderArtifact({
+      rounds: ROUNDS,
+      commit: head,
+      timestamp,
+      samples: () => [sampleMs, sampleMs, sampleMs],
+    });
+    return JSON.stringify(fresh);
+  }
+
+  async function check(fresh: string, extraArgs: readonly string[] = []) {
     const freshPath = resolve(directory, `fresh-${crypto.randomUUID()}.json`);
-    writeFileSync(freshPath, freshContent);
-    return Bun.spawnSync(
-      [
-        "bun",
-        "run",
-        resolve(import.meta.dir, "../src/check.ts"),
+    writeFileSync(freshPath, fresh);
+    const stderr: string[] = [];
+    const write = spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      stderr.push(String(chunk));
+      return true;
+    });
+    // The comparison table goes to standard output; the verdict goes to standard error.
+    const table = spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const exitCode = await runCheck([
         "--baseline",
         baselinePath,
         "--fresh",
@@ -179,96 +172,46 @@ describe("strict benchmark check CLI", () => {
         "--concurrency",
         String(TEST_RUNNER.concurrency),
         ...extraArgs,
-      ],
-      { cwd: REPOSITORY_ROOT, stdout: "pipe", stderr: "pipe" },
-    );
+      ]);
+      return { exitCode, stderr: stderr.join("") };
+    } finally {
+      write.mockRestore();
+      table.mockRestore();
+    }
   }
 
-  function freshArtifact(samples = 10): RenderBenchmarkArtifact {
-    return makeRenderArtifact({
-      rounds: 10,
-      commit: head,
-      timestamp: new Date().toISOString(),
-      samples: () => [samples, samples, samples],
-    });
-  }
-
-  test("fails malformed, incomplete, stale, and materially slower artifacts", () => {
-    expect(runCli("{broken").exitCode).not.toBe(0);
-
-    const missingBase = freshArtifact();
-    const missingResults = missingBase.results.slice(1);
-    const missing = {
-      ...missingBase,
-      results: missingResults,
-      completeness: summarizeCompleteness(
-        missingBase.config,
-        missingBase.metadata.rounds,
-        missingResults,
-      ),
-    };
-    expect(runCli(JSON.stringify(missing)).exitCode).not.toBe(0);
-
-    const failedBase = freshArtifact();
-    const source = failedBase.results[0]!;
-    const failedCell: FailedScenario = {
-      runId: source.runId,
-      round: source.round,
-      engine: source.engine,
-      rows: source.rows,
-      scenarioId: source.scenarioId,
-      group: source.group,
-      status: "failed",
-      stage: "measure",
-      errorClass: "Error",
-      message: "crashed",
-      timeout: false,
-      crash: true,
-      consoleErrors: [],
-      pageErrors: [],
-      partialSamples: [],
-      validation: [],
-      memory: { beforeBytes: null, afterBytes: null, deltaBytes: null },
-    };
-    const failedResults = [failedCell, ...failedBase.results.slice(1)];
-    const failed = {
-      ...failedBase,
-      results: failedResults,
-      completeness: summarizeCompleteness(
-        failedBase.config,
-        failedBase.metadata.rounds,
-        failedResults,
-      ),
-    };
-    expect(runCli(JSON.stringify(failed)).exitCode).not.toBe(0);
-
-    const staleBase = freshArtifact();
-    const stale = {
-      ...staleBase,
-      metadata: { ...staleBase.metadata, timestamp: "2020-01-01T00:00:00.000Z" },
-    };
-    expect(runCli(JSON.stringify(stale)).exitCode).not.toBe(0);
-    expect(runCli(JSON.stringify(freshArtifact(10.01))).exitCode).not.toBe(0);
+  test("passes a complete matched result and fails malformed, stale or slower results", async () => {
+    const passing = await check(freshJson());
+    expect(passing.exitCode, passing.stderr).toBe(0);
+    expect(passing.stderr).toContain("no statistically detected regression");
+    for (const [fresh, verdict] of [
+      ["{broken", "performance gate invalid"],
+      [freshJson(10, "2020-01-01T00:00:00.000Z"), "stale render result timestamp"],
+      [freshJson(10.01), "statistically significant slowdown"],
+    ] as const) {
+      const failing = await check(fresh);
+      expect(failing.exitCode).toBe(1);
+      expect(failing.stderr).toContain(verdict);
+    }
   });
 
-  test("fails when checked-in raw provenance is missing or checksum-mismatched", () => {
-    const original = readFileSync(rawPath, "utf8");
-    rmSync(rawPath);
-    expect(runCli(JSON.stringify(freshArtifact())).exitCode).not.toBe(0);
-    writeFileSync(rawPath, `${original} `);
-    const mismatch = runCli(JSON.stringify(freshArtifact()));
-
-    expect(mismatch.exitCode).not.toBe(0);
-    expect(mismatch.stderr.toString()).toContain("checksum mismatch");
-    writeFileSync(rawPath, original);
-  });
-  test("passes a complete matched result and keeps report-only explicitly non-gating", () => {
-    const passing = runCli(JSON.stringify(freshArtifact()));
-    expect(passing.exitCode, passing.stderr.toString()).toBe(0);
-    expect(passing.stderr.toString()).toContain("no statistically detected regression");
-
-    const diagnostic = runCli("{broken", ["--report-only"]);
+  test("keeps report-only explicitly non-gating", async () => {
+    const diagnostic = await check("{broken", ["--report-only"]);
     expect(diagnostic.exitCode).toBe(0);
-    expect(diagnostic.stderr.toString()).toContain("REPORT ONLY — NON-GATING");
+    expect(diagnostic.stderr).toContain("REPORT ONLY — NON-GATING");
+  });
+
+  test("fails when checked-in raw provenance is missing or checksum-mismatched", async () => {
+    const original = readFileSync(rawPath, "utf8");
+    try {
+      rmSync(rawPath);
+      expect((await check(freshJson())).exitCode).toBe(1);
+      writeFileSync(rawPath, `${original} `);
+      const mismatch = await check(freshJson());
+      expect(mismatch.exitCode).toBe(1);
+      expect(mismatch.stderr).toContain("checksum mismatch");
+    } finally {
+      writeFileSync(rawPath, original);
+    }
   });
 });

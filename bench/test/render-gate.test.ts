@@ -1,154 +1,84 @@
-import { describe, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 
 import { validateRenderGateArtifact } from "../src/render-gate.js";
 import {
-  type FailedScenario,
   parseRenderArtifact,
+  type RenderBenchmarkArtifact,
   summarizeCompleteness,
 } from "../src/render-protocol.js";
-import { makeRenderArtifact } from "./gate-fixtures.js";
+import {
+  type DeepMutable,
+  expectRejections,
+  makeRenderArtifact,
+  makeSmokeRenderArtifact,
+  must,
+  mutableCopy,
+  withFailedFirstCell,
+} from "./gate-fixtures.js";
 
-describe("render deterministic gate", () => {
-  test("accepts exact full and smoke matrices while keeping them distinct", () => {
-    const full = makeRenderArtifact();
-    const smoke = makeRenderArtifact({
-      rounds: 1,
-      engines: ["sheetwrite"],
-      rows: [200],
-      measuredSamples: 1,
-    });
-    expect(() => validateRenderGateArtifact(full, "full")).not.toThrow();
-    expect(() => validateRenderGateArtifact(smoke, "smoke")).not.toThrow();
-    expect(() => validateRenderGateArtifact(smoke, "full")).toThrow("render-full-v1 configuration");
-  });
+type Artifact = DeepMutable<RenderBenchmarkArtifact>;
 
-  test("rejects corrupted controlled dataset, order, and launch metadata", () => {
-    const source = makeRenderArtifact({
-      rounds: 1,
-      engines: ["sheetwrite"],
-      rows: [200],
-      measuredSamples: 1,
-    });
-    const wrongDataset = {
-      ...source,
-      metadata: {
-        ...source.metadata,
-        datasetHashes: { "200": "fnv1a32:corrupt" },
-      },
-    };
-    expect(() => validateRenderGateArtifact(wrongDataset, "smoke")).toThrow(
-      "metadata does not match the controlled dataset/run policy",
-    );
+const GIB = 1024 * 1024 * 1024;
 
-    const wrongOrder = {
-      ...source,
-      metadata: { ...source.metadata, orderSeed: 1 },
-    };
-    expect(() => validateRenderGateArtifact(wrongOrder, "smoke")).toThrow(
-      "metadata does not match the controlled dataset/run policy",
-    );
+function firstCellMemory(
+  beforeBytes: number | null,
+  afterBytes: number | null,
+  deltaBytes: number | null,
+) {
+  return (artifact: Artifact) => {
+    const first = must(artifact.results[0], "first cell");
+    first.memory = { beforeBytes, afterBytes, deltaBytes };
+  };
+}
 
-    const unexpectedLaunch = {
-      ...source,
-      metadata: {
-        ...source.metadata,
-        launchAttempts: [
-          ...source.metadata.launchAttempts,
-          { ...source.metadata.launchAttempts[0]!, rows: 201 },
-        ],
-      },
-    };
-    expect(() => validateRenderGateArtifact(unexpectedLaunch, "smoke")).toThrow(
-      "unexpected browser launch attempt",
-    );
-  });
+test("accepts the exact full and smoke matrices and keeps them distinct", () => {
+  expect(() => validateRenderGateArtifact(makeRenderArtifact(), "full")).not.toThrow();
+  expect(() => validateRenderGateArtifact(makeSmokeRenderArtifact(), "smoke")).not.toThrow();
+  expect(() => validateRenderGateArtifact(makeSmokeRenderArtifact(), "full")).toThrow(
+    "render-full-v1 configuration",
+  );
+});
 
-  test("preserves typed crash evidence but fails the gate closed", () => {
-    const artifact = makeRenderArtifact({
-      rounds: 1,
-      engines: ["sheetwrite"],
-      rows: [200],
-      measuredSamples: 1,
-    });
-    const source = artifact.results[0]!;
-    const failure: FailedScenario = {
-      runId: source.runId,
-      round: source.round,
-      engine: source.engine,
-      rows: source.rows,
-      scenarioId: source.scenarioId,
-      group: source.group,
-      status: "failed",
-      stage: "launch",
-      errorClass: "BrowserCrash",
-      message: "browser crashed",
-      timeout: false,
-      crash: true,
-      consoleErrors: [],
-      pageErrors: [],
-      partialSamples: [],
-      validation: [],
-      memory: { beforeBytes: null, afterBytes: null, deltaBytes: null },
-    };
-    const failed = {
-      ...artifact,
-      results: [failure, ...artifact.results.slice(1)],
-    };
-    failed.completeness = summarizeCompleteness(
-      failed.config,
-      failed.metadata.rounds,
-      failed.results,
-    );
-    expect(parseRenderArtifact(failed).completeness.failedKeys).toHaveLength(1);
-    expect(() => validateRenderGateArtifact(failed, "smoke")).toThrow("contains failed cells");
-  });
+test("keeps typed crash evidence but fails the gate closed", () => {
+  const failed = withFailedFirstCell(makeSmokeRenderArtifact(), { stage: "launch" });
+  expect(parseRenderArtifact(failed).completeness.failedKeys).toHaveLength(1);
+  expect(() => validateRenderGateArtifact(failed, "smoke")).toThrow("contains failed cells");
+});
 
-  test("requires finite bounded renderer memory evidence for every successful cell", () => {
-    const source = makeRenderArtifact({
-      rounds: 1,
-      engines: ["sheetwrite"],
-      rows: [200],
-      measuredSamples: 1,
-    });
-    const first = source.results[0]!;
-    if (first.status !== "success") throw new Error("fixture must be successful");
-
-    const missing = {
-      ...source,
-      results: [
-        { ...first, memory: { beforeBytes: null, afterBytes: null, deltaBytes: null } },
-        ...source.results.slice(1),
-      ],
-    };
-    expect(() => validateRenderGateArtifact(missing, "smoke")).toThrow(".memory is missing");
-
-    const malformed = {
-      ...source,
-      results: [
-        { ...first, memory: { beforeBytes: -1, afterBytes: 0, deltaBytes: 1 } },
-        ...source.results.slice(1),
-      ],
-    };
-    expect(() => validateRenderGateArtifact(malformed, "smoke")).toThrow(
-      "finite non-negative integer heap samples",
-    );
-
-    const overCeiling = {
-      ...source,
-      results: [
-        {
-          ...first,
-          memory: {
-            beforeBytes: 0,
-            afterBytes: 4 * 1024 * 1024 * 1024,
-            deltaBytes: 4 * 1024 * 1024 * 1024,
-          },
+test("rejects corrupt run metadata, missing cells and unbounded renderer memory", () => {
+  const policy = "metadata does not match the controlled dataset/run policy";
+  expectRejections<Artifact>(
+    () => mutableCopy(makeSmokeRenderArtifact()),
+    (artifact) => validateRenderGateArtifact(artifact, "smoke"),
+    [
+      ["dataset", (artifact) => (artifact.metadata.datasetHashes = { "200": "corrupt" }), policy],
+      ["order seed", (artifact) => (artifact.metadata.orderSeed = 1), policy],
+      [
+        "launch",
+        (artifact) => {
+          const attempts = artifact.metadata.launchAttempts;
+          attempts.push({ ...must(attempts[0], "launch attempt"), rows: 201 });
         },
-        ...source.results.slice(1),
+        "unexpected browser launch attempt",
       ],
-    };
-    expect(() => validateRenderGateArtifact(overCeiling, "smoke")).toThrow(
-      "broad renderer heap safety ceiling",
-    );
-  });
+      [
+        "missing cell",
+        (artifact) => {
+          artifact.results.pop();
+          const { config, metadata, results } = artifact;
+          artifact.completeness = mutableCopy(
+            summarizeCompleteness(config, metadata.rounds, results),
+          );
+        },
+        "matrix is incomplete",
+      ],
+      ["missing memory", firstCellMemory(null, null, null), ".memory is missing"],
+      ["negative memory", firstCellMemory(-1, 0, 1), "finite non-negative integer heap samples"],
+      [
+        "memory ceiling",
+        firstCellMemory(0, 4 * GIB, 4 * GIB),
+        "broad renderer heap safety ceiling",
+      ],
+    ],
+  );
 });

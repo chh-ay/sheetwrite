@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { expect, it } from "bun:test";
 
 import {
   assertCapturedOnRunningMachine,
@@ -7,159 +7,132 @@ import {
   STARTUP_METADATA_LIMIT_BYTES,
   validateBillionCellBenchmark,
 } from "../src/billion-cell-bench.js";
+import { type DeepMutable, expectRejections, must, mutableCopy } from "./gate-fixtures.js";
 
-const RESULT_URL = new URL("../results/billion-cell-results.json", import.meta.url);
+type Artifact = DeepMutable<BillionCellBenchmarkArtifact>;
 
-async function checkedArtifact(): Promise<BillionCellBenchmarkArtifact> {
-  const value: unknown = JSON.parse(await Bun.file(RESULT_URL).text());
-  validateBillionCellBenchmark(value);
-  return value;
-}
+const recorded: unknown = await Bun.file(
+  new URL("../results/billion-cell-results.json", import.meta.url),
+).json();
+validateBillionCellBenchmark(recorded);
+const RECORDED: BillionCellBenchmarkArtifact = recorded;
+const copy = () => mutableCopy(RECORDED);
+const firstScale = (artifact: Artifact) => must(artifact.scales[0], "scale");
+const firstScenario = (artifact: Artifact) => must(firstScale(artifact).scenarios[0], "scenario");
 
-type DeepMutable<T> = T extends boolean
-  ? boolean
-  : T extends readonly (infer Item)[]
-    ? DeepMutable<Item>[]
-    : T extends object
-      ? { -readonly [Key in keyof T]: DeepMutable<T[Key]> }
-      : T;
+/** A platform and architecture that differ from the running process. */
+const OTHER_MACHINE = {
+  platform: process.platform === "linux" ? "darwin" : "linux",
+  architecture: process.arch === "x64" ? "arm64" : "x64",
+};
 
-function clone(artifact: BillionCellBenchmarkArtifact): DeepMutable<BillionCellBenchmarkArtifact> {
-  return structuredClone(artifact) as unknown as DeepMutable<BillionCellBenchmarkArtifact>;
-}
+it("stores every derived ceiling result and rejects tampering with any gate", () => {
+  const derived = deriveBillionCellGateChecks(RECORDED.scales);
+  expect(RECORDED.gate.checks).toEqual(derived);
+  expect(new Set(derived.map(({ id }) => id)).size).toBe(derived.length);
+  expect(derived.every(({ passed }) => passed)).toBe(true);
+  expectRejections(
+    copy,
+    validateBillionCellBenchmark,
+    derived.map((check, index) => [
+      check.id,
+      (artifact) => (must(artifact.gate.checks[index], check.id).actual += 1),
+    ]),
+  );
+});
 
-/** Returns a platform and architecture that differ from the running process. */
-function otherMachine(): { platform: string; architecture: string } {
-  return {
-    platform: process.platform === "linux" ? "darwin" : "linux",
-    architecture: process.arch === "x64" ? "arm64" : "x64",
-  };
-}
-
-describe("two-dimensional billion-cell resource gate", () => {
-  it("stores every derived ceiling result and rejects tampering with any gate", async () => {
-    const artifact = await checkedArtifact();
-    const derived = deriveBillionCellGateChecks(artifact.scales);
-    expect(artifact.gate.checks).toEqual(derived);
-    expect(new Set(derived.map(({ id }) => id)).size).toBe(derived.length);
-    expect(derived.every(({ passed }) => passed)).toBe(true);
-    for (let index = 0; index < derived.length; index += 1) {
-      const tampered = clone(artifact);
-      tampered.gate.checks[index]!.actual += 1;
-      expect(() => validateBillionCellBenchmark(tampered), derived[index]!.id).toThrow();
-    }
-  });
-
-  it("derives an exact failed artifact when a stated bound is exceeded", async () => {
-    const artifact = clone(await checkedArtifact());
-    artifact.scales[0]!.startupRuntimeMetadataBytes = STARTUP_METADATA_LIMIT_BYTES + 1;
-    const measuredScales = artifact.scales as unknown as BillionCellBenchmarkArtifact["scales"];
-    artifact.gate.checks = [...deriveBillionCellGateChecks(measuredScales)];
-    artifact.gate.failures = artifact.gate.checks.filter(
-      (candidate: { passed: boolean }) => !candidate.passed,
-    );
-    artifact.status = "failed";
-    artifact.gate.status = "failed";
-    expect(() => validateBillionCellBenchmark(artifact)).not.toThrow();
-    expect(artifact.gate.failures).toHaveLength(1);
-    expect(artifact.gate.failures[0]!).toMatchObject({
+it("derives an exact failed artifact when a stated bound is exceeded", () => {
+  const artifact = copy();
+  firstScale(artifact).startupRuntimeMetadataBytes = STARTUP_METADATA_LIMIT_BYTES + 1;
+  // The scales are measured values; only their readonly modifiers differ from the recorded type.
+  const scales = artifact.scales as unknown as BillionCellBenchmarkArtifact["scales"];
+  artifact.gate.checks = mutableCopy(deriveBillionCellGateChecks(scales));
+  artifact.gate.failures = artifact.gate.checks.filter((check) => !check.passed);
+  artifact.status = "failed";
+  artifact.gate.status = "failed";
+  expect(() => validateBillionCellBenchmark(artifact)).not.toThrow();
+  expect(artifact.gate.failures).toEqual([
+    expect.objectContaining({
       id: "10m:startup-metadata",
       actual: STARTUP_METADATA_LIMIT_BYTES + 1,
       limit: STARTUP_METADATA_LIMIT_BYTES,
       comparator: "<=",
       passed: false,
-    });
-    expect(artifact.gate.failures[0]!.reason).toContain(
-      `actual ${STARTUP_METADATA_LIMIT_BYTES + 1}`,
-    );
-  });
+      reason: expect.stringContaining(`actual ${STARTUP_METADATA_LIMIT_BYTES + 1}`),
+    }),
+  ]);
+});
 
-  it("rejects schema, geometry, traffic, residency, and owner-sum corruption", async () => {
-    const artifact = await checkedArtifact();
-    const cases: unknown[] = [];
-    const missingScale = clone(artifact);
-    missingScale.scales.pop();
-    cases.push(missingScale);
+it("rejects schema, geometry, traffic, residency, owner-sum and toolchain corruption", () => {
+  expectRejections(copy, validateBillionCellBenchmark, [
+    ["missing scale", (artifact) => artifact.scales.pop()],
+    ["non-finite", (artifact) => (firstScenario(artifact).timing.samplesMs[0] = Number.NaN)],
+    [
+      "fabricated band",
+      (artifact) => {
+        const exchange = must(firstScale(artifact).protocol.exchanges[0], "exchange");
+        must(exchange.request.columns[0], "column").keys[0] = "not-a-column";
+      },
+    ],
+    [
+      "omitted cell",
+      (artifact) =>
+        (must(
+          firstScale(artifact).protocol.exchanges[0],
+          "exchange",
+        ).page.everyRowHasEveryDeclaredKey = false),
+    ],
+    [
+      "amplified traffic",
+      (artifact) => {
+        const scenarios = firstScale(artifact).scenarios;
+        must(
+          scenarios.find(({ id }) => id === "first-visible-tile"),
+          "first tile",
+        ).trafficPerRun.returnedCells += 1;
+      },
+    ],
+    [
+      "full matrix",
+      (artifact) => {
+        const { resources } = firstScenario(artifact);
+        resources.loadedCleanCells = firstScale(artifact).logicalCells;
+        resources.residentCells = firstScale(artifact).logicalCells;
+      },
+    ],
+    [
+      "double-counted owner",
+      (artifact) => {
+        const { owners } = firstScenario(artifact).resources;
+        owners.push(structuredClone(must(owners[0], "owner")));
+      },
+    ],
+    ["owner sum", (artifact) => (firstScenario(artifact).resources.ownerSums.allocatedBytes += 1)],
+    ...(["bunVersion", "typescriptVersion", "platform", "architecture"] as const).map(
+      (field) => [field, (artifact: Artifact) => (artifact.toolchain[field] = "")] as const,
+    ),
+  ]);
+});
 
-    const nonfinite = clone(artifact);
-    nonfinite.scales[0]!.scenarios[0]!.timing.samplesMs[0] = Number.NaN;
-    cases.push(nonfinite);
+it("accepts committed evidence captured on a different machine", () => {
+  const artifact = copy();
+  Object.assign(artifact.toolchain, OTHER_MACHINE, { bunVersion: "0.0.0-other" });
+  expect(() => validateBillionCellBenchmark(artifact)).not.toThrow();
+});
 
-    const fabricatedBand = clone(artifact);
-    fabricatedBand.scales[0]!.protocol.exchanges[0]!.request.columns[0]!.keys[0] = "not-a-column";
-    cases.push(fabricatedBand);
-
-    const omittedCell = clone(artifact);
-    omittedCell.scales[0]!.protocol.exchanges[0]!.page.everyRowHasEveryDeclaredKey = false;
-    cases.push(omittedCell);
-
-    const amplified = clone(artifact);
-    amplified.scales[0]!.scenarios.find(
-      (scenario) => scenario.id === "first-visible-tile",
-    )!.trafficPerRun.returnedCells += 1;
-    cases.push(amplified);
-
-    const fullMatrix = clone(artifact);
-    fullMatrix.scales[0]!.scenarios[0]!.resources.loadedCleanCells =
-      fullMatrix.scales[0]!.logicalCells;
-    fullMatrix.scales[0]!.scenarios[0]!.resources.residentCells =
-      fullMatrix.scales[0]!.logicalCells;
-    cases.push(fullMatrix);
-
-    const doubleCounted = clone(artifact);
-    doubleCounted.scales[0]!.scenarios[0]!.resources.owners.push(
-      structuredClone(doubleCounted.scales[0]!.scenarios[0]!.resources.owners[0]!),
-    );
-    cases.push(doubleCounted);
-
-    const wrongSum = clone(artifact);
-    wrongSum.scales[0]!.scenarios[0]!.resources.ownerSums.allocatedBytes += 1;
-    cases.push(wrongSum);
-
-    for (const candidate of cases) expect(() => validateBillionCellBenchmark(candidate)).toThrow();
-  });
-
-  it("accepts committed evidence captured on a different machine", async () => {
-    const artifact = clone(await checkedArtifact());
-    const machine = otherMachine();
-    artifact.toolchain.platform = machine.platform;
-    artifact.toolchain.architecture = machine.architecture;
-    artifact.toolchain.bunVersion = "0.0.0-other";
-
-    expect(() => validateBillionCellBenchmark(artifact)).not.toThrow();
-  });
-
-  it("rejects committed evidence with an incomplete toolchain record", async () => {
-    const artifact = await checkedArtifact();
-    const fields = ["bunVersion", "typescriptVersion", "platform", "architecture"] as const;
-
-    for (const field of fields) {
-      const tampered = clone(artifact);
-      tampered.toolchain[field] = "";
-      expect(() => validateBillionCellBenchmark(tampered), field).toThrow();
-    }
-  });
-
-  it("rejects a new capture that does not record the running machine", async () => {
-    const recorded = (await checkedArtifact()).toolchain;
-    const running = {
-      ...recorded,
-      bunVersion: Bun.version,
-      platform: process.platform,
-      architecture: process.arch,
-    };
-
-    expect(() => assertCapturedOnRunningMachine(running)).not.toThrow();
-
-    const machine = otherMachine();
-    const foreign = [
-      { ...running, platform: machine.platform },
-      { ...running, architecture: machine.architecture },
-      { ...running, bunVersion: "0.0.0-other" },
-    ];
-
-    for (const toolchain of foreign) {
-      expect(() => assertCapturedOnRunningMachine(toolchain)).toThrow();
-    }
-  });
+it("rejects a new capture that does not record the running machine", () => {
+  const running = {
+    ...RECORDED.toolchain,
+    bunVersion: Bun.version,
+    platform: process.platform,
+    architecture: process.arch,
+  };
+  expect(() => assertCapturedOnRunningMachine(running)).not.toThrow();
+  for (const toolchain of [
+    { ...running, platform: OTHER_MACHINE.platform },
+    { ...running, architecture: OTHER_MACHINE.architecture },
+    { ...running, bunVersion: "0.0.0-other" },
+  ]) {
+    expect(() => assertCapturedOnRunningMachine(toolchain)).toThrow();
+  }
 });
