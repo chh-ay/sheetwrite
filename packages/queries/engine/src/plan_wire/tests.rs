@@ -1,11 +1,15 @@
 //! Malformed plan lanes must fail as definitions or limits, never as panics or partial plans.
 
-#![allow(clippy::indexing_slicing)]
+#![allow(
+    clippy::indexing_slicing,
+    reason = "a fixture index past the end fails the test, which is what it should do"
+)]
 
 use super::*;
+use crate::buffers::TextParts;
 use crate::plan::ColumnType;
 
-fn table(strings: &[&str]) -> (Vec<u8>, Vec<u32>) {
+fn table(strings: &[&str]) -> TextParts {
     let mut text = Vec::new();
     let mut offsets = vec![0];
 
@@ -33,61 +37,62 @@ fn decode(codes: &[u32], numbers: &[f64], strings: &[&str]) -> Result<Plan, Diag
 
 const STRINGS: [&str; 4] = ["value", "Total", "right", "Value"];
 
+/// One plan with every step kind, over `STRINGS` and the number lane `[2.5]`.
+const EVERY_STEP: [u32; 49] = [
+    7,
+    STEP_FILTER,
+    PREDICATE_NOT,
+    PREDICATE_AND,
+    2,
+    PREDICATE_COMPARE,
+    0,
+    5,
+    LITERAL_NUMBER,
+    0,
+    PREDICATE_CONTAINS,
+    0,
+    1,
+    STEP_SELECT,
+    1,
+    0,
+    STEP_RENAME,
+    1,
+    0,
+    1,
+    STEP_CHANGE_TYPE,
+    0,
+    3,
+    2,
+    STEP_JOIN,
+    2,
+    8,
+    1,
+    0,
+    2,
+    STEP_GROUP,
+    1,
+    0,
+    2,
+    1,
+    1,
+    1,
+    NO_COLUMN,
+    1,
+    3,
+    6,
+    0,
+    STEP_UNPIVOT,
+    1,
+    0,
+    1,
+    3,
+    2,
+    3,
+];
+
 #[test]
 fn every_step_kind_decodes_from_typed_lanes() {
-    let codes = [
-        7,
-        STEP_FILTER,
-        PREDICATE_NOT,
-        PREDICATE_AND,
-        2,
-        PREDICATE_COMPARE,
-        0,
-        5,
-        LITERAL_NUMBER,
-        0,
-        PREDICATE_CONTAINS,
-        0,
-        1,
-        STEP_SELECT,
-        1,
-        0,
-        STEP_RENAME,
-        1,
-        0,
-        1,
-        STEP_CHANGE_TYPE,
-        0,
-        3,
-        2,
-        STEP_JOIN,
-        2,
-        8,
-        1,
-        0,
-        2,
-        STEP_GROUP,
-        1,
-        0,
-        2,
-        1,
-        1,
-        1,
-        NO_COLUMN,
-        1,
-        3,
-        6,
-        0,
-        STEP_UNPIVOT,
-        1,
-        0,
-        1,
-        3,
-        2,
-        3,
-    ];
-
-    let plan = decode(&codes, &[2.5], &STRINGS).unwrap();
+    let plan = decode(&EVERY_STEP, &[2.5], &STRINGS).unwrap();
 
     assert_eq!(plan.len(), 7);
     let Step::Filter {

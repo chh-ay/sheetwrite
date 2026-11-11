@@ -1,6 +1,6 @@
 //! Writes saved queries as one Power Query section. Each step becomes one `let`
 //! binding, built only from functions documented in the M function reference:
-//! https://learn.microsoft.com/powerquery-m/power-query-m-function-reference
+//! <https://learn.microsoft.com/powerquery-m/power-query-m-function-reference>
 //!
 //! Where an M default differs from the engine, the binding says so explicitly:
 //! `Table.Sort`, `Table.Group` and `Table.Join` do not promise a row order, so
@@ -10,7 +10,7 @@
 use super::text::{field, identifier, member_name, number, text};
 use super::{MQuery, MSourceKind};
 use crate::plan::{
-    AggregateOp, ColumnType, CompareOp, ErrorPolicy, JoinKind, Literal, Predicate, Step,
+    Aggregate, AggregateOp, ColumnType, CompareOp, ErrorPolicy, JoinKind, Literal, Predicate, Step,
 };
 
 /// Culture for every type conversion, so a refresh does not depend on the user's locale.
@@ -23,16 +23,22 @@ const RIGHT_ROW: &str = "Sheetwrite.RightRow";
 /// A difference between the engine's behavior and the exported M, reported with the export.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Loss {
+    /// Position of the query in the list given to [`emit_section`].
     pub query: usize,
+    /// Zero-based index of the step, or `None` when the difference is in the source.
     pub step: Option<usize>,
+    /// Stable code that names the difference, such as `member-name`.
     pub code: &'static str,
 }
 
 /// The section text, each query's member name, and every reported difference.
 #[derive(Debug)]
 pub struct Section {
+    /// The whole `section Section1;` document.
     pub text: String,
+    /// The member name of each query, in input order.
     pub members: Vec<String>,
+    /// Every difference found while writing.
     pub losses: Vec<Loss>,
 }
 
@@ -43,7 +49,7 @@ struct Column {
     kind: ColumnType,
 }
 
-fn type_value(kind: ColumnType) -> &'static str {
+const fn type_value(kind: ColumnType) -> &'static str {
     match kind {
         ColumnType::Number => "type number",
         ColumnType::Logical => "type logical",
@@ -66,11 +72,40 @@ fn name_list(out: &mut String, names: &[&str]) {
     out.push('}');
 }
 
+/// A written query's member name and output columns, for joins in later queries.
+struct MemberSchema {
+    member: String,
+    columns: Vec<Column>,
+    /// The query's stable id, which join steps name.
+    query: String,
+}
+
+/// A join step's right input, key pairs and kind.
+struct JoinStep<'s> {
+    other: &'s str,
+    keys: &'s [(String, String)],
+    join: JoinKind,
+}
+
+/// `Table.TransformColumnTypes` of one column, in the fixed culture.
+fn type_conversion(input: &str, name: &str, column_type: ColumnType) -> String {
+    let mut conversion = String::from("Table.TransformColumnTypes(");
+    conversion.push_str(input);
+    conversion.push_str(", {{");
+    text(&mut conversion, name);
+    conversion.push_str(", ");
+    conversion.push_str(type_value(column_type));
+    conversion.push_str("}}, ");
+    text(&mut conversion, CULTURE);
+    conversion.push(')');
+    conversion
+}
+
 struct Writer<'a> {
     query: usize,
     columns: Vec<Column>,
     losses: &'a mut Vec<Loss>,
-    schemas: &'a [(String, Vec<Column>, String)],
+    schemas: &'a [MemberSchema],
 }
 
 impl Writer<'_> {
@@ -154,9 +189,9 @@ impl Writer<'_> {
                 }
                 out.push(')');
             }
-            Predicate::Not { predicate } => {
+            Predicate::Not { predicate: inner } => {
                 out.push_str("not (");
-                self.predicate(out, predicate);
+                self.predicate(out, inner);
                 out.push(')');
             }
         }
@@ -189,57 +224,15 @@ impl Writer<'_> {
                 self.predicate(out, predicate);
                 out.push_str(") = true)");
             }
-            Step::Select { columns } => {
-                let names: Vec<&str> = columns.iter().map(|id| self.name(id)).collect();
-                out.push_str("Table.SelectColumns(");
-                out.push_str(input);
-                out.push_str(", ");
-                name_list(out, &names);
-                out.push(')');
-
-                self.columns = columns
-                    .iter()
-                    .filter_map(|id| self.columns.iter().find(|column| &column.id == id).cloned())
-                    .collect();
-            }
-            Step::Rename { columns } => {
-                out.push_str("Table.RenameColumns(");
-                out.push_str(input);
-                out.push_str(", {");
-                for (position, (id, name)) in columns.iter().enumerate() {
-                    if position > 0 {
-                        out.push_str(", ");
-                    }
-
-                    out.push('{');
-                    text(out, self.name(id));
-                    out.push_str(", ");
-                    text(out, name);
-                    out.push('}');
-                }
-                out.push_str("})");
-
-                for (id, name) in columns {
-                    if let Some(column) = self.columns.iter_mut().find(|column| &column.id == id) {
-                        column.name.clone_from(name);
-                    }
-                }
-            }
+            Step::Select { columns } => self.select(out, input, columns),
+            Step::Rename { columns } => self.rename(out, input, columns),
             Step::ChangeType {
                 column,
                 column_type,
                 on_error,
             } => {
                 let name = self.name(column).to_owned();
-                let mut conversion = String::from("Table.TransformColumnTypes(");
-                conversion.push_str(input);
-                conversion.push_str(", {{");
-                text(&mut conversion, &name);
-                conversion.push_str(", ");
-                conversion.push_str(type_value(*column_type));
-                conversion.push_str("}}, ");
-                text(&mut conversion, CULTURE);
-                conversion.push(')');
+                let conversion = type_conversion(input, &name, *column_type);
 
                 if *on_error == ErrorPolicy::Null {
                     // Table.ReplaceErrorValues also replaces errors that existed before this step.
@@ -261,73 +254,17 @@ impl Writer<'_> {
                 input: other,
                 keys,
                 join,
-            } => self.join(out, input, other, keys, *join, index),
-            Step::Group { keys, aggregates } => {
-                let key_names: Vec<String> =
-                    keys.iter().map(|id| self.name(id).to_owned()).collect();
-                let key_refs: Vec<&str> = key_names.iter().map(String::as_str).collect();
-                let mut grouped = String::from("Table.Group(");
-                grouped.push_str(input);
-                grouped.push_str(", ");
-                name_list(&mut grouped, &key_refs);
-                grouped.push_str(", {");
-
-                let mut next: Vec<Column> = keys
-                    .iter()
-                    .filter_map(|id| self.columns.iter().find(|column| &column.id == id).cloned())
-                    .collect();
-
-                for (position, aggregate) in aggregates.iter().enumerate() {
-                    if position > 0 {
-                        grouped.push_str(", ");
-                    }
-
-                    let source = aggregate
-                        .column
-                        .as_deref()
-                        .map(|id| self.name(id).to_owned());
-                    grouped.push('{');
-                    text(&mut grouped, &aggregate.name);
-                    grouped.push_str(", each ");
-                    let (function, kind) = match aggregate.op {
-                        AggregateOp::CountRows => ("Table.RowCount", ColumnType::Number),
-                        AggregateOp::Count => ("List.NonNullCount", ColumnType::Number),
-                        AggregateOp::Sum => ("List.Sum", ColumnType::Number),
-                        AggregateOp::Average => ("List.Average", ColumnType::Number),
-                        AggregateOp::Min | AggregateOp::Max => {
-                            let kind = aggregate
-                                .column
-                                .as_deref()
-                                .and_then(|id| self.columns.iter().find(|column| column.id == id))
-                                .map_or(ColumnType::Mixed, |column| column.kind);
-                            let function = if matches!(aggregate.op, AggregateOp::Min) {
-                                "List.Min"
-                            } else {
-                                "List.Max"
-                            };
-                            (function, kind)
-                        }
-                    };
-                    grouped.push_str(function);
-                    grouped.push('(');
-                    match &source {
-                        Some(name) => field(&mut grouped, name),
-                        None => grouped.push('_'),
-                    }
-                    grouped.push_str(")}");
-
-                    next.push(Column {
-                        id: aggregate.id.clone(),
-                        name: aggregate.name.clone(),
-                        kind,
-                    });
-                }
-                grouped.push_str("})");
-
-                // Table.Group does not promise an order; the engine emits groups in key order.
-                Self::sort(out, &grouped, &key_refs);
-                self.columns = next;
-            }
+            } => self.join(
+                out,
+                input,
+                JoinStep {
+                    other,
+                    keys,
+                    join: *join,
+                },
+                index,
+            ),
+            Step::Group { keys, aggregates } => self.group(out, input, keys, aggregates),
             Step::Unpivot {
                 columns,
                 attribute,
@@ -359,23 +296,120 @@ impl Writer<'_> {
         }
     }
 
-    fn join(
-        &mut self,
-        out: &mut String,
-        input: &str,
-        other: &str,
-        keys: &[(String, String)],
-        join: JoinKind,
-        index: usize,
-    ) {
-        let Some((member, right, _)) = self.schemas.iter().find(|entry| entry.2 == other) else {
+    fn select(&mut self, out: &mut String, input: &str, columns: &[String]) {
+        let names: Vec<&str> = columns.iter().map(|id| self.name(id)).collect();
+        out.push_str("Table.SelectColumns(");
+        out.push_str(input);
+        out.push_str(", ");
+        name_list(out, &names);
+        out.push(')');
+
+        self.columns = columns
+            .iter()
+            .filter_map(|id| self.columns.iter().find(|column| &column.id == id).cloned())
+            .collect();
+    }
+
+    fn rename(&mut self, out: &mut String, input: &str, columns: &[(String, String)]) {
+        out.push_str("Table.RenameColumns(");
+        out.push_str(input);
+        out.push_str(", {");
+        for (position, (id, name)) in columns.iter().enumerate() {
+            if position > 0 {
+                out.push_str(", ");
+            }
+
+            out.push('{');
+            text(out, self.name(id));
+            out.push_str(", ");
+            text(out, name);
+            out.push('}');
+        }
+        out.push_str("})");
+
+        for (id, name) in columns {
+            if let Some(column) = self.columns.iter_mut().find(|column| &column.id == id) {
+                column.name.clone_from(name);
+            }
+        }
+    }
+
+    fn group(&mut self, out: &mut String, input: &str, keys: &[String], aggregates: &[Aggregate]) {
+        let key_names: Vec<String> = keys.iter().map(|id| self.name(id).to_owned()).collect();
+        let key_refs: Vec<&str> = key_names.iter().map(String::as_str).collect();
+        let mut grouped = String::from("Table.Group(");
+        grouped.push_str(input);
+        grouped.push_str(", ");
+        name_list(&mut grouped, &key_refs);
+        grouped.push_str(", {");
+
+        let mut next: Vec<Column> = keys
+            .iter()
+            .filter_map(|id| self.columns.iter().find(|column| &column.id == id).cloned())
+            .collect();
+
+        for (position, aggregate) in aggregates.iter().enumerate() {
+            if position > 0 {
+                grouped.push_str(", ");
+            }
+
+            let source = aggregate
+                .column
+                .as_deref()
+                .map(|id| self.name(id).to_owned());
+            grouped.push('{');
+            text(&mut grouped, &aggregate.name);
+            grouped.push_str(", each ");
+            let (function, kind) = match aggregate.op {
+                AggregateOp::CountRows => ("Table.RowCount", ColumnType::Number),
+                AggregateOp::Count => ("List.NonNullCount", ColumnType::Number),
+                AggregateOp::Sum => ("List.Sum", ColumnType::Number),
+                AggregateOp::Average => ("List.Average", ColumnType::Number),
+                AggregateOp::Min | AggregateOp::Max => {
+                    let kind = aggregate
+                        .column
+                        .as_deref()
+                        .and_then(|id| self.columns.iter().find(|column| column.id == id))
+                        .map_or(ColumnType::Mixed, |column| column.kind);
+                    let function = if matches!(aggregate.op, AggregateOp::Min) {
+                        "List.Min"
+                    } else {
+                        "List.Max"
+                    };
+                    (function, kind)
+                }
+            };
+            grouped.push_str(function);
+            grouped.push('(');
+            match &source {
+                Some(name) => field(&mut grouped, name),
+                None => grouped.push('_'),
+            }
+            grouped.push_str(")}");
+
+            next.push(Column {
+                id: aggregate.id.clone(),
+                name: aggregate.name.clone(),
+                kind,
+            });
+        }
+        grouped.push_str("})");
+
+        // Table.Group does not promise an order; the engine emits groups in key order.
+        Self::sort(out, &grouped, &key_refs);
+        self.columns = next;
+    }
+
+    fn join(&mut self, out: &mut String, input: &str, step: JoinStep<'_>, index: usize) {
+        let JoinStep { other, keys, join } = step;
+        let Some(schema) = self.schemas.iter().find(|entry| entry.query == other) else {
             // The engine rejects a join to a missing input before export.
             self.loss(Some(index), "join-input");
             out.push_str(input);
             return;
         };
-        let member = member.clone();
-        let right = right.clone();
+        let member = schema.member.clone();
+        let right = schema.columns.clone();
         let right_name = |id: &str| -> String {
             right
                 .iter()
@@ -390,36 +424,13 @@ impl Writer<'_> {
         let keep_left = !matches!(join, JoinKind::RightSemi | JoinKind::RightAnti);
         let keep_right = !matches!(join, JoinKind::LeftSemi | JoinKind::LeftAnti);
 
-        let mut joined = String::from("Table.Join(Table.AddIndexColumn(");
-        joined.push_str(input);
-        joined.push_str(", ");
-        text(&mut joined, LEFT_ROW);
-        joined.push_str(", 0, 1), ");
-        name_list(
-            &mut joined,
+        let joined = indexed_join(
+            input,
+            &member,
             &left_keys.iter().map(String::as_str).collect::<Vec<_>>(),
-        );
-        joined.push_str(", Table.AddIndexColumn(");
-        identifier(&mut joined, &member);
-        joined.push_str(", ");
-        text(&mut joined, RIGHT_ROW);
-        joined.push_str(", 0, 1), ");
-        name_list(
-            &mut joined,
             &right_keys.iter().map(String::as_str).collect::<Vec<_>>(),
+            join,
         );
-        joined.push_str(", ");
-        joined.push_str(match join {
-            JoinKind::Inner => "JoinKind.Inner",
-            JoinKind::Left => "JoinKind.LeftOuter",
-            JoinKind::Right => "JoinKind.RightOuter",
-            JoinKind::Full => "JoinKind.FullOuter",
-            JoinKind::LeftSemi => "JoinKind.LeftSemi",
-            JoinKind::RightSemi => "JoinKind.RightSemi",
-            JoinKind::LeftAnti => "JoinKind.LeftAnti",
-            JoinKind::RightAnti => "JoinKind.RightAnti",
-        });
-        joined.push(')');
 
         // Key order, then original left and right row positions, as in the engine.
         let mut order: Vec<&str> = Vec::new();
@@ -462,6 +473,47 @@ impl Writer<'_> {
     }
 }
 
+/// The M name of a join kind.
+const fn join_kind_name(join: JoinKind) -> &'static str {
+    match join {
+        JoinKind::Inner => "JoinKind.Inner",
+        JoinKind::Left => "JoinKind.LeftOuter",
+        JoinKind::Right => "JoinKind.RightOuter",
+        JoinKind::Full => "JoinKind.FullOuter",
+        JoinKind::LeftSemi => "JoinKind.LeftSemi",
+        JoinKind::RightSemi => "JoinKind.RightSemi",
+        JoinKind::LeftAnti => "JoinKind.LeftAnti",
+        JoinKind::RightAnti => "JoinKind.RightAnti",
+    }
+}
+
+/// `Table.Join` of `input` and the `member` query, each with an added row-index column, so the
+/// result can be sorted back to the engine's row order.
+fn indexed_join(
+    input: &str,
+    member: &str,
+    left_keys: &[&str],
+    right_keys: &[&str],
+    join: JoinKind,
+) -> String {
+    let mut joined = String::from("Table.Join(Table.AddIndexColumn(");
+    joined.push_str(input);
+    joined.push_str(", ");
+    text(&mut joined, LEFT_ROW);
+    joined.push_str(", 0, 1), ");
+    name_list(&mut joined, left_keys);
+    joined.push_str(", Table.AddIndexColumn(");
+    identifier(&mut joined, member);
+    joined.push_str(", ");
+    text(&mut joined, RIGHT_ROW);
+    joined.push_str(", 0, 1), ");
+    name_list(&mut joined, right_keys);
+    joined.push_str(", ");
+    joined.push_str(join_kind_name(join));
+    joined.push(')');
+    joined
+}
+
 fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(String, String)>) {
     let source = &query.source;
     let names: Vec<&str> = source
@@ -477,15 +529,7 @@ fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(Str
     let Some(locator) = web.filter(|_| !matches!(source.kind, MSourceKind::Host)) else {
         // A host-supplied source has no M connector; refresh in Excel reports this error.
         writer.loss(None, "host-source");
-        let mut expression = String::from("error Error.Record(\"Sheetwrite.HostSource\", ");
-        text(
-            &mut expression,
-            "The host application supplies this source.",
-        );
-        expression.push_str(", [SourceId = ");
-        text(&mut expression, &source.source_id);
-        expression.push_str("])");
-        bindings.push((String::from("Source"), expression));
+        bindings.push((String::from("Source"), host_source_error(&source.source_id)));
         typed_binding(writer, query, bindings);
         return;
     };
@@ -524,20 +568,7 @@ fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(Str
                 selected.push(')');
                 bindings.push((String::from("Selected"), selected));
             } else {
-                let mut named = String::from("Table.RenameColumns(Source, {");
-                for (position, name) in names.iter().enumerate() {
-                    if position > 0 {
-                        named.push_str(", ");
-                    }
-
-                    named.push('{');
-                    text(&mut named, &format!("Column{}", position + 1));
-                    named.push_str(", ");
-                    text(&mut named, name);
-                    named.push('}');
-                }
-                named.push_str("})");
-                bindings.push((String::from("Selected"), named));
+                bindings.push((String::from("Selected"), numbered_renames(&names)));
             }
 
             if *empty_is_null {
@@ -549,33 +580,70 @@ fn source_steps(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(Str
                 bindings.push((String::from("Blanks"), blanks));
             }
         }
-        MSourceKind::Json { path } => {
-            bindings.push((String::from("Source"), format!("Json.Document({fetched})")));
-            let mut records = String::from("Source");
-            for member in path {
-                field(&mut records, member);
-            }
-
-            // Missing fields are null, and fields outside the schema are ignored, as in the engine.
-            let mut table = String::from("Table.FromRecords(");
-            table.push_str(&records);
-            table.push_str(", ");
-            name_list(&mut table, &names);
-            table.push_str(", MissingField.UseNull)");
-            bindings.push((String::from("Selected"), table));
-        }
+        MSourceKind::Json { path } => json_steps(&fetched, path, &names, bindings),
         MSourceKind::Host => {}
     }
 
     typed_binding(writer, query, bindings);
 }
 
+/// An M error that names a host-supplied source, which no M connector can read.
+fn host_source_error(source_id: &str) -> String {
+    let mut expression = String::from("error Error.Record(\"Sheetwrite.HostSource\", ");
+    text(
+        &mut expression,
+        "The host application supplies this source.",
+    );
+    expression.push_str(", [SourceId = ");
+    text(&mut expression, source_id);
+    expression.push_str("])");
+    expression
+}
+
+/// Renames the `Column1`, `Column2`, ... columns of a CSV document without headers.
+fn numbered_renames(names: &[&str]) -> String {
+    let mut named = String::from("Table.RenameColumns(Source, {");
+    for (position, name) in names.iter().enumerate() {
+        if position > 0 {
+            named.push_str(", ");
+        }
+
+        named.push('{');
+        text(&mut named, &format!("Column{}", position + 1));
+        named.push_str(", ");
+        text(&mut named, name);
+        named.push('}');
+    }
+    named.push_str("})");
+    named
+}
+
+/// Reads the records at `path` of a fetched JSON document as a table of the declared columns.
+fn json_steps(
+    fetched: &str,
+    path: &[String],
+    names: &[&str],
+    bindings: &mut Vec<(String, String)>,
+) {
+    bindings.push((String::from("Source"), format!("Json.Document({fetched})")));
+    let mut records = String::from("Source");
+    for member in path {
+        field(&mut records, member);
+    }
+
+    // Missing fields are null, and fields outside the schema are ignored, as in the engine.
+    let mut table = String::from("Table.FromRecords(");
+    table.push_str(&records);
+    table.push_str(", ");
+    name_list(&mut table, names);
+    table.push_str(", MissingField.UseNull)");
+    bindings.push((String::from("Selected"), table));
+}
+
 /// The explicit typed schema; every conversion uses one fixed culture.
 fn typed_binding(writer: &mut Writer<'_>, query: &MQuery, bindings: &mut Vec<(String, String)>) {
     let source = &query.source;
-    let previous = bindings
-        .last()
-        .map_or_else(String::new, |binding| binding.0.clone());
+    let previous = last_binding(bindings);
     let mut typed = String::from("Table.TransformColumnTypes(");
     typed.push_str(&previous);
     typed.push_str(", {");
@@ -613,7 +681,12 @@ fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
                     .iter()
                     .position(|candidate| &candidate.id == input)
                     .is_none_or(|position| order.contains(&position)),
-                _ => true,
+                Step::Filter { .. }
+                | Step::Select { .. }
+                | Step::Rename { .. }
+                | Step::ChangeType { .. }
+                | Step::Group { .. }
+                | Step::Unpivot { .. } => true,
             });
             if ready {
                 order.push(index);
@@ -632,12 +705,11 @@ fn dependency_order(queries: &[MQuery]) -> Vec<usize> {
     order
 }
 
-/// Writes every query as a shared member of `Section1`.
-pub fn emit_section(queries: &[MQuery]) -> Section {
-    let mut losses = Vec::new();
+/// Member names for every query, unique when letter case is ignored, as Excel requires for
+/// query names. A name that had to change is reported as a difference.
+fn member_names(queries: &[MQuery], losses: &mut Vec<Loss>) -> Vec<String> {
     let mut members: Vec<String> = Vec::with_capacity(queries.len());
 
-    // Member names are unique when letter case is ignored, as Excel requires for query names.
     for (index, query) in queries.iter().enumerate() {
         let base = member_name(&query.name);
         let mut candidate = base.clone();
@@ -661,7 +733,41 @@ pub fn emit_section(queries: &[MQuery]) -> Section {
         members.push(candidate);
     }
 
-    let mut schemas: Vec<(String, Vec<Column>, String)> = Vec::new();
+    members
+}
+
+/// The name of the last binding, which the next step reads and the `in` clause returns.
+fn last_binding(bindings: &[(String, String)]) -> String {
+    bindings
+        .last()
+        .map_or_else(String::new, |binding| binding.0.clone())
+}
+
+/// A `let` expression with one line per binding that returns the last binding.
+fn let_body(bindings: &[(String, String)]) -> String {
+    let mut body = String::from("let\n");
+    for (position, (name, expression)) in bindings.iter().enumerate() {
+        body.push_str("    ");
+        identifier(&mut body, name);
+        body.push_str(" = ");
+        body.push_str(expression);
+        body.push_str(if position + 1 < bindings.len() {
+            ",\n"
+        } else {
+            "\n"
+        });
+    }
+    body.push_str("in\n    ");
+    identifier(&mut body, &last_binding(bindings));
+    body
+}
+
+/// Writes every query as a shared member of `Section1`.
+#[must_use]
+pub fn emit_section(queries: &[MQuery]) -> Section {
+    let mut losses = Vec::new();
+    let members = member_names(queries, &mut losses);
+    let mut schemas: Vec<MemberSchema> = Vec::new();
     let mut bodies: Vec<String> = vec![String::new(); queries.len()];
 
     for index in dependency_order(queries) {
@@ -689,41 +795,21 @@ pub fn emit_section(queries: &[MQuery]) -> Section {
 
         for (position, step) in query.steps.iter().enumerate() {
             let mut input = String::new();
-            identifier(
-                &mut input,
-                &bindings
-                    .last()
-                    .map_or_else(String::new, |binding| binding.0.clone()),
-            );
+            identifier(&mut input, &last_binding(&bindings));
             let mut expression = String::new();
             writer.step(&mut expression, &input, step, position);
             bindings.push((format!("Step {}", position + 1), expression));
         }
 
         let columns = writer.columns;
-        let mut body = String::from("let\n");
-        for (position, (name, expression)) in bindings.iter().enumerate() {
-            body.push_str("    ");
-            identifier(&mut body, name);
-            body.push_str(" = ");
-            body.push_str(expression);
-            body.push_str(if position + 1 < bindings.len() {
-                ",\n"
-            } else {
-                "\n"
-            });
-        }
-        body.push_str("in\n    ");
-        identifier(
-            &mut body,
-            &bindings
-                .last()
-                .map_or_else(String::new, |binding| binding.0.clone()),
-        );
         if let Some(slot) = bodies.get_mut(index) {
-            *slot = body;
+            *slot = let_body(&bindings);
         }
-        schemas.push((member.clone(), columns, query.id.clone()));
+        schemas.push(MemberSchema {
+            member: member.clone(),
+            columns,
+            query: query.id.clone(),
+        });
     }
 
     let mut text = String::from("section Section1;\n");

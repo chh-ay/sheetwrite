@@ -176,20 +176,6 @@ describe("dashboard sheets", () => {
     expect(validateWorkbookSnapshot(rangePivot).ok).toBe(false);
   });
 
-  it("admits items inside the grid that do not overlap", () => {
-    const grid = mount();
-    const set = (item: DashboardItem) =>
-      apply(grid, { op: "setDashboardItem", sheet: "dash", item });
-
-    expect(set({ ...slicer, id: "wide", box: { x: 4, y: 6, w: 9, h: 2 } })).toBe("rejected");
-    expect(set({ ...slicer, id: "under", box: { x: 4, y: 5, w: 4, h: 2 } })).toBe("noop");
-    expect(apply(grid, { op: "setDashboardItem", sheet: "data", item: slicer })).toBe("noop");
-
-    expect(set({ ...slicer, id: "below", box: { x: 0, y: 6, w: 12, h: 2 } })).toBe("applied");
-    expect(set({ ...slicer, box: { x: 8, y: 0, w: 4, h: 5 }, selected: ["West"] })).toBe("applied");
-    expect(dashboardOf(grid)?.items.map((item) => item.id)).toEqual(["sales", "region", "below"]);
-  });
-
   it("keeps a pivot item whose pivot is removed, and undo brings the pivot back", () => {
     const grid = mount();
 

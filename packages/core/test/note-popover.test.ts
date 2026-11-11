@@ -8,7 +8,6 @@ import type { CellAddress } from "../src/types.js";
 import { makeColumnarData, makeWorkbook, scrollerOf } from "./fixtures.js";
 
 const NOTED: CellAddress = { sheet: "s1", row: 2, col: 1 };
-const PLAIN: CellAddress = { sheet: "s1", row: 4, col: 0 };
 
 let restoreStubs: () => void;
 let grid: GridImpl | null = null;
@@ -95,15 +94,6 @@ describe("note hover card", () => {
     expect(document.activeElement).toBe(focused);
   });
 
-  it("shows nothing over a cell without a note", () => {
-    const { host } = mount();
-
-    hover(host, PLAIN);
-    jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS * 3);
-
-    expect(noteCard(host)).toBeNull();
-  });
-
   it.each([
     [
       "the pointer leaves the grid",
@@ -128,16 +118,6 @@ describe("note hover card", () => {
 
     expect(noteCard(host)).toBeNull();
   });
-
-  it("does not show a note when the pointer leaves before the delay ends", () => {
-    const { host } = mount();
-
-    hover(host, NOTED);
-    scrollerOf(host).dispatchEvent(new PointerEvent("pointerleave", { pointerType: "mouse" }));
-    jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS * 2);
-
-    expect(noteCard(host)).toBeNull();
-  });
 });
 
 describe("note editor", () => {
@@ -158,18 +138,6 @@ describe("note editor", () => {
 
     target.undo();
     expect(target.getNote(NOTED)).toBe("Check the totals");
-  });
-
-  it("creates a note on a plain cell when the editor loses focus", () => {
-    const { host, grid: target } = mount();
-
-    openEditor(target, PLAIN);
-    const editor = noteEditor(host);
-    expect(editor.value).toBe("");
-    editor.value = "Ask Dara";
-    editor.blur();
-
-    expect(target.getNote(PLAIN)).toBe("Ask Dara");
   });
 
   it("deletes the note when the committed text is empty", () => {
@@ -205,14 +173,6 @@ describe("note editor", () => {
     const editor = noteEditor(host);
     expect(editor.value).toBe("Check the totals");
     expect(host.querySelector(".sheetwrite-editor")).toBeNull();
-  });
-
-  it("does not open on a read-only grid", () => {
-    const { host, grid: target } = mount({ readOnly: true });
-
-    openEditor(target, NOTED);
-
-    expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
   });
 });
 

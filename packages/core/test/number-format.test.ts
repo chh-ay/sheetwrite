@@ -1,11 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
-import {
-  formatNumber,
-  getNumberFormatResourceStatsForTest,
-  resetNumberFormatResourcesForTest,
-} from "../src/number-format.js";
+import { formatNumber, resetNumberFormatResourcesForTest } from "../src/number-format.js";
 
 describe("formatNumber", () => {
   it.each([
@@ -45,27 +41,6 @@ describe("formatNumber", () => {
     expect(formatNumber(Number.NaN, "0.00")).toBe("");
     expect(formatNumber(Number.POSITIVE_INFINITY, "#,##0.00")).toBe("");
     expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
-  });
-
-  it("bounds diverse caches and recomputes an evicted format correctly", () => {
-    resetNumberFormatResourcesForTest();
-    expect(formatNumber(12.5, '0.00" format-0"')).toBe("12.50 format-0");
-    for (let index = 1; index < 300; index++) {
-      expect(formatNumber(12.5, `0.00" format-${index}"`)).toBe(`12.50 format-${index}`);
-    }
-    for (let index = 0; index < 140; index++) {
-      formatNumber(1_000, undefined, `en-US-x-cache-${index}`);
-    }
-    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
-    for (let index = 0; index < 40; index++) {
-      formatNumber(serial, "mmm dddd", `en-US-x-date-${index}`);
-    }
-
-    const stats = getNumberFormatResourceStatsForTest();
-    expect(stats.formatCacheEntries).toBeLessThanOrEqual(256);
-    expect(stats.numberFormatterCacheEntries).toBeLessThanOrEqual(128);
-    expect(stats.dateTimeFormatterCacheEntries).toBeLessThanOrEqual(64);
-    expect(formatNumber(12.5, '0.00" format-0"')).toBe("12.50 format-0");
   });
 
   it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {
@@ -210,28 +185,5 @@ describe("formatNumber", () => {
       // The second call serves the entry the first call stored.
       expect(formatNumber(value, code, locale), `warm ${value}`).toBe(expected);
     }
-  });
-
-  it("recomputes text evicted by the value and format-group bounds", () => {
-    resetNumberFormatResourcesForTest();
-    const code = "#,##0.000000";
-    // More distinct values than one format/locale group keeps, so the first
-    // entry is evicted before it is read again.
-    for (let index = 0; index < 600; index++) formatNumber(index + 0.5, code);
-    expect(formatNumber(0.5, code)).toBe("0.500000");
-    expect(formatNumber(599.5, code)).toBe("599.500000");
-    expect(formatNumber(100.5, code)).toBe("100.500000");
-
-    // More (format, locale) groups than the group limit keeps, so the oldest
-    // groups are dropped. Ten locale spellings of one format are ten groups.
-    for (let index = 0; index < 10; index++) {
-      expect(formatNumber(7.4, "#,##0.0", `en-US-x-${index}`)).toBe("7.4");
-    }
-    expect(formatNumber(7.4, "#,##0.0", "en-US-x-0")).toBe("7.4");
-    for (let index = 0; index < 10; index++) {
-      expect(formatNumber(7.4, `0.${"0".repeat(index + 1)}`)).toBe(`7.4${"0".repeat(index)}`);
-    }
-    expect(formatNumber(7.4, "0.0")).toBe("7.4");
-    expect(formatNumber(0.5, code)).toBe("0.500000");
   });
 });

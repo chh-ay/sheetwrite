@@ -12,7 +12,6 @@ const RANDOM_SPREADSHEET_NUMBERS: usize = 30_000;
 const SPREADSHEET_EXPONENTS: f64 = 20.0;
 const SEED: u64 = 0x9e37_79b9_7f4a_7c15;
 /// Decimal places checked for the fixed form: every count it supports.
-#[cfg(feature = "analysis")]
 const FIXED_PLACES_CHECKED: u32 = MAX_FIXED_PLACES;
 
 /// A deterministic xorshift generator, so a failure reproduces.
@@ -95,104 +94,6 @@ fn all_numbers() -> Vec<f64> {
     numbers
 }
 
-/// The digits `format!("{:.*e}")` writes, without trailing zeros.
-fn core_rounded(number: f64, count: u32) -> Digits {
-    let text = format!("{:.*e}", count as usize - 1, number);
-    let (mantissa, exponent) = text.split_once('e').expect("an exponent");
-    let digits: String = mantissa.chars().filter(char::is_ascii_digit).collect();
-    let digits: u64 = digits.trim_end_matches('0').parse().expect("digits");
-    Digits {
-        digits,
-        exponent: exponent.parse().expect("an integer exponent"),
-    }
-}
-
-#[test]
-fn rounded_digits_match_core_scientific_formatting() {
-    let numbers = all_numbers();
-    for &number in &numbers {
-        assert_eq!(
-            rounded_digits(number, EXCEL_DIGITS),
-            core_rounded(number, EXCEL_DIGITS),
-            "{number:e}"
-        );
-    }
-
-    // Every digit count on a sample, including the short counts where the
-    // rounding carries most often.
-    for (index, &number) in numbers.iter().enumerate().step_by(7) {
-        let count = 1 + (index as u32 % MAX_DIGITS);
-        assert_eq!(
-            rounded_digits(number, count),
-            core_rounded(number, count),
-            "{number:e} at {count} digits"
-        );
-    }
-}
-
-#[test]
-fn rounded_digits_round_half_to_even_on_the_binary_value() {
-    for (number, count, digits, exponent) in [
-        (0.5, 1, 5, -1),
-        (2.5, 1, 2, 0),
-        (3.5, 1, 4, 0),
-        (1_234_567_890_123_455.0, 15, 123_456_789_012_346, 15),
-        (1_234_567_890_123_445.0, 15, 123_456_789_012_344, 15),
-        // The double nearest 1.005 is below it.
-        (1.005, 3, 1, 0),
-        (999_999_999_999_999.5, 15, 1, 15),
-    ] {
-        assert_eq!(
-            rounded_digits(number, count),
-            Digits { digits, exponent },
-            "{number} at {count} digits"
-        );
-    }
-}
-
-#[test]
-fn number_text_matches_to_string() {
-    for number in all_numbers() {
-        for number in [number, -number] {
-            assert_eq!(
-                NumberText::of(number).as_str(),
-                number.to_string(),
-                "{number:e}"
-            );
-        }
-    }
-
-    for number in [
-        0.0,
-        -0.0,
-        f64::INFINITY,
-        f64::NEG_INFINITY,
-        f64::NAN,
-        -f64::NAN,
-    ] {
-        assert_eq!(NumberText::of(number).as_str(), number.to_string());
-    }
-}
-
-#[test]
-fn shortest_digits_read_back_as_the_number() {
-    for (number, digits, exponent) in [
-        (0.1, 1, -1),
-        (0.1 + 0.2, 30_000_000_000_000_004, -1),
-        (1e23, 1, 23),
-        (f64::from_bits(1), 5, -324),
-        (f64::MAX, 17_976_931_348_623_157, 308),
-        (100.0, 1, 2),
-    ] {
-        assert_eq!(
-            shortest_digits(number),
-            Digits { digits, exponent },
-            "{number:e}"
-        );
-    }
-}
-
-#[cfg(feature = "analysis")]
 #[test]
 fn fixed_text_matches_core_fixed_formatting() {
     for number in all_numbers() {

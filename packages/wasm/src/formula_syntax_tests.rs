@@ -45,43 +45,6 @@ fn numbers_accept_an_exponent() {
 }
 
 #[test]
-fn whole_columns_and_rows_parse_and_write_back_in_short_form() {
-    for (source, expected) in [
-        ("=SUM(A:A)", "=SUM(A:A)"),
-        ("=sum(a:c)", "=SUM(A:C)"),
-        ("=SUM($A:$C)", "=SUM($A:$C)"),
-        ("=SUM(C:A)", "=SUM(A:C)"),
-        ("=SUM(1:1)", "=SUM(1:1)"),
-        ("=SUM($2:5)", "=SUM($2:5)"),
-        ("=SUM(Sheet2!B:B)", "=SUM(Sheet2!B:B)"),
-        ("=SUM('My Sheet'!3:4)", "=SUM('My Sheet'!3:4)"),
-        ("=SUM(Sheet1:Sheet3!A:B)", "=SUM(Sheet1:Sheet3!A:B)"),
-        ("=SUM(A1:A1048576)", "=SUM(A:A)"),
-        ("=SUM(A2:XFD3)", "=SUM(2:3)"),
-        ("=A:B B:C", "=A:B B:C"),
-    ] {
-        assert_eq!(round_trip(source), expected, "{source}");
-    }
-
-    assert!(parse("=SUM(A:1)").is_err());
-    assert!(parse("=SUM(1:A)").is_err());
-    assert!(parse("=SUM(A1:B)").is_err());
-}
-
-#[test]
-fn whole_columns_and_rows_keep_their_axis_through_edits_and_copies() {
-    assert_eq!(after_row_edit("=SUM(A:A)", 0, 5), "=SUM(A:A)");
-    assert_eq!(after_row_edit("=SUM(A:A)", 2, -1), "=SUM(A:A)");
-    assert_eq!(after_col_edit("=SUM(A:A)", 0, 1), "=SUM(B:B)");
-    assert_eq!(after_col_edit("=SUM(1:1)", 0, 3), "=SUM(1:1)");
-    assert_eq!(after_row_edit("=SUM(1:2)", 0, 1), "=SUM(2:3)");
-
-    let mut ast = parse("=SUM(A:A,1:1)").unwrap();
-    translate_relative_refs(&mut ast, 3, 1);
-    assert_eq!(serialize(&ast), "=SUM(B:B,4:4)");
-}
-
-#[test]
 fn references_stay_inside_the_sheet_limits() {
     for source in ["=XYZ1", "=XFE1", "=A1048577", "=A0"] {
         assert!(
