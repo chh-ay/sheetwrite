@@ -1,27 +1,21 @@
-import { describe, expect, it } from "bun:test";
+import { expect, it } from "bun:test";
 
 import { decideWasmProfile, parseWasmProfileMatrix } from "../src/wasm-profile-matrix.js";
+import { expectRejections, must } from "./gate-fixtures.js";
 
 const HASH = {
   input: "a".repeat(64),
   runner: "b".repeat(64),
   tool: "c".repeat(64),
-  evidence: "d".repeat(64),
   stdout: "e".repeat(64),
   stderr: "f".repeat(64),
 } as const;
 const COMMIT = "1".repeat(40);
 
-function gate(wasmSha256: string, kind: "formula" | "render") {
+function gate(wasmSha256: string, commands: string[][]) {
   return {
     status: "passed",
-    commands:
-      kind === "formula"
-        ? [["bun", "run", "bench:formula"]]
-        : [
-            ["bun", "run", "bench:render"],
-            ["bun", "run", "bench:check"],
-          ],
+    commands,
     exitCode: 0,
     artifactPath: `bench/results/candidate-${wasmSha256.slice(0, 8)}.json`,
     evidenceSha256: wasmSha256,
@@ -33,18 +27,28 @@ function gate(wasmSha256: string, kind: "formula" | "render") {
 
 function fixture() {
   const variants = [
-    { wasmOpt: "-O3", rawBytes: 1_000, gzipBytes: 500, brotliBytes: 400, hash: "2" },
-    { wasmOpt: "-Os", rawBytes: 950, gzipBytes: 480, brotliBytes: 390, hash: "3" },
-    { wasmOpt: "-Oz", rawBytes: 900, gzipBytes: 470, brotliBytes: 380, hash: "4" },
-  ].map(({ wasmOpt, rawBytes, gzipBytes, brotliBytes, hash }) => {
-    const artifactSha256 = hash.repeat(64);
+    ["-O3", 1_000, 500, 400, "2"],
+    ["-Os", 950, 480, 390, "3"],
+    ["-Oz", 900, 470, 380, "4"],
+  ].map(([wasmOpt, rawBytes, gzipBytes, brotliBytes, hash]) => {
+    const sha256 = String(hash).repeat(64);
     return {
-      wasmOpt,
+      wasmOpt: String(wasmOpt),
       inputWasmSha256: HASH.input,
-      artifact: { rawBytes, gzipBytes, brotliBytes, sha256: artifactSha256 },
-      formulaGate: gate(artifactSha256, "formula"),
-      renderGate: gate(artifactSha256, "render"),
+      artifact: { rawBytes, gzipBytes, brotliBytes, sha256 },
+      formulaGate: gate(sha256, [["bun", "run", "bench:formula"]]),
+      renderGate: gate(sha256, [
+        ["bun", "run", "bench:render"],
+        ["bun", "run", "bench:check"],
+      ]),
     };
+  });
+  const blocker = (id: string, owner: string, dependency: string, reason: string) => ({
+    id,
+    kind: "dependency-cycle",
+    owner,
+    dependency,
+    reason,
   });
   return {
     schemaVersion: 1,
@@ -71,131 +75,101 @@ function fixture() {
       requireFormulaGate: true,
       requireRenderGate: true,
     },
-    captureOrder: {
-      formula: ["-O3", "-Oz", "-Os"],
-      render: ["-Os", "-O3", "-Oz"],
-    },
+    captureOrder: { formula: ["-O3", "-Oz", "-Os"], render: ["-Os", "-O3", "-Oz"] },
     variants,
     storeOnlyProbe: {
-      provenance: {
-        commit: COMMIT,
-        dirty: false,
-        timestamp: "2026-08-09T12:01:00.000Z",
-      },
+      provenance: { commit: COMMIT, dirty: false, timestamp: "2026-08-09T12:01:00.000Z" },
       command: [
-        "cargo",
-        "check",
-        "--target",
-        "wasm32-unknown-unknown",
-        "--no-default-features",
-        "--message-format=json",
+        ...["cargo", "check", "--target", "wasm32-unknown-unknown"],
+        ...["--no-default-features", "--message-format=json"],
       ],
       outcome: "blocked",
       exitCode: 101,
       stdoutSha256: HASH.stdout,
       stderrSha256: HASH.stderr,
       blockers: [
-        {
-          id: "formula-entry-ast",
-          kind: "dependency-cycle",
-          owner: "types::FormulaEntry::ast",
-          dependency: "calc::Ast",
-          reason: "stored syntax crosses the boundary",
-        },
-        {
-          id: "dependency-index",
-          kind: "dependency-cycle",
-          owner: "graph::FormulaGraph::index",
-          dependency: "eval::DepIndex",
-          reason: "dependency state crosses the boundary",
-        },
+        blocker(
+          "formula-entry-ast",
+          "types::FormulaEntry::ast",
+          "calc::Ast",
+          "stored syntax crosses the boundary",
+        ),
+        blocker(
+          "dependency-index",
+          "graph::FormulaGraph::index",
+          "eval::DepIndex",
+          "dependency state crosses the boundary",
+        ),
       ],
     },
   };
 }
+type Fixture = ReturnType<typeof fixture>;
+const variant = (evidence: Fixture, index: number) =>
+  must(evidence.variants[index], `variant ${index}`);
 
-describe("WASM post-link matrix evidence", () => {
-  it("keeps Rust opt-level separate and selects by the declared Brotli policy", () => {
-    const parsed = parseWasmProfileMatrix(fixture());
-    expect(parsed.rustProfile.optLevel).toBe(3);
-    expect(parsed.variants.map(({ wasmOpt }) => wasmOpt)).toEqual(["-O3", "-Os", "-Oz"]);
-    expect(decideWasmProfile(parsed)).toEqual({
-      status: "recommended",
-      wasmOpt: "-Oz",
-      baseline: "-O3",
-      savedBytes: { raw: 100, gzip: 30, brotli: 20 },
-    });
+it("keeps Rust opt-level separate and selects by the declared Brotli policy", () => {
+  const parsed = parseWasmProfileMatrix(fixture());
+  expect(parsed.rustProfile.optLevel).toBe(3);
+  expect(parsed.variants.map(({ wasmOpt }) => wasmOpt)).toEqual(["-O3", "-Os", "-Oz"]);
+  expect(decideWasmProfile(parsed)).toEqual({
+    status: "recommended",
+    wasmOpt: "-Oz",
+    baseline: "-O3",
+    savedBytes: { raw: 100, gzip: 30, brotli: 20 },
   });
+});
 
-  it("rejects variants that do not share one pre-post-link artifact", () => {
-    const evidence = fixture();
-    evidence.variants[1]!.inputWasmSha256 = "9".repeat(64);
-    expect(() => parseWasmProfileMatrix(evidence)).toThrow(
+it("rejects unshared inputs, non-gating commands, opted-out gates and unmatched provenance", () => {
+  expectRejections(fixture, parseWasmProfileMatrix, [
+    [
+      (evidence) => (variant(evidence, 1).inputWasmSha256 = "9".repeat(64)),
       "-Os did not use the shared pre-post-link artifact",
-    );
-  });
-
-  it("rejects non-gating and report-only benchmark commands", () => {
-    const preliminary = fixture();
-    preliminary.variants[0]!.formulaGate.commands = [
-      ["bun", "run", "bench:formula", "--preliminary"],
-    ];
-    expect(() => parseWasmProfileMatrix(preliminary)).toThrow(
+    ],
+    [
+      (evidence) =>
+        (variant(evidence, 0).formulaGate.commands = [
+          ["bun", "run", "bench:formula", "--preliminary"],
+        ]),
       "must run the gating formula benchmark",
-    );
-
-    const reportOnly = fixture();
-    reportOnly.variants[0]!.renderGate.commands[1]!.push("--report-only");
-    expect(() => parseWasmProfileMatrix(reportOnly)).toThrow(
+    ],
+    [
+      (evidence) =>
+        must(variant(evidence, 0).renderGate.commands[1], "check command").push("--report-only"),
       "must run the render capture and fail-closed check",
-    );
-  });
-
-  it("rejects attempts to opt out of either required performance gate", () => {
-    const evidence = fixture();
-    evidence.decisionPolicy.requireRenderGate = false;
-    expect(() => parseWasmProfileMatrix(evidence)).toThrow(
-      "decisionPolicy.requireRenderGate must be true",
-    );
-  });
-
-  it("rejects dirty or unmatched runner provenance", () => {
-    const dirty = fixture();
-    dirty.provenance.dirty = true;
-    expect(() => parseWasmProfileMatrix(dirty)).toThrow("provenance.dirty must be false");
-
-    const unmatched = fixture();
-    unmatched.variants[2]!.renderGate.runnerFingerprint = "9".repeat(64);
-    expect(() => parseWasmProfileMatrix(unmatched)).toThrow(
+    ],
+    [
+      (evidence) => (evidence.decisionPolicy.requireRenderGate = false),
+      "requireRenderGate must be true",
+    ],
+    [(evidence) => (evidence.provenance.dirty = true), "provenance.dirty must be false"],
+    [
+      (evidence) => (variant(evidence, 2).renderGate.runnerFingerprint = "9".repeat(64)),
       "renderGate runner provenance is incomparable",
-    );
-  });
+    ],
+  ]);
+});
 
-  it("blocks the decision when any formula or render gate fails", () => {
-    const formulaFailure = fixture();
-    formulaFailure.variants[2]!.formulaGate.status = "failed";
-    formulaFailure.variants[2]!.formulaGate.exitCode = 1;
-    expect(decideWasmProfile(formulaFailure)).toEqual({
-      status: "blocked",
-      failures: ["-Oz formula gate failed"],
-    });
-
-    const renderFailure = fixture();
-    renderFailure.variants[1]!.renderGate.status = "failed";
-    renderFailure.variants[1]!.renderGate.exitCode = 1;
-    expect(decideWasmProfile(renderFailure)).toEqual({
-      status: "blocked",
-      failures: ["-Os render gate failed"],
-    });
-  });
-
-  it("blocks a recommendation when the compile probe failure is unclassified", () => {
+it("blocks the decision on any failed gate or an unclassified compile probe failure", () => {
+  for (const [edit, failure] of [
+    [
+      (evidence: Fixture) =>
+        Object.assign(variant(evidence, 2).formulaGate, { status: "failed", exitCode: 1 }),
+      "-Oz formula gate failed",
+    ],
+    [
+      (evidence: Fixture) =>
+        Object.assign(variant(evidence, 1).renderGate, { status: "failed", exitCode: 1 }),
+      "-Os render gate failed",
+    ],
+    [
+      (evidence: Fixture) =>
+        Object.assign(evidence.storeOnlyProbe, { outcome: "failed", blockers: [] }),
+      "store-only compile probe failed without a classified outcome",
+    ],
+  ] as const) {
     const evidence = fixture();
-    evidence.storeOnlyProbe.outcome = "failed";
-    evidence.storeOnlyProbe.blockers = [];
-    expect(decideWasmProfile(evidence)).toEqual({
-      status: "blocked",
-      failures: ["store-only compile probe failed without a classified outcome"],
-    });
-  });
+    edit(evidence);
+    expect(decideWasmProfile(evidence)).toEqual({ status: "blocked", failures: [failure] });
+  }
 });

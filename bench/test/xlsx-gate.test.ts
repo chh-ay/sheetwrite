@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { expect, it } from "bun:test";
 
 import { summarizeFinite } from "../src/stats.js";
 import {
@@ -7,6 +7,9 @@ import {
   type XlsxRawSample,
   type XlsxScenarioSummary,
 } from "../src/xlsx-bench.js";
+import { type DeepMutable, expectRejections, must, mutableCopy } from "./gate-fixtures.js";
+
+type Artifact = DeepMutable<XlsxBenchmarkArtifact>;
 
 const SCENARIOS = [
   ["import", "combined"],
@@ -17,14 +20,15 @@ const SCENARIOS = [
   ["reject", "compression-ratio"],
   ["reject", "deep-xml"],
 ] as const;
+const LIMIT_BY_REJECTION: Record<string, string> = {
+  "compression-ratio": "maxCompressionRatio",
+  "deep-xml": "maxXmlDepth",
+};
 
-function sample(
-  round: number,
-  operation: XlsxRawSample["operation"],
-  scenario: string,
-): XlsxRawSample {
+function sample(operation: XlsxRawSample["operation"], scenario: string): XlsxRawSample {
+  const limit = LIMIT_BY_REJECTION[scenario];
   return {
-    round,
+    round: 0,
     engine: "current",
     operation,
     scenario,
@@ -42,72 +46,67 @@ function sample(
     inputBytes: 10,
     outputBytes: 20,
     checksum: "a".repeat(64),
-    ...(operation === "reject"
-      ? {
-          rejection: `XlsxResourceError:Sheetwrite: XLSX import ${scenario === "compression-ratio" ? "maxCompressionRatio" : "maxXmlDepth"} limit exceeded`,
-        }
+    ...(limit
+      ? { rejection: `XlsxResourceError:Sheetwrite: XLSX import ${limit} limit exceeded` }
       : {}),
   };
 }
 
-function summary(values: readonly XlsxRawSample[]): XlsxScenarioSummary {
-  const value = values[0]!;
-  const allocations = values.map(
-    (entry) =>
-      Math.max(0, entry.heapAfterBytes - entry.heapBeforeBytes) +
-      Math.max(0, entry.arrayBuffersAfterBytes - entry.arrayBuffersBeforeBytes),
-  );
-  const retained = values.map(
-    (entry) =>
-      Math.max(0, entry.heapRetainedBytes - entry.heapBeforeBytes) +
-      Math.max(0, entry.arrayBuffersRetainedBytes - entry.arrayBuffersBeforeBytes),
-  );
-  const rss = values.map((entry) => entry.maxRssBytes);
-  return {
-    engine: value.engine,
-    operation: value.operation,
-    scenario: value.scenario,
-    durationMs: summarizeFinite(values.map((entry) => entry.durationMs)),
-    processWallMs: summarizeFinite(values.map((entry) => entry.processWallMs)),
-    maxRssBytes: { ...summarizeFinite(rss), max: Math.max(...rss) },
-    returnAllocationDeltaBytes: {
-      ...summarizeFinite(allocations),
-      max: Math.max(...allocations),
-    },
-    retainedAfterGcDeltaBytes: {
-      ...summarizeFinite(retained),
-      max: Math.max(...retained),
-    },
-  };
-}
-
+/** The per-scenario summaries the artifact must carry for `samples`. */
 function summaries(samples: readonly XlsxRawSample[]): XlsxScenarioSummary[] {
-  const grouped = new Map<string, XlsxRawSample[]>();
-  for (const value of samples) {
-    const key = `${value.engine}:${value.operation}:${value.scenario}`;
-    const bucket = grouped.get(key);
-    if (bucket) bucket.push(value);
-    else grouped.set(key, [value]);
-  }
-  return [...grouped.values()]
-    .map(summary)
-    .sort((left, right) =>
-      `${left.engine}:${left.operation}:${left.scenario}`.localeCompare(
-        `${right.engine}:${right.operation}:${right.scenario}`,
-      ),
-    );
+  const groups = Map.groupBy(
+    samples,
+    (value) => `${value.engine}:${value.operation}:${value.scenario}`,
+  );
+  const withMax = (values: number[]) => ({ ...summarizeFinite(values), max: Math.max(...values) });
+  const growth = (before: number, after: number) => Math.max(0, after - before);
+  return [...groups.entries()]
+    .toSorted(([left], [right]) => left.localeCompare(right))
+    .map(([, values]) => {
+      const { engine, operation, scenario } = must(values[0], "sample");
+      return {
+        engine,
+        operation,
+        scenario,
+        durationMs: summarizeFinite(values.map((value) => value.durationMs)),
+        processWallMs: summarizeFinite(values.map((value) => value.processWallMs)),
+        maxRssBytes: withMax(values.map((value) => value.maxRssBytes)),
+        returnAllocationDeltaBytes: withMax(
+          values.map(
+            (value) =>
+              growth(value.heapBeforeBytes, value.heapAfterBytes) +
+              growth(value.arrayBuffersBeforeBytes, value.arrayBuffersAfterBytes),
+          ),
+        ),
+        retainedAfterGcDeltaBytes: withMax(
+          values.map(
+            (value) =>
+              growth(value.heapBeforeBytes, value.heapRetainedBytes) +
+              growth(value.arrayBuffersBeforeBytes, value.arrayBuffersRetainedBytes),
+          ),
+        ),
+      };
+    });
 }
 
-function artifact(): XlsxBenchmarkArtifact {
-  const samples = SCENARIOS.map(([operation, scenario]) => sample(0, operation, scenario));
+/** A full artifact comparing the current codec with the old backend; only import's ratio varies. */
+function comparedArtifact(importRatio = 1): XlsxBenchmarkArtifact {
+  const current = SCENARIOS.map(([operation, scenario]) => ({
+    ...sample(operation, scenario),
+    durationMs: operation === "import" ? importRatio : 1,
+  }));
+  const baseline = current
+    .filter((value) => value.operation !== "reject")
+    .map((value) => ({ ...value, engine: "baseline" as const, durationMs: 1 }));
+  const samples = [...current, ...baseline];
   return {
     protocol: "sheetwrite-xlsx-codec-v2",
-    mode: "smoke",
+    mode: "full",
     metadata: {
       commit: "test",
       dirty: true,
       timestamp: "2026-07-18T00:00:00.000Z",
-      engineVersions: { sheetwrite: "0.4.0" },
+      engineVersions: { sheetwrite: "0.4.0", exceljs: "4.4.0" },
     },
     rounds: 1,
     maxBaselineRatio: 1.25,
@@ -125,106 +124,76 @@ function artifact(): XlsxBenchmarkArtifact {
       platform: "linux",
       arch: "x64",
       cpu: "test",
+      baselineCommit: "87fadb72397947ea8c6ba576682925c7879579b8",
     },
     methodology: { timing: "isolated", memory: "VmHWM", allocation: "return and post-GC" },
     scenarios: SCENARIOS.map(([operation, scenario]) => `${operation}:${scenario}`),
     samples,
     summaries: summaries(samples),
-    comparisons: [],
-  };
-}
-
-function comparedArtifact(importDurationMs = 2): XlsxBenchmarkArtifact {
-  const currentOnly = artifact();
-  const current = currentOnly.samples.map((value) =>
-    value.operation === "import" ? { ...value, durationMs: importDurationMs } : value,
-  );
-  const baseline = current
-    .filter((value) => value.operation !== "reject")
-    .map((value) => ({ ...value, engine: "baseline" as const, durationMs: 1 }));
-  const samples = [...current, ...baseline];
-  return {
-    ...currentOnly,
-    mode: "full",
-    metadata: {
-      ...currentOnly.metadata,
-      engineVersions: { ...currentOnly.metadata.engineVersions, exceljs: "4.4.0" },
-    },
-    toolchain: {
-      ...currentOnly.toolchain,
-      baselineCommit: "87fadb72397947ea8c6ba576682925c7879579b8",
-    },
-    samples,
-    summaries: summaries(samples),
-    comparisons: SCENARIOS.filter(([operation]) => operation !== "reject").map(
-      ([operation, scenario]) => ({
-        operation: operation as "import" | "export",
-        scenario,
-        medianWallRatio: operation === "import" ? importDurationMs : 1,
-        peakRssRatio: 1,
-      }),
+    comparisons: SCENARIOS.flatMap(([operation, scenario]) =>
+      operation === "reject"
+        ? []
+        : [
+            {
+              operation,
+              scenario,
+              medianWallRatio: operation === "import" ? importRatio : 1,
+              peakRssRatio: 1,
+            },
+          ],
     ),
   };
 }
 
-describe("XLSX benchmark gate", () => {
-  it("requires versions for the engines actually measured", () => {
-    const valid = comparedArtifact(1);
-    expect(() => validateXlsxBenchmarkArtifact(valid)).not.toThrow();
-    for (const engine of ["sheetwrite", "exceljs"] as const) {
-      for (const version of [undefined, "", "4", "^4.4.0", "01.2.3"]) {
-        expect(() =>
-          validateXlsxBenchmarkArtifact({
-            ...valid,
-            metadata: {
-              ...valid.metadata,
-              engineVersions: { ...valid.metadata.engineVersions, [engine]: version },
-            },
-          }),
-        ).toThrow(`engineVersions.${engine}`);
-      }
+it("accepts a complete comparison and rejects drifted versions, summaries and outputs", () => {
+  expect(() => validateXlsxBenchmarkArtifact(comparedArtifact())).not.toThrow();
+  for (const engine of ["sheetwrite", "exceljs"]) {
+    for (const version of [undefined, "", "4", "^4.4.0", "01.2.3"]) {
+      const artifact = mutableCopy(comparedArtifact());
+      Reflect.set(artifact.metadata.engineVersions, engine, version);
+      expect(() => validateXlsxBenchmarkArtifact(artifact)).toThrow(`engineVersions.${engine}`);
     }
-  });
-
-  it("recomputes summaries from raw samples", () => {
-    const value = artifact();
-    for (const metric of [
-      "durationMs",
-      "returnAllocationDeltaBytes",
-      "retainedAfterGcDeltaBytes",
-    ] as const) {
-      expect(() =>
-        validateXlsxBenchmarkArtifact({
+  }
+  expectRejections(() => mutableCopy(comparedArtifact()), validateXlsxBenchmarkArtifact, [
+    ...(["sheetwrite", "exceljs"] as const).map(
+      (engine) =>
+        [
+          (artifact: Artifact) => Reflect.set(artifact.metadata.engineVersions, engine, "^4.4.0"),
+          `engineVersions.${engine}`,
+        ] as const,
+    ),
+    ...(["durationMs", "returnAllocationDeltaBytes", "retainedAfterGcDeltaBytes"] as const).map(
+      (metric) =>
+        [
+          (artifact: Artifact) => {
+            const [first, ...rest] = artifact.summaries;
+            if (!first) throw new Error("fixture has no summary");
+            artifact.summaries = [
+              { ...first, [metric]: { ...first[metric], median: 0.5 } },
+              ...rest,
+            ];
+          },
+          "summaries do not match raw samples",
+        ] as const,
+    ),
+    [
+      (artifact) => {
+        const secondRound = artifact.samples.map((value) => ({
           ...value,
-          summaries: value.summaries.map((entry, index) =>
-            index === 0 ? { ...entry, [metric]: { ...entry[metric], median: 0.5 } } : entry,
-          ),
-        }),
-      ).toThrow("summaries do not match raw samples");
-    }
-  });
+          round: 1,
+          checksum: value.scenario === "scalar" ? "b".repeat(64) : value.checksum,
+        }));
+        artifact.rounds = 2;
+        artifact.samples = [...artifact.samples, ...secondRound];
+        artifact.summaries = mutableCopy(summaries(artifact.samples));
+      },
+      "is not deterministic",
+    ],
+  ]);
+});
 
-  it("rejects wall-time regressions above the old-backend ratio", () => {
-    expect(() => validateXlsxBenchmarkArtifact(comparedArtifact())).toThrow(
-      "import:combined regressed",
-    );
-  });
-
-  it("rejects output checksum drift across isolated rounds", () => {
-    const value = artifact();
-    const secondRound = value.samples.map((entry) => ({
-      ...entry,
-      round: 1,
-      checksum: entry.scenario === "scalar" ? "b".repeat(64) : entry.checksum,
-    }));
-    const samples = [...value.samples, ...secondRound];
-    expect(() =>
-      validateXlsxBenchmarkArtifact({
-        ...value,
-        rounds: 2,
-        samples,
-        summaries: summaries(samples),
-      }),
-    ).toThrow("export:scalar is not deterministic");
-  });
+it("rejects wall-time regressions above the old-backend ratio", () => {
+  expect(() => validateXlsxBenchmarkArtifact(comparedArtifact(2))).toThrow(
+    "import:combined regressed",
+  );
 });
