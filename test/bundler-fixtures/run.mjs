@@ -89,7 +89,9 @@ async function withStaticServer(root, runWithOrigin) {
               ? "text/css; charset=utf-8"
               : extname(file) === ".wasm"
                 ? "application/wasm"
-                : "application/octet-stream";
+                : extname(file) === ".svg"
+                  ? "image/svg+xml"
+                  : "application/octet-stream";
       response.writeHead(200, { "content-type": contentType }).end(bytes);
     } catch {
       response.writeHead(404).end();
