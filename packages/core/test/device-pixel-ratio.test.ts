@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { GridImpl } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, Store, Workbook } from "../src/types.js";
-import { makeWorkbook } from "./fixtures.js";
+import { makeWorkbook, mountHost } from "./fixtures.js";
 
 class ResolutionQuery extends EventTarget {
   readonly media: string;
@@ -60,14 +60,6 @@ function makeStore(workbook: Workbook): Store {
     on: () => () => {},
     viewRowCount: (sheet) => workbook.sheets.find((entry) => entry.id === sheet)?.rowCount ?? 0,
   };
-}
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
 }
 
 async function flushScheduledFrame(frames: Map<number, FrameRequestCallback>): Promise<void> {
