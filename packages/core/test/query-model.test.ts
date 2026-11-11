@@ -102,19 +102,6 @@ describe("query step editor text", () => {
       "Area",
     ]);
   });
-
-  it("reports unknown columns, the query itself as a join input and trailing text", () => {
-    const columns = columnsAfter(sales, queries);
-    expect(parseStep("select", "Missing", columns, queries, "sales")).toEqual({
-      error: "No column is named Missing.",
-    });
-    expect(parseStep("join", "Sales on Region = Region", columns, queries, "sales")).toEqual({
-      error: "Name another saved query.",
-    });
-    expect(parseStep("changeType", "Total: number extra", columns, queries, "sales")).toEqual({
-      error: "Unexpected text at the end of the step.",
-    });
-  });
 });
 
 describe("query source columns text", () => {

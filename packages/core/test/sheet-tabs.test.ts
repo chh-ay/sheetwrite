@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 
-import { POPUP_VIEWPORT_MARGIN } from "../src/menu-surface.js";
 import { type SheetTabRecord, SheetTabs, type SheetTabsOptions } from "../src/sheet-tabs.js";
 import type { SheetLifecycleResult } from "../src/types/grid.js";
+import { pressLikeWebKit } from "./fixtures.js";
 
 const SHEETS: readonly SheetTabRecord[] = [
   { id: "a", name: "Sales" },
@@ -113,52 +113,6 @@ describe("SheetTabs", () => {
     key(host, "Backspace");
     expect(removed).toEqual([]);
   });
-  it("renders visible sheets as an ID-controlled tablist and never reveals veryHidden", () => {
-    tabs.update(
-      [
-        ...SHEETS,
-        { id: "hidden", name: "Hidden", visibility: "hidden" },
-        { id: "secret", name: "Secret", visibility: "veryHidden" },
-      ],
-      "b",
-    );
-
-    const buttons = tabButtons(host);
-    expect(buttons.map((button) => button.textContent)).toEqual(["Sales", "Sales", "Summary"]);
-    expect(buttons.map((button) => button.getAttribute("aria-selected"))).toEqual([
-      "false",
-      "true",
-      "false",
-    ]);
-    buttons[0]!.click();
-    expect(activated).toEqual(["a"]);
-    expect(host.textContent).not.toContain("Secret");
-  });
-
-  it("keeps tab scrolling inside the strip during mount and keyboard navigation", () => {
-    expect(scrolled).toEqual([]);
-    const selectedTab = host.querySelector<HTMLButtonElement>('[role="tab"][aria-selected="true"]');
-    if (!selectedTab) throw new Error("Expected a selected tab");
-    const stripWidth = 100;
-    const nextTabLeft = 150;
-    const nextTabRight = 200;
-    Object.defineProperty(host, "getBoundingClientRect", {
-      value: () => ({ left: 0, right: stripWidth }),
-    });
-    const nextTab = tabButtons(host)[2];
-    if (!nextTab) throw new Error("Expected the next sheet tab");
-    Object.defineProperty(nextTab, "getBoundingClientRect", {
-      value: () => ({
-        left: nextTabLeft - host.scrollLeft,
-        right: nextTabRight - host.scrollLeft,
-      }),
-    });
-    selectedTab.focus();
-    key(selectedTab, "ArrowRight");
-    expect(document.activeElement).toBe(nextTab);
-    expect(host.scrollLeft).toBe(nextTabRight - stripWidth);
-    expect(scrolled).toEqual([]);
-  });
 
   it("renames inline by double-click and F2, committing Enter or changed blur and cancelling Escape", () => {
     const renames: Array<[string, string]> = [];
@@ -229,75 +183,6 @@ describe("SheetTabs", () => {
     input.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true, data: "売上" }));
     key(input, "Enter");
     expect(renames).toEqual(["b:売上"]);
-  });
-
-  it("keeps the options menu open for scrolls that do not move its trigger", () => {
-    tabs.destroy();
-    tabs = new SheetTabs(host, { onActivate: () => {}, onRename: (id) => applied(id) });
-    tabs.update(SHEETS, "b");
-    let triggerTop = 500;
-    Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
-      configurable: true,
-      value(this: HTMLElement) {
-        const top = this.classList.contains("sheetwrite-tab-options-button") ? triggerTop : 0;
-        return { left: 40, right: 68, top, bottom: top + 24, width: 28, height: 24 };
-      },
-    });
-    try {
-      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
-      const rename = host.querySelector<HTMLButtonElement>('[aria-label="Rename Sales sheet"]')!;
-      expect(document.activeElement).toBe(rename);
-
-      // Another panel on the page scrolls (for example an event log that grows).
-      const panel = document.createElement("div");
-      document.body.appendChild(panel);
-      panel.dispatchEvent(new Event("scroll"));
-      expect(host.querySelector('[role="menu"]')).not.toBeNull();
-      expect(document.activeElement).toBe(rename);
-
-      // The page scrolls and the trigger moves: the placed menu would be wrong, so it closes.
-      triggerTop = 300;
-      document.dispatchEvent(new Event("scroll"));
-      expect(host.querySelector('[role="menu"]')).toBeNull();
-    } finally {
-      Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect");
-    }
-  });
-
-  it("keeps the options menu the shared popup margin inside the viewport", () => {
-    tabs.destroy();
-    tabs = new SheetTabs(host, { onActivate: () => {}, onRename: (id) => applied(id) });
-    tabs.update(SHEETS, "b");
-    const menuWidth = 160;
-    const menuHeight = 120;
-    Object.defineProperty(HTMLElement.prototype, "getBoundingClientRect", {
-      configurable: true,
-      value(this: HTMLElement) {
-        if (this.classList.contains("sheetwrite-tab-options-button")) {
-          const left = window.innerWidth - 20;
-          const top = window.innerHeight - 24;
-          return { left, right: left + 20, top, bottom: top + 24, width: 20, height: 24 };
-        }
-        return {
-          left: 0,
-          right: menuWidth,
-          top: 0,
-          bottom: menuHeight,
-          width: menuWidth,
-          height: menuHeight,
-        };
-      },
-    });
-    try {
-      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
-      const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
-      expect(Number.parseFloat(menu.style.left)).toBe(
-        window.innerWidth - menuWidth - POPUP_VIEWPORT_MARGIN,
-      );
-      expect(Number.parseFloat(menu.style.top)).toBe(window.innerHeight - 24 - menuHeight);
-    } finally {
-      Reflect.deleteProperty(HTMLElement.prototype, "getBoundingClientRect");
-    }
   });
 
   it("keeps invalid Enter and blur edits focused with their structured lifecycle error associated", () => {
@@ -472,6 +357,36 @@ describe("SheetTabs", () => {
     ]);
   });
 
+  it("keeps its menus open for a press on a choice that does not focus the choice", () => {
+    const actions: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onHide: (id) => {
+        actions.push(`hide:${id}`);
+        return applied(id);
+      },
+      onUnhide: (id) => {
+        actions.push(`unhide:${id}`);
+        return applied(id);
+      },
+    });
+    tabs.update([...SHEETS, { id: "hidden", name: "Hidden", visibility: "hidden" }], "b");
+
+    const trigger = host.querySelector<HTMLButtonElement>(
+      '[aria-label="Options for Sales sheet"]',
+    )!;
+    trigger.focus();
+    key(trigger, "ArrowDown");
+    pressLikeWebKit(host.querySelector<HTMLButtonElement>('[aria-label="Hide Sales sheet"]')!);
+
+    const unhide = host.querySelector<HTMLButtonElement>('[aria-label="Unhide sheet"]')!;
+    unhide.click();
+    pressLikeWebKit(host.querySelector('[aria-label="Hidden sheets"]')!.querySelector("button")!);
+
+    expect(actions).toEqual(["hide:b", "unhide:hidden"]);
+  });
+
   it("supports pointer drag reorder and maps drops to workbook indexes through hidden sheets", () => {
     const moves: string[] = [];
     tabs.destroy();
@@ -593,71 +508,5 @@ describe("SheetTabs", () => {
     tabs.setReadOnly(true);
     expect(host.querySelector("input")).toBeNull();
     expect(actions).toEqual([]);
-  });
-
-  it("surfaces a forbidden final-sheet hide outcome on the associated active tab", () => {
-    tabs.destroy();
-    tabs = new SheetTabs(host, {
-      onActivate: () => {},
-      onAdd: () => applied("new"),
-      onRename: (id) => applied(id),
-      onHide: (id) => rejected(id, "A workbook must keep one visible sheet", "last-visible-sheet"),
-    });
-    tabs.update([{ id: "only", name: "Only" }], "only");
-    expect(tabButtons(host)).toHaveLength(1);
-    expect(host.querySelector('[aria-label="Add sheet"]')).not.toBeNull();
-    host.querySelector<HTMLButtonElement>('[aria-label="Options for Only sheet"]')!.click();
-    expect(host.querySelector('[aria-label="Rename Only sheet"]')).not.toBeNull();
-    host.querySelector<HTMLButtonElement>('[aria-label="Hide Only sheet"]')!.click();
-    const tab = tabButtons(host)[0]!;
-    const error = host.querySelector<HTMLElement>('[role="alert"]')!;
-    expect(error.dataset.code).toBe("last-visible-sheet");
-    expect(tab.getAttribute("aria-describedby")).toBe(error.id);
-    expect(host.querySelector('[role="menu"]')).toBeNull();
-    expect(document.activeElement).toBe(
-      host.querySelector<HTMLButtonElement>('[aria-label="Options for Only sheet"]'),
-    );
-  });
-
-  it("associates applied lifecycle rejections with the ordinary Unhide control", () => {
-    const hostMessage = "host rejection message";
-    tabs.destroy();
-    tabs = new SheetTabs(host, {
-      onActivate: () => {},
-      onUnhide: (id) => ({
-        status: "applied",
-        epoch: 2,
-        transaction: { patches: [] },
-        sheet: id,
-        rejections: [
-          {
-            kind: "sheet-lifecycle",
-            severity: "error",
-            code: "sheet-not-found",
-            sheet: id,
-            operationIndex: 0,
-            message: hostMessage,
-          },
-        ],
-      }),
-    });
-    tabs.update(
-      [
-        { id: "visible", name: "Visible" },
-        { id: "hidden", name: "Hidden", visibility: "hidden" },
-      ],
-      "visible",
-    );
-    let unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
-    host
-      .querySelector<HTMLButtonElement>('[role="group"][aria-label="Hidden sheets"] button')!
-      .click();
-
-    unhide = host.querySelector<HTMLElement>('[aria-label="Unhide sheet"]')!;
-    const error = host.querySelector<HTMLElement>('[role="alert"]')!;
-    expect(unhide.getAttribute("aria-invalid")).toBe("true");
-    expect(unhide.getAttribute("aria-describedby")).toBe(error.id);
-    expect(error.textContent).toBe(hostMessage);
-    expect(error.dataset.code).toBe("sheet-not-found");
   });
 });

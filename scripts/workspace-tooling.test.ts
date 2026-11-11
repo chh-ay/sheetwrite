@@ -11,6 +11,7 @@ import {
   validateReleasePackageVersions,
 } from "./changeset-ci.js";
 import {
+  COVERED_PACKAGE_TEST_ROOTS,
   PUBLISHABLE_PACKAGE_ORDER,
   TOOLING_TEST_PATHS,
   TYPECHECK_NODES,
@@ -132,7 +133,13 @@ describe("canonical workspace graph", () => {
         ),
       ).toHaveLength(1);
     }
-    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + verificationProjects.length);
+    const nodeProjects = TYPECHECK_NODES.flatMap((node) => {
+      const index = node.command.indexOf("-p");
+      return index >= 0 ? [node.command[index + 1] ?? ""] : [];
+    });
+    expect(nodeProjects.filter((project) => !existsSync(join(root, project)))).toEqual([]);
+    expect(new Set(nodeProjects).size).toBe(nodeProjects.length);
+    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + nodeProjects.length);
   });
 
   it("runs every script test suite from exactly one test list", async () => {
@@ -146,6 +153,42 @@ describe("canonical workspace graph", () => {
     expect(listed.filter((path, index) => listed.indexOf(path) !== index)).toEqual([]);
     expect(suites.filter((suite) => !listed.includes(suite)).sort()).toEqual([]);
     expect(listed.filter((path) => !existsSync(join(root, path)))).toEqual([]);
+  });
+
+  it("runs every unit suite in CI once, either uncovered or under coverage", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const result = Bun.spawnSync(
+      ["bun", "scripts/workspace-tooling.ts", "test-unit-uncovered", "--dry-run"],
+      { cwd: root, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(result.exitCode, result.stderr.toString()).toBe(0);
+    const command = result.stdout
+      .toString()
+      .split("\n")
+      .map((line) => line.split("\t"))
+      .find(([id]) => id === "test:unit:uncovered")?.[1];
+    if (command === undefined)
+      throw new Error("test-unit-uncovered has no test:unit:uncovered node");
+    const paths = command
+      .split(" ")
+      .slice(2)
+      .map((argument) => JSON.parse(argument) as string);
+
+    const packageTestDirectories: string[] = [];
+    for await (const path of new Bun.Glob("packages/*/test").scan({
+      cwd: root,
+      onlyFiles: false,
+    })) {
+      packageTestDirectories.push(path);
+    }
+    const packageRuns = [
+      ...paths.filter((path) => path.startsWith("packages/")),
+      ...COVERED_PACKAGE_TEST_ROOTS,
+    ];
+    expect(packageRuns.sort()).toEqual(packageTestDirectories.sort());
+    expect(paths.filter((path) => !path.startsWith("packages/"))).toEqual(
+      UNIT_TEST_PATHS.filter((path) => path !== "packages"),
+    );
   });
 });
 

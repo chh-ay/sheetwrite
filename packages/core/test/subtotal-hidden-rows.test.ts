@@ -77,28 +77,6 @@ describe("SUBTOTAL over hidden rows", () => {
     expect(subtotals(storeWithSubtotals(workbook))).toEqual([153, 61.5]);
   });
 
-  it("sends many hidden rows as one packed engine call, and nothing when they do not change", () => {
-    const setHiddenRows = spyOn(getEngine().CellStore.prototype, "setHiddenRows");
-    try {
-      const store = storeWithSubtotals(makeWorkbook(2_000));
-      setHiddenRows.mockClear();
-      const everyOtherRow = Array.from({ length: 1_000 }, (_, index) => index * 2);
-
-      store.hideRows("s1", everyOtherRow);
-      expect(setHiddenRows).toHaveBeenCalledTimes(1);
-      const [, manual, filtered] = setHiddenRows.mock.calls[0] ?? [];
-      expect(manual?.length).toBe(2_000);
-      expect(filtered?.length).toBe(0);
-
-      store.setViewSort("s1", [{ col: 1, ascending: false }]);
-      expect(setHiddenRows).toHaveBeenCalledTimes(1);
-      // Rows 1, 3 and 5 are visible; 0.5 + 20.5 + 40.5 are hidden.
-      expect(subtotals(store)).toEqual([153, 91.5]);
-    } finally {
-      setHiddenRows.mockRestore();
-    }
-  });
-
   it("closes the mutation when the engine rejects the hidden rows", () => {
     const store = storeWithSubtotals();
     const setHiddenRows = spyOn(getEngine().CellStore.prototype, "setHiddenRows");

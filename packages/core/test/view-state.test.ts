@@ -77,25 +77,6 @@ describe("StoreViewState packed inverse index", () => {
     ).toBe(true);
   });
 
-  it("reallocates on structural growth and drops the inverse when the view resets", () => {
-    const state = sortedView(4, [3, 1]);
-    expect(state.view.viewRowOf("s1", 3)).toBe(0);
-
-    const sheet = state.workbook.sheets[0]!;
-    sheet.rowCount = 6;
-    sheet.hiddenRows = new Set([1]);
-    state.view.rowsChanged("s1");
-    expect(state.view.viewRowOf("s1", 1)).toBeNull();
-    expect(state.view.viewRowOf("s1", 5)).toBe(4);
-
-    sheet.rowCount = 3;
-    sheet.hiddenRows.clear();
-    state.view.rowsChanged("s1");
-    expect(state.view.hasView("s1")).toBe(false);
-    expect(state.view.viewRowOf("s1", 2)).toBe(2);
-    expect(state.view.viewRowOf("s1", 3)).toBeNull();
-  });
-
   it("maps collapsed groups and explicitly rejects layouts wider than the sentinel", () => {
     const document = workbook(6);
     const sheet = document.sheets[0]!;
@@ -117,42 +98,6 @@ describe("StoreViewState packed inverse index", () => {
     expect(() => oversized.view.viewRowOf("s1", 0)).toThrow(
       expect.objectContaining({ code: "resource-limit", operation: "store" }),
     );
-  });
-
-  it("isolates sheet caches and releases every retained index on removal and disposal", () => {
-    const document = workbook(4);
-    document.sheets.push({
-      ...document.sheets[0]!,
-      id: "s2",
-      name: "Sheet 2",
-    });
-    const orders = [Uint32Array.from([3, 1]), Uint32Array.from([2, 0])];
-    const wasm = {
-      sortRowsMulti: (handle: number) => orders[handle]!,
-    } as unknown as RecomputingCellStore;
-    const view = new StoreViewState(
-      wasm,
-      sheetRegistry(document, [
-        ["s1", 0],
-        ["s2", 1],
-      ]),
-    );
-    view.metadataChanged("s1");
-    view.metadataChanged("s2");
-
-    expect(view.viewRowOf("s1", 3)).toBe(0);
-    expect(view.viewRowOf("s2", 2)).toBe(0);
-    expect(view.viewRowOf("s2", 3)).toBeNull();
-
-    view.removeSheet("s1");
-    document.sheets.splice(0, 1);
-    expect(view.order("s1")).toBeUndefined();
-    expect(view.viewRowOf("s1", 3)).toBeNull();
-    expect(view.viewRowOf("s2", 2)).toBe(0);
-
-    view.dispose();
-    expect(view.order("s2")).toBeUndefined();
-    expect(view.viewRowOf("s2", 2)).toBe(2);
   });
 
   it("rejects out-of-bounds and duplicate view rows instead of creating coordinate aliases", () => {

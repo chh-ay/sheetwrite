@@ -81,6 +81,8 @@ The adapter initializes WASM after client mount. Use a client-only boundary when
   </Tab>
 </Tabs>
 
+`styles.css` imports every part of the stylesheet. To ship less CSS, import only the parts your grid uses from `styles/`; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Server-rendered host boundaries
 
 The adapter host, its `Grid`, and WASM initialization are client-owned. Server rendering may produce surrounding layout and fallback content, but it must not instantiate a Sheetwrite component or call `createGrid`.
