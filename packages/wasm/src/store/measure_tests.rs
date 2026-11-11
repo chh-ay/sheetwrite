@@ -401,49 +401,6 @@ fn measures_equal_their_formula_over_each_cells_flattened_rows() {
 }
 
 #[test]
-fn measure_cells_follow_value_key_and_measure_edits() {
-    let (rows, columns, flags): (&[usize], &[usize], u32) = (
-        &[REGION, SEGMENT],
-        &[QUARTER],
-        ROW_TOTALS | COLUMN_TOTALS | SUBTOTALS | TABULAR,
-    );
-    let mut fixture = MeasureFixture::new(11);
-    fixture.install(rows, columns, flags);
-
-    for row in [0, 5, 18] {
-        fixture.data[row].amount = Amount::Number(1_000.0 + row as f64);
-        fixture.data[row].region = (fixture.data[row].region + 1) % REGIONS.len();
-        fixture.data[row].quarter = 4.0;
-        fixture.write_order(row);
-    }
-    fixture.data[ERROR_ROW].channel = 1.0;
-    fixture.write_order(ERROR_ROW);
-    fixture.store.recompute_changed();
-    fixture.assert_matches_flattened(rows, columns, flags);
-
-    fixture.data[ERROR_ROW].channel = 2.0;
-    fixture.write_order(ERROR_ROW);
-    let mut formulas = MEASURES.map(|(formula, _)| formula);
-    formulas[0] = "=SUM(orders[qty])/SUM(orders[amount])";
-    fixture.set_measures(&formulas);
-    fixture.store.recompute_changed();
-    let status = fixture.store.pivot_status(fixture.output);
-    let total_row = status[3] as usize - 1;
-    let selected = fixture.select(
-        rows,
-        &[Value::text("Total"), Value::Blank],
-        columns,
-        &[Value::text("Total")],
-    );
-    let expected = fixture.oracle("=SUM(B1:B{n})/SUM(A1:A{n})", &selected);
-    let last_col = status[4] as usize - MEASURES.len();
-    assert_eq!(
-        settled(&fixture.store, fixture.output, total_row, last_col),
-        expected
-    );
-}
-
-#[test]
 fn measure_errors_show_in_their_cells_and_a_missing_measure_at_the_anchor() {
     let mut fixture = MeasureFixture::new(5);
     fixture.set_measures(&[

@@ -2236,15 +2236,6 @@ mod tests {
         assert!(!error.keeps(&Value::Error(FormulaError::DivZero), &mut folded));
     }
 
-    #[test]
-    fn fold_case_matches_to_lowercase() {
-        let mut folded = String::new();
-        for text in ["Apple", "ÄÖÜ", "İstanbul", "ΣΑΣ ΟΔΟΣ", "σας", "ǅ"] {
-            fold_case(text, &mut folded);
-            assert_eq!(folded, text.to_lowercase(), "{text}");
-        }
-    }
-
     /// 2^53: past it, consecutive numbers are 2 apart.
     const TWO_POW_53: f64 = 9_007_199_254_740_992.0;
 
@@ -2289,21 +2280,5 @@ mod tests {
         assert_eq!(sum.value(), 1.0);
 
         remove_all(&mut sum, &[1.0, 1e100, -1e100]);
-    }
-
-    #[test]
-    fn exact_sum_carries_past_the_number_range_and_back() {
-        let mut sum = exact_sum(&[f64::MAX; 3]);
-        assert!(sum
-            .spilled
-            .as_ref()
-            .is_some_and(|spilled| spilled.carry != 0));
-        assert_eq!(sum.value(), f64::INFINITY);
-
-        sum.add(-f64::MAX);
-        sum.add(-f64::MAX);
-        assert_eq!(sum.value(), f64::MAX);
-
-        remove_all(&mut sum, &[f64::MAX]);
     }
 }

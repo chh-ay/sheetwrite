@@ -7,6 +7,9 @@ use crate::keys::{compare_keys, indexes, sorted_rows};
 use crate::plan::{Aggregate, AggregateOp, ColumnSpec, ColumnType, Diagnostic, Limits};
 use std::cmp::Ordering;
 
+/// The input column index of each aggregate; row counts have none.
+type SourceColumns = Vec<Option<u32>>;
+
 /// Null keys form one group; numeric folds ignore null values but propagate errors.
 pub(crate) fn group(
     batch: &Batch,
@@ -65,7 +68,7 @@ pub(crate) fn group(
     Batch::new(columns, groups, limits)
 }
 
-fn source_columns(batch: &Batch, aggregates: &[Aggregate]) -> Result<Vec<Option<u32>>, Diagnostic> {
+fn source_columns(batch: &Batch, aggregates: &[Aggregate]) -> Result<SourceColumns, Diagnostic> {
     aggregates
         .iter()
         .map(|aggregate| match aggregate.op {
@@ -76,7 +79,11 @@ fn source_columns(batch: &Batch, aggregates: &[Aggregate]) -> Result<Vec<Option<
 
                 Ok(None)
             }
-            _ => aggregate
+            AggregateOp::Count
+            | AggregateOp::Sum
+            | AggregateOp::Average
+            | AggregateOp::Min
+            | AggregateOp::Max => aggregate
                 .column
                 .as_ref()
                 .ok_or_else(|| Diagnostic::new("aggregate"))
@@ -104,12 +111,13 @@ fn output_columns(
     for (aggregate, source) in aggregates.iter().zip(sources) {
         let column_type = match aggregate.op {
             AggregateOp::Min | AggregateOp::Max => {
-                let source = source.ok_or_else(|| Diagnostic::new("aggregate"))?;
-                at(&batch.columns, row_index(source)?)?.column_type()
+                let source_index = source.ok_or_else(|| Diagnostic::new("aggregate"))?;
+                at(&batch.columns, row_index(source_index)?)?.column_type()
             }
             AggregateOp::Sum | AggregateOp::Average => {
-                let source = source.ok_or_else(|| Diagnostic::new("aggregate"))?;
-                if at(&batch.columns, row_index(source)?)?.column_type() != ColumnType::Number {
+                let source_index = source.ok_or_else(|| Diagnostic::new("aggregate"))?;
+                if at(&batch.columns, row_index(source_index)?)?.column_type() != ColumnType::Number
+                {
                     return Err(Diagnostic::new("type"));
                 }
 
@@ -140,17 +148,21 @@ fn fold<'a>(
         return Ok(Value::Number(f64::from(flat_index(rows.len())?)));
     }
 
-    let source = row_index(source.ok_or_else(|| Diagnostic::new("aggregate"))?)?;
+    let column = row_index(source.ok_or_else(|| Diagnostic::new("aggregate"))?)?;
     let mut count = 0u32;
     let mut sum = 0.0;
     let mut selected = Value::Null;
 
     for row in rows {
-        let value = batch.value(source, row_index(*row)?)?;
+        let value = batch.value(column, row_index(*row)?)?;
         match value {
             Value::Null => continue,
             Value::Error(_) => return Ok(value),
-            _ => count += 1,
+            Value::Number(_)
+            | Value::Logical(_)
+            | Value::Text(_)
+            | Value::Date(_)
+            | Value::DateTime(_) => count += 1,
         }
 
         match op {
@@ -177,6 +189,6 @@ fn fold<'a>(
         AggregateOp::Count | AggregateOp::CountRows => Value::Number(f64::from(count)),
         AggregateOp::Sum if count > 0 => Value::Number(sum),
         AggregateOp::Average if count > 0 => Value::Number(sum / f64::from(count)),
-        _ => selected,
+        AggregateOp::Sum | AggregateOp::Average | AggregateOp::Min | AggregateOp::Max => selected,
     })
 }

@@ -37,29 +37,29 @@ impl Mixed {
                 ERROR_TAG,
                 error_index.ok_or_else(|| Diagnostic::new("error-code"))?,
             ),
-            Value::Number(value) => {
+            Value::Number(number) => {
                 let index = flat_index(self.numbers.len())?;
-                self.numbers.push(value);
+                self.numbers.push(number);
                 (NUMBER_TAG, index)
             }
-            Value::Logical(value) => {
+            Value::Logical(logical) => {
                 let index = flat_index(self.logical.len())?;
-                self.logical.push(value)?;
+                self.logical.push(logical)?;
                 (LOGICAL_TAG, index)
             }
-            Value::Text(value) => {
+            Value::Text(text) => {
                 let index = flat_index(self.texts.len())?;
-                self.texts.push(value)?;
+                self.texts.push(text)?;
                 (TEXT_TAG, index)
             }
-            Value::Date(value) => {
+            Value::Date(days) => {
                 let index = flat_index(self.dates.len())?;
-                self.dates.push(value);
+                self.dates.push(days);
                 (DATE_TAG, index)
             }
-            Value::DateTime(value) => {
+            Value::DateTime(micros) => {
                 let index = flat_index(self.date_times.len())?;
-                self.date_times.push(value);
+                self.date_times.push(micros);
                 (DATE_TIME_TAG, index)
             }
         };

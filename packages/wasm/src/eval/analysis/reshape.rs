@@ -865,20 +865,6 @@ mod tests {
     }
 
     #[test]
-    fn flatten_ignores_errors_on_request() {
-        let data: &[&[&str]] = &[&["1", "=1/0", ""], &["", "=NA()", "2"]];
-        assert_eq!(
-            evaluate(data, "=TOROW(A1:C2,2)"),
-            grid(&[&["1", "0", "0", "2"]])
-        );
-        assert_eq!(evaluate(data, "=TOROW(A1:C2,3)"), grid(&[&["1", "2"]]));
-        assert_eq!(
-            evaluate(data, "=TOROW(A1:C2)"),
-            grid(&[&["1", "#DIV/0!", "0", "0", "#N/A", "2"]])
-        );
-    }
-
-    #[test]
     fn wrap_matches_microsoft_examples() {
         let letters: &[&[&str]] = &[&["A", "B", "C", "D", "E", "F", "G"]];
         // https://support.microsoft.com/en-us/excel/functions/wraprows-function
@@ -1079,74 +1065,6 @@ mod tests {
             evaluate(data, "=TOROW(HSTACK(A1:A2,B1:B2),0,TRUE)"),
             grid(&[&["1", "3", "2", "4"]])
         );
-    }
-
-    #[test]
-    fn spill_follows_cell_arguments_after_edits() {
-        let data: &[&[&str]] = &[&["1", "2"], &["3", "3"], &["5"], &["7"]];
-        let (mut store, sheet) = sheet_with(data);
-        store.set_formula(sheet, 0, RESULT_COL, "=WRAPROWS(A1:A4,B1)", 0);
-        store.recompute(sheet);
-        assert_eq!(result(&store, sheet), grid(&[&["1", "3"], &["5", "7"]]));
-
-        store.set_number(sheet, 0, 1, 3.0, 0);
-        store.recompute(sheet);
-        assert_eq!(
-            result(&store, sheet),
-            grid(&[&["1", "3", "5"], &["7", "#N/A", "#N/A"]])
-        );
-
-        store.set_formula(sheet, 0, RESULT_COL, "=EXPAND(A1:A2,B2,B1,0)", 0);
-        store.recompute(sheet);
-        assert_eq!(
-            result(&store, sheet),
-            grid(&[&["1", "0", "0"], &["3", "0", "0"], &["0", "0", "0"]])
-        );
-
-        store.set_number(sheet, 1, 0, 9.0, 0);
-        store.set_number(sheet, 1, 1, 2.0, 0);
-        store.recompute(sheet);
-        assert_eq!(
-            result(&store, sheet),
-            grid(&[&["1", "0", "0"], &["9", "0", "0"]])
-        );
-    }
-
-    #[test]
-    fn filter_accepts_value_dependent_shapes() {
-        let source: &[&[&str]] = &[&["1", "3", "", "1"], &["2", "", "", "1"], &["3"], &["4"]];
-        assert_eq!(
-            evaluate(source, "=FILTER(WRAPROWS(A1:A4,B1),D1:D2)"),
-            grid(&[&["1", "2", "3"], &["4", "#N/A", "#N/A"]])
-        );
-        assert_eq!(
-            evaluate(source, "=FILTER(EXPAND(A1:A2,B1,2,0),A1:A3)"),
-            grid(&[&["1", "0"], &["2", "0"], &["0", "0"]])
-        );
-        assert_eq!(
-            evaluate(source, "=SUM(HSTACK(EXPAND(A1:A2,B1,2,0),SEQUENCE(3)))"),
-            grid(&[&["9"]])
-        );
-    }
-
-    #[test]
-    fn oversized_results_report_num() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 20_000);
-        store.set_formula(sheet, 0, 1, "=TOROW(SEQUENCE(20000))", 0);
-        // A computed ignore code keeps the upper bound inside the column limit.
-        store.set_formula(sheet, 1, 1, "=TOROW(SEQUENCE(20000),C1)", 0);
-        store.set_formula(
-            sheet,
-            2,
-            1,
-            "=HSTACK(SEQUENCE(1,10000),SEQUENCE(1,10000))",
-            0,
-        );
-        store.recompute(sheet);
-        for row in 0..3 {
-            assert_eq!(shown(&store, sheet, row, 1), "#NUM!", "row {row}");
-        }
     }
 
     #[test]

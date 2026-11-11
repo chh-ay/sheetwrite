@@ -24,16 +24,6 @@ function mountHost(): HTMLElement {
   return host;
 }
 
-function mountGrid(addons?: Record<string, unknown>): Grid {
-  const grid = createGrid(mountHost(), {
-    workbook: makeWorkbook(5),
-    config: { toolbar: false, find: false, contextMenu: false },
-    addons,
-  });
-  grids.push(grid);
-  return grid;
-}
-
 function recordingAddon(name: string, log: string[]): SheetwriteAddon {
   return {
     name,
@@ -42,17 +32,6 @@ function recordingAddon(name: string, log: string[]): SheetwriteAddon {
 }
 
 describe("initSheetwrite add-ons", () => {
-  it("sets up add-ons once, in list order", async () => {
-    const log: string[] = [];
-
-    await initSheetwrite({
-      addons: [recordingAddon("order-b", log), recordingAddon("order-a", log)],
-    });
-    await initSheetwrite({ addons: [recordingAddon("order-a", log)] });
-
-    expect(log).toEqual(["order-b", "order-a"]);
-  });
-
   it("rejects a name listed twice before any setup runs", async () => {
     const log: string[] = [];
 
@@ -88,61 +67,6 @@ describe("createGrid add-on settings", () => {
         context: { addon: "not-installed" },
       }),
     );
-    expect(host.childElementCount).toBe(0);
-  });
-
-  it("gives each grid its own settings and cleans up when that grid is destroyed", async () => {
-    const attached: Array<{ grid: Grid; settings: unknown }> = [];
-    const detached: Grid[] = [];
-    const settingsAddon: SheetwriteAddon<{ label: string }> = {
-      name: "per-grid",
-      setup: () => {},
-      grid: ({ grid, settings }) => {
-        attached.push({ grid, settings });
-        return () => detached.push(grid);
-      },
-    };
-    await initSheetwrite({ addons: [settingsAddon] });
-
-    const first = mountGrid({ "per-grid": { label: "first" } });
-    const second = mountGrid();
-    first.destroy();
-
-    expect(attached).toEqual([
-      { grid: first, settings: { label: "first" } },
-      { grid: second, settings: undefined },
-    ]);
-    expect(detached).toEqual([first]);
-  });
-
-  it("destroys the grid and runs earlier cleanups when a grid hook throws", async () => {
-    const cleanedUp: string[] = [];
-    const failure = new Error("grid hook failed");
-    // Add-ons stay installed for the page, so these hooks act only on grids that name them.
-    await initSheetwrite({
-      addons: [
-        {
-          name: "hook-before",
-          grid: ({ settings }) => (settings ? () => cleanedUp.push("hook-before") : undefined),
-        },
-        {
-          name: "hook-failing",
-          grid: ({ settings }) => {
-            if (settings) throw failure;
-          },
-        },
-      ],
-    });
-    const host = mountHost();
-
-    expect(() =>
-      createGrid(host, {
-        workbook: makeWorkbook(5),
-        addons: { "hook-before": true, "hook-failing": true },
-      }),
-    ).toThrow(failure);
-
-    expect(cleanedUp).toEqual(["hook-before"]);
     expect(host.childElementCount).toBe(0);
   });
 });

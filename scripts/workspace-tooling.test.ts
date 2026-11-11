@@ -133,7 +133,13 @@ describe("canonical workspace graph", () => {
         ),
       ).toHaveLength(1);
     }
-    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + verificationProjects.length);
+    const nodeProjects = TYPECHECK_NODES.flatMap((node) => {
+      const index = node.command.indexOf("-p");
+      return index >= 0 ? [node.command[index + 1] ?? ""] : [];
+    });
+    expect(nodeProjects.filter((project) => !existsSync(join(root, project)))).toEqual([]);
+    expect(new Set(nodeProjects).size).toBe(nodeProjects.length);
+    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + nodeProjects.length);
   });
 
   it("runs every script test suite from exactly one test list", async () => {

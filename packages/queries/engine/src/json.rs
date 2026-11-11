@@ -33,6 +33,10 @@ pub(crate) enum Kind {
     Object,
 }
 
+/// The next member name, or `None` once the object closed. A name with escapes is decoded
+/// into an owned string; any other name borrows the source bytes.
+pub(crate) type NextKey<'a> = Option<Cow<'a, str>>;
+
 /// The cursor owns no source data and limits nesting before it enters a container.
 pub(crate) struct Reader<'a> {
     bytes: &'a [u8],
@@ -42,7 +46,7 @@ pub(crate) struct Reader<'a> {
 
 impl<'a> Reader<'a> {
     /// The caller keeps the byte slice alive for every borrowed string.
-    pub(crate) fn new(bytes: &'a [u8]) -> Self {
+    pub(crate) const fn new(bytes: &'a [u8]) -> Self {
         Self {
             bytes,
             offset: 0,
@@ -166,10 +170,7 @@ impl<'a> Reader<'a> {
     }
 
     /// Returns the next member name, positioned at its value, or `None` once the object closed.
-    pub(crate) fn next_key(
-        &mut self,
-        first: &mut bool,
-    ) -> Result<Option<Cow<'a, str>>, Diagnostic> {
+    pub(crate) fn next_key(&mut self, first: &mut bool) -> Result<NextKey<'a>, Diagnostic> {
         if !self.next_item(b'}', first)? {
             return Ok(None);
         }
@@ -218,19 +219,19 @@ impl<'a> Reader<'a> {
                 b'"' => {
                     let segment = self.string_segment(start)?;
                     self.offset += 1;
-                    return if let Some(mut decoded) = decoded {
-                        decoded.push_str(segment);
-                        Ok(Cow::Owned(decoded))
+                    return if let Some(mut owned) = decoded {
+                        owned.push_str(segment);
+                        Ok(Cow::Owned(owned))
                     } else {
                         Ok(Cow::Borrowed(segment))
                     };
                 }
                 b'\\' => {
                     let segment = self.string_segment(start)?;
-                    let decoded = decoded.get_or_insert_with(String::new);
-                    decoded.push_str(segment);
+                    let buffer = decoded.get_or_insert_with(String::new);
+                    buffer.push_str(segment);
                     self.offset += 1;
-                    decoded.push(self.escape()?);
+                    buffer.push(self.escape()?);
                     start = self.offset;
                 }
                 0..=CONTROL_CHARACTER_END => return Err(syntax()),
@@ -241,7 +242,7 @@ impl<'a> Reader<'a> {
 
     fn string_segment(&self, start: usize) -> Result<&'a str, Diagnostic> {
         let bytes = self.bytes.get(start..self.offset).ok_or_else(syntax)?;
-        std::str::from_utf8(bytes).map_err(|_| syntax())
+        std::str::from_utf8(bytes).ok().ok_or_else(syntax)
     }
 
     fn escape(&mut self) -> Result<char, Diagnostic> {
@@ -327,9 +328,11 @@ impl<'a> Reader<'a> {
 
         let token = self.bytes.get(start..self.offset).ok_or_else(syntax)?;
         std::str::from_utf8(token)
-            .map_err(|_| syntax())?
+            .ok()
+            .ok_or_else(syntax)?
             .parse()
-            .map_err(|_| syntax())
+            .ok()
+            .ok_or_else(syntax)
     }
 
     fn digits(&mut self) {
