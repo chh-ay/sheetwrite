@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { evaluate } from "@mdx-js/mdx";
+import { compile, evaluate } from "@mdx-js/mdx";
 import { renderToStaticMarkup } from "react-dom/server";
 import * as runtime from "react/jsx-runtime";
 
@@ -105,5 +105,16 @@ grid.setViewSort([{ col: 2, ascending: true }]);
     const next = await render(`<Update version="0.7.0">Next.</Update>`);
     expect(next).toContain('<span class="sw-update__date">Next release</span>');
     expect(next).toContain(">0.7.0 (next)</a>");
+  });
+
+  it("links the stylesheets of the components a page uses that most pages do not", async () => {
+    const moduleCode = async (source: string) =>
+      String(await compile(source, { rehypePlugins: [contentComponents] }));
+    const code = await moduleCode(
+      `<Accordion title="Why">Because.</Accordion>\n\n<Note>Plain.</Note>`,
+    );
+    expect(code).toContain('import stylesheet0 from "/src/styles/content/accordion.css?url";');
+    expect(code).toContain("export const stylesheets = [stylesheet0];");
+    expect(await moduleCode("<Note>Only shared styles.</Note>")).not.toContain("stylesheets");
   });
 });

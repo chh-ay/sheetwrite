@@ -43,16 +43,21 @@ function commitRequest(clientMutationId: string, rows: readonly number[]) {
 }
 
 describe("showcase collaboration server", () => {
-  it("broadcasts an atomic batch with each member's position, once, and applies a stale one nowhere", async () => {
+  it("sequences an atomic batch with each member's position, once, and applies a stale one nowhere", async () => {
     const server = new ShowcaseCollaborationServer(makeCollaborationSnapshot());
+    const link = new ShowcaseNetworkLink(server);
+    cleanups.push(() => link.destroy());
     const broadcasts: VersionedOperation[] = [];
+    const statuses: string[] = [];
     cleanups.push(server.subscribe((operation) => broadcasts.push(operation)));
+    cleanups.push(server.observeCommits((record) => statuses.push(record.status)));
     const request = { ...commitRequest("batch-m1", [0, 1]), versionOperationCounts: [1, 1] };
 
-    expect(await server.commitBatch(request)).toMatchObject({ status: "applied", version: 2 });
-    expect(await server.commitBatch(request)).toMatchObject({ status: "duplicate", version: 2 });
-    const conflict = await server.commitBatch({ ...request, clientMutationId: "batch-m2" });
+    expect(await link.commitBatch(request)).toMatchObject({ status: "applied", version: 2 });
+    expect(await link.commitBatch(request)).toMatchObject({ status: "duplicate", version: 2 });
+    const conflict = await link.commitBatch({ ...request, clientMutationId: "batch-m2" });
     expect(conflict).toMatchObject({ status: "conflict", currentVersion: 2 });
+    expect(statuses).toEqual(["applied", "duplicate", "conflict"]);
     expect(server.headVersion(COLLABORATION_DOCUMENT_ID)).toBe(2);
     expect(broadcasts.map((operation) => [operation.version, operation.batch])).toEqual([
       [1, { index: 0, count: 2 }],

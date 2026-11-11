@@ -1,8 +1,16 @@
 import { expect, it } from "bun:test";
 
-import { createRowBridge, type DocumentOp } from "@sheetwrite/core";
+import { createRowBridge } from "@sheetwrite/core";
 
 import { applyHostProjection, type HostEntity } from "../src/showcases/host-rows-store.js";
+
+const COLUMNS = [
+  { key: "name" as const, title: "Account" },
+  { key: "amount" as const, title: "ARR", type: "number" as const },
+  { key: "region" as const, title: "Region" },
+  { key: "owner" as const, title: "Owner" },
+  { key: "stage" as const, title: "Stage" },
+];
 
 it("clears the cleared values of one host account only", () => {
   const rows: HostEntity[] = ["001", "002"].map((suffix, index) => ({
@@ -14,23 +22,18 @@ it("clears the cleared values of one host account only", () => {
     stage: "Renewal",
   }));
   const bridge = createRowBridge({
-    columns: [
-      { key: "name" as const, title: "Account" },
-      { key: "amount" as const, title: "ARR", type: "number" as const },
-      { key: "region" as const, title: "Region" },
-      { key: "owner" as const, title: "Owner" },
-      { key: "stage" as const, title: "Stage" },
-    ],
+    columns: COLUMNS,
     defaultRows: rows,
     getRowId: (row) => row.id,
   });
-  const clear: DocumentOp = {
-    op: "clearRange",
-    range: { sheet: "sheet1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } },
-  };
   const projection = bridge.reconcile({
     status: "accepted",
-    operations: [clear],
+    operations: [
+      {
+        op: "clearRange",
+        range: { sheet: "sheet1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } },
+      },
+    ],
     commitReason: "api",
   });
   const store = applyHostProjection(new Map(rows.map((row) => [row.id, row])), projection);
