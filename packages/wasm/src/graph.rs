@@ -639,6 +639,31 @@ impl SheetFormulas {
         });
     }
 
+    /// Prototype: moves the entries in rows `start..start + targets.len()` of
+    /// columns `cols` to row `start + targets[offset]`, keeping their ids and
+    /// shifting each tree's relative references by its row move, as a sort
+    /// does. Dirties the whole sheet.
+    pub(crate) fn permute_rows(
+        &mut self,
+        sheet: u32,
+        start: u32,
+        cols: (u32, u32),
+        targets: &[u32],
+        slots: &mut FormulaStore,
+    ) {
+        let end = start + targets.len() as u32;
+        self.move_entries(slots, |(row, col), entry| {
+            if row < start || row >= end || col < cols.0 || col >= cols.1 {
+                return Some((row, col));
+            }
+            let target = start + targets[(row - start) as usize];
+            if target != row {
+                entry.translate_rows(i64::from(target) - i64::from(row), sheet);
+            }
+            Some((target, col))
+        });
+    }
+
     /// Drops entries in rows `at..at + count`, moves later entries up, rewrites
     /// same-sheet references, and dirties the whole sheet.
     pub(crate) fn delete_rows(

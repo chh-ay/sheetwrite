@@ -86,11 +86,63 @@ impl CellStore {
             return BLOCK_RESOURCE_LIMIT;
         }
 
-        if self.permute_block_rows(block, order, revision, true) {
+        if self.permute_moving_ids(block, order, revision) {
             BLOCK_OK
         } else {
             BLOCK_RESOURCE_LIMIT
         }
+    }
+
+    /// Prototype: a sort that moves each formula id with its row and shifts
+    /// its tree, instead of writing its text back through the parser. Cells
+    /// move as storage only.
+    fn permute_moving_ids(
+        &mut self,
+        block: PermutedBlock,
+        order: &[u32],
+        revision: Option<u64>,
+    ) -> bool {
+        let Some(targets) = order_targets(order) else {
+            return false;
+        };
+        let data = &mut self.sheets[block.sheet];
+        data.formulas.permute_rows(
+            block.sheet as u32,
+            block.start_row as u32,
+            (block.start_col as u32, (block.start_col + block.cols) as u32),
+            &targets,
+            &mut self.formula_slots,
+        );
+        self.graph.invalidate();
+        if let Some(rect) = DirtyRect::new(
+            block.start_row,
+            block.start_col,
+            block.start_row + block.rows - 1,
+            block.start_col + block.cols - 1,
+        ) {
+            crate::store::prepare_rect_write(data, rect);
+        }
+        let mut column = Vec::with_capacity(block.rows);
+        for col in block.start_col..block.start_col + block.cols {
+            column.clear();
+            for &source in order {
+                let index = data.cells.idx(block.start_row + source as usize, col);
+                column.push((
+                    data.cells.source_kind_at(index),
+                    data.cells.source_payload_at(index),
+                    data.cells.style_at(index),
+                ));
+            }
+            for (offset, &(kind, payload, style)) in column.iter().enumerate() {
+                if !data
+                    .cells
+                    .write_cell(block.start_row + offset, col, kind, payload, style, revision)
+                {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     /// Move `count` whole rows from row `from`, so that the first of them is

@@ -3192,7 +3192,7 @@ impl Default for CellStore {
 /// Marks a validated bulk source rectangle once and detaches intersecting
 /// spills in one pass, so the per-cell loop that follows writes storage only.
 /// Paged callers reserve the rectangle's dirty overlay before calling.
-fn prepare_rect_write(sheet: &mut SheetData, rect: DirtyRect) {
+pub(crate) fn prepare_rect_write(sheet: &mut SheetData, rect: DirtyRect) {
     sheet.formulas.mark_dirty_rect(rect);
 
     if !sheet.spill.is_empty() {
