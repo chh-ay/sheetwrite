@@ -954,3 +954,76 @@ html:has(.sw-nav-dialog[open]) {
     align-self: stretch;
   }
 }
+
+/* The 404 page: the site's page head, search, and the three places most
+   readers go next, across the frame. */
+.sw-not-found {
+  display: grid;
+  gap: var(--sw-space-8);
+  align-content: start;
+  padding-block: var(--sw-space-16);
+}
+.sw-not-found__head {
+  display: grid;
+  gap: var(--sw-space-3);
+  max-width: var(--sw-measure-lead);
+}
+.sw-not-found__eyebrow {
+  margin: 0;
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+}
+.sw-not-found h1 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-h1) / var(--sw-leading-heading) var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-display);
+}
+.sw-not-found__lead {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-lead);
+  line-height: var(--sw-leading-body);
+}
+.sw-not-found__search .sw-search-button {
+  width: min(100%, 24rem);
+  min-height: 44px;
+}
+.sw-not-found__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--sw-space-4);
+}
+.sw-not-found__link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-0-5) var(--sw-space-3);
+  align-items: center;
+  min-height: 44px;
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  text-decoration: none;
+  transition: border-color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+.sw-not-found__link .sw-icon {
+  grid-row: span 2;
+  color: var(--sw-accent);
+}
+.sw-not-found__link span {
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-ui) var(--sw-font-display);
+}
+.sw-not-found__link small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+.sw-not-found__link:hover {
+  border-color: var(--sw-accent);
+}
+.sw-not-found__link:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
