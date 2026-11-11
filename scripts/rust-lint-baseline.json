@@ -51,20 +51,7 @@
     "unnameable_types": 6,
     "unreachable_pub": 29
   },
-  "history": {
-    "clippy::allow_attributes_without_reason": 1,
-    "clippy::disallowed_methods": 2,
-    "clippy::map_err_ignore": 2,
-    "clippy::missing_const_for_fn": 4,
-    "clippy::must_use_candidate": 12,
-    "clippy::shadow_reuse": 4,
-    "clippy::too_many_arguments": 1,
-    "clippy::type_complexity": 1,
-    "clippy::use_self": 2,
-    "missing_debug_implementations": 1,
-    "missing_docs": 14,
-    "unreachable_pub": 40
-  },
+  "history": {},
   "queries": {
     "clippy::allow_attributes_without_reason": 3,
     "clippy::derive_partial_eq_without_eq": 2,
