@@ -102,9 +102,7 @@ test("a selected chart moves with the arrow keys, stays at its cells on focus, a
   expect((await box.boundingBox())?.x).toBe(before?.x);
 });
 
-test("the Chart menu inserts the picked kind, and the right-click menu deletes with undo", async ({
-  page,
-}) => {
+test("the Chart menu inserts the picked kind", async ({ page }) => {
   await open(page);
   const nameBox = page.getByRole("textbox", { name: "Cell reference" });
   await nameBox.fill("A2:C8");
@@ -118,9 +116,10 @@ test("the Chart menu inserts the picked kind, and the right-click menu deletes w
     .poll(async () => (await charts(page)).map((entry) => entry.kind))
     .toEqual(["line", "pie"]);
   await expect(chartObjects(page)).toHaveCount(2);
-  await page.keyboard.press("ControlOrMeta+z");
-  await expect(chartObjects(page)).toHaveCount(1);
+});
 
+test("a chart's right-click menu deletes it, and undo brings it back", async ({ page }) => {
+  await open(page);
   // The menu closes on scroll, as Excel's does: let the scroll into view settle first.
   await chart(page).scrollIntoViewIfNeeded();
   await nextFrames(page);

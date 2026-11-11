@@ -25,7 +25,7 @@ test("Try it runs the example, reruns an edit, reports an error at its line, and
   await page.goto("/docs/start/first-grid/");
   await waitForHydration(page);
   // Nothing of the playground loads before the reader asks for it.
-  expect(scripts.filter((path) => PLAYGROUND_SCRIPT.test(path))).toEqual([]);
+  expect(scripts.filter((path) => /Playground|run-example|sucrase/i.test(path))).toEqual([]);
 
   await page.getByRole("button", { name: "Try it" }).first().click();
   const playground = page.getByRole("region", { name: "Complete first grid" });
