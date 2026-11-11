@@ -253,3 +253,97 @@ test.describe(() => {
     await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live");
   });
 });
+test("context menu shows platform shortcuts, and Undo removes a highlight", async ({ page }) => {
+  await open(page);
+  const surface = page.locator(`${GRID} .sheetwrite-scroller`);
+  await surface.scrollIntoViewIfNeeded();
+  const openMenu = () => surface.click({ button: "right", position: { x: 160, y: 80 } });
+  const highlightItem = page.locator('[data-context-menu-item="highlight-cell"]');
+  const mac = await page.evaluate(() =>
+    /Mac|iPhone|iPad|iPod/i.test(navigator.platform || navigator.userAgent),
+  );
+
+  await openMenu();
+  await expect(
+    page.locator('[data-context-menu-item="copy"] .sheetwrite-context-menu-shortcut'),
+  ).toHaveText(mac ? "⌘C" : "Ctrl+C");
+  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
+  await highlightItem.click();
+  await expect(page.getByText(/^Highlighted R\d+ C\d+ · Ctrl\+Z undoes it$/)).toBeVisible();
+
+  await openMenu();
+  await expect(highlightItem).toHaveText(/^Clear highlight R\d+ C\d+$/);
+  await highlightItem.click();
+  await expect(page.getByText(/^Highlight cleared R\d+ C\d+/)).toBeVisible();
+  await openMenu();
+  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
+
+  // The highlight is a cell fill in the document, so Undo removes it.
+  await highlightItem.click();
+  await surface.click({ position: { x: 160, y: 80 } });
+  await page.keyboard.press(mac ? "Meta+Z" : "Control+Z");
+  await openMenu();
+  await expect(highlightItem).toHaveText(/^Highlight cell R\d+ C\d+$/);
+});
+
+test("the paged data path serves host pages and reports allocation honestly", async ({ page }) => {
+  // Deep link straight into the paged datasource.
+  await page.goto(`/vanilla/?data=paged`);
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
+    timeout: 20_000,
+  });
+
+  const stats = page.getByTestId("paged-stats");
+  await expect(stats).toBeVisible();
+  await expect
+    .poll(async () => Number((await stats.getAttribute("data-chunks")) ?? 0), {
+      timeout: 15_000,
+      message: "paged store never reported a loaded chunk",
+    })
+    .toBeGreaterThan(0);
+  const initialChunks = Number((await stats.getAttribute("data-chunks")) ?? 0);
+  await expect(stats).toHaveAttribute("data-fully-loaded", "false");
+
+  // The aria mirror boots on the loading snapshot; focus a body cell so it
+  // refreshes through normal grid interaction, then values are readable.
+  await page.locator(GRID).click({ position: { x: 300, y: 82 } });
+  await expect.poll(() => gridCellTexts(page, GRID), { timeout: 15_000 }).toContain(FIRST_ACCOUNT);
+
+  // Full-column aggregate over a partial store fails honestly.
+  await page
+    .locator(".sw-vw-instrument")
+    .getByRole("button", { exact: true, name: "Total ARR" })
+    .click();
+  await expect(page.getByTestId("activity")).toContainText(/full dataset/i);
+  // The summary sheet needs the whole fixture, so the host disables it here.
+  await expect(
+    page.locator(".sw-vw-instrument").getByRole("button", { exact: true, name: "Summary sheet" }),
+  ).toBeDisabled();
+
+  // Scrolling far pulls new pages through the host page source.
+  await page.locator(`${GRID} .sheetwrite-scroller`).evaluate((scroller) => {
+    scroller.scrollTop = 500_000;
+    scroller.dispatchEvent(new Event("scroll"));
+  });
+  await expect
+    .poll(async () => Number((await stats.getAttribute("data-chunks")) ?? 0), {
+      timeout: 20_000,
+      message: "scroll never grew the paged allocation",
+    })
+    .toBeGreaterThan(initialChunks);
+  await expect(page.getByTestId("activity")).toContainText(/host page source/i);
+
+  // Back to the dense path: stats disappear, aggregates complete.
+  await page.getByRole("tab", { name: /Main \/ Worker/ }).click();
+  await expect(page.getByTestId("lifecycle")).toHaveAttribute("data-phase", "live", {
+    timeout: 20_000,
+  });
+  await expect(page).not.toHaveURL(/data=paged/);
+  await expect(page.getByTestId("paged-stats")).toHaveCount(0);
+  await page.getByRole("tab", { name: /XLSX/ }).click();
+  await page
+    .locator(".sw-vw-instrument")
+    .getByRole("button", { exact: true, name: "Total ARR" })
+    .click();
+  await expect(page.getByTestId("activity")).toContainText(/total/i);
+});

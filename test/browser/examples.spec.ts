@@ -48,3 +48,69 @@ test("vanilla example commits an edit through the formula bar and undoes it @por
   await selectB2();
   await expect(page.locator("#formula")).toHaveValue(original);
 });
+
+test("validation dropdown and checkbox editors are keyboard and ARIA operable", async ({
+  page,
+}) => {
+  await page.goto("/vue/");
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  await expect
+    .poll(() => page.evaluate(() => Boolean(window.__sheetwriteVueWorkbench?.grid)))
+    .toBe(true);
+
+  // The rule is host configuration (public API); the editor itself must open
+  // through user input: select the cell, then press Enter on the grid host.
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    if (!grid) throw new Error("Vue grid is unavailable");
+    grid.setValidationRule({
+      id: "browser-list",
+      range: { sheet: "orders", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+      condition: { kind: "list", values: [1, 2, 3] },
+      policy: "reject",
+      helpText: "Choose an order ID",
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 0 } });
+  });
+  await page.locator(".sw-demo-grid .sheetwrite").press("Enter");
+
+  const list = page.getByRole("listbox", { name: "Choose an order ID" });
+  await expect(list).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: 0, col: 0 })
+            .resolved,
+      ),
+    )
+    .toBe(2);
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    if (!grid) throw new Error("Vue grid is unavailable");
+    grid.setValidationRule({
+      id: "browser-checkbox",
+      range: { sheet: "orders", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+      condition: { kind: "checkbox", checkedValue: true, uncheckedValue: false },
+      policy: "reject",
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
+  });
+  await page.locator(".sw-demo-grid .sheetwrite").press("Enter");
+
+  const checkbox = page.getByRole("checkbox", { name: "Toggle checkbox" });
+  await expect(checkbox).toBeVisible();
+  await page.keyboard.press(" ");
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: 1, col: 0 })
+            .resolved,
+      ),
+    )
+    .toBe(true);
+});
