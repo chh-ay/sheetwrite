@@ -274,7 +274,7 @@ fn expand_let_args<'a>(
     for pair in args[..args.len() - 1].as_chunks::<2>().0 {
         // A resolved LET keeps each binding's name in its `LetName`.
         let name = match &pair[0] {
-            Ast::Name(name) => name.as_str(),
+            Ast::Name(name) => name.as_ref(),
             Ast::LetName { name, .. } => &**name,
             _ => {
                 bindings.truncate(original_len);
@@ -320,7 +320,7 @@ fn expand_let_node<'a>(
 ) -> Result<Ast, FormulaError> {
     // A resolved use expands like the name it keeps.
     let used_name = match ast {
-        Ast::Name(name) => Some(name.as_str()),
+        Ast::Name(name) => Some(name.as_ref()),
         Ast::LetName { name, .. } => Some(&**name),
         _ => None,
     };
@@ -342,7 +342,8 @@ fn expand_let_node<'a>(
     }
     count_let_node(nodes)?;
     #[cfg(feature = "analysis")]
-    if let Ast::UnknownFunc(name, args) = ast {
+    if let Ast::UnknownFunc(call) = ast {
+        let crate::calc::UnknownCall { name, args } = &**call;
         if let Some((_, expression, visible, _)) = bindings
             .iter()
             .rev()
@@ -359,7 +360,10 @@ fn expand_let_node<'a>(
                     .map(|argument| expand_let_node(argument, bindings, nodes, next_slot))
                     .collect::<Result<Vec<_>, _>>()?,
             );
-            return Ok(Ast::UnknownFunc(analysis::lambda::CALL.into(), invocation));
+            return Ok(Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                name: analysis::lambda::CALL.into(),
+                args: invocation.into(),
+            })));
         }
     }
     Ok(match ast {
@@ -382,21 +386,28 @@ fn expand_let_node<'a>(
             }
             let mut definition = args[..args.len() - 1].to_vec();
             definition.push(analysis::lambda::capture(&args[args.len() - 1], &captured)?);
-            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), definition)
+            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), definition.into())
         }
         Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
         Ast::Func(func, args) => Ast::Func(
             *func,
-            args.iter()
+            (args
+                .iter()
                 .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>, _>>()?)
+            .into(),
         ),
-        Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
-            name.clone(),
-            args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
-                .collect::<Result<Vec<_>, _>>()?,
-        ),
+        Ast::UnknownFunc(call) => {
+            let crate::calc::UnknownCall { name, args } = &**call;
+            Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                name: name.clone(),
+                args: (args
+                    .iter()
+                    .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
+                    .collect::<Result<Vec<_>, _>>()?)
+                .into(),
+            }))
+        }
         Ast::Bin(op, left, right) => Ast::Bin(
             *op,
             Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
@@ -1654,11 +1665,16 @@ impl CellStore {
 
         match ast {
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            Ast::BoundMatrix(reference) => {
+                let crate::calc::BoundMatrix { values, .. } = &**reference;
+                values.first().cloned().unwrap_or(Value::Blank)
+            }
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(pattern) => Value::text(pattern.text()),
             #[cfg(feature = "analysis")]
-            Ast::UnknownFunc(name, args) if name == analysis::lambda::CALL => {
+            Ast::UnknownFunc(call) if call.name == analysis::lambda::CALL => {
+                let crate::calc::UnknownCall { args, .. } = &**call;
+
                 analysis::lambda::evaluate(
                     self,
                     analysis::lambda::CALL,
@@ -1669,10 +1685,13 @@ impl CellStore {
                 )
             }
             Ast::Num(n) => Value::number(*n),
-            Ast::Str(text) => Value::text(text.as_str()),
+            Ast::Str(text) => Value::text(text.as_ref()),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
-            Ast::Array { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            Ast::Array(array) => {
+                let crate::calc::ArrayLiteral { values, .. } = &**array;
+                values.first().cloned().unwrap_or(Value::Blank)
+            }
             Ast::Cell(row, col, _) => {
                 self.eval_at(sheet, *row as usize, *col as usize, pass, depth + 1)
             }
@@ -1707,14 +1726,19 @@ impl CellStore {
             Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
             Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
-            Ast::UnknownFunc(name, arguments) => {
+            Ast::UnknownFunc(call) => {
+                let crate::calc::UnknownCall {
+                    name,
+                    args: arguments,
+                } = &**call;
+
                 self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
             }
             // With host functions the arm above takes every unknown call; the
             // default engine keeps this arm as it was, so its binary does not
             // change.
             #[cfg_attr(feature = "host-functions", allow(unreachable_patterns))]
-            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
+            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(_) => {
                 Value::Error(FormulaError::Name)
             }
             Ast::NamedRange(named)

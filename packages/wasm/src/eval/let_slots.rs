@@ -43,7 +43,14 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
                 resolve_scope(args, &mut bindings, &mut next);
             }
         }
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+        Ast::Func(_, args) => {
+            for arg in args {
+                resolve_let_names(arg);
+            }
+        }
+        Ast::UnknownFunc(call) => {
+            let args = &mut call.args;
+
             for arg in args {
                 resolve_let_names(arg);
             }
@@ -93,10 +100,13 @@ fn nested_lets_scalar(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(..) => false,
+        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) => false,
         Ast::Func(_, args) => args.iter().all(nested_lets_scalar),
         #[cfg(not(feature = "analysis"))]
-        Ast::UnknownFunc(_, args) => args.iter().all(nested_lets_scalar),
+        Ast::UnknownFunc(call) => {
+            let args = &call.args;
+            args.iter().all(nested_lets_scalar)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             nested_lets_scalar(left) && nested_lets_scalar(right)
         }
@@ -191,10 +201,10 @@ fn resolve_scope(args: &mut [Ast], bindings: &mut Vec<Binding>, next: &mut u32) 
         debug_assert!(valid_let_name(text));
         let slot = *next;
         *next += 1;
-        bindings.push((text.clone(), slot));
+        bindings.push((text.to_string(), slot));
         *name = Ast::LetName {
             slot,
-            name: std::mem::take(text).into_boxed_str(),
+            name: std::mem::take(text),
         };
     }
     resolve_uses(&mut args[last], bindings, next);
@@ -211,12 +221,19 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
             {
                 *ast = Ast::LetName {
                     slot,
-                    name: std::mem::take(name).into_boxed_str(),
+                    name: std::mem::take(name),
                 };
             }
         }
         Ast::Func(Func::Let, args) => resolve_scope(args, bindings, next),
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+        Ast::Func(_, args) => {
+            for arg in args {
+                resolve_uses(arg, bindings, next);
+            }
+        }
+        Ast::UnknownFunc(call) => {
+            let args = &mut call.args;
+
             for arg in args {
                 resolve_uses(arg, bindings, next);
             }
@@ -404,7 +421,7 @@ mod tests {
 
     fn let_args(source: &str) -> Vec<Ast> {
         match parse(source) {
-            Ok(Ast::Func(Func::Let, args)) => args,
+            Ok(Ast::Func(Func::Let, args)) => args.into_vec(),
             other => panic!("{source} is not a LET: {other:?}"),
         }
     }

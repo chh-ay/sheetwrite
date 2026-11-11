@@ -71,7 +71,7 @@ impl CellStore {
         let name = name.to_ascii_uppercase();
         let is_call = matches!(
             parse(&format!("={name}()")),
-            Ok(Ast::UnknownFunc(parsed, arguments)) if parsed == name && arguments.is_empty()
+            Ok(Ast::UnknownFunc(call)) if call.name == name && call.args.is_empty()
         );
         if !is_call || is_reference_like(&name) {
             return false;
@@ -250,7 +250,12 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
             .any(|argument| calls_volatile_custom(argument, functions))
     };
     match ast {
-        Ast::UnknownFunc(name, arguments) => {
+        Ast::UnknownFunc(call) => {
+            let crate::calc::UnknownCall {
+                name,
+                args: arguments,
+            } = &**call;
+
             functions
                 .get(&name.to_ascii_uppercase())
                 .is_some_and(|function| function.volatile)
