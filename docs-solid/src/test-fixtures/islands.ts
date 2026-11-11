@@ -1,3 +1,6 @@
+import { type Component, createComponent } from "solid-js";
+
+import type { IslandRender } from "../islands/client.js";
 import type { ShowcaseIsland } from "../showcases/islands.js";
 
 /*
@@ -8,7 +11,17 @@ import type { ShowcaseIsland } from "../showcases/islands.js";
  * read these entries as they read the showcases'.
  */
 
+function withProps<Props extends object>(component: Component<Props>): IslandRender {
+  // The server wrote these props from the same component's props (islands/Island.tsx).
+  return (_island, props) => createComponent(component, props as Props);
+}
+
 /** Each fixture island's module and loader. */
-export const TEST_FIXTURE_ISLANDS = {} as const satisfies Readonly<Record<string, ShowcaseIsland>>;
+export const TEST_FIXTURE_ISLANDS = {
+  "test-xlsx": {
+    source: "src/test-fixtures/xlsx/XlsxFixture.tsx",
+    load: () => import("./xlsx/XlsxFixture.js").then(({ XlsxFixture }) => withProps(XlsxFixture)),
+  },
+} as const satisfies Readonly<Record<string, ShowcaseIsland>>;
 
 export type TestFixtureIslandName = keyof typeof TEST_FIXTURE_ISLANDS;
