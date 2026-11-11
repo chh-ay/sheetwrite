@@ -10,8 +10,16 @@ import "../art.css";
 import { For, type JSX } from "solid-js";
 import { render } from "solid-js/web";
 
-import { DIAGRAMS } from "../diagrams.js";
+import {
+  BoundarySeam,
+  CollaborationRecoveryDiagram,
+  CommandModelDiagram,
+  DataModelDiagram,
+  DIAGRAMS,
+  RecalculationDiagram,
+} from "../diagrams.js";
 import { HUB_ART } from "../hub-art.js";
+import { COLLABORATION_PROOF_ART, VANILLA_PROOF_ART } from "../proof-art.js";
 
 const params = new URLSearchParams(location.search);
 if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
@@ -282,6 +290,42 @@ function Diagrams() {
   );
 }
 
-const views: Record<string, () => JSX.Element> = { hub: Hub, diagrams: Diagrams };
+/** Every picture the page-pattern mockups place, each under a `data-part` name. */
+function Parts() {
+  const parts: readonly (readonly [string, () => JSX.Element])[] = [
+    ...Object.entries(COLLABORATION_PROOF_ART).map(
+      ([title, Art]) => [`proof:${title}`, Art] as const,
+    ),
+    ...Object.entries(VANILLA_PROOF_ART).map(([title, Art]) => [`proof:${title}`, Art] as const),
+    ["command-model", CommandModelDiagram],
+    ["data-model", DataModelDiagram],
+    ["recalculation", RecalculationDiagram],
+    ["collaboration-recovery", CollaborationRecoveryDiagram],
+    [
+      "seam:collaboration",
+      () => (
+        <BoundarySeam
+          interfaces={[
+            ["PersistenceAdapter", ["load(documentId)", "commit(request)"]],
+            ["RemoteOperationSource", ["subscribe(…)"]],
+          ]}
+        />
+      ),
+    ],
+  ];
+  return (
+    <main>
+      <For each={parts}>
+        {([name, Part]) => (
+          <div data-part={name}>
+            <Part />
+          </div>
+        )}
+      </For>
+    </main>
+  );
+}
+
+const views: Record<string, () => JSX.Element> = { hub: Hub, diagrams: Diagrams, parts: Parts };
 const root = document.getElementById("root");
 if (root) render(views[params.get("view") ?? "hub"] ?? Hub, root);
