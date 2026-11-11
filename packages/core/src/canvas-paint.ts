@@ -1160,7 +1160,7 @@ export function intersectingMerges(
   return queryMerges(prepared, rowStart, rowEnd - 1, minimumColumn, maximumColumn);
 }
 
-export function horizontalMergeGaps(
+function horizontalMergeGaps(
   prepared: PreparedMergeIndex,
   row: number,
   columnMinimum = Number.NEGATIVE_INFINITY,
@@ -1171,7 +1171,7 @@ export function horizontalMergeGaps(
     .sort((a, b) => a.c0 - b.c0 || a.c1 - b.c1);
 }
 
-export function verticalMergeGaps(
+function verticalMergeGaps(
   prepared: PreparedMergeIndex,
   column: number,
   rowMinimum = Number.NEGATIVE_INFINITY,
