@@ -142,9 +142,15 @@ pub(crate) enum Value {
 // Every cell value, argument and array element is a `Value`: a larger
 // `Value` grows every evaluation buffer. Change these only with a measurement.
 #[cfg(target_arch = "wasm32")]
-const _: () = assert!(std::mem::size_of::<Value>() == 16);
+const _: () = assert!(
+    std::mem::size_of::<Value>() == 16,
+    "Value changed size: measure, then update this number"
+);
 #[cfg(not(target_arch = "wasm32"))]
-const _: () = assert!(std::mem::size_of::<Value>() == 24);
+const _: () = assert!(
+    std::mem::size_of::<Value>() == 24,
+    "Value changed size: measure, then update this number"
+);
 
 impl Value {
     pub(crate) fn number(value: f64) -> Self {
@@ -430,9 +436,15 @@ pub(crate) struct FormulaEntry {
 
 // One per stored formula, in every workbook's formula table.
 #[cfg(target_arch = "wasm32")]
-const _: () = assert!(std::mem::size_of::<FormulaEntry>() == 88);
+const _: () = assert!(
+    std::mem::size_of::<FormulaEntry>() == 88,
+    "FormulaEntry changed size: measure, then update this number"
+);
 #[cfg(not(target_arch = "wasm32"))]
-const _: () = assert!(std::mem::size_of::<FormulaEntry>() == 144);
+const _: () = assert!(
+    std::mem::size_of::<FormulaEntry>() == 144,
+    "FormulaEntry changed size: measure, then update this number"
+);
 
 impl FormulaEntry {
     const ERROR_MASK: u16 = 0x0f;

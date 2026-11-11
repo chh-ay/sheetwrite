@@ -370,7 +370,10 @@ pub(crate) struct DirtySlot {
 }
 
 // One per unacknowledged edit of a paged sheet.
-const _: () = assert!(std::mem::size_of::<DirtySlot>() == 32);
+const _: () = assert!(
+    std::mem::size_of::<DirtySlot>() == 32,
+    "DirtySlot changed size: measure, then update this number"
+);
 
 /// A dirty block and the slot array it indexes.
 #[derive(Clone, Copy)]
