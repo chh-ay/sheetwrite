@@ -188,16 +188,31 @@ mod tests {
     #[test]
     fn spill_anchors_owners_and_blockers_have_disjoint_capacity_owners() {
         let mut store = CellStore::new();
-        let sheet = store.add_sheet(2, 3);
-        for row in 0..3 {
+        let sheet = store.add_sheet(2, 1000);
+        for row in 0..1000 {
             store.set_number(sheet, row, 0, (row + 1) as f64, 0);
         }
-        store.set_formula(sheet, 0, 1, "=A1:A3", 0);
+        store.set_formula(sheet, 0, 1, "=A1:A1000", 0);
         store.recompute(sheet);
+
+        // Ownership is one run per spilled column, whatever the spill's
+        // height: one column record and its one run.
         let materialized = store.memory_stats();
         assert_eq!(owner(&materialized, SPILL_RANGES).2, 1);
-        assert_eq!(owner(&materialized, SPILL_OWNERS).2, 3);
+        assert_eq!(owner(&materialized, SPILL_OWNERS).2, 2);
+        assert!(owner(&materialized, SPILL_OWNERS).0 <= 128);
         assert_eq!(owner(&materialized, SPILL_BLOCKERS).2, 0);
+
+        // A source write inside the spill obstructs it: the anchor keeps its
+        // attempt, owns nothing, and the run storage is released.
+        store.set_number(sheet, 500, 1, 7.0, 0);
+        store.recompute(sheet);
+        let obstructed = store.memory_stats();
+        assert_eq!(owner(&obstructed, SPILL_RANGES).2, 1);
+        assert_eq!(owner(&obstructed, SPILL_OWNERS), (0, 0, 0));
+        store.clear_cell(sheet, 500, 1, 0);
+        store.recompute(sheet);
+        assert_eq!(owner(&store.memory_stats(), SPILL_OWNERS).2, 2);
 
         assert!(store.set_spill_blockers(sheet, &[1, 1, 1, 1]));
         store.recompute(sheet);
