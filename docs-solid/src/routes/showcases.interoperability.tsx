@@ -4,6 +4,7 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { InteropFlowDiagram } from "../showcases/art/diagrams.js";
 import { InteropStage } from "../showcases/interop/InteropStage.js";
 import { InteropLabs } from "../showcases/interop/labs/InteropLabs.js";
 import { SpillProof } from "../showcases/interop/SpillProof.js";
@@ -14,6 +15,7 @@ import {
 } from "../showcases/scenarios/interop-fixtures.js";
 import InteroperabilitySnippet from "../showcases/snippets/interoperability.mdx";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import stylesheet from "../styles/showcases/interoperability.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -25,6 +27,7 @@ export const Route = createFileRoute("/showcases/interoperability")({
   head: () => ({
     meta: pageMeta("Spreadsheet interoperability — Sheetwrite showcases", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
@@ -56,6 +59,7 @@ function InteroperabilityShowcase() {
         task="Load a workbook into a live grid, change it, then export it to XLSX, import it again and compare every cell."
         title="Open the workbook. Change it. Bring it back intact."
       >
+        <InteropFlowDiagram />
         <Island component={SpillProof} name="showcase-interop-spill" props={{}} />
         <Island component={InteropLabs} name="showcase-interop-labs" props={{}} />
       </ShowcasePage>

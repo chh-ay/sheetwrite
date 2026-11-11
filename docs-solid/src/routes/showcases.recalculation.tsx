@@ -11,10 +11,12 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { RecalculationDiagram } from "../showcases/art/diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { FirstCalculationFact } from "../showcases/recalculation/FirstCalculationFact.js";
 import { RecalculationStage } from "../showcases/recalculation/RecalculationStage.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -26,6 +28,7 @@ export const Route = createFileRoute("/showcases/recalculation")({
       "Edit a cell under 100,000 formulas and move 1,000 lookups over 100,000 rows; the page times each recalculation and paint in your browser.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
@@ -81,6 +84,7 @@ function RecalculationShowcase() {
         }
         title={`Recalculate ${ROWS.toLocaleString("en")} formulas, live`}
       >
+        <RecalculationDiagram />
         <ShowcaseSection id="recalculation-notes" title="What the timings include">
           <ul>
             <li>

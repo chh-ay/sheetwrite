@@ -4,12 +4,14 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { CollaborationRecoveryDiagram } from "../showcases/art/diagrams.js";
 import { CollaborationFaults } from "../showcases/collaboration/CollaborationFaults.js";
 import { CollaborationStage } from "../showcases/collaboration/CollaborationStage.js";
 import { ProofPage, type ProofPageContent } from "../showcases/layout/ProofPage.js";
 import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import CollaborationSnippet from "../showcases/snippets/collaboration.mdx";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import proofStylesheet from "../styles/showcases/proofs.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -21,6 +23,7 @@ export const Route = createFileRoute("/showcases/collaboration")({
   head: () => ({
     meta: pageMeta("Live collaboration — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: proofStylesheet },
@@ -125,6 +128,7 @@ function CollaborationShowcase() {
           />
         }
       >
+        <CollaborationRecoveryDiagram />
         <ShowcaseSection id="collaboration-faults" title="Protocol faults">
           <Island
             component={CollaborationFaults}
