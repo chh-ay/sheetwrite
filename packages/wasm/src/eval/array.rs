@@ -89,7 +89,7 @@ fn sequence_shape(args: &[Ast]) -> Result<(usize, usize, usize), FormulaError> {
         return Err(FormulaError::Value);
     }
     let rows = static_integer(optional_ast(args, 0)).ok_or(FormulaError::Value)?;
-    let cols = static_integer(optional_ast(args, 1)).map_or(1, |value| value);
+    let cols = static_integer(optional_ast(args, 1)).unwrap_or(1);
     if rows <= 0 || cols <= 0 {
         return Err(FormulaError::Value);
     }
@@ -103,7 +103,7 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
     if requested == 0 {
         return Err(FormulaError::Calc);
     }
-    let magnitude = usize::try_from(requested.unsigned_abs()).map_or(usize::MAX, |value| value);
+    let magnitude = usize::try_from(requested.unsigned_abs()).unwrap_or(usize::MAX);
     let selected = magnitude.min(size);
     let output = if drop {
         size.saturating_sub(selected)
@@ -258,7 +258,7 @@ impl CellStore {
                     }
                     Err(shape_error) => self
                         .dynamic_array_bound(source, formula_sheet, pass)
-                        .map_or(Err(shape_error), |value| value),
+                        .unwrap_or(Err(shape_error)),
                 })
             }
             Ast::Func(Func::ChooseCols | Func::ChooseRows, args) => {
@@ -952,12 +952,7 @@ impl CellStore {
 
         for row in rows.clone() {
             for col in cols.clone() {
-                values.push(
-                    source
-                        .get(row, col)
-                        .cloned()
-                        .map_or(Value::Blank, |value| value),
-                );
+                values.push(source.get(row, col).cloned().unwrap_or(Value::Blank));
             }
         }
 
@@ -1049,7 +1044,7 @@ impl CellStore {
             return Err(FormulaError::Calc);
         }
         let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
-        let cols = requested_cols.map_or(source.cols as i64, |value| value);
+        let cols = requested_cols.unwrap_or(source.cols as i64);
         let output_rows = transformed_axis_bound(source.rows, rows, drop)?;
         let output_cols = match requested_cols {
             Some(cols) => transformed_axis_bound(source.cols, cols, drop)?,
@@ -1058,10 +1053,10 @@ impl CellStore {
         let cells = EvalMatrix::validate_shape(output_rows, output_cols, 2, 0)?;
         source.validate_copies(2)?;
         let row_magnitude = usize::try_from(rows.unsigned_abs())
-            .map_or(usize::MAX, |value| value)
+            .unwrap_or(usize::MAX)
             .min(source.rows);
         let col_magnitude = usize::try_from(cols.unsigned_abs())
-            .map_or(usize::MAX, |value| value)
+            .unwrap_or(usize::MAX)
             .min(source.cols);
         let row_start = if drop {
             if rows > 0 {

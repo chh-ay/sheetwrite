@@ -426,7 +426,7 @@ impl CellStore {
         }
 
         placement.restart();
-        let formula_sheet = key.0.map_or(NO_SHEET, |value| value);
+        let formula_sheet = key.0.unwrap_or(NO_SHEET);
         let target = self.expand(definition, key.clone(), formula_sheet, placement)?;
         let shared = !placement.positional.get()
             && !placement.sheet_bound.get()

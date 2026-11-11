@@ -42,7 +42,7 @@ pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
         "PROB" => return probability(values).map_or_else(Value::Error, Value::number),
         _ => return Value::Error(FormulaError::Name),
     };
-    statistics::apply(current, values).map_or(Value::Error(FormulaError::Name), |value| value)
+    statistics::apply(current, values).unwrap_or(Value::Error(FormulaError::Name))
 }
 
 fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
@@ -395,7 +395,7 @@ fn frequency(
     let mut order = super::sorted_positions(bins.len(), &mut |left, right| {
         bins[left]
             .partial_cmp(&bins[right])
-            .map_or(Ordering::Equal, |value| value)
+            .unwrap_or(Ordering::Equal)
     });
     // Equal bins always route to the first bin. Search only those distinct bins.
     order.dedup_by(|right, left| bins[*right] == bins[*left]);
@@ -403,10 +403,7 @@ fn frequency(
     let mut counts = vec![0.0; bins.len() + 1];
     for number in numbers {
         let position = sorted_bins.partition_point(|&bin| bin < number);
-        let slot = order
-            .get(position)
-            .copied()
-            .map_or(bins.len(), |value| value);
+        let slot = order.get(position).copied().unwrap_or(bins.len());
         counts[slot] += 1.0;
     }
     Ok(EvalMatrix::new(

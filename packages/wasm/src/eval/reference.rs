@@ -443,7 +443,7 @@ impl CellStore {
                 let unquoted = qualifier
                     .strip_prefix('\'')
                     .and_then(|value| value.strip_suffix('\''));
-                let title = unquoted.map_or(qualifier, |value| value).replace("''", "'");
+                let title = unquoted.unwrap_or(qualifier).replace("''", "'");
                 let sheet = self
                     .sheet_ids
                     .get(&title)

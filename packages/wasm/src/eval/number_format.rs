@@ -349,7 +349,7 @@ fn resolve_commas(section: &mut Section<'_>) {
         .tokens
         .iter()
         .position(|token| matches!(token, Token::Point | Token::Exponent { .. }))
-        .map_or(section.tokens.len(), |value| value);
+        .unwrap_or(section.tokens.len());
     let last_digit = section.tokens[..integer_end]
         .iter()
         .rposition(|token| matches!(token, Token::Digit(_)));
@@ -560,7 +560,7 @@ fn write_tokens(section: &Section<'_>, layout: &Layout, digits: &Digits<'_>, tex
         match token {
             Token::Digit(_) if in_exponent => {
                 if !exponent_written {
-                    let width = layout.exponent_digits.map_or(1, |value| value);
+                    let width = layout.exponent_digits.unwrap_or(1);
                     push_exponent_digits(digits.exponent, width, text);
                     exponent_written = true;
                 }

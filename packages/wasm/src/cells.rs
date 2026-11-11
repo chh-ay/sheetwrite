@@ -1054,9 +1054,7 @@ impl CellRun<'_> {
     #[inline]
     fn paged_cell(&self, index: usize) -> Option<(u8, u64, u32)> {
         let (kind, payload, style) = self.paged_source(index)?;
-        let (kind, payload) = self
-            .calculated_cell(index)
-            .map_or((kind, payload), |value| value);
+        let (kind, payload) = self.calculated_cell(index).unwrap_or((kind, payload));
         Some((kind, payload, style))
     }
 

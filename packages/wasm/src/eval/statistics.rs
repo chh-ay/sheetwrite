@@ -105,7 +105,7 @@ fn mode_sngl(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     }
     if run_count > best_count {
         best_count = run_count;
-        best_value = *numbers.last().map_or(&best_value, |value| value);
+        best_value = *numbers.last().unwrap_or(&best_value);
     }
     if best_count < 2 {
         Err(FormulaError::Na)

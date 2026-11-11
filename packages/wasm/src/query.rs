@@ -587,7 +587,7 @@ impl CellStore {
             return self.sort_rows(
                 sheet,
                 cols[0] as usize,
-                ascending.first().copied().map_or(1, |value| value) != 0,
+                ascending.first().copied().unwrap_or(1) != 0,
             );
         }
         if cols.iter().any(|&col| col as usize >= data.cells.n_cols()) {
@@ -638,7 +638,7 @@ impl CellStore {
                 let order = keys.compare(
                     key * row_count + left as usize,
                     key * row_count + right as usize,
-                    ascending.get(key).copied().map_or(1, |value| value) != 0,
+                    ascending.get(key).copied().unwrap_or(1) != 0,
                 );
                 if order != Ordering::Equal {
                     return order;
@@ -1333,9 +1333,7 @@ fn sort_finite_number_column_comparison(
                 )
             }
         };
-        let ord = left
-            .partial_cmp(&right)
-            .map_or(Ordering::Equal, |value| value);
+        let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
             a.cmp(&b)
@@ -1528,7 +1526,7 @@ impl<'a> ComparableCell<'a> {
                 }
             }
             KIND_STRING => Self::pool_text(strings, sheet.cells.str_id_at(index))
-                .map_or(ComparableCell::Empty, |value| value),
+                .unwrap_or(ComparableCell::Empty),
             _ => ComparableCell::Empty,
         }
     }
@@ -1560,9 +1558,7 @@ impl<'a> ComparableCell<'a> {
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
             KIND_BOOL => Self::Bool(payload_num(payload) != 0.0),
-            KIND_STRING => {
-                Self::pool_text(strings, payload_str_id(payload)).map_or(Self::Empty, |value| value)
-            }
+            KIND_STRING => Self::pool_text(strings, payload_str_id(payload)).unwrap_or(Self::Empty),
             KIND_FORMULA => {
                 let Some(key) = key_for_index(sheet, index) else {
                     return Self::Empty;
@@ -1744,7 +1740,7 @@ impl SortKeys {
         } else if class_left == CLASS_NUMBER {
             let a = f64::from_bits(self.values[left]);
             let b = f64::from_bits(self.values[right]);
-            a.partial_cmp(&b).map_or(Ordering::Equal, |value| value)
+            a.partial_cmp(&b).unwrap_or(Ordering::Equal)
         } else {
             self.values[left].cmp(&self.values[right])
         };
@@ -1764,9 +1760,7 @@ impl Eq for OrderedNumber {}
 
 impl Ord for OrderedNumber {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.0
-            .partial_cmp(&other.0)
-            .map_or(Ordering::Equal, |value| value)
+        self.0.partial_cmp(&other.0).unwrap_or(Ordering::Equal)
     }
 }
 

@@ -30,7 +30,7 @@ pub(super) fn half_width(text: &str) -> String {
             IDEOGRAPHIC_SPACE => output.push(' '),
             '\u{FF01}'..='\u{FF5E}' => output.push(shift(character, false)),
             VU => {
-                output.push(half_form(U).map_or(U, |value| value));
+                output.push(half_form(U).unwrap_or(U));
                 output.push(HALF_VOICED_MARK);
             }
             _ => push_half_katakana(&mut output, character),
@@ -78,7 +78,7 @@ pub(super) fn full_width(text: &str) -> String {
         let full = match character {
             ' ' => IDEOGRAPHIC_SPACE,
             '!'..='~' => shift(character, true),
-            _ => full_form(character).map_or(character, |value| value),
+            _ => full_form(character).unwrap_or(character),
         };
         let mark = characters.peek().copied();
         let combined = match mark {
@@ -107,7 +107,7 @@ fn shift(character: char, to_full: bool) -> char {
         code - FULL_WIDTH_OFFSET
     };
 
-    char::from_u32(shifted).map_or(character, |value| value)
+    char::from_u32(shifted).unwrap_or(character)
 }
 
 fn full_form(character: char) -> Option<char> {

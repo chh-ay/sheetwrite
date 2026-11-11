@@ -398,7 +398,7 @@ fn formula_metadata(ast: &Ast, formula_sheet: u32, contains_let: bool) -> (ReadS
         return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
     }
     let expanded = expand_let_reachable_ast(ast).ok();
-    let metadata = expanded.as_ref().map_or(ast, |value| value);
+    let metadata = expanded.as_ref().unwrap_or(ast);
     (
         ReadSet::from_ast(metadata, formula_sheet),
         ast_is_volatile(metadata),

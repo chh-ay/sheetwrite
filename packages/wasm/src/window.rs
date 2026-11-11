@@ -159,7 +159,7 @@ impl CellStore {
                     ast: formula_asts
                         .get(i)
                         .and_then(Clone::clone)
-                        .map_or(Ast::InvalidRef, |value| value),
+                        .unwrap_or(Ast::InvalidRef),
                     anchor_row: r0,
                     anchor_col: c0,
                 },
@@ -291,7 +291,7 @@ impl CellStore {
         let cond_matches = cond_matches_for_window(
             self,
             sheet,
-            |ri| rows.get(ri).copied().map_or(u32::MAX, |value| value),
+            |ri| rows.get(ri).copied().unwrap_or(u32::MAX),
             cols,
             &cells,
         );

@@ -264,7 +264,7 @@ impl Axis {
                         .iter()
                         .find(|code| code.unsigned_abs() as usize == field + 1)
                         .copied()
-                        .map_or(1, |value| value);
+                        .unwrap_or(1);
                     let order = compare_group_values(&left_fields[field], &right_fields[field]);
                     if order != Ordering::Equal {
                         // Compare each sibling's full aggregate, not the value
@@ -449,7 +449,7 @@ pub(crate) fn bound(
         let bound = store
             .dynamic_array_bound(expression, sheet, pass)
             .transpose()?
-            .map_or(cells, |value| value);
+            .unwrap_or(cells);
         Ok(if bound > cells {
             (bound, bound)
         } else {
@@ -655,7 +655,7 @@ pub(crate) fn evaluate_matrix(
             .as_ref()
             .map(|matrix| bool_from_value(&matrix.values[row]))
             .transpose()?
-            .is_none_or(|value| value)
+            .unwrap_or(true)
         {
             included.push(row);
         }
@@ -817,14 +817,10 @@ pub(crate) fn evaluate_matrix(
                     2 => (rows.grand, columns.grand),
                     3 => (
                         row_group,
-                        columns.groups[col_group]
-                            .parent
-                            .map_or(columns.grand, |value| value),
+                        columns.groups[col_group].parent.unwrap_or(columns.grand),
                     ),
                     4 => (
-                        rows.groups[row_group]
-                            .parent
-                            .map_or(rows.grand, |value| value),
+                        rows.groups[row_group].parent.unwrap_or(rows.grand),
                         col_group,
                     ),
                     _ => unreachable!(),

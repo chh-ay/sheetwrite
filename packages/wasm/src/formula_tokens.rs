@@ -159,7 +159,7 @@ impl<'a> Utf16Offsets<'a> {
     fn at(&mut self, byte: usize) -> u32 {
         self.unit += self.src[self.byte..byte].encode_utf16().count();
         self.byte = byte;
-        u32::try_from(self.unit).map_or(u32::MAX, |value| value)
+        u32::try_from(self.unit).unwrap_or(u32::MAX)
     }
 }
 

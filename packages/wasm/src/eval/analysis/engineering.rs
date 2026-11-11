@@ -138,7 +138,7 @@ fn convert_between(
 /// The digits of a binary, octal or hexadecimal argument. A number argument
 /// is read as its decimal digits, so `BIN2DEC(101)` reads `101`.
 fn digits_argument(values: &FuncAccumulator) -> Result<String, FormulaError> {
-    match values.arg_value(0).map_or(&Value::Blank, |value| value) {
+    match values.arg_value(0).unwrap_or(&Value::Blank) {
         Value::Bool(_) => Err(FormulaError::Value),
         Value::Number(number) if *number < 0.0 || number.fract() != 0.0 => Err(FormulaError::Num),
         value => text_from_value(value),
@@ -218,7 +218,7 @@ fn digits(mut number: i64, base: u32) -> String {
 
     loop {
         let digit = (number % i64::from(base)) as u32;
-        let character = char::from_digit(digit, base).map_or('0', |value| value);
+        let character = char::from_digit(digit, base).unwrap_or('0');
         reversed.push(character.to_ascii_uppercase());
         number /= i64::from(base);
 
@@ -314,7 +314,7 @@ fn error_function_between(values: &FuncAccumulator) -> NumberResult {
 /// erf(x) = sign(x) P(1/2, x^2), with the regularized lower incomplete gamma
 /// function P.
 fn error_function(x: f64) -> f64 {
-    let magnitude = gamma_probability(HALF, x * x, false).map_or(1.0, |value| value);
+    let magnitude = gamma_probability(HALF, x * x, false).unwrap_or(1.0);
 
     magnitude.copysign(x)
 }
