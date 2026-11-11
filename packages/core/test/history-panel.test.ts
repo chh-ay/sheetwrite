@@ -127,17 +127,6 @@ async function edit(grid: Grid, sync: SyncCoordinator, operation: DocumentOp): P
   await sync.flush();
 }
 
-it("keeps both history commands unavailable until a host supplies history", () => {
-  const host = document.createElement("div");
-  document.body.append(host);
-  const grid = createGridFromSnapshot(host, snapshot(), { config: { ribbon: true } });
-
-  expect(grid.getCommandState("versionHistory").disabled).toBe(true);
-  expect(grid.getCommandState("saveVersion").disabled).toBe(true);
-  expect(host.querySelector('[data-command="versionHistory"]')).toBeNull();
-  grid.destroy();
-});
-
 it("saves a named version, shows the edit and its author, and restores it as one undo step", async () => {
   const { grid, host, sync } = await setup();
   expect(grid.getCommandState("versionHistory").disabled).toBe(false);

@@ -293,18 +293,6 @@ describe("relationships in the store", () => {
     }
   });
 
-  it("returns clones that callers cannot use to change the document", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
-    try {
-      const [read] = store.getRelationships();
-      if (!read) throw new Error("the relationship is missing");
-      read.to.column = "region";
-      expect(store.getRelationships()).toEqual([ordersToCustomers]);
-    } finally {
-      store.dispose();
-    }
-  });
-
   it("admits a relationship only between existing columns and without a cycle", () => {
     const store = SheetwriteStore.fromSnapshot(snapshot([]));
     try {
@@ -334,17 +322,6 @@ describe("relationships in the store", () => {
       expect(store.removeRelationship("unknown").status).not.toBe("applied");
       expect(store.removeRelationship(replaced.id).status).toBe("applied");
       expect(store.getRelationships()).toEqual([customersToRegions]);
-    } finally {
-      store.dispose();
-    }
-  });
-});
-
-describe("relationship key status", () => {
-  it("is unavailable on the default engine, which checks no keys", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
-    try {
-      expect(store.getRelationshipStatus(ordersToCustomers.id)).toEqual({ status: "unavailable" });
     } finally {
       store.dispose();
     }

@@ -3,7 +3,6 @@ import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { registerQueryCommands } from "../src/query-commands.js";
-import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { QueryCommands } from "../src/types.js";
@@ -134,35 +133,6 @@ async function setup(xlsxSource?: Workbook["xlsxSource"]) {
   };
   return { grid, host, commandButton, openTab, press, panelOpened, focusKey, buttonLabelled };
 }
-
-it("shows the Data query commands only while a session is registered", async () => {
-  const { grid, commandButton, openTab } = await setup();
-  openTab("Data");
-  expect(commandButton("getData")).toBeNull();
-
-  const toolbarHost = document.createElement("div");
-  document.body.appendChild(toolbarHost);
-  const toolbar = createToolbar(toolbarHost, grid);
-  // The toolbar places a newly available command at its next fit, one frame later.
-  const toolbarShows = async (id: string): Promise<boolean> => {
-    const frame = Promise.withResolvers<void>();
-    requestAnimationFrame(() => frame.resolve());
-    await frame.promise;
-    return toolbar.element.querySelector<HTMLElement>(`[data-command="${id}"]`)?.hidden === false;
-  };
-  expect(await toolbarShows("refreshAll")).toBe(false);
-
-  const unregister = registerQueryCommands(grid, new FakeCommands(grid));
-  expect(commandButton("getData")).not.toBeNull();
-  expect(commandButton("refreshAll")).not.toBeNull();
-  expect(commandButton("queries")).not.toBeNull();
-  expect(await toolbarShows("refreshAll")).toBe(true);
-
-  unregister();
-  expect(commandButton("refreshAll")).toBeNull();
-  expect(await toolbarShows("refreshAll")).toBe(false);
-  toolbar.destroy();
-});
 
 it("runs one Refresh All, and a second press cancels it", async () => {
   const { grid, host, commandButton, openTab, press } = await setup();

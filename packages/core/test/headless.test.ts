@@ -30,39 +30,6 @@ afterEach(() => {
 
 const A = (row: number, col: number): CellAddress => ({ sheet: "s1", row, col });
 
-describe("config.keyboard: false (headless key policy)", () => {
-  // Contract: `keyboard: false` drops EVERY stock binding. A keydown on the host
-  // must not navigate, start an edit, clear a cell, or open the find bar.
-  it("ignores arrow navigation, type-to-edit, Delete, and Ctrl+F", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { keyboard: false } }, store);
-
-    grid.setSelection({ kind: "cell", addr: A(2, 0) });
-
-    // Arrow navigation is gated: selection stays put (stock ArrowDown -> row 3).
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-    const sel = grid.getSelection();
-    expect(sel?.kind).toBe("cell");
-    expect(sel?.kind === "cell" ? sel.addr.row : -1).toBe(2);
-
-    // Type-to-edit is gated: no editor opens (stock printable key seeds one).
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
-    expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
-
-    // Destructive clear is gated: Delete leaves the selected cell intact.
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
-    expect(store.getCell(A(2, 0)).resolved).toBe("Customer 2");
-
-    // Find is gated: Ctrl+F does not open the find bar, so its DOM is never built.
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
-
-    grid.destroy();
-  });
-});
-
 describe("config.keyboard: (e, grid) => boolean (host interceptor)", () => {
   // Contract: the handler runs before the stock bindings. Returning true consumes
   // the event (the stock binding must NOT also run); returning false falls

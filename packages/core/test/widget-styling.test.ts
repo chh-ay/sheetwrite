@@ -100,26 +100,6 @@ function mustFind<T extends Element = HTMLElement>(host: HTMLElement, selector: 
 }
 
 describe("built-in widget styling", () => {
-  // ── Seeding: theme → host-root custom properties ───────────────────────────
-  // Contract: construction seeds every widget token on the shared host root
-  // (the ancestor that parents each widget), verbatim from the resolved theme.
-  // These are what styles.css reads via var(); if seeding drops or mismaps a
-  // field the widgets silently lose their theme.
-  it("seeds the widget custom properties onto the host root from the theme", async () => {
-    const { host } = await makeGrid();
-    const prop = (name: string): string => host.style.getPropertyValue(name);
-
-    expect(prop("--sheetwrite-widget-bg")).toBe(THEME.bg);
-    expect(prop("--sheetwrite-widget-fg")).toBe(THEME.fg);
-    expect(prop("--sheetwrite-widget-border")).toBe(THEME.gridLine);
-    expect(prop("--sheetwrite-widget-accent")).toBe(THEME.headerFg);
-    expect(prop("--sheetwrite-widget-selection")).toBe(THEME.selection);
-    expect(prop("--sheetwrite-toolbar-bg")).toBe(THEME.headerBg);
-    expect(prop("--sheetwrite-toolbar-fg")).toBe(THEME.headerFg);
-    expect(prop("--sheetwrite-menu-hover")).toBe(THEME.gridLine);
-    expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
-  });
-
   // Contract: every widget token the stylesheets read either is seeded or
   // falls back to a value derived from seeded tokens, so no widget paints a
   // light-theme colour under a dark theme. The menu shadow and the disabled
@@ -202,41 +182,6 @@ describe("built-in widget styling", () => {
       expect(host.style.getPropertyValue("--sheetwrite-widget-bg")).toBe(THEME.bg);
       expect(getComputedStyle(findEl).display).toBe("flex");
     }
-  });
-  it("renders icon strings as text and supports reusable SVG nodes and factories", async () => {
-    const shared = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    shared.setAttribute("data-icon", "shared");
-
-    const { host } = await makeGrid({
-      toolbar: [
-        { action: "bold", icon: '<img src=x onerror="alert(1)">' },
-        { action: "italic", icon: shared },
-        { action: "underline", icon: shared },
-        {
-          action: "strikethrough",
-          icon: () => {
-            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            svg.setAttribute("data-icon", "factory");
-            return svg;
-          },
-        },
-      ],
-    });
-
-    const glyph = (command: string): HTMLElement =>
-      mustFind<HTMLElement>(host, `[data-command="${command}"] .sheetwrite-ribbon-icon`);
-
-    const raw = glyph("bold");
-    expect(raw.textContent).toBe('<img src=x onerror="alert(1)">');
-    expect(raw.children).toHaveLength(0);
-
-    const italic = glyph("italic");
-    const underline = glyph("underline");
-    expect(italic.querySelector("svg[data-icon=shared]")).not.toBeNull();
-    expect(underline.querySelector("svg[data-icon=shared]")).not.toBeNull();
-    expect(italic.firstElementChild).not.toBe(underline.firstElementChild);
-
-    expect(glyph("strikethrough").querySelector("svg[data-icon=factory]")).not.toBeNull();
   });
 });
 

@@ -2,7 +2,10 @@
 
 use super::{Reader, Record};
 
-fn records(bytes: &[u8], delimiter: u8) -> Result<Vec<Vec<String>>, String> {
+/// The fields of each record, in order.
+type Records = Vec<Vec<String>>;
+
+fn records(bytes: &[u8], delimiter: u8) -> Result<Records, String> {
     let mut reader = Reader::new(bytes, delimiter).map_err(|issue| issue.code)?;
     let mut record = Record::default();
     let mut output = Vec::new();

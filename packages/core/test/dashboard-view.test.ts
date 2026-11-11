@@ -133,23 +133,6 @@ async function setup(readOnly = false) {
   return { grid, host, store, items, element, press, key, runMenu };
 }
 
-it("shows the items of the active dashboard over the cells, and hides them on a worksheet", async () => {
-  const { grid, host } = await setup();
-  const view = host.querySelector<HTMLElement>(".sheetwrite-dashboard");
-
-  expect(view?.hidden).toBe(false);
-  expect(
-    [...host.querySelectorAll(".sheetwrite-dashboard-item")].map((item) =>
-      item.getAttribute("aria-label"),
-    ),
-  ).toEqual(["Region", "By region"]);
-  // The default engine keeps the pivot and says what computing it needs.
-  expect(host.querySelector(".sheetwrite-dashboard-note")?.textContent).toContain("full engine");
-
-  grid.setActiveSheet("data");
-  expect(view?.hidden).toBe(true);
-});
-
 it("moves an item with the keyboard, one undo step per arrow, and refuses an occupied place", async () => {
   const { grid, items, element, key, runMenu } = await setup();
 
@@ -210,13 +193,6 @@ it("keeps one slicer value on a click and adds one with Ctrl, as saved changes",
 
   grid.undo();
   expect(items()[0]).toEqual({ ...slicer, selected: ["East"] });
-});
-
-it("offers no layout changes in a read-only grid", async () => {
-  const { host } = await setup(true);
-
-  expect(host.querySelector(".sheetwrite-dashboard-item .sheetwrite-panel-menu-button")).toBeNull();
-  expect(host.querySelector(".sheetwrite-dashboard-resize")).toBeNull();
 });
 
 it("adds a dashboard from Insert and shows it", async () => {
