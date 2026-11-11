@@ -36,6 +36,9 @@
 .sw-lp-hero__start {
   display: grid;
   gap: var(--sw-space-5);
+  /* Ends on the frame's right edge, with the header's controls and the app
+     preview below. */
+  justify-self: end;
   width: min(100%, 26rem);
 }
 

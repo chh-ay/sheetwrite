@@ -6,6 +6,11 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* One column: the actions start under the copy. */
+  .sw-lp-hero__start {
+    justify-self: start;
+  }
+
   .sw-lp-split {
     grid-template-areas:
       "head"
