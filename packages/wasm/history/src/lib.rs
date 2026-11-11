@@ -15,6 +15,7 @@ use transfer::{read_block, Block};
 use wasm_bindgen::prelude::*;
 
 /// Rows, columns and writers of one sheet of the later version.
+#[derive(Debug)]
 struct Sheet {
     rows: Axis,
     cols: Axis,
@@ -22,7 +23,7 @@ struct Sheet {
 }
 
 /// One page of changes as parallel columns.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Page {
     sheet: Vec<u32>,
     row: Vec<u32>,
@@ -34,7 +35,7 @@ struct Page {
 }
 
 impl Page {
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.flags.len()
     }
 
@@ -52,6 +53,7 @@ impl Page {
 /// Diff state for one comparison. JavaScript creates one per request and
 /// frees it when the request ends.
 #[wasm_bindgen]
+#[derive(Debug)]
 pub struct DiffKernel {
     sheets: Vec<Option<Sheet>>,
     before_styles: Vec<u32>,
@@ -66,8 +68,9 @@ pub struct DiffKernel {
 impl DiffKernel {
     /// A kernel whose pages hold at most `limit` changes.
     #[wasm_bindgen(constructor)]
-    pub fn new(limit: u32) -> DiffKernel {
-        DiffKernel {
+    #[must_use]
+    pub fn new(limit: u32) -> Self {
+        Self {
             sheets: Vec::new(),
             before_styles: Vec::new(),
             after_styles: Vec::new(),
@@ -83,15 +86,15 @@ impl DiffKernel {
     /// later has no earlier lines. Returns the sheet's slot.
     #[wasm_bindgen(js_name = addSheet)]
     pub fn add_sheet(&mut self, rows: u32, cols: u32, earlier: bool) -> u32 {
-        let (rows, cols) = if earlier {
+        let (row_axis, col_axis) = if earlier {
             (Axis::identity(rows), Axis::identity(cols))
         } else {
             (Axis::inserted(rows), Axis::inserted(cols))
         };
 
         self.sheets.push(Some(Sheet {
-            rows,
-            cols,
+            rows: row_axis,
+            cols: col_axis,
             touches: Touches::default(),
         }));
 
@@ -106,37 +109,47 @@ impl DiffKernel {
         }
     }
 
+    /// Rows `at..at + count` were inserted.
     #[wasm_bindgen(js_name = insertRows)]
     pub fn insert_rows(&mut self, slot: u32, at: u32, count: u32) {
         self.rows(slot, AxisOp::Insert { at, count });
     }
 
+    /// Rows `at..at + count` were removed.
     #[wasm_bindgen(js_name = removeRows)]
     pub fn remove_rows(&mut self, slot: u32, at: u32, count: u32) {
         self.rows(slot, AxisOp::Remove { at, count });
     }
 
+    /// Rows `from..from + count` moved to start at row `to`.
     #[wasm_bindgen(js_name = moveRows)]
     pub fn move_rows(&mut self, slot: u32, from: u32, count: u32, to: u32) {
         self.rows(slot, AxisOp::Move { from, count, to });
     }
 
+    /// Columns `at..at + count` were inserted.
     #[wasm_bindgen(js_name = insertCols)]
     pub fn insert_cols(&mut self, slot: u32, at: u32, count: u32) {
         self.cols(slot, AxisOp::Insert { at, count });
     }
 
+    /// Columns `at..at + count` were removed.
     #[wasm_bindgen(js_name = removeCols)]
     pub fn remove_cols(&mut self, slot: u32, at: u32, count: u32) {
         self.cols(slot, AxisOp::Remove { at, count });
     }
 
+    /// Columns `from..from + count` moved to start at column `to`.
     #[wasm_bindgen(js_name = moveCols)]
     pub fn move_cols(&mut self, slot: u32, from: u32, count: u32, to: u32) {
         self.cols(slot, AxisOp::Move { from, count, to });
     }
 
     /// Record that `author` wrote rows `r0..=r1` and columns `c0..=c1`.
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "a WebAssembly export: JavaScript passes the rectangle as numbers, without building an object per call"
+    )]
     pub fn touch(&mut self, slot: u32, r0: u32, c0: u32, r1: u32, c1: u32, author: u32) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
             sheet.touches.add(Touch {
@@ -161,12 +174,14 @@ impl DiffKernel {
     /// `[start, length, earlier start]` per row segment; the earlier start is
     /// `0xFFFFFFFF` for inserted rows.
     #[wasm_bindgen(js_name = rowSegments)]
+    #[must_use]
     pub fn row_segments(&self, slot: u32) -> Vec<u32> {
         self.segments(slot, true)
     }
 
     /// `[start, length, earlier start]` per column segment.
     #[wasm_bindgen(js_name = colSegments)]
+    #[must_use]
     pub fn col_segments(&self, slot: u32) -> Vec<u32> {
         self.segments(slot, false)
     }
@@ -192,7 +207,10 @@ impl DiffKernel {
     /// the sheet coordinates of the piece in each version. Returns the ordinal
     /// of the next cell to compare: `rows * cols` when the piece is done, less
     /// when the page filled up first.
-    #[allow(clippy::too_many_arguments)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "a WebAssembly export: JavaScript passes the piece as numbers, without building an object per call"
+    )]
     pub fn compare(
         &mut self,
         slot: u32,
@@ -263,45 +281,65 @@ impl DiffKernel {
 
     /// Changes written since the last `clearPage`.
     #[wasm_bindgen(js_name = pageLength)]
+    #[must_use]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "wasm-bindgen cannot export a const fn"
+    )]
     pub fn page_length(&self) -> u32 {
         self.page.len() as u32
     }
 
+    /// The sheet slot of each change.
     #[wasm_bindgen(js_name = pageSheets)]
+    #[must_use]
     pub fn page_sheets(&self) -> Vec<u32> {
         self.page.sheet.clone()
     }
 
+    /// The later row of each change.
     #[wasm_bindgen(js_name = pageRows)]
+    #[must_use]
     pub fn page_rows(&self) -> Vec<u32> {
         self.page.row.clone()
     }
 
+    /// The later column of each change.
     #[wasm_bindgen(js_name = pageCols)]
+    #[must_use]
     pub fn page_cols(&self) -> Vec<u32> {
         self.page.col.clone()
     }
 
+    /// The earlier row of each change; `0xFFFFFFFF` for a new row.
     #[wasm_bindgen(js_name = pageBeforeRows)]
+    #[must_use]
     pub fn page_before_rows(&self) -> Vec<u32> {
         self.page.before_row.clone()
     }
 
+    /// The earlier column of each change; `0xFFFFFFFF` for a new column.
     #[wasm_bindgen(js_name = pageBeforeCols)]
+    #[must_use]
     pub fn page_before_cols(&self) -> Vec<u32> {
         self.page.before_col.clone()
     }
 
+    /// What changed in each cell, as `VALUE`, `FORMULA`, `STYLE`, `ADDED` and `REMOVED` bits.
     #[wasm_bindgen(js_name = pageFlags)]
+    #[must_use]
     pub fn page_flags(&self) -> Vec<u8> {
         self.page.flags.clone()
     }
 
+    /// The last writer of each changed cell; `0xFFFFFFFF` when no logged write reaches it.
     #[wasm_bindgen(js_name = pageAuthors)]
+    #[must_use]
     pub fn page_authors(&self) -> Vec<u32> {
         self.page.author.clone()
     }
 
+    /// Empty the page so `compare` can fill it again.
     #[wasm_bindgen(js_name = clearPage)]
     pub fn clear_page(&mut self) {
         self.page.clear();
@@ -309,6 +347,7 @@ impl DiffKernel {
 
     /// Everyone who wrote a cell of the later version, in the order of their first write.
     #[wasm_bindgen(js_name = cellAuthors)]
+    #[must_use]
     pub fn cell_authors(&self, slot: u32, row: u32, col: u32) -> Vec<u32> {
         let mut authors = Vec::new();
         if let Some(Some(sheet)) = self.sheets.get(slot as usize) {
