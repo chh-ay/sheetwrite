@@ -21,6 +21,11 @@ export function revealCurrentNavigation(): void {
       list.scrollLeft += row.left - box.left - (box.width - row.width) / 2;
     }
   };
-  reveal(".sw-sidebar", '[aria-current="page"]', true);
-  reveal(".sw-docs-tabs", "[aria-current]", false);
+  try {
+    reveal(".sw-sidebar", '[aria-current="page"]', true);
+    reveal(".sw-docs-tabs", "[aria-current]", false);
+  } finally {
+    // DocsShell's hold script hid the sidebar's links until now.
+    delete document.documentElement.dataset.navReveal;
+  }
 }

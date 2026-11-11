@@ -72,6 +72,11 @@
   );
 }
 
+/* Until the inline reveal script has placed the current row in view (Solid
+   docs pages, DocsShell.tsx), the sidebar shows its surface without its links. */
+html[data-nav-reveal="pending"] .sw-sidebar__nav {
+  visibility: hidden;
+}
 .sw-sidebar {
   position: sticky;
   top: 0;

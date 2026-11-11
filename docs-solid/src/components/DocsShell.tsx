@@ -45,6 +45,13 @@ interface DocsShellProps {
   readonly title: string;
 }
 
+/**
+ * Holds the sidebar's links out of sight until REVEAL_SCRIPT has scrolled the
+ * current row into view. A browser that paints while the sidebar is still
+ * parsing (Firefox can) then shows its surface for that frame, not the list
+ * at the top jumping to the current row.
+ */
+const HOLD_SCRIPT = 'document.documentElement.dataset.navReveal="pending"';
 /** Places the current page's sidebar row and tab in view while the page parses. */
 const REVEAL_SCRIPT = `(${revealCurrentNavigation.toString()})()`;
 
@@ -110,6 +117,7 @@ export function DocsShell(props: DocsShellProps) {
         Skip to content
       </a>
       <DocsTopbar activeHref={props.activeHref} activeTab={tab} />
+      <script innerHTML={HOLD_SCRIPT} />
       <aside class="sw-sidebar">
         <a aria-label="Sheetwrite home" class="sw-sidebar__brand" href="/">
           <BrandMark />
