@@ -316,9 +316,22 @@ declare global {
 // listener holds events back. Interaction islands hold and replay their own.
 globalThis._$HY ??= { events: [], completed: new WeakSet(), r: {} };
 
-/** An old URL redirects here with its old #fragment; send that heading on. */
-const forwarded = forwardedHeading(window.location.pathname, window.location.hash);
-if (forwarded === undefined) {
+/**
+ * Runs `enhance` once the page's full stylesheets apply. A built page paints
+ * with its critical CSS and loads its sheets after (islands/page-scripts.ts);
+ * the critical CSS only styles the server's markup, so scripts that add
+ * markup, classes or states wait for the full sheets.
+ */
+function whenFullStylesApply(enhance: () => void): void {
+  const pending =
+    document.documentElement.dataset.styles !== "full" &&
+    document.querySelector("link[data-full-style]") !== null;
+  if (pending) window.addEventListener("sw-full-styles", enhance, { once: true });
+  else enhance();
+}
+
+/** The page's behaviour: plain-DOM enhancements and its islands. */
+function enhancePage(): void {
   initializeCodeEnhancements();
   installExpressiveCodeScripts();
   installAnchorReveal();
@@ -349,6 +362,9 @@ if (forwarded === undefined) {
       );
     }),
   );
-} else {
-  window.location.replace(forwarded);
 }
+
+/** An old URL redirects here with its old #fragment; send that heading on. */
+const forwarded = forwardedHeading(window.location.pathname, window.location.hash);
+if (forwarded === undefined) whenFullStylesApply(enhancePage);
+else window.location.replace(forwarded);

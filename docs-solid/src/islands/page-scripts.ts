@@ -4,7 +4,9 @@
  *   module preloads for its entry and for the content islands that page holds;
  * - links the stylesheets of the islands it holds (their markup is in the page);
  * - keeps a feature stylesheet (`data-feature`, routes/__root.tsx) only if one
- *   of its selectors names only classes the page's markup uses.
+ *   of its selectors names only classes the page's markup uses;
+ * - inlines its critical CSS and loads its stylesheets without blocking the
+ *   first paint.
  *
  *   bun src/islands/page-scripts.ts
  */
@@ -13,6 +15,7 @@ import { join } from "node:path";
 
 import { SHOWCASE_ISLANDS, type ShowcaseIsland } from "../showcases/islands.ts";
 import { TEST_FIXTURE_ISLANDS } from "../test-fixtures/islands.ts";
+import { criticalCss, type ParsedCss, parseCss } from "./critical-css.ts";
 import type { IslandName } from "./Island.tsx";
 
 const ISLANDS_ENTRY = "src/islands/client.tsx";
@@ -180,15 +183,20 @@ async function selectorsOf(href: string): Promise<string[][]> {
   return sets;
 }
 
+/** Every class the page's markup uses. */
+function pageClasses(html: string): Set<string> {
+  return new Set(
+    Array.from(html.matchAll(CLASS_ATTRIBUTE), ([, value]) => (value ?? "").split(/\s+/)).flat(),
+  );
+}
+
 /**
  * Drops the feature stylesheets a page does not use. A feature sheet stays
  * when one of its selectors names only classes the page's markup uses (or
  * when it has no selector that names a class).
  */
 async function withUsedFeatureStylesheets(html: string): Promise<string> {
-  const used = new Set(
-    Array.from(html.matchAll(CLASS_ATTRIBUTE), ([, value]) => (value ?? "").split(/\s+/)).flat(),
-  );
+  const used = pageClasses(html);
   let result = html;
   for (const [tag] of html.matchAll(STYLESHEET_LINK)) {
     if (!FEATURE_ATTRIBUTE.test(tag)) continue;
@@ -197,6 +205,61 @@ async function withUsedFeatureStylesheets(html: string): Promise<string> {
     result = result.replace(tag, keep ? tag.replace(FEATURE_ATTRIBUTE, "") : "");
   }
   return result;
+}
+
+const parsedSheets = new Map<string, ParsedCss>();
+async function parsedSheet(href: string): Promise<ParsedCss> {
+  let parsed = parsedSheets.get(href);
+  if (parsed === undefined) {
+    parsed = parseCss(await readFile(join(CLIENT_OUTPUT, href), "utf8"));
+    parsedSheets.set(href, parsed);
+  }
+  return parsed;
+}
+
+/** Marks a stylesheet that loads without blocking the first paint. */
+const FULL_STYLE_ATTRIBUTE = "data-full-style";
+
+/**
+ * Switches the page's stylesheets on together once all of them have loaded
+ * (or at the load event, if one fails), so at every moment the cascade is
+ * either the critical CSS alone or the critical CSS followed by every sheet in
+ * order, which applies exactly as the sheets alone do. The islands client
+ * waits for `sw-full-styles` before it changes the page. A sheet already in
+ * the cache can load before this runs, so it checks each one's `sheet`.
+ */
+const FULL_STYLES_SCRIPT = `{const links=Array.from(document.querySelectorAll("link[${FULL_STYLE_ATTRIBUTE}]"));let applied=false;const apply=()=>{if(applied)return;applied=true;for(const link of links)link.media="all";document.documentElement.dataset.styles="full";dispatchEvent(new Event("sw-full-styles"))};const check=()=>{if(links.every((link)=>link.sheet!==null))apply()};for(const link of links)link.addEventListener("load",check);addEventListener("load",apply,{once:true});check()}`;
+
+/**
+ * Inlines the page's critical CSS (critical-css.ts) ahead of its stylesheets
+ * and turns those into print-media links, which the browser loads without
+ * holding back the first paint; FULL_STYLES_SCRIPT switches them on. The
+ * critical CSS holds every rule that can match the page's markup, so the full
+ * sheets change nothing on screen; they add the rules for markup that scripts
+ * create.
+ */
+async function withCriticalCss(html: string): Promise<string> {
+  const headEnd = html.indexOf("</head>");
+  const head = html.slice(0, headEnd);
+  const links = Array.from(head.matchAll(STYLESHEET_LINK), ([tag]) => tag);
+  const [first] = links;
+  if (first === undefined) return html;
+  const classes = pageClasses(html);
+  let critical = "";
+  for (const tag of links) {
+    const href = HREF.exec(tag)?.[1];
+    if (href === undefined) throw new Error(`A stylesheet link without href: ${tag}`);
+    critical += criticalCss(await parsedSheet(href), classes);
+  }
+  if (critical.includes("</style")) throw new Error("Critical CSS would close its style element");
+  let rewritten = head.replace(first, `<style>${critical}</style>${first}`);
+  for (const tag of links) {
+    rewritten = rewritten.replace(
+      tag,
+      tag.replace(/\/?>$/, ` media="print" ${FULL_STYLE_ATTRIBUTE}/>`),
+    );
+  }
+  return `${rewritten}<script>${FULL_STYLES_SCRIPT}</script>${html.slice(headEnd)}`;
 }
 
 const manifestPath = join(CLIENT_OUTPUT, ISLANDS_MANIFEST);
@@ -209,7 +272,8 @@ for await (const page of new Bun.Glob("**/*.html").scan(CLIENT_OUTPUT)) {
   // enhancements (code copy and popovers) and marks the page hydrated.
   const withoutRouter = ROUTER_TAGS.reduce((markup, tag) => markup.replace(tag, ""), html);
   const withScripts = withoutRouter.replace("</head>", `${pageScripts(manifest, html)}</head>`);
-  await writeFile(path, await withUsedFeatureStylesheets(withIslandCode(manifest, withScripts)));
+  const withFeatures = await withUsedFeatureStylesheets(withIslandCode(manifest, withScripts));
+  await writeFile(path, await withCriticalCss(withFeatures));
   rewrittenPages += 1;
 }
 // The manifest is a build input, not a page asset.
