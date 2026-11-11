@@ -272,6 +272,33 @@ Measured natively before LETs resolved function-call bindings to slots, a
 once they did. Its ratio limit is the 1.2 default until same-engine pairs
 calibrate it.
 
+Seven rows (10K and 100K formulas each) time how formulas bind to sheets,
+defined names and tables, which the other rows never change after load:
+
+- `name-define`: one formula per row, `=A1*2` in nine rows of ten and
+  `=A1*Scale_k` in the tenth. The timed run defines the ten names
+  `Scale_0`…`Scale_9` one at a time, as an edit session or a remote change
+  does; a workbook load defines its names before its formulas.
+- `row-insert-names`: the same sheet with the names defined; the timed run
+  inserts one row above everything, so every formula and name moves.
+- `table-append-row`: table `Sales` with `=[@Amount]*2` in every body row and
+  `=SUM(Sales[Amount])` beside it. The timed run appends a row: a value, the
+  table grown by one row, and the column's formula in the new row.
+- `sort-formula-column`: `=A1*2` in every row; the timed run sorts A:B by a
+  fixed shuffle with `permuteRows`.
+- `parse-load-qualified` and `parse-load-table`: `independent-parse-load` with
+  `=Data!A1+Data!B1` on a second sheet, and with `=[@Amount]*2` in a table.
+- `memory-import`: `importMemoryState` of a released engine whose formulas
+  read another sheet, every tenth also through a defined name.
+
+On develop, each name or table change resolves every formula of the workbook
+again and recalculates all of them, and a sort or a memory import parses
+every moved formula again; no other row times this. Measured natively on
+develop (Mac), per timed run at 100K: `name-define` made 5.8 M
+heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
+`sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
+the 1.2 default until same-engine pairs calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
