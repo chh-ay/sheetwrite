@@ -688,3 +688,25 @@ samp,
     justify-self: end;
   }
 }
+
+/* Phone touch targets: the brand and the header's icon buttons keep their
+   look and get an invisible, centred 44 px area. */
+@media (max-width: 42rem) {
+  .sw-header__brand,
+  .sw-header__actions .sw-icon-button {
+    position: relative;
+  }
+  /* Room for the buttons' areas to sit side by side without overlapping. */
+  .sw-header__actions {
+    gap: var(--sw-space-2);
+  }
+  .sw-header__brand::after,
+  .sw-header__actions .sw-icon-button::after {
+    position: absolute;
+    top: min(0px, calc(50% - 22px));
+    right: min(0px, calc(50% - 22px));
+    bottom: min(0px, calc(50% - 22px));
+    left: min(0px, calc(50% - 22px));
+    content: "";
+  }
+}
