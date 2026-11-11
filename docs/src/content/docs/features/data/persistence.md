@@ -68,6 +68,8 @@ Use `WorkbookSnapshot` plus `validateWorkbookSnapshot()` at persistence boundari
 | `sync.sendNext()` / `sync.retry(id)` | Host-controlled sends. Retries keep the original ID. |
 | `sync.subscribe(source)` | Accepts a transport-neutral callback source and validates strict version order. |
 
+Snapshot hydration and transaction paste write source-free sparse blocks column by column on dense sheets without spills. Formula and reference sources keep their source-replacement rules; datasource page loads still preserve local dirty edits, and a dirty-capacity rejection leaves the whole block unchanged.
+
 Use `MemoryPersistenceAdapter` as an executable, server-sequenced reference, not as durable storage. Adapter methods accept `AbortSignal`. Transport failures use `PersistenceError`, while version conflicts are typed commit responses that keep local work.
 
 ### Document state and session state

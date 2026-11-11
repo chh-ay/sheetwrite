@@ -1154,6 +1154,29 @@ impl CellStorage {
         true
     }
 
+    /// Writes validated rows of one dense column, leaving unlisted cells alone.
+    /// Like `write_dense_block`, replaces sources and discards calculated slots.
+    pub(crate) fn write_dense_column_cells(
+        &mut self,
+        col: usize,
+        cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+    ) {
+        debug_assert!(self.paged.is_none() && col < self.n_cols);
+        let column = col * self.row_count..(col + 1) * self.row_count;
+        let kinds = &mut self.kind[column.clone()];
+        let payloads = &mut self.payload[column.clone()];
+        let styles = &mut self.style[column];
+        let has_calculated = self.dense_calculated_cells != 0;
+        for (row, kind, payload, style) in cells {
+            if has_calculated && kinds[row] & CALCULATED != 0 {
+                self.dense_calculated_cells -= 1;
+            }
+            kinds[row] = kind;
+            payloads[row] = payload;
+            styles[row] = style;
+        }
+    }
+
     /// Releases paged calculated pages that hold no result.
     pub(crate) fn compact_calculated(&mut self) {
         if let Some(paged) = &mut self.paged {
