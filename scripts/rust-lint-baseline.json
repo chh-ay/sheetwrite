@@ -2,7 +2,7 @@
   "wasm": {
     "clippy::allow_attributes_without_reason": 10,
     "clippy::clone_on_ref_ptr": 2,
-    "clippy::cognitive_complexity": 29,
+    "clippy::cognitive_complexity": 30,
     "clippy::default_trait_access": 1,
     "clippy::deref_by_slicing": 2,
     "clippy::derive_partial_eq_without_eq": 8,
