@@ -50,6 +50,40 @@ fn formulas_follow_a_link_that_is_added_removed_and_added_again() {
     assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(formula));
 }
 
+/// Excel writes a name of another workbook as `Budget.xlsx!Total`, with the
+/// path when the workbook is closed (Microsoft, "Create workbook links":
+/// `=SUM(Budget.xlsx!Sales)`), and keeps the saved values of the cells the
+/// name refers to.
+#[test]
+fn defined_names_of_a_link_read_its_saved_values() {
+    let (mut store, report, _) = store_with_names();
+    let cases = [
+        ("=Budget.xlsx!Total", "7"),
+        ("=SUM(budget.xlsx!ROWS) * 2", "24"),
+        ("='C:\\Reports\\Budget.xlsx'!Total", "7"),
+        ("=[Budget.xlsx]!Total+1", "8"),
+        ("='C:\\Reports\\[Budget.xlsx]'!Total", "7"),
+        ("=[Budget.xlsx]Annual!Local", "5"),
+        // A name the link does not hold, or a link without values.
+        ("=Budget.xlsx!Missing", "#REF!"),
+        ("=Sales.xlsx!Total", "#REF!"),
+    ];
+    for (row, (formula, _)) in cases.iter().enumerate() {
+        store.set_formula(report, row, 0, formula, 0);
+    }
+    store.recompute(report);
+
+    for (row, (formula, expected)) in cases.iter().enumerate() {
+        let cell = store.get_cell(report, row, 0);
+        let shown = cell.string().unwrap_or_else(|| cell.num().to_string());
+        assert_eq!(shown, *expected, "{formula}");
+        assert_eq!(
+            store.formula_source(report, row, 0).as_deref(),
+            Some(*formula)
+        );
+    }
+}
+
 /// Define a name of `Budget.xlsx` as core does from its link part: the
 /// name qualified by the book (and its sheet), referring to the link sheet.
 fn define(store: &mut CellStore, name: &str, cells: &str) -> bool {

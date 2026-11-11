@@ -94,6 +94,33 @@ fn tells_logical_values_from_calls_and_sheets() {
 }
 
 #[test]
+fn reads_every_other_kind() {
+    use TokenKind::*;
+
+    assert_eq!(
+        kinds("='My sheet'!A1#+Table1[Col]&#N/A"),
+        vec![
+            QuotedSheet,
+            Bang,
+            Ident,
+            Hash,
+            Operator,
+            Ident,
+            StructuredRef,
+            Operator,
+            ErrorLiteral
+        ]
+    );
+    assert_eq!(
+        kinds("={1,2;3,4}<>1"),
+        vec![
+            LBrace, Number, Comma, Number, Semicolon, Number, Comma, Number, RBrace, Operator,
+            Number
+        ]
+    );
+}
+
+#[test]
 fn goes_on_after_text_it_cannot_read() {
     use TokenKind::*;
 
@@ -134,6 +161,30 @@ fn runs_an_open_quote_or_bracket_to_the_end_as_incomplete() {
     assert_eq!(
         error("=T[Col"),
         Some((2, 6, true, "Add ] to close the table reference.".into()))
+    );
+}
+
+#[test]
+fn reports_a_missing_end_as_incomplete_at_the_end_of_the_text() {
+    assert_eq!(
+        error("=SUM(1"),
+        Some((6, 6, true, "Add ) to close the (.".into()))
+    );
+    assert_eq!(
+        error("=1+"),
+        Some((3, 3, true, "Enter a value to complete the formula.".into()))
+    );
+    assert_eq!(
+        error("="),
+        Some((1, 1, true, "Enter a value to complete the formula.".into()))
+    );
+    assert_eq!(
+        error("={1,2"),
+        Some((5, 5, true, "Add } to close the array constant.".into()))
+    );
+    assert_eq!(
+        error("=A1:"),
+        Some((4, 4, true, "Enter a cell, column or row after :.".into()))
     );
 }
 

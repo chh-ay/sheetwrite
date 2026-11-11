@@ -81,6 +81,15 @@ fn structural_edits_leave_other_sheet_references() {
     );
 }
 
+#[test]
+fn moved_rows_take_their_references_along() {
+    assert_eq!(move_formula_axis("=A1+A2+A4", ROWS, 0, 2, 1), "=A2+A3+A4");
+    assert_eq!(
+        move_formula_axis("=SUM(A1:A10)", ROWS, 1, 2, 8),
+        "=SUM(A1:A8)"
+    );
+}
+
 /// Renaming a table or a column updates the structured references that name
 /// it, as Excel updates formulas: "Rename an Excel table" and "Using
 /// structured references with Excel tables" on Microsoft Support.

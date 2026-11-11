@@ -28,6 +28,19 @@ fn data_store() -> (CellStore, usize) {
     (store, sheet)
 }
 
+#[test]
+fn a_dynamic_name_reads_the_range_its_formula_returns() {
+    let (mut store, sheet) = data_store();
+    assert!(store.set_named_formula("Filled", -1, "=OFFSET(Data!$A$1,0,0,COUNT(Data!$A:$A),1)"));
+    store.set_formula(sheet, 0, 3, "=SUM(Filled)", 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 6.0);
+
+    store.set_number(sheet, 3, 0, 4.0, 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 10.0);
+}
+
 /// Excel keeps a name's relative references relative to A1 and moves them
 /// to the cell that uses the name, wrapping past the last column, so
 /// `=Data!XFD1` reads the cell to the left of each cell that uses it.
@@ -107,6 +120,20 @@ fn a_chain_of_names_over_a_sheets_own_name_binds_in_linear_time() {
     assert_eq!(text(&store, sheet, 0, 3).as_deref(), Some("#NUM!"));
     assert_eq!(number(&store, sheet, 1, 3), 512.0);
     assert_eq!(number(&store, other, 0, 0), 1024.0);
+}
+
+#[test]
+fn names_refer_to_other_names_and_a_cycle_through_names_is_a_name_error() {
+    let (mut store, sheet) = data_store();
+    assert!(store.set_named_formula("Rate", -1, "=0.1"));
+    assert!(store.set_named_formula("Total", -1, "=SUM(Data!$B$1:$B$3)*(1+Rate)"));
+    assert!(store.set_named_formula("Loop", -1, "=Loop+1"));
+    store.set_formula(sheet, 0, 3, "=Total", 0);
+    store.set_formula(sheet, 1, 3, "=Loop", 0);
+    store.recompute(sheet);
+
+    assert!((number(&store, sheet, 0, 3) - 66.0).abs() < 1e-9);
+    assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NAME?"));
 }
 
 #[test]

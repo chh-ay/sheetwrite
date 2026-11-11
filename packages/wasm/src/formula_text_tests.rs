@@ -34,6 +34,34 @@ fn texts(store: &CellStore, sheet: usize, first: usize, count: usize) -> Vec<Str
 }
 
 #[test]
+fn a_sheet_rename_changes_only_the_sheet_names() {
+    let (mut store, sales, summary) = two_sheets();
+    let formulas = [
+        "=Sales!A1+1",
+        "=SUM(Sales!A1:A3) * (Sales!B1)",
+        "=-Sales!A1^2",
+        "=[Book.xlsx]S!A1+Sales!A1",
+        "=SUM(Sales:Summary!B1)/2",
+        "=IF(Sales!A1>0,\"Sales!A1\",(Sales!B1))",
+    ];
+    enter(&mut store, summary, &formulas);
+
+    assert!(store.rename_sheet(sales, "sales", "Sales Data"));
+
+    assert_eq!(
+        texts(&store, summary, 0, formulas.len()),
+        [
+            "='Sales Data'!A1+1",
+            "=SUM('Sales Data'!A1:A3) * ('Sales Data'!B1)",
+            "=-'Sales Data'!A1^2",
+            "=[Book.xlsx]S!A1+'Sales Data'!A1",
+            "=SUM('Sales Data:Summary'!B1)/2",
+            "=IF('Sales Data'!A1>0,\"Sales!A1\",('Sales Data'!B1))",
+        ]
+    );
+}
+
+#[test]
 fn a_row_or_column_edit_changes_only_the_moved_references() {
     let (mut store, sales, _) = two_sheets();
     let formulas = [
