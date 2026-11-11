@@ -921,6 +921,9 @@ html:has(.sw-nav-dialog[open]) {
     padding-block: 0;
     line-height: 44px;
   }
+  .sw-prose .api-member-index > summary {
+    min-height: 44px;
+  }
   .fig-range-row__name {
     min-height: 44px;
     align-items: center;
