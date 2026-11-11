@@ -5,27 +5,25 @@ use crate::column::{compare, Batch, Value};
 use crate::plan::Diagnostic;
 use std::cmp::Ordering;
 
-/// A batch and the columns that form its composite key.
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct KeyColumns<'a> {
-    pub(crate) batch: &'a Batch,
-    pub(crate) keys: &'a [u32],
-}
-
 /// Composite keys compare left-to-right; null equals null before any typed value.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the comparator of every key sort and merge; passing each side as a struct made \
+              join and group 3-4% slower in packages/queries/bench.ts on the Mac (Apple \
+              Silicon, Bun)"
+)]
 pub(crate) fn compare_keys(
-    left: KeyColumns<'_>,
-    right: KeyColumns<'_>,
+    left: &Batch,
+    right: &Batch,
+    left_keys: &[u32],
+    right_keys: &[u32],
     left_row: u32,
     right_row: u32,
 ) -> Result<Ordering, Diagnostic> {
-    for (left_column, right_column) in left.keys.iter().zip(right.keys) {
+    for (left_column, right_column) in left_keys.iter().zip(right_keys) {
         let order = compare(
-            left.batch
-                .value(row_index(*left_column)?, row_index(left_row)?)?,
-            right
-                .batch
-                .value(row_index(*right_column)?, row_index(right_row)?)?,
+            left.value(row_index(*left_column)?, row_index(left_row)?)?,
+            right.value(row_index(*right_column)?, row_index(right_row)?)?,
         );
         if order != Ordering::Equal {
             return Ok(order);
@@ -52,17 +50,16 @@ pub(crate) fn sorted_rows(batch: &Batch, keys: &[u32]) -> Result<Vec<u32>, Diagn
     let count = flat_index(batch.row_count())?;
     let mut rows: Vec<u32> = (0..count).collect();
     let mut failure = None;
-    let side = KeyColumns { batch, keys };
 
-    rows.sort_unstable_by(
-        |left, right| match compare_keys(side, side, *left, *right) {
+    rows.sort_unstable_by(|left, right| {
+        match compare_keys(batch, batch, keys, keys, *left, *right) {
             Ok(order) => order.then_with(|| left.cmp(right)),
             Err(issue) => {
                 failure = Some(issue);
                 Ordering::Equal
             }
-        },
-    );
+        }
+    });
 
     if let Some(issue) = failure {
         return Err(issue);

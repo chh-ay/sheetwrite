@@ -3,7 +3,7 @@
 use crate::budget::OutputBudget;
 use crate::buffers::{at, at_mut, flat_index, row_index};
 use crate::column::{compare, validate_names, Batch, Column, Value};
-use crate::keys::{compare_keys, indexes, sorted_rows, KeyColumns};
+use crate::keys::{compare_keys, indexes, sorted_rows};
 use crate::plan::{Aggregate, AggregateOp, ColumnSpec, ColumnType, Diagnostic, Limits};
 use std::cmp::Ordering;
 
@@ -26,7 +26,6 @@ pub(crate) fn group(
     // https://learn.microsoft.com/powerquery-m/table-group
     // https://learn.microsoft.com/powerquery-m/list-sum
     let sorted = sorted_rows(batch, &keys)?;
-    let side = KeyColumns { batch, keys: &keys };
     let mut start = 0;
     let mut groups = 0;
     let mut budget = OutputBudget::new(limits);
@@ -34,8 +33,14 @@ pub(crate) fn group(
     while start < sorted.len() {
         let mut end = start + 1;
         while end < sorted.len()
-            && compare_keys(side, side, *at(&sorted, start)?, *at(&sorted, end)?)?
-                == Ordering::Equal
+            && compare_keys(
+                batch,
+                batch,
+                &keys,
+                &keys,
+                *at(&sorted, start)?,
+                *at(&sorted, end)?,
+            )? == Ordering::Equal
         {
             end += 1;
         }
