@@ -33,6 +33,9 @@ const PAGES = [
     diagram: "recalculation",
   },
   { id: "vanilla", path: "/vanilla/" },
+  { id: "react", path: "/react/" },
+  { id: "vue", path: "/vue/" },
+  { id: "svelte", path: "/svelte/" },
   {
     id: "analysis",
     path: "/showcases/analysis/",

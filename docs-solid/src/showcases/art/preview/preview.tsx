@@ -31,7 +31,12 @@ import {
   VersionsDiagram,
 } from "../explain-diagrams.js";
 import { HUB_ART } from "../hub-art.js";
-import { COLLABORATION_PROOF_ART, DATABASE_PROOF_ART, VANILLA_PROOF_ART } from "../proof-art.js";
+import {
+  COLLABORATION_PROOF_ART,
+  DATABASE_PROOF_ART,
+  FRAMEWORK_PROOF_ART,
+  VANILLA_PROOF_ART,
+} from "../proof-art.js";
 
 const params = new URLSearchParams(location.search);
 if (params.get("theme") === "dark") document.documentElement.dataset.theme = "dark";
@@ -310,6 +315,7 @@ function Parts() {
     ),
     ...Object.entries(VANILLA_PROOF_ART).map(([title, Art]) => [`proof:${title}`, Art] as const),
     ...Object.entries(DATABASE_PROOF_ART).map(([title, Art]) => [`proof:${title}`, Art] as const),
+    ...Object.entries(FRAMEWORK_PROOF_ART).map(([title, Art]) => [`proof:${title}`, Art] as const),
     ["command-model", CommandModelDiagram],
     ["analysis", ChartReadsCellsDiagram],
     ["dashboards", DashboardDiagram],
