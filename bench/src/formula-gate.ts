@@ -126,6 +126,19 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
   "workload=spill-sequence-admission;size=100000": 1.15,
+  // Full engine only. Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  "workload=map-lambda;size=10000": 1.2,
+  "workload=map-lambda;size=100000": 1.2,
+  "workload=reduce-lambda;size=10000": 1.2,
+  "workload=reduce-lambda;size=100000": 1.2,
+  "workload=byrow-lambda;size=10000": 1.2,
+  "workload=byrow-lambda;size=100000": 1.2,
+  "workload=lambda-call;size=10000": 1.2,
+  "workload=lambda-call;size=100000": 1.2,
+  "workload=named-lambda;size=10000": 1.2,
+  "workload=named-lambda;size=100000": 1.2,
+  "workload=measure-pivot;size=10000": 1.2,
+  "workload=measure-pivot;size=100000": 1.2,
 };
 
 export const FORMULA_RATIO_LIMITS: ReadonlyMap<string, number> = new Map(
