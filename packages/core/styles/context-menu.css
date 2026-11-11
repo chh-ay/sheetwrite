@@ -1,0 +1,105 @@
+/* @sheetwrite/core/styles/context-menu.css: the right-click menu. Its icons
+   need icons.css. */
+
+/* Development builds read this to warn once when this part is missing. */
+.sheetwrite-context-menu {
+  --sheetwrite-context-menu-ready: 1;
+}
+
+/* Context menu: icon column, label, then shortcut or submenu chevron. Rows are
+   inset with rounded highlights; hover and keyboard focus look the same. */
+.sheetwrite-context-menu {
+  min-width: 200px;
+  /* Keep in sync with MENU_PADDING_PX in src/context-menu.ts. */
+  padding: 4px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 8px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+  box-sizing: border-box;
+  user-select: none;
+  z-index: 1000;
+}
+
+/* A submenu stacks above the menu that opened it. */
+.sheetwrite-context-menu-sub {
+  z-index: 1001;
+}
+
+.sheetwrite-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 5px;
+  cursor: pointer;
+  white-space: nowrap;
+  background: transparent;
+  outline: none;
+}
+
+.sheetwrite-context-menu-item:is(:hover, :focus-visible, :focus):not(
+    .sheetwrite-context-menu-item-disabled
+  ),
+.sheetwrite-context-menu-item[aria-expanded="true"] {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+/* High Contrast drops backgrounds; an outline keeps the active row visible. */
+@media (forced-colors: active) {
+  .sheetwrite-context-menu-item:is(:focus, [aria-expanded="true"]) {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+}
+
+.sheetwrite-context-menu-item-disabled {
+  cursor: default;
+  opacity: var(--sheetwrite-menu-disabled-opacity, 0.5);
+}
+
+.sheetwrite-context-menu-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-context-menu-label {
+  flex: 1;
+}
+
+.sheetwrite-context-menu-shortcut {
+  margin-left: 24px;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+  font-size: 0.9em;
+}
+
+/* Submenu chevron, drawn with borders so it follows the text color. */
+.sheetwrite-context-menu-arrow {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 0 24px;
+  border-top: 1.5px solid currentColor;
+  border-right: 1.5px solid currentColor;
+  opacity: 0.6;
+  transform: rotate(45deg);
+}
+
+.sheetwrite-context-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #eeeeee));
+}

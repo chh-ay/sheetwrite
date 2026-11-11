@@ -3,6 +3,7 @@
 // panel opens; this module only builds what goes inside it. The panel is not
 // modal: the sheet stays usable while it is open.
 
+import { checkIconStyles, checkStylePart } from "./style-parts.js";
 import type { GridPanel } from "./types/grid.js";
 
 /** Controls that take keyboard focus when the panel opens. */
@@ -62,6 +63,8 @@ export function mountSidePanel(
 
   host.appendChild(panel);
   const cleanup = content.render(body);
+  checkStylePart(panel, "panels", `The ${content.title} panel`);
+  checkIconStyles(panel, `The ${content.title} panel`);
   if (content.focus !== false) (body.querySelector<HTMLElement>(FOCUSABLE) ?? closeButton).focus();
 
   let disposed = false;

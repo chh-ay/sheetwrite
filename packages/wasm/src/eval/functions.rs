@@ -47,6 +47,10 @@ impl Default for FuncAccumulator {
 }
 
 impl FuncAccumulator {
+    #[allow(
+        unsafe_code,
+        reason = "arguments live in a fixed array of MaybeUninit slots; a safe layout is not yet measured on both machines"
+    )]
     fn arg_metadata(&self, index: usize) -> Option<&FuncArg> {
         if index >= self.arg_count {
             return None;
@@ -537,40 +541,72 @@ impl ReductionFold {
     /// or the column would pass the cell limit; the caller then reads it cell
     /// by cell. The running sum stays one accumulator, so it adds in the same
     /// order and rounds the same.
+    ///
+    /// The column is read once, with one loop per reduction that keeps only
+    /// what its result needs. A cell of another kind or a non-finite number is
+    /// noted in a flag, not by leaving the loop, and nothing is kept until the
+    /// whole column has been read. JavaScriptCore on Apple Silicon runs a
+    /// separate pass over the kinds, a branch out of the loop, or a `min` and
+    /// `max` per cell markedly slower than this shape.
     pub(super) fn push_number_column(
         &mut self,
         kinds: &[u8],
         payloads: &[u64],
     ) -> Option<Result<(), FormulaError>> {
         let cells = kinds.len() as u64;
-        // An OR over the kind bytes is one pass without a branch per cell;
-        // only empty (0) and number (1) kinds leave no other bit set.
-        let any_kind = kinds.iter().fold(0, |any, &kind| any | kind);
-        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT || any_kind & !KIND_NUMBER != 0 {
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
             return None;
         }
 
-        let counts_only = matches!(self.kind, ReductionKind::Count | ReductionKind::CountA);
         let mut count = self.count;
         let mut sum = self.sum;
         let mut min = self.min;
         let mut max = self.max;
-        for (&kind, &payload) in kinds.iter().zip(payloads) {
-            if kind != KIND_NUMBER {
-                continue;
+        // Only empty (0) and number (1) kinds leave no other bit set.
+        let mut any_kind = 0u8;
+        let mut non_finite = false;
+        match self.kind {
+            ReductionKind::Count | ReductionKind::CountA => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    let is_number = kind == KIND_NUMBER;
+                    non_finite |= is_number & !payload_num(payload).is_finite();
+                    count += u64::from(is_number);
+                }
             }
+            ReductionKind::Sum | ReductionKind::Average => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    let is_number = kind == KIND_NUMBER;
+                    // An empty cell adds zero, which leaves the sum as it is.
+                    let number = if is_number { payload_num(payload) } else { 0.0 };
+                    non_finite |= !number.is_finite();
+                    count += u64::from(is_number);
+                    sum += number;
+                }
+            }
+            ReductionKind::Minimum | ReductionKind::Maximum => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    if kind != KIND_NUMBER {
+                        continue;
+                    }
 
-            let number = payload_num(payload);
-            if !number.is_finite() {
-                return Some(Err(FormulaError::Num));
+                    let number = payload_num(payload);
+                    non_finite |= !number.is_finite();
+                    count += 1;
+                    // The result checks the sum even for a minimum or maximum.
+                    sum += number;
+                    min = min.min(number);
+                    max = max.max(number);
+                }
             }
-
-            count += 1;
-            if !counts_only {
-                sum += number;
-                min = min.min(number);
-                max = max.max(number);
-            }
+        }
+        if any_kind & !KIND_NUMBER != 0 {
+            return None;
+        }
+        if non_finite {
+            return Some(Err(FormulaError::Num));
         }
 
         self.cells += cells;

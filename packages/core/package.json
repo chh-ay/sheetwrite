@@ -70,16 +70,28 @@
       "default": "./dist/testing.js"
     },
     "./styles.css": "./styles.css",
+    "./styles/grid.css": "./styles/grid.css",
+    "./styles/formula-help.css": "./styles/formula-help.css",
+    "./styles/find.css": "./styles/find.css",
+    "./styles/ribbon.css": "./styles/ribbon.css",
+    "./styles/panels.css": "./styles/panels.css",
+    "./styles/context-menu.css": "./styles/context-menu.css",
+    "./styles/tabs.css": "./styles/tabs.css",
+    "./styles/charts.css": "./styles/charts.css",
+    "./styles/icons.css": "./styles/icons.css",
+    "./styles/dashboard.css": "./styles/dashboard.css",
+    "./styles/icons.svg": "./styles/icons.svg",
     "./shell.css": "./shell.css",
-    "./icons.svg": "./dist/icons.svg",
+    "./icons.svg": "./styles/icons.svg",
     "./icons.json": "./dist/icons.json"
   },
   "files": [
     "dist/**/*.js",
     "dist/**/*.d.ts",
     "styles.css",
+    "styles/*.css",
+    "styles/icons.svg",
     "shell.css",
-    "dist/icons.svg",
     "dist/icons.json"
   ],
   "publishConfig": {
@@ -88,7 +100,7 @@
   },
   "scripts": {
     "generate": "bun ../../scripts/function-metadata.ts",
-    "build": "bun run generate && rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.types.json && rm -f dist/types/*.js dist/types/*.js.map && bun ../../scripts/package-dist.ts . && cp src/icons/sheet.svg dist/icons.svg && cp src/icons/icons.json dist/icons.json",
+    "build": "bun run generate && rm -rf dist && tsc -p tsconfig.build.json && tsc -p tsconfig.types.json && rm -f dist/types/*.js dist/types/*.js.map && bun ../../scripts/package-dist.ts . && cp src/icons/icons.json dist/icons.json",
     "prepublishOnly": "bun run build",
     "typecheck": "bun run generate && tsc --noEmit -p tsconfig.json"
   },

@@ -126,6 +126,10 @@ grid.highlightCells(null);
 
 The Vanilla workbench offers **Clear highlight** in its context menu. Right-click the highlighted cell to toggle it off, or right-click another cell and choose **Clear highlight**. Both actions write to the host event log.
 
+## Styles
+
+The menu needs `@sheetwrite/core/styles/context-menu.css`, and `@sheetwrite/core/styles/icons.css` for its built-in icons. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
+
 ## Edge cases and limits
 
 - Hidden separators are normalized.

@@ -16,6 +16,7 @@ struct CountingAllocator;
 static LIVE_BYTES: AtomicUsize = AtomicUsize::new(0);
 
 // SAFETY: every call forwards to `System` unchanged and only adjusts a counter.
+#[allow(unsafe_code, reason = "the test replaces the global allocator")]
 unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let pointer = System.alloc(layout);
