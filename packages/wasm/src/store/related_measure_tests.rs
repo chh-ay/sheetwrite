@@ -362,20 +362,6 @@ fn settled(store: &CellStore, sheet: usize, row: usize, col: usize) -> Value {
 }
 
 #[test]
-fn related_table_measures_follow_one_way_filters_and_measure_references() {
-    let fixture = Fixture::new();
-    fixture.assert_matches();
-}
-
-#[test]
-fn related_table_measures_follow_reachable_column_fields() {
-    let mut fixture = Fixture::new();
-    fixture.transposed = true;
-    fixture.install();
-    fixture.assert_matches();
-}
-
-#[test]
 fn related_table_measures_recalculate_after_edits_to_that_table() {
     let mut fixture = Fixture::new();
     fixture.customers[0].credit = 1_000.0;

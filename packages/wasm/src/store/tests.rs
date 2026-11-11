@@ -239,10 +239,10 @@ fn pivot_fields_report_source_headers_and_types() {
     let (mut store, source, output) = fixture(12);
     install(&mut store, source, output, 12, &[SUM]);
 
-    let fields = store.pivot_fields(output, 0);
+    let mut fields = store.pivot_fields(output, 0);
 
-    assert_eq!(fields.names(), ["Region", "Quarter", "Sales"]);
-    assert_eq!(fields.types(), [1, 1, 1]);
+    assert_eq!(fields.take_names(), ["Region", "Quarter", "Sales"]);
+    assert_eq!(fields.take_types(), [1, 1, 1]);
 }
 
 #[test]
@@ -765,7 +765,7 @@ fn assert_copy_matches_placed(store: &CellStore, output: usize) {
     assert_eq!(status[STATUS_ERROR], 0);
     assert_eq!(status[STATUS_STRIDE + STATUS_ERROR], 0, "the copy computes");
 
-    let copy = store.pivot_output(output, 1);
+    let mut copy = store.pivot_output(output, 1);
     let layout: Vec<usize> = copy
         .layout()
         .into_iter()
@@ -775,7 +775,7 @@ fn assert_copy_matches_placed(store: &CellStore, output: usize) {
     // Two regions by three quarters.
     assert_eq!((rows - header_rows, cols - label_cols), (2, 3));
 
-    let numbers = copy.numbers();
+    let numbers = copy.take_numbers();
     for row in header_rows..rows {
         for col in label_cols..cols {
             let placed = store.get_cell(output, row, col).num();

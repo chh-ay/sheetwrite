@@ -4,11 +4,11 @@
 //! changed row.
 
 /// A line with no earlier position: it was inserted after the earlier version.
-pub const NONE: u32 = u32::MAX;
+pub(crate) const NONE: u32 = u32::MAX;
 
 /// One structural change on an axis.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum AxisOp {
+pub(crate) enum AxisOp {
     Insert {
         at: u32,
         count: u32,
@@ -29,7 +29,7 @@ pub enum AxisOp {
 /// Consecutive later lines `start..start + len` that were `origin..origin + len`,
 /// or that are new when `origin` is `NONE`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Segment {
+pub(crate) struct Segment {
     pub start: u32,
     pub len: u32,
     pub origin: u32,
@@ -37,19 +37,19 @@ pub struct Segment {
 
 /// The map of one axis as a short list of segments: one per structural change.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Axis {
+pub(crate) struct Axis {
     segments: Vec<Segment>,
     len: u32,
 }
 
 impl Axis {
     /// `len` lines, each at its earlier position.
-    pub fn identity(len: u32) -> Self {
+    pub(crate) fn identity(len: u32) -> Self {
         Self::with_origin(len, 0)
     }
 
     /// `len` new lines, as in a sheet added after the earlier version.
-    pub fn inserted(len: u32) -> Self {
+    pub(crate) fn inserted(len: u32) -> Self {
         Self::with_origin(len, NONE)
     }
 
@@ -68,17 +68,17 @@ impl Axis {
     }
 
     #[cfg(test)]
-    pub fn len(&self) -> u32 {
+    pub(crate) const fn len(&self) -> u32 {
         self.len
     }
 
-    pub fn segments(&self) -> &[Segment] {
+    pub(crate) fn segments(&self) -> &[Segment] {
         &self.segments
     }
 
     /// Earlier position of `line`, or `NONE`.
     #[cfg(test)]
-    pub fn origin(&self, line: u32) -> u32 {
+    pub(crate) fn origin(&self, line: u32) -> u32 {
         let index = self
             .segments
             .partition_point(|segment| segment.start + segment.len <= line);
@@ -92,7 +92,7 @@ impl Axis {
     }
 
     /// Apply `op`; an operation outside the axis is ignored, as the store rejects it.
-    pub fn apply(&mut self, op: AxisOp) {
+    pub(crate) fn apply(&mut self, op: AxisOp) {
         match op {
             AxisOp::Insert { at, count } => {
                 if count == 0 || at > self.len {
@@ -211,7 +211,7 @@ impl Axis {
 
 /// Lines `first..=last` after `op`, appended to `out`: none when they were
 /// removed, two pieces when lines were inserted inside them.
-pub fn transform(op: AxisOp, first: u32, last: u32, out: &mut Vec<(u32, u32)>) {
+pub(crate) fn transform(op: AxisOp, first: u32, last: u32, out: &mut Vec<(u32, u32)>) {
     match op {
         AxisOp::Insert { at, count } => {
             if last < at {

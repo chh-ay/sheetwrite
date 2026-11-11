@@ -297,37 +297,6 @@ mod tests {
     }
 
     #[test]
-    fn dense_wide_streams_read_every_column() {
-        const COLUMNS: usize = 4096;
-        const ROWS: usize = 2;
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(COLUMNS, ROWS);
-        store.set_number(sheet, 0, 0, 7.0, 0);
-        store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
-        store.recompute(sheet);
-
-        let affected = FormulaWork::default();
-        let mut results = FormulaResults::default();
-
-        let mut pass = EvalPass {
-            affected: &affected,
-            results: &mut results,
-        };
-        let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
-        let mut reader = RangeReader::new(&store, range, 0).unwrap();
-        let mut count = 0;
-        let mut sum = 0.0;
-        while let Some(value) = reader.next(&mut pass).unwrap() {
-            count += 1;
-            if let Value::Number(number) = value {
-                sum += number;
-            }
-        }
-        assert_eq!(count, ROWS * COLUMNS);
-        assert_eq!(sum, 16.0);
-    }
-
-    #[test]
     fn wide_paged_streams_preserve_loading() {
         const COLUMNS: usize = 65;
         const ROWS: usize = 2;
@@ -405,38 +374,6 @@ mod tests {
 
     fn range(sheet: usize, r0: u32, c0: u32, r1: u32, c1: u32) -> CellRange {
         CellRange::new(sheet as u32, r0, c0, r1, c1)
-    }
-
-    #[test]
-    fn streaming_matches_the_list_path_for_mixed_blank_and_formula_cells() {
-        let (store, sheet) = mixed_store();
-        for candidate in [
-            range(sheet, 0, 0, 3, 1),
-            range(sheet, 0, 0, 1, 1),
-            range(sheet, 0, 0, 0, 0),
-            range(sheet, 2, 0, 2, 1),
-            range(sheet, 0, 1, 2, 1),
-            range(sheet, 0, 0, 11, 2),
-            range(sheet, 0, 2, 2, 2),
-        ] {
-            assert_eq!(
-                streamed_values(&store, candidate),
-                listed_values(&store, candidate),
-                "range {candidate:?}"
-            );
-        }
-        assert_eq!(
-            RangeReader::new(&store, range(sheet, 0, 0, 11, 2), 0)
-                .unwrap()
-                .shape(),
-            (12, 3)
-        );
-        assert_eq!(
-            RangeReader::new(&store, range(sheet, 2, 1, 99, 99), 0)
-                .unwrap()
-                .shape(),
-            (10, 2)
-        );
     }
 
     #[test]

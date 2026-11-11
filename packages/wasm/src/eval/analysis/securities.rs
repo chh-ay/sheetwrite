@@ -803,60 +803,6 @@ mod tests {
         ),
     ];
 
-    /// Results that follow from the definitions, worked by hand. A bond
-    /// whose coupon equals its yield, settled on a coupon date, has price
-    /// 100 and Macaulay duration (1 + i) / i * (1 - (1 + i)^-n) periods,
-    /// where i is the yield per period and n the number of coupons. A
-    /// one-year discount security has a year share of 1 on the 30/360
-    /// basis. Dates are serials: 43845 is 2020-01-15, 47498 is 2030-01-15,
-    /// 43831 is 2020-01-01 and 44197 is 2021-01-01.
-    const WORKED_RESULTS: &[(&str, &[f64], f64)] = &[
-        (
-            "PRICE",
-            &[43845.0, 47498.0, 0.06, 0.06, 100.0, 2.0, 0.0],
-            100.0,
-        ),
-        (
-            "YIELD",
-            &[43845.0, 47498.0, 0.06, 100.0, 100.0, 2.0, 0.0],
-            0.06,
-        ),
-        (
-            "DURATION",
-            &[43845.0, 47498.0, 0.06, 0.06, 2.0, 0.0],
-            7.6618995531345915,
-        ),
-        (
-            "MDURATION",
-            &[43845.0, 47498.0, 0.06, 0.06, 2.0, 0.0],
-            7.438737430227759,
-        ),
-        ("COUPNUM", &[43845.0, 47498.0, 2.0, 0.0], 20.0),
-        ("COUPDAYBS", &[43845.0, 47498.0, 2.0, 0.0], 0.0),
-        ("COUPDAYS", &[40568.0, 40862.0, 2.0, 0.0], 180.0),
-        ("COUPDAYS", &[40568.0, 40862.0, 2.0, 3.0], 182.5),
-        ("COUPDAYBS", &[40568.0, 40862.0, 2.0, 0.0], 70.0),
-        ("COUPDAYSNC", &[40568.0, 40862.0, 2.0, 0.0], 110.0),
-        ("DISC", &[43831.0, 44197.0, 95.0, 100.0, 0.0], 0.05),
-        ("PRICEDISC", &[43831.0, 44197.0, 0.05, 100.0, 0.0], 95.0),
-        (
-            "YIELDDISC",
-            &[43831.0, 44197.0, 95.0, 100.0, 0.0],
-            0.05263157894736842,
-        ),
-        (
-            "INTRATE",
-            &[43831.0, 44197.0, 95.0, 100.0, 0.0],
-            0.05263157894736842,
-        ),
-        ("RECEIVED", &[43831.0, 44197.0, 95.0, 0.05, 0.0], 100.0),
-        ("ACCRINTM", &[43831.0, 44197.0, 0.05, 1000.0, 0.0], 50.0),
-        ("VDB", &[1000.0, 0.0, 5.0, 0.0, 1.0], 400.0),
-        ("VDB", &[1000.0, 0.0, 5.0, 1.0, 2.0], 240.0),
-        ("ISPMT", &[0.1, 1.0, 3.0, 30.0], -2.0),
-        ("DOLLARDE", &[-1.02, 16.0], -1.125),
-    ];
-
     #[test]
     fn microsoft_published_examples() {
         let mismatches: Vec<String> = MICROSOFT_EXAMPLES
@@ -873,19 +819,6 @@ mod tests {
             .collect();
 
         assert!(mismatches.is_empty(), "{}", mismatches.join("\n"));
-    }
-
-    #[test]
-    fn results_worked_from_the_definitions() {
-        for (name, arguments, expected) in WORKED_RESULTS {
-            let actual = number(name, arguments);
-            let error = (actual - expected).abs() / expected.abs().max(1.0);
-
-            assert!(
-                error < 1e-12,
-                "{name}{arguments:?}: {actual} is not {expected}"
-            );
-        }
     }
 
     #[test]

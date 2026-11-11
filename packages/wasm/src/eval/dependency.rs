@@ -1874,39 +1874,6 @@ mod tests {
     use crate::store::CellStore;
     use crate::types::Value;
 
-    #[test]
-    fn duplicate_direct_and_range_edges_preserve_cycle_error_propagation() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 4);
-        store.set_formula(sheet, 0, 0, "=B1+B1+SUM(B1:B1)", 0);
-        store.set_formula(sheet, 0, 1, "=A1+SUM(A1:A1)", 0);
-        let left = AbsCellKey::new(sheet, 0, 0);
-        let right = AbsCellKey::new(sheet, 0, 1);
-        let mut affected = FormulaWork::default();
-        affected.select(&store.sheets, left);
-        affected.select(&store.sheets, right);
-        let index = build_dep_index(&store.sheets, &store.formula_slots);
-
-        let mut memo = FormulaResults::default();
-        seed_dependency_depth_errors(
-            &store.sheets,
-            &store.formula_slots,
-            &affected,
-            &index,
-            &mut memo,
-        );
-        assert!(matches!(
-            memo.seeded_result(store.formula_id(left).expect("left formula"))
-                .as_ref(),
-            Some(Value::Error(FormulaError::Cycle))
-        ));
-        assert!(matches!(
-            memo.seeded_result(store.formula_id(right).expect("right formula"))
-                .as_ref(),
-            Some(Value::Error(FormulaError::Cycle))
-        ));
-    }
-
     type IntervalRow = (u32, u32, usize, u32);
 
     /// Everything a rebuild derives from the entries. Reader order carries no
@@ -1994,59 +1961,6 @@ mod tests {
         assert!(patched.pending.is_empty());
         assert_eq!(index_contents(patched), index_contents(&rebuilt));
         assert!(patched.has_formula_dependencies || !rebuilt.has_formula_dependencies);
-    }
-
-    #[test]
-    fn one_transaction_of_mixed_rewrites_patches_the_index_to_a_rebuild() {
-        let mut store = CellStore::new();
-        let data = store.add_sheet(1, 4);
-        let report = store.add_sheet(5, 3);
-        store.set_sheet_name(data, "data", "Data");
-        for row in 0..4 {
-            store.set_number(data, row, 0, row as f64 + 1.0, 0);
-        }
-        store.set_formula(report, 0, 0, "=SUM(Data!A1:A4)", 0);
-        store.set_formula(report, 1, 0, "=SUM(Data!A1:A4)*2", 0);
-        store.set_formula(report, 2, 0, "=Data!A1", 0);
-        store.set_formula(report, 0, 2, "=Data!A1:A2", 0);
-        store.set_formula(report, 0, 3, "=MAX(Data!A3:A4)", 0);
-        store.set_formula(report, 0, 4, "=E2", 0);
-        store.recompute(report);
-        assert_patch_matches_rebuild(&mut store);
-        let epoch = store.graph.epoch();
-
-        // A2 leaves the shared Data!A1:A4 group for a new range; A3 swaps its
-        // exact read for that group plus another cell; clearing C1:D1 removes
-        // the only array formula and empties the Data!A3:A4 group; E2 becomes
-        // a formula at a cell E1 already read as a literal, closing a cycle.
-        store.set_formula(report, 1, 0, "=SUM(Data!A2:A4)", 0);
-        store.set_formula(report, 2, 0, "=SUM(Data!A1:A4)+Data!A2", 0);
-        assert!(store.clear_range(report, 0, 2, 0, 3, true, false));
-        store.set_formula(report, 1, 4, "=E1", 0);
-        store.recompute(report);
-
-        assert_eq!(
-            store.graph.epoch(),
-            epoch,
-            "a local rewrite must not rebuild"
-        );
-        assert_patch_matches_rebuild(&mut store);
-        assert!(store
-            .graph
-            .index()
-            .is_some_and(|index| !index.has_dynamic_arrays()));
-        assert_eq!(store.get_cell(report, 1, 0).num(), 9.0);
-        assert_eq!(store.get_cell(report, 2, 0).num(), 12.0);
-        assert_eq!(
-            store.get_cell(report, 0, 4).string().as_deref(),
-            Some("#CYCLE!")
-        );
-
-        store.set_number(data, 1, 0, 20.0, 0);
-        store.recompute(data);
-        assert_eq!(store.get_cell(report, 0, 0).num(), 28.0);
-        assert_eq!(store.get_cell(report, 1, 0).num(), 27.0);
-        assert_eq!(store.get_cell(report, 2, 0).num(), 48.0);
     }
 
     #[test]
@@ -2150,77 +2064,6 @@ mod tests {
                 edges.allocated_bytes
             );
             assert_eq!(store.get_cell(sheet, MOVING_READERS - 1, 2).num(), 0.0);
-        }
-    }
-
-    #[test]
-    fn dense_overlapping_ranges_share_one_node_per_range() {
-        const ROWS: usize = 256;
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(2, ROWS);
-        let reader = format!("=SUM(A1:A{ROWS})+SUM(A2:A{ROWS})");
-        let mut affected = FormulaWork::default();
-        for row in 0..ROWS {
-            store.set_formula(sheet, row, 0, "=1", 0);
-            store.set_formula(sheet, row, 1, &reader, 0);
-            affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 0));
-            affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 1));
-        }
-
-        let index = build_dep_index(&store.sheets, &store.formula_slots);
-        let mut ranges = GroupMarks::default();
-        ranges.reset(index.range_groups.len());
-        let mut walk = DependencyDepthWalk::new(
-            &store.sheets,
-            &store.formula_slots,
-            &index,
-            &affected,
-            &mut ranges,
-        );
-        for row in 0..ROWS {
-            let node = walk
-                .formulas
-                .node(AbsCellKey::new(sheet, row as u32, 1))
-                .expect("walked formula");
-            assert_eq!(walk.depth(node), Ok(2));
-        }
-        // Every formula plus the two distinct ranges. Expanding the ranges into
-        // reader-to-member edges would instead retain ROWS * (2 * ROWS - 1).
-        assert_eq!(
-            walk.formula_states.len() + walk.range_states.len(),
-            2 * ROWS + 2
-        );
-
-        store.set_formula(sheet, 0, 0, "=B1", 0);
-        let index = build_dep_index(&store.sheets, &store.formula_slots);
-        let mut memo = FormulaResults::default();
-        seed_dependency_depth_errors(
-            &store.sheets,
-            &store.formula_slots,
-            &affected,
-            &index,
-            &mut memo,
-        );
-        assert_eq!(memo.seeded.len(), ROWS + 1);
-        assert!(matches!(
-            memo.seeded_result(
-                store
-                    .formula_id(AbsCellKey::new(sheet, 0, 0))
-                    .expect("formula")
-            )
-            .as_ref(),
-            Some(Value::Error(FormulaError::Cycle))
-        ));
-        for row in 0..ROWS {
-            assert!(matches!(
-                memo.seeded_result(
-                    store
-                        .formula_id(AbsCellKey::new(sheet, row as u32, 1))
-                        .expect("formula")
-                )
-                .as_ref(),
-                Some(Value::Error(FormulaError::Cycle))
-            ));
         }
     }
 

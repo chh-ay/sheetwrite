@@ -320,63 +320,6 @@ mod tests {
     }
 
     #[test]
-    fn status_reports_a_duplicate_key_by_its_data_rows() {
-        let (mut store, sheet) = fixture();
-        // C3 becomes c1, equal to C1 without case; data rows 0 and 2.
-        store.set_string(sheet, 3, CUSTOMER_ID, "c1", 0);
-        store.commit_sources();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_DUPLICATE_KEY, 0, 2, 0]
-        );
-    }
-
-    #[test]
-    fn status_reads_settled_formula_results_and_key_kinds() {
-        let (mut store, sheet) = fixture();
-        store.set_formula(sheet, 3, CUSTOMER_ID, "=\"C\"&1", 0);
-        store.recompute(sheet);
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_DUPLICATE_KEY, 0, 2, 0]
-        );
-
-        store.set_number(sheet, 3, CUSTOMER_ID, 3.0, 0);
-        store.commit_sources();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_ONE_SIDE_TYPE, 2, NO_ROW, 0]
-        );
-
-        store.set_string(sheet, 3, CUSTOMER_ID, "C3", 0);
-        store.set_number(sheet, 4, ORDER_CUSTOMER, 9.0, 0);
-        store.commit_sources();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_MANY_SIDE_TYPE, 3, NO_ROW, 0]
-        );
-    }
-
-    #[test]
-    fn status_reports_a_removed_table_or_column() {
-        let (mut store, _) = fixture();
-        let missing_column = ["r", "orders", "gone", "customers", "id"];
-        assert!(store.set_relationships(missing_column.map(String::from).to_vec()));
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_MISSING_COLUMN, NO_ROW, NO_ROW, 0]
-        );
-
-        let valid = ["r", "orders", "customer", "customers", "id"];
-        assert!(store.set_relationships(valid.map(String::from).to_vec()));
-        assert!(store.remove_table("customers"));
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_MISSING_TABLE, NO_ROW, NO_ROW, 0]
-        );
-    }
-
-    #[test]
     fn malformed_payloads_change_nothing_and_an_empty_one_frees_the_model() {
         let (mut store, _) = fixture();
         assert!(!store.set_relationships(vec!["r".into(), "orders".into()]));

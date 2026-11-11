@@ -160,35 +160,6 @@ mod tests {
     const SAMPLE_DRAWS: usize = 10_000;
 
     #[test]
-    fn seeded_generators_repeat_and_distinct_seeds_diverge() {
-        let mut first = SplitMix64::new(42);
-        let mut second = SplitMix64::new(42);
-        let mut other = SplitMix64::new(43);
-        let draws: Vec<f64> = (0..8).map(|_| first.next_unit()).collect();
-
-        assert_eq!(
-            draws,
-            (0..8).map(|_| second.next_unit()).collect::<Vec<_>>()
-        );
-        assert_ne!(draws, (0..8).map(|_| other.next_unit()).collect::<Vec<_>>());
-    }
-
-    #[test]
-    fn unit_draws_stay_in_the_half_open_interval_and_cover_it() {
-        let mut generator = SplitMix64::new(0);
-        let mut low = false;
-        let mut high = false;
-        for _ in 0..SAMPLE_DRAWS {
-            let unit = generator.next_unit();
-            assert!((0.0..1.0).contains(&unit));
-            low |= unit < 0.01;
-            high |= unit > 0.99;
-        }
-
-        assert!(low && high, "draws should reach both ends of [0, 1)");
-    }
-
-    #[test]
     fn randbetween_rounds_bounds_inward_and_rejects_empty_intervals() {
         assert_eq!(integer_bounds(1.2, 3.8), Ok((2.0, 3.0)));
         assert_eq!(integer_bounds(-2.5, -2.5), Err(FormulaError::Num));

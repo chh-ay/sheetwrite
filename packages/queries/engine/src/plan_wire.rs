@@ -8,7 +8,7 @@
 use crate::buffers::row_index;
 use crate::plan::{
     Aggregate, AggregateOp, CompareOp, Diagnostic, ErrorPolicy, JoinKind, Limits, Literal,
-    OutputColumn, Plan, Predicate, Step, MAX_PREDICATE_DEPTH,
+    OutputColumn, Plan, Predicate, Step, StringPairs, MAX_PREDICATE_DEPTH,
 };
 use crate::wire::{decode_strings, decode_type};
 
@@ -19,32 +19,32 @@ const MAX_PLAN_CODES: usize = 256 * 1024;
 /// `changeType`: id, type, policy. `join`: input, kind, count, left/right pairs. `group`: count,
 /// ids, count, aggregates as id, name, op, column or `NO_COLUMN`. `unpivot`: count, ids,
 /// attribute id/name, value id/name.
-pub const STEP_FILTER: u32 = 1;
-pub const STEP_SELECT: u32 = 2;
-pub const STEP_RENAME: u32 = 3;
-pub const STEP_CHANGE_TYPE: u32 = 4;
-pub const STEP_JOIN: u32 = 5;
-pub const STEP_GROUP: u32 = 6;
-pub const STEP_UNPIVOT: u32 = 7;
+pub(crate) const STEP_FILTER: u32 = 1;
+pub(crate) const STEP_SELECT: u32 = 2;
+pub(crate) const STEP_RENAME: u32 = 3;
+pub(crate) const STEP_CHANGE_TYPE: u32 = 4;
+pub(crate) const STEP_JOIN: u32 = 5;
+pub(crate) const STEP_GROUP: u32 = 6;
+pub(crate) const STEP_UNPIVOT: u32 = 7;
 
 /// Predicate codes. `compare`: column, op, literal. `isNull`: column. `contains`: column, text.
 /// `and`/`or`: count, predicates. `not`: predicate.
-pub const PREDICATE_COMPARE: u32 = 1;
-pub const PREDICATE_IS_NULL: u32 = 2;
-pub const PREDICATE_CONTAINS: u32 = 3;
-pub const PREDICATE_AND: u32 = 4;
-pub const PREDICATE_OR: u32 = 5;
-pub const PREDICATE_NOT: u32 = 6;
+pub(crate) const PREDICATE_COMPARE: u32 = 1;
+pub(crate) const PREDICATE_IS_NULL: u32 = 2;
+pub(crate) const PREDICATE_CONTAINS: u32 = 3;
+pub(crate) const PREDICATE_AND: u32 = 4;
+pub(crate) const PREDICATE_OR: u32 = 5;
+pub(crate) const PREDICATE_NOT: u32 = 6;
 
 /// Literal codes; `number` and `text` are followed by a lane or string-table index.
-pub const LITERAL_NULL: u32 = 0;
-pub const LITERAL_FALSE: u32 = 1;
-pub const LITERAL_TRUE: u32 = 2;
-pub const LITERAL_NUMBER: u32 = 3;
-pub const LITERAL_TEXT: u32 = 4;
+pub(crate) const LITERAL_NULL: u32 = 0;
+pub(crate) const LITERAL_FALSE: u32 = 1;
+pub(crate) const LITERAL_TRUE: u32 = 2;
+pub(crate) const LITERAL_NUMBER: u32 = 3;
+pub(crate) const LITERAL_TEXT: u32 = 4;
 
 /// A row-count aggregate has no source column.
-pub const NO_COLUMN: u32 = u32::MAX;
+pub(crate) const NO_COLUMN: u32 = u32::MAX;
 
 /// Operator codes are one-based positions in these tables; zero is never valid.
 const COMPARE_OPS: [CompareOp; 6] = [
@@ -76,10 +76,15 @@ const AGGREGATE_OPS: [AggregateOp; 6] = [
 ];
 
 /// Borrowed host lanes for one plan; the decoder copies only the strings it keeps.
+#[derive(Debug)]
 pub struct PlanWire<'a> {
+    /// Step, predicate and literal codes, starting with the step count.
     pub codes: &'a [u32],
+    /// Number literals, indexed by `LITERAL_NUMBER` operands.
     pub numbers: &'a [f64],
+    /// UTF-8 bytes of the string table.
     pub text: &'a [u8],
+    /// String table boundaries: string i is `text[offsets[i]..offsets[i + 1]]`.
     pub offsets: &'a [u32],
 }
 
@@ -106,7 +111,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Whether every code was read; a padded lane is a definition failure.
-    pub(crate) fn finished(&self) -> bool {
+    pub(crate) const fn finished(&self) -> bool {
         self.position == self.codes.len()
     }
 
@@ -139,7 +144,7 @@ impl<'a> Cursor<'a> {
         (0..count).map(|_| self.string()).collect()
     }
 
-    fn pairs(&mut self) -> Result<Vec<(String, String)>, Diagnostic> {
+    fn pairs(&mut self) -> Result<StringPairs, Diagnostic> {
         let count = self.count()?;
 
         (0..count)
@@ -250,8 +255,10 @@ impl<'a> Cursor<'a> {
             },
             STEP_CHANGE_TYPE => Step::ChangeType {
                 column: self.string()?,
-                column_type: decode_type(u8::try_from(self.code()?).map_err(|_| definition())?)
-                    .map_err(|_| definition())?,
+                column_type: u8::try_from(self.code()?)
+                    .ok()
+                    .and_then(|code| decode_type(code).ok())
+                    .ok_or_else(definition)?,
                 on_error: error_policy(self.code()?)?,
             },
             STEP_JOIN => Step::Join {

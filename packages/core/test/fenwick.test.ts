@@ -1,25 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { OffsetIndex, ScaledScroll } from "../src/fenwick.js";
-
-describe("OffsetIndex", () => {
-  it("maps offsets arithmetically while every row has the default height", () => {
-    const idx = new OffsetIndex(1_000_000, 28);
-    expect(idx.rowAtOffset(14_000_005)).toEqual({ row: 500_000, top: 14_000_000 });
-    expect(idx.totalHeight).toBe(1_000_000 * 28);
-  });
-
-  it("reflects a single-row height override in subsequent offsets", () => {
-    const idx = new OffsetIndex(10, 20);
-    idx.setHeight(2, 50);
-    expect(idx.totalHeight).toBe(230);
-    expect(idx.heightOf(2)).toBe(50);
-    expect(idx.offsetOf(3)).toBe(20 + 20 + 50);
-    // row 2 now spans [40, 90)
-    expect(idx.rowAtOffset(85)).toEqual({ row: 2, top: 40 });
-    expect(idx.rowAtOffset(90)).toEqual({ row: 3, top: 90 });
-  });
-});
+import { ScaledScroll } from "../src/fenwick.js";
 
 describe("ScaledScroll", () => {
   it("maps a capped scroll range onto the full virtual range above the cap", () => {

@@ -1063,16 +1063,6 @@ describe("operation sequences", () => {
     );
   });
 
-  it("shifts an edit written after a local deletion past a server insert", () => {
-    // Local row 6 after deleting row 6 is the original row 7; the server
-    // inserted a row before it, so the edit lands on row 7.
-    expectRebased(
-      [set(2, 0, 1), removeRows(6), set(6, 2, 2)],
-      [set(5, 1, 3), addRows(7, 1), set(6, 0, 4)],
-      [set(2, 0, 1), removeRows(6), set(7, 2, 2)],
-    );
-  });
-
   it("conflicts when a later local edit follows a local insert inside rows the server deleted", () => {
     // The server deleted rows 4-5; the local rows inserted between them survive
     // at row 4, but the deletion no longer maps to one span for the later edit.

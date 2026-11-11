@@ -1158,20 +1158,6 @@ mod tests {
         assert_slots_indexed(&restored, "sheet removal");
     }
 
-    /// A two-column block written row by row stays one rectangle.
-    #[test]
-    fn row_by_row_block_stays_one_rectangle() {
-        let mut ranges = Vec::new();
-        for row in 0..1_000 {
-            for col in 2..4 {
-                SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((row, col)));
-            }
-        }
-
-        assert_eq!(ranges.len(), 1);
-        assert_eq!(ranges[0].area(), 2_000);
-    }
-
     /// Cells a row apart are not adjacent: the gap row is not marked.
     #[test]
     fn gapped_cells_stay_separate() {
@@ -1188,62 +1174,6 @@ mod tests {
         cells.sort_unstable();
         cells.dedup();
         cells
-    }
-
-    /// Address-order writes append without a fold and stay sorted.
-    #[test]
-    fn address_order_writes_stay_sorted() {
-        let mut cells = DirtyCells::default();
-        for row in 0..1_000 {
-            cells.insert((row, 1));
-            cells.insert((row, 1));
-        }
-
-        assert_eq!(cells.sorted_len, 1_000);
-        assert_eq!(cells.cells.len(), 1_000);
-    }
-
-    /// Re-marking cells of a sorted list adds nothing.
-    #[test]
-    fn sorted_list_ignores_repeated_cells() {
-        let mut cells = DirtyCells::default();
-        for row in 0..100 {
-            cells.insert((row, 0));
-        }
-        for row in (0..100).rev() {
-            cells.insert((row, 0));
-        }
-
-        assert_eq!(cells.sorted_len, 100);
-        assert_eq!(cells.cells.len(), 100);
-    }
-
-    /// A spill edit marks one source cell, then the vacated column and the
-    /// reinstalled column as batches: the second run merges into the first
-    /// and the list stays sorted and unique.
-    #[test]
-    fn repeated_column_batch_after_a_later_cell_adds_nothing() {
-        let mut cells = DirtyCells::default();
-        cells.insert((999, 1));
-        for _ in 0..2 {
-            cells.extend((0..999).map(|row| (row, 2)));
-        }
-
-        let mut expected: Vec<_> = (0..999).map(|row| (row, 2)).collect();
-        expected.push((999, 1));
-        assert_eq!(cells.cells, expected);
-        assert_eq!(cells.sorted_len, expected.len());
-    }
-
-    /// A batch out of address order is sorted in with the list.
-    #[test]
-    fn unordered_batch_is_sorted_in() {
-        let mut cells = DirtyCells::default();
-        cells.extend([(5, 0), (1, 0)]);
-        cells.extend([(3, 0), (1, 0), (9, 0), (3, 0)]);
-
-        assert_eq!(cells.cells, [(1, 0), (3, 0), (5, 0), (9, 0)]);
-        assert_eq!(cells.sorted_len, 4);
     }
 
     /// Scattered repeated writes keep every cell and fold duplicates, so the

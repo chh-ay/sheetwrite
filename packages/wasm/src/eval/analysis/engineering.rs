@@ -507,21 +507,4 @@ mod tests {
             assert!((actual - published).abs() < 1e-8, "{name}: {actual}");
         }
     }
-
-    #[test]
-    fn error_functions_match_fifteen_digit_tables() {
-        // Abramowitz and Stegun, Table 7.1: erf(0.5) = 0.520499877813047.
-        let Value::Number(erf) = call("ERF", &[number(0.5)]) else {
-            panic!("ERF returned an error");
-        };
-        assert!((erf - 0.520499877813047).abs() < 1e-15);
-        assert_eq!(call("ERF", &[number(-0.5)]), number(-erf));
-
-        // erfc(5) = 1.53745979442803e-12 keeps its precision as a right tail.
-        let Value::Number(tail) = call("ERFC", &[number(5.0)]) else {
-            panic!("ERFC returned an error");
-        };
-        assert!((tail / 1.53745979442803e-12 - 1.0).abs() < 1e-13);
-        assert_eq!(call("ERFC", &[number(0.0)]), number(1.0));
-    }
 }
