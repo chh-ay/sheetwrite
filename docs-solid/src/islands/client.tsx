@@ -331,16 +331,11 @@ if (forwarded === undefined) {
   revealAnchoredMember();
   injectAnalytics({ framework: "solid" });
   injectSpeedInsights({ framework: "solid" });
-  // Interaction islands listen at once; their code loads ahead or on first use,
-  // or at load when the URL deep-links into one (`data-island-param`).
-  const query = new URLSearchParams(window.location.search);
-  const atLoad = (island: HTMLElement): boolean =>
-    island.dataset.islandHydrate !== "interaction" ||
-    (island.dataset.islandParam !== undefined && query.has(island.dataset.islandParam));
+  // Interaction islands listen at once; their code loads ahead or on first use.
   const islands = Array.from(document.querySelectorAll<HTMLElement>("[data-island]"));
-  const onLoad = islands.filter(atLoad);
+  const onLoad = islands.filter((island) => island.dataset.islandHydrate !== "interaction");
   for (const island of islands) {
-    if (!atLoad(island)) hydrateOnInteraction(island);
+    if (island.dataset.islandHydrate === "interaction") hydrateOnInteraction(island);
   }
   // After the first frame: the small bundle can arrive before the stylesheets
   // let the page paint, and hydrating then would hold the first paint back.
