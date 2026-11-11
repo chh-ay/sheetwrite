@@ -3,10 +3,14 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { FRAMEWORK_PROOF_ART } from "../showcases/art/proof-art.js";
 import { SvelteWorkbenchIsland } from "../showcases/frameworks/FrameworkMount.js";
 import { FrameworkPage } from "../showcases/frameworks/FrameworkPage.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
+import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
+import bandStylesheet from "../styles/showcases/workbench-band.css?url";
 import heroStylesheet from "@docs/styles/showcase-capability-hero.css?url";
 import svelteWorkbenchStylesheet from "@docs/styles/svelte-workbench.css?url";
 import stageStylesheet from "@docs/styles/workbench-stage.css?url";
@@ -18,10 +22,13 @@ export const Route = createFileRoute("/svelte")({
   head: () => ({
     meta: pageMeta("Svelte offline workbench — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: stageStylesheet },
       { rel: "stylesheet", href: heroStylesheet },
       { rel: "stylesheet", href: svelteWorkbenchStylesheet },
+      { rel: "stylesheet", href: bandStylesheet },
+      { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),
   component: SvelteRoute,
@@ -31,6 +38,7 @@ function SvelteRoute() {
   return (
     <NoHydration>
       <FrameworkPage
+        proofArt={FRAMEWORK_PROOF_ART}
         description={description}
         eyebrow="SVELTE / OFFLINE FIELD WORK"
         framework="svelte"

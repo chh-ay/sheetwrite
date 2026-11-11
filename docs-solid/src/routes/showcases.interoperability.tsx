@@ -14,6 +14,7 @@ import {
   POSITIVE_FIXTURES,
 } from "../showcases/scenarios/interop-fixtures.js";
 import InteroperabilitySnippet from "../showcases/snippets/interoperability.mdx";
+import InteroperabilitySnippetSource from "../showcases/snippets/interoperability.mdx?source";
 
 import artStylesheet from "../showcases/art/art.css?url";
 import stylesheet from "../styles/showcases/interoperability.css?url";
@@ -40,7 +41,12 @@ function InteroperabilityShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "The code behind it", Snippet: InteroperabilitySnippet }}
+        code={{
+          title: "The code behind it",
+          Snippet: InteroperabilitySnippet,
+          source: InteroperabilitySnippetSource,
+          figure: <InteropFlowDiagram />,
+        }}
         eyebrow="Spreadsheet interoperability"
         facts={[
           { label: "Source workbooks", value: POSITIVE_FIXTURES.length.toLocaleString("en") },
@@ -59,7 +65,6 @@ function InteroperabilityShowcase() {
         task="Load a workbook into a live grid, change it, then export it to XLSX, import it again and compare every cell."
         title="Open the workbook. Change it. Bring it back intact."
       >
-        <InteropFlowDiagram />
         <Island component={SpillProof} name="showcase-interop-spill" props={{}} />
         <Island component={InteropLabs} name="showcase-interop-labs" props={{}} />
       </ShowcasePage>

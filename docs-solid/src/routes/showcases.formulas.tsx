@@ -2,15 +2,18 @@ import { functionCount } from "@docs/generated/formula-summary.json";
 import { pageMeta } from "@docs/lib/seo.js";
 import { FORMULA_PANELS, ORDER_ROWS, PLAYGROUND } from "@docs/showcases/scenarios/formulas.js";
 import FormulasSetupSnippet from "@docs/showcases/snippets/formulas-setup.mdx";
+import FormulasSetupSnippetSource from "@docs/showcases/snippets/formulas-setup.mdx?source";
 import { cellA1 } from "@sheetwrite/core";
 import { createFileRoute } from "@tanstack/solid-router";
 import { For } from "solid-js";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { EngineApiDiagram } from "../showcases/art/explain-diagrams.js";
 import { FormulasStage } from "../showcases/formulas/FormulasStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import stylesheet from "../styles/showcases/formulas.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -22,6 +25,7 @@ export const Route = createFileRoute("/showcases/formulas")({
   head: () => ({
     meta: pageMeta("Formula analysis with the full engine — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
@@ -40,7 +44,28 @@ function FormulasShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "Select the full engine", Snippet: FormulasSetupSnippet }}
+        explain={
+          <ShowcaseSection
+            id="formulas-engines"
+            figure={<EngineApiDiagram />}
+            title="Two engines, one API"
+          >
+            <p>
+              <code>@sheetwrite/wasm</code> is the default engine. <code>@sheetwrite/formulas</code>{" "}
+              is the same engine with the full function set. Select it once, before you create a
+              grid. The function families 0.7.0 adds are on the{" "}
+              <a href="/showcases/functions/">functions showcase</a>.
+            </p>
+            <ul aria-label="Families on this page" class="sw-fx-families">
+              <For each={FAMILIES}>{(family) => <li>{family}</li>}</For>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "Select the full engine",
+          Snippet: FormulasSetupSnippet,
+          source: FormulasSetupSnippetSource,
+        }}
         eyebrow="Formulas"
         facts={[
           { label: "Function names", value: functionCount.toLocaleString("en") },
@@ -70,19 +95,7 @@ function FormulasShowcase() {
           </>
         }
         title="Ask the data. Watch the answer spill."
-      >
-        <ShowcaseSection id="formulas-engines" title="Two engines, one API">
-          <p>
-            <code>@sheetwrite/wasm</code> is the default engine. <code>@sheetwrite/formulas</code>{" "}
-            is the same engine with the full function set. Select it once, before you create a grid.
-            The function families 0.7.0 adds are on the{" "}
-            <a href="/showcases/functions/">functions showcase</a>.
-          </p>
-          <ul aria-label="Families on this page" class="sw-fx-families">
-            <For each={FAMILIES}>{(family) => <li>{family}</li>}</For>
-          </ul>
-        </ShowcaseSection>
-      </ShowcasePage>
+      ></ShowcasePage>
     </NoHydration>
   );
 }

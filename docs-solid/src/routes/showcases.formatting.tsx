@@ -4,11 +4,14 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { FormattingDiagram } from "../showcases/art/explain-diagrams.js";
 import { FormattingImported } from "../showcases/formatting/FormattingImported.js";
 import { FONT_FAMILIES, FormattingStage } from "../showcases/formatting/FormattingStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import FormattingSnippet from "../showcases/snippets/formatting.mdx";
+import FormattingSnippetSource from "../showcases/snippets/formatting.mdx?source";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import stylesheet from "../styles/showcases/formatting.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -20,6 +23,7 @@ export const Route = createFileRoute("/showcases/formatting")({
       "Style a live operating budget: typography, alignment, borders, conditional formatting, mixed per-cell number formats, and an executable XLSX round-trip proof.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: stylesheet },
@@ -32,7 +36,36 @@ function FormattingShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "How it is built", Snippet: FormattingSnippet }}
+        explain={
+          <ShowcaseSection
+            id="formatting-notes"
+            figure={<FormattingDiagram />}
+            title="How formatting behaves"
+          >
+            <ul>
+              <li>
+                Georgia, Arial and Courier New coexist with the theme font, and an unavailable
+                family falls back to it. The ledger also shows bold, italic, underline, strike,
+                wrap, three alignments and independently styled border sides.
+              </li>
+              <li>
+                Number formats change the display, not the stored numbers. G3 opts out of a currency
+                column with General; G15 inherits the column default. Negative variances keep a
+                minus sign as well as their conditional fill.
+              </li>
+              <li>
+                The controls are host UI calling <code>grid.styleRange</code>. For independent file
+                fixtures and fidelity boundaries, open{" "}
+                <a href="/showcases/interoperability/">spreadsheet interoperability</a>.
+              </li>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "How it is built",
+          Snippet: FormattingSnippet,
+          source: FormattingSnippetSource,
+        }}
         eyebrow="Formatting"
         facts={[
           { label: "Number formats", value: FORMAT_OPTIONS.length.toLocaleString("en") },
@@ -55,25 +88,6 @@ function FormattingShowcase() {
         title="Formatting and number formats"
       >
         <Island component={FormattingImported} name="showcase-formatting-imported" props={{}} />
-        <ShowcaseSection id="formatting-notes" title="How formatting behaves">
-          <ul>
-            <li>
-              Georgia, Arial and Courier New coexist with the theme font, and an unavailable family
-              falls back to it. The ledger also shows bold, italic, underline, strike, wrap, three
-              alignments and independently styled border sides.
-            </li>
-            <li>
-              Number formats change the display, not the stored numbers. G3 opts out of a currency
-              column with General; G15 inherits the column default. Negative variances keep a minus
-              sign as well as their conditional fill.
-            </li>
-            <li>
-              The controls are host UI calling <code>grid.styleRange</code>. For independent file
-              fixtures and fidelity boundaries, open{" "}
-              <a href="/showcases/interoperability/">spreadsheet interoperability</a>.
-            </li>
-          </ul>
-        </ShowcaseSection>
       </ShowcasePage>
     </NoHydration>
   );

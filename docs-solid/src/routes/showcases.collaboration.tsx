@@ -5,13 +5,16 @@ import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
 import { CollaborationRecoveryDiagram } from "../showcases/art/diagrams.js";
+import { COLLABORATION_PROOF_ART } from "../showcases/art/proof-art.js";
 import { CollaborationFaults } from "../showcases/collaboration/CollaborationFaults.js";
 import { CollaborationStage } from "../showcases/collaboration/CollaborationStage.js";
 import { ProofPage, type ProofPageContent } from "../showcases/layout/ProofPage.js";
 import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import CollaborationSnippet from "../showcases/snippets/collaboration.mdx";
+import CollaborationSnippetSource from "../showcases/snippets/collaboration.mdx?source";
 
 import artStylesheet from "../showcases/art/art.css?url";
+import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import proofStylesheet from "../styles/showcases/proofs.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -27,6 +30,7 @@ export const Route = createFileRoute("/showcases/collaboration")({
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: proofStylesheet },
+      { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),
   component: CollaborationShowcase,
@@ -65,7 +69,10 @@ const COLLABORATION_PAGE: ProofPageContent = {
         "Who a collaborator is, what they may edit, and where the service runs are host decisions. Presence identity is advisory UI state, never access control.",
     },
   ],
-  boundaryContract: "PersistenceAdapter + RemoteOperationSource",
+  boundaryInterfaces: [
+    ["PersistenceAdapter", ["load(documentId)", "commit(request)"]],
+    ["RemoteOperationSource", ["subscribe(…)"]],
+  ],
   boundaryLede:
     "Everything moving on this page is the real collaboration flow running in your browser tab. The server is deliberately illustrative: the responsibilities below never move into Sheetwrite.",
   description,
@@ -115,7 +122,26 @@ function CollaborationShowcase() {
   return (
     <NoHydration>
       <ProofPage
-        code={{ title: "The code behind it", Snippet: CollaborationSnippet }}
+        proofArt={COLLABORATION_PROOF_ART}
+        explain={
+          <ShowcaseSection
+            id="collaboration-faults"
+            figure={<CollaborationRecoveryDiagram />}
+            layout="half"
+            title="Protocol faults"
+          >
+            <Island
+              component={CollaborationFaults}
+              name="showcase-collaboration-faults"
+              props={{ actors: COLLABORATION_ACTORS }}
+            />
+          </ShowcaseSection>
+        }
+        code={{
+          title: "The code behind it",
+          Snippet: CollaborationSnippet,
+          source: CollaborationSnippetSource,
+        }}
         content={COLLABORATION_PAGE}
         stage={
           <Island
@@ -127,16 +153,7 @@ function CollaborationShowcase() {
             }}
           />
         }
-      >
-        <CollaborationRecoveryDiagram />
-        <ShowcaseSection id="collaboration-faults" title="Protocol faults">
-          <Island
-            component={CollaborationFaults}
-            name="showcase-collaboration-faults"
-            props={{ actors: COLLABORATION_ACTORS }}
-          />
-        </ShowcaseSection>
-      </ProofPage>
+      ></ProofPage>
     </NoHydration>
   );
 }

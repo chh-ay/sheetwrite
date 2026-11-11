@@ -30,6 +30,10 @@ export interface ShowcaseCode {
   readonly title: string;
   /** The default export of a `.mdx` snippet file holding one fenced code block. */
   readonly Snippet: Component;
+  /** The snippet file's text (`?raw`): the aside lists the calls it makes, and long code folds. */
+  readonly source: string;
+  /** A picture beside the code, in place of the list of calls (an architecture diagram). */
+  readonly figure?: JSX.Element;
 }
 
 /** A link from the showcase to the guide that explains it. */
@@ -52,6 +56,8 @@ export interface ShowcasePageProps {
   readonly stage: JSX.Element;
   readonly code?: ShowcaseCode;
   readonly guide?: ShowcaseGuide;
+  /** How it works: {@link ShowcaseSection}s with their pictures, between the demo and the code. */
+  readonly explain?: JSX.Element;
   /** Further explanation after the code, as {@link ShowcaseSection}s. */
   readonly children?: JSX.Element;
 }
@@ -72,6 +78,7 @@ export function ShowcasePage(props: ShowcasePageProps) {
           </Show>
         </header>
         {props.stage}
+        {props.explain}
         <Show when={props.code}>
           {(code) => <ShowcaseCodeBlock code={code()} guide={props.guide} />}
         </Show>
@@ -122,18 +129,75 @@ function CodeFactValue(props: { readonly value: string }) {
   );
 }
 
+/** Code longer than this folds to its first lines, with a control to show it all. */
+const FOLDED_LINES = 26;
+/** At most this many calls are listed beside the code. */
+const LISTED_CALLS = 8;
+/** A call the snippet makes: a Grid method, a factory, an init, a constructed class, or a subscription. */
+const CALL =
+  /\b(?:grid\.[a-zA-Z.]+|create[A-Z][A-Za-z]+|init[A-Z][A-Za-z]+|new [A-Z][A-Za-z]+|[a-z]+\.(?:subscribe|on|ready))(?=\()/g;
+const BUILT_IN = /^new (?:Promise|Map|Set|Error|URL|Date|Uint8Array)$/;
+
+/** The fenced code of a snippet file, without the fences. */
+function fencedCode(source: string): string {
+  const fence = source.match(/^(`{3,}|~{3,}).*\n([\s\S]*?)^\1\s*$/m);
+  return fence?.[2] ?? source;
+}
+
 function ShowcaseCodeBlock(props: {
   readonly code: ShowcaseCode;
   readonly guide: ShowcaseGuide | undefined;
 }) {
   const Snippet = props.code.Snippet;
+  const code = fencedCode(props.code.source);
+  const lines = code.trimEnd().split("\n").length;
+  const calls = [...new Set(code.match(CALL) ?? [])]
+    .filter((call) => !BUILT_IN.test(call))
+    .map((call) => call.replace(/^new /, ""))
+    .slice(0, LISTED_CALLS);
+  const hasFigure = "figure" in props.code;
   return (
-    <section aria-labelledby="showcase-code-title" class="sw-showcase__code">
-      <header class="sw-showcase__section-header">
-        <h2 class="sw-showcase__section-title" id="showcase-code-title">
-          <Icon name="code" size="md" />
-          {props.code.title}
-        </h2>
+    <div class="sw-showcase__code-row" data-figure={hasFigure ? "" : undefined}>
+      <section aria-labelledby="showcase-code-title" class="sw-showcase__code">
+        <header class="sw-showcase__section-header">
+          <h2 class="sw-showcase__section-title" id="showcase-code-title">
+            <Icon name="code" size="md" />
+            {props.code.title}
+          </h2>
+        </header>
+        <div class="sw-showcase__code-body" data-folded={lines > FOLDED_LINES ? "" : undefined}>
+          <Snippet />
+          <Show when={lines > FOLDED_LINES}>
+            {/* Opening it unfolds the code above (showcase-layout.css). */}
+            <details class="sw-showcase__code-more">
+              <summary class="sw-button">
+                <span data-when="closed">Show all {lines} lines</span>
+                <span data-when="open">Show the first lines</span>
+              </summary>
+            </details>
+          </Show>
+        </div>
+      </section>
+      <aside aria-label="What this code uses" class="sw-showcase__code-aside">
+        <Show
+          fallback={
+            <>
+              <h3 class="sw-showcase__aside-title">In this code</h3>
+              <ul class="sw-showcase__calls">
+                <For each={calls}>
+                  {(call) => (
+                    <li>
+                      <code>{call}</code>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </>
+          }
+          when={hasFigure}
+        >
+          {props.code.figure}
+        </Show>
         <Show when={props.guide}>
           {(guide) => (
             <a class="sw-link-arrow" href={guide().href}>
@@ -143,9 +207,8 @@ function ShowcaseCodeBlock(props: {
             </a>
           )}
         </Show>
-      </header>
-      <Snippet />
-    </section>
+      </aside>
+    </div>
   );
 }
 
@@ -218,16 +281,34 @@ export interface ShowcaseSectionProps {
   readonly id: string;
   readonly title: string;
   readonly children: JSX.Element;
+  /** The diagram the text explains, beside it at wide widths. */
+  readonly figure?: JSX.Element;
+  /**
+   * How the text and its figure share the row: the text beside the figure
+   * (`beside`, the default), half the row each for a panel of controls
+   * (`half`), or the figure under the heading at full width, for a section
+   * whose own content is one small control (`stack`).
+   */
+  readonly layout?: "beside" | "half" | "stack";
 }
 
-/** A section of explanation after the demo and its code. */
+/** A section of explanation; with a figure, the text sits beside its picture. */
 export function ShowcaseSection(props: ShowcaseSectionProps) {
+  const hasFigure = "figure" in props;
+  const layout = props.layout ?? "beside";
   return (
-    <section aria-labelledby={props.id} class="sw-showcase__section sw-prose">
+    <section
+      aria-labelledby={props.id}
+      class="sw-showcase__section sw-prose"
+      data-figure={hasFigure ? layout : undefined}
+    >
       <h2 class="sw-showcase__section-title" id={props.id}>
         {props.title}
       </h2>
-      {props.children}
+      <Show fallback={props.children} when={hasFigure}>
+        <div class="sw-showcase__section-text">{props.children}</div>
+        <figure class="sw-showcase__figure">{props.figure}</figure>
+      </Show>
     </section>
   );
 }

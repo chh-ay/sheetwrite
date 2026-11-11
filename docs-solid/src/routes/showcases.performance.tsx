@@ -20,6 +20,7 @@ import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
 import { PerformanceDiagnostics } from "../showcases/performance/PerformanceDiagnostics.js";
 import { PerformanceStage } from "../showcases/performance/PerformanceStage.js";
 import PerformanceSnippet from "../showcases/snippets/performance.mdx";
+import PerformanceSnippetSource from "../showcases/snippets/performance.mdx?source";
 
 import artStylesheet from "../showcases/art/art.css?url";
 import stylesheet from "../styles/showcases/performance.css?url";
@@ -247,7 +248,12 @@ function PerformanceShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "The code behind it", Snippet: PerformanceSnippet }}
+        code={{
+          title: "The code behind it",
+          Snippet: PerformanceSnippet,
+          source: PerformanceSnippetSource,
+          figure: <PagingDiagram />,
+        }}
         eyebrow="Data and scale"
         facts={[
           { label: "Rows", value: SCALE_ROWS.toLocaleString("en") },
@@ -274,7 +280,6 @@ function PerformanceShowcase() {
         }
         title="A billion cells. Within reach."
       >
-        <PagingDiagram />
         <div class="sw-sp-page">
           <Island
             component={PerformanceDiagnostics}

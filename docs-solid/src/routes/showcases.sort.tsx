@@ -1,13 +1,16 @@
 import { pageMeta } from "@docs/lib/seo.js";
 import { FORMULA_COUNT, ORDER_COUNT, SORTS, type SortId } from "@docs/showcases/scenarios/sort.js";
 import SortSnippet from "@docs/showcases/snippets/sort.mdx";
+import SortSnippetSource from "@docs/showcases/snippets/sort.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { SortModesDiagram } from "../showcases/art/explain-diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { SortStage } from "../showcases/sort/SortStage.js";
 
+import artStylesheet from "../showcases/art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -19,6 +22,7 @@ export const Route = createFileRoute("/showcases/sort")({
       "Sort orders in place as Excel does, or sort only the view, and see which formulas follow. Includes the Sort panel and undo.",
     ),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: featureStylesheet },
@@ -33,7 +37,30 @@ function SortShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "The code behind it", Snippet: SortSnippet }}
+        explain={
+          <ShowcaseSection
+            id="sort-rules"
+            figure={<SortModesDiagram />}
+            title="How the sort treats the workbook"
+          >
+            <ul>
+              <li>
+                Values, formulas, styles and notes move with their row. A formula that reads its own
+                row, like <code>=D1*E1</code>, keeps reading it.
+              </li>
+              <li>Formulas outside the range keep their references, so they read the new order.</li>
+              <li>
+                Text sorts without case in Excel's order, and blank cells are last in both
+                directions.
+              </li>
+              <li>
+                Collaborators receive an in-place sort as one transaction. A view sort is saved with
+                the sheet and exports to Excel as its sort state.
+              </li>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{ title: "The code behind it", Snippet: SortSnippet, source: SortSnippetSource }}
         eyebrow="Data"
         facts={[
           { label: "Orders", value: ORDER_COUNT.toLocaleString("en") },
@@ -62,24 +89,7 @@ function SortShowcase() {
           </>
         }
         title="Sort the cells, or just the view"
-      >
-        <ShowcaseSection id="sort-rules" title="How the sort treats the workbook">
-          <ul>
-            <li>
-              Values, formulas, styles and notes move with their row. A formula that reads its own
-              row, like <code>=D1*E1</code>, keeps reading it.
-            </li>
-            <li>Formulas outside the range keep their references, so they read the new order.</li>
-            <li>
-              Text sorts without case in Excel's order, and blank cells are last in both directions.
-            </li>
-            <li>
-              Collaborators receive an in-place sort as one transaction. A view sort is saved with
-              the sheet and exports to Excel as its sort state.
-            </li>
-          </ul>
-        </ShowcaseSection>
-      </ShowcasePage>
+      ></ShowcasePage>
     </NoHydration>
   );
 }

@@ -1,0 +1,56 @@
+/*
+ * Framework workbenches (/vanilla/, /react/, /vue/, /svelte/): the grid takes
+ * the stage's full width, and the instrument panel that sat beside it is a
+ * band under it, its sections in as many columns as fit at 17rem or more.
+ * Each workbench's own sheet (docs/src/styles/*-workbench.css) lays the panel
+ * beside the grid; this sheet comes after it on these pages.
+ */
+
+/* The page frame, which the site header shares, is the showcases' 120rem. */
+.sw-showcase-frame {
+  --sw-frame-max: 120rem;
+}
+
+.sw-showcase-frame .sw-showcase-page {
+  width: min(100% - 2 * var(--sw-page-gutter), var(--sw-frame-max));
+}
+.sw-showcase-page
+  :is(.sw-vw-workspace, .sw-rwb-workspace, .sw-vuewb-workspace, .sw-svw .sw-demo-workspace) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* The grid keeps the height it had beside the panel. */
+.sw-showcase-page .sw-vuewb-workspace {
+  grid-template-rows: 40rem auto;
+  height: auto;
+}
+
+.sw-showcase-page .sw-rwb-workspace {
+  grid-template-rows: minmax(32rem, auto) auto;
+}
+
+.sw-showcase-page .sw-vw-gridstage {
+  min-height: 31rem;
+}
+
+/* The grid's edge toward the panel moves from its side to its foot. */
+.sw-showcase-page :is(.sw-vw-gridstage, .sw-rwb-workspace > .sw-demo-grid) {
+  border-right: 0;
+  border-inline-end: 0;
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.sw-showcase-page :is(.sw-vuewb-panel, .sw-svw-rail) {
+  border-top: 1px solid var(--sw-border-strong);
+  border-left: 0;
+}
+
+.sw-showcase-page :is(.sw-vw-instrument, .sw-rwb-state, .sw-svw-rail) {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  align-items: start;
+}
+
+.sw-showcase-page .sw-svw-rail > :is(section, details) {
+  border-right: 1px solid var(--sw-border);
+}

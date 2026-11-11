@@ -1,15 +1,23 @@
 /* The shared showcase layout (ShowcaseLayout.tsx): header with task and facts,
-   the demo stage with its control panel, the code, then explanation.
-   The live grid is the product: it takes the full content width at every
-   size, and the control panel is a band under it. Text keeps its own
-   reading measure, so the grid is wider than the text column. */
+   the demo stage with its control panel, how it works, the code, then the
+   rest of the explanation. The live grid is the product: it takes the full
+   width of the page frame, and the control panel is a band under it. Every
+   section shares the frame's edges; text keeps its reading measure inside
+   it, beside a picture where it has one. */
 .sw-showcase {
+  /* The page frame, which the site header shares: up to 120rem, wide enough
+     for a working grid, not so wide that it fills thousands of pixels with
+     empty rows. */
+  --sw-frame-max: 120rem;
+
   min-height: 100vh;
   background: var(--sw-surface-0);
   color: var(--sw-fg);
 }
 
 .sw-showcase__page {
+  --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-frame-max)) / 2);
+
   display: grid;
   gap: var(--sw-space-10);
   padding: var(--sw-space-10) var(--sw-page-inset) var(--sw-space-section);
@@ -112,20 +120,10 @@
   }
 }
 
-/* The stage runs past the text column into the page margins on wide
-   screens, up to 120rem: wide enough for a working grid, not so wide that
-   it fills thousands of pixels with empty rows. */
 .sw-showcase__stage {
-  --sw-stage-bleed: clamp(
-    0px,
-    (100vw - var(--sw-page-max)) / 2 - var(--sw-page-gutter),
-    (120rem - var(--sw-page-max)) / 2
-  );
-
   display: grid;
   gap: var(--sw-space-4);
   align-items: start;
-  margin-inline: calc(-1 * var(--sw-stage-bleed));
 }
 
 .sw-showcase__demo {
@@ -191,10 +189,179 @@
 }
 
 .sw-showcase__section {
-  max-width: var(--sw-measure-prose);
   color: var(--sw-fg);
   font-size: var(--sw-text-body);
   line-height: var(--sw-leading-body);
+}
+
+/* Text keeps its reading measure inside the frame. */
+.sw-showcase__section > :is(p, ul, ol, .sw-showcase__section-text) {
+  max-width: var(--sw-measure-prose);
+}
+
+/* ---- Text beside its picture --------------------------------------------- */
+.sw-showcase__figure {
+  min-width: 0;
+  margin: 0;
+  padding: clamp(var(--sw-space-3), 2vw, var(--sw-space-6));
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-showcase__section[data-figure] {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+@media (min-width: 72rem) {
+  .sw-showcase__section[data-figure] {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--sw-space-8);
+  }
+
+  .sw-showcase__section[data-figure] > .sw-showcase__section-title {
+    grid-column: 1 / -1;
+  }
+
+  /* The text, 4 of 12 columns, beside its picture. */
+  .sw-showcase__section[data-figure="beside"] > .sw-showcase__section-text {
+    grid-column: span 4;
+  }
+
+  .sw-showcase__section[data-figure="beside"] > .sw-showcase__figure {
+    grid-column: span 8;
+  }
+
+  /* A panel of controls and its picture: half the row each. */
+  .sw-showcase__section[data-figure="half"]
+    > :is(.sw-showcase__section-text, .sw-showcase__figure) {
+    grid-column: span 6;
+    max-width: none;
+  }
+
+  /* One small control: the picture first, at full width, then the control. */
+  .sw-showcase__section[data-figure="stack"] > .sw-showcase__figure {
+    grid-row: 2;
+    grid-column: 1 / -1;
+  }
+
+  .sw-showcase__section[data-figure="stack"] > .sw-showcase__section-text {
+    grid-row: 3;
+    grid-column: 1 / -1;
+  }
+}
+
+/* Very wide: the text gets a fifth column back. */
+@media (min-width: 100rem) {
+  .sw-showcase__section[data-figure="beside"] > .sw-showcase__section-text {
+    grid-column: span 5;
+  }
+
+  .sw-showcase__section[data-figure="beside"] > .sw-showcase__figure {
+    grid-column: span 7;
+  }
+}
+
+/* ---- The code and what it uses -------------------------------------------- */
+.sw-showcase__code-row {
+  display: grid;
+  gap: var(--sw-space-6);
+  align-items: start;
+}
+
+.sw-showcase__code-aside {
+  display: grid;
+  gap: var(--sw-space-3);
+  align-content: start;
+  padding: var(--sw-space-5);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  font-size: var(--sw-text-small);
+}
+
+.sw-showcase__aside-title {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+  text-transform: uppercase;
+}
+
+.sw-showcase__calls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-showcase__calls code {
+  display: inline-block;
+  padding: var(--sw-space-1) var(--sw-space-2);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-sm);
+  background: var(--sw-code-bg);
+  color: var(--sw-code-function);
+}
+
+/* Long code shows its first lines until the reader opens the rest. */
+.sw-showcase__code-body {
+  display: grid;
+  gap: var(--sw-space-3);
+  min-width: 0;
+}
+
+.sw-showcase__code-body[data-folded]:not(:has(> .sw-showcase__code-more[open])) pre {
+  max-height: 26rem;
+  overflow: hidden;
+  mask-image: linear-gradient(#000 80%, transparent);
+}
+
+.sw-showcase__code-more > summary {
+  justify-self: start;
+  width: fit-content;
+  list-style: none;
+  cursor: pointer;
+}
+
+.sw-showcase__code-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sw-showcase__code-more:not([open]) [data-when="open"],
+.sw-showcase__code-more[open] [data-when="closed"] {
+  display: none;
+}
+
+@media (min-width: 72rem) {
+  .sw-showcase__code-row {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: var(--sw-space-8);
+  }
+
+  .sw-showcase__code-row > .sw-showcase__code {
+    grid-column: span 8;
+  }
+
+  /* The aside starts level with the code, under the code's heading. */
+  .sw-showcase__code-row > .sw-showcase__code-aside {
+    position: sticky;
+    top: var(--sw-space-8);
+    grid-column: span 4;
+    margin-top: var(--sw-space-12);
+  }
+
+  /* An architecture picture beside the code gets more of the row. */
+  .sw-showcase__code-row[data-figure] > .sw-showcase__code {
+    grid-column: span 7;
+  }
+
+  .sw-showcase__code-row[data-figure] > .sw-showcase__code-aside {
+    grid-column: span 5;
+  }
 }
 
 .sw-showcase__section-header {
@@ -304,22 +471,47 @@
 }
 
 /* ---- Walkthrough steps --------------------------------------------------- */
+/* Steps and the keyboard each take a full row of the band; the steps are
+   cards, 3 across from 88rem, 2 from 52rem, 1 below. */
+.sw-showcase__control-group:has(
+  > .sw-showcase__control-body > :is(.sw-showcase__steps, .sw-showcase__keys)
+) {
+  grid-column: 1 / -1;
+}
+
 .sw-showcase__steps {
   display: grid;
-  gap: var(--sw-space-4);
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sw-space-3);
   margin: 0;
   padding: 0;
   list-style: none;
   counter-reset: showcase-step;
 }
 
+@media (min-width: 52rem) {
+  .sw-showcase__steps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 88rem) {
+  .sw-showcase__steps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 .sw-showcase__steps li {
   position: relative;
   display: grid;
   gap: var(--sw-space-1);
+  align-content: start;
   justify-items: start;
-  padding-left: var(--sw-space-8);
+  padding: var(--sw-space-4) var(--sw-space-4) var(--sw-space-4) var(--sw-space-12);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
   color: var(--sw-fg);
+  background: var(--sw-surface-0);
   font-size: var(--sw-text-small);
   line-height: var(--sw-leading-ui);
   counter-increment: showcase-step;
@@ -327,8 +519,8 @@
 
 .sw-showcase__steps li::before {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: var(--sw-space-4);
+  left: var(--sw-space-4);
   display: grid;
   width: var(--sw-icon-lg);
   height: var(--sw-icon-lg);
@@ -358,9 +550,25 @@
 }
 
 /* ---- Keyboard ------------------------------------------------------------ */
+/* The keyboard model: one strip along the bottom of the band. */
+.sw-showcase__control-group:has(> .sw-showcase__control-body > .sw-showcase__keys) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-5);
+  align-items: center;
+  padding-top: var(--sw-space-4);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-showcase__control-group:has(> .sw-showcase__control-body > .sw-showcase__keys)
+  > .sw-showcase__control-body {
+  display: contents;
+}
+
 .sw-showcase__keys {
-  display: grid;
-  gap: var(--sw-space-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-5);
   margin: 0;
   font-size: var(--sw-text-small);
 }
@@ -375,7 +583,6 @@
   display: flex;
   flex: none;
   gap: var(--sw-space-1);
-  min-width: 6rem;
 }
 
 .sw-showcase__keys dd {

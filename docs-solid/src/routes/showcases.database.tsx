@@ -3,12 +3,18 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
 import { Island } from "../islands/Island.js";
+import { StorageDiagram } from "../showcases/art/explain-diagrams.js";
+import { DATABASE_PROOF_ART } from "../showcases/art/proof-art.js";
 import { DatabaseLab } from "../showcases/database/DatabaseLab.js";
 import { DatabaseStage } from "../showcases/database/DatabaseStage.js";
 import { COMPACTION } from "../showcases/database/state.js";
 import { ProofPage, type ProofPageContent } from "../showcases/layout/ProofPage.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import DatabaseSnippet from "../showcases/snippets/database.mdx";
+import DatabaseSnippetSource from "../showcases/snippets/database.mdx?source";
 
+import artStylesheet from "../showcases/art/art.css?url";
+import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import proofStylesheet from "../styles/showcases/proofs.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
@@ -20,9 +26,11 @@ export const Route = createFileRoute("/showcases/database")({
   head: () => ({
     meta: pageMeta("Database and document lifecycle — Sheetwrite", description),
     links: [
+      { rel: "stylesheet", href: artStylesheet },
       { rel: "stylesheet", href: targetsStylesheet },
       { rel: "stylesheet", href: layoutStylesheet },
       { rel: "stylesheet", href: proofStylesheet },
+      { rel: "stylesheet", href: proofCardsStylesheet },
     ],
   }),
   component: DatabaseShowcase,
@@ -61,7 +69,7 @@ const DATABASE_PAGE: ProofPageContent = {
         "HTTP, WebSocket, queues, regions, backups: the adapter interface is transport-neutral by design and ships no network code.",
     },
   ],
-  boundaryContract: "PersistenceAdapter",
+  boundaryInterfaces: [["PersistenceAdapter", ["load(documentId)", "commit(request)"]]],
   boundaryLede:
     "This showcase runs the full save-and-reload flow against a real browser database so you can inspect it. The pieces a product must own stay explicitly yours.",
   description,
@@ -113,7 +121,29 @@ function DatabaseShowcase() {
   return (
     <NoHydration>
       <ProofPage
-        code={{ title: "The code behind it", Snippet: DatabaseSnippet }}
+        proofArt={DATABASE_PROOF_ART}
+        explain={
+          <ShowcaseSection
+            figure={<StorageDiagram />}
+            id="database-failure-lab"
+            layout="half"
+            title="Failure lab and storage"
+          >
+            <Island
+              component={DatabaseLab}
+              name="showcase-database-lab"
+              props={{
+                maxTailRecords: COMPACTION.maxTailRecords,
+                maxTailBytes: COMPACTION.maxTailBytes,
+              }}
+            />
+          </ShowcaseSection>
+        }
+        code={{
+          title: "The code behind it",
+          Snippet: DatabaseSnippet,
+          source: DatabaseSnippetSource,
+        }}
         content={DATABASE_PAGE}
         stage={
           <Island
@@ -122,16 +152,7 @@ function DatabaseShowcase() {
             props={{ demoLabel: `${DATABASE_PAGE.title} live scenario` }}
           />
         }
-      >
-        <Island
-          component={DatabaseLab}
-          name="showcase-database-lab"
-          props={{
-            maxTailRecords: COMPACTION.maxTailRecords,
-            maxTailBytes: COMPACTION.maxTailBytes,
-          }}
-        />
-      </ProofPage>
+      ></ProofPage>
     </NoHydration>
   );
 }

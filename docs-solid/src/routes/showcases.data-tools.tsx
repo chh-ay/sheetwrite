@@ -13,6 +13,7 @@ import {
   probeValue,
 } from "../showcases/scenarios/data-tools.js";
 import DataToolsSnippet from "../showcases/snippets/data-tools.mdx";
+import DataToolsSnippetSource from "../showcases/snippets/data-tools.mdx?source";
 
 import stylesheet from "../styles/showcases/data-tools.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
@@ -45,7 +46,11 @@ function DataToolsShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "How it is built", Snippet: DataToolsSnippet }}
+        code={{
+          title: "How it is built",
+          Snippet: DataToolsSnippet,
+          source: DataToolsSnippetSource,
+        }}
         eyebrow="Data"
         facts={[
           { label: "Orders", value: DATA_ROWS.toLocaleString("en") },

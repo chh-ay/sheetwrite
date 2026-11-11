@@ -28,8 +28,8 @@ export function DatabaseLab(props: DatabaseLabProps) {
   ];
 
   return (
-    <ShowcaseSection id="database-failure-lab" title="Failure lab and storage">
-      <details class="sw-dbx__diagnostics" data-testid="dbx-diagnostics">
+    <>
+      <details class="sw-dbx__diagnostics" data-testid="dbx-diagnostics" open>
         <summary>
           <Icon name="chevron-right" />
           Lose acknowledgements, force conflicts, and read the storage counters
@@ -110,6 +110,6 @@ export function DatabaseLab(props: DatabaseLabProps) {
           </section>
         </div>
       </details>
-    </ShowcaseSection>
+    </>
   );
 }

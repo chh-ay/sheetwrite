@@ -9,6 +9,7 @@ import {
   UNKNOWN_PRODUCT,
 } from "@docs/showcases/scenarios/data-model.js";
 import DataModelSnippet from "@docs/showcases/snippets/data-model.mdx";
+import DataModelSnippetSource from "@docs/showcases/snippets/data-model.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
@@ -42,7 +43,37 @@ function DataModelShowcase() {
   return (
     <NoHydration>
       <ShowcasePage
-        code={{ title: "The code behind it", Snippet: DataModelSnippet }}
+        explain={
+          <ShowcaseSection
+            id="data-model-rules"
+            figure={<DataModelDiagram />}
+            title="How the model reads the tables"
+          >
+            <ul>
+              <li>
+                A pivot over the model equals a pivot over Orders with each related column looked up
+                for every order. An order without a matching product shows a blank row label.
+              </li>
+              <li>
+                A repeated lookup key makes the lookup ambiguous, so the pivot shows{" "}
+                <code>#VALUE!</code> until the key is unique again.
+              </li>
+              <li>
+                The measure <code>=SUM(Orders[Amount])/COUNT(Orders[Amount])</code> is calculated
+                again for each cell and total, so a total is the mean of all its orders.
+              </li>
+              <li>
+                Relationships, measures and model pivots are saved in the workbook, undone and
+                synced. Excel opens an exported file without them.
+              </li>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "The code behind it",
+          Snippet: DataModelSnippet,
+          source: DataModelSnippetSource,
+        }}
         eyebrow="Analysis"
         facts={[
           { label: "Orders", value: ORDER_ROWS.toLocaleString("en") },
@@ -73,29 +104,7 @@ function DataModelShowcase() {
           </>
         }
         title="One pivot across related tables"
-      >
-        <DataModelDiagram />
-        <ShowcaseSection id="data-model-rules" title="How the model reads the tables">
-          <ul>
-            <li>
-              A pivot over the model equals a pivot over Orders with each related column looked up
-              for every order. An order without a matching product shows a blank row label.
-            </li>
-            <li>
-              A repeated lookup key makes the lookup ambiguous, so the pivot shows{" "}
-              <code>#VALUE!</code> until the key is unique again.
-            </li>
-            <li>
-              The measure <code>=SUM(Orders[Amount])/COUNT(Orders[Amount])</code> is calculated
-              again for each cell and total, so a total is the mean of all its orders.
-            </li>
-            <li>
-              Relationships, measures and model pivots are saved in the workbook, undone and synced.
-              Excel opens an exported file without them.
-            </li>
-          </ul>
-        </ShowcaseSection>
-      </ShowcasePage>
+      ></ShowcasePage>
     </NoHydration>
   );
 }
