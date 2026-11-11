@@ -12,6 +12,6 @@ The command icon sheet is now its own file, `styles/icons.svg`, which `icons.css
 Upgrade checklist:
 
 - Nothing to do if you import `styles.css` with Vite, webpack or Next.js: they copy `icons.svg` into the build.
-- With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`.
+- With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. Without one, the build fails with `No loader is configured for ".svg" files: icons.svg`.
 - If you set `--sheetwrite-icon-sheet` only because your Content Security Policy blocks `data:` images, you can remove it: the default sheet is now a file from your own origin.
 - To ship less CSS, replace `styles.css` with the parts your grid uses, `grid.css` first. The docs page on styles lists which part each widget needs.
