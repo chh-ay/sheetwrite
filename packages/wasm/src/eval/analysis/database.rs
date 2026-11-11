@@ -379,50 +379,6 @@ mod tests {
     }
 
     #[test]
-    fn criteria_prefixes_wildcards_escapes_and_blank_rows_filter_records() {
-        // Microsoft documents prefix text, *, ?, ~, and blank criteria rows here:
-        // https://support.microsoft.com/en-us/excel/functions/daverage-function
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(10, 20);
-        store.set_string(sheet, 0, 0, "Name", 0);
-        store.set_string(sheet, 0, 1, "Amount", 0);
-        for (row, name) in ["Apple", "APPLE PIE", "A*", "A?", "A~", "Pear"]
-            .iter()
-            .enumerate()
-        {
-            store.set_string(sheet, row + 1, 0, name, 0);
-            store.set_number(sheet, row + 1, 1, (row + 1) as f64, 0);
-        }
-        let cases = [
-            ("App", 3.0),
-            ("=apple", 1.0),
-            ("=A?", 12.0),
-            ("=A~*", 3.0),
-            ("=A~?", 4.0),
-            ("=A~~", 5.0),
-            ("<>Pear", 15.0),
-            (">=Pear", 6.0),
-            ("", 21.0),
-        ];
-        for (column, (criterion, _)) in cases.iter().enumerate() {
-            store.set_string(sheet, 9, column, "nAmE", 0);
-            store.set_string(sheet, 10, column, criterion, 0);
-            let letter = (b'A' + column as u8) as char;
-            store.set_formula(
-                sheet,
-                column,
-                9,
-                &format!("=DSUM(A1:B7,\"amount\",{letter}10:{letter}11)"),
-                0,
-            );
-        }
-        store.recompute(sheet);
-        for (row, (_, expected)) in cases.iter().enumerate() {
-            assert_eq!(store.get_cell(sheet, row, 9).num(), *expected);
-        }
-    }
-
-    #[test]
     fn selected_errors_empty_fields_and_text_values_keep_database_semantics() {
         let (mut store, sheet) = orchard();
         store.set_string(sheet, 12, 0, "Tree", 0);

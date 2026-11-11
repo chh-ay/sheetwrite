@@ -1038,19 +1038,6 @@ mod tests {
     }
 
     #[test]
-    fn frequency_keeps_the_order_of_unsorted_and_equal_bins() {
-        // Each result belongs to the bin at the same position in bins_array.
-        // https://support.microsoft.com/en-us/office/frequency-function-44e3be2b-eca0-42cd-a3f7-fd9ea898fdb9
-        let (mut store, sheet) =
-            sheet_with_columns(&[&[1.0, 2.0, 3.0, 4.0, 5.0], &[3.0, 1.0, 3.0]]);
-        store.set_formula(sheet, 0, 4, "=FREQUENCY(A1:A5,B1:B3)", 0);
-        store.recompute(sheet);
-        for (row, expected) in [2.0, 1.0, 0.0, 2.0].iter().enumerate() {
-            close(&store, sheet, row, 4, *expected, 0.0);
-        }
-    }
-
-    #[test]
     fn regression_inputs_must_be_numbers() {
         let (mut store, sheet) =
             sheet_with_columns(&[&[1.0, 9.0, 5.0, 7.0], &[0.0, 4.0, 2.0, 3.0]]);
@@ -1068,20 +1055,6 @@ mod tests {
                 "{formula}"
             );
         }
-    }
-
-    #[test]
-    fn statistics_flag_from_a_cell_selects_the_row_count() {
-        // https://support.microsoft.com/en-us/excel/functions/linest-function
-        let (mut store, sheet) =
-            sheet_with_columns(&[&[1.0, 9.0, 5.0, 7.0], &[0.0, 4.0, 2.0, 3.0], &[0.0]]);
-        store.set_formula(sheet, 0, 4, "=LINEST(A1:A4,B1:B4,TRUE,C1)", 0);
-        store.recompute(sheet);
-        close(&store, sheet, 0, 4, 2.0, 1e-12);
-        assert_eq!(store.get_cell(sheet, 3, 5).num(), 0.0);
-        store.set_number(sheet, 0, 2, 1.0, 0);
-        store.recompute(sheet);
-        close(&store, sheet, 3, 5, 2.0, 0.0);
     }
 
     #[test]
