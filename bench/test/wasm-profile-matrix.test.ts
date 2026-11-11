@@ -1,6 +1,7 @@
 import { expect, it } from "bun:test";
 
 import { decideWasmProfile, parseWasmProfileMatrix } from "../src/wasm-profile-matrix.js";
+import { expectRejections, must } from "./gate-fixtures.js";
 
 const HASH = {
   input: "a".repeat(64),
@@ -103,6 +104,9 @@ function fixture() {
     },
   };
 }
+type Fixture = ReturnType<typeof fixture>;
+const variant = (evidence: Fixture, index: number) =>
+  must(evidence.variants[index], `variant ${index}`);
 
 it("keeps Rust opt-level separate and selects by the declared Brotli policy", () => {
   const parsed = parseWasmProfileMatrix(fixture());
@@ -114,4 +118,58 @@ it("keeps Rust opt-level separate and selects by the declared Brotli policy", ()
     baseline: "-O3",
     savedBytes: { raw: 100, gzip: 30, brotli: 20 },
   });
+});
+
+it("rejects unshared inputs, non-gating commands, opted-out gates and unmatched provenance", () => {
+  expectRejections(fixture, parseWasmProfileMatrix, [
+    [
+      (evidence) => (variant(evidence, 1).inputWasmSha256 = "9".repeat(64)),
+      "-Os did not use the shared pre-post-link artifact",
+    ],
+    [
+      (evidence) =>
+        (variant(evidence, 0).formulaGate.commands = [
+          ["bun", "run", "bench:formula", "--preliminary"],
+        ]),
+      "must run the gating formula benchmark",
+    ],
+    [
+      (evidence) =>
+        must(variant(evidence, 0).renderGate.commands[1], "check command").push("--report-only"),
+      "must run the render capture and fail-closed check",
+    ],
+    [
+      (evidence) => (evidence.decisionPolicy.requireRenderGate = false),
+      "requireRenderGate must be true",
+    ],
+    [(evidence) => (evidence.provenance.dirty = true), "provenance.dirty must be false"],
+    [
+      (evidence) => (variant(evidence, 2).renderGate.runnerFingerprint = "9".repeat(64)),
+      "renderGate runner provenance is incomparable",
+    ],
+  ]);
+});
+
+it("blocks the decision on any failed gate or an unclassified compile probe failure", () => {
+  for (const [edit, failure] of [
+    [
+      (evidence: Fixture) =>
+        Object.assign(variant(evidence, 2).formulaGate, { status: "failed", exitCode: 1 }),
+      "-Oz formula gate failed",
+    ],
+    [
+      (evidence: Fixture) =>
+        Object.assign(variant(evidence, 1).renderGate, { status: "failed", exitCode: 1 }),
+      "-Os render gate failed",
+    ],
+    [
+      (evidence: Fixture) =>
+        Object.assign(evidence.storeOnlyProbe, { outcome: "failed", blockers: [] }),
+      "store-only compile probe failed without a classified outcome",
+    ],
+  ] as const) {
+    const evidence = fixture();
+    edit(evidence);
+    expect(decideWasmProfile(evidence)).toEqual({ status: "blocked", failures: [failure] });
+  }
 });

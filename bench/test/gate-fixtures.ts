@@ -210,6 +210,16 @@ export function makeRenderArtifact(options: RenderFixtureOptions = {}): RenderBe
   };
 }
 
+/** The exact `render-smoke-v1` matrix: one round of Sheetwrite at 200 rows. */
+export function makeSmokeRenderArtifact(): RenderBenchmarkArtifact {
+  return makeRenderArtifact({
+    rounds: 1,
+    engines: ["sheetwrite"],
+    rows: [200],
+    measuredSamples: 1,
+  });
+}
+
 /** `artifact` with its first cell replaced by a typed failure, completeness recomputed. */
 export function withFailedFirstCell(
   artifact: RenderBenchmarkArtifact,

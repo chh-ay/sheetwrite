@@ -12,6 +12,7 @@ import {
   type ReaderGatePair,
   summarizeReaderPairs,
 } from "../src/reader-gate.js";
+import { must } from "./gate-fixtures.js";
 
 const GATE_PAIRS = 8;
 const READER = "aggregate SUM A";
@@ -77,10 +78,41 @@ function verdict(ratios: readonly number[], candidateDigest = BASE_DIGEST): bool
 }
 
 const repeat = (ratio: number, count = GATE_PAIRS) => Array.from({ length: count }, () => ratio);
+const SLOW_WITH_ONE_FAST = [...repeat(1.15, GATE_PAIRS - 1), 0.95];
 
-it("fails a 1.15x slowdown although one pair was faster and passes A/A-like noise", () => {
-  expect(verdict([...repeat(1.15, GATE_PAIRS - 1), 0.95])).toBe(false);
-  expect(verdict([0.96, 1.04, 0.98, 1.03, 1.0, 0.97, 1.05, 1.02])).toBe(true);
+it.each([
+  ["fails a 1.15x slowdown although one pair of eight was faster", SLOW_WITH_ONE_FAST, false],
+  ["fails a uniform 2.1x slowdown that one slow A/A pair would have excused", repeat(2.1), false],
+  ["passes a run that looks like A/A noise", [0.96, 1.04, 0.98, 1.03, 1.0, 0.97, 1.05, 1.02], true],
+  ["passes a faster run", repeat(0.9), true],
+  [
+    "does not let 16 pairs pass a slowdown that eight pairs fail",
+    [...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST],
+    false,
+  ],
+  [
+    "does not let 24 pairs pass it",
+    [...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST, ...SLOW_WITH_ONE_FAST],
+    false,
+  ],
+] as const)("%s", (_name, ratios, passed) => {
+  expect(verdict(ratios)).toBe(passed);
+});
+
+it("fails a reader whose result differs and rejects runs with too few pairs", () => {
+  expect(verdict(repeat(0.9), BASE_DIGEST + 1)).toBe(false);
+  expect(() => verdict(repeat(1, GATE_PAIRS - 1))).toThrow();
+});
+
+it("builds limits from resampled medians, not from the slowest A/A pair", () => {
+  const limit = must(FLOOR.rows[READER], READER).limit;
+  expect(limit).toBeGreaterThan(1);
+  expect(limit).toBeLessThan(1.15);
+  const quiet = must(
+    READER_CASE_NAMES.find((name) => name !== READER),
+    "quiet reader",
+  );
+  expect(FLOOR.rows[quiet]?.limit).toBe(1);
 });
 
 it("writes a floor only from an A/A report of one engine", () => {
@@ -94,6 +126,16 @@ it("writes a floor only from an A/A report of one engine", () => {
   }
   expect(FLOOR.source).toEqual({ sha: AA_SHA, engineSha256: AA_ENGINE, cpus: AA_CPUS });
   expect(parseReaderNoiseFloor(FLOOR, FLOOR_PATH)).toEqual(FLOOR);
+});
+
+it("rejects floors with missing, unknown or loosened rows", () => {
+  const { rows } = FLOOR;
+  const row = must(rows[READER], READER);
+  const { [READER]: _dropped, ...missing } = rows;
+  const loosened = { ...rows, [READER]: { ...row, limit: row.limit + 0.05 } };
+  for (const bad of [missing, { ...rows, "unknown reader": row }, loosened]) {
+    expect(() => parseReaderNoiseFloor({ ...FLOOR, rows: bad }, FLOOR_PATH)).toThrow();
+  }
 });
 
 it("hashes the engine's JavaScript glue as well as its module", () => {
