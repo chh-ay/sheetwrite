@@ -131,6 +131,16 @@ describe("native XLSX workbook tables", () => {
     },
   );
 
+  it("keeps Excel autofilters that carry revision uid attributes", async () => {
+    const { table, warnings } = await reimported(
+      ruleTable(
+        '<autoFilter xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" ref="A1:A3" xr:uid="{00000000-0001-0000-0000-000000000000}"><filterColumn colId="0"><filters><filter val="1"/></filters></filterColumn></autoFilter>',
+      ),
+    );
+    expect(table?.autoFilter?.attributes).toEqual({ ref: "A1:A3" });
+    expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toEqual([]);
+  });
+
   it("re-anchors filter and sort refs to a table range moved by structure edits", async () => {
     const imported = await backend.fromXlsxWorkbook(
       nativeTablePackage(

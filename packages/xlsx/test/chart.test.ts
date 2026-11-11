@@ -103,6 +103,59 @@ describe("native XLSX charts", () => {
     expect(drawingCount(bytes)).toBe(1);
   });
 
+  it("keeps chart IDs, an omitted legend and subpixel anchors through the sidecar", async () => {
+    const snapshot = authored();
+    const [first] = sheetAt(snapshot).charts ?? [];
+    if (!first) throw new Error("authored workbook has no chart");
+    delete first.legend;
+    first.anchor = { ...first.anchor, offsetX: 2.25, width: 420.5 };
+
+    const restored = await fromXlsxWorkbook(await toXlsxWorkbook(snapshot));
+
+    expect(sheetAt(restored).charts).toEqual(sheetAt(snapshot).charts);
+  });
+
+  it("writes no drawing or chart part for a workbook without charts", async () => {
+    const snapshot = authored();
+    delete sheetAt(snapshot).charts;
+    const bytes = await toXlsxWorkbook(snapshot);
+    expect(partNames(bytes).filter((part) => /drawing|chart/.test(part))).toEqual([]);
+  });
+
+  it("imports one chart per part when thousands of anchors repeat it or have no chart", async () => {
+    const bytes = withoutSidecar(await toXlsxWorkbook(authored()));
+    const drawing = partText(bytes, DRAWING);
+    const anchor = drawing.match(/<xdr:oneCellAnchor\b[^>]*>[\s\S]*?<\/xdr:oneCellAnchor>/)?.[0];
+    if (!anchor) throw new Error("authored drawing has no one-cell anchor");
+    const repeats = 1_500;
+    // Full-sheet two-cell spans without a frame size would make anchor sizing walk every column.
+    const unlinked = anchor
+      .replace(/<c:chart\b[^>]*\/>/, "")
+      .replaceAll("oneCellAnchor", "twoCellAnchor")
+      .replace(
+        /<xdr:ext\b[^>]*\/>/,
+        "<xdr:to><xdr:col>16383</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1048575</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to>",
+      );
+    const edited = editParts(
+      bytes,
+      {
+        [DRAWING]: drawing.replace(
+          "</xdr:wsDr>",
+          `${anchor.repeat(repeats)}${unlinked.repeat(repeats)}</xdr:wsDr>`,
+        ),
+      },
+      0,
+    );
+    const { warnings, onWarning } = collectWarnings();
+
+    const imported = await fromXlsxWorkbook(edited, { onWarning });
+
+    expect(sheetAt(imported).charts).toHaveLength(KINDS.length);
+    // The repeated frames share one chart part, so the host gets one warning, not one per frame.
+    expect(warnings.filter((warning) => warning.code === "unsupported-feature")).toHaveLength(1);
+    expect(packageProblems(await toXlsxWorkbook(imported))).toEqual([]);
+  }, 5_000);
+
   it("imports the Excel-made line chart fixture and keeps it through a cell edit", async () => {
     const snapshot = await fromXlsxWorkbook(await fixture("preserve-WithChart.xlsx"));
     const owner = snapshot.sheets.find((entry) => entry.charts?.length);

@@ -172,6 +172,12 @@ describe("XLSX streaming", () => {
     store.dispose();
   });
 
+  it("imports a seekable Blob with the same result as buffered bytes", async () => {
+    const bytes = await toXlsxWorkbook(largeSnapshot(500));
+    const fromBlob = await fromXlsxWorkbookFile(new Blob([new Uint8Array(bytes)]));
+    expect(fromBlob).toEqual(await fromXlsxWorkbook(bytes));
+  });
+
   // Sweeping the padding before the rows moves the chunk boundary across every byte of the row markup.
   it("imports worksheet rows identically wherever an inflater chunk boundary falls", async () => {
     const rowXml = (row: number) =>

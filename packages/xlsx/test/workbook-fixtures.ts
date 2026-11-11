@@ -145,6 +145,8 @@ export function partNames(bytes: Uint8Array): string[] {
 export function editParts(
   bytes: Uint8Array,
   edits: Readonly<Record<string, string | Uint8Array | null | ((xml: string) => string)>>,
+  /** 0 stores the parts, so repetitive XML does not trip the compression-ratio limit. */
+  level: 0 | 6 = 6,
 ): Uint8Array {
   const files = unzipSync(bytes);
   for (const [name, edit] of Object.entries(edits)) {
@@ -153,7 +155,7 @@ export function editParts(
       files[name] = strToU8(edit(strFromU8(files[name] ?? new Uint8Array())));
     else files[name] = typeof edit === "string" ? strToU8(edit) : new Uint8Array(edit);
   }
-  return zipSync(files, { level: 6, mtime: FIXED_ZIP_TIME });
+  return zipSync(files, { level, mtime: FIXED_ZIP_TIME });
 }
 
 const SIDECAR_MARKER = "sheetwrite-workbook-metadata-v1";

@@ -241,6 +241,11 @@ describe("XLSX unmodelled-part preservation", () => {
     }
   });
 
+  it("keeps images when an untracked snapshot changes only cell values", async () => {
+    const imported = await fromXlsxWorkbook(await checkedFixture("preserve-picture.xlsx"));
+    expect(partNames(await toXlsxWorkbook(editFirstCell(imported, "changed")))).toContain(IMAGE);
+  });
+
   it("fingerprints snapshots edited outside a store", async () => {
     const edited = editFirstCell(
       await fromXlsxWorkbook(await load(OPAQUE_CHART_SAMPLE)),

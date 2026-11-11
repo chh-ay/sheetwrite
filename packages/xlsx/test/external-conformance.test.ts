@@ -270,6 +270,43 @@ describe("pinned external XLSX behavioral vectors", () => {
 });
 
 describe("local deterministic and adversarial XLSX gates", () => {
+  it("is insertion-order invariant with canonical ZIP entries, relationships, styles, and timestamps", async () => {
+    // The same workbook, with blocks and style keys in different orders.
+    const build = (reordered: boolean) => {
+      const styled = block([[2]], 1, 1);
+      const text = block([["x"]]);
+      const [cell] = styled.cells;
+      if (!cell) throw new Error("the styled block has no cell");
+      cell.style = reordered
+        ? { backgroundColor: "#AABBCC", italic: true }
+        : { italic: true, backgroundColor: "#AABBCC" };
+      const cellStyle = reordered
+        ? { color: "#112233", bold: true }
+        : { bold: true, color: "#112233" };
+      return book([
+        sheet("s", "Sheet1", [], {
+          rowCount: 2,
+          columns: [
+            { key: "a", header: "A", width: 80, type: "text" },
+            { key: "b", header: "B", width: 90, type: "number", cellStyle },
+          ],
+          cells: reordered ? [text, styled] : [styled, text],
+        }),
+      ]);
+    };
+    const [left, right] = await Promise.all([
+      backend.toXlsxWorkbook(build(false)),
+      backend.toXlsxWorkbook(build(true)),
+    ]);
+    expect(right).toEqual(left);
+    const entries = Object.keys(unzipSync(left));
+    expect(entries).toEqual([...entries].sort((a, b) => a.localeCompare(b)));
+    patchEntries(left, ({ view, local }) => {
+      // Local header modification time 0 and date 33: the DOS epoch, 1980-01-01.
+      expect([view.getUint16(local + 10, true), view.getUint16(local + 12, true)]).toEqual([0, 33]);
+    });
+  });
+
   it("rejects with the exact abort reason while reading shared strings, without warnings", async () => {
     // abort.test.ts aborts at every check of written workbooks, which hold no shared strings.
     const reason = new Error("abort during shared strings");

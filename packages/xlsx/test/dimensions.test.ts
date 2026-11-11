@@ -2,9 +2,51 @@ import { expect, it } from "bun:test";
 
 import { sheetwriteWorkbookBackend as backend } from "../src/workbook.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
-import { partText, sheetAt } from "./workbook-fixtures.js";
+import { book, columns, partText, sheet, sheetAt } from "./workbook-fixtures.js";
 
 const oneSheet = (body: string) => rawXlsx({ sheets: [{ xml: worksheet(body) }] });
+const matches = (xml: string, pattern: RegExp) =>
+  [...xml.matchAll(pattern)].map((match) => match[1]);
+
+it("writes padded maximum-digit widths in Calibri 11 units and reads exact pixel widths back", async () => {
+  const widths = [1, 5, 12, 61, 75, 80, 100, 111.25];
+  const cols = columns(widths.length).map((column, index) => ({
+    ...column,
+    width: widths[index] ?? 0,
+    ...(index === 0 ? { cellStyle: { color: "#123456" } } : {}),
+  }));
+  const bytes = await backend.toXlsxWorkbook(
+    book([sheet("s", "Dimensions", [], { columns: cols })]),
+  );
+
+  // 7px maximum digit width, with OOXML's 5px padding stored in the width.
+  expect(
+    matches(partText(bytes, "xl/worksheets/sheet1.xml"), /<col\b[^>]*\bwidth="([^"]+)"/g),
+  ).toEqual([
+    "0.140625",
+    "0.7109375",
+    "1.7109375",
+    "8.7109375",
+    "10.7109375",
+    "11.42578125",
+    "14.28515625",
+    "15.890625",
+  ]);
+  // Every native font, default and custom, declares the font the widths are measured in.
+  const fontCollection = partText(bytes, "xl/styles.xml").match(
+    /<fonts\b[^>]*>([\s\S]*?)<\/fonts>/,
+  )?.[1];
+  const fonts = matches(fontCollection ?? "", /<font>([\s\S]*?)<\/font>/g);
+  expect(fonts).toHaveLength(2);
+  for (const font of fonts) {
+    expect(font).toContain('<name val="Calibri"/>');
+    expect(font).toContain('<sz val="11"/>');
+  }
+  // Fractional pixel widths come back exactly.
+  expect(
+    sheetAt(await backend.fromXlsxWorkbook(bytes)).columns.map((column) => column.width),
+  ).toEqual(widths);
+});
 
 it("imports native padded widths without five-pixel growth and converges over byte cycles", async () => {
   const widths = ["8.7109375", "10.7109375", "11.42578125", "14.28515625"];
@@ -16,11 +58,8 @@ it("imports native padded widths without five-pixel growth and converges over by
     expect(sheetAt(imported).columns.map((column) => column.width)).toEqual([61, 75, 80, 100]);
     bytes = await backend.toXlsxWorkbook(imported);
   }
-  // 7px maximum digit width, with OOXML's 5px padding stored in the width.
   expect(
-    [...partText(bytes, "xl/worksheets/sheet1.xml").matchAll(/<col\b[^>]*\bwidth="([^"]+)"/g)].map(
-      (match) => match[1],
-    ),
+    matches(partText(bytes, "xl/worksheets/sheet1.xml"), /<col\b[^>]*\bwidth="([^"]+)"/g),
   ).toEqual(widths);
 });
 
@@ -36,8 +75,5 @@ it("only treats customHeight rows as fixed, retaining hidden automatic rows", as
     [4, { height: 36 }],
   ]);
   const xml = partText(await backend.toXlsxWorkbook(imported), "xl/worksheets/sheet1.xml");
-  expect([...xml.matchAll(/<row\b[^>]*\bht="([^"]+)"/g)].map((match) => match[1])).toEqual([
-    "21",
-    "27",
-  ]);
+  expect(matches(xml, /<row\b[^>]*\bht="([^"]+)"/g)).toEqual(["21", "27"]);
 });

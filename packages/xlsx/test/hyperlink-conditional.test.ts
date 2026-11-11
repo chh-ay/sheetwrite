@@ -4,7 +4,15 @@ import type { WorkbookSnapshot } from "@sheetwrite/core";
 
 import { sheetwriteWorkbookBackend as backend } from "../src/workbook.js";
 import { rawXlsx, TRANSITIONAL_REL, worksheet } from "./raw-opc.js";
-import { book, collectWarnings, partText, range, sheet, sheetAt } from "./workbook-fixtures.js";
+import {
+  book,
+  collectWarnings,
+  partText,
+  range,
+  sheet,
+  sheetAt,
+  styleAt,
+} from "./workbook-fixtures.js";
 
 /** A source sheet with A1 "Report" and the extra worksheet parts, beside an empty destination sheet. */
 function authoredVector(
@@ -69,6 +77,51 @@ function sourceSnapshot(): WorkbookSnapshot {
 }
 
 describe("XLSX hyperlink and conditional-format fidelity", () => {
+  it("exports hyperlink appearance into native cell styles without relying on metadata", async () => {
+    const source = sourceSnapshot();
+    const first = sheetAt(source);
+    const [column] = first.columns;
+    const cells = first.cells[0];
+    const internalCell = cells?.cells[1];
+    if (!column || !cells || !internalCell) throw new Error("the source sheet lost its cells");
+    column.cellStyle = { bold: true, color: "#ABCDEF" };
+    internalCell.style = { color: "#654321", underline: false };
+    cells.cells.push({ rowOffset: 0, colOffset: 1, value: { kind: "literal", value: "Default" } });
+    first.hyperlinks?.push({
+      id: "default-link",
+      range: range("source", 0, 1),
+      target: { kind: "external", url: "https://example.com/default" },
+    });
+    const bytes = await backend.toXlsxWorkbook(source);
+    // Import only the native worksheet and style parts: the metadata sheet must not
+    // be able to supply the hyperlink appearance under test.
+    const relationships = partText(bytes, "xl/worksheets/_rels/sheet1.xml.rels").match(
+      /<Relationship\b[^>]*\/>/g,
+    );
+    const imported = await backend.fromXlsxWorkbook(
+      rawXlsx({
+        sheets: [
+          {
+            name: "Source",
+            xml: partText(bytes, "xl/worksheets/sheet1.xml"),
+            relationships: relationships?.join(""),
+          },
+          { name: "Destination Sheet", xml: worksheet("<sheetData/>") },
+        ],
+        styles: partText(bytes, "xl/styles.xml"),
+      }),
+    );
+    expect(styleAt(imported, 0, 0)).toMatchObject({
+      bold: true,
+      color: "#123456",
+      underline: true,
+    });
+    expect(styleAt(imported, 1, 0)).toMatchObject({ bold: true, color: "#654321" });
+    // An absent OOXML <u> is the native false value.
+    expect(styleAt(imported, 1, 0)?.underline ?? false).toBe(false);
+    expect(styleAt(imported, 0, 1)).toMatchObject({ color: "#0563C1", underline: true });
+  });
+
   it.each([
     ['ref="A1" r:id="rId1"', "Report"],
     ['ref="A1" location="&apos;Destination Sheet&apos;!A1"', "Report"],
