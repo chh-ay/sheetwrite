@@ -794,7 +794,7 @@ impl FormulaEntry {
             F: Fn(&StructuredRef) -> Option<(u32, u32, u32)>,
         {
             if let Ast::Structured(reference) = ast {
-                if reference.table_id != table_id {
+                if *reference.table_id != *table_id {
                     return false;
                 }
                 return match span(reference) {

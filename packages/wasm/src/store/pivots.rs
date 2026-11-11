@@ -460,7 +460,7 @@ impl PivotSource for StoreSource<'_> {
         if let Some(names) = self.names {
             return names
                 .get(field)
-                .map_or(Value::Blank, |column| Value::text(column.name.as_str()));
+                .map_or(Value::Blank, |column| Value::text(column.name.clone()));
         }
         self.rect.header.map_or(Value::Blank, |row| {
             settled_cell_value(

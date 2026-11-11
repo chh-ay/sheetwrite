@@ -693,10 +693,10 @@ pub struct UnresolvedStructuredRef {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructuredRef {
-    pub table_id: String,
-    pub table_name: String,
-    pub column_id: String,
-    pub column_name: String,
+    pub table_id: std::rc::Rc<str>,
+    pub table_name: std::rc::Rc<str>,
+    pub column_id: std::rc::Rc<str>,
+    pub column_name: std::rc::Rc<str>,
     pub sheet: u32,
     pub row_start: u32,
     pub row_end: u32,
@@ -911,10 +911,7 @@ impl Ast {
             Ast::Structured(value) => {
                 let bytes = std::mem::size_of::<StructuredRef>();
                 out.add_payload(bytes, bytes);
-                add_string_memory(&value.table_id, out);
-                add_string_memory(&value.table_name, out);
-                add_string_memory(&value.column_id, out);
-                add_string_memory(&value.column_name, out);
+                // Prototype: the table's strings are shared, not owned per formula.
             }
             Ast::SheetCell(sheet, ..) | Ast::SheetRange(sheet, ..) => {
                 add_string_memory(&sheet.name, out);
@@ -3325,7 +3322,7 @@ where
     F: Fn(&StructuredRef) -> Option<StructuredRef>,
 {
     if let Ast::Structured(reference) = ast {
-        if reference.table_id == table_id {
+        if *reference.table_id == *table_id {
             *ast = resolve(reference).map_or(Ast::InvalidRef, |reference| {
                 Ast::Structured(Box::new(reference))
             });
@@ -3474,7 +3471,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
             out,
         ),
         Ast::Structured(reference) => write_structured_ref(
-            reference.qualified.then_some(reference.table_name.as_str()),
+            reference.qualified.then_some(&*reference.table_name),
             &reference.column_name,
             reference.section,
             out,

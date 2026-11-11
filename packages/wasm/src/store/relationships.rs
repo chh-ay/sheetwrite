@@ -75,7 +75,7 @@ impl KeyColumn {
         let column = table
             .columns
             .iter()
-            .find(|column| column.id == column_id)
+            .find(|column| *column.id == *column_id)
             .ok_or(RelationshipError::MissingColumn)?;
         Ok(Self::at(table, column))
     }
@@ -182,7 +182,7 @@ impl CellStore {
     /// The table with stable ID `id`. Tables are keyed by name, so this scans.
     #[inline(never)]
     pub(super) fn table_by_id(&self, id: &str) -> Option<&TableDefinition> {
-        self.tables.values().find(|table| table.id == id)
+        self.tables.values().find(|table| *table.id == *id)
     }
 
     /// The key column `column` names, if its table and column exist.

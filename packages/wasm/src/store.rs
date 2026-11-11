@@ -248,15 +248,15 @@ pub(crate) fn workbook_name_key(value: &str) -> String {
 
 #[derive(Clone, Debug)]
 struct TableColumnDefinition {
-    id: String,
-    name: String,
+    id: std::rc::Rc<str>,
+    name: std::rc::Rc<str>,
     col: u32,
 }
 
 #[derive(Clone, Debug)]
 struct TableDefinition {
-    id: String,
-    name: String,
+    id: std::rc::Rc<str>,
+    name: std::rc::Rc<str>,
     sheet: u32,
     row_start: u32,
     col_start: u32,
@@ -2350,7 +2350,7 @@ impl CellStore {
         let existing_key = self
             .tables
             .iter()
-            .find_map(|(key, table)| (table.id == id).then(|| key.clone()));
+            .find_map(|(key, table)| (*table.id == *id).then(|| key.clone()));
         let is_new = existing_key.is_none();
         if (is_new && self.tables.len() >= MAX_TABLES)
             || id.is_empty()
@@ -2382,7 +2382,7 @@ impl CellStore {
         if self
             .tables
             .get(&name_key)
-            .is_some_and(|table| table.id != id)
+            .is_some_and(|table| *table.id != *id)
         {
             return false;
         }
@@ -2405,14 +2405,14 @@ impl CellStore {
                 return false;
             }
             columns.push(TableColumnDefinition {
-                id: column_id,
-                name: column_name,
+                id: column_id.into(),
+                name: column_name.into(),
                 col: col_start as u32 + column_index as u32,
             });
         }
         let definition = TableDefinition {
-            id: id.to_string(),
-            name: name.to_string(),
+            id: id.into(),
+            name: name.into(),
             sheet: sheet as u32,
             row_start: row_start as u32,
             col_start: col_start as u32,
@@ -2423,7 +2423,7 @@ impl CellStore {
             columns,
         };
         if self.tables.values().any(|other| {
-            other.id != id
+            *other.id != *id
                 && other.sheet == definition.sheet
                 && definition.row_start <= other.row_end
                 && definition.row_end >= other.row_start
@@ -2454,7 +2454,7 @@ impl CellStore {
         let Some(key) = self
             .tables
             .iter()
-            .find_map(|(key, table)| (table.id == id).then(|| key.clone()))
+            .find_map(|(key, table)| (*table.id == *id).then(|| key.clone()))
         else {
             return false;
         };
@@ -3652,11 +3652,10 @@ impl CellStore {
             formula_row,
             formula_col,
         )?;
-        let column_key = workbook_name_key(&reference.column_name);
         let column_index = table
             .columns
             .iter()
-            .position(|column| workbook_name_key(&column.name) == column_key)?;
+            .position(|column| column.name.eq_ignore_ascii_case(&reference.column_name))?;
         let column = &table.columns[column_index];
         let (row_start, row_end) = match reference.section {
             TableSection::Headers if table.header_row => (table.row_start, table.row_start),
@@ -4066,7 +4065,7 @@ impl CellStore {
         self.tables
             .values()
             .filter(|table| table.sheet == sheet)
-            .map(|table| table.id.clone())
+            .map(|table| table.id.to_string())
             .collect()
     }
 
@@ -4147,7 +4146,7 @@ impl CellStore {
     /// table `table_id` at its definition, marking dirty only the formulas
     /// whose reads changed. Returns false when the table is gone.
     fn rebind_table_users(&mut self, table_id: &str) -> bool {
-        let Some(table) = self.tables.values().find(|table| table.id == table_id).cloned() else {
+        let Some(table) = self.tables.values().find(|table| *table.id == *table_id).cloned() else {
             return false;
         };
         self.ensure_binding_users();
@@ -4236,7 +4235,7 @@ fn collect_binding_uses(ast: &Ast, id: FormulaId, users: &mut BindingUsers) {
         }
         Ast::Structured(reference) => users
             .tables
-            .entry(reference.table_id.clone())
+            .entry(reference.table_id.to_string())
             .or_default()
             .push(id),
         _ => {

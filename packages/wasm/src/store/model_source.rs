@@ -61,7 +61,7 @@ impl<'a> ModelSource<'a> {
             let definition = table
                 .columns
                 .iter()
-                .find(|field| field.id == column.column)
+                .find(|field| *field.id == *column.column)
                 .ok_or(FormulaError::Ref)?;
             fields.push(Field {
                 column: KeyColumn::at(table, definition),

@@ -382,9 +382,9 @@ impl CellStore {
         for (column, context) in read {
             let slot = slots
                 .iter()
-                .position(|slot| slot.0 == column.table_id && slot.1 == context)
+                .position(|slot| *slot.0 == *column.table_id && slot.1 == context)
                 .unwrap_or_else(|| {
-                    slots.push((column.table_id.clone(), context));
+                    slots.push((column.table_id.to_string(), context));
                     slots.len() - 1
                 });
             let owner = context
@@ -652,8 +652,8 @@ struct ContextEdit {
 
 fn column_ref(column: &StructuredRef) -> ColumnRef {
     ColumnRef {
-        table: column.table_id.clone(),
-        column: column.column_id.clone(),
+        table: column.table_id.to_string(),
+        column: column.column_id.to_string(),
     }
 }
 
