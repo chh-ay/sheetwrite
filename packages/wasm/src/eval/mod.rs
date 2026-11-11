@@ -34,6 +34,7 @@ mod pass_rule_tests;
 mod random;
 mod range_fold;
 mod range_reader;
+mod range_view;
 mod reference;
 #[cfg(feature = "analysis")]
 pub(crate) mod regex_patterns;
@@ -2522,6 +2523,16 @@ impl CellStore {
 
     /// The values of a written range, up to the sheet's used extent.
     fn eval_range_matrix(
+        &self,
+        range: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<EvalMatrix, FormulaError> {
+        range_view::RangeView::new(self, range, depth)?.materialize(pass)
+    }
+
+    #[cfg(test)]
+    fn legacy_range_matrix(
         &self,
         range: CellRange,
         pass: &mut EvalPass<'_>,
