@@ -47,6 +47,10 @@ impl Default for FuncAccumulator {
 }
 
 impl FuncAccumulator {
+    #[allow(
+        unsafe_code,
+        reason = "arguments live in a fixed array of MaybeUninit slots; a safe layout is not yet measured on both machines"
+    )]
     fn arg_metadata(&self, index: usize) -> Option<&FuncArg> {
         if index >= self.arg_count {
             return None;
