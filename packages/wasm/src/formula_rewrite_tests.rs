@@ -1,6 +1,6 @@
 //! Formula text rewrites for paste, fill and conditional-format rules.
 
-use crate::formula_rewrite::{shift_formula_axis, translate_formula};
+use crate::formula_rewrite::{move_formula_axis, shift_formula_axis, translate_formula};
 
 const ROWS: bool = false;
 const COLUMNS: bool = true;
