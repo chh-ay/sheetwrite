@@ -1,4 +1,14 @@
-import type { ColumnarData, Range, Sheet, Workbook } from "../src/types.js";
+import { GridImpl } from "../src/grid.js";
+import { SheetwriteStore } from "../src/store.js";
+import type {
+  ColumnarData,
+  DataSourcePage,
+  DataSourceRequest,
+  Range,
+  RowData,
+  Sheet,
+  Workbook,
+} from "../src/types.js";
 import {
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
@@ -72,6 +82,42 @@ export function range(sheetId: string, r0: number, c0: number, r1: number, c1: n
 }
 
 /**
+ * Append a grid host to the document with an 800 x 400 layout size, which
+ * happy-dom does not compute on its own.
+ */
+export function mountHost(): HTMLDivElement {
+  const host = document.createElement("div");
+  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
+  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
+  document.body.appendChild(host);
+  return host;
+}
+
+/**
+ * Mount a grid over a caller-owned store of `makeWorkbook(rowCount)` filled
+ * with `makeColumnarData(rowCount)`.
+ */
+export function mountGridWithData(rowCount = 50): {
+  workbook: Workbook;
+  store: SheetwriteStore;
+  host: HTMLDivElement;
+  grid: GridImpl;
+} {
+  const workbook = makeWorkbook(rowCount);
+  const store = new SheetwriteStore(workbook, makeColumnarData(rowCount));
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  return { workbook, store, host, grid };
+}
+
+/** The grid's scroll container under `host`. */
+export function scrollerOf(host: HTMLElement): HTMLDivElement {
+  const node = host.querySelector(".sheetwrite-scroller");
+  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
+  return node;
+}
+
+/**
  * Resolve with the first element under `host` that matches `selector`, now or
  * when it is added. Use it for chrome that loads its own chunk, such as the
  * find bar, instead of a guessed delay.
@@ -94,6 +140,25 @@ export function elementAdded<T extends Element>(
     });
     observer.observe(host, { childList: true, subtree: true });
   });
+}
+
+/** Fill each requested column of `values`, with `null` for keys it lacks. */
+function coveredRow(request: DataSourceRequest, values: RowData): RowData {
+  const row: RowData = {};
+  for (const band of request.columns) {
+    for (const key of band.keys) row[key] = values[key] ?? null;
+  }
+  return row;
+}
+
+/** A protocol-2 page that answers `request` with `rows`, covering every requested column. */
+export function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
+  return {
+    protocol: 2,
+    start: request.start,
+    columns: request.columns,
+    rows: rows.map((row) => coveredRow(request, row)),
+  };
 }
 
 /**
