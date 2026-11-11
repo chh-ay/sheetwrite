@@ -44,6 +44,31 @@ fn after_row_move(formula: &str, from: usize, count: usize, to: usize) -> String
 }
 
 #[test]
+fn moved_cells_keep_their_values_and_references_follow_them() {
+    let (mut store, data, summary) = store();
+    store.set_formula(data, 1, 1, "=A2*2", 0);
+    store.set_formula(data, 2, 1, "=A3 + A2", 0);
+    store.set_formula(summary, 0, 0, "=Data!A2*2", 0);
+    store.set_formula(summary, 1, 0, "=(Data!A3 + 1) * 2", 0);
+
+    // Row 2 lands below row 4.
+    assert_eq!(store.move_rows(data, 1, 1, 3), BLOCK_OK);
+    store.recompute(summary);
+    store.recompute(data);
+
+    let column: Vec<f64> = (0..5).map(|row| number(&store, data, row, 0)).collect();
+    assert_eq!(column, [1.0, 3.0, 4.0, 2.0, 5.0]);
+    assert_eq!(text(&store, data, 3, 1), "=A4*2");
+    assert_eq!(text(&store, data, 1, 1), "=A2 + A4");
+    assert_eq!(text(&store, summary, 0, 0), "=Data!A4*2");
+    assert_eq!(text(&store, summary, 1, 0), "=(Data!A2 + 1) * 2");
+    assert_eq!(number(&store, data, 3, 1), 4.0);
+    assert_eq!(number(&store, data, 1, 1), 5.0);
+    assert_eq!(number(&store, summary, 0, 0), 4.0);
+    assert_eq!(number(&store, summary, 1, 0), 8.0);
+}
+
+#[test]
 fn a_range_follows_excel_rules_for_a_moved_block() {
     // The block moves inside the range: the range is the same.
     assert_eq!(
@@ -82,6 +107,25 @@ fn a_range_follows_excel_rules_for_a_moved_block() {
     );
     // Whole columns are not changed by a row move.
     assert_eq!(after_row_move("=SUM(Data!A:B)", 4, 2, 0), "=SUM(Data!A:B)");
+}
+
+#[test]
+fn moved_columns_follow_the_same_rules() {
+    let (mut store, data, summary) = store();
+    store.set_number(data, 0, 1, 20.0, 0);
+    store.set_formula(summary, 0, 0, "=Data!B1+SUM(Data!A1:C1)", 0);
+    store.set_formula(data, 1, 3, "=A1", 0);
+
+    // Column A lands after column C.
+    assert_eq!(store.move_cols(data, 0, 1, 2), BLOCK_OK);
+    store.recompute(summary);
+    store.recompute(data);
+
+    assert_eq!(number(&store, data, 0, 0), 20.0);
+    assert_eq!(number(&store, data, 0, 2), 1.0);
+    assert_eq!(text(&store, summary, 0, 0), "=Data!A1+SUM(Data!A1:B1)");
+    assert_eq!(text(&store, data, 1, 3), "=C1");
+    assert_eq!(number(&store, data, 1, 3), 1.0);
 }
 
 #[test]

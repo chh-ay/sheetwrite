@@ -99,6 +99,35 @@ fn a_row_or_column_edit_changes_only_the_moved_references() {
     );
 }
 
+#[test]
+fn a_deleted_reference_becomes_ref_error_and_the_rest_stays() {
+    let (mut store, sales, _) = two_sheets();
+    enter(&mut store, sales, &["=(B2 + B3) * 2"]);
+
+    assert!(store.remove_rows(sales, 2, 1));
+
+    assert_eq!(texts(&store, sales, 0, 1), ["=(B2 + #REF!) * 2"]);
+}
+
+#[test]
+fn a_tab_move_changes_only_the_three_d_reference() {
+    let mut store = CellStore::new();
+    let [first, middle, last, summary] = ["First", "Middle", "Last", "Summary"].map(|name| {
+        let sheet = store.add_sheet(COLS, ROWS);
+        store.set_sheet_name(sheet, name, name);
+        sheet as u32
+    });
+    store.set_formula(summary as usize, 0, 0, "=(SUM(First:Last!B1) + 1)*2", 0);
+
+    // Moving the first endpoint past the last one drops it from the span.
+    assert!(store.set_sheet_order(&[summary, middle, last, first]));
+
+    assert_eq!(
+        texts(&store, summary as usize, 0, 1),
+        ["=(SUM(Middle:Last!B1) + 1)*2"]
+    );
+}
+
 /// Every kind of reference in the text pairs with its node in the tree, so
 /// each reference is written over exactly its own text: here, each one in
 /// Excel's spelling.

@@ -3,7 +3,42 @@
 //! cell range in another workbook". Without values for the other workbook,
 //! a reference is `#REF!`, and its formula text stays as written.
 
+use crate::calc::{parse, serialize, shift_cols, shift_rows, translate_relative_refs};
 use crate::store::CellStore;
+
+const SHEET: u32 = 0;
+
+fn copied(source: &str, rows: i64, cols: i64) -> String {
+    let mut ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
+    translate_relative_refs(&mut ast, rows, cols);
+    serialize(&ast)
+}
+
+#[test]
+fn copies_move_relative_external_references_and_edits_do_not() {
+    assert_eq!(
+        copied("=[Budget.xlsx]Annual!C10", 1, 2),
+        "=[Budget.xlsx]Annual!E11"
+    );
+    assert_eq!(
+        copied("=[Budget.xlsx]Annual!$C$10", 1, 2),
+        "=[Budget.xlsx]Annual!$C$10"
+    );
+
+    // A row or column edit in this workbook does not change the other one.
+    for source in [
+        "=[Budget.xlsx]Annual!C10",
+        "=SUM('[Budget 2024.xlsx]Annual Plan'!C10:C25)",
+    ] {
+        let mut rows = parse(source).unwrap();
+        shift_rows(&mut rows, 0, 3, SHEET, SHEET);
+        assert_eq!(serialize(&rows), source);
+
+        let mut cols = parse(source).unwrap();
+        shift_cols(&mut cols, 0, 3, SHEET, SHEET);
+        assert_eq!(serialize(&cols), source);
+    }
+}
 
 /// A store with one local sheet, `Report`, and the cached values of the
 /// sheet `Annual` of `Budget.xlsx`: C10 = 7 and C11 = 5.
@@ -50,6 +85,23 @@ fn formulas_follow_a_link_that_is_added_removed_and_added_again() {
     assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(formula));
 }
 
+/// Define a name of `Budget.xlsx` as core does from its link part: the
+/// name qualified by the book (and its sheet), referring to the link sheet.
+fn define(store: &mut CellStore, name: &str, cells: &str) -> bool {
+    store.set_named_formula(name, -1, &format!("='[Budget.xlsx]Annual'!{cells}"))
+}
+
+/// `linked_store` with the names of `Budget.xlsx` that its link part saves:
+/// `Total` (C10) and `Rows` (C10:C11) for the workbook, and `Local` (C11)
+/// for the sheet `Annual`.
+fn store_with_names() -> (CellStore, usize, usize) {
+    let (mut store, report, annual) = linked_store();
+    assert!(define(&mut store, "[Budget.xlsx]!Total", "$C$10"));
+    assert!(define(&mut store, "[Budget.xlsx]!Rows", "$C$10:$C$11"));
+    assert!(define(&mut store, "'[Budget.xlsx]Annual'!Local", "$C$11"));
+    (store, report, annual)
+}
+
 /// Excel writes a name of another workbook as `Budget.xlsx!Total`, with the
 /// path when the workbook is closed (Microsoft, "Create workbook links":
 /// `=SUM(Budget.xlsx!Sales)`), and keeps the saved values of the cells the
@@ -82,23 +134,6 @@ fn defined_names_of_a_link_read_its_saved_values() {
             Some(*formula)
         );
     }
-}
-
-/// Define a name of `Budget.xlsx` as core does from its link part: the
-/// name qualified by the book (and its sheet), referring to the link sheet.
-fn define(store: &mut CellStore, name: &str, cells: &str) -> bool {
-    store.set_named_formula(name, -1, &format!("='[Budget.xlsx]Annual'!{cells}"))
-}
-
-/// `linked_store` with the names of `Budget.xlsx` that its link part saves:
-/// `Total` (C10) and `Rows` (C10:C11) for the workbook, and `Local` (C11)
-/// for the sheet `Annual`.
-fn store_with_names() -> (CellStore, usize, usize) {
-    let (mut store, report, annual) = linked_store();
-    assert!(define(&mut store, "[Budget.xlsx]!Total", "$C$10"));
-    assert!(define(&mut store, "[Budget.xlsx]!Rows", "$C$10:$C$11"));
-    assert!(define(&mut store, "'[Budget.xlsx]Annual'!Local", "$C$11"));
-    (store, report, annual)
 }
 
 #[test]

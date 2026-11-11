@@ -25,6 +25,11 @@ fn copy_keeps_names_past_the_last_column() {
     );
 }
 
+#[test]
+fn copy_keeps_absolute_parts() {
+    assert_eq!(translate_formula("=$A$1+$A1+A$1", 2, 3), "=$A$1+$A3+D$1");
+}
+
 /// A copy can move a relative edge past an absolute one; each edge keeps
 /// its own `$` marker, as Excel writes it.
 #[test]
@@ -64,6 +69,23 @@ fn text_that_does_not_lex_stays_unchanged() {
 }
 
 #[test]
+fn deleted_rows_shrink_a_range() {
+    assert_eq!(
+        shift_formula_axis("=SUM(A1:A5)", ROWS, 3, -2),
+        "=SUM(A1:A3)"
+    );
+    assert_eq!(
+        shift_formula_axis("=SUM(A2:A3)", ROWS, 1, -2),
+        "=SUM(#REF!)"
+    );
+    assert_eq!(
+        shift_formula_axis("=A1+B1+C1", COLUMNS, 1, -1),
+        "=A1+#REF!+B1"
+    );
+    assert_eq!(shift_formula_axis("=SUM(A3#)", ROWS, 0, -1), "=SUM(A2#)");
+}
+
+#[test]
 fn structural_edits_move_absolute_parts_and_keep_whole_axes() {
     assert_eq!(shift_formula_axis("=$A$2+A:A", ROWS, 0, 2), "=$A$4+A:A");
     assert_eq!(shift_formula_axis("=SUM(B:B)", COLUMNS, 0, -1), "=SUM(A:A)");
@@ -88,6 +110,52 @@ fn moved_rows_take_their_references_along() {
         move_formula_axis("=SUM(A1:A10)", ROWS, 1, 2, 8),
         "=SUM(A1:A8)"
     );
+}
+
+/// A sort moves each row as a unit and adjusts the formulas of that row for
+/// its own move only (Microsoft Support, "Overview of formulas in Excel":
+/// relative references change when the formula cell moves).
+mod sort {
+    use crate::formula_rewrite::sort_formula;
+
+    #[test]
+    fn same_row_references_move_with_the_row() {
+        assert_eq!(sort_formula("=A2*B2", 3), "=A5*B5");
+        assert_eq!(sort_formula("=SUM(A2:C2)", -1), "=SUM(A1:C1)");
+    }
+
+    #[test]
+    fn references_to_other_rows_keep_their_offset() {
+        assert_eq!(sort_formula("=A1+1", 3), "=A4+1");
+    }
+
+    #[test]
+    fn a_reference_that_leaves_the_sheet_becomes_ref() {
+        assert_eq!(sort_formula("=A1+B3", -1), "=#REF!+B2");
+    }
+
+    #[test]
+    fn absolute_rows_stay() {
+        assert_eq!(sort_formula("=$A$1+A$1+$A1", 2), "=$A$1+A$1+$A3");
+    }
+
+    #[test]
+    fn columns_stay() {
+        assert_eq!(sort_formula("=SUM(B:B)+C2", 1), "=SUM(B:B)+C3");
+    }
+
+    /// Microsoft Q&A, "INDEX + MATCH Breaks When Sorting": a reference with
+    /// a sheet name does not follow the sort, also on the formula's own sheet.
+    #[test]
+    fn references_with_a_sheet_name_stay() {
+        assert_eq!(sort_formula("=Sheet1!A2+A2", 2), "=Sheet1!A2+A4");
+        assert_eq!(sort_formula("='My Data'!B2:B9", 2), "='My Data'!B2:B9");
+    }
+
+    #[test]
+    fn structured_references_and_names_stay() {
+        assert_eq!(sort_formula("=[@Qty]*Rate", 4), "=[@Qty]*Rate");
+    }
 }
 
 /// Renaming a table or a column updates the structured references that name
@@ -131,6 +199,19 @@ mod structured_renames {
                 "Net"
             ),
             "=SUM(orders[Net])+orders[@Net]+LEN(orders[[#Totals],[Net]])+other[amount]+orders[qty]"
+        );
+    }
+
+    #[test]
+    fn an_empty_table_renames_unqualified_references() {
+        assert_eq!(
+            rename_structured_reference(
+                "=[Total Sales]/orders[total sales]+[Other]",
+                "",
+                "total sales",
+                "Revenue"
+            ),
+            "=[Revenue]/orders[total sales]+[Other]"
         );
     }
 

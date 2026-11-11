@@ -7,6 +7,7 @@ use crate::types::{KIND_BOOL, KIND_EMPTY};
 
 const ROWS: usize = 6;
 const COLS: usize = 4;
+const STYLE: u32 = 7;
 
 fn sheet() -> (CellStore, usize) {
     let mut store = CellStore::new();
@@ -42,6 +43,24 @@ fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
 
 fn column(store: &CellStore, sheet: usize, col: usize, rows: usize) -> Vec<String> {
     (0..rows).map(|row| shown(store, sheet, row, col)).collect()
+}
+
+#[test]
+fn values_and_styles_move_with_their_row() {
+    let (mut store, sheet) = sheet();
+    for (row, value) in [30.0, 10.0, 20.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    store.set_string(sheet, 0, 1, "c", STYLE);
+    store.set_string(sheet, 1, 1, "a", 0);
+    store.set_bool(sheet, 2, 1, true, 0);
+
+    assert_eq!(permute(&mut store, sheet, 0, 0, 2, &[1, 2, 0]), BLOCK_OK);
+    store.recompute(sheet);
+
+    assert_eq!(column(&store, sheet, 0, 3), ["10", "20", "30"]);
+    assert_eq!(column(&store, sheet, 1, 3), ["a", "TRUE", "c"]);
+    assert_eq!(store.get_cell(sheet, 2, 1).style(), STYLE);
 }
 
 /// The example of #353: formulas outside the range read the new values.
@@ -118,6 +137,19 @@ fn references_keep_their_target() {
         Some(vec![sheet as u32, 5, 3])
     );
     assert_eq!(shown(&store, sheet, 0, 0), "42");
+}
+
+#[test]
+fn columns_outside_the_rectangle_stay() {
+    let (mut store, sheet) = sheet();
+    store.set_number(sheet, 0, 0, 2.0, 0);
+    store.set_number(sheet, 1, 0, 1.0, 0);
+    store.set_string(sheet, 0, 2, "first", 0);
+    store.set_string(sheet, 1, 2, "second", 0);
+
+    assert_eq!(permute(&mut store, sheet, 0, 0, 2, &[1, 0]), BLOCK_OK);
+
+    assert_eq!(column(&store, sheet, 2, 2), ["first", "second"]);
 }
 
 #[test]

@@ -256,6 +256,40 @@ fn names_follow_row_and_column_edits_for_formulas_before_and_after_them() {
     assert_eq!(number(&store, summary, 1, 2), 30.0);
 }
 
+/// Formulas that used the names before a sheet rename or removal and
+/// formulas that use them after it give the same result.
+#[test]
+fn names_follow_a_sheet_rename_and_removal() {
+    let (mut store, data) = data_store();
+    let summary = add_summary(&mut store);
+    assert!(store.set_named_formula("Sales", -1, "=SUM(Data!$B$1:$B$3)"));
+    assert!(store.set_named_formula("First", -1, "=Data!$B$1"));
+    store.set_formula(summary, 0, 0, "=Sales", 0);
+    store.set_formula(summary, 0, 1, "=First", 0);
+
+    assert!(store.rename_sheet(data, "data", "Sales Data"));
+    store.set_formula(summary, 1, 0, "=Sales", 0);
+    store.set_formula(summary, 1, 1, "=First", 0);
+    store.recompute(summary);
+    for row in [0, 1] {
+        assert_eq!(number(&store, summary, row, 0), 60.0);
+        assert_eq!(number(&store, summary, row, 1), 10.0);
+    }
+    assert_eq!(
+        store.formula_source(summary, 1, 0).as_deref(),
+        Some("=Sales")
+    );
+
+    assert!(store.remove_sheet(data));
+    store.set_formula(summary, 2, 0, "=Sales", 0);
+    store.set_formula(summary, 2, 1, "=First", 0);
+    store.recompute(summary);
+    for row in 0..3 {
+        assert_eq!(text(&store, summary, row, 0).as_deref(), Some("#REF!"));
+        assert_eq!(text(&store, summary, row, 1).as_deref(), Some("#REF!"));
+    }
+}
+
 #[cfg(not(feature = "analysis"))]
 #[test]
 fn the_default_engine_keeps_a_named_lambda_and_calling_it_is_a_name_error() {
