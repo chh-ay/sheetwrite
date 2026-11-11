@@ -299,6 +299,28 @@ heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
 `sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
 the 1.2 default until same-engine pairs calibrate them.
 
+Four rows time paged storage (#325, R5). Each paged sheet loads its values as
+clean pages inside a page load, the way datasource pages arrive:
+
+- `paged-cell-reads` (100,000 rows): `=A{r}+B{r}*$C$1` in every row of a paged
+  sheet; the timed edit changes `$C$1`, so every formula reads two loaded
+  cells again, one at a time.
+- `paged-insert-row` (1,000,000 rows, two loaded columns, 1,000 local edits):
+  inserts one row at row 11; the untimed restore removes it again.
+- `paged-range-loaded` (the same sheet): `rangeFullyLoaded` over both
+  columns.
+- `paged-eviction` (8,192 pages of 4 rows): one page load of the whole column
+  through a cache that holds 512 pages, with the top 16 pinned by a viewport
+  band, so every page it writes evicts the oldest one.
+
+Measured natively on develop (Linux, instructions per timed run, perf
+samples): `paged-cell-reads` ran 251 M, 41% of it in paged cell lookups, three
+per cell read; `paged-insert-row` 1,905 M, 99% rebuilding the whole storage
+cell by cell; `paged-range-loaded` 343 M, one full cell read per cell; and
+`paged-eviction` 14.7 M, about 10% keeping the eviction order and most of the
+rest writing the page one cell at a time. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
