@@ -272,6 +272,56 @@ Measured natively before LETs resolved function-call bindings to slots, a
 once they did. Its ratio limit is the 1.2 default until same-engine pairs
 calibrate it.
 
+Seven rows (10K and 100K formulas each) time how formulas bind to sheets,
+defined names and tables, which the other rows never change after load:
+
+- `name-define`: one formula per row, `=A1*2` in nine rows of ten and
+  `=A1*Scale_k` in the tenth. The timed run defines the ten names
+  `Scale_0`…`Scale_9` one at a time, as an edit session or a remote change
+  does; a workbook load defines its names before its formulas.
+- `row-insert-names`: the same sheet with the names defined; the timed run
+  inserts one row above everything, so every formula and name moves.
+- `table-append-row`: table `Sales` with `=[@Amount]*2` in every body row and
+  `=SUM(Sales[Amount])` beside it. The timed run appends a row: a value, the
+  table grown by one row, and the column's formula in the new row.
+- `sort-formula-column`: `=A1*2` in every row; the timed run sorts A:B by a
+  fixed shuffle with `permuteRows`.
+- `parse-load-qualified` and `parse-load-table`: `independent-parse-load` with
+  `=Data!A1+Data!B1` on a second sheet, and with `=[@Amount]*2` in a table.
+- `memory-import`: `importMemoryState` of a released engine whose formulas
+  read another sheet, every tenth also through a defined name.
+
+On develop, each name or table change resolves every formula of the workbook
+again and recalculates all of them, and a sort or a memory import parses
+every moved formula again; no other row times this. Measured natively on
+develop (Mac), per timed run at 100K: `name-define` made 5.8 M
+heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
+`sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
+the 1.2 default until same-engine pairs calibrate them.
+
+Five rows measure how functions read ranges (#325, R1). The shares below
+come from a native replay of the timed runs on develop `d9827e1f`, perf
+samples with inlined frames, at the sizes the rows first had (1,000 lookups,
+10,000 ranks):
+
+- `index-match-many` (200 lookups):
+  `=INDEX($B$1:$B$100000,MATCH($C$1+r,$A$1:$A$100000,0))`. Each match lands
+  near the top of the table. INDEX copied its whole area into values to
+  return one cell: 99.8% of the run, a 2.4 MB allocation per formula.
+- `rank-many` (4,000 rows): `=RANK.EQ(A{r},$A$1:$A$N)` in even rows and
+  `=LARGE($A$1:$A$N,ROW())` in odd rows; the edit changes A1. Turning the
+  column into values per formula was 94% of the run.
+- `sort-unique-filter` (100,000 rows): one
+  `=SORT(UNIQUE(FILTER(A1:A100000,B1:B100000<$D$1)))` over text keys; the
+  edit narrows the filter to 500 rows. Converting ranges was 47%, the array
+  steps 38%.
+- `subtotal-filtered` (100,000 rows): `=SUBTOTAL(109,A1:A100000)` with every
+  other block of 10 rows hidden by a filter. The per-row hidden check was 53%.
+- `sparse-page-write` (100,000 × 10): one `setSparseBlock` inside a page
+  load, 10% blank cells, half text. Per-cell writes were 90% (#572).
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
