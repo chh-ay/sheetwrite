@@ -299,6 +299,29 @@ heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
 `sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
 the 1.2 default until same-engine pairs calibrate them.
 
+Five rows measure how functions read ranges (#325, R1). The shares below
+come from a native replay of the timed runs on develop `d9827e1f`, perf
+samples with inlined frames, at the sizes the rows first had (1,000 lookups,
+10,000 ranks):
+
+- `index-match-many` (200 lookups):
+  `=INDEX($B$1:$B$100000,MATCH($C$1+r,$A$1:$A$100000,0))`. Each match lands
+  near the top of the table. INDEX copied its whole area into values to
+  return one cell: 99.8% of the run, a 2.4 MB allocation per formula.
+- `rank-many` (4,000 rows): `=RANK.EQ(A{r},$A$1:$A$N)` in even rows and
+  `=LARGE($A$1:$A$N,ROW())` in odd rows; the edit changes A1. Turning the
+  column into values per formula was 94% of the run.
+- `sort-unique-filter` (100,000 rows): one
+  `=SORT(UNIQUE(FILTER(A1:A100000,B1:B100000<$D$1)))` over text keys; the
+  edit narrows the filter to 500 rows. Converting ranges was 47%, the array
+  steps 38%.
+- `subtotal-filtered` (100,000 rows): `=SUBTOTAL(109,A1:A100000)` with every
+  other block of 10 rows hidden by a filter. The per-row hidden check was 53%.
+- `sparse-page-write` (100,000 × 10): one `setSparseBlock` inside a page
+  load, 10% blank cells, half text. Per-cell writes were 90% (#572).
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
