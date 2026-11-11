@@ -339,6 +339,16 @@ export function safeStyle(untrusted: unknown) {
 }
 ```
 
+## Stylesheet parts
+
+`@sheetwrite/core/styles.css` now imports the stylesheet in parts, and the command icon sheet is its own file, `styles/icons.svg`, instead of a `data:` URL ([#543](https://github.com/chh-ay/sheetwrite/pull/543)). An app that imports `styles.css` looks the same.
+
+| Change | What to do |
+| --- | --- |
+| `icons.css` loads `icons.svg` from beside it. | Nothing with Vite, webpack or Next.js. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. |
+| The default icon sheet is a file from your origin, not a `data:` URL. | If you set `--sheetwrite-icon-sheet` only because your Content Security Policy blocks `data:` images, you can remove it. |
+| The parts are published under `@sheetwrite/core/styles/` and in each framework adapter. | To ship less CSS, import only the parts your grid uses; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts). |
+
 ## Behavior changes you will notice
 
 ### Excel sort order
