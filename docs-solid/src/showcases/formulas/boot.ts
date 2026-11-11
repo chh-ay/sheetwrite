@@ -4,7 +4,6 @@
 import "@sheetwrite/core/styles.css";
 import { initFullEngine, whenStylesReady } from "@docs/lib/full-engine.js";
 import { observeSiteTheme } from "@docs/lib/site-theme.js";
-import { siteGridTheme } from "@docs/showcases/site-grid-theme.js";
 import {
   ANALYSIS_SHEET_ID,
   apacPromotionOps,
@@ -15,6 +14,7 @@ import {
   ORDER_ROWS,
   PLAYGROUND,
 } from "@docs/showcases/scenarios/formulas.js";
+import { siteGridTheme } from "@docs/showcases/site-grid-theme.js";
 import { createGrid, type DocumentOp, type Grid } from "@sheetwrite/core";
 
 declare global {

@@ -119,7 +119,10 @@
     align-items: end;
   }
 
-  .sw-showcase__controls:has(.sw-data-rules) > :nth-child(1) .sw-showcase__control-body > .sw-button {
+  .sw-showcase__controls:has(.sw-data-rules)
+    > :nth-child(1)
+    .sw-showcase__control-body
+    > .sw-button {
     justify-self: start;
   }
 
