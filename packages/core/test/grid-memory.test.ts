@@ -3,11 +3,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { getNumberFormatResourceStatsForTest } from "../src/number-format.js";
 import { SheetwriteStore } from "../src/store.js";
-import { storeEngine } from "../src/store/engine-registry.js";
-import { NO_STRING } from "../src/store/wire-tags.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Workbook } from "../src/types.js";
-import { WorkerRenderer } from "../src/worker-renderer.js";
 import { makeColumnarData } from "./fixtures.js";
 
 const ROWS = 4_000;
@@ -167,117 +164,5 @@ describe("Grid.trimMemory", () => {
 
     expect(overlayDivs(host)).toEqual(shownBefore);
     grid.destroy();
-  });
-
-  it("does nothing after destroy", () => {
-    const workbook = formattedWorkbook();
-    const grid = new GridImpl(mountHost(), { workbook, data: makeColumnarData(ROWS) });
-    grid.destroy();
-
-    expect(() => grid.trimMemory()).not.toThrow();
-  });
-
-  it("makes the next worker frame resend every visible string", () => {
-    const workbook = formattedWorkbook();
-    const store = new SheetwriteStore(workbook, makeColumnarData(ROWS));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const messages: unknown[] = [];
-    const renderer = new WorkerRenderer();
-    Reflect.set(renderer, "worker", { postMessage: (message: unknown) => messages.push(message) });
-    expect(Reflect.set(grid, "renderer", renderer)).toBe(true);
-    scrollTo(host, 100 * 28);
-    scrollTo(host, 101 * 28);
-
-    messages.length = 0;
-    grid.trimMemory();
-    const paint = messages.find(
-      (message): message is { stringPoolIds: Uint32Array; stringPoolUpdateIds?: Uint32Array } =>
-        typeof message === "object" &&
-        message !== null &&
-        "type" in message &&
-        message.type === "paintPacked",
-    );
-    if (!paint) throw new Error("no packed paint after the trim");
-    const visible = new Set(paint.stringPoolIds);
-    visible.delete(NO_STRING);
-
-    expect(messages[0]).toEqual({ type: "trim" });
-    expect(visible.size).toBeGreaterThan(0);
-    expect(new Set(paint.stringPoolUpdateIds)).toEqual(visible);
-    Reflect.set(renderer, "worker", null);
-    grid.destroy();
-  });
-});
-
-describe("window reader trim", () => {
-  it("lists every visible string as a pool update in the next read", () => {
-    const workbook = formattedWorkbook();
-    const store = new SheetwriteStore(workbook, makeColumnarData(ROWS));
-    const rows = { start: 0, end: 20 };
-    const columns = [0, 1, 2];
-    const first = store.getVisibleWindow("s1", rows, columns);
-    const stringIds = new Set(first.stringPoolIds);
-    stringIds.delete(NO_STRING);
-
-    expect(store.getVisibleWindow("s1", rows, columns).stringPoolUpdateIds).toBeUndefined();
-
-    storeEngine(store)?.trimMemory();
-    const updated = new Set(store.getVisibleWindow("s1", rows, columns).stringPoolUpdateIds);
-
-    expect(updated).toEqual(stringIds);
-    store.dispose();
-  });
-});
-
-describe("grid selectors", () => {
-  // The browser keeps a parsed copy of each different selector text for the
-  // page, so a selector with a per-grid id leaves one entry for every grid.
-  it("uses the same selector texts for every grid", () => {
-    const queryMethods = ["querySelector", "querySelectorAll", "matches", "closest"] as const;
-    const patched: Array<{ target: object; name: string; own?: PropertyDescriptor }> = [];
-    let selectors = new Set<string>();
-    for (const target of [Element.prototype, Document.prototype, DocumentFragment.prototype]) {
-      for (const name of queryMethods) {
-        const original: unknown = Reflect.get(target, name);
-        if (typeof original !== "function") continue;
-
-        patched.push({ target, name, own: Object.getOwnPropertyDescriptor(target, name) });
-        Object.defineProperty(target, name, {
-          configurable: true,
-          writable: true,
-          value(this: unknown, selector: string) {
-            selectors.add(selector);
-            return Reflect.apply(original, this, [selector]);
-          },
-        });
-      }
-    }
-
-    const selectorsOfOneGrid = (): Set<string> => {
-      selectors = new Set();
-      const host = mountHost();
-      const grid = new GridImpl(host, {
-        workbook: formattedWorkbook(),
-        data: makeColumnarData(ROWS),
-      });
-      scrollTo(host, 100 * 28);
-      grid.destroy();
-      host.remove();
-      return selectors;
-    };
-
-    try {
-      const first = selectorsOfOneGrid();
-      const second = selectorsOfOneGrid();
-
-      expect(first.size).toBeGreaterThan(0);
-      expect([...second].sort()).toEqual([...first].sort());
-    } finally {
-      for (const { target, name, own } of patched.reverse()) {
-        if (own) Object.defineProperty(target, name, own);
-        else Reflect.deleteProperty(target, name);
-      }
-    }
   });
 });

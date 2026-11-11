@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, jest } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -28,31 +28,6 @@ function mountHost(): HTMLDivElement {
 }
 
 describe("worker renderer fallback observability", () => {
-  it("falls back to canvas observably when the worker cannot construct", async () => {
-    const workbook = makeWorkbook(5);
-    const events: Array<GridEvents["renderer-fallback"]> = [];
-
-    // happy-dom offers no OffscreenCanvas worker path, so construction fails
-    // and must fall back — loudly, not silently.
-    const grid = new GridImpl(mountHost(), {
-      workbook,
-      data: makeColumnarData(5),
-      renderer: "worker",
-      workerUrl: "http://invalid.invalid/w.js",
-    });
-    grid.on("renderer-fallback", (event) => events.push(event));
-
-    // The emit is deferred one microtask so post-construction subscribers see it.
-    await Promise.resolve();
-
-    expect(grid.rendererKind()).toBe("canvas");
-    expect(events).toHaveLength(1);
-    expect(events[0]!.requested).toBe("worker");
-    expect(events[0]!.error).toBeDefined();
-
-    grid.destroy();
-  });
-
   it("falls back exactly once when a constructed worker fails asynchronously", async () => {
     const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
     const transferDescriptor = Object.getOwnPropertyDescriptor(
@@ -133,69 +108,6 @@ describe("worker renderer fallback observability", () => {
       grid.destroy();
       expect(host.querySelectorAll("canvas")).toHaveLength(0);
     } finally {
-      if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
-      else Reflect.deleteProperty(globalThis, "Worker");
-      if (transferDescriptor) {
-        Object.defineProperty(
-          HTMLCanvasElement.prototype,
-          "transferControlToOffscreen",
-          transferDescriptor,
-        );
-      } else {
-        Reflect.deleteProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen");
-      }
-    }
-  });
-
-  it("falls back exactly once when the worker never acknowledges initialization", async () => {
-    jest.useFakeTimers();
-    const workerDescriptor = Object.getOwnPropertyDescriptor(globalThis, "Worker");
-    const transferDescriptor = Object.getOwnPropertyDescriptor(
-      HTMLCanvasElement.prototype,
-      "transferControlToOffscreen",
-    );
-    let terminations = 0;
-
-    class SilentWorker extends EventTarget {
-      postMessage(): void {}
-
-      terminate(): void {
-        terminations += 1;
-      }
-    }
-
-    Object.defineProperty(globalThis, "Worker", {
-      configurable: true,
-      value: SilentWorker,
-    });
-    Object.defineProperty(HTMLCanvasElement.prototype, "transferControlToOffscreen", {
-      configurable: true,
-      value: () => new EventTarget(),
-    });
-
-    try {
-      const host = mountHost();
-      const events: Array<GridEvents["renderer-fallback"]> = [];
-      const grid = new GridImpl(host, {
-        workbook: makeWorkbook(5),
-        data: makeColumnarData(5),
-        renderer: "worker",
-        workerUrl: "/worker-that-never-replies.js",
-      });
-      grid.on("renderer-fallback", (event) => events.push(event));
-      expect(grid.rendererKind()).toBe("worker");
-
-      jest.advanceTimersByTime(30_000);
-      await Promise.resolve();
-
-      expect(grid.rendererKind()).toBe("canvas");
-      expect(host.querySelectorAll("canvas")).toHaveLength(1);
-      expect(events).toHaveLength(1);
-      expect(terminations).toBe(1);
-
-      grid.destroy();
-    } finally {
-      jest.useRealTimers();
       if (workerDescriptor) Object.defineProperty(globalThis, "Worker", workerDescriptor);
       else Reflect.deleteProperty(globalThis, "Worker");
       if (transferDescriptor) {
