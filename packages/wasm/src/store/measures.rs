@@ -466,7 +466,28 @@ impl CellStore {
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
                 self.inline_references(inner, stack)
             }
-            _ => Ok(()),
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::BoundMatrix { .. }
+            | Ast::RegexPattern(_)
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => Ok(()),
         }
     }
 
@@ -587,7 +608,34 @@ impl CellStore {
                 matrix @ Ast::BoundMatrix { .. } => {
                     Ast::Func(Func::Index, vec![matrix, Ast::Num(1.0), Ast::Num(1.0)])
                 }
-                other => other,
+                other @ (Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::RegexPattern(_)
+                | Ast::Name(_)
+                | Ast::NamedRange(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(..)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::InvalidRef
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Cmp(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array { .. }) => other,
             };
             bindings.push((&calculation.name, bound));
         }
@@ -670,7 +718,7 @@ fn swapped(op: CmpOp) -> CmpOp {
         CmpOp::Gt => CmpOp::Lt,
         CmpOp::Le => CmpOp::Ge,
         CmpOp::Ge => CmpOp::Le,
-        same => same,
+        same @ (CmpOp::Eq | CmpOp::Ne) => same,
     }
 }
 
@@ -731,7 +779,24 @@ impl CellStore {
                 | Func::Cell
                 | Func::AnchorArray,
                 _,
-            ) => Err(FormulaError::Value),
+            )
+            | Ast::BoundMatrix { .. }
+            | Ast::RegexPattern(_)
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. } => Err(FormulaError::Value),
             Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => {
                 arguments.iter_mut().try_for_each(|argument| {
                     self.name_columns(argument, columns, context, contexts, calculations)
@@ -745,7 +810,6 @@ impl CellStore {
                 self.name_columns(inner, columns, context, contexts, calculations)
             }
             Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array { .. } => Ok(()),
-            _ => Err(FormulaError::Value),
         }
     }
 
@@ -773,7 +837,34 @@ impl CellStore {
                     (value, Ast::Structured(column)) => (column, swapped(*op), value),
                     _ => return Err(FormulaError::Value),
                 },
-                _ => return Err(FormulaError::Value),
+                Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::BoundMatrix { .. }
+                | Ast::RegexPattern(_)
+                | Ast::Name(_)
+                | Ast::NamedRange(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(..)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::InvalidRef
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array { .. } => return Err(FormulaError::Value),
             };
             if !is_data_column(column) {
                 return Err(FormulaError::Value);

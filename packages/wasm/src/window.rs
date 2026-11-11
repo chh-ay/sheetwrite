@@ -81,7 +81,11 @@ impl ConditionalRules {
                 let text = match &rule.pred {
                     CondPred::EqStr(value) => Some(value),
                     CondPred::Contains { needle, .. } => Some(needle),
-                    _ => None,
+                    CondPred::GtNum(_)
+                    | CondPred::LtNum(_)
+                    | CondPred::EqNum(_)
+                    | CondPred::EqEmpty
+                    | CondPred::Formula { .. } => None,
                 };
                 if let Some(payload) = text {
                     metadata.add_payload(payload.len(), payload.capacity());
@@ -466,10 +470,15 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                         ) {
                             Value::Bool(value) => value,
                             Value::Number(value) => value != 0.0,
-                            _ => false,
+                            Value::Text(_) | Value::Blank | Value::Error(_) => false,
                         }
                     }
-                    predicate => cond_pred_matches(
+                    predicate @ (CondPred::GtNum(_)
+                    | CondPred::LtNum(_)
+                    | CondPred::EqNum(_)
+                    | CondPred::EqStr(_)
+                    | CondPred::EqEmpty
+                    | CondPred::Contains { .. }) => cond_pred_matches(
                         predicate,
                         cells.kind[dst],
                         cells.num[dst],
