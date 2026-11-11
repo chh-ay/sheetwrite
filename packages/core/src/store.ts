@@ -1029,14 +1029,6 @@ export class SheetwriteStore implements Store {
     return this.engine.exportSnapshot(this.documentId, this.documentVersion);
   }
 
-  renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
-    return this.engine.renameSheetFormulaIdentity(sheet, name);
-  }
-
-  removeSheetFormulaIdentity(sheet: SheetId): boolean {
-    return this.engine.removeSheetFormulaIdentity(sheet);
-  }
-
   loadPage(
     sheet: SheetId,
     start: number,
