@@ -10,47 +10,31 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 
-/** The chart that `chartWorkbook` defines: amounts in A1:A3 of sheet `s`. */
+/** Charts of `chartWorkbook`: `SALES` reads amounts in A1:A3, `NOTES` reads only B1:B3. */
 export const SALES: ChartRef = { sheet: "s", id: "sales" };
+export const NOTES: ChartRef = { sheet: "s", id: "notes" };
 
-/** One sheet `s` with an amount column, a text column, and the `SALES` chart. */
-export function chartWorkbook(): Workbook {
+function chart({ id }: ChartRef, kind: ChartKind, col: number): ChartDefinition {
   return {
-    activeSheet: "s",
-    sheets: [
-      {
-        id: "s",
-        name: "Sales",
-        rowCount: 3,
-        columns: [
-          { key: "amount", header: "Amount", width: 80, type: "number" },
-          { key: "note", header: "Note", width: 80, type: "text" },
-        ],
-        charts: [
-          {
-            id: SALES.id,
-            kind: "column",
-            anchor: { row: 0, col: 1, offsetX: 0, offsetY: 0, width: 320, height: 200 },
-            series: [
-              {
-                name: "Amount",
-                values: { sheet: "s", start: { row: 0, col: 0 }, end: { row: 2, col: 0 } },
-              },
-            ],
-          },
-        ],
-      },
-    ],
+    id,
+    kind,
+    anchor: { row: 0, col: 1 - col, offsetX: 0, offsetY: 0, width: 320, height: 200 },
+    series: [{ values: { sheet: "s", start: { row: 0, col }, end: { row: 2, col } } }],
   };
 }
 
+/** One sheet `s` with an amount column, a text column, and the `SALES` and `NOTES` charts. */
+export function chartWorkbook(): Workbook {
+  const columns = [
+    { key: "amount", header: "Amount", width: 80, type: "number" as const },
+    { key: "note", header: "Note", width: 80, type: "text" as const },
+  ];
+  const charts = [chart(SALES, "column", 0), chart(NOTES, "line", 1)];
+  return { activeSheet: "s", sheets: [{ id: "s", name: "Sales", rowCount: 3, columns, charts }] };
+}
+
 /** Write one literal on sheet `s`; the edit must apply. */
-export function setCell(
-  store: SheetwriteStore,
-  row: number,
-  col: number,
-  value: number | string,
-): void {
+export function setCell(store: SheetwriteStore, row: number, col: number, value: number): void {
   const result = store.applyTransaction({
     patches: [{ op: "set", addr: { sheet: "s", row, col }, value: { kind: "literal", value } }],
   });
@@ -81,16 +65,7 @@ export function seriesView(
 export function chartView(
   kind: ChartKind,
   series: ChartSeriesView[],
-  chart: Partial<ChartDefinition> = {},
+  fields: Partial<ChartDefinition> = {},
 ): ChartView {
-  return {
-    chart: {
-      id: "view",
-      kind,
-      anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 400, height: 300 },
-      series: [],
-      ...chart,
-    },
-    series,
-  };
+  return { chart: { ...chart({ sheet: "s", id: "view" }, kind, 0), ...fields }, series };
 }
