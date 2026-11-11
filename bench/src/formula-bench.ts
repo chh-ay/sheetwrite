@@ -310,8 +310,16 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     ...SHAPE_ROW_IDS.flatMap((id) =>
       (smoke ? [1_000] : SHAPE_ROW_SIZES).map((size) => formulaWorkloadKey({ id, size })),
     ),
+    ...BINDING_ROW_IDS.flatMap((id) =>
+      (smoke ? [1_000] : BINDING_ROW_SIZES).map((size) => formulaWorkloadKey({ id, size })),
+    ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
+    formulaWorkloadKey({ id: "index-match-many", size: smoke ? 50 : INDEX_MATCH_FORMULAS }),
+    formulaWorkloadKey({ id: "rank-many", size: smoke ? 1_000 : RANK_MANY_SIZE }),
+    formulaWorkloadKey({ id: "sort-unique-filter", size: range }),
+    formulaWorkloadKey({ id: "subtotal-filtered", size: range }),
+    formulaWorkloadKey({ id: "sparse-page-write", size: range }),
   );
   keys.push(formulaWorkloadKey({ id: "spill-sequence-admission", size: smoke ? 1_000 : 100_000 }));
   return keys;
@@ -342,6 +350,13 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "offset-many",
   "indirect-many",
   "let-calls",
+  "name-define",
+  "row-insert-names",
+  "table-append-row",
+  "sort-formula-column",
+  "parse-load-qualified",
+  "parse-load-table",
+  "memory-import",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -352,6 +367,11 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "index-match-many",
+  "rank-many",
+  "sort-unique-filter",
+  "subtotal-filtered",
+  "sparse-page-write",
 ]);
 
 function legacyFormulaBaselineWorkloadKeys(): string[] {
@@ -454,12 +474,34 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       const y = Math.round((x / 3) * 100) / 100;
       return x + y + y * x;
     }
+    case "name-define":
+    case "row-insert-names":
+      return (size - NAMED_FORMULA_STRIDE + 1) * NAME_SCALE;
+    case "table-append-row":
+      return ((size + 1) * (size + 2)) / 2;
+    case "sort-formula-column":
+      return 2 * (sortedSourceRow(size, size - 1) + 1);
+    case "parse-load-qualified":
+      return size;
+    case "parse-load-table":
+    case "memory-import":
+      return size * 2;
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
       return `12:${size + 1}`;
     case "spill-sequence-admission":
       return `1:${size}:0`;
+    case "index-match-many":
+      return INDEX_MATCH_VALUE_SCALE * (SHAPE_EDITED_SCALE + size - 1);
+    case "rank-many":
+      return `${size}:${RANK_MANY_EDITED_FIRST}`;
+    case "sort-unique-filter":
+      return sortUniqueOutput(SORT_UNIQUE_EDITED_ROWS);
+    case "subtotal-filtered":
+      return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
+    case "sparse-page-write":
+      return sparsePageOutput(size);
     default:
       throw new Error(`formula benchmark has no expected output for workload=${id};size=${size}`);
   }
@@ -1953,10 +1995,640 @@ function letCallsFormula(row: number): string {
     : `=LET(x,SUM(${source},1),y,ROUND(x/3,2),z,y*x,x+y+z)`;
 }
 
+/**
+ * Rows for binding formulas to sheets, names and tables: defining names, a
+ * row insert in a workbook with names, a table that grows by a row, a sort
+ * that moves formulas, loading formulas that name another sheet or a table
+ * column, and restoring a released engine from its memory state.
+ */
+const BINDING_ROW_IDS = [
+  "name-define",
+  "row-insert-names",
+  "table-append-row",
+  "sort-formula-column",
+  "parse-load-qualified",
+  "parse-load-table",
+  "memory-import",
+] as const;
+const BINDING_ROW_SIZES = [10_000, 100_000] as const;
+/** Defined names `Scale_0`…`Scale_9`; each points at one cell holding `NAME_SCALE`. */
+const BINDING_NAMES = 10;
+/** One formula in this many uses a name; the others are plain. */
+const NAMED_FORMULA_STRIDE = 10;
+const NAME_SCALE = 2;
+/** Sorting moves row `i` to row `(i * SORT_STRIDE) % rows`; prime, so it permutes every size. */
+const SORT_STRIDE = 7_919;
+
+function bindingName(index: number): string {
+  return `Scale_${index}`;
+}
+
+/** Every `NAMED_FORMULA_STRIDE`th formula multiplies by a defined name, the others by 2. */
+function namedRowFormula(row: number, cell: string): string {
+  const scale =
+    row % NAMED_FORMULA_STRIDE === 0
+      ? bindingName((row / NAMED_FORMULA_STRIDE) % BINDING_NAMES)
+      : String(NAME_SCALE);
+  return `=${cell}*${scale}`;
+}
+
+/** Points the names at `C1`…`C10` of `sheet`, one name at a time. */
+function defineBindingNames(store: CellStore, sheet: number): void {
+  for (let index = 0; index < BINDING_NAMES; index++) {
+    assert(
+      store.setNamedRange(bindingName(index), -1, sheet, index, 2, index, 2),
+      "binding name defined",
+    );
+  }
+}
+
+/** Column A holds 1…count, column B a formula per row, and C1:C10 the values the names point at. */
+function namedFormulasSheet(store: CellStore, count: number): number {
+  const sheet = store.addSheet(3, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    2,
+    0,
+    numericColumn(BINDING_NAMES, () => NAME_SCALE),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, namedRowFormula(row, `A${row + 1}`), 0);
+  }
+  return sheet;
+}
+
+/** The value of the last formula that uses a name, `offset` rows below where it was written. */
+function lastNamedFormula(store: CellStore, sheet: number, count: number, offset = 0): number {
+  return numberAt(store, sheet, count - NAMED_FORMULA_STRIDE + offset, 1);
+}
+
+/**
+ * The formulas exist before the names, as when a workbook defines its names
+ * after its formulas. The timed run defines the ten names one at a time.
+ */
+function nameDefineFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = namedFormulasSheet(store, count);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      defineBindingNames(store, sheet);
+      store.recompute(sheet);
+    },
+    check: () => lastNamedFormula(store, sheet, count),
+    dispose: () => store.free(),
+    restore: () => {
+      for (let index = 0; index < BINDING_NAMES; index++) {
+        store.removeNamedRange(bindingName(index), -1);
+      }
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** The timed run inserts one row above everything, so every formula and name moves. */
+function rowInsertNamesFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = namedFormulasSheet(store, count);
+  defineBindingNames(store, sheet);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      assert(store.addRows(sheet, 0, 1), "row inserted");
+      store.recompute(sheet);
+    },
+    check: () => lastNamedFormula(store, sheet, count, 1),
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.removeRows(sheet, 0, 1), "row removed");
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** Table `Sales` over A:B with a header row: `Amount` holds numbers, `Double` is `=[@Amount]*2`. */
+function setSalesTable(store: CellStore, sheet: number, bodyRows: number): void {
+  assert(
+    store.setTable(
+      "sales",
+      "Sales",
+      sheet,
+      0,
+      0,
+      bodyRows,
+      1,
+      true,
+      false,
+      ["amount", "double"],
+      ["Amount", "Double"],
+    ),
+    "table set",
+  );
+}
+
+/** A sheet whose rows 1…count are the body of `Sales`, with `Amount` 1…count and room for one more row. */
+function salesSheet(store: CellStore, count: number): number {
+  const sheet = store.addSheet(4, count + 2);
+  store.setString(sheet, 0, 0, "Amount", 0);
+  store.setString(sheet, 0, 1, "Double", 0);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    1,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  setSalesTable(store, sheet, count);
+  return sheet;
+}
+
+const TABLE_ROW_FORMULA = "=[@Amount]*2";
+
+/**
+ * Every body row has `=[@Amount]*2`, and D1 sums the column. The timed run
+ * appends a row the way a user does: a value, the table grown by one row,
+ * and the column's formula in the new row.
+ */
+function tableAppendRowFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = salesSheet(store, count);
+  for (let row = 1; row <= count; row++) {
+    store.setFormula(sheet, row, 1, TABLE_ROW_FORMULA, 0);
+  }
+  store.setFormula(sheet, 0, 3, "=SUM(Sales[Amount])", 0);
+  store.recompute(sheet);
+  const added = count + 1;
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, added, 0, added, 0);
+      setSalesTable(store, sheet, added);
+      store.setFormula(sheet, added, 1, TABLE_ROW_FORMULA, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, 0, 3),
+    dispose: () => store.free(),
+    restore: () => {
+      setSalesTable(store, sheet, count);
+      store.clearCell(sheet, added, 1, 0);
+      store.clearCell(sheet, added, 0, 0);
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** The source row that sorting moves to target row `row`. */
+function sortedSourceRow(rows: number, row: number): number {
+  return (row * SORT_STRIDE) % rows;
+}
+
+/** Column A holds 1…count and column B `=A{r}*2`. The timed run sorts A:B by a fixed shuffle. */
+function sortFormulaColumnFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, `=A${row + 1}*2`, 0);
+  }
+  store.recompute(sheet);
+  const order = Uint32Array.from({ length: count }, (_, row) => sortedSourceRow(count, row));
+  const inverse = new Uint32Array(count);
+  for (const [target, source] of order.entries()) inverse[source] = target;
+  return {
+    store,
+    run: () => {
+      assert(store.permuteRows(sheet, 0, 0, 2, order) === 0, "rows sorted");
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 1),
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.permuteRows(sheet, 0, 0, 2, inverse) === 0, "rows unsorted");
+      store.recompute(sheet);
+    },
+  };
+}
+
+/** Loads `=Data!A{r}+Data!B{r}` into a second sheet; A holds the row and B holds 1. */
+function parseLoadQualifiedFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const data = store.addSheet(2, count);
+  const calc = store.addSheet(1, count);
+  store.setSheetName(data, "data", "Data");
+  store.setSheetName(calc, "calc", "Calc");
+  store.setColumnNumbers(
+    data,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setColumnNumbers(
+    data,
+    1,
+    0,
+    numericColumn(count, () => 1),
+    0,
+  );
+  const formulas = Array.from({ length: count }, (_, row) => `=Data!A${row + 1}+Data!B${row + 1}`);
+  return {
+    store,
+    run: () => {
+      for (const [row, formula] of formulas.entries()) store.setFormula(calc, row, 0, formula, 0);
+    },
+    check: () => {
+      store.recompute(calc);
+      return numberAt(store, calc, count - 1, 0);
+    },
+    dispose: () => store.free(),
+  };
+}
+
+/** Loads `=[@Amount]*2` into every body row of `Sales`. */
+function parseLoadTableFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = salesSheet(store, count);
+  return {
+    store,
+    run: () => {
+      for (let row = 1; row <= count; row++) {
+        store.setFormula(sheet, row, 1, TABLE_ROW_FORMULA, 0);
+      }
+    },
+    check: () => {
+      store.recompute(sheet);
+      return numberAt(store, sheet, count, 1);
+    },
+    dispose: () => store.free(),
+  };
+}
+
+/**
+ * A released engine's state restored: formulas on `Calc` read `Data`, and
+ * every tenth one also uses a defined name. The timed run imports the state
+ * exported at setup.
+ */
+function memoryImportFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const data = store.addSheet(3, count);
+  const calc = store.addSheet(1, count);
+  store.setSheetName(data, "data", "Data");
+  store.setSheetName(calc, "calc", "Calc");
+  store.setColumnNumbers(
+    data,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    data,
+    2,
+    0,
+    numericColumn(BINDING_NAMES, () => NAME_SCALE),
+    0,
+  );
+  defineBindingNames(store, data);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(calc, row, 0, namedRowFormula(row, `Data!A${row + 1}`), 0);
+  }
+  store.recompute(calc);
+  const state = store.exportMemoryState();
+  let imported: CellStore | undefined;
+  return {
+    store,
+    run: () => {
+      imported = CellStore.importMemoryState(state);
+    },
+    check: () => {
+      assert(imported, "memory state imported");
+      imported.recompute(calc);
+      return numberAt(imported, calc, count - 1, 0);
+    },
+    dispose: () => {
+      imported?.free();
+      store.free();
+    },
+    restore: () => {
+      imported?.free();
+      imported = undefined;
+    },
+  };
+}
+
+function bindingRowFixture(id: (typeof BINDING_ROW_IDS)[number], count: number): TimedFixture {
+  switch (id) {
+    case "name-define":
+      return nameDefineFixture(count);
+    case "row-insert-names":
+      return rowInsertNamesFixture(count);
+    case "table-append-row":
+      return tableAppendRowFixture(count);
+    case "sort-formula-column":
+      return sortFormulaColumnFixture(count);
+    case "parse-load-qualified":
+      return parseLoadQualifiedFixture(count);
+    case "parse-load-table":
+      return parseLoadTableFixture(count);
+    case "memory-import":
+      return memoryImportFixture(count);
+  }
+}
+
 /** Even rows bind one name, odd rows bind three that build on each other. */
 function letManyFormula(row: number): string {
   const source = `A${row + 1}*$C$1`;
   return row % 2 === 0 ? `=LET(x,${source},x+x+x)` : `=LET(x,${source},y,x+1,z,y*x,x+y+z)`;
+}
+
+/**
+ * Rows for how functions read ranges: INDEX/MATCH, RANK and LARGE filled
+ * down, SORT(UNIQUE(FILTER())), SUBTOTAL over a filtered column, and one
+ * sparse block written during a page load.
+ */
+const INDEX_MATCH_VALUE_SCALE = 10;
+/** Lookups in `index-match-many`. Each reads a 100,000-row table, so a few hundred is enough. */
+const INDEX_MATCH_FORMULAS = 200;
+/**
+ * Rows of `rank-many`. Every formula reads the whole column, so the work grows with the square.
+ */
+const RANK_MANY_SIZE = 4_000;
+/** The `rank-many` edit moves A1 below every other value. */
+const RANK_MANY_EDITED_FIRST = -1;
+/** `sort-unique-filter` keys cycle through this many labels (a prime, so a row step visits all). */
+const SORT_UNIQUE_KEYS = 997;
+const SORT_UNIQUE_STEP = 7_919;
+/** The timed edit keeps only the rows before this one. */
+const SORT_UNIQUE_EDITED_ROWS = 500;
+/** `subtotal-filtered` hides every other block of this many rows. */
+const SUBTOTAL_BLOCK_ROWS = 10;
+const SUBTOTAL_EDITED_FIRST = 2;
+const SPARSE_PAGE_COLUMNS = 10;
+/** One cell in this many is blank, so the block is sparse. */
+const SPARSE_PAGE_BLANK_EVERY = 10;
+const SPARSE_PAGE_LABELS = 97;
+const KIND_NUMBER = 1;
+const KIND_STRING = 2;
+
+function sortUniqueKey(row: number): string {
+  return `k${(row * SORT_UNIQUE_STEP) % SORT_UNIQUE_KEYS}`;
+}
+
+/** First and last of the sorted distinct keys of the rows before `rows`, and their count. */
+function sortUniqueOutput(rows: number): string {
+  const keys = [...new Set(Array.from({ length: rows }, (_, row) => sortUniqueKey(row)))].sort();
+  return `${keys[0]}:${keys.at(-1)}:${keys.length}`;
+}
+
+function subtotalVisible(row: number): boolean {
+  return Math.floor(row / SUBTOTAL_BLOCK_ROWS) % 2 === 0;
+}
+
+/** Sum of `row + 1` over the visible rows, with A1 holding `first`. */
+function subtotalOutput(count: number, first: number): number {
+  let total = first;
+  for (let row = 1; row < count; row++) if (subtotalVisible(row)) total += row + 1;
+  return total;
+}
+
+/** The value a `sparse-page-write` block holds at one offset: blank, a number or a label. */
+function sparsePageValue(offset: number): number | string | null {
+  if (offset % SPARSE_PAGE_BLANK_EVERY === 0) return null;
+  return offset % 2 === 0 ? offset : `label${offset % SPARSE_PAGE_LABELS}`;
+}
+
+function sparsePageOutput(rows: number): string {
+  const last = (rows - 1) * SPARSE_PAGE_COLUMNS;
+  return `${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 2))}:${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 1))}`;
+}
+
+/**
+ * `formulas` INDEX/MATCH lookups over a `rows`-row table: keys in A, values in
+ * B. Each key is `$C$1` plus the formula's row, so the timed edit recomputes
+ * every lookup, and each match lands near the top of the table.
+ */
+function indexMatchFixture(formulas: number, rows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, rows);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(rows, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(rows, (row) => (row + 1) * INDEX_MATCH_VALUE_SCALE),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, SHAPE_SCALE, 0);
+  for (let row = 0; row < formulas; row++) {
+    store.setFormula(
+      sheet,
+      row,
+      3,
+      `=INDEX($B$1:$B$${rows},MATCH($C$1+${row},$A$1:$A$${rows},0))`,
+      0,
+    );
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, SHAPE_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, formulas - 1, 3),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: SHAPE_SCALE }),
+  };
+}
+
+/**
+ * RANK.EQ in even rows and LARGE in odd rows, each over the whole column, so
+ * one edit of A1 recomputes all of them: the fill-down shape that reads the
+ * column once per formula.
+ */
+function rankManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(
+      sheet,
+      row,
+      1,
+      row % 2 === 0 ? `=RANK.EQ(A${row + 1},$A$1:$A$${count})` : `=LARGE($A$1:$A$${count},ROW())`,
+      0,
+    );
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, RANK_MANY_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+  };
+}
+
+/**
+ * One `SORT(UNIQUE(FILTER()))` over text keys in A, kept while B is below
+ * `$D$1`. The timed edit narrows the filter to the first rows.
+ */
+function sortUniqueFilterFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  for (let row = 0; row < count; row++) store.setString(sheet, row, 0, sortUniqueKey(row), 0);
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setNumber(sheet, 0, 3, count, 0);
+  store.setFormula(sheet, 0, 2, `=SORT(UNIQUE(FILTER(A1:A${count},B1:B${count}<$D$1)))`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 3, SORT_UNIQUE_EDITED_ROWS, 0);
+      store.recompute(sheet);
+    },
+    check: () => {
+      const last = SORT_UNIQUE_EDITED_ROWS - 1;
+      const spilled = store.spillAnchorRow(sheet, last, 2) === 0 ? SORT_UNIQUE_EDITED_ROWS : 0;
+      return `${textAt(store, sheet, 0, 2) ?? ""}:${textAt(store, sheet, last, 2) ?? ""}:${spilled}`;
+    },
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 3, value: count }),
+  };
+}
+
+/** `SUBTOTAL(109)` over a column whose filter hides every other block of rows. */
+function subtotalFilteredFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  const hidden: number[] = [];
+  for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
+    hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
+  }
+  assert(
+    store.setHiddenRows(sheet, new Uint32Array(), Uint32Array.from(hidden)),
+    "subtotal-filtered: hidden rows rejected",
+  );
+  store.setFormula(sheet, 0, 1, `=SUBTOTAL(109,A1:A${count})`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, SUBTOTAL_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, 0, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+  };
+}
+
+/**
+ * One sparse block of `rows` × 10 cells written inside a page load, as
+ * snapshot hydration and datasource pages write: numbers and labels, with
+ * every tenth cell blank. The inputs are built before the timed write.
+ */
+function sparsePageWriteFixture(rows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(SPARSE_PAGE_COLUMNS, rows);
+  const offsets: number[] = [];
+  const kinds: number[] = [];
+  const numbers: number[] = [];
+  const texts: string[] = [];
+  for (let offset = 0; offset < rows * SPARSE_PAGE_COLUMNS; offset++) {
+    const value = sparsePageValue(offset);
+    if (value === null) continue;
+    offsets.push(offset);
+    kinds.push(typeof value === "number" ? KIND_NUMBER : KIND_STRING);
+    numbers.push(typeof value === "number" ? value : 0);
+    if (typeof value === "string") texts.push(value);
+  }
+  const encoder = new TextEncoder();
+  const textBytes = encoder.encode(texts.join(""));
+  const textOffsets = new Uint32Array(texts.length + 1);
+  for (let index = 0; index < texts.length; index++) {
+    textOffsets[index + 1] = (textOffsets[index] ?? 0) + encoder.encode(texts[index]).length;
+  }
+  const entryOffsets = Uint32Array.from(offsets);
+  const entryKinds = Uint8Array.from(kinds);
+  const entryNumbers = Float64Array.from(numbers);
+  const styles = new Uint32Array(offsets.length);
+  const none = new Uint32Array();
+  return {
+    store,
+    run: () => {
+      store.beginPageLoad();
+      const status = store.setSparseBlock(
+        sheet,
+        0,
+        0,
+        rows,
+        SPARSE_PAGE_COLUMNS,
+        entryOffsets,
+        entryKinds,
+        entryNumbers,
+        textBytes,
+        textOffsets,
+        styles,
+        none,
+        [],
+        none,
+        none,
+      );
+      store.commitSources();
+      assert(status === 0, `sparse-page-write: block rejected with ${status}`);
+    },
+    check: () => {
+      const last = rows - 1;
+      const number = numberAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 2);
+      return `${number}:${textAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 1) ?? ""}`;
+    },
+    dispose: () => store.free(),
+  };
 }
 
 /**
@@ -2135,10 +2807,22 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
       add(id, size, () => shapeRowFixture(id, size));
     }
   }
+  for (const id of BINDING_ROW_IDS) {
+    for (const size of smoke ? [1_000] : BINDING_ROW_SIZES) {
+      add(id, size, () => bindingRowFixture(id, size));
+    }
+  }
   add("iterative-finance", 1_000, () => iterativeFinanceFixture(1_000));
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
   );
+  const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
+  add("index-match-many", indexMatchFormulas, () => indexMatchFixture(indexMatchFormulas, range));
+  const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
+  add("rank-many", rankManySize, () => rankManyFixture(rankManySize));
+  add("sort-unique-filter", range, () => sortUniqueFilterFixture(range));
+  add("subtotal-filtered", range, () => subtotalFilteredFixture(range));
+  add("sparse-page-write", range, () => sparsePageWriteFixture(range));
   add("spill-sequence-admission", large, () => spillSequenceAdmissionFixture(large));
   return workloads;
 }
