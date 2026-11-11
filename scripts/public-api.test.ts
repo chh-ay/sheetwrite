@@ -281,7 +281,7 @@ export * from "./right.js";`,
       ["getRows(request: unknown)", "getRows?(request: unknown)", "DataSource"],
       ['{ op: "set" };', '{ op: "set" } | { op: "clear" };', "DocumentOp"],
       ["Box<T extends string = string>", "Box<T extends string | number = string>", "Box"],
-    ]) {
+    ] as const) {
       expect(await issuesAfter(from, to)).toContainEqual(["changed-signature", symbol]);
     }
     expect(
