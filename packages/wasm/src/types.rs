@@ -322,7 +322,7 @@ impl ReadSet {
             | Ast::Num(_)
             | Ast::Array { .. } => {}
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {}
+            Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
         }
     }
 
@@ -534,6 +534,10 @@ impl FormulaEntry {
             };
         }
 
+        // A LAMBDA reads its parameters from the call frame; numbering them
+        // first lets the shape below see which ones a call binds to arrays.
+        #[cfg(feature = "analysis")]
+        crate::eval::analysis::lambda::resolve_parameters(&mut ast);
         let contains_let = ast_contains_let(&ast);
         let (reads, volatile) = formula_metadata(&ast, sheet, contains_let);
 
@@ -546,7 +550,10 @@ impl FormulaEntry {
 
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
-        entry.set_produces_array(crate::eval::ast_produces_array(&ast));
+        entry.set_produces_array(crate::eval::ast_produces_array(
+            &ast,
+            crate::eval::Shapes::NONE,
+        ));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
         // The flags and reads above come from the tree as written; resolving
         // LET names afterwards changes how it evaluates, not what it reads.
@@ -567,6 +574,10 @@ impl FormulaEntry {
         reads: ReadSet,
         is_reference: bool,
     ) -> Self {
+        #[cfg(feature = "analysis")]
+        if let Some(ast) = ast.as_mut() {
+            crate::eval::analysis::lambda::resolve_parameters(ast);
+        }
         if let Some(ast) = ast
             .as_mut()
             .filter(|ast| ast_contains_let(ast) && !ast_contains_spill_ref(ast))

@@ -33,32 +33,50 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     }
 }
 
-pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
+/// What shape checks know about LAMBDA parameters; the default engine has no
+/// LAMBDA, so it knows nothing and costs nothing.
+#[cfg(feature = "analysis")]
+pub(crate) use super::analysis::lambda::Shapes;
+
+#[cfg(not(feature = "analysis"))]
+#[derive(Clone, Copy)]
+pub(crate) struct Shapes<'a>(std::marker::PhantomData<&'a ()>);
+
+#[cfg(not(feature = "analysis"))]
+impl Shapes<'_> {
+    pub(crate) const NONE: Shapes<'static> = Shapes(std::marker::PhantomData);
+}
+
+/// Whether `ast` evaluates to an array. A LAMBDA parameter's shape comes
+/// from `shapes`: [`Shapes::NONE`] outside every call.
+pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, _) => true,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } => true,
+        Ast::Parameter { depth, index, .. } => shapes.parameter_is_array(*depth, *index),
         #[cfg(feature = "analysis")]
         Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-            super::analysis::lambda::produces_array(name, args)
+            super::analysis::lambda::produces_array(name, args, shapes)
         }
         Ast::Range(..)
         | Ast::AbsRange(..)
         | Ast::NamedRange(..)
         | Ast::Structured(..)
         | Ast::Array { .. } => true,
-        Ast::LetSlot { expression, .. } => ast_produces_array(expression),
-        Ast::NamedFormula(named) => ast_produces_array(&named.expression),
+        Ast::LetSlot { expression, .. } => ast_produces_array(expression, shapes),
+        Ast::NamedFormula(named) => ast_produces_array(&named.expression, shapes),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_produces_array(left) || ast_produces_array(right)
+            ast_produces_array(left, shapes) || ast_produces_array(right, shapes)
         }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_produces_array(inner),
+        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            ast_produces_array(inner, shapes)
+        }
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(id), args) => {
             let name = super::analysis::name(*id);
             super::analysis::family(name)
                 .and_then(|family| family.array.as_ref())
-                .is_some_and(|hooks| (hooks.produces_array)(name, args))
+                .is_some_and(|hooks| (hooks.produces_array)(name, args, shapes))
         }
         Ast::Func(
             Func::Filter
@@ -73,11 +91,13 @@ pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
             | Func::TrimRange,
             _,
         ) => true,
-        Ast::Func(Func::Let, args) => args.iter().any(ast_produces_array),
+        Ast::Func(Func::Let, args) => args.iter().any(|arg| ast_produces_array(arg, shapes)),
         Ast::Func(Func::Index, args) => index_selects_whole_axis(args),
-        Ast::Func(Func::Choose, args) => args
-            .get(1..)
-            .is_some_and(|choices| choices.iter().any(ast_produces_array)),
+        Ast::Func(Func::Choose, args) => args.get(1..).is_some_and(|choices| {
+            choices
+                .iter()
+                .any(|choice| ast_produces_array(choice, shapes))
+        }),
         _ => false,
     }
 }
@@ -157,7 +177,7 @@ impl CellStore {
             // charges the spill budget with the evaluated size instead.
             Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(UNKNOWN_SIZE_PRECHARGE)),
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
-                if ast_produces_array(ast) =>
+                if ast_produces_array(ast, pass.shapes()) =>
             {
                 Some(
                     self.matrix_shape(ast, formula_sheet, pass)
@@ -182,12 +202,14 @@ impl CellStore {
                 )
             }
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, .. } => {
-                Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0))
+            Ast::Parameter { depth, index, .. } => {
+                let frame = pass.results.call_frame();
+                let (rows, cols) = super::analysis::lambda::parameter_shape(frame, *depth, *index)?;
+                Some(EvalMatrix::validate_shape(rows, cols, 1, 0))
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-                ast_produces_array(ast).then(|| {
+                ast_produces_array(ast, pass.shapes()).then(|| {
                     runtime_reference_bound(
                         ast,
                         super::analysis::lambda::bound(self, name, args, formula_sheet, pass),
@@ -198,7 +220,7 @@ impl CellStore {
             Ast::Func(Func::Analysis(id), args) => {
                 let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(name)?.array.as_ref()?;
-                if !(hooks.produces_array)(name, args) {
+                if !(hooks.produces_array)(name, args, pass.shapes()) {
                     return None;
                 }
                 Some(runtime_reference_bound(
@@ -311,7 +333,7 @@ impl CellStore {
     ) -> Option<Result<EvalMatrix, FormulaError>> {
         let result = match ast {
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
-                if ast_produces_array(ast) =>
+                if ast_produces_array(ast, pass.shapes()) =>
             {
                 self.eval_operator_array(ast, sheet, pass, depth + 1)
             }
@@ -324,12 +346,15 @@ impl CellStore {
             }
             Ast::InvalidRef => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, values } => {
-                Ok(EvalMatrix::new(*rows, *cols, values.as_ref().clone()))
+            Ast::Parameter { depth, index, .. } => {
+                let frame = pass.results.call_frame();
+                Ok(super::analysis::lambda::parameter_matrix(
+                    frame, *depth, *index,
+                )?)
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
-                if !ast_produces_array(ast) {
+                if !ast_produces_array(ast, pass.shapes()) {
                     return None;
                 }
                 super::analysis::lambda::evaluate_matrix(self, name, args, sheet, pass, depth + 1)
@@ -338,7 +363,7 @@ impl CellStore {
             Ast::Func(Func::Analysis(id), args) => {
                 let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(name)?.array.as_ref()?;
-                if !(hooks.produces_array)(name, args) {
+                if !(hooks.produces_array)(name, args, pass.shapes()) {
                     return None;
                 }
                 (hooks.evaluate)(self, name, args, sheet, pass, depth + 1)
@@ -433,12 +458,12 @@ impl CellStore {
     ) -> Result<(usize, usize, usize), FormulaError> {
         match ast {
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                let (left_rows, left_cols, _) = if ast_produces_array(left) {
+                let (left_rows, left_cols, _) = if ast_produces_array(left, pass.shapes()) {
                     self.matrix_shape(left, formula_sheet, pass)?
                 } else {
                     (1, 1, 1)
                 };
-                let (right_rows, right_cols, _) = if ast_produces_array(right) {
+                let (right_rows, right_cols, _) = if ast_produces_array(right, pass.shapes()) {
                     self.matrix_shape(right, formula_sheet, pass)?
                 } else {
                     (1, 1, 1)
@@ -459,12 +484,13 @@ impl CellStore {
             }
             Ast::InvalidRef => return Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, .. } => {
-                return Ok((
-                    *rows,
-                    *cols,
-                    EvalMatrix::validate_shape(*rows, *cols, 1, 0)?,
-                ));
+            Ast::Parameter { depth, index, .. } => {
+                let frame = pass.results.call_frame();
+                if let Some((rows, cols)) =
+                    super::analysis::lambda::parameter_shape(frame, *depth, *index)
+                {
+                    return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
+                }
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
@@ -476,7 +502,7 @@ impl CellStore {
                 let hooks = super::analysis::family(name)
                     .and_then(|family| family.array.as_ref())
                     .ok_or(FormulaError::Value)?;
-                if !(hooks.produces_array)(name, args) {
+                if !(hooks.produces_array)(name, args, pass.shapes()) {
                     return Err(FormulaError::Value);
                 }
                 let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet, pass)?;

@@ -643,7 +643,11 @@ fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTa
 
 /// The expansion of `name`, or a `#NUM!` in its place when it is larger than
 /// [`EXPANSION_NODE_LIMIT`].
-fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
+fn bounded_expansion(name: &str, mut expression: Ast) -> NamedFormulaRef {
+    // A named LAMBDA reads its parameters from the call frame, like one
+    // written in a formula.
+    #[cfg(feature = "analysis")]
+    crate::eval::analysis::lambda::resolve_parameters(&mut expression);
     let nodes = expanded_nodes(&expression);
     let expression = if nodes > EXPANSION_NODE_LIMIT {
         Ast::Array {

@@ -10,6 +10,7 @@ use super::super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_C
 use super::super::number_format::{format_number, general_text, round_decimal, Rounding};
 use super::super::value::{bool_from_value, number_from_value, text_from_value};
 use super::super::EvalPass;
+use super::super::Shapes;
 use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
@@ -63,7 +64,8 @@ impl Context<'_, '_> {
         bool_from_value(&self.scalar(args, index, Value::Bool(default)))
     }
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if range_from_ast(ast, self.sheet).is_some() || super::super::array::ast_produces_array(ast)
+        if range_from_ast(ast, self.sheet).is_some()
+            || super::super::array::ast_produces_array(ast, self.pass.shapes())
         {
             self.store
                 .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
@@ -596,7 +598,7 @@ pub(super) fn evaluate_ast(
     )
     .unwrap_or_else(Value::Error)
 }
-pub(super) fn produces_array(name: &str, _args: &[Ast]) -> bool {
+pub(super) fn produces_array(name: &str, _args: &[Ast], _: Shapes<'_>) -> bool {
     matches!(name, "TEXTSPLIT" | "REGEXEXTRACT")
 }
 pub(super) fn evaluate_matrix(

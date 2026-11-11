@@ -169,7 +169,7 @@ fn call_has_scalar_result(call: &Ast) -> bool {
     ) {
         return false;
     }
-    !ast_produces_array(call) && args.iter().all(nested_lets_scalar)
+    !ast_produces_array(call, super::Shapes::NONE) && args.iter().all(nested_lets_scalar)
 }
 
 /// One visible binding while resolving: its name and slot.

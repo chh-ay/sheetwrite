@@ -13,7 +13,6 @@
 //! table included, then finds its rows as another table does.
 
 use std::hash::{Hash, Hasher};
-use std::rc::Rc;
 
 use rustc_hash::FxHasher;
 
@@ -22,7 +21,7 @@ use super::relationships::{ColumnRef, KeyColumn, Relationship};
 use super::CellStore;
 use crate::calc::{parse, Ast, CmpOp, Func, StructuredRef, TableSection};
 use crate::eval::analysis::grouping::{key_part, KeyPart};
-use crate::eval::analysis::lambda::{capture, literal};
+use crate::eval::analysis::lambda::{bind_slots, unbind_slots, Shapes, Slot};
 use crate::eval::{ast_produces_array, comparison, settled_cell_value};
 use crate::formula_slots::FormulaResults;
 use crate::pivot::{MeasureCell, PivotCache, PivotLayout};
@@ -33,8 +32,6 @@ use crate::types::{FormulaError, Value};
 struct PreparedMeasure {
     expression: Ast,
     columns: Vec<StructuredRef>,
-    /// `column_name(i)` for each column, made once per pass.
-    names: Vec<String>,
     /// For each column, its table's index in the pass's table list.
     tables: Vec<usize>,
     /// For each column, the expression that reads it: 0 for the measure's
@@ -403,11 +400,14 @@ impl CellStore {
             columns.push(column);
             owners.push(owner);
         }
-        let names = (0..columns.len()).map(column_name).collect();
+        let mut expression = expression;
+        number_parameters(&mut expression, 0, &owners, calculations.len());
+        for (index, calculation) in calculations.iter_mut().enumerate() {
+            number_parameters(&mut calculation.expression, index + 1, &owners, 0);
+        }
         Ok(PreparedMeasure {
             expression,
             columns,
-            names,
             base_only: tables.iter().all(|&table| table == 0),
             reads_base: tables.contains(&0),
             tables,
@@ -571,43 +571,38 @@ impl CellStore {
         rows_of: &dyn Fn(usize) -> &'r [u32],
         calculated: &[Value],
     ) -> Value {
-        let mut bindings: Vec<(&str, Ast)> = Vec::with_capacity(measure.columns.len());
+        let mut slots = Vec::with_capacity(measure.columns.len() + calculated.len());
         for (index, column) in measure.columns.iter().enumerate() {
             if measure.owners[index] == owner {
                 let rows = rows_of(measure.tables[index]);
-                bindings.push((&measure.names[index], self.bind_column(column, rows)));
+                slots.push(self.bind_column(column, rows));
             }
         }
-        for (calculation, value) in measure.calculations.iter().zip(calculated) {
-            // A blank or an error is a one-cell matrix; INDEX reads it as one
-            // value, so the expression around it, IFERROR included, sees it
-            // as it would the CALCULATE itself.
-            let value = match literal(value) {
-                matrix @ Ast::BoundMatrix { .. } => {
-                    Ast::Func(Func::Index, vec![matrix, Ast::Num(1.0), Ast::Num(1.0)])
-                }
-                value => value,
-            };
-            bindings.push((&calculation.name, value));
+        // A calculated value reads as one value, blanks and errors included,
+        // as the CALCULATE it stands for.
+        if owner == 0 {
+            slots.extend(calculated.iter().cloned().map(Slot::Value));
         }
 
         let expression = match owner {
             0 => &measure.expression,
             owner => &measure.calculations[owner - 1].expression,
         };
-        match capture(expression, &bindings) {
-            Ok(expression) if ast_produces_array(&expression) => Value::Error(FormulaError::Value),
-            Ok(expression) => {
-                self.eval_conditional_ast(&expression, 0, 0, 0, &mut FormulaResults::default())
-            }
-            Err(error) => Value::Error(error),
-        }
+        let mut results = FormulaResults::default();
+        bind_slots(&mut results, slots);
+        let value = if ast_produces_array(expression, Shapes::of(results.call_frame())) {
+            Value::Error(FormulaError::Value)
+        } else {
+            self.eval_conditional_ast(expression, 0, 0, 0, &mut results)
+        };
+        unbind_slots(&mut results);
+        value
     }
 
     /// The settled values of one column at `rows`, as a one-column matrix.
     /// No rows bind one blank, as an empty range reads.
     #[inline(never)]
-    fn bind_column(&self, column: &StructuredRef, rows: &[u32]) -> Ast {
+    fn bind_column(&self, column: &StructuredRef, rows: &[u32]) -> Slot {
         let sheet = &self.sheets[column.sheet as usize];
         let mut values: Vec<Value> = rows
             .iter()
@@ -624,10 +619,10 @@ impl CellStore {
         if values.is_empty() {
             values.push(Value::Blank);
         }
-        Ast::BoundMatrix {
+        Slot::Array {
             rows: values.len(),
             cols: 1,
-            values: Rc::new(values),
+            values: values.into(),
         }
     }
 }
@@ -795,4 +790,44 @@ impl CellStore {
         }
         Ok(edit)
     }
+}
+
+/// Turns the local names of a prepared expression into parameters of its
+/// cell's call: expression `owner` (0 the measure's own, `k + 1` calculation
+/// `k`) binds its columns in order, then, for the measure's own, the
+/// `calculated` values of its calculations.
+fn number_parameters(ast: &mut Ast, owner: usize, owners: &[usize], calculated: usize) {
+    let mut positions = vec![None; owners.len()];
+    let mut next = 0u16;
+    for (column, &read_by) in owners.iter().enumerate() {
+        if read_by == owner {
+            positions[column] = Some(next);
+            next += 1;
+        }
+    }
+    let calculations = (0..calculated).map(|index| next + index as u16);
+    let parameters: Vec<(String, u16)> = positions
+        .iter()
+        .enumerate()
+        .filter_map(|(column, position)| position.map(|position| (column_name(column), position)))
+        .chain((0..calculated).map(calculation_name).zip(calculations))
+        .collect();
+    rename(ast, &parameters);
+}
+
+fn rename(ast: &mut Ast, parameters: &[(String, u16)]) {
+    if let Ast::Name(name) = ast {
+        if let Some((_, index)) = parameters.iter().find(|(local, _)| local == name) {
+            *ast = Ast::Parameter {
+                depth: 0,
+                index: *index,
+                name: std::mem::take(name).into_boxed_str(),
+            };
+        }
+        return;
+    }
+    ast.fold_children_mut(&mut |child| {
+        rename(child, parameters);
+        false
+    });
 }

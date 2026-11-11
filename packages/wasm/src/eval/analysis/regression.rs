@@ -1,6 +1,6 @@
 //! Least-squares arrays, FREQUENCY, MODE.MULT, PROB and legacy statistical names.
 
-use super::super::array::ast_produces_array;
+use super::super::array::{ast_produces_array, Shapes};
 use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAccumulator};
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
@@ -70,7 +70,7 @@ fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         .sum())
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
+pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     matches!(
         name,
         "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND"
@@ -87,7 +87,7 @@ fn argument_shape(
         Ast::Num(_) | Ast::Bool(_) | Ast::Str(_) => Ok((1, 1, 1)),
         // A scalar expression such as 1/0 or A1*2 gives one value; its
         // error, if any, appears when it is evaluated.
-        _ if !is_reference(ast) && !ast_produces_array(ast) => Ok((1, 1, 1)),
+        _ if !is_reference(ast) && !ast_produces_array(ast, pass.shapes()) => Ok((1, 1, 1)),
         _ => store.matrix_shape(ast, sheet, pass),
     }
 }
@@ -420,7 +420,7 @@ fn frequency(
 fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let mut numbers = Vec::new();
     for arg in args {
-        let from_range = is_reference(arg) || ast_produces_array(arg);
+        let from_range = is_reference(arg) || ast_produces_array(arg, evaluation.pass.shapes());
         for value in &evaluation.matrix(arg)?.values {
             if let Some(number) = aggregate_number(value, from_range)? {
                 // -0 and 0 are the same value.

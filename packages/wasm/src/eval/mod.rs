@@ -65,8 +65,8 @@ use crate::types::{
     RANGE_CELL_LIMIT,
 };
 
-pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
+pub(crate) use array::{ast_produces_array, Shapes};
 pub(crate) use criteria::sum_range_extent;
 use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
 use date::host_clock_serial;
@@ -144,6 +144,20 @@ pub(crate) struct EvalPass<'a> {
     pub(crate) affected: &'a FormulaWork,
     /// Results and active-call bits exist only for this pass.
     pub(crate) results: &'a mut FormulaResults,
+}
+
+impl EvalPass<'_> {
+    /// What shape checks know about the LAMBDA parameters of the calls in
+    /// progress.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn shapes(&self) -> Shapes<'_> {
+        Shapes::of(self.results.call_frame())
+    }
+
+    #[cfg(not(feature = "analysis"))]
+    pub(crate) fn shapes(&self) -> Shapes<'static> {
+        Shapes::NONE
+    }
 }
 
 fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
@@ -235,8 +249,9 @@ impl<'a> LiteralSources<'a> {
 }
 
 /// One LET binding: its name, its expression, how many earlier bindings its
-/// expression can see, and the slot its value is kept in.
-type LetBinding<'a> = (&'a str, &'a Ast, usize, u32);
+/// expression can see, the slot its value is kept in, and how many LAMBDAs
+/// enclose it inside the expansion.
+type LetBinding<'a> = (&'a str, &'a Ast, usize, u32, u16);
 
 /// Expands a LET call into an expression tree where every binding use carries
 /// the slot its value is kept in, and reports how many slots the tree holds.
@@ -247,7 +262,7 @@ pub(super) fn expand_let_ast(args: &[Ast]) -> Result<(Ast, u32), FormulaError> {
         .map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
     let mut next_slot = 0u32;
-    let expanded = expand_let_args(args, &mut bindings, &mut nodes, &mut next_slot)?;
+    let expanded = expand_let_args(args, &mut bindings, &mut nodes, &mut next_slot, 0)?;
     Ok((expanded, next_slot))
 }
 
@@ -258,7 +273,7 @@ pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
     bindings.try_reserve(4).map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
     let mut next_slot = 0u32;
-    expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot)
+    expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot, 0)
 }
 
 fn expand_let_args<'a>(
@@ -266,6 +281,7 @@ fn expand_let_args<'a>(
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
     next_slot: &mut u32,
+    lambdas: u16,
 ) -> Result<Ast, FormulaError> {
     if args.len() < 3 || args.len().is_multiple_of(2) || args.len() / 2 > LET_BINDING_LIMIT {
         return Err(FormulaError::Value);
@@ -288,9 +304,9 @@ fn expand_let_args<'a>(
         let visible = bindings.len();
         let slot = *next_slot;
         *next_slot = next_slot.checked_add(1).ok_or(FormulaError::Num)?;
-        bindings.push((name, &pair[1], visible, slot));
+        bindings.push((name, &pair[1], visible, slot, lambdas));
     }
-    let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot);
+    let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot, lambdas);
     bindings.truncate(original_len);
     result
 }
@@ -312,11 +328,15 @@ fn count_let_node(nodes: &mut usize) -> Result<(), FormulaError> {
     }
 }
 
+/// Expands the LET bindings `ast` uses. `lambdas` counts the LAMBDAs around
+/// `ast` inside the expansion: a binding copied under more LAMBDAs than it
+/// was written under has its parameter uses reach that many further out.
 fn expand_let_node<'a>(
     ast: &'a Ast,
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
     next_slot: &mut u32,
+    lambdas: u16,
 ) -> Result<Ast, FormulaError> {
     // A resolved use expands like the name it keeps.
     let used_name = match ast {
@@ -325,100 +345,125 @@ fn expand_let_node<'a>(
         _ => None,
     };
     if let Some(name) = used_name {
-        if let Some((_, expression, visible, slot)) = bindings
-            .iter()
-            .rev()
-            .find(|(binding, _, _, _)| binding.eq_ignore_ascii_case(name))
-            .copied()
-        {
-            let hidden = bindings.split_off(visible);
-            let result = expand_let_node(expression, bindings, nodes, next_slot);
-            bindings.extend(hidden);
-            return Ok(Ast::LetSlot {
-                slot,
-                expression: Box::new(result?),
-            });
-        }
-    }
-    count_let_node(nodes)?;
-    #[cfg(feature = "analysis")]
-    if let Ast::UnknownFunc(name, args) = ast {
-        if let Some((_, expression, visible, _)) = bindings
+        if let Some((_, expression, visible, slot, bound_in)) = bindings
             .iter()
             .rev()
             .find(|(binding, ..)| binding.eq_ignore_ascii_case(name))
             .copied()
         {
             let hidden = bindings.split_off(visible);
-            let callee = expand_let_node(expression, bindings, nodes, next_slot);
+            let result = expand_let_node(expression, bindings, nodes, next_slot, bound_in);
             bindings.extend(hidden);
-            let callee = callee?;
+            let mut result = result?;
+            shift_parameters(&mut result, lambdas - bound_in);
+            return Ok(Ast::LetSlot {
+                slot,
+                expression: Box::new(result),
+            });
+        }
+    }
+    count_let_node(nodes)?;
+    #[cfg(feature = "analysis")]
+    if let Ast::UnknownFunc(name, args) = ast {
+        if let Some((_, expression, visible, _, bound_in)) = bindings
+            .iter()
+            .rev()
+            .find(|(binding, ..)| binding.eq_ignore_ascii_case(name))
+            .copied()
+        {
+            let hidden = bindings.split_off(visible);
+            let callee = expand_let_node(expression, bindings, nodes, next_slot, bound_in);
+            bindings.extend(hidden);
+            let mut callee = callee?;
+            shift_parameters(&mut callee, lambdas - bound_in);
             let mut invocation = vec![callee];
             invocation.extend(
                 args.iter()
-                    .map(|argument| expand_let_node(argument, bindings, nodes, next_slot))
+                    .map(|argument| expand_let_node(argument, bindings, nodes, next_slot, lambdas))
                     .collect::<Result<Vec<_>, _>>()?,
             );
             return Ok(Ast::UnknownFunc(analysis::lambda::CALL.into(), invocation));
         }
     }
+    let expand =
+        |arg: &'a Ast,
+         bindings: &mut Vec<LetBinding<'a>>,
+         nodes: &mut usize,
+         next_slot: &mut u32| { expand_let_node(arg, bindings, nodes, next_slot, lambdas) };
     Ok(match ast {
+        // The parameters stay as declared; the body sits one LAMBDA deeper.
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(analysis::LAMBDA_ID), args) if !args.is_empty() => {
-            let mut captured = Vec::with_capacity(bindings.len());
-            for (name, expression, visible, slot) in bindings.iter().copied() {
-                if args[..args.len() - 1].iter().any(|parameter| {
-                    matches!(parameter, Ast::Name(parameter) if parameter.eq_ignore_ascii_case(name))
-                }) { continue; }
-                let mut earlier = bindings[..visible].to_vec();
-                let expanded = expand_let_node(expression, &mut earlier, nodes, next_slot)?;
-                captured.push((
-                    name,
-                    Ast::LetSlot {
-                        slot,
-                        expression: Box::new(expanded),
-                    },
-                ));
-            }
-            let mut definition = args[..args.len() - 1].to_vec();
-            definition.push(analysis::lambda::capture(&args[args.len() - 1], &captured)?);
+            let (body, parameters) = args.split_last().expect("checked non-empty");
+            let mut definition = parameters.to_vec();
+            definition.push(expand_let_node(
+                body,
+                bindings,
+                nodes,
+                next_slot,
+                lambdas + 1,
+            )?);
             Ast::Func(Func::Analysis(analysis::LAMBDA_ID), definition)
         }
-        Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
+        Ast::Func(Func::Let, args) => {
+            return expand_let_args(args, bindings, nodes, next_slot, lambdas)
+        }
         Ast::Func(func, args) => Ast::Func(
             *func,
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
+                .map(|arg| expand(arg, bindings, nodes, next_slot))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
             name.clone(),
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
+                .map(|arg| expand(arg, bindings, nodes, next_slot))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
         Ast::Bin(op, left, right) => Ast::Bin(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
-            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
+            Box::new(expand(left, bindings, nodes, next_slot)?),
+            Box::new(expand(right, bindings, nodes, next_slot)?),
         ),
         Ast::Cmp(op, left, right) => Ast::Cmp(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
-            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
+            Box::new(expand(left, bindings, nodes, next_slot)?),
+            Box::new(expand(right, bindings, nodes, next_slot)?),
         ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(expand_let_node(
-            inner, bindings, nodes, next_slot,
-        )?)),
-        Ast::Pos(inner) => Ast::Pos(Box::new(expand_let_node(
-            inner, bindings, nodes, next_slot,
-        )?)),
-        Ast::Percent(inner) => Ast::Percent(Box::new(expand_let_node(
-            inner, bindings, nodes, next_slot,
-        )?)),
+        Ast::Neg(inner) => Ast::Neg(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Pos(inner) => Ast::Pos(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Percent(inner) => Ast::Percent(Box::new(expand(inner, bindings, nodes, next_slot)?)),
         other => other.clone(),
     })
 }
+
+/// Makes the parameter uses in `ast` that reach outside it reach `by`
+/// LAMBDAs further out, for a copy placed under `by` more LAMBDAs.
+#[cfg(feature = "analysis")]
+fn shift_parameters(ast: &mut Ast, by: u16) {
+    fn shift(ast: &mut Ast, by: u16, inside: u16) {
+        match ast {
+            Ast::Parameter { depth, .. } if *depth >= inside => *depth += by,
+            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), args) => {
+                if let Some(body) = args.last_mut() {
+                    shift(body, by, inside + 1);
+                }
+            }
+            _ => {
+                ast.fold_children_mut(&mut |child| {
+                    shift(child, by, inside);
+                    false
+                });
+            }
+        }
+    }
+    if by > 0 {
+        shift(ast, by, 0);
+    }
+}
+
+#[cfg(not(feature = "analysis"))]
+fn shift_parameters(_ast: &mut Ast, _by: u16) {}
 
 /// The match and search modes of XMATCH and XLOOKUP. A missing argument takes
 /// its default, and an argument error is returned unchanged.
@@ -1655,7 +1700,9 @@ impl CellStore {
 
         match ast {
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            Ast::Parameter { depth, index, .. } => {
+                analysis::lambda::parameter_value(pass.results.call_frame(), *depth, *index)
+            }
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(pattern) => Value::text(pattern.text()),
             #[cfg(feature = "analysis")]
@@ -1887,7 +1934,7 @@ impl CellStore {
             let name = analysis::name(id);
             if let Some(family) = analysis::family(name) {
                 if let Some(hooks) = &family.array {
-                    if (hooks.produces_array)(name, args) {
+                    if (hooks.produces_array)(name, args, pass.shapes()) {
                         return match (hooks.evaluate)(self, name, args, sheet, pass, depth)
                             .and_then(|matrix| {
                                 matrix.validate_bytes()?;
@@ -2138,7 +2185,7 @@ impl CellStore {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
-            } else if ast_produces_array(arg) {
+            } else if ast_produces_array(arg, pass.shapes()) {
                 match self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
                     Some(Ok(matrix)) => {
                         if let Err(error) = matrix.validate_copies(2) {

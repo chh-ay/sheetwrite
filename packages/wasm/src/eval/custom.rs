@@ -165,7 +165,8 @@ impl CellStore {
 
         let mut evaluated = Vec::with_capacity(arguments.len());
         for argument in arguments {
-            let block = if range_from_ast(argument, sheet).is_some() || ast_produces_array(argument)
+            let block = if range_from_ast(argument, sheet).is_some()
+                || ast_produces_array(argument, pass.shapes())
             {
                 match self.eval_matrix_arg(argument, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,

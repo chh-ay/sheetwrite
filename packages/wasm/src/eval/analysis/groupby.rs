@@ -1,11 +1,12 @@
 //! Bounded grouping and pivot aggregation for the full engine.
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::rc::Rc;
 
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::value::{bool_from_value, compare_values, number_from_value};
 use super::super::EvalPass;
+use super::super::Shapes;
+use super::lambda::Slot;
 use crate::calc::{parse, Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
@@ -51,7 +52,7 @@ impl Context<'_, '_> {
             .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if !super::super::array::ast_produces_array(expression) {
+        if !super::super::array::ast_produces_array(expression, self.pass.shapes()) {
             self.charge(1)?;
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
         }
@@ -326,6 +327,8 @@ impl Axis {
 }
 
 struct Aggregator {
+    /// A LAMBDA, or for a built-in function the call of it with its
+    /// arguments as parameters 0 and 1 of the frame (`values`, `total`).
     function: Ast,
     arity: usize,
     label: String,
@@ -338,10 +341,24 @@ impl Aggregator {
             if !AGGREGATORS.contains(&label.as_str()) {
                 return Err(FormulaError::Value);
             }
-            let function = parse(&format!("={label}(0)")).map_err(|_| FormulaError::Value)?;
+            let arity = if label == "PERCENTOF" { 2 } else { 1 };
+            let Ast::Func(function, _) =
+                parse(&format!("={label}(0)")).map_err(|_| FormulaError::Value)?
+            else {
+                return Err(FormulaError::Value);
+            };
+            let arguments = ["values", "total"][..arity]
+                .iter()
+                .zip(0u16..)
+                .map(|(name, index)| Ast::Parameter {
+                    depth: 0,
+                    index,
+                    name: (*name).into(),
+                })
+                .collect();
             return Ok(Self {
-                arity: if label == "PERCENTOF" { 2 } else { 1 },
-                function,
+                arity,
+                function: Ast::Func(function, arguments),
                 label,
             });
         }
@@ -380,44 +397,45 @@ impl Aggregator {
                 },
             );
         }
-        let source = |indices: &[usize]| Ast::BoundMatrix {
-            rows: indices.len().max(1),
-            cols: 1,
-            values: Rc::new(if indices.is_empty() {
-                vec![Value::Blank]
+        let source = |indices: &[usize]| {
+            let values: std::rc::Rc<[Value]> = if indices.is_empty() {
+                [Value::Blank].into()
             } else {
                 indices
                     .iter()
                     .map(|&row| values.values[row * values.cols + column].clone())
                     .collect()
-            }),
+            };
+            Slot::Array {
+                rows: values.len(),
+                cols: 1,
+                values,
+            }
         };
         context.charge(rows.len() + if self.arity == 2 { total_rows.len() } else { 0 })?;
-        let mut arguments = vec![source(rows)];
+        let mut slots = vec![source(rows)];
         if self.arity == 2 {
-            arguments.push(source(total_rows));
+            slots.push(source(total_rows));
         }
-        let invocation = if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
-            arguments.insert(0, self.function.clone());
-            Ast::UnknownFunc(super::lambda::CALL.into(), arguments)
-        } else if let Ast::Func(function, _) = self.function {
-            Ast::Func(function, arguments)
+        let (store, sheet, depth) = (context.store, context.sheet, context.depth);
+        if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
+            super::lambda::call_with_slots(store, &self.function, slots, sheet, context.pass, depth)
+        } else if let Ast::Func(_, _) = &self.function {
+            super::lambda::evaluate_with_slots(
+                store,
+                &self.function,
+                slots,
+                sheet,
+                context.pass,
+                depth,
+            )
         } else {
-            return Err(FormulaError::Value);
-        };
-        if super::super::array::ast_produces_array(&invocation) {
-            let result = context.matrix(&invocation)?;
-            if result.values.len() != 1 {
-                return Err(FormulaError::Calc);
-            }
-            Ok(result.into_first())
-        } else {
-            Ok(context.scalar(&invocation))
+            Err(FormulaError::Value)
         }
     }
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
+pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     name != "PERCENTOF"
 }
 pub(crate) fn shape(
@@ -442,7 +460,7 @@ pub(crate) fn bound(
         return Err(FormulaError::Value);
     }
     let mut extent = |expression: &Ast| -> Result<(usize, usize), FormulaError> {
-        if !super::super::array::ast_produces_array(expression) {
+        if !super::super::array::ast_produces_array(expression, pass.shapes()) {
             return Ok((1, 1));
         }
         let (rows, cols, cells) = store.matrix_shape(expression, sheet, pass)?;

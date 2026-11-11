@@ -711,13 +711,16 @@ pub enum Ast {
     Str(String),
     Bool(bool),
     Missing,
-    /// A helper parameter value. It exists only during full-engine evaluation.
+    /// A use of a LAMBDA parameter, numbered when the formula was entered
+    /// (`eval::analysis::lambda::resolve_parameters`). `depth` counts the
+    /// LAMBDAs between the use and the one that declares the parameter;
+    /// `index` is the parameter's position. A call reads the value from the
+    /// pass's call frame. The name stays for writing the formula back.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Transient values are not part of the public AST API.
-    BoundMatrix {
-        rows: usize,
-        cols: usize,
-        values: std::rc::Rc<Vec<crate::types::Value>>,
+    Parameter {
+        depth: u16,
+        index: u16,
+        name: Box<str>,
     },
     /// The literal pattern of a REGEX call, shared by every formula in the
     /// store with the same pattern text. Its compiled programs live as long
@@ -816,7 +819,7 @@ impl Ast {
             Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => test(inner),
             Self::LetSlot { expression, .. } => test(expression),
             #[cfg(feature = "analysis")]
-            Self::BoundMatrix { .. } => false,
+            Self::Parameter { .. } => false,
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => false,
             Self::LetName { .. } => false,
@@ -854,7 +857,7 @@ impl Ast {
             Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => visit(inner),
             Self::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
-            Self::BoundMatrix { .. } => false,
+            Self::Parameter { .. } => false,
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => false,
             Self::LetName { .. } => false,
@@ -884,9 +887,7 @@ impl Ast {
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
             #[cfg(feature = "analysis")]
-            Self::BoundMatrix { values, .. } => {
-                out.add_vec::<crate::types::Value>(values.len(), values.capacity());
-            }
+            Self::Parameter { name, .. } => out.add_payload(name.len(), name.len()),
             // The store's pattern index counts each shared pattern once.
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => {}
@@ -2899,7 +2900,7 @@ fn translate_relative_refs_inner(
         | Ast::InvalidRef
         | Ast::Array { .. } => true,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } => true,
+        Ast::Parameter { .. } => true,
         #[cfg(feature = "analysis")]
         Ast::RegexPattern(_) => true,
     }
@@ -3451,7 +3452,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         }
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
+        Ast::Parameter { name, .. } => out.push_str(name),
         #[cfg(feature = "analysis")]
         Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),
