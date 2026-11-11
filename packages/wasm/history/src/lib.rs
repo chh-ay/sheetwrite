@@ -31,7 +31,6 @@ struct Page {
     before_row: Vec<u32>,
     before_col: Vec<u32>,
     flags: Vec<u8>,
-    author: Vec<u32>,
 }
 
 impl Page {
@@ -46,7 +45,6 @@ impl Page {
         self.before_row.clear();
         self.before_col.clear();
         self.flags.clear();
-        self.author.clear();
     }
 }
 
@@ -62,6 +60,7 @@ pub struct DiffKernel {
     after: Block,
     page: Page,
     limit: usize,
+    strip: Vec<u8>,
 }
 
 #[wasm_bindgen]
@@ -78,6 +77,7 @@ impl DiffKernel {
             after: Block::default(),
             page: Page::default(),
             limit: limit.max(1) as usize,
+            strip: Vec::new(),
         }
     }
 
@@ -232,49 +232,57 @@ impl DiffKernel {
         let window_rows = self.after.rows;
         let total = rows * cols;
         let mut ordinal = from;
+        let mut strip = std::mem::take(&mut self.strip);
+        const STRIP_ROWS: u32 = 64;
 
-        while ordinal < total {
-            if self.page.len() >= self.limit {
-                break;
-            }
-
-            let row = ordinal / cols;
-            let col = ordinal % cols;
-            let after_index = (piece_col + col) as usize * window_rows + (piece_row + row) as usize;
-            let after = compare::Cell {
-                block: &self.after,
-                index: after_index,
-                style: compare::style(&self.after_styles, self.after.styles[after_index]),
-            };
-
-            let before = earlier.then(|| {
-                let index = col as usize * self.before.rows + row as usize;
-                compare::Cell {
-                    block: &self.before,
-                    index,
-                    style: compare::style(&self.before_styles, self.before.styles[index]),
+        while ordinal < total && self.page.len() < self.limit {
+            let first_row = ordinal / cols;
+            let end_row = (first_row + STRIP_ROWS).min(rows);
+            let strip_rows = (end_row - first_row) as usize;
+            strip.clear();
+            strip.resize(strip_rows * cols as usize, 0);
+            for col in 0..cols {
+                let after_base = (piece_col + col) as usize * window_rows + (piece_row + first_row) as usize;
+                let before_base = col as usize * self.before.rows + first_row as usize;
+                for r in 0..strip_rows {
+                    let after_index = after_base + r;
+                    let after = compare::Cell {
+                        block: &self.after,
+                        index: after_index,
+                        style: compare::style(&self.after_styles, self.after.styles[after_index]),
+                    };
+                    let before = earlier.then(|| {
+                        let index = before_base + r;
+                        compare::Cell {
+                            block: &self.before,
+                            index,
+                            style: compare::style(&self.before_styles, self.before.styles[index]),
+                        }
+                    });
+                    strip[r * cols as usize + col as usize] = compare::flags(before, after);
                 }
-            });
-
-            let flags = compare::flags(before, after);
-            if flags != 0 {
-                self.page.sheet.push(slot);
-                self.page.row.push(row0 + row);
-                self.page.col.push(col0 + col);
-                self.page
-                    .before_row
-                    .push(if earlier { before_row0 + row } else { NONE });
-                self.page
-                    .before_col
-                    .push(if earlier { before_col0 + col } else { NONE });
-                self.page.flags.push(flags);
-                self.page
-                    .author
-                    .push(sheet.touches.last_author(row0 + row, col0 + col));
             }
-
-            ordinal += 1;
+            let strip_end = end_row * cols;
+            while ordinal < strip_end {
+                if self.page.len() >= self.limit {
+                    break;
+                }
+                let flags = strip[(ordinal - first_row * cols) as usize];
+                if flags != 0 {
+                    let row = ordinal / cols;
+                    let col = ordinal % cols;
+                    self.page.sheet.push(slot);
+                    self.page.row.push(row0 + row);
+                    self.page.col.push(col0 + col);
+                    self.page.before_row.push(if earlier { before_row0 + row } else { NONE });
+                    self.page.before_col.push(if earlier { before_col0 + col } else { NONE });
+                    self.page.flags.push(flags);
+                }
+                ordinal += 1;
+            }
         }
+        self.strip = strip;
+        let _ = sheet;
 
         ordinal
     }
@@ -293,50 +301,66 @@ impl DiffKernel {
     /// The sheet slot of each change.
     #[wasm_bindgen(js_name = pageSheets)]
     #[must_use]
-    pub fn page_sheets(&self) -> Vec<u32> {
-        self.page.sheet.clone()
+    pub fn page_sheets(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.page.sheet)
     }
 
     /// The later row of each change.
     #[wasm_bindgen(js_name = pageRows)]
     #[must_use]
-    pub fn page_rows(&self) -> Vec<u32> {
-        self.page.row.clone()
+    pub fn page_rows(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.page.row)
     }
 
     /// The later column of each change.
     #[wasm_bindgen(js_name = pageCols)]
     #[must_use]
-    pub fn page_cols(&self) -> Vec<u32> {
-        self.page.col.clone()
+    pub fn page_cols(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.page.col)
     }
 
     /// The earlier row of each change; `0xFFFFFFFF` for a new row.
     #[wasm_bindgen(js_name = pageBeforeRows)]
     #[must_use]
-    pub fn page_before_rows(&self) -> Vec<u32> {
-        self.page.before_row.clone()
+    pub fn page_before_rows(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.page.before_row)
     }
 
     /// The earlier column of each change; `0xFFFFFFFF` for a new column.
     #[wasm_bindgen(js_name = pageBeforeCols)]
     #[must_use]
-    pub fn page_before_cols(&self) -> Vec<u32> {
-        self.page.before_col.clone()
+    pub fn page_before_cols(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.page.before_col)
     }
 
     /// What changed in each cell, as `VALUE`, `FORMULA`, `STYLE`, `ADDED` and `REMOVED` bits.
     #[wasm_bindgen(js_name = pageFlags)]
     #[must_use]
-    pub fn page_flags(&self) -> Vec<u8> {
-        self.page.flags.clone()
+    pub fn page_flags(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.page.flags)
     }
 
     /// The last writer of each changed cell; `0xFFFFFFFF` when no logged write reaches it.
     #[wasm_bindgen(js_name = pageAuthors)]
     #[must_use]
     pub fn page_authors(&self) -> Vec<u32> {
-        self.page.author.clone()
+        let len = self.page.sheet.len();
+        let mut authors = vec![NONE; len];
+        let mut order: Vec<u32> = (0..len as u32).collect();
+        order.sort_unstable_by_key(|&i| (self.page.sheet[i as usize], self.page.row[i as usize], self.page.col[i as usize]));
+        let mut start = 0;
+        while start < order.len() {
+            let slot = self.page.sheet[order[start] as usize];
+            let mut end = start;
+            while end < order.len() && self.page.sheet[order[end] as usize] == slot { end += 1; }
+            let run = &order[start..end];
+            if let Some(Some(sheet)) = self.sheets.get(slot as usize) {
+                let rows: Vec<u32> = run.iter().map(|&i| self.page.row[i as usize]).collect();
+                sheet.touches.assign_last_authors(&rows, run, &self.page.col, &mut authors);
+            }
+            start = end;
+        }
+        authors
     }
 
     /// Empty the page so `compare` can fill it again.

@@ -94,6 +94,24 @@ impl Touches {
             .map_or(NONE, |touch| touch.author)
     }
 
+    /// Proto: last author of each page entry, sweeping the log once.
+    pub(crate) fn assign_last_authors(&self, rows: &[u32], entries: &[u32], cols: &[u32], authors: &mut [u32]) {
+        let mut remaining = entries.len();
+        for touch in self.list.iter().rev() {
+            let lo = rows.partition_point(|&r| r < touch.r0);
+            let hi = rows.partition_point(|&r| r <= touch.r1);
+            for k in lo..hi {
+                let entry = entries[k] as usize;
+                let col = cols[entry];
+                if authors[entry] == NONE && touch.c0 <= col && col <= touch.c1 {
+                    authors[entry] = touch.author;
+                    remaining -= 1;
+                }
+            }
+            if remaining == 0 { break; }
+        }
+    }
+
     /// Every person who wrote the cell, in the order of their first write.
     pub(crate) fn authors(&self, row: u32, col: u32, out: &mut Vec<u32>) {
         for touch in &self.list {
