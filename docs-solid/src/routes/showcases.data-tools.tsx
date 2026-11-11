@@ -5,7 +5,7 @@ import { NoHydration } from "solid-js/web";
 import { Island } from "../islands/Island.js";
 import { DataEvents } from "../showcases/data-tools/DataEvents.js";
 import { DataToolsStage } from "../showcases/data-tools/DataToolsStage.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
 import {
   DATA_COLUMNS,
   DATA_ROWS,
@@ -50,6 +50,20 @@ function DataToolsShowcase() {
           title: "How it is built",
           Snippet: DataToolsSnippet,
           source: DataToolsSnippetSource,
+          // What the grid reported, live, beside the calls that produce it.
+          figure: (
+            <section aria-labelledby="data-events" class="sw-data-events-aside">
+              <h3 class="sw-showcase__aside-title" id="data-events">
+                What the grid reported
+              </h3>
+              <p>Newest first: grid calls and events, plus labeled host role changes.</p>
+              <Island component={DataEvents} name="showcase-data-events" props={{}} />
+              <p class="sw-prose">
+                Sorting has its own showcase: <a href="/showcases/sort/">sort in place</a>, as Excel
+                does, or for the view only.
+              </p>
+            </section>
+          ),
         }}
         eyebrow="Data"
         facts={[
@@ -76,16 +90,7 @@ function DataToolsShowcase() {
           </>
         }
         title="Filter the work, guard the data"
-      >
-        <ShowcaseSection id="data-events" title="What the grid reported">
-          <p>Newest first: grid calls and events, plus labeled host role changes.</p>
-          <Island component={DataEvents} name="showcase-data-events" props={{}} />
-          <p>
-            Sorting moved to its own showcase: <a href="/showcases/sort/">sort in place</a>, as
-            Excel does, or for the view only.
-          </p>
-        </ShowcaseSection>
-      </ShowcasePage>
+      />
     </NoHydration>
   );
 }

@@ -105,6 +105,18 @@
   font-size: var(--sw-text-small);
 }
 
+/* The event log beside the code (the code's aside). */
+.sw-data-events-aside {
+  display: grid;
+  gap: var(--sw-space-2);
+  min-width: 0;
+}
+
+.sw-data-events-aside > p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+}
+
 .sw-data-events {
   max-height: calc(var(--sw-control-height) * 10);
   margin: 0;
