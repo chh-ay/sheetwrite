@@ -326,7 +326,13 @@ export function SecurityLab() {
           {ran() ? `Run all ${nf(ATTACK_COUNT)} again` : `Run all ${nf(ATTACK_COUNT)}`}
         </button>
       </div>
-      <table class="sw-attack-table" data-testid="interop-hostile-table" ref={table}>
+      <table
+        class="sw-attack-table"
+        data-testid="interop-hostile-table"
+        ref={(element) => {
+          table = element;
+        }}
+      >
         <caption class="sw-visually-hidden">
           Hostile files and limits, with what happened to each in this run
         </caption>

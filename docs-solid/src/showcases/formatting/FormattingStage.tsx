@@ -214,8 +214,19 @@ export function FormattingStage(props: FormattingStageProps) {
       }
       demo={
         <>
-          <div class="sw-formatting-formula" ref={formulaHost} />
-          <div aria-label="Operating budget" class="sw-formatting-grid" ref={host} />
+          <div
+            class="sw-formatting-formula"
+            ref={(element) => {
+              formulaHost = element;
+            }}
+          />
+          <div
+            aria-label="Operating budget"
+            class="sw-formatting-grid"
+            ref={(element) => {
+              host = element;
+            }}
+          />
           <p class="sw-formatting-caption">
             Negative variance is highlighted by a live conditional rule. Edit the actuals to change
             it.

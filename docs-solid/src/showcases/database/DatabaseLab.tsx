@@ -2,7 +2,6 @@ import { formatBytes } from "@docs/lib/format.js";
 import { For, Show } from "solid-js";
 
 import { Icon } from "../../components/Icon.js";
-import { ShowcaseSection } from "../layout/ShowcaseLayout.js";
 import { Button } from "../ui/Button.js";
 import { ready, runAction } from "./DatabaseStage.js";
 import { busy, engine, limitReport, stats, status } from "./state.js";
@@ -44,7 +43,12 @@ export function DatabaseLab(props: DatabaseLabProps) {
             >
               Try a 128-byte undo limit
             </Button>
-            <div class="sw-dbx__limit-grid" ref={limitHost} />
+            <div
+              class="sw-dbx__limit-grid"
+              ref={(element) => {
+                limitHost = element;
+              }}
+            />
             <Show when={limitReport()}>
               {(report) => (
                 <p

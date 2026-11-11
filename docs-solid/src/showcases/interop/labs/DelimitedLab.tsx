@@ -36,7 +36,7 @@ function ExportedText(props: Readonly<{ text: string; testId: string }>) {
     expanded() ? textLines(props.text.slice(0, CHARS_SHOWN)) : all().slice(0, LINES_SHOWN);
   return (
     <>
-      {/* A scrolling region of text has a tab stop so keyboard users can scroll it. */}
+      {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- a scrolling region of text takes a tab stop so keyboard users can scroll it. */}
       <pre class="sw-delimited-text" data-testid={props.testId} tabindex="0">
         <For each={lines()}>
           {(line) => (

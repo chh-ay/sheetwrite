@@ -50,7 +50,12 @@ export function HubFilter(props: HubFilterProps) {
   };
 
   return (
-    <div class="sw-hub__toolbar" ref={root}>
+    <div
+      class="sw-hub__toolbar"
+      ref={(element) => {
+        root = element;
+      }}
+    >
       <fieldset class="sw-hub__filters">
         <legend>Filter product examples</legend>
         <For each={props.groups}>

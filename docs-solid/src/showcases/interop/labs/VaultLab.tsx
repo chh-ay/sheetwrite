@@ -372,6 +372,7 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
                     data-selected={selected()?.id === entry.id || undefined}
                   >
                     <th scope="row">
+                      {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- its text is the check's name and steps, rendered below. */}
                       <button
                         aria-pressed={selected()?.id === entry.id}
                         data-testid={`compatibility-result-${entry.position}`}
@@ -449,7 +450,13 @@ function CheckBrowser(props: Readonly<{ kind: KindFilter; onKind: (kind: KindFil
           <Show when={selected()}>{(entry) => <CheckDetail entry={entry()} />}</Show>
         </aside>
       </div>
-      <dialog aria-label="The selected check" class="sw-vault-sheet" ref={sheet}>
+      <dialog
+        aria-label="The selected check"
+        class="sw-vault-sheet"
+        ref={(element) => {
+          sheet = element;
+        }}
+      >
         <span aria-hidden="true" class="sw-vault-sheet__grab" />
         <Show when={selected()}>
           {(entry) => <CheckDetail entry={entry()} onClose={() => sheet.close()} />}

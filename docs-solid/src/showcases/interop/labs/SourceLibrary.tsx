@@ -187,6 +187,7 @@ export function SourceLibrary() {
                   </td>
                   <td>
                     <details class="sw-lab-row-details">
+                      {/* oxlint-disable-next-line jsx-a11y/control-has-associated-label -- its text is chosen below from the entry's evidence. */}
                       <summary>
                         {entry.evidence.startsWith("packages/")
                           ? "What is checked in"

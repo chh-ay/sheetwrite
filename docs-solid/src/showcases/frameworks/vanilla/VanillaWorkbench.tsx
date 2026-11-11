@@ -369,7 +369,12 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
           </header>
 
           <div class="sw-vw-stagewrap">
-            <div class="sw-vanilla-shell sw-vw-stage" ref={host} />
+            <div
+              class="sw-vanilla-shell sw-vw-stage"
+              ref={(element) => {
+                host = element;
+              }}
+            />
             <Show when={alive() && phase() === "booting"}>
               <div class="sw-vw-veil" role="status">
                 Initializing WASM and {props.rows.toLocaleString()} rows…
@@ -651,7 +656,9 @@ export function VanillaWorkbench(props: VanillaWorkbenchProps) {
                   event.currentTarget.value = "";
                   if (file !== undefined) importWorkbook(file);
                 }}
-                ref={fileInput}
+                ref={(element) => {
+                  fileInput = element;
+                }}
                 type="file"
               />
             </div>

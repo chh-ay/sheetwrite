@@ -203,7 +203,13 @@ export function HostRowsStage() {
       }
       demo={
         <div class="host-rows-showcase" data-testid="host-rows-showcase">
-          <div class="sheetwrite host-rows-grid" ref={host} style={{ height: "428px" }} />
+          <div
+            class="sheetwrite host-rows-grid"
+            ref={(element) => {
+              host = element;
+            }}
+            style={{ height: "428px" }}
+          />
           <ActionError error={error()} />
           <HostState entities={entities()} log={log()} />
         </div>

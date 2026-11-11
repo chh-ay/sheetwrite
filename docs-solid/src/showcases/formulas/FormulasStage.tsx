@@ -217,7 +217,9 @@ export function FormulasStage(props: FormulasStageProps) {
           class="sw-showcase__grid"
           data-state={state()}
           data-testid="formulas-grid"
-          ref={host}
+          ref={(element) => {
+            host = element;
+          }}
           role="grid"
         />
       }

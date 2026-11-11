@@ -304,7 +304,9 @@ export function DatabaseStage(props: DatabaseStageProps) {
             aria-label="Quarterly subscription revenue workbook"
             class="sw-dbx__grid"
             data-testid="dbx-grid"
-            ref={host}
+            ref={(element) => {
+              host = element;
+            }}
             role="application"
           />
         </section>

@@ -381,7 +381,9 @@ export function PerformanceStage(props: PerformanceStageProps) {
             data-cache-bytes={activeStorage().cacheBytes}
             data-chunk-rows={activeStorage().chunkRows}
             data-testid="scale-grid"
-            ref={host}
+            ref={(element) => {
+              host = element;
+            }}
             role="grid"
           />
           <Show when={evictionWatch()}>

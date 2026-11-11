@@ -35,7 +35,15 @@ export function FrameworkMount(props: FrameworkMountProps) {
       unmount?.();
     });
   });
-  return <div class="sw-framework-island" data-framework={props.framework} ref={host} />;
+  return (
+    <div
+      class="sw-framework-island"
+      data-framework={props.framework}
+      ref={(element) => {
+        host = element;
+      }}
+    />
+  );
 }
 
 /** The /vue/ page's island. */

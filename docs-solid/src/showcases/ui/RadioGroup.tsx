@@ -39,7 +39,9 @@ export function RadioGroup<Value extends string>(props: RadioGroupProps<Value>) 
     <div
       aria-label={props.label}
       class={["sw-demo-radio-group", props.class].filter(Boolean).join(" ")}
-      ref={group}
+      ref={(element) => {
+        group = element;
+      }}
       role="radiogroup"
     >
       <For each={props.options}>

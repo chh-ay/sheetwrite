@@ -27,7 +27,9 @@ export function FormattingImported() {
             <div
               aria-label="Re-imported operating budget"
               class="sw-formatting-imported"
-              ref={host}
+              ref={(element) => {
+                host = element;
+              }}
             />
             <Show when={report().differences.length > 0}>
               <p>{report().differences.join(", ")}</p>

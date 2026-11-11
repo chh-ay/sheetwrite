@@ -151,7 +151,12 @@ export function SpreadsheetStage(props: SpreadsheetStageProps) {
             data-testid="spreadsheet-window"
             style={frameWidth() === null ? undefined : { "max-width": `${frameWidth()}px` }}
           >
-            <div class="sw-showcase__grid" ref={host} />
+            <div
+              class="sw-showcase__grid"
+              ref={(element) => {
+                host = element;
+              }}
+            />
           </div>
           <ActionError error={error()} />
         </>

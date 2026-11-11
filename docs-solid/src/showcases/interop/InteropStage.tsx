@@ -393,7 +393,7 @@ export function InteropStage() {
     <ShowcaseStage
       controls={<ExchangeControls />}
       demo={
-        // A file drop target; the file picker is the keyboard path.
+        // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- a file drop target; the file picker is the keyboard path.
         <section
           aria-label="Live workbook and spreadsheet drop target"
           class="sw-si-workbench"
@@ -418,15 +418,27 @@ export function InteropStage() {
               height lives on this owned wrapper. */}
           <div class="sw-si-stage">
             <div class="sheetwrite-shell">
-              <div class="sheetwrite-shell-row sheetwrite-shell-formula-row" ref={formulaRow} />
+              <div
+                class="sheetwrite-shell-row sheetwrite-shell-formula-row"
+                ref={(element) => {
+                  formulaRow = element;
+                }}
+              />
               {/* Sheetwrite upgrades this host into a virtualized ARIA grid. */}
               <div
                 aria-label="Interoperability workbench grid"
                 class="sheetwrite-shell-grid sw-si-grid"
-                ref={gridHost}
+                ref={(element) => {
+                  gridHost = element;
+                }}
                 role="grid"
               />
-              <div class="sheetwrite-shell-row sheetwrite-shell-bottom-row" ref={statusRow} />
+              <div
+                class="sheetwrite-shell-row sheetwrite-shell-bottom-row"
+                ref={(element) => {
+                  statusRow = element;
+                }}
+              />
             </div>
           </div>
           <FormulaModel />

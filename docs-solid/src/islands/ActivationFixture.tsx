@@ -45,7 +45,9 @@ export function ActivationFixture(props: {
           <input
             aria-label="Type"
             onInput={(event) => setText(event.currentTarget.value)}
-            ref={field}
+            ref={(element) => {
+              field = element;
+            }}
             type="text"
           />
         </Match>

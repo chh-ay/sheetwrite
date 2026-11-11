@@ -192,7 +192,6 @@ export function createCollaborationEngine(
   const accounts: Record<ClientKey, string> = { a: "the first deal", b: "the first deal" };
   const recovering: Record<ClientKey, boolean> = { a: false, b: false };
   let bootGeneration = 0;
-  let bootQueue: Promise<void> = Promise.resolve();
   const flashes: Record<ClientKey, Map<string, HighlightRange & { until: number }>> = {
     a: new Map(),
     b: new Map(),
@@ -1048,7 +1047,7 @@ export function createCollaborationEngine(
 
   // The page owns one boot session; reset starts the next generation.
   bootGeneration = 1;
-  bootQueue = bootQueue.then(() => bootAll(1));
+  void bootAll(1);
 
   return {
     sampleEdit(key) {

@@ -259,7 +259,9 @@ export function ScaleMinimap(props: Readonly<ScaleMinimapProps>) {
       <canvas
         data-testid="scale-flight-map"
         height={MAP_HEIGHT}
-        ref={canvas}
+        ref={(element) => {
+          canvas = element;
+        }}
         style={{ width: `${MAP_WIDTH}px`, height: `${MAP_HEIGHT}px` }}
         width={MAP_WIDTH}
       />
