@@ -605,19 +605,6 @@ export function formatReleaseComparison(
   return rows.join("\n");
 }
 
-export function formatSizeHistory(history: SizeHistory): string {
-  const rows: string[] = [];
-  for (let index = 1; index < history.releases.length; index += 1) {
-    const previous = history.releases[index - 1]!;
-    const current = history.releases[index]!;
-    rows.push(`v${previous.version} → v${current.version}`);
-    rows.push(formatReleaseComparison(current.metrics, previous));
-  }
-  return rows.length === 0
-    ? "No release-to-release size comparison is available."
-    : rows.join("\n\n");
-}
-
 function assertReleaseVersion(version: string): void {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
     throw new Error(`Invalid release version: ${version}`);
@@ -749,14 +736,10 @@ async function cli(): Promise<void> {
   const reuseBundlers = process.argv.includes("--reuse-bundlers");
   try {
     const artifactDirectory = optionValue(process.argv, "--artifacts");
-    if (mode !== "report" && mode !== "history" && mode !== "record") {
+    if (mode !== "report" && mode !== "record") {
       throw new Error(`Unknown size-report mode: ${mode}`);
     }
     const history = await readSizeHistory();
-    if (mode === "history") {
-      console.log(formatSizeHistory(history));
-      return;
-    }
     if (mode === "record") {
       const version = optionValue(process.argv, "--version");
       if (version === undefined) throw new Error("record mode requires --version");

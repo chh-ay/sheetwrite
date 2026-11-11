@@ -1,5 +1,6 @@
 // Engine selection is process-wide, and host functions need the full engine,
-// so `custom-functions.test.ts` runs this file in its own process.
+// so `full-engine.test.ts` runs this file in a process of its own; it gives every grid
+// of that process a host function.
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import * as formulas from "@sheetwrite/formulas";

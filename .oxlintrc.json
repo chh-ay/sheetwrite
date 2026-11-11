@@ -36,6 +36,7 @@
     }
   ],
   "ignorePatterns": [
+    ".agents",
     "**/dist",
     "**/pkg",
     "**/*.d.ts",
