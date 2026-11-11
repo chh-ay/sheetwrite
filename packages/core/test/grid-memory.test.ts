@@ -8,7 +8,7 @@ import { NO_STRING } from "../src/store/wire-tags.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Workbook } from "../src/types.js";
 import { WorkerRenderer } from "../src/worker-renderer.js";
-import { makeColumnarData } from "./fixtures.js";
+import { makeColumnarData, scrollerOf } from "./fixtures.js";
 
 const ROWS = 4_000;
 const originalRaf = globalThis.requestAnimationFrame;
@@ -85,12 +85,6 @@ function mountHost(): HTMLDivElement {
   const host = document.createElement("div");
   document.body.appendChild(host);
   return host;
-}
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
 }
 
 function scrollTo(host: HTMLElement, top: number): void {
