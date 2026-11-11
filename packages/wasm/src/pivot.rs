@@ -1099,15 +1099,14 @@ pub(crate) struct PivotLayout {
     col_groups: Vec<u32>,
     /// Each group's index in `row_groups` / `col_groups`, so a changed pair
     /// finds its output cells without a scan.
-    row_positions: FxHashMap<u32, u32>,
-    col_positions: FxHashMap<u32, u32>,
+    row_positions: Vec<u32>,
+    col_positions: Vec<u32>,
 }
 
 impl PivotLayout {
     pub(crate) fn retained_bytes(&self) -> usize {
         (self.row_groups.capacity() + self.col_groups.capacity()) * size_of::<u32>()
-            + (self.row_positions.capacity() + self.col_positions.capacity())
-                * (2 * size_of::<u32>() + 1)
+            + (self.row_positions.capacity() + self.col_positions.capacity()) * size_of::<u32>()
     }
 }
 
@@ -1172,7 +1171,7 @@ pub(crate) struct PivotCache {
     texts: TextIds,
     /// `(row group, col group) → slot`; slot `s` owns partials
     /// `s * values .. (s + 1) * values`.
-    pairs: FxHashMap<u64, u32>,
+    pairs: DensePairs,
     pair_rows: Vec<u32>,
     free_pairs: Vec<u32>,
     partials: Vec<Partial>,
@@ -1243,6 +1242,45 @@ pub(crate) struct MeasureCell<'a> {
     pub(crate) rows: &'a [u32],
     /// The row and column groups of the cell.
     pub(crate) groups: (u32, u32),
+}
+
+/// Proto: pair slots in a dense row-group × column-group table.
+#[derive(Default)]
+struct DensePairs {
+    rows: u32,
+    cols: u32,
+    slots: Vec<u32>,
+}
+
+impl DensePairs {
+    fn get(&self, row: u32, col: u32) -> Option<u32> {
+        if row >= self.rows || col >= self.cols {
+            return None;
+        }
+        let slot = self.slots[(row * self.cols + col) as usize];
+        (slot != NO_GROUP).then_some(slot)
+    }
+
+    fn insert(&mut self, row: u32, col: u32, slot: u32) {
+        if row >= self.rows || col >= self.cols {
+            let rows = (row + 1).max(self.rows * 2).max(16);
+            let cols = (col + 1).max(if col >= self.cols { self.cols * 2 } else { self.cols }).max(4);
+            let mut slots = vec![NO_GROUP; (rows * cols) as usize];
+            for r in 0..self.rows {
+                for c in 0..self.cols {
+                    slots[(r * cols + c) as usize] = self.slots[(r * self.cols + c) as usize];
+                }
+            }
+            *self = Self { rows, cols, slots };
+        }
+        self.slots[(row * self.cols + col) as usize] = slot;
+    }
+
+    fn remove(&mut self, row: u32, col: u32) {
+        if row < self.rows && col < self.cols {
+            self.slots[(row * self.cols + col) as usize] = NO_GROUP;
+        }
+    }
 }
 
 fn pair_key(row_group: u32, col_group: u32) -> u64 {
@@ -1460,7 +1498,7 @@ impl PivotCache {
             contribution_payloads: vec![0; rows * values],
             key_errors: BTreeMap::new(),
             texts: TextIds::default(),
-            pairs: FxHashMap::default(),
+            pairs: DensePairs::default(),
             pair_rows: Vec::new(),
             free_pairs: Vec::new(),
             partials: Vec::new(),
@@ -1688,7 +1726,7 @@ impl PivotCache {
 
     fn pair_slot(&mut self, row_group: u32, col_group: u32, adding: bool) -> u32 {
         let key = pair_key(row_group, col_group);
-        if let Some(&slot) = self.pairs.get(&key) {
+        if let Some(slot) = self.pairs.get(row_group, col_group) {
             if adding {
                 self.pair_rows[slot as usize] += 1;
             }
@@ -1708,7 +1746,7 @@ impl PivotCache {
                 (self.pair_rows.len() - 1) as u32
             }
         };
-        self.pairs.insert(key, slot);
+        self.pairs.insert(row_group, col_group, slot);
         slot
     }
 
@@ -1716,7 +1754,7 @@ impl PivotCache {
         let rows = &mut self.pair_rows[slot as usize];
         *rows -= 1;
         if *rows == 0 {
-            self.pairs.remove(&pair_key(row_group, col_group));
+            self.pairs.remove(row_group, col_group);
             let values = self.definition.values.len();
             for partial in &mut self.partials[slot as usize * values..(slot as usize + 1) * values]
             {
@@ -1767,12 +1805,12 @@ impl PivotCache {
             return Err(FormulaError::Num);
         }
 
-        let positions = |groups: &[u32]| -> FxHashMap<u32, u32> {
-            groups
-                .iter()
-                .enumerate()
-                .map(|(position, &group)| (group, position as u32))
-                .collect()
+        let positions = |groups: &[u32]| -> Vec<u32> {
+            let mut positions = vec![NO_GROUP; groups.iter().max().map_or(0, |&g| g as usize + 1)];
+            for (position, &group) in groups.iter().enumerate() {
+                positions[group as usize] = position as u32;
+            }
+            positions
         };
         let (rows, cols, header_rows) = if cols == 0 {
             // Nothing to show: one blank cell keeps the anchor visible.
@@ -1880,8 +1918,8 @@ impl PivotCache {
 
         let col_group = layout.col_groups[position];
         self.pairs
-            .get(&pair_key(row_group, col_group))
-            .map_or(Value::Blank, |&pair| {
+            .get(row_group, col_group)
+            .map_or(Value::Blank, |pair| {
                 self.partials[pair as usize * definition.values.len() + aggregated_slot]
                     .result(value.aggregation)
             })
@@ -1944,11 +1982,13 @@ impl PivotCache {
 
         let row = *layout
             .row_positions
-            .get(&row_group)
+            .get(row_group as usize)
+            .filter(|&&p| p != NO_GROUP)
             .ok_or(FormulaError::Ref)? as usize;
         let col = *layout
             .col_positions
-            .get(&col_group)
+            .get(col_group as usize)
+            .filter(|&&p| p != NO_GROUP)
             .ok_or(FormulaError::Ref)? as usize;
         let offset = (layout.header_rows + row) * layout.cols
             + layout.label_cols
@@ -2019,8 +2059,8 @@ impl PivotCache {
         let mut offsets = Vec::with_capacity(pairs.len() * values);
         for (row_group, col_group) in pairs {
             let (Some(&row), Some(&col)) = (
-                layout.row_positions.get(&row_group),
-                layout.col_positions.get(&col_group),
+                layout.row_positions.get(row_group as usize).filter(|&&p| p != NO_GROUP),
+                layout.col_positions.get(col_group as usize).filter(|&&p| p != NO_GROUP),
             ) else {
                 continue;
             };
@@ -2041,7 +2081,7 @@ impl PivotCache {
             + self.contribution_payloads.capacity() * size_of::<u64>()
             + self.key_errors.len() * (size_of::<u32>() + size_of::<FormulaError>())
             + self.texts.retained_bytes()
-            + self.pairs.capacity() * (size_of::<u64>() + size_of::<u32>() + 1)
+            + self.pairs.slots.capacity() * size_of::<u32>()
             + (self.pair_rows.capacity() + self.free_pairs.capacity()) * size_of::<u32>()
             + self.partials.capacity() * size_of::<Partial>()
             + self
