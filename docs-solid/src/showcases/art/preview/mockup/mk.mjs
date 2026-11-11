@@ -33,13 +33,78 @@ const PAGES = [
     diagram: "recalculation",
   },
   { id: "vanilla", path: "/vanilla/" },
-];
-const SHOTS = [
-  [1440, "light"],
-  [2560, "light"],
-  [390, "light"],
-  [1440, "dark"],
-];
+  {
+    id: "analysis",
+    path: "/showcases/analysis/",
+    explain: "The chart reads cells",
+    diagram: "analysis",
+  },
+  {
+    id: "dashboards",
+    path: "/showcases/dashboards/",
+    explain: "How a dashboard works",
+    diagram: "dashboards",
+  },
+  {
+    id: "queries",
+    path: "/showcases/queries/",
+    explain: "What a refresh does",
+    diagram: "queries",
+  },
+  {
+    id: "sort",
+    path: "/showcases/sort/",
+    explain: "How the sort treats the workbook",
+    diagram: "sort",
+  },
+  {
+    id: "functions",
+    path: "/showcases/functions/",
+    explain: "Where they run",
+    diagram: "functions",
+  },
+  {
+    id: "version-history",
+    path: "/showcases/version-history/",
+    explain: "How versions are kept",
+    diagram: "version-history",
+  },
+  {
+    id: "formulas",
+    path: "/showcases/formulas/",
+    explain: "Two engines, one API",
+    diagram: "formulas",
+  },
+  {
+    id: "database",
+    path: "/showcases/database/",
+    explain: "Failure lab and storage",
+    diagram: "database",
+  },
+  {
+    id: "host-rows",
+    path: "/showcases/host-rows/",
+    explain: "How the import loads",
+    diagram: "host-rows",
+  },
+  {
+    id: "formatting",
+    path: "/showcases/formatting/",
+    explain: "How formatting behaves",
+    diagram: "formatting",
+  },
+].filter((page) => !process.env.MK_PAGES || process.env.MK_PAGES.split(",").includes(page.id));
+const SHOTS = process.env.MK_SHOTS
+  ? process.env.MK_SHOTS.split(",").map((shot) => {
+      const [width, theme] = shot.split("-");
+      return [Number(width), theme];
+    })
+  : [
+      [1440, "light"],
+      [2560, "light"],
+      [390, "light"],
+      [1440, "dark"],
+    ];
 
 const browser = await chromium.launch();
 const partsPage = await browser.newPage();
