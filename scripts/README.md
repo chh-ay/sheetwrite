@@ -42,8 +42,13 @@ timing comparisons run deliberately through the local protocol in
 `bench/README.md`, not as a required CI job. A green `verify:ci` is strong
 evidence, not a guarantee.
 
-CI starts preflight and the canonical artifact build independently. Package
-consumers still verify the same canonical tarballs. Rust build caches are
+CI starts preflight, the canonical artifact build and the Rust tests
+independently. The Rust job runs the default-feature engine tests, then the
+analysis, history and queries tests once, under coverage. After the artifact
+build, separate jobs run the package suites under coverage
+(`test:coverage:ts`), the other unit suites (`test:unit:uncovered`), the type,
+public API and generated-docs checks, and the benchmark smoke, so each unit
+suite runs once. Package consumers still verify the same canonical tarballs. Rust build caches are
 separate for release and coverage profiles; tool versions and build inputs
 identify their keys. Bun caches contain downloads, not `node_modules`, and
 every job still installs with the frozen lockfile. Browser caches contain
