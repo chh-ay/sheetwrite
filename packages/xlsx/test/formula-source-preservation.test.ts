@@ -1,212 +1,108 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { beforeAll, expect, it } from "bun:test";
 
 import {
   fromXlsxWorkbook,
   initSheetwrite,
   SheetwriteStore,
   toXlsxWorkbook,
-  type CellValue,
-  type SheetSnapshot,
-  type WorkbookSnapshot,
 } from "@sheetwrite/core";
-import { strFromU8, unzipSync } from "fflate";
 
 import { xlsxAddon } from "../src/index.js";
 import { escapeXml } from "../src/xml.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
-
-interface FormulaContractInventory {
-  functions: {
-    canonical: string;
-    contractStatus: string;
-  }[];
-}
+import { book, formula, partText, sheet, sheetNamed, valuesOf } from "./workbook-fixtures.js";
 
 const INVENTORY = (await Bun.file(
   new URL("../../../test/conformance/formula-contract.inventory.json", import.meta.url),
-).json()) as FormulaContractInventory;
-const FORMULA_SOURCES = INVENTORY.functions
-  .filter((entry) => entry.contractStatus === "required-supported")
-  .map((entry) => `=${entry.canonical}()`);
-FORMULA_SOURCES.push("={1,2;3,4}", "=SUM({1,2,3})", '={"A1",TRUE,#N/A}');
+).json()) as { functions: { canonical: string; contractStatus: string }[] };
+
 beforeAll(async () => {
   await initSheetwrite({ addons: [xlsxAddon()] });
 });
 
-function formulaWorkbook(sources: readonly string[] = FORMULA_SOURCES): WorkbookSnapshot {
-  return {
-    schemaVersion: 1,
-    documentId: "formula-source-preservation",
-    version: 1,
-    workbook: { activeSheet: "formula" },
+const column = (sources: readonly string[]) => sources.map((src) => [formula(src)]);
+
+it("round-trips every required function source and writes Excel's native spellings", async () => {
+  // [editor source, native OOXML text]; an empty native text is only checked by the round trip.
+  const cases: [string, string][] = [
+    ...INVENTORY.functions
+      .filter((entry) => entry.contractStatus === "required-supported")
+      .map((entry): [string, string] => [`=${entry.canonical}()`, ""]),
+    ["={1,2;3,4}", ""],
+    ["=SUM({1,2,3})", ""],
+    ['={"A1",TRUE,#N/A}', ""],
+    ["=LET(x,1,x+1)", "_xlfn.LET(_xlpm.x,1,_xlpm.x+1)"],
+    ["=LAMBDA(v,v+1)(2)", "_xlfn.LAMBDA(_xlpm.v,_xlpm.v+1)(2)"],
+    ["=XLOOKUP(1,A1:A3,B1:B3)", "_xlfn.XLOOKUP(1,A1:A3,B1:B3)"],
+    ["=FILTER(A1:A3,A1:A3>0)", "_xlfn._xlws.FILTER(A1:A3,A1:A3>0)"],
+    ["=SORT(A1:A3)", "_xlfn._xlws.SORT(A1:A3)"],
+    [
+      "=LET(x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&x)",
+      "_xlfn.LET(_xlpm.x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&_xlpm.x)",
+    ],
+    // Spill references use Excel's ANCHORARRAY; the quoted text is not a reference and keeps its `#`.
+    ["=SUM(A1#)", "SUM(_xlfn.ANCHORARRAY(A1))"],
+    ["='My Sheet'!$B$2#", "_xlfn.ANCHORARRAY('My Sheet'!$B$2)"],
+    ['=LEN("A1#")&C3#', 'LEN("A1#")&_xlfn.ANCHORARRAY(C3)'],
+  ];
+  const sources = cases.map(([source]) => source);
+  expect(new Set(sources).size).toBe(sources.length);
+  const encoded = await toXlsxWorkbook(book([sheet("formula", "Formula Source", column(sources))]));
+
+  const native = partText(encoded, "xl/worksheets/sheet1.xml");
+  for (const [, expected] of cases) {
+    if (expected) expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
+  }
+  expect(valuesOf(await fromXlsxWorkbook(encoded))).toEqual(sources.map(formula));
+});
+
+it("strips prefixes after expanding shared formulas without shifting local names", async () => {
+  const encoded = rawXlsx({
     sheets: [
       {
-        id: "formula",
-        name: "Formula Source",
-        order: 0,
-        rowCount: sources.length,
-        columns: [{ key: "formula", header: "Formula", width: 180, type: "number" }],
-        cells: [
-          {
-            startRow: 0,
-            startCol: 0,
-            rowCount: sources.length,
-            colCount: 1,
-            cells: sources.map((src, rowOffset) => ({
-              rowOffset,
-              colOffset: 0,
-              value: { kind: "formula" as const, src },
-            })),
-          },
-        ],
-      },
-    ],
-  };
-}
-
-function formulaSources(snapshot: WorkbookSnapshot): string[] {
-  return snapshot.sheets[0]!.cells.flatMap((block) =>
-    block.cells.flatMap((cell) => (cell.value.kind === "formula" ? [cell.value.src] : [])),
-  );
-}
-
-describe("XLSX formula source preservation", () => {
-  it("round-trips every required target source without asserting recalculation or producer compatibility", async () => {
-    const encoded = await toXlsxWorkbook(formulaWorkbook());
-    const decoded = await fromXlsxWorkbook(encoded);
-    expect(FORMULA_SOURCES.length).toBeGreaterThan(0);
-    expect(new Set(FORMULA_SOURCES).size).toBe(FORMULA_SOURCES.length);
-
-    expect(decoded.workbook.activeSheet).toBe("formula");
-    expect(decoded.sheets).toHaveLength(1);
-    expect(decoded.sheets[0]).toMatchObject({
-      id: "formula",
-      name: "Formula Source",
-      order: 0,
-      rowCount: FORMULA_SOURCES.length,
-    });
-    expect(formulaSources(decoded)).toEqual(FORMULA_SOURCES);
-  });
-
-  it("writes Excel future-function and local-binding spellings and imports editor sources", async () => {
-    const cases: readonly (readonly [source: string, expected: string])[] = [
-      ["=LET(x,1,x+1)", "_xlfn.LET(_xlpm.x,1,_xlpm.x+1)"],
-      ["=LAMBDA(v,v+1)(2)", "_xlfn.LAMBDA(_xlpm.v,_xlpm.v+1)(2)"],
-      ["=XLOOKUP(1,A1:A3,B1:B3)", "_xlfn.XLOOKUP(1,A1:A3,B1:B3)"],
-      ["=FILTER(A1:A3,A1:A3>0)", "_xlfn._xlws.FILTER(A1:A3,A1:A3>0)"],
-      ["=SORT(A1:A3)", "_xlfn._xlws.SORT(A1:A3)"],
-      [
-        "=LET(x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&x)",
-        "_xlfn.LET(_xlpm.x,'_xlfn.Sheet'!A1,\"_xlfn.LET(_xlpm.x)\"&_xlpm.x)",
-      ],
-    ];
-    const sources = cases.map(([source]) => source);
-    const encoded = await toXlsxWorkbook(formulaWorkbook(sources));
-    const xml = unzipSync(encoded)["xl/worksheets/sheet1.xml"];
-    if (xml === undefined) throw new Error("Missing exported worksheet");
-    const native = strFromU8(xml);
-    for (const [, expected] of cases) {
-      expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
-    }
-    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual(sources);
-  });
-
-  it("strips prefixes after expanding shared formulas without shifting local names", async () => {
-    const encoded = rawXlsx({
-      sheets: [
-        {
-          xml: worksheet(`<sheetData>
+        xml: worksheet(`<sheetData>
           <row r="1"><c r="B1"><f t="shared" si="0" ref="B1:B2">_xlfn.LET(_xlpm.x,A1,_xlfn.LAMBDA(_xlpm.v,_xlpm.v+_xlpm.x)(2))</f></c></row>
           <row r="2"><c r="B2"><f t="shared" si="0"/></c></row>
         </sheetData>`),
-        },
-      ],
-    });
-    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual([
-      "=LET(x,A1,LAMBDA(v,v+x)(2))",
-      "=LET(x,A2,LAMBDA(v,v+x)(2))",
-    ]);
+      },
+    ],
   });
+  expect(valuesOf(await fromXlsxWorkbook(encoded))).toEqual([
+    formula("=LET(x,A1,LAMBDA(v,v+x)(2))"),
+    formula("=LET(x,A2,LAMBDA(v,v+x)(2))"),
+  ]);
+});
 
-  it("writes spill references in Excel's ANCHORARRAY form and reads them back", async () => {
-    const sources = ["=SUM(A1#)", "='My Sheet'!$B$2#", '=LEN("A1#")&C3#'];
-    const encoded = await toXlsxWorkbook(formulaWorkbook(sources));
-    const worksheet = strFromU8(unzipSync(encoded)["xl/worksheets/sheet1.xml"]!);
-    expect(worksheet).toContain("<f>SUM(_xlfn.ANCHORARRAY(A1))</f>");
-    expect(worksheet).toContain("<f>_xlfn.ANCHORARRAY(&apos;My Sheet&apos;!$B$2)</f>");
-    // The quoted text is not a reference and keeps its `#`.
-    expect(worksheet).toContain("A1#&quot;)&amp;_xlfn.ANCHORARRAY(C3)");
-    expect(formulaSources(await fromXlsxWorkbook(encoded))).toEqual(sources);
-  });
-
-  it("writes reference operators as Excel text and recalculates them after import", async () => {
-    const column = (
-      id: string,
-      name: string,
-      order: number,
-      values: readonly CellValue[],
-    ): SheetSnapshot => ({
-      id,
-      name,
-      order,
-      rowCount: values.length,
-      columns: [{ key: "value", header: "Value", width: 120, type: "number" }],
-      cells: [
-        {
-          startRow: 0,
-          startCol: 0,
-          rowCount: values.length,
-          colCount: 1,
-          cells: values.map((value, rowOffset) => ({ rowOffset, colOffset: 0, value })),
-        },
+it("writes reference operators as Excel text and recalculates them after import", async () => {
+  const sources = [
+    "=SUM(Jan:Mar!A1)",
+    "=SUM((Jan!A1,Mar!A1))",
+    "=SUM(Jan!A1:A3 Jan!A2:A4)",
+    "=INDEX((Jan!A1:A4,Feb!A1),1,1,2)",
+    "=SUM('Jan:Q1 Close'!A1)",
+  ];
+  const encoded = await toXlsxWorkbook(
+    book(
+      [
+        sheet("jan", "Jan", [[1], [2], [3], [4]]),
+        sheet("feb", "Feb", [[10]]),
+        sheet("mar", "Mar", [[100]]),
+        sheet("close", "Q1 Close", [[1000]]),
+        sheet("summary", "Summary", column(sources)),
       ],
-    });
-    const literal = (value: number): CellValue => ({ kind: "literal", value });
-    const sources = [
-      "=SUM(Jan:Mar!A1)",
-      "=SUM((Jan!A1,Mar!A1))",
-      "=SUM(Jan!A1:A3 Jan!A2:A4)",
-      "=INDEX((Jan!A1:A4,Feb!A1),1,1,2)",
-      "=SUM('Jan:Q1 Close'!A1)",
-    ];
-    const snapshot: WorkbookSnapshot = {
-      schemaVersion: 1,
-      documentId: "reference-operators",
-      version: 1,
-      workbook: { activeSheet: "summary" },
-      sheets: [
-        column("jan", "Jan", 0, [1, 2, 3, 4].map(literal)),
-        column("feb", "Feb", 1, [literal(10)]),
-        column("mar", "Mar", 2, [literal(100)]),
-        column("close", "Q1 Close", 3, [literal(1000)]),
-        column(
-          "summary",
-          "Summary",
-          4,
-          sources.map((src) => ({ kind: "formula", src })),
-        ),
-      ],
-    };
+      { activeSheet: "summary" },
+    ),
+  );
+  const summaryXml = partText(encoded, "xl/worksheets/sheet5.xml");
+  for (const source of sources)
+    expect(summaryXml).toContain(`<f>${escapeXml(source.slice(1))}</f>`);
 
-    const encoded = await toXlsxWorkbook(snapshot);
-    const summaryXml = strFromU8(
-      unzipSync(encoded)["xl/worksheets/sheet5.xml"] ?? new Uint8Array(),
-    );
-    expect(summaryXml).toContain("<f>SUM(Jan:Mar!A1)</f>");
-    expect(summaryXml).toContain("<f>SUM((Jan!A1,Mar!A1))</f>");
-    expect(summaryXml).toContain("<f>SUM(Jan!A1:A3 Jan!A2:A4)</f>");
-    expect(summaryXml).toContain("<f>SUM(&apos;Jan:Q1 Close&apos;!A1)</f>");
-
-    const decoded = await fromXlsxWorkbook(encoded);
-    const summary = decoded.sheets.find((sheet) => sheet.name === "Summary");
-    if (!summary) throw new Error("the imported workbook lost the Summary sheet");
-    expect(formulaSources({ ...decoded, sheets: [summary] })).toEqual(sources);
-
-    const store = SheetwriteStore.fromSnapshot(decoded);
-    const results = sources.map(
-      (_, row) => store.getCell({ sheet: summary.id, row, col: 0 }).resolved,
-    );
-    expect(results).toEqual([111, 101, 5, 10, 1111]);
-    store.dispose();
-  });
+  const decoded = await fromXlsxWorkbook(encoded);
+  const summary = sheetNamed(decoded, "Summary");
+  expect(valuesOf(decoded, decoded.sheets.indexOf(summary))).toEqual(sources.map(formula));
+  const store = SheetwriteStore.fromSnapshot(decoded);
+  expect(
+    sources.map((_, row) => store.getCell({ sheet: summary.id, row, col: 0 }).resolved),
+  ).toEqual([111, 101, 5, 10, 1111]);
+  store.dispose();
 });

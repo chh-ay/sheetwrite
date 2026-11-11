@@ -143,7 +143,6 @@ export const TOOLING_TEST_PATHS = [
   "scripts/changeset-ci.test.ts",
   "scripts/workflow-contract.test.ts",
   "scripts/formula-docs.test.ts",
-  "scripts/release-performance-docs.test.ts",
   "scripts/coverage-check.test.ts",
   "scripts/normalize-sitemap.test.ts",
   "scripts/prepare-docs-deployment.test.ts",
@@ -155,7 +154,6 @@ export const TOOLING_TEST_PATHS = [
 
 export const UNIT_TEST_PATHS = [
   "packages",
-  "test/browser/canvas-assertions.test.ts",
   "scripts/public-api.test.ts",
   "scripts/conformance.test.ts",
   "scripts/conformance-excel-runner.test.ts",

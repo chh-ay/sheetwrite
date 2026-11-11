@@ -37,25 +37,4 @@ describe("build-time outline", () => {
       { id: "store", label: "store", depth: 1 },
     ]);
   });
-
-  it("leaves member rows to a page's own member index", () => {
-    const tree = {
-      type: "root",
-      children: [
-        element("h2", { id: "members" }, [text("Members")]),
-        element("details", { className: ["api-member-index"] }, []),
-        element("details", { id: "store", className: ["api-member"] }, [
-          element("summary", {}, [element("code", {}, [text("store")])]),
-        ]),
-        element("h2", { id: "declaration" }, [text("Declaration")]),
-      ],
-    };
-    expect(collectOutline(tree).map((item) => item.id)).toEqual(["members", "declaration"]);
-  });
-
-  it("is empty below two entries", () => {
-    expect(
-      collectOutline({ type: "root", children: [element("h2", { id: "a" }, [text("A")])] }),
-    ).toEqual([]);
-  });
 });

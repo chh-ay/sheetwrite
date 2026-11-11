@@ -942,8 +942,9 @@ describe("SheetwriteStore clipboard bulk reads", () => {
 
       store.setViewSort("s1", [{ col: 1, ascending: false }]);
       const sorted = store.getClipboardWindow("s1", { start: 0, end: 10 }, [1]);
-      expect(Array.from(sorted.dataRows)).not.toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
       expect(sorted.values).toHaveLength(10);
+      const amounts = Array.from(sorted.values, Number);
+      expect(amounts).toEqual([...amounts].sort((left, right) => right - left));
       expect(sorted.ffiCalls).toBe(4);
       const sortedRows = Array.from(sorted.dataRows);
       expect(sorted.formulas).toEqual([{ offset: sortedRows.indexOf(0), source: "=1+1" }]);
