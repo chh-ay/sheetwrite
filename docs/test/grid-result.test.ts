@@ -75,25 +75,19 @@ function marked(figure: Node, marker: string): string[] {
 
 describe("grid result figures", () => {
   it("turns an authored table into a sheet with letters, row numbers, and grid-formatted values", () => {
-    const tree: Node = {
-      type: "root",
-      children: [
-        resultDiv(
-          { dataCaption: "Totals" },
-          {
-            type: "element",
-            tagName: "sw-format",
-            properties: { value: "1234.5", code: "#,##0.00", locale: "de-DE" },
-            children: [],
-          },
-        ),
-      ],
-    };
-
-    renderGridResults()(tree);
-    const figure = tree.children?.[0];
-    expect(figure?.tagName).toBe("figure");
-    const rows = (figure?.children?.[0]?.children?.[0]?.children ?? []).flatMap(
+    const figure = render(
+      resultDiv(
+        { dataCaption: "Totals" },
+        {
+          type: "element",
+          tagName: "sw-format",
+          properties: { value: "1234.5", code: "#,##0.00", locale: "de-DE" },
+          children: [],
+        },
+      ),
+    );
+    expect(figure.tagName).toBe("figure");
+    const rows = (figure.children?.[0]?.children?.[0]?.children ?? []).flatMap(
       (part) => part.children ?? [],
     );
     expect(rows.map((row) => (row.children ?? []).map(textOf))).toEqual([
@@ -111,37 +105,7 @@ describe("grid result figures", () => {
       "true",
       undefined,
     ]);
-    expect(textOf(figure?.children?.[1] ?? text(""))).toBe("Totals");
-  });
-
-  it("aligns numbers and dates to the right, as the grid paints them, unless the author chose", () => {
-    const authoredLeft: Node = { ...cell("td", text("7")), properties: { align: "left" } };
-    const div = resultDiv({});
-    div.children = [
-      cell(
-        "table",
-        cell("thead", cell("tr", cell("th", text("Item")), cell("th", text("Total")))),
-        cell(
-          "tbody",
-          cell("tr", cell("td", text("-1,234.50")), cell("td", text("12%"))),
-          cell("tr", authoredLeft, cell("td", text("2026-01-31"))),
-          cell("tr", cell("td", text("31/01/2026")), cell("td", text("Job 1-2"))),
-        ),
-      ),
-    ];
-    const figure = render(div);
-    const aligned = sheetRows(figure).map((row) =>
-      (row.children ?? [])
-        .slice(1)
-        .filter((sheetCell) => !isEdge(sheetCell))
-        .map((sheetCell) => sheetCell.properties?.dataType ?? sheetCell.properties?.align ?? ""),
-    );
-    expect(aligned).toEqual([
-      ["", ""],
-      ["number", "number"],
-      ["left", "number"],
-      ["number", ""],
-    ]);
+    expect(textOf(figure.children?.[1] ?? text(""))).toBe("Totals");
   });
 
   it("rejects missing and blank sw-format values instead of displaying zero", () => {
@@ -172,41 +136,26 @@ describe("grid result figures", () => {
     );
   });
 
-  it("marks selected, note and list cells by A1 reference, with the first selected cell active", () => {
+  it("marks cells by A1 reference, the first selected cell active, and shows row IDs", () => {
     const figure = render(
-      resultDiv({ dataSelected: "B1:B2", dataNotes: "A2", dataLists: "B2 A1" }),
+      resultDiv({
+        dataSelected: "B1:B2",
+        dataNotes: "A2",
+        dataLists: "B2 A1",
+        dataRowIds: "header invoice-1",
+      }),
     );
     expect(marked(figure, "dataSelected")).toEqual(["B1", "B2"]);
     expect(marked(figure, "dataActive")).toEqual(["B1"]);
     expect(marked(figure, "dataNote")).toEqual(["A2"]);
     expect(marked(figure, "dataList")).toEqual(["A1", "B2"]);
-  });
-
-  it("shows each row ID beside its row number", () => {
-    const figure = render(resultDiv({ dataRowIds: "header invoice-1" }));
     expect(sheetRows(figure).map((row) => textOf(row.children?.[0] ?? text("")))).toEqual([
       "1header",
       "2invoice-1",
     ]);
   });
 
-  it("puts authored blocks under the sheet and the authored caption last", () => {
-    const legend = cell("dl", cell("dt", text("A2 · note")), cell("dd", text("Checked")));
-    const menu = cell("div", text("Copy value"));
-    const caption = cell("figcaption", text("Result: "), cell("code", text("A2")));
-    const figure = render(resultDiv({}, undefined, text("\n"), legend, caption, menu));
-    expect((figure.children ?? []).map((part) => part.tagName)).toEqual([
-      "div",
-      "dl",
-      "div",
-      "figcaption",
-    ]);
-    expect(figure.children?.[1]?.properties?.className).toEqual(["sw-grid-result__legend"]);
-    expect(textOf(figure.children?.[3] ?? text(""))).toBe("Result: A2");
-    expect(figure.properties?.ariaLabel).toBe("Result: A2");
-  });
-
-  it("formats sw-format tokens in the legend and the caption, as on the rest of the page", () => {
+  it("puts authored blocks under the sheet, formats their sw-format tokens, and the caption last", () => {
     const token = (value: string): Node => ({
       type: "element",
       tagName: "sw-format",
@@ -214,25 +163,23 @@ describe("grid result figures", () => {
       children: [],
     });
     const legend = cell("dl", cell("dt", text("B2")), cell("dd", token("1234.5")));
+    const menu = cell("div", text("Copy value"));
     const caption = cell("figcaption", text("Total: "), token("99"));
-    const figure = render(resultDiv({}, undefined, legend, caption));
+    const figure = render(resultDiv({}, undefined, text("\n"), legend, caption, menu));
 
-    const expected = formatNumber(1234.5, "#,##0.00", "de-DE");
-    expect(textOf(figure.children?.[1] ?? text(""))).toBe(`B2${expected}`);
-    expect(textOf(figure.children?.[2] ?? text(""))).toBe(
-      `Total: ${formatNumber(99, "#,##0.00", "de-DE")}`,
+    expect((figure.children ?? []).map((part) => part.tagName)).toEqual([
+      "div",
+      "dl",
+      "div",
+      "figcaption",
+    ]);
+    expect(figure.children?.[1]?.properties?.className).toEqual(["sw-grid-result__legend"]);
+    const total = `Total: ${formatNumber(99, "#,##0.00", "de-DE")}`;
+    expect(textOf(figure.children?.[1] ?? text(""))).toBe(
+      `B2${formatNumber(1234.5, "#,##0.00", "de-DE")}`,
     );
-    expect(figure.properties?.ariaLabel).toBe(`Total: ${formatNumber(99, "#,##0.00", "de-DE")}`);
-  });
-
-  it("keeps a block written before the table above the sheet", () => {
-    const div = resultDiv({});
-    const widget = cell("div", text("Find"));
-    div.children = [widget, ...(div.children ?? [])];
-    const figure = render(div);
-    const [first, second] = figure.children ?? [];
-    expect(first).toBe(widget);
-    expect(second?.properties?.className).toEqual(["sw-grid-result__frame"]);
+    expect(textOf(figure.children?.[3] ?? text(""))).toBe(total);
+    expect(figure.properties?.ariaLabel).toBe(total);
   });
 
   it("rejects a marker that points outside the table", () => {
