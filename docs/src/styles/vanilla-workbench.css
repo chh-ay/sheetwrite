@@ -346,11 +346,13 @@
   line-height: 1.5;
 }
 
-/* The lifecycle instrument: its sections in as many columns as fit. */
+/* The lifecycle instrument under the grid: host state and the resources it
+   owns as one strip, then the open scenario across the band (its steps as
+   cards on wider screens), then the debug controls in a row of their own. */
 .sw-vw-instrument {
   display: grid;
   min-height: 0;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
   background: var(--sw-surface-0);
 }
@@ -526,6 +528,52 @@
   color: var(--sw-fg);
   font-size: var(--sw-text-small);
   line-height: 1.5;
+}
+
+@media (min-width: 52rem) {
+  .sw-vw-instrument {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+
+  .sw-vw-instrument > :is(section, .sw-vw-details) {
+    grid-column: 1 / -1;
+  }
+
+  .sw-vw-instrument > :is(.sw-vw-identity, .sw-vw-ownership) {
+    align-self: stretch;
+  }
+
+  .sw-vw-identity > div {
+    grid-template-columns: auto auto;
+    gap: var(--sw-space-3);
+    align-items: center;
+    justify-content: start;
+  }
+
+  .sw-vw-ownership {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sw-space-4);
+    border-left: 1px solid var(--sw-border);
+  }
+
+  .sw-vw-ownership > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sw-space-1);
+    align-content: start;
+  }
+
+  .sw-vw-challenge ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sw-space-3);
+  }
+
+  .sw-vw-challenge li {
+    align-content: start;
+    padding: var(--sw-space-3);
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-radius-md);
+    background: var(--sw-surface-1);
+  }
 }
 
 .sw-vw .sw-demo-radio-group {
