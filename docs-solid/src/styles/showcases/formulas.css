@@ -23,9 +23,30 @@
   list-style: none;
 }
 
-/* Two columns in the wide band, so the recipes are no taller than the groups
-   beside them. */
+/* The wide band: the recipes and their detail take two of three columns, and
+   the one-button groups (change the data, try a formula) stack in the third,
+   so every column ends near the others. */
 @media (min-width: 72rem) {
+  .sw-showcase__controls:has(.sw-fx-recipes) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    align-content: start;
+  }
+
+  .sw-showcase__controls:has(.sw-fx-recipes) > :nth-child(1) {
+    grid-row: 1;
+    grid-column: 3;
+  }
+
+  .sw-showcase__controls:has(.sw-fx-recipes) > :nth-child(2) {
+    grid-row: 1 / span 2;
+    grid-column: 1 / span 2;
+  }
+
+  .sw-showcase__controls:has(.sw-fx-recipes) > :nth-child(3) {
+    grid-row: 2;
+    grid-column: 3;
+  }
+
   .sw-fx-recipes {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     column-gap: var(--sw-space-2);
