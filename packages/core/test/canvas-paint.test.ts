@@ -8,6 +8,7 @@ import {
   paintFrame,
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
+import { dateToSerial } from "../src/date-serial.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellStyle, RenderLayout, Theme, Viewport, VisibleWindowView } from "../src/types.js";
@@ -307,8 +308,6 @@ describe("paintFrame number formats", () => {
   });
 });
 
-describe("paintFrame vertical alignment", () => {});
-
 describe("paintFrame variable row heights", () => {
   it("examines only visible merge intersections with thousands offscreen", () => {
     const merges = Array.from({ length: 10_000 }, (_, index) => ({
@@ -456,7 +455,52 @@ describe("paintFrame typography and wrapping", () => {
   });
 });
 
-describe("paintFrame text decorations", () => {
+describe("paintFrame compiled number formats", () => {
+  it("paints fixed-decimal and named-date values consistently across cells", () => {
+    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows: { start: 0, end: 3 },
+      cols: [0, 1],
+      values: [1234.5, serial, 1234.5, serial, 1234.5, serial],
+      styleIds: new Uint32Array(6),
+      styles: [{}],
+    };
+    const layout = makeLayout([
+      {
+        key: "amount",
+        header: "Amount",
+        width: 120,
+        type: "number",
+        numberFormat: "#,##0.00",
+        numberLocale: "en-US",
+      },
+      {
+        key: "date",
+        header: "Date",
+        width: 120,
+        type: "date",
+        numberFormat: "mmmm d",
+        numberLocale: "en-US",
+      },
+    ]);
+
+    const ctx = render(view, layout, UNIFORM_VIEWPORT);
+    expect(ctx.fillTexts.filter((call) => call.text === "1,234.50")).toHaveLength(3);
+    expect(ctx.fillTexts.filter((call) => call.text === "July 4")).toHaveLength(3);
+  });
+});
+
+describe("scroll blit and damage-band integrity", () => {
+  const blitViewport = (scrollTop: number): Viewport => ({
+    scrollTop,
+    scrollLeft: 0,
+    width: 400,
+    height: 300,
+    contentRevision: 7,
+  });
+
   function runBlit(prevTop: number, nextTop: number, dpr = 1) {
     const ctx = makeRecordingCtx();
     const draws: unknown[][] = [];
