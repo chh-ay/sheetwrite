@@ -146,6 +146,17 @@ describe("note editor", () => {
     expect(target.getNote(NOTED)).toBe("Check the totals");
   });
 
+  it("deletes the note when the committed text is empty", () => {
+    const { host, grid: target } = mount();
+
+    openEditor(target, NOTED);
+    const editor = noteEditor(host);
+    editor.value = "   ";
+    press(editor, { key: "Enter", metaKey: true });
+
+    expect(target.getNote(NOTED)).toBeNull();
+  });
+
   it("leaves the note unchanged on Escape and returns focus to the grid", () => {
     const { host, grid: target } = mount();
 
@@ -172,6 +183,15 @@ describe("note editor", () => {
 });
 
 describe("deleteNote", () => {
+  it("removes the focus cell's note", () => {
+    const { grid: target } = mount();
+    target.setSelection({ kind: "cell", addr: NOTED });
+
+    target.actions.deleteNote();
+
+    expect(target.getNote(NOTED)).toBeNull();
+  });
+
   it("keeps the note on a read-only grid", () => {
     const { grid: target } = mount({ readOnly: true });
     target.setSelection({ kind: "cell", addr: NOTED });

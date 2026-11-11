@@ -414,6 +414,63 @@ describe("SheetTabs", () => {
     expect(moves).toEqual(["a:2"]);
   });
 
+  it("reconciles remote rename, reorder, and removal while editing by stable ID", () => {
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onRename: (id) => applied(id),
+    });
+    tabs.update(SHEETS, "b");
+    tabButtons(host)[1]!.focus();
+    key(host, "F2");
+    let input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    inputText(input, "Local draft");
+
+    tabs.update(
+      [
+        { id: "c", name: "Summary" },
+        { id: "b", name: "Remote Sales" },
+        { id: "a", name: "Sales" },
+      ],
+      "b",
+    );
+    input = host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")!;
+    expect(input.value).toBe("Local draft");
+    expect(input.dataset.sheetId).toBe("b");
+    expect(document.activeElement).toBe(input);
+    key(input, "Escape");
+    expect(tabButtons(host).map((button) => button.textContent)).toEqual([
+      "Summary",
+      "Remote Sales",
+      "Sales",
+    ]);
+
+    tabButtons(host)[1]!.focus();
+    key(host, "F2");
+    tabs.update(
+      [
+        { id: "c", name: "Summary" },
+        { id: "b", name: "Server final" },
+        { id: "a", name: "Sales" },
+      ],
+      "b",
+    );
+    expect(host.querySelector<HTMLInputElement>(".sheetwrite-tab-input")?.value).toBe(
+      "Server final",
+    );
+
+    tabs.update(
+      [
+        { id: "c", name: "Summary" },
+        { id: "a", name: "Sales" },
+      ],
+      "c",
+    );
+    expect(host.querySelector(".sheetwrite-tab-input")).toBeNull();
+    expect(document.activeElement).toBe(tabButtons(host)[1]!);
+    expect(tabButtons(host).map((button) => button.tabIndex)).toEqual([-1, 0]);
+  });
+
   it("suppresses mutation affordances in read-only mode while preserving navigation", () => {
     const actions: string[] = [];
     tabs.destroy();

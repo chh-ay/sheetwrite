@@ -397,6 +397,20 @@ describe("pointer input: drag lifecycle", () => {
     store.dispose();
   });
 
+  it("abandons a fill when structure changes before release", () => {
+    const { grid, store, scroller, workbook, capture } = makeGrid();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    const before = store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved;
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(2, 1, workbook)));
+    grid.setColumnWidth(0, 200);
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(2, 1, workbook)));
+    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe(before);
+    expect(capture.released).toEqual([1]);
+    grid.destroy();
+    store.dispose();
+  });
+
   for (const axis of ["column", "row"] as const) {
     it(`restores ${axis} preview geometry when structural admission rejects release`, () => {
       const { grid, store, scroller } = makeGrid();
