@@ -54,7 +54,7 @@
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^21.0.4",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.63.0",
     "@types/bun": "^1.4.3",
     "typescript": "^7.0.2"
   },
