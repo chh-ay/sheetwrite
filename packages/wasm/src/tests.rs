@@ -2310,6 +2310,26 @@ fn distinct_values_limit_stops_the_first_seen_scan() {
 }
 
 #[test]
+fn distinct_values_in_rows_reads_only_the_row_range() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 16);
+    fill_mixed_distinct_column(&mut store, sheet);
+
+    // Rows 11..14 hold "Alpha", a formula that evaluates to "Alpha", and "Beta".
+    let mut middle = store.distinct_values_in_rows(sheet, 0, 11, 14, 0);
+    assert_eq!(middle.take_kinds(), vec![2, 2]);
+    assert_eq!(middle.take_texts(), vec!["Alpha", "Beta"]);
+
+    // A range past the last row is clipped to the sheet.
+    let mut tail = store.distinct_values_in_rows(sheet, 0, 14, 100, 0);
+    assert_eq!(tail.take_kinds(), vec![3, 1]);
+    assert_eq!(
+        distinct_number_bits(&mut tail),
+        vec![0.0f64.to_bits(), 1.0f64.to_bits()]
+    );
+}
+
+#[test]
 fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
     let mut store = CellStore::new();
     let _earlier_sheet = store.add_sheet(1, 1);

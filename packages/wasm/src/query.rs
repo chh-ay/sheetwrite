@@ -842,8 +842,25 @@ impl CellStore {
         out
     }
 
+    /// Distinct resolved values of a whole column, in first-seen order.
     #[wasm_bindgen(js_name = distinctValues)]
     pub fn distinct_values(&self, sheet: usize, col: usize, limit: usize) -> DistinctColumn {
+        self.distinct_values_in_rows(sheet, col, 0, usize::MAX, limit)
+    }
+
+    /// Distinct resolved values of one column over the canonical data rows
+    /// `start_row..end_row`, in first-seen order. The range is clipped to the
+    /// sheet. A zero `limit` returns every value; otherwise the scan stops at
+    /// `limit` values.
+    #[wasm_bindgen(js_name = distinctValuesInRows)]
+    pub fn distinct_values_in_rows(
+        &self,
+        sheet: usize,
+        col: usize,
+        start_row: usize,
+        end_row: usize,
+        limit: usize,
+    ) -> DistinctColumn {
         let mut out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
             return out;
@@ -851,6 +868,8 @@ impl CellStore {
         if col >= data.cells.n_cols() {
             return out;
         }
+        let row_count = data.cells.row_count();
+        let rows = start_row.min(row_count)..end_row.min(row_count);
         let text_at = |index: usize| {
             resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or("")
         };
@@ -866,7 +885,7 @@ impl CellStore {
             let mut stamps = PoolIdStamps::new();
             let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
             let mut needs_content = false;
-            for row in 0..data.cells.row_count() {
+            for row in rows.clone() {
                 let index = col * data.cells.row_count() + row;
                 let kind = resolved_kind(data, index, &self.formula_slots);
                 let fresh = match kind {

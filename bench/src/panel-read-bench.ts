@@ -1,7 +1,7 @@
 // Panel reads of a large source range: the pivot field list (distinct values
-// of a filter field), dashboard slicer values and Insert › Chart (category and
-// header inference). The output records each result so two runs can be
-// compared for equality.
+// of a filter field), dashboard slicer values, a dashboard pivot's output and
+// Insert › Chart (category and header inference). The output records each
+// result so two runs can be compared for equality.
 
 import "./dom-setup.js";
 import { createHash } from "node:crypto";
@@ -10,7 +10,10 @@ import { cpus, hostname } from "node:os";
 
 import * as formulas from "@sheetwrite/formulas";
 
-import { slicerValuesOf } from "../../packages/core/src/dashboard/dashboard-engine.js";
+import {
+  pivotOutputOf,
+  slicerValuesOf,
+} from "../../packages/core/src/dashboard/dashboard-engine.js";
 import {
   createGrid,
   initSheetwrite,
@@ -28,6 +31,7 @@ const SOURCE_ROWS = 100_000;
 const GROUP_COUNT = 32;
 const WARMUPS = 5;
 const SAMPLES = 30;
+const REPORT_SHEET = "report";
 const SHEET = "source";
 const HOST_WIDTH_PX = 900;
 const HOST_HEIGHT_PX = 500;
@@ -70,6 +74,16 @@ const pivot: PivotDefinition = {
   values: [],
   filters: [{ field: 0, values: groups }],
 };
+/** One output row per source row: the largest output a dashboard pivot reads. */
+const outputPivot: PivotDefinition = {
+  id: "output-pivot",
+  name: "OutputPivot",
+  source: { range },
+  anchor: { row: 0, col: 0 },
+  rows: [1],
+  columns: [],
+  values: [{ field: 0, aggregation: "COUNT" }],
+};
 const table = {
   id: "panel-table",
   name: "PanelTable",
@@ -90,7 +104,10 @@ const slicer: DashboardSlicerItem = {
 const grid = createGrid(host, {
   workbook: {
     activeSheet: SHEET,
-    sheets: [{ id: SHEET, name: "Source", rowCount: ROW_COUNT, columns, tables: [table] }],
+    sheets: [
+      { id: SHEET, name: "Source", rowCount: ROW_COUNT, columns, tables: [table] },
+      { id: REPORT_SHEET, name: "Report", kind: "dashboard", rowCount: 0, columns: [] },
+    ],
   },
   data: { rowCount: ROW_COUNT, columns: { region: labels, amount: amounts } },
   config: { toolbar: false, find: false, contextMenu: false },
@@ -112,6 +129,9 @@ function measure(run: () => () => void): number[] {
 
 try {
   if (grid.setPivot(pivot, SHEET).status !== "applied") throw new Error("pivot was not applied");
+  if (grid.setPivot(outputPivot, REPORT_SHEET).status !== "applied") {
+    throw new Error("output pivot was not applied");
+  }
 
   const body = document.createElement("div");
   let pivotPanelDigest = "";
@@ -129,6 +149,16 @@ try {
     const values = slicerValuesOf(grid.store, slicer);
     return () => {
       slicerValues = JSON.stringify(values);
+    };
+  });
+
+  let pivotOutputDigest = "";
+  const pivotOutputMs = measure(() => {
+    const read = pivotOutputOf(grid.store, REPORT_SHEET, 0);
+    if (read === null) throw new Error("dashboard pivot output is missing");
+    return () => {
+      const text = JSON.stringify(read);
+      pivotOutputDigest = createHash("sha256").update(text).digest("hex");
     };
   });
 
@@ -159,9 +189,10 @@ try {
         groups: GROUP_COUNT,
         warmups: WARMUPS,
         samples: SAMPLES,
-        results: { pivotPanelDigest, slicerValues, chartDefinition },
+        results: { pivotPanelDigest, slicerValues, pivotOutputDigest, chartDefinition },
         pivotPanelMs: summarize(pivotMs),
         slicerValuesMs: summarize(slicerMs),
+        pivotOutputMs: summarize(pivotOutputMs),
         insertChartMs: summarize(chartMs),
       },
       null,
