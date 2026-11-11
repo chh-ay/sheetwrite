@@ -41,8 +41,8 @@ fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<S
         .collect()
 }
 
-pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) {
-    out.text(&entry.source());
+pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32, names: &[String]) {
+    out.text(&entry.source(names));
     out.bool(entry.is_reference());
 
     if entry.is_reference() {
@@ -99,8 +99,6 @@ impl CellStore {
             Some(Ast::AbsCell(
                 SheetRef {
                     handle: target.sheet,
-                    name: self.sheet_names[target.sheet as usize].clone(),
-                    quoted: false,
                 },
                 target.row,
                 target.col,
@@ -409,7 +407,7 @@ impl CellStore {
             for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
                 out.u32(row);
                 out.u32(col);
-                write_formula(&mut out, entry, sheet as u32);
+                write_formula(&mut out, entry, sheet as u32, &self.sheet_names);
             }
         }
 

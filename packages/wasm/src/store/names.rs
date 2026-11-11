@@ -7,7 +7,8 @@
 //! Expansion happens when the formula is parsed, like the expansion of named
 //! ranges, so evaluation reads no name table. Every change that alters an
 //! expansion (a definition, a sheet, a table, a row or column edit)
-//! re-resolves every formula through `refresh_named_formula_entries`.
+//! re-resolves every formula through `refresh_named_formula_entries`. Bound
+//! sheet references retain only handles; rewritten source uses the registry.
 //!
 //! As in Excel, relative references in a name's formula are relative to cell
 //! A1, and a formula at C5 that uses the name reads them two columns right
@@ -83,11 +84,11 @@ enum Visit {
 impl Definition {
     /// Rewrite the tree with `rewrite`; the source follows a changed tree in
     /// the references it writes differently.
-    fn rewrite(&mut self, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+    fn rewrite(&mut self, names: &[String], rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         if !rewrite(&mut self.ast) {
             return false;
         }
-        self.source = write_references(&self.source, &self.ast);
+        self.source = write_references(&self.source, &self.ast, names);
         true
     }
 }
@@ -466,7 +467,7 @@ impl CellStore {
                 continue;
             };
             refresh |= definition.positional
-                | definition.rewrite(|ast| {
+                | definition.rewrite(&self.sheet_names, |ast| {
                     if columns {
                         shift_cols(ast, at, delta, NO_SHEET, edited_sheet)
                     } else {
@@ -492,7 +493,7 @@ impl CellStore {
             refresh |= match definition {
                 DefinedName::Formula(definition) => {
                     definition.positional
-                        | definition.rewrite(|ast| {
+                        | definition.rewrite(&self.sheet_names, |ast| {
                             move_refs(ast, edited_sheet, NO_SHEET, columns, (from, count, to))
                         })
                 }
@@ -519,7 +520,9 @@ impl CellStore {
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         for definition in self.defined_names.values_mut() {
             if let DefinedName::Formula(definition) = definition {
-                definition.rewrite(|ast| rename_sheet_refs(ast, handle, name));
+                definition.rewrite(&self.sheet_names, |ast| {
+                    rename_sheet_refs(ast, handle, name)
+                });
             }
         }
     }
@@ -530,7 +533,8 @@ impl CellStore {
         let mut changed = false;
         for definition in self.defined_names.values_mut() {
             if let DefinedName::Formula(definition) = definition {
-                changed |= definition.rewrite(|ast| invalidate_sheet_refs(ast, handle));
+                changed |=
+                    definition.rewrite(&self.sheet_names, |ast| invalidate_sheet_refs(ast, handle));
             }
         }
         changed
@@ -619,10 +623,7 @@ fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTa
         return NameTarget::Range(range);
     }
     if formula_sheet == NO_SHEET && depth > 0 {
-        let absolute = RefFlags {
-            row_abs: true,
-            col_abs: true,
-        };
+        let absolute = RefFlags::new(true, true);
         return NameTarget::Reference(Ast::Range(
             range.row_start,
             range.col_start,
@@ -646,10 +647,10 @@ fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTa
 fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
     let nodes = expanded_nodes(&expression);
     let expression = if nodes > EXPANSION_NODE_LIMIT {
-        Ast::Array {
+        Ast::Array(Box::new(crate::calc::ArrayLiteral {
             cols: 1,
             values: vec![Value::Error(FormulaError::Num)],
-        }
+        }))
     } else {
         expression
     };
@@ -664,7 +665,12 @@ fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
 fn expanded_nodes(ast: &Ast) -> usize {
     let children = match ast {
         Ast::NamedFormula(named) => return named.nodes,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args
+        Ast::Func(_, args) => args
+            .iter()
+            .map(expanded_nodes)
+            .fold(0, usize::saturating_add),
+        Ast::UnknownFunc(call) => call
+            .args
             .iter()
             .map(expanded_nodes)
             .fold(0, usize::saturating_add),
@@ -707,11 +713,10 @@ fn reference_target(
 /// The names that `ast` uses, as a name or as a function it calls.
 fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
     match ast {
-        Ast::Name(name) => names.push(name),
-        Ast::LetName { name, .. } => names.push(name),
-        Ast::UnknownFunc(name, args) => {
-            names.push(name);
-            for arg in args {
+        Ast::Name(name) | Ast::LetName { name, .. } => names.push(name),
+        Ast::UnknownFunc(call) => {
+            names.push(&call.name);
+            for arg in &call.args {
                 used_names(arg, names);
             }
         }
@@ -735,19 +740,22 @@ fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
 /// of the cell that uses it.
 fn is_positional(ast: &Ast) -> bool {
     match ast {
-        Ast::Cell(_, _, flags) | Ast::SheetCell(_, _, _, flags) | Ast::AbsCell(_, _, _, flags) => {
-            !flags.row_abs || !flags.col_abs
+        Ast::Cell(_, _, flags) | Ast::AbsCell(_, _, _, flags) => {
+            !flags.row_abs() || !flags.col_abs()
         }
-        Ast::Range(.., flags) | Ast::SheetRange(.., flags) | Ast::AbsRange(.., flags) => {
-            [flags.start, flags.end]
-                .iter()
-                .any(|corner| !corner.row_abs || !corner.col_abs)
-        }
+        Ast::Range(.., flags) | Ast::AbsRange(.., flags) => [flags.start, flags.end]
+            .iter()
+            .any(|corner| !corner.row_abs() || !corner.col_abs()),
+        Ast::SheetCell(reference) => !reference.flags.row_abs() || !reference.flags.col_abs(),
+        Ast::SheetRange(reference) => [reference.flags.start, reference.flags.end]
+            .iter()
+            .any(|corner| !corner.row_abs() || !corner.col_abs()),
         Ast::SheetSpan(span) => [span.flags.start, span.flags.end]
             .iter()
-            .any(|corner| !corner.row_abs || !corner.col_abs),
+            .any(|corner| !corner.row_abs() || !corner.col_abs()),
         Ast::UnresolvedStructured(_) | Ast::Structured(_) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(is_positional),
+        Ast::Func(_, args) => args.iter().any(is_positional),
+        Ast::UnknownFunc(call) => call.args.iter().any(is_positional),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             is_positional(left) || is_positional(right)
         }

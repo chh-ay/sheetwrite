@@ -1,5 +1,8 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
+use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::calc::unresolved_sheet_names;
 use crate::memory::{StoreMemoryStats, FORMULAS};
 use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, FormulaError};
 
@@ -217,6 +220,10 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
+    // Only detached references occupy these maps; ordinary formulas add no
+    // per-slot state. Reverse membership makes replacement/removal local.
+    unresolved_sheets: FxHashMap<String, FxHashSet<FormulaId>>,
+    unresolved_by_formula: FxHashMap<FormulaId, Vec<String>>,
 }
 
 impl FormulaStore {
@@ -277,6 +284,7 @@ impl FormulaStore {
     }
 
     fn track(&mut self, id: FormulaId) {
+        self.track_unresolved_sheets(id);
         let (volatile, subtotal) = self.get(id).map_or((false, false), |entry| {
             (entry.volatile(), entry.calls_subtotal())
         });
@@ -292,6 +300,48 @@ impl FormulaStore {
             self.subtotals.remove(id);
             self.subtotals.release_if_empty();
         }
+    }
+
+    fn track_unresolved_sheets(&mut self, id: FormulaId) {
+        if let Some(names) = self.unresolved_by_formula.remove(&id) {
+            for name in names {
+                if let Some(users) = self.unresolved_sheets.get_mut(&name) {
+                    users.remove(&id);
+                    if users.is_empty() {
+                        self.unresolved_sheets.remove(&name);
+                    }
+                }
+            }
+        }
+        let mut names = Vec::new();
+        if let Some(ast) = self.get(id).and_then(|entry| entry.ast.as_ref()) {
+            unresolved_sheet_names(ast, &mut names);
+        }
+        if !names.is_empty() {
+            names.sort_unstable();
+            names.dedup();
+            for name in &names {
+                self.unresolved_sheets
+                    .entry(name.clone())
+                    .or_default()
+                    .insert(id);
+            }
+            self.unresolved_by_formula.insert(id, names);
+        } else if self.unresolved_by_formula.is_empty() {
+            self.unresolved_by_formula = FxHashMap::default();
+            self.unresolved_sheets = FxHashMap::default();
+        }
+    }
+
+    /// Stable formula users of one normalized detached sheet name.
+    pub(crate) fn unresolved_sheet_users(
+        &self,
+        name: &str,
+    ) -> impl Iterator<Item = FormulaId> + '_ {
+        self.unresolved_sheets
+            .get(name)
+            .into_iter()
+            .flat_map(|users| users.iter().copied())
     }
 
     /// Reuse a free slot or grow one page; source writes preflight id capacity.
@@ -317,6 +367,7 @@ impl FormulaStore {
                 self.subtotals.insert(id);
             }
         }
+        self.track_unresolved_sheets(id);
         Some(id)
     }
 
@@ -471,6 +522,24 @@ impl FormulaStore {
         formulas.add_vec::<Vec<FormulaSlot>>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
+        formulas.add_hash_table::<String, FxHashSet<FormulaId>>(
+            self.unresolved_sheets.len(),
+            self.unresolved_sheets.capacity(),
+        );
+        for (name, users) in &self.unresolved_sheets {
+            formulas.add_payload(name.len(), name.capacity());
+            formulas.add_hash_table::<FormulaId, ()>(users.len(), users.capacity());
+        }
+        formulas.add_hash_table::<FormulaId, Vec<String>>(
+            self.unresolved_by_formula.len(),
+            self.unresolved_by_formula.capacity(),
+        );
+        for names in self.unresolved_by_formula.values() {
+            formulas.add_vec::<String>(names.len(), names.capacity());
+            for name in names {
+                formulas.add_payload(name.len(), name.capacity());
+            }
+        }
         for page in &self.entries {
             formulas.add_vec::<FormulaSlot>(page.len(), page.capacity());
             for slot in page {

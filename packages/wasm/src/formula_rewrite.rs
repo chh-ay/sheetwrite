@@ -10,8 +10,8 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::calc::{
-    area, lex_token, rewrite_own_sheet_axis, serialize, translate_relative_refs, write_ast,
-    AreaEnd, Ast, Axis, AxisChange, Func, Tok,
+    area, lex_token, rewrite_own_sheet_axis, translate_relative_refs, write_ast,
+    write_ast_with_sheets, AreaEnd, Ast, Axis, AxisChange, Func, Tok,
 };
 use crate::types::FormulaError;
 
@@ -221,7 +221,7 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
 /// When the counts differ, they cannot be paired, and the whole formula is
 /// written from the tree. Out of line: every reader of formula text calls it.
 #[inline(never)]
-pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
+pub(crate) fn write_references(source: &str, ast: &Ast, names: &[String]) -> String {
     let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
     let mut out = String::with_capacity(source.len());
     let mut copied = 0;
@@ -235,7 +235,7 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
         let kept = out.len();
         out.push_str(&source[copied..span.start]);
         let written = out.len();
-        write_ast(node, &mut out);
+        write_ast_with_sheets(node, &mut out, names);
 
         // A deleted spill anchor writes as `#REF!`, without the suffix.
         if span.spills() && !matches!(node, Ast::InvalidRef) {
@@ -250,7 +250,9 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
 
     debug_assert_eq!(count, spans.len(), "references of {source}");
     if count != spans.len() {
-        return serialize(ast);
+        out.clear();
+        write_ast_with_sheets(ast, &mut out, names);
+        return out;
     }
     out.push_str(&source[copied..]);
     out
@@ -282,7 +284,7 @@ fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
 fn is_deleted(reference: &Ast) -> bool {
     match reference {
         Ast::InvalidRef => true,
-        Ast::Func(Func::AnchorArray, anchor) => matches!(anchor.as_slice(), [Ast::InvalidRef]),
+        Ast::Func(Func::AnchorArray, anchor) => matches!(anchor.as_ref(), [Ast::InvalidRef]),
         _ => false,
     }
 }
@@ -420,7 +422,7 @@ fn reference_at(lexemes: &[Lexeme<'_>], index: usize) -> Option<(Ast, usize)> {
     };
     let cell = Ast::Cell(row, col, flags);
     if tok(index + 1) == Some(&Tok::Hash) {
-        return Some((Ast::Func(Func::AnchorArray, vec![cell]), index + 2));
+        return Some((Ast::Func(Func::AnchorArray, (vec![cell]).into()), index + 2));
     }
     Some((cell, index + 1))
 }

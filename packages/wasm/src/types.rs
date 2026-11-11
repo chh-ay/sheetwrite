@@ -1,8 +1,10 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, move_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs,
-    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    bind_sheet_refs, has_unresolved_local_sheets, invalidate_sheet_refs, move_refs,
+    refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, shift_cols, shift_rows,
+    update_structured_refs, Ast, Func, RefFlags, SheetRef, SheetResolver, SpanPlacer,
+    StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::formula_rewrite::write_references;
@@ -298,8 +300,13 @@ impl ReadSet {
                     }
                 }
             }
-            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+            Ast::Func(_, args) => {
                 for arg in args {
+                    self.collect(arg, formula_sheet);
+                }
+            }
+            Ast::UnknownFunc(call) => {
+                for arg in &call.args {
                     self.collect(arg, formula_sheet);
                 }
             }
@@ -320,9 +327,9 @@ impl ReadSet {
             | Ast::LetName { .. }
             | Ast::UnresolvedStructured(_)
             | Ast::Num(_)
-            | Ast::Array { .. } => {}
+            | Ast::Array(_) => {}
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {}
+            Ast::BoundMatrix(_) | Ast::RegexPattern(_) => {}
         }
     }
 
@@ -437,12 +444,12 @@ pub(crate) struct FormulaEntry {
 // One per stored formula, in every workbook's formula table.
 #[cfg(target_arch = "wasm32")]
 const _: () = assert!(
-    std::mem::size_of::<FormulaEntry>() == 88,
+    std::mem::size_of::<FormulaEntry>() == 64,
     "FormulaEntry changed size: measure, then update this number"
 );
 #[cfg(not(target_arch = "wasm32"))]
 const _: () = assert!(
-    std::mem::size_of::<FormulaEntry>() == 144,
+    std::mem::size_of::<FormulaEntry>() == 104,
     "FormulaEntry changed size: measure, then update this number"
 );
 
@@ -461,16 +468,27 @@ impl FormulaEntry {
     /// the text, so a rename or a row edit over many formulas writes none of
     /// them; the text is written when it is read. Out of line: many readers.
     #[inline(never)]
-    pub(crate) fn source(&self) -> Cow<'_, str> {
+    pub(crate) fn source(&self, names: &[String]) -> Cow<'_, str> {
         match &self.ast {
             Some(ast) if self.flags & Self::STALE_REFERENCES != 0 => {
-                Cow::Owned(write_references(&self.source, ast))
+                Cow::Owned(write_references(&self.source, ast, names))
             }
             _ => Cow::Borrowed(&self.source),
         }
     }
 
-    /// Source parse rejection; recalculation never mutates this value.
+    /// Capture a history entry with current source text. Its stale bit is
+    /// cleared, so history can read/export it without retaining the registry.
+    pub(crate) fn captured(&self, names: &[String]) -> Self {
+        Self {
+            ast: self.ast.clone(),
+            source: self.source(names).into_owned(),
+            reads: self.reads.clone(),
+            flags: self.flags & !Self::STALE_REFERENCES,
+        }
+    }
+
+    /// Parse rejection or an unresolved local sheet; binding can clear the latter.
     pub(crate) fn source_error(&self) -> Option<FormulaError> {
         let encoded = self.flags & Self::ERROR_MASK;
 
@@ -526,12 +544,15 @@ impl FormulaEntry {
         // name or array: every flag below stays clear, and its reads are the
         // only metadata that needs a walk.
         if ast_is_plain(&ast) {
-            return Self {
+            let missing_local = has_unresolved_local_sheets(&ast);
+            let mut entry = Self {
                 flags: 0,
                 reads: ReadSet::from_ast(&ast, sheet),
                 ast: Some(ast),
                 source,
             };
+            entry.set_source_error(missing_local.then_some(FormulaError::Ref));
+            return entry;
         }
 
         let contains_let = ast_contains_let(&ast);
@@ -553,6 +574,7 @@ impl FormulaEntry {
         if contains_let && !entry.has_spill_refs() {
             crate::eval::resolve_let_names(&mut ast);
         }
+        entry.set_source_error(has_unresolved_local_sheets(&ast).then_some(FormulaError::Ref));
         entry.ast = Some(ast);
 
         entry
@@ -590,12 +612,10 @@ impl FormulaEntry {
         entry
     }
 
-    pub(crate) fn reference(target: AbsCellKey, target_name: &str, formula_sheet: u32) -> Self {
+    pub(crate) fn reference(target: AbsCellKey, formula_sheet: u32) -> Self {
         let ast = Ast::AbsCell(
             SheetRef {
                 handle: target.sheet,
-                name: target_name.to_string(),
-                quoted: false,
             },
             target.row,
             target.col,
@@ -672,6 +692,25 @@ impl FormulaEntry {
         true
     }
 
+    /// Bind only retained detached sheet references. Moves the tree and source
+    /// into its replacement, leaving the old read set for the graph edit.
+    pub(crate) fn bind_sheets(
+        &mut self,
+        formula_sheet: u32,
+        resolve: &SheetResolver<'_>,
+        place: &SpanPlacer<'_>,
+    ) -> Option<Self> {
+        let ast = self.ast.as_mut()?;
+        if !bind_sheet_refs(ast, resolve, place) {
+            return None;
+        }
+        let ast = self.ast.take()?;
+        let mut replacement =
+            Self::parsed_source(ast, formula_sheet, std::mem::take(&mut self.source));
+        replacement.flags |= self.flags & (Self::REFERENCE | Self::STALE_REFERENCES);
+        Some(replacement)
+    }
+
     pub(crate) fn shift_rows(
         &mut self,
         at: u32,
@@ -726,11 +765,12 @@ impl FormulaEntry {
         key: &str,
         handle: Option<u32>,
         formula_sheet: u32,
+        names: &[String],
     ) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
         };
-        if !relink_sheet_refs(ast, key, handle) {
+        if !relink_sheet_refs(ast, key, handle, names) {
             return false;
         }
 
@@ -814,7 +854,6 @@ mod formula_entry_tests {
                         row: 1,
                         col: 2,
                     },
-                    "Sheet1",
                     0,
                 )
             } else {

@@ -15,6 +15,11 @@ From 0.5.0, each release has a release post with highlights, measured
 performance, and an upgrade checklist:
 [sheetwrite.dev/docs/releases](https://www.sheetwrite.dev/docs/releases/).
 
+## Unreleased
+
+- Reduce formula-tree memory and bind sheet references while parsing. Formulas
+  that name a sheet created later bind without reparsing unrelated formulas.
+
 ## 0.6.1
 
 - Make data-grid value edits, scrolling back to evicted pages, text lookups
