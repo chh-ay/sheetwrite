@@ -14,8 +14,8 @@
    Bricolage Grotesque for headings, Instrument Sans for body and interface
    text, JetBrains Mono for code and numbers. All SIL Open Font License,
    self-hosted, latin and latin-ext only; the browser fetches latin-ext only
-   for text that needs it. The latin heading, body and regular mono files
-   are preloaded first in the document head (routes/__root.tsx).
+   for text that needs it. The latin heading and body files are preloaded
+   first in the document head (routes/__root.tsx).
 
    Every face is `font-display: optional`: a face that is not ready for the
    first paint is not swapped in later, so a font never moves the layout

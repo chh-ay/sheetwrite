@@ -1,7 +1,6 @@
 import headingFont from "@docs/fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
 import { SITE_URL } from "@docs/lib/seo.js";
 import bodyFont from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
-import codeFont from "@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2?url";
 import { createRootRoute, HeadContent, Outlet, ScriptOnce } from "@tanstack/solid-router";
 import type { JSX } from "solid-js";
 
@@ -83,9 +82,6 @@ export const Route = createRootRoute({
       links: [
         { ...FONT_PRELOAD, href: headingFont },
         { ...FONT_PRELOAD, href: bodyFont },
-        // Code chips, the version badge and the terminal set mono on the first
-        // screen; with font-display: optional an unpreloaded face misses it.
-        { ...FONT_PRELOAD, href: codeFont },
         // Head links are render-blocking; link order is the cascade (site.css's order).
         stylesheet(siteCoreStylesheet),
         featureStylesheet(apiReferenceStylesheet),

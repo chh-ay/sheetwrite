@@ -109,8 +109,9 @@ export default defineConfig({
       },
       // Font files the root route preloads come from the docs site's packages.
       {
-        find: /^(@fontsource(?:-variable)?)\//,
-        replacement: `${new URL("../docs/node_modules/", import.meta.url).pathname}$1/`,
+        find: /^@fontsource-variable\//,
+        replacement: new URL("../docs/node_modules/@fontsource-variable/", import.meta.url)
+          .pathname,
       },
     ],
   },
