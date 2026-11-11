@@ -42,11 +42,11 @@ pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
         Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
             super::analysis::lambda::produces_array(name, args)
         }
-        Ast::Range(..)
-        | Ast::AbsRange(..)
-        | Ast::NamedRange(..)
-        | Ast::Structured(..)
-        | Ast::Array { .. } => true,
+        Ast::NamedRange(named) => {
+            named.row_start != named.row_end || named.col_start != named.col_end
+        }
+        Ast::Structured(reference) => reference.row_start != reference.row_end,
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::Array { .. } => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
         Ast::NamedFormula(named) => ast_produces_array(&named.expression),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
