@@ -6,7 +6,7 @@
     "clippy::default_trait_access": 1,
     "clippy::deref_by_slicing": 2,
     "clippy::derive_partial_eq_without_eq": 8,
-    "clippy::disallowed_methods": 170,
+    "clippy::disallowed_methods": 169,
     "clippy::disallowed_types": 48,
     "clippy::doc_markdown": 33,
     "clippy::equatable_if_let": 2,
