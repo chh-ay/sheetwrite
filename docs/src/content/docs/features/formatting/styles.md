@@ -217,7 +217,7 @@ A grid with `find`, `contextMenu` and `tabs` set to `false` whose users do not t
 
 In a development build (one where your bundler sets `process.env.NODE_ENV` to `"development"`), a widget whose part is missing logs one console warning that names the part to import.
 
-`icons.css` loads the icon sheet, `icons.svg`, from beside it, so only pages that show icons download it and the browser caches it. Vite, webpack and Next.js copy it into the build. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. The sheet is a file, not a `data:` URL, so a Content Security Policy that allows images from your own origin allows it. To replace every glyph, set `--sheetwrite-icon-sheet` to `url()` of your own sheet, drawn on the layout in `@sheetwrite/core/icons.json`.
+`icons.css` loads the icon sheet, `icons.svg`, from beside it, so only pages that show icons download it and the browser caches it. Vite, webpack and Next.js copy it into the build. With esbuild, give `.svg` files a loader, for example `loader: { ".svg": "file" }`. Without one, the build fails with `No loader is configured for ".svg" files: icons.svg`. The sheet is a file, not a `data:` URL, so a Content Security Policy that allows images from your own origin allows it. To replace every glyph, set `--sheetwrite-icon-sheet` to `url()` of your own sheet, drawn on the layout in `@sheetwrite/core/icons.json`.
 
 `resolveThemeFromCss` maps these custom properties onto `Theme` fields:
 
