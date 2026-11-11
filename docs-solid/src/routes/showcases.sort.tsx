@@ -5,12 +5,12 @@ import SortSnippetSource from "@docs/showcases/snippets/sort.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { SortModesDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
-import { SortModesDiagram } from "../showcases/art/explain-diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { SortStage } from "../showcases/sort/SortStage.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import featureStylesheet from "@docs/styles/feature-showcases.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

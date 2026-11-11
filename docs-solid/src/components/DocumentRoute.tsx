@@ -2,17 +2,17 @@ import { breadcrumbsFor } from "@docs/lib/navigation.js";
 import { documentStructuredData, pageImageMeta, pageMeta, pageTitle } from "@docs/lib/seo.js";
 import { NoHydration } from "solid-js/web";
 
+import { pageHasArt } from "../art/docs-pictures.js";
 import { FormulaReference, PackageCommand } from "../islands/content.js";
 import {
   type DocumentComponents,
   type DocumentRecord,
   loadedDocumentComponent,
 } from "../lib/content.js";
-import { pageHasArt } from "../showcases/art/docs-pictures.js";
 import { DocsShell } from "./DocsShell.js";
 import PerfFigure from "./PerfFigure.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 
 /*
  * A documentation page, for the docs routes (routes/docs.$.tsx and the

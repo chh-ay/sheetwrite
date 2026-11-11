@@ -2,8 +2,8 @@ import { pageMeta } from "@docs/lib/seo.js";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { HostImportDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
-import { HostImportDiagram } from "../showcases/art/explain-diagrams.js";
 import {
   ACCOUNT_COLUMNS,
   ACCOUNT_ROWS,
@@ -15,7 +15,7 @@ import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayou
 import HostRowsSnippet from "../showcases/snippets/host-rows.mdx";
 import HostRowsSnippetSource from "../showcases/snippets/host-rows.mdx?source";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/host-rows.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";

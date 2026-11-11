@@ -13,13 +13,13 @@ import AnalysisSetupSnippetSource from "@docs/showcases/snippets/analysis-setup.
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { ChartReadsCellsDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { AnalysisStage } from "../showcases/analysis/AnalysisStage.js";
-import { ChartReadsCellsDiagram } from "../showcases/art/explain-diagrams.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import { ANALYSIS_WORKBOOK_TITLE } from "../showcases/scenarios/analysis.js";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 

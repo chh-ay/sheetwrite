@@ -1,5 +1,5 @@
 /* Route-owned gallery. Each card's illustration is inline SVG
-   (showcases/art/hub-art.tsx); nothing on the page mounts a Grid. */
+   (art/hub-art.tsx); nothing on the page mounts a Grid. */
 
 .sw-hub-frame {
   position: relative;

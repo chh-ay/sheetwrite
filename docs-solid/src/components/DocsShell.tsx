@@ -8,11 +8,11 @@ import type { OutlineItem } from "@docs/lib/outline.js";
 import { editUrl, reportProblemUrl } from "@docs/lib/page-links.js";
 import { type JSX, Show } from "solid-js";
 
+import { DOCS_CARD_ART } from "../art/docs-art.js";
+import { SECTION_HEADER_ART, SECTION_MARKS } from "../art/docs-pictures.js";
+import { SectionMark } from "../art/section-marks.js";
 import { Island } from "../islands/Island.js";
 import { revealCurrentNavigation } from "../lib/shell-ids.js";
-import { DOCS_CARD_ART } from "../showcases/art/docs-art.js";
-import { SECTION_HEADER_ART, SECTION_MARKS } from "../showcases/art/docs-pictures.js";
-import { SectionMark } from "../showcases/art/section-marks.js";
 import { ApiSymbolFilter, MINIMUM_FILTERABLE_CARDS } from "./ApiSymbolFilter.js";
 import { BrandMark } from "./BrandMark.js";
 import { NavigationSections } from "./DocsNavigation.js";
@@ -99,7 +99,7 @@ function eyebrowFor(activeHref: string | undefined, titlePackage: string | undef
   return group.label;
 }
 
-/** A section page's illustration beside its title (showcases/art/docs-pictures.ts); nothing elsewhere. */
+/** A section page's illustration beside its title (art/docs-pictures.ts); nothing elsewhere. */
 function SectionArt(props: { readonly href: string | undefined }) {
   const Art = DOCS_CARD_ART[SECTION_HEADER_ART[props.href ?? ""] ?? ""];
   return Art === undefined ? null : (

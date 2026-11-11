@@ -2,9 +2,9 @@ import { pageMeta } from "@docs/lib/seo.js";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { StorageDiagram } from "../art/explain-diagrams.js";
+import { DATABASE_PROOF_ART } from "../art/proof-art.js";
 import { Island } from "../islands/Island.js";
-import { StorageDiagram } from "../showcases/art/explain-diagrams.js";
-import { DATABASE_PROOF_ART } from "../showcases/art/proof-art.js";
 import { DatabaseLab } from "../showcases/database/DatabaseLab.js";
 import { DatabaseStage } from "../showcases/database/DatabaseStage.js";
 import { COMPACTION } from "../showcases/database/state.js";
@@ -13,7 +13,7 @@ import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import DatabaseSnippet from "../showcases/snippets/database.mdx";
 import DatabaseSnippetSource from "../showcases/snippets/database.mdx?source";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import proofCardsStylesheet from "../styles/showcases/proof-cards.css?url";
 import proofStylesheet from "../styles/showcases/proofs.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";

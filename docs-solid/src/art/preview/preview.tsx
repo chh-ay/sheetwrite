@@ -1,11 +1,11 @@
 // Review page for the showcase illustrations; served by preview/vite.config.ts
 // only, never part of the site build. `?view=hub` (default) or `?view=diagrams`,
 // and `?theme=dark`.
-import "../../../styles/site-core.css";
-import "../../../styles/site-mid.css";
-import "../../../styles/site-tail.css";
-import "../../../styles/showcases/touch-targets.css";
-import "../../../styles/showcases/hub.css";
+import "../../styles/site-core.css";
+import "../../styles/site-mid.css";
+import "../../styles/site-tail.css";
+import "../../styles/showcases/touch-targets.css";
+import "../../styles/showcases/hub.css";
 import "../art.css";
 import { For, type JSX } from "solid-js";
 import { render } from "solid-js/web";

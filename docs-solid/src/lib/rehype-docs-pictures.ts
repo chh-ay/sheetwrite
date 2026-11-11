@@ -1,6 +1,6 @@
 // Puts the docs art into compiled pages: each section card's illustration, the
 // diagrams replacing older figure images, and a diagram after each heading the
-// placement table names (showcases/art/docs-pictures.ts). Runs after rehype-slug,
+// placement table names (art/docs-pictures.ts). Runs after rehype-slug,
 // so headings have their ids. A placement whose heading is missing fails the
 // build, so the table can't drift from the pages.
 import {
@@ -8,7 +8,7 @@ import {
   CARD_ART_NAMES,
   DOCS_PICTURE_PLACEMENTS,
   REPLACED_DIAGRAMS,
-} from "../showcases/art/docs-pictures.js";
+} from "../art/docs-pictures.js";
 
 interface HastNode {
   type: string;
@@ -22,8 +22,8 @@ interface HastNode {
 }
 
 const CONTENT_ROOT = "/docs/src/content/docs/";
-const PICTURE_MODULE = new URL("../showcases/art/DocsPicture.tsx", import.meta.url).pathname;
-const ART_STYLESHEET = new URL("../showcases/art/art.css", import.meta.url).pathname;
+const PICTURE_MODULE = new URL("../art/DocsPicture.tsx", import.meta.url).pathname;
+const ART_STYLESHEET = new URL("../art/art.css", import.meta.url).pathname;
 
 /** The docs address of a content file: `start/index.md` is `/docs/start/`. */
 function pageAddress(path: string): string | undefined {

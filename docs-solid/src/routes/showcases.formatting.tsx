@@ -3,15 +3,15 @@ import { FORMAT_OPTIONS, STYLE_COMMANDS } from "@docs/showcases/scenarios/format
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
+import { FormattingDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
-import { FormattingDiagram } from "../showcases/art/explain-diagrams.js";
 import { FormattingImported } from "../showcases/formatting/FormattingImported.js";
 import { FONT_FAMILIES, FormattingStage } from "../showcases/formatting/FormattingStage.js";
 import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
 import FormattingSnippet from "../showcases/snippets/formatting.mdx";
 import FormattingSnippetSource from "../showcases/snippets/formatting.mdx?source";
 
-import artStylesheet from "../showcases/art/art.css?url";
+import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/formatting.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
 import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
