@@ -611,14 +611,6 @@ impl CellStorage {
         payload_str_id(self.resolved_payload_at(i))
     }
 
-    /// The source payloads of dense cells `range`, without calculated values;
-    /// `None` when the range is outside the dense vectors.
-    /// Literal kinds cannot have a calculated value; formulas must resolve it.
-    #[inline]
-    pub(crate) fn dense_payloads(&self, range: std::ops::Range<usize>) -> Option<&[u64]> {
-        self.payload.get(range)
-    }
-
     #[inline]
     pub(crate) fn contains_cell(&self, row: usize, col: usize) -> bool {
         row < self.row_count && col < self.n_cols

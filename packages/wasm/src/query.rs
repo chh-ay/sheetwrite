@@ -1319,7 +1319,8 @@ fn sort_finite_number_column_comparison(
     base: usize,
     ascending: bool,
 ) -> Option<Vec<u32>> {
-    let mut order = Vec::with_capacity(sheet.cells.row_count());
+    // Each row keeps its value beside it, so the comparator reads no cells.
+    let mut keyed: Vec<(f64, u32)> = Vec::with_capacity(sheet.cells.row_count());
     let end = base + sheet.cells.row_count();
     let mut start = base;
     while start < end {
@@ -1329,28 +1330,12 @@ fn sort_finite_number_column_comparison(
             if !value.is_finite() {
                 return None;
             }
-            order.push((index - base) as u32);
+            keyed.push((value, (index - base) as u32));
         }
         start = run.end;
     }
 
-    // Paged storage keeps no dense payloads; its rows go through `num_at`.
-    let dense_payloads = if sheet.cells.is_paged() {
-        None
-    } else {
-        sheet.cells.dense_payloads(base..end)
-    };
-    let value_at_row = |row: u32| {
-        let index = row as usize;
-        dense_payloads
-            .and_then(|payloads| payloads.get(index))
-            .map_or_else(
-                || sheet.cells.num_at(base + index),
-                |&bits| f64::from_bits(bits),
-            )
-    };
-    order.sort_unstable_by(|&a, &b| {
-        let (left, right) = (value_at_row(a), value_at_row(b));
+    keyed.sort_unstable_by(|&(left, a), &(right, b)| {
         let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
         let ord = if ascending { ord } else { ord.reverse() };
         if ord == Ordering::Equal {
@@ -1359,7 +1344,7 @@ fn sort_finite_number_column_comparison(
             ord
         }
     });
-    Some(order)
+    Some(keyed.into_iter().map(|(_, row)| row).collect())
 }
 
 fn sort_finite_number_column_radix(

@@ -901,7 +901,7 @@ const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 /// one buffer with an 8-byte `(offset, len)` span per id, keeping pool text
 /// cache-contiguous for filter/search scans.
 pub(crate) struct StringStorage {
-    text: String,
+    bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
     lookup:
         std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
@@ -918,7 +918,7 @@ struct PoolSpan {
 impl StringStorage {
     pub(crate) fn new() -> Self {
         Self {
-            text: String::new(),
+            bytes: Vec::new(),
             spans: Vec::new(),
             lookup: Default::default(),
             epoch: 0,
@@ -926,18 +926,24 @@ impl StringStorage {
         }
     }
 
-    /// Text for a pool id; `None` when out of range. O(1), allocation-free:
-    /// slicing a `str` checks only that both ends fall on character boundaries.
+    /// Text for a pool id; `None` when out of range. O(1), allocation-free.
+    #[allow(
+        unsafe_code,
+        reason = "pool text is valid UTF-8 by construction; checking it again on every read is not yet measured"
+    )]
     pub(crate) fn get(&self, id: u32) -> Option<&str> {
         let span = self.spans.get(id as usize)?;
         let start = span.offset as usize;
-        self.text.get(start..start + span.len as usize)
+        let bytes = &self.bytes[start..start + span.len as usize];
+        // SAFETY: `push` only appends whole valid UTF-8 strings, and every
+        // span covers exactly one pushed string.
+        Some(unsafe { std::str::from_utf8_unchecked(bytes) })
     }
 
     fn push(&mut self, text: &str) -> u32 {
         let id = self.spans.len() as u32;
-        let offset = self.text.len() as u32;
-        self.text.push_str(text);
+        let offset = self.bytes.len() as u32;
+        self.bytes.extend_from_slice(text.as_bytes());
         self.spans.push(PoolSpan {
             offset,
             len: text.len() as u32,
@@ -982,7 +988,7 @@ impl StringStorage {
     }
 
     pub(crate) fn retained_bytes(&self) -> usize {
-        self.text.len() + self.spans.len() * std::mem::size_of::<PoolSpan>()
+        self.bytes.len() + self.spans.len() * std::mem::size_of::<PoolSpan>()
     }
 
     /// Build before remapping roots: reservation failure leaves the old epoch intact.
@@ -1005,7 +1011,7 @@ impl StringStorage {
         }
 
         let mut replacement = Self::new();
-        replacement.text.try_reserve_exact(live_utf8).ok()?;
+        replacement.bytes.try_reserve_exact(live_utf8).ok()?;
         replacement.spans.try_reserve_exact(live_count).ok()?;
         replacement.lookup.try_reserve(live_count).ok()?;
 
@@ -1056,7 +1062,7 @@ impl StringStorage {
 impl StringStorage {
     pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
         let mut utf8 = MemoryOwnerStats::default();
-        utf8.add_vec::<u8>(self.text.len(), self.text.capacity());
+        utf8.add_vec::<u8>(self.bytes.len(), self.bytes.capacity());
         let mut spans = MemoryOwnerStats::default();
         spans.add_vec::<PoolSpan>(self.spans.len(), self.spans.capacity());
         (utf8, spans)
