@@ -5,7 +5,9 @@ use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
-use super::super::matrix::{EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS};
+use super::super::matrix::{
+    EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
+};
 use super::super::value::number_from_value;
 use super::super::EvalPass;
 
@@ -111,8 +113,8 @@ pub(crate) fn shape(
     Ok((rows, cols, cells))
 }
 
-/// An MUNIT size that is known only after evaluation can use the largest
-/// spill, like SEQUENCE.
+/// An MUNIT size that is known only after evaluation is charged once it is
+/// known, like SEQUENCE.
 pub(crate) fn bound(
     store: &CellStore,
     name: &str,
@@ -122,7 +124,7 @@ pub(crate) fn bound(
 ) -> Result<usize, FormulaError> {
     if let ("MUNIT", [dimension]) = (name, args) {
         if literal_dimension(dimension).is_none() {
-            return Ok(SPILL_MAX_CELLS);
+            return Ok(UNKNOWN_SIZE_PRECHARGE);
         }
     }
     shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)

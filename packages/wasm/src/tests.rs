@@ -4104,3 +4104,77 @@ mod aggregate_storage_parity {
         assert_dense_matches_paged("=SEQUENCE(3)", [10.0, 2.5, 1.0, 4.0, 4.0]);
     }
 }
+
+/// Array formulas whose size comes from a cell all spill in one pass: each is
+/// charged against the pass budget for what it produces, not for the largest
+/// possible spill (#569).
+#[test]
+fn array_sizes_read_from_cells_spill_in_every_formula_of_a_pass() {
+    let mut sources = vec![
+        "=SEQUENCE($J$1)",
+        "=SEQUENCE($J$1)*2",
+        "=SEQUENCE($J$1,1,10)+0",
+        "=CHOOSEROWS($I$1:$I$20,$J$1,1)",
+        "=CHOOSECOLS($I$1:$I$3,$J$1/$J$1)",
+        "=INDEX(SEQUENCE($J$1,2),0,1)",
+    ];
+    if cfg!(feature = "analysis") {
+        sources.extend([
+            "=MUNIT($J$1)",
+            "=EXPAND($I$1:$I$2,$J$1)",
+            "=MAKEARRAY($J$1,1,LAMBDA(r,c,r))",
+            "=WRAPROWS($I$1:$I$6,$J$1)",
+        ]);
+    }
+
+    for source in sources {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(10, 60);
+        store.set_number(sheet, 0, 9, 3.0, 0);
+        for row in 0..20 {
+            store.set_number(sheet, row, 8, (row + 1) as f64, 0);
+        }
+        // Six copies stacked in column A, far enough apart to spill freely.
+        for copy in 0..6 {
+            store.set_formula(sheet, copy * 8, 0, source, 0);
+        }
+        store.recompute(sheet);
+
+        for copy in 0..6 {
+            let anchor = copy * 8;
+            assert_eq!(
+                string(&store, sheet, anchor, 0),
+                None,
+                "{source} copy {copy}"
+            );
+            assert_eq!(
+                store.spill_anchor_row(sheet, anchor + 1, 0),
+                anchor as u32,
+                "{source} copy {copy}"
+            );
+        }
+    }
+}
+
+/// The pass budget still stops a pass whose arrays really pass it: three
+/// arrays of 900,000 cells sized from a cell, each obstructed so that none
+/// installs, spend it with the third (#569).
+#[test]
+fn array_sizes_read_from_cells_still_spend_the_pass_budget() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 1_000_000);
+    store.set_number(sheet, 0, 3, 900_000.0, 0);
+    for col in 0..3 {
+        store.set_formula(sheet, 0, col, "=SEQUENCE($D$1)", 0);
+        store.set_number(sheet, 5, col, 1.0, 0);
+    }
+    store.recompute(sheet);
+
+    let errors = (0..3)
+        .map(|col| string(&store, sheet, 0, col))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        errors,
+        ["#SPILL!", "#SPILL!", "#NUM!"].map(|error| Some(error.to_owned()))
+    );
+}
