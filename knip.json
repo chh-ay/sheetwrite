@@ -14,7 +14,8 @@
         "src/shell.ts",
         "src/testing.ts",
         "src/worker.ts",
-        "test/**/*.test.ts"
+        "test/**/*.test.ts",
+        "test/*.full-engine.ts"
       ],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
