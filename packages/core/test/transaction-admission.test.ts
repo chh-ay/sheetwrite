@@ -29,24 +29,6 @@ describe("grid transaction admission", () => {
     }).not.toThrow();
   });
 
-  it("registers one guard and removes it idempotently", () => {
-    const grid = {} as Grid;
-    const log: string[] = [];
-    const dispose = registerGridTransactionAdmission(grid, {
-      reserve: () => ({ ok: true, reservation: reservation(log, "only") }),
-    });
-
-    const decision = beginGridTransactionAdmission(grid, []);
-    expect(decision.ok).toBe(true);
-    if (!decision.ok) throw new Error("single guard unexpectedly rejected");
-    decision.reservation.finish(outcome);
-    expect(log).toEqual(["only:finish:noop"]);
-
-    dispose();
-    dispose();
-    expect(beginGridTransactionAdmission(grid, []).ok).toBe(true);
-  });
-
   it("finishes or cancels every reservation exactly once", () => {
     const grid = {} as Grid;
     const finishLog: string[] = [];

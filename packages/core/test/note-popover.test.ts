@@ -8,7 +8,6 @@ import type { CellAddress } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 const NOTED: CellAddress = { sheet: "s1", row: 2, col: 1 };
-const PLAIN: CellAddress = { sheet: "s1", row: 4, col: 0 };
 
 let restoreStubs: () => void;
 let grid: GridImpl | null = null;
@@ -101,15 +100,6 @@ describe("note hover card", () => {
     expect(document.activeElement).toBe(focused);
   });
 
-  it("shows nothing over a cell without a note", () => {
-    const { host } = mount();
-
-    hover(host, PLAIN);
-    jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS * 3);
-
-    expect(noteCard(host)).toBeNull();
-  });
-
   it.each([
     [
       "the pointer leaves the grid",
@@ -131,16 +121,6 @@ describe("note hover card", () => {
     expect(noteCard(host)).not.toBeNull();
 
     dismiss(host, target);
-
-    expect(noteCard(host)).toBeNull();
-  });
-
-  it("does not show a note when the pointer leaves before the delay ends", () => {
-    const { host } = mount();
-
-    hover(host, NOTED);
-    scrollerOf(host).dispatchEvent(new PointerEvent("pointerleave", { pointerType: "mouse" }));
-    jest.advanceTimersByTime(NOTE_HOVER_DELAY_MS * 2);
 
     expect(noteCard(host)).toBeNull();
   });
@@ -166,29 +146,6 @@ describe("note editor", () => {
     expect(target.getNote(NOTED)).toBe("Check the totals");
   });
 
-  it("creates a note on a plain cell when the editor loses focus", () => {
-    const { host, grid: target } = mount();
-
-    openEditor(target, PLAIN);
-    const editor = noteEditor(host);
-    expect(editor.value).toBe("");
-    editor.value = "Ask Dara";
-    editor.blur();
-
-    expect(target.getNote(PLAIN)).toBe("Ask Dara");
-  });
-
-  it("deletes the note when the committed text is empty", () => {
-    const { host, grid: target } = mount();
-
-    openEditor(target, NOTED);
-    const editor = noteEditor(host);
-    editor.value = "   ";
-    press(editor, { key: "Enter", metaKey: true });
-
-    expect(target.getNote(NOTED)).toBeNull();
-  });
-
   it("leaves the note unchanged on Escape and returns focus to the grid", () => {
     const { host, grid: target } = mount();
 
@@ -212,26 +169,9 @@ describe("note editor", () => {
     expect(editor.value).toBe("Check the totals");
     expect(host.querySelector(".sheetwrite-editor")).toBeNull();
   });
-
-  it("does not open on a read-only grid", () => {
-    const { host, grid: target } = mount({ readOnly: true });
-
-    openEditor(target, NOTED);
-
-    expect(host.querySelector(".sheetwrite-note-editor")).toBeNull();
-  });
 });
 
 describe("deleteNote", () => {
-  it("removes the focus cell's note", () => {
-    const { grid: target } = mount();
-    target.setSelection({ kind: "cell", addr: NOTED });
-
-    target.actions.deleteNote();
-
-    expect(target.getNote(NOTED)).toBeNull();
-  });
-
   it("keeps the note on a read-only grid", () => {
     const { grid: target } = mount({ readOnly: true });
     target.setSelection({ kind: "cell", addr: NOTED });

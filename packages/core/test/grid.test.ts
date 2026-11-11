@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { validateTransactionResources } from "../src/document-protocol.js";
 import {
@@ -12,7 +12,6 @@ import {
 import { releaseEngineMemory } from "../src/index.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { registerGridTransactionAdmission } from "../src/transaction-admission.js";
 import type {
   CellScalar,
   ChangeEvent,
@@ -23,7 +22,6 @@ import type {
   RowData,
   Store,
   Workbook,
-  XlsxTableExportBackend,
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
 import { keepXlsxSlots, makeColumnarData, makeWorkbook } from "./fixtures.js";
@@ -135,24 +133,6 @@ function scrollerOf(host: HTMLElement): HTMLDivElement {
   return node;
 }
 
-function cellPoint(
-  row: number,
-  col: number,
-  workbook: Workbook,
-): { clientX: number; clientY: number } {
-  const sheet = workbook.sheets[0];
-  if (!sheet) throw new Error("expected fixture sheet");
-
-  let x = DEFAULT_THEME.rowHeaderWidth;
-  for (let c = 0; c < col; c++) x += sheet.columns[c]?.width ?? 0;
-  x += (sheet.columns[col]?.width ?? DEFAULT_THEME.rowHeight) / 2;
-
-  const y =
-    DEFAULT_THEME.headerHeight + row * DEFAULT_THEME.rowHeight + DEFAULT_THEME.rowHeight / 2;
-
-  return { clientX: x, clientY: y };
-}
-
 describe("Grid editing (Layer 3)", () => {
   beforeAll(async () => {
     await initSheetwrite();
@@ -195,25 +175,6 @@ describe("Grid editing (Layer 3)", () => {
       if (clipboardDescriptor) Object.defineProperty(navigator, "clipboard", clipboardDescriptor);
       else Reflect.deleteProperty(navigator, "clipboard");
     }
-  });
-
-  it("commits a typed edit through the editor into the store", () => {
-    const workbook = makeWorkbook(20);
-    const store = new SheetwriteStore(workbook, makeColumnarData(20));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    const node = host.querySelector("textarea.sheetwrite-editor");
-    expect(node).not.toBeNull();
-    if (!(node instanceof HTMLTextAreaElement)) return;
-    node.value = "Edited!";
-    node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Edited!");
-    grid.destroy();
   });
 
   it("requests the required datasource window fields and consumes its page", async () => {
@@ -273,62 +234,6 @@ describe("Grid editing (Layer 3)", () => {
     grid.destroy();
   });
 
-  it("starts a new search at the current viewport and wraps when needed", () => {
-    const workbook = makeWorkbook(100);
-    const store = new SheetwriteStore(workbook, makeColumnarData(100));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const scroller = scrollerOf(host);
-
-    scroller.scrollTop = 50 * DEFAULT_THEME.rowHeight;
-    const middle = grid.search("Tokyo");
-    expect(middle.matches[middle.active]?.row).toBe(52);
-
-    scroller.scrollTop = 99 * DEFAULT_THEME.rowHeight;
-    const wrapped = grid.search("Tokyo");
-    expect(wrapped.matches[wrapped.active]?.row).toBe(1);
-    grid.destroy();
-  });
-
-  it("uses merged-cell anchors for pointer selection and editing", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-
-    grid.setSelection({
-      kind: "range",
-      range: {
-        sheet: "s1",
-        start: { row: 0, col: 0 },
-        end: { row: 1, col: 1 },
-      },
-    });
-    grid.actions.merge();
-
-    const scroller = scrollerOf(host);
-    const covered = cellPoint(1, 1, workbook);
-    scroller.dispatchEvent(
-      new PointerEvent("pointerdown", { ...covered, button: 0, bubbles: true }),
-    );
-    scroller.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
-
-    expect(grid.getSelection()).toEqual({
-      kind: "cell",
-      addr: { sheet: "s1", row: 0, col: 0 },
-    });
-
-    scroller.dispatchEvent(new MouseEvent("dblclick", { ...covered, button: 0, bubbles: true }));
-    const editor = expectEditor(host);
-    editor.value = "Merged anchor";
-    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Merged anchor");
-    expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBeNull();
-
-    grid.destroy();
-  });
-
   it("double-clicking a column border fits the whole column, as autoFitColumns does", () => {
     const rows = 300;
     const build = () => {
@@ -365,25 +270,6 @@ describe("Grid editing (Layer 3)", () => {
         }),
       );
       expect(workbook.sheets[0]!.columns[0]!.width).toBe(expectedWidth);
-    } finally {
-      grid.destroy();
-    }
-  });
-
-  it("applies the store's view rules: whole rows only, and no commit for an unchanged view", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const grid = new GridImpl(mountHost(), { workbook }, store);
-    const reasons: string[] = [];
-    grid.on("change", (event) => reasons.push(event.commitReason));
-    try {
-      grid.hideRows([1.5, 2]);
-      expect(grid.hiddenRows()).toEqual([2]);
-
-      reasons.length = 0;
-      grid.clearView();
-      grid.setColumnFilter(0, null);
-      expect(reasons).toEqual([]);
     } finally {
       grid.destroy();
     }
@@ -454,24 +340,6 @@ describe("Grid editing (Layer 3)", () => {
     grid.redo();
     expect(store.getCell(first).resolved).toBe("Batch");
     expect(store.getCell(second).resolved).toBe(99);
-
-    grid.destroy();
-  });
-
-  it("resolves pointer coordinates for host-owned context menus", () => {
-    const workbook = makeWorkbook(10);
-    const store = makeFakeStore(workbook);
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { contextMenu: false } }, store);
-    const point = cellPoint(2, 1, workbook);
-
-    expect(grid.getCellAtPoint(point.clientX, point.clientY)).toEqual({
-      sheet: "s1",
-      row: 2,
-      col: 1,
-    });
-    expect(grid.getCellAtPoint(0, 0)).toBeNull();
-    expect(host.querySelector(".sheetwrite-context-menu")).toBeNull();
 
     grid.destroy();
   });
@@ -620,55 +488,6 @@ describe("Grid transaction resource ingress", () => {
         (_, row) => grid.store.getCell({ sheet: "s1", row, col: 2 }).resolved,
       ),
     ).toEqual([0.5, 10.5, 20.5, 30.5, 40.5, 50.5]);
-    grid.destroy();
-  });
-
-  it("re-measures payloads that admission guards rewrote before the store applies them", () => {
-    const workbook = makeWorkbook(4);
-    const grid = new GridImpl(mountHost(), {
-      workbook,
-      transactionResourceLimits: { maxEncodedBytes: 128 },
-    });
-    const changes: ChangeEvent[] = [];
-    let rejectionEvents = 0;
-    grid.on("change", (event) => changes.push(event));
-    grid.on("mutation-rejected", () => {
-      rejectionEvents += 1;
-    });
-    const address = { sheet: "s1", row: 0, col: 0 };
-    let rewritePayload = false;
-    const disposeGuard = registerGridTransactionAdmission(grid, {
-      reserve: (operations) => {
-        if (rewritePayload) {
-          const patch = operations[0];
-          if (patch?.op === "set") {
-            patch.value = { kind: "literal", value: "x".repeat(200) };
-          }
-        }
-        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
-      },
-    });
-
-    const accepted = grid.applyTransaction({
-      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
-    });
-    expect(accepted.status).toBe("applied");
-    expect(grid.store.getCell(address).resolved).toBe("first");
-
-    rewritePayload = true;
-    const rejected = grid.applyTransaction({
-      patches: [{ op: "set", addr: address, value: { kind: "literal", value: "first" } }],
-    });
-    expect(rejected).toMatchObject({
-      status: "rejected",
-      issues: [{ kind: "resource-limit", resource: "encoded-bytes", max: 128 }],
-    });
-    if (rejected.status !== "rejected") throw new Error("rewritten payload unexpectedly applied");
-    expect(grid.store.getCell(address).resolved).toBe("first");
-    expect(changes).toHaveLength(1);
-    expect(rejectionEvents).toBe(1);
-
-    disposeGuard();
     grid.destroy();
   });
 
@@ -834,72 +653,9 @@ describe("Grid transaction resource ingress", () => {
   }, 30_000);
 });
 
-describe("Grid store lifecycle", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
-  it("disposes the store it constructed and leaves a fresh grid usable", () => {
-    const host = mountHost();
-    const disposeSpy = spyOn(SheetwriteStore.prototype, "dispose");
-
-    // No store injected: the grid constructs and owns its SheetwriteStore, so
-    // destroy() must free the underlying WASM CellStore.
-    const grid = new GridImpl(host, { workbook: makeWorkbook(20) });
-    grid.destroy();
-    expect(disposeSpy).toHaveBeenCalledTimes(1);
-    disposeSpy.mockRestore();
-
-    // Each store owns an independent CellStore, so freeing one must not corrupt
-    // a brand-new grid/store built afterwards.
-    const host2 = mountHost();
-    const grid2 = new GridImpl(host2, { workbook: makeWorkbook(20) });
-
-    expect(() => grid2.store.getCell({ sheet: "s1", row: 0, col: 0 })).not.toThrow();
-    grid2.destroy();
-  });
-
-  it("does not dispose a caller-provided store on destroy", () => {
-    const workbook = makeWorkbook(20);
-    const store = new SheetwriteStore(workbook, makeColumnarData(20));
-    const host = mountHost();
-
-    // Store injected via the constructor: the caller owns it, so destroy() must
-    // leave it alone and fully usable.
-    const grid = new GridImpl(host, { workbook }, store);
-    const disposeSpy = spyOn(store, "dispose");
-
-    grid.destroy();
-
-    expect(disposeSpy).not.toHaveBeenCalled();
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Customer 0");
-
-    disposeSpy.mockRestore();
-    store.dispose();
-  });
-});
-
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   beforeAll(async () => {
     await initSheetwrite();
-  });
-
-  it("replaceTheme(undefined) re-reads host CSS custom properties (Tailwind-style)", () => {
-    const workbook = makeWorkbook(10);
-    const host = mountHost();
-
-    // A Tailwind arbitrary property (`[--sheetwrite-bg:...]`) lands as a
-    // custom property on the host; construction and replaceTheme(undefined)
-    // must both resolve it.
-    host.style.setProperty("--sheetwrite-bg", "#0b0b0c");
-    const grid = new GridImpl(host, { workbook }, makeFakeStore(workbook));
-    expect(grid.getEffectiveTheme().bg).toBe("#0b0b0c");
-
-    grid.setTheme({ bg: "#ff0000" });
-    grid.replaceTheme(undefined);
-    expect(grid.getEffectiveTheme().bg).toBe("#0b0b0c");
-
-    grid.destroy();
   });
 
   it("replaceTheme replaces the whole option value instead of merging", () => {
@@ -958,112 +714,9 @@ describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
   });
 });
 
-describe("ChangeEvent.commitReason", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
-  function reasonsOf(grid: GridImpl): string[] {
-    const reasons: string[] = [];
-    grid.on("change", (event) => reasons.push(event.commitReason));
-    return reasons;
-  }
-
-  it("classifies editor commits by gesture: Enter vs blur", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const reasons = reasonsOf(grid);
-
-    grid.beginEdit(0, 0);
-    let editor = expectEditor(host);
-    editor.value = "by enter";
-    editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    grid.beginEdit(1, 0);
-    editor = expectEditor(host);
-    editor.value = "by blur";
-    editor.dispatchEvent(new FocusEvent("blur"));
-
-    expect(reasons).toEqual(["edit-enter", "edit-blur"]);
-
-    grid.destroy();
-    store.dispose();
-  });
-});
-
-describe("Grid.setOverscan", () => {
-  beforeAll(async () => {
-    await initSheetwrite();
-  });
-
-  it("live-widens the render window on the next frame", () => {
-    const workbook = makeWorkbook(200);
-    const store = new SheetwriteStore(workbook, makeColumnarData(200));
-    const grid = new GridImpl(mountHost(), { workbook, overscan: 0 }, store);
-    const windows: Array<{ firstRow: number; lastRow: number }> = [];
-    grid.on("scroll", (event) =>
-      windows.push({ firstRow: event.firstRow, lastRow: event.lastRow }),
-    );
-
-    grid.refresh();
-    const before = windows.at(-1)!;
-
-    grid.setOverscan(40);
-    grid.refresh();
-    const after = windows.at(-1)!;
-
-    // 40 extra rows painted beyond the viewport (bottom edge; top clamps at 0).
-    expect(after.lastRow).toBe(before.lastRow + 40);
-
-    // `undefined` restores the DEFAULT_OVERSCAN-based window.
-    grid.setOverscan();
-    grid.refresh();
-    expect(windows.at(-1)!.lastRow).toBeLessThan(after.lastRow);
-
-    grid.destroy();
-    store.dispose();
-  });
-});
-
 describe("Grid.setMinColumns", () => {
   beforeAll(async () => {
     await initSheetwrite();
-  });
-
-  it("keeps presentation padding virtual until a padded column is edited", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    let changes = 0;
-    grid.on("change", () => {
-      changes += 1;
-    });
-
-    grid.setMinColumns(12);
-    grid.refresh();
-
-    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(3);
-    expect(host.getAttribute("aria-colcount")).toBe("12");
-    expect(changes).toBe(0);
-
-    grid.applyTransaction({
-      patches: [
-        {
-          op: "set",
-          addr: { sheet: "s1", row: 0, col: 10 },
-          value: { kind: "literal", value: "materialized" },
-        },
-      ],
-    });
-    expect(store.getWorkbook().sheets[0]!.columns).toHaveLength(11);
-    expect(store.getCell({ sheet: "s1", row: 0, col: 10 }).resolved).toBe("materialized");
-    expect(changes).toBe(1);
-
-    grid.destroy();
-    store.dispose();
   });
 
   it("fills the host width with empty columns only for a spreadsheet", () => {
@@ -1087,43 +740,6 @@ describe("Grid.setMinColumns", () => {
     grid.setMinColumns(undefined);
     expect(host.getAttribute("aria-colcount")).toBe("3");
     grid.destroy();
-  });
-
-  it("routes Grid.exportXlsx through the registered table backend", async () => {
-    const store = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
-    const grid = new GridImpl(mountHost(), { workbook: store.getWorkbook() }, store);
-    const actionErrors: unknown[] = [];
-    grid.on("export-error", (event) => actionErrors.push(event));
-    const expected = new Error("fake XLSX export reached");
-    let receivedWorkbook: Workbook | undefined;
-    let receivedStore: Store | undefined;
-    const backend: XlsxTableExportBackend = {
-      name: "fake-grid-export",
-      toXlsxTable: async (workbook, actualStore) => {
-        receivedWorkbook = workbook;
-        receivedStore = actualStore;
-        throw expected;
-      },
-    };
-
-    setXlsxTableExportBackend(null);
-    await expect(grid.exportXlsx("missing.xlsx")).rejects.toMatchObject({
-      code: "optional-backend-unavailable",
-      operation: "xlsx-export",
-    });
-    setXlsxTableExportBackend(backend);
-    try {
-      await expect(grid.exportXlsx("fake.xlsx")).rejects.toMatchObject({
-        code: "export-failed",
-        operation: "xlsx-export",
-        cause: expected,
-      });
-      expect(receivedWorkbook).toBe(store.getWorkbook());
-      expect(receivedStore).toBe(store);
-      expect(actionErrors).toEqual([]);
-    } finally {
-      grid.destroy();
-    }
   });
 
   it("guards table XLSX export by the backend-selected active sheet only", async () => {

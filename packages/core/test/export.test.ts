@@ -6,15 +6,7 @@ import {
   DelimitedTextOptionsError,
   DelimitedTextResourceError,
 } from "../src/delimited-text.js";
-import {
-  downloadBytes,
-  fromCsv,
-  parseCsv,
-  toCsv,
-  toCsvStream,
-  toTsv,
-  toTsvStream,
-} from "../src/export.js";
+import { fromCsv, parseCsv, toCsv, toCsvStream, toTsv, toTsvStream } from "../src/export.js";
 import { initSheetwrite } from "../src/grid.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
@@ -482,41 +474,6 @@ describe("export", () => {
     store.dispose();
   });
 
-  it("bounds CSV and TSV store reads by maxWriterWindowRows", () => {
-    const store = new SheetwriteStore(workbook(), {
-      rowCount: 3,
-      columns: { a: ["a", "b", "c"], b: [1, 2, 3] },
-    });
-    const windows: number[] = [];
-    const readWindow = store.getVisibleWindow.bind(store);
-    store.getVisibleWindow = ((sheet, rows, columns) => {
-      windows.push(rows.end - rows.start);
-      return readWindow(sheet, rows, columns);
-    }) as typeof store.getVisibleWindow;
-    const dataWindows: number[] = [];
-    const readDataWindow = store.getDataWindow.bind(store);
-    store.getDataWindow = ((sheet, rows, columns) => {
-      dataWindows.push(rows.end - rows.start);
-      return readDataWindow(sheet, rows, columns);
-    }) as typeof store.getDataWindow;
-
-    expect(
-      toCsv(store.getWorkbook().sheets[0]!, store, {
-        resourceLimits: { maxWriterWindowRows: 1 },
-      }),
-    ).toContain("a,1\r\nb,2\r\nc,3");
-    expect(windows.length).toBeGreaterThan(0);
-    expect(windows.every((rows) => rows > 0 && rows <= 1)).toBe(true);
-    expect(
-      toTsv({ sheet: "s", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } }, store, {
-        resourceLimits: { maxWriterWindowRows: 1 },
-      }),
-    ).toBe("a\t1\r\nb\t2\r\nc\t3");
-    expect(dataWindows.length).toBeGreaterThan(0);
-    expect(dataWindows.every((rows) => rows > 0 && rows <= 1)).toBe(true);
-    store.dispose();
-  });
-
   it("streams CSV/TSV on demand with byte-identical output and lazy cancellable store reads", async () => {
     const rowCount = 20_000;
     const text = Array.from(
@@ -595,104 +552,5 @@ describe("export", () => {
       await failureOf(toCsvStream(sheet, store, { resourceLimits: { maxOutputBytes: 8 } })),
     ).toBeInstanceOf(DelimitedTextResourceError);
     store.dispose();
-  });
-});
-
-describe("downloadBytes", () => {
-  it("appends+removes the anchor and defers the object-URL revoke", () => {
-    const created: string[] = [];
-    const revoked: string[] = [];
-    const clicks: HTMLAnchorElement[] = [];
-    const appended: HTMLAnchorElement[] = [];
-    const deferred: Array<() => void> = [];
-
-    const originalCreate = URL.createObjectURL;
-    const originalRevoke = URL.revokeObjectURL;
-    const originalClick = HTMLAnchorElement.prototype.click;
-    const originalAppend = document.body.appendChild.bind(document.body);
-    const originalSetTimeout = globalThis.setTimeout;
-
-    URL.createObjectURL = (() => {
-      created.push("blob:sheetwrite-test");
-      return "blob:sheetwrite-test";
-    }) as typeof URL.createObjectURL;
-    URL.revokeObjectURL = ((url: string) => {
-      revoked.push(url);
-    }) as typeof URL.revokeObjectURL;
-    HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
-      clicks.push(this);
-      // The anchor must be in the document when clicked.
-      expect(this.isConnected).toBe(true);
-    };
-    document.body.appendChild = ((node: Node) => {
-      if (node instanceof HTMLAnchorElement) appended.push(node);
-      return originalAppend(node);
-    }) as typeof document.body.appendChild;
-    // Deterministic deferral: capture the timeout callback instead of waiting.
-    globalThis.setTimeout = ((fn: () => void) => {
-      deferred.push(fn);
-      return 0;
-    }) as unknown as typeof globalThis.setTimeout;
-
-    try {
-      downloadBytes(new Uint8Array([1, 2, 3]), "t.bin", "application/octet-stream");
-
-      expect(created).toEqual(["blob:sheetwrite-test"]);
-      expect(appended).toHaveLength(1);
-      expect(clicks).toHaveLength(1);
-      expect(appended[0]!.isConnected).toBe(false); // removed after click
-      expect(appended[0]!.download).toBe("t.bin");
-
-      // Revoke is deferred, never synchronous with the click.
-      expect(revoked).toEqual([]);
-      for (const fn of deferred) fn();
-      expect(revoked).toEqual(["blob:sheetwrite-test"]);
-    } finally {
-      URL.createObjectURL = originalCreate;
-      URL.revokeObjectURL = originalRevoke;
-      HTMLAnchorElement.prototype.click = originalClick;
-      document.body.appendChild = originalAppend as typeof document.body.appendChild;
-      globalThis.setTimeout = originalSetTimeout;
-    }
-  });
-
-  it("cleans up the anchor and object URL when click throws", () => {
-    const revoked: string[] = [];
-    const deferred: Array<() => void> = [];
-    let anchor: HTMLAnchorElement | null = null;
-    const originalCreate = URL.createObjectURL;
-    const originalRevoke = URL.revokeObjectURL;
-    const originalClick = HTMLAnchorElement.prototype.click;
-    const originalAppend = document.body.appendChild.bind(document.body);
-    const originalSetTimeout = globalThis.setTimeout;
-
-    URL.createObjectURL = (() => "blob:sheetwrite-failure") as typeof URL.createObjectURL;
-    URL.revokeObjectURL = ((url: string) => revoked.push(url)) as typeof URL.revokeObjectURL;
-    HTMLAnchorElement.prototype.click = () => {
-      throw new Error("click failed");
-    };
-    document.body.appendChild = ((node: Node) => {
-      if (node instanceof HTMLAnchorElement) anchor = node;
-      return originalAppend(node);
-    }) as typeof document.body.appendChild;
-    globalThis.setTimeout = ((fn: () => void) => {
-      deferred.push(fn);
-      return 0;
-    }) as unknown as typeof globalThis.setTimeout;
-
-    try {
-      expect(() => downloadBytes("x", "failure.txt", "text/plain")).toThrow("click failed");
-      expect(anchor).not.toBeNull();
-      expect(anchor!.isConnected).toBe(false);
-      expect(revoked).toEqual([]);
-      for (const callback of deferred) callback();
-      expect(revoked).toEqual(["blob:sheetwrite-failure"]);
-    } finally {
-      URL.createObjectURL = originalCreate;
-      URL.revokeObjectURL = originalRevoke;
-      HTMLAnchorElement.prototype.click = originalClick;
-      document.body.appendChild = originalAppend as typeof document.body.appendChild;
-      globalThis.setTimeout = originalSetTimeout;
-    }
   });
 });

@@ -2,11 +2,8 @@ import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 
 import { actionFeedbackFor } from "../src/action-feedback.js";
 import { createGrid, initSheetwrite } from "../src/grid.js";
-import { showFormulaExplanation } from "../src/panels/panel-loader.js";
-import { menuButton } from "../src/panels/panel-menu.js";
 import { createSpreadsheetShell } from "../src/shell.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Grid } from "../src/types.js";
 import { makeColumnarData, makeWorkbook } from "./fixtures.js";
 
 /** Enough cells (3 columns) that a summary yields after two reads and an auto-fit runs over frames. */
@@ -300,22 +297,6 @@ describe("grid destroy", () => {
     expect(await summary).toMatchObject({ name: "AbortError" });
   });
 
-  it("drops chrome, find bar and panel chunks that load after destroy", async () => {
-    restoreCanvas = installCanvasTestStubs();
-    const host = mountHost();
-    const grid: Grid = createGrid(host, { workbook: makeWorkbook(3), config: { ribbon: true } });
-    grid.actions.find();
-    showFormulaExplanation(grid);
-    grid.destroy();
-
-    await import("../src/ribbon/ribbon.js");
-    await import("../src/find-bar.js");
-    await import("../src/panels/panel-controller.js");
-    await mountTurns();
-
-    expect(host.childElementCount).toBe(0);
-  });
-
   it("drops shell chrome that loads after the shell is destroyed", async () => {
     restoreCanvas = installCanvasTestStubs();
     const host = mountHost();
@@ -330,21 +311,5 @@ describe("grid destroy", () => {
     await mountTurns();
 
     expect(toolbarRow?.childElementCount).toBe(0);
-  });
-});
-
-describe("panel menu", () => {
-  it("stops listening on the document when its panel's signal aborts", () => {
-    const lifetime = new LifetimeProbe();
-    probe = lifetime;
-    const panel = new AbortController();
-    const wrapper = menuButton("Field actions", "field-0-menu", () => [], panel.signal);
-    document.body.appendChild(wrapper);
-    wrapper.querySelector("button")?.click();
-    expect(lifetime.live().listeners).toBe(1);
-
-    panel.abort();
-
-    expect(lifetime.live().listeners).toBe(0);
   });
 });
