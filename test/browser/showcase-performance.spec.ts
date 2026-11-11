@@ -69,10 +69,17 @@ async function bootScale(page: Page): Promise<void> {
 
 /** The public window readout, checked against its row and column headers. */
 async function readWindow(page: Page): Promise<WindowReadout> {
-  const text = (testId: string) => page.getByTestId(testId).textContent();
-  const windowText = await text("scale-window-a1");
-  const rowText = await text("scale-window-rows");
-  const columnText = await text("scale-window-columns");
+  // One snapshot: the readouts move together while the grid scrolls.
+  const { windowText, rowText, columnText, selected } = await page.evaluate(() => {
+    const text = (testId: string) =>
+      document.querySelector(`[data-testid="${testId}"]`)?.textContent ?? null;
+    return {
+      windowText: text("scale-window-a1"),
+      rowText: text("scale-window-rows"),
+      columnText: text("scale-window-columns"),
+      selected: text("scale-current-a1"),
+    };
+  });
   const windowMatch = windowText?.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/);
   const rowMatch = rowText?.trim().match(/^(\d+)–(\d+)$/);
   const columnMatch = columnText?.trim().match(/^([A-Z]+)–([A-Z]+)$/);
@@ -84,7 +91,7 @@ async function readWindow(page: Page): Promise<WindowReadout> {
     lastRow: Number(windowMatch[4]),
     firstColumn: columnIndex(windowMatch[1] ?? ""),
     lastColumn: columnIndex(windowMatch[3] ?? ""),
-    selected: (await text("scale-current-a1"))?.trim() ?? "",
+    selected: selected?.trim() ?? "",
   };
   expect([readout.firstRow, readout.lastRow]).toEqual([Number(rowMatch[1]), Number(rowMatch[2])]);
   expect([readout.firstColumn, readout.lastColumn]).toEqual([
