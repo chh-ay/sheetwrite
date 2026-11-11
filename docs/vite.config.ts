@@ -329,6 +329,33 @@ function markShortInlineCode() {
   };
 }
 
+/**
+ * A link that is a list item's or paragraph's whole content ("See also" and
+ * next-step lists, "Read the notes") is a control of its own, not a link in
+ * running text; the class gives it a 44 px row on phones.
+ */
+function markLinkRows() {
+  return (tree: HastNode): void => {
+    const visit = (node: HastNode): void => {
+      for (const child of node.children ?? []) {
+        if (child.tagName === "pre") continue;
+        if (child.tagName === "li" || child.tagName === "p") {
+          const content = (child.children ?? []).filter(
+            (part) => part.type !== "text" || (part.value ?? "").trim() !== "",
+          );
+          const link = content[0];
+          if (content.length === 1 && link?.tagName === "a") {
+            const className = [link.properties?.className ?? []].flat().map(String);
+            link.properties = { ...link.properties, className: [...className, "sw-link-row"] };
+          }
+        }
+        visit(child);
+      }
+    };
+    visit(tree);
+  };
+}
+
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   // One frame style for every fence: shell commands use the same code frame as
   // other languages. Long lines wrap, so no line is cut at the frame edge on
@@ -487,6 +514,7 @@ export const DOCS_MDX_OPTIONS = {
     markResponsiveCodeBlocks,
     wrapProseTables,
     markShortInlineCode,
+    markLinkRows,
   ],
 } satisfies MdxOptions;
 
