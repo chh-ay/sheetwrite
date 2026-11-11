@@ -774,6 +774,20 @@ pub enum Ast {
         values: Vec<Value>,
     },
 }
+
+// Every node of every parsed formula is an `Ast`; large or rare variants are
+// boxed to keep it at this size.
+#[cfg(target_arch = "wasm32")]
+const _: () = assert!(
+    std::mem::size_of::<Ast>() == 48,
+    "Ast changed size: measure, then update this number"
+);
+#[cfg(not(target_arch = "wasm32"))]
+const _: () = assert!(
+    std::mem::size_of::<Ast>() == 64,
+    "Ast changed size: measure, then update this number"
+);
+
 impl Ast {
     /// The expression that a LET binding's use or a defined name stands
     /// for, through any number of them: what a function argument such as
