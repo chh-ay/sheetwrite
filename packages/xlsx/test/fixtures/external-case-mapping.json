@@ -243,7 +243,7 @@
       "id": 35,
       "status": "covered-existing",
       "source": "apache-poi:test-data/spreadsheet/DataValidations-49244.xlsx",
-      "testName": "scheduled independent Microsoft Excel corpus > imports checksum-locked DataValidations-49244.xlsx",
+      "testName": "raw spec-authored OOXML fidelity > maps every native validation comparison operator without broadening",
       "nonShippedChecksumDownloadOnly": true
     },
     {
