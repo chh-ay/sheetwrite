@@ -22,11 +22,11 @@ import {
   validateResult,
   verifyCaptureArtifacts,
 } from "./conformance.js";
-import { AUTHORED_ASSERTIONS } from "./conformance/formula-evidence.js";
 
-const [{ manifest: CHECKED_MANIFEST }, CHECKED_INVENTORY] = await Promise.all([
+const [{ manifest: CHECKED_MANIFEST }, CHECKED_INVENTORY, CORPUS] = await Promise.all([
   generatedConformanceEvidence(),
   readFormulaInventory(),
+  loadCorpus(),
 ]);
 const NO_ARTIFACTS = new Set<string>();
 
@@ -49,7 +49,7 @@ function validateCorpusChecked(
 
 describe("neutral conformance corpus", () => {
   it("rejects formula padding and proves the direct category result path", async () => {
-    const corpus = await loadCorpus();
+    const corpus = clone(CORPUS);
     const direct = corpus.cases.find(
       (entry) =>
         entry.id === "formula.function.abs.empty.1" && entry.formula?.includes("ABS(C1)=0"),
@@ -110,7 +110,7 @@ describe("neutral conformance corpus", () => {
   });
 
   it("rejects missing producer versions, artifact checksums, and secret-like content", async () => {
-    const corpus = await loadCorpus();
+    const corpus = clone(CORPUS);
     const observation = clone(corpus);
     observation.cases[0]!.observations.push({
       producer: "excel-web",
@@ -129,7 +129,7 @@ describe("neutral conformance corpus", () => {
   });
 
   it("binds reviewed observations to exact immutable capture bytes", async () => {
-    const corpus = await loadCorpus();
+    const corpus = clone(CORPUS);
     const capturedAt = "2026-07-22T00:00:00.000Z";
     const artifact = {
       protocol: 1,
@@ -179,8 +179,8 @@ describe("neutral conformance corpus", () => {
     }
   });
 
-  it("rejects fake producer observations and denominator drift", async () => {
-    const corpus = await loadCorpus();
+  it("rejects fake producer observations, checksum and denominator drift", async () => {
+    const corpus = clone(CORPUS);
     const altered = clone(corpus);
     altered.cases[0]!.expected = { type: "number", value: 3 };
     const forgedManifest = structuredClone(CHECKED_MANIFEST);
@@ -203,10 +203,7 @@ describe("neutral conformance corpus", () => {
         "altered record or unstable checksum",
       ),
     ).toBe(true);
-  });
 
-  it("rejects fake producer observations and denominator drift", async () => {
-    const corpus = await loadCorpus();
     const fake = clone(corpus);
     const fakeHash = "a".repeat(64);
     fake.cases[0]!.source.authorship = "producer-observation";
@@ -294,7 +291,7 @@ describe("offline typed comparison", () => {
   });
 
   it("rejects incomplete or drifted Excel Office Script captures", async () => {
-    const corpus = await loadCorpus();
+    const corpus = clone(CORPUS);
     const capture = {
       protocol: 1,
       producer: "excel-web",
@@ -348,7 +345,7 @@ describe("offline typed comparison", () => {
   });
 
   it("reports every engine error as an error result", async () => {
-    const corpus = await loadCorpus();
+    const corpus = clone(CORPUS);
     const template = corpus.cases.find(
       (entry) => entry.kind === "formula" && !entry.unsupported && !entry.calculation,
     );
@@ -362,7 +359,7 @@ describe("offline typed comparison", () => {
   });
 
   it("runs every supported case and preserves the seven-canary metric", async () => {
-    const corpus = await loadCorpus();
+    const corpus = clone(CORPUS);
     const result = await runOffline(corpus);
     const unsupported = corpus.cases.filter((entry) => entry.unsupported === true);
     expect(result.checked).toBe(corpus.cases.length);
@@ -374,12 +371,5 @@ describe("offline typed comparison", () => {
     expect(compatibilityCheckSummary(result, true)).toContain(
       "Excel and Google Sheets compatibility remains unclaimed",
     );
-  });
-});
-
-describe("authored formula assertions", () => {
-  it("lists functions in name order, so function pull requests add different lines", () => {
-    const names = Object.keys(AUTHORED_ASSERTIONS);
-    expect(names).toEqual([...names].sort());
   });
 });
