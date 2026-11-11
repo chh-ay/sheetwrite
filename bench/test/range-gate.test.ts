@@ -1,4 +1,4 @@
-import { describe, expect, it } from "bun:test";
+import { it } from "bun:test";
 
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import {
@@ -9,9 +9,43 @@ import {
   validateRangeArtifact,
 } from "../src/range-gate.js";
 import { summarize } from "../src/stats.js";
+import { type DeepMutable, expectRejections, must, mutableCopy } from "./gate-fixtures.js";
 
-function result(workload: RangeStructuralResult["workload"]): RangeStructuralResult {
-  const base: RangeStructuralResult = {
+type Workload = RangeStructuralResult["workload"];
+
+/** Per-workload counters that differ from the zero baseline row. */
+const COUNTERS: Partial<Record<Workload, Partial<RangeStructuralResult>>> = {
+  "style merge and clear": {
+    documentOperationCount: 2,
+    jsPatchObjectCount: 2,
+    maxTransferredArrayLength: 2,
+  },
+  "sparse setRange": { addressedCells: 3, jsPatchObjectCount: 4 },
+  "dense setBlock": { addressedCells: 100, maxTransferredArrayLength: 100 },
+  "clipboard bulk read": {
+    documentOperationCount: 0,
+    jsPatchObjectCount: 10_000,
+    ffiCalls: 4,
+    maxTransferredArrayLength: 30_001,
+    outputSentinel: '["first",null]',
+  },
+  "datasource revision retention": {
+    documentOperationCount: 3,
+    jsPatchObjectCount: 5,
+    retainedRevisionPointsBefore: 2,
+    retainedRevisionRectanglesBefore: 2,
+  },
+  "large exact auto-fit": {
+    maxTransferredArrayLength: RANGE_AUTO_FIT_CHUNK_CELLS,
+    maxVisibleWindowCells: RANGE_AUTO_FIT_CHUNK_CELLS,
+    autoFitChunkCellLimit: RANGE_AUTO_FIT_CHUNK_CELLS,
+    visibleWindowRequests: 2,
+    scheduledChunks: 2,
+  },
+};
+
+function artifact(): DeepMutable<RangeGateArtifact> {
+  const results = RANGE_WORKLOADS.map((workload) => ({
     rows: 10_000,
     workload,
     addressedCells: 10_000,
@@ -33,95 +67,41 @@ function result(workload: RangeStructuralResult["workload"]): RangeStructuralRes
     scheduledChunks: 0,
     historyBytes: 0,
     outputSentinel: "",
-  };
-  if (workload === "style merge and clear") {
-    return {
-      ...base,
-      documentOperationCount: 2,
-      jsPatchObjectCount: 2,
-      maxTransferredArrayLength: 2,
-    };
-  }
-  if (workload === "sparse setRange") return { ...base, addressedCells: 3, jsPatchObjectCount: 4 };
-  if (workload === "dense setBlock") {
-    return { ...base, addressedCells: 100, maxTransferredArrayLength: 100 };
-  }
-  if (workload === "clipboard bulk read") {
-    return {
-      ...base,
-      documentOperationCount: 0,
-      jsPatchObjectCount: 10_000,
-      ffiCalls: 4,
-      maxTransferredArrayLength: 30_001,
-      outputSentinel: '["first",null]',
-    };
-  }
-  if (workload === "datasource revision retention") {
-    return {
-      ...base,
-      documentOperationCount: 3,
-      jsPatchObjectCount: 5,
-      retainedRevisionPointsBefore: 2,
-      retainedRevisionRectanglesBefore: 2,
-    };
-  }
-  if (workload === "large exact auto-fit") {
-    return {
-      ...base,
-      maxTransferredArrayLength: RANGE_AUTO_FIT_CHUNK_CELLS,
-      maxVisibleWindowCells: RANGE_AUTO_FIT_CHUNK_CELLS,
-      autoFitChunkCellLimit: RANGE_AUTO_FIT_CHUNK_CELLS,
-      visibleWindowRequests: 2,
-      scheduledChunks: 2,
-    };
-  }
-  return base;
-}
-
-function artifact(): RangeGateArtifact {
-  return {
+    ...COUNTERS[workload],
+  }));
+  return mutableCopy({
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode: "smoke",
     matrixId: MATRIX_IDS.range.smoke,
-    results: RANGE_WORKLOADS.map(result),
-  };
+    results,
+  } satisfies RangeGateArtifact);
 }
 
-describe("range structural gate", () => {
-  it("fails closed on incomplete matrices, retained revisions, and oversized auto-fit windows", () => {
-    const incomplete = artifact();
-    expect(() =>
-      validateRangeArtifact({ ...incomplete, results: incomplete.results.slice(1) }, "smoke"),
-    ).toThrow(/missing 10000:style merge and clear/);
+const resultOf = (value: DeepMutable<RangeGateArtifact>, workload: Workload) =>
+  must(
+    value.results.find((entry) => entry.workload === workload),
+    workload,
+  );
 
-    const retained = artifact();
-    const retainedResults = retained.results.map((entry) =>
-      entry.workload === "datasource revision retention"
-        ? { ...entry, retainedRevisionRectanglesAfter: 1 }
-        : entry,
-    );
-    expect(() => validateRangeArtifact({ ...retained, results: retainedResults }, "smoke")).toThrow(
+it("fails closed on incomplete matrices, retained revisions and oversized auto-fit windows", () => {
+  expectRejections(artifact, (value) => validateRangeArtifact(value, "smoke"), [
+    [(value) => value.results.shift(), /missing 10000:style merge and clear/],
+    [
+      (value) =>
+        (resultOf(value, "datasource revision retention").retainedRevisionRectanglesAfter = 1),
       /retained revision rectangles/,
-    );
-
-    const staleLimit = artifact();
-    const staleLimitResults = staleLimit.results.map((entry) =>
-      entry.workload === "large exact auto-fit"
-        ? { ...entry, autoFitChunkCellLimit: RANGE_AUTO_FIT_CHUNK_CELLS + 1 }
-        : entry,
-    );
-    expect(() =>
-      validateRangeArtifact({ ...staleLimit, results: staleLimitResults }, "smoke"),
-    ).toThrow(/reported a stale auto-fit chunk-cell limit/);
-
-    const oversized = artifact();
-    const oversizedResults = oversized.results.map((entry) =>
-      entry.workload === "large exact auto-fit"
-        ? { ...entry, maxVisibleWindowCells: RANGE_AUTO_FIT_CHUNK_CELLS + 1 }
-        : entry,
-    );
-    expect(() =>
-      validateRangeArtifact({ ...oversized, results: oversizedResults }, "smoke"),
-    ).toThrow(/exceeded the auto-fit chunk-cell limit/);
-  });
+    ],
+    [
+      (value) =>
+        (resultOf(value, "large exact auto-fit").autoFitChunkCellLimit =
+          RANGE_AUTO_FIT_CHUNK_CELLS + 1),
+      /reported a stale auto-fit chunk-cell limit/,
+    ],
+    [
+      (value) =>
+        (resultOf(value, "large exact auto-fit").maxVisibleWindowCells =
+          RANGE_AUTO_FIT_CHUNK_CELLS + 1),
+      /exceeded the auto-fit chunk-cell limit/,
+    ],
+  ]);
 });

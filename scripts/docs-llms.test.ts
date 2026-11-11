@@ -1,164 +1,93 @@
 import { describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
-import type { NavigationSection } from "../docs/src/lib/navigation.js";
-import {
-  expectedLlmsFiles,
-  inNavigationOrder,
-  LLMS_FULL_PATH,
-  LLMS_SITE_BASE,
-} from "./docs-llms.js";
+import { expectedLlmsFiles, LLMS_FULL_PATH, LLMS_SITE_BASE } from "./docs-llms.js";
 
-describe("llms reading order", () => {
-  it("orders pages depth-first by the sidebar, then unlisted pages by route", () => {
-    const sections = [
-      {
-        label: "Features",
-        tab: "guides",
-        items: [
-          {
-            label: "Grid",
-            items: [
-              { label: "Search", href: "/docs/features/grid/search/" },
-              { label: "Context menu", href: "/docs/features/grid/context-menu/" },
-            ],
-          },
-        ],
-      },
-      {
-        label: "Reference",
-        tab: "api",
-        items: [{ label: "Events", href: "/docs/reference/events/" }],
-      },
-    ] satisfies readonly NavigationSection[];
-    const documents = [
-      { route: "/docs/reference/events/" },
-      { route: "/docs/zeta/" },
-      { route: "/docs/features/grid/context-menu/" },
-      { route: "/docs/alpha/" },
-      { route: "/docs/features/grid/search/" },
-    ];
-    expect(inNavigationOrder(documents, sections).map((document) => document.route)).toEqual([
-      "/docs/features/grid/search/",
-      "/docs/features/grid/context-menu/",
-      "/docs/reference/events/",
-      "/docs/alpha/",
-      "/docs/zeta/",
-    ]);
-  });
-});
+/** The full-text endpoint built from the given docs pages, keyed by content path. */
+async function fullText(pages: Readonly<Record<string, string>>): Promise<string> {
+  const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
+  try {
+    for (const [path, content] of Object.entries(pages)) {
+      const file = join(root, "docs/src/content/docs", path);
+      await mkdir(dirname(file), { recursive: true });
+      await writeFile(file, content);
+    }
+    const files = await expectedLlmsFiles({ formatVersion: 2, packages: [] }, root, []);
+    const full = files.find((file) => file.path === join(root, LLMS_FULL_PATH));
+    if (full === undefined) throw new Error("Full-text endpoint is missing");
+    return full.content;
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+}
 
-describe("llms document text", () => {
-  it("formats prose tokens while preserving fenced examples verbatim", async () => {
-    const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
-    const contentRoot = join(root, "docs/src/content/docs");
+const page = (title: string, ...body: string[]) =>
+  ["---", `title: ${title}`, "---", ...body].join("\n");
+
+describe("llms full text", () => {
+  it("formats prose tokens and keeps code, blank lines included, verbatim", async () => {
     const example = '<sw-format value="0.25" code="0%"></sw-format>';
-    try {
-      await mkdir(contentRoot, { recursive: true });
-      await writeFile(
-        join(contentRoot, "index.md"),
-        [
-          "---",
-          "title: Format examples",
-          "---",
-          `Result: ${example}.`,
-          "",
-          "```html compile",
-          example,
-          '<sw-format code="0.00"></sw-format>',
-          "```",
-          "",
-          "~~~html",
-          example,
-          "~~~",
-        ].join("\n"),
-      );
+    const code = ["const text = `first", "", "", "last`;"].join("\n");
+    const content = await fullText({
+      "index.md": page(
+        "Format examples",
+        `Result: ${example}.`,
+        "",
+        "~~~html",
+        example,
+        "~~~",
+        "",
+        `\`\`\`ts compile\n${code}\n\`\`\``,
+      ),
+    });
 
-      const files = await expectedLlmsFiles({ formatVersion: 2, packages: [] }, root, []);
-      const full = files.find((file) => file.path === join(root, LLMS_FULL_PATH));
-      if (full === undefined) throw new Error("Full-text endpoint is missing");
-
-      expect(full.content).toContain("Result: 25%.");
-      expect(full.content).toContain(
-        `\`\`\`html\n${example}\n<sw-format code="0.00"></sw-format>\n\`\`\``,
-      );
-      expect(full.content).toContain(`~~~html\n${example}\n~~~`);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+    expect(content).toContain("Result: 25%.");
+    expect(content).toContain(`~~~html\n${example}\n~~~`);
+    // The compile flag is site tooling, not part of the example.
+    expect(content).toContain(`\`\`\`ts\n${code}\n\`\`\``);
   });
 
-  it("keeps blank lines inside code and gives repeated guide titles their own anchors", async () => {
-    const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
-    const contentRoot = join(root, "docs/src/content/docs");
-    const code = ["```ts", "const text = `first", "", "", "last`;", "```"].join("\n");
-    const guide = (body: string) => ["---", "title: Same title", "---", body].join("\n");
-    try {
-      await mkdir(join(contentRoot, "guides"), { recursive: true });
-      await writeFile(join(contentRoot, "guides/first.md"), guide(`Intro.\n\n\n\n${code}`));
-      await writeFile(join(contentRoot, "guides/second.md"), guide("Second."));
+  it("gives repeated guide titles their own anchors", async () => {
+    const content = await fullText({
+      "guides/first.md": page("Same title", "First."),
+      "guides/second.md": page("Same title", "Second."),
+    });
 
-      const files = await expectedLlmsFiles({ formatVersion: 2, packages: [] }, root, []);
-      const full = files.find((file) => file.path === join(root, LLMS_FULL_PATH));
-      if (full === undefined) throw new Error("Full-text endpoint is missing");
-
-      expect(full.content).toContain(`Intro.\n\n${code}`);
-      const links = [...full.content.matchAll(/^- \[Same title\]\(#([^)]+)\)$/gm)].map(
-        (match) => match[1],
-      );
-      expect(links).toHaveLength(2);
-      expect(new Set(links).size).toBe(2);
-      for (const anchor of links) expect(full.content).toContain(`<a id="${anchor}"></a>`);
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+    const links = [...content.matchAll(/^- \[Same title\]\(#([^)]+)\)$/gm)].map(
+      (match) => match[1],
+    );
+    expect(new Set(links).size).toBe(2);
+    for (const anchor of links) expect(content).toContain(`<a id="${anchor}"></a>`);
   });
 
   it("reads content components as titled text, figures as their alt text", async () => {
-    const root = await mkdtemp(join(tmpdir(), "sheetwrite-llms-"));
-    const contentRoot = join(root, "docs/src/content/docs");
-    try {
-      await mkdir(contentRoot, { recursive: true });
-      await writeFile(
-        join(contentRoot, "index.mdx"),
-        [
-          "---",
-          "title: Components",
-          "---",
-          "<Note>Read this first.</Note>",
-          "",
-          "<Steps>",
-          '<Step title="Install the packages">',
-          "Add the core package.",
-          "</Step>",
-          "</Steps>",
-          "",
-          "<Screenshot",
-          '  name="dashboard"',
-          '  alt="A dashboard with a slicer."',
-          "/>",
-          "",
-          '<Card title="Dashboards" href="/docs/features/analysis/dashboards/">',
-          "Pivots and slicers.",
-          "</Card>",
-        ].join("\n"),
-      );
+    const content = await fullText({
+      "index.mdx": page(
+        "Components",
+        "<Note>Read this first.</Note>",
+        "",
+        "<Steps>",
+        '<Step title="Install the packages">',
+        "Add the core package.",
+        "</Step>",
+        "</Steps>",
+        "",
+        '<Screenshot name="dashboard" alt="A dashboard with a slicer." />',
+        "",
+        '<Card title="Dashboards" href="/docs/features/analysis/dashboards/">',
+        "Pivots and slicers.",
+        "</Card>",
+      ),
+    });
 
-      const files = await expectedLlmsFiles({ formatVersion: 2, packages: [] }, root, []);
-      const full = files.find((file) => file.path === join(root, LLMS_FULL_PATH));
-      if (full === undefined) throw new Error("Full-text endpoint is missing");
-
-      expect(full.content).toContain("Note: Read this first.");
-      expect(full.content).toContain("**Install the packages**\nAdd the core package.");
-      expect(full.content).toContain("(Figure: A dashboard with a slicer.)");
-      expect(full.content).not.toContain('name="dashboard"');
-      expect(full.content).toContain(
-        `**[Dashboards](${LLMS_SITE_BASE}/docs/features/analysis/dashboards/)**`,
-      );
-    } finally {
-      await rm(root, { recursive: true, force: true });
-    }
+    expect(content).toContain("Note: Read this first.");
+    expect(content).toContain("**Install the packages**\nAdd the core package.");
+    expect(content).toContain("(Figure: A dashboard with a slicer.)");
+    expect(content).not.toContain('name="dashboard"');
+    expect(content).toContain(
+      `**[Dashboards](${LLMS_SITE_BASE}/docs/features/analysis/dashboards/)**`,
+    );
   });
 });

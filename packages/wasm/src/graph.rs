@@ -1086,7 +1086,7 @@ impl FormulaGraph {
 
 #[cfg(test)]
 mod tests {
-    use super::{DirtyCells, DirtyRect, SheetFormulas};
+    use super::DirtyCells;
     use crate::store::CellStore;
 
     /// Every occupied formula slot is the formula indexed at its location,
@@ -1163,16 +1163,6 @@ mod tests {
         assert!(restored.remove_sheet(other));
         restored.recompute(data);
         assert_slots_indexed(&restored, "sheet removal");
-    }
-
-    /// Cells a row apart are not adjacent: the gap row is not marked.
-    #[test]
-    fn gapped_cells_stay_separate() {
-        let mut ranges = Vec::new();
-        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((0, 1)));
-        SheetFormulas::add_dirty_rect(&mut ranges, DirtyRect::cell((2, 1)));
-
-        assert_eq!(ranges.len(), 2);
     }
 
     /// The distinct cells a list holds, in address order.

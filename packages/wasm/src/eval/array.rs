@@ -15,8 +15,8 @@ use super::expand_let_ast;
 use super::index::index_selects_whole_axis;
 use super::lookup::{integer_arg, option_code};
 use super::matrix::{
-    intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS,
-    SPILL_MAX_RECOMPUTE_CELLS,
+    intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS,
+    UNKNOWN_SIZE_PRECHARGE,
 };
 use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
@@ -117,9 +117,6 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
     }
 }
 
-/// Spill-budget cells charged before a runtime reference is evaluated.
-const RUNTIME_REFERENCE_PRECHARGE: usize = 1;
-
 impl CellStore {
     /// The range that the anchor of `A1#` spills into now, or `#REF!` when
     /// the anchor holds no spill.
@@ -160,7 +157,7 @@ impl CellStore {
         match ast {
             // The shape is known only after evaluation, so the pending loop
             // charges the spill budget with the evaluated size instead.
-            Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(RUNTIME_REFERENCE_PRECHARGE)),
+            Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(UNKNOWN_SIZE_PRECHARGE)),
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
                 if ast_produces_array(ast) =>
             {
@@ -168,14 +165,11 @@ impl CellStore {
                     self.matrix_shape(ast, formula_sheet, pass)
                         .map(|shape| shape.2)
                         .or_else(|error| {
-                            // An operator over a runtime reference gets its
-                            // shape only after evaluation, which charges it.
-                            if error == FormulaError::Value
-                                && super::reference::ast_contains_runtime_ref(ast)
-                            {
-                                Ok(RUNTIME_REFERENCE_PRECHARGE)
-                            } else if error == FormulaError::Value {
-                                Ok(SPILL_MAX_CELLS)
+                            // An operator over a runtime reference or a size
+                            // read from a cell gets its shape only after
+                            // evaluation, which charges it.
+                            if error == FormulaError::Value {
+                                Ok(UNKNOWN_SIZE_PRECHARGE)
                             } else {
                                 Err(error)
                             }
@@ -230,10 +224,10 @@ impl CellStore {
                 self.dynamic_array_bound(&named.expression, formula_sheet, pass)
             }
             // The selection is at most the whole area; an area that has no
-            // shape before evaluation is charged at the spill limit.
+            // shape before evaluation is charged after it.
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => Some(Ok(self
                 .matrix_shape(&args[0], formula_sheet, pass)
-                .map_or(SPILL_MAX_CELLS, |(_, _, cells)| cells))),
+                .map_or(UNKNOWN_SIZE_PRECHARGE, |(_, _, cells)| cells))),
             Ast::Func(Func::Let, args) => match expand_let_ast(args) {
                 Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet, pass),
                 Err(_) => None,
@@ -272,7 +266,7 @@ impl CellStore {
                     }
                     Err(shape_error) => match self.dynamic_array_bound(source, formula_sheet, pass)
                     {
-                        Some(Ok(_)) => Ok(SPILL_MAX_CELLS),
+                        Some(Ok(_)) => Ok(UNKNOWN_SIZE_PRECHARGE),
                         Some(Err(error)) => Err(error),
                         None => Err(shape_error),
                     },
@@ -284,7 +278,7 @@ impl CellStore {
                 || (optional_ast(args, 1).is_some()
                     && static_integer(optional_ast(args, 1)).is_none())
             {
-                Ok(SPILL_MAX_CELLS)
+                Ok(UNKNOWN_SIZE_PRECHARGE)
             } else {
                 sequence_shape(args).map(|shape| shape.2)
             }),
@@ -1213,7 +1207,7 @@ fn runtime_reference_bound(
 ) -> Result<usize, FormulaError> {
     match bound {
         Err(FormulaError::Value) if super::reference::ast_contains_runtime_ref(ast) => {
-            Ok(RUNTIME_REFERENCE_PRECHARGE)
+            Ok(UNKNOWN_SIZE_PRECHARGE)
         }
         estimate => estimate,
     }

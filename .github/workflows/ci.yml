@@ -76,6 +76,8 @@ jobs:
         run: bun run changeset:ci
       - name: Install checksum-pinned wasm-pack
         run: bun scripts/install-wasm-pack.ts
+      - name: Install checksum-pinned typos and cargo-deny
+        run: bun scripts/install-rust-checks.ts
       - name: Tooling contracts
         run: bun run test:tooling
       - name: Import cycles

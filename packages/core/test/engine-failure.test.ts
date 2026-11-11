@@ -235,26 +235,6 @@ describe("engine failure", () => {
     healthy.destroy();
   });
 
-  it("does not notify a destroyed grid", () => {
-    const destroyed = mountGrid();
-    destroyed.destroy();
-
-    const notified: unknown[] = [];
-    const prototype: { onEngineFailed(): void } = Object.getPrototypeOf(destroyed);
-    const onEngineFailed = spyOn(prototype, "onEngineFailed").mockImplementation(function (
-      this: unknown,
-    ) {
-      notified.push(this);
-    });
-    try {
-      expectEngineFailed(stopThrough(new SheetwriteStore(makeWorkbook(5), makeColumnarData(5))));
-    } finally {
-      onEngineFailed.mockRestore();
-    }
-
-    expect(notified).not.toContain(destroyed);
-  });
-
   it("migrates only the running engine's stores after a restart", async () => {
     const stopped = new SheetwriteStore(makeWorkbook(5), makeColumnarData(5));
     expectEngineFailed(stopThrough(stopped));

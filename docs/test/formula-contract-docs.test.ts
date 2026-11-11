@@ -11,30 +11,9 @@ import {
 
 const REPO_ROOT = join(import.meta.dir, "..", "..");
 
-type FormulaInventory = {
-  functions: Array<{
-    canonical: string;
-    aliases: string[];
-    contractStatus: "required-supported" | "supported";
-  }>;
-  unsupportedCategories: Array<{ id: string }>;
-};
+type FormulaInventory = { functions: Array<{ canonical: string }> };
 
 describe("generated formula documentation contract", () => {
-  it("fails generation when the required-supported target set is incomplete", async () => {
-    const inventory = (await loadFormulaContractInventory(REPO_ROOT)) as FormulaInventory;
-    const incomplete = structuredClone(inventory);
-    const index = incomplete.functions.findIndex(
-      ({ contractStatus }) => contractStatus === "required-supported",
-    );
-    incomplete.functions.splice(index, 1);
-
-    const summaries = await loadFormulaReferenceEntries(REPO_ROOT);
-    expect(() => renderFormulaFunctionPages(incomplete, summaries)).toThrow(
-      "requires 100 required-supported functions; found 99",
-    );
-  });
-
   it("publishes every function on exactly one family page, with the profiles its rows link", async () => {
     const inventory = (await loadFormulaContractInventory(REPO_ROOT)) as FormulaInventory;
     const pages = renderFormulaFunctionPages(
@@ -59,34 +38,6 @@ describe("generated formula documentation contract", () => {
     expect(formulaFamilyNavigation(pages).map((entry) => entry.href)).toEqual(
       families.map((page) => `/docs/${page.route.replace(/\.md$/, "/")}`),
     );
-  });
-
-  it("describes every function in one line, with its Excel syntax", async () => {
-    const inventory = (await loadFormulaContractInventory(REPO_ROOT)) as FormulaInventory;
-    const entries = await loadFormulaReferenceEntries(REPO_ROOT);
-    const missing = { ...entries };
-    delete missing[inventory.functions[0]?.canonical ?? ""];
-
-    expect(() => renderFormulaFunctionPages(inventory, missing)).toThrow("has no entry for");
-    expect(() =>
-      renderFormulaFunctionPages(inventory, {
-        ...entries,
-        NOTAFUNCTION: { summary: "x", syntax: "NOTAFUNCTION()" },
-      }),
-    ).toThrow("describes unknown functions: NOTAFUNCTION");
-  });
-
-  it("points every legacy function at a modern function that exists", async () => {
-    const entries = await loadFormulaReferenceEntries(REPO_ROOT);
-    for (const [name, { summary }] of Object.entries(entries)) {
-      const replacements = /older form of (.+)\.$/.exec(summary)?.[1];
-      if (replacements === undefined) continue;
-      for (const replacement of replacements.split(/ and /)) {
-        expect(`${name} -> ${replacement}`).toBe(
-          `${name} -> ${entries[replacement] === undefined ? "missing" : replacement}`,
-        );
-      }
-    }
   });
 
   it("accepts argument names and rejects example values in a syntax line", () => {

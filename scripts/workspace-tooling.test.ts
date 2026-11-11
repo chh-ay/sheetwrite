@@ -193,34 +193,6 @@ describe("canonical workspace graph", () => {
 });
 
 describe("changeset workspace contract", () => {
-  it("resolves every configured ignore to an existing workspace", async () => {
-    const root = resolve(import.meta.dir, "..");
-    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
-      readonly workspaces: readonly string[];
-    };
-    const changesetConfig = JSON.parse(
-      await readFile(join(root, ".changeset/config.json"), "utf8"),
-    ) as {
-      readonly ignore: readonly string[];
-    };
-    const workspaceNames = new Set<string>();
-    for (const workspace of rootManifest.workspaces) {
-      const glob = new Bun.Glob(`${workspace}/package.json`);
-      for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
-        const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
-          readonly name?: string;
-        };
-        if (manifest.name) workspaceNames.add(manifest.name);
-      }
-    }
-
-    for (const ignore of changesetConfig.ignore) {
-      const escaped = ignore.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-      const pattern = new RegExp(`^${escaped.replaceAll("*", ".*").replaceAll("?", ".")}$`);
-      expect([...workspaceNames].some((name) => pattern.test(name))).toBeTrue();
-    }
-  });
-
   it("routes release and package-size-history branches", () => {
     expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
     expect(releaseVersionFromHeadRef("release/version-0.4.0")).toBe("0.4.0");

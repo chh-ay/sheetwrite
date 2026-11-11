@@ -561,10 +561,6 @@ struct ChangedOutputs {
     /// and `2i + 1`, and leaf `leaves + k` is output `k`.
     last_rows: Vec<u32>,
     leaves: usize,
-    /// Tree nodes the reads visited. Tests read it to bound the check's
-    /// work, which no value can show.
-    #[cfg(test)]
-    visited: std::cell::Cell<usize>,
 }
 
 impl ChangedOutputs {
@@ -591,8 +587,6 @@ impl ChangedOutputs {
             outputs,
             last_rows,
             leaves,
-            #[cfg(test)]
-            visited: std::cell::Cell::new(0),
         }
     }
 
@@ -625,9 +619,6 @@ impl ChangedOutputs {
         if stop <= first || end <= start || self.last_rows[node] < read.row_start {
             return;
         }
-
-        #[cfg(test)]
-        self.visited.set(self.visited.get() + 1);
 
         if stop - start == 1 {
             let (bounds, sequence) = self.outputs[start];
@@ -799,11 +790,6 @@ impl CellStore {
     /// affect. It does not settle pivot tables, which is why the pivot settle
     /// loops call it between their own steps.
     pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
-        #[cfg(test)]
-        {
-            self.formula_passes += 1;
-        }
-
         if seeds.is_empty() {
             return;
         }
@@ -845,13 +831,6 @@ impl CellStore {
                     })
                 }
             }
-        }
-
-        #[cfg(test)]
-        let selected_by_seeds = affected.len();
-        #[cfg(test)]
-        {
-            self.recomputed_formulas += selected_by_seeds;
         }
 
         if affected.is_empty() {
@@ -1163,10 +1142,6 @@ impl CellStore {
             if !runtime_readers.is_empty() {
                 let outputs = ChangedOutputs::new(&spill_changes);
                 stale_readers.extend(stale_runtime_readers(&runtime_readers, &outputs));
-                #[cfg(test)]
-                {
-                    self.stale_reader_visits += outputs.visited.get();
-                }
             }
             for change in spill_changes {
                 stale_readers.extend(
@@ -1230,12 +1205,6 @@ impl CellStore {
                 );
             }
             self.flush_seeded(&mut memo);
-        }
-
-        #[cfg(test)]
-        {
-            // Spill changes select the formulas that read them.
-            self.recomputed_formulas += affected.len() - selected_by_seeds;
         }
 
         let found_cycle = self.graph.index().is_some_and(|index| {
