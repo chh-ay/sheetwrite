@@ -53,7 +53,7 @@ separate for release and coverage profiles; tool versions and build inputs
 identify their keys. Bun caches contain downloads, not `node_modules`, and
 every job still installs with the frozen lockfile. Browser caches contain
 engines, not system libraries; installation still checks host dependencies.
-The production browser suite runs in four shards with two workers each.
+The production browser suite runs in three shards with two workers each.
 Required CI waits for every shard. Pull requests do not deploy docs.
 
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are

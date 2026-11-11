@@ -739,7 +739,7 @@ jobs:
           key: ${{ steps.bun-downloads.outputs.cache-primary-key }}
 
   browser-smoke:
-    name: Browser Smoke (${{ matrix.shard }}/4)
+    name: Browser Smoke (${{ matrix.shard }}/3)
     needs: docs-build
     runs-on: ubuntu-latest
     # The image ships the browsers and their system libraries. Installing them
@@ -752,7 +752,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4]
+        shard: [1, 2, 3]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -779,7 +779,7 @@ jobs:
       - name: Exercise production site
         env:
           DOCS_OUTPUT_DIR: .vercel/output/static
-        run: bun run test:browser --workers=2 --shard=${{ matrix.shard }}/4
+        run: bun run test:browser --workers=2 --shard=${{ matrix.shard }}/3
       - name: Upload browser evidence on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
