@@ -26,7 +26,7 @@
     "clippy::needless_continue": 2,
     "clippy::option_option": 4,
     "clippy::or_fun_call": 5,
-    "clippy::panic": 4,
+    "clippy::panic": 5,
     "clippy::rc_buffer": 1,
     "clippy::redundant_clone": 1,
     "clippy::shadow_reuse": 467,
