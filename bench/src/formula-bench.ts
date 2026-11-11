@@ -315,6 +315,13 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
+    formulaWorkloadKey({ id: "paged-cell-reads", size: range }),
+    formulaWorkloadKey({ id: "paged-insert-row", size: smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS }),
+    formulaWorkloadKey({ id: "paged-range-loaded", size: smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS }),
+    formulaWorkloadKey({
+      id: "paged-eviction",
+      size: smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES,
+    }),
     formulaWorkloadKey({ id: "index-match-many", size: smoke ? 50 : INDEX_MATCH_FORMULAS }),
     formulaWorkloadKey({ id: "rank-many", size: smoke ? 1_000 : RANK_MANY_SIZE }),
     formulaWorkloadKey({ id: "sort-unique-filter", size: range }),
@@ -367,6 +374,10 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "paged-cell-reads",
+  "paged-insert-row",
+  "paged-range-loaded",
+  "paged-eviction",
   "index-match-many",
   "rank-many",
   "sort-unique-filter",
@@ -492,6 +503,14 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return `12:${size + 1}`;
     case "spill-sequence-admission":
       return `1:${size}:0`;
+    case "paged-cell-reads":
+      return pagedCellReadsOutput(size);
+    case "paged-insert-row":
+      return pagedInsertRowOutput(size);
+    case "paged-range-loaded":
+      return 1;
+    case "paged-eviction":
+      return pagedEvictionOutput(size);
     case "index-match-many":
       return INDEX_MATCH_VALUE_SCALE * (SHAPE_EDITED_SCALE + size - 1);
     case "rank-many":
@@ -2737,6 +2756,185 @@ function incrementalDependencyClosureFixture(count: number): TimedFixture {
   };
 }
 
+/**
+ * Rows for paged storage: single-cell reads through formulas, a row insert
+ * near the top, the loaded-range check, and page loads through a full cache.
+ * Every paged sheet loads its values as clean pages, the way datasource pages
+ * arrive, and keeps some local edits on top.
+ */
+const PAGED_ROWS = 1_000_000;
+const PAGED_SMOKE_ROWS = 10_000;
+const PAGED_CHUNK_ROWS = 4_096;
+/** Local edits spread over column B of the insert and range-check sheets. */
+const PAGED_DIRTY_CELLS = 1_000;
+const PAGED_DIRTY_OFFSET = 0.5;
+const PAGED_INSERT_AT = 10;
+const PAGED_READ_SCALE = 2;
+const PAGED_READ_EDITED_SCALE = 3;
+/** The eviction row loads 4-row pages through a cache that holds 512 of them. */
+const PAGED_EVICTION_CHUNK_ROWS = 4;
+const PAGED_EVICTION_PAGES = 8_192;
+const PAGED_EVICTION_SMOKE_PAGES = 1_024;
+const PAGED_EVICTION_RESIDENT = 512;
+/** Pages a viewport band pins at the top of the eviction sheet. */
+const PAGED_EVICTION_PINNED = 16;
+/** Bytes of one resident page: kind, payload and style per row, plus the loaded bits. */
+const PAGED_EVICTION_PAGE_BYTES =
+  PAGED_EVICTION_CHUNK_ROWS *
+    (Uint8Array.BYTES_PER_ELEMENT +
+      Float64Array.BYTES_PER_ELEMENT +
+      Uint32Array.BYTES_PER_ELEMENT) +
+  BigUint64Array.BYTES_PER_ELEMENT;
+
+/** Column A holds `row`, column B `row + 1`, and `$C$1` the scale. */
+function pagedCellReadsOutput(count: number): number {
+  const last = count - 1;
+  return last + (last + 1) * PAGED_READ_EDITED_SCALE;
+}
+
+/** Old row 10 of column A one row lower, and every loaded and edited cell kept. */
+function pagedInsertRowOutput(rows: number): string {
+  return `${PAGED_INSERT_AT}:${rows * 2}:${PAGED_DIRTY_CELLS}`;
+}
+
+function pagedEvictionOutput(pages: number): string {
+  return `${PAGED_EVICTION_RESIDENT}:${pages * PAGED_EVICTION_CHUNK_ROWS - 1}:0`;
+}
+
+/**
+ * A paged sheet whose first `loaded` columns hold `row + col` in clean,
+ * loaded pages. A budget of 0 keeps every page resident.
+ */
+function loadedPagedSheet(
+  cols: number,
+  rows: number,
+  loaded: number,
+  chunkRows: number,
+  byteBudget: number,
+): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(cols, rows, chunkRows, byteBudget, 0);
+  store.beginPageLoad();
+  for (let col = 0; col < loaded; col++) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(rows, (row) => row + col),
+      0,
+    );
+  }
+  store.commitSources();
+  return { store, sheet };
+}
+
+/** `PAGED_DIRTY_CELLS` local edits spread evenly down column B. */
+function addPagedEdits(store: CellStore, sheet: number, rows: number): void {
+  for (let index = 0; index < PAGED_DIRTY_CELLS; index++) {
+    const row = Math.floor((index * rows) / PAGED_DIRTY_CELLS);
+    store.setNumber(sheet, row, 1, row + 1 + PAGED_DIRTY_OFFSET, 0);
+  }
+}
+
+/**
+ * `=A{r}+B{r}*$C$1` in every row of a paged sheet: each formula reads two
+ * loaded cells and one edited cell, one at a time. The timed edit changes the
+ * scale, so every formula recalculates.
+ */
+function pagedCellReadsFixture(count: number): TimedFixture {
+  const { store, sheet } = loadedPagedSheet(4, count, 2, PAGED_CHUNK_ROWS, 0);
+  store.setNumber(sheet, 0, 2, PAGED_READ_SCALE, 0);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 3, `=A${row + 1}+B${row + 1}*$C$1`, 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, PAGED_READ_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 3),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: PAGED_READ_SCALE }),
+  };
+}
+
+/** Two loaded columns of `rows` rows, with local edits in column B. */
+function editedPagedSheet(rows: number): { store: CellStore; sheet: number } {
+  const paged = loadedPagedSheet(2, rows, 2, PAGED_CHUNK_ROWS, 0);
+  addPagedEdits(paged.store, paged.sheet, rows);
+  return paged;
+}
+
+function pagedInsertRowCheck(store: CellStore, sheet: number): string {
+  const stats = store.pagedStats(sheet);
+  return `${numberAt(store, sheet, PAGED_INSERT_AT + 1, 0)}:${stats[1]}:${stats[2]}`;
+}
+
+/** One row inserted near the top of a paged sheet; removing it again restores the sheet. */
+function pagedInsertRowFixture(rows: number): TimedFixture {
+  const { store, sheet } = editedPagedSheet(rows);
+  return {
+    store,
+    run: () => assert(store.addRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: insert"),
+    check: () => pagedInsertRowCheck(store, sheet),
+    dispose: () => store.free(),
+    restore: () => assert(store.removeRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: restore"),
+  };
+}
+
+/** Whether every cell of both columns is loaded. The check changes nothing to restore. */
+function pagedRangeLoadedFixture(rows: number): TimedFixture {
+  const { store, sheet } = editedPagedSheet(rows);
+  let loaded = false;
+  return {
+    store,
+    run: () => {
+      loaded = store.rangeFullyLoaded(sheet, 0, 0, rows - 1, 1);
+    },
+    check: () => (loaded ? 1 : 0),
+    dispose: () => store.free(),
+    restore: () => {},
+  };
+}
+
+/**
+ * One page load of `pages` 4-row pages through a cache that holds 512, with
+ * the top 16 pages pinned by a viewport band, so every unpinned page the load
+ * writes evicts the oldest one. The fixture starts in the state a run leaves:
+ * the pinned pages and the newest pages resident. So a run needs no restore.
+ */
+function pagedEvictionFixture(pages: number): TimedFixture {
+  const rows = pages * PAGED_EVICTION_CHUNK_ROWS;
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(
+    1,
+    rows,
+    PAGED_EVICTION_CHUNK_ROWS,
+    PAGED_EVICTION_RESIDENT * PAGED_EVICTION_PAGE_BYTES,
+    0,
+  );
+  const pinnedRows = PAGED_EVICTION_PINNED * PAGED_EVICTION_CHUNK_ROWS;
+  store.pinViewportBands(sheet, Uint32Array.of(0, pinnedRows, 0, 1));
+  const values = numericColumn(rows, (row) => row);
+  const load = (start: number, end: number) => {
+    store.beginPageLoad();
+    store.setColumnNumbers(sheet, 0, start, values.subarray(start, end), 0);
+    store.commitSources();
+  };
+  load(0, pinnedRows);
+  load(rows - (PAGED_EVICTION_RESIDENT - PAGED_EVICTION_PINNED) * PAGED_EVICTION_CHUNK_ROWS, rows);
+  return {
+    store,
+    run: () => load(0, rows),
+    check: () =>
+      `${store.pagedStats(sheet)[0]}:${numberAt(store, sheet, rows - 1, 0)}:${numberAt(store, sheet, 0, 0)}`,
+    dispose: () => store.free(),
+    restore: () => {},
+  };
+}
+
 /** One matrix row: its identity and a factory for a fresh, untimed fixture. */
 interface FormulaWorkload {
   readonly id: string;
@@ -2816,6 +3014,12 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
   );
+  add("paged-cell-reads", range, () => pagedCellReadsFixture(range));
+  const pagedRows = smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS;
+  add("paged-insert-row", pagedRows, () => pagedInsertRowFixture(pagedRows));
+  add("paged-range-loaded", pagedRows, () => pagedRangeLoadedFixture(pagedRows));
+  const evictionPages = smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES;
+  add("paged-eviction", evictionPages, () => pagedEvictionFixture(evictionPages));
   const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
   add("index-match-many", indexMatchFormulas, () => indexMatchFixture(indexMatchFormulas, range));
   const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
