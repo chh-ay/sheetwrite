@@ -509,8 +509,8 @@ impl CellStore {
         for _ in 0..input.count()? {
             let key = input.text()?;
             let mut table = TableDefinition {
-                id: input.text()?,
-                name: input.text()?,
+                id: input.text()?.into(),
+                name: input.text()?.into(),
                 sheet: sheet_handle(&mut input, sheets)?,
                 row_start: input.u32()?,
                 col_start: input.u32()?,
@@ -523,8 +523,8 @@ impl CellStore {
 
             for _ in 0..input.count()? {
                 table.columns.push(TableColumnDefinition {
-                    id: input.text()?,
-                    name: input.text()?,
+                    id: input.text()?.into(),
+                    name: input.text()?.into(),
                     col: input.u32()?,
                 });
             }
