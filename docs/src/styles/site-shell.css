@@ -383,6 +383,12 @@ details[open] > summary > .sw-disclosure-icon {
   font-size: var(--sw-text-body);
   line-height: var(--sw-leading-body);
 }
+/* An article that opens with a heading starts at the page head's gap, as one
+   that opens with a paragraph does (the heading rules below outrank base.css's
+   first-child rule). */
+.sw-docs .sw-prose > :first-child {
+  margin-top: 0;
+}
 .sw-docs .sw-prose h2 {
   margin: var(--sw-space-16) 0 var(--sw-space-4);
   padding-top: 0;
