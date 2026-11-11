@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
@@ -27,6 +27,16 @@ const engine: typeof defaultEngine =
 const { CellStore, initSync } = engine;
 // Fixtures run on either provider, so they use the store type both share.
 type CellStore = InstanceType<defaultEngine.EngineInstance["CellStore"]>;
+/** The version-history diff kernel, from the same checkout as the engine. */
+const historyKernel: typeof import("@sheetwrite/wasm/history") = await import(
+  pathToFileURL(
+    resolve(
+      ENGINE_ROOT ?? fileURLToPath(new URL("../..", import.meta.url)),
+      "packages/wasm/history-node.mjs",
+    ),
+  ).href
+);
+await historyKernel.loadHistoryKernel();
 
 import { optionValue } from "./cli-options.js";
 import {
@@ -253,7 +263,14 @@ export function formulaWorkloadKey(workload: Pick<FormulaWorkloadResult, "id" | 
   return `workload=${workload.id};size=${workload.size}`;
 }
 
-export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
+/**
+ * The workload matrix of a capture. The full engine adds the rows for
+ * functions that only it has.
+ */
+export function expectedFormulaWorkloadKeys(
+  mode: BenchmarkMode,
+  enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
+): string[] {
   const smoke = mode === "smoke";
   const keys: string[] = [];
   for (const size of smoke ? [1_000] : FORMULA_SIZES) {
@@ -329,6 +346,8 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     formulaWorkloadKey({ id: "sparse-page-write", size: range }),
   );
   keys.push(formulaWorkloadKey({ id: "spill-sequence-admission", size: smoke ? 1_000 : 100_000 }));
+  keys.push(formulaWorkloadKey({ id: "history-diff", size: HISTORY_CELLS }));
+  if (enginePackage === "formulas") keys.push(...fullEngineRowKeys(smoke));
   return keys;
 }
 
@@ -364,6 +383,12 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "parse-load-qualified",
   "parse-load-table",
   "memory-import",
+  "history-diff",
+  "groupby-sum",
+  "pivotby-percentof",
+  "pivot-rebuild",
+  "getpivotdata-many",
+  "analysis-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -386,7 +411,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
 ]);
 
 function legacyFormulaBaselineWorkloadKeys(): string[] {
-  return expectedFormulaWorkloadKeys("full").filter((key) => {
+  return expectedFormulaWorkloadKeys("full", "wasm").filter((key) => {
     const id = key.slice("workload=".length, key.indexOf(";size="));
     return !EXPANDED_FORMULA_WORKLOAD_IDS.has(id);
   });
@@ -497,6 +522,18 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "parse-load-table":
     case "memory-import":
       return size * 2;
+    case "groupby-sum":
+      return groupingEditedTotal(size);
+    case "pivotby-percentof":
+      return groupingFirstQuarterShare(size);
+    case "pivot-rebuild":
+      return pivotRebuildOutput(size);
+    case "getpivotdata-many":
+      return pivotDataValue(size - 1);
+    case "analysis-calls":
+      return analysisCallsOutput(size);
+    case "history-diff":
+      return historyDiffOutput();
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
@@ -2370,6 +2407,555 @@ function bindingRowFixture(id: (typeof BINDING_ROW_IDS)[number], count: number):
   }
 }
 
+/**
+ * Rows for the full engine's grouping, pivot and analysis functions, which
+ * the default engine does not have: GROUPBY with SUM and PIVOTBY with
+ * PERCENTOF over two text key levels, a pivot table built again, many
+ * GETPIVOTDATA cells, and one formula per row that calls four analysis
+ * functions.
+ */
+const FULL_ENGINE_ROWS = [
+  { id: "groupby-sum", size: 100_000, smokeSize: 1_000 },
+  // Here PIVOTBY charges between 29 and 40 units of its 2,000,000-unit work
+  // budget per source row: 70,000 rows already give #NUM!.
+  { id: "pivotby-percentof", size: 50_000, smokeSize: 1_000 },
+  { id: "pivot-rebuild", size: 100_000, smokeSize: 1_000 },
+  { id: "getpivotdata-many", size: 1_000, smokeSize: 100 },
+  // 100,000 formulas took 0.19 s per edit natively on the Mac; 10,000 make 40,000 calls.
+  { id: "analysis-calls", size: 10_000, smokeSize: 1_000 },
+] as const;
+type FullEngineRowId = (typeof FULL_ENGINE_ROWS)[number]["id"];
+
+function fullEngineRowKeys(smoke: boolean): string[] {
+  return FULL_ENGINE_ROWS.map(({ id, size, smokeSize }) =>
+    formulaWorkloadKey({ id, size: smoke ? smokeSize : size }),
+  );
+}
+
+/** Keys of the grouping rows: ten regions, each with ten of the hundred products. */
+const GROUPING_REGIONS = 10;
+const GROUPING_PRODUCTS = 100;
+const GROUPING_QUARTERS = 4;
+/** Each run of this many source rows shares a quarter, so quarters mix with products. */
+const GROUPING_QUARTER_RUN = 7;
+const GROUPING_AMOUNT = 1;
+const GROUPING_EDITED_AMOUNT = 2;
+const GROUPING_AMOUNT_COL = 2;
+const GROUPING_QUARTER_COL = 3;
+/** Source in A:D; the formula spills from F1. */
+const GROUPING_FORMULA_COL = 5;
+const GROUPING_KEY_FIELDS = 2;
+/** One row per product, one subtotal per region and the grand total. */
+const GROUPING_OUTPUT_ROWS = GROUPING_PRODUCTS + GROUPING_REGIONS + 1;
+/** The two key columns, a column per quarter and the total. */
+const GROUPING_OUTPUT_COLS = GROUPING_KEY_FIELDS + GROUPING_QUARTERS + 1;
+
+function groupingQuarter(row: number): number {
+  return Math.floor(row / GROUPING_QUARTER_RUN) % GROUPING_QUARTERS;
+}
+
+/** The sum of the amounts after the timed edit, which raises the first one. */
+function groupingEditedTotal(rows: number): number {
+  return rows * GROUPING_AMOUNT + GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
+}
+
+/** The first quarter's share of the edited total; the edited first row is in it. */
+function groupingFirstQuarterShare(rows: number): number {
+  let firstQuarter = GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
+  for (let row = 0; row < rows; row++) {
+    if (groupingQuarter(row) === 0) firstQuarter += GROUPING_AMOUNT;
+  }
+  return firstQuarter / groupingEditedTotal(rows);
+}
+
+/**
+ * Source rows in A:D: region text `R0`…`R9`, product text `P00`…`P99` (each
+ * product in one region), the amount, and quarter text `Q0`…`Q3`. `formula`
+ * goes in F1; the timed run edits the first amount.
+ */
+function groupingFixture(
+  rows: number,
+  formula: string,
+  check: (store: CellStore, sheet: number) => number,
+): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(GROUPING_FORMULA_COL + GROUPING_OUTPUT_COLS, rows);
+  const textColumn = (col: number, text: (row: number) => string) =>
+    store.setColumnStrings(
+      sheet,
+      col,
+      0,
+      Array.from({ length: rows }, (_, row) => text(row)),
+      0,
+    );
+  textColumn(0, (row) => `R${row % GROUPING_REGIONS}`);
+  textColumn(1, (row) => `P${String(row % GROUPING_PRODUCTS).padStart(2, "0")}`);
+  store.setColumnNumbers(
+    sheet,
+    GROUPING_AMOUNT_COL,
+    0,
+    numericColumn(rows, () => GROUPING_AMOUNT),
+    0,
+  );
+  textColumn(GROUPING_QUARTER_COL, (row) => `Q${groupingQuarter(row)}`);
+  store.setFormula(sheet, 0, GROUPING_FORMULA_COL, formula, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, GROUPING_AMOUNT_COL, GROUPING_EDITED_AMOUNT, 0);
+      store.recompute(sheet);
+    },
+    check: () => check(store, sheet),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, {
+      row: 0,
+      col: GROUPING_AMOUNT_COL,
+      value: GROUPING_AMOUNT,
+    }),
+  };
+}
+
+/** `GROUPBY` with SUM by region and product, with subtotals; checks the grand total. */
+function groupBySumFixture(rows: number): TimedFixture {
+  const last = GROUPING_OUTPUT_ROWS - 1;
+  return groupingFixture(rows, `=GROUPBY(A1:B${rows},C1:C${rows},SUM,0,2)`, (store, sheet) =>
+    numberAt(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
+  );
+}
+
+/**
+ * `PIVOTBY` with PERCENTOF of the grand total, by region and product with
+ * subtotals and by quarter with a total; checks the first quarter's share in
+ * the grand-total row.
+ */
+function pivotByPercentOfFixture(rows: number): TimedFixture {
+  // One header row holds the quarters.
+  const last = GROUPING_OUTPUT_ROWS;
+  return groupingFixture(
+    rows,
+    `=PIVOTBY(A1:B${rows},D1:D${rows},C1:C${rows},PERCENTOF,0,2,,1,,,2)`,
+    (store, sheet) => numberAt(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
+  );
+}
+
+/**
+ * Pivot sources: a header row `Field0`…`Field5`, then fields 0–3 hold the
+ * row's decimal digits from the last (`row % 10`, `row / 10 % 10`, …) and
+ * fields 4 and 5 hold `row + 4` and `row + 5`, as in the pivot benchmark.
+ */
+const PIVOT_FIELDS = 6;
+const PIVOT_DIGIT_FIELDS = 4;
+const PIVOT_DIGITS = 10;
+const PIVOT_SUM_FIELD = 4;
+const PIVOT_SUM = 0;
+const PIVOT_AVERAGE = 2;
+const PIVOT_AVERAGE_FIELD = 5;
+/** Totals, subtotals and headers. */
+const PIVOT_ALL_TOTALS = 7;
+const PIVOT_NO_NAME = -1;
+const PIVOT_RANGE_SOURCE = 0;
+const PIVOT_OUTPUT_ROWS = 2_000;
+const PIVOT_OUTPUT_COLS = 32;
+
+function pivotSourceSheet(store: CellStore, rows: number): number {
+  const sheet = store.addSheet(PIVOT_FIELDS, rows + 1);
+  for (let field = 0; field < PIVOT_FIELDS; field++) {
+    store.setString(sheet, 0, field, `Field${field}`, 0);
+    const values = numericColumn(rows, (row) =>
+      field < PIVOT_DIGIT_FIELDS
+        ? Math.floor(row / PIVOT_DIGITS ** field) % PIVOT_DIGITS
+        : row + field,
+    );
+    store.setColumnNumbers(sheet, field, 1, values, 0);
+  }
+  return sheet;
+}
+
+/** The packed definition `setPivots` takes, anchored at A1, with every total. */
+function pivotDefinition(
+  source: number,
+  rows: number,
+  axes: { rowFields: number[]; colFields: number[]; values: [number, number][] },
+): Float64Array {
+  return new Float64Array([
+    0,
+    PIVOT_RANGE_SOURCE,
+    source,
+    0,
+    0,
+    rows,
+    PIVOT_FIELDS - 1,
+    0,
+    0,
+    axes.rowFields.length,
+    ...axes.rowFields,
+    axes.colFields.length,
+    ...axes.colFields,
+    axes.values.length,
+    ...axes.values.flatMap(([field, aggregation]) => [field, aggregation, PIVOT_NO_NAME]),
+    0,
+    0,
+    PIVOT_ALL_TOTALS,
+  ]);
+}
+
+const PIVOT_ID = "pivot";
+
+/** A store whose engine has pivot tables: the full engine. */
+type PivotStore = CellStore &
+  Pick<InstanceType<typeof formulas.CellStore>, "setPivots" | "pivotStatus">;
+
+function hasPivots(store: CellStore): store is PivotStore {
+  return "setPivots" in store && "pivotStatus" in store;
+}
+
+/**
+ * The pivot benchmark's pivot: three row fields, one column field, SUM and
+ * AVERAGE. The timed run installs it and recalculates; restoring removes it.
+ */
+function pivotRebuildFixture(rows: number): TimedFixture {
+  const store = new CellStore();
+  assert(hasPivots(store), "the full engine has pivot tables");
+  const source = pivotSourceSheet(store, rows);
+  const output = store.addSheet(PIVOT_OUTPUT_COLS, PIVOT_OUTPUT_ROWS);
+  store.commitSources();
+  const definition = pivotDefinition(source, rows, {
+    rowFields: [0, 1, 2],
+    colFields: [3],
+    values: [
+      [PIVOT_SUM_FIELD, PIVOT_SUM],
+      [PIVOT_AVERAGE_FIELD, PIVOT_AVERAGE],
+    ],
+  });
+  // The first leaf group's SUM: below the column and value headers.
+  const leafRow = PIVOT_DIGIT_FIELDS;
+  return {
+    store,
+    run: () => {
+      assert(store.setPivots(output, definition, [PIVOT_ID]), "pivot installed");
+      store.recompute(output);
+    },
+    check: () => {
+      assert(store.pivotStatus(output)[0] === 0, "pivot built");
+      return numberAt(store, output, leafRow, 1);
+    },
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.setPivots(output, new Float64Array(), []), "pivot removed");
+      store.recompute(output);
+    },
+  };
+}
+
+/** The first leaf group holds every row whose four digit fields are 0. */
+function pivotRebuildOutput(rows: number): number {
+  const stride = PIVOT_DIGITS ** PIVOT_DIGIT_FIELDS;
+  let sum = 0;
+  for (let row = 0; row < rows; row += stride) sum += row + PIVOT_SUM_FIELD;
+  return sum;
+}
+
+/** Source rows of the pivot that `getpivotdata-many` reads: 100 groups of 100. */
+const PIVOT_DATA_SOURCE_ROWS = 10_000;
+const PIVOT_DATA_EDIT = 1;
+const PIVOT_DATA_EDITED = 2;
+
+/** The item pair that GETPIVOTDATA cell `index` names. */
+function pivotDataItems(index: number): [number, number] {
+  return [index % PIVOT_DIGITS, Math.floor(index / PIVOT_DIGITS) % PIVOT_DIGITS];
+}
+
+/** Sum of field 4 over the source rows whose last two digits are `first` and `second`. */
+function pivotDataValue(index: number): number {
+  const [first, second] = pivotDataItems(index);
+  let sum = 0;
+  for (let row = first + second * PIVOT_DIGITS; row < PIVOT_DATA_SOURCE_ROWS; row += 100) {
+    sum += row + PIVOT_SUM_FIELD;
+  }
+  return sum;
+}
+
+/**
+ * A pivot on sheet `Pivot` sums field 4 by fields 0 and 1; `count` cells on
+ * another sheet read it with `GETPIVOTDATA`. GETPIVOTDATA is volatile, so the
+ * timed edit of an unrelated cell recalculates all of them.
+ */
+function getPivotDataManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  assert(hasPivots(store), "the full engine has pivot tables");
+  const source = pivotSourceSheet(store, PIVOT_DATA_SOURCE_ROWS);
+  const pivot = store.addSheet(PIVOT_OUTPUT_COLS, PIVOT_OUTPUT_ROWS);
+  const calc = store.addSheet(2, count);
+  store.setSheetName(pivot, "pivot", "Pivot");
+  store.commitSources();
+  assert(
+    store.setPivots(
+      pivot,
+      pivotDefinition(source, PIVOT_DATA_SOURCE_ROWS, {
+        rowFields: [0, 1],
+        colFields: [],
+        values: [[PIVOT_SUM_FIELD, PIVOT_SUM]],
+      }),
+      [PIVOT_ID],
+    ),
+    "pivot installed",
+  );
+  store.recompute(pivot);
+  store.setNumber(calc, 0, 0, PIVOT_DATA_EDIT, 0);
+  for (let index = 0; index < count; index++) {
+    const [first, second] = pivotDataItems(index);
+    store.setFormula(
+      calc,
+      index,
+      1,
+      `=GETPIVOTDATA("Sum of Field4",Pivot!$A$1,"Field0",${first},"Field1",${second})`,
+      0,
+    );
+  }
+  store.recompute(calc);
+  return {
+    store,
+    run: () => {
+      store.setNumber(calc, 0, 0, PIVOT_DATA_EDITED, 0);
+      store.recompute(calc);
+    },
+    check: () => numberAt(store, calc, count - 1, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, calc, { row: 0, col: 0, value: PIVOT_DATA_EDIT }),
+  };
+}
+
+const ANALYSIS_PREFIX = "ab";
+
+/**
+ * One formula per row with four analysis functions: SUMSQ, AGGREGATE (SUM,
+ * ignoring errors), FORECAST.LINEAR and TEXTBEFORE. Each reads `$C$1`, so the
+ * timed edit recalculates all of them. FORECAST.LINEAR fits `$A$2:$A$3` (2, 3)
+ * over `$A$1:$A$2` (1, 2), the line y = x + 1.
+ */
+function analysisCallsFixture(count: number): TimedFixture {
+  return shapeRowsFixture(
+    count,
+    numbersInA(),
+    (row) =>
+      `=SUMSQ(A${row + 1},$C$1)+AGGREGATE(9,6,A${row + 1},$C$1)` +
+      `+FORECAST.LINEAR(A${row + 1},$A$2:$A$3,$A$1:$A$2)` +
+      `+LEN(TEXTBEFORE("${ANALYSIS_PREFIX}-"&A${row + 1}&$C$1,"-"))`,
+    SHAPE_SCALE,
+    SHAPE_EDITED_SCALE,
+    (store, sheet) => numberAt(store, sheet, count - 1, 1),
+  );
+}
+
+/** The last formula, after the edit: its row holds `count` and `$C$1` holds the edited scale. */
+function analysisCallsOutput(count: number): number {
+  const scale = SHAPE_EDITED_SCALE;
+  const sumOfSquares = count * count + scale * scale;
+  const sum = count + scale;
+  const forecast = count + 1;
+  return sumOfSquares + sum + forecast + ANALYSIS_PREFIX.length;
+}
+
+function fullEngineRowFixture(id: FullEngineRowId, size: number): TimedFixture {
+  switch (id) {
+    case "groupby-sum":
+      return groupBySumFixture(size);
+    case "pivotby-percentof":
+      return pivotByPercentOfFixture(size);
+    case "pivot-rebuild":
+      return pivotRebuildFixture(size);
+    case "getpivotdata-many":
+      return getPivotDataManyFixture(size);
+    case "analysis-calls":
+      return analysisCallsFixture(size);
+  }
+}
+
+/**
+ * The version-history diff kernel on the version-history benchmark's sheet:
+ * 5,000 rows by 20 columns, with 12,000 logged writes. The timed run diffs one
+ * page of 1,000 changes, as a diff request does: it creates the kernel, logs
+ * the writes, and compares the windows of both versions until the page is
+ * full. The engine's window bytes are captured at setup, so the row times the
+ * kernel only.
+ */
+const HISTORY_ROWS = 5_000;
+const HISTORY_COLS = 20;
+const HISTORY_CELLS = HISTORY_ROWS * HISTORY_COLS;
+const HISTORY_WRITES = 12_000;
+const HISTORY_AUTHORS = 8;
+/** One diff page; it is also the number of changed cells, so the page ends at the last one. */
+const HISTORY_PAGE = 1_000;
+/** Changed cell `k` is in row `HISTORY_CHANGE_STRIDE * k + HISTORY_CHANGE_ROW`. */
+const HISTORY_CHANGE_STRIDE = 5;
+const HISTORY_CHANGE_ROW = 2;
+const HISTORY_CHANGE_COL_STRIDE = 7;
+const HISTORY_CHANGE = 0.5;
+/** Earlier writes land on row `(i * HISTORY_WRITE_STRIDE) % HISTORY_ROWS`; prime, so they spread. */
+const HISTORY_WRITE_STRIDE = 7_919;
+/** The version-history diff reads windows of about this many cells. */
+const HISTORY_WINDOW_CELLS = 65_536;
+
+interface HistoryWrite {
+  row: number;
+  col: number;
+  author: number;
+}
+
+function historyChange(index: number): HistoryWrite {
+  return {
+    row: HISTORY_CHANGE_STRIDE * index + HISTORY_CHANGE_ROW,
+    col: (index * HISTORY_CHANGE_COL_STRIDE) % HISTORY_COLS,
+    author: index % HISTORY_AUTHORS,
+  };
+}
+
+/** Scattered writes first, then the write of each changed cell, so its author is the last one. */
+function historyWrites(): HistoryWrite[] {
+  const scattered = HISTORY_WRITES - HISTORY_PAGE;
+  return [
+    ...Array.from({ length: scattered }, (_, index) => ({
+      row: (index * HISTORY_WRITE_STRIDE) % HISTORY_ROWS,
+      col: index % HISTORY_COLS,
+      author: index % HISTORY_AUTHORS,
+    })),
+    ...Array.from({ length: HISTORY_PAGE }, (_, index) => historyChange(index)),
+  ];
+}
+
+/** Each change counts its cell's position plus its author times the cell count. */
+function historyChangeChecksum(row: number, col: number, author: number): number {
+  return row * HISTORY_COLS + col + author * HISTORY_CELLS;
+}
+
+function historyDiffOutput(): number {
+  let checksum = 0;
+  for (let index = 0; index < HISTORY_PAGE; index++) {
+    const change = historyChange(index);
+    checksum += historyChangeChecksum(change.row, change.col, change.author);
+  }
+  return checksum;
+}
+
+/** A sheet of 5,000 × 20 numbers, column by column. */
+function historyVersion(changes: readonly HistoryWrite[]): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addSheet(HISTORY_COLS, HISTORY_ROWS);
+  for (let col = 0; col < HISTORY_COLS; col++) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(HISTORY_ROWS, (row) => row * HISTORY_COLS + col),
+      0,
+    );
+  }
+  for (const change of changes) {
+    store.setNumber(
+      sheet,
+      change.row,
+      change.col,
+      change.row * HISTORY_COLS + change.col + HISTORY_CHANGE,
+      0,
+    );
+  }
+  return { store, sheet };
+}
+
+interface HistoryWindow {
+  row0: number;
+  rows: number;
+  before: Uint8Array;
+  after: Uint8Array;
+}
+
+function historyWindowBytes(
+  version: { store: CellStore; sheet: number },
+  row0: number,
+  rows: number,
+): Uint8Array {
+  const range = version.store.captureRange(version.sheet, row0, 0, rows, HISTORY_COLS);
+  assert(range !== undefined, "history window captured");
+  try {
+    return range.exportMemoryState(version.sheet);
+  } finally {
+    range.free();
+  }
+}
+
+function historyDiffFixture(): TimedFixture {
+  const before = historyVersion([]);
+  const after = historyVersion(Array.from({ length: HISTORY_PAGE }, (_, k) => historyChange(k)));
+  const windowRows = Math.floor(HISTORY_WINDOW_CELLS / HISTORY_COLS);
+  const windows: HistoryWindow[] = [];
+  for (let row0 = 0; row0 < HISTORY_ROWS; row0 += windowRows) {
+    const rows = Math.min(windowRows, HISTORY_ROWS - row0);
+    windows.push({
+      row0,
+      rows,
+      before: historyWindowBytes(before, row0, rows),
+      after: historyWindowBytes(after, row0, rows),
+    });
+  }
+  before.store.free();
+  const writes = historyWrites();
+  const noStyles = new Uint32Array();
+  let checksum = Number.NaN;
+  return {
+    store: after.store,
+    run: () => {
+      const kernel = new historyKernel.DiffKernel(HISTORY_PAGE);
+      try {
+        const slot = kernel.addSheet(HISTORY_ROWS, HISTORY_COLS, true);
+        for (const write of writes) {
+          kernel.touch(slot, write.row, write.col, write.row, write.col, write.author);
+        }
+        kernel.setStyles(noStyles, noStyles);
+        for (const window of windows) {
+          assert(kernel.loadAfter(window.after), "later window loaded");
+          assert(kernel.loadBefore(window.before), "earlier window loaded");
+          const cells = window.rows * HISTORY_COLS;
+          const next = kernel.compare(
+            slot,
+            true,
+            0,
+            0,
+            window.rows,
+            HISTORY_COLS,
+            window.row0,
+            0,
+            window.row0,
+            0,
+            0,
+          );
+          if (next < cells) break;
+        }
+        const rows = kernel.pageRows();
+        const cols = kernel.pageCols();
+        const authors = kernel.pageAuthors();
+        assert(
+          kernel.pageSheets().length === rows.length &&
+            kernel.pageBeforeRows().length === rows.length &&
+            kernel.pageBeforeCols().length === rows.length &&
+            kernel.pageFlags().length === rows.length,
+          "page columns have one entry per change",
+        );
+        checksum = 0;
+        for (const [index, row] of rows.entries()) {
+          checksum += historyChangeChecksum(row, cols[index] ?? 0, authors[index] ?? 0);
+        }
+      } finally {
+        kernel.free();
+      }
+    },
+    check: () => checksum,
+    dispose: () => after.store.free(),
+    // Each run builds and frees its own kernel; the versions stay unchanged.
+    restore: () => undefined,
+  };
+}
+
 /** Even rows bind one name, odd rows bind three that build on each other. */
 function letManyFormula(row: number): string {
   const source = `A${row + 1}*$C$1`;
@@ -3028,6 +3614,13 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("subtotal-filtered", range, () => subtotalFilteredFixture(range));
   add("sparse-page-write", range, () => sparsePageWriteFixture(range));
   add("spill-sequence-admission", large, () => spillSequenceAdmissionFixture(large));
+  add("history-diff", HISTORY_CELLS, historyDiffFixture);
+  if (ENGINE_PACKAGE === "formulas") {
+    for (const row of FULL_ENGINE_ROWS) {
+      const size = smoke ? row.smokeSize : row.size;
+      add(row.id, size, () => fullEngineRowFixture(row.id, size));
+    }
+  }
   return workloads;
 }
 
@@ -3787,14 +4380,18 @@ export function formulaRegressionBaselineIdentity(baseline: FormulaBenchmarkResu
  */
 function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): string[] {
   const observed = baseline.workloads.map(formulaWorkloadKey);
-  const candidates = [expectedFormulaWorkloadKeys("full"), legacyFormulaBaselineWorkloadKeys()];
+  const candidates = [
+    expectedFormulaWorkloadKeys("full", "wasm"),
+    expectedFormulaWorkloadKeys("full", "formulas"),
+    legacyFormulaBaselineWorkloadKeys(),
+  ];
   for (const expected of candidates) {
     if (expected.length === observed.length && expected.every((key) => observed.includes(key))) {
       return expected;
     }
   }
   const observedSet = new Set(observed);
-  const recognised = new Set(expectedFormulaWorkloadKeys("full"));
+  const recognised = new Set(expectedFormulaWorkloadKeys("full", "formulas"));
   const core = legacyFormulaBaselineWorkloadKeys();
   if (
     observed.length > 0 &&

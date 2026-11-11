@@ -117,6 +117,12 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=sort-unique-filter;size=100000": 1.2,
   "workload=subtotal-filtered;size=100000": 1.2,
   "workload=sparse-page-write;size=100000": 1.2,
+  "workload=history-diff;size=100000": 1.2,
+  "workload=groupby-sum;size=100000": 1.2,
+  "workload=pivotby-percentof;size=50000": 1.2,
+  "workload=pivot-rebuild;size=100000": 1.2,
+  "workload=getpivotdata-many;size=1000": 1.2,
+  "workload=analysis-calls;size=10000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
   "workload=spill-sequence-admission;size=100000": 1.15,
@@ -125,7 +131,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
 export const FORMULA_RATIO_LIMITS: ReadonlyMap<string, number> = new Map(
   Object.entries(MEASURED_RATIO_LIMITS),
 );
-validateExactMatrix("formula gate ratio limits", expectedFormulaWorkloadKeys("full"), [
+// The full engine's matrix holds every row of the default engine's.
+validateExactMatrix("formula gate ratio limits", expectedFormulaWorkloadKeys("full", "formulas"), [
   ...FORMULA_RATIO_LIMITS.keys(),
 ]);
 
