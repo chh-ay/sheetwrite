@@ -36,6 +36,11 @@ interface IslandProps<Props extends object> {
   readonly omitFromPage?: readonly (keyof Props)[];
   /** Defaults to `load`. */
   readonly hydrate?: IslandHydration;
+  /**
+   * An `interaction` island hydrates at load instead when the page's URL
+   * carries this query parameter: a deep link into the island.
+   */
+  readonly hydrateAtLoadWith?: string;
 }
 
 /**
@@ -64,6 +69,7 @@ export function Island<Props extends object>(props: IslandProps<Props>): JSX.Ele
       data-island={props.name}
       data-island-hydrate={props.hydrate === "interaction" ? "interaction" : undefined}
       data-island-id={id}
+      data-island-param={props.hydrateAtLoadWith}
       data-props={Object.keys(pageProps).length === 0 ? undefined : JSON.stringify(pageProps)}
       style={{ display: "contents" }}
     >

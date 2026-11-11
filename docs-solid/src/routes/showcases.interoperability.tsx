@@ -66,7 +66,15 @@ function InteroperabilityShowcase() {
         title="Open the workbook. Change it. Bring it back intact."
       >
         <Island component={SpillProof} name="showcase-interop-spill" props={{}} />
-        <Island component={InteropLabs} name="showcase-interop-labs" props={{}} />
+        {/* The labs sit below the stage: their code (the checked compatibility
+            results among it) loads when the reader reaches for them. */}
+        <Island
+          component={InteropLabs}
+          hydrate="interaction"
+          hydrateAtLoadWith="compatibility"
+          name="showcase-interop-labs"
+          props={{}}
+        />
       </ShowcasePage>
     </NoHydration>
   );
