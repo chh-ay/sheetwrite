@@ -167,7 +167,10 @@ async function writeRelease(first: TarballOptions = {}): Promise<{
       writeTarball(root, name, index === 0 ? first : {}),
     ),
   );
-  await writeFile(join(root, RELEASE_ARTIFACT_MANIFEST), serializeReleaseManifest(manifest(packages)));
+  await writeFile(
+    join(root, RELEASE_ARTIFACT_MANIFEST),
+    serializeReleaseManifest(manifest(packages)),
+  );
   return { root, packages };
 }
 
@@ -208,7 +211,12 @@ describe("canonical release artifacts", () => {
     const [packed] = await packBuiltPackages(join(root, "packed"), [source]);
     if (packed === undefined) throw new Error("Expected the fixture tarball");
     expect(packed.artifact.path).toBe("sheetwrite-core-1.2.3.tgz");
-    expect(packed.artifact.files).toEqual(["LICENSE", "README.md", "dist/index.js", "package.json"]);
+    expect(packed.artifact.files).toEqual([
+      "LICENSE",
+      "README.md",
+      "dist/index.js",
+      "package.json",
+    ]);
     const extract = (path: string): string => {
       const result = Bun.spawnSync(["tar", "-xOzf", packed.tarballPath, `package/${path}`]);
       if (result.exitCode !== 0) throw new Error(result.stderr.toString());
@@ -248,7 +256,16 @@ describe("canonical release artifacts", () => {
     git("init", "--quiet");
     await writeFile(join(root, ".gitignore"), "dist/\n");
     git("add", ".gitignore");
-    git("-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "--quiet", "-m", "init");
+    git(
+      "-c",
+      "user.name=test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "--quiet",
+      "-m",
+      "init",
+    );
     await mkdir(join(root, "dist"));
     await writeFile(join(root, "dist/index.js"), "");
     expect(await releaseTreeStatus(root)).toBe("");
@@ -276,7 +293,10 @@ describe("canonical release artifacts", () => {
     const react = await writeTarball(root, "@sheetwrite/react", {
       manifest: { dependencies: { "@sheetwrite/core": "0.1.0" } },
     });
-    await writeFile(join(root, RELEASE_ARTIFACT_MANIFEST), serializeReleaseManifest(manifest([react])));
+    await writeFile(
+      join(root, RELEASE_ARTIFACT_MANIFEST),
+      serializeReleaseManifest(manifest([react])),
+    );
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(
       `@sheetwrite/react internal dependency @sheetwrite/core must be ${TEST_RELEASE_VERSION}`,
     );
@@ -295,7 +315,9 @@ describe("canonical release artifacts", () => {
     await writeFile(tarballPath, tamperedBytes);
     await expect(verifyReleaseArtifacts(root)).rejects.toThrow(`${first.name} shasum changed`);
 
-    const wrongIdentity = await writeTarball(root, first.name, { packedName: "@sheetwrite/tampered" });
+    const wrongIdentity = await writeTarball(root, first.name, {
+      packedName: "@sheetwrite/tampered",
+    });
     await writeFile(
       join(root, RELEASE_ARTIFACT_MANIFEST),
       serializeReleaseManifest(manifest([wrongIdentity, ...rest])),
@@ -306,10 +328,22 @@ describe("canonical release artifacts", () => {
   });
 
   it.each<[string, TarballOptions, string]>([
-    ["a lifecycle script", { manifest: { scripts: { prepublishOnly: "exit 1" } } }, "retains prepublishOnly"],
-    ["a missing export target", { manifest: { exports: "./Missing.js" } }, "package target does not exist with exact case"],
+    [
+      "a lifecycle script",
+      { manifest: { scripts: { prepublishOnly: "exit 1" } } },
+      "retains prepublishOnly",
+    ],
+    [
+      "a missing export target",
+      { manifest: { exports: "./Missing.js" } },
+      "package target does not exist with exact case",
+    ],
     // README.md is packed; a target that differs only by case must not resolve to it.
-    ["an export target of another case", { manifest: { exports: "./readme.md" } }, "package target does not exist with exact case"],
+    [
+      "an export target of another case",
+      { manifest: { exports: "./readme.md" } },
+      "package target does not exist with exact case",
+    ],
     ["a malicious archive path", { maliciousPath: true }, "malicious archive path"],
   ])("rejects a tarball with %s", async (_label, first, message) => {
     const { root } = await writeRelease(first);

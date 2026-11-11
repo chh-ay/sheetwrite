@@ -90,14 +90,23 @@ const coreEntry = entryPoint(".", [
     "interface",
     "interface ChangeEvent { commitReason: CommitReason; }",
     "Committed transaction event.",
-    [{ name: "commitReason", documentation: "What produced this commit — see {@link CommitReason}." }],
+    [
+      {
+        name: "commitReason",
+        documentation: "What produced this commit — see {@link CommitReason}.",
+      },
+    ],
   ),
 ]);
 const corePackage: ApiPackage = { name: "@sheetwrite/core", entryPoints: [coreEntry] };
 
 describe("API reference pages", () => {
   it("links symbols and gives every member and overload row a unique anchor", async () => {
-    const symbolPage = await renderSymbolPage(corePackage, coreEntry, exportNamed(coreEntry, "Grid"));
+    const symbolPage = await renderSymbolPage(
+      corePackage,
+      coreEntry,
+      exportNamed(coreEntry, "Grid"),
+    );
     expect(renderEntryPage(corePackage, coreEntry)).toContain('href="/docs/api/core/grid/"');
 
     const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
@@ -577,7 +586,13 @@ describe("adapter documentation contract", () => {
       .map((name) => (name.includes("-") ? `"${name}"?: unknown;` : `${name}?: unknown;`))
       .join(" ")} }`;
   const props = (members: readonly string[]) =>
-    apiExport("SheetwriteGridProps", "interface", propsSignature(members), undefined, documented(members));
+    apiExport(
+      "SheetwriteGridProps",
+      "interface",
+      propsSignature(members),
+      undefined,
+      documented(members),
+    );
   const readyEvent = () =>
     apiExport(
       "GridReadyEvent",

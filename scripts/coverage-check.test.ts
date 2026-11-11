@@ -39,9 +39,16 @@ function record(
 
 describe("LCOV parser", () => {
   const GRID = "SF:packages/core/src/grid.ts";
-  const report = [GRID, "FNF:2", "FNH:1", "DA:10,2", "DA:11,0", "LF:2", "LH:1", "end_of_record"].join(
-    "\n",
-  );
+  const report = [
+    GRID,
+    "FNF:2",
+    "FNH:1",
+    "DA:10,2",
+    "DA:11,0",
+    "LF:2",
+    "LH:1",
+    "end_of_record",
+  ].join("\n");
 
   it("normalizes repository paths and counts uncovered lines", () => {
     expect(parseLcov(report, ROOT)[0]).toMatchObject({
@@ -55,7 +62,11 @@ describe("LCOV parser", () => {
   it.each([
     ["a non-finite counter", report.replace("DA:11,0", "DA:11,NaN"), "finite non-negative integer"],
     ["a duplicate source record", `${report}\n${report}`, "Duplicate LCOV source record"],
-    ["a duplicate line counter", report.replace("DA:11,0", "DA:11,0\nDA:11,1"), "Duplicate LCOV DA"],
+    [
+      "a duplicate line counter",
+      report.replace("DA:11,0", "DA:11,0\nDA:11,1"),
+      "Duplicate LCOV DA",
+    ],
     ["a missing terminator", `${GRID}\nDA:1,1`, "ended before end_of_record"],
     ["an LF that disagrees with DA", report.replace("LF:2", "LF:3"), "LF does not match"],
   ])("fails closed on %s", (_label, text, message) => {
@@ -198,7 +209,11 @@ describe("policy schema", () => {
       { ...valid, floors: { ...valid.floors, rust: { lines: 80 } } },
       "Coverage rust floor functions must be an integer percentage",
     ],
-    ["an unsupported schema", { ...valid, schemaVersion: 2 }, "Unsupported coverage policy schema version"],
+    [
+      "an unsupported schema",
+      { ...valid, schemaVersion: 2 },
+      "Unsupported coverage policy schema version",
+    ],
     ["an unknown policy field", { ...valid, typo: true }, "unknown field"],
     [
       "an unknown language",
@@ -207,7 +222,10 @@ describe("policy schema", () => {
     ],
     [
       "an unknown floor metric",
-      { ...valid, floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } } },
+      {
+        ...valid,
+        floors: { ...valid.floors, typescript: { lines: 90, functions: 80, statements: 90 } },
+      },
       "unknown field",
     ],
     [

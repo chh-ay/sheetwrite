@@ -40,6 +40,12 @@ function changelog(name: string, groups: Readonly<Record<string, readonly string
 }
 
 const changelogs: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(
+    PUBLISHABLE_PACKAGE_ORDER.map((name) => [
+      name,
+      changelog(name, { "Patch Changes": [provenance, dependencyUpdate] }),
+    ]),
+  ),
   "@sheetwrite/core": changelog("@sheetwrite/core", {
     "Minor Changes": [pivots],
     "Patch Changes": [provenance, dependencyUpdate],
@@ -59,15 +65,10 @@ const changelogs: Readonly<Record<string, string>> = {
       provenance,
     ],
   }),
-  "@sheetwrite/queries": changelog("@sheetwrite/queries", {
-    "Patch Changes": [provenance, dependencyUpdate],
-  }),
+  // A dependency update under its own heading leaves no section behind.
   "@sheetwrite/xlsx": changelog("@sheetwrite/xlsx", {
     "Minor Changes": [dependencyUpdate],
     "Patch Changes": [provenance],
-  }),
-  "@sheetwrite/charts": changelog("@sheetwrite/charts", {
-    "Patch Changes": [provenance, dependencyUpdate],
   }),
   "@sheetwrite/react": changelog("@sheetwrite/react", {
     "Patch Changes": [
@@ -77,9 +78,7 @@ const changelogs: Readonly<Record<string, string>> = {
       dependencyUpdate,
     ],
   }),
-  "@sheetwrite/vue": changelog("@sheetwrite/vue", {
-    "Patch Changes": [provenance, dependencyUpdate],
-  }),
+  // Entry order within a section does not matter for the shared group.
   "@sheetwrite/svelte": changelog("@sheetwrite/svelte", {
     "Patch Changes": [dependencyUpdate, provenance],
   }),

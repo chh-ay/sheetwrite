@@ -15,7 +15,9 @@ import {
 } from "./workspace-tooling.js";
 
 const root = resolve(import.meta.dir, "..");
-const rustToolchain = Bun.TOML.parse(readFileSync(resolve(root, "rust-toolchain.toml"), "utf8")) as {
+const rustToolchain = Bun.TOML.parse(
+  readFileSync(resolve(root, "rust-toolchain.toml"), "utf8"),
+) as {
   readonly toolchain?: Readonly<Record<string, unknown>>;
 };
 const workflow = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");

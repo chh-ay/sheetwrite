@@ -29,7 +29,8 @@ async function fullText(pages: Readonly<Record<string, string>>): Promise<string
   }
 }
 
-const page = (title: string, ...body: string[]) => ["---", `title: ${title}`, "---", ...body].join("\n");
+const page = (title: string, ...body: string[]) =>
+  ["---", `title: ${title}`, "---", ...body].join("\n");
 
 describe("llms full text", () => {
   it("orders pages depth-first by the sidebar, then unlisted pages by route", () => {
@@ -47,7 +48,11 @@ describe("llms full text", () => {
           },
         ],
       },
-      { label: "Reference", tab: "api", items: [{ label: "Events", href: "/docs/reference/events/" }] },
+      {
+        label: "Reference",
+        tab: "api",
+        items: [{ label: "Events", href: "/docs/reference/events/" }],
+      },
     ] satisfies readonly NavigationSection[];
     const routes = [
       "/docs/reference/events/",
@@ -56,7 +61,12 @@ describe("llms full text", () => {
       "/docs/alpha/",
       "/docs/features/grid/search/",
     ];
-    expect(inNavigationOrder(routes.map((route) => ({ route })), sections).map((document) => document.route)).toEqual([
+    expect(
+      inNavigationOrder(
+        routes.map((route) => ({ route })),
+        sections,
+      ).map((document) => document.route),
+    ).toEqual([
       "/docs/features/grid/search/",
       "/docs/features/grid/context-menu/",
       "/docs/reference/events/",
@@ -93,7 +103,9 @@ describe("llms full text", () => {
       "guides/second.md": page("Same title", "Second."),
     });
 
-    const links = [...content.matchAll(/^- \[Same title\]\(#([^)]+)\)$/gm)].map((match) => match[1]);
+    const links = [...content.matchAll(/^- \[Same title\]\(#([^)]+)\)$/gm)].map(
+      (match) => match[1],
+    );
     expect(new Set(links).size).toBe(2);
     for (const anchor of links) expect(content).toContain(`<a id="${anchor}"></a>`);
   });

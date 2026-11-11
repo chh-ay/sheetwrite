@@ -122,7 +122,9 @@ describe("manual package release workflow", () => {
 
   it("binds canonical artifact bytes only to the exact source commit", () => {
     const packages = [WASM, CORE];
-    expect(() => assertCanonicalReleaseIdentity({ sourceCommit: SHA, packages }, SHA)).not.toThrow();
+    expect(() =>
+      assertCanonicalReleaseIdentity({ sourceCommit: SHA, packages }, SHA),
+    ).not.toThrow();
     expect(() =>
       assertCanonicalReleaseIdentity({ sourceCommit: "b".repeat(40), packages }, SHA),
     ).toThrow("Canonical artifacts came from");
@@ -322,8 +324,8 @@ describe("manual package release workflow", () => {
       reads += 1;
       return reads < 3 ? notFound() : registryEntry(CORE);
     };
-    expect(await verifyPublishedArtifacts([CORE], eventuallyFound, latest, 5, noPause, [CORE])).toBe(
-      "verified",
-    );
+    expect(
+      await verifyPublishedArtifacts([CORE], eventuallyFound, latest, 5, noPause, [CORE]),
+    ).toBe("verified");
   });
 });

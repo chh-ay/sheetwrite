@@ -205,7 +205,7 @@ describe("prebuilt docs deployment", () => {
   });
 });
 
-describe("feed type", () => {
+describe("routing", () => {
   it("serves the changelog feed as RSS", async () => {
     const root = await fixture();
     await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
@@ -217,31 +217,23 @@ describe("feed type", () => {
       (await requestPackagedFile(root, "/sitemap.xml"))?.headers["content-type"],
     ).toBeUndefined();
   });
-});
 
-describe("moved docs pages", () => {
-  it("redirects every old address, with or without its trailing slash, to its new page", async () => {
+  it("redirects every moved page and merged showcase, with or without its trailing slash", async () => {
     const root = await fixture();
     await prepareDocsDeployment(root);
-    const moved = Object.entries(MOVED_PAGES);
-    expect(moved.length).toBeGreaterThan(0);
-    for (const [from, page] of moved) {
+    const redirects = [
+      ...Object.entries(MOVED_PAGES).map(([from, page]) => [from, page.to] as const),
+      ...Object.entries(MOVED_SHOWCASES),
+    ];
+    expect(Object.keys(MOVED_PAGES).length).toBeGreaterThan(0);
+    for (const [from, to] of redirects) {
       for (const pathname of [from, from.slice(0, -1)]) {
         const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(page.to);
-      }
-    }
-  });
-
-  it("redirects every merged showcase to the showcase that holds its story now", async () => {
-    const root = await fixture();
-    await prepareDocsDeployment(root);
-    for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
-      for (const pathname of [from, from.slice(0, -1)]) {
-        const response = await requestPackagedFile(root, pathname);
-        expect(response?.status).toBe(308);
-        expect(response?.headers.Location).toBe(to);
+        expect({ pathname, status: response?.status, to: response?.headers.Location }).toEqual({
+          pathname,
+          status: 308,
+          to,
+        });
       }
     }
   });
