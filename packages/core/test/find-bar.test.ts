@@ -4,7 +4,7 @@ import { FindBar } from "../src/find-bar.js";
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { SearchResult } from "../src/types.js";
-import { elementAdded, makeWorkbook } from "./fixtures.js";
+import { elementAdded, makeWorkbook, mountHost } from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 
@@ -20,14 +20,6 @@ afterEach(() => {
   restoreCanvasStubs();
   document.body.innerHTML = "";
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 describe("FindBar", () => {
   it("searches and replaces live cells without leaking field keystrokes", async () => {

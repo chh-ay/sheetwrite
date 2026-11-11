@@ -12,7 +12,7 @@ import {
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -27,14 +27,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 function makeGrid(rowCount = 20): { grid: Grid; store: SheetwriteStore; host: HTMLDivElement } {
   const workbook = makeWorkbook(rowCount);
   const store = new SheetwriteStore(workbook, makeColumnarData(rowCount));

@@ -441,10 +441,6 @@ function nodesForMode(mode: string, root: string): readonly CommandNode[] {
       return GENERATED_SOURCE_NODES;
     case "typecheck-packages":
       return PACKAGE_TYPECHECK_NODES;
-    case "typecheck-examples":
-      return EXAMPLE_TYPECHECK_NODES;
-    case "typecheck-bench":
-      return BENCH_TYPECHECK_NODES;
     case "typecheck":
       return TYPECHECK_NODES;
     case "verify-ci":
