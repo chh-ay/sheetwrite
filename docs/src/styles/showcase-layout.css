@@ -1,5 +1,8 @@
 /* The shared showcase layout (ShowcaseLayout.tsx): header with task and facts,
-   the demo stage with its control panel, the code, then explanation. */
+   the demo stage with its control panel, the code, then explanation.
+   The live grid is the product: it takes the full content width at every
+   size, and the control panel is a band under it. Text keeps its own
+   reading measure, so the grid is wider than the text column. */
 .sw-showcase {
   min-height: 100vh;
   background: var(--sw-surface-0);
@@ -109,10 +112,20 @@
   }
 }
 
+/* The stage runs past the text column into the page margins on wide
+   screens, up to 120rem: wide enough for a working grid, not so wide that
+   it fills thousands of pixels with empty rows. */
 .sw-showcase__stage {
+  --sw-stage-bleed: clamp(
+    0px,
+    (100vw - var(--sw-page-max)) / 2 - var(--sw-page-gutter),
+    (120rem - var(--sw-page-max)) / 2
+  );
+
   display: grid;
   gap: var(--sw-space-4);
   align-items: start;
+  margin-inline: calc(-1 * var(--sw-stage-bleed));
 }
 
 .sw-showcase__demo {
@@ -214,29 +227,17 @@
   justify-self: start;
 }
 
-/* Tablets: the panel spans the stage under the demo, so its groups sit in
-   two columns instead of stretching each row across the page. */
-@media (min-width: 52rem) and (max-width: 71.99rem) {
+/* From tablets up, the panel spans the stage under the demo with its groups
+   in columns (as many as fit at a readable width), divided by rules. */
+@media (min-width: 52rem) {
   .sw-showcase__controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    column-gap: var(--sw-space-8);
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: var(--sw-space-5) var(--sw-space-8);
   }
 
   .sw-showcase__control-group + .sw-showcase__control-group {
     padding-top: 0;
     border-top: 0;
-  }
-}
-
-/* Desktop: the control panel sits beside the demo and stays in view. */
-@media (min-width: 72rem) {
-  .sw-showcase__stage[data-has-controls="true"] {
-    grid-template-columns: minmax(0, 1fr) 19rem;
-  }
-
-  .sw-showcase__controls {
-    position: sticky;
-    top: calc(var(--sw-header-height) + var(--sw-space-4));
   }
 }
 
