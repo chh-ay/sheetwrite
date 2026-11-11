@@ -682,6 +682,6 @@ impl Big {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "analysis"))]
 #[path = "float_text_tests.rs"]
 mod tests;

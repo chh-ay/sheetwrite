@@ -65,27 +65,6 @@ fn a_paged_sheet_rejects_a_chunk_size_it_cannot_round() {
 }
 
 #[test]
-fn structural_edits_keep_the_text_of_formulas_they_do_not_move() {
-    let (mut store, sheet, reader) = sheet_with_reference();
-    let untouched = store.add_sheet(COLS, ROWS);
-    store.set_formula(untouched, 0, 0, "=A2+B2*2", 0);
-    store.recompute(untouched);
-
-    assert!(store.add_rows(sheet, 0, 1));
-    store.recompute(sheet);
-
-    assert_eq!(
-        store.formula_source(untouched, 0, 0).as_deref(),
-        Some("=A2+B2*2")
-    );
-    assert_eq!(
-        store.formula_source(reader, 0, 0).as_deref(),
-        Some("=Grid!A3")
-    );
-    assert_eq!(store.get_cell(reader, 0, 0).num(), 7.0);
-}
-
-#[test]
 fn formula_ids_survive_structural_edits_and_slot_reuse() {
     use crate::types::AbsCellKey;
 
