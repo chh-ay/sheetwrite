@@ -74,16 +74,6 @@ const pivot: PivotDefinition = {
   values: [],
   filters: [{ field: 0, values: groups }],
 };
-/** One output row per source row: the largest output a dashboard pivot reads. */
-const outputPivot: PivotDefinition = {
-  id: "output-pivot",
-  name: "OutputPivot",
-  source: { range },
-  anchor: { row: 0, col: 0 },
-  rows: [1],
-  columns: [],
-  values: [{ field: 0, aggregation: "COUNT" }],
-};
 const table = {
   id: "panel-table",
   name: "PanelTable",
@@ -94,6 +84,16 @@ const table = {
   ],
   headerRow: true,
   totalsRow: false,
+};
+/** One output row per source row: the largest output a dashboard pivot reads. */
+const outputPivot: PivotDefinition = {
+  id: "output-pivot",
+  name: "OutputPivot",
+  source: { table: table.id },
+  anchor: { row: 0, col: 0 },
+  rows: [1],
+  columns: [],
+  values: [{ field: 0, aggregation: "COUNT" }],
 };
 const slicer: DashboardSlicerItem = {
   id: "panel-slicer",
