@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { SheetwriteGrid } from "@sheetwrite/react";
 
 import "@sheetwrite/react/styles.css";

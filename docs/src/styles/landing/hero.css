@@ -36,6 +36,9 @@
 .sw-lp-hero__start {
   display: grid;
   gap: var(--sw-space-5);
+  /* Ends on the frame's right edge, with the header's controls and the app
+     preview below. */
+  justify-self: end;
   width: min(100%, 26rem);
 }
 
@@ -388,6 +391,18 @@
   justify-content: flex-start;
 }
 
+/* A value the animation rewrites fills its cell, so a value that gets
+   narrower or wider (or swaps fonts) does not move its box. */
+.ha-cell > span {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: right;
+}
+
+.ha-cell[data-text] > span {
+  text-align: left;
+}
+
 .ha-cell[data-head] {
   color: var(--sw-fg-strong);
   font-weight: var(--sw-weight-semibold);
@@ -416,11 +431,14 @@
   text-align: left;
 }
 
-/* Overlays placed in cell units (see cellBox in HeroApp.tsx). */
+/* Overlays placed in cell units (see cellBox in HeroApp.tsx). The animation
+   moves the selection, so it is placed with a transform: a move of top and
+   left is a layout shift on every load. */
 .ha-box {
   position: absolute;
-  top: calc(var(--r) * var(--rh));
-  left: calc(var(--rhw) + var(--c) * var(--cw));
+  top: 0;
+  left: 0;
+  transform: translate(calc(var(--rhw) + var(--c) * var(--cw)), calc(var(--r) * var(--rh)));
   width: calc(var(--w) * var(--cw));
   height: calc(var(--h) * var(--rh));
   pointer-events: none;

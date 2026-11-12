@@ -28,7 +28,7 @@ async function fixture(): Promise<string> {
   const root = await mkdtemp(join(tmpdir(), "sheetwrite-docs-deployment-"));
   fixtureRoots.push(root);
   for (const [path, contents] of Object.entries(builtFiles)) {
-    await put(root, `docs/dist/client/${path}`, contents);
+    await put(root, `docs-solid/dist/client/${path}`, contents);
   }
   await put(root, ".vercel/output/static/old.html", "previous deployment");
   return root;
@@ -98,7 +98,7 @@ describe("prebuilt docs deployment", () => {
     await put(root, ".vercel/output/config.json", '{"version":3,"stale":true}');
     await put(root, ".vercel/project.json", '{"projectId":"keep-me"}');
     await put(root, ".vercel/.env.production.local", "keep this metadata");
-    await put(root, "docs/dist/server/private.js", "server only");
+    await put(root, "docs-solid/dist/server/private.js", "server only");
     await put(root, "outside.txt", "outside source");
 
     await prepareDocsDeployment(root);
@@ -131,7 +131,7 @@ describe("prebuilt docs deployment", () => {
     "preserves the previous deployment when %s is missing",
     async (path) => {
       const root = await fixture();
-      await rm(join(root, "docs/dist/client", path));
+      await rm(join(root, "docs-solid/dist/client", path));
       await expect(prepareDocsDeployment(root)).rejects.toThrow("Docs build is incomplete");
       expect(await readFile(join(root, ".vercel/output/static/old.html"), "utf8")).toBe(
         "previous deployment",
@@ -146,7 +146,7 @@ describe("prebuilt docs deployment", () => {
       await put(root, "outside/private.txt", "must not deploy");
       await symlink(
         join(root, kind === "file" ? "outside/private.txt" : "outside"),
-        join(root, "docs/dist/client/linked"),
+        join(root, "docs-solid/dist/client/linked"),
       );
       await expect(prepareDocsDeployment(root)).rejects.toThrow("symlink or special file");
       expect(await readFile(join(root, ".vercel/output/static/old.html"), "utf8")).toBe(
@@ -208,7 +208,7 @@ describe("prebuilt docs deployment", () => {
 describe("feed type", () => {
   it("serves the changelog feed as RSS", async () => {
     const root = await fixture();
-    await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
+    await put(root, "docs-solid/dist/client/changelog/rss.xml", '<rss version="2.0" />');
     await prepareDocsDeployment(root);
     const response = await requestPackagedFile(root, "/changelog/rss.xml");
     expect(response?.body).toEqual(Buffer.from('<rss version="2.0" />'));

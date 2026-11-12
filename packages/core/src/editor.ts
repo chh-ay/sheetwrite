@@ -1,3 +1,4 @@
+import { insertEditorLineBreak, sizeEditorTextarea } from "./editor-textarea.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
 import type { CellFormat } from "./types/cell.js";
@@ -63,6 +64,7 @@ export class EditController {
     ta.inputMode = opts.type === "number" || opts.type === "currency" ? "decimal" : "text";
     ta.spellcheck = false;
     ta.wrap = "off";
+    ta.setAttribute("aria-multiline", "true");
     if (opts.type === "date") ta.placeholder = "yyyy-mm-dd";
     ta.setAttribute("aria-label", opts.label);
     // Cosmetics live in styles.css (`.sheetwrite-editor`). The effective theme
@@ -101,8 +103,8 @@ export class EditController {
     ta.style.left = `${rect.x}px`;
     ta.style.top = `${rect.y}px`;
     ta.style.width = `${rect.w}px`;
-    ta.style.height = `${rect.h}px`;
     ta.style.lineHeight = `${Math.max(1, rect.h - 4)}px`;
+    sizeEditorTextarea(ta, rect.h);
     this.assist?.reposition();
   }
 
@@ -124,6 +126,7 @@ export class EditController {
     this.refEnd = start + ref.length;
     ta.setSelectionRange(this.refEnd, this.refEnd);
     ta.focus();
+    this.resize();
     this.assist?.update();
   }
 
@@ -135,8 +138,13 @@ export class EditController {
 
   private readonly onInput = (): void => {
     this.refStart = -1;
+    this.resize();
     this.assist?.update();
   };
+
+  private resize(): void {
+    if (this.textarea && this.opts) sizeEditorTextarea(this.textarea, this.opts.rect.h);
+  }
 
   commit(navigate: EditNavigate): void {
     const opts = this.opts;
@@ -168,7 +176,11 @@ export class EditController {
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // While the IME is composing, every keystroke belongs to the composition.
-    if (this.composing) {
+    if (this.composing || e.isComposing) {
+      e.stopPropagation();
+      return;
+    }
+    if (this.textarea && insertEditorLineBreak(e, this.textarea)) {
       e.stopPropagation();
       return;
     }

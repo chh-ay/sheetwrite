@@ -1,0 +1,20 @@
+```ts prelude="core" title="data-tools.ts"
+const REGION = 1;
+const UNITS = 4;
+const units = { sheet: "operations", start: { row: 0, col: UNITS }, end: { row: 4799, col: UNITS } };
+
+// Column filters compose; hidden rows and collapsed groups stay when they clear
+grid.setColumnFilter(REGION, { kind: "values", values: ["EMEA"] });
+grid.groupRows(0, 23);
+grid.setGroupCollapsed(0, true);
+grid.hideRows([24, 25, 26]);
+
+// A rule on the stored data: an edit outside it is rejected, in any view
+grid.setValidationRule({
+  id: "units-positive",
+  range: units,
+  condition: { kind: "number", integer: true, min: 1, max: 250 },
+  policy: "reject",
+  helpText: "Units must be an integer from 1 to 250.",
+});
+```

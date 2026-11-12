@@ -20,6 +20,12 @@ const HOSTILE_FIXTURE_IDS = [
   "compression-ratio",
   "corrupt-deflate",
 ] as const;
+/** The limits the security lab runs beside its hostile files. */
+const LIMIT_TEST_IDS = [
+  "interop-abort-report",
+  "interop-cellcap-report",
+  "interop-csvcap-report",
+] as const;
 
 interface BootErrors {
   console: string[];
@@ -29,21 +35,21 @@ interface BootErrors {
 /** Totals of the checked compatibility results file. */
 interface CompatibilityTestSet {
   totalTests: number;
+  publishedExamples: number;
   formulaTests: number;
   editSequenceTests: number;
   workbookTests: number;
   localPassed: number;
   unsupported: number;
   reviewedResults: number;
+  knownDifferences: number;
   checksum: string;
 }
 
-/** Fetches the checked results file the page serves behind "Open exact generated JSON". */
+/** Fetches the checked results file the vault's "Published checks" link serves. */
 async function servedCompatibilityTestSet(page: Page): Promise<CompatibilityTestSet> {
-  const href = await page
-    .locator("a", { hasText: "Open exact generated JSON" })
-    .getAttribute("href");
-  if (href === null) throw new Error("The compatibility results link has no href");
+  const href = await page.getByRole("link", { name: "Published checks" }).getAttribute("href");
+  if (href === null) throw new Error("The published checks link has no href");
   const response = await page.request.get(new URL(href, page.url()).href);
   expect(response.ok()).toBe(true);
   const results = (await response.json()) as { testSet: CompatibilityTestSet };
@@ -72,187 +78,101 @@ async function bootInterop(page: Page, url = ROUTE): Promise<void> {
     .toContain("Loaded:");
 }
 
-async function chooseFilter(page: Page, testId: string, label: string): Promise<void> {
-  const summary = page.getByTestId(testId);
-  await summary.click();
-  await summary.locator("..").getByRole("button", { name: label, exact: true }).click();
-  await expect(summary).toBeFocused();
+/** Open a lab through its tile; one lab is open at a time, below the tiles. */
+async function openLab(page: Page, lab: string): Promise<void> {
+  const tile = page.getByTestId(`interop-lab-${lab}`);
+  await tile.click();
+  await expect(tile).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(`#interop-lab-${lab}-panel`)).toBeVisible();
 }
 
-async function openDisclosure(page: Page, testId: string): Promise<void> {
-  const disclosure = page.getByTestId(testId);
-  if ((await disclosure.getAttribute("open")) === null) {
-    await disclosure.locator(":scope > summary").click();
-  }
-  await expect(disclosure).toHaveAttribute("open", "");
-}
-
-test("@portability compatibility results expose every truthful state from checked data", async ({
+test("@portability the evidence vault answers from the checked data and browses its checks", async ({
   page,
 }) => {
   const errors = collectErrors(page);
   await bootInterop(page, `${ROUTE}?compatibility=producer.google-sheets`);
   await expect(page.locator("select")).toHaveCount(0);
-  const exampleButtons = page.locator(".sw-si-results .sw-si-compat__records button");
-  await expect(exampleButtons).toHaveCount(20);
-  const firstExample = await exampleButtons.first().textContent();
-  const examplePage = page.getByTestId("compatibility-example-page");
-  await examplePage.click();
-  await examplePage
-    .locator("..")
-    .getByRole("button", { name: /^2 of /u })
-    .click();
-  await expect(exampleButtons.first()).not.toHaveText(firstExample ?? "");
-  await examplePage.click();
-  await examplePage
-    .locator("..")
-    .getByRole("button", { name: /^1 of /u })
-    .click();
-  await expect(exampleButtons.first()).toHaveText(firstExample ?? "");
+  const vault = page.locator("#interop-lab-vault-panel");
+  await expect(vault).toBeVisible();
 
-  const inventoryDetail = page.getByTestId("compatibility-detail");
-  await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
-  await expect(inventoryDetail).toContainText(
-    "No Google Sheets import or resave behavior is claimed.",
-  );
-  await expect(inventoryDetail).toContainText("Open the checked source");
-
-  const boundaryStatus = inventoryDetail.locator(".sw-si-compat__mode > span");
-  await expect(boundaryStatus).toHaveCount(1);
-  await expect(boundaryStatus).toHaveText("Supported with warning");
-  expect(
-    await page.locator(".sw-si-inventory .sw-si-compat__record-status").count(),
-  ).toBeGreaterThan(0);
-
-  await chooseFilter(page, "inventory-behavior-filter", "All behavior scopes");
-  await chooseFilter(page, "inventory-status-filter", "Supported");
-  const evaluatedBoundary = page
-    .locator('.sw-si-inventory button[data-status="supported"][data-result="evaluated"]')
-    .first();
-  await evaluatedBoundary.click();
-  await expect(boundaryStatus).toHaveCount(1);
-  await expect(boundaryStatus).toHaveText("Supported · Evaluated");
-  await expect(evaluatedBoundary).toHaveAccessibleName(/Supported · Evaluated/u);
-
-  // The summary renders the checked results file; take the expected numbers
-  // from the copy the page links to.
+  // Every figure comes from the file the page links to.
   const testSet = await servedCompatibilityTestSet(page);
-  const supported = testSet.totalTests - testSet.unsupported;
-  expect(testSet.localPassed).toBeLessThanOrEqual(supported);
-  const summary = page.getByTestId("compatibility-results-summary");
-  for (const count of [
-    testSet.totalTests,
-    testSet.formulaTests,
-    testSet.editSequenceTests,
-    testSet.workbookTests,
-  ]) {
-    await expect(summary).toContainText(count.toLocaleString("en-US"));
+  const applicable = testSet.totalTests - testSet.unsupported;
+  const figure = page.getByTestId("compatibility-results-summary");
+  await expect(figure).toContainText(testSet.localPassed.toLocaleString("en-US"));
+  await expect(figure).toContainText(`/ ${applicable.toLocaleString("en-US")}`);
+  // No known-difference count while there are none.
+  if (testSet.knownDifferences === 0) await expect(figure).not.toContainText("known difference");
+  for (const count of [testSet.formulaTests, testSet.editSequenceTests, testSet.workbookTests]) {
+    await expect(vault.locator(".sw-vault-kinds")).toContainText(count.toLocaleString("en-US"));
   }
-  await expect(summary).toContainText(
-    `${testSet.localPassed.toLocaleString("en-US")} of ${supported.toLocaleString("en-US")}`,
+  await expect(vault).toContainText(
+    `${testSet.unsupported.toLocaleString("en-US")} checks don't apply`,
   );
-  await expect(summary).toContainText(
-    `${testSet.reviewedResults.toLocaleString("en-US")} reviewed`,
-  );
-  await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveText(testSet.checksum);
-
-  const detail = page.getByTestId("compatibility-result-detail");
-
-  // Shared local pass: a local result is real, while incumbent app observations
-  // remain explicitly unavailable.
-  await expect(detail).toHaveAttribute("data-behavior", "shared");
-  await expect(detail).toHaveAttribute("data-status", /local-pass/u);
-  await expect(page.getByTestId("app-result-excel-desktop")).toHaveAttribute(
-    "data-state",
-    "unavailable",
-  );
-  await expect(page.getByTestId("app-result-google-sheets")).toContainText(
-    "no reviewed result file is attached",
+  if (testSet.reviewedResults === 0) {
+    await expect(vault).toContainText("No results from Excel, Google Sheets and LibreOffice");
+  }
+  await expect(page.getByTestId("compatibility-test-set-checksum")).toHaveAttribute(
+    "title",
+    testSet.checksum,
   );
 
-  const appRows = detail.locator(".sw-si-results__apps > ul > li");
-  await expect(appRows.first()).toHaveAttribute("data-testid", "app-result-sheetwrite");
-  await expect(appRows).toHaveCount(4);
-  await expect(page.getByTestId("app-result-excel-web")).toHaveCount(0);
-  const localResult = page.getByTestId("app-result-sheetwrite");
-  await expect(localResult).toHaveAttribute("data-state", "local-pass");
-  await expect(localResult).toContainText("Local check passed");
-  await expect(page.getByTestId("app-result-sheetwrite-capture")).toBeVisible();
+  // A page of 15 checks, with the pager.
+  const rows = page.getByTestId("compatibility-results-table").locator("tbody th button");
+  await expect(rows).toHaveCount(15);
+  const pager = page.getByTestId("compatibility-example-page");
+  await expect(pager).toHaveText(`1–15 of ${testSet.publishedExamples.toLocaleString("en-US")}`);
+  const firstName = await rows.first().textContent();
+  await vault.getByRole("button", { name: "Next checks" }).click();
+  await expect(pager).toHaveText(/^16–30 of /u);
+  await expect(rows.first()).not.toHaveText(firstName ?? "");
+  await vault.getByRole("button", { name: "Previous checks" }).click();
+  await expect(rows.first()).toHaveText(firstName ?? "");
 
-  // The checked set currently carries exact tolerance only. Exercise that
-  // truthful comparison boundary rather than inventing a numeric tolerance.
-  await expect(page.getByTestId("compatibility-tolerance")).toHaveText("Exact type and value");
+  // Choosing a check opens it beside the table.
+  const detail = vault.locator(".sw-vault-detail").getByTestId("compatibility-result-detail");
+  await rows.nth(2).click();
+  await expect(rows.nth(2)).toHaveAttribute("aria-pressed", "true");
+  await expect(detail).toContainText("Expected");
+  await expect(detail).toContainText("No recorded result yet");
 
-  // Excel-specific behavior: serial 60 shows Excel's 29 February 1900, so the check
-  // passes locally with no known difference, and no reviewed Excel result is attached.
-  await chooseFilter(page, "compatibility-behavior-filter", "Excel-specific behavior");
-  await expect(detail).toHaveAttribute("data-behavior", "excel");
-  await expect(detail).toHaveAttribute("data-status", /local-pass/u);
-  await expect(detail).not.toHaveAttribute("data-status", /known-difference/u);
-  await expect(page.getByTestId("known-difference")).toHaveCount(0);
-  await expect(page.getByTestId("app-result-excel-desktop")).toContainText("Result unavailable");
+  // Search, the kind segments and the result menu narrow the table.
+  await page.getByTestId("compatibility-search").fill("VLOOKUP");
+  await expect(rows.first()).toContainText("VLOOKUP");
+  await page.getByTestId("compatibility-search").fill("");
+  await page.getByTestId("compatibility-kind-workbook").click();
+  await expect(page.getByTestId("compatibility-kind-workbook")).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await expect(detail).toContainText("Workbook");
+  await page.getByTestId("compatibility-kind-all").click();
+  await page.getByRole("combobox", { name: "Result" }).click();
+  await page.getByRole("option", { name: "Not applicable" }).click();
+  await expect(rows).toHaveCount(1);
+  await rows.first().click();
+  await expect(detail).toContainText("Not applicable");
 
-  // The separate checked feature boundary records the Google-only scope and
-  // still renders it as unavailable rather than claiming an executed result.
-  await chooseFilter(page, "inventory-status-filter", "All statuses");
-  await chooseFilter(page, "inventory-behavior-filter", "Google Sheets-specific behavior");
-  await expect(inventoryDetail).toContainText("Recorded public Google Sheets export");
-  await expect(inventoryDetail).toContainText("missing bytes display unavailable status");
-
-  await chooseFilter(page, "inventory-behavior-filter", "All behavior scopes");
-  await chooseFilter(page, "inventory-status-filter", "Unsupported");
-  const unsupportedBoundary = page
-    .locator('.sw-si-inventory button[data-status="unsupported"][data-result="unsupported"]')
-    .first();
-  await expect(unsupportedBoundary).toBeVisible();
-  await unsupportedBoundary.click();
-  const unsupportedBadges = inventoryDetail.locator(".sw-si-compat__mode > span");
-  await expect(unsupportedBadges).toHaveCount(1);
-  await expect(unsupportedBadges).toHaveText("Unsupported · not claimed");
-  // Known difference is a tested empty state: no check differs from Excel.
-  await chooseFilter(page, "compatibility-behavior-filter", "All behavior scopes");
-  await chooseFilter(page, "compatibility-status-filter", "Known difference");
-  await expect(page.getByTestId("compatibility-results-empty")).toContainText(
-    "No known differences from Excel are recorded",
+  // `?compatibility=` opened its feature record under the boundary columns.
+  const record = page.getByTestId("compatibility-detail");
+  await expect(record).toContainText("Recorded public Google Sheets export");
+  await expect(record).toContainText("The checked source");
+  await expect(page.getByTestId("compatibility-producer.google-sheets")).toHaveAttribute(
+    "aria-pressed",
+    "true",
   );
 
-  // Explicit unsupported nonclaim.
-  await chooseFilter(page, "compatibility-status-filter", "Unsupported / not claimed");
-  await expect(detail).toHaveAttribute("data-status", /unsupported/u);
-  await expect(detail).toContainText("excluded from the pass percentage");
-
-  // Warning behavior, with a real workbook-operation preview from checked data.
-  await chooseFilter(page, "compatibility-status-filter", "Warning behavior");
-  await expect(detail).toHaveAttribute("data-status", /warning/u);
-  await expect(detail).toContainText("Warning behavior check");
-  await expect(page.getByTestId("compatibility-workbook-preview")).toContainText('"warnings"');
-
-  // Regression is a tested empty state: there are no reviewed external results,
-  // therefore there can be no reviewed regression record.
-  await chooseFilter(page, "compatibility-status-filter", "Regression");
-  await expect(page.getByTestId("compatibility-results-empty")).toContainText(
-    "No reviewed regressions are recorded",
-  );
-  await expect(page.locator(".sw-si-results .sw-si-compat__records button")).toHaveCount(0);
-
-  // Function/feature filtering and case selection work through the keyboard.
-  await chooseFilter(page, "compatibility-status-filter", "All result states");
-  const featureFilter = page.getByTestId("compatibility-feature-filter");
-  await chooseFilter(page, "compatibility-feature-filter", "Function · ABS");
-  const absResults = page.locator(".sw-si-results .sw-si-compat__records button");
-  await expect(absResults).toHaveCount(1);
-  await expect(absResults.first()).toContainText("ABS");
-  await featureFilter.focus();
-  await page.keyboard.press("Tab");
-  await expect(page.getByTestId("compatibility-behavior-filter")).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(page.getByTestId("compatibility-status-filter")).toBeFocused();
-  await page.keyboard.press("Tab");
-  await expect(absResults.first()).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(detail).toContainText("ABS");
-
+  // On a phone the check opens as a sheet that Escape closes, and nothing
+  // overflows the page.
   await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("combobox", { name: "Result" }).click();
+  await page.getByRole("option", { name: "Any result" }).click();
+  await rows.first().click();
+  const sheet = page.locator(".sw-vault-sheet");
+  await expect(sheet).toBeVisible();
+  await expect(sheet.getByTestId("compatibility-result-detail")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(sheet).toBeHidden();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
@@ -343,10 +263,11 @@ test("@portability File import opens the native picker from the keyboard and rep
   await bootInterop(page);
 
   // The showcase registers its optional backend on its first XLSX action.
-  await openDisclosure(page, "interop-fixtures-disclosure");
-  await page.getByTestId("fixture-libreoffice-rich-load").click();
+  await openLab(page, "fixtures");
+  const load = page.getByTestId("fixture-libreoffice-rich-load");
+  await expect(load).toBeEnabled({ timeout: 20_000 });
+  await load.click();
 
-  // The label updates before React mounts the new grid; configure only the live workbook.
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -411,9 +332,10 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  await openDisclosure(page, "interop-fixtures-disclosure");
+  await openLab(page, "fixtures");
   const load = page.locator('[data-testid="fixture-libreoffice-rich-load"]');
   await expect(load).toBeEnabled({ timeout: 20_000 });
+  await expect(page.getByTestId("interop-lab-fixtures")).toContainText("3 hashes match");
   await load.click();
 
   await expect
@@ -437,10 +359,10 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
 
   const fixture = fixtureManifest.positive.find((entry) => entry.file === "libreoffice-rich.xlsx");
   if (!fixture) throw new Error("The fixture manifest must include the imported workbook");
-  await openDisclosure(page, "interop-warnings-disclosure");
+  await openLab(page, "warnings");
   const warnings = page.locator('[data-testid="interop-warnings"]');
   await expect(warnings).toBeVisible();
-  await expect(warnings).toContainText(fixture.file);
+  await expect(page.getByTestId("interop-warning-count")).toContainText(fixture.file);
   const codes = await warnings.locator(".sw-si-warncode").allTextContents();
   for (const warning of fixture.expectedWarnings) {
     expect(codes.map((code) => code.trim())).toContain(warning.split(":")[0]?.trim());
@@ -451,19 +373,15 @@ test("committed LibreOffice fixture imports live with structured coded warnings"
   expect(errors.console).toEqual([]);
 });
 
-test("hostile packages, aborted signals, and resource ceilings are rejected with typed errors", async ({
-  page,
-}) => {
+test("one run stops every hostile file and limit with a typed error", async ({ page }) => {
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  await openDisclosure(page, "interop-limits-disclosure");
-  await page.getByTestId("interop-injection-load").click();
-  await expect(page.getByTestId("interop-status")).toContainText("Loaded: Security lab");
-  await page.getByTestId("interop-injection-export").click();
-  await expect(page.getByTestId("interop-injection-proof")).toContainText("'=HYPERLINK(");
-
-  await page.click('[data-testid="interop-hostile-run"]');
+  await openLab(page, "security");
+  const total = HOSTILE_FIXTURE_IDS.length + LIMIT_TEST_IDS.length;
+  const figure = page.getByTestId("interop-attacks-figure");
+  await expect(figure).toContainText("attacks, not run yet");
+  await page.getByTestId("interop-hostile-run").click();
   for (const id of HOSTILE_FIXTURE_IDS) {
     await expect
       .poll(() => page.locator(`[data-testid="hostile-${id}"]`).getAttribute("data-state"), {
@@ -472,35 +390,70 @@ test("hostile packages, aborted signals, and resource ceilings are rejected with
       })
       .toBe("rejected");
   }
+  for (const id of LIMIT_TEST_IDS) {
+    await expect(page.getByTestId(id)).toHaveAttribute("data-state", "rejected", {
+      timeout: 15_000,
+    });
+  }
+  await expect(page.getByTestId("interop-abort-report")).toContainText("AbortError");
+  await expect(page.getByTestId("interop-cellcap-report")).toContainText("XlsxResourceError");
+  await expect(page.getByTestId("interop-cellcap-report")).toContainText("maxCells");
+  await expect(page.getByTestId("interop-csvcap-report")).toContainText(
+    "DelimitedTextResourceError",
+  );
+  await expect(figure).toContainText(`${total}`);
+  await expect(figure).toContainText("attacks stopped in this run");
+  await expect(page.getByTestId("interop-lab-security")).toContainText(
+    `${total} / ${total} stopped`,
+  );
 
-  await page.click('[data-testid="interop-abort-demo"]');
-  const abortReport = page.locator('[data-testid="interop-abort-report"]');
-  await expect(abortReport).toBeVisible({ timeout: 15_000 });
-  await expect(abortReport).toHaveAttribute("data-state", "pass");
-  await expect(abortReport).toContainText(/AbortError|SheetwriteError/);
-  await expect(abortReport).toContainText(/abort/i);
-
-  await page.click('[data-testid="interop-cellcap-demo"]');
-  const cellCap = page.locator('[data-testid="interop-cellcap-report"]');
-  await expect(cellCap).toBeVisible({ timeout: 15_000 });
-  await expect(cellCap).toHaveAttribute("data-state", "pass");
-  await expect(cellCap).toContainText("XlsxResourceError");
-  await expect(cellCap).toContainText("maxCells");
-
-  await page.click('[data-testid="interop-csvcap-demo"]');
-  const csvCap = page.locator('[data-testid="interop-csvcap-report"]');
-  await expect(csvCap).toHaveAttribute("data-state", "pass");
-  await expect(csvCap).toContainText("DelimitedTextResourceError");
-
+  // On a phone the attacks become cards that fit the page.
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    ),
+  ).toBe(true);
   expect(errors.page).toEqual([]);
   expect(errors.console).toEqual([]);
 });
 
-test("CSV and TSV export and pasted CSV rebuild the live workbench", async ({ page }) => {
+test("the lab tiles are tabs: arrow keys move between labs, one open at a time", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await bootInterop(page);
+  const vault = page.getByTestId("interop-lab-vault");
+  await expect(vault).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#interop-lab-vault-panel")).toBeVisible();
+
+  await vault.focus();
+  await page.keyboard.press("ArrowRight");
+  const fixtures = page.getByTestId("interop-lab-fixtures");
+  await expect(fixtures).toBeFocused();
+  await expect(fixtures).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator("#interop-lab-vault-panel")).toBeHidden();
+  await expect(page.locator("#interop-lab-fixtures-panel")).toBeVisible();
+  await page.keyboard.press("End");
+  const runtime = page.getByTestId("interop-lab-runtime");
+  await expect(runtime).toBeFocused();
+  await expect(page.getByTestId("interop-isolation")).toBeVisible();
+  await expect(page.getByTestId("interop-isolation-error")).toContainText(
+    "XLSX add-on not installed",
+  );
+  await page.keyboard.press("Home");
+  await expect(vault).toBeFocused();
+  expect(errors.page).toEqual([]);
+  expect(errors.console).toEqual([]);
+});
+
+test("CSV and TSV export, the injection probe and pasted CSV rebuild the live workbench", async ({
+  page,
+}) => {
   const errors = collectErrors(page);
   await bootInterop(page);
 
-  await openDisclosure(page, "interop-delimited-disclosure");
+  await openLab(page, "delimited");
 
   await page.click('[data-testid="interop-csv-export"]');
   await expect(page.locator('[data-testid="interop-csv-output"]')).toBeVisible();
@@ -511,6 +464,12 @@ test("CSV and TSV export and pasted CSV rebuild the live workbench", async ({ pa
   await page.click(".sw-si-grid", { position: { x: 120, y: 80 } });
   await page.click('[data-testid="interop-tsv-export"]');
   await expect(page.locator('[data-testid="interop-tsv-output"]')).toBeVisible();
+
+  // Formula-like text leaves as text.
+  await page.getByTestId("interop-injection-load").click();
+  await expect(page.getByTestId("interop-status")).toContainText("Loaded: CSV and TSV");
+  await page.getByTestId("interop-injection-export").click();
+  await expect(page.getByTestId("interop-injection-proof")).toContainText("'=HYPERLINK(");
 
   await page.fill(
     '[data-testid="interop-csv-input"]',
