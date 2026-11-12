@@ -742,7 +742,9 @@ impl CellStore {
 
                 data.cells.contains_cell(start_row, col_index)
                     && data.cells.contains_cell(end_row - 1, col_index)
-                    && (start_row..end_row).all(|row| data.cells.is_loaded(row, col_index))
+                    && data
+                        .cells
+                        .range_fully_loaded(start_row, col_index, end_row - 1, col_index)
             })
         })
     }

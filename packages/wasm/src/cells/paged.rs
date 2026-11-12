@@ -15,6 +15,8 @@
 
 use std::cell::Cell;
 
+mod rows;
+
 use super::{StorageEntry, MAX_PAGE_CHUNK_ROWS};
 use crate::derived::{decode_cell, encode_cell, ABSENT_TAG};
 use crate::memory::{
