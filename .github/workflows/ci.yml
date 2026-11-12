@@ -331,6 +331,7 @@ jobs:
         run: |
           bun run typecheck
           bun run api:check
+          bun scripts/check-engine-exports.ts
           bun run docs:check
       - name: Save Bun downloads cache
         if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
