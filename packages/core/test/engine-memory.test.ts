@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 import { getEngine } from "../src/engine.js";
 import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
 import { storeEngine } from "../src/store/engine-registry.js";
+import { collectUntilFreed } from "./collect-garbage.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -91,14 +92,7 @@ describe("explicit engine memory release", () => {
       const first = releaseEngineMemory();
       expect(releaseEngineMemory()).toBe(first);
       await first;
-
-      for (let cycle = 0; cycle < 5; cycle++) {
-        // A real task boundary ends WeakRef's keep-alive job; fake time cannot force GC.
-        const next = Promise.withResolvers<void>();
-        setImmediate(next.resolve);
-        await next.promise;
-        Bun.gc(true);
-      }
+      await collectUntilFreed([retired]);
 
       expect(retired.deref()).toBeUndefined();
 
