@@ -5,14 +5,16 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "moduleDetection": "force",
-    "jsx": "react-jsx",
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true,
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
-    "types": ["vite/client", "bun"]
+    "types": ["vite/client", "bun"],
+    "paths": { "@docs/*": ["../docs/src/*"] }
   },
-  "include": ["src", "test", "vite.config.ts"]
+  "include": ["src", "test"]
 }
