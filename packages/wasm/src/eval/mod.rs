@@ -30,7 +30,7 @@ mod number_format_corpus_tests;
 mod operators;
 #[cfg(test)]
 mod pass_rule_tests;
-pub(crate) mod preview;
+mod preview;
 mod preview_limits;
 #[cfg(test)]
 mod preview_tests;

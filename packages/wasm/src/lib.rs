@@ -95,8 +95,6 @@ mod structural_edit_tests;
 mod tests;
 
 #[cfg(feature = "formula-engine")]
-pub use eval::preview::{FormulaPreview, FormulaPreviewKind, FormulaPreviewStatus};
-#[cfg(feature = "formula-engine")]
 pub use formula_tokens::{check_formula_syntax, formula_tokens, FormulaSyntaxError};
 #[cfg(feature = "formula-engine")]
 pub use formula_xlsx::{formula_from_xlsx, formula_to_xlsx};

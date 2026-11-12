@@ -168,7 +168,7 @@ import {
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
-import { decodePreview, type FormulaPreview } from "./formula-preview-result.js";
+import { decodePreview, type FormulaPreview, PREVIEW_FIELDS } from "./formula-preview-result.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   MERGED_CELLS_SORT_MESSAGE,
@@ -1340,9 +1340,15 @@ export class StoreDataEngine {
 
   /** The result `text` would have in `cell`, read without changing the store (#221). */
   previewFormula(cell: CellAddress, text: string): FormulaPreview {
-    return decodePreview(
-      this.wasm.previewFormula(this.sheets.handleOf(cell.sheet), cell.row, cell.col, text),
+    const fields = new Float64Array(PREVIEW_FIELDS);
+    const result = this.wasm.previewFormula(
+      this.sheets.handleOf(cell.sheet),
+      cell.row,
+      cell.col,
+      text,
+      fields,
     );
+    return decodePreview(fields, result);
   }
 
   private sameNamedRange(

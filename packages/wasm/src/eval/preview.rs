@@ -24,11 +24,12 @@ use super::{ast_produces_array, EvalPass, FormulaOriginGuard};
 const PREVIEW_SOURCE_UNITS: usize = 8_192;
 /// Nesting deeper than this is not previewed.
 const PREVIEW_NESTING: usize = 256;
+/// The numbers the JavaScript export writes for one preview.
+const PREVIEW_FIELDS: usize = 5;
 
-/// What a preview returned.
-#[wasm_bindgen]
+/// What a preview returned. JavaScript reads the status as its number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FormulaPreviewStatus {
+pub(crate) enum FormulaPreviewStatus {
     /// One value.
     Value = 0,
     /// An array: `rows` × `cols`, with its top-left value.
@@ -43,10 +44,9 @@ pub enum FormulaPreviewStatus {
     Syntax = 5,
 }
 
-/// The kind of a preview's value.
-#[wasm_bindgen]
+/// The kind of a preview's value. JavaScript reads the kind as its number.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FormulaPreviewKind {
+pub(crate) enum FormulaPreviewKind {
     /// An empty result.
     Blank = 0,
     /// A number, in `number`.
@@ -60,9 +60,8 @@ pub enum FormulaPreviewKind {
 }
 
 /// The result of [`CellStore::preview_formula`].
-#[wasm_bindgen]
 #[derive(Debug)]
-pub struct FormulaPreview {
+pub(crate) struct FormulaPreview {
     status: FormulaPreviewStatus,
     kind: FormulaPreviewKind,
     number: f64,
@@ -71,48 +70,61 @@ pub struct FormulaPreview {
     cols: u32,
 }
 
-#[wasm_bindgen]
 impl FormulaPreview {
     /// Whether the preview has a value, and if not, why.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn status(&self) -> FormulaPreviewStatus {
+    pub(crate) const fn status(&self) -> FormulaPreviewStatus {
         self.status
     }
 
     /// The kind of the value (of the top-left value for an array).
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn kind(&self) -> FormulaPreviewKind {
+    pub(crate) const fn kind(&self) -> FormulaPreviewKind {
         self.kind
     }
 
     /// A number, or 1 / 0 for a logical value.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn number(&self) -> f64 {
+    pub(crate) const fn number(&self) -> f64 {
         self.number
     }
 
     /// Text, or an error's text such as `#DIV/0!`.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn text(&self) -> Option<String> {
-        self.text.clone()
+    pub(crate) fn text(&self) -> Option<&str> {
+        self.text.as_deref()
     }
 
     /// Rows of an array result; 1 for a value.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn rows(&self) -> u32 {
+    pub(crate) const fn rows(&self) -> u32 {
         self.rows
     }
 
     /// Columns of an array result; 1 for a value.
-    #[wasm_bindgen(getter)]
-    #[must_use]
-    pub fn cols(&self) -> u32 {
+    pub(crate) const fn cols(&self) -> u32 {
         self.cols
+    }
+
+    /// The numbers JavaScript decodes: status, kind, number, rows, columns.
+    fn fields(&self) -> [f64; PREVIEW_FIELDS] {
+        let status = match self.status {
+            FormulaPreviewStatus::Value => 0.0,
+            FormulaPreviewStatus::Array => 1.0,
+            FormulaPreviewStatus::UnsafeFunction => 2.0,
+            FormulaPreviewStatus::CostLimit => 3.0,
+            FormulaPreviewStatus::Loading => 4.0,
+            FormulaPreviewStatus::Syntax => 5.0,
+        };
+        let kind = match self.kind {
+            FormulaPreviewKind::Blank => 0.0,
+            FormulaPreviewKind::Number => 1.0,
+            FormulaPreviewKind::Text => 2.0,
+            FormulaPreviewKind::Boolean => 3.0,
+            FormulaPreviewKind::Error => 4.0,
+        };
+        [
+            status,
+            kind,
+            self.number,
+            f64::from(self.rows),
+            f64::from(self.cols),
+        ]
     }
 }
 
@@ -154,14 +166,37 @@ impl FormulaPreview {
 #[wasm_bindgen]
 impl CellStore {
     /// The result `source` (a formula with its leading `=`) would have in the
+    /// cell at `row` and `col` of `sheet`, without changing the store, as
+    /// [`Self::preview_formula`] gives it. Writes five numbers into `out`
+    /// (status, kind, number, rows, columns; see `formula-preview-result.ts`
+    /// in core) and returns the text of a text or error value. Plain numbers
+    /// keep the export free of an object that JavaScript must free.
+    #[wasm_bindgen(js_name = previewFormula)]
+    #[must_use]
+    pub fn preview_formula_fields(
+        &self,
+        sheet: usize,
+        row: u32,
+        col: u32,
+        source: &str,
+        out: &mut [f64],
+    ) -> Option<String> {
+        let preview = self.preview_formula(sheet, row, col, source);
+        for (slot, field) in out.iter_mut().zip(preview.fields()) {
+            *slot = field;
+        }
+        preview.text
+    }
+}
+
+impl CellStore {
+    /// The result `source` (a formula with its leading `=`) would have in the
     /// cell at `row` and `col` of `sheet`, without changing the store.
     /// Referenced formulas give their stored results; nothing recalculates.
     /// A formula that calls RAND, RANDBETWEEN or a host function is refused
     /// before any of it runs, and one that needs more than the preview
     /// limits returns `CostLimit` rather than a partial answer.
-    #[wasm_bindgen(js_name = previewFormula)]
-    #[must_use]
-    pub fn preview_formula(
+    pub(crate) fn preview_formula(
         &self,
         sheet: usize,
         row: u32,
@@ -290,6 +325,7 @@ impl SafetyWalk<'_> {
             unused_variables,
             clippy::unused_self,
             clippy::needless_pass_by_ref_mut,
+            clippy::missing_const_for_fn,
             reason = "the default engine has no host functions or LAMBDA"
         )
     )]

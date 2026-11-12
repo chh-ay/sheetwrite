@@ -29,15 +29,15 @@ export type FormulaPreview =
     }
   | { readonly status: "unavailable"; readonly reason: FormulaPreviewUnavailable };
 
-/** What the engine returns; the numbers are the Rust enums' values. */
-export interface EnginePreview {
+/** The numbers the engine's `previewFormula` writes: status, kind, number, rows, columns. */
+export const PREVIEW_FIELDS = 5;
+
+/** One engine preview: its five numbers and the text of a text or error value. */
+interface EnginePreview {
   readonly status: number;
   readonly kind: number;
   readonly number: number;
   readonly text: string | undefined;
-  readonly rows: number;
-  readonly cols: number;
-  free(): void;
 }
 
 const STATUS_VALUE = 0;
@@ -71,25 +71,14 @@ function previewValue(preview: EnginePreview): FormulaPreviewValue {
   }
 }
 
-/** The public form of an engine preview; frees the engine object. */
-export function decodePreview(preview: EnginePreview): FormulaPreview {
-  try {
-    if (preview.status === STATUS_VALUE) return { status: "value", value: previewValue(preview) };
-    if (preview.status === STATUS_ARRAY) {
-      return {
-        status: "array",
-        rows: preview.rows,
-        cols: preview.cols,
-        first: previewValue(preview),
-      };
-    }
+/** The public form of the numbers and text the engine's `previewFormula` returned. */
+export function decodePreview(fields: Float64Array, text: string | undefined): FormulaPreview {
+  const [status = -1, kind = 0, number = 0, rows = 0, cols = 0] = fields;
+  const preview: EnginePreview = { status, kind, number, text };
+  if (status === STATUS_VALUE) return { status: "value", value: previewValue(preview) };
+  if (status === STATUS_ARRAY) return { status: "array", rows, cols, first: previewValue(preview) };
 
-    const reason = UNAVAILABLE[preview.status];
-    if (reason === undefined) {
-      throw new Error(`Sheetwrite: unknown formula preview status ${preview.status}`);
-    }
-    return { status: "unavailable", reason };
-  } finally {
-    preview.free();
-  }
+  const reason = UNAVAILABLE[status];
+  if (reason === undefined) throw new Error(`Sheetwrite: unknown formula preview status ${status}`);
+  return { status: "unavailable", reason };
 }

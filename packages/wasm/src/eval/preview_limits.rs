@@ -71,7 +71,7 @@ fn active() -> bool {
     ACTIVE.with(|active| active.get().is_some())
 }
 
-fn add(counter: &mut usize, amount: usize, limit: usize) -> bool {
+const fn add(counter: &mut usize, amount: usize, limit: usize) -> bool {
     *counter = counter.saturating_add(amount);
     *counter <= limit
 }
