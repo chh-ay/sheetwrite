@@ -34,6 +34,7 @@ function dataModelElement(workbookRoot: XmlElement): XmlElement | undefined {
 export function hasExcelDataModel(workbookRoot: XmlElement): boolean {
   return dataModelElement(workbookRoot) !== undefined;
 }
+
 /** Worksheet table name of each connection that loads a range into the model, by connection name. */
 function connectionSources(connections: XmlElement | undefined): Map<string, string> {
   const sources = new Map<string, string>();
