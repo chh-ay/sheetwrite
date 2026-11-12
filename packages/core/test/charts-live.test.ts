@@ -430,6 +430,63 @@ describe("chart identities and resolution", () => {
     expect(resolveChartView(store, "data", "sales")?.chart.title).toBe("New");
   });
 
+  it("types the shared definition read-only all the way down", () => {
+    const { store } = setup();
+    const view = resolveChartView(store, "data", "sales");
+    if (view === null) throw new Error("Expected the chart to resolve");
+    const writes = [
+      () => {
+        // @ts-expect-error A view's chart definition is read-only.
+        view.chart.title = "Edited";
+      },
+      () => {
+        // @ts-expect-error Nested objects are read-only too.
+        view.chart.anchor.row = 5;
+      },
+      () => {
+        // @ts-expect-error Arrays are read-only.
+        view.chart.series.push({ values: range("data", 0, 1, 1, 1) });
+      },
+    ];
+    // Only the types are under test; the writes never run.
+    expect(writes).toHaveLength(3);
+  });
+
+  it("freezes the shared definition in development builds, and the store keeps working", () => {
+    const { store } = setup();
+    const previous = process.env.NODE_ENV;
+    process.env.NODE_ENV = "development";
+    try {
+      const view = resolveChartView(store, "data", "sales");
+      if (view === null) throw new Error("Expected the chart to resolve");
+      expect(Object.isFrozen(view.chart)).toBe(true);
+      expect(Object.isFrozen(view.chart.anchor)).toBe(true);
+      expect(Object.isFrozen(view.chart.series[0])).toBe(true);
+      expect(() => {
+        Object.assign(view.chart.anchor, { row: 5 });
+      }).toThrow(TypeError);
+
+      // The store replaces frozen definitions instead of writing into them.
+      apply(store, [{ op: "addRows", sheet: "data", at: 0, count: 2 }]);
+      apply(store, [{ op: "removeRows", sheet: "data", at: 0, count: 1 }]);
+      apply(store, [
+        {
+          op: "setChart",
+          sheet: "data",
+          chart: { ...chart("sales", range("data", 1, 1, 2, 1)), title: "Moved" },
+        },
+      ]);
+      const moved = resolveChartView(store, "data", "sales");
+      expect(moved?.chart.title).toBe("Moved");
+      expect(moved?.chart.anchor.row).toBe(0);
+      expect(moved?.series[0]?.values).toEqual([10, 20]);
+      expect(view.chart.anchor.row).toBe(0);
+      expect(view.chart.title).toBeUndefined();
+    } finally {
+      process.env.NODE_ENV = previous;
+    }
+  });
+
   it("names a chart once when a commit both edits its source and redefines it", () => {
     const { store, events } = setup();
     apply(store, [

@@ -103,13 +103,27 @@ export interface ChartSeriesView {
   referenceError: boolean;
 }
 
+/** `T` with every property, array and nested object read-only. */
+type DeepReadonly<T> = T extends readonly (infer Element)[]
+  ? ReadonlyArray<DeepReadonly<Element>>
+  : T extends object
+    ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
+    : T;
+
+/**
+ * A chart definition that its holder must not modify. A `ChartView` hands out
+ * the store's own definition, so it is typed read-only all the way down.
+ */
+export type ReadonlyChartDefinition = DeepReadonly<ChartDefinition>;
+
 /** One immutable-by-convention rendering input, refreshed on chart-change events. */
 export interface ChartView {
   /**
    * The store's own definition, not a copy. The store replaces a chart when
-   * it changes and never writes into one, so do not modify it either.
+   * it changes and never writes into one. Development builds freeze it, so a
+   * write throws; copy it (for example with `structuredClone`) to edit it.
    */
-  chart: ChartDefinition;
+  chart: ReadonlyChartDefinition;
   series: ChartSeriesView[];
 }
 

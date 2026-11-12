@@ -5,6 +5,7 @@
 // workbooks without charts pay nothing.
 
 import { MAX_CHART_POINTS } from "./chart-definition.js";
+import { isDevelopmentBuild } from "./development-build.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
@@ -240,6 +241,15 @@ function seriesName(store: Store, sheets: SheetLookup, series: ChartSeries, inde
   return `Series ${index + 1}`;
 }
 
+/** Freeze `value` and everything it holds; frozen parts are not visited again. */
+function deepFreeze(value: object): void {
+  if (Object.isFrozen(value)) return;
+  Object.freeze(value);
+  for (const child of Object.values(value)) {
+    if (typeof child === "object" && child !== null) deepFreeze(child);
+  }
+}
+
 /** Builds the view of a chart over a pivot; set by the pivot view chunk when it loads. */
 let pivotCharts: ((store: Store, sheet: SheetId, chart: ChartDefinition) => ChartView) | null =
   null;
@@ -299,6 +309,8 @@ export function resolveChartView(store: Store, sheet: SheetId, id: string): Char
   const sheets = sheetLookup(store);
   const chart = sheets(sheet)?.charts?.find((candidate) => candidate.id === id);
   if (!chart) return null;
+  // The view shares the store's definition; a development build catches a write into it.
+  if (isDevelopmentBuild()) deepFreeze(chart);
   if (chart.pivot !== undefined) {
     requestPivotViews(store);
     return pivotCharts?.(store, sheet, chart) ?? { chart, series: [] };

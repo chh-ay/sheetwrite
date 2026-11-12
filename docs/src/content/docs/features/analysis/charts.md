@@ -290,3 +290,7 @@ A host that draws its own charts can read the same live data.
 the values, categories and number formats of each series. It notifies its
 listeners when a chart's data changes, and gives no notice for edits to other
 cells.
+
+A view's `chart` is the store's own definition, typed `ReadonlyChartDefinition`.
+Development builds freeze it, so writing into it throws. To change a chart,
+copy the definition, edit the copy and commit it with `setChart`.
