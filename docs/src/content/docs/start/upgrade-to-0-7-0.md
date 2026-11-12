@@ -1,6 +1,6 @@
 ---
 title: Upgrade to 0.7.0
-description: Replace the removed sort and revision APIs, update error and cancellation handling, and review the sort order and formula results that change in 0.7.0.
+description: Replace the removed sort, revision and add-on registration APIs, update error and cancellation handling and direct engine calls, and review the sort order and formula results that change in 0.7.0.
 ---
 
 > [!NOTE]
@@ -172,7 +172,8 @@ kinds before you accept 0.7.0 clients.
 
 0.7.0 installs add-ons in one way: `initSheetwrite({ engine, source, addons })`,
 plus per-grid settings in `createGrid(host, { addons: { [name]: settings } })`
-([#366](https://github.com/chh-ay/sheetwrite/issues/366)). Each add-on package
+([#366](https://github.com/chh-ay/sheetwrite/issues/366),
+[#466](https://github.com/chh-ay/sheetwrite/pull/466)). Each add-on package
 exports a factory named `<name>Addon`.
 
 Before:
@@ -203,12 +204,10 @@ await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] })
 | `setChartRendererFactory`, `setChartViewProviderFactory` | An add-on whose `setup` calls `context.charts({ views, renderer })` |
 | `setXlsxWorkbookBackend`, `setXlsxTableImportBackend`, `setXlsxTableExportBackend` | An add-on whose `setup` calls `context.xlsx({ workbook, tableImport, tableExport })` |
 | `initSheetwrite(source, engine)` | `initSheetwrite({ source, engine })` |
-| `registerFunction(store, metadata, fn)` from `@sheetwrite/core/functions` | `functionsAddon([{ metadata, implementation: fn }])` for every grid, or `createGrid(host, { addons: { functions: [...] } })` for one grid |
-| `unregisterFunction(store, name)` | None: functions register when a grid is created. Create the grid again without the function. |
-| `createQuerySession(grid, { fetchSource })` from `@sheetwrite/queries` | `queriesAddon({ fetchSource })`, or `addons: { queries: { fetchSource } }` for one grid; then `await querySessionOf(grid)` |
-| `registerQueryCommands(grid, commands)` from `@sheetwrite/core` | An add-on whose `grid` hook calls `context.queryCommands(commands)` |
-| `GridConfig.history` with `createHistoryCommands({ archive, authorId })` | `historyAddon()` from `@sheetwrite/core/history`, and `addons: { history: { archive, authorId } }` for the grid |
-| `connectExternalLinks(grid, resolve)` from `@sheetwrite/core/external-links` | `externalLinksAddon({ resolve })`, or `addons: { externalLinks: { resolve } }` for one grid |
+
+Custom functions, saved queries, the version history commands and external
+links are new in 0.7.0 and install the same way: `functionsAddon`,
+`queriesAddon`, `historyAddon` and `externalLinksAddon`.
 
 Add-ons set up once, in list order. A name listed twice in one call rejects
 with `invalid-argument`; a name installed by an earlier call is kept. Settings
@@ -349,6 +348,44 @@ export function safeStyle(untrusted: unknown) {
 | The default icon sheet is a file from your origin, not a `data:` URL. | If you set `--sheetwrite-icon-sheet` only because your Content Security Policy blocks `data:` images, you can remove it. |
 | The parts are published under `@sheetwrite/core/styles/` and in each framework adapter. | To ship less CSS, import only the parts your grid uses; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts). |
 
+## Direct engine calls
+
+Most apps never call the engine directly. If you call `CellStore` from
+`@sheetwrite/wasm` or `@sheetwrite/formulas` yourself, two methods change.
+
+| 0.6 | 0.7.0 | Pull request |
+| --- | --- | --- |
+| `setSparseBlock(..., numbers, texts, styles, ...)` with one string per entry | `setSparseBlock(..., numbers, textBuf, textOffsets, styles, ...)`: the UTF-8 bytes of the string entries only, in entry order. The n-th string entry owns bytes `textOffsets[n]` to `textOffsets[n + 1]`; a block without text passes an empty buffer and `[0]`. | [#571](https://github.com/chh-ay/sheetwrite/pull/571) |
+| `PivotFields.names()`, `PivotFields.types()` | `takeNames()`, `takeTypes()`. Each hands the buffer over once and leaves it empty. | [#565](https://github.com/chh-ay/sheetwrite/pull/565) |
+
+Before:
+
+```js partial="0.6 code"
+cells.setSparseBlock(sheet, row, col, rows, cols, offsets, kinds, numbers,
+  texts, styles, formulaOffsets, formulaSources, referenceOffsets, referenceTargets);
+const names = fields.names();
+const types = fields.types();
+```
+
+After:
+
+```js partial="requires an engine CellStore, its block arrays and a PivotFields list"
+// String entries have kind 2.
+const encoder = new TextEncoder();
+const parts = texts.filter((_, i) => kinds[i] === 2).map((text) => encoder.encode(text));
+const textOffsets = new Uint32Array(parts.length + 1);
+parts.forEach((part, i) => (textOffsets[i + 1] = textOffsets[i] + part.length));
+const textBuf = new Uint8Array(textOffsets[parts.length]);
+parts.forEach((part, i) => textBuf.set(part, textOffsets[i]));
+cells.setSparseBlock(sheet, row, col, rows, cols, offsets, kinds, numbers,
+  textBuf, textOffsets, styles, formulaOffsets, formulaSources, referenceOffsets, referenceTargets);
+
+// Take each buffer once.
+const names = fields.takeNames();
+const types = fields.takeTypes();
+fields.free();
+```
+
 ## Behavior changes you will notice
 
 ### Excel sort order
@@ -400,6 +437,10 @@ the sort on the table's header buttons
 | XLSX import expands shared formulas with the same rule, so a shared whole-column reference moves with each cell. | [#322](https://github.com/chh-ay/sheetwrite/pull/322) |
 | A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. | [#300](https://github.com/chh-ay/sheetwrite/pull/300) |
 | A reference to another workbook, such as `[Budget.xlsx]Annual!C10`, keeps its text and shows `#REF!` until the workbook has values for the link. Before, the unquoted form was a syntax error and a quoted form made the whole formula `#REF!`. | [#430](https://github.com/chh-ay/sheetwrite/pull/430) |
+| A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references: renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. | [#497](https://github.com/chh-ay/sheetwrite/pull/497) |
+| Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does: references follow the moved cells instead of becoming `#REF!`, a range loses a moved row at its edge and grows by one that lands inside it, and a move that would split a table is refused. | [#499](https://github.com/chh-ay/sheetwrite/pull/499) |
+| Array formulas whose size comes from a cell, such as `=SEQUENCE($C$1)`, spill in every formula of a recalculation; the third and later ones no longer show `#NUM!`. | [#574](https://github.com/chh-ay/sheetwrite/pull/574) |
+| On paged data, `INDEX` that returns one cell shows `#LOADING!` only until that cell loads, and a short text result no longer shows `#NUM!` when other cells of its area hold a lot of text. | [#594](https://github.com/chh-ay/sheetwrite/pull/594) |
 
 ### Grid markup and loading
 
