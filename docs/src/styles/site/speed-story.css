@@ -359,6 +359,13 @@
   cursor: pointer;
 }
 
+/* Phone touch target: the switch's label is its control. */
+@media (max-width: 42rem) {
+  .speed-story__toggle-label {
+    min-height: 44px;
+  }
+}
+
 .speed-story__toggle-label::before {
   width: 1.75rem;
   height: 1rem;

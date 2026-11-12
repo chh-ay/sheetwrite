@@ -26,7 +26,7 @@
     "clippy::shadow_reuse": 34,
     "clippy::shadow_same": 3,
     "clippy::single_match_else": 5,
-    "clippy::str_to_string": 25,
+    "clippy::str_to_string": 23,
     "clippy::suspicious_operation_groupings": 3,
     "clippy::too_many_arguments": 107,
     "clippy::too_many_lines": 60,

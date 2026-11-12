@@ -40,8 +40,14 @@ pub(super) fn binary<Right: std::borrow::Borrow<Value>>(
             Ok(text) => text,
             Err(error) => return Value::Error(error),
         };
-        return match text_from_value(right_operand().borrow()) {
-            Ok(right) => Value::text(left + &right),
+        let right_value = right_operand();
+        return match text_from_value(right_value.borrow()) {
+            Ok(right_text) => {
+                let mut output = String::with_capacity(left.len() + right_text.len());
+                output.push_str(&left);
+                output.push_str(&right_text);
+                Value::text(output)
+            }
             Err(error) => Value::Error(error),
         };
     }

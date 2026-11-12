@@ -1,5 +1,6 @@
 //! Shared bounded argument accumulation and thin scalar-family dispatch.
 
+use std::borrow::Cow;
 use std::mem::MaybeUninit;
 
 use crate::calc::Func;
@@ -727,17 +728,17 @@ pub(super) fn bool_arg(
     }
 }
 
-pub(super) fn text_arg(
-    values: &FuncAccumulator,
+pub(super) fn text_arg<'a>(
+    values: &'a FuncAccumulator,
     index: usize,
-    default: Option<&str>,
-) -> Result<String, FormulaError> {
+    default: Option<&'a str>,
+) -> Result<Cow<'a, str>, FormulaError> {
     if values.arg_missing(index) {
-        return default.map(str::to_string).ok_or(FormulaError::Value);
+        return default.map(Cow::Borrowed).ok_or(FormulaError::Value);
     }
     match values.arg_value(index) {
         Some(value) => text_from_value(value),
-        None => default.map(str::to_string).ok_or(FormulaError::Value),
+        None => default.map(Cow::Borrowed).ok_or(FormulaError::Value),
     }
 }
 

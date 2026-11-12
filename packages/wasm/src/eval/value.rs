@@ -1,5 +1,6 @@
 //! Cached formula values, coercion, comparison, aggregation, and text formatting.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 
 use crate::cells::{payload_num, payload_str_id};
@@ -102,24 +103,29 @@ pub(super) fn bool_from_value(value: &Value) -> Result<bool, FormulaError> {
         Value::Bool(flag) => Ok(*flag),
         Value::Number(number) if number.is_finite() => Ok(*number != 0.0),
         Value::Number(_) => Err(FormulaError::Num),
-        Value::Text(text) => match text.trim().to_ascii_uppercase().as_str() {
-            "TRUE" => Ok(true),
-            "FALSE" => Ok(false),
-            _ => Err(FormulaError::Value),
-        },
+        Value::Text(text) => {
+            let trimmed = text.trim();
+            if trimmed.eq_ignore_ascii_case("TRUE") {
+                Ok(true)
+            } else if trimmed.eq_ignore_ascii_case("FALSE") {
+                Ok(false)
+            } else {
+                Err(FormulaError::Value)
+            }
+        }
         Value::Blank => Ok(false),
         Value::Error(error) => Err(*error),
     }
 }
 
-pub(super) fn text_from_value(value: &Value) -> Result<String, FormulaError> {
+pub(super) fn text_from_value(value: &Value) -> Result<Cow<'_, str>, FormulaError> {
     match value {
-        Value::Number(number) if number.is_finite() => Ok(general_text(*number)),
+        Value::Number(number) if number.is_finite() => Ok(Cow::Owned(general_text(*number))),
         Value::Number(_) => Err(FormulaError::Num),
-        Value::Text(text) => Ok(text.to_string()),
-        Value::Bool(flag) => Ok(bool_text(*flag).to_owned()),
+        Value::Text(text) => Ok(Cow::Borrowed(text)),
+        Value::Bool(flag) => Ok(Cow::Borrowed(bool_text(*flag))),
         Value::Error(error) => Err(*error),
-        Value::Blank => Ok(String::new()),
+        Value::Blank => Ok(Cow::Borrowed("")),
     }
 }
 
@@ -199,7 +205,7 @@ pub(super) fn aggregate_number(
 /// formatter cannot read gives the General text of the number.
 pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, FormulaError> {
     let Value::Number(number) = value else {
-        return text_from_value(value);
+        return text_from_value(value).map(Cow::into_owned);
     };
 
     if !number.is_finite() {

@@ -1,0 +1,258 @@
+import { readFile } from "node:fs/promises";
+
+import mdx from "@mdx-js/rollup";
+import { svelte } from "@sveltejs/vite-plugin-svelte";
+import { tanstackStart } from "@tanstack/solid-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import { globSync } from "tinyglobby";
+import { defineConfig, type Plugin, type PluginOption } from "vite";
+import solid from "vite-plugin-solid";
+
+import { formulaTables } from "../docs/src/lib/formula-tables.ts";
+import { perfFigureMarkup } from "../docs/src/lib/perf-figure-markup.ts";
+import { SITE_URL } from "../docs/src/lib/seo.ts";
+import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "../docs/vite.config.ts";
+import { SOLID_MDX_OPTIONS } from "./src/lib/recma-solid-elements.ts";
+import { rehypeDocsPictures } from "./src/lib/rehype-docs-pictures.ts";
+
+const DOCS_SOURCE = new URL("../docs/src/", import.meta.url).pathname;
+const CONTENT_ROOT = `${DOCS_SOURCE}content/docs/`;
+
+/** Every docs page, by address: the build prerenders each one (lib/content.ts reads the same files). */
+const PAGES = globSync("**/*.{md,mdx}", { cwd: CONTENT_ROOT }).map((source) => {
+  const page = source.replace(/\.(?:md|mdx)$/, "").replace(/(?:^|\/)index$/, "");
+  return page.length === 0 ? "/docs/" : `/docs/${page}/`;
+});
+
+/**
+ * The fixture pages for the browser tests (src/routes/test.*.tsx) are
+ * prerendered only when SHEETWRITE_DOCS_FIXTURES=1 (`bun run build:test`), so
+ * the published site has none.
+ */
+const BUILD_FIXTURES = process.env.SHEETWRITE_DOCS_FIXTURES === "1";
+
+/** The showcase pages (src/routes/showcases.*.tsx), each prerendered like a docs page. */
+const SHOWCASE_PAGES = [
+  "/showcases/",
+  ...[
+    "spreadsheet",
+    "analysis",
+    "data-tools",
+    "formulas",
+    "formatting",
+    "host-rows",
+    "performance",
+    "database",
+    "collaboration",
+    "interoperability",
+    "sort",
+    "functions",
+    "recalculation",
+    "data-model",
+    "dashboards",
+    "queries",
+    "version-history",
+  ].map((id) => `/showcases/${id}/`),
+  // The framework workbenches (src/routes/{vanilla,react,vue,svelte}.tsx).
+  ...["vanilla", "react", "vue", "svelte"].map((framework) => `/${framework}/`),
+];
+
+/**
+ * The React workbench (/react/) and its React-only modules. The /react/ and
+ * /svelte/ pages demonstrate @sheetwrite/react and @sheetwrite/svelte, so their
+ * workbenches stay written in React and Svelte: these files compile as React
+ * (never as Solid), `.svelte` files compile with Svelte, and each runtime loads
+ * only in its page's island (src/showcases/frameworks/FrameworkMount.tsx).
+ */
+export const REACT_WORKBENCH_FILES = [
+  "showcases/ReactWorkbench.tsx",
+  "showcases/ui/DemoButton.tsx",
+  "showcases/ui/DemoRadioGroup.tsx",
+  "showcases/ui/DemoRenderingMode.tsx",
+  "showcases/ui/DemoSelect.tsx",
+  "components/Icon.tsx",
+  "lib/use-action.tsx",
+  // The React fixture of /test/framework-lifecycle/react/ (test builds only).
+  "test-fixtures/framework-lifecycle/ReactFixture.tsx",
+].map((file) => `${DOCS_SOURCE}${file}`);
+
+/** The compilers of the React and Svelte workbenches; both configs use them. */
+export function frameworkWorkbenches(): PluginOption[] {
+  return [react({ include: REACT_WORKBENCH_FILES }), svelte()];
+}
+
+/**
+ * The browsers the site's CSS is compiled for (Lightning CSS prefixes and
+ * lowers only what these need): Vite's default build target,
+ * "baseline-widely-available", which the islands' JavaScript is built for.
+ */
+const version = (major: number, minor = 0): number => (major << 16) | (minor << 8);
+export const CSS_TARGETS = {
+  chrome: version(111),
+  edge: version(111),
+  firefox: version(114),
+  safari: version(16, 4),
+  ios_saf: version(16, 4),
+};
+
+/** Lightning CSS compiles every stylesheet (vite.islands.config.ts uses the same). */
+export const CSS_OPTIONS = {
+  transformer: "lightningcss",
+  lightningcss: { targets: CSS_TARGETS },
+} as const;
+
+type PageOutput = { code: string; map?: unknown } | undefined;
+
+/**
+ * Compiles every docs page once for both build environments. Pages render on
+ * the server only (under NoHydration), and the islands build ships all client
+ * code, so the router app's client build gets a stub per page: the stylesheet
+ * URL imports, whose files the client build emits, and the page's metadata.
+ * Compiling (and running Solid's compiler on) each page's markup there too
+ * would double the build for output no page loads.
+ */
+/**
+ * `import text from "./snippet.mdx?source"`: a snippet file's text, for the
+ * showcase layout's list of calls and its fold. A `?raw` import would still
+ * reach the MDX compiler; this module id ends in `.source`, so nothing else
+ * transforms it.
+ */
+function snippetSources(): Plugin {
+  const PREFIX = "\0snippet-source:";
+  return {
+    name: "docs-solid:snippet-sources",
+    enforce: "pre",
+    async resolveId(id, importer) {
+      if (!id.endsWith(".mdx?source")) return null;
+      const resolved = await this.resolve(id.slice(0, -"?source".length), importer, {
+        skipSelf: true,
+      });
+      return resolved === null ? null : `${PREFIX}${resolved.id}.source`;
+    },
+    async load(id) {
+      if (!id.startsWith(PREFIX)) return null;
+      const file = id.slice(PREFIX.length, -".source".length);
+      this.addWatchFile(file);
+      return `export default ${JSON.stringify(await readFile(file, "utf8"))};`;
+    },
+  };
+}
+
+function docsPages(): Plugin {
+  const pages = mdx({
+    ...DOCS_MDX_OPTIONS,
+    ...SOLID_MDX_OPTIONS,
+    // Last, after rehype-slug gives headings their ids: the docs art.
+    rehypePlugins: [...DOCS_MDX_OPTIONS.rehypePlugins, rehypeDocsPictures],
+  });
+  const compile = pages.transform as (source: string, id: string) => Promise<PageOutput>;
+  // Each page is compiled by whichever environment builds first and taken by the other.
+  const pending = new Map<string, { source: string; output: Promise<PageOutput> }>();
+
+  return {
+    ...pages,
+    name: "docs-solid:pages",
+    enforce: "pre",
+    async transform(source, id) {
+      let entry = pending.get(id);
+      if (entry === undefined || entry.source !== source) {
+        entry = { source, output: compile.call(this, source, id) };
+        pending.set(id, entry);
+      } else {
+        pending.delete(id);
+      }
+      const output = await entry.output;
+      if (output === undefined || this.environment.name !== "client") return output;
+
+      const kept = this.parse(output.code, { lang: "jsx" }).body.filter(
+        (node) =>
+          (node.type === "ImportDeclaration" && String(node.source.value).endsWith("?url")) ||
+          (node.type === "ExportNamedDeclaration" &&
+            node.declaration?.type === "VariableDeclaration" &&
+            node.declaration.declarations.some(
+              (declaration) =>
+                declaration.id.type === "Identifier" &&
+                (declaration.id.name === "frontmatter" || declaration.id.name === "stylesheets"),
+            )),
+      );
+      return {
+        code: [
+          ...kept.map((node) => output.code.slice(node.start, node.end)),
+          "export default function MDXContent() { return null; }",
+        ].join("\n"),
+        map: null,
+      };
+    },
+  };
+}
+
+export default defineConfig({
+  resolve: {
+    alias: [
+      { find: /^@docs\//, replacement: DOCS_SOURCE },
+      // Page stylesheets the content pipeline adds (lib/content-components.ts) are the docs site's.
+      { find: /^\/src\/styles\//, replacement: `${DOCS_SOURCE}styles/` },
+      // The content pipeline imports Tabs, LiveGrid and RunnableCode into pages; here they are islands.
+      {
+        find: /^\/src\/components\/(?:Tabs|LiveGrid|RunnableCode)\.tsx$/,
+        replacement: new URL("./src/islands/content.tsx", import.meta.url).pathname,
+      },
+      // Two pages import these diagrams by relative path; here they are Solid components.
+      {
+        find: /^(?:\.\.\/)+components\/(RuntimeArchitecture|CollaborationFlow)$/,
+        replacement: `${new URL("./src/components/", import.meta.url).pathname}$1.tsx`,
+      },
+      // Font files the root route preloads come from the docs site's packages.
+      {
+        find: /^@fontsource-variable\//,
+        replacement: new URL("../docs/node_modules/@fontsource-variable/", import.meta.url)
+          .pathname,
+      },
+    ],
+  },
+  css: CSS_OPTIONS,
+  // Pages link their stylesheets from `?url` imports (routes/__root.tsx); the
+  // page script (src/islands/page-scripts.ts) drops those a page does not use.
+  build: { cssCodeSplit: false, cssMinify: "lightningcss" },
+  worker: { format: "es" },
+  // The docs site's static files: favicon, llms.txt, the changelog feed, figures.
+  publicDir: new URL("../docs/public/", import.meta.url).pathname,
+  plugins: [
+    snippetSources(),
+    docsPages(),
+    expressiveCodeAssets(),
+    formulaTables(),
+    perfFigureMarkup(),
+    tanstackStart({
+      pages: [
+        { path: "/" },
+        ...PAGES.map((path) => ({ path })),
+        ...SHOWCASE_PAGES.map((path) => ({ path })),
+        // Static hosts serve /404.html for every URL without a page; the
+        // deployment fallback supplies the 404 status for unknown URLs.
+        {
+          path: "/404/",
+          prerender: { enabled: true, outputPath: "/404.html" },
+          sitemap: { exclude: true },
+        },
+        // The framework lifecycle fixture is one dynamic route; the test build
+        // prerenders a page per framework (the filter below drops them otherwise).
+        ...["react", "vue", "svelte"].map((framework) => ({
+          path: `/test/framework-lifecycle/${framework}/`,
+        })),
+      ],
+      prerender: {
+        enabled: true,
+        crawlLinks: false,
+        failOnError: true,
+        autoSubfolderIndex: true,
+        // Every static route is discovered; the fixtures only in a test build.
+        filter: (page) => BUILD_FIXTURES || !page.path.startsWith("/test/"),
+      },
+      // scripts/normalize-sitemap.ts trims it to canonical page URLs after the build.
+      sitemap: { enabled: true, host: SITE_URL },
+    }),
+    solid({ ssr: true, extensions: [".md", ".mdx"], exclude: REACT_WORKBENCH_FILES }),
+    ...frameworkWorkbenches(),
+  ],
+});

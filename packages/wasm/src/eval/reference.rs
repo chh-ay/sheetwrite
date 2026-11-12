@@ -444,7 +444,7 @@ impl CellStore {
 
         let converted;
         let source = if a1 {
-            text.as_str()
+            text.as_ref()
         } else {
             converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or_default()) {
                 Ok(converted) => converted,

@@ -10,9 +10,11 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   ).toHaveAttribute("aria-current", "page");
 
   // One launcher per showcase owner, and no Grid or renderer on the static hub.
+  // The cards are static markup: a filter hides the others.
   const launchers = page.locator("main a[data-owner]");
+  const shownLaunchers = launchers.filter({ visible: true });
   const shownOwners = async () =>
-    (await launchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort();
+    (await shownLaunchers.evaluateAll((links) => links.map((link) => link.dataset.owner))).sort();
   const owners = CAPABILITY_OWNERS.map((owner) => owner.id).sort();
   expect(await shownOwners()).toEqual(owners);
   await expect(page.locator('main [role="grid"], main canvas')).toHaveCount(0);
@@ -57,7 +59,7 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
     .poll(shownOwners)
     .toEqual(["data-tools", "database", "host-rows", "performance", "queries", "sort"]);
   await allFilter.click();
-  await expect(launchers).toHaveCount(owners.length);
+  await expect(shownLaunchers).toHaveCount(owners.length);
 
   // Every owning showcase URL resolves.
   for (const owner of CAPABILITY_OWNERS) {

@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { Select } from "@base-ui/react/select";
 
 import { Icon } from "../../components/Icon.js";

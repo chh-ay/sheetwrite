@@ -100,6 +100,10 @@ export const SHOT_SIZES = {
   panel: { width: 720, height: 480 },
   wide: { width: 1200, height: 480 },
   card: { width: 640, height: 400 },
+  /** A dashboard's full layout, cropped to its items: the whole chart and pivot show. */
+  dashboard: { width: 720, height: 520 },
+  /** A dashboard's lower row (the PivotChart and the pivot), cropped to those items. */
+  dashboardRow: { width: 720, height: 352 },
   /** The tablet layout of a dashboard, cropped to its items: shown near its own width. */
   tablet: { width: 560, height: 632 },
   /** The phone layout of a dashboard, cropped to its items: shown near its own width. */
