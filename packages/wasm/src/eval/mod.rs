@@ -816,44 +816,8 @@ impl CellStore {
 
         for sheet in sheets {
             if let Some(data) = self.sheets.get_mut(sheet) {
-                // Source writes detach spills into these same dirty seeds. Capture
-                // them before finishing, including cells outside the edited anchor.
-                // A seed that now holds a source value is a direct edit, which core
-                // already matched; only empty seeds can be vacated spill cells.
                 if let Some(changes) = self.recalculation.as_deref_mut() {
-                    match data.formulas.dirty_seeds() {
-                        DirtySeeds::All => changes.rect([
-                            sheet as u32,
-                            0,
-                            data.cells.row_count() as u32,
-                            0,
-                            data.cells.n_cols() as u32,
-                        ]),
-                        DirtySeeds::Cells(cells) => {
-                            for &(row, col) in cells {
-                                let (row_index, col_index) = (row as usize, col as usize);
-                                if !data.cells.contains_cell(row_index, col_index)
-                                    || data
-                                        .cells
-                                        .source_kind_at(data.cells.idx(row_index, col_index))
-                                        == KIND_EMPTY
-                                {
-                                    changes.cell(sheet as u32, row, col);
-                                }
-                            }
-                        }
-                        DirtySeeds::Ranges(rects) => {
-                            for rect in rects {
-                                changes.rect([
-                                    sheet as u32,
-                                    rect.row_start,
-                                    rect.row_end + 1,
-                                    rect.col_start,
-                                    rect.col_end + 1,
-                                ]);
-                            }
-                        }
-                    }
+                    changes.dirty_seeds(sheet, data);
                 }
                 data.finish_recompute();
             }

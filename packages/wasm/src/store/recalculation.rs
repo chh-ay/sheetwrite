@@ -3,10 +3,17 @@
 use wasm_bindgen::prelude::*;
 
 use super::CellStore;
+use crate::cells::CellStorage;
+use crate::graph::{DirtyRect, DirtySeeds};
+use crate::sheet::SheetData;
+use crate::types::KIND_EMPTY;
 
 /// At most 80 KiB of rectangle coordinates; overflow requests a conservative refresh.
 const MAX_RECTS: usize = 4096;
 const RECT_WIDTH: usize = 5;
+/// Seed rectangles up to this many cells are checked cell by cell; larger
+/// block writes are reported whole, since checking them would cost a scan.
+const CHECKED_SEED_CELLS: u64 = 64;
 
 /// Reused flat half-open rectangles. Only stores with an attached tracker allocate it.
 #[derive(Default)]
@@ -48,6 +55,52 @@ impl Recalculation {
         }
     }
 
+    /// Report the sheet's dirty seeds before the pass clears them. A source
+    /// write that cuts a spill marks the vacated cells dirty here, and they can
+    /// lie outside the written rectangle. A seed that now holds a source value
+    /// is a direct edit, which core matches itself, so only seeds that may be
+    /// empty are reported: an unrelated literal edit then reports nothing.
+    pub(crate) fn dirty_seeds(&mut self, sheet: usize, data: &SheetData) {
+        let sheet_id = sheet as u32;
+        match data.formulas.dirty_seeds() {
+            DirtySeeds::All => self.rect([
+                sheet_id,
+                0,
+                data.cells.row_count() as u32,
+                0,
+                data.cells.n_cols() as u32,
+            ]),
+            DirtySeeds::Cells(cells) => {
+                for &(row, col) in cells {
+                    if may_be_vacated(
+                        &data.cells,
+                        DirtyRect {
+                            row_start: row,
+                            col_start: col,
+                            row_end: row,
+                            col_end: col,
+                        },
+                    ) {
+                        self.cell(sheet_id, row, col);
+                    }
+                }
+            }
+            DirtySeeds::Ranges(rects) => {
+                for &rect in rects {
+                    if may_be_vacated(&data.cells, rect) {
+                        self.rect([
+                            sheet_id,
+                            rect.row_start,
+                            rect.row_end.saturating_add(1),
+                            rect.col_start,
+                            rect.col_end.saturating_add(1),
+                        ]);
+                    }
+                }
+            }
+        }
+    }
+
     fn reset(&mut self) {
         self.rects.clear();
         self.overflow = false;
@@ -61,6 +114,24 @@ impl Recalculation {
             header + self.rects.capacity() * 4,
         )
     }
+}
+
+/// Whether the inclusive seed `rect` may hold a cell a cut spill vacated: a
+/// large rectangle always may; a small one only when a cell has no source.
+fn may_be_vacated(cells: &CellStorage, rect: DirtyRect) -> bool {
+    let rows = u64::from(rect.row_end - rect.row_start) + 1;
+    let cols = u64::from(rect.col_end - rect.col_start) + 1;
+    if rows * cols > CHECKED_SEED_CELLS {
+        return true;
+    }
+    (rect.col_start..=rect.col_end).any(|col| {
+        let col_index = col as usize;
+        (rect.row_start..=rect.row_end).any(|row| {
+            let row_index = row as usize;
+            !cells.contains_cell(row_index, col_index)
+                || cells.source_kind_at(cells.idx(row_index, col_index)) == KIND_EMPTY
+        })
+    })
 }
 
 #[wasm_bindgen]
@@ -126,12 +197,13 @@ impl CellStore {
 #[cfg(test)]
 mod tests {
     use super::{Recalculation, MAX_RECTS};
+    use crate::graph::DirtyRect;
     use crate::store::CellStore;
 
     #[test]
     fn reports_only_tracked_formula_work_and_releases_when_disabled() {
         let mut store = CellStore::new();
-        let sheet = store.add_sheet(10, 4);
+        let sheet = store.add_sheet(4, 10);
         store.set_formula(sheet, 0, 1, "=A1*2", 0);
         store.set_number(sheet, 9, 3, 1.0, 0);
         store.recompute(sheet);
@@ -154,6 +226,39 @@ mod tests {
 
         store.set_recalculation_tracking(false);
         assert!(store.recalculation.is_none());
+    }
+
+    #[test]
+    fn leaves_direct_edits_out_of_small_seed_rectangles() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 10);
+        store.set_formula(sheet, 0, 1, "=A1*2", 0);
+        store.recompute(sheet);
+        store.set_recalculation_tracking(true);
+
+        // Block writes seed rectangles instead of cells.
+        store.begin_mutation();
+        store.set_number(sheet, 9, 3, 2.0, 0);
+        store.sheets[sheet].formulas.mark_dirty_rect(DirtyRect {
+            row_start: 9,
+            col_start: 3,
+            row_end: 9,
+            col_end: 3,
+        });
+        store.commit_sources();
+        assert_eq!(store.recalculated_rects(), Vec::<u32>::new());
+
+        // An emptied cell may be a vacated spill cell, so it is reported.
+        store.begin_mutation();
+        store.clear_cell(sheet, 9, 3, 0);
+        store.sheets[sheet].formulas.mark_dirty_rect(DirtyRect {
+            row_start: 9,
+            col_start: 3,
+            row_end: 9,
+            col_end: 3,
+        });
+        store.commit_sources();
+        assert_eq!(store.recalculated_rects(), vec![sheet as u32, 9, 10, 3, 4]);
     }
 
     #[test]
