@@ -14,12 +14,12 @@ import {
 } from "./formula-analysis.js";
 import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
-import type { FormulaPreview, FormulaPreviewValue } from "./store/formula-preview-result.js";
 import { storeFunctions } from "./functions/registry.js";
 import { argumentLabel, signature } from "./functions/signature.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
 import { sheetNameKey } from "./name-key.js";
 import { storeEngine } from "./store/engine-registry.js";
+import type { FormulaPreview, FormulaPreviewValue } from "./store/formula-preview-result.js";
 import { checkStylePart } from "./style-parts.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";

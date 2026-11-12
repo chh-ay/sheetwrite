@@ -15,7 +15,7 @@ async function selectCell(page: Page, reference: string): Promise<void> {
   await nameBox.press("Enter");
 }
 
-function storedFormula(page: Page): Promise<string | undefined> {
+function storedFormula(page: Page): Promise<string | null | undefined> {
   return page.evaluate(() =>
     window.__sheetwriteSpreadsheetGrid?.store.getFormula({ sheet: "sales", row: 2, col: 7 }),
   );

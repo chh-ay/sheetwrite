@@ -75,36 +75,42 @@ pub struct FormulaPreview {
 impl FormulaPreview {
     /// Whether the preview has a value, and if not, why.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn status(&self) -> FormulaPreviewStatus {
         self.status
     }
 
     /// The kind of the value (of the top-left value for an array).
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn kind(&self) -> FormulaPreviewKind {
         self.kind
     }
 
     /// A number, or 1 / 0 for a logical value.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn number(&self) -> f64 {
         self.number
     }
 
     /// Text, or an error's text such as `#DIV/0!`.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn text(&self) -> Option<String> {
         self.text.clone()
     }
 
     /// Rows of an array result; 1 for a value.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn rows(&self) -> u32 {
         self.rows
     }
 
     /// Columns of an array result; 1 for a value.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn cols(&self) -> u32 {
         self.cols
     }
@@ -154,6 +160,7 @@ impl CellStore {
     /// before any of it runs, and one that needs more than the preview
     /// limits returns `CostLimit` rather than a partial answer.
     #[wasm_bindgen(js_name = previewFormula)]
+    #[must_use]
     pub fn preview_formula(
         &self,
         sheet: usize,

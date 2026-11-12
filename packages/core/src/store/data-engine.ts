@@ -46,7 +46,6 @@ import {
   type SheetwriteErrorContext,
 } from "../errors.js";
 import { installExternalLinks, removeExternalLinks } from "../external-link.js";
-import { decodePreview, type FormulaPreview } from "./formula-preview-result.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -169,6 +168,7 @@ import {
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
+import { decodePreview, type FormulaPreview } from "./formula-preview-result.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   MERGED_CELLS_SORT_MESSAGE,
