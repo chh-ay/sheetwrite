@@ -4,13 +4,14 @@ import { cpus, release } from "node:os";
 import { resolve } from "node:path";
 
 import { optionValue } from "./cli-options.js";
+import { FORMULA_SUPPORT_SOURCE_FILES } from "./formula-artifact.js";
 import {
   AGGREGATED_SAMPLE_MAX_ITERATIONS,
   type AggregatedWorkloadSample,
-  expectedFormulaOutput,
   SAMPLE_AGGREGATE_MS,
   SAMPLE_WARMUP_FIXTURES,
 } from "./formula-bench.js";
+import { expectedFormulaOutput } from "./formula-fixtures.js";
 import {
   benchmarkEnginePath,
   captureEngineBaselineContext,
@@ -44,6 +45,7 @@ export function matchedMethod(rounds: number): string {
   return `${rounds} ABAB paired rounds per workload; each timed sample uses a fresh Bun process, runs ${MATCHED_WARMUP_FIXTURES} untimed warm-up fixtures, then repeats the fixture until at least ${MATCHED_MINIMUM_SAMPLE_MS} ms of measured time and records the per-iteration mean`;
 }
 const SOURCE_PATHS = [
+  ...FORMULA_SUPPORT_SOURCE_FILES,
   "bench/src/matched-engine-bench.ts",
   "bench/src/formula-bench.ts",
   "bench/src/formula-dataset.ts",
@@ -151,7 +153,15 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
     !Number.isFinite(Date.parse(result.meta.timestamp))
   )
     throw new Error("Invalid matched metadata");
-  validateExactMatrix("matched source files", SOURCE_PATHS, Object.keys(result.sourceFiles));
+  validateExactMatrix(
+    "matched source files",
+    FORMULA_SUPPORT_SOURCE_FILES.some((path) => path in result.sourceFiles)
+      ? SOURCE_PATHS
+      : SOURCE_PATHS.filter(
+          (path) => !(FORMULA_SUPPORT_SOURCE_FILES as readonly string[]).includes(path),
+        ),
+    Object.keys(result.sourceFiles),
+  );
   if (
     Object.values(result.sourceFiles).some((digest) => !/^[0-9a-f]{64}$/u.test(digest)) ||
     result.sourceDigest !== sourceDigest(result)
