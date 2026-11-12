@@ -21,7 +21,8 @@ interface HastNode {
   data?: unknown;
 }
 
-const CONTENT_ROOT = new URL("../content/docs/", import.meta.url).pathname;
+/** Content files sit under docs/src/content/docs/; a file path holds this once. */
+const CONTENT_ROOT = "/src/content/docs/";
 const PICTURE_MODULE = new URL("../art/DocsPicture.tsx", import.meta.url).pathname;
 const ART_STYLESHEET = new URL("../art/art.css", import.meta.url).pathname;
 
