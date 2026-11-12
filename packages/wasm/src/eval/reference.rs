@@ -142,7 +142,7 @@ impl RuntimeReadPause {
 
 impl Drop for RuntimeReadPause {
     fn drop(&mut self) {
-        drop(RUNTIME_READS.with(|reads| reads.replace(self.0.take())));
+        _ = RUNTIME_READS.with(|reads| reads.replace(self.0.take()));
     }
 }
 
