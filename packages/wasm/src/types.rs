@@ -356,6 +356,10 @@ pub(crate) enum FormulaValueKind {
 
 /// Values, cell references and operators only, with no function, range,
 /// name, array or LET anywhere in the tree.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not plain"
+)]
 fn ast_is_plain(ast: &Ast) -> bool {
     match ast {
         Ast::Num(_)
@@ -395,6 +399,10 @@ fn ast_is_volatile(ast: &Ast) -> bool {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
 fn ast_contains_let(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, _) => true,
@@ -403,6 +411,10 @@ fn ast_contains_let(ast: &Ast) -> bool {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
 fn ast_contains_spill_ref(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
@@ -644,6 +656,10 @@ impl FormulaEntry {
         self.flags & Self::REFERENCE != 0
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other formula has no target cell"
+    )]
     pub(crate) fn reference_target(&self, formula_sheet: u32) -> Option<AbsCellKey> {
         if !self.is_reference() {
             return None;

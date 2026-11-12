@@ -16,6 +16,10 @@ const MAX_FORMULA_TEXT_CHARS: usize = 8_192;
 const ABSOLUTE_ADDRESS: i32 = 1;
 
 impl CellStore {
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn eval_info_func(
         &self,
         func: Func,
@@ -57,6 +61,10 @@ impl CellStore {
     /// The top-left cell of a reference argument. A deleted reference is
     /// `#REF!`; any other value is `#VALUE!`, after its own error, as Excel
     /// reports a non-reference argument.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "two Ast variants exist only with the analysis feature, so a full list differs by build; every other reference shape takes the last arm"
+    )]
     fn reference_cell(
         &self,
         reference: &Ast,
@@ -73,7 +81,9 @@ impl CellStore {
                 None => {
                     return match self.eval_ast(reference, sheet, pass, depth + 1) {
                         Value::Error(error) => Err(error),
-                        _ => Err(FormulaError::Value),
+                        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                            Err(FormulaError::Value)
+                        }
                     }
                 }
             },
@@ -175,7 +185,7 @@ impl CellStore {
         let info_type = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
             Value::Text(text) => text,
             Value::Error(error) => return Err(error),
-            _ => return Err(FormulaError::Value),
+            Value::Number(_) | Value::Bool(_) | Value::Blank => return Err(FormulaError::Value),
         };
 
         let cell = if let Some(reference) = optional_ast(args, 1) {
@@ -218,7 +228,7 @@ impl CellStore {
             "type" => Ok(Value::text(match contents(pass) {
                 Value::Blank => "b",
                 Value::Text(_) => "l",
-                _ => "v",
+                Value::Number(_) | Value::Bool(_) | Value::Error(_) => "v",
             })),
             _ => Err(FormulaError::Value),
         }
@@ -255,7 +265,9 @@ impl CellStore {
                 None => match self.eval_ast(value, sheet, pass, depth + 1) {
                     Value::Error(error) => return Err(error),
                     Value::Text(name) => self.sheet_named(&name).ok_or(FormulaError::Na)?,
-                    _ => return Err(FormulaError::Na),
+                    Value::Number(_) | Value::Bool(_) | Value::Blank => {
+                        return Err(FormulaError::Na)
+                    }
                 },
             },
             _ => return Err(FormulaError::Value),
@@ -295,7 +307,9 @@ impl CellStore {
                 } else {
                     return match self.eval_ast(value, sheet, pass, depth + 1) {
                         Value::Error(error) => Err(error),
-                        _ => Err(FormulaError::Ref),
+                        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                            Err(FormulaError::Ref)
+                        }
                     };
                 }
             }
@@ -322,7 +336,7 @@ impl CellStore {
         let kind = match self.eval_ast(type_text, sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
             Value::Text(text) => text.to_ascii_lowercase(),
-            _ => return Err(FormulaError::Value),
+            Value::Number(_) | Value::Bool(_) | Value::Blank => return Err(FormulaError::Value),
         };
 
         match kind.as_str() {
@@ -354,7 +368,9 @@ fn value_information(func: Func, value: Value) -> Value {
         Value::Error(FormulaError::Loading) => 8.0,
         Value::Error(FormulaError::Spill) => 9.0,
         Value::Error(FormulaError::Calc) => 14.0,
-        _ => return Value::Error(FormulaError::Na),
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            return Value::Error(FormulaError::Na)
+        }
     };
 
     Value::number(number)

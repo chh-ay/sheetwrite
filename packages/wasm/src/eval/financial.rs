@@ -14,6 +14,10 @@ const ROOT_X_REL_TOLERANCE: f64 = 1e-12;
 const ROOT_X_MIN: f64 = -36.0;
 const ROOT_X_MAX: f64 = 700.0;
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Pv => pv(values),
@@ -566,7 +570,9 @@ mod tests {
     fn result_number(func: Func, values: &FuncAccumulator) -> f64 {
         match apply(func, values).unwrap() {
             Value::Number(value) => value,
-            value => panic!("expected number, got {value:?}"),
+            value @ (Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_)) => {
+                panic!("expected number, got {value:?}")
+            }
         }
     }
 

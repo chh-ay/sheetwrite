@@ -722,7 +722,9 @@ jobs:
           test -n "$ARTIFACT_DIGEST"
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
       - name: Build production docs
-        run: bun run --filter '@sheetwrite/docs-start' build:site
+        # This build only feeds Browser Smoke (docs-deploy.yml builds the
+        # published site), so it includes the test fixture pages.
+        run: bun run --filter '@sheetwrite/docs' build:test
       - name: Example XLSX isolation
         run: bun scripts/verify-example-xlsx-isolation.ts
       - name: Package prebuilt deployment

@@ -57,7 +57,7 @@
     "verify:packed": "bun scripts/verify-packed-consumer.ts",
     "verify:bundlers": "node test/bundler-fixtures/run.mjs",
     "verify:node-esm": "node scripts/verify-node-esm.mjs",
-    "examples": "bun run build:packages && bun run --filter '@sheetwrite/docs-start' dev",
+    "examples": "bun run build:packages && bun run --filter '@sheetwrite/docs' build && bun scripts/serve-docs.ts",
     "toolchain:install-wasm-pack": "bun scripts/install-wasm-pack.ts",
     "wasm:profile:build": "bun scripts/wasm-profile-matrix.ts build",
     "wasm:profile:assemble": "bun scripts/wasm-profile-matrix.ts assemble",

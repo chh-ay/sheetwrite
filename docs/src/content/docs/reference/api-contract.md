@@ -42,7 +42,9 @@ The API manifest describes type compatibility. Runtime behavior remains protecte
 
 | Package | Removed or deprecated | Replacement | Release |
 | --- | --- | --- | --- |
-| `@sheetwrite/wasm` | Removed `CellStore.setBlock` | `CellStore.setBlockPacked` | Next minor release |
+| `@sheetwrite/wasm` | Removed `CellStore.setBlock` | `CellStore.setBlockPacked` | 0.5.0 |
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `CellStore.sortRows`, `styleIdAt`, `hydratePageNumbers`, `hydratePageStringsPacked`, `pinRange` | `sortRowsMulti` with one key; `getCell(...).style`; `setSparseBlock` inside `beginPageLoad`/`commitSources`; no replacement for `pinRange` | 0.6.0 |
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `CellStore.canDirtyCell`, `dirtyRevision`, `markCellCleanRevision`, `spillOwnerCoordinates`, `isSheetAlive` | None (no caller) | 0.6.0 |
 | `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `SourceSnapshot.byteLength` | None (no caller); `RangeSnapshot.byteLength` is unchanged | 0.6.0 |
+| `@sheetwrite/wasm`, `@sheetwrite/formulas` | Changed the `texts: string[]` argument of `CellStore.setSparseBlock` | `textBuf` and `textOffsets`: the UTF-8 bytes of the string entries, as `setBlockPacked` takes them | 0.7.0 |
+| `@sheetwrite/wasm`, `@sheetwrite/formulas` | Removed `PivotFields.names()` and `types()` | `takeNames()` and `takeTypes()` | 0.7.0 |

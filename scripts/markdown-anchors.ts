@@ -4,7 +4,7 @@ import { maskFences } from "./markdown-fences.js";
  * Every fragment the site gives a page. Explicit `id` attributes keep their
  * value. Headings get the slug of their text, and a repeated slug gets `-1`,
  * `-2` and so on in page order, as `rehype-slug` (github-slugger) does in
- * `docs/vite.config.ts`.
+ * `docs/src/lib/mdx-pipeline.ts`.
  */
 export function headingAnchors(content: string): Set<string> {
   const anchors = new Set<string>();

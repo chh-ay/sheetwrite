@@ -743,6 +743,16 @@
     padding: clamp(var(--sw-space-4), 2vw, var(--sw-space-8)) 0 var(--sw-space-16);
   }
 
+  /* Workbench pages take the showcases' 120rem frame, which the site header
+     shares. */
+  .sw-showcase-frame--workbench {
+    --sw-frame-max: 120rem;
+  }
+
+  .sw-showcase-frame--workbench .sw-showcase-page {
+    width: min(100% - 2 * var(--sw-page-gutter), var(--sw-frame-max));
+  }
+
   .sw-showcase-page__hero {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(19rem, 23rem);

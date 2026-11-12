@@ -3,11 +3,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
-import {
-  expectedFormulaMemoryKeys,
-  expectedFormulaWorkloadKeys,
-  type FormulaBenchmarkResult,
-} from "../src/formula-bench.js";
+import { type FormulaBenchmarkResult } from "../src/formula-artifact.js";
+import { expectedFormulaMemoryKeys, expectedFormulaWorkloadKeys } from "../src/formula-bench.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
 

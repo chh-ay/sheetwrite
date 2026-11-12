@@ -1,0 +1,290 @@
+/* Showcase illustrations: one visual language for the hub cards and the
+   in-page diagrams. Every colour is a site token, so light and dark both work.
+   Shapes use a 20-unit grid, 1.5-unit strokes, 6-unit panel corners and
+   4-unit cell corners; each picture leads with one hue and may add one more. */
+
+.sw-art {
+  --art-hue: var(--sw-accent);
+  --art-alt: var(--sw-info);
+  --art-tint: color-mix(in srgb, var(--art-hue) 16%, var(--sw-surface-1));
+  --art-alt-tint: color-mix(in srgb, var(--art-alt) 16%, var(--sw-surface-1));
+  --art-loaded: color-mix(in srgb, var(--art-hue) 34%, var(--sw-surface-1));
+
+  color: var(--sw-fg-muted);
+}
+
+/* Box defaults at zero specificity, so the box a page puts the art in wins. */
+:where(.sw-art) {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--sw-surface-0);
+}
+
+:where(.sw-art--diagram) {
+  height: auto;
+  background: none;
+}
+
+/* The lead hue and the second hue, from the site palette. */
+.sw-art[data-hue="green"] {
+  --art-hue: var(--sw-accent);
+}
+.sw-art[data-hue="blue"] {
+  --art-hue: var(--sw-info);
+}
+.sw-art[data-hue="violet"] {
+  --art-hue: var(--sw-violet);
+}
+.sw-art[data-hue="amber"] {
+  --art-hue: var(--sw-warning);
+}
+.sw-art[data-hue="teal"] {
+  --art-hue: var(--sw-code-type);
+}
+.sw-art[data-hue="pink"] {
+  --art-hue: var(--sw-code-property);
+}
+.sw-art[data-hue="red"] {
+  --art-hue: var(--sw-danger);
+}
+.sw-art[data-hue="react"] {
+  --art-hue: var(--sw-fw-react);
+}
+.sw-art[data-hue="vue"] {
+  --art-hue: var(--sw-fw-vue);
+}
+.sw-art[data-hue="svelte"] {
+  --art-hue: var(--sw-fw-svelte);
+}
+.sw-art[data-alt="green"] {
+  --art-alt: var(--sw-accent);
+}
+.sw-art[data-alt="blue"] {
+  --art-alt: var(--sw-info);
+}
+.sw-art[data-alt="violet"] {
+  --art-alt: var(--sw-violet);
+}
+.sw-art[data-alt="amber"] {
+  --art-alt: var(--sw-warning);
+}
+.sw-art[data-alt="teal"] {
+  --art-alt: var(--sw-code-type);
+}
+.sw-art[data-alt="pink"] {
+  --art-alt: var(--sw-code-property);
+}
+.sw-art[data-alt="red"] {
+  --art-alt: var(--sw-danger);
+}
+
+.sw-art :where(path, rect, circle, ellipse) {
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Surfaces. */
+.sw-art .grid {
+  fill: none;
+  stroke: var(--sw-grid-line);
+  stroke-width: 1;
+}
+.sw-art .panel {
+  fill: var(--sw-surface-1);
+  stroke: var(--sw-border-strong);
+}
+.sw-art .shade {
+  fill: var(--sw-border);
+}
+.sw-art .soft {
+  fill: var(--sw-surface-2);
+}
+.sw-art .rule {
+  fill: none;
+  stroke: var(--sw-border);
+}
+.sw-art .bar {
+  fill: var(--sw-border-strong);
+}
+.sw-art .ink {
+  fill: currentColor;
+}
+.sw-art .ink-line {
+  fill: none;
+  stroke: currentColor;
+}
+
+/* The lead hue. */
+.sw-art .hue {
+  fill: var(--art-hue);
+}
+.sw-art .hue-line {
+  fill: none;
+  stroke: var(--art-hue);
+  stroke-width: 2;
+}
+.sw-art .hue-soft {
+  fill: var(--art-tint);
+  stroke: var(--art-hue);
+}
+.sw-art .hue-tint {
+  fill: var(--art-tint);
+}
+
+/* The second hue. */
+.sw-art .alt {
+  fill: var(--art-alt);
+}
+.sw-art .alt-line {
+  fill: none;
+  stroke: var(--art-alt);
+  stroke-width: 2;
+}
+.sw-art .alt-soft {
+  fill: var(--art-alt-tint);
+  stroke: var(--art-alt);
+}
+.sw-art .alt-tint {
+  fill: var(--art-alt-tint);
+}
+
+/* Failure: typed errors and lost messages in diagrams. */
+.sw-art .error-line {
+  fill: none;
+  stroke: var(--sw-danger);
+  stroke-width: 2;
+}
+.sw-art .error-soft {
+  fill: var(--sw-danger-soft);
+  stroke: var(--sw-danger);
+}
+
+/* Ink on a solid hue: the page surface, so it reads in both themes. */
+.sw-art .on-hue {
+  fill: var(--sw-surface-1);
+}
+.sw-art .on-hue-line {
+  fill: none;
+  stroke: var(--sw-surface-1);
+  stroke-width: 2;
+}
+
+.sw-art .dash {
+  stroke-dasharray: 4 3;
+}
+.sw-art .faint {
+  opacity: 0.4;
+}
+
+/* Rows of square tiles, drawn as one dashed stroke per row. */
+.sw-art .tiles {
+  fill: none;
+  stroke: var(--sw-border);
+  stroke-width: 14;
+  stroke-dasharray: 14 6;
+  stroke-linecap: butt;
+}
+.sw-art .tiles-loaded {
+  stroke: var(--art-loaded);
+}
+.sw-art .tiles-shown {
+  stroke: var(--art-hue);
+}
+
+/* Text: short mono labels on cards; diagrams add body-font captions. */
+.sw-art text {
+  fill: currentColor;
+  font: 600 11px/1 var(--sw-font-mono);
+  /* Lay text out at the drawing's real scale: Chromium otherwise measures it
+     at a rounded font size, so a long label reports a wider box than it has. */
+  text-rendering: geometricPrecision;
+}
+.sw-art .small {
+  font-size: 10px;
+}
+.sw-art .glyph {
+  font: 650 26px/1 var(--sw-font-display);
+}
+.sw-art .hue-text {
+  fill: var(--art-hue);
+}
+.sw-art .alt-text {
+  fill: var(--art-alt);
+}
+.sw-art .strong {
+  fill: var(--sw-fg-strong);
+}
+.sw-art .caption {
+  font: 400 12px/1.3 var(--sw-font-body);
+}
+.sw-art .heading {
+  fill: var(--sw-fg-strong);
+  font: 600 13px/1.3 var(--sw-font-body);
+}
+
+/* A diagram ships a wide and a narrow drawing; small screens get the narrow one. */
+.sw-art-diagram__narrow {
+  display: none;
+}
+
+@media (max-width: 40rem) {
+  .sw-art-diagram__wide {
+    display: none;
+  }
+  .sw-art-diagram__narrow {
+    display: block;
+  }
+}
+
+/* ---- Docs placements (art/docs-pictures.ts) ------------------------------- */
+/* A diagram in the reading column, after the heading of the section it explains. */
+.sw-art-figure {
+  margin: var(--sw-space-6) 0;
+  padding: clamp(var(--sw-space-3), 2vw, var(--sw-space-5));
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+/* A tab landing page's mark, above the eyebrow. */
+.sw-section-mark {
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: var(--sw-space-2);
+  color: var(--sw-fg);
+}
+
+/* A section page's illustration beside its title; phones skip it. */
+.sw-section-art {
+  display: none;
+}
+
+@media (min-width: 52rem) {
+  .sw-document__header:has(> .sw-section-art) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 17rem;
+    column-gap: var(--sw-space-8);
+    align-items: center;
+  }
+
+  .sw-document__header:has(> .sw-section-art) > :not(.sw-section-art) {
+    grid-column: 1;
+  }
+
+  .sw-section-art {
+    display: block;
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    overflow: clip;
+    border: var(--sw-border-width) solid var(--sw-border);
+    border-radius: var(--sw-radius-lg);
+  }
+
+  .sw-section-art > .sw-art {
+    height: auto;
+    aspect-ratio: 2 / 1;
+  }
+}

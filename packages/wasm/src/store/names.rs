@@ -302,7 +302,7 @@ impl CellStore {
         if let Some(target) = &definition.resolved {
             return Some(match target {
                 NameTarget::Range(range) => place_range(range.clone(), formula_sheet, depth),
-                _ => target.clone(),
+                NameTarget::Formula(_) | NameTarget::Reference(_) => target.clone(),
             });
         }
 
@@ -665,6 +665,10 @@ fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
 }
 
 /// The nodes a walk over `ast` visits, where a name counts as its expansion.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node counts as one"
+)]
 fn expanded_nodes(ast: &Ast) -> usize {
     let children = match ast {
         Ast::NamedFormula(named) => return named.nodes,
@@ -689,6 +693,10 @@ fn expanded_nodes(ast: &Ast) -> usize {
 
 /// A name whose formula is one cell or range reference is a named range in
 /// the formula that uses it, so functions that take a reference accept it.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not a single cell or range"
+)]
 fn reference_target(
     ast: &Ast,
     name: &str,
@@ -714,6 +722,10 @@ fn reference_target(
 }
 
 /// The names that `ast` uses, as a name or as a function it calls.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node uses no name"
+)]
 fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
     match ast {
         Ast::Name(name) | Ast::LetName { name, .. } => names.push(name),
@@ -741,6 +753,10 @@ fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
 /// Whether a name's formula reads differently from different cells: it has
 /// a relative row or column, or a table reference, which can name the row
 /// of the cell that uses it.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node has no reference to read"
+)]
 fn is_positional(ast: &Ast) -> bool {
     match ast {
         Ast::Cell(_, _, flags) | Ast::AbsCell(_, _, _, flags) => {

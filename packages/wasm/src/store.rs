@@ -3743,7 +3743,7 @@ fn refresh_structured_reference(
             }
             (reference.row_start, reference.row_start)
         }
-        _ => return None,
+        TableSection::Headers | TableSection::Totals => return None,
     };
     Some(StructuredRef {
         table_id: table.id.clone(),
@@ -3847,7 +3847,7 @@ impl CellStore {
                 }
                 (formula_row, formula_row)
             }
-            _ => return None,
+            TableSection::Headers | TableSection::Totals => return None,
         };
         Some(StructuredRef {
             table_id: table.id.clone(),

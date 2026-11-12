@@ -71,7 +71,26 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_runtime_ref(inner),
         Ast::LetSlot { expression, .. } => ast_contains_runtime_ref(expression),
         Ast::NamedFormula(named) => ast_contains_runtime_ref(&named.expression),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -142,6 +161,10 @@ fn record_runtime_read(reads: &mut RuntimeReads, range: CellRange) {
 
 impl CellStore {
     /// The range an OFFSET or INDIRECT call refers to now.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn runtime_range(
         &self,
         func: Func,
@@ -345,7 +368,9 @@ impl CellStore {
             None => {
                 return Err(match self.eval_ast(&args[0], sheet, pass, depth + 1) {
                     Value::Error(error) => error,
-                    _ => FormulaError::Value,
+                    Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                        FormulaError::Value
+                    }
                 });
             }
         };
@@ -426,7 +451,7 @@ impl CellStore {
 
         let converted;
         let source = if a1 {
-            text.as_str()
+            text.as_ref()
         } else {
             converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or_default()) {
                 Ok(converted) => converted,
@@ -463,7 +488,33 @@ impl CellStore {
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             ast @ (Ast::NamedRange(_) | Ast::Structured(_)) => range_from_ast(ast, sheet),
-            _ => None,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => None,
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
         }
     }
 }

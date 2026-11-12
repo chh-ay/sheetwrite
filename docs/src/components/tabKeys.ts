@@ -1,11 +1,9 @@
-import type { KeyboardEvent } from "react";
-
 /**
  * Arrow, Home, and End keys for a WAI-ARIA tab list with automatic
  * activation: the key selects the next tab and moves focus to it.
  */
 export function onTabListKey<T extends string>(
-  event: KeyboardEvent<HTMLElement>,
+  event: KeyboardEvent,
   ids: readonly T[],
   active: T,
   select: (id: T) => void,

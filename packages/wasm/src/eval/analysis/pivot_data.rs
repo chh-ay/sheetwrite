@@ -1,6 +1,8 @@
 //! `GETPIVOTDATA(data_field, pivot_table, [field1, item1, ...])`: a value
 //! cell of a pivot table, named by its data field and row and column items.
 
+use std::borrow::Cow;
+
 use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
@@ -43,7 +45,7 @@ fn pivot_data(
     }
 
     let text = |ast: &Ast, pass: &mut EvalPass<'_>| {
-        text_from_value(&store.eval_ast(ast, sheet, pass, depth + 1))
+        text_from_value(&store.eval_ast(ast, sheet, pass, depth + 1)).map(Cow::into_owned)
     };
     let data_field = text(&args[0], pass)?;
 
@@ -54,7 +56,9 @@ fn pivot_data(
         None => {
             return match store.eval_ast(&args[1], sheet, pass, depth + 1) {
                 Value::Error(error) => Err(error),
-                _ => Err(FormulaError::Ref),
+                Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                    Err(FormulaError::Ref)
+                }
             }
         }
     };
@@ -65,7 +69,7 @@ fn pivot_data(
         let field = text(field_ast, pass)?;
         let item = match store.eval_ast(item_ast, sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
-            item => item,
+            item @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => item,
         };
         items.push((field, item));
     }

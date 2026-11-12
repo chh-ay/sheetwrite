@@ -214,7 +214,9 @@ pub(super) fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
 fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
     let serial = match value {
         Value::Text(text) => number_from_text(text)?,
-        _ => number_from_value(value)?,
+        Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            number_from_value(value)?
+        }
     };
     if serial.is_finite() && serial >= 0.0 {
         Ok(serial)
@@ -227,7 +229,9 @@ fn serial_date_arg(values: &FuncAccumulator, index: usize) -> Result<i64, Formul
     let value = values.arg_value(index).ok_or(FormulaError::Value)?;
     let number = match value {
         Value::Text(text) => number_from_text(text)?,
-        _ => number_from_value(value)?,
+        Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            number_from_value(value)?
+        }
     };
     if !number.is_finite() {
         return Err(FormulaError::Num);
@@ -376,7 +380,7 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
             Value::Text(text) if text.trim().is_empty() => continue,
             Value::Text(text) => number_from_text(text)?,
             Value::Error(error) => return Err(*error),
-            value => number_from_value(value)?,
+            value @ (Value::Number(_) | Value::Bool(_)) => number_from_value(value)?,
         };
         if !number.is_finite() {
             return Err(FormulaError::Num);
@@ -613,6 +617,10 @@ fn time_function(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     Ok(total.rem_euclid(SECONDS_PER_DAY) as f64 / SECONDS_PER_DAY as f64)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+)]
 fn time_component(values: &FuncAccumulator, component: Func) -> Result<f64, FormulaError> {
     require_arity(values, 1, 1)?;
     let serial = temporal_serial(values.arg_value(0).ok_or(FormulaError::Value)?)?;
@@ -625,6 +633,10 @@ fn time_component(values: &FuncAccumulator, component: Func) -> Result<f64, Form
     } as f64)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Date => {

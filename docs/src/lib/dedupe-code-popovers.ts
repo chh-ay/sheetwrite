@@ -10,6 +10,8 @@
  * it, and `code-popovers.ts` clones a panel from the store when it opens.
  */
 
+import { relative } from "node:path";
+
 import { type ElementContent, toHtml } from "@expressive-code/core/hast";
 
 import type { HastNode } from "./build-hast.js";
@@ -17,6 +19,17 @@ import { hashIdentifier } from "./hash-identifier.js";
 
 interface VFileLike {
   path?: string;
+}
+
+/**
+ * The repository root. Panel ids hash a document's path relative to it, so the
+ * same sources build the same HTML wherever the checkout is.
+ */
+const REPOSITORY_ROOT = new URL("../../../", import.meta.url).pathname;
+
+/** The id prefix of one document's shared panels, from its repository path. */
+export function popoverIdPrefix(path: string | undefined): string {
+  return `sw-popover-${hashIdentifier(path === undefined ? "" : relative(REPOSITORY_ROOT, path))}`;
 }
 
 const PANEL_CLASS = "sw-code-popover__panel";
@@ -101,8 +114,8 @@ export function dedupeCodePopovers() {
     const sharedIdByKey = new Map<string, string>();
     const store: HastNode[] = [];
     // Several documents can share one page (landing snippets, showcase setup),
-    // so shared ids carry a per-document prefix.
-    const prefix = `sw-popover-${hashIdentifier(file.path ?? "")}`;
+    // so shared ids carry a per-document prefix, then the panel's position.
+    const prefix = popoverIdPrefix(file.path);
 
     const collect = (node: HastNode): void => {
       if (!node.children) return;

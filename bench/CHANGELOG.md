@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Separate formula fixture construction and artifact checks from the command runner. Keep one ordered gate row table shared by capture and validation; preserve CLI modes, allocation checks and baseline policy.
 - Capture live chart tracking at 200, 2,000, and 20,000 charts, with exact notification checks and separate conservative formula-source evidence. Include chart tracking and the 100,000-row pivot matrix in the stamped release capture.
 - Gate engine reader changes with a paired ABBA harness over 39 `CellStore` readers (windows, queries, batched cell reads, formula ranges). A reader fails only when its digests disagree, or when its median paired ratio exceeds its A/A noise limit and the candidate is slower in every pair. `--write-floor` turns an A/A report into the committed per-reader limits.
 - Gate formula changes with one harness that loads the base and candidate engine builds in interleaved captures, aggregates each row to at least 50 ms, and compares median paired ratios against measured per-row limits. Keep the absolute formula baseline for quiet-machine release captures.
@@ -43,3 +44,4 @@
 - Updated dependencies [87fadb7]
   - @sheetwrite/core@0.2.0
   - @sheetwrite/wasm@0.2.0
+

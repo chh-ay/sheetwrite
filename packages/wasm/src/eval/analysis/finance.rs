@@ -281,7 +281,7 @@ fn scheduled_value(arguments: &FuncAccumulator) -> NumberResult {
             Value::Number(rate) => future *= 1.0 + rate,
             Value::Blank => (),
             Value::Error(error) => return Err(*error),
-            _ => return Err(FormulaError::Value),
+            Value::Text(_) | Value::Bool(_) => return Err(FormulaError::Value),
         }
     }
     Ok(future)
@@ -322,7 +322,7 @@ fn list_number(entry: &FuncValue) -> NumberResult {
         Value::Number(number) if number.is_finite() => Ok(*number),
         Value::Blank => Ok(0.0),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) => Err(FormulaError::Value),
     }
 }
 
@@ -416,11 +416,11 @@ fn discounted(
         // Both slices have been validated before the iteration starts.
         let cash = match &cash_cell.value {
             Value::Number(number) => *number,
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
         let date = match &date_cell.value {
             Value::Number(number) => number.trunc(),
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
         let years = (date - first_date) / DAYS_PER_YEAR;
         let discounted_cash = cash / (1.0 + rate).powf(years);
@@ -447,11 +447,11 @@ fn discounted_cached(
     for (cash_cell, date_cell) in cash_flows.iter().zip(dates) {
         let cash = match &cash_cell.value {
             Value::Number(number) => *number,
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
         let date = match &date_cell.value {
             Value::Number(number) => number.trunc(),
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
         let year_index = (date - first_date) as usize;
         let discounted_cash = cash / powers[year_index];

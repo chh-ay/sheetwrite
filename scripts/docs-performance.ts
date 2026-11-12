@@ -163,7 +163,7 @@ export async function renderLandingBench(): Promise<string> {
  * The speed story as built HTML, for the landing page and the performance
  * showcase. It is its own generated file, inlined by the server render and
  * fetched as an asset after a client-side navigation, so no page script
- * carries it (see docs/src/lib/speed-story-markup.ts).
+ * carries it (docs/src/routes/index.tsx and showcases.performance.tsx import it).
  */
 export async function renderLandingStory(): Promise<string> {
   const scale = await loadMachineCaptures(

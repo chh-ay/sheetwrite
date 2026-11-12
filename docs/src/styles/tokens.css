@@ -1,13 +1,4 @@
-@import "tailwindcss";
-
-/* Tailwind skips gitignored files when it looks for class names, and the
-   generated pages and data are gitignored, so name them here. */
-@source "../generated";
-@source "../content/docs/api";
-@source "../content/docs/performance";
-@source "../content/docs/reference";
-@source "../../public/llms.txt";
-@source "../../public/llms-full.txt";
+@import "./reset.css";
 
 /*
  * The site's design tokens. Every page, showcase and component reads these;
@@ -26,6 +17,11 @@
    for text that needs it. The latin heading and body files are preloaded
    first in the document head (routes/__root.tsx).
 
+   Every face is `font-display: optional`: a face that is not ready for the
+   first paint is not swapped in later, so a font never moves the layout
+   (CLS). That page view keeps the metric-matched fallback below; the font,
+   now cached, renders from the next view on.
+
    The latin heading file (src/fonts, licence beside it) is the fontsource
    optical-size file cut to what headings use: one weight (650) for every
    heading role, the 14–72 optical sizes, and latin text characters:
@@ -36,7 +32,7 @@
 @font-face {
   font-family: "Bricolage Grotesque Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600 700;
   src: url("../fonts/bricolage-grotesque-latin-650-opsz.woff2") format("woff2-variations");
   unicode-range:
@@ -50,7 +46,7 @@
 @font-face {
   font-family: "Bricolage Grotesque Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600 700;
   src: url("@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-ext-opsz-normal.woff2")
     format("woff2-variations");
@@ -63,7 +59,7 @@
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400 700;
   src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2")
     format("woff2-variations");
@@ -75,7 +71,7 @@
 @font-face {
   font-family: "Instrument Sans Variable";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400 700;
   src: url("@fontsource-variable/instrument-sans/files/instrument-sans-latin-ext-wght-normal.woff2")
     format("woff2-variations");
@@ -88,7 +84,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2") format("woff2");
   unicode-range:
@@ -99,7 +95,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 400;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-400-normal.woff2")
     format("woff2");
@@ -112,7 +108,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-600-normal.woff2") format("woff2");
   unicode-range:
@@ -123,7 +119,7 @@
 @font-face {
   font-family: "JetBrains Mono";
   font-style: normal;
-  font-display: swap;
+  font-display: optional;
   font-weight: 600;
   src: url("@fontsource/jetbrains-mono/files/jetbrains-mono-latin-ext-600-normal.woff2")
     format("woff2");
@@ -135,10 +131,16 @@
 
 /* Metric-matched fallbacks: Arial (Liberation Sans on Linux) scaled to each
    face's width, with line metrics from the face's hhea table divided by the
-   scale, so text keeps its line breaks and height while the web fonts load.
-   Widths are measured per weight the docs use (body text at 400, bold and
-   navigation at 600, headings at 600 and 700) on the same English text, and
-   match the face's width, so the swap does not re-wrap a line. */
+   scale, so a view that misses the web fonts looks as close to them as the
+   fallback allows.
+   Each weight the site sets has its own band, scaled by the width ratio of
+   the web font to the fallback on the text the site sets at that weight
+   (navigation 600, emphasis 700; the heading file is one 650 instance).
+   Two bands are fitted on particular text: 500 on the docs tabs (the tab
+   row's width matches within 1.5 px), and 400 at the scale that keeps the
+   landing's lead on the same lines in hinted Linux text, whose glyph widths
+   snap to whole pixels. Instrument Sans: ascent 0.97, descent 0.25.
+   Bricolage: 0.93, 0.27. */
 @font-face {
   font-family: "Bricolage Grotesque Fallback";
   font-weight: 100 549;
@@ -157,15 +159,15 @@
   src:
     local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"),
     local("LiberationSans-Bold"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 93.4%;
-  ascent-override: 99.58%;
-  descent-override: 28.9%;
+  size-adjust: 93.82%;
+  ascent-override: 99.13%;
+  descent-override: 28.78%;
   line-gap-override: 0%;
 }
 
 @font-face {
   font-family: "Instrument Sans Fallback";
-  font-weight: 100 549;
+  font-weight: 100 449;
   src:
     local("Liberation Sans"), local("LiberationSans"), local("Arial"), local("ArialMT"),
     local("Helvetica");
@@ -177,13 +179,37 @@
 
 @font-face {
   font-family: "Instrument Sans Fallback";
-  font-weight: 550 900;
+  font-weight: 450 549;
+  src:
+    local("Liberation Sans"), local("LiberationSans"), local("Arial"), local("ArialMT"),
+    local("Helvetica");
+  size-adjust: 104%;
+  ascent-override: 93.27%;
+  descent-override: 24.04%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Sans Fallback";
+  font-weight: 550 649;
   src:
     local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arial Bold"),
     local("Arial-BoldMT"), local("Helvetica Bold"), local("Helvetica-Bold");
-  size-adjust: 97.04%;
-  ascent-override: 99.96%;
-  descent-override: 25.77%;
+  size-adjust: 97.12%;
+  ascent-override: 99.88%;
+  descent-override: 25.74%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "Instrument Sans Fallback";
+  font-weight: 650 900;
+  src:
+    local("Liberation Sans Bold"), local("LiberationSans-Bold"), local("Arial Bold"),
+    local("Arial-BoldMT"), local("Helvetica Bold"), local("Helvetica-Bold");
+  size-adjust: 99.87%;
+  ascent-override: 97.13%;
+  descent-override: 25.03%;
   line-gap-override: 0%;
 }
 
@@ -348,6 +374,10 @@
   --sw-page-gutter: clamp(1rem, 4vw, 4rem);
   --sw-page-max: 92rem;
   --sw-page-inset: max(var(--sw-page-gutter), (100% - var(--sw-page-max)) / 2);
+  /* The width of the page's outermost content, whose edges the site header
+     shares. A page with a wider or narrower frame sets it on its root (the
+     landing's 80rem; a showcase stage's 120rem). */
+  --sw-frame-max: var(--sw-page-max);
   --sw-control-height: 2.25rem;
   --sw-control-height-lg: 2.75rem;
 

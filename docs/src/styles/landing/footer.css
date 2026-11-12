@@ -51,7 +51,7 @@
   display: grid;
   grid-template-columns: minmax(14rem, 1fr) minmax(0, 2fr);
   gap: var(--sw-space-10) clamp(var(--sw-space-8), 6vw, var(--sw-space-20));
-  width: min(80rem, calc(100% - 2 * var(--sw-page-inset)));
+  width: min(var(--sw-frame-max), calc(100% - 2 * var(--sw-page-inset)));
   margin-inline: auto;
   padding-block: var(--sw-space-12) var(--sw-space-12);
 }

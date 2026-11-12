@@ -23,7 +23,9 @@ fn serial_value(value: &Value) -> DateResult {
             Some(serial) => serial,
             None => number_from_text(text)?,
         },
-        _ => number_from_value(value)?,
+        Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            number_from_value(value)?
+        }
     };
     if !number.is_finite() || !(0.0..=MAX_SERIAL as f64).contains(&number.trunc()) {
         return Err(FormulaError::Num);

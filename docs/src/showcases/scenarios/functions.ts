@@ -7,7 +7,7 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 
-import type { LiveScenario } from "../use-live-scenario.js";
+import type { LiveScenario } from "./live-scenario.js";
 import { createListeners, mountShowcaseShell, requireApplied } from "./showcase-shell.js";
 
 // The functions showcase: one sheet per function family that 0.7.0 adds to

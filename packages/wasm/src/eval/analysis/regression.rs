@@ -88,7 +88,32 @@ fn argument_shape(
         // A scalar expression such as 1/0 or A1*2 gives one value; its
         // error, if any, appears when it is evaluated.
         _ if !is_reference(ast) && !ast_produces_array(ast) => Ok((1, 1, 1)),
-        _ => store.matrix_shape(ast, sheet, pass),
+        Ast::Missing
+        | Ast::BoundMatrix { .. }
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => store.matrix_shape(ast, sheet, pass),
     }
 }
 
@@ -367,7 +392,7 @@ fn strict_number(value: &Value) -> Result<f64, FormulaError> {
     match value {
         Value::Number(number) => Ok(*number),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Text(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
     }
 }
 
@@ -378,7 +403,7 @@ fn numeric_values(matrix: &EvalMatrix) -> Result<Vec<f64>, FormulaError> {
         .filter_map(|value| match value {
             Value::Number(number) => Some(Ok(*number)),
             Value::Error(error) => Some(Err(*error)),
-            _ => None,
+            Value::Text(_) | Value::Bool(_) | Value::Blank => None,
         })
         .collect()
 }
@@ -473,7 +498,25 @@ fn is_reference(ast: &Ast) -> bool {
         | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => is_reference(expression),
         Ast::NamedFormula(named) => is_reference(&named.expression),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::BoundMatrix { .. }
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
     }
 }
 
