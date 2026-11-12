@@ -487,8 +487,9 @@ pub(super) enum PairedKind {
     PopulationCovariance,
 }
 
+/// The running moments of a paired statistic.
 #[derive(Default)]
-struct PairedMoments {
+pub(super) struct PairedMoments {
     count: usize,
     mean_x: f64,
     mean_y: f64,
@@ -498,7 +499,8 @@ struct PairedMoments {
 }
 
 impl PairedMoments {
-    fn push(&mut self, x: f64, y: f64) -> Result<(), FormulaError> {
+    /// Adds the pair `x`, `y`; `#NUM!` once a moment stops being finite.
+    pub(super) fn push(&mut self, x: f64, y: f64) -> Result<(), FormulaError> {
         self.count += 1;
         let divisor = self.count as f64;
         let delta_x = x - self.mean_x;
@@ -569,30 +571,37 @@ pub(super) fn paired_statistic(
             _ => {}
         }
     }
-    match kind {
-        PairedKind::Correlation => {
-            if moments.count < 2 || moments.m2_x <= 0.0 || moments.m2_y <= 0.0 {
-                return Err(FormulaError::DivZero);
+    moments.finish(kind)
+}
+
+impl PairedMoments {
+    /// The statistic `kind` of the pairs added so far.
+    pub(super) fn finish(&self, kind: PairedKind) -> Result<f64, FormulaError> {
+        match kind {
+            PairedKind::Correlation => {
+                if self.count < 2 || self.m2_x <= 0.0 || self.m2_y <= 0.0 {
+                    return Err(FormulaError::DivZero);
+                }
+                let result = self.co_moment / self.m2_x.sqrt() / self.m2_y.sqrt();
+                if result.is_finite() {
+                    Ok(result.clamp(-1.0, 1.0))
+                } else {
+                    Err(FormulaError::Num)
+                }
             }
-            let result = moments.co_moment / moments.m2_x.sqrt() / moments.m2_y.sqrt();
-            if result.is_finite() {
-                Ok(result.clamp(-1.0, 1.0))
-            } else {
-                Err(FormulaError::Num)
+            PairedKind::SampleCovariance => {
+                if self.count < 2 {
+                    Err(FormulaError::DivZero)
+                } else {
+                    Ok(self.co_moment / (self.count - 1) as f64)
+                }
             }
-        }
-        PairedKind::SampleCovariance => {
-            if moments.count < 2 {
-                Err(FormulaError::DivZero)
-            } else {
-                Ok(moments.co_moment / (moments.count - 1) as f64)
-            }
-        }
-        PairedKind::PopulationCovariance => {
-            if moments.count == 0 {
-                Err(FormulaError::DivZero)
-            } else {
-                Ok(moments.co_moment / moments.count as f64)
+            PairedKind::PopulationCovariance => {
+                if self.count == 0 {
+                    Err(FormulaError::DivZero)
+                } else {
+                    Ok(self.co_moment / self.count as f64)
+                }
             }
         }
     }

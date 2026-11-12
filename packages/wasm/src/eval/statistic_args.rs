@@ -20,7 +20,7 @@ use super::array::ast_produces_array;
 use super::functions::{treats_cell_as_reference, FuncAccumulator, MAX_FUNCTION_ARGS};
 use super::matrix::argument_range;
 use super::range_view::{NumberSink, RangeView};
-use super::statistics::{self, NumberStatistic, PairedCell};
+use super::statistics::{self, NumberStatistic, PairedCell, PairedKind, PairedMoments};
 use super::value::aggregate_number;
 use super::EvalPass;
 
@@ -403,6 +403,41 @@ pub(super) struct StatisticCall<'a> {
 }
 
 impl CellStore {
+    /// CORREL or COVARIANCE of two written ranges of dense literal cells of
+    /// the same size, read pair by pair without keeping the cells. `None`
+    /// leaves the call to the general reader, before any cell is evaluated.
+    fn literal_paired(
+        &self,
+        kind: PairedKind,
+        call: &StatisticCall<'_>,
+    ) -> Option<Result<f64, FormulaError>> {
+        let [left_arg, right_arg] = call.args else {
+            return None;
+        };
+        let depth = call.depth + 1;
+        if depth > FORMULA_RECURSION_LIMIT {
+            return None;
+        }
+        let left = RangeView::clipped(self, argument_range(left_arg, call.sheet)?, depth).ok()?;
+        let right = RangeView::clipped(self, argument_range(right_arg, call.sheet)?, depth).ok()?;
+        let (left_rows, left_cols) = left.shape();
+        let cells = left_rows.checked_mul(left_cols)?;
+        if cells.checked_mul(2)? > RANGE_CELL_LIMIT as usize {
+            return None;
+        }
+
+        let mut moments = PairedMoments::default();
+        let mut moment_error = None;
+        let read = left.literal_pairs(&right, |x, y| {
+            if let (Some(x), Some(y), None) = (x, y, moment_error) {
+                if let Err(error) = moments.push(x, y) {
+                    moment_error = Some(error);
+                }
+            }
+        })?;
+        Some(read.and_then(|()| moment_error.map_or_else(|| moments.finish(kind), Err)))
+    }
+
     /// A statistic that reads numbers, with its range arguments read in
     /// place. See `eval_func` for why families live in out-of-line
     /// `*_family` handlers.
@@ -412,6 +447,12 @@ impl CellStore {
         call: &StatisticCall<'_>,
         pass: &mut EvalPass<'_>,
     ) -> EvalResult {
+        if let NumberStatistic::Paired(kind) = call.statistic {
+            if let Some(result) = self.literal_paired(kind, call) {
+                return result.map_or_else(Value::Error, Value::number);
+            }
+        }
+
         let reader = Reader {
             store: self,
             func: call.func,

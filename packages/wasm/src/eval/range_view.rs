@@ -8,7 +8,8 @@ use crate::cells::{payload_num, payload_str_id};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
+    CellRange, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
+    KIND_NUMBER, KIND_STRING,
 };
 
 use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
@@ -154,28 +155,62 @@ impl<'a> RangeView<'a> {
         for row in self.row_start..self.row_start + self.rows {
             for col in self.col_start..self.col_start + self.cols {
                 let index = self.data.cells.idx(row, col);
-                let (Some(&kind), Some(&payload)) = (kinds.get(index), payloads.get(index)) else {
-                    return Err(FormulaError::Ref);
-                };
-                match kind {
-                    KIND_NUMBER => {
-                        let number = payload_num(payload);
-                        if !number.is_finite() {
-                            return Err(FormulaError::Num);
-                        }
-                        sink.number(number);
-                    }
-                    KIND_STRING => {
-                        string_from_pool_ref(&self.store.strings, payload_str_id(payload))
-                            .ok_or(FormulaError::Ref)?;
-                        sink.skipped();
-                    }
-                    KIND_BOOL | KIND_EMPTY => sink.skipped(),
-                    _ => self.scan_computed(row, col, pass, sink)?,
+                match literal_number(&self.store.strings, kinds, payloads, index) {
+                    Some(Ok(Some(number))) => sink.number(number),
+                    Some(Ok(None)) => sink.skipped(),
+                    Some(Err(error)) => return Err(error),
+                    None => self.scan_computed(row, col, pass, sink)?,
                 }
             }
         }
         Ok(())
+    }
+
+    /// The sheet row and column of each cell, in row-major order.
+    fn cells(&self) -> impl Iterator<Item = (usize, usize)> + '_ {
+        (self.row_start..self.row_start + self.rows).flat_map(move |row| {
+            (self.col_start..self.col_start + self.cols).map(move |col| (row, col))
+        })
+    }
+
+    /// Pairs the cells of this view with those of `other` in row-major order,
+    /// as a paired statistic reads two ranges of literal cells: an error of
+    /// this view wins over any error of `other`, and `visit` gets each pair's
+    /// numbers. `None`, before any cell is evaluated, when either view isn't
+    /// dense, when they differ in size, or when a cell holds a formula.
+    pub(super) fn literal_pairs(
+        &self,
+        other: &Self,
+        mut visit: impl FnMut(Option<f64>, Option<f64>),
+    ) -> Option<Result<(), FormulaError>> {
+        if self.rows * self.cols != other.rows * other.cols {
+            return None;
+        }
+        let (left_kinds, left_payloads) = LiteralSources::new(self.data, self.depth)?.sources.raw();
+        let (right_kinds, right_payloads) =
+            LiteralSources::new(other.data, other.depth)?.sources.raw();
+        let strings = &self.store.strings;
+
+        let mut right_cells = other.cells();
+        let mut right_error = None;
+        for (row, col) in self.cells() {
+            let index = self.data.cells.idx(row, col);
+            let left = match literal_number(strings, left_kinds, left_payloads, index)? {
+                Ok(number) => number,
+                Err(error) => return Some(Err(error)),
+            };
+            if right_error.is_some() {
+                continue;
+            }
+
+            let (right_row, right_col) = right_cells.next()?;
+            let right_index = other.data.cells.idx(right_row, right_col);
+            match literal_number(strings, right_kinds, right_payloads, right_index)? {
+                Ok(right) => visit(left, right),
+                Err(error) => right_error = Some(error),
+            }
+        }
+        Some(right_error.map_or(Ok(()), Err))
     }
 
     /// One loaded cell without a literal source: blank, or a formula or
@@ -252,6 +287,36 @@ impl<'a> RangeView<'a> {
         }
         Ok(())
     }
+}
+
+/// A dense cell as a function that reads only numbers sees it: a number,
+/// `None` for text, a logical value or a blank, or the error of a number that
+/// isn't finite or text missing from the string pool. `None` for a formula
+/// or spill cell, which needs evaluating.
+#[inline]
+fn literal_number(
+    strings: &StringStorage,
+    kinds: &[u8],
+    payloads: &[u64],
+    index: usize,
+) -> Option<Result<Option<f64>, FormulaError>> {
+    let (Some(&kind), Some(&payload)) = (kinds.get(index), payloads.get(index)) else {
+        return Some(Err(FormulaError::Ref));
+    };
+    Some(match kind {
+        KIND_NUMBER => {
+            let number = payload_num(payload);
+            if number.is_finite() {
+                Ok(Some(number))
+            } else {
+                Err(FormulaError::Num)
+            }
+        }
+        KIND_STRING => string_from_pool_ref(strings, payload_str_id(payload))
+            .map_or(Err(FormulaError::Ref), |_| Ok(None)),
+        KIND_BOOL | KIND_EMPTY => Ok(None),
+        _ => return None,
+    })
 }
 
 /// Receives the cells of a range as a function that reads only numbers sees
