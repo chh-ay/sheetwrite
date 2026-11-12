@@ -57,6 +57,24 @@ const STRUCTURED_DATA = JSON.stringify({
   ],
 });
 
+/**
+ * Pages navigate by document, so the browser fetches a site page when a
+ * reader hovers or presses its link. Text and feed files are left out.
+ */
+const SPECULATION_RULES = JSON.stringify({
+  prefetch: [
+    {
+      where: {
+        and: [
+          { href_matches: "/*" },
+          { not: { selector_matches: "[href$='.txt'], [href$='.xml'], [download]" } },
+        ],
+      },
+      eagerness: "moderate",
+    },
+  ],
+});
+
 /** Fonts first in the head, so they load with the stylesheets and are ready for the first paint. */
 const FONT_PRELOAD = {
   rel: "preload",
@@ -129,6 +147,7 @@ export const Route = createRootRoute({
       ],
       scripts: [
         { type: "application/ld+json", children: STRUCTURED_DATA },
+        { type: "speculationrules", children: SPECULATION_RULES },
         // The build links the islands client from each page (page-scripts.ts);
         // the dev server loads it from source so islands hydrate there too.
         ...(import.meta.env.DEV ? [{ type: "module", src: "/src/islands/client.tsx" }] : []),

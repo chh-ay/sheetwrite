@@ -37,24 +37,10 @@ test("dispatch controls compose a view and report real policy outcomes", async (
   await page.getByRole("button", { name: "Clear view", exact: true }).click();
   await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
   await expect(page.getByRole("combobox", { name: "Region" })).toHaveText("All regions");
-  await page.getByRole("button", { name: "Collapse batch" }).click();
-  await expect(page.getByTestId("data-visible")).toHaveText("4,776 / 4,800 rows visible");
-  await page.getByRole("button", { name: "Hide rows 25–27" }).click();
-  await expect(page.getByTestId("data-visible")).toHaveText("4,773 / 4,800 rows visible");
-  await page.getByRole("button", { name: "Hide freight & owner" }).click();
-  await expect(page.getByText("Hidden: 3 rows, 2 columns")).toBeVisible();
-  await page.getByRole("button", { name: "Expand batch" }).click();
-  await page.getByRole("button", { name: "Unhide rows", exact: true }).click();
-  await page.getByRole("button", { name: "Unhide columns", exact: true }).click();
-  await expect(page.getByTestId("data-visible")).toHaveText("4,800 / 4,800 rows visible");
+  // docs/test/data-tools.test.ts holds each probe's outcome and the hidden-row state.
   await page.getByRole("button", { name: "Try units −5" }).click();
   await expectProbe(page, "units", "rejected", "1");
   await expectLatestEvent(page, "reject", "applyTransaction");
-  await page.getByRole("button", { name: "Try freight $350" }).click();
-  await expectProbe(page, "freight", "warned", "350");
-  await expectLatestEvent(page, "warn", "applyTransaction");
-  await page.getByRole("button", { name: "Try a new order ID" }).click();
-  await expectProbe(page, "order", "rejected", "ORD-10001");
   await page.getByRole("button", { name: "Manager", exact: true }).click();
   await expect(page.getByRole("button", { name: "Manager", exact: true })).toHaveAttribute(
     "aria-pressed",

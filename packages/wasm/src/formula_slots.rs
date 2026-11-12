@@ -248,16 +248,22 @@ impl UnresolvedSheetUsers {
         }
     }
 
-    fn record(&mut self, id: FormulaId, mut names: Vec<String>) {
+    fn record(&mut self, id: FormulaId, names: Vec<String>) {
         if names.is_empty() {
             return;
         }
-        names.sort_unstable();
-        names.dedup();
-        for name in &names {
+        // A formula names few sheets, so a scan drops repeats; sorting
+        // strings would add a sort to the engine for this alone.
+        let mut unique: Vec<String> = Vec::with_capacity(names.len());
+        for name in names {
+            if !unique.contains(&name) {
+                unique.push(name);
+            }
+        }
+        for name in &unique {
             self.by_name.entry(name.clone()).or_default().insert(id);
         }
-        self.by_formula.insert(id, names);
+        self.by_formula.insert(id, unique);
     }
 
     fn is_empty(&self) -> bool {

@@ -4,7 +4,8 @@
  *   module preloads for its entry and for the content islands that page holds;
  * - links the stylesheets of the islands it holds (their markup is in the page);
  * - keeps a feature stylesheet (`data-feature`, routes/__root.tsx) only if one
- *   of its selectors names only classes the page's markup uses.
+ *   of its selectors names only classes the page's markup uses;
+ * - on the landing, inlines every stylesheet (INLINED_STYLESHEET_PAGES).
  *
  *   bun src/islands/page-scripts.ts
  */
@@ -62,9 +63,11 @@ const ROUTER_TAGS = [
   /<script\b[^>]*>(?:(?!<\/script>).)*?(?:\$tsr-stream-boundary|__TSR_key|\$_TSR)(?:(?!<\/script>).)*?<\/script>/gs,
 ];
 
-/** An island's opening tag (islands/Island.tsx), its name, and whether it hydrates on interaction. */
+/** An island's opening tag (islands/Island.tsx), its name, and when it hydrates. */
 const ISLAND_MARKER = /<div\b[^>]*\bdata-island="([^"]+)"[^>]*>/g;
 const ON_INTERACTION = /\bdata-island-hydrate="interaction"/;
+/** Islands that hydrate after load (on interaction or when visible). */
+const DEFERRED = /\bdata-island-hydrate="/;
 
 const STYLESHEET_LINK = /<link\b[^>]*\brel="stylesheet"[^>]*>/g;
 const FEATURE_ATTRIBUTE = /\sdata-feature(?:="")?/;
@@ -101,16 +104,16 @@ function pageScripts(manifest: Manifest, html: string): string {
   if (entry === undefined) throw new Error(`${ISLANDS_ENTRY} is missing from ${ISLANDS_MANIFEST}`);
   const islands = Array.from(html.matchAll(ISLAND_MARKER)).flatMap(([tag, name]) =>
     name !== undefined && isOnDemandIsland(name)
-      ? [{ source: ON_DEMAND_ISLANDS[name], onInteraction: ON_INTERACTION.test(tag) }]
+      ? [{ source: ON_DEMAND_ISLANDS[name], deferred: DEFERRED.test(tag) }]
       : [],
   );
-  // Islands that hydrate on interaction fetch their code later (islands/client.tsx);
-  // preloading it would cost every visit. Their markup is in the page, so their
-  // stylesheets are linked like every other island's.
+  // Islands that hydrate on interaction or when visible fetch their code later
+  // (islands/client.tsx); preloading it would cost every visit. Their markup is
+  // in the page, so their stylesheets are linked like every other island's.
   const preloads = new Set([
     ...chunkFiles(manifest, ISLANDS_ENTRY),
     ...islands
-      .filter((island) => !island.onInteraction)
+      .filter((island) => !island.deferred)
       .flatMap((island) => chunkFiles(manifest, island.source)),
   ]);
   // The script tag loads the entry itself.
@@ -199,6 +202,36 @@ async function withUsedFeatureStylesheets(html: string): Promise<string> {
   return result;
 }
 
+/**
+ * Pages whose stylesheets are inlined in one `<style>`, in cascade order. The
+ * landing is the main first visit; without stylesheet requests it paints a
+ * round trip sooner. Every rule is there from the first paint, so nothing is
+ * added to the cascade later: a stylesheet switched on after the first paint
+ * makes Chromium re-resolve fonts and take a web font that arrived too late
+ * for `font-display: optional`, which moves the text (#504).
+ */
+const INLINED_STYLESHEET_PAGES = new Set(["index.html"]);
+
+async function withInlinedStylesheets(html: string): Promise<string> {
+  const headEnd = html.indexOf("</head>");
+  const head = html.slice(0, headEnd);
+  const links = Array.from(head.matchAll(STYLESHEET_LINK), ([tag]) => tag);
+  const [first] = links;
+  if (first === undefined) return html;
+  let css = "";
+  for (const tag of links) {
+    const href = HREF.exec(tag)?.[1];
+    if (href === undefined) throw new Error(`A stylesheet link without href: ${tag}`);
+    css += await readFile(join(CLIENT_OUTPUT, href), "utf8");
+  }
+  if (css.includes("</style")) throw new Error("A stylesheet would close its style element");
+  const inlined = links.reduce(
+    (markup, tag) => markup.replace(tag, tag === first ? `<style>${css}</style>` : ""),
+    head,
+  );
+  return `${inlined}${html.slice(headEnd)}`;
+}
+
 const manifestPath = join(CLIENT_OUTPUT, ISLANDS_MANIFEST);
 const manifest: Manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 let rewrittenPages = 0;
@@ -209,7 +242,11 @@ for await (const page of new Bun.Glob("**/*.html").scan(CLIENT_OUTPUT)) {
   // enhancements (code copy and popovers) and marks the page hydrated.
   const withoutRouter = ROUTER_TAGS.reduce((markup, tag) => markup.replace(tag, ""), html);
   const withScripts = withoutRouter.replace("</head>", `${pageScripts(manifest, html)}</head>`);
-  await writeFile(path, await withUsedFeatureStylesheets(withIslandCode(manifest, withScripts)));
+  const styled = await withUsedFeatureStylesheets(withIslandCode(manifest, withScripts));
+  await writeFile(
+    path,
+    INLINED_STYLESHEET_PAGES.has(page) ? await withInlinedStylesheets(styled) : styled,
+  );
   rewrittenPages += 1;
 }
 // The manifest is a build input, not a page asset.

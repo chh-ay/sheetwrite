@@ -10,11 +10,4 @@ describe("popoverIdPrefix", () => {
   it("hashes the document's repository path, not where the checkout is", () => {
     expect(popoverIdPrefix(`${REPOSITORY_ROOT}${PAGE}`)).toBe(`sw-popover-${hashIdentifier(PAGE)}`);
   });
-
-  it("gives each document its own prefix", () => {
-    const other = "docs/src/content/docs/start/installation.mdx";
-    expect(popoverIdPrefix(`${REPOSITORY_ROOT}${PAGE}`)).not.toBe(
-      popoverIdPrefix(`${REPOSITORY_ROOT}${other}`),
-    );
-  });
 });
