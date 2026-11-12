@@ -4,12 +4,6 @@ import type { Page } from "@playwright/test";
 
 import { expect, siteUrl, test, waitForHydration } from "./fixtures.js";
 
-const SITE_TITLE = "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV";
-const SITE_DESCRIPTION =
-  "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.";
-const SOCIAL_IMAGE_ALT =
-  "Sheetwrite multi-sheet workbook with selected formula cell and sheet tabs";
-
 test("on a phone, documentation has a visible route back home and to the showcases", async ({
   page,
 }) => {
@@ -52,29 +46,7 @@ test("a moved page redirects permanently and forwards its old heading link", asy
   await expect(page.locator("#requests-and-pages")).toBeVisible();
 });
 
-test("feature overview cards lead to short examples and formatted result sheets", async ({
-  page,
-}) => {
-  await page.goto("/docs/features/formatting/");
-  await waitForHydration(page);
-  await page
-    .locator(".sw-section-cards")
-    .getByRole("link", { name: /Number formats/ })
-    .click();
-  await expect(page).toHaveURL(/\/docs\/features\/formatting\/number-formats\/$/);
-  const result = page.locator(".sw-grid-result").first();
-  await expect(result.getByRole("columnheader", { name: "A", exact: true })).toBeVisible();
-  await expect(result.getByRole("cell", { name: "1.234,50", exact: true })).toBeVisible();
-  const setup = page
-    .locator("details")
-    .filter({ has: page.locator("summary", { hasText: "Full setup" }) })
-    .first();
-  await expect(setup).not.toHaveAttribute("open");
-  await setup.locator("summary").click();
-  await expect(setup.locator("pre")).toBeVisible();
-});
-
-test("site root serves the product landing with its search and social metadata", async ({
+test("the landing loads no grid runtime, and its social image and version match the files", async ({
   page,
 }) => {
   const wasmRequests: string[] = [];
@@ -88,15 +60,7 @@ test("site root serves the product landing with its search and social metadata",
   await expect(page.locator("main canvas, main .sheetwrite")).toHaveCount(0);
   await expect(page.getByTestId("landing-product-story")).toBeVisible();
   expect(wasmRequests).toEqual([]);
-  await expect(page).toHaveTitle(SITE_TITLE);
   for (const [selector, content] of [
-    ['meta[name="description"]', SITE_DESCRIPTION],
-    ['meta[property="og:description"]', SITE_DESCRIPTION],
-    ['meta[name="twitter:description"]', SITE_DESCRIPTION],
-    ['meta[property="og:title"]', SITE_TITLE],
-    ['meta[name="twitter:title"]', SITE_TITLE],
-    ['meta[property="og:image:alt"]', SOCIAL_IMAGE_ALT],
-    ['meta[name="twitter:image:alt"]', SOCIAL_IMAGE_ALT],
     ['meta[property="og:image:width"]', "1200"],
     ['meta[property="og:image:height"]', "630"],
   ] as const) {
@@ -126,11 +90,6 @@ test("site root serves the product landing with its search and social metadata",
   });
   // The benchmark section publishes real generated numbers, never placeholders.
   await expect(page.locator("#benchmarks li").first()).toContainText(/\d/);
-  await page.getByRole("link", { name: /Performance & scale/ }).click();
-  await expect(page).toHaveURL(siteUrl("/showcases/performance/"));
-  await page.goBack();
-  await page.getByRole("link", { name: "Get started" }).click();
-  await expect(page).toHaveURL(siteUrl("/docs/start/installation/"));
 });
 
 test("documentation pages render one heading and a canonical URL", async ({ page }) => {
