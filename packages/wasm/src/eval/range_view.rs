@@ -5,6 +5,7 @@
 //! whole range as an `EvalMatrix`.
 
 use crate::cells::{payload_num, payload_str_id};
+use crate::row_visibility::HiddenRowCursor;
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
@@ -240,6 +241,58 @@ impl<'a> RangeView<'a> {
         Ok(())
     }
 
+    /// Reads the cells in row-major order into `sink`, as SUBTOTAL reads a
+    /// reference: rows that `hidden` skips and formula cells for which
+    /// `skips_formula` holds are left out unread. The first unloaded cell is
+    /// `#LOADING!`, and the first error cell, a literal number that isn't
+    /// finite or text missing from the string pool stops the walk with its
+    /// error.
+    pub(super) fn scan_visible(
+        &self,
+        hidden: &mut HiddenRowCursor,
+        skips_formula: impl Fn(usize, usize) -> bool,
+        pass: &mut EvalPass<'_>,
+        sink: &mut impl CellSink,
+    ) -> Result<(), FormulaError> {
+        let literals =
+            LiteralSources::new(self.data, self.depth).map(|sources| sources.sources.raw());
+        for row in self.row_start..self.row_start + self.rows {
+            if hidden.skips(row as u32) {
+                continue;
+            }
+
+            for col in self.col_start..self.col_start + self.cols {
+                if !self.data.cells.is_loaded(row, col) {
+                    return Err(FormulaError::Loading);
+                }
+
+                let index = self.data.cells.idx(row, col);
+                let literal = literals.and_then(|(kinds, payloads)| {
+                    literal_number(&self.store.strings, kinds, payloads, index)
+                        .map(|number| (number, kinds.get(index).copied()))
+                });
+                match literal {
+                    Some((Ok(Some(number)), _)) => sink.number(number),
+                    Some((Ok(None), Some(KIND_EMPTY))) => {}
+                    Some((Ok(None), _)) => sink.other(),
+                    Some((Err(error), _)) => return Err(error),
+                    None if skips_formula(row, col)
+                        || self.data.cells.kind_at(index) == KIND_EMPTY => {}
+                    None => match self
+                        .store
+                        .eval_at(self.sheet, row, col, pass, self.depth + 1)
+                    {
+                        Value::Number(number) => sink.number(number),
+                        Value::Error(error) => return Err(error),
+                        Value::Text(_) | Value::Bool(_) => sink.other(),
+                        Value::Blank => {}
+                    },
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Every cell of the view in one row-major matrix. Fails with `#NUM!`
     /// when the values and their stored text exceed the array byte budget, and
     /// with `#LOADING!` when any cell isn't loaded.
@@ -331,6 +384,16 @@ pub(super) trait NumberSink {
 
     /// A cell holding text, a logical value or nothing.
     fn skipped(&mut self);
+}
+
+/// Receives the cells of a range as SUBTOTAL reads them. Blank cells reach
+/// neither method.
+pub(super) trait CellSink {
+    /// A cell holding `number`, which a formula may have left non-finite.
+    fn number(&mut self, number: f64);
+
+    /// A cell holding text or a logical value.
+    fn other(&mut self);
 }
 
 /// A function argument read as an array: a written range in place, or the
