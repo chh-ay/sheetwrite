@@ -358,6 +358,16 @@ async function warmRoute(browser: Browser, route: string): Promise<void> {
 
 /** Navigate, prove the route renders, and wait until its first page is resident. */
 async function loadUsableRoute(page: Page, route: string): Promise<number> {
+  // The route can answer 200 while its grid island fails to load, for example
+  // on a tree without the committed bench/results evidence the showcase
+  // imports. A page error ends the wait at once, naming the failed requests.
+  const failedRequests: string[] = [];
+  page.on("requestfailed", (request) => failedRequests.push(`failed ${request.url()}`));
+  page.on("response", (response) => {
+    if (!response.ok()) failedRequests.push(`${response.status()} ${response.url()}`);
+  });
+  const firstPageError = Promise.withResolvers<Error>();
+  page.once("pageerror", firstPageError.resolve);
   const response = await page.goto(route);
   if (response === null || !response.ok()) {
     throw new Error(
@@ -366,18 +376,43 @@ async function loadUsableRoute(page: Page, route: string): Promise<number> {
   }
   // The first rectangular page of the feed must be resident in the public
   // paged store: the same readiness signal the showcase browser test uses.
-  await page.waitForFunction(
-    () => (window.__sheetwriteScaleGrid?.store.getPagedStats?.("scale")?.loadedCells ?? 0) > 0,
-    undefined,
-    { timeout: USABLE_TIMEOUT_MS },
-  );
+  // The wait settles to a value so a page error can end it without leaving a
+  // rejection behind when the caller closes the page.
+  const ready = page
+    .waitForFunction(
+      () => (window.__sheetwriteScaleGrid?.store.getPagedStats?.("scale")?.loadedCells ?? 0) > 0,
+      undefined,
+      { timeout: USABLE_TIMEOUT_MS },
+    )
+    .then(
+      () => ({ usable: true as const }),
+      (error: unknown) => ({ usable: false as const, error }),
+    );
+  const outcome = await Promise.race([
+    ready,
+    firstPageError.promise.then((error) => ({ usable: false as const, error })),
+  ]);
+  if (!outcome.usable) {
+    const message = outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+    const requests = failedRequests.length === 0 ? "none" : failedRequests.join(", ");
+    throw new Error(
+      `the showcase grid did not become usable on ${route}: ${message}; failed requests: ${requests}`,
+      { cause: outcome.error },
+    );
+  }
   return page.evaluate(() => performance.now());
 }
 
-async function waitForRoute(route: string): Promise<void> {
+/** Poll the route until the docs server this capture started serves it. */
+async function waitForRoute(route: string, server: Bun.Subprocess): Promise<void> {
   const deadline = Date.now() + SERVER_READY_TIMEOUT_MS;
   let refusal: string | undefined;
   while (Date.now() < deadline) {
+    if (server.exitCode !== null) {
+      throw new Error(
+        `the docs dev server exited with code ${server.exitCode} before it served ${route}`,
+      );
+    }
     try {
       const response = await fetch(route);
       if (response.ok) return;
@@ -392,6 +427,22 @@ async function waitForRoute(route: string): Promise<void> {
     await Bun.sleep(SERVER_RETRY_MS);
   }
   throw new Error(`interaction docs server did not become ready on ${route}: ${refusal ?? ""}`);
+}
+
+/**
+ * The docs server uses a fixed port with --strictPort, so a server another tree
+ * left on that port would answer every request while this tree's server exits.
+ */
+async function assertDocsPortFree(route: string): Promise<void> {
+  try {
+    await fetch(route);
+  } catch (error) {
+    if (error instanceof TypeError) return;
+    throw error;
+  }
+  throw new Error(
+    `port ${DOCS_PORT} already answers ${route}; stop that server so the capture measures this tree`,
+  );
 }
 
 /** The capture already at this path, when it is a capture of this schema. */
@@ -478,6 +529,33 @@ function methodNotes(): InteractionPerformanceArtifact["method"] {
   };
 }
 
+/** Docs server error lines kept for a failure message. */
+const SERVER_ERROR_LINES = 20;
+const SERVER_ERROR_LINE = /error|fail/i;
+
+/**
+ * Forward the docs server's stderr and keep its recent error lines. A route
+ * whose imports fail (for example a missing bench/results file) still answers,
+ * and only the server log names the file it could not load.
+ */
+function forwardServerErrors(stream: ReadableStream<Uint8Array>): {
+  readonly recentErrors: () => string;
+  readonly drained: Promise<void>;
+} {
+  const errorLines: string[] = [];
+  const decoder = new TextDecoder();
+  const drained = (async () => {
+    for await (const chunk of stream) {
+      process.stderr.write(chunk);
+      for (const line of decoder.decode(chunk, { stream: true }).split("\n")) {
+        if (SERVER_ERROR_LINE.test(line)) errorLines.push(line.trim());
+      }
+      errorLines.splice(0, Math.max(0, errorLines.length - SERVER_ERROR_LINES));
+    }
+  })();
+  return { recentErrors: () => errorLines.join("\n"), drained };
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   const mode = args.includes("--smoke") ? "smoke" : "full";
@@ -486,6 +564,7 @@ async function main(): Promise<void> {
   const samples = INTERACTION_SAMPLE_COUNTS[mode];
 
   const previous = await readPreviousCapture(outputPath);
+  await assertDocsPortFree(route);
   const server = Bun.spawn(
     [
       process.execPath,
@@ -497,8 +576,9 @@ async function main(): Promise<void> {
       String(DOCS_PORT),
       "--strictPort",
     ],
-    { cwd: DOCS_ROOT, stdout: "ignore", stderr: "inherit" },
+    { cwd: DOCS_ROOT, stdout: "ignore", stderr: "pipe" },
   );
+  const serverErrors = forwardServerErrors(server.stderr);
   const browser = await chromium.launch();
   const collected: Record<InteractionMetric, number[]> = {
     lookupMedianNs: [],
@@ -510,7 +590,7 @@ async function main(): Promise<void> {
     usableMs: [],
   };
   try {
-    await waitForRoute(route);
+    await waitForRoute(route, server);
     await warmRoute(browser, route);
     for (let sample = 0; sample < samples; sample++) {
       const lookup = lookupSample();
@@ -526,10 +606,16 @@ async function main(): Promise<void> {
         `sample ${sample + 1}/${samples}: lookup ${lookup.medianNs.toFixed(1)} ns, inverse ${lookup.inverseIndexBytes} B, dirty100 ${collected.dirty100Bytes[sample]} B, owned cold long task ${cold.ownedMs} ms, usable ${cold.usableMs.toFixed(1)} ms\n`,
       );
     }
+  } catch (error) {
+    const recentErrors = serverErrors.recentErrors();
+    if (recentErrors === "") throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`${message}\nthe docs server reported:\n${recentErrors}`, { cause: error });
   } finally {
     await browser.close();
     server.kill();
     await server.exited;
+    await serverErrors.drained;
   }
 
   const values = summarizeSamples(collected);

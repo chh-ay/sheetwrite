@@ -1274,7 +1274,9 @@ const FAILED_EVICTION = -1;
 /**
  * Runs in a fresh Node process. Core is imported before timing, as in an app;
  * the measured span is initSheetwrite() through first-store construction.
- * The heartbeat records event-loop stalls during that cold initialization.
+ * The heartbeat records event-loop stalls during that cold initialization:
+ * the largest gap spans the load's start, every tick, and its end, so a load
+ * that blocks the loop throughout reports zero ticks and its whole duration.
  */
 const NODE_CHILD_PROGRAM = `
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
@@ -1316,7 +1318,7 @@ process.stdout.write(JSON.stringify({
 }));
 `;
 
-interface NodeLoadSample {
+export interface NodeLoadSample {
   readonly loadMs: number;
   readonly largestGapMs: number;
   readonly loaded: boolean;
@@ -1359,6 +1361,24 @@ function parseNodeLoadSample(stdout: string, stderr: string, exitCode: number): 
   };
 }
 
+/**
+ * Reject a fresh-process sample that did not load, computed the wrong value or
+ * reported an impossible time. Zero heartbeat ticks is a valid observation: on
+ * a fast machine the whole load can finish between two 1 ms ticks.
+ */
+export function checkNodeLoadSample(sample: NodeLoadSample): void {
+  if (!sample.loaded) fail("the fresh Node process did not finish loading the module");
+  if (sample.engineStatus !== "applied" || sample.engineValue !== 42) {
+    fail("the loaded module did not produce the expected engine result");
+  }
+  if (!(sample.loadMs > 0)) fail("the fresh Node process reported a non-positive load time");
+  if (!(sample.largestGapMs >= 0) || sample.largestGapMs > NODE_GAP_CEILING_MS) {
+    fail(
+      `the fresh Node process reported an implausible heartbeat gap of ${sample.largestGapMs} ms`,
+    );
+  }
+}
+
 async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioResult> {
   const samplesMs: number[] = [];
   let largestGapMs = 0;
@@ -1376,17 +1396,7 @@ async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioRe
       child.exited,
     ]);
     const sample = parseNodeLoadSample(stdout, stderr, exitCode);
-    if (!sample.loaded) fail("the fresh Node process did not finish loading the module");
-    if (sample.engineStatus !== "applied" || sample.engineValue !== 42) {
-      fail("the loaded module did not produce the expected engine result");
-    }
-    if (!(sample.loadMs > 0)) fail("the fresh Node process reported a non-positive load time");
-    if (!(sample.largestGapMs >= 0) || sample.largestGapMs > NODE_GAP_CEILING_MS) {
-      fail(
-        `the fresh Node process reported an implausible heartbeat gap of ${sample.largestGapMs} ms`,
-      );
-    }
-    if (sample.heartbeatTicks < 1) fail("the heartbeat produced no tick while the module loaded");
+    checkNodeLoadSample(sample);
     if (nodeVersion.length === 0) nodeVersion = sample.nodeVersion;
     else if (nodeVersion !== sample.nodeVersion) {
       fail(`the fresh Node processes disagree on their runtime version`);
