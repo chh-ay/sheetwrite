@@ -30,8 +30,12 @@ import {
   SMOKE_SAMPLES,
   TIMING_METHOD,
   validateCurrentCaptureProvenance,
-  createFormulaArtifactChecks,
-  type FormulaArtifactChecks,
+  type FormulaArtifactMatrix,
+  readCommittedFormulaBaseline as readBaseline,
+  validateFormulaBenchmark as checkFormulaBenchmark,
+  validateFormulaCapture as checkFormulaCapture,
+  validateFormulaRegression as checkFormulaRegression,
+  validateRecordedFormulaCapture as checkRecordedFormulaCapture,
   type FormulaEnginePackage,
   formulaWorkloadKey,
 } from "./formula-artifact.js";
@@ -328,18 +332,38 @@ export function expectedFormulaMemoryKeys(mode: BenchmarkMode): string[] {
   return sizes.map((formulas) => `memory=formulas=${formulas}`);
 }
 
-export const {
-  validateFormulaBenchmark,
-  validateFormulaRegression,
-  validateFormulaCapture,
-  validateRecordedFormulaCapture,
-  readCommittedFormulaBaseline,
-}: FormulaArtifactChecks = createFormulaArtifactChecks({
+/** The rows above, as the artifact checks read them. */
+const FORMULA_MATRIX: FormulaArtifactMatrix = {
   workloadKeys: expectedFormulaWorkloadKeys,
   legacyWorkloadKeys: legacyFormulaBaselineWorkloadKeys,
   memoryKeys: expectedFormulaMemoryKeys,
   shapeRowIds: SHAPE_ROW_IDS,
-});
+};
+
+export function validateFormulaBenchmark(
+  result: FormulaBenchmarkResult,
+  expectedMode: BenchmarkMode = result.mode,
+): asserts result is CompleteFormulaBenchmarkResult {
+  checkFormulaBenchmark(FORMULA_MATRIX, result, expectedMode);
+}
+
+export function validateFormulaRegression(
+  candidate: FormulaBenchmarkResult,
+  baseline: FormulaBenchmarkResult,
+): void {
+  checkFormulaRegression(FORMULA_MATRIX, candidate, baseline);
+}
+
+export function validateFormulaCapture(
+  candidate: FormulaBenchmarkResult,
+  baseline?: FormulaBenchmarkResult,
+): void {
+  checkFormulaCapture(FORMULA_MATRIX, candidate, baseline);
+}
+
+export function validateRecordedFormulaCapture(capture: FormulaBenchmarkResult): void {
+  checkRecordedFormulaCapture(FORMULA_MATRIX, capture);
+}
 
 // Check every entry path before it can load or measure the selected baseline.
 if (ENGINE_ROOT !== undefined) {
@@ -757,7 +781,7 @@ async function runBenchmark(
   const mode: BenchmarkMode = smoke ? "smoke" : "full";
   let baseline: FormulaBenchmarkResult | undefined;
   if (captureKind === "gated") {
-    baseline = readCommittedFormulaBaseline();
+    baseline = readBaseline(FORMULA_MATRIX);
   }
 
   await initSheetwrite({ engine: engine });
