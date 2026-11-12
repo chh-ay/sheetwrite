@@ -31,6 +31,7 @@ pub(crate) fn write_number_column(
             &[],
         ),
         crate::store::BLOCK_OK,
+        "numeric fixture column must load",
     );
 }
 
@@ -1044,10 +1045,14 @@ fn structural_edits_rewrite_cross_sheet_targets_and_preserve_qualifiers() {
     assert_close(number(&store, summary, 1, 0), 7.0);
 }
 
+/// Joined text, its UTF-16 lengths and the cells it must produce.
+#[cfg(not(feature = "analysis"))]
+type SavedTextCase<'a> = (&'a str, &'a [u32], &'a [&'a str]);
+
 #[cfg(not(feature = "analysis"))]
 #[test]
 fn saved_pivot_text_survives_hostile_utf16_lengths() {
-    let cases: &[(&str, &[u32], &[&str])] = &[
+    let cases: &[SavedTextCase<'_>] = &[
         ("abc", &[2, 5, 3], &["ab", "c", ""]),
         ("abcdef", &[2, 1], &["ab", "c"]),
         ("𝄞x", &[1, 1], &["𝄞", "x"]),
