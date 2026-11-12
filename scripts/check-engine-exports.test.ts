@@ -38,6 +38,7 @@ test("engine caller audit resolves aliases, getters and structural callers but r
     "packages/client/src/caller.ts": `
       import { convert as convertFormula } from "../../engine/loader.js";
       const { CellStore } = await import("../../engine/loader.js");
+      // Exercise the destructured lazy-loading boundary used by version history.
       const engine = new CellStore();
       engine.write();
       const { aliasWrite: writeAlias } = engine;
