@@ -44,9 +44,13 @@ export interface ChartTrackingRow {
   readonly eventMs: Stat | null;
   /** Resolving every chart the commit named, after the commit; null when it named none. */
   readonly resolveMs: Stat | null;
+  /** Events in each measured commit. */
   readonly expectedEvents: number;
+  /** Median charts the implementation named; must include every required chart. */
   readonly expectedCharts: number;
   readonly resolutionsPerCommit: number;
+  /** Charts whose source value necessarily changed. */
+  readonly requiredCharts: number;
 }
 
 export interface ChartTrackingArtifact {
@@ -64,26 +68,30 @@ export interface ChartTrackingArtifact {
   readonly rows: readonly ChartTrackingRow[];
 }
 
-/** Validate identities, not just counts: a duplicate or unrelated chart is incorrect. */
+/**
+ * Validate identities, not just counts. `allowed` keeps conservative engines valid
+ * for paired comparisons, while every required chart must still be named once.
+ */
 export function checkChartEvents(
   events: readonly ChartChangeEvent[],
-  expected: readonly ChartRef[],
-): void {
-  const expectedEvents = expected.length === 0 ? 0 : 1;
-  if (events.length !== expectedEvents) {
-    throw new Error(`Expected ${expectedEvents} chart events, received ${events.length}`);
+  required: readonly ChartRef[],
+  allowed: readonly ChartRef[] = required,
+): number {
+  if (events.length > 1 || (required.length > 0 && events.length !== 1)) {
+    throw new Error(`Expected at most one chart event, received ${events.length}`);
   }
 
-  const actual = events
-    .flatMap((event) => event.charts)
-    .map((ref) => `${ref.sheet}/${ref.id}`)
-    .sort();
-  const wanted = expected.map((ref) => `${ref.sheet}/${ref.id}`).sort();
-  if (actual.length !== wanted.length || actual.some((id, index) => id !== wanted[index])) {
+  const actual = events.flatMap((event) => event.charts).map((ref) => `${ref.sheet}/${ref.id}`);
+  const unique = new Set(actual);
+  const allowedIds = new Set(allowed.map((ref) => `${ref.sheet}/${ref.id}`));
+  const missing = required.map((ref) => `${ref.sheet}/${ref.id}`).filter((id) => !unique.has(id));
+  const unrelated = actual.filter((id) => !allowedIds.has(id));
+  if (unique.size !== actual.length || missing.length > 0 || unrelated.length > 0) {
     throw new Error(
-      `Incorrect chart identities: expected ${wanted.join(",")}, received ${actual.join(",")}`,
+      `Incorrect chart identities: missing ${missing.join(",")}, unrelated ${unrelated.join(",")}`,
     );
   }
+  return actual.length;
 }
 
 function sheet(id: string, rowCount: number): Sheet {
@@ -227,15 +235,15 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
       });
       try {
         for (const scenario of ["outside", "inside"] as const) {
-          const expected =
+          const required = scenario === "inside" ? [reference(0)] : [];
+          const allowed =
             source === "formula"
               ? Array.from({ length: count }, (_, index) => reference(index))
-              : scenario === "inside"
-                ? [reference(0)]
-                : [];
+              : required;
           const commits: number[] = [];
           const latencies: number[] = [];
           const resolveTimes: number[] = [];
+          const named: number[] = [];
           for (let iteration = -warmups; iteration < samples; iteration++) {
             events.length = 0;
             resolutions = 0;
@@ -251,7 +259,7 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
             started = now();
             apply(store, [patch]);
             const elapsed = now() - started;
-            checkChartEvents(events, expected);
+            const namedCharts = checkChartEvents(events, required, allowed);
             // Resolution is what a consumer does with the event; it is timed on its own.
             const resolved: Array<{ ref: ChartRef; view: ChartView | null }> = [];
             const resolveStart = now();
@@ -276,11 +284,11 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
               }
               resolutions++;
             }
-            if (resolutions !== expected.length)
-              throw new Error("Incorrect chart resolution count");
+            if (resolutions !== namedCharts) throw new Error("Incorrect chart resolution count");
             if (iteration >= 0) {
               commits.push(elapsed);
-              if (expected.length > 0) {
+              named.push(namedCharts);
+              if (namedCharts > 0) {
                 latencies.push(eventLatency);
                 resolveTimes.push(resolveElapsed);
               }
@@ -295,9 +303,10 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
             baselineMs,
             eventMs: latencies.length > 0 ? summarize(latencies) : null,
             resolveMs: resolveTimes.length > 0 ? summarize(resolveTimes) : null,
-            expectedEvents: expected.length > 0 ? 1 : 0,
-            expectedCharts: expected.length,
-            resolutionsPerCommit: expected.length,
+            expectedEvents: summarize(named).median > 0 ? 1 : 0,
+            expectedCharts: summarize(named).median,
+            resolutionsPerCommit: summarize(named).median,
+            requiredCharts: required.length,
           });
         }
       } finally {

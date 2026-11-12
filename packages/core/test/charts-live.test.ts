@@ -511,7 +511,7 @@ describe("chart identities and resolution", () => {
     expect(events).toEqual([]);
   });
 
-  it("names every computed chart on each value commit, once", () => {
+  it("names only charts whose formula sources the commit recomputes, once", () => {
     const { store, events } = setup();
     apply(store, [
       formula("data", 0, 2, "=B1*2"),
@@ -522,13 +522,75 @@ describe("chart identities and resolution", () => {
     events.length = 0;
 
     apply(store, [set("data", 9, 3, 1), set("data", 8, 3, 2)]);
+    expect(events).toEqual([]);
+    apply(store, [set("data", 0, 1, 5)]);
     expect(events).toHaveLength(1);
     expect(events[0]?.charts).toEqual([
+      { sheet: "data", id: "sales" },
       { sheet: "data", id: "doubled" },
       { sheet: "other", id: "cross" },
     ]);
-    apply(store, [set("data", 0, 1, 5)]);
     expect(resolveChartView(store, "other", "cross")?.series[0]?.values).toEqual([10, 40]);
+  });
+
+  it("reports spill children that shrink or disappear when the anchor is overwritten", () => {
+    const { store, events } = setup();
+    apply(store, [set("data", 9, 2, 3), formula("data", 4, 0, "=SEQUENCE(C10,2)")]);
+    apply(store, [
+      { op: "setChart", sheet: "data", chart: chart("tail", range("data", 6, 1, 6, 1)) },
+    ]);
+    events.length = 0;
+    apply(store, [set("data", 9, 2, 1)]);
+    expect(events[0]?.charts).toEqual([{ sheet: "data", id: "tail" }]);
+    expect(resolveChartView(store, "data", "tail")?.series[0]?.values).toEqual([null]);
+    apply(store, [set("data", 9, 2, 3)]);
+    events.length = 0;
+    apply(store, [set("data", 4, 0, 9)]);
+    expect(events[0]?.charts).toEqual([{ sheet: "data", id: "tail" }]);
+    expect(resolveChartView(store, "data", "tail")?.series[0]?.values).toEqual([null]);
+  });
+
+  it("follows references and volatile formulas without naming unrelated charts", () => {
+    const { store, events } = setup();
+    apply(store, [
+      {
+        op: "set",
+        addr: { sheet: "other", row: 0, col: 2 },
+        value: { kind: "ref", target: { sheet: "data", row: 0, col: 1 } },
+      },
+      formula("other", 1, 2, "=TODAY()"),
+      { op: "setChart", sheet: "other", chart: chart("reference", range("other", 0, 2, 0, 2)) },
+      { op: "setChart", sheet: "other", chart: chart("clock", range("other", 1, 2, 1, 2)) },
+    ]);
+    events.length = 0;
+    store.recalculateVolatile(new Date("2024-01-02T00:00:00Z"));
+    expect(events[0]?.charts).toEqual([{ sheet: "other", id: "clock" }]);
+    expect(resolveChartView(store, "other", "clock")?.series[0]?.values).toEqual([45293]);
+    events.length = 0;
+    apply(store, [set("data", 0, 1, 15)]);
+    expect(events[0]?.charts).toContainEqual({ sheet: "other", id: "reference" });
+    expect(resolveChartView(store, "other", "reference")?.series[0]?.values).toEqual([15]);
+  });
+
+  it("keeps each commit's recalculation report across a reentrant earlier listener", () => {
+    const store = new SheetwriteStore(workbook(10));
+    stores.push(store);
+    apply(store, [
+      formula("other", 0, 2, "=data!B1*2"),
+      { op: "setChart", sheet: "other", chart: chart("derived", range("other", 0, 2, 0, 2)) },
+    ]);
+    let reentered = false;
+    store.on("change", () => {
+      if (reentered) return;
+      reentered = true;
+      apply(store, [set("data", 9, 3, 7)]);
+    });
+    const events: ChartChangeEvent[] = [];
+    subscribeChartChanges(store, (event) => events.push(event));
+    apply(store, [set("data", 0, 1, 9)]);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.charts).toEqual([{ sheet: "other", id: "derived" }]);
+    expect(resolveChartView(store, "other", "derived")?.series[0]?.values).toEqual([18]);
   });
 
   it("finds sheets that were added, moved or removed after the store was created", () => {

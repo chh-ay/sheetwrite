@@ -45,6 +45,7 @@ pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+mod recalculation;
 #[cfg(all(test, feature = "analysis"))]
 mod related_measure_tests;
 #[cfg(feature = "analysis")]
@@ -358,6 +359,8 @@ pub struct CellStore {
     pub(crate) formula_slots: FormulaStore,
     /// Moving one pointer keeps pass setup independent of scratch-header size.
     pub(crate) formula_results: Option<Box<FormulaResults>>,
+    /// Optional bounded commit output; absent until a chart tracker subscribes.
+    pub(crate) recalculation: Option<Box<recalculation::Recalculation>>,
     pub(crate) graph: FormulaGraph,
     pub(crate) conditional_rules: ConditionalRules,
     /// Host functions of this store. `None` until the host registers one, so
@@ -465,6 +468,7 @@ impl CellStore {
             strings: StringStorage::new(),
             formula_slots: FormulaStore::default(),
             formula_results: None,
+            recalculation: None,
             graph: FormulaGraph::default(),
             conditional_rules: ConditionalRules::default(),
             #[cfg(feature = "host-functions")]
@@ -799,6 +803,7 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = beginMutation)]
     pub fn begin_mutation(&mut self) -> u64 {
+        self.reset_recalculation();
         let revision = self.next_mutation_revision();
         self.active_mutation_revision = Some(revision);
         revision
@@ -2600,6 +2605,7 @@ impl CellStore {
         if !serial.is_finite() {
             return false;
         }
+        self.reset_recalculation();
         self.volatile_serial = serial;
         self.recompute_volatile_formulas();
         true
@@ -2795,6 +2801,9 @@ impl CellStore {
     /// per-pass memo table to reuse formula results across dependent reads.
     #[wasm_bindgen(js_name = recompute)]
     pub fn recompute(&mut self, sheet: usize) {
+        if self.active_mutation_revision.is_none() {
+            self.reset_recalculation();
+        }
         self.recompute_sheet(sheet);
     }
 
@@ -3515,6 +3524,12 @@ impl CellStore {
             .owner_mut(STRING_INDEX)
             .add(self.strings.index_memory_stats());
         self.formula_slots.add_memory_stats(&mut stats);
+        if let Some(changes) = &self.recalculation {
+            let (used, retained) = changes.bytes();
+            stats
+                .owner_mut(crate::memory::FORMULAS)
+                .add_payload(used, retained);
+        }
         if let Some(results) = &self.formula_results {
             let bytes = size_of::<FormulaResults>();
             stats

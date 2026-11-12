@@ -994,12 +994,17 @@ cell of chart 0's source. In the formula case, its first cell reads that
 second cell, so the formula stays in place and the index is not rebuilt.
 Outside edits change a literal after the source region. A formula-replacement
 edit, which rebuilds the chart index, is not measured in 0.6. The formula rows
-are named `literal-dependency-edit`. The conservative policy reports every
-computed chart on both inside
-and outside value commits. Their cost can grow with chart count. Outside
-literal edits still query the source index; a silent event stream is not a
-claim of constant time. Every sample checks event count, exact identities,
-and resolution count.
+are named `literal-dependency-edit`. The engine reports half-open rectangles of
+formulas selected by the recompute pass and of changed spill and pivot cells;
+the tracker queries the same source index with them. An outside edit therefore
+names no formula chart, and an inside edit names chart 0. A recomputed formula
+whose value stayed equal can still name its chart. Custom stores, disabled
+tracking and a full 4,096-rectangle engine report keep the conservative
+all-chart refresh. `requiredCharts` is the minimum correct set; for paired
+comparisons with a conservative base, `expectedCharts` and
+`resolutionsPerCommit` are the median charts actually named. Every sample
+checks event count, required and permitted identities, duplicates and
+resolution count.
 
 Smoke admits both full-size 20,000-chart fixtures before it records the
 200-chart timing rows, with five samples and two warmups. Setup transactions

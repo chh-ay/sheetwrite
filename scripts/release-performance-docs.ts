@@ -76,6 +76,8 @@ interface ChartTrackingEvidence {
     resolveMs?: Timing | null;
     expectedEvents: number;
     expectedCharts: number;
+    /** Minimum charts whose source value changed; absent in older captures. */
+    requiredCharts?: number;
     resolutionsPerCommit: number;
   }>;
 }
@@ -160,7 +162,9 @@ export function validateChartTrackingArtifact(
       row.commitMs.iters !== artifact.samples ||
       (row.eventMs !== null && !timing(row.eventMs)) ||
       (row.resolveMs !== undefined && row.resolveMs !== null && !timing(row.resolveMs)) ||
-      ![row.expectedEvents, row.expectedCharts, row.resolutionsPerCommit].every(nonnegative)
+      ![row.expectedEvents, row.expectedCharts, row.resolutionsPerCommit].every(nonnegative) ||
+      (row.requiredCharts !== undefined &&
+        (!nonnegative(row.requiredCharts) || row.requiredCharts > row.expectedCharts))
     ) {
       return "chart-tracking capture contains invalid or duplicate measurements";
     }

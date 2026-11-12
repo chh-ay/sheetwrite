@@ -693,6 +693,7 @@ export class StoreDataEngine {
   private pageIdleWaiters: Array<() => void> | undefined;
 
   private readonly memoryReleaseListeners = new Set<() => void>();
+  private chartRecalculations: WeakMap<ChangeEvent, Uint32Array | null> | undefined;
 
   /** Hooks of `@sheetwrite/core/functions`; `undefined` until a host function is registered. */
   hostFunctions: HostFunctionHooks | undefined;
@@ -2031,45 +2032,41 @@ export class StoreDataEngine {
     };
   }
 
-  /**
-   * Whether any cell in the rectangle takes its value from elsewhere: a formula,
-   * a cross-reference, a spill child or pivot output. Chart tracking calls it
-   * once per series range when its index is rebuilt, never per edit: the source
-   * capture walks every formula on the sheet. Callers clip the range to the
-   * sheet first.
-   */
-  chartSourcesComputed(range: Range): boolean {
-    const bounds = normalizedRange(range);
+  /** Keep one bounded engine report per commit only while charts are observed. */
+  trackChartRecalculation(enabled: boolean): void {
+    this.chartRecalculations = enabled ? new WeakMap() : undefined;
+    this.wasm.setRecalculationTracking(enabled);
+  }
 
-    // The engine writes pivot output with no document op on its cells. The output
-    // grows down and right from the anchor like a spill, so a pivot anchored at or
-    // above-left of the range end can reach it. This model test is cheap, so do it first.
-    const pivots = this.workbook.sheets.find((sheet) => sheet.id === bounds.sheet)?.pivots ?? [];
-    const pivotReaches = pivots.some(
-      (pivot) => pivot.anchor.row <= bounds.end.row && pivot.anchor.col <= bounds.end.col,
-    );
-    if (pivotReaches) return true;
+  /** Capture before any change listener can reenter the store with another commit. */
+  captureChartRecalculation(event: ChangeEvent): void {
+    this.chartRecalculations?.set(event, this.wasm.recalculatedRects() ?? null);
+  }
 
-    // Spill children carry no source of their own, so the source capture cannot see them.
-    if (this.hasSpillChildren(range)) return true;
-
-    // Include anchors above and left: an existing spill may grow into this range
-    // after a precedent changes. This conservatively follows those formulas too.
-    // Not `captureSourceProjection`: that one counts toward range-mutation statistics.
-    const snapshot = this.wasm.captureSources(
-      this.sheets.handleOf(bounds.sheet),
-      0,
-      0,
-      bounds.end.row + 1,
-      bounds.end.col + 1,
-    );
-    if (!snapshot) return false;
-
-    try {
-      return snapshot.formulaOffsets().length > 0 || snapshot.referenceOffsets().length > 0;
-    } finally {
-      snapshot.free();
+  /** Visit primitive half-open bounds; false asks the tracker to refresh conservatively. */
+  visitChartRecalculation(
+    event: ChangeEvent,
+    visit: (sheet: SheetId, r0: number, r1: number, c0: number, c1: number) => void,
+  ): boolean {
+    const rects = this.chartRecalculations?.get(event);
+    if (rects == null) return false;
+    for (let offset = 0; offset < rects.length; offset += 5) {
+      const handle = rects[offset];
+      const r0 = rects[offset + 1];
+      const r1 = rects[offset + 2];
+      const c0 = rects[offset + 3];
+      const c1 = rects[offset + 4];
+      const sheet = handle === undefined ? undefined : this.sheetIdsByHandle[handle];
+      if (
+        sheet !== undefined &&
+        r0 !== undefined &&
+        r1 !== undefined &&
+        c0 !== undefined &&
+        c1 !== undefined
+      )
+        visit(sheet, r0, r1, c0, c1);
     }
+    return true;
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
@@ -4926,6 +4923,7 @@ export class StoreDataEngine {
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
+        if (this.chartRecalculations) replacement.setRecalculationTracking(true);
         this.hostFunctions?.adopt(replacement);
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);

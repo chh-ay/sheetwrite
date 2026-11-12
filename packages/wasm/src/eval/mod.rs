@@ -805,12 +805,46 @@ impl CellStore {
     where
         I: IntoIterator<Item = usize> + Clone,
     {
+        if let (Some(changes), Some(work)) = (self.recalculation.as_deref_mut(), affected) {
+            for key in work.keys(&self.formula_slots) {
+                changes.cell(key.sheet, key.row, key.col);
+            }
+        }
         if self.pivots.is_some() {
             self.capture_pivot_changes(sheets.clone(), affected);
         }
 
         for sheet in sheets {
             if let Some(data) = self.sheets.get_mut(sheet) {
+                // Source writes detach spills into these same dirty seeds. Capture
+                // them before finishing, including cells outside the edited anchor.
+                if let Some(changes) = self.recalculation.as_deref_mut() {
+                    match data.formulas.dirty_seeds() {
+                        DirtySeeds::All => changes.rect([
+                            sheet as u32,
+                            0,
+                            data.cells.row_count() as u32,
+                            0,
+                            data.cells.n_cols() as u32,
+                        ]),
+                        DirtySeeds::Cells(cells) => {
+                            for &(row, col) in cells {
+                                changes.cell(sheet as u32, row, col);
+                            }
+                        }
+                        DirtySeeds::Ranges(rects) => {
+                            for rect in rects {
+                                changes.rect([
+                                    sheet as u32,
+                                    rect.row_start,
+                                    rect.row_end + 1,
+                                    rect.col_start,
+                                    rect.col_end + 1,
+                                ]);
+                            }
+                        }
+                    }
+                }
                 data.finish_recompute();
             }
         }
@@ -1155,6 +1189,7 @@ impl CellStore {
                         output_cells: cleared.len(),
                         cells: cleared.clone(),
                     });
+                    self.record_recalculated_cells(output_sheet, &cleared);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1172,6 +1207,7 @@ impl CellStore {
                 }
 
                 if !changed.is_empty() {
+                    self.record_recalculated_cells(output_sheet, &changed);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
