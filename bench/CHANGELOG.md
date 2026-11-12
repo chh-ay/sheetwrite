@@ -17,6 +17,7 @@
 - Verify fresh interaction smoke evidence in CI instead of validating the historical committed capture, so the gate checks the current artifact contract and measured workspace version.
 - Add default and full formula engine measurements. Keep raw time and allocation samples, output checks, and source hashes.
 - Add analysis workloads, WASM file sizes, and fresh Node initialization samples.
+- Fix four bench problems from the grid audit. Render restores now write the date serial that Sheetwrite's ingest stores, not the ISO text. `merge-heavy.paint` compares its covered cell with the value before merging, so it passes when it runs alone. `geometry-unresized.1m` times 10,000 builds per action, because one build is shorter than the browser clock, and it reports time per build. Core paths `node-cold-init` accepts a load that finishes between two heartbeat ticks. The interaction capture refuses a docs port another server already answers, stops when its docs server exits, and fails at the first page error with the failed requests and the docs server's errors, instead of waiting out a 60 s timeout. It also stops the docs server's whole process group, so Vite no longer keeps the port after a capture.
 
 ## 0.0.2
 
