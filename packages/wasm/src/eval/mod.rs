@@ -1798,7 +1798,7 @@ impl CellStore {
                 )
             }
             Ast::Num(n) => Value::number(*n),
-            Ast::Str(text) => Value::text(text.as_ref()),
+            Ast::Str(text) => Value::Text(std::rc::Rc::clone(text)),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
             Ast::Array(array) => {
