@@ -31,7 +31,7 @@
     "clippy::too_many_arguments": 106,
     "clippy::too_many_lines": 57,
     "clippy::tuple_array_conversions": 2,
-    "clippy::type_complexity": 136,
+    "clippy::type_complexity": 134,
     "clippy::undocumented_unsafe_blocks": 2,
     "clippy::uninlined_format_args": 1,
     "clippy::use_self": 1,
