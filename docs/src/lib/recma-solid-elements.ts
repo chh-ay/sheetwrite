@@ -9,7 +9,7 @@
  * It also turns the docs pipeline's React attributes into Solid's:
  * - `dangerouslySetInnerHTML={{ __html: x }}`, which the code-popover store
  *   uses (docs/src/lib/dedupe-code-popovers.ts), becomes `innerHTML={x}`;
- * - `suppressHydrationWarning`, which code blocks carry (docs/vite.config.ts),
+ * - `suppressHydrationWarning`, which code blocks carry (lib/mdx-pipeline.ts),
  *   is dropped: Solid has no such prop and would write it as an attribute;
  * - style objects get CSS property names. MDX's own `css` casing would also
  *   rewrite custom properties (Expressive Code's `--ecMaxLine` would become

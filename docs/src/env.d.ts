@@ -1,6 +1,6 @@
 /// <reference types="vite/client" />
 
-/** Expressive Code's code-block scripts; see `expressiveCodeAssets` in docs/vite.config.ts. */
+/** Expressive Code's code-block scripts; see `expressiveCodeAssets` in lib/mdx-pipeline.ts. */
 declare module "virtual:expressive-code-scripts" {
   export function installExpressiveCodeScripts(): void;
 }

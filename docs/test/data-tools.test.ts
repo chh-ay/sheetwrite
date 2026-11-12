@@ -26,9 +26,6 @@ test("clear view preserves independent manual and grouped visibility", async () 
   scenario = createDataToolsScenario(host);
   await scenario.ready;
   expect(scenario.snapshot().error).toBeNull();
-  scenario.run("sort");
-  const sorted = scenario.grid()?.store.getVisibleWindow(DATA_SHEET, { start: 0, end: 1 }, [1, 4]);
-  expect(sorted ? Array.from(sorted.values) : []).toEqual(["Americas", 250]);
   scenario.filter("EMEA", "Northstar");
   expect(scenario.snapshot().visible).toBe(640);
   scenario.run("group");

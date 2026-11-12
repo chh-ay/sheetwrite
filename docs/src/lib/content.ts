@@ -17,7 +17,7 @@ export interface DocumentFrontmatter {
 
 /** Build-inserted components a compiled page uses. */
 export interface DocumentComponents {
-  /** Install fences become this terminal at build time; see docs/vite.config.ts. */
+  /** Install fences become this terminal at build time; see lib/mdx-pipeline.ts. */
   PackageCommand: Component<{ packages: string; note?: string }>;
   /** A formula family's table and filter. */
   FormulaReference: Component<{ family: string }>;
@@ -47,9 +47,7 @@ export interface DocumentRecord {
 }
 
 /** Every docs page, from the docs site's content (generated pages included). */
-const sourceModules = import.meta.glob<DocumentModule>(
-  "../../../docs/src/content/docs/**/*.{md,mdx}",
-);
+const sourceModules = import.meta.glob<DocumentModule>("../content/docs/**/*.{md,mdx}");
 
 function hrefFromSource(source: string): string {
   const relative = source
@@ -67,7 +65,7 @@ const DOCUMENT_SOURCES = new Map(
       {
         load,
         fallbackTitle: href.split("/").filter(Boolean).at(-1)?.replaceAll("-", " ") ?? "Sheetwrite",
-        sourcePath: source.replace(/^.*\/docs\/src\//, "docs/src/"),
+        sourcePath: source.replace(/^.*\/content\/docs\//, "docs/src/content/docs/"),
       },
     ];
   }),

@@ -1,10 +1,10 @@
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 
-import { expressiveCodeAssets } from "../docs/src/lib/mdx-pipeline.ts";
+import { expressiveCodeAssets } from "./src/lib/mdx-pipeline.ts";
 import { CSS_OPTIONS, frameworkWorkbenches, REACT_WORKBENCH_FILES } from "./vite.config.ts";
 
-const DOCS_SOURCE = new URL("../docs/src/", import.meta.url).pathname;
+const DOCS_SOURCE = new URL("./src/", import.meta.url).pathname;
 
 /**
  * The script of static pages (src/islands/client.tsx), built into the site's

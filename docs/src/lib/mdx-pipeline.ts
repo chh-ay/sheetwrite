@@ -462,7 +462,7 @@ export function expressiveCodeAssets(): Plugin {
   };
 }
 
-/** The docs Markdown pipeline: docs-solid/vite.config.ts compiles every page with it. */
+/** The docs Markdown pipeline: vite.config.ts compiles every page with it. */
 export const DOCS_MDX_OPTIONS = {
   remarkPlugins: [
     remarkFrontmatter,

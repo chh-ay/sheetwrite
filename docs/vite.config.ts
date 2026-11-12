@@ -8,14 +8,14 @@ import { globSync } from "tinyglobby";
 import { defineConfig, type Plugin, type PluginOption } from "vite";
 import solid from "vite-plugin-solid";
 
-import { formulaTables } from "../docs/src/lib/formula-tables.ts";
-import { perfFigureMarkup } from "../docs/src/lib/perf-figure-markup.ts";
-import { SITE_URL } from "../docs/src/lib/seo.ts";
-import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "../docs/src/lib/mdx-pipeline.ts";
+import { formulaTables } from "./src/lib/formula-tables.ts";
+import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "./src/lib/mdx-pipeline.ts";
+import { perfFigureMarkup } from "./src/lib/perf-figure-markup.ts";
 import { SOLID_MDX_OPTIONS } from "./src/lib/recma-solid-elements.ts";
 import { rehypeDocsPictures } from "./src/lib/rehype-docs-pictures.ts";
+import { SITE_URL } from "./src/lib/seo.ts";
 
-const DOCS_SOURCE = new URL("../docs/src/", import.meta.url).pathname;
+const DOCS_SOURCE = new URL("./src/", import.meta.url).pathname;
 const CONTENT_ROOT = `${DOCS_SOURCE}content/docs/`;
 
 /** Every docs page, by address: the build prerenders each one (lib/content.ts reads the same files). */
@@ -120,7 +120,7 @@ type PageOutput = { code: string; map?: unknown } | undefined;
 function snippetSources(): Plugin {
   const PREFIX = "\0snippet-source:";
   return {
-    name: "docs-solid:snippet-sources",
+    name: "docs:snippet-sources",
     enforce: "pre",
     async resolveId(id, importer) {
       if (!id.endsWith(".mdx?source")) return null;
@@ -151,7 +151,7 @@ function docsPages(): Plugin {
 
   return {
     ...pages,
-    name: "docs-solid:pages",
+    name: "docs:pages",
     enforce: "pre",
     async transform(source, id) {
       let entry = pending.get(id);
@@ -190,23 +190,10 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: /^@docs\//, replacement: DOCS_SOURCE },
-      // Page stylesheets the content pipeline adds (lib/content-components.ts) are the docs site's.
-      { find: /^\/src\/styles\//, replacement: `${DOCS_SOURCE}styles/` },
       // The content pipeline imports Tabs, LiveGrid and RunnableCode into pages; here they are islands.
       {
         find: /^\/src\/components\/(?:Tabs|LiveGrid|RunnableCode)\.tsx$/,
         replacement: new URL("./src/islands/content.tsx", import.meta.url).pathname,
-      },
-      // Two pages import these diagrams by relative path; here they are Solid components.
-      {
-        find: /^(?:\.\.\/)+components\/(RuntimeArchitecture|CollaborationFlow)$/,
-        replacement: `${new URL("./src/components/", import.meta.url).pathname}$1.tsx`,
-      },
-      // Font files the root route preloads come from the docs site's packages.
-      {
-        find: /^@fontsource-variable\//,
-        replacement: new URL("../docs/node_modules/@fontsource-variable/", import.meta.url)
-          .pathname,
       },
     ],
   },
@@ -215,8 +202,6 @@ export default defineConfig({
   // page script (src/islands/page-scripts.ts) drops those a page does not use.
   build: { cssCodeSplit: false, cssMinify: "lightningcss" },
   worker: { format: "es" },
-  // The docs site's static files: favicon, llms.txt, the changelog feed, figures.
-  publicDir: new URL("../docs/public/", import.meta.url).pathname,
   plugins: [
     snippetSources(),
     docsPages(),
