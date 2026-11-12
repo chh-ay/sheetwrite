@@ -236,6 +236,7 @@ not a failure: it rejects with the signal's reason. See
 | An aborted XLSX or CSV/TSV call rejected with `code: "aborted"` | Rejects with `signal.reason`; persistence and IndexedDB storage keep `aborted` | [#294](https://github.com/chh-ay/sheetwrite/pull/294) |
 | `grid.summarizeSelection()` kept reading after `destroy()` | Rejects with an `AbortError` | [#315](https://github.com/chh-ay/sheetwrite/pull/315) |
 | `<Sheetwrite>` in Vue and Svelte threw a plain `Error` for a bad `height`/`fill` | `invalid-argument`, operation `create-grid` | [#320](https://github.com/chh-ay/sheetwrite/pull/320) |
+| `<Sheetwrite>` in React accepted both or neither of `height` and `fill`, and Svelte checked them after the grid mounted. Vue typed `fill` as `boolean` | React, Vue and Svelte throw `invalid-argument` (operation `create-grid`) while rendering, before a grid mounts. Vue types `fill` as `fill?: true` | [#622](https://github.com/chh-ay/sheetwrite/pull/622) |
 | `revision-failed`, `revision` | Removed with `RevisionCoordinator`; see [Revisions move to version history](#revisions-move-to-version-history) | [#390](https://github.com/chh-ay/sheetwrite/pull/390) |
 
 Before:
