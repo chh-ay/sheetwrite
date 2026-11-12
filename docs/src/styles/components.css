@@ -529,6 +529,10 @@ samp,
 
 /* ── Site header: one header on every page ──────────────────────────────── */
 .sw-header {
+  /* The page frame's edges (--sw-frame-max), so the header's content starts
+     and ends where the page's does. */
+  --sw-header-inset: max(var(--sw-page-gutter), (100% - var(--sw-frame-max)) / 2);
+
   position: sticky;
   z-index: 50;
   top: 0;
@@ -537,7 +541,7 @@ samp,
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--sw-space-2) var(--sw-space-8);
   align-items: center;
-  padding: var(--sw-space-2) var(--sw-page-inset);
+  padding: var(--sw-space-2) var(--sw-header-inset);
   border-bottom: var(--sw-border-width) solid var(--sw-border);
   background: color-mix(in srgb, var(--sw-surface-0) 92%, transparent);
   backdrop-filter: blur(12px);
@@ -664,7 +668,7 @@ samp,
     display: none;
     flex-direction: column;
     align-items: stretch;
-    padding: var(--sw-space-2) var(--sw-page-inset) var(--sw-space-4);
+    padding: var(--sw-space-2) var(--sw-header-inset) var(--sw-space-4);
     border-bottom: var(--sw-border-width) solid var(--sw-border);
     background: var(--sw-surface-0);
     box-shadow: var(--sw-shadow-md);
@@ -682,5 +686,27 @@ samp,
 
   .sw-header__search {
     justify-self: end;
+  }
+}
+
+/* Phone touch targets: the brand and the header's icon buttons keep their
+   look and get an invisible, centred 44 px area. */
+@media (max-width: 42rem) {
+  .sw-header__brand,
+  .sw-header__actions .sw-icon-button {
+    position: relative;
+  }
+  /* Room for the buttons' areas to sit side by side without overlapping. */
+  .sw-header__actions {
+    gap: var(--sw-space-2);
+  }
+  .sw-header__brand::after,
+  .sw-header__actions .sw-icon-button::after {
+    position: absolute;
+    top: min(0px, calc(50% - 22px));
+    right: min(0px, calc(50% - 22px));
+    bottom: min(0px, calc(50% - 22px));
+    left: min(0px, calc(50% - 22px));
+    content: "";
   }
 }

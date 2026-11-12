@@ -481,7 +481,7 @@ impl FormulaEntry {
 
     pub(crate) fn set_source_error(&mut self, error: Option<FormulaError>) {
         self.flags =
-            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |error| (error.slot() + 1) as u16);
+            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |known| (known.slot() + 1) as u16);
     }
 
     pub(crate) fn volatile(&self) -> bool {
@@ -567,11 +567,11 @@ impl FormulaEntry {
         reads: ReadSet,
         is_reference: bool,
     ) -> Self {
-        if let Some(ast) = ast
+        if let Some(tree) = ast
             .as_mut()
-            .filter(|ast| ast_contains_let(ast) && !ast_contains_spill_ref(ast))
+            .filter(|candidate| ast_contains_let(candidate) && !ast_contains_spill_ref(candidate))
         {
-            crate::eval::resolve_let_names(ast);
+            crate::eval::resolve_let_names(tree);
         }
         let mut entry = Self {
             ast,

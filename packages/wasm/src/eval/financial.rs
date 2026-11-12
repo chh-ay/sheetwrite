@@ -443,11 +443,11 @@ fn solve_root(
 }
 
 fn choose_bracket(
-    left: Option<RootBracket>,
-    right: Option<RootBracket>,
+    left_bracket: Option<RootBracket>,
+    right_bracket: Option<RootBracket>,
     initial_x: f64,
 ) -> Option<RootBracket> {
-    match (left, right) {
+    match (left_bracket, right_bracket) {
         (Some(left), Some(right)) => {
             if bracket_distance(left, initial_x) <= bracket_distance(right, initial_x) {
                 Some(left)
@@ -550,14 +550,14 @@ mod tests {
     }
 
     fn irr_args(cashflows: impl IntoIterator<Item = f64>, guess: Option<f64>) -> FuncAccumulator {
-        let cashflows: Vec<f64> = cashflows.into_iter().collect();
+        let collected: Vec<f64> = cashflows.into_iter().collect();
         let mut values = FuncAccumulator::default();
-        for cashflow in cashflows {
+        for cashflow in collected {
             values.push_range(Value::Number(cashflow)).unwrap();
         }
         values.finish_arg(1, values.len()).unwrap();
-        if let Some(guess) = guess {
-            values.push_scalar(Value::Number(guess)).unwrap();
+        if let Some(rate_guess) = guess {
+            values.push_scalar(Value::Number(rate_guess)).unwrap();
             values.finish_arg(1, 1).unwrap();
         }
         values

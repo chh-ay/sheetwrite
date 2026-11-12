@@ -107,10 +107,10 @@
   display: grid;
   min-width: 0;
   min-height: 0;
-  /* The rail shares the grid's height: no empty band opens above the status
-     bar, and the grid stays the tallest element on the stage. */
-  grid-template-columns: minmax(0, 1fr) 23rem;
-  height: 40rem;
+  /* The grid takes the stage's full width at a fixed height; the rail is a
+     band under it. */
+  grid-template-rows: 40rem auto;
+  grid-template-columns: minmax(0, 1fr);
   align-items: stretch;
 }
 
@@ -127,7 +127,7 @@
   min-height: 0;
   /* Task tabs, the scenario body, then the event strip on the bottom edge. */
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-left: 1px solid var(--sw-border-strong);
+  border-top: 1px solid var(--sw-border-strong);
   background: var(--sw-surface-1);
 }
 
@@ -725,13 +725,6 @@
   gap: var(--sw-space-2);
 }
 
-@media (max-width: 80rem) {
-  /* Narrower rail first, stacking last: the grid keeps the widest column. */
-  .sw-vuewb-workspace {
-    grid-template-columns: minmax(0, 1fr) 21rem;
-  }
-}
-
 @media (max-width: 64rem) {
   .sw-vuewb-main {
     height: auto;
@@ -739,10 +732,7 @@
   }
 
   .sw-vuewb-workspace {
-    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto auto;
-    /* Stacked, the rail sets its own height again. */
-    height: auto;
   }
 
   .sw-vuewb-grid {
@@ -751,8 +741,6 @@
 
   .sw-vuewb-panel {
     grid-template-rows: auto auto auto;
-    border-top: 1px solid var(--sw-border-strong);
-    border-left: 0;
   }
 
   .sw-vuewb-taskpanel {

@@ -129,6 +129,10 @@ export const EXAMPLE_TYPECHECK_NODES: readonly CommandNode[] = [
     id: "typecheck:@sheetwrite/docs-start",
     command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "typecheck"],
   },
+  {
+    id: "typecheck:@sheetwrite/docs-solid",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs-solid", "typecheck"],
+  },
 ];
 
 export const VERIFICATION_TYPECHECK_NODES: readonly CommandNode[] = [

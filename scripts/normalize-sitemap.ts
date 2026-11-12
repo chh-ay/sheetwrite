@@ -10,6 +10,7 @@
  * sitemap does too.
  */
 import { readFileSync, writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\/$/, /^\/404\/$/];
 /** A last path segment with an extension (`llms.txt`) is a file, not an HTML page. */
@@ -55,7 +56,11 @@ export function normalizeSitemap(xml: string): { xml: string; kept: number; drop
 }
 
 if (import.meta.main) {
-  const path = new URL("../docs/dist/client/sitemap.xml", import.meta.url).pathname;
+  const [clientDirectory] = process.argv.slice(2);
+  if (clientDirectory === undefined) {
+    throw new Error("usage: bun scripts/normalize-sitemap.ts <built client directory>");
+  }
+  const path = resolve(clientDirectory, "sitemap.xml");
   const { xml, kept, dropped } = normalizeSitemap(readFileSync(path, "utf8"));
   if (kept === 0) throw new Error("sitemap normalization produced zero URLs");
   writeFileSync(path, xml);

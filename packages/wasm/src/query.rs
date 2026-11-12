@@ -226,8 +226,8 @@ impl CellStore {
                     }
                     _ => None,
                 };
-                if let Some(value) = value {
-                    acc.add(value, op);
+                if let Some(found) = value {
+                    acc.add(found, op);
                 }
             }
         } else {
@@ -292,7 +292,7 @@ impl CellStore {
         }
 
         let base = col * s.cells.row_count();
-        let needle = needle.to_lowercase();
+        let lower_needle = needle.to_lowercase();
         let mut out: Vec<u32> = Vec::with_capacity(s.cells.row_count().min(1024));
         let mut cache = MatchCache::new();
 
@@ -308,19 +308,19 @@ impl CellStore {
                     KIND_STRING => cache.matches(
                         &self.strings,
                         payload_str_id(payloads[row]),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
                     KIND_NUMBER => number_matches_text(
                         payload_num(payloads[row]),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
                     KIND_BOOL => matches_needle(
                         boolean_text(payload_num(payloads[row]) != 0.0),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
@@ -329,7 +329,7 @@ impl CellStore {
                         s,
                         self,
                         base + row,
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                         &mut cache,
@@ -352,7 +352,7 @@ impl CellStore {
                     cache.matches(
                         &self.strings,
                         payload_str_id(payload),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     )
@@ -363,7 +363,7 @@ impl CellStore {
                         s,
                         self,
                         index,
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                         &mut cache,
@@ -422,10 +422,10 @@ impl CellStore {
         if next < 0 || next as usize > last {
             return if step < 0 { 0 } else { last as u32 };
         }
-        let next = next as usize;
+        let next_index = next as usize;
 
-        if occupied(pos) && occupied(next) {
-            let mut p = next;
+        if occupied(pos) && occupied(next_index) {
+            let mut p = next_index;
             loop {
                 let ahead = p as isize + step;
                 if ahead < 0 || ahead as usize > last || !occupied(ahead as usize) {
@@ -435,7 +435,7 @@ impl CellStore {
             }
         }
 
-        let mut p = next as isize;
+        let mut p = next_index as isize;
         while p >= 0 && p as usize <= last {
             if occupied(p as usize) {
                 return p as u32;
@@ -552,11 +552,11 @@ impl CellStore {
             }
             start = run.end;
         }
-        let keys = keys.rank();
+        let ranked = keys.rank();
 
         let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
         order.sort_unstable_by(|&a, &b| {
-            let ord = keys.compare(a as usize, b as usize, ascending);
+            let ord = ranked.compare(a as usize, b as usize, ascending);
             if ord == Ordering::Equal {
                 a.cmp(&b)
             } else {
@@ -629,13 +629,13 @@ impl CellStore {
                 ));
             }
         }
-        let keys = keys.rank();
+        let ranked = keys.rank();
 
         let mut positions: Vec<u32> = (0..row_count as u32).collect();
         // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
         positions.sort_by(|&left, &right| {
             for key in 0..cols.len() {
-                let order = keys.compare(
+                let order = ranked.compare(
                     key * row_count + left as usize,
                     key * row_count + right as usize,
                     ascending.get(key).copied().unwrap_or(1) != 0,
@@ -974,10 +974,10 @@ impl CellStore {
         let column = data.cells.dense_column(col);
         let occupied = |view: usize| {
             order.get(view).is_some_and(|&r| {
-                let r = r as usize;
-                let index = col * data.cells.row_count() + r;
-                r < data.cells.row_count()
-                    && match column.map(|column| column.raw_kind(r)) {
+                let data_row = r as usize;
+                let index = col * data.cells.row_count() + data_row;
+                data_row < data.cells.row_count()
+                    && match column.map(|dense| dense.raw_kind(data_row)) {
                         Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
                         Some(KIND_EMPTY) => false,
                         _ => resolved_kind(data, index, &self.formula_slots) != 0,
@@ -1137,12 +1137,12 @@ pub(crate) fn matches_needle(
     }
 
     if hay.is_ascii() && needle.is_ascii() {
-        let hay = hay.as_bytes();
-        let needle = needle.as_bytes();
+        let hay_bytes = hay.as_bytes();
+        let needle_bytes = needle.as_bytes();
         return if whole_cell {
-            hay.eq_ignore_ascii_case(needle)
+            hay_bytes.eq_ignore_ascii_case(needle_bytes)
         } else {
-            ascii_contains_ignore_case(hay, needle)
+            ascii_contains_ignore_case(hay_bytes, needle_bytes)
         };
     }
 
@@ -1341,11 +1341,11 @@ fn sort_finite_number_column_comparison(
 
     keyed.sort_unstable_by(|&(left, a), &(right, b)| {
         let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
-        let ord = if ascending { ord } else { ord.reverse() };
-        if ord == Ordering::Equal {
+        let directed = if ascending { ord } else { ord.reverse() };
+        if directed == Ordering::Equal {
             a.cmp(&b)
         } else {
-            ord
+            directed
         }
     });
     Some(keyed.into_iter().map(|(_, row)| row).collect())
@@ -1467,9 +1467,9 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
     if next < 0 || next as usize > last {
         return if step < 0 { 0 } else { last };
     }
-    let next = next as usize;
-    if occupied(pos) && occupied(next) {
-        pos = next;
+    let next_index = next as usize;
+    if occupied(pos) && occupied(next_index) {
+        pos = next_index;
         loop {
             let ahead = pos as isize + step;
             if ahead < 0 || ahead as usize > last || !occupied(ahead as usize) {
@@ -1478,7 +1478,7 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
             pos = ahead as usize;
         }
     }
-    let mut candidate = next as isize;
+    let mut candidate = next_index as isize;
     while candidate >= 0 && candidate as usize <= last {
         if occupied(candidate as usize) {
             return candidate as usize;
@@ -1554,13 +1554,13 @@ impl<'a> ComparableCell<'a> {
         if sheet.cells.is_paged() {
             return Self::from_cell(sheet, strings, index, slots);
         }
-        let (kind, payload) = run.source(index);
+        let (source_kind, source_payload) = run.source(index);
         // Spill owners install calculated output in these same dense slots.
         // Read the bounded run directly; ownership needs no per-row hash probe.
-        let (kind, payload) = if kind == KIND_EMPTY {
+        let (kind, payload) = if source_kind == KIND_EMPTY {
             run.resolved(index)
         } else {
-            (kind, payload)
+            (source_kind, source_payload)
         };
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
@@ -1698,11 +1698,13 @@ impl SortKeyBuilder {
     }
 
     fn collation_cmp(&self, a: u32, b: u32) -> Ordering {
-        let a = self.texts[a as usize];
-        let b = self.texts[b as usize];
-        let a_key = &self.arena[a.start as usize..a.end as usize];
-        let b_key = &self.arena[b.start as usize..b.end as usize];
-        a_key.cmp(b_key).then(a.has_hyphen.cmp(&b.has_hyphen))
+        let a_text = self.texts[a as usize];
+        let b_text = self.texts[b as usize];
+        let a_key = &self.arena[a_text.start as usize..a_text.end as usize];
+        let b_key = &self.arena[b_text.start as usize..b_text.end as usize];
+        a_key
+            .cmp(b_key)
+            .then(a_text.has_hyphen.cmp(&b_text.has_hyphen))
     }
 }
 

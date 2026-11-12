@@ -124,6 +124,7 @@ export class TextMirror {
   sync(): void {
     const box = boxIn(this.field, layerParent(this.field));
     const style = this.layer.style;
+    style.lineHeight = this.lineHeight(getComputedStyle(this.field));
     style.left = `${box.left}px`;
     style.top = `${box.top}px`;
     style.width = `${box.width}px`;

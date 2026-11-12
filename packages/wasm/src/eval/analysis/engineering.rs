@@ -1,6 +1,8 @@
 //! Engineering functions for number bases, bits, steps and the error
 //! function: `BIN2DEC`, `BITAND`, `DELTA`, `ERF` and their relatives.
 
+use std::borrow::Cow;
+
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
 use super::super::value::text_from_value;
 use super::distributions::gamma_probability;
@@ -141,7 +143,7 @@ fn digits_argument(values: &FuncAccumulator) -> Result<String, FormulaError> {
     match values.arg_value(0).unwrap_or(&Value::Blank) {
         Value::Bool(_) => Err(FormulaError::Value),
         Value::Number(number) if *number < 0.0 || number.fract() != 0.0 => Err(FormulaError::Num),
-        value => text_from_value(value),
+        value => text_from_value(value).map(Cow::into_owned),
     }
 }
 
@@ -206,8 +208,8 @@ fn format_digits(number: i64, radix: Radix, places: Option<usize>) -> Result<Str
     let text = digits(number, radix.base);
 
     match places {
-        Some(places) if text.len() > places => Err(FormulaError::Num),
-        Some(places) => Ok(format!("{text:0>places$}")),
+        Some(width) if text.len() > width => Err(FormulaError::Num),
+        Some(width) => Ok(format!("{text:0>width$}")),
         None => Ok(text),
     }
 }
@@ -491,7 +493,7 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
 
-        for (name, arguments, published) in [
+        for (name, inputs, published) in [
             ("ERF", vec![0.745], 0.70792892),
             ("ERF", vec![1.0, 2.0], 0.15262147),
             ("ERF.PRECISE", vec![0.745], 0.70792892),
@@ -499,7 +501,7 @@ mod tests {
             ("ERFC", vec![1.0], 0.15729921),
             ("ERFC.PRECISE", vec![1.0], 0.15729921),
         ] {
-            let arguments: Vec<Value> = arguments.into_iter().map(number).collect();
+            let arguments: Vec<Value> = inputs.into_iter().map(number).collect();
             let Value::Number(actual) = call(name, &arguments) else {
                 panic!("{name} returned an error");
             };

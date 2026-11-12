@@ -11,7 +11,7 @@ import type {
   WorkbookTable,
 } from "@sheetwrite/core";
 
-import type { LiveScenario } from "../use-live-scenario.js";
+import type { LiveScenario } from "./live-scenario.js";
 import { createListeners, mountShowcaseShell, requireApplied } from "./showcase-shell.js";
 
 // The dashboards showcase: an Orders table on a worksheet, and a dashboard

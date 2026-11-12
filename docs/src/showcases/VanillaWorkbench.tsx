@@ -695,6 +695,7 @@ export default function VanillaWorkbench({ renderer, data, onSpecChange }: Vanil
                     checked={readOnly}
                     onChange={(event) => toggleReadOnly(event.target.checked)}
                   />
+                  <span aria-hidden="true" className="sw-vw-toggle__track" />
                   Read-only
                 </label>
               </div>
