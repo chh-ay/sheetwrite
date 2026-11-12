@@ -46,7 +46,7 @@ import {
   type SheetwriteErrorContext,
 } from "../errors.js";
 import { installExternalLinks, removeExternalLinks } from "../external-link.js";
-import { decodePreview, type FormulaPreview } from "../formula-preview.js";
+import { decodePreview, type FormulaPreview } from "./formula-preview-result.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {

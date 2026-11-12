@@ -282,6 +282,7 @@ impl SafetyWalk<'_> {
         allow(
             unused_variables,
             clippy::unused_self,
+            clippy::needless_pass_by_ref_mut,
             reason = "the default engine has no host functions or LAMBDA"
         )
     )]
