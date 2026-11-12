@@ -23,7 +23,7 @@ struct FirstPeriodBond {
     basis: Basis,
 }
 
-/// ODDFPRICE and ODDFYIELD(settlement, maturity, issue, first_coupon, rate,
+/// ODDFPRICE and ODDFYIELD(settlement, maturity, issue, `first_coupon`, rate,
 /// yld or pr, redemption, frequency, [basis]).
 pub(super) fn first_period(values: &FuncAccumulator, is_yield: bool) -> NumberResult {
     require_arity(values, 8, 9)?;
@@ -209,7 +209,7 @@ struct LastPeriodShares {
     remaining: f64,
 }
 
-/// ODDLPRICE and ODDLYIELD(settlement, maturity, last_interest, rate, yld
+/// ODDLPRICE and ODDLYIELD(settlement, maturity, `last_interest`, rate, yld
 /// or pr, redemption, frequency, [basis]).
 pub(super) fn last_period(values: &FuncAccumulator, is_yield: bool) -> NumberResult {
     require_arity(values, 7, 8)?;

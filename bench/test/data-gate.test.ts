@@ -84,10 +84,6 @@ test("rejects drifted identity, metadata, matrix cells and query resources", () 
   }
   expectRejections(smokeFixture, validate, [
     [
-      (result) => Reflect.set(result.meta.engineVersions, "handsontable", "^18.1.2"),
-      "engineVersions.handsontable",
-    ],
-    [
       (result) => Reflect.set(result, "protocolVersion", PERFORMANCE_GATE_PROTOCOL_VERSION),
       "data stale protocol: expected 2, observed 1",
     ],

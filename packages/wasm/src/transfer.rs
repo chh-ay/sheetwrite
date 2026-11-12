@@ -129,7 +129,7 @@ impl Writer {
     }
 
     pub(crate) fn error(&mut self, error: Option<FormulaError>) {
-        self.u32(error.map_or(u32::MAX, |error| error.slot() as u32));
+        self.u32(error.map_or(u32::MAX, |known| known.slot() as u32));
     }
 }
 

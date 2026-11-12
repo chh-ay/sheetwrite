@@ -75,13 +75,13 @@ impl FormulaBits {
             self.grow_to(word);
         }
         let mask = 1u64 << (index % BITS_PER_WORD);
-        let Some(word) = self.words.get_mut(word) else {
+        let Some(bits) = self.words.get_mut(word) else {
             return false;
         };
-        if *word & mask != 0 {
+        if *bits & mask != 0 {
             return false;
         }
-        *word |= mask;
+        *bits |= mask;
         self.count += 1;
         true
     }
@@ -864,7 +864,7 @@ impl FormulaResults {
     /// above those in use and drop them before it returns, so the frame comes
     /// back as it was lent.
     #[cfg(feature = "analysis")]
-    pub(crate) fn swap_scratch(&mut self, other: &mut FormulaResults) {
+    pub(crate) fn swap_scratch(&mut self, other: &mut Self) {
         std::mem::swap(&mut self.scratch, &mut other.scratch);
     }
 

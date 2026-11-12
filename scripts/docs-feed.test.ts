@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { RELEASES } from "../docs/src/lib/releases.js";
+import { RELEASES, releaseHref } from "../docs/src/lib/releases.js";
 import { SITE_URL } from "../docs/src/lib/seo.js";
 import { CHANGELOG_FEED_HREF, expectedChangelogFeed } from "./docs-feed.js";
 
@@ -43,7 +43,10 @@ describe("changelog feed", () => {
     const published = RELEASES.filter(
       (release) => !("unreleased" in release && release.unreleased === true),
     );
-    expect(rssItems(feed.content)).toHaveLength(published.length);
+    // Same releases, newest first: a feed of the right size can still name the wrong versions.
+    expect(rssItems(feed.content).map((item) => text(item, "guid"))).toEqual(
+      published.map((release) => `${SITE_URL}${releaseHref(release.version)}`),
+    );
     expect(feed.content).toContain(
       `<atom:link href="${SITE_URL}${CHANGELOG_FEED_HREF}" rel="self"`,
     );

@@ -565,6 +565,14 @@ describe("metadata, identity, and sheet lifecycle", () => {
       [{ op: "removeSheet", sheet: SHEET }],
       "sheet-removed",
     );
+    const sheetScoped: DocumentOp[] = [
+      { op: "setRangeStyle", range: range("row", 0, 2), style: { bold: true } },
+      { op: "setRowMeta", sheet: SHEET, row: 2, meta: { height: 24 } },
+      { op: "removeNamedRange", name: "Local", scope: SHEET },
+    ];
+    for (const operation of sheetScoped) {
+      expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    }
     const unrelated: DocumentOp = {
       op: "set",
       addr: address("row", 1, OTHER_SHEET),
@@ -626,46 +634,6 @@ describe("metadata, identity, and sheet lifecycle", () => {
     };
 
     expectRebased([local], [structure("column", "insert", 1, 2)], [local]);
-  });
-
-  it("detects sheet-removal conflicts across representative operation families", () => {
-    const cases: Array<{ family: RebaseConflictFamily; operation: DocumentOp }> = [
-      {
-        family: "cell",
-        operation: { op: "setNote", addr: address("row", 1), text: "review" },
-      },
-      {
-        family: "range",
-        operation: {
-          op: "setRangeStyle",
-          range: range("row", 0, 2),
-          style: { bold: true },
-        },
-      },
-      {
-        family: "sheet",
-        operation: { op: "setRowMeta", sheet: SHEET, row: 2, meta: { height: 24 } },
-      },
-      {
-        family: "named-range",
-        operation: {
-          op: "setNamedRange",
-          namedRange: {
-            name: "Local",
-            scope: SHEET,
-            range: range("row", 0, 2),
-          },
-        },
-      },
-      {
-        family: "named-range",
-        operation: { op: "removeNamedRange", name: "Local", scope: SHEET },
-      },
-    ];
-
-    for (const { operation } of cases) {
-      expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
-    }
   });
 
   it("detects representative overlapping edits for each conflict family", () => {

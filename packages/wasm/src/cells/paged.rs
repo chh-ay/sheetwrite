@@ -461,7 +461,7 @@ impl PagedStorage {
         byte_budget: usize,
         max_dirty_cells: usize,
     ) -> Result<Self, String> {
-        let chunk_rows = Some(chunk_rows.max(1))
+        let rounded_chunk_rows = Some(chunk_rows.max(1))
             .filter(|&rows| rows <= MAX_PAGE_CHUNK_ROWS)
             .map(usize::next_power_of_two)
             .ok_or_else(|| {
@@ -469,9 +469,11 @@ impl PagedStorage {
             })?;
 
         Ok(Self {
-            chunk_rows,
-            page_shift: chunk_rows.trailing_zeros(),
-            calculated_shift: chunk_rows.trailing_zeros().min(MAX_CALCULATED_BLOCK_SHIFT),
+            chunk_rows: rounded_chunk_rows,
+            page_shift: rounded_chunk_rows.trailing_zeros(),
+            calculated_shift: rounded_chunk_rows
+                .trailing_zeros()
+                .min(MAX_CALCULATED_BLOCK_SHIFT),
             byte_budget,
             max_dirty_cells,
             pages: Directory::default(),
@@ -714,7 +716,7 @@ impl PagedStorage {
 
     pub(super) fn clean_loaded(&self, row: usize, col: usize) -> bool {
         let (clean, offset) = self.clean_page(row, col);
-        clean.is_some_and(|clean| bit(&clean.loaded, offset))
+        clean.is_some_and(|page| bit(&page.loaded, offset))
     }
 
     #[inline]
@@ -757,16 +759,16 @@ impl PagedStorage {
         }
 
         self.touch(id);
-        let clean = &self.clean[clean as usize];
+        let clean_page = &self.clean[clean as usize];
 
-        if !bit(&clean.loaded, offset) {
+        if !bit(&clean_page.loaded, offset) {
             return (KIND_EMPTY, 0, 0, false, false);
         }
 
         (
-            clean.kind[offset],
-            clean.payload[offset],
-            clean.style[offset],
+            clean_page.kind[offset],
+            clean_page.payload[offset],
+            clean_page.style[offset],
             true,
             false,
         )
@@ -1181,13 +1183,14 @@ impl PagedStorage {
         let mut next = std::mem::take(&mut self.scratch);
 
         for &[r0, r1, c0, c1] in bands.as_chunks::<4>().0 {
-            let [r0, r1, c0, c1] = [r0 as usize, r1 as usize, c0 as usize, c1 as usize];
-            if r0 >= r1 {
+            let [first_row, end_row, first_col, end_col] =
+                [r0 as usize, r1 as usize, c0 as usize, c1 as usize];
+            if first_row >= end_row {
                 continue;
             }
 
-            for col in c0..c1 {
-                for page in r0 >> self.page_shift..=(r1 - 1) >> self.page_shift {
+            for col in first_col..end_col {
+                for page in first_row >> self.page_shift..=(end_row - 1) >> self.page_shift {
                     self.collect_pin(col, page, &mut next);
                 }
             }

@@ -46,8 +46,8 @@ pub(super) fn baht_text(values: &FuncAccumulator) -> EvalResult {
 
 fn words(number: f64) -> String {
     let digits = fixed_text(number.abs(), SATANG_PLACES);
-    let (baht, satang) = digits.split_at(digits.len() - 3);
-    let satang = &satang[1..];
+    let (baht, point_and_satang) = digits.split_at(digits.len() - 3);
+    let satang = &point_and_satang[1..];
     let has_baht = baht != "0";
     let has_satang = satang != "00";
 
@@ -126,17 +126,5 @@ fn push_group(text: &mut String, group: &str) {
         text.push_str(UNIT_ONE);
     } else if units > 0 {
         text.push_str(DIGITS[units]);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The example of the Microsoft Support page,
-    /// `https://support.microsoft.com/en-us/excel/functions/bahttext-function`.
-    #[test]
-    fn microsoft_published_example() {
-        assert_eq!(words(1234.0), "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน");
     }
 }

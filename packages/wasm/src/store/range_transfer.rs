@@ -34,9 +34,9 @@ impl RangeSnapshot {
 /// string of the range's own pool, before any cell reaches the store.
 #[cfg(any(target_arch = "wasm32", test))]
 fn check_range_cells(kind: &[u8], payload: &[u64], strings: usize) -> TransferResult<()> {
-    let kinds_valid = kind.iter().all(|&kind| kind <= KIND_FORMULA);
-    let strings_valid = payload.iter().all(|&payload| {
-        let id = payload_str_id(payload);
+    let kinds_valid = kind.iter().all(|&cell_kind| cell_kind <= KIND_FORMULA);
+    let strings_valid = payload.iter().all(|&cell_payload| {
+        let id = payload_str_id(cell_payload);
         id == NO_STRING || (id as usize) < strings
     });
     if !kinds_valid || !strings_valid {

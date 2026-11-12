@@ -1,5 +1,6 @@
 //! Cached formula values, coercion, comparison, aggregation, and text formatting.
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 
 use crate::cells::{payload_num, payload_str_id};
@@ -19,8 +20,8 @@ pub(super) fn cached_formula_value(
     index: usize,
     error: Option<FormulaError>,
 ) -> Value {
-    if let Some(error) = error {
-        return Value::Error(error);
+    if let Some(stored) = error {
+        return Value::Error(stored);
     }
 
     let Some((kind, payload)) = sheet.cells.calculated_cell_at(index) else {
@@ -80,16 +81,16 @@ pub(super) fn number_from_text(text: &str) -> Result<f64, FormulaError> {
         return Ok(serial);
     }
     if let Some((date, time)) = parse_time_with_date(trimmed) {
-        return Ok(date.map_or(time, |date| date.floor() + time));
+        return Ok(date.map_or(time, |day| day.floor() + time));
     }
     parse_number(trimmed, '.', Some(','), InnerSpaces::Reject)
 }
 
 pub(super) fn number_from_value(value: &Value) -> Result<f64, FormulaError> {
     match value {
-        Value::Number(value) if value.is_finite() => Ok(*value),
+        Value::Number(number) if number.is_finite() => Ok(*number),
         Value::Number(_) => Err(FormulaError::Num),
-        Value::Bool(value) => Ok(if *value { 1.0 } else { 0.0 }),
+        Value::Bool(flag) => Ok(if *flag { 1.0 } else { 0.0 }),
         Value::Text(text) if text.trim().is_empty() => Ok(0.0),
         Value::Text(text) => number_from_text(text),
         Value::Blank => Ok(0.0),
@@ -99,27 +100,32 @@ pub(super) fn number_from_value(value: &Value) -> Result<f64, FormulaError> {
 
 pub(super) fn bool_from_value(value: &Value) -> Result<bool, FormulaError> {
     match value {
-        Value::Bool(value) => Ok(*value),
-        Value::Number(value) if value.is_finite() => Ok(*value != 0.0),
+        Value::Bool(flag) => Ok(*flag),
+        Value::Number(number) if number.is_finite() => Ok(*number != 0.0),
         Value::Number(_) => Err(FormulaError::Num),
-        Value::Text(text) => match text.trim().to_ascii_uppercase().as_str() {
-            "TRUE" => Ok(true),
-            "FALSE" => Ok(false),
-            _ => Err(FormulaError::Value),
-        },
+        Value::Text(text) => {
+            let trimmed = text.trim();
+            if trimmed.eq_ignore_ascii_case("TRUE") {
+                Ok(true)
+            } else if trimmed.eq_ignore_ascii_case("FALSE") {
+                Ok(false)
+            } else {
+                Err(FormulaError::Value)
+            }
+        }
         Value::Blank => Ok(false),
         Value::Error(error) => Err(*error),
     }
 }
 
-pub(super) fn text_from_value(value: &Value) -> Result<String, FormulaError> {
+pub(super) fn text_from_value(value: &Value) -> Result<Cow<'_, str>, FormulaError> {
     match value {
-        Value::Number(value) if value.is_finite() => Ok(general_text(*value)),
+        Value::Number(number) if number.is_finite() => Ok(Cow::Owned(general_text(*number))),
         Value::Number(_) => Err(FormulaError::Num),
-        Value::Text(text) => Ok(text.to_string()),
-        Value::Bool(value) => Ok(bool_text(*value).to_string()),
+        Value::Text(text) => Ok(Cow::Borrowed(text)),
+        Value::Bool(flag) => Ok(Cow::Borrowed(bool_text(*flag))),
         Value::Error(error) => Err(*error),
-        Value::Blank => Ok(String::new()),
+        Value::Blank => Ok(Cow::Borrowed("")),
     }
 }
 
@@ -137,8 +143,11 @@ pub(super) fn compare_text_case_insensitive(left: &str, right: &str) -> Ordering
     left.to_lowercase().cmp(&right.to_lowercase())
 }
 
-pub(super) fn compare_values(left: &Value, right: &Value) -> Result<Ordering, FormulaError> {
-    match (left, right) {
+pub(super) fn compare_values(
+    left_value: &Value,
+    right_value: &Value,
+) -> Result<Ordering, FormulaError> {
+    match (left_value, right_value) {
         (Value::Blank, Value::Blank) => Ok(Ordering::Equal),
         (Value::Blank, Value::Number(right)) => 0.0f64.partial_cmp(right).ok_or(FormulaError::Num),
         (Value::Number(left), Value::Blank) => left.partial_cmp(&0.0).ok_or(FormulaError::Num),
@@ -152,7 +161,7 @@ pub(super) fn compare_values(left: &Value, right: &Value) -> Result<Ordering, Fo
         }
         (Value::Text(left), Value::Text(right)) => Ok(compare_text_case_insensitive(left, right)),
         (Value::Bool(left), Value::Bool(right)) => Ok(left.cmp(right)),
-        _ => Ok(value_rank(left).cmp(&value_rank(right))),
+        _ => Ok(value_rank(left_value).cmp(&value_rank(right_value))),
     }
 }
 
@@ -171,13 +180,13 @@ pub(super) fn aggregate_number(
     from_range: bool,
 ) -> Result<Option<f64>, FormulaError> {
     match value {
-        Value::Number(value) if value.is_finite() => Ok(Some(*value)),
+        Value::Number(number) if number.is_finite() => Ok(Some(*number)),
         Value::Number(_) => Err(FormulaError::Num),
-        Value::Bool(value) => {
+        Value::Bool(flag) => {
             if from_range {
                 Ok(None)
             } else {
-                Ok(Some(if *value { 1.0 } else { 0.0 }))
+                Ok(Some(if *flag { 1.0 } else { 0.0 }))
             }
         }
         Value::Text(text) => {
@@ -196,7 +205,7 @@ pub(super) fn aggregate_number(
 /// formatter cannot read gives the General text of the number.
 pub(super) fn format_basic_text(value: &Value, format: &str) -> Result<String, FormulaError> {
     let Value::Number(number) = value else {
-        return text_from_value(value);
+        return text_from_value(value).map(Cow::into_owned);
     };
 
     if !number.is_finite() {

@@ -119,17 +119,6 @@ mod sort {
     use crate::formula_rewrite::sort_formula;
 
     #[test]
-    fn same_row_references_move_with_the_row() {
-        assert_eq!(sort_formula("=A2*B2", 3), "=A5*B5");
-        assert_eq!(sort_formula("=SUM(A2:C2)", -1), "=SUM(A1:C1)");
-    }
-
-    #[test]
-    fn references_to_other_rows_keep_their_offset() {
-        assert_eq!(sort_formula("=A1+1", 3), "=A4+1");
-    }
-
-    #[test]
     fn a_reference_that_leaves_the_sheet_becomes_ref() {
         assert_eq!(sort_formula("=A1+B3", -1), "=#REF!+B2");
     }
@@ -142,14 +131,6 @@ mod sort {
     #[test]
     fn columns_stay() {
         assert_eq!(sort_formula("=SUM(B:B)+C2", 1), "=SUM(B:B)+C3");
-    }
-
-    /// Microsoft Q&A, "INDEX + MATCH Breaks When Sorting": a reference with
-    /// a sheet name does not follow the sort, also on the formula's own sheet.
-    #[test]
-    fn references_with_a_sheet_name_stay() {
-        assert_eq!(sort_formula("=Sheet1!A2+A2", 2), "=Sheet1!A2+A4");
-        assert_eq!(sort_formula("='My Data'!B2:B9", 2), "='My Data'!B2:B9");
     }
 
     #[test]

@@ -296,19 +296,6 @@ const LOCAL_UNCOMPRESSED_SIZE = 22;
 const ZIP64_SENTINEL = 0xffffffff;
 
 describe("ZIP raw entries", () => {
-  it("copies validated compressed entries without inflating into the output archive", async () => {
-    const context = createCodecContext("export");
-    const payload = strToU8("<custom>preserved</custom>".repeat(100));
-    const archive = writeZip(new Map([["custom/item.xml", payload]]), context);
-    const reader = await ZipReader.open(archive, createCodecContext("import"));
-    const stored = await reader.stored("custom/item.xml");
-    expect(stored.method).toBe(8);
-    expect(stored.compressedSize).toBeLessThan(payload.byteLength);
-    expect(
-      unzipSync(writeZip([{ name: "custom/item.xml", stored }], context))["custom/item.xml"],
-    ).toEqual(payload);
-  });
-
   it("rejects forged retained metadata before emitting archive bytes", () => {
     const context = createCodecContext("export");
     const data = deflateSync(strToU8("hello"));

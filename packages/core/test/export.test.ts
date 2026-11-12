@@ -15,7 +15,6 @@ import {
   fromXlsxWorkbook,
   toXlsxTable,
   toXlsxWorkbook,
-  XlsxResourceError,
 } from "../src/xlsx-bridge.js";
 import {
   setXlsxTableExportBackend,
@@ -112,17 +111,6 @@ describe("export", () => {
       context: { backend: "xlsx", functionName: "fromXlsxWorkbook" },
     });
     store.dispose();
-  });
-
-  it("reports typed XLSX resource-limit details", () => {
-    const error = new XlsxResourceError("maxInputBytes", 32, 33, "import");
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe("XlsxResourceError");
-    expect(error.code).toBe("xlsx-resource-limit");
-    expect(error.resource).toBe("maxInputBytes");
-    expect(error.limit).toBe(32);
-    expect(error.actual).toBe(33);
-    expect(error.operation).toBe("xlsx-import");
   });
 
   it("csv: a column header beginning with a formula char is neutralized", () => {

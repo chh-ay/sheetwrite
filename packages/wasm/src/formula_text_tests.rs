@@ -59,6 +59,10 @@ fn a_sheet_rename_changes_only_the_sheet_names() {
             "=IF('Sales Data'!A1>0,\"Sales!A1\",('Sales Data'!B1))",
         ]
     );
+
+    // A quote in the new name is doubled inside the quoted sheet name.
+    assert!(store.rename_sheet(sales, "sales", "O'Brien"));
+    assert_eq!(texts(&store, summary, 0, 1), ["='O''Brien'!A1+1"]);
 }
 
 #[test]
@@ -70,6 +74,7 @@ fn a_row_or_column_edit_changes_only_the_moved_references() {
         "=(B1+C1)/2",
         "=LET(x, B2, x*2)",
         "= B1 & \" B1 \"",
+        " =  B1 & \" λ \"  ",
     ];
     enter(&mut store, sales, &formulas);
 
@@ -82,6 +87,7 @@ fn a_row_or_column_edit_changes_only_the_moved_references() {
             "=(B2+C2)/2",
             "=LET(x, B3, x*2)",
             "= B2 & \" B1 \"",
+            " =  B2 & \" λ \"  ",
         ]
     );
 
@@ -95,6 +101,7 @@ fn a_row_or_column_edit_changes_only_the_moved_references() {
             "=(C1+D1)/2",
             "=LET(x, C2, x*2)",
             "= C1 & \" B1 \"",
+            " =  C1 & \" λ \"  ",
         ]
     );
 }
