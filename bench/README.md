@@ -955,8 +955,8 @@ mkdir v0.5.4 && (cd v0.5.4 && echo '{"type":"module"}' > package.json && \
 # The same for 0.6.1. For an unpublished commit, build its packages, run
 # `bun pm pack` in packages/{wasm,formulas,core,xlsx} and install the tarballs.
 
-# On an otherwise idle machine (Linux: bench-run --exclusive taskset -c 0-19;
-# Mac: ~/learn/mac-quiet):
+# On an otherwise idle machine (Linux: `<bench-run> --exclusive taskset -c 0-19`;
+# Mac: `<mac-quiet> <name>`, the Mac timing lock):
 bun run bench:version-comparison -- run --machine Linux --rounds 8 \
   --version 0.5.4=v0.5.4 --version 0.6.1=v0.6.1 --version 0.7.0=v0.7.0 \
   --commit 0.7.0=<sha> --output linux.json

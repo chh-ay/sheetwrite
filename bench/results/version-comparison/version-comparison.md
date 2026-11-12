@@ -56,8 +56,8 @@ default engine and 8% on the full engine, both well above the 1.1% spread.
   Run under `bench-run --exclusive` (every benchmark slot and the quiet lock
   held, so no build or other benchmark ran), on all CPUs
   (`taskset -c 0-19`), as the release formula captures do.
-- Mac: Apple M5 Pro, 15 logical CPUs, macOS 27.2, Bun 1.4.4. Run under
-  `~/learn/mac-quiet` (the Mac timing lock).
+- Mac: Apple M5 Pro, 15 logical CPUs, macOS 27.2, Bun 1.4.4. Run under the
+  Mac timing lock (`<mac-quiet>`), so no other timing run overlapped.
 - 8 rounds per machine. Each round runs every version and engine in fresh
   processes: versions 0.5.4, 0.6.1, 0.7.0 in even rounds and the reverse in odd
   rounds; engines default then full in even rounds, the reverse in odd rounds.
@@ -142,8 +142,8 @@ per process; the process median, then the median over rounds.
 bun bench/src/version-comparison.ts run --machine Linux --rounds 8 \
   --version 0.5.4=v0.5.4 --version 0.6.1=v0.6.1 --version 0.7.0=v0.7.0 \
   --commit 0.7.0=<release sha> --output linux.json
-# Linux: prefix with `/home/vvin/learn/bench-run --exclusive taskset -c 0-19`;
-# Mac: prefix with `~/learn/mac-quiet <name>` and use --machine Mac.
+# Linux: prefix with `<bench-run> --exclusive taskset -c 0-19`;
+# Mac: prefix with `<mac-quiet> <name>` (the timing lock) and use --machine Mac.
 bun bench/src/version-comparison.ts report --input linux.json --input mac.json \
   --output table.md
 ```
