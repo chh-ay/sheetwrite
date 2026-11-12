@@ -289,14 +289,14 @@ async function collectCallers(
   }
 }
 
-/** Audit built bindings. Only executable package/test sources count, not generated glue or declarations. */
+/** Audit built bindings. Only executable package/test/bench sources count, not generated glue or declarations. */
 export async function auditEngineExports(root: string): Promise<EngineExportAudit> {
   const bindingPaths = BINDINGS.map((binding) => resolve(root, binding));
   for (const binding of bindingPaths) {
     if (!existsSync(binding))
       throw new Error(`Missing ${relative(root, binding)}; run bun run build:packages first`);
   }
-  const callers = ["packages", "test"].flatMap((directory) => {
+  const callers = ["packages", "test", "bench/src"].flatMap((directory) => {
     const path = resolve(root, directory);
     return existsSync(path) ? sourceFiles(path) : [];
   });
@@ -332,7 +332,7 @@ export async function auditEngineExports(root: string): Promise<EngineExportAudi
         .filter((entry) => entry.callers.size === 0 && !entry.publicReason)
         .map(
           (entry) =>
-            `${relative(root, entry.binding)}: ${entry.name} has no package/test caller; remove it or document @enginePublic with a reason`,
+            `${relative(root, entry.binding)}: ${entry.name} has no package/test/bench caller; remove it or document @enginePublic with a reason`,
         );
       return { exports, issues: [...bindingNameIssues(root), ...issues] };
     } finally {

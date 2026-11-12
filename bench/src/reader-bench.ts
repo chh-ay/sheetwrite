@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { validateExactMatrix } from "./gate-protocol.js";
+import { writeNumberColumn, writeStringColumn, type PackedFixtureStore } from "./packed-fixture.js";
 import { now, summarize } from "./stats.js";
 
 const ROWS = 100_000;
@@ -223,21 +224,7 @@ interface Engine {
   setString(sheet: number, row: number, col: number, value: string, style: number): void;
   setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
   setFormula(sheet: number, row: number, col: number, src: string, style: number): number;
-  setColumnNumbers(
-    sheet: number,
-    col: number,
-    startRow: number,
-    values: Float64Array,
-    style: number,
-  ): void;
-  setColumnStringsPacked(
-    sheet: number,
-    col: number,
-    startRow: number,
-    buf: string,
-    utf16Lens: Uint32Array,
-    style: number,
-  ): void;
+  setBlockPacked: PackedFixtureStore["setBlockPacked"];
   setConditionalRules(
     sheet: number,
     kinds: Uint8Array,
@@ -487,14 +474,14 @@ class FixtureWriter {
     const store = this.#store;
     const sheet = store.addSheet(columns, ROWS);
     const columnA = this.#randomNumbers(ROWS);
-    store.setColumnNumbers(sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
+    writeNumberColumn(store, sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
     this.#writeLabels(sheet, COLUMN_B);
     this.#writeMixed(sheet, COLUMN_C);
     this.#writeDoublingFormulas(sheet, COLUMN_D);
     if (columns === MAIN_COLUMNS) {
       this.#writeNumbersWithGaps(sheet, COLUMN_E);
       for (let col = COLUMN_E + 1; col < MAIN_COLUMNS; col++) {
-        store.setColumnNumbers(sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
+        writeNumberColumn(store, sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
       }
     }
 
@@ -515,8 +502,7 @@ class FixtureWriter {
       { length: ROWS },
       () => `item-${Math.floor(this.nextUnit() * DISTINCT_LABELS)}`,
     );
-    const lengths = Uint32Array.from(labels, (label) => label.length);
-    this.#store.setColumnStringsPacked(sheet, col, 0, labels.join(""), lengths, DEFAULT_STYLE);
+    writeStringColumn(this.#store, sheet, col, 0, labels, DEFAULT_STYLE);
   }
 
   /** Column C: number, text, boolean and blank cells in turn. */
@@ -556,7 +542,8 @@ class FixtureWriter {
     let start = 0;
     for (const gap of [...EDGE_GAP_ROWS, ROWS]) {
       if (gap > start) {
-        this.#store.setColumnNumbers(
+        writeNumberColumn(
+          this.#store,
           sheet,
           col,
           start,

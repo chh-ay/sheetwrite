@@ -16,6 +16,7 @@ test("engine caller audit resolves aliases, getters and structural callers but r
         write(): void;
         aliasWrite(): void;
         bracketWrite(): void;
+        benchOnly(): void;
         setNumber(value: number): void;
         readonly rows: number;
         unused(): void;
@@ -76,6 +77,10 @@ test("engine caller audit resolves aliases, getters and structural callers but r
       const unrelated = { unused() {} };
       unrelated.unused();
     `,
+    "bench/src/caller.ts": `
+      import { CellStore } from "../../packages/wasm/loader.js";
+      new CellStore().benchOnly();
+    `,
     "packages/client/dist/generated.js": "engine.unused(); engine.missingReason();",
     "test/contract.d.ts": "declare const ignored: { unused(): void };",
   };
@@ -87,9 +92,13 @@ test("engine caller audit resolves aliases, getters and structural callers but r
     }
     const audit = await auditEngineExports(root);
     expect(audit.issues).toHaveLength(5);
-    expect(audit.issues.join("\n")).toContain("CellStore.unused has no package/test caller");
-    expect(audit.issues.join("\n")).toContain("CellStore.missingReason has no package/test caller");
-    expect(audit.issues.join("\n")).toContain("UnusedStore.constructor has no package/test caller");
+    expect(audit.issues.join("\n")).toContain("CellStore.unused has no package/test/bench caller");
+    expect(audit.issues.join("\n")).toContain(
+      "CellStore.missingReason has no package/test/bench caller",
+    );
+    expect(audit.issues.join("\n")).toContain(
+      "UnusedStore.constructor has no package/test/bench caller",
+    );
     expect(audit.issues.join("\n")).toContain(
       "packages/wasm/src/lib.rs:5: exported Rust function needs a camelCase js_name",
     );

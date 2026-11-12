@@ -6,6 +6,7 @@ import type { Workbook } from "@sheetwrite/core";
 import type * as CoreEngineModule from "../../packages/core/src/engine.js";
 import type * as CoreGridModule from "../../packages/core/src/grid.js";
 import type * as CoreStoreModule from "../../packages/core/src/store.js";
+import { writeStringColumn } from "./packed-fixture.js";
 
 const root = process.env.STRING_POOL_CHECKOUT ?? new URL("../../", import.meta.url).pathname;
 // Runtime selection keeps the two checked-out implementations isolated.
@@ -36,7 +37,8 @@ for (let sample = 0; sample <= 7; sample++) {
     const sheet = engine.addSheet(1, INGEST_ROWS);
     const start = performance.now();
     for (let row = 0; row < INGEST_ROWS; row += BATCH_ROWS) {
-      engine.setColumnStrings(
+      writeStringColumn(
+        engine,
         sheet,
         0,
         row,

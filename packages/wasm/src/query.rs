@@ -1,5 +1,6 @@
 //! Whole-column queries: sort, filter, search, aggregate — cache-local scans.
 
+use std::cell::Cell;
 use std::cmp::Ordering;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
@@ -57,6 +58,10 @@ impl PoolIdStamps {
 
         fresh
     }
+}
+
+thread_local! {
+    static QUERY_STATS: Cell<[u64; 2]> = const { Cell::new([0, 0]) };
 }
 
 /// Longest picked-value list still scanned linearly: below this, building a
@@ -167,6 +172,19 @@ impl NumericAccumulator {
 
 #[wasm_bindgen]
 impl CellStore {
+    /// `[contains cache constructions, owned distinct strings]`.
+    /// @enginePublic Benchmarks check contains-cache construction and owned distinct strings.
+    #[wasm_bindgen(js_name = queryResourceStats)]
+    pub fn query_resource_stats(&self) -> Vec<f64> {
+        QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
+    }
+
+    /// @enginePublic Reset the resource counters before each benchmark probe.
+    #[wasm_bindgen(js_name = resetQueryResourceStats)]
+    pub fn reset_query_resource_stats(&self) {
+        QUERY_STATS.with(|stats| stats.set([0, 0]));
+    }
+
     /// Column aggregate over numeric cells. op: 0 sum, 1 avg, 2 min, 3 max, 4 count.
     #[wasm_bindgen(js_name = aggregate)]
     pub fn aggregate(&self, sheet: usize, col: usize, op: u8) -> f64 {
@@ -678,6 +696,11 @@ impl CellStore {
             cache_index[index] = match_caches.len();
             match_caches.push(MatchCache::new());
         }
+        QUERY_STATS.with(|stats| {
+            let mut current = stats.get();
+            current[0] = current[0].saturating_add(match_caches.len() as u64);
+            stats.set(current);
+        });
         let mut value_sets: Vec<ValueSet<'_>> = Vec::with_capacity(kinds.len());
         for (i, &kind) in kinds.iter().enumerate() {
             if kind != 0 {
@@ -921,6 +944,11 @@ impl CellStore {
             }
             pooled = false;
         }
+        QUERY_STATS.with(|stats| {
+            let mut current = stats.get();
+            current[1] = current[1].saturating_add(out.texts.len() as u64);
+            stats.set(current);
+        });
         out
     }
 

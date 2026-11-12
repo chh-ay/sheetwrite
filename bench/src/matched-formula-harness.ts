@@ -1,3 +1,4 @@
+import { writeNumberColumn } from "./packed-fixture.js";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -81,7 +82,7 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(2, count);
-    store.setColumnNumbers(
+    writeNumberColumn(store, 
       sheet,
       0,
       0,
@@ -135,7 +136,7 @@ const factories: Record<string, (wasm: Wasm) => Fixture> = {
     const count = 1_000;
     const store = new wasm.CellStore();
     const sheet = store.addSheet(2, count);
-    store.setColumnNumbers(
+    writeNumberColumn(store, 
       sheet,
       0,
       0,

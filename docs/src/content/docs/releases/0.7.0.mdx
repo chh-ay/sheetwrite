@@ -323,7 +323,6 @@ Direct `@sheetwrite/wasm` and `@sheetwrite/formulas` users must replace these bi
 | Removed | Replacement |
 | --- | --- |
 | `CellStore.setColumnNumbers`, `setColumnStrings`, `setColumnStringsPacked` | `setColumnBlockPacked`, `setBlockPacked` or `setSparseBlock` |
-| `CellStore.queryResourceStats`, `resetQueryResourceStats` | Application-side benchmark measurements; the internal query counters are gone |
 | `DiffKernel.clearPage` | Consume the page arrays; the next `compare` starts a new page |
 | `DiffKernel.pageLength` | Read the length of a returned page array |
 
