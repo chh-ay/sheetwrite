@@ -12,9 +12,11 @@ import {
 } from "../src/index.js";
 import type { DocumentOp, PivotDefinition } from "../src/index.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { installCoreStyles } from "./fixtures.js";
 
 await initSheetwrite({ engine: formulas });
 const restore = installCanvasTestStubs();
+const removeStyles = installCoreStyles();
 const host = document.createElement("div");
 document.body.appendChild(host);
 const pivot: PivotDefinition = {
@@ -301,5 +303,6 @@ try {
 } finally {
   grid.destroy();
   host.remove();
+  removeStyles();
   restore();
 }
