@@ -456,7 +456,11 @@ impl CellStore {
                 *expression = self.inlined_measure(measure, stack)?;
                 Ok(())
             }
-            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => arguments
+            Ast::Func(_, arguments) => arguments
+                .iter_mut()
+                .try_for_each(|argument| self.inline_references(argument, stack)),
+            Ast::UnknownFunc(call) => call
+                .args
                 .iter_mut()
                 .try_for_each(|argument| self.inline_references(argument, stack)),
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
@@ -605,9 +609,10 @@ impl CellStore {
             // value, so the expression around it, IFERROR included, sees it
             // as it would the CALCULATE itself.
             let bound = match literal(value) {
-                matrix @ Ast::BoundMatrix { .. } => {
-                    Ast::Func(Func::Index, vec![matrix, Ast::Num(1.0), Ast::Num(1.0)])
-                }
+                matrix @ Ast::BoundMatrix(_) => Ast::Func(
+                    Func::Index,
+                    vec![matrix, Ast::Num(1.0), Ast::Num(1.0)].into(),
+                ),
                 other @ (Ast::Num(_)
                 | Ast::Str(_)
                 | Ast::Bool(_)
@@ -619,15 +624,15 @@ impl CellStore {
                 | Ast::UnresolvedStructured(_)
                 | Ast::Structured(_)
                 | Ast::Cell(..)
-                | Ast::SheetCell(..)
+                | Ast::SheetCell(_)
                 | Ast::AbsCell(..)
                 | Ast::Range(..)
-                | Ast::SheetRange(..)
+                | Ast::SheetRange(_)
                 | Ast::AbsRange(..)
                 | Ast::SheetSpan(_)
                 | Ast::InvalidRef
                 | Ast::Func(..)
-                | Ast::UnknownFunc(..)
+                | Ast::UnknownFunc(_)
                 | Ast::Bin(..)
                 | Ast::Cmp(..)
                 | Ast::Neg(_)
@@ -635,7 +640,7 @@ impl CellStore {
                 | Ast::Percent(_)
                 | Ast::LetSlot { .. }
                 | Ast::LetName { .. }
-                | Ast::Array { .. }) => other,
+                | Ast::Array(_)) => other,
             };
             bindings.push((&calculation.name, bound));
         }
@@ -673,11 +678,11 @@ impl CellStore {
         if values.is_empty() {
             values.push(Value::Blank);
         }
-        Ast::BoundMatrix {
+        Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
             rows: values.len(),
             cols: 1,
             values: Rc::new(values),
-        }
+        }))
     }
 }
 
@@ -751,7 +756,7 @@ impl CellStore {
                         columns.push(((**reference).clone(), context));
                         columns.len() - 1
                     });
-                *expression = Ast::Name(column_name(index));
+                *expression = Ast::Name(column_name(index).into_boxed_str());
                 Ok(())
             }
             Ast::UnresolvedStructured(reference)
@@ -759,7 +764,8 @@ impl CellStore {
             {
                 Err(FormulaError::Ref)
             }
-            Ast::UnknownFunc(name, arguments) if name.eq_ignore_ascii_case(CALCULATE) => {
+            Ast::UnknownFunc(call) if call.name.eq_ignore_ascii_case(CALCULATE) => {
+                let arguments = &mut call.args;
                 if context != 0 || arguments.is_empty() {
                     return Err(FormulaError::Value);
                 }
@@ -767,7 +773,7 @@ impl CellStore {
                 let inner_context = contexts.len() - 1;
                 let mut inner = std::mem::replace(&mut arguments[0], Ast::Missing);
                 self.name_columns(&mut inner, columns, inner_context, contexts, calculations)?;
-                *expression = Ast::Name(calculation_name(calculations.len()));
+                *expression = Ast::Name(calculation_name(calculations.len()).into_boxed_str());
                 calculations.push((inner_context, inner));
                 Ok(())
             }
@@ -780,7 +786,7 @@ impl CellStore {
                 | Func::AnchorArray,
                 _,
             )
-            | Ast::BoundMatrix { .. }
+            | Ast::BoundMatrix(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
             | Ast::NamedRange(_)
@@ -788,20 +794,21 @@ impl CellStore {
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
-            | Ast::SheetCell(..)
+            | Ast::SheetCell(_)
             | Ast::AbsCell(..)
             | Ast::Range(..)
-            | Ast::SheetRange(..)
+            | Ast::SheetRange(_)
             | Ast::AbsRange(..)
             | Ast::SheetSpan(_)
             | Ast::InvalidRef
             | Ast::LetSlot { .. }
             | Ast::LetName { .. } => Err(FormulaError::Value),
-            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => {
-                arguments.iter_mut().try_for_each(|argument| {
-                    self.name_columns(argument, columns, context, contexts, calculations)
-                })
-            }
+            Ast::Func(_, arguments) => arguments.iter_mut().try_for_each(|argument| {
+                self.name_columns(argument, columns, context, contexts, calculations)
+            }),
+            Ast::UnknownFunc(call) => call.args.iter_mut().try_for_each(|argument| {
+                self.name_columns(argument, columns, context, contexts, calculations)
+            }),
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
                 self.name_columns(left, columns, context, contexts, calculations)?;
                 self.name_columns(right, columns, context, contexts, calculations)
@@ -809,7 +816,7 @@ impl CellStore {
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
                 self.name_columns(inner, columns, context, contexts, calculations)
             }
-            Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array { .. } => Ok(()),
+            Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array(_) => Ok(()),
         }
     }
 
@@ -823,8 +830,8 @@ impl CellStore {
         let mut edit = ContextEdit::default();
         for filter in filters {
             let (column, op, value) = match filter {
-                Ast::UnknownFunc(name, arguments) if name.eq_ignore_ascii_case(ALL) => {
-                    match arguments.as_slice() {
+                Ast::UnknownFunc(call) if call.name.eq_ignore_ascii_case(ALL) => {
+                    match call.args.as_ref() {
                         [Ast::Structured(column)] if is_data_column(column) => {
                             edit.removed.push(column_ref(column));
                             continue;

@@ -65,16 +65,18 @@ pub(crate) fn ast_produces_array(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, _) => true,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } => true,
+        Ast::BoundMatrix(_) => true,
         #[cfg(feature = "analysis")]
-        Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+        Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
+            let crate::calc::UnknownCall { name, args } = &**call;
+
             super::analysis::lambda::produces_array(name, args)
         }
         Ast::NamedRange(named) => {
             named.row_start != named.row_end || named.col_start != named.col_end
         }
         Ast::Structured(reference) => reference.row_start != reference.row_end,
-        Ast::Range(..) | Ast::AbsRange(..) | Ast::Array { .. } => true,
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::Array(_) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression),
         Ast::NamedFormula(named) => ast_produces_array(&named.expression),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
@@ -161,8 +163,6 @@ impl CellStore {
         };
         let sheet_ref = SheetRef {
             handle: sheet as u32,
-            name: String::new(),
-            quoted: false,
         };
         Ast::AbsRange(
             sheet_ref,
@@ -210,11 +210,15 @@ impl CellStore {
                 )
             }
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, .. } => {
+            Ast::BoundMatrix(reference) => {
+                let crate::calc::BoundMatrix { rows, cols, .. } = &**reference;
+
                 Some(EvalMatrix::validate_shape(*rows, *cols, 1, 0))
             }
             #[cfg(feature = "analysis")]
-            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+            Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
+                let crate::calc::UnknownCall { name, args } = &**call;
+
                 ast_produces_array(ast).then(|| {
                     runtime_reference_bound(
                         ast,
@@ -239,7 +243,7 @@ impl CellStore {
             | Ast::NamedRange(..)
             | Ast::Structured(..)
             | Ast::Func(Func::Intersect, _)
-            | Ast::Array { .. } => Some(
+            | Ast::Array(_) => Some(
                 self.matrix_shape(ast, formula_sheet, pass)
                     .map(|(_, _, cells)| cells),
             ),
@@ -352,11 +356,15 @@ impl CellStore {
             }
             Ast::InvalidRef => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, values } => {
+            Ast::BoundMatrix(reference) => {
+                let crate::calc::BoundMatrix { rows, cols, values } = &**reference;
+
                 Ok(EvalMatrix::new(*rows, *cols, values.as_ref().clone()))
             }
             #[cfg(feature = "analysis")]
-            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+            Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
+                let crate::calc::UnknownCall { name, args } = &**call;
+
                 if !ast_produces_array(ast) {
                     return None;
                 }
@@ -377,9 +385,11 @@ impl CellStore {
             // An empty intersection is #NULL!, which the range path cannot tell.
             Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet)
                 .and_then(|_| self.eval_matrix_arg(ast, sheet, pass, depth + 1)),
-            Ast::Array { values, .. } => self
-                .matrix_shape(ast, sheet, pass)
-                .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone())),
+            Ast::Array(array) => {
+                let crate::calc::ArrayLiteral { values, .. } = &**array;
+                self.matrix_shape(ast, sheet, pass)
+                    .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone()))
+            }
             Ast::LetSlot { expression, .. } => {
                 return self.eval_dynamic_array(expression, sheet, pass, depth)
             }
@@ -487,7 +497,9 @@ impl CellStore {
             }
             Ast::InvalidRef => return Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { rows, cols, .. } => {
+            Ast::BoundMatrix(reference) => {
+                let crate::calc::BoundMatrix { rows, cols, .. } = &**reference;
+
                 return Ok((
                     *rows,
                     *cols,
@@ -495,7 +507,9 @@ impl CellStore {
                 ));
             }
             #[cfg(feature = "analysis")]
-            Ast::UnknownFunc(name, args) if name == super::analysis::lambda::CALL => {
+            Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
+                let crate::calc::UnknownCall { name, args } = &**call;
+
                 return super::analysis::lambda::shape(self, name, args, formula_sheet, pass);
             }
             #[cfg(feature = "analysis")]
@@ -542,10 +556,11 @@ impl CellStore {
             Ast::NamedFormula(named) => {
                 return self.matrix_shape(&named.expression, formula_sheet, pass);
             }
-            Ast::Array {
-                cols: width,
-                values,
-            } => {
+            Ast::Array(array) => {
+                let crate::calc::ArrayLiteral {
+                    cols: width,
+                    values,
+                } = &**array;
                 let cols = *width as usize;
                 let rows = values.len() / cols;
                 return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));

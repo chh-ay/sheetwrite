@@ -13,7 +13,11 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast) -> bool {
         Ast::Func(Func::Subtotal, _) => true,
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_calls_subtotal),
+        Ast::Func(_, args) => args.iter().any(ast_calls_subtotal),
+        Ast::UnknownFunc(call) => {
+            let args = &call.args;
+            args.iter().any(ast_calls_subtotal)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_calls_subtotal(left) || ast_calls_subtotal(right)
         }

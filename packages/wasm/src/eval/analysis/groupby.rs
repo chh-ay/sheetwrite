@@ -380,17 +380,19 @@ impl Aggregator {
                 },
             );
         }
-        let source = |indices: &[usize]| Ast::BoundMatrix {
-            rows: indices.len().max(1),
-            cols: 1,
-            values: Rc::new(if indices.is_empty() {
-                vec![Value::Blank]
-            } else {
-                indices
-                    .iter()
-                    .map(|&row| values.values[row * values.cols + column].clone())
-                    .collect()
-            }),
+        let source = |indices: &[usize]| {
+            Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
+                rows: indices.len().max(1),
+                cols: 1,
+                values: Rc::new(if indices.is_empty() {
+                    vec![Value::Blank]
+                } else {
+                    indices
+                        .iter()
+                        .map(|&row| values.values[row * values.cols + column].clone())
+                        .collect()
+                }),
+            }))
         };
         context.charge(rows.len() + if self.arity == 2 { total_rows.len() } else { 0 })?;
         let mut arguments = vec![source(rows)];
@@ -399,9 +401,12 @@ impl Aggregator {
         }
         let invocation = if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
             arguments.insert(0, self.function.clone());
-            Ast::UnknownFunc(super::lambda::CALL.into(), arguments)
+            Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                name: super::lambda::CALL.into(),
+                args: arguments.into(),
+            }))
         } else if let Ast::Func(function, _) = self.function {
-            Ast::Func(function, arguments)
+            Ast::Func(function, arguments.into())
         } else {
             return Err(FormulaError::Value);
         };
@@ -490,7 +495,7 @@ pub(crate) fn evaluate_ast(
     }
     let sum = |expression: &Ast, pass: &mut EvalPass<'_>| {
         store.eval_ast(
-            &Ast::Func(Func::Sum, vec![expression.clone()]),
+            &Ast::Func(Func::Sum, (vec![expression.clone()]).into()),
             sheet,
             pass,
             depth + 1,

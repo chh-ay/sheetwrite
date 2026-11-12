@@ -510,11 +510,7 @@ impl CellStore {
             MovedSource::Formula(text) => {
                 self.parse_formula_entry(&text, sheet as u32, key.0, key.1)
             }
-            MovedSource::Reference(target) => FormulaEntry::reference(
-                target,
-                &self.sheet_names[target.sheet as usize],
-                sheet as u32,
-            ),
+            MovedSource::Reference(target) => FormulaEntry::reference(target, sheet as u32),
         }
     }
 }

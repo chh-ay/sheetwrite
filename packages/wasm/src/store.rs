@@ -1,4 +1,6 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
+//! Missing sheet references retain their tree and are indexed by stable formula
+//! identity, so naming a sheet binds only its waiting users without reparsing.
 
 use std::borrow::Cow;
 use std::mem::size_of;
@@ -7,9 +9,10 @@ use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, external_name_key, moved_index, moved_span, parse,
-    parse_with_features, place_span, resolve_sheet_refs, resolve_structured_refs, sheet_name_key,
-    shift_range, Ast, NamedRangeRef, StructuredRef, TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, bind_sheet_refs, external_name_key, has_unresolved_local_sheets,
+    moved_index, moved_span, parse, parse_bound_with_features, place_span, resolve_structured_refs,
+    sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef, TableSection,
+    UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -132,7 +135,8 @@ impl SourceSnapshot {
 ///
 /// The host may retain this object in undo history, but it is deliberately not
 /// part of the serialized document protocol. A deduplicated local dictionary
-/// owns captured text independently of the store's pool epoch.
+/// owns captured text independently of the store's pool epoch. Formula text
+/// is materialized at capture, so history needs no sheet-name registry.
 #[wasm_bindgen]
 pub struct RangeSnapshot {
     rows: usize,
@@ -212,7 +216,7 @@ impl RangeSnapshot {
                 .map(|(_, _, entry)| {
                     std::mem::size_of::<(u32, u32)>()
                         + if entry.is_formula() {
-                            entry.source().len()
+                            entry.source(&[]).len()
                         } else {
                             std::mem::size_of::<AbsCellKey>()
                         }
@@ -225,7 +229,7 @@ impl RangeSnapshot {
         self.formulas
             .iter()
             .filter(|(_, _, entry)| entry.is_formula())
-            .map(|(_, _, entry)| entry.source().into_owned())
+            .map(|(_, _, entry)| entry.source(&[]).into_owned())
             .collect()
     }
 }
@@ -819,6 +823,10 @@ impl CellStore {
         self.sheet_names[sheet] = name.to_owned();
         self.sheet_ids.insert(id.to_owned(), sheet);
         self.sheet_lookup.insert(sheet_name_key(name), sheet);
+        let affected = self.bind_pending_sheet_formulas(id, name);
+        if !affected.is_empty() {
+            self.recompute_seed_sheets(&affected);
+        }
     }
 
     /// Rename a live stable sheet handle and rewrite every resolved formula AST reference.
@@ -856,10 +864,15 @@ impl CellStore {
             }
         }
 
-        self.rename_sheet_in_named_formulas(sheet as u32, name);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_owned();
         self.sheet_lookup.insert(name_key, sheet);
+        self.rename_sheet_in_named_formulas(sheet as u32, name);
+        for pending_sheet in self.bind_pending_sheet_formulas(id, name) {
+            if !affected.contains(&pending_sheet) {
+                affected.push(pending_sheet);
+            }
+        }
         self.graph.invalidate();
 
         self.recompute_with_volatile_sheets(affected);
@@ -1276,10 +1289,7 @@ impl CellStore {
                 return BLOCK_SOURCE_INVALID;
             }
 
-            prepared_sources.insert(
-                offset,
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
-            );
+            prepared_sources.insert(offset, FormulaEntry::reference(target, sheet as u32));
         }
 
         if let Some(revision) = dirty_revision {
@@ -1526,7 +1536,7 @@ impl CellStore {
             }
             let offset = ((sheet_row - r0) * cols + sheet_col - c0) as u32;
             if entry.is_formula() {
-                formulas.push((offset, entry.source().into_owned()));
+                formulas.push((offset, entry.source(&self.sheet_names).into_owned()));
             } else if let Some(target) = entry.reference_target(sheet as u32) {
                 references.push((offset, target));
             }
@@ -1598,7 +1608,7 @@ impl CellStore {
                 };
                 if entry.is_formula() {
                     formula_offsets.push(offset as u32);
-                    formula_sources.push(entry.source().into_owned());
+                    formula_sources.push(entry.source(&self.sheet_names).into_owned());
                 } else if let Some(target) = entry.reference_target(sheet as u32) {
                     reference_offsets.push(offset as u32);
                     reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
@@ -1767,7 +1777,7 @@ impl CellStore {
             let source = s.formulas.get(key, &self.formula_slots);
             let text = source
                 .filter(|entry| entry.is_formula())
-                .map(FormulaEntry::source);
+                .map(|entry| entry.source(&self.sheet_names));
             let reference_target = source
                 .filter(|entry| entry.is_reference())
                 .and_then(|entry| entry.reference_target(sheet as u32));
@@ -1871,7 +1881,7 @@ impl CellStore {
                         (
                             (sheet_row - r0) as u32,
                             (sheet_col - c0) as u32,
-                            entry.clone(),
+                            entry.captured(&self.sheet_names),
                         )
                     })
             })
@@ -1915,7 +1925,7 @@ impl CellStore {
                 return false;
             };
             let source = if entry.is_formula() {
-                self.parse_formula_entry(&entry.source(), sheet as u32, key.0, key.1)
+                self.parse_formula_entry(&entry.source(&[]), sheet as u32, key.0, key.1)
             } else {
                 let Some(target) = entry.reference_target(sheet as u32) else {
                     return false;
@@ -1928,7 +1938,7 @@ impl CellStore {
                 {
                     return false;
                 }
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32)
+                FormulaEntry::reference(target, sheet as u32)
             };
             sources.insert(key, source);
         }
@@ -2661,7 +2671,9 @@ impl CellStore {
             .get(sheet)?
             .formulas
             .get(key, &self.formula_slots)?;
-        entry.is_formula().then(|| entry.source().into_owned())
+        entry
+            .is_formula()
+            .then(|| entry.source(&self.sheet_names).into_owned())
     }
 
     #[wasm_bindgen(js_name = referenceTarget)]
@@ -3048,10 +3060,7 @@ impl CellStore {
             let Some(key) = cell_key(row, col) else {
                 return BLOCK_SOURCE_INVALID;
             };
-            prepared.insert(
-                key,
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
-            );
+            prepared.insert(key, FormulaEntry::reference(target, sheet as u32));
         }
 
         // Check every text slice before reserving dirty capacity or interning,
@@ -3884,26 +3893,29 @@ impl CellStore {
         formula_col: u32,
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
-            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned()),
+            Ok((ast, detached_sheets)) => {
+                FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned(), detached_sheets)
+            }
             Err(error) => FormulaEntry::error(source, error),
         }
     }
 
     /// Parses a formula and resolves its sheets, defined names and table
     /// references. Each step runs only when the parse found a node it
-    /// rewrites, so a formula of plain cells is parsed in one pass.
+    /// rewrites, so a formula of plain cells is parsed in one pass. The flag
+    /// tells whether a sheet reference stayed detached.
     fn resolve_formula_ast(
         &self,
         source: &str,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
-    ) -> Result<Ast, FormulaError> {
-        let (mut ast, features) = parse_with_features(source).map_err(|_| FormulaError::Value)?;
-
-        if features.sheet_refs {
-            ast = self.resolve_sheets(ast)?;
-        }
+    ) -> Result<ResolvedFormula, FormulaError> {
+        let (mut ast, features) =
+            parse_bound_with_features(source, &|name| self.sheet_handle(name), &|span| {
+                place_span(span, &self.tab_order())
+            })
+            .map_err(|_| FormulaError::Value)?;
 
         if features.names {
             let placement = names::NamePlacement::new(formula_row, formula_col);
@@ -3911,14 +3923,14 @@ impl CellStore {
         }
 
         if features.table_refs {
-            ast = self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col);
+            self.resolve_table_refs(&mut ast, formula_sheet, formula_row, formula_col);
         }
 
         #[cfg(feature = "analysis")]
         let resolved = self.bind_regex_patterns(source, ast);
         #[cfg(not(feature = "analysis"))]
         let resolved = ast;
-        Ok(resolved)
+        Ok((resolved, features.detached_sheets))
     }
 
     /// Resolves a parsed formula as if it were in the cell at
@@ -3935,19 +3947,20 @@ impl CellStore {
     ) -> Result<Ast, FormulaError> {
         let with_sheets = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
-        let with_names = self.resolve_defined_names(with_sheets, formula_sheet, &placement);
-        Ok(self.resolve_table_refs(with_names, formula_sheet, formula_row, formula_col))
+        let mut with_names = self.resolve_defined_names(with_sheets, formula_sheet, &placement);
+        self.resolve_table_refs(&mut with_names, formula_sheet, formula_row, formula_col);
+        Ok(with_names)
     }
 
     /// Resolves the table references of a formula in the cell at
     /// (`formula_row`, `formula_col`) of `formula_sheet`.
     fn resolve_table_refs(
         &self,
-        ast: Ast,
+        ast: &mut Ast,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
-    ) -> Ast {
+    ) {
         resolve_structured_refs(
             ast,
             formula_sheet,
@@ -3971,19 +3984,80 @@ impl CellStore {
         ast
     }
 
-    /// Resolve the sheet names of a parsed formula to stable handles.
-    fn resolve_sheets(&self, ast: Ast) -> Result<Ast, FormulaError> {
-        resolve_sheet_refs(
-            ast,
-            &|name| {
-                self.sheet_ids
-                    .get(name)
-                    .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
-                    .map(|&index| index as u32)
-            },
-            &|span| place_span(span, &self.tab_order()),
-        )
-        .map_err(|_| FormulaError::Ref)
+    /// Naming a sheet visits only formulas whose retained tree names it.
+    /// Stable ids keep this index correct when formulas move between cells.
+    fn bind_pending_sheet_formulas(&mut self, id: &str, name: &str) -> Vec<usize> {
+        let mut users: FxHashSet<_> = self
+            .formula_slots
+            .unresolved_sheet_users(&sheet_name_key(name))
+            .collect();
+        users.extend(
+            self.formula_slots
+                .unresolved_sheet_users(&sheet_name_key(id)),
+        );
+        if users.is_empty() {
+            return Vec::new();
+        }
+        let order = self.tab_order().into_owned();
+        let mut affected = Vec::new();
+        for formula in users {
+            let Some(location) = self.formula_slots.location(formula) else {
+                continue;
+            };
+            let sheet = location.sheet as usize;
+            let replacement = {
+                let Some(entry) = self.formula_slots.get_mut(formula) else {
+                    continue;
+                };
+                let ids = &self.sheet_ids;
+                let lookup = &self.sheet_lookup;
+                entry.bind_sheets(
+                    location.sheet,
+                    &|name| {
+                        ids.get(name)
+                            .or_else(|| lookup.get(&sheet_name_key(name)))
+                            .map(|&handle| handle as u32)
+                    },
+                    &|span| place_span(span, &order),
+                )
+            };
+            let Some(entry) = replacement else {
+                continue;
+            };
+            let data = &mut self.sheets[sheet];
+            self.graph.replace_entry(
+                &mut data.formulas,
+                &mut self.formula_slots,
+                sheet,
+                location.local(),
+                Some(entry),
+            );
+            data.formulas.mark_cell_dirty(location.local());
+            if !affected.contains(&sheet) {
+                affected.push(sheet);
+            }
+        }
+        affected
+    }
+
+    /// Resolve a sheet id or case-insensitive name to its stable handle.
+    fn sheet_handle(&self, name: &str) -> Option<u32> {
+        self.sheet_ids
+            .get(name)
+            .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
+            .map(|&index| index as u32)
+    }
+
+    /// Bind standalone-parsed definitions/measures without rebuilding their tree.
+    /// Such definitions still reject missing local sheets at installation.
+    fn resolve_sheets(&self, mut ast: Ast) -> Result<Ast, FormulaError> {
+        bind_sheet_refs(&mut ast, &|name| self.sheet_handle(name), &|span| {
+            place_span(span, &self.tab_order())
+        });
+        if has_unresolved_local_sheets(&ast) {
+            return Err(FormulaError::Ref);
+        }
+        Ok(ast)
     }
 
     fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
@@ -4176,7 +4250,7 @@ impl CellStore {
                 .formulas
                 .iter(&self.formula_slots)
                 .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (key, entry.source().into_owned()))
+                .map(|(key, entry)| (key, entry.source(&self.sheet_names).into_owned()))
                 .collect();
             let refreshed: Vec<_> = sources
                 .into_iter()
@@ -4198,6 +4272,10 @@ impl CellStore {
         self.graph.invalidate();
     }
 }
+
+/// A resolved formula tree, and whether a sheet reference in it stayed
+/// detached.
+type ResolvedFormula = (Ast, bool);
 
 /// Result of a single-cell read.
 #[wasm_bindgen]
