@@ -240,7 +240,6 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal
         | Func::IsEven
         | Func::IsOdd
         | Func::CeilingPrecise
