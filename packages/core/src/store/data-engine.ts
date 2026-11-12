@@ -1341,13 +1341,8 @@ export class StoreDataEngine {
   /** The result `text` would have in `cell`, read without changing the store (#221). */
   previewFormula(cell: CellAddress, text: string): FormulaPreview {
     const fields = new Float64Array(PREVIEW_FIELDS);
-    const result = this.wasm.previewFormula(
-      this.sheets.handleOf(cell.sheet),
-      cell.row,
-      cell.col,
-      text,
-      fields,
-    );
+    const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
+    const result = this.wasm.previewFormula(target, text, fields);
     return decodePreview(fields, result);
   }
 

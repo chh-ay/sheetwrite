@@ -37,11 +37,11 @@ fn values_errors_text_and_the_editing_position() {
 
     let text = preview(&store, sheet, "=\"n=\"&B1");
     assert_eq!(text.kind(), FormulaPreviewKind::Text);
-    assert_eq!(text.text().as_deref(), Some("n=6"));
+    assert_eq!(text.text(), Some("n=6"));
 
     let error = preview(&store, sheet, "=1/0");
     assert_eq!(error.kind(), FormulaPreviewKind::Error);
-    assert_eq!(error.text().as_deref(), Some("#DIV/0!"));
+    assert_eq!(error.text(), Some("#DIV/0!"));
 
     assert_eq!(
         preview(&store, sheet, "=SUM(").status(),

@@ -70,6 +70,7 @@ pub(crate) struct FormulaPreview {
     cols: u32,
 }
 
+#[cfg(test)]
 impl FormulaPreview {
     /// Whether the preview has a value, and if not, why.
     pub(crate) const fn status(&self) -> FormulaPreviewStatus {
@@ -100,7 +101,9 @@ impl FormulaPreview {
     pub(crate) const fn cols(&self) -> u32 {
         self.cols
     }
+}
 
+impl FormulaPreview {
     /// The numbers JavaScript decodes: status, kind, number, rows, columns.
     fn fields(&self) -> [f64; PREVIEW_FIELDS] {
         let status = match self.status {
@@ -166,7 +169,7 @@ impl FormulaPreview {
 #[wasm_bindgen]
 impl CellStore {
     /// The result `source` (a formula with its leading `=`) would have in the
-    /// cell at `row` and `col` of `sheet`, without changing the store, as
+    /// cell `[sheet, row, col]`, without changing the store, as
     /// [`Self::preview_formula`] gives it. Writes five numbers into `out`
     /// (status, kind, number, rows, columns; see `formula-preview-result.ts`
     /// in core) and returns the text of a text or error value. Plain numbers
@@ -175,13 +178,14 @@ impl CellStore {
     #[must_use]
     pub fn preview_formula_fields(
         &self,
-        sheet: usize,
-        row: u32,
-        col: u32,
+        cell: &[u32],
         source: &str,
         out: &mut [f64],
     ) -> Option<String> {
-        let preview = self.preview_formula(sheet, row, col, source);
+        let &[sheet, row, col] = cell else {
+            return None;
+        };
+        let preview = self.preview_formula(sheet as usize, row, col, source);
         for (slot, field) in out.iter_mut().zip(preview.fields()) {
             *slot = field;
         }
