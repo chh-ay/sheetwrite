@@ -147,10 +147,7 @@ async function publicReason(node: Node, project: Project): Promise<string | unde
   const tag = (await symbol?.getJsDocTags(project.checker))?.find(
     (candidate) => candidate.name === "enginePublic",
   );
-  return tag?.text
-    ?.map((part) => part.text)
-    .join("")
-    .trim();
+  return tag?.text?.trim();
 }
 
 async function bindingExports(binding: string, project: Project): Promise<EngineExport[]> {
