@@ -147,7 +147,7 @@ impl CellStore {
             .and_then(|literal_only| match fold.finish() {
                 Value::Number(sum) => Ok((sum, literal_only)),
                 Value::Error(error) => Err(error),
-                _ => Err(FormulaError::Value),
+                Value::Text(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
             });
         let (sum, literal_only) = match folded {
             Ok((sum, literal_only)) => (Ok(sum), literal_only),
@@ -265,7 +265,27 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
         }),
         Ast::Missing | Ast::Func(Func::Union | Func::Intersect, _) | Ast::SheetSpan(_) => None,
         _ if ast_produces_array(arg) => None,
-        _ => Some(SumArg::Scalar { reference: false }),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Name(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::SheetCell(..)
+        | Ast::SheetRange(..)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => Some(SumArg::Scalar { reference: false }),
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => Some(SumArg::Scalar { reference: false }),
     }
 }
 

@@ -258,6 +258,10 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
 
 /// Visit each reference of `ast` in source order: the nodes that
 /// [`references`] finds in the text.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is walked through its children"
+)]
 fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     match ast {
         Ast::Cell(..)
@@ -279,6 +283,10 @@ fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not a deleted reference"
+)]
 fn is_deleted(reference: &Ast) -> bool {
     match reference {
         Ast::InvalidRef => true,

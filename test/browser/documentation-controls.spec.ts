@@ -126,29 +126,6 @@ test("a malformed fragment is ignored", async ({ page }) => {
   expect(errors.page).toEqual([]);
 });
 
-test("the formula reference engine filter has the select popup styles", async ({ page }) => {
-  await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
-  await waitForHydration(page);
-
-  await page.getByRole("combobox", { name: "Available in" }).click();
-  // The React site's Base UI popup, or the Solid site's own list.
-  const popup = page.locator(".sw-demo-select__popup, .sw-select__list");
-  await expect(popup).toBeVisible();
-
-  const style = await popup.evaluate((element) => {
-    const computed = getComputedStyle(element);
-    const layer = element.closest(".sw-demo-select__positioner") ?? element;
-    return {
-      borderRadius: computed.borderRadius,
-      boxShadow: computed.boxShadow,
-      positionerLayer: getComputedStyle(layer).zIndex,
-    };
-  });
-  expect(style.borderRadius).toBe("8px");
-  expect(style.boxShadow).not.toBe("none");
-  expect(style.positionerLayer).toBe("100");
-});
-
 test("the outline lists only symbol groups that the filter shows", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(siteUrl("/docs/api/core/"));

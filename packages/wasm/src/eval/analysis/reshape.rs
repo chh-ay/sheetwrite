@@ -68,7 +68,9 @@ fn is_array_argument(ast: &Ast, sheet: usize) -> bool {
 fn output_value(value: &Value) -> Value {
     match value {
         Value::Blank => Value::Number(0.0),
-        other => other.clone(),
+        other @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Error(_)) => {
+            other.clone()
+        }
     }
 }
 
@@ -84,7 +86,32 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         Ast::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
         Ast::Neg(inner) => literal_number(inner).map(|value| -value),
         Ast::Pos(inner) => literal_number(inner),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Missing
+        | Ast::BoundMatrix { .. }
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
     }
 }
 
@@ -257,11 +284,13 @@ fn estimate(
                     Estimate::Exact { rows, cols }
                 }
                 // Any wrap gives fewer than twice the source cells.
-                _ => Estimate::Approximate {
-                    rows: cells,
-                    cols: 1,
-                    max_cells: cells.saturating_mul(2).saturating_sub(1),
-                },
+                StaticArgument::Omitted | StaticArgument::Literal(_) | StaticArgument::Computed => {
+                    Estimate::Approximate {
+                        rows: cells,
+                        cols: 1,
+                        max_cells: cells.saturating_mul(2).saturating_sub(1),
+                    }
+                }
             }
         }
         "EXPAND" => match (
@@ -386,7 +415,7 @@ impl Inputs {
                     bytes
                         .checked_add(match value {
                             Value::Text(text) => text.len(),
-                            _ => 0,
+                            Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0,
                         })
                         .ok_or(FormulaError::Num)
                 },
@@ -503,7 +532,7 @@ fn flatten(
         let is_skipped = match value {
             Value::Blank => ignore & IGNORE_BLANKS != 0,
             Value::Error(_) => ignore & IGNORE_ERRORS != 0,
-            _ => false,
+            Value::Number(_) | Value::Text(_) | Value::Bool(_) => false,
         };
         if !is_skipped {
             values.push(value)?;

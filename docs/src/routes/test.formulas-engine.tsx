@@ -1,76 +1,23 @@
-import { createGrid, type Grid, initSheetwrite, type Workbook } from "@sheetwrite/core";
-import * as formulas from "@sheetwrite/formulas";
+import { createFileRoute } from "@tanstack/solid-router";
+import { NoHydration } from "solid-js/web";
 
-import "@sheetwrite/core/styles.css";
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { Island } from "../islands/Island.js";
+import { FormulasEngineFixture } from "../test-fixtures/formulas-engine/FormulasEngineFixture.js";
 
-import { errorText } from "../lib/errors.js";
+const FIXTURE_PAGE_PADDING = "24px";
 
 export const Route = createFileRoute("/test/formulas-engine")({
   head: () => ({ meta: [{ name: "robots", content: "noindex, nofollow" }] }),
-  component: FormulasEngineFixture,
+  component: FormulasEngineFixturePage,
 });
 
-const workbook: Workbook = {
-  activeSheet: "distribution",
-  sheets: [
-    {
-      id: "distribution",
-      name: "Distribution",
-      rowCount: 2,
-      columns: [{ key: "probability", header: "Probability", width: 240, type: "number" }],
-    },
-  ],
-};
-
-function FormulasEngineFixture() {
-  const host = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState("loading");
-  const [value, setValue] = useState("");
-
-  useEffect(() => {
-    const element = host.current;
-    if (!element) return;
-    let disposed = false;
-    let grid: Grid | undefined;
-    const fullEngine = new URLSearchParams(location.search).get("engine") === "full";
-    void initSheetwrite({ engine: fullEngine ? formulas : undefined }).then(
-      () => {
-        if (disposed) return;
-        grid = createGrid(element, { workbook });
-        const address = { sheet: "distribution", row: 0, col: 0 };
-        const result = grid.applyTransaction({
-          patches: [
-            {
-              op: "set",
-              addr: address,
-              value: { kind: "formula", src: "=NORM.S.DIST(1,TRUE)" },
-            },
-          ],
-        });
-        if (result.status !== "applied") throw new Error("Formula fixture edit was not applied.");
-        setValue(String(grid.store.getCell(address).resolved));
-        setStatus("ready");
-      },
-      (error: unknown) => {
-        if (!disposed) setStatus(errorText(error));
-      },
-    );
-    return () => {
-      disposed = true;
-      grid?.destroy();
-    };
-  }, []);
-
+function FormulasEngineFixturePage() {
   return (
-    <main style={{ padding: 24 }}>
-      <h1>Formula engine browser fixture</h1>
-      <output id="formula-engine-status" data-status={status}>
-        {status}
-      </output>
-      <output id="formula-engine-value">{value}</output>
-      <section ref={host} aria-label="Distribution grid" style={{ width: 600, height: 300 }} />
-    </main>
+    <NoHydration>
+      <main style={{ padding: FIXTURE_PAGE_PADDING }}>
+        <h1>Formula engine browser fixture</h1>
+        <Island name="test-formulas-engine" component={FormulasEngineFixture} props={{}} />
+      </main>
+    </NoHydration>
   );
 }

@@ -55,6 +55,10 @@ enum Statistic {
 }
 
 /// The statistic `func` computes, or `None` for a function of another family.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 const fn statistic(func: Func) -> Option<Statistic> {
     Some(match func {
         Func::Median => Statistic::Numbers(NumberStatistic::Median),
@@ -415,7 +419,9 @@ fn counted_numbers(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
             Value::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
             Value::Text(_) if entry.from_range => Some(0.0),
             Value::Text(text) if text.is_empty() => Some(0.0),
-            value => aggregate_number(value, entry.from_range)?,
+            value @ (Value::Number(_) | Value::Text(_) | Value::Blank | Value::Error(_)) => {
+                aggregate_number(value, entry.from_range)?
+            }
         };
 
         if let Some(number) = counted {

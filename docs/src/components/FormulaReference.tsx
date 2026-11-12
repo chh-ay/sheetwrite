@@ -1,7 +1,13 @@
-import { useEffect, useId, useRef, useState } from "react";
-import { formulaTableHtml, formulaTableUrl } from "virtual:formula-tables";
+import { createEffect, createSignal, createUniqueId, Show } from "solid-js";
+import { isServer } from "solid-js/web";
 
-import { DemoSelect } from "../showcases/ui/DemoSelect.js";
+import { Select } from "./Select.js";
+
+/*
+ * A formula family's filter, ported from docs/src/components/FormulaReference.tsx.
+ * The family's table is static page markup beside it (islands/content.tsx
+ * renders both); this island only hides and counts the table's rows.
+ */
 
 const ENGINE_OPTIONS = [
   { label: "Either engine", value: "all" },
@@ -9,61 +15,38 @@ const ENGINE_OPTIONS = [
   { label: "Full only", value: "full" },
 ] as const;
 
-/** A family table's markup, or why it is missing. */
-type TableState = { html: string } | { failed: true };
-
-/**
- * The family table's markup: inlined by the server render, read back from the
- * prerendered page when it hydrates, and fetched after a client-side
- * navigation. The page's script never carries the rows.
- */
-function useFamilyTable(family: string, elementId: string): TableState | null {
-  const [table, setTable] = useState<TableState | null>(() => {
-    const html =
-      formulaTableHtml(family) ??
-      (typeof document === "undefined" ? null : document.getElementById(elementId)?.innerHTML);
-    return html ? { html } : null;
-  });
-  useEffect(() => {
-    if (table !== null) return;
-    const url = formulaTableUrl(family);
-    if (url === null) {
-      setTable({ failed: true });
-      return;
-    }
-    const controller = new AbortController();
-    fetch(url, { signal: controller.signal })
-      .then((response) => (response.ok ? response.text() : Promise.reject(response.status)))
-      .then((html) => setTable({ html }))
-      .catch(() => {
-        if (!controller.signal.aborted) setTable({ failed: true });
-      });
-    return () => controller.abort();
-  }, [family, table]);
-  return table;
+/** The id of a family's table element, which the filter reads its rows from. */
+export function formulaTableId(family: string): string {
+  return `formula-table-${family}`;
 }
 
-/**
- * A family's function table with its filter. The rows are static HTML (see
- * formula-tables.ts); the filter hides rows by their data attributes.
- */
-export function FormulaReference({ family }: Readonly<{ family: string }>) {
-  const root = useRef<HTMLDivElement>(null);
-  const id = useId();
-  const tableId = `formula-table-${family}`;
-  const table = useFamilyTable(family, tableId);
-  const [query, setQuery] = useState("");
-  const [engine, setEngine] = useState("all");
-  const [count, setCount] = useState<number | null>(null);
+/** The find field, the engine select and the match count over the family's table. */
+export function FormulaFilter(props: {
+  readonly family: string;
+  /** The table's function count, so the server markup shows the count hydration keeps. */
+  readonly total: number;
+}) {
+  const id = createUniqueId();
+  // The island hydrates when the reader first uses it (islands/content.tsx), so
+  // they may have typed into the server-rendered field already; keep that text.
+  const typed = isServer
+    ? ""
+    : ((document.getElementById(`${id}-search`) as HTMLInputElement | null)?.value ?? "");
+  const [query, setQuery] = createSignal(typed);
+  const [engine, setEngine] = createSignal("all");
+  const [count, setCount] = createSignal(props.total);
 
-  useEffect(() => {
+  createEffect(() => {
+    const needle = query().trim().toLowerCase();
+    const wanted = engine();
+    const table = document.getElementById(formulaTableId(props.family));
     let visible = 0;
-    for (const family of root.current?.querySelectorAll<HTMLElement>(".sw-formula-family") ?? []) {
+    for (const family of table?.querySelectorAll<HTMLElement>(".sw-formula-family") ?? []) {
       let familyCount = 0;
       for (const row of family.querySelectorAll<HTMLElement>("[data-formula-name]")) {
         const matches =
-          (row.dataset.formulaName ?? "").toLowerCase().includes(query.trim().toLowerCase()) &&
-          (engine === "all" || row.dataset.engine === engine);
+          (row.dataset.formulaName ?? "").toLowerCase().includes(needle) &&
+          (wanted === "all" || row.dataset.engine === wanted);
         row.hidden = !matches;
         if (matches) familyCount++;
       }
@@ -71,41 +54,34 @@ export function FormulaReference({ family }: Readonly<{ family: string }>) {
       visible += familyCount;
     }
     setCount(visible);
-  }, [query, engine, table]);
+  });
 
   return (
-    <div className="sw-formula-reference" ref={root}>
-      <div className="sw-formula-filter">
-        <label htmlFor={`${id}-search`}>
+    <>
+      <div class="sw-formula-filter">
+        <label for={`${id}-search`}>
           Find a function
           <input
             id={`${id}-search`}
-            type="search"
+            onInput={(event) => setQuery(event.currentTarget.value)}
             placeholder="Name or alias, e.g. SUM"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            type="search"
+            value={query()}
           />
         </label>
-        <DemoSelect
-          className="sw-formula-filter__engine"
+        <Select
+          class="sw-formula-filter__engine"
+          id={`${id}-engine`}
           label="Available in"
+          onChange={setEngine}
           options={ENGINE_OPTIONS}
-          value={engine}
-          onValueChange={setEngine}
+          value={engine()}
         />
-        <p role="status">{count === null ? "All functions" : `${count} functions`}</p>
+        <p role="status">{`${count()} functions`}</p>
       </div>
-      {count === 0 && table !== null && "html" in table ? (
+      <Show when={count() === 0}>
         <p>No functions match. Try another name or engine.</p>
-      ) : null}
-      {table !== null && "failed" in table ? (
-        <p>The function table did not load. Reload the page to see it.</p>
-      ) : null}
-      <div
-        className="sw-formula-reference__table"
-        dangerouslySetInnerHTML={{ __html: table !== null && "html" in table ? table.html : "" }}
-        id={tableId}
-      />
-    </div>
+      </Show>
+    </>
   );
 }

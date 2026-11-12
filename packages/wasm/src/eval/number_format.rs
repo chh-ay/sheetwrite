@@ -404,7 +404,11 @@ fn render(section: &Section<'_>, value: f64) -> Result<String, FormulaError> {
         for token in &section.tokens {
             match token {
                 Token::General => text.push_str(&general_text(value)),
-                other => text.push_str(literal_text(other)),
+                other @ (Token::Literal(_)
+                | Token::Digit(_)
+                | Token::Point
+                | Token::Percent
+                | Token::Exponent { .. }) => text.push_str(literal_text(other)),
             }
         }
         return Ok(text);
@@ -457,7 +461,7 @@ fn literal_text<'a>(token: &Token<'a>) -> &'a str {
         Token::Literal(text) => text,
         Token::Percent => "%",
         Token::Point => ".",
-        _ => "",
+        Token::Digit(_) | Token::Exponent { .. } | Token::General => "",
     }
 }
 
@@ -490,7 +494,7 @@ impl Layout {
                         layout.integer_zeros += usize::from(*placeholder == '0');
                     }
                 },
-                _ => {}
+                Token::Literal(_) | Token::Percent | Token::General => {}
             }
         }
         layout
@@ -600,7 +604,9 @@ fn write_tokens(section: &Section<'_>, layout: &Layout, digits: &Digits<'_>, tex
                     text.push('+');
                 }
             }
-            other => text.push_str(literal_text(other)),
+            other @ (Token::Literal(_) | Token::Percent | Token::General) => {
+                text.push_str(literal_text(other))
+            }
         }
     }
 }

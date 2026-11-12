@@ -2413,6 +2413,15 @@ fn structured_references_cover_body_headers_totals_current_row_and_dependencies(
     assert_close(number(&store, sheet, 2, 2), 60.0);
     assert_close(number(&store, sheet, 1, 1), 20.0);
     assert_close(number(&store, sheet, 2, 1), 40.0);
+    for (row, col) in [(1, 1), (2, 1), (1, 2), (2, 2)] {
+        assert_eq!(store.spill_anchor_row(sheet, row, col), u32::MAX);
+    }
+
+    assert!(store.set_named_range("Scale", -1, sheet, 1, 0, 1, 0));
+    store.set_formula(sheet, 3, 2, "=Scale*2", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 3, 2), 20.0);
+    assert_eq!(store.spill_anchor_row(sheet, 3, 2), u32::MAX);
 
     store.set_number(sheet, 1, 0, 15.0, 0);
     store.recompute(sheet);

@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-const distRoot = resolve(import.meta.dir, "../docs-solid/dist/client");
+const distRoot = resolve(import.meta.dir, "../docs/dist/client");
 const defaultPages = [
   "index.html",
   "react/index.html",

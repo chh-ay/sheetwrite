@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createEffect, createSignal, mergeProps, on, onCleanup, Show } from "solid-js";
 
 /** Props of {@link LiveGrid}. */
 interface LiveGridProps {
@@ -23,56 +23,65 @@ type LiveGridState = "idle" | "loading" | "ready" | "failed";
  * so nothing moves when it loads, and the engine, the styles and the
  * workbook load only when the grid comes near the viewport.
  */
-export function LiveGrid({ name, height = DEFAULT_HEIGHT, label, caption }: LiveGridProps) {
-  const host = useRef<HTMLDivElement>(null);
-  const [state, setState] = useState<LiveGridState>("idle");
+export function LiveGrid(rawProps: LiveGridProps) {
+  const props = mergeProps({ height: DEFAULT_HEIGHT }, rawProps);
+  let host!: HTMLDivElement;
+  const [state, setState] = createSignal<LiveGridState>("idle");
 
-  useEffect(() => {
-    const element = host.current;
-    if (element === null) return;
-    let dispose: (() => void) | undefined;
-    let removed = false;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        observer.disconnect();
-        setState("loading");
-        import("../figures/live-grid.js")
-          .then(({ mountLiveGrid }) => mountLiveGrid(element, name))
-          .then(
-            (teardown) => {
-              if (removed) return teardown();
-              dispose = teardown;
-              setState("ready");
-            },
-            () => setState("failed"),
-          );
+  createEffect(
+    on(
+      () => props.name,
+      (name) => {
+        const element = host;
+        let dispose: (() => void) | undefined;
+        let removed = false;
+        const observer = new IntersectionObserver(
+          (entries) => {
+            if (!entries.some((entry) => entry.isIntersecting)) return;
+            observer.disconnect();
+            setState("loading");
+            import("@docs/figures/live-grid.js")
+              .then(({ mountLiveGrid }) => mountLiveGrid(element, name))
+              .then(
+                (teardown) => {
+                  if (removed) return teardown();
+                  dispose = teardown;
+                  setState("ready");
+                },
+                () => setState("failed"),
+              );
+          },
+          { rootMargin: PRELOAD_MARGIN },
+        );
+        observer.observe(element);
+        onCleanup(() => {
+          removed = true;
+          observer.disconnect();
+          dispose?.();
+        });
       },
-      { rootMargin: PRELOAD_MARGIN },
-    );
-    observer.observe(element);
-    return () => {
-      removed = true;
-      observer.disconnect();
-      dispose?.();
-    };
-  }, [name]);
+    ),
+  );
 
   return (
-    <figure className="sw-live-grid" data-state={state}>
+    <figure class="sw-live-grid" data-state={state()}>
       <div
-        aria-busy={state === "loading"}
-        aria-label={label}
-        className="sw-live-grid__host"
-        ref={host}
+        aria-busy={state() === "loading"}
+        aria-label={props.label}
+        class="sw-live-grid__host"
+        ref={(element) => {
+          host = element;
+        }}
         role="region"
-        style={{ height }}
+        style={{ height: `${props.height}px` }}
       >
-        {state === "failed" && (
-          <p className="sw-live-grid__status">The live grid could not load. Reload to try again.</p>
-        )}
+        <Show when={state() === "failed"}>
+          <p class="sw-live-grid__status">The live grid could not load. Reload to try again.</p>
+        </Show>
       </div>
-      {caption !== undefined && <figcaption>{caption}</figcaption>}
+      <Show when={props.caption !== undefined}>
+        <figcaption>{props.caption}</figcaption>
+      </Show>
     </figure>
   );
 }

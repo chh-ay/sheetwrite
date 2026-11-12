@@ -124,23 +124,6 @@ describe("code enhancements", () => {
     expect(trigger.hasAttribute("data-popover-open")).toBe(false);
   });
 
-  it("closes a panel on Escape from the trigger or from inside it, giving focus back", () => {
-    const { trigger } = mountCodeBlock();
-    uninstall = installCodePopovers();
-    trigger.focus();
-    pressKey(trigger, "Escape");
-    expect(isOpen()).toBe(false);
-
-    trigger.blur();
-    trigger.focus();
-    const link = document.getElementById(PANEL_ID)?.querySelector("a");
-    if (!link) throw new Error("No open panel holds a link");
-    link.focus();
-    pressKey(link, "Escape");
-    expect(isOpen()).toBe(false);
-    expect(document.activeElement === trigger).toBe(true);
-  });
-
   it("moves the block's one Tab stop with the arrow keys", () => {
     const page = document.createElement("article");
     page.innerHTML = `

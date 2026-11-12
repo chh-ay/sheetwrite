@@ -35,6 +35,10 @@ fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "the last function of the group takes the fallback arm; listing the 200 other Func variants adds nothing"
+)]
 fn unary(func: Func, number: f64) -> NumberResult {
     match func {
         Func::Sin => Ok(number.sin()),
@@ -81,6 +85,10 @@ fn unary(func: Func, number: f64) -> NumberResult {
 
 /// COT, CSC, SEC, COTH, CSCH and SECH: one over TAN, SIN, COS, TANH, SINH
 /// and COSH. A zero denominator is `#DIV/0!`.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "the last function of the group takes the fallback arm; listing the 200 other Func variants adds nothing"
+)]
 fn reciprocal(func: Func, number: f64) -> NumberResult {
     ensure(number.abs() < RECIPROCAL_LIMIT)?;
 
