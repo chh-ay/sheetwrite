@@ -3,10 +3,9 @@
 //! once, here, and an edit of a table finds the formulas that use it through
 //! the store's users index instead of walking every formula.
 
-use rustc_hash::FxHashMap;
+use std::cell::Cell;
 
 use crate::calc::{external_name_key, StructuredRef, TableSection};
-use crate::store::workbook_name_key;
 use crate::types::AbsCellKey;
 
 /// A table reference as it is written: its table name (`None` for
@@ -114,31 +113,41 @@ impl Table {
     }
 }
 
-/// Tables by slot, and slots by name key. A removed table's slot is reused:
-/// the formulas that used it no longer name it.
+/// Tables by slot. A removed table's slot is reused: the formulas that used
+/// it no longer name it. Names are found by scanning the few tables of a
+/// workbook, the last table found first, so a column of formulas that name
+/// one table builds no name key; the store keeps the same size it had with
+/// a map by name.
 #[derive(Default)]
 pub(crate) struct TableSlots {
     slots: Vec<Option<Table>>,
-    by_name: FxHashMap<String, u16>,
+    last_named: Cell<Option<u16>>,
 }
 
 impl TableSlots {
+    /// The number of live tables.
     pub(crate) fn len(&self) -> usize {
-        self.by_name.len()
+        self.iter().count()
     }
 
     pub(crate) fn get(&self, slot: u16) -> Option<&Table> {
         self.slots.get(usize::from(slot))?.as_ref()
     }
 
-    /// The table whose name has lookup key `key`.
-    pub(crate) fn named(&self, key: &str) -> Option<(u16, &Table)> {
-        let slot = *self.by_name.get(key)?;
-        Some((slot, self.get(slot)?))
-    }
-
-    pub(crate) fn contains_name(&self, key: &str) -> bool {
-        self.by_name.contains_key(key)
+    /// The table named `name`, compared as `workbook_name_key` compares.
+    pub(crate) fn named(&self, name: &str) -> Option<(u16, &Table)> {
+        let last = self
+            .last_named
+            .get()
+            .and_then(|slot| Some((slot, self.get(slot)?)));
+        if let Some(found) = last.filter(|(_, table)| same_name(&table.name, name)) {
+            return Some(found);
+        }
+        let found = self
+            .iter()
+            .find(|(_, table)| same_name(&table.name, name))?;
+        self.last_named.set(Some(found.0));
+        Some(found)
     }
 
     pub(crate) fn with_id(&self, id: &str) -> Option<(u16, &Table)> {
@@ -162,13 +171,6 @@ impl TableSlots {
             .filter_map(|(slot, table)| Some((slot as u16, table.as_mut()?)))
     }
 
-    /// Live tables with their name keys, for the memory state.
-    pub(crate) fn named_tables(&self) -> impl Iterator<Item = (&str, &Table)> {
-        self.by_name
-            .iter()
-            .filter_map(|(key, &slot)| Some((key.as_str(), self.get(slot)?)))
-    }
-
     /// Bind the table reference `written`, for a formula in the cell `at`.
     /// An unqualified reference names the one table that holds the cell, and
     /// a `[@Column]` reads the cell's row. `None` when no table or column
@@ -179,7 +181,7 @@ impl TableSlots {
         at: AbsCellKey,
     ) -> Option<StructuredRef> {
         let (slot, table) = if let Some(name) = written.table {
-            self.named(&workbook_name_key(name))?
+            self.named(name)?
         } else {
             let mut holding = self.iter().filter(|(_, table)| table.contains(at));
             let only = holding.next()?;
@@ -199,9 +201,9 @@ impl TableSlots {
         })
     }
 
-    /// Store `table` under name key `key` in a free slot. The store's table
-    /// limit keeps slots far below `u16::MAX`.
-    pub(crate) fn insert(&mut self, key: String, table: Table) -> u16 {
+    /// Store `table` in a free slot. The store's table limit keeps slots far
+    /// below `u16::MAX`.
+    pub(crate) fn insert(&mut self, table: Table) -> u16 {
         let index = if let Some(free) = self.slots.iter().position(Option::is_none) {
             self.slots[free] = Some(table);
             free
@@ -209,23 +211,17 @@ impl TableSlots {
             self.slots.push(Some(table));
             self.slots.len() - 1
         };
-        let slot = index as u16;
-        self.by_name.insert(key, slot);
-        slot
+        index as u16
     }
 
-    /// Put `table` in place of the table in `slot`, now under name key
-    /// `key`. Returns the table it replaced.
-    pub(crate) fn replace(&mut self, slot: u16, key: String, table: Table) -> Option<Table> {
-        let previous = self.slots.get_mut(usize::from(slot))?.replace(table);
-        self.by_name.retain(|_, named| *named != slot);
-        self.by_name.insert(key, slot);
-        previous
+    /// Put `table` in place of the table in `slot`. Returns the table it
+    /// replaced.
+    pub(crate) fn replace(&mut self, slot: u16, table: Table) -> Option<Table> {
+        self.slots.get_mut(usize::from(slot))?.replace(table)
     }
 
     pub(crate) fn remove(&mut self, slot: u16) -> Option<Table> {
         let table = self.slots.get_mut(usize::from(slot))?.take()?;
-        self.by_name.retain(|_, named| *named != slot);
         if self.slots.iter().all(Option::is_none) {
             self.slots = Vec::new();
         }

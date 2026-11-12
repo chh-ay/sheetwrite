@@ -246,7 +246,6 @@ impl CellStore {
         }
 
         for _ in 0..input.count()? {
-            let key = input.text()?;
             let mut table = Table {
                 id: input.text()?,
                 name: input.text()?,
@@ -268,7 +267,7 @@ impl CellStore {
                 });
             }
 
-            store.tables.insert(key, table);
+            store.tables.insert(table);
         }
 
         // The formulas below bind to the names, so resolve them first.
@@ -381,8 +380,7 @@ impl CellStore {
 
         out.usize(self.tables.len());
 
-        for (key, table) in self.tables.named_tables() {
-            out.text(key);
+        for (_, table) in self.tables.iter() {
             out.text(&table.id);
             out.text(&table.name);
             out.u32(table.sheet);

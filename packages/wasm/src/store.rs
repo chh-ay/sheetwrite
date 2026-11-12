@@ -2488,7 +2488,7 @@ impl CellStore {
         }
         if self
             .tables
-            .named(&name_key)
+            .named(name)
             .is_some_and(|(_, table)| table.id != id)
         {
             return false;
@@ -2540,8 +2540,8 @@ impl CellStore {
             return false;
         }
         let (slot, previous) = match existing {
-            Some(slot) => (slot, self.tables.replace(slot, name_key, definition)),
-            None => (self.tables.insert(name_key, definition), None),
+            Some(slot) => (slot, self.tables.replace(slot, definition)),
+            None => (self.tables.insert(definition), None),
         };
         self.after_table_edit(slot, previous.as_ref());
         #[cfg(feature = "analysis")]
@@ -3716,7 +3716,7 @@ impl CellStore {
     fn defined_name_scope(&self, name: &str, scope: i32) -> Option<Option<u32>> {
         if name.is_empty()
             || !matches!(parse(name), Ok(Ast::Name(_)))
-            || self.tables.contains_name(&workbook_name_key(name))
+            || self.tables.named(name).is_some()
         {
             return None;
         }
