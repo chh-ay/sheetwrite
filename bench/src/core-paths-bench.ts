@@ -880,12 +880,56 @@ function rebaseBlockAcrossInserts(scale: CorePathScale, plan: SamplePlan): CoreP
       fail(`rebase modified its input block at offset ${offset}`);
     }
   }
+
+  // Sync recovery rebases pending work only across remote cell edits; a
+  // structural remote reloads instead. Time that path on the same block.
+  let cellResult: DocumentRebaseResult | undefined;
+  const cellEditSamplesMs = collect(
+    () => {
+      cellResult = rebaseDocumentOperations(localOperations, remoteOperations);
+    },
+    {
+      warmup: plan.warmup,
+      iters: plan.iters,
+      before: () => {
+        generation += 1;
+        remoteOperations = Array.from({ length: scale.rebaseInsertOperations }, (_, index) => ({
+          op: "set" as const,
+          addr: { sheet: SHEET, row: 200 + index * 2 + (generation % 3), col: 0 },
+          value: { kind: "literal" as const, value: generation },
+        }));
+      },
+    },
+  );
+  const cellRebase = requireValue(cellResult, "cell-edit rebase timed no result");
+  if (cellRebase.status !== "rebased") fail(`cell-edit rebase reported ${cellRebase.status}`);
+  const kept = requireValue(cellRebase.operations[0], "cell-edit rebase returned no operation");
+  if (kept.op !== "setBlock" || kept.range.start.row !== blockRange.start.row) {
+    fail("cell-edit rebase moved the block");
+  }
+  for (let offset = 0; offset < blockCells; offset += 1) {
+    if (kept.block.values[offset] !== sourceValues[offset]) {
+      fail(`cell-edit rebase value ${offset} does not match the source value`);
+    }
+  }
+
   return scenarioResult(
     "rebase-large",
     `one rebase of a ${blockCells.toLocaleString("en-US")}-cell block across ${shift} single-row inserts`,
     samplesMs,
-    { blockCells, insertOperations: shift, verifiedValues: blockCells },
-    "the block rebases without conflict, shifts down by exactly the inserted row count, keeps every source value, and leaves the caller's operations untouched",
+    {
+      blockCells,
+      insertOperations: shift,
+      verifiedValues: blockCells,
+      cellEditMedianMs: summarize(cellEditSamplesMs).median,
+    },
+    "the block rebases without conflict, shifts down by exactly the inserted row count across the inserts and stays in place across the cell edits, keeps every source value, and leaves the caller's operations untouched",
+    {
+      variants: [
+        variant("across-row-inserts", samplesMs),
+        variant("across-cell-edits", cellEditSamplesMs),
+      ],
+    },
   );
 }
 
