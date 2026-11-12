@@ -1069,6 +1069,29 @@ locked commands so other checkouts can acquire the shared lock.
 taskset -c <idle-core> bun run bench:interaction-sessions
 ```
 
+`bench:forced-layout` counts forced style and layout in Chromium, which happy-dom
+cannot. A forced recalculation is an `UpdateLayoutTree` or `Layout` trace event
+that runs inside script: script read a style or a geometry while the DOM had
+writes the browser had not applied yet. The browser's own update before it
+paints a frame is not forced. Each action runs on a 100,000-row grid in a fresh
+page. Five are input followed by the two frames that paint it: a scroll step of
+three rows (the painted window moves), an arrow key, opening the cell editor,
+an edit commit (open, type, Enter), and a scroll step while the editor is open.
+Three repeat the render benchmark's timed loop, where `grid.refresh()` paints
+and the steps run back to back with no frame between them: scroll, arrow key
+and edit commit. Two User Timing marks bracket each step; ten warm-up steps run
+first. The table gives, per action, the median forced styles and layouts per
+step, the nodes they touched (elements restyled plus layout objects laid out,
+as the trace reports them), the most nodes in any step, the median forced time,
+the frame's own style and layout time, and the script time. The run fails when
+the forced recalculations of one step touch more nodes than the action's
+ceiling in `src/forced-layout-bench.ts`; node counts do not depend on the
+machine's speed.
+
+```sh
+bun run bench:forced-layout -- --runs 3 --steps 40 --output forced-layout.json
+```
+
 A change to a harness source file, to the sampling flags, or to the protocol
 version invalidates the committed render baseline: `bench:check` compares the
 harness hashes, the declared sampling, and the runner (OS, CPU, Bun, Node,
@@ -1318,6 +1341,8 @@ bench/
     render-protocol.ts     # result schema, completeness, Markdown generator
     render-driver.ts       # fresh-process Playwright runner and persistence
     render-bench.html      # render benchmark page shell
+    forced-layout-bench.ts # forced style and layout per input step (Chromium trace)
+    forced-layout-page.ts  # its page: one grid, one action per page load
     check.ts               # regression checks against captured results
     controlled-baseline.ts # reviewed baseline schema and raw-round reduction
     gate-protocol.ts       # exact matrices, resource/stat checks, fingerprints

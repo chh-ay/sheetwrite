@@ -109,6 +109,12 @@ with a unique id (`sheetwrite-grid-<n>`) and `role="rowgroup"`. It contains:
   selection marks both its header and visible cells. The focused cell's id is
   mirrored into the host's `aria-activedescendant`.
 
+Each paint writes the mirror and `aria-activedescendant` as its last step, after
+it has read the scroll position and placed the cell editor, so the page never
+lays out the mirror in the middle of a paint. The write happens in the same task
+as the paint: in the frame that shows a scroll, a key or an edit, and before
+`grid.refresh()` or `createGrid` returns.
+
 Sketch of the emitted structure:
 
 ```html partial="illustrative output or schema" title="Illustrative excerpt"

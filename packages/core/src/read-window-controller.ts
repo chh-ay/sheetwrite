@@ -271,6 +271,9 @@ export class ReadWindowController {
       if (!onEngineTrap || !isEngineTrap(error)) throw error;
 
       onEngineTrap(error);
+    } finally {
+      // Last, after every layout read of the paint, in the same task.
+      this.options.ariaMirror.flush();
     }
   }
 

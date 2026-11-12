@@ -1,4 +1,9 @@
-import { insertEditorLineBreak, sizeEditorTextarea } from "./editor-textarea.js";
+import {
+  type EditorFieldMetrics,
+  insertEditorLineBreak,
+  readEditorFieldMetrics,
+  sizeEditorTextarea,
+} from "./editor-textarea.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
 import type { CellFormat } from "./types/cell.js";
@@ -32,6 +37,13 @@ export interface BeginEditOptions {
   onShortcut?: (event: KeyboardEvent) => boolean;
 }
 
+/** What the textarea's last sizing depended on; equal inputs give the same height. */
+interface EditorSizing {
+  readonly width: string;
+  readonly minimumHeight: number;
+  readonly value: string;
+}
+
 /**
  * Owns Layer 3: a single real `<textarea>` mounted over the active cell only
  * while editing, never recycled — so IME composition and focus survive scroll.
@@ -45,6 +57,11 @@ export class EditController {
   private refStart = -1;
   private refEnd = -1;
   private readonly assist: FormulaAssist | null;
+  // Read once per open and again only when the editor's line height changes,
+  // so sizing reads only the textarea's own box, never its computed style.
+  private metrics: EditorFieldMetrics | null = null;
+  private metricsLineHeight = "";
+  private sizing: EditorSizing | null = null;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -97,14 +114,29 @@ export class EditController {
     this.assist?.attach(ta, opts.theme);
   }
 
+  /** Follow the cell. A move that keeps the cell's size only writes the position. */
   position(rect: EditRect): void {
     const ta = this.textarea;
     if (!ta) return;
     ta.style.left = `${rect.x}px`;
     ta.style.top = `${rect.y}px`;
-    ta.style.width = `${rect.w}px`;
-    ta.style.lineHeight = `${Math.max(1, rect.h - 4)}px`;
-    sizeEditorTextarea(ta, rect.h);
+    const width = `${rect.w}px`;
+    const sizing = this.sizing;
+    if (
+      sizing === null ||
+      sizing.width !== width ||
+      sizing.minimumHeight !== rect.h ||
+      sizing.value !== ta.value
+    ) {
+      ta.style.width = width;
+      const lineHeight = `${Math.max(1, rect.h - 4)}px`;
+      if (lineHeight !== this.metricsLineHeight) {
+        ta.style.lineHeight = lineHeight;
+        this.metrics = readEditorFieldMetrics(ta);
+        this.metricsLineHeight = lineHeight;
+      }
+      this.size(rect.h);
+    }
     this.assist?.reposition();
   }
 
@@ -143,7 +175,14 @@ export class EditController {
   };
 
   private resize(): void {
-    if (this.textarea && this.opts) sizeEditorTextarea(this.textarea, this.opts.rect.h);
+    if (this.textarea && this.opts) this.size(this.opts.rect.h);
+  }
+
+  private size(minimumHeight: number): void {
+    const ta = this.textarea;
+    if (!ta) return;
+    sizeEditorTextarea(ta, minimumHeight, this.metrics);
+    this.sizing = { width: ta.style.width, minimumHeight, value: ta.value };
   }
 
   commit(navigate: EditNavigate): void {
@@ -226,6 +265,9 @@ export class EditController {
     this.composing = false;
     this.refStart = -1;
     this.refEnd = -1;
+    this.metrics = null;
+    this.metricsLineHeight = "";
+    this.sizing = null;
     this.tearingDown = false;
   }
 }
