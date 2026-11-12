@@ -40,15 +40,36 @@ export function convertFormulaSources(
 }
 
 /**
- * Convert the workbook's distinct formula sources in one engine call. A
- * workbook without formulas leaves the engine unloaded.
+ * Whether a source's OOXML spelling can differ from it. The export rule
+ * (`formula_to_xlsx` in the engine) only prefixes a name followed by `(` and
+ * rewrites a reference followed by `#`; a source with neither is already its
+ * own OOXML spelling.
+ */
+function mayGainXlsxSpelling(source: string): boolean {
+  return source.includes("(") || source.includes("#");
+}
+
+/**
+ * Convert the workbook's distinct formula sources in one engine call. On
+ * export, sources the engine would return unchanged skip the call; a workbook
+ * with no other formula leaves the engine unloaded.
  */
 export async function convertWorkbookFormulas(
   snapshot: WorkbookSnapshot,
   direction: "import" | "export",
 ): Promise<ReadonlyMap<string, string>> {
   const formulas = workbookFormulaSources(snapshot);
-  if (formulas.length === 0) return new Map();
+  const pending =
+    direction === "export" ? formulas.filter((source) => mayGainXlsxSpelling(source)) : formulas;
+  const converted =
+    pending.length === 0
+      ? new Map<string, string>()
+      : await withXlsxFormulaEngine((engine) => convertFormulaSources(engine, pending, direction));
+  if (pending.length === formulas.length) return converted;
 
-  return withXlsxFormulaEngine((engine) => convertFormulaSources(engine, formulas, direction));
+  const results = new Map(converted);
+  for (const source of formulas) {
+    if (!results.has(source)) results.set(source, source);
+  }
+  return results;
 }

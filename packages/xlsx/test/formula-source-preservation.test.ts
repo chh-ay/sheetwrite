@@ -5,6 +5,7 @@ import {
   initSheetwrite,
   SheetwriteStore,
   toXlsxWorkbook,
+  withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
 import { xlsxAddon } from "../src/index.js";
@@ -54,6 +55,26 @@ it("round-trips every required function source and writes Excel's native spellin
     if (expected) expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
   }
   expect(valuesOf(await fromXlsxWorkbook(encoded))).toEqual(sources.map(formula));
+});
+
+// Export skips the engine for a source with no `(` and no `#`, because the
+// engine's export spelling only changes calls and spill references.
+it("keeps every source without a call or spill reference unchanged in the export spelling", async () => {
+  const sources = [
+    "=A1+B1",
+    "='My Sheet'!$A$1:$B$2*2",
+    "=Table1[Amount]",
+    "=Rate*-A1%",
+    "=_xlpm.x+LET",
+    "=A1:A3 B2:B4",
+    "=@A1:A3",
+    "={1,2;3,4}",
+    "=[Budget.xlsx]Annual!C10",
+    '="text"&TRUE',
+  ];
+  expect(await withXlsxFormulaEngine((engine) => engine.convert(sources, "export"))).toEqual(
+    sources,
+  );
 });
 
 it("strips prefixes after expanding shared formulas without shifting local names", async () => {
