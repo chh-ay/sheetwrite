@@ -98,13 +98,13 @@ impl RowVisibility {
             runs.manual.iter().peekable(),
         );
         loop {
-            let run = match (filtered.peek(), manual.peek()) {
+            let next = match (filtered.peek(), manual.peek()) {
                 (Some(left), Some(right)) if left.start <= right.start => filtered.next(),
-                (Some(_), Some(_)) | (None, Some(_)) => manual.next(),
+                (Some(_) | None, Some(_)) => manual.next(),
                 (Some(_), None) => filtered.next(),
                 (None, None) => break,
             };
-            if let Some(&run) = run {
+            if let Some(&run) = next {
                 push_merged(&mut merged, run);
             }
         }
@@ -112,15 +112,6 @@ impl RowVisibility {
             runs: merged,
             next: 0,
         }
-    }
-
-    pub(crate) fn skips(&self, row: u32, skipped: SkippedRows) -> bool {
-        let Some(runs) = &self.0 else {
-            return false;
-        };
-
-        contains(&runs.filtered, row)
-            || (skipped == SkippedRows::Hidden && contains(&runs.manual, row))
     }
 
     /// Shifts the runs at or below `at` down by `count`. A run that `at`
@@ -266,11 +257,6 @@ fn push_merged(runs: &mut Vec<RowRun>, run: RowRun) {
     }
 }
 
-fn contains(runs: &[RowRun], row: u32) -> bool {
-    let after = runs.partition_point(|run| run.start <= row);
-    after > 0 && runs[after - 1].end >= row
-}
-
 #[cfg(test)]
 mod tests {
     use super::{RowVisibility, SkippedRows};
@@ -280,9 +266,8 @@ mod tests {
     const TAG: u32 = 7;
 
     fn hidden_rows(visibility: &RowVisibility, skipped: SkippedRows) -> Vec<u32> {
-        (0..20)
-            .filter(|&row| visibility.skips(row, skipped))
-            .collect()
+        let mut hidden = visibility.hidden_rows(skipped);
+        (0..20).filter(|&row| hidden.skips(row)).collect()
     }
 
     #[test]

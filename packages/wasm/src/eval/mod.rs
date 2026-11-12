@@ -2134,7 +2134,7 @@ impl CellStore {
             return self.eval_statistics_family(&call, pass);
         }
 
-        if func == Func::Subtotal && !subtotal::views_off() {
+        if func == Func::Subtotal {
             if let Some(result) = self.eval_subtotal_family(args, sheet, pass, depth) {
                 return result;
             }
@@ -3206,9 +3206,8 @@ impl CellStore {
                     value
                 } else if skipped.is_some_and(|filter| {
                     filter.skips_cell(s, row as u32, col as u32, &self.formula_slots)
-                }) {
-                    Value::Blank
-                } else if s.cells.kind_at(i) == KIND_EMPTY {
+                }) || s.cells.kind_at(i) == KIND_EMPTY
+                {
                     Value::Blank
                 } else {
                     self.eval_at(sheet, row, col, pass, depth + 1)

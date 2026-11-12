@@ -398,6 +398,10 @@ fn gcd(mut left: u64, mut right: u64) -> u64 {
     left
 }
 
+/// SUBTOTAL's function (1 to 11) and the hidden rows it skips, or the error
+/// of a code that names neither.
+pub(super) type SubtotalCode = Result<(i64, SkippedRows), FormulaError>;
+
 /// Codes 101 to 111 name the same functions as 1 to 11.
 const SKIPS_HIDDEN_ROWS_OFFSET: i64 = 100;
 
@@ -411,9 +415,7 @@ const SKIPS_HIDDEN_ROWS_OFFSET: i64 = 100;
 /// function inlined there pushed `eval_ast` over that limit, and a SUM over
 /// 100,000 rows recalculated 63% slower.
 #[inline(never)]
-pub(super) fn subtotal_function(
-    values: &FuncAccumulator,
-) -> Result<(i64, SkippedRows), FormulaError> {
+pub(super) fn subtotal_function(values: &FuncAccumulator) -> SubtotalCode {
     match integer_arg(values, 0, None)? {
         code @ 1..=11 => Ok((code, SkippedRows::Filtered)),
         code @ 101..=111 => Ok((code - SKIPS_HIDDEN_ROWS_OFFSET, SkippedRows::Hidden)),
@@ -508,7 +510,7 @@ impl SubtotalFold {
     /// A reference cell holding text or a logical value, which only
     /// SUBTOTAL 3 (COUNTA) counts.
     #[inline]
-    pub(super) fn push_other(&mut self) {
+    pub(super) const fn push_other(&mut self) {
         if self.error.is_none() && self.function == 3 {
             self.count += 1;
         }
