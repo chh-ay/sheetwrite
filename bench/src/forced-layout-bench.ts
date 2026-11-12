@@ -52,17 +52,20 @@ const LAYOUT_EVENT = "Layout";
 /**
  * Most elements a forced style recalculation may restyle plus layout objects a
  * forced layout may lay out, in one step of each action. Counting nodes, not
- * time, keeps the gate independent of the machine.
+ * time, keeps the gate independent of the machine. The screen-reader mirror of
+ * the painted window is about 330 nodes; laying it out inside a step fails
+ * every row. The editor rows hold what opening, measuring, focusing and closing
+ * the textarea itself needs (#625).
  */
 const FORCED_LAYOUT_CEILINGS: Readonly<Record<ForcedLayoutAction, number>> = {
-  scroll: Number.POSITIVE_INFINITY,
-  "arrow-down": Number.POSITIVE_INFINITY,
-  "edit-open": Number.POSITIVE_INFINITY,
-  "edit-commit": Number.POSITIVE_INFINITY,
-  "editor-scroll": Number.POSITIVE_INFINITY,
-  "scroll-refresh": Number.POSITIVE_INFINITY,
-  "arrow-down-refresh": Number.POSITIVE_INFINITY,
-  "edit-commit-refresh": Number.POSITIVE_INFINITY,
+  scroll: 0,
+  "arrow-down": 0,
+  "edit-open": 10,
+  "edit-commit": 25,
+  "editor-scroll": 0,
+  "scroll-refresh": 8,
+  "arrow-down-refresh": 4,
+  "edit-commit-refresh": 27,
 };
 
 interface TraceEvent {
