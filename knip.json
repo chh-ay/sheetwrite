@@ -15,6 +15,7 @@
         "src/testing.ts",
         "src/worker.ts",
         "test/**/*.test.ts",
+        "test/*-probe.ts",
         "test/*.full-engine.ts"
       ],
       "project": ["src/**/*.ts", "test/**/*.ts"]

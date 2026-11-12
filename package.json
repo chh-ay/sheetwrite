@@ -73,7 +73,7 @@
     "test:coverage:ts": "bun scripts/coverage.ts ts",
     "test:coverage:rust": "bun scripts/coverage.ts rust",
     "test:coverage": "bun run test:coverage:ts && bun run test:coverage:rust",
-    "lint": "oxlint && bun fmt --check && bun scripts/check-local-paths.ts && bun scripts/icon-sheet.ts --check",
+    "lint": "oxlint && bun fmt --check && bun scripts/check-local-paths.ts && bun scripts/check-path-case.ts && bun scripts/icon-sheet.ts --check",
     "icons:generate": "bun scripts/icon-sheet.ts",
     "lint:rust": "bun run format:rust:check && bun scripts/rust-lint.ts",
     "format": "bun fmt",

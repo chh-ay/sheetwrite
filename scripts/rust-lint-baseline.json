@@ -12,10 +12,10 @@
     "clippy::if_then_some_else_none": 2,
     "clippy::iter_with_drain": 1,
     "clippy::lossy_float_literal": 5,
-    "clippy::map_err_ignore": 61,
+    "clippy::map_err_ignore": 60,
     "clippy::match_same_arms": 6,
     "clippy::missing_assert_message": 60,
-    "clippy::missing_const_for_fn": 203,
+    "clippy::missing_const_for_fn": 200,
     "clippy::naive_bytecount": 2,
     "clippy::needless_bitwise_bool": 1,
     "clippy::needless_continue": 2,
@@ -29,9 +29,9 @@
     "clippy::str_to_string": 23,
     "clippy::suspicious_operation_groupings": 3,
     "clippy::too_many_arguments": 107,
-    "clippy::too_many_lines": 60,
+    "clippy::too_many_lines": 58,
     "clippy::tuple_array_conversions": 2,
-    "clippy::type_complexity": 140,
+    "clippy::type_complexity": 138,
     "clippy::undocumented_unsafe_blocks": 2,
     "clippy::uninlined_format_args": 1,
     "clippy::use_self": 1,
@@ -43,7 +43,7 @@
     "missing_docs": 45,
     "redundant_imports": 14,
     "unnameable_types": 6,
-    "unreachable_pub": 29
+    "unreachable_pub": 25
   },
   "history": {},
   "queries": {}

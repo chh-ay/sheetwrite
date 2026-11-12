@@ -61,14 +61,22 @@ interface TransformFailure {
  *
  * The engine rewrites the formula of a conditional format that a row or
  * column edit moves, so such a rebase needs `initSheetwrite()` first.
+ *
+ * The caller's operations are never modified. A local operation is copied
+ * only when a remote row or column change rewrites it, and the copy shares
+ * every payload the transform does not write; every other operation in the
+ * result is the caller's own object, so treat the result as read-only.
  */
 export function rebaseDocumentOperations(
   localOperations: readonly DocumentOp[],
   remoteOperations: readonly DocumentOp[],
 ): DocumentRebaseResult {
-  const operations: DocumentOp[] = cloneJsonValue([...localOperations]);
-  // Only private clones enter this scope; transformed refs remain decoded until
-  // every remote operation succeeds, without retaining state across rebases.
+  const operations: DocumentOp[] = [...localOperations];
+  // Private copies of the local operations that a structural remote rewrites.
+  // Only these are transformed in place or have their restore payload re-encoded.
+  const owned = new Set<DocumentOp>();
+  // Decoded restore payloads, for reads of any operation and transforms of owned
+  // ones; no state is retained across rebases.
   const restoreBlocks = new Map<RestoreOperation, PackedCellBlock>();
   const restoreBlock: RestoreBlockReader = (operation) => {
     let block = restoreBlocks.get(operation);
@@ -88,14 +96,22 @@ export function rebaseDocumentOperations(
     // compared. It stays the caller's object until a local row or column change
     // moves it; only then is a private footprint copied.
     let carried: DocumentOp | null = remote;
-    let owned = false;
+    let carriedIsOwned = false;
     let axisChange = structuralChange(remote);
     for (let localIndex = 0; localIndex < operations.length && carried; localIndex++) {
-      const local = operations[localIndex]!;
+      let local = operations[localIndex]!;
       // Read before the transform: the next local operation is written after this one.
       const localChange = changesStructure(local) ? structuralChange(local) : null;
       if (axisChange) {
-        if (axisChange.kind !== "move") hasStructuralTransforms = true;
+        if (axisChange.kind !== "move") {
+          hasStructuralTransforms = true;
+          // Copy before any payload read, so a decoded restore block belongs to the copy.
+          if (!owned.has(local)) {
+            local = ownedLocalCopy(local);
+            owned.add(local);
+            operations[localIndex] = local;
+          }
+        }
         if (
           axisChange.kind === "move" &&
           operationTouchesSheet(local, axisChange.sheet, restoreBlock)
@@ -143,7 +159,7 @@ export function rebaseDocumentOperations(
       // only a local row or column change moves it.
       if (localIndex + 1 === operations.length || !localChange) continue;
       const next = carryPastLocal(
-        owned ? carried : remoteFootprint(carried),
+        carriedIsOwned ? carried : remoteFootprint(carried),
         localChange,
         restoreBlock,
       );
@@ -152,13 +168,14 @@ export function rebaseDocumentOperations(
       }
 
       carried = next ? next.operation : null;
-      owned = true;
+      carriedIsOwned = true;
       if (carried) axisChange = structuralChange(carried);
     }
   }
 
   if (hasStructuralTransforms) {
     for (const [operation, block] of restoreBlocks) {
+      if (!owned.has(operation)) continue;
       Object.assign(operation, encodeRestoreBlock(operation.range, block));
     }
   }
@@ -276,6 +293,46 @@ function remoteFootprint(operation: DocumentOp): DocumentOp {
 }
 
 /**
+ * A private copy of a local operation that a structural transform may rewrite.
+ * Transforms replace top-level coordinates with new objects and write only
+ * into the containers copied here, so cell values, styles and other payload
+ * arrays stay shared with the caller's operation and are never written.
+ */
+function ownedLocalCopy(operation: DocumentOp): DocumentOp {
+  switch (operation.op) {
+    case "setRange":
+      return operation.cells.some((cell) => cell.value.kind === "ref")
+        ? { ...operation, cells: operation.cells.map((cell) => ({ ...cell })) }
+        : { ...operation };
+    case "setBlock": {
+      const refs = operation.block.refs;
+      if (refs === undefined) return { ...operation };
+      return {
+        ...operation,
+        block: {
+          ...operation.block,
+          refs: refs.map(([offset, target]): [number, CellAddress] => [offset, target]),
+        },
+      };
+    }
+    case "addSheet":
+    case "setHyperlink":
+    case "setValidationRule":
+    case "setProtectedRange":
+    case "setNamedRange":
+    case "addTable":
+    case "updateTable":
+    case "setSheetMeta":
+    case "setChart":
+    case "setPivot":
+      return cloneJsonValue(operation);
+    default:
+      // Includes restoreBlock: its payload is decoded into a private block.
+      return { ...operation };
+  }
+}
+
+/**
  * Moves a carried remote operation past one local operation, so it is in the
  * coordinates the next local operation was written in. Returns null when the
  * local operation deleted the remote target: in server order the remote write
@@ -336,8 +393,8 @@ function carryPastLocal(
 
 /**
  * Transforms one privately owned operation in place. `rebaseDocumentOperations`
- * already works on its own deep clone of the caller's operations, so no copy
- * is needed here; the original array the caller passed in is never touched.
+ * passes only its own copy of a caller's operation (see `ownedLocalCopy`), so
+ * no copy is needed here; the caller's operations are never touched.
  */
 function transformForAxis(
   input: DocumentOp,
@@ -714,7 +771,8 @@ function transformSnapshotCells(
   for (const cell of cells) {
     const value = transformCellValue(cell.value, change);
     if (!value) return deletedReference();
-    cell.value = value;
+    // Only a moved reference is written; other cells may be shared with the caller.
+    if (value !== cell.value) cell.value = value;
   }
   return null;
 }

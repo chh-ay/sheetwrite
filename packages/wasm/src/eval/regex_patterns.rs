@@ -132,7 +132,9 @@ impl PatternIndex {
                     self.bind(arg);
                 }
             }
-            Ast::UnknownFunc(_, args) => {
+            Ast::UnknownFunc(call) => {
+                let args = &mut call.args;
+
                 for arg in args {
                     self.bind(arg);
                 }

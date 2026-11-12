@@ -4,71 +4,220 @@ use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
 use super::criteria::Criterion;
-use super::functions::{
-    integer_arg, number_arg, numeric_entries, require_arity, FuncAccumulator, FuncValue,
-};
-use super::value::aggregate_number;
+use super::functions::{require_arity, FuncAccumulator};
+use super::statistic_args::StatisticArgs;
+use super::value::{aggregate_number, number_from_value};
 
 /// The most values `MEDIAN`, `PERCENTILE.INC` and the other selections read.
 pub(super) const MAX_SELECTION_VALUES: usize = RANGE_CELL_LIMIT as usize;
 const MAX_CRITERIA_PAIRS: usize = 126;
 
+/// A statistic that reads only numbers, through [`StatisticArgs`].
+#[derive(Clone, Copy)]
+pub(super) enum NumberStatistic {
+    Median,
+    Mode,
+    Large,
+    Small,
+    Rank,
+    Percentile,
+    Quartile,
+    Variance {
+        sample: bool,
+        standard_deviation: bool,
+    },
+    GeoMean,
+    Paired(PairedKind),
+}
+
+impl NumberStatistic {
+    /// Whether the statistic pairs the cells of two arguments by position.
+    pub(super) const fn is_paired(self) -> bool {
+        matches!(self, Self::Paired(_))
+    }
+}
+
+/// What a statistical function computes.
+enum Statistic {
+    Numbers(NumberStatistic),
+    CountBlank,
+    ConditionalExtreme {
+        maximum: bool,
+    },
+    CountedAverage,
+    CountedExtreme {
+        maximum: bool,
+    },
+    CountedVariance {
+        sample: bool,
+        standard_deviation: bool,
+    },
+}
+
+/// The statistic `func` computes, or `None` for a function of another family.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
 )]
-pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
-    let result = match func {
-        Func::Median => aggregate_result(median(values)),
-        Func::ModeSngl => aggregate_result(mode_sngl(values)),
-        Func::Large => aggregate_result(large_small(values, false)),
-        Func::Small => aggregate_result(large_small(values, true)),
-        Func::RankEq => aggregate_result(rank_eq(values)),
-        Func::PercentileInc => aggregate_result(percentile_inc(values)),
-        Func::QuartileInc => aggregate_result(quartile_inc(values)),
-        Func::StdevS => aggregate_result(variance_result(values, true, true)),
-        Func::StdevP => aggregate_result(variance_result(values, false, true)),
-        Func::VarS => aggregate_result(variance_result(values, true, false)),
-        Func::VarP => aggregate_result(variance_result(values, false, false)),
-        Func::GeoMean => aggregate_result(geomean(values)),
-        Func::Correl => aggregate_result(paired_result(values, PairedKind::Correlation)),
-        Func::CovarianceS => aggregate_result(paired_result(values, PairedKind::SampleCovariance)),
-        Func::CovarianceP => {
-            aggregate_result(paired_result(values, PairedKind::PopulationCovariance))
+const fn statistic(func: Func) -> Option<Statistic> {
+    Some(match func {
+        Func::Median => Statistic::Numbers(NumberStatistic::Median),
+        Func::ModeSngl => Statistic::Numbers(NumberStatistic::Mode),
+        Func::Large => Statistic::Numbers(NumberStatistic::Large),
+        Func::Small => Statistic::Numbers(NumberStatistic::Small),
+        Func::RankEq => Statistic::Numbers(NumberStatistic::Rank),
+        Func::PercentileInc => Statistic::Numbers(NumberStatistic::Percentile),
+        Func::QuartileInc => Statistic::Numbers(NumberStatistic::Quartile),
+        Func::StdevS => Statistic::Numbers(NumberStatistic::Variance {
+            sample: true,
+            standard_deviation: true,
+        }),
+        Func::StdevP => Statistic::Numbers(NumberStatistic::Variance {
+            sample: false,
+            standard_deviation: true,
+        }),
+        Func::VarS => Statistic::Numbers(NumberStatistic::Variance {
+            sample: true,
+            standard_deviation: false,
+        }),
+        Func::VarP => Statistic::Numbers(NumberStatistic::Variance {
+            sample: false,
+            standard_deviation: false,
+        }),
+        Func::GeoMean => Statistic::Numbers(NumberStatistic::GeoMean),
+        Func::Correl => Statistic::Numbers(NumberStatistic::Paired(PairedKind::Correlation)),
+        Func::CovarianceS => {
+            Statistic::Numbers(NumberStatistic::Paired(PairedKind::SampleCovariance))
         }
-        Func::CountBlank => count_blank(values),
-        Func::MaxIfs => conditional_extreme(values, true),
-        Func::MinIfs => conditional_extreme(values, false),
-        Func::AverageA => aggregate_result(counted_average(values)),
-        Func::MaxA => aggregate_result(counted_extreme(values, true)),
-        Func::MinA => aggregate_result(counted_extreme(values, false)),
-        Func::StdevA => aggregate_result(counted_variance(values, true, true)),
-        Func::StdevPA => aggregate_result(counted_variance(values, false, true)),
-        Func::VarA => aggregate_result(counted_variance(values, true, false)),
-        Func::VarPA => aggregate_result(counted_variance(values, false, false)),
+        Func::CovarianceP => {
+            Statistic::Numbers(NumberStatistic::Paired(PairedKind::PopulationCovariance))
+        }
+        Func::CountBlank => Statistic::CountBlank,
+        Func::MaxIfs => Statistic::ConditionalExtreme { maximum: true },
+        Func::MinIfs => Statistic::ConditionalExtreme { maximum: false },
+        Func::AverageA => Statistic::CountedAverage,
+        Func::MaxA => Statistic::CountedExtreme { maximum: true },
+        Func::MinA => Statistic::CountedExtreme { maximum: false },
+        Func::StdevA => Statistic::CountedVariance {
+            sample: true,
+            standard_deviation: true,
+        },
+        Func::StdevPA => Statistic::CountedVariance {
+            sample: false,
+            standard_deviation: true,
+        },
+        Func::VarA => Statistic::CountedVariance {
+            sample: true,
+            standard_deviation: false,
+        },
+        Func::VarPA => Statistic::CountedVariance {
+            sample: false,
+            standard_deviation: false,
+        },
         _ => return None,
-    };
-    Some(result)
+    })
+}
+
+/// The statistic of `func` that reads only numbers, if it is one.
+pub(super) const fn number_statistic(func: Func) -> Option<NumberStatistic> {
+    match statistic(func) {
+        Some(Statistic::Numbers(statistic)) => Some(statistic),
+        Some(
+            Statistic::CountBlank
+            | Statistic::ConditionalExtreme { .. }
+            | Statistic::CountedAverage
+            | Statistic::CountedExtreme { .. }
+            | Statistic::CountedVariance { .. },
+        )
+        | None => None,
+    }
+}
+
+pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
+    Some(match statistic(func)? {
+        Statistic::Numbers(statistic) => apply_numbers(
+            statistic,
+            &mut StatisticArgs::from_accumulator(values, statistic.is_paired()),
+        ),
+        Statistic::CountBlank => count_blank(values),
+        Statistic::ConditionalExtreme { maximum } => conditional_extreme(values, maximum),
+        Statistic::CountedAverage => aggregate_result(counted_average(values)),
+        Statistic::CountedExtreme { maximum } => aggregate_result(counted_extreme(values, maximum)),
+        Statistic::CountedVariance {
+            sample,
+            standard_deviation,
+        } => aggregate_result(counted_variance(values, sample, standard_deviation)),
+    })
+}
+
+/// `statistic` of `values`.
+pub(super) fn apply_numbers(statistic: NumberStatistic, values: &mut StatisticArgs) -> EvalResult {
+    aggregate_result(match statistic {
+        NumberStatistic::Median => median(values),
+        NumberStatistic::Mode => mode_sngl(values),
+        NumberStatistic::Large => large_small(values, false),
+        NumberStatistic::Small => large_small(values, true),
+        NumberStatistic::Rank => rank_eq(values),
+        NumberStatistic::Percentile => percentile_inc(values),
+        NumberStatistic::Quartile => quartile_inc(values),
+        NumberStatistic::Variance {
+            sample,
+            standard_deviation,
+        } => variance_result(values, sample, standard_deviation),
+        NumberStatistic::GeoMean => geomean(values),
+        NumberStatistic::Paired(kind) => paired_result(values, kind),
+    })
 }
 
 fn aggregate_result(result: Result<f64, FormulaError>) -> Value {
     result.map_or_else(Value::Error, Value::number)
 }
 
-fn collect_numbers(entries: &[FuncValue]) -> Result<Vec<f64>, FormulaError> {
-    if entries.len() > MAX_SELECTION_VALUES {
+/// `#VALUE!` unless the statistic has between `minimum` and `maximum`
+/// arguments.
+fn require_args(
+    values: &StatisticArgs,
+    minimum: usize,
+    maximum: usize,
+) -> Result<(), FormulaError> {
+    if (minimum..=maximum).contains(&values.arg_count()) {
+        Ok(())
+    } else {
+        Err(FormulaError::Value)
+    }
+}
+
+fn require_at_least_one_arg(values: &StatisticArgs) -> Result<(), FormulaError> {
+    require_args(values, 1, 254)
+}
+
+/// Argument `index` as one number; `default` when it is left out.
+fn number_at(
+    values: &StatisticArgs,
+    index: usize,
+    default: Option<f64>,
+) -> Result<f64, FormulaError> {
+    if values.arg_missing(index) {
+        return default.ok_or(FormulaError::Value);
+    }
+    match values.arg_value(index) {
+        Some(value) => number_from_value(value),
+        None => default.ok_or(FormulaError::Value),
+    }
+}
+
+/// Argument `index` as an integer, truncated toward zero.
+fn integer_at(values: &StatisticArgs, index: usize) -> Result<i64, FormulaError> {
+    let number = number_at(values, index, None)?;
+    if !number.is_finite() || number < i64::MIN as f64 || number > i64::MAX as f64 {
         return Err(FormulaError::Num);
     }
-    numeric_entries(entries)
+    Ok(number.trunc() as i64)
 }
 
-fn require_at_least_one_arg(values: &FuncAccumulator) -> Result<(), FormulaError> {
-    require_arity(values, 1, 254)
-}
-
-fn median(values: &FuncAccumulator) -> Result<f64, FormulaError> {
+fn median(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
-    let mut numbers = collect_numbers(values.entries())?;
+    let numbers = values.all_numbers(MAX_SELECTION_VALUES)?;
     if numbers.is_empty() {
         return Ok(0.0);
     }
@@ -86,9 +235,9 @@ fn median(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     Ok(lower * 0.5 + *upper * 0.5)
 }
 
-fn mode_sngl(values: &FuncAccumulator) -> Result<f64, FormulaError> {
+fn mode_sngl(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
-    let mut numbers = collect_numbers(values.entries())?;
+    let numbers = values.all_numbers(MAX_SELECTION_VALUES)?;
     if numbers.len() < 2 {
         return Err(FormulaError::Na);
     }
@@ -118,10 +267,11 @@ fn mode_sngl(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     }
 }
 
-fn large_small(values: &FuncAccumulator, ascending: bool) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 2)?;
-    let mut numbers = collect_numbers(values.arg(0).unwrap_or_default())?;
-    let k = usize::try_from(integer_arg(values, 1, None)?).map_err(|_| FormulaError::Num)?;
+fn large_small(values: &mut StatisticArgs, ascending: bool) -> Result<f64, FormulaError> {
+    require_args(values, 2, 2)?;
+    values.numbers(0, MAX_SELECTION_VALUES)?;
+    let k = usize::try_from(integer_at(values, 1)?).map_err(|_| FormulaError::Num)?;
+    let numbers = values.numbers(0, MAX_SELECTION_VALUES)?;
     if k == 0 || k > numbers.len() {
         return Err(FormulaError::Num);
     }
@@ -130,18 +280,17 @@ fn large_small(values: &FuncAccumulator, ascending: bool) -> Result<f64, Formula
     Ok(*selected)
 }
 
-fn rank_eq(values: &FuncAccumulator) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 3)?;
-    let target = number_arg(values, 0, None)?;
-    let numbers = collect_numbers(values.arg(1).unwrap_or_default())?;
-    if numbers.is_empty() {
+/// RANK.EQ counts in place: it needs no copy of the numbers.
+fn rank_eq(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
+    require_args(values, 2, 3)?;
+    let target = number_at(values, 0, None)?;
+    let numbers = values.numbers(1, MAX_SELECTION_VALUES)?;
+    if numbers.is_empty() || !numbers.contains(&target) {
         return Err(FormulaError::Na);
     }
-    if !numbers.contains(&target) {
-        return Err(FormulaError::Na);
-    }
-    let ascending = number_arg(values, 2, Some(0.0))? != 0.0;
-    let before = numbers
+    let ascending = number_at(values, 2, Some(0.0))? != 0.0;
+    let before = values
+        .numbers(1, MAX_SELECTION_VALUES)?
         .iter()
         .filter(|&&value| {
             if ascending {
@@ -154,24 +303,25 @@ fn rank_eq(values: &FuncAccumulator) -> Result<f64, FormulaError> {
     Ok((before + 1) as f64)
 }
 
-fn percentile_inc(values: &FuncAccumulator) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 2)?;
-    let numbers = collect_numbers(values.arg(0).unwrap_or_default())?;
-    percentile(numbers, number_arg(values, 1, None)?)
+fn percentile_inc(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
+    require_args(values, 2, 2)?;
+    values.numbers(0, MAX_SELECTION_VALUES)?;
+    let fraction = number_at(values, 1, None)?;
+    percentile(values.numbers(0, MAX_SELECTION_VALUES)?, fraction)
 }
 
-fn quartile_inc(values: &FuncAccumulator) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 2)?;
-    let quartile = integer_arg(values, 1, None)?;
+fn quartile_inc(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
+    require_args(values, 2, 2)?;
+    let quartile = integer_at(values, 1)?;
     if !(0..=4).contains(&quartile) {
         return Err(FormulaError::Num);
     }
-    let numbers = collect_numbers(values.arg(0).unwrap_or_default())?;
+    let numbers = values.numbers(0, MAX_SELECTION_VALUES)?;
     percentile(numbers, quartile as f64 * 0.25)
 }
 
 /// The `PERCENTILE.INC` of `numbers` at `fraction`.
-pub(super) fn percentile(mut numbers: Vec<f64>, fraction: f64) -> Result<f64, FormulaError> {
+fn percentile(numbers: &mut [f64], fraction: f64) -> Result<f64, FormulaError> {
     if numbers.is_empty() || !(0.0..=1.0).contains(&fraction) {
         return Err(FormulaError::Num);
     }
@@ -213,13 +363,13 @@ impl Moments {
 }
 
 fn variance_result(
-    values: &FuncAccumulator,
+    values: &mut StatisticArgs,
     sample: bool,
     standard_deviation: bool,
 ) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
     variance(
-        &collect_numbers(values.entries())?,
+        values.all_numbers(MAX_SELECTION_VALUES)?,
         sample,
         standard_deviation,
     )
@@ -254,7 +404,7 @@ fn variance(numbers: &[f64], sample: bool, standard_deviation: bool) -> Result<f
 /// as an argument is read as a number, and empty text is 0. Empty cells
 /// are skipped.
 fn counted_numbers(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
-    require_at_least_one_arg(values)?;
+    require_arity(values, 1, 254)?;
 
     let entries = values.entries();
 
@@ -312,9 +462,9 @@ fn counted_variance(
     variance(&counted_numbers(values)?, sample, standard_deviation)
 }
 
-fn geomean(values: &FuncAccumulator) -> Result<f64, FormulaError> {
+fn geomean(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
-    let numbers = collect_numbers(values.entries())?;
+    let numbers = values.all_numbers(MAX_SELECTION_VALUES)?;
     if numbers.is_empty() || numbers.iter().any(|&value| value <= 0.0) {
         return Err(FormulaError::Num);
     }
@@ -343,24 +493,9 @@ pub(super) enum PairedKind {
     PopulationCovariance,
 }
 
-impl PairedKind {
-    /// The statistic of `func`, or `None` when it is not a paired function.
-    #[allow(
-        clippy::wildcard_enum_match_arm,
-        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
-    )]
-    pub(super) fn of(func: Func) -> Option<Self> {
-        match func {
-            Func::Correl => Some(Self::Correlation),
-            Func::CovarianceS => Some(Self::SampleCovariance),
-            Func::CovarianceP => Some(Self::PopulationCovariance),
-            _ => None,
-        }
-    }
-}
-
+/// The running moments of a paired statistic.
 #[derive(Default)]
-struct PairedMoments {
+pub(super) struct PairedMoments {
     count: usize,
     mean_x: f64,
     mean_y: f64,
@@ -370,7 +505,8 @@ struct PairedMoments {
 }
 
 impl PairedMoments {
-    fn push(&mut self, x: f64, y: f64) -> Result<(), FormulaError> {
+    /// Adds the pair `x`, `y`; `#NUM!` once a moment stops being finite.
+    pub(super) fn push(&mut self, x: f64, y: f64) -> Result<(), FormulaError> {
         self.count += 1;
         let divisor = self.count as f64;
         let delta_x = x - self.mean_x;
@@ -393,23 +529,18 @@ impl PairedMoments {
     }
 }
 
-fn paired_result(values: &FuncAccumulator, kind: PairedKind) -> Result<f64, FormulaError> {
-    require_arity(values, 2, 2)?;
-    let left = values.arg(0).unwrap_or_default();
-    let right = values.arg(1).unwrap_or_default();
+fn paired_result(values: &StatisticArgs, kind: PairedKind) -> Result<f64, FormulaError> {
+    require_args(values, 2, 2)?;
+    let left = values.paired(0);
+    let right = values.paired(1);
     if left.len() != right.len() {
         return Err(FormulaError::Na);
     }
-    let pairs = left.iter().zip(right).map(|(left_cell, right_cell)| {
-        (
-            PairedCell::of(&left_cell.value),
-            PairedCell::of(&right_cell.value),
-        )
-    });
-    paired_statistic(pairs, kind)
+    paired_statistic(left.iter().copied().zip(right.iter().copied()), kind)
 }
 
 /// One cell of a paired statistic's argument, as the statistic reads it.
+#[derive(Clone, Copy)]
 pub(super) enum PairedCell {
     Number(f64),
     Error(FormulaError),
@@ -418,7 +549,8 @@ pub(super) enum PairedCell {
 }
 
 impl PairedCell {
-    fn of(value: &Value) -> Self {
+    /// The cell holding `value`.
+    pub(super) const fn of(value: &Value) -> Self {
         match value {
             Value::Number(number) => Self::Number(*number),
             Value::Error(error) => Self::Error(*error),
@@ -445,30 +577,37 @@ pub(super) fn paired_statistic(
             _ => {}
         }
     }
-    match kind {
-        PairedKind::Correlation => {
-            if moments.count < 2 || moments.m2_x <= 0.0 || moments.m2_y <= 0.0 {
-                return Err(FormulaError::DivZero);
+    moments.finish(kind)
+}
+
+impl PairedMoments {
+    /// The statistic `kind` of the pairs added so far.
+    pub(super) fn finish(&self, kind: PairedKind) -> Result<f64, FormulaError> {
+        match kind {
+            PairedKind::Correlation => {
+                if self.count < 2 || self.m2_x <= 0.0 || self.m2_y <= 0.0 {
+                    return Err(FormulaError::DivZero);
+                }
+                let result = self.co_moment / self.m2_x.sqrt() / self.m2_y.sqrt();
+                if result.is_finite() {
+                    Ok(result.clamp(-1.0, 1.0))
+                } else {
+                    Err(FormulaError::Num)
+                }
             }
-            let result = moments.co_moment / moments.m2_x.sqrt() / moments.m2_y.sqrt();
-            if result.is_finite() {
-                Ok(result.clamp(-1.0, 1.0))
-            } else {
-                Err(FormulaError::Num)
+            PairedKind::SampleCovariance => {
+                if self.count < 2 {
+                    Err(FormulaError::DivZero)
+                } else {
+                    Ok(self.co_moment / (self.count - 1) as f64)
+                }
             }
-        }
-        PairedKind::SampleCovariance => {
-            if moments.count < 2 {
-                Err(FormulaError::DivZero)
-            } else {
-                Ok(moments.co_moment / (moments.count - 1) as f64)
-            }
-        }
-        PairedKind::PopulationCovariance => {
-            if moments.count == 0 {
-                Err(FormulaError::DivZero)
-            } else {
-                Ok(moments.co_moment / moments.count as f64)
+            PairedKind::PopulationCovariance => {
+                if self.count == 0 {
+                    Err(FormulaError::DivZero)
+                } else {
+                    Ok(self.co_moment / self.count as f64)
+                }
             }
         }
     }

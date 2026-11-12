@@ -17,6 +17,7 @@ import type {
   ChartChangeEvent,
   ChartDefinition,
   ChartRef,
+  ChartView,
   DocumentOp,
   Sheet,
   Workbook,
@@ -41,6 +42,8 @@ export interface ChartTrackingRow {
   readonly commitMs: Stat;
   readonly baselineMs: Stat;
   readonly eventMs: Stat | null;
+  /** Resolving every chart the commit named, after the commit; null when it named none. */
+  readonly resolveMs: Stat | null;
   readonly expectedEvents: number;
   readonly expectedCharts: number;
   readonly resolutionsPerCommit: number;
@@ -232,6 +235,7 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
                 : [];
           const commits: number[] = [];
           const latencies: number[] = [];
+          const resolveTimes: number[] = [];
           for (let iteration = -warmups; iteration < samples; iteration++) {
             events.length = 0;
             resolutions = 0;
@@ -248,29 +252,38 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
             apply(store, [patch]);
             const elapsed = now() - started;
             checkChartEvents(events, expected);
+            // Resolution is what a consumer does with the event; it is timed on its own.
+            const resolved: Array<{ ref: ChartRef; view: ChartView | null }> = [];
+            const resolveStart = now();
             for (const event of events) {
               for (const ref of event.charts) {
-                const view = resolveChartView(store, ref.sheet, ref.id);
-                if (view === null) {
-                  throw new Error(`Reported chart did not resolve: ${ref.sheet}/${ref.id}`);
-                }
-                if (scenario === "inside" && ref.id === reference(0).id) {
-                  const values = view.series[0]?.values;
-                  if (
-                    values?.[EDIT_VALUE_COL] !== value ||
-                    (source === "formula" && values?.[SOURCE_VALUE_COL] !== value * FORMULA_FACTOR)
-                  ) {
-                    throw new Error("Reported chart did not contain the committed source value");
-                  }
-                }
-                resolutions++;
+                resolved.push({ ref, view: resolveChartView(store, ref.sheet, ref.id) });
               }
+            }
+            const resolveElapsed = now() - resolveStart;
+            for (const { ref, view } of resolved) {
+              if (view === null) {
+                throw new Error(`Reported chart did not resolve: ${ref.sheet}/${ref.id}`);
+              }
+              if (scenario === "inside" && ref.id === reference(0).id) {
+                const values = view.series[0]?.values;
+                if (
+                  values?.[EDIT_VALUE_COL] !== value ||
+                  (source === "formula" && values?.[SOURCE_VALUE_COL] !== value * FORMULA_FACTOR)
+                ) {
+                  throw new Error("Reported chart did not contain the committed source value");
+                }
+              }
+              resolutions++;
             }
             if (resolutions !== expected.length)
               throw new Error("Incorrect chart resolution count");
             if (iteration >= 0) {
               commits.push(elapsed);
-              if (expected.length > 0) latencies.push(eventLatency);
+              if (expected.length > 0) {
+                latencies.push(eventLatency);
+                resolveTimes.push(resolveElapsed);
+              }
             }
           }
           rows.push({
@@ -281,6 +294,7 @@ export async function captureChartTracking(smoke: boolean): Promise<ChartTrackin
             commitMs: summarize(commits),
             baselineMs,
             eventMs: latencies.length > 0 ? summarize(latencies) : null,
+            resolveMs: resolveTimes.length > 0 ? summarize(resolveTimes) : null,
             expectedEvents: expected.length > 0 ? 1 : 0,
             expectedCharts: expected.length,
             resolutionsPerCommit: expected.length,

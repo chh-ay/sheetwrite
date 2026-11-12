@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { installCoreStyles } from "./fixtures.js";
 
 const LOAD_ERROR = "the ribbon chunk failed to load";
 mock.module("../src/ribbon/ribbon.js", () => {
@@ -16,6 +17,7 @@ process.on("unhandledRejection", (reason) => reported.push(reason));
 
 await initSheetwrite();
 const restore = installCanvasTestStubs();
+const removeStyles = installCoreStyles();
 const host = document.createElement("div");
 Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
 document.body.appendChild(host);
@@ -46,5 +48,6 @@ try {
   assert.equal(reported.length, 1, "the load error still reaches the host");
 } finally {
   grid.destroy();
+  removeStyles();
   restore();
 }
