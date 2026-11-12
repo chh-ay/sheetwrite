@@ -217,7 +217,7 @@ interface RangeSnapshotHandle {
   kinds(): Uint8Array;
   free(): void;
 }
-/** The `CellStore` surface the readers use; present in 0.5.x and later engines. */
+/** The `CellStore` surface the readers use, including packed fixture writes. */
 interface Engine {
   addSheet(nCols: number, rowCount: number): number;
   setNumber(sheet: number, row: number, col: number, value: number, style: number): void;

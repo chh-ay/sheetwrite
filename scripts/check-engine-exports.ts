@@ -296,7 +296,7 @@ export async function auditEngineExports(root: string): Promise<EngineExportAudi
     if (!existsSync(binding))
       throw new Error(`Missing ${relative(root, binding)}; run bun run build:packages first`);
   }
-  const callers = ["packages", "test", "bench/src"].flatMap((directory) => {
+  const callers = ["packages", "test", "bench"].flatMap((directory) => {
     const path = resolve(root, directory);
     return existsSync(path) ? sourceFiles(path) : [];
   });

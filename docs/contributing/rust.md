@@ -39,7 +39,7 @@ The existing Type Checks & Generated Docs job checks engine exports. Every
 exported Rust function and method names its JavaScript binding with an
 explicit camelCase `js_name`; constructors are the exception. The check also
 resolves the built default, full, history and query declarations against
-executable sources in `packages`, `test` and `bench/src`; generated output and type-only
+executable sources in `packages`, `test` and `bench`; generated output and type-only
 declarations do not count. Remove an uncalled export unless it is public API
 on purpose. In that case, add `/// @enginePublic <reason>` to its Rust docs,
 so the generated declaration carries the reason. A bare marker does not pass.
