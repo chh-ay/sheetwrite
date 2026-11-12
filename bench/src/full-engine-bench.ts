@@ -6,13 +6,8 @@ import { brotliCompressSync, constants } from "node:zlib";
 
 import type * as Formulas from "@sheetwrite/formulas";
 
-import {
-  type CompleteFormulaBenchmarkResult,
-  type CompleteFormulaWorkloadResult,
-  collectFixture,
-  formulaSourceEnginePackage,
-  validateRecordedFormulaCapture,
-} from "./formula-bench.js";
+import { type CompleteFormulaBenchmarkResult, type CompleteFormulaWorkloadResult, formulaSourceEnginePackage, FORMULA_SUPPORT_SOURCE_FILES } from "./formula-artifact.js";
+import { collectFixture, validateRecordedFormulaCapture } from "./formula-bench.js";
 import {
   benchmarkEnginePath,
   captureEngineBaselineContext,
@@ -66,6 +61,7 @@ export interface FullEngineResult {
 const INIT_METHOD =
   "five fresh Node processes; monotonic time around initSheetwrite only; imports and process startup excluded; filesystem cache not cleared";
 const SOURCE_PATHS = [
+  ...FORMULA_SUPPORT_SOURCE_FILES,
   "bench/src/full-engine-bench.ts",
   "bench/src/formula-bench.ts",
   "bench/src/gate-protocol.ts",
@@ -122,7 +118,7 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     throw new Error("invalid engine metadata");
   if (result.schemaVersion !== 2 || result.initializationMethod !== INIT_METHOD)
     throw new Error("engine protocol mismatch");
-  exactKeys(result.sourceFiles, SOURCE_PATHS, "engine source files");
+  exactKeys(result.sourceFiles, FORMULA_SUPPORT_SOURCE_FILES.some((path) => path in result.sourceFiles) ? SOURCE_PATHS : SOURCE_PATHS.filter((path) => !(FORMULA_SUPPORT_SOURCE_FILES as readonly string[]).includes(path)), "engine source files");
   if (
     Object.values(result.sourceFiles).some((digest) => !/^[0-9a-f]{64}$/u.test(digest)) ||
     result.sourceDigest !== sourceDigest(result)
@@ -439,3 +435,4 @@ async function capture(): Promise<void> {
   );
 }
 if (import.meta.main) await capture();
+
