@@ -17,7 +17,7 @@ use super::matrix::{intersection_range, range_from_ast};
 use super::EvalPass;
 
 /// The functions that Excel lets read a 3-D reference.
-fn accepts_sheet_span(func: Func) -> bool {
+pub(super) fn accepts_sheet_span(func: Func) -> bool {
     match func {
         Func::Sum
         | Func::Avg
@@ -46,7 +46,7 @@ fn accepts_sheet_span(func: Func) -> bool {
 /// The functions that read a union as one list of values. Functions that pair
 /// cells by position, such as SUMPRODUCT and CORREL, need one range, so a
 /// union there is `#VALUE!`, as in Excel.
-fn accepts_union(func: Func) -> bool {
+pub(super) fn accepts_union(func: Func) -> bool {
     match func {
         Func::Small
         | Func::Large

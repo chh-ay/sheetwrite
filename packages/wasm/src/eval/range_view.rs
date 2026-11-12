@@ -4,9 +4,12 @@
 //! touches only that cell, and nothing is copied until a caller asks for the
 //! whole range as an `EvalMatrix`.
 
+use crate::cells::{payload_num, payload_str_id};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{CellRange, FormulaError, Value, KIND_FORMULA, KIND_STRING};
+use crate::types::{
+    CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
+};
 
 use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
 use super::{string_from_pool_ref, EvalPass, LiteralSources};
@@ -32,6 +35,19 @@ impl<'a> RangeView<'a> {
         range: CellRange,
         depth: usize,
     ) -> Result<Self, FormulaError> {
+        let view = Self::clipped(store, range, depth)?;
+        EvalMatrix::validate_shape(view.rows, view.cols, 1, 0)?;
+        Ok(view)
+    }
+
+    /// Clips `range` to the sheet without a size limit, for readers that
+    /// apply their own. A missing sheet or a range that starts outside it is
+    /// `#REF!`. No cell is read.
+    pub(super) fn clipped(
+        store: &'a CellStore,
+        range: CellRange,
+        depth: usize,
+    ) -> Result<Self, FormulaError> {
         let sheet = range.sheet as usize;
         let data = store.sheets.get(sheet).ok_or(FormulaError::Ref)?;
         let row_start = range.row_start as usize;
@@ -46,9 +62,6 @@ impl<'a> RangeView<'a> {
 
         let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
         let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
-        let rows = row_end - row_start + 1;
-        let cols = col_end - col_start + 1;
-        EvalMatrix::validate_shape(rows, cols, 1, 0)?;
 
         Ok(Self {
             store,
@@ -56,8 +69,8 @@ impl<'a> RangeView<'a> {
             sheet,
             row_start,
             col_start,
-            rows,
-            cols,
+            rows: row_end - row_start + 1,
+            cols: col_end - col_start + 1,
             depth,
         })
     }
@@ -101,6 +114,55 @@ impl<'a> RangeView<'a> {
                 .store
                 .eval_at(self.sheet, row, col, pass, self.depth + 1),
         }
+    }
+
+    /// Visits every cell in row-major order as a number or a skipped cell,
+    /// as a function that reads only the numbers of a range sees it. The
+    /// first unloaded cell is `#LOADING!` and the first error cell is its
+    /// error, as is a literal number that isn't finite or text missing from
+    /// the string pool; the walk stops there.
+    pub(super) fn scan_numbers(
+        &self,
+        pass: &mut EvalPass<'_>,
+        mut visit: impl FnMut(Option<f64>),
+    ) -> Result<(), FormulaError> {
+        let literals = LiteralSources::new(self.data, self.depth);
+        for row in self.row_start..self.row_start + self.rows {
+            for col in self.col_start..self.col_start + self.cols {
+                if !self.data.cells.is_loaded(row, col) {
+                    return Err(FormulaError::Loading);
+                }
+
+                let index = self.data.cells.idx(row, col);
+                let literal = literals.and_then(|sources| sources.sources.literal(index));
+                let number = match literal {
+                    Some((KIND_NUMBER, payload)) => {
+                        let number = payload_num(payload);
+                        if !number.is_finite() {
+                            return Err(FormulaError::Num);
+                        }
+                        Some(number)
+                    }
+                    Some((KIND_STRING, payload)) => {
+                        string_from_pool_ref(&self.store.strings, payload_str_id(payload))
+                            .ok_or(FormulaError::Ref)?;
+                        None
+                    }
+                    Some(_) => None,
+                    None if self.data.cells.kind_at(index) == KIND_EMPTY => None,
+                    None => match self
+                        .store
+                        .eval_at(self.sheet, row, col, pass, self.depth + 1)
+                    {
+                        Value::Number(number) => Some(number),
+                        Value::Error(error) => return Err(error),
+                        Value::Text(_) | Value::Bool(_) | Value::Blank => None,
+                    },
+                };
+                visit(number);
+            }
+        }
+        Ok(())
     }
 
     /// Every cell of the view in one row-major matrix. Fails with `#NUM!`

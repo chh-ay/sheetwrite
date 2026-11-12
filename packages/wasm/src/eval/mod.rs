@@ -19,7 +19,6 @@ mod iteration;
 mod let_slots;
 mod literal_criteria;
 mod literal_products;
-mod literal_statistics;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -38,6 +37,7 @@ mod range_view;
 mod reference;
 #[cfg(feature = "analysis")]
 pub(crate) mod regex_patterns;
+mod statistic_args;
 mod statistics;
 mod subtotal;
 #[cfg(test)]
@@ -2048,13 +2048,8 @@ impl CellStore {
             }
         }
 
-        if matches!(
-            func,
-            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
-        ) {
-            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
-                return result;
-            }
+        if statistic_args::reads_numbers(func) && !statistic_args::views_off() {
+            return self.eval_statistics_family(func, args, sheet, pass, depth);
         }
 
         if func == Func::Sum {
