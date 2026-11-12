@@ -17,6 +17,7 @@
     "src/react-main.tsx",
     "src/vue-main.ts",
     "src/App.svelte",
-    "src/svelte-main.ts"
+    "src/svelte-main.ts",
+    "src/SimpleRows.svelte"
   ]
 }
