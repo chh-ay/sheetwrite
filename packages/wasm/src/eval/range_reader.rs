@@ -129,8 +129,8 @@ impl<'a> RangeReader<'a> {
 
         for col in self.col_start..=self.col_end {
             let column = self.data.cells.dense_column(col)?;
-            let (kinds, payloads) = column.raw_slices();
-            let kinds = kinds.get(rows.clone())?;
+            let (column_kinds, payloads) = column.raw_slices();
+            let kinds = column_kinds.get(rows.clone())?;
 
             // Literal kinds are 0..=3 (a raw empty kind without the calculated
             // bit is a plain blank). Any other kind sets a higher bit, so one
@@ -174,7 +174,9 @@ impl<'a> RangeReader<'a> {
         }
 
         let index = self.data.cells.idx(self.row, self.col);
-        let value = if !self.data.cells.is_paged() {
+        let value = if self.data.cells.is_paged() {
+            self.paged_value_at(index, pass)?
+        } else {
             if let Some(value) = self
                 .literals
                 .and_then(|sources| sources.value_at(&self.store.strings, index))
@@ -183,8 +185,6 @@ impl<'a> RangeReader<'a> {
             } else {
                 self.dense_value_at(self.row, self.col, pass)
             }
-        } else {
-            self.paged_value_at(index, pass)?
         };
 
         self.col += 1;

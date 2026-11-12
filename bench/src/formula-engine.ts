@@ -1,9 +1,10 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import * as formulas from "@sheetwrite/formulas";
 import * as defaultEngine from "@sheetwrite/wasm";
+import type * as HistoryKernel from "@sheetwrite/wasm/history";
 
 export const ENGINE_PACKAGE = process.env.SHEETWRITE_BENCH_ENGINE === "full" ? "formulas" : "wasm";
 /**
@@ -31,3 +32,15 @@ const ENGINE_PKG_URL =
     : pathToFileURL(`${resolve(ENGINE_ROOT, `packages/${ENGINE_PACKAGE}/pkg`)}/`);
 export const WASM_PATH = new URL("sheetwrite_wasm_bg.wasm", ENGINE_PKG_URL);
 export const ENGINE_GLUE_PATH = new URL("sheetwrite_wasm.js", ENGINE_PKG_URL);
+
+/** The version-history diff kernel, from the same checkout as the engine. */
+export const historyKernel: typeof HistoryKernel = await import(
+  pathToFileURL(
+    resolve(
+      ENGINE_ROOT ?? fileURLToPath(new URL("../..", import.meta.url)),
+      "packages/wasm/history-node.mjs",
+    ),
+  ).href
+);
+await historyKernel.loadHistoryKernel();
+

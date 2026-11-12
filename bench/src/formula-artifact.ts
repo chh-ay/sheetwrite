@@ -34,7 +34,7 @@ const HARNESS_SOURCE_URLS = {
   "bun.lock": new URL("../../bun.lock", import.meta.url),
 } as const;
 const ENGINE_SOURCE_FILENAMES = ["sheetwrite_wasm.js", "sheetwrite_wasm_bg.wasm"] as const;
-type FormulaEnginePackage = "wasm" | "formulas";
+export type FormulaEnginePackage = "wasm" | "formulas";
 
 /** The provenance keys of a capture that measured the engine in `packages/<enginePackage>`. */
 function formulaSourceFiles(enginePackage: FormulaEnginePackage): string[] {
@@ -332,7 +332,7 @@ export function formulaRegressionBaselineIdentity(baseline: FormulaBenchmarkResu
 }
 
 export interface FormulaArtifactMatrix {
-  workloadKeys(mode: BenchmarkMode): string[];
+  workloadKeys(mode: BenchmarkMode, enginePackage?: FormulaEnginePackage): string[];
   legacyWorkloadKeys(): string[];
   memoryKeys(mode: BenchmarkMode): string[];
   readonly shapeRowIds: readonly string[];
@@ -857,14 +857,18 @@ function validateLegacyFormulaBaseline(result: FormulaBenchmarkResult): void {
  */
 function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): string[] {
   const observed = baseline.workloads.map(formulaWorkloadKey);
-  const candidates = [expectedFormulaWorkloadKeys("full"), legacyFormulaBaselineWorkloadKeys()];
+  const candidates = [
+    expectedFormulaWorkloadKeys("full", "wasm"),
+    expectedFormulaWorkloadKeys("full", "formulas"),
+    legacyFormulaBaselineWorkloadKeys(),
+  ];
   for (const expected of candidates) {
     if (expected.length === observed.length && expected.every((key) => observed.includes(key))) {
       return expected;
     }
   }
   const observedSet = new Set(observed);
-  const recognised = new Set(expectedFormulaWorkloadKeys("full"));
+  const recognised = new Set(expectedFormulaWorkloadKeys("full", "formulas"));
   const core = legacyFormulaBaselineWorkloadKeys();
   if (
     observed.length > 0 &&

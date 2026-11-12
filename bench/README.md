@@ -299,6 +299,101 @@ heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
 `sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
 the 1.2 default until same-engine pairs calibrate them.
 
+Four rows time paged storage (#325, R5). Each paged sheet loads its values as
+clean pages inside a page load, the way datasource pages arrive:
+
+- `paged-cell-reads` (100,000 rows): `=A{r}+B{r}*$C$1` in every row of a paged
+  sheet; the timed edit changes `$C$1`, so every formula reads two loaded
+  cells again, one at a time.
+- `paged-insert-row` (1,000,000 rows, two loaded columns, 1,000 local edits):
+  inserts one row at row 11; the untimed restore removes it again.
+- `paged-range-loaded` (the same sheet): `rangeFullyLoaded` over both
+  columns.
+- `paged-eviction` (8,192 pages of 4 rows): one page load of the whole column
+  through a cache that holds 512 pages, with the top 16 pinned by a viewport
+  band, so every page it writes evicts the oldest one.
+
+Measured natively on develop (Linux, instructions per timed run, perf
+samples): `paged-cell-reads` ran 251 M, 41% of it in paged cell lookups, three
+per cell read; `paged-insert-row` 1,905 M, 99% rebuilding the whole storage
+cell by cell; `paged-range-loaded` 343 M, one full cell read per cell; and
+`paged-eviction` 14.7 M, about 10% keeping the eviction order and most of the
+rest writing the page one cell at a time. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
+Five rows measure how functions read ranges (#325, R1). The shares below
+come from a native replay of the timed runs on develop `d9827e1f`, perf
+samples with inlined frames, at the sizes the rows first had (1,000 lookups,
+10,000 ranks):
+
+- `index-match-many` (200 lookups):
+  `=INDEX($B$1:$B$100000,MATCH($C$1+r,$A$1:$A$100000,0))`. Each match lands
+  near the top of the table. INDEX copied its whole area into values to
+  return one cell: 99.8% of the run, a 2.4 MB allocation per formula.
+- `rank-many` (4,000 rows): `=RANK.EQ(A{r},$A$1:$A$N)` in even rows and
+  `=LARGE($A$1:$A$N,ROW())` in odd rows; the edit changes A1. Turning the
+  column into values per formula was 94% of the run.
+- `sort-unique-filter` (100,000 rows): one
+  `=SORT(UNIQUE(FILTER(A1:A100000,B1:B100000<$D$1)))` over text keys; the
+  edit narrows the filter to 500 rows. Converting ranges was 47%, the array
+  steps 38%.
+- `subtotal-filtered` (100,000 rows): `=SUBTOTAL(109,A1:A100000)` with every
+  other block of 10 rows hidden by a filter. The per-row hidden check was 53%.
+- `sparse-page-write` (100,000 × 10): one `setSparseBlock` inside a page
+  load, 10% blank cells, half text. Per-cell writes were 90% (#572).
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
+Six rows time grouping, pivots, analysis functions and the version-history
+diff, which no other row reaches. The first five run on the full engine only,
+since the default engine has none of these functions; the default engine's
+matrix leaves them out.
+
+- `groupby-sum` (100K source rows): `=GROUPBY(A1:B…,C1:C…,SUM,0,2)` over
+  region text (10 values) and product text (100 values, each in one region),
+  with subtotals. The timed run edits the first amount.
+- `pivotby-percentof` (50K source rows): `=PIVOTBY(…,PERCENTOF,0,2,,1,,,2)`
+  over the same keys by quarter, as shares of the grand total. 70K rows
+  already pass PIVOTBY's work budget and give `#NUM!`.
+- `pivot-rebuild` (100K source rows): the pivot benchmark's pivot (three row
+  fields, one column field, SUM and AVERAGE) installed with `setPivots` and
+  recalculated; restoring removes it.
+- `getpivotdata-many` (1K cells): `GETPIVOTDATA` cells that each name one of
+  the 100 groups of a pivot over 10K rows. GETPIVOTDATA is volatile, so the
+  timed edit of an unrelated cell recalculates all of them.
+- `analysis-calls` (10K formulas): SUMSQ, AGGREGATE, FORECAST.LINEAR and
+  TEXTBEFORE in one formula per row, all reading the edited `$C$1`.
+- `history-diff` (100K cells, both engines): the version-history diff kernel
+  from the engine's checkout, on the version-history benchmark's 5,000 × 20
+  sheet with 12,000 logged writes. The timed run creates a kernel, logs the
+  writes and compares both versions until its page of 1,000 changes is full.
+  The engine's window bytes are captured at setup, so it times the kernel.
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
+Six rows (10K and 100K each) time closures. Only the full engine has LAMBDA,
+its helpers and data-model measures, so these rows are in the matrix only when
+`SHEETWRITE_BENCH_ENGINE=full`; the default engine's matrix is unchanged.
+
+- `map-lambda`, `reduce-lambda` and `byrow-lambda`: one formula over A1:A_n
+  (A1:B_n for BYROW): `=MAP(A1:A_n,LAMBDA(x,x*$C$1+1))`,
+  `=REDUCE(0,A1:A_n,LAMBDA(a,x,a+x*$C$1))` and
+  `=BYROW(A1:B_n,LAMBDA(r,SUM(r)*$C$1))`. The timed run changes `$C$1`.
+- `lambda-call` and `named-lambda`: one call per row,
+  `=LAMBDA(x,s,x*s+1)(A1,$C$1)`, and the same LAMBDA through the defined name
+  `Affine`, `=Affine(A1,$C$1)`. The timed run changes `$C$1`.
+- `measure-pivot`: table `orders` with n rows (25 regions, 4 quarters) and a
+  data-model pivot over it, regions down and quarters across, with two
+  measures: `=SUM(orders[amount])/SUM(orders[qty])` and a region's share of
+  its quarter through `CALCULATE(…,ALL(orders[region]))`. The timed run
+  changes one order's amount, so every pivot cell updates.
+
+On develop, every LAMBDA call copies the LAMBDA's formula tree with its
+arguments put in, once per element for the helpers, and a pivot update
+copies, for every cell, each measure's tree and the values of the columns it
+reads. Their ratio limits are the 1.2 default until same-engine pairs
+calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when

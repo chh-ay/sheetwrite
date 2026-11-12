@@ -208,9 +208,9 @@ impl CellStore {
     /// the string pool; a settled value would copy it into a new `Rc<str>`.
     fn key_cell(&self, column: KeyColumn, row: u32) -> KeyCell<'_> {
         let cells = &self.sheets[column.sheet].cells;
-        let (row, col) = ((column.first_row + row) as usize, column.col as usize);
-        if cells.contains_cell(row, col) && cells.is_loaded(row, col) {
-            let index = cells.idx(row, col);
+        let (sheet_row, col) = ((column.first_row + row) as usize, column.col as usize);
+        if cells.contains_cell(sheet_row, col) && cells.is_loaded(sheet_row, col) {
+            let index = cells.idx(sheet_row, col);
             if cells.source_kind_at(index) == KIND_STRING {
                 let id = payload_str_id(cells.source_payload_at(index));
                 if let Some(text) = string_from_pool_ref(&self.strings, id) {
@@ -218,7 +218,7 @@ impl CellStore {
                 }
             }
         }
-        KeyCell::Value(self.key_value(column, row as u32 - column.first_row))
+        KeyCell::Value(self.key_value(column, sheet_row as u32 - column.first_row))
     }
 
     /// Checks both key columns of `relationship` and maps each many-side
@@ -274,7 +274,7 @@ mod tests {
         }
         store.commit_sources();
 
-        let two = |first: &str, second: &str| vec![first.to_string(), second.to_string()];
+        let two = |first: &str, second: &str| vec![first.to_owned(), second.to_owned()];
         assert!(store.set_table(
             "orders",
             "Orders",

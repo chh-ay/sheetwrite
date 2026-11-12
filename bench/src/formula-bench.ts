@@ -5,7 +5,7 @@ import { initSheetwrite } from "@sheetwrite/core";
 import { optionValue } from "./cli-options.js";
 import { engine, ENGINE_PACKAGE, ENGINE_ROOT, CellStore, initSync, ENGINE_GLUE_PATH, WASM_PATH } from "./formula-engine.js";
 import { assert, createFormulaFixture, expectedFormulaOutput, gridConstantEditSample, type FixtureFactory, type TimedFixture } from "./formula-fixtures.js";
-import { ALLOCATION_METHOD, CORRECTNESS_METHOD, type CompleteFormulaBenchmarkResult, type CompleteFormulaWorkloadResult, currentFormulaSourceProvenance, currentRunnerProvenance, DEFAULT_SAMPLES, exactInteger, type FormulaAllocationSample, type FormulaAllocationStat, type FormulaBenchmarkResult, type FormulaCaptureKind, type FormulaMemoryResult, type FormulaOutput, FORMULA_BENCHMARK_SCHEMA_VERSION, FORMULA_GATE_TOLERANCE, formulaRegressionBaselineIdentity, type PassedRegressionGate, type BlockedRegressionGate, OUTPUT_CAPTURE_BLOCKER, outputsEqual, PRELIMINARY_BLOCKER, sha256, SMOKE_SAMPLES, TIMING_METHOD, validateCurrentCaptureProvenance, createFormulaArtifactChecks, type FormulaArtifactChecks, formulaWorkloadKey } from "./formula-artifact.js";
+import { ALLOCATION_METHOD, CORRECTNESS_METHOD, type CompleteFormulaBenchmarkResult, type CompleteFormulaWorkloadResult, currentFormulaSourceProvenance, currentRunnerProvenance, DEFAULT_SAMPLES, exactInteger, type FormulaAllocationSample, type FormulaAllocationStat, type FormulaBenchmarkResult, type FormulaCaptureKind, type FormulaMemoryResult, type FormulaOutput, FORMULA_BENCHMARK_SCHEMA_VERSION, FORMULA_GATE_TOLERANCE, formulaRegressionBaselineIdentity, type PassedRegressionGate, type BlockedRegressionGate, OUTPUT_CAPTURE_BLOCKER, outputsEqual, PRELIMINARY_BLOCKER, sha256, SMOKE_SAMPLES, TIMING_METHOD, validateCurrentCaptureProvenance, createFormulaArtifactChecks, type FormulaArtifactChecks, type FormulaEnginePackage, formulaWorkloadKey } from "./formula-artifact.js";
 import { type BenchmarkMode, captureEngineBaselineContext, MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "./gate-protocol.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, summarize } from "./stats.js";
@@ -53,16 +53,47 @@ const BINDING_ROW_SIZES = [10_000, 100_000] as const;
 const LOOKUP_ROW_IDS = ["vlookup-many","vlookup-many-sorted","xlookup-many","xlookup-many-sorted","text-lookup-many","text-lookup-many-sorted"] as const;
 
 
-/** Ordered gate rows. Add or resize workloads here; captures and artifact checks share this table. */
+const CLOSURE_ROW_IDS = [
+  "map-lambda",
+  "reduce-lambda",
+  "byrow-lambda",
+  "lambda-call",
+  "named-lambda",
+  "measure-pivot",
+] as const;
+const CLOSURE_ROW_SIZES = [10_000, 100_000] as const;
+
+const FULL_ENGINE_ROWS = [
+  { id: "groupby-sum", size: 100_000, smokeSize: 1_000 },
+  // Here PIVOTBY charges between 29 and 40 units of its 2,000,000-unit work
+  // budget per source row: 70,000 rows already give #NUM!.
+  { id: "pivotby-percentof", size: 50_000, smokeSize: 1_000 },
+  { id: "pivot-rebuild", size: 100_000, smokeSize: 1_000 },
+  { id: "getpivotdata-many", size: 1_000, smokeSize: 100 },
+  // 100,000 formulas took 0.19 s per edit natively on the Mac; 10,000 make 40,000 calls.
+  { id: "analysis-calls", size: 10_000, smokeSize: 1_000 },
+] as const;
+
+
+const PAGED_ROWS = 1_000_000;
+const PAGED_SMOKE_ROWS = 10_000;
+const PAGED_EVICTION_PAGES = 8_192;
+const PAGED_EVICTION_SMOKE_PAGES = 1_024;
+const INDEX_MATCH_FORMULAS = 200;
+const RANK_MANY_SIZE = 4_000;
+const HISTORY_CELLS = 100_000;
+
+/** Ordered gate rows. Captures and artifact checks share this table. */
 interface FormulaWorkload {
   readonly id: string;
   readonly size: number;
+  readonly rangeSize?: number;
 }
 
-function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
+function formulaWorkloads(smoke: boolean, enginePackage: FormulaEnginePackage = ENGINE_PACKAGE): FormulaWorkload[] {
   const workloads: FormulaWorkload[] = [];
-  const add = (id: string, size: number) =>
-    workloads.push({ id, size });
+  const add = (id: string, size: number, rangeSize?: number) =>
+    workloads.push({ id, size, ...(rangeSize === undefined ? {} : { rangeSize }) });
   for (const size of smoke ? ([1_000] as const) : FORMULA_SIZES) {
     add("independent-parse-load", size);
     add("independent-first-recompute", size);
@@ -125,12 +156,37 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   }
   add("iterative-finance", 1_000);
   add("incremental-dependency-closure-edit", range);
+  add("paged-cell-reads", range);
+  const pagedRows = smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS;
+  add("paged-insert-row", pagedRows);
+  add("paged-range-loaded", pagedRows);
+  const evictionPages = smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES;
+  add("paged-eviction", evictionPages);
+  const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
+  add("index-match-many", indexMatchFormulas, range);
+  const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
+  add("rank-many", rankManySize);
+  add("sort-unique-filter", range);
+  add("subtotal-filtered", range);
+  add("sparse-page-write", range);
   add("spill-sequence-admission", large);
+  add("history-diff", HISTORY_CELLS);
+  if (enginePackage === "formulas") {
+    for (const row of FULL_ENGINE_ROWS) {
+      const size = smoke ? row.smokeSize : row.size;
+      add(row.id, size);
+    }
+    for (const id of CLOSURE_ROW_IDS) {
+      for (const size of smoke ? [1_000] : CLOSURE_ROW_SIZES) {
+        add(id, size);
+      }
+    }
+  }
   return workloads;
 }
 
-export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
-  return formulaWorkloads(mode === "smoke").map(formulaWorkloadKey);
+export function expectedFormulaWorkloadKeys(mode: BenchmarkMode, enginePackage: FormulaEnginePackage = ENGINE_PACKAGE): string[] {
+  return formulaWorkloads(mode === "smoke", enginePackage).map(formulaWorkloadKey);
 }
 
 const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
@@ -165,6 +221,12 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "parse-load-qualified",
   "parse-load-table",
   "memory-import",
+  "history-diff",
+  "groupby-sum",
+  "pivotby-percentof",
+  "pivot-rebuild",
+  "getpivotdata-many",
+  "analysis-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -175,10 +237,25 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "paged-cell-reads",
+  "paged-insert-row",
+  "paged-range-loaded",
+  "paged-eviction",
+  "index-match-many",
+  "rank-many",
+  "sort-unique-filter",
+  "subtotal-filtered",
+  "sparse-page-write",
+  "map-lambda",
+  "reduce-lambda",
+  "byrow-lambda",
+  "lambda-call",
+  "named-lambda",
+  "measure-pivot",
 ]);
 
 function legacyFormulaBaselineWorkloadKeys(): string[] {
-  return expectedFormulaWorkloadKeys("full").filter((key) => {
+  return expectedFormulaWorkloadKeys("full", "wasm").filter((key) => {
     const id = key.slice("workload=".length, key.indexOf(";size="));
     return !EXPANDED_FORMULA_WORKLOAD_IDS.has(id);
   });
@@ -428,8 +505,8 @@ export function collectFixture(
 
 function runWorkloads(smoke: boolean): CompleteFormulaWorkloadResult[] {
   const samples = smoke ? SMOKE_SAMPLES : DEFAULT_SAMPLES;
-  return formulaWorkloads(smoke).map(({ id, size }) =>
-    collectFixture(id, size, () => createFormulaFixture(id, size), samples),
+  return formulaWorkloads(smoke).map(({ id, size, rangeSize }) =>
+    collectFixture(id, size, () => createFormulaFixture(id, size, rangeSize), samples),
   );
 }
 
@@ -494,11 +571,11 @@ function captureGateSide(): FormulaGateCapture {
     bytes: {},
     skipped: {},
   };
-  for (const { id, size } of formulaWorkloads(false)) {
+  for (const { id, size, rangeSize } of formulaWorkloads(false)) {
     const key = formulaWorkloadKey({ id, size });
     let sample: AggregatedWorkloadSample;
     try {
-      sample = collectAggregatedSample(id, size, () => createFormulaFixture(id, size), {
+      sample = collectAggregatedSample(id, size, () => createFormulaFixture(id, size, rangeSize), {
         warmupFixtures: SAMPLE_WARMUP_FIXTURES,
         minimumWarmupMs: GATE_TIER_UP_WARMUP_MS[key] ?? 0,
         minimumSampleDurationMs: SAMPLE_AGGREGATE_MS,

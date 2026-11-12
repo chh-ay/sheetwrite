@@ -48,20 +48,66 @@ export async function collectStaticGraph(
   return files;
 }
 
-async function entrypointsFromHtml(relativePath: string): Promise<string[]> {
+/**
+ * The modules a page loads only later: everything its lazy imports reach,
+ * including the lazy imports of lazily loaded modules (the XLSX add-on loads
+ * its codec on first use). Lazy imports in `routers` are not followed: they
+ * are the other pages of the site, which every page can reach.
+ */
+export async function collectLazyGraph(
+  staticGraph: ReadonlyMap<string, string>,
+  routers: ReadonlySet<string>,
+): Promise<Map<string, string>> {
+  const lazy = new Map<string, string>();
+  const known = (path: string): boolean => staticGraph.has(path) || lazy.has(path);
+  let frontier: [string, string][] = [...staticGraph];
+  while (frontier.length > 0) {
+    const entrypoints: string[] = [];
+    for (const [path, content] of frontier) {
+      if (routers.has(path)) continue;
+      for (const specifier of relativeImports(content, "dynamic-import")) {
+        const target = resolve(dirname(path), specifier);
+        if (!known(target)) entrypoints.push(target);
+      }
+    }
+    frontier = [...(await collectStaticGraph(entrypoints))].filter(([path]) => !known(path));
+    for (const [path, content] of frontier) lazy.set(path, content);
+  }
+  return lazy;
+}
+
+interface Page {
+  /** Every module the page references. */
+  readonly modules: readonly string[];
+  /** The page's entry scripts, whose lazy imports are the site's routes. */
+  readonly routers: ReadonlySet<string>;
+}
+
+async function readPage(relativePath: string): Promise<Page> {
   const html = await readFile(join(distRoot, relativePath), "utf8");
-  const entrypoints: string[] = [];
+  const modules: string[] = [];
   for (const match of html.matchAll(
     /(?:src|component-url|renderer-url|href)=["'][^"']*?(assets\/[^"']+\.js)["']/g,
   )) {
-    if (match[1] !== undefined) entrypoints.push(join(distRoot, match[1]));
+    if (match[1] !== undefined) modules.push(join(distRoot, match[1]));
   }
-  return entrypoints;
+  const routers = new Set<string>();
+  for (const match of html.matchAll(
+    /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["'][^"']*?(assets\/[^"']+\.js)["']/g,
+  )) {
+    if (match[1] !== undefined) routers.add(join(distRoot, match[1]));
+  }
+  if (routers.size === 0) throw new Error(`${relativePath} has no entry script`);
+  return { modules, routers };
+}
+
+function includesBackend(graph: ReadonlyMap<string, string>): boolean {
+  return [...graph.values()].some((content) => content.includes(xlsxMarker));
 }
 
 async function main(): Promise<void> {
   const defaultEntrypoints = (
-    await Promise.all(defaultPages.map((page) => entrypointsFromHtml(page)))
+    await Promise.all(defaultPages.map(async (page) => (await readPage(page)).modules))
   ).flat();
   const defaultGraph = await collectStaticGraph(defaultEntrypoints);
   for (const [path, content] of defaultGraph) {
@@ -70,31 +116,21 @@ async function main(): Promise<void> {
     }
   }
 
-  const reactGraph = await collectStaticGraph(await entrypointsFromHtml("react/index.html"));
-  const lazyEntrypoints: string[] = [];
-  for (const [path, content] of reactGraph) {
-    for (const specifier of relativeImports(content, "dynamic-import")) {
-      lazyEntrypoints.push(resolve(dirname(path), specifier));
-    }
-    // Vite 8's preload helper hoists dynamic-import dependencies into
-    // __vite__mapDeps as dist-root-relative asset strings.
-    for (const match of content.matchAll(/["']assets\/([^"']+\.js)["']/g)) {
-      if (match[1] !== undefined) lazyEntrypoints.push(join(distRoot, "assets", match[1]));
-    }
-  }
-  const lazyGraph = await collectStaticGraph(lazyEntrypoints);
-  if (![...lazyGraph.values()].some((content) => content.includes(xlsxMarker))) {
+  const reactPage = await readPage("react/index.html");
+  const reactGraph = await collectStaticGraph(reactPage.modules);
+  if (!includesBackend(await collectLazyGraph(reactGraph, reactPage.routers))) {
     throw new Error("React workbook XLSX action cannot reach the backend through a lazy import");
   }
 
-  const xlsxEntrypoints = await entrypointsFromHtml("test/xlsx/index.html");
-  const xlsxGraph = await collectStaticGraph(xlsxEntrypoints);
-  if (![...xlsxGraph.values()].some((content) => content.includes(xlsxMarker))) {
-    throw new Error("Dedicated XLSX route does not contain the concrete workbook backend");
+  const xlsxPage = await readPage("test/xlsx/index.html");
+  const xlsxGraph = await collectStaticGraph(xlsxPage.modules);
+  const xlsxLazyGraph = await collectLazyGraph(xlsxGraph, xlsxPage.routers);
+  if (!includesBackend(xlsxGraph) && !includesBackend(xlsxLazyGraph)) {
+    throw new Error("Dedicated XLSX route cannot load the concrete workbook backend");
   }
 
   console.log(
-    `Example XLSX isolation passed (${defaultGraph.size} default chunks, ${xlsxGraph.size} XLSX chunks)`,
+    `Example XLSX isolation passed (${defaultGraph.size} default chunks, ${xlsxGraph.size + xlsxLazyGraph.size} XLSX chunks)`,
   );
 }
 

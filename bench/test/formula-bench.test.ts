@@ -94,6 +94,30 @@ function withSamples(samples: number[]): Fixture {
   return result;
 }
 
+describe("formula workload matrix", () => {
+  it("runs the closure rows on the full engine only", () => {
+    const closures = [
+      "map-lambda",
+      "reduce-lambda",
+      "byrow-lambda",
+      "lambda-call",
+      "named-lambda",
+      "measure-pivot",
+    ];
+    const isClosure = (key: string) => closures.some((id) => key.startsWith(`workload=${id};`));
+    const full = expectedFormulaWorkloadKeys("full", "formulas");
+    const base = expectedFormulaWorkloadKeys("full", "wasm");
+    expect(base.filter(isClosure)).toEqual([]);
+    expect(base.filter((key) => !full.includes(key))).toEqual([]);
+    expect(full.filter(isClosure)).toEqual(
+      closures.flatMap((id) => [`workload=${id};size=10000`, `workload=${id};size=100000`]),
+    );
+    expect(expectedFormulaWorkloadKeys("smoke", "formulas").filter(isClosure)).toEqual(
+      closures.map((id) => `workload=${id};size=1000`),
+    );
+  });
+});
+
 describe("formula benchmark schema", () => {
   it("rejects drifted workload identities, raw samples, summaries and provenance", () => {
     const named = (result: Fixture) =>
@@ -229,6 +253,16 @@ describe("formula regression gate", () => {
       "parse-load-qualified",
       "parse-load-table",
       "memory-import",
+      "paged-cell-reads",
+      "paged-insert-row",
+      "paged-range-loaded",
+      "paged-eviction",
+      "index-match-many",
+      "rank-many",
+      "sort-unique-filter",
+      "subtotal-filtered",
+      "sparse-page-write",
+      "history-diff",
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",

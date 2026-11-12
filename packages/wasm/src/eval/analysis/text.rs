@@ -46,7 +46,7 @@ impl Context<'_, '_> {
         })
     }
     fn text(&mut self, args: &[Ast], index: usize, default: &str) -> Result<String, FormulaError> {
-        let text = text_from_value(&self.scalar(args, index, Value::text(default)))?;
+        let text = text_from_value(&self.scalar(args, index, Value::text(default)))?.into_owned();
         if text.len() > MAX_TEXT_BYTES || text.chars().count() > MAX_TEXT_CHARS {
             return Err(FormulaError::Value);
         }
@@ -85,7 +85,7 @@ impl Context<'_, '_> {
         let mut delimiters = Vec::new();
         let mut bytes = 0usize;
         for value in &matrix.values {
-            let delimiter = text_from_value(value)?;
+            let delimiter = text_from_value(value)?.into_owned();
             bytes = bytes
                 .checked_add(delimiter.len())
                 .ok_or(FormulaError::Num)?;
@@ -637,10 +637,10 @@ pub(super) fn shape(
         affected: &affected,
         results: &mut results,
     };
-    let matrix = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
+    let evaluated = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
 
     results.swap_scratch(outer.results);
-    let matrix = matrix?;
+    let matrix = evaluated?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
 pub(super) fn bound(
