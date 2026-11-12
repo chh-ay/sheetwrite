@@ -222,7 +222,16 @@ fn cell_by_cell_reads_and_arrays_have_smaller_limits() {
 
 #[test]
 fn text_output_has_a_limit() {
-    let (store, sheet) = small_store();
+    let (mut store, sheet) = small_store();
+    store.set_string(sheet, 0, 0, &"x".repeat(1_048_577), 0);
+    store.commit_sources();
+    for source in ["=A1", "=LEN(UPPER(A1))", "=LEN(CLEAN(A1))"] {
+        assert_eq!(
+            preview(&store, sheet, source).status(),
+            FormulaPreviewStatus::CostLimit,
+            "{source}"
+        );
+    }
     assert_eq!(
         preview(&store, sheet, "=LEN(REPT(\"ab\",600000))").status(),
         FormulaPreviewStatus::CostLimit

@@ -74,7 +74,10 @@ fn unary_text(
     if let Err(error) = require_arity(values, 1, 1) {
         return Value::Error(error);
     }
-    match text_arg(values, 0, None).and_then(|text| operation(&text)) {
+    match text_arg(values, 0, None).and_then(|text| {
+        preview_limits::text(text.len())?;
+        operation(&text)
+    }) {
         Ok(value) => value,
         Err(error) => Value::Error(error),
     }
@@ -482,6 +485,7 @@ fn collect_code_points(text: &str) -> Result<Vec<char>, FormulaError> {
     if text.len() > MAX_TEXT_OUTPUT_BYTES {
         return Err(FormulaError::Num);
     }
+    preview_limits::text(text.len())?;
     let count = text.chars().count();
     let mut characters = Vec::new();
     characters

@@ -277,6 +277,11 @@ impl CellStore {
         if value == Value::Error(FormulaError::Loading) {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);
         }
+        if let Value::Text(text) = &value {
+            if super::preview_limits::text(text.len()).is_err() {
+                return FormulaPreview::unavailable(FormulaPreviewStatus::CostLimit);
+            }
+        }
         FormulaPreview::value(status, value, shape)
     }
 }
