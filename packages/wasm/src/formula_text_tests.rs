@@ -146,9 +146,103 @@ fn each_reference_of_the_text_pairs_with_the_tree() {
     let ast = parse(source).expect("formula parses");
 
     assert_eq!(
-        write_references(source, &ast),
+        write_references(source, &ast, &[]),
         "= sum( A1 , B1:C2 ) & {1,#REF!;TRUE,\"x\"} & 'My Sheet'!B2:C3 \
          + First:Last!A1 + [Book.xlsx]S!A1 + A1# + #REF! + 1:3 + A:B \
          + T[[#Headers],[C]] + [@C] + Name + LOG10(A1) + (A1,B1) + A1 B1"
     );
+}
+
+#[test]
+fn detached_references_keep_their_exact_sheet_text() {
+    for source in [
+        "='O''Brien'!$B$2",
+        "='C:\\Reports\\[Missing.xlsx]O''Brien'!$A$1:$B$2",
+    ] {
+        let ast = parse(source).expect("detached formula parses");
+        assert_eq!(crate::calc::serialize(&ast), source);
+        assert_eq!(
+            crate::formula_rewrite::translate_formula(source, 0, 0),
+            source
+        );
+        let mut store = CellStore::new();
+        let report = store.add_sheet(2, 2);
+        store.set_sheet_name(report, "report", "Report");
+        store.set_formula(report, 0, 0, source, 0);
+        store.recompute(report);
+        assert_eq!(
+            store.get_cell(report, 0, 0).string().as_deref(),
+            Some("#REF!")
+        );
+        assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(source));
+    }
+}
+
+#[test]
+fn a_late_sheet_binds_only_the_formulas_that_name_it() {
+    use crate::calc::Ast;
+
+    let mut store = CellStore::new();
+    let report = store.add_sheet(3, 4);
+    store.set_sheet_name(report, "report", "Report");
+    let source = "=SUM('O''Brien'!A1:A2)+1";
+    store.set_formula(report, 0, 0, source, 0);
+    store.set_formula(report, 1, 0, "=IF(FALSE,'O''Brien'!A1,9)", 0);
+    store.set_formula(report, 2, 0, "=(2+3)*4", 0);
+    store.recompute(report);
+    for row in 0..2 {
+        assert_eq!(
+            store.get_cell(report, row, 0).string().as_deref(),
+            Some("#REF!")
+        );
+    }
+    let unrelated_operand = |store: &CellStore| {
+        let entry = store.sheets[report]
+            .formulas
+            .get((2, 0), &store.formula_slots)
+            .unwrap();
+        let Some(Ast::Bin(_, left, _)) = &entry.ast else {
+            panic!("binary formula");
+        };
+        std::ptr::from_ref::<Ast>(left)
+    };
+    let original_operand = unrelated_operand(&store);
+    let data = store.add_sheet(1, 2);
+    store.set_number(data, 0, 0, 7.0, 0);
+    store.set_number(data, 1, 0, 5.0, 0);
+    store.set_sheet_name(data, "data", "O'Brien");
+    store.recompute(report);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 13.0);
+    assert_eq!(store.get_cell(report, 1, 0).num(), 9.0);
+    assert_eq!(store.get_cell(report, 2, 0).num(), 20.0);
+    assert_eq!(
+        unrelated_operand(&store),
+        original_operand,
+        "unrelated tree was not reparsed"
+    );
+    assert_eq!(store.formula_source(report, 0, 0).as_deref(), Some(source));
+    store.set_number(data, 0, 0, 11.0, 0);
+    store.recompute(data);
+    assert_eq!(
+        store.get_cell(report, 0, 0).num(),
+        17.0,
+        "late binding installed graph reads"
+    );
+}
+
+#[test]
+fn overwritten_and_moved_pending_formulas_do_not_leave_stale_sheet_users() {
+    let mut store = CellStore::new();
+    let report = store.add_sheet(2, 4);
+    store.set_sheet_name(report, "report", "Report");
+    store.set_formula(report, 0, 0, "=Later!A1", 0);
+    store.set_formula(report, 1, 0, "=Later!A1+2", 0);
+    store.set_number(report, 0, 0, 17.0, 0);
+    store.add_rows(report, 0, 1);
+    let data = store.add_sheet(1, 1);
+    store.set_number(data, 0, 0, 5.0, 0);
+    store.set_sheet_name(data, "data", "Later");
+    store.recompute(report);
+    assert_eq!(store.get_cell(report, 1, 0).num(), 17.0);
+    assert_eq!(store.get_cell(report, 2, 0).num(), 7.0);
 }

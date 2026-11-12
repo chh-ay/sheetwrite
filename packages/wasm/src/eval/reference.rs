@@ -60,7 +60,11 @@ impl RewriteScope {
 pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Offset | Func::Indirect, _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::Func(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::UnknownFunc(call) => {
+            let args = &call.args;
+            args.iter().any(ast_contains_runtime_ref)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_contains_runtime_ref(left) || ast_contains_runtime_ref(right)
         }
@@ -91,11 +95,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
 }
 
 fn sheet_ref(handle: u32) -> SheetRef {
-    SheetRef {
-        handle,
-        name: String::new(),
-        quoted: false,
-    }
+    SheetRef { handle }
 }
 
 fn range_ast(range: CellRange) -> Ast {
@@ -300,15 +300,22 @@ impl CellStore {
                     Ok(range) => *ast = range_ast(range),
                     Err(FormulaError::Ref) => *ast = Ast::InvalidRef,
                     Err(error) if scope == RewriteScope::Root => {
-                        *ast = Ast::Array {
+                        *ast = Ast::Array(Box::new(crate::calc::ArrayLiteral {
                             cols: 1,
                             values: vec![Value::Error(error)],
-                        };
+                        }));
                     }
                     Err(_) => {}
                 }
             }
-            Ast::Func(Func::Let, args) | Ast::UnknownFunc(_, args) => {
+            Ast::Func(Func::Let, args) => {
+                for arg in args {
+                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
+                }
+            }
+            Ast::UnknownFunc(call) => {
+                let args = &mut call.args;
+
                 for arg in args {
                     self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
                 }

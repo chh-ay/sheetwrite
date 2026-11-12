@@ -124,7 +124,7 @@ fn substitute(
             let visible: Vec<_> = bindings.iter().filter(|(name, _)| !parameters.iter().any(|parameter| matches!(parameter, Ast::Name(local) if local.eq_ignore_ascii_case(name)))).copied().collect();
             let mut nested = arguments[..arguments.len() - 1].to_vec();
             nested.push(substitute(body, &visible, nodes)?);
-            Ast::Func(Func::Analysis(super::LAMBDA_ID), nested)
+            Ast::Func(Func::Analysis(super::LAMBDA_ID), nested.into())
         }
         Ast::Func(Func::Let, arguments) => {
             if arguments.len() < 3 || arguments.len().is_multiple_of(2) {
@@ -144,16 +144,22 @@ fn substitute(
                 &visible,
                 nodes,
             )?);
-            Ast::Func(Func::Let, expanded)
+            Ast::Func(Func::Let, expanded.into())
         }
         Ast::Func(function, arguments) => Ast::Func(
             *function,
-            arguments
+            (arguments
                 .iter()
                 .map(|argument| substitute(argument, bindings, nodes))
-                .collect::<Result<Vec<_>, _>>()?,
+                .collect::<Result<Vec<_>, _>>()?)
+            .into(),
         ),
-        Ast::UnknownFunc(name, arguments) => {
+        Ast::UnknownFunc(call) => {
+            let crate::calc::UnknownCall {
+                name,
+                args: arguments,
+            } = &**call;
+
             let bound = lookup(name);
             let mut invocation = Vec::with_capacity(arguments.len() + usize::from(bound.is_some()));
             if let Some(function) = bound {
@@ -162,14 +168,14 @@ fn substitute(
             for argument in arguments {
                 invocation.push(substitute(argument, bindings, nodes)?);
             }
-            Ast::UnknownFunc(
-                if bound.is_some() {
+            Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                name: if bound.is_some() {
                     CALL.into()
                 } else {
                     name.clone()
                 },
-                invocation,
-            )
+                args: invocation.into(),
+            }))
         }
         Ast::Bin(operator, left, right) => Ast::Bin(
             *operator,
@@ -219,14 +225,14 @@ fn apply(function: &Ast, arguments: &[Ast]) -> Result<Ast, FormulaError> {
     match parameters {
         [] => return substitute(body, &[], &mut 0),
         [Ast::Name(name)] => {
-            return substitute(body, &[(name.as_str(), &arguments[0])], &mut 0);
+            return substitute(body, &[(name.as_ref(), &arguments[0])], &mut 0);
         }
         [Ast::Name(first), Ast::Name(second)] => {
             return substitute(
                 body,
                 &[
-                    (first.as_str(), &arguments[0]),
-                    (second.as_str(), &arguments[1]),
+                    (first.as_ref(), &arguments[0]),
+                    (second.as_ref(), &arguments[1]),
                 ],
                 &mut 0,
             );
@@ -240,7 +246,7 @@ fn apply(function: &Ast, arguments: &[Ast]) -> Result<Ast, FormulaError> {
             let Ast::Name(name) = parameter else {
                 unreachable!("definition validates parameters")
             };
-            (name.as_str(), argument)
+            (name.as_ref(), argument)
         })
         .collect();
     substitute(body, &bindings, &mut 0)
@@ -371,11 +377,11 @@ impl Context<'_, '_> {
                 }
                 if ast_produces_array(argument) {
                     let mut matrix = self.matrix(argument)?;
-                    return Ok(Ast::BoundMatrix {
+                    return Ok(Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
                         rows: matrix.rows,
                         cols: matrix.cols,
                         values: Rc::new(std::mem::take(&mut matrix.values)),
-                    });
+                    })));
                 }
                 // An error argument is bound as a value, so the body can
                 // handle it (`LAMBDA(x,IFERROR(x,0))(1/0)` is 0).
@@ -427,13 +433,13 @@ impl Context<'_, '_> {
 pub(crate) fn literal(value: &Value) -> Ast {
     match value {
         Value::Number(number) => Ast::Num(*number),
-        Value::Text(text) => Ast::Str(text.to_string()),
+        Value::Text(text) => Ast::Str((text.to_string()).into()),
         Value::Bool(boolean) => Ast::Bool(*boolean),
-        Value::Blank | Value::Error(_) => Ast::BoundMatrix {
+        Value::Blank | Value::Error(_) => Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
             rows: 1,
             cols: 1,
             values: Rc::new(vec![value.clone()]),
-        },
+        })),
     }
 }
 
@@ -458,7 +464,7 @@ pub(crate) fn evaluate(
     let result = match name {
         "LAMBDA" => definition(&Ast::Func(
             Func::Analysis(super::LAMBDA_ID),
-            arguments.to_vec(),
+            (arguments.to_vec()).into(),
         ))
         .map(|_| Value::Error(FormulaError::Calc)),
         "ISOMITTED" if arguments.len() == 1 => {
@@ -595,11 +601,11 @@ fn evaluate_with_context(
                         .map(|row| array.values[row * array.cols + index].clone())
                         .collect()
                 };
-                let parameter = Ast::BoundMatrix {
+                let parameter = Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
                     rows: if by_row { 1 } else { array.rows },
                     cols: if by_row { array.cols } else { 1 },
                     values: Rc::new(slice),
-                };
+                }));
                 values.push(context.invoke(&arguments[1], &[parameter])?);
             }
             Ok(EvalMatrix::new(
