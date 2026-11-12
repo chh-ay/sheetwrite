@@ -292,60 +292,73 @@ impl UnresolvedSheetUsers {
     }
 }
 
-/// Formulas by the table slots they use. A table edit changes the cells of
-/// its `spanning` users, and of its `row` users only when the rows of the
-/// table move or shrink, so appending a row touches no `[@Column]` formula.
+/// How one formula uses tables: the table slot it reads and how, or
+/// [`TableUses::SEVERAL`] when it reads more than one table.
+#[derive(Clone, Copy)]
+struct TableUses {
+    slot: u16,
+    kinds: u8,
+}
+
+impl TableUses {
+    /// Reads rows of the table: a whole column, its header or its totals.
+    const SPANNING: u8 = 1;
+    /// Reads only its own row of the table (`[@Column]`).
+    const ROW: u8 = 2;
+    /// Holds a table reference no table binds yet.
+    const UNBOUND: u8 = 4;
+    /// Reads more than one table; every table edit lists it.
+    const SEVERAL: u8 = 8;
+
+    /// Whether an edit of table `slot` changes the formula's cells. With
+    /// `own_rows` the edit also moves or shrinks the rows a `[@Column]` reads.
+    const fn uses(self, slot: u16, own_rows: bool) -> bool {
+        let kinds = if own_rows {
+            Self::SPANNING | Self::ROW
+        } else {
+            Self::SPANNING
+        };
+        self.kinds & Self::SEVERAL != 0 || (self.slot == slot && self.kinds & kinds != 0)
+    }
+}
+
+/// The formulas that use tables, with how they use them. A table edit
+/// changes the cells of the formulas that read its rows, and of its
+/// `[@Column]` formulas only when the rows of the table move or shrink, so
+/// appending a row touches no `[@Column]` formula.
 #[derive(Default)]
 struct TableUsers {
-    /// Formulas that read rows of the table: a whole column, its header or
-    /// its totals.
-    spanning: FxHashMap<u16, FxHashSet<FormulaId>>,
-    /// Formulas that read only their own row of the table (`[@Column]`).
-    row: FxHashMap<u16, FxHashSet<FormulaId>>,
-    /// Formulas that hold a table reference no table binds yet.
-    unbound: FxHashSet<FormulaId>,
+    by_formula: FxHashMap<FormulaId, TableUses>,
 }
 
 impl TableUsers {
-    fn forget(&mut self, id: FormulaId) {
-        for users in [&mut self.spanning, &mut self.row] {
-            users.retain(|_, formulas| {
-                formulas.remove(&id);
-                !formulas.is_empty()
-            });
-        }
-        self.unbound.remove(&id);
-    }
-
     fn record(&mut self, id: FormulaId, ast: &Ast) {
-        for_each_table_ref(ast, &mut |reference| match reference {
-            Some((slot, TableSection::CurrentRow)) => {
-                self.row.entry(slot).or_default().insert(id);
+        let mut uses = TableUses { slot: 0, kinds: 0 };
+        for_each_table_ref(ast, &mut |reference| {
+            let Some((slot, section)) = reference else {
+                uses.kinds |= TableUses::UNBOUND;
+                return;
+            };
+            if uses.kinds & (TableUses::SPANNING | TableUses::ROW) != 0 && uses.slot != slot {
+                uses.kinds |= TableUses::SEVERAL;
             }
-            Some((slot, TableSection::Body | TableSection::Headers | TableSection::Totals)) => {
-                self.spanning.entry(slot).or_default().insert(id);
-            }
-            None => {
-                self.unbound.insert(id);
-            }
+            uses.slot = slot;
+            uses.kinds |= if section == TableSection::CurrentRow {
+                TableUses::ROW
+            } else {
+                TableUses::SPANNING
+            };
         });
-    }
-
-    fn is_empty(&self) -> bool {
-        self.spanning.is_empty() && self.row.is_empty() && self.unbound.is_empty()
+        if uses.kinds != 0 {
+            self.by_formula.insert(id, uses);
+        }
     }
 
     fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
-        for users in [&self.spanning, &self.row] {
-            formulas.add_hash_table::<u16, FxHashSet<FormulaId>>(users.len(), users.capacity());
-            for formulas_of_table in users.values() {
-                formulas.add_hash_table::<FormulaId, ()>(
-                    formulas_of_table.len(),
-                    formulas_of_table.capacity(),
-                );
-            }
-        }
-        formulas.add_hash_table::<FormulaId, ()>(self.unbound.len(), self.unbound.capacity());
+        formulas.add_hash_table::<FormulaId, TableUses>(
+            self.by_formula.len(),
+            self.by_formula.capacity(),
+        );
     }
 }
 
@@ -472,11 +485,11 @@ impl FormulaStore {
         let index = self.references.get_or_insert_with(Box::default);
         index.sheets.forget(id);
         index.sheets.record(id, names);
-        index.tables.forget(id);
+        index.tables.by_formula.remove(&id);
         if let Some(ast) = table_tree {
             index.tables.record(id, ast);
         }
-        if index.sheets.is_empty() && index.tables.is_empty() {
+        if index.sheets.is_empty() && index.tables.by_formula.is_empty() {
             self.references = None;
         }
     }
@@ -493,29 +506,27 @@ impl FormulaStore {
             .flat_map(|users| users.iter().copied())
     }
 
-    /// The formulas that use table slot `table`: those that read its rows,
-    /// and with `own_rows` also the `[@Column]` formulas.
+    /// The formulas whose cells an edit of table slot `table` changes: those
+    /// that read its rows, and with `own_rows` also its `[@Column]` formulas.
     pub(crate) fn table_users(&self, table: u16, own_rows: bool) -> Vec<FormulaId> {
-        let Some(index) = &self.references else {
-            return Vec::new();
-        };
-        let spanning = index.tables.spanning.get(&table).into_iter().flatten();
-        let row = index
-            .tables
-            .row
-            .get(&table)
-            .filter(|_| own_rows)
-            .into_iter()
-            .flatten();
-        spanning.chain(row).copied().collect()
+        self.table_users_where(|uses| uses.uses(table, own_rows))
     }
 
     /// The formulas that hold a table reference no table binds yet.
     pub(crate) fn unbound_table_users(&self) -> Vec<FormulaId> {
-        self.references
-            .as_ref()
-            .map(|index| index.tables.unbound.iter().copied().collect())
-            .unwrap_or_default()
+        self.table_users_where(|uses| uses.kinds & TableUses::UNBOUND != 0)
+    }
+
+    fn table_users_where(&self, keep: impl Fn(TableUses) -> bool) -> Vec<FormulaId> {
+        let Some(index) = &self.references else {
+            return Vec::new();
+        };
+        index
+            .tables
+            .by_formula
+            .iter()
+            .filter_map(|(&id, &uses)| keep(uses).then_some(id))
+            .collect()
     }
 
     /// Reuse a free slot or grow one page; source writes preflight id capacity.

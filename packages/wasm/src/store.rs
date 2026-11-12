@@ -896,16 +896,9 @@ impl CellStore {
 
         // The references to these tables are on the removed sheet, so the
         // walk above already made them `#REF!`.
-        let removed_tables: Vec<u16> = self
-            .tables
-            .iter()
-            .filter(|(_, table)| table.sheet == sheet as u32)
-            .map(|(slot, _)| slot)
-            .collect();
-
-        for &slot in &removed_tables {
-            self.tables.remove(slot);
-        }
+        let tables_before = self.tables.len();
+        self.tables.retain_mut(|table| table.sheet != sheet as u32);
+        let removed_tables = self.tables.len() != tables_before;
 
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
@@ -927,7 +920,7 @@ impl CellStore {
         }
         self.graph.invalidate();
 
-        if removed_names || !removed_tables.is_empty() {
+        if removed_names || removed_tables {
             self.refresh_named_formula_entries();
             self.recompute_all_sheets();
         } else {
@@ -3687,6 +3680,11 @@ impl CellStore {
     }
 }
 
+/// Makes the new entry of the formula in the cell it is given after a table
+/// edit, reading the tables as they are now; `None` leaves it unchanged.
+type TableRebind<'a> =
+    dyn Fn(&mut FormulaEntry, AbsCellKey, &TableSlots) -> Option<FormulaEntry> + 'a;
+
 /// Whether an edit of a table from `previous` to `table` only added rows
 /// around its data, keeping its sheet, columns, names, header and totals:
 /// the rows a `[@Column]` reads are still in the table, so only the
@@ -3760,16 +3758,8 @@ impl CellStore {
                 .tables
                 .get(slot)
                 .is_some_and(|table| rows_only_grew(previous, table));
-            let users: FxHashSet<FormulaId> = self
-                .formula_slots
-                .table_users(slot, own_rows)
-                .into_iter()
-                .collect();
-            for formula in users {
-                let Some(location) = self.formula_slots.location(formula) else {
-                    continue;
-                };
-                let tables = &self.tables;
+            let users = self.formula_slots.table_users(slot, own_rows);
+            self.rebind_table_users(users, &|entry, location, tables| {
                 let refresh = |reference: &StructuredRef| {
                     let table = tables.get(slot)?;
                     let column_id = &previous.column_at(reference.col)?.id;
@@ -3784,53 +3774,48 @@ impl CellStore {
                         ..refreshed
                     })
                 };
-                let replacement = self
-                    .formula_slots
-                    .get_mut(formula)
-                    .and_then(|entry| entry.refresh_table(slot, location.sheet, &refresh));
-                if let Some(entry) = replacement {
-                    self.replace_bound_formula(location, entry);
-                }
-            }
+                entry.refresh_table(slot, location.sheet, &refresh)
+            });
         }
-        self.bind_waiting_table_formulas();
+        // The formulas holding a table reference that no table bound may
+        // bind now. Their text stays as typed.
+        let waiting = self.formula_slots.unbound_table_users();
+        self.rebind_table_users(waiting, &|entry, location, tables| {
+            entry.bind_tables(location, tables)
+        });
         if self.names_use_tables() {
             self.refresh_named_formula_entries();
         }
     }
 
-    /// Bind the formulas holding a table reference that no table bound, now
-    /// that a table was added or changed. Their text stays as typed.
-    fn bind_waiting_table_formulas(&mut self) {
-        for formula in self.formula_slots.unbound_table_users() {
+    /// Give each of `formulas` the entry `rebind` makes of it, if any: the
+    /// dependency index patches its reads and the formula recalculates.
+    /// Out of line, so the two table passes share one copy of the loop.
+    #[inline(never)]
+    fn rebind_table_users(&mut self, formulas: Vec<FormulaId>, rebind: &TableRebind<'_>) {
+        for formula in formulas {
             let Some(location) = self.formula_slots.location(formula) else {
                 continue;
             };
             let tables = &self.tables;
-            let replacement = self
+            let Some(entry) = self
                 .formula_slots
                 .get_mut(formula)
-                .and_then(|entry| entry.bind_tables(location, tables));
-            if let Some(entry) = replacement {
-                self.replace_bound_formula(location, entry);
-            }
+                .and_then(|entry| rebind(entry, location, tables))
+            else {
+                continue;
+            };
+            let sheet = location.sheet as usize;
+            let data = &mut self.sheets[sheet];
+            self.graph.replace_entry(
+                &mut data.formulas,
+                &mut self.formula_slots,
+                sheet,
+                location.local(),
+                Some(entry),
+            );
+            data.formulas.mark_cell_dirty(location.local());
         }
-    }
-
-    /// Store `entry` again for the formula at `location`, whose tree a
-    /// binding changed: the dependency index patches its reads and the
-    /// formula recalculates.
-    fn replace_bound_formula(&mut self, location: AbsCellKey, entry: FormulaEntry) {
-        let sheet = location.sheet as usize;
-        let data = &mut self.sheets[sheet];
-        self.graph.replace_entry(
-            &mut data.formulas,
-            &mut self.formula_slots,
-            sheet,
-            location.local(),
-            Some(entry),
-        );
-        data.formulas.mark_cell_dirty(location.local());
     }
 
     pub(crate) fn parse_formula_entry(
@@ -4072,54 +4057,38 @@ impl CellStore {
     // A table's references follow the edit in each formula tree, so moving
     // or removing the table here leaves no formula naming a removed slot.
     fn rebase_table_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
-        let removed: Vec<u16> = self
-            .tables
-            .iter_mut()
-            .filter_map(|(slot, table)| {
-                if table.sheet != edited_sheet {
-                    return None;
-                }
-                if let Some((start, end)) = shift_range(table.row_start, table.row_end, at, delta) {
-                    table.row_start = start;
-                    table.row_end = end;
-                    None
-                } else {
-                    Some(slot)
-                }
-            })
-            .collect();
-        for slot in removed {
-            self.tables.remove(slot);
-        }
+        self.tables.retain_mut(|table| {
+            if table.sheet != edited_sheet {
+                return true;
+            }
+            let Some((start, end)) = shift_range(table.row_start, table.row_end, at, delta) else {
+                return false;
+            };
+            table.row_start = start;
+            table.row_end = end;
+            true
+        });
     }
 
     fn rebase_table_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
-        let removed: Vec<u16> = self
-            .tables
-            .iter_mut()
-            .filter_map(|(slot, table)| {
-                if table.sheet != edited_sheet {
-                    return None;
-                }
-                let Some((start, end)) = shift_range(table.col_start, table.col_end, at, delta)
-                else {
-                    return Some(slot);
+        self.tables.retain_mut(|table| {
+            if table.sheet != edited_sheet {
+                return true;
+            }
+            let Some((start, end)) = shift_range(table.col_start, table.col_end, at, delta) else {
+                return false;
+            };
+            table.col_start = start;
+            table.col_end = end;
+            table.columns.retain_mut(|column| {
+                let Some((col, _)) = shift_range(column.col, column.col, at, delta) else {
+                    return false;
                 };
-                table.col_start = start;
-                table.col_end = end;
-                table.columns.retain_mut(|column| {
-                    let Some((col, _)) = shift_range(column.col, column.col, at, delta) else {
-                        return false;
-                    };
-                    column.col = col;
-                    true
-                });
-                table.columns.is_empty().then_some(slot)
-            })
-            .collect();
-        for slot in removed {
-            self.tables.remove(slot);
-        }
+                column.col = col;
+                true
+            });
+            !table.columns.is_empty()
+        });
     }
 
     fn recompute_all_sheets(&mut self) {

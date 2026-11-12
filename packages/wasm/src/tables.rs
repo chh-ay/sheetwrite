@@ -5,7 +5,8 @@
 
 use std::cell::Cell;
 
-use crate::calc::{external_name_key, StructuredRef, TableSection};
+use crate::calc::{StructuredRef, TableSection};
+use crate::store::workbook_name_key;
 use crate::types::AbsCellKey;
 
 /// A table reference as it is written: its table name (`None` for
@@ -38,17 +39,14 @@ pub(crate) struct Table {
     pub(crate) columns: Vec<TableColumn>,
 }
 
-/// Whether two table or column names are the same name: equal without
-/// case, as `workbook_name_key` compares them, without building the keys
-/// unless a name has the `Book!Name` form of a linked workbook.
+/// Whether two table or column names are the same name, as
+/// `workbook_name_key` compares them, without building the keys for the
+/// usual ASCII names.
 fn same_name(left: &str, right: &str) -> bool {
-    if left.contains('!') || right.contains('!') {
-        return external_name_key(left).unwrap_or_else(|| left.to_uppercase())
-            == external_name_key(right).unwrap_or_else(|| right.to_uppercase());
+    if left.is_ascii() && right.is_ascii() && !left.contains('!') && !right.contains('!') {
+        return left.eq_ignore_ascii_case(right);
     }
-    left.chars()
-        .flat_map(char::to_uppercase)
-        .eq(right.chars().flat_map(char::to_uppercase))
+    workbook_name_key(left) == workbook_name_key(right)
 }
 
 impl Table {
@@ -222,9 +220,27 @@ impl TableSlots {
 
     pub(crate) fn remove(&mut self, slot: u16) -> Option<Table> {
         let table = self.slots.get_mut(usize::from(slot))?.take()?;
+        self.release_if_empty();
+        Some(table)
+    }
+
+    /// Keep the tables for which `keep` returns true; it may edit them.
+    pub(crate) fn retain_mut(&mut self, mut keep: impl FnMut(&mut Table) -> bool) {
+        for slot in &mut self.slots {
+            if let Some(table) = slot {
+                if keep(table) {
+                    continue;
+                }
+                *slot = None;
+            }
+        }
+        self.release_if_empty();
+    }
+
+    /// Free the slot list once no table is left.
+    fn release_if_empty(&mut self) {
         if self.slots.iter().all(Option::is_none) {
             self.slots = Vec::new();
         }
-        Some(table)
     }
 }
