@@ -35,13 +35,21 @@ bun scripts/check-engine-exports.ts  # after build:packages: callers of generate
   (`deny.toml`). `bun scripts/install-rust-checks.ts` installs both at the
   versions CI uses.
 
-The existing Type Checks & Generated Docs job checks engine export callers.
-The check resolves the built default, full, history and query declarations
-against executable sources in `packages` and `test`; generated output and
-type-only declarations do not count. Remove an uncalled export unless it is
-public API on purpose. In that case, add `/// @enginePublic <reason>` to its
-Rust docs, so the generated declaration carries the reason. A bare marker
-does not pass. Run with `--report` to list the callers and public reasons.
+The existing Type Checks & Generated Docs job checks engine exports. Every
+exported Rust function and method names its JavaScript binding with an
+explicit camelCase `js_name`; constructors are the exception. The check also
+resolves the built default, full, history and query declarations against
+executable sources in `packages` and `test`; generated output and type-only
+declarations do not count. Remove an uncalled export unless it is public API
+on purpose. In that case, add `/// @enginePublic <reason>` to its Rust docs,
+so the generated declaration carries the reason. A bare marker does not pass.
+Run with `--report` to list the callers and public reasons.
+
+Result buffers cross the boundary once. Expose a buffer through a `take*`
+method that moves it out (`std::mem::take`), not through a getter that clones
+it on every read. Review enforces this rule; a cloning getter is not reliably
+distinguishable from a small fixed result in a source check.
+
 
 
 ## Lint policy

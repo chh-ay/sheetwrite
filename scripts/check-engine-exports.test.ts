@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 
 import { auditEngineExports } from "./check-engine-exports.js";
 
-test("engine caller audit resolves aliases, getters and structural callers but rejects dead exports", async () => {
+test("engine caller audit resolves aliases, getters and structural callers but rejects dead or misnamed exports", async () => {
   const root = mkdtempSync(join(tmpdir(), "sheetwrite-engine-exports-"));
   const binding = "packages/wasm/pkg/sheetwrite_wasm.d.ts";
   const files = {
@@ -33,6 +33,28 @@ test("engine caller audit resolves aliases, getters and structural callers but r
     "packages/formulas/pkg/sheetwrite_wasm.d.ts": "export {};",
     "packages/wasm/pkg-history/sheetwrite_history.d.ts": "export {};",
     "packages/queries/pkg/sheetwrite_queries.d.ts": "export {};",
+    "packages/wasm/src/lib.rs": `
+      #[wasm_bindgen(js_name = convert)]
+      pub fn convert() -> String { String::new() }
+      #[wasm_bindgen]
+      pub fn missing_name() {}
+      #[wasm_bindgen]
+      impl Store {
+          #[wasm_bindgen(constructor)]
+          pub fn new() -> Self { Self }
+          /// A doc comment can sit between the attribute and function.
+          #[wasm_bindgen(getter, js_name = rows)]
+          #[must_use]
+          pub fn rows(&self) -> u32 { let marker = "{"; 0 }
+          #[allow(
+              clippy::too_many_arguments,
+              reason = "a multi-line attribute"
+          )]
+          #[wasm_bindgen(js_name = take_rows)]
+          pub fn take_rows(&mut self) -> Vec<u32> { Vec::new() }
+          pub(crate) fn private_helper(&self) {}
+      }
+    `,
     "packages/core/src/external-link.ts": `
       export interface ExternalLinkEngine { setNumber(value: number): void; }
       export function installLink(engine: ExternalLinkEngine) { engine.setNumber(12); }
@@ -64,12 +86,19 @@ test("engine caller audit resolves aliases, getters and structural callers but r
       writeFileSync(target, contents);
     }
     const audit = await auditEngineExports(root);
-    expect(audit.issues).toHaveLength(3);
+    expect(audit.issues).toHaveLength(5);
     expect(audit.issues.join("\n")).toContain("CellStore.unused has no package/test caller");
     expect(audit.issues.join("\n")).toContain("CellStore.missingReason has no package/test caller");
     expect(audit.issues.join("\n")).toContain("UnusedStore.constructor has no package/test caller");
-    expect(audit.exports.find((entry) => entry.name === "CellStore.allocatorStats")?.publicReason)
-      .toBe("Hosts can query the allocator without a Sheetwrite wrapper.");
+    expect(audit.issues.join("\n")).toContain(
+      "packages/wasm/src/lib.rs:5: exported Rust function needs a camelCase js_name",
+    );
+    expect(audit.issues.join("\n")).toContain(
+      "packages/wasm/src/lib.rs:19: exported Rust function needs a camelCase js_name",
+    );
+    expect(
+      audit.exports.find((entry) => entry.name === "CellStore.allocatorStats")?.publicReason,
+    ).toBe("Hosts can query the allocator without a Sheetwrite wrapper.");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -590,7 +590,7 @@ mod tests {
         original.set_formula(0, 0, 1, "=SUM(A1:A5000)", 0);
         original.set_formula(0, 0, 2, "=\"survivor\"", 0);
         original.recompute_changed();
-        original.set_column_numbers(0, 0, 0, &vec![1.0; EDIT_ROWS], 0);
+        crate::tests::write_number_column(&mut original, 0, 0, 0, &vec![1.0; EDIT_ROWS]);
 
         let mut replacement =
             CellStore::read_memory_state(&original.export_memory_state()).unwrap();

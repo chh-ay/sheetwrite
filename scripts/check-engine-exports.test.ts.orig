@@ -1,0 +1,61 @@
+import { expect, test } from "bun:test";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+
+import { auditEngineExports } from "./check-engine-exports.js";
+
+test("engine caller audit resolves aliases and getters, rejects dead exports, and requires a public reason", () => {
+  const root = mkdtempSync(join(tmpdir(), "sheetwrite-engine-exports-"));
+  const binding = "packages/engine/pkg/engine.d.ts";
+  const files = {
+    [binding]: `
+      export class Store {
+        free(): void;
+        write(): void;
+        aliasWrite(): void;
+        bracketWrite(): void;
+        readonly rows: number;
+        unused(): void;
+        /** @enginePublic Hosts can query the allocator without a Sheetwrite wrapper. */
+        allocatorStats(): void;
+        /** @enginePublic */
+        missingReason(): void;
+      }
+      export function convert(): string;
+      export function initSync(): void;
+      export default function __wbg_init(): void;
+    `,
+    "packages/client/src/caller.ts": `
+      import { Store, convert as convertFormula } from "../../engine/pkg/engine.js";
+      const engine = new Store();
+      engine.write();
+      const { aliasWrite: writeAlias } = engine;
+      writeAlias();
+      engine["bracketWrite"]();
+      const rows = engine.rows;
+      convertFormula();
+      // engine.unused();
+      const documentation = "engine.unused()";
+      const unrelated = { unused() {} };
+      unrelated.unused();
+    `,
+    "packages/client/dist/generated.js": "engine.unused(); engine.missingReason();",
+    "test/contract.d.ts": "declare const ignored: { unused(): void };",
+  };
+  try {
+    for (const [path, contents] of Object.entries(files)) {
+      const target = join(root, path);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, contents);
+    }
+    const audit = auditEngineExports(root, [binding]);
+    expect(audit.issues).toHaveLength(2);
+    expect(audit.issues.join("\n")).toContain("Store.unused has no package/test caller");
+    expect(audit.issues.join("\n")).toContain("Store.missingReason has no package/test caller");
+    expect(audit.exports.find((entry) => entry.name === "Store.allocatorStats")?.publicReason)
+      .toBe("Hosts can query the allocator without a Sheetwrite wrapper.");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

@@ -213,14 +213,14 @@ pub struct FormulaSyntaxError {
 #[wasm_bindgen]
 impl FormulaSyntaxError {
     /// The UTF-16 offset where the marked text starts.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = from)]
     #[must_use]
     pub fn from(&self) -> u32 {
         self.from
     }
 
     /// The UTF-16 offset where the marked text ends.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = to)]
     #[must_use]
     pub fn to(&self) -> u32 {
         self.to
@@ -228,13 +228,13 @@ impl FormulaSyntaxError {
 
     /// The text ends before the formula is complete: a value, a `)` or a
     /// closing quote is missing at the end. Typing on usually completes it.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = incomplete)]
     #[must_use]
     pub fn incomplete(&self) -> bool {
         self.incomplete
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = message)]
     #[must_use]
     pub fn message(&self) -> String {
         self.message.clone()

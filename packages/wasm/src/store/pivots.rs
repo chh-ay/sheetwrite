@@ -915,6 +915,7 @@ impl PivotOutput {
     }
 
     /// `[rows, cols, headerRows, labelCols]` of the output; zeros without a layout.
+    #[wasm_bindgen(js_name = layout)]
     pub fn layout(&self) -> Vec<u32> {
         self.layout.to_vec()
     }
