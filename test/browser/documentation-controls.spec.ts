@@ -131,16 +131,17 @@ test("the formula reference engine filter has the select popup styles", async ({
   await waitForHydration(page);
 
   await page.getByRole("combobox", { name: "Available in" }).click();
-  const popup = page.locator(".sw-demo-select__popup");
+  // The React site's Base UI popup, or the Solid site's own list.
+  const popup = page.locator(".sw-demo-select__popup, .sw-select__list");
   await expect(popup).toBeVisible();
 
   const style = await popup.evaluate((element) => {
     const computed = getComputedStyle(element);
-    const positioner = element.closest(".sw-demo-select__positioner");
+    const layer = element.closest(".sw-demo-select__positioner") ?? element;
     return {
       borderRadius: computed.borderRadius,
       boxShadow: computed.boxShadow,
-      positionerLayer: positioner === null ? "" : getComputedStyle(positioner).zIndex,
+      positionerLayer: getComputedStyle(layer).zIndex,
     };
   });
   expect(style.borderRadius).toBe("8px");

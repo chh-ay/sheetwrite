@@ -46,7 +46,7 @@ pub(super) fn index_selects_whole_axis(args: &[Ast]) -> bool {
 /// The rows and columns of `matrix` that a 1-based `row` and `col` select;
 /// zero selects every row or column. `None` when a position is outside it.
 fn selection(matrix: &EvalMatrix, row: usize, col: usize) -> Option<(Range<usize>, Range<usize>)> {
-    let axis = |position: usize, len: usize| match position {
+    let axis = |index: usize, len: usize| match index {
         0 => Some(0..len),
         position if position <= len => Some(position - 1..position),
         _ => None,

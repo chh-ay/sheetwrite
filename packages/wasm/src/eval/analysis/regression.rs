@@ -734,7 +734,7 @@ fn fit(
 fn dot(left: &[f64], right: &[f64]) -> f64 {
     left.iter()
         .zip(right)
-        .map(|(left, right)| left * right)
+        .map(|(left_value, right_value)| left_value * right_value)
         .sum()
 }
 
@@ -742,7 +742,7 @@ impl Fit {
     fn statistics(self, rows: usize, is_exponential: bool) -> Result<EvalMatrix, FormulaError> {
         let cols = self.coefficients.len() + 1;
         let mut values = vec![Value::Error(FormulaError::Na); rows * cols];
-        for (index, coefficient) in self
+        for (index, stored) in self
             .coefficients
             .iter()
             .rev()
@@ -750,9 +750,9 @@ impl Fit {
             .enumerate()
         {
             let coefficient = if is_exponential {
-                coefficient.exp()
+                stored.exp()
             } else {
-                *coefficient
+                *stored
             };
             if !coefficient.is_finite() {
                 return Err(FormulaError::Num);

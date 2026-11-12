@@ -32,24 +32,30 @@ pub(super) fn unary(op: UnaryOp, value: &Value) -> Value {
 #[inline]
 pub(super) fn binary<Right: std::borrow::Borrow<Value>>(
     op: Op,
-    left: &Value,
-    right: impl FnOnce() -> Right,
+    left_value: &Value,
+    right_operand: impl FnOnce() -> Right,
 ) -> Value {
     if op == Op::Concat {
-        let left = match text_from_value(left) {
+        let left = match text_from_value(left_value) {
             Ok(text) => text,
             Err(error) => return Value::Error(error),
         };
-        return match text_from_value(right().borrow()) {
-            Ok(right) => Value::text(left + &right),
+        let right_value = right_operand();
+        return match text_from_value(right_value.borrow()) {
+            Ok(right_text) => {
+                let mut output = String::with_capacity(left.len() + right_text.len());
+                output.push_str(&left);
+                output.push_str(&right_text);
+                Value::text(output)
+            }
             Err(error) => Value::Error(error),
         };
     }
-    let left = match number_from_value(left) {
+    let left = match number_from_value(left_value) {
         Ok(number) => number,
         Err(error) => return Value::Error(error),
     };
-    let right = match number_from_value(right().borrow()) {
+    let right = match number_from_value(right_operand().borrow()) {
         Ok(number) => number,
         Err(error) => return Value::Error(error),
     };
@@ -164,12 +170,12 @@ impl CellStore {
             }
             return Ok(matrix);
         }
-        let (left, right) = match ast {
+        let (left_ast, right_ast) = match ast {
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => (left, right),
             _ => return Err(FormulaError::Value),
         };
-        let left = self.operator_operand(left, sheet, pass, depth + 1)?;
-        let right = self.operator_operand(right, sheet, pass, depth + 1)?;
+        let left = self.operator_operand(left_ast, sheet, pass, depth + 1)?;
+        let right = self.operator_operand(right_ast, sheet, pass, depth + 1)?;
         let (left_rows, left_cols) = left.shape();
         let (right_rows, right_cols) = right.shape();
         let rows = left_rows.max(right_rows);
@@ -184,9 +190,9 @@ impl CellStore {
         for row in 0..rows {
             for col in 0..cols {
                 let value = match (left.at(row, col), right.at(row, col)) {
-                    (Some(left), Some(right)) => match ast {
-                        Ast::Bin(op, _, _) => binary(*op, left, || right),
-                        Ast::Cmp(op, _, _) => comparison(*op, left, right),
+                    (Some(left_cell), Some(right_cell)) => match ast {
+                        Ast::Bin(op, _, _) => binary(*op, left_cell, || right_cell),
+                        Ast::Cmp(op, _, _) => comparison(*op, left_cell, right_cell),
                         _ => unreachable!("binary operator matched above"),
                     },
                     _ => Value::Error(FormulaError::Na),

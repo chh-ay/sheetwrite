@@ -164,8 +164,6 @@ wildcard_enum_match_arm = "warn"
 # Off: noisy for this code, or covered by another rule.
 len_without_is_empty = "allow"
 literal_string_with_formatting_args = "allow"
-# `unwrap_or` is a disallowed method (clippy.toml); this lint would suggest it.
-manual_unwrap_or = "allow"
 # `mul_add` and `hypot` round differently from the separate operations that
 # Excel performs, and WASM has no fused multiply-add instruction.
 imprecise_flops = "allow"

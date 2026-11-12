@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
 import { resolve } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
@@ -27,6 +27,16 @@ const engine: typeof defaultEngine =
 const { CellStore, initSync } = engine;
 // Fixtures run on either provider, so they use the store type both share.
 type CellStore = InstanceType<defaultEngine.EngineInstance["CellStore"]>;
+/** The version-history diff kernel, from the same checkout as the engine. */
+const historyKernel: typeof import("@sheetwrite/wasm/history") = await import(
+  pathToFileURL(
+    resolve(
+      ENGINE_ROOT ?? fileURLToPath(new URL("../..", import.meta.url)),
+      "packages/wasm/history-node.mjs",
+    ),
+  ).href
+);
+await historyKernel.loadHistoryKernel();
 
 import { optionValue } from "./cli-options.js";
 import {
@@ -253,7 +263,14 @@ export function formulaWorkloadKey(workload: Pick<FormulaWorkloadResult, "id" | 
   return `workload=${workload.id};size=${workload.size}`;
 }
 
-export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
+/**
+ * The workload matrix of a capture. The full engine adds the rows for
+ * functions that only it has.
+ */
+export function expectedFormulaWorkloadKeys(
+  mode: BenchmarkMode,
+  enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
+): string[] {
   const smoke = mode === "smoke";
   const keys: string[] = [];
   for (const size of smoke ? [1_000] : FORMULA_SIZES) {
@@ -315,8 +332,29 @@ export function expectedFormulaWorkloadKeys(mode: BenchmarkMode): string[] {
     ),
     formulaWorkloadKey({ id: "iterative-finance", size: 1_000 }),
     formulaWorkloadKey({ id: "incremental-dependency-closure-edit", size: range }),
+    formulaWorkloadKey({ id: "paged-cell-reads", size: range }),
+    formulaWorkloadKey({ id: "paged-insert-row", size: smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS }),
+    formulaWorkloadKey({ id: "paged-range-loaded", size: smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS }),
+    formulaWorkloadKey({
+      id: "paged-eviction",
+      size: smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES,
+    }),
+    formulaWorkloadKey({ id: "index-match-many", size: smoke ? 50 : INDEX_MATCH_FORMULAS }),
+    formulaWorkloadKey({ id: "rank-many", size: smoke ? 1_000 : RANK_MANY_SIZE }),
+    formulaWorkloadKey({ id: "sort-unique-filter", size: range }),
+    formulaWorkloadKey({ id: "subtotal-filtered", size: range }),
+    formulaWorkloadKey({ id: "sparse-page-write", size: range }),
   );
   keys.push(formulaWorkloadKey({ id: "spill-sequence-admission", size: smoke ? 1_000 : 100_000 }));
+  keys.push(formulaWorkloadKey({ id: "history-diff", size: HISTORY_CELLS }));
+  if (enginePackage === "formulas") {
+    keys.push(...fullEngineRowKeys(smoke));
+    for (const id of CLOSURE_ROW_IDS) {
+      for (const size of smoke ? [1_000] : CLOSURE_ROW_SIZES) {
+        keys.push(formulaWorkloadKey({ id, size }));
+      }
+    }
+  }
   return keys;
 }
 
@@ -352,6 +390,12 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "parse-load-qualified",
   "parse-load-table",
   "memory-import",
+  "history-diff",
+  "groupby-sum",
+  "pivotby-percentof",
+  "pivot-rebuild",
+  "getpivotdata-many",
+  "analysis-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",
   "sumproduct-matrix-edit",
@@ -362,10 +406,25 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "paged-cell-reads",
+  "paged-insert-row",
+  "paged-range-loaded",
+  "paged-eviction",
+  "index-match-many",
+  "rank-many",
+  "sort-unique-filter",
+  "subtotal-filtered",
+  "sparse-page-write",
+  "map-lambda",
+  "reduce-lambda",
+  "byrow-lambda",
+  "lambda-call",
+  "named-lambda",
+  "measure-pivot",
 ]);
 
 function legacyFormulaBaselineWorkloadKeys(): string[] {
-  return expectedFormulaWorkloadKeys("full").filter((key) => {
+  return expectedFormulaWorkloadKeys("full", "wasm").filter((key) => {
     const id = key.slice("workload=".length, key.indexOf(";size="));
     return !EXPANDED_FORMULA_WORKLOAD_IDS.has(id);
   });
@@ -476,12 +535,52 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "parse-load-table":
     case "memory-import":
       return size * 2;
+    case "groupby-sum":
+      return groupingEditedTotal(size);
+    case "pivotby-percentof":
+      return groupingFirstQuarterShare(size);
+    case "pivot-rebuild":
+      return pivotRebuildOutput(size);
+    case "getpivotdata-many":
+      return pivotDataValue(size - 1);
+    case "analysis-calls":
+      return analysisCallsOutput(size);
+    case "history-diff":
+      return historyDiffOutput();
     case "iterative-finance":
       return 0.08663094803653158 + 0.08144165646436567;
     case "incremental-dependency-closure-edit":
       return `12:${size + 1}`;
     case "spill-sequence-admission":
       return `1:${size}:0`;
+    case "paged-cell-reads":
+      return pagedCellReadsOutput(size);
+    case "paged-insert-row":
+      return pagedInsertRowOutput(size);
+    case "paged-range-loaded":
+      return 1;
+    case "paged-eviction":
+      return pagedEvictionOutput(size);
+    case "index-match-many":
+      return INDEX_MATCH_VALUE_SCALE * (SHAPE_EDITED_SCALE + size - 1);
+    case "rank-many":
+      return `${size}:${RANK_MANY_EDITED_FIRST}`;
+    case "sort-unique-filter":
+      return sortUniqueOutput(SORT_UNIQUE_EDITED_ROWS);
+    case "subtotal-filtered":
+      return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
+    case "sparse-page-write":
+      return sparsePageOutput(size);
+    case "map-lambda":
+    case "lambda-call":
+    case "named-lambda":
+      return size * CLOSURE_EDITED_SCALE + 1;
+    case "reduce-lambda":
+      return (CLOSURE_EDITED_SCALE * size * (size + 1)) / 2;
+    case "byrow-lambda":
+      return 2 * size * CLOSURE_EDITED_SCALE;
+    case "measure-pivot":
+      return measurePivotOutput(size);
     default:
       throw new Error(`formula benchmark has no expected output for workload=${id};size=${size}`);
   }
@@ -2331,10 +2430,1052 @@ function bindingRowFixture(id: (typeof BINDING_ROW_IDS)[number], count: number):
   }
 }
 
+/**
+ * Full-engine rows for closures, which only that engine has: LAMBDA helpers
+ * over a range, a LAMBDA call in every row (written inline and through a
+ * defined name), and a data-model pivot whose measures run for every pivot
+ * cell. The timed edit reaches every call: the helpers and calls read `$C$1`,
+ * and the pivot's source changes in one row.
+ */
+const CLOSURE_ROW_IDS = [
+  "map-lambda",
+  "reduce-lambda",
+  "byrow-lambda",
+  "lambda-call",
+  "named-lambda",
+  "measure-pivot",
+] as const;
+const CLOSURE_ROW_SIZES = [10_000, 100_000] as const;
+const CLOSURE_SCALE = 2;
+const CLOSURE_EDITED_SCALE = 3;
+/** The defined name `named-lambda` calls. */
+const CLOSURE_NAME = "Affine";
+const CLOSURE_LAMBDA = "LAMBDA(x,s,x*s+1)";
+
+/**
+ * One helper formula in D1 over `count` rows: A and B hold 1…count and `$C$1`
+ * the scale the timed edit changes.
+ */
+function closureRangeFixture(
+  count: number,
+  formula: string,
+  check: (store: CellStore, sheet: number) => number,
+): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  for (const col of [0, 1]) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(count, (row) => row + 1),
+      0,
+    );
+  }
+  store.setNumber(sheet, 0, 2, CLOSURE_SCALE, 0);
+  store.setFormula(sheet, 0, 3, formula, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, CLOSURE_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => check(store, sheet),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: CLOSURE_SCALE }),
+  };
+}
+
+/** The columns of the `orders` table behind `measure-pivot`, and how each row fills them. */
+const ORDER_COLUMNS = ["region", "quarter", "amount", "qty"] as const;
+const ORDER_REGIONS = 25;
+const orderRegion = (row: number) => row % ORDER_REGIONS;
+const orderQuarter = (row: number) => (Math.floor(row / ORDER_REGIONS) % 4) + 1;
+const orderAmount = (row: number) => (row % 7) + 1;
+const orderQty = (row: number) => (row % 3) + 1;
+const ORDER_EDITED_AMOUNT = 101;
+
+/**
+ * The two measures: average price, and a region's share of its quarter, which
+ * removes the region filter with `CALCULATE(…,ALL(…))`.
+ */
+const ORDER_MEASURES = [
+  "=SUM(orders[amount])/SUM(orders[qty])",
+  "=SUM(orders[amount])/CALCULATE(SUM(orders[amount]),ALL(orders[region]))",
+] as const;
+
+/**
+ * The pivot's first cell (region `R0`, quarter 1) after the timed edit: the
+ * sum of its two measures.
+ */
+function measurePivotOutput(rows: number): number {
+  let amount = 0;
+  let qty = 0;
+  let quarterAmount = 0;
+  for (let row = 0; row < rows; row++) {
+    if (orderQuarter(row) !== 1) continue;
+    const value = row === 0 ? ORDER_EDITED_AMOUNT : orderAmount(row);
+    quarterAmount += value;
+    if (orderRegion(row) !== 0) continue;
+    amount += value;
+    qty += orderQty(row);
+  }
+  return amount / qty + amount / quarterAmount;
+}
+
+/**
+ * Table `orders` with `count` body rows on one sheet, and on another a model
+ * pivot over it: regions down, quarters across, both measures in each cell.
+ * The timed run changes the first order's amount, so every cell updates.
+ */
+function measurePivotFixture(count: number): TimedFixture {
+  // Only the full engine has pivots and measures.
+  const store = new CellStore() as unknown as InstanceType<formulas.EngineInstance["CellStore"]>;
+  const orders = store.addSheet(ORDER_COLUMNS.length, count + 1);
+  const output = store.addSheet(1 + 4 * ORDER_MEASURES.length, ORDER_REGIONS + 2);
+  for (const [col, header] of ORDER_COLUMNS.entries()) {
+    store.setString(orders, 0, col, header, 0);
+  }
+  for (let row = 0; row < count; row++) {
+    store.setString(orders, row + 1, 0, `R${orderRegion(row)}`, 0);
+  }
+  for (const [col, value] of [orderQuarter, orderAmount, orderQty].entries()) {
+    store.setColumnNumbers(orders, col + 1, 1, numericColumn(count, value), 0);
+  }
+  assert(
+    store.setTable(
+      "orders",
+      "orders",
+      orders,
+      0,
+      0,
+      count,
+      ORDER_COLUMNS.length - 1,
+      true,
+      false,
+      [...ORDER_COLUMNS],
+      [...ORDER_COLUMNS],
+    ),
+    "orders table set",
+  );
+  // Measure records: [id, homeTable, formula, "", name].
+  assert(
+    store.setRelationships(
+      ORDER_MEASURES.flatMap((formula, index) => [
+        `m${index}`,
+        "orders",
+        formula,
+        "",
+        `Measure ${index}`,
+      ]),
+    ),
+    "measures set",
+  );
+  // Pivot "pivot" from a model source (kind 3) over `orders`, every column a
+  // field by table and column string, anchored at A1: regions down, quarters
+  // across, each measure a value field; no filters, sorts or totals.
+  const strings = [
+    "pivot",
+    "orders",
+    ...ORDER_COLUMNS,
+    ...ORDER_MEASURES.map((_, index) => `m${index}`),
+  ];
+  const definition = [0, 3, 1, ORDER_COLUMNS.length];
+  for (const col of ORDER_COLUMNS.keys()) definition.push(1, 2 + col);
+  definition.push(0, 0, 1, 0, 1, 1, ORDER_MEASURES.length);
+  for (const index of ORDER_MEASURES.keys()) {
+    definition.push(2 + ORDER_COLUMNS.length + index, 7, -1);
+  }
+  definition.push(0, 0, 0);
+  assert(store.setPivots(output, new Float64Array(definition), strings), "pivot set");
+  store.recompute(orders);
+  const edit = (value: number) => {
+    store.setNumber(orders, 1, 2, value, 0);
+    store.recompute(orders);
+  };
+  return {
+    store,
+    run: () => edit(ORDER_EDITED_AMOUNT),
+    // Below the quarter labels and the measure names: region R0 in quarter 1.
+    check: () => numberAt(store, output, 2, 1) + numberAt(store, output, 2, 2),
+    dispose: () => store.free(),
+    restore: () => edit(orderAmount(0)),
+  };
+}
+
+function closureRowFixture(id: (typeof CLOSURE_ROW_IDS)[number], count: number): TimedFixture {
+  const last = (store: CellStore, sheet: number) => numberAt(store, sheet, count - 1, 1);
+  switch (id) {
+    case "map-lambda":
+      return closureRangeFixture(count, `=MAP(A1:A${count},LAMBDA(x,x*$C$1+1))`, (store, sheet) =>
+        numberAt(store, sheet, count - 1, 3),
+      );
+    case "reduce-lambda":
+      return closureRangeFixture(
+        count,
+        `=REDUCE(0,A1:A${count},LAMBDA(a,x,a+x*$C$1))`,
+        (store, sheet) => numberAt(store, sheet, 0, 3),
+      );
+    case "byrow-lambda":
+      return closureRangeFixture(
+        count,
+        `=BYROW(A1:B${count},LAMBDA(r,SUM(r)*$C$1))`,
+        (store, sheet) => numberAt(store, sheet, count - 1, 3),
+      );
+    case "lambda-call":
+      return shapeRowsFixture(
+        count,
+        numbersInA(),
+        (row) => `=${CLOSURE_LAMBDA}(A${row + 1},$C$1)`,
+        CLOSURE_SCALE,
+        CLOSURE_EDITED_SCALE,
+        last,
+      );
+    case "named-lambda":
+      return shapeRowsFixture(
+        count,
+        (store, sheet, rows) => {
+          numbersInA()(store, sheet, rows);
+          assert(store.setNamedFormula(CLOSURE_NAME, -1, `=${CLOSURE_LAMBDA}`), "LAMBDA name set");
+        },
+        (row) => `=${CLOSURE_NAME}(A${row + 1},$C$1)`,
+        CLOSURE_SCALE,
+        CLOSURE_EDITED_SCALE,
+        last,
+      );
+    case "measure-pivot":
+      return measurePivotFixture(count);
+  }
+}
+
+/**
+ * Rows for the full engine's grouping, pivot and analysis functions, which
+ * the default engine does not have: GROUPBY with SUM and PIVOTBY with
+ * PERCENTOF over two text key levels, a pivot table built again, many
+ * GETPIVOTDATA cells, and one formula per row that calls four analysis
+ * functions.
+ */
+const FULL_ENGINE_ROWS = [
+  { id: "groupby-sum", size: 100_000, smokeSize: 1_000 },
+  // Here PIVOTBY charges between 29 and 40 units of its 2,000,000-unit work
+  // budget per source row: 70,000 rows already give #NUM!.
+  { id: "pivotby-percentof", size: 50_000, smokeSize: 1_000 },
+  { id: "pivot-rebuild", size: 100_000, smokeSize: 1_000 },
+  { id: "getpivotdata-many", size: 1_000, smokeSize: 100 },
+  // 100,000 formulas took 0.19 s per edit natively on the Mac; 10,000 make 40,000 calls.
+  { id: "analysis-calls", size: 10_000, smokeSize: 1_000 },
+] as const;
+type FullEngineRowId = (typeof FULL_ENGINE_ROWS)[number]["id"];
+
+function fullEngineRowKeys(smoke: boolean): string[] {
+  return FULL_ENGINE_ROWS.map(({ id, size, smokeSize }) =>
+    formulaWorkloadKey({ id, size: smoke ? smokeSize : size }),
+  );
+}
+
+/** Keys of the grouping rows: ten regions, each with ten of the hundred products. */
+const GROUPING_REGIONS = 10;
+const GROUPING_PRODUCTS = 100;
+const GROUPING_QUARTERS = 4;
+/** Each run of this many source rows shares a quarter, so quarters mix with products. */
+const GROUPING_QUARTER_RUN = 7;
+const GROUPING_AMOUNT = 1;
+const GROUPING_EDITED_AMOUNT = 2;
+const GROUPING_AMOUNT_COL = 2;
+const GROUPING_QUARTER_COL = 3;
+/** Source in A:D; the formula spills from F1. */
+const GROUPING_FORMULA_COL = 5;
+const GROUPING_KEY_FIELDS = 2;
+/** One row per product, one subtotal per region and the grand total. */
+const GROUPING_OUTPUT_ROWS = GROUPING_PRODUCTS + GROUPING_REGIONS + 1;
+/** The two key columns, a column per quarter and the total. */
+const GROUPING_OUTPUT_COLS = GROUPING_KEY_FIELDS + GROUPING_QUARTERS + 1;
+
+function groupingQuarter(row: number): number {
+  return Math.floor(row / GROUPING_QUARTER_RUN) % GROUPING_QUARTERS;
+}
+
+/** The sum of the amounts after the timed edit, which raises the first one. */
+function groupingEditedTotal(rows: number): number {
+  return rows * GROUPING_AMOUNT + GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
+}
+
+/** The first quarter's share of the edited total; the edited first row is in it. */
+function groupingFirstQuarterShare(rows: number): number {
+  let firstQuarter = GROUPING_EDITED_AMOUNT - GROUPING_AMOUNT;
+  for (let row = 0; row < rows; row++) {
+    if (groupingQuarter(row) === 0) firstQuarter += GROUPING_AMOUNT;
+  }
+  return firstQuarter / groupingEditedTotal(rows);
+}
+
+/**
+ * Source rows in A:D: region text `R0`…`R9`, product text `P00`…`P99` (each
+ * product in one region), the amount, and quarter text `Q0`…`Q3`. `formula`
+ * goes in F1; the timed run edits the first amount.
+ */
+function groupingFixture(
+  rows: number,
+  formula: string,
+  check: (store: CellStore, sheet: number) => number,
+): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(GROUPING_FORMULA_COL + GROUPING_OUTPUT_COLS, rows);
+  const textColumn = (col: number, text: (row: number) => string) =>
+    store.setColumnStrings(
+      sheet,
+      col,
+      0,
+      Array.from({ length: rows }, (_, row) => text(row)),
+      0,
+    );
+  textColumn(0, (row) => `R${row % GROUPING_REGIONS}`);
+  textColumn(1, (row) => `P${String(row % GROUPING_PRODUCTS).padStart(2, "0")}`);
+  store.setColumnNumbers(
+    sheet,
+    GROUPING_AMOUNT_COL,
+    0,
+    numericColumn(rows, () => GROUPING_AMOUNT),
+    0,
+  );
+  textColumn(GROUPING_QUARTER_COL, (row) => `Q${groupingQuarter(row)}`);
+  store.setFormula(sheet, 0, GROUPING_FORMULA_COL, formula, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, GROUPING_AMOUNT_COL, GROUPING_EDITED_AMOUNT, 0);
+      store.recompute(sheet);
+    },
+    check: () => check(store, sheet),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, {
+      row: 0,
+      col: GROUPING_AMOUNT_COL,
+      value: GROUPING_AMOUNT,
+    }),
+  };
+}
+
+/** `GROUPBY` with SUM by region and product, with subtotals; checks the grand total. */
+function groupBySumFixture(rows: number): TimedFixture {
+  const last = GROUPING_OUTPUT_ROWS - 1;
+  return groupingFixture(rows, `=GROUPBY(A1:B${rows},C1:C${rows},SUM,0,2)`, (store, sheet) =>
+    numberAt(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
+  );
+}
+
+/**
+ * `PIVOTBY` with PERCENTOF of the grand total, by region and product with
+ * subtotals and by quarter with a total; checks the first quarter's share in
+ * the grand-total row.
+ */
+function pivotByPercentOfFixture(rows: number): TimedFixture {
+  // One header row holds the quarters.
+  const last = GROUPING_OUTPUT_ROWS;
+  return groupingFixture(
+    rows,
+    `=PIVOTBY(A1:B${rows},D1:D${rows},C1:C${rows},PERCENTOF,0,2,,1,,,2)`,
+    (store, sheet) => numberAt(store, sheet, last, GROUPING_FORMULA_COL + GROUPING_KEY_FIELDS),
+  );
+}
+
+/**
+ * Pivot sources: a header row `Field0`…`Field5`, then fields 0–3 hold the
+ * row's decimal digits from the last (`row % 10`, `row / 10 % 10`, …) and
+ * fields 4 and 5 hold `row + 4` and `row + 5`, as in the pivot benchmark.
+ */
+const PIVOT_FIELDS = 6;
+const PIVOT_DIGIT_FIELDS = 4;
+const PIVOT_DIGITS = 10;
+const PIVOT_SUM_FIELD = 4;
+const PIVOT_SUM = 0;
+const PIVOT_AVERAGE = 2;
+const PIVOT_AVERAGE_FIELD = 5;
+/** Totals, subtotals and headers. */
+const PIVOT_ALL_TOTALS = 7;
+const PIVOT_NO_NAME = -1;
+const PIVOT_RANGE_SOURCE = 0;
+const PIVOT_OUTPUT_ROWS = 2_000;
+const PIVOT_OUTPUT_COLS = 32;
+
+function pivotSourceSheet(store: CellStore, rows: number): number {
+  const sheet = store.addSheet(PIVOT_FIELDS, rows + 1);
+  for (let field = 0; field < PIVOT_FIELDS; field++) {
+    store.setString(sheet, 0, field, `Field${field}`, 0);
+    const values = numericColumn(rows, (row) =>
+      field < PIVOT_DIGIT_FIELDS
+        ? Math.floor(row / PIVOT_DIGITS ** field) % PIVOT_DIGITS
+        : row + field,
+    );
+    store.setColumnNumbers(sheet, field, 1, values, 0);
+  }
+  return sheet;
+}
+
+/** The packed definition `setPivots` takes, anchored at A1, with every total. */
+function pivotDefinition(
+  source: number,
+  rows: number,
+  axes: { rowFields: number[]; colFields: number[]; values: [number, number][] },
+): Float64Array {
+  return new Float64Array([
+    0,
+    PIVOT_RANGE_SOURCE,
+    source,
+    0,
+    0,
+    rows,
+    PIVOT_FIELDS - 1,
+    0,
+    0,
+    axes.rowFields.length,
+    ...axes.rowFields,
+    axes.colFields.length,
+    ...axes.colFields,
+    axes.values.length,
+    ...axes.values.flatMap(([field, aggregation]) => [field, aggregation, PIVOT_NO_NAME]),
+    0,
+    0,
+    PIVOT_ALL_TOTALS,
+  ]);
+}
+
+const PIVOT_ID = "pivot";
+
+/** A store whose engine has pivot tables: the full engine. */
+type PivotStore = CellStore &
+  Pick<InstanceType<typeof formulas.CellStore>, "setPivots" | "pivotStatus">;
+
+function hasPivots(store: CellStore): store is PivotStore {
+  return "setPivots" in store && "pivotStatus" in store;
+}
+
+/**
+ * The pivot benchmark's pivot: three row fields, one column field, SUM and
+ * AVERAGE. The timed run installs it and recalculates; restoring removes it.
+ */
+function pivotRebuildFixture(rows: number): TimedFixture {
+  const store = new CellStore();
+  assert(hasPivots(store), "the full engine has pivot tables");
+  const source = pivotSourceSheet(store, rows);
+  const output = store.addSheet(PIVOT_OUTPUT_COLS, PIVOT_OUTPUT_ROWS);
+  store.commitSources();
+  const definition = pivotDefinition(source, rows, {
+    rowFields: [0, 1, 2],
+    colFields: [3],
+    values: [
+      [PIVOT_SUM_FIELD, PIVOT_SUM],
+      [PIVOT_AVERAGE_FIELD, PIVOT_AVERAGE],
+    ],
+  });
+  // The first leaf group's SUM: below the column and value headers.
+  const leafRow = PIVOT_DIGIT_FIELDS;
+  return {
+    store,
+    run: () => {
+      assert(store.setPivots(output, definition, [PIVOT_ID]), "pivot installed");
+      store.recompute(output);
+    },
+    check: () => {
+      assert(store.pivotStatus(output)[0] === 0, "pivot built");
+      return numberAt(store, output, leafRow, 1);
+    },
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.setPivots(output, new Float64Array(), []), "pivot removed");
+      store.recompute(output);
+    },
+  };
+}
+
+/** The first leaf group holds every row whose four digit fields are 0. */
+function pivotRebuildOutput(rows: number): number {
+  const stride = PIVOT_DIGITS ** PIVOT_DIGIT_FIELDS;
+  let sum = 0;
+  for (let row = 0; row < rows; row += stride) sum += row + PIVOT_SUM_FIELD;
+  return sum;
+}
+
+/** Source rows of the pivot that `getpivotdata-many` reads: 100 groups of 100. */
+const PIVOT_DATA_SOURCE_ROWS = 10_000;
+const PIVOT_DATA_EDIT = 1;
+const PIVOT_DATA_EDITED = 2;
+
+/** The item pair that GETPIVOTDATA cell `index` names. */
+function pivotDataItems(index: number): [number, number] {
+  return [index % PIVOT_DIGITS, Math.floor(index / PIVOT_DIGITS) % PIVOT_DIGITS];
+}
+
+/** Sum of field 4 over the source rows whose last two digits are `first` and `second`. */
+function pivotDataValue(index: number): number {
+  const [first, second] = pivotDataItems(index);
+  let sum = 0;
+  for (let row = first + second * PIVOT_DIGITS; row < PIVOT_DATA_SOURCE_ROWS; row += 100) {
+    sum += row + PIVOT_SUM_FIELD;
+  }
+  return sum;
+}
+
+/**
+ * A pivot on sheet `Pivot` sums field 4 by fields 0 and 1; `count` cells on
+ * another sheet read it with `GETPIVOTDATA`. GETPIVOTDATA is volatile, so the
+ * timed edit of an unrelated cell recalculates all of them.
+ */
+function getPivotDataManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  assert(hasPivots(store), "the full engine has pivot tables");
+  const source = pivotSourceSheet(store, PIVOT_DATA_SOURCE_ROWS);
+  const pivot = store.addSheet(PIVOT_OUTPUT_COLS, PIVOT_OUTPUT_ROWS);
+  const calc = store.addSheet(2, count);
+  store.setSheetName(pivot, "pivot", "Pivot");
+  store.commitSources();
+  assert(
+    store.setPivots(
+      pivot,
+      pivotDefinition(source, PIVOT_DATA_SOURCE_ROWS, {
+        rowFields: [0, 1],
+        colFields: [],
+        values: [[PIVOT_SUM_FIELD, PIVOT_SUM]],
+      }),
+      [PIVOT_ID],
+    ),
+    "pivot installed",
+  );
+  store.recompute(pivot);
+  store.setNumber(calc, 0, 0, PIVOT_DATA_EDIT, 0);
+  for (let index = 0; index < count; index++) {
+    const [first, second] = pivotDataItems(index);
+    store.setFormula(
+      calc,
+      index,
+      1,
+      `=GETPIVOTDATA("Sum of Field4",Pivot!$A$1,"Field0",${first},"Field1",${second})`,
+      0,
+    );
+  }
+  store.recompute(calc);
+  return {
+    store,
+    run: () => {
+      store.setNumber(calc, 0, 0, PIVOT_DATA_EDITED, 0);
+      store.recompute(calc);
+    },
+    check: () => numberAt(store, calc, count - 1, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, calc, { row: 0, col: 0, value: PIVOT_DATA_EDIT }),
+  };
+}
+
+const ANALYSIS_PREFIX = "ab";
+
+/**
+ * One formula per row with four analysis functions: SUMSQ, AGGREGATE (SUM,
+ * ignoring errors), FORECAST.LINEAR and TEXTBEFORE. Each reads `$C$1`, so the
+ * timed edit recalculates all of them. FORECAST.LINEAR fits `$A$2:$A$3` (2, 3)
+ * over `$A$1:$A$2` (1, 2), the line y = x + 1.
+ */
+function analysisCallsFixture(count: number): TimedFixture {
+  return shapeRowsFixture(
+    count,
+    numbersInA(),
+    (row) =>
+      `=SUMSQ(A${row + 1},$C$1)+AGGREGATE(9,6,A${row + 1},$C$1)` +
+      `+FORECAST.LINEAR(A${row + 1},$A$2:$A$3,$A$1:$A$2)` +
+      `+LEN(TEXTBEFORE("${ANALYSIS_PREFIX}-"&A${row + 1}&$C$1,"-"))`,
+    SHAPE_SCALE,
+    SHAPE_EDITED_SCALE,
+    (store, sheet) => numberAt(store, sheet, count - 1, 1),
+  );
+}
+
+/** The last formula, after the edit: its row holds `count` and `$C$1` holds the edited scale. */
+function analysisCallsOutput(count: number): number {
+  const scale = SHAPE_EDITED_SCALE;
+  const sumOfSquares = count * count + scale * scale;
+  const sum = count + scale;
+  const forecast = count + 1;
+  return sumOfSquares + sum + forecast + ANALYSIS_PREFIX.length;
+}
+
+function fullEngineRowFixture(id: FullEngineRowId, size: number): TimedFixture {
+  switch (id) {
+    case "groupby-sum":
+      return groupBySumFixture(size);
+    case "pivotby-percentof":
+      return pivotByPercentOfFixture(size);
+    case "pivot-rebuild":
+      return pivotRebuildFixture(size);
+    case "getpivotdata-many":
+      return getPivotDataManyFixture(size);
+    case "analysis-calls":
+      return analysisCallsFixture(size);
+  }
+}
+
+/**
+ * The version-history diff kernel on the version-history benchmark's sheet:
+ * 5,000 rows by 20 columns, with 12,000 logged writes. The timed run diffs one
+ * page of 1,000 changes, as a diff request does: it creates the kernel, logs
+ * the writes, and compares the windows of both versions until the page is
+ * full. The engine's window bytes are captured at setup, so the row times the
+ * kernel only.
+ */
+const HISTORY_ROWS = 5_000;
+const HISTORY_COLS = 20;
+const HISTORY_CELLS = HISTORY_ROWS * HISTORY_COLS;
+const HISTORY_WRITES = 12_000;
+const HISTORY_AUTHORS = 8;
+/** One diff page; it is also the number of changed cells, so the page ends at the last one. */
+const HISTORY_PAGE = 1_000;
+/** Changed cell `k` is in row `HISTORY_CHANGE_STRIDE * k + HISTORY_CHANGE_ROW`. */
+const HISTORY_CHANGE_STRIDE = 5;
+const HISTORY_CHANGE_ROW = 2;
+const HISTORY_CHANGE_COL_STRIDE = 7;
+const HISTORY_CHANGE = 0.5;
+/** Earlier writes land on row `(i * HISTORY_WRITE_STRIDE) % HISTORY_ROWS`; prime, so they spread. */
+const HISTORY_WRITE_STRIDE = 7_919;
+/** The version-history diff reads windows of about this many cells. */
+const HISTORY_WINDOW_CELLS = 65_536;
+
+interface HistoryWrite {
+  row: number;
+  col: number;
+  author: number;
+}
+
+function historyChange(index: number): HistoryWrite {
+  return {
+    row: HISTORY_CHANGE_STRIDE * index + HISTORY_CHANGE_ROW,
+    col: (index * HISTORY_CHANGE_COL_STRIDE) % HISTORY_COLS,
+    author: index % HISTORY_AUTHORS,
+  };
+}
+
+/** Scattered writes first, then the write of each changed cell, so its author is the last one. */
+function historyWrites(): HistoryWrite[] {
+  const scattered = HISTORY_WRITES - HISTORY_PAGE;
+  return [
+    ...Array.from({ length: scattered }, (_, index) => ({
+      row: (index * HISTORY_WRITE_STRIDE) % HISTORY_ROWS,
+      col: index % HISTORY_COLS,
+      author: index % HISTORY_AUTHORS,
+    })),
+    ...Array.from({ length: HISTORY_PAGE }, (_, index) => historyChange(index)),
+  ];
+}
+
+/** Each change counts its cell's position plus its author times the cell count. */
+function historyChangeChecksum(row: number, col: number, author: number): number {
+  return row * HISTORY_COLS + col + author * HISTORY_CELLS;
+}
+
+function historyDiffOutput(): number {
+  let checksum = 0;
+  for (let index = 0; index < HISTORY_PAGE; index++) {
+    const change = historyChange(index);
+    checksum += historyChangeChecksum(change.row, change.col, change.author);
+  }
+  return checksum;
+}
+
+/** A sheet of 5,000 × 20 numbers, column by column. */
+function historyVersion(changes: readonly HistoryWrite[]): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addSheet(HISTORY_COLS, HISTORY_ROWS);
+  for (let col = 0; col < HISTORY_COLS; col++) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(HISTORY_ROWS, (row) => row * HISTORY_COLS + col),
+      0,
+    );
+  }
+  for (const change of changes) {
+    store.setNumber(
+      sheet,
+      change.row,
+      change.col,
+      change.row * HISTORY_COLS + change.col + HISTORY_CHANGE,
+      0,
+    );
+  }
+  return { store, sheet };
+}
+
+interface HistoryWindow {
+  row0: number;
+  rows: number;
+  before: Uint8Array;
+  after: Uint8Array;
+}
+
+function historyWindowBytes(
+  version: { store: CellStore; sheet: number },
+  row0: number,
+  rows: number,
+): Uint8Array {
+  const range = version.store.captureRange(version.sheet, row0, 0, rows, HISTORY_COLS);
+  assert(range !== undefined, "history window captured");
+  try {
+    return range.exportMemoryState(version.sheet);
+  } finally {
+    range.free();
+  }
+}
+
+function historyDiffFixture(): TimedFixture {
+  const before = historyVersion([]);
+  const after = historyVersion(Array.from({ length: HISTORY_PAGE }, (_, k) => historyChange(k)));
+  const windowRows = Math.floor(HISTORY_WINDOW_CELLS / HISTORY_COLS);
+  const windows: HistoryWindow[] = [];
+  for (let row0 = 0; row0 < HISTORY_ROWS; row0 += windowRows) {
+    const rows = Math.min(windowRows, HISTORY_ROWS - row0);
+    windows.push({
+      row0,
+      rows,
+      before: historyWindowBytes(before, row0, rows),
+      after: historyWindowBytes(after, row0, rows),
+    });
+  }
+  before.store.free();
+  const writes = historyWrites();
+  const noStyles = new Uint32Array();
+  let checksum = Number.NaN;
+  return {
+    store: after.store,
+    run: () => {
+      const kernel = new historyKernel.DiffKernel(HISTORY_PAGE);
+      try {
+        const slot = kernel.addSheet(HISTORY_ROWS, HISTORY_COLS, true);
+        for (const write of writes) {
+          kernel.touch(slot, write.row, write.col, write.row, write.col, write.author);
+        }
+        kernel.setStyles(noStyles, noStyles);
+        for (const window of windows) {
+          assert(kernel.loadAfter(window.after), "later window loaded");
+          assert(kernel.loadBefore(window.before), "earlier window loaded");
+          const cells = window.rows * HISTORY_COLS;
+          const next = kernel.compare(
+            slot,
+            true,
+            0,
+            0,
+            window.rows,
+            HISTORY_COLS,
+            window.row0,
+            0,
+            window.row0,
+            0,
+            0,
+          );
+          if (next < cells) break;
+        }
+        const rows = kernel.pageRows();
+        const cols = kernel.pageCols();
+        const authors = kernel.pageAuthors();
+        assert(
+          kernel.pageSheets().length === rows.length &&
+            kernel.pageBeforeRows().length === rows.length &&
+            kernel.pageBeforeCols().length === rows.length &&
+            kernel.pageFlags().length === rows.length,
+          "page columns have one entry per change",
+        );
+        checksum = 0;
+        for (const [index, row] of rows.entries()) {
+          checksum += historyChangeChecksum(row, cols[index] ?? 0, authors[index] ?? 0);
+        }
+      } finally {
+        kernel.free();
+      }
+    },
+    check: () => checksum,
+    dispose: () => after.store.free(),
+    // Each run builds and frees its own kernel; the versions stay unchanged.
+    restore: () => undefined,
+  };
+}
+
 /** Even rows bind one name, odd rows bind three that build on each other. */
 function letManyFormula(row: number): string {
   const source = `A${row + 1}*$C$1`;
   return row % 2 === 0 ? `=LET(x,${source},x+x+x)` : `=LET(x,${source},y,x+1,z,y*x,x+y+z)`;
+}
+
+/**
+ * Rows for how functions read ranges: INDEX/MATCH, RANK and LARGE filled
+ * down, SORT(UNIQUE(FILTER())), SUBTOTAL over a filtered column, and one
+ * sparse block written during a page load.
+ */
+const INDEX_MATCH_VALUE_SCALE = 10;
+/** Lookups in `index-match-many`. Each reads a 100,000-row table, so a few hundred is enough. */
+const INDEX_MATCH_FORMULAS = 200;
+/**
+ * Rows of `rank-many`. Every formula reads the whole column, so the work grows with the square.
+ */
+const RANK_MANY_SIZE = 4_000;
+/** The `rank-many` edit moves A1 below every other value. */
+const RANK_MANY_EDITED_FIRST = -1;
+/** `sort-unique-filter` keys cycle through this many labels (a prime, so a row step visits all). */
+const SORT_UNIQUE_KEYS = 997;
+const SORT_UNIQUE_STEP = 7_919;
+/** The timed edit keeps only the rows before this one. */
+const SORT_UNIQUE_EDITED_ROWS = 500;
+/** `subtotal-filtered` hides every other block of this many rows. */
+const SUBTOTAL_BLOCK_ROWS = 10;
+const SUBTOTAL_EDITED_FIRST = 2;
+const SPARSE_PAGE_COLUMNS = 10;
+/** One cell in this many is blank, so the block is sparse. */
+const SPARSE_PAGE_BLANK_EVERY = 10;
+const SPARSE_PAGE_LABELS = 97;
+const KIND_NUMBER = 1;
+const KIND_STRING = 2;
+
+function sortUniqueKey(row: number): string {
+  return `k${(row * SORT_UNIQUE_STEP) % SORT_UNIQUE_KEYS}`;
+}
+
+/** First and last of the sorted distinct keys of the rows before `rows`, and their count. */
+function sortUniqueOutput(rows: number): string {
+  const keys = [...new Set(Array.from({ length: rows }, (_, row) => sortUniqueKey(row)))].sort();
+  return `${keys[0]}:${keys.at(-1)}:${keys.length}`;
+}
+
+function subtotalVisible(row: number): boolean {
+  return Math.floor(row / SUBTOTAL_BLOCK_ROWS) % 2 === 0;
+}
+
+/** Sum of `row + 1` over the visible rows, with A1 holding `first`. */
+function subtotalOutput(count: number, first: number): number {
+  let total = first;
+  for (let row = 1; row < count; row++) if (subtotalVisible(row)) total += row + 1;
+  return total;
+}
+
+/** The value a `sparse-page-write` block holds at one offset: blank, a number or a label. */
+function sparsePageValue(offset: number): number | string | null {
+  if (offset % SPARSE_PAGE_BLANK_EVERY === 0) return null;
+  return offset % 2 === 0 ? offset : `label${offset % SPARSE_PAGE_LABELS}`;
+}
+
+function sparsePageOutput(rows: number): string {
+  const last = (rows - 1) * SPARSE_PAGE_COLUMNS;
+  return `${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 2))}:${String(sparsePageValue(last + SPARSE_PAGE_COLUMNS - 1))}`;
+}
+
+/**
+ * `formulas` INDEX/MATCH lookups over a `rows`-row table: keys in A, values in
+ * B. Each key is `$C$1` plus the formula's row, so the timed edit recomputes
+ * every lookup, and each match lands near the top of the table.
+ */
+function indexMatchFixture(formulas: number, rows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, rows);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(rows, (row) => row + 1),
+    0,
+  );
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(rows, (row) => (row + 1) * INDEX_MATCH_VALUE_SCALE),
+    0,
+  );
+  store.setNumber(sheet, 0, 2, SHAPE_SCALE, 0);
+  for (let row = 0; row < formulas; row++) {
+    store.setFormula(
+      sheet,
+      row,
+      3,
+      `=INDEX($B$1:$B$${rows},MATCH($C$1+${row},$A$1:$A$${rows},0))`,
+      0,
+    );
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, SHAPE_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, formulas - 1, 3),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: SHAPE_SCALE }),
+  };
+}
+
+/**
+ * RANK.EQ in even rows and LARGE in odd rows, each over the whole column, so
+ * one edit of A1 recomputes all of them: the fill-down shape that reads the
+ * column once per formula.
+ */
+function rankManyFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  for (let row = 0; row < count; row++) {
+    store.setFormula(
+      sheet,
+      row,
+      1,
+      row % 2 === 0 ? `=RANK.EQ(A${row + 1},$A$1:$A$${count})` : `=LARGE($A$1:$A$${count},ROW())`,
+      0,
+    );
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, RANK_MANY_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => `${numberAt(store, sheet, 0, 1)}:${numberAt(store, sheet, count - 1, 1)}`,
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+  };
+}
+
+/**
+ * One `SORT(UNIQUE(FILTER()))` over text keys in A, kept while B is below
+ * `$D$1`. The timed edit narrows the filter to the first rows.
+ */
+function sortUniqueFilterFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  for (let row = 0; row < count; row++) store.setString(sheet, row, 0, sortUniqueKey(row), 0);
+  store.setColumnNumbers(
+    sheet,
+    1,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  store.setNumber(sheet, 0, 3, count, 0);
+  store.setFormula(sheet, 0, 2, `=SORT(UNIQUE(FILTER(A1:A${count},B1:B${count}<$D$1)))`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 3, SORT_UNIQUE_EDITED_ROWS, 0);
+      store.recompute(sheet);
+    },
+    check: () => {
+      const last = SORT_UNIQUE_EDITED_ROWS - 1;
+      const spilled = store.spillAnchorRow(sheet, last, 2) === 0 ? SORT_UNIQUE_EDITED_ROWS : 0;
+      return `${textAt(store, sheet, 0, 2) ?? ""}:${textAt(store, sheet, last, 2) ?? ""}:${spilled}`;
+    },
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 3, value: count }),
+  };
+}
+
+/** `SUBTOTAL(109)` over a column whose filter hides every other block of rows. */
+function subtotalFilteredFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(2, count);
+  store.setColumnNumbers(
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  const hidden: number[] = [];
+  for (let start = SUBTOTAL_BLOCK_ROWS; start < count; start += 2 * SUBTOTAL_BLOCK_ROWS) {
+    hidden.push(start, Math.min(start + SUBTOTAL_BLOCK_ROWS, count) - 1);
+  }
+  assert(
+    store.setHiddenRows(sheet, new Uint32Array(), Uint32Array.from(hidden)),
+    "subtotal-filtered: hidden rows rejected",
+  );
+  store.setFormula(sheet, 0, 1, `=SUBTOTAL(109,A1:A${count})`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, SUBTOTAL_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, 0, 1),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 1 }),
+  };
+}
+
+/**
+ * One sparse block of `rows` × 10 cells written inside a page load, as
+ * snapshot hydration and datasource pages write: numbers and labels, with
+ * every tenth cell blank. The inputs are built before the timed write.
+ */
+function sparsePageWriteFixture(rows: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(SPARSE_PAGE_COLUMNS, rows);
+  const offsets: number[] = [];
+  const kinds: number[] = [];
+  const numbers: number[] = [];
+  const texts: string[] = [];
+  for (let offset = 0; offset < rows * SPARSE_PAGE_COLUMNS; offset++) {
+    const value = sparsePageValue(offset);
+    if (value === null) continue;
+    offsets.push(offset);
+    kinds.push(typeof value === "number" ? KIND_NUMBER : KIND_STRING);
+    numbers.push(typeof value === "number" ? value : 0);
+    if (typeof value === "string") texts.push(value);
+  }
+  const encoder = new TextEncoder();
+  const textBytes = encoder.encode(texts.join(""));
+  const textOffsets = new Uint32Array(texts.length + 1);
+  for (let index = 0; index < texts.length; index++) {
+    textOffsets[index + 1] = (textOffsets[index] ?? 0) + encoder.encode(texts[index]).length;
+  }
+  const entryOffsets = Uint32Array.from(offsets);
+  const entryKinds = Uint8Array.from(kinds);
+  const entryNumbers = Float64Array.from(numbers);
+  const styles = new Uint32Array(offsets.length);
+  const none = new Uint32Array();
+  return {
+    store,
+    run: () => {
+      store.beginPageLoad();
+      const status = store.setSparseBlock(
+        sheet,
+        0,
+        0,
+        rows,
+        SPARSE_PAGE_COLUMNS,
+        entryOffsets,
+        entryKinds,
+        entryNumbers,
+        textBytes,
+        textOffsets,
+        styles,
+        none,
+        [],
+        none,
+        none,
+      );
+      store.commitSources();
+      assert(status === 0, `sparse-page-write: block rejected with ${status}`);
+    },
+    check: () => {
+      const last = rows - 1;
+      const number = numberAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 2);
+      return `${number}:${textAt(store, sheet, last, SPARSE_PAGE_COLUMNS - 1) ?? ""}`;
+    },
+    dispose: () => store.free(),
+  };
 }
 
 /**
@@ -2443,6 +3584,185 @@ function incrementalDependencyClosureFixture(count: number): TimedFixture {
   };
 }
 
+/**
+ * Rows for paged storage: single-cell reads through formulas, a row insert
+ * near the top, the loaded-range check, and page loads through a full cache.
+ * Every paged sheet loads its values as clean pages, the way datasource pages
+ * arrive, and keeps some local edits on top.
+ */
+const PAGED_ROWS = 1_000_000;
+const PAGED_SMOKE_ROWS = 10_000;
+const PAGED_CHUNK_ROWS = 4_096;
+/** Local edits spread over column B of the insert and range-check sheets. */
+const PAGED_DIRTY_CELLS = 1_000;
+const PAGED_DIRTY_OFFSET = 0.5;
+const PAGED_INSERT_AT = 10;
+const PAGED_READ_SCALE = 2;
+const PAGED_READ_EDITED_SCALE = 3;
+/** The eviction row loads 4-row pages through a cache that holds 512 of them. */
+const PAGED_EVICTION_CHUNK_ROWS = 4;
+const PAGED_EVICTION_PAGES = 8_192;
+const PAGED_EVICTION_SMOKE_PAGES = 1_024;
+const PAGED_EVICTION_RESIDENT = 512;
+/** Pages a viewport band pins at the top of the eviction sheet. */
+const PAGED_EVICTION_PINNED = 16;
+/** Bytes of one resident page: kind, payload and style per row, plus the loaded bits. */
+const PAGED_EVICTION_PAGE_BYTES =
+  PAGED_EVICTION_CHUNK_ROWS *
+    (Uint8Array.BYTES_PER_ELEMENT +
+      Float64Array.BYTES_PER_ELEMENT +
+      Uint32Array.BYTES_PER_ELEMENT) +
+  BigUint64Array.BYTES_PER_ELEMENT;
+
+/** Column A holds `row`, column B `row + 1`, and `$C$1` the scale. */
+function pagedCellReadsOutput(count: number): number {
+  const last = count - 1;
+  return last + (last + 1) * PAGED_READ_EDITED_SCALE;
+}
+
+/** Old row 10 of column A one row lower, and every loaded and edited cell kept. */
+function pagedInsertRowOutput(rows: number): string {
+  return `${PAGED_INSERT_AT}:${rows * 2}:${PAGED_DIRTY_CELLS}`;
+}
+
+function pagedEvictionOutput(pages: number): string {
+  return `${PAGED_EVICTION_RESIDENT}:${pages * PAGED_EVICTION_CHUNK_ROWS - 1}:0`;
+}
+
+/**
+ * A paged sheet whose first `loaded` columns hold `row + col` in clean,
+ * loaded pages. A budget of 0 keeps every page resident.
+ */
+function loadedPagedSheet(
+  cols: number,
+  rows: number,
+  loaded: number,
+  chunkRows: number,
+  byteBudget: number,
+): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(cols, rows, chunkRows, byteBudget, 0);
+  store.beginPageLoad();
+  for (let col = 0; col < loaded; col++) {
+    store.setColumnNumbers(
+      sheet,
+      col,
+      0,
+      numericColumn(rows, (row) => row + col),
+      0,
+    );
+  }
+  store.commitSources();
+  return { store, sheet };
+}
+
+/** `PAGED_DIRTY_CELLS` local edits spread evenly down column B. */
+function addPagedEdits(store: CellStore, sheet: number, rows: number): void {
+  for (let index = 0; index < PAGED_DIRTY_CELLS; index++) {
+    const row = Math.floor((index * rows) / PAGED_DIRTY_CELLS);
+    store.setNumber(sheet, row, 1, row + 1 + PAGED_DIRTY_OFFSET, 0);
+  }
+}
+
+/**
+ * `=A{r}+B{r}*$C$1` in every row of a paged sheet: each formula reads two
+ * loaded cells and one edited cell, one at a time. The timed edit changes the
+ * scale, so every formula recalculates.
+ */
+function pagedCellReadsFixture(count: number): TimedFixture {
+  const { store, sheet } = loadedPagedSheet(4, count, 2, PAGED_CHUNK_ROWS, 0);
+  store.setNumber(sheet, 0, 2, PAGED_READ_SCALE, 0);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 3, `=A${row + 1}+B${row + 1}*$C$1`, 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 2, PAGED_READ_EDITED_SCALE, 0);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 3),
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 2, value: PAGED_READ_SCALE }),
+  };
+}
+
+/** Two loaded columns of `rows` rows, with local edits in column B. */
+function editedPagedSheet(rows: number): { store: CellStore; sheet: number } {
+  const paged = loadedPagedSheet(2, rows, 2, PAGED_CHUNK_ROWS, 0);
+  addPagedEdits(paged.store, paged.sheet, rows);
+  return paged;
+}
+
+function pagedInsertRowCheck(store: CellStore, sheet: number): string {
+  const stats = store.pagedStats(sheet);
+  return `${numberAt(store, sheet, PAGED_INSERT_AT + 1, 0)}:${stats[1]}:${stats[2]}`;
+}
+
+/** One row inserted near the top of a paged sheet; removing it again restores the sheet. */
+function pagedInsertRowFixture(rows: number): TimedFixture {
+  const { store, sheet } = editedPagedSheet(rows);
+  return {
+    store,
+    run: () => assert(store.addRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: insert"),
+    check: () => pagedInsertRowCheck(store, sheet),
+    dispose: () => store.free(),
+    restore: () => assert(store.removeRows(sheet, PAGED_INSERT_AT, 1), "paged-insert-row: restore"),
+  };
+}
+
+/** Whether every cell of both columns is loaded. The check changes nothing to restore. */
+function pagedRangeLoadedFixture(rows: number): TimedFixture {
+  const { store, sheet } = editedPagedSheet(rows);
+  let loaded = false;
+  return {
+    store,
+    run: () => {
+      loaded = store.rangeFullyLoaded(sheet, 0, 0, rows - 1, 1);
+    },
+    check: () => (loaded ? 1 : 0),
+    dispose: () => store.free(),
+    restore: () => {},
+  };
+}
+
+/**
+ * One page load of `pages` 4-row pages through a cache that holds 512, with
+ * the top 16 pages pinned by a viewport band, so every unpinned page the load
+ * writes evicts the oldest one. The fixture starts in the state a run leaves:
+ * the pinned pages and the newest pages resident. So a run needs no restore.
+ */
+function pagedEvictionFixture(pages: number): TimedFixture {
+  const rows = pages * PAGED_EVICTION_CHUNK_ROWS;
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(
+    1,
+    rows,
+    PAGED_EVICTION_CHUNK_ROWS,
+    PAGED_EVICTION_RESIDENT * PAGED_EVICTION_PAGE_BYTES,
+    0,
+  );
+  const pinnedRows = PAGED_EVICTION_PINNED * PAGED_EVICTION_CHUNK_ROWS;
+  store.pinViewportBands(sheet, Uint32Array.of(0, pinnedRows, 0, 1));
+  const values = numericColumn(rows, (row) => row);
+  const load = (start: number, end: number) => {
+    store.beginPageLoad();
+    store.setColumnNumbers(sheet, 0, start, values.subarray(start, end), 0);
+    store.commitSources();
+  };
+  load(0, pinnedRows);
+  load(rows - (PAGED_EVICTION_RESIDENT - PAGED_EVICTION_PINNED) * PAGED_EVICTION_CHUNK_ROWS, rows);
+  return {
+    store,
+    run: () => load(0, rows),
+    check: () =>
+      `${store.pagedStats(sheet)[0]}:${numberAt(store, sheet, rows - 1, 0)}:${numberAt(store, sheet, 0, 0)}`,
+    dispose: () => store.free(),
+    restore: () => {},
+  };
+}
+
 /** One matrix row: its identity and a factory for a fresh, untimed fixture. */
 interface FormulaWorkload {
   readonly id: string;
@@ -2522,7 +3842,32 @@ function formulaWorkloads(smoke: boolean): FormulaWorkload[] {
   add("incremental-dependency-closure-edit", range, () =>
     incrementalDependencyClosureFixture(range),
   );
+  add("paged-cell-reads", range, () => pagedCellReadsFixture(range));
+  const pagedRows = smoke ? PAGED_SMOKE_ROWS : PAGED_ROWS;
+  add("paged-insert-row", pagedRows, () => pagedInsertRowFixture(pagedRows));
+  add("paged-range-loaded", pagedRows, () => pagedRangeLoadedFixture(pagedRows));
+  const evictionPages = smoke ? PAGED_EVICTION_SMOKE_PAGES : PAGED_EVICTION_PAGES;
+  add("paged-eviction", evictionPages, () => pagedEvictionFixture(evictionPages));
+  const indexMatchFormulas = smoke ? 50 : INDEX_MATCH_FORMULAS;
+  add("index-match-many", indexMatchFormulas, () => indexMatchFixture(indexMatchFormulas, range));
+  const rankManySize = smoke ? 1_000 : RANK_MANY_SIZE;
+  add("rank-many", rankManySize, () => rankManyFixture(rankManySize));
+  add("sort-unique-filter", range, () => sortUniqueFilterFixture(range));
+  add("subtotal-filtered", range, () => subtotalFilteredFixture(range));
+  add("sparse-page-write", range, () => sparsePageWriteFixture(range));
   add("spill-sequence-admission", large, () => spillSequenceAdmissionFixture(large));
+  add("history-diff", HISTORY_CELLS, historyDiffFixture);
+  if (ENGINE_PACKAGE === "formulas") {
+    for (const row of FULL_ENGINE_ROWS) {
+      const size = smoke ? row.smokeSize : row.size;
+      add(row.id, size, () => fullEngineRowFixture(row.id, size));
+    }
+    for (const id of CLOSURE_ROW_IDS) {
+      for (const size of smoke ? [1_000] : CLOSURE_ROW_SIZES) {
+        add(id, size, () => closureRowFixture(id, size));
+      }
+    }
+  }
   return workloads;
 }
 
@@ -3278,18 +4623,22 @@ export function formulaRegressionBaselineIdentity(baseline: FormulaBenchmarkResu
 
 /**
  * An older baseline may leave out expanded workloads. Every core workload must still be listed,
- * and no key outside the current full matrix is allowed.
+ * and no key outside the current full matrix of the baseline's engine is allowed.
  */
 function regressionBaselineWorkloadKeys(baseline: FormulaBenchmarkResult): string[] {
   const observed = baseline.workloads.map(formulaWorkloadKey);
-  const candidates = [expectedFormulaWorkloadKeys("full"), legacyFormulaBaselineWorkloadKeys()];
+  const candidates = [
+    expectedFormulaWorkloadKeys("full", "wasm"),
+    expectedFormulaWorkloadKeys("full", "formulas"),
+    legacyFormulaBaselineWorkloadKeys(),
+  ];
   for (const expected of candidates) {
     if (expected.length === observed.length && expected.every((key) => observed.includes(key))) {
       return expected;
     }
   }
   const observedSet = new Set(observed);
-  const recognised = new Set(expectedFormulaWorkloadKeys("full"));
+  const recognised = new Set(expectedFormulaWorkloadKeys("full", "formulas"));
   const core = legacyFormulaBaselineWorkloadKeys();
   if (
     observed.length > 0 &&

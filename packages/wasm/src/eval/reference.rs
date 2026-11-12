@@ -160,8 +160,8 @@ impl CellStore {
             return Err(FormulaError::Ref);
         }
 
-        RUNTIME_READS.with(|reads| {
-            if let Some(reads) = reads.borrow_mut().as_mut() {
+        RUNTIME_READS.with(|slot| {
+            if let Some(reads) = slot.borrow_mut().as_mut() {
                 record_runtime_read(reads, range);
             }
         });
@@ -419,15 +419,15 @@ impl CellStore {
 
         let converted;
         let source = if a1 {
-            text.as_str()
+            text.as_ref()
         } else {
-            converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or((0, 0))) {
+            converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or_default()) {
                 Ok(converted) => converted,
                 Err(error) => return self.indirect_named_reference(&text, sheet).ok_or(error),
             };
             &converted
         };
-        let (row, col) = current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(source, sheet as u32, row, col);
         entry
             .ast
@@ -437,7 +437,7 @@ impl CellStore {
             .ok_or(FormulaError::Ref)
     }
 
-    fn indirect_named_reference(&self, text: &str, sheet: usize) -> Option<CellRange> {
+    fn indirect_named_reference(&self, text: &str, formula_sheet: usize) -> Option<CellRange> {
         let (sheet, name) = match text.rsplit_once('!') {
             Some((qualifier, name)) => {
                 let unquoted = qualifier
@@ -450,9 +450,9 @@ impl CellStore {
                     .or_else(|| self.sheet_lookup.get(&sheet_name_key(&title)))?;
                 (*sheet, name)
             }
-            None => (sheet, text),
+            None => (formula_sheet, text),
         };
-        let (row, col) = current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             ast @ (Ast::NamedRange(_) | Ast::Structured(_)) => range_from_ast(ast, sheet),
@@ -468,14 +468,14 @@ fn r1c1_to_a1(text: &str, origin: (u32, u32)) -> Result<String, FormulaError> {
             (&text[..sheet.len() + 1], reference)
         });
     let mut output = String::from(prefix);
-    for (index, endpoint) in reference.split(':').enumerate() {
+    for (index, part) in reference.split(':').enumerate() {
         if index > 1 {
             return Err(FormulaError::Ref);
         }
         if index != 0 {
             output.push(':');
         }
-        let endpoint = endpoint.to_ascii_uppercase();
+        let endpoint = part.to_ascii_uppercase();
         let remainder = endpoint.strip_prefix('R').ok_or(FormulaError::Ref)?;
         let separator = remainder.find('C').ok_or(FormulaError::Ref)?;
         let row = r1c1_axis(&remainder[..separator], origin.0, SPILL_MAX_ROWS)?;

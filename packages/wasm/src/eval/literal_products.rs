@@ -120,9 +120,9 @@ fn number_columns_total(ranges: &[LiteralColumns<'_>], rows: usize) -> Option<f6
     let mut columns = Vec::new();
     columns.try_reserve_exact(ranges.len()).ok()?;
     for range in ranges {
-        let &(kinds, payloads) = range.columns.first()?;
-        let kinds = kinds.get(..rows)?;
-        let payloads = payloads.get(..rows)?;
+        let &(column_kinds, column_payloads) = range.columns.first()?;
+        let kinds = column_kinds.get(..rows)?;
+        let payloads = column_payloads.get(..rows)?;
         if kinds.iter().fold(0, |any, &kind| any | kind) & !KIND_NUMBER != 0 {
             return None;
         }

@@ -18,7 +18,7 @@ pub(crate) const REMOVED: u8 = 16;
 /// Style IDs are local to each store; `table` maps them to content IDs that
 /// both versions share. An ID outside the table is compared as itself.
 pub(crate) fn style(table: &[u32], id: u32) -> u32 {
-    table.get(id as usize).map_or(id, |&content| content)
+    table.get(id as usize).copied().unwrap_or(id)
 }
 
 /// One cell of a decoded block.

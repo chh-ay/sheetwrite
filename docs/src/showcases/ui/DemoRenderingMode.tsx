@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { DemoRadioGroup, DemoRadioItem } from "./DemoRadioGroup.js";
 import type { RenderingMode } from "./rendering-mode.js";
 

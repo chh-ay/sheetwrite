@@ -1,4 +1,7 @@
 .sw-landing {
+  /* The landing's content column; the site header shares its edges. */
+  --sw-frame-max: 80rem;
+
   /* Keeps the pointer glow (z-index -1) above this background, below content. */
   isolation: isolate;
   display: flex;
@@ -21,7 +24,7 @@
 
 .sw-landing main {
   flex: 1;
-  width: min(80rem, calc(100% - 2 * var(--sw-page-inset)));
+  width: min(var(--sw-frame-max), calc(100% - 2 * var(--sw-page-inset)));
   margin: 0 auto;
   padding: clamp(var(--sw-space-8), 6vh, var(--sw-space-16)) 0
     clamp(var(--sw-space-10), 7vh, var(--sw-space-16));

@@ -44,11 +44,39 @@
 /* Layout: a full-height sidebar beside one column that holds the top bar and
    the page. Below 64rem the sidebar moves into the menu drawer. */
 .sw-docs {
+  /* The reading column's width (its tracks, outline included), whose edges
+     the top bar's content shares. */
+  --sw-docs-frame-max: var(--sw-content-width);
+  /* The docs frame (the sidebar, then the reading column with its gutters)
+     is centred: on a screen wider than the frame, the rest is shared out on
+     both sides, so the column always starts one gutter after the sidebar. */
+  --sw-docs-outside: max(
+    0px,
+    (100% - var(--sw-sidebar-width) - var(--sw-docs-frame-max) - 2 * var(--sw-page-gutter)) / 2
+  );
+
   display: grid;
   grid-template-columns: var(--sw-sidebar-width) minmax(0, 1fr);
   grid-template-rows: auto 1fr;
+  padding-inline: var(--sw-docs-outside);
+  /* The top bar's edge reaches past the frame (below); nothing scrolls sideways. */
+  overflow-x: clip;
+  /* The sidebar is sticky and one screen tall; its surface (out to the
+     screen's left edge) and hairline run the full page height from here. */
+  background: linear-gradient(
+    to right,
+    var(--sw-surface-0)
+      calc(var(--sw-docs-outside) + var(--sw-sidebar-width) - var(--sw-border-width)),
+    var(--sw-border) 0 calc(var(--sw-docs-outside) + var(--sw-sidebar-width)),
+    var(--sw-surface-1) 0
+  );
 }
 
+/* Until the inline reveal script has placed the current row in view (Solid
+   docs pages, DocsShell.tsx), the sidebar shows its surface without its links. */
+html[data-nav-reveal="pending"] .sw-sidebar__nav {
+  visibility: hidden;
+}
 .sw-sidebar {
   position: sticky;
   top: 0;
@@ -213,10 +241,23 @@ details[open] > summary > .sw-disclosure-icon {
   justify-content: space-between;
   gap: var(--sw-space-6);
   min-height: var(--sw-header-height);
-  padding: 0 var(--sw-page-gutter);
+  padding: 0 max(var(--sw-page-gutter), (100% - var(--sw-docs-frame-max)) / 2);
   border-bottom: var(--sw-border-width) solid var(--sw-border);
   background: color-mix(in srgb, var(--sw-surface-1) 92%, transparent);
   backdrop-filter: blur(12px);
+}
+/* Past the frame, the bar's surface and bottom edge run on to the screen's
+   right edge, as the page's surface does below it. */
+.sw-docs-bar::after {
+  position: absolute;
+  top: 0;
+  bottom: calc(-1 * var(--sw-border-width));
+  left: 100%;
+  width: 50vw;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: inherit;
+  backdrop-filter: inherit;
+  content: "";
 }
 .sw-docs-bar__brand {
   display: none;
@@ -346,6 +387,12 @@ details[open] > summary > .sw-disclosure-icon {
   min-width: 0;
   font-size: var(--sw-text-body);
   line-height: var(--sw-leading-body);
+}
+/* An article that opens with a heading starts at the page head's gap, as one
+   that opens with a paragraph does (the heading rules below outrank base.css's
+   first-child rule). */
+.sw-docs .sw-prose > :first-child {
+  margin-top: 0;
 }
 .sw-docs .sw-prose h2 {
   margin: var(--sw-space-16) 0 var(--sw-space-4);
@@ -671,6 +718,11 @@ html:has(.sw-nav-dialog[open]) {
 }
 
 @media (min-width: 88rem) {
+  .sw-docs:not(.sw-docs--api) {
+    --sw-docs-frame-max: calc(
+      var(--sw-content-width) + var(--sw-space-16) + var(--sw-docs-outline-width)
+    );
+  }
   .sw-docs:not(.sw-docs--api) .sw-document {
     grid-template-columns:
       min(100% - var(--sw-docs-outline-width) - var(--sw-space-16), var(--sw-content-width))
@@ -706,6 +758,7 @@ html:has(.sw-nav-dialog[open]) {
   .sw-docs {
     --sw-docs-tab-row-height: 2.75rem;
     grid-template-columns: minmax(0, 1fr);
+    background: var(--sw-surface-1);
   }
   .sw-sidebar {
     display: none;
@@ -742,9 +795,10 @@ html:has(.sw-nav-dialog[open]) {
   }
 }
 /* The search control as its icon; its label stays as the accessible name.
-   Phones use it beside the brand; between the sidebar's breakpoint and a wide
-   screen it keeps the tabs their room, and GitHub leaves the bar. */
-@media (min-width: 64rem) and (max-width: 79.999rem), (max-width: 42rem) {
+   Phones use it beside the brand. Between the sidebar's breakpoint and the
+   outline's, the bar shares the narrow reading column's edges, so it keeps
+   the tabs their room and GitHub leaves the bar. */
+@media (min-width: 64rem) and (max-width: 87.999rem), (max-width: 42rem) {
   .sw-docs .sw-search-button {
     width: var(--sw-control-height);
     height: var(--sw-control-height);
@@ -770,13 +824,14 @@ html:has(.sw-nav-dialog[open]) {
     padding-top: var(--sw-space-6);
   }
   /* The bar's icon buttons keep their size but take a 44px touch target,
-     the height of the tab row's targets. */
+     the height of the tab row's targets. The inset is measured from the
+     padding box, so it also reaches over the buttons' 1px border. */
   .sw-docs-bar :is(.sw-search-button, .sw-icon-button) {
     position: relative;
   }
   .sw-docs-bar :is(.sw-search-button, .sw-icon-button)::after {
     position: absolute;
-    inset: calc((44px - var(--sw-control-height)) / -2);
+    inset: calc((44px - var(--sw-control-height)) / -2 - 1px);
     content: "";
   }
   .sw-doc-pager,
@@ -790,11 +845,15 @@ html:has(.sw-nav-dialog[open]) {
 
 /* Site 404 and route error pages. This sheet loads on every page, including
    documentation pages, which skip the showcase stylesheet. */
+/* The message starts on the page frame's left edge, under the header's
+   brand; its lines keep a reading measure. */
 .sw-route-fallback {
   display: grid;
   gap: var(--sw-space-4);
-  max-width: 40rem;
   padding-block: var(--sw-space-16);
+}
+.sw-route-fallback > * {
+  max-width: 40rem;
 }
 .sw-route-fallback__actions {
   display: flex;
@@ -818,6 +877,244 @@ html:has(.sw-nav-dialog[open]) {
   filter: brightness(1.08);
 }
 .sw-route-fallback__actions button:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+/* Phone touch targets: every control takes at least 44 × 44 px. Buttons and
+   links that keep their smaller look get the rest as an invisible, centred
+   area (it never moves the layout); fields, rows and tabs grow instead,
+   because a neighbour sits too close for an area to spread into. */
+@media (max-width: 42rem) {
+  :is(
+    .sw-page-actions .sw-button,
+    .sw-runnable__actions .sw-button,
+    .sw-terminal__copy,
+    .sw-document__colophon a,
+    .sw-release-strip a,
+    .sw-prose td a
+  ) {
+    position: relative;
+  }
+  :is(
+    .sw-page-actions .sw-button,
+    .sw-runnable__actions .sw-button,
+    .sw-terminal__copy,
+    .sw-release-strip a,
+    .sw-prose td a,
+    .sw-document__colophon a
+  )::after {
+    position: absolute;
+    top: min(0px, calc(50% - 22px));
+    right: min(0px, calc(50% - 22px));
+    bottom: min(0px, calc(50% - 22px));
+    left: min(0px, calc(50% - 22px));
+    content: "";
+  }
+  /* Code blocks' copy buttons draw their frame and icon with both pseudo-elements. */
+  .sw-prose .expressive-code .copy button {
+    width: 44px;
+    height: 44px;
+  }
+  .sw-terminal__tabs button {
+    min-width: 44px;
+  }
+  /* The 44 px tabs take the gaps' place, and the prompt glyph leaves the bar,
+     so the tabs and Copy fit a phone's column; a narrower one wraps Copy to
+     its own row instead of pushing it past the edge. */
+  .sw-terminal__tabs {
+    gap: 0;
+  }
+  .sw-terminal__bar {
+    flex-wrap: wrap;
+    gap: 0 var(--sw-space-2);
+  }
+  .sw-terminal__icon {
+    display: none;
+  }
+  .sw-tabs__list [role="tab"] {
+    min-height: 44px;
+  }
+  .sw-toc-inline > summary {
+    min-height: 44px;
+  }
+  /* A symbol's member index and the figures' rows grow to 44 px rows. The
+     index's names stay one line with their ellipsis, centred by the line
+     height. */
+  .sw-prose .api-member-index a {
+    padding-block: 0;
+    line-height: 44px;
+  }
+  .sw-prose .api-member-index > summary {
+    min-height: 44px;
+  }
+  /* A link that is a whole list item or paragraph ("See also", next steps,
+     "Read the notes", from markLinkRows in vite.config.ts), and a release's
+     version link: 44 px rows. */
+  /* A symbol's source link is a 44 px box of its own (WebKit does not hit-test
+     a pseudo-element's area outside the link); its path wraps inside it. */
+  .sw-prose .api-metadata dd a {
+    display: inline-flex;
+    max-width: 100%;
+    min-height: 44px;
+    align-items: center;
+  }
+  .sw-prose .sw-link-row,
+  .sw-docs .sw-prose .sw-update__version a {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+  /* A field's type link sits in its code token: the head row is 44 px tall
+     and the link's target fills it, without growing the token. */
+  .sw-prose .api-field__head {
+    min-height: 44px;
+    align-items: center;
+  }
+  .sw-prose .api-field__type a {
+    position: relative;
+  }
+  .sw-prose .api-field__type a::after {
+    position: absolute;
+    inset: -13px -6px;
+    content: "";
+  }
+  .fig-range-row__name {
+    min-height: 44px;
+    align-items: center;
+  }
+  /* An API index lists its exports as one 44 px row each on a phone: the
+     kind and the name. The summary stays in the page (search reads it) and
+     on the symbol's page, one tap away. */
+  .sw-docs .api-symbol-grid {
+    gap: 0;
+    margin-block: var(--sw-space-2) var(--sw-space-8);
+    border-top: var(--sw-border-width) solid var(--sw-border);
+  }
+  .sw-docs .api-symbol-card {
+    min-height: 44px;
+    justify-content: center;
+    padding: var(--sw-space-1) var(--sw-space-2);
+    border: 0;
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+    border-radius: 0;
+    background: transparent;
+  }
+  .sw-docs .api-symbol-card__desc {
+    display: none;
+  }
+  /* The open outline's rows are 44 px tall. */
+  .sw-toc-inline a {
+    display: flex;
+    min-height: 44px;
+    align-items: center;
+  }
+  /* Article disclosures (signature profiles, accordions): text centred where
+     the browser can centre a block's content, at the top elsewhere. */
+  .sw-prose details > summary {
+    min-height: 44px;
+    align-content: center;
+  }
+  /* One line each (they never wrap); the line height keeps their disclosure marker. */
+  .sw-prose .sw-formula-table summary {
+    line-height: 44px;
+  }
+  /* An opened contract lists its four profile links as 44 px rows under the
+     summary (their line breaks are then the rows' edges). */
+  .sw-prose .sw-formula-table details a {
+    display: flex;
+    min-height: 44px;
+    flex-wrap: wrap;
+    column-gap: 0.25em;
+    align-items: center;
+  }
+  .sw-prose .sw-formula-table details br {
+    display: none;
+  }
+  .sw-formula-filter input,
+  .sw-formula-filter__engine .sw-demo-select__trigger {
+    min-height: 44px;
+  }
+  /* The field draws the border; the input inside it takes the field's full height. */
+  .sw-symbol-filter__field {
+    min-height: 46px;
+    padding-block: 0;
+  }
+  .sw-symbol-filter__field input {
+    align-self: stretch;
+  }
+}
+
+/* The 404 page: the site's page head, search, and the three places most
+   readers go next, across the frame. */
+.sw-not-found {
+  display: grid;
+  gap: var(--sw-space-8);
+  align-content: start;
+  padding-block: var(--sw-space-16);
+}
+.sw-not-found__head {
+  display: grid;
+  gap: var(--sw-space-3);
+  max-width: var(--sw-measure-lead);
+}
+.sw-not-found__eyebrow {
+  margin: 0;
+  color: var(--sw-accent-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
+}
+.sw-not-found h1 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-bold) var(--sw-text-h1) / var(--sw-leading-heading) var(--sw-font-display);
+  letter-spacing: var(--sw-tracking-display);
+}
+.sw-not-found__lead {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-lead);
+  line-height: var(--sw-leading-body);
+}
+.sw-not-found__search .sw-search-button {
+  width: min(100%, 24rem);
+  min-height: 44px;
+}
+.sw-not-found__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--sw-space-4);
+}
+.sw-not-found__link {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-0-5) var(--sw-space-3);
+  align-items: center;
+  min-height: 44px;
+  padding: var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  text-decoration: none;
+  transition: border-color var(--sw-motion-fast) var(--sw-motion-standard);
+}
+.sw-not-found__link .sw-icon {
+  grid-row: span 2;
+  color: var(--sw-accent);
+}
+.sw-not-found__link span {
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-ui) var(--sw-font-display);
+}
+.sw-not-found__link small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+.sw-not-found__link:hover {
+  border-color: var(--sw-accent);
+}
+.sw-not-found__link:focus-visible {
   outline: 2px solid var(--sw-accent);
   outline-offset: 2px;
 }

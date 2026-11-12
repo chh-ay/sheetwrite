@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import { iconHref } from "../icons/icon-href.js";
 import type { IconName } from "../icons/icon-names.js";
 

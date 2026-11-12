@@ -149,8 +149,8 @@ fn coupon(name: &str, values: &FuncAccumulator) -> NumberResult {
     })
 }
 
-/// ACCRINT(issue, first_interest, settlement, rate, par, frequency,
-/// [basis], [calc_method]).
+/// ACCRINT(issue, `first_interest`, settlement, rate, par, frequency,
+/// [basis], [`calc_method`]).
 #[inline(never)]
 fn accrued_interest(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 6, 8)?;

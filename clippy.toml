@@ -57,6 +57,4 @@ disallowed-types = [
 disallowed-methods = [
   { path = "std::env::var", reason = "the engine reads no environment; pass settings in from the host" },
   { path = "std::mem::drop", reason = "use `_ = value` to discard a value, or a block to end a borrow early" },
-  { path = "core::option::Option::unwrap_or", reason = "use `map_or`, `if let`, `let ... else` or `?`" },
-  { path = "core::result::Result::unwrap_or", reason = "use `map_or`, `if let`, `let ... else` or `?`" },
 ]
