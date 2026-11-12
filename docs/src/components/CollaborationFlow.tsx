@@ -4,6 +4,8 @@
  * labels name the real API so the diagram doubles as an index into the guide.
  */
 
+import { For } from "solid-js";
+
 const LANES = [
   { x: 120, title: "Client A", detail: "Grid + SyncCoordinator" },
   { x: 380, title: "Your server", detail: "PersistenceAdapter endpoint" },
@@ -50,33 +52,35 @@ const NOTES: readonly Note[] = [
 const NOTE_WIDTH = 196;
 const LINE_HEIGHT = 17;
 
-function Arrow({ from, to, y, label, kind }: Message) {
-  const start = LANES[from].x;
-  const end = LANES[to].x;
+function Arrow(props: Message) {
+  const start = LANES[props.from].x;
+  const end = LANES[props.to].x;
   const direction = Math.sign(end - start);
   const tip = end - direction * 6;
   return (
-    <g className="sw-collab-flow__message" data-kind={kind}>
-      <line x1={start} x2={tip} y1={y} y2={y} />
-      <path d={`M${tip} ${y - 5} L${end} ${y} L${tip} ${y + 5} Z`} />
-      <text textAnchor="middle" x={(start + end) / 2} y={y - 9}>
-        {label}
+    <g class="sw-collab-flow__message" data-kind={props.kind}>
+      <line x1={start} x2={tip} y1={props.y} y2={props.y} />
+      <path d={`M${tip} ${props.y - 5} L${end} ${props.y} L${tip} ${props.y + 5} Z`} />
+      <text text-anchor="middle" x={(start + end) / 2} y={props.y - 9}>
+        {props.label}
       </text>
     </g>
   );
 }
 
-function NoteBox({ lane, y, lines, kind }: Note) {
-  const height = lines.length * LINE_HEIGHT + 14;
-  const x = LANES[lane].x - NOTE_WIDTH / 2;
+function NoteBox(props: Note) {
+  const height = props.lines.length * LINE_HEIGHT + 14;
+  const center = LANES[props.lane].x;
   return (
-    <g className="sw-collab-flow__note" data-kind={kind}>
-      <rect height={height} rx={8} width={NOTE_WIDTH} x={x} y={y} />
-      {lines.map((line, index) => (
-        <text key={line} textAnchor="middle" x={LANES[lane].x} y={y + 21 + index * LINE_HEIGHT}>
-          {line}
-        </text>
-      ))}
+    <g class="sw-collab-flow__note" data-kind={props.kind}>
+      <rect height={height} rx={8} width={NOTE_WIDTH} x={center - NOTE_WIDTH / 2} y={props.y} />
+      <For each={props.lines}>
+        {(line, index) => (
+          <text text-anchor="middle" x={center} y={props.y + 21 + index() * LINE_HEIGHT}>
+            {line}
+          </text>
+        )}
+      </For>
     </g>
   );
 }
@@ -85,40 +89,38 @@ export default function CollaborationFlow() {
   return (
     <figure
       aria-label="One edit through the collaboration protocol"
-      className="sw-collab-flow"
+      class="sw-collab-flow"
       role="region"
     >
-      <div className="sw-collab-flow__frame">
+      <div class="sw-collab-flow__frame">
         <svg aria-labelledby="sw-collab-flow-title" role="img" viewBox="0 0 760 560">
           <title id="sw-collab-flow-title">
             Client A commits an edit, the server appends version 42 and acknowledges it, Client B
             applies version 42; on a version conflict Client A recovers and resends.
           </title>
-          {LANES.map((lane) => (
-            <g className="sw-collab-flow__lane" key={lane.title}>
-              <rect height={52} rx={10} width={210} x={lane.x - 105} y={16} />
-              <text className="sw-collab-flow__lane-title" textAnchor="middle" x={lane.x} y={38}>
-                {lane.title}
-              </text>
-              <text className="sw-collab-flow__lane-detail" textAnchor="middle" x={lane.x} y={56}>
-                {lane.detail}
-              </text>
-              <line x1={lane.x} x2={lane.x} y1={68} y2={548} />
-            </g>
-          ))}
+          <For each={LANES}>
+            {(lane) => (
+              <g class="sw-collab-flow__lane">
+                <rect height={52} rx={10} width={210} x={lane.x - 105} y={16} />
+                <text class="sw-collab-flow__lane-title" text-anchor="middle" x={lane.x} y={38}>
+                  {lane.title}
+                </text>
+                <text class="sw-collab-flow__lane-detail" text-anchor="middle" x={lane.x} y={56}>
+                  {lane.detail}
+                </text>
+                <line x1={lane.x} x2={lane.x} y1={68} y2={548} />
+              </g>
+            )}
+          </For>
           {/* The conflict path is an alternative, so it sits in its own frame. */}
-          <g className="sw-collab-flow__alt">
+          <g class="sw-collab-flow__alt">
             <rect height={126} rx={10} width={724} x={18} y={420} />
             <text x={30} y={440}>
               If baseVersion is behind the server
             </text>
           </g>
-          {NOTES.map((note) => (
-            <NoteBox key={note.lines[0]} {...note} />
-          ))}
-          {MESSAGES.map((message) => (
-            <Arrow key={message.label} {...message} />
-          ))}
+          <For each={NOTES}>{(note) => <NoteBox {...note} />}</For>
+          <For each={MESSAGES}>{(message) => <Arrow {...message} />}</For>
         </svg>
       </div>
       <figcaption>

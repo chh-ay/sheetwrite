@@ -1,7 +1,7 @@
 /**
  * The figure kit as build-time HTML, for figures that the docs generator
- * writes into Markdown and generated JSON. Pages that render figures in React
- * use the components directly.
+ * writes into Markdown and generated JSON. The kit's components are React,
+ * rendered to static markup here; no page ships them.
  */
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";

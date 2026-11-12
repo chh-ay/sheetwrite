@@ -84,8 +84,8 @@ jobs:
       # The production build has no /test/ fixture pages.
       - name: Type check and build production docs
         run: |
-          bun run --filter '@sheetwrite/docs-solid' typecheck
-          bun run --filter '@sheetwrite/docs-solid' build
+          bun run --filter '@sheetwrite/docs' typecheck
+          bun run --filter '@sheetwrite/docs' build
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
       - name: Upload production docs

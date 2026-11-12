@@ -1,3 +1,14 @@
+import { installCharts } from "@docs/lib/addons.js";
+import { initFullEngine, whenStylesReady } from "@docs/lib/full-engine.js";
+import { observeSiteTheme } from "@docs/lib/site-theme.js";
+import {
+  buildStoryOrders,
+  DIP_REGION,
+  PRICE_CHANGE_MONTH,
+  STORY_COMPANY,
+  type StoryOrders,
+} from "@docs/showcases/scenarios/orders-story.js";
+import { siteGridTheme } from "@docs/showcases/site-grid-theme.js";
 import type {
   CellAddress,
   CellScalar,
@@ -11,18 +22,6 @@ import type {
   Workbook,
 } from "@sheetwrite/core";
 import { createSpreadsheetShell, type SpreadsheetShell } from "@sheetwrite/core/shell";
-
-import { installCharts } from "../../lib/addons.js";
-import { initFullEngine, whenStylesReady } from "../../lib/full-engine.js";
-import { observeSiteTheme } from "../../lib/site-theme.js";
-import { siteGridTheme } from "../site-grid-theme.js";
-import {
-  buildStoryOrders,
-  DIP_REGION,
-  PRICE_CHANGE_MONTH,
-  STORY_COMPANY,
-  type StoryOrders,
-} from "./orders-story.js";
 
 // The analysis showcase: one orders sheet, a pivot of revenue by month and
 // region on a summary sheet, and a line chart that reads the pivot's output.
@@ -64,15 +63,16 @@ const REVENUE_FORMAT = "$#,##0";
 /** Summary columns: the pivot's labels, four regions and the total, then room for the chart. */
 const SUMMARY_COLUMNS = 16;
 const SUMMARY_ROWS = 40;
-const SUMMARY_LABEL_WIDTH = 104;
-const SUMMARY_VALUE_WIDTH = 96;
+const SUMMARY_LABEL_WIDTH = 88;
+const SUMMARY_VALUE_WIDTH = 84;
 
 /**
- * The chart sits one column right of the pivot. 560 px shows 24 months clearly
- * and still fits beside the pivot in the workspace at a 1440 px window.
+ * The chart starts 12 px right of the pivot's last column. 400 px shows 24
+ * months and, with the pivot, fits the workspace beside the side panel at a
+ * 1280 px window.
  */
-const CHART_GAP_COLUMNS = 1;
-const CHART_WIDTH = 560;
+const CHART_GAP_PX = 12;
+const CHART_WIDTH = 400;
 const CHART_HEIGHT = 340;
 
 /** The orders as the grid's columnar data, with the header row first. */
@@ -186,8 +186,8 @@ export function revenueChart(pivot: PivotDefinition, result: PivotResultView): C
     legend: "bottom",
     anchor: {
       row: anchor.row,
-      col: anchor.col + result.cols + CHART_GAP_COLUMNS,
-      offsetX: 0,
+      col: anchor.col + result.cols,
+      offsetX: CHART_GAP_PX,
       offsetY: 0,
       width: CHART_WIDTH,
       height: CHART_HEIGHT,

@@ -1,6 +1,6 @@
 import { expect, it } from "bun:test";
 
-import { formulaSourceDigest } from "../src/formula-bench.js";
+import { formulaSourceDigest } from "../src/formula-artifact.js";
 import { type FullEngineResult, validateFullEngineResult } from "../src/full-engine-bench.js";
 import { expectRejections, must, type Rejection } from "./gate-fixtures.js";
 

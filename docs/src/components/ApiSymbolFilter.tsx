@@ -1,7 +1,15 @@
-import { useLocation } from "@tanstack/react-router";
-import { type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { createEffect, createSignal, createUniqueId, Show } from "solid-js";
+import { isServer } from "solid-js/web";
 
 import { Icon } from "./Icon.js";
+
+/*
+ * Filter over the generated exported-symbol cards of an entry-point page,
+ * ported from docs/src/components/ApiSymbolFilter.tsx. An island that hydrates
+ * on first use. The cards are filtered in place rather than re-rendered: the
+ * article's anchors, the outline and the Pagefind index keep pointing at the
+ * same elements.
+ */
 
 interface SymbolCard {
   element: HTMLElement;
@@ -20,18 +28,15 @@ interface SymbolGroup {
   heading: HTMLElement | null;
 }
 
-/** Only entry-point pages list exported symbols. */
-const ENTRY_POINT_PATH = /^\/docs\/api\/[^/]+\/$/;
-
 /** Below this many cards a filter costs more clicks than it saves. */
-const MINIMUM_FILTERABLE_CARDS = 12;
+export const MINIMUM_FILTERABLE_CARDS = 12;
 
-const PROSE_SELECTOR = "#main-content article.sw-prose";
-
-function collectGroups(article: HTMLElement): readonly SymbolGroup[] {
+function collectGroups(): readonly SymbolGroup[] {
+  if (isServer) return [];
+  const article = document.querySelector<HTMLElement>("#main-content article.sw-prose");
   const groups: SymbolGroup[] = [];
-  for (const grid of article.querySelectorAll<HTMLElement>(".api-symbol-grid")) {
-    const cards = [...grid.querySelectorAll<HTMLElement>(".api-symbol-card")].map((element) => ({
+  for (const grid of article?.querySelectorAll<HTMLElement>(".api-symbol-grid") ?? []) {
+    const cards = Array.from(grid.querySelectorAll<HTMLElement>(".api-symbol-card"), (element) => ({
       element,
       text: (element.textContent ?? "").toLowerCase(),
     }));
@@ -52,61 +57,24 @@ function statusFor(query: string, matches: number, total: number): string {
   return `${matches} of ${total} exported symbols match "${query}".`;
 }
 
-/**
- * Filter over the generated exported-symbol cards of an entry-point page.
- *
- * The cards are filtered in place rather than re-rendered: the article's own
- * anchors, the outline, and the Pagefind index keep pointing at the same
- * elements, and the disclosure rows below stay the generator's markup.
- */
-export function ApiSymbolFilter({
-  symbolCount,
-}: Readonly<{
-  /**
-   * The page's exported symbol count from its frontmatter: the filter renders
-   * from it on the server and until the cards are collected, so it never
-   * appears late and moves the article.
-   */
-  symbolCount?: number;
-}>): ReactNode {
-  const pathname = useLocation({ select: (location) => location.pathname });
-  const [groups, setGroups] = useState<readonly SymbolGroup[]>([]);
-  const [query, setQuery] = useState("");
-  const [matchCount, setMatchCount] = useState(0);
-  const inputId = useId();
-  const statusId = useId();
-  const collectedSignature = useRef("");
+export function ApiSymbolFilter(props: {
+  /** The page's exported symbol count from its frontmatter, so the server renders the filter. */
+  readonly symbolCount: number;
+}) {
+  const inputId = createUniqueId();
+  const statusId = createUniqueId();
+  // The page is static, so its cards are all there when the island hydrates.
+  const groups = collectGroups();
+  // The reader may have typed into the server-rendered field before it hydrated.
+  const typed = isServer
+    ? ""
+    : ((document.getElementById(inputId) as HTMLInputElement | null)?.value ?? "");
+  const [query, setQuery] = createSignal(typed);
+  const [matchCount, setMatchCount] = createSignal(props.symbolCount);
+  const trimmed = () => query().trim();
 
-  // Markdown for a route mounts after hydration, so collect the cards on every
-  // child-list change instead of once on mount.
-  useEffect(() => {
-    setQuery("");
-    setGroups([]);
-    collectedSignature.current = "";
-    if (!ENTRY_POINT_PATH.test(pathname)) return;
-    const article = document.querySelector<HTMLElement>(PROSE_SELECTOR);
-    if (article === null) return;
-    const scan = () => {
-      const collected = collectGroups(article);
-      const signature = collected.map((group) => group.cards.length).join("|");
-      if (signature === collectedSignature.current) return;
-      collectedSignature.current = signature;
-      setGroups(collected);
-    };
-    scan();
-    const mutations = new MutationObserver(scan);
-    mutations.observe(article, { childList: true, subtree: true });
-    return () => mutations.disconnect();
-  }, [pathname]);
-
-  const collected = groups.reduce((count, group) => count + group.cards.length, 0);
-  const total = groups.length > 0 ? collected : (symbolCount ?? 0);
-  const filterable = total >= MINIMUM_FILTERABLE_CARDS;
-  const trimmedQuery = query.trim();
-
-  useEffect(() => {
-    if (!filterable) return;
-    const needle = trimmedQuery.toLowerCase();
+  createEffect(() => {
+    const needle = trimmed().toLowerCase();
     let matches = 0;
     for (const group of groups) {
       let groupMatches = 0;
@@ -119,38 +87,37 @@ export function ApiSymbolFilter({
       group.grid.hidden = groupMatches === 0;
       group.heading?.toggleAttribute("hidden", groupMatches === 0);
     }
-    setMatchCount(matches);
-  }, [filterable, groups, trimmedQuery]);
-
-  if (!filterable) return null;
+    if (groups.length > 0) setMatchCount(matches);
+  });
 
   return (
-    <search aria-label="Filter exported symbols" className="sw-symbol-filter">
-      <label className="sw-symbol-filter__label" htmlFor={inputId}>
+    <search aria-label="Filter exported symbols" class="sw-symbol-filter">
+      {/* oxlint-disable-next-line jsx-a11y/label-has-associated-control -- `for` names the input; the rule knows only React's `htmlFor`. */}
+      <label class="sw-symbol-filter__label" for={inputId}>
         Filter exported symbols
       </label>
-      <div className="sw-symbol-filter__field">
+      <div class="sw-symbol-filter__field">
         <Icon name="search" />
         <input
           aria-describedby={statusId}
-          autoComplete="off"
+          autocomplete="off"
           id={inputId}
-          onChange={(event) => setQuery(event.currentTarget.value)}
+          onInput={(event) => setQuery(event.currentTarget.value)}
           onKeyDown={(event) => {
             if (event.key === "Escape") setQuery("");
           }}
           placeholder="incremental, camelCase, or a word from the summary"
           type="search"
-          value={query}
+          value={query()}
         />
-        {query.length === 0 ? null : (
-          <button className="sw-symbol-filter__clear" onClick={() => setQuery("")} type="button">
+        <Show when={query().length > 0}>
+          <button class="sw-symbol-filter__clear" onClick={() => setQuery("")} type="button">
             Clear
           </button>
-        )}
+        </Show>
       </div>
-      <p aria-live="polite" className="sw-symbol-filter__status" id={statusId}>
-        {statusFor(trimmedQuery, matchCount, total)}
+      <p aria-live="polite" class="sw-symbol-filter__status" id={statusId}>
+        {statusFor(trimmed(), matchCount(), props.symbolCount)}
       </p>
     </search>
   );

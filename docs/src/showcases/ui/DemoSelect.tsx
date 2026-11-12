@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import { Select } from "@base-ui/react/select";
 
-import { Icon } from "../../components/Icon.js";
+import { Icon } from "./Icon.js";
 
 export interface DemoSelectOption {
   label: string;

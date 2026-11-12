@@ -1,15 +1,27 @@
-/** @jsxImportSource react */
-import { useRef, useState } from "react";
+import { type ActionGuard, type ActionState, createActionGuard } from "@docs/lib/action-guard.js";
+import { createSignal } from "solid-js";
 
-import { type ActionGuard, type ActionState, createActionGuard } from "./action-guard.js";
-
-/** React binding for {@link createActionGuard}: one guard per component instance. */
+/**
+ * Solid binding for {@link createActionGuard}: one guard per component
+ * instance. `pending`, `error` and `state` are reactive getters, so read them
+ * where they render (never destructure them).
+ */
 function useAction(): ActionGuard & ActionState {
-  const [state, setState] = useState<ActionState>({ pending: false, error: null });
-  const guard = useRef<ActionGuard | null>(null);
-  guard.current ??= createActionGuard(setState);
-  const { run, clearError } = guard.current;
-  return { ...state, state, run, clearError };
+  const [state, setState] = createSignal<ActionState>({ pending: false, error: null });
+  const { run, clearError } = createActionGuard(setState);
+  return {
+    get pending() {
+      return state().pending;
+    },
+    get error() {
+      return state().error;
+    },
+    get state() {
+      return state();
+    },
+    run,
+    clearError,
+  };
 }
 
 /** Attributes that mark a button as working on its action (styled by the site CSS). */
@@ -18,10 +30,10 @@ function pendingProps(pending: boolean): { "aria-busy"?: true; disabled?: true }
 }
 
 /** The one place an action failure is shown, next to the controls it belongs to. */
-function ActionError({ error }: Readonly<{ error: string | null }>) {
+function ActionError(props: Readonly<{ error: string | null }>) {
   return (
-    <p className="sw-action-error" data-action-error="" hidden={error === null} role="alert">
-      {error}
+    <p class="sw-action-error" data-action-error="" hidden={props.error === null} role="alert">
+      {props.error}
     </p>
   );
 }
