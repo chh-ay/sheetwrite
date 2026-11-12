@@ -14,12 +14,14 @@ import {
 } from "./formula-analysis.js";
 import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
+import type { FormulaPreview, FormulaPreviewValue } from "./formula-preview.js";
 import { storeFunctions } from "./functions/registry.js";
 import { argumentLabel, signature } from "./functions/signature.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
 import { sheetNameKey } from "./name-key.js";
+import { storeEngine } from "./store/engine-registry.js";
 import { checkStylePart } from "./style-parts.js";
-import type { HighlightRange, SheetId } from "./types/coordinates.js";
+import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 
@@ -38,6 +40,8 @@ export interface AssistDeps {
   highlightCells: (ranges: HighlightRange[] | null) => void;
   /** Sheet id the formula's unqualified references resolve against (the active sheet). */
   sheet: () => SheetId;
+  /** The data address of the cell being edited, which the result preview evaluates in. */
+  cell: () => Readonly<CellAddress> | null;
   /** The store whose sheets and functions the formula uses. */
   store: Store;
 }
@@ -55,6 +59,44 @@ const FIELD_ATTRIBUTES = [
 
 let helpSerial = 0;
 
+/** The pause after the last keystroke before the result preview calculates. */
+const PREVIEW_DELAY_MS = 120;
+/** Characters of a text result the preview shows before it shortens it. */
+const PREVIEW_TEXT_CHARS = 80;
+/** Significant digits of a number in the preview, as the grid shows them. */
+const PREVIEW_DIGITS = 15;
+
+function previewValueText(value: FormulaPreviewValue): string {
+  if (value === null) return "0";
+  if (typeof value === "number") return String(Number(value.toPrecision(PREVIEW_DIGITS)));
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  if (typeof value === "object") return value.error;
+
+  const shown =
+    value.length > PREVIEW_TEXT_CHARS ? `${value.slice(0, PREVIEW_TEXT_CHARS)}…` : value;
+  return `"${shown}"`;
+}
+
+/** The preview line for a result; empty when there is nothing to show. */
+function previewLine(preview: FormulaPreview): string {
+  switch (preview.status) {
+    case "value":
+      return `= ${previewValueText(preview.value)}`;
+    case "array":
+      return `= ${previewValueText(preview.first)} … (${preview.rows} × ${preview.cols} array)`;
+    case "unavailable":
+      switch (preview.reason) {
+        case "unsafe-function":
+          return "No preview: this formula calls a function that runs only in the cell.";
+        case "cost-limit":
+          return "No preview: this formula is too large to calculate while you type.";
+        case "loading":
+          return "No preview yet: the cells it reads are still loading.";
+        case "syntax":
+          return "";
+      }
+  }
+}
 /**
  * Errors to show now. An error that only says the formula is not finished
  * waits while the caret is at the end of the text, where the user is still
@@ -116,6 +158,8 @@ export class FormulaHelp {
   private layer: HTMLDivElement | null = null;
   private guide: HTMLDivElement | null = null;
   private list: HTMLDivElement | null = null;
+  private preview: HTMLDivElement | null = null;
+  private previewTimer: ReturnType<typeof setTimeout> | undefined;
   private mirror: TextMirror | null = null;
   /** The text the guide shows now, so an unchanged guide is not announced again. */
   private guideText = "";
@@ -171,6 +215,7 @@ export class FormulaHelp {
     const field = this.field;
     if (field === null) return;
 
+    this.cancelPreview();
     field.removeEventListener("scroll", this.onScroll);
     document.removeEventListener("selectionchange", this.onSelectionChange);
     for (const name of FIELD_ATTRIBUTES) field.removeAttribute(name);
@@ -183,6 +228,7 @@ export class FormulaHelp {
     this.layer = null;
     this.guide = null;
     this.list = null;
+    this.preview = null;
     this.guideText = "";
     this.completion = null;
     this.dismissedText = null;
@@ -210,6 +256,7 @@ export class FormulaHelp {
     this.call = analysis.call;
     this.diagnostics = diagnostics;
     this.showGuide();
+    this.schedulePreview(text, analysis.diagnostics.length === 0);
     field.setAttribute("aria-invalid", diagnostics.length > 0 ? "true" : "false");
     this.reposition();
   }
@@ -280,19 +327,58 @@ export class FormulaHelp {
     guide.className = "sheetwrite-formula-guide";
     guide.id = `${this.id}-guide`;
     guide.setAttribute("role", "status");
-    layer.append(guide);
-    field.setAttribute("aria-describedby", guide.id);
+    // The preview is not a live region: it changes on every keystroke.
+    const preview = document.createElement("div");
+    preview.className = "sheetwrite-formula-preview";
+    preview.id = `${this.id}-preview`;
+    layer.append(guide, preview);
+    field.setAttribute("aria-describedby", `${guide.id} ${preview.id}`);
 
     layerParent(field).appendChild(layer);
     checkStylePart(layer, "formula-help", "Formula help");
     this.layer = layer;
     this.guide = guide;
+    this.preview = preview;
+  }
+
+  /**
+   * Calculates the result preview once typing pauses. A formula with a
+   * problem has no preview; its error is in the guide instead.
+   */
+  private schedulePreview(text: string, complete: boolean): void {
+    this.cancelPreview();
+    if (!complete) {
+      this.showPreview("");
+      return;
+    }
+
+    this.previewTimer = setTimeout(() => {
+      this.previewTimer = undefined;
+      const engine = storeEngine(this.deps.store);
+      const cell = this.deps.cell();
+      if (this.field?.value !== text || engine === null || cell === null) return;
+
+      this.showPreview(previewLine(engine.previewFormula(cell, text)));
+    }, PREVIEW_DELAY_MS);
+  }
+
+  private cancelPreview(): void {
+    if (this.previewTimer === undefined) return;
+
+    clearTimeout(this.previewTimer);
+    this.previewTimer = undefined;
+  }
+
+  private showPreview(line: string): void {
+    if (this.preview !== null && this.preview.textContent !== line) this.preview.textContent = line;
   }
 
   private clear(): void {
     this.deps.highlightCells(null);
     this.mirror?.remove();
     this.mirror = null;
+    this.cancelPreview();
+    this.showPreview("");
     this.showCompletion(null);
     this.call = null;
     this.diagnostics = [];

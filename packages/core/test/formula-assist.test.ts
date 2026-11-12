@@ -53,6 +53,7 @@ function deps(highlights: (HighlightRange[] | null)[] = []): AssistDeps {
       highlights.push(ranges);
     },
     sheet: () => "s1",
+    cell: () => ({ sheet: "s1", row: 0, col: 0 }),
     store,
   };
 }
@@ -175,5 +176,27 @@ describe("reference colours", () => {
     expect(state.committed).toBe("=SUM(A1:B2)+C3+'Sheet 1'!A1:B2+Missing!A1");
     expect(state.highlights.at(-1)).toBeNull();
     expect(document.querySelector(".sheetwrite-formula-mirror")).toBeNull();
+  });
+});
+
+describe("result preview", () => {
+  it("shows the result once typing pauses, and nothing for an unfinished formula", async () => {
+    const { textarea } = beginEdit();
+    const preview = () => document.querySelector(".sheetwrite-formula-preview")?.textContent ?? "";
+
+    type(textarea, "=ROUND(1/3,2)*3");
+    await waitFor(() => preview() === "= 0.99", "the preview of a value");
+    expect(textarea.getAttribute("aria-describedby")).toContain(
+      document.querySelector(".sheetwrite-formula-preview")?.id ?? "missing",
+    );
+
+    type(textarea, "=SEQUENCE(2,3,5)");
+    await waitFor(() => preview() === "= 5 … (2 × 3 array)", "the preview of an array");
+
+    type(textarea, "=RAND()");
+    await waitFor(() => preview().startsWith("No preview"), "a refused preview");
+
+    type(textarea, "=ROUND(");
+    expect(preview()).toBe("");
   });
 });

@@ -10,7 +10,29 @@ When a cell editor or the formula bar holds a formula (text that starts with `=`
 - **Live errors.** Syntax errors, unknown function names and wrong argument counts are underlined in the text, and the guide shows the first one. The syntax check is the parser of the active engine, so formula help marks exactly the formulas that the engine rejects. An error that only says the formula is not finished, such as a missing `)`, waits while the caret is at the end of the text.
 - **Coloured references.** Each reference gets a colour in the text, and its range on the grid gets a fill in the same colour. Equal references share one colour.
 
-Formula help does not calculate. It reads the text and the function metadata only, so it never runs a volatile or host function.
+- **Result preview.** When you stop typing for a moment and the formula has no problem, a line under the guide shows its result, such as `= 0.99`, or the first value and size of an array, such as `= 5 … (2 × 3 array)`.
+
+## Result preview
+
+The preview evaluates the formula as if it were in the cell you are editing, so `ROW()` and relative references read that cell. It does not change the workbook: referenced formulas give their current results, nothing recalculates, and no undo step or change event follows.
+
+- Functions that only read are previewed, the volatile ones too: `TODAY`, `NOW`, `OFFSET`, `INDIRECT`, `CELL` and `INFO`.
+- `RAND`, `RANDBETWEEN` and [custom functions](/docs/features/formulas/custom-functions/) are never run for a preview, even in a branch that would not be chosen. The line says that the formula has no preview.
+- A formula that reads more than 1,000,000 cells in fast range scans or 50,000 cells one by one, builds an array of more than 10,000 cells, makes more than 50,000 `LAMBDA` calls or produces more than 1 MB of text has no preview. The cell still calculates it in full when you commit.
+- A formula that reads cells that are not loaded yet shows that the preview waits for them.
+
+Host editors read the same result with `previewFormula(store, cell, text)` from `@sheetwrite/core/functions`.
+
+```ts prelude="core" partial="requires an initialized grid" title="Preview a formula in D1"
+import { previewFormula } from "@sheetwrite/core/functions";
+
+const preview = previewFormula(grid.store, { sheet: grid.getActiveSheet(), row: 0, col: 3 }, "=SUM(A1:A3)");
+if (preview.status === "value") console.log(preview.value);
+```
+
+The result is `{ status: "value", value }`, `{ status: "array", rows, cols, first }` or `{ status: "unavailable", reason }`, where `reason` is `"unsafe-function"`, `"cost-limit"`, `"loading"` or `"syntax"`. A value is a number, text, `true` or `false`, `null` for an empty result, or `{ error: "#DIV/0!" }`.
+
+The rest of formula help does not calculate. It reads the text and the function metadata only.
 
 ## Styles
 
@@ -34,7 +56,7 @@ While the list is closed, the keys do what the editor does: Enter commits, Tab m
 
 - The editor field has `aria-autocomplete="list"`, `aria-controls` names the list, and `aria-activedescendant` names the selected item. Both editors are multi-line text fields (`aria-multiline="true"`), without a combobox role.
 - The list is an ARIA listbox with one option per function.
-- The argument guide is a polite live region (`role="status"`) and describes the field (`aria-describedby`). A screen reader reads the guide when the function, the argument or the first error changes.
+- The argument guide is a polite live region (`role="status"`) and describes the field (`aria-describedby`), with the result preview. The preview is not a live region, because it changes as you type. A screen reader reads the guide when the function, the argument or the first error changes.
 - The field has `aria-invalid="true"` while it shows an error.
 
 ## Explain Formula
@@ -83,6 +105,5 @@ The engine packages export the two reads that `analyzeFormula` uses: `formulaTok
 
 ## Limits
 
-- Formula help does not show the result of the formula while you type.
 - Reference colours repeat after six distinct references.
 - A reference to a sheet that the workbook does not have gets a colour in the text but no fill on the grid.

@@ -7,6 +7,7 @@
 //! both stop the walk at the same cell. `next_allow_errors` instead returns
 //! error cells as values for criteria ranges.
 
+use super::preview_limits::{self, RangeRead};
 use super::{EvalPass, LiteralSources};
 
 use crate::sheet::SheetData;
@@ -82,6 +83,7 @@ impl<'a> RangeReader<'a> {
         if (rows as u64).saturating_mul(cols as u64) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
+        preview_limits::range(data, (row_start, col_start), (rows, cols), RangeRead::Typed)?;
 
         Ok(Self {
             store,

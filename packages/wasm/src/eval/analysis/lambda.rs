@@ -44,6 +44,7 @@ impl CallBudget {
         })
     }
     fn charge(work: usize) -> Result<(), FormulaError> {
+        super::super::preview_limits::work(work)?;
         CALL_BUDGET.with(|budget| {
             let (depth, previous) = budget.get();
             if depth == 0 {

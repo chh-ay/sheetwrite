@@ -46,6 +46,7 @@ import {
   type SheetwriteErrorContext,
 } from "../errors.js";
 import { installExternalLinks, removeExternalLinks } from "../external-link.js";
+import { decodePreview, type FormulaPreview } from "../formula-preview.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -1335,6 +1336,13 @@ export class StoreDataEngine {
         ? namedRange
         : { ...namedRange, formula };
     });
+  }
+
+  /** The result `text` would have in `cell`, read without changing the store (#221). */
+  previewFormula(cell: CellAddress, text: string): FormulaPreview {
+    return decodePreview(
+      this.wasm.previewFormula(this.sheets.handleOf(cell.sheet), cell.row, cell.col, text),
+    );
   }
 
   private sameNamedRange(
