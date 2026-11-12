@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
@@ -43,4 +42,3 @@ export const historyKernel: typeof HistoryKernel = await import(
   ).href
 );
 await historyKernel.loadHistoryKernel();
-

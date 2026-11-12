@@ -3,10 +3,61 @@ import { readFileSync } from "node:fs";
 import { initSheetwrite } from "@sheetwrite/core";
 
 import { optionValue } from "./cli-options.js";
-import { engine, ENGINE_PACKAGE, ENGINE_ROOT, CellStore, initSync, ENGINE_GLUE_PATH, WASM_PATH } from "./formula-engine.js";
-import { assert, createFormulaFixture, expectedFormulaOutput, gridConstantEditSample, type FixtureFactory, type TimedFixture } from "./formula-fixtures.js";
-import { ALLOCATION_METHOD, CORRECTNESS_METHOD, type CompleteFormulaBenchmarkResult, type CompleteFormulaWorkloadResult, currentFormulaSourceProvenance, currentRunnerProvenance, DEFAULT_SAMPLES, exactInteger, type FormulaAllocationSample, type FormulaAllocationStat, type FormulaBenchmarkResult, type FormulaCaptureKind, type FormulaMemoryResult, type FormulaOutput, FORMULA_BENCHMARK_SCHEMA_VERSION, FORMULA_GATE_TOLERANCE, formulaRegressionBaselineIdentity, type PassedRegressionGate, type BlockedRegressionGate, OUTPUT_CAPTURE_BLOCKER, outputsEqual, PRELIMINARY_BLOCKER, sha256, SMOKE_SAMPLES, TIMING_METHOD, validateCurrentCaptureProvenance, createFormulaArtifactChecks, type FormulaArtifactChecks, type FormulaEnginePackage, formulaWorkloadKey } from "./formula-artifact.js";
-import { type BenchmarkMode, captureEngineBaselineContext, MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "./gate-protocol.js";
+import {
+  ALLOCATION_METHOD,
+  CORRECTNESS_METHOD,
+  type CompleteFormulaBenchmarkResult,
+  type CompleteFormulaWorkloadResult,
+  currentFormulaSourceProvenance,
+  currentRunnerProvenance,
+  DEFAULT_SAMPLES,
+  exactInteger,
+  type FormulaAllocationSample,
+  type FormulaAllocationStat,
+  type FormulaBenchmarkResult,
+  type FormulaCaptureKind,
+  type FormulaMemoryResult,
+  type FormulaOutput,
+  FORMULA_BENCHMARK_SCHEMA_VERSION,
+  FORMULA_GATE_TOLERANCE,
+  formulaRegressionBaselineIdentity,
+  type PassedRegressionGate,
+  type BlockedRegressionGate,
+  OUTPUT_CAPTURE_BLOCKER,
+  outputsEqual,
+  PRELIMINARY_BLOCKER,
+  sha256,
+  SMOKE_SAMPLES,
+  TIMING_METHOD,
+  validateCurrentCaptureProvenance,
+  createFormulaArtifactChecks,
+  type FormulaArtifactChecks,
+  type FormulaEnginePackage,
+  formulaWorkloadKey,
+} from "./formula-artifact.js";
+import {
+  engine,
+  ENGINE_PACKAGE,
+  ENGINE_ROOT,
+  CellStore,
+  initSync,
+  ENGINE_GLUE_PATH,
+  WASM_PATH,
+} from "./formula-engine.js";
+import {
+  assert,
+  createFormulaFixture,
+  expectedFormulaOutput,
+  gridConstantEditSample,
+  type FixtureFactory,
+  type TimedFixture,
+} from "./formula-fixtures.js";
+import {
+  type BenchmarkMode,
+  captureEngineBaselineContext,
+  MATRIX_IDS,
+  PERFORMANCE_GATE_PROTOCOL_VERSION,
+} from "./gate-protocol.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { forceGc, mib, ms, now, summarize } from "./stats.js";
 
@@ -50,8 +101,14 @@ const BINDING_ROW_IDS = [
   "memory-import",
 ] as const;
 const BINDING_ROW_SIZES = [10_000, 100_000] as const;
-const LOOKUP_ROW_IDS = ["vlookup-many","vlookup-many-sorted","xlookup-many","xlookup-many-sorted","text-lookup-many","text-lookup-many-sorted"] as const;
-
+const LOOKUP_ROW_IDS = [
+  "vlookup-many",
+  "vlookup-many-sorted",
+  "xlookup-many",
+  "xlookup-many-sorted",
+  "text-lookup-many",
+  "text-lookup-many-sorted",
+] as const;
 
 const CLOSURE_ROW_IDS = [
   "map-lambda",
@@ -74,7 +131,6 @@ const FULL_ENGINE_ROWS = [
   { id: "analysis-calls", size: 10_000, smokeSize: 1_000 },
 ] as const;
 
-
 const PAGED_ROWS = 1_000_000;
 const PAGED_SMOKE_ROWS = 10_000;
 const PAGED_EVICTION_PAGES = 8_192;
@@ -90,7 +146,10 @@ interface FormulaWorkload {
   readonly rangeSize?: number;
 }
 
-function formulaWorkloads(smoke: boolean, enginePackage: FormulaEnginePackage = ENGINE_PACKAGE): FormulaWorkload[] {
+function formulaWorkloads(
+  smoke: boolean,
+  enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
+): FormulaWorkload[] {
   const workloads: FormulaWorkload[] = [];
   const add = (id: string, size: number, rangeSize?: number) =>
     workloads.push({ id, size, ...(rangeSize === undefined ? {} : { rangeSize }) });
@@ -185,7 +244,10 @@ function formulaWorkloads(smoke: boolean, enginePackage: FormulaEnginePackage = 
   return workloads;
 }
 
-export function expectedFormulaWorkloadKeys(mode: BenchmarkMode, enginePackage: FormulaEnginePackage = ENGINE_PACKAGE): string[] {
+export function expectedFormulaWorkloadKeys(
+  mode: BenchmarkMode,
+  enginePackage: FormulaEnginePackage = ENGINE_PACKAGE,
+): string[] {
   return formulaWorkloads(mode === "smoke", enginePackage).map(formulaWorkloadKey);
 }
 
@@ -266,7 +328,13 @@ export function expectedFormulaMemoryKeys(mode: BenchmarkMode): string[] {
   return sizes.map((formulas) => `memory=formulas=${formulas}`);
 }
 
-export const { validateFormulaBenchmark, validateFormulaRegression, validateFormulaCapture, validateRecordedFormulaCapture, readCommittedFormulaBaseline }: FormulaArtifactChecks = createFormulaArtifactChecks({
+export const {
+  validateFormulaBenchmark,
+  validateFormulaRegression,
+  validateFormulaCapture,
+  validateRecordedFormulaCapture,
+  readCommittedFormulaBaseline,
+}: FormulaArtifactChecks = createFormulaArtifactChecks({
   workloadKeys: expectedFormulaWorkloadKeys,
   legacyWorkloadKeys: legacyFormulaBaselineWorkloadKeys,
   memoryKeys: expectedFormulaMemoryKeys,
@@ -774,8 +842,18 @@ if (import.meta.main) {
     const id = process.argv[sampleIndex + 1];
     const size = Number(process.argv[sampleIndex + 2]);
     assert(Number.isInteger(size) && size > 0, "invalid sample size");
-    const sampleIds = ["independent-parse-load", "independent-first-recompute", "linear-chain", "wide-fan-out-edit", "scalar-edit-affects-0", "formula-constant-edit", "vlookup-many"];
-    const factories = Object.fromEntries(sampleIds.map((sampleId) => [sampleId, () => createFormulaFixture(sampleId, size)]));
+    const sampleIds = [
+      "independent-parse-load",
+      "independent-first-recompute",
+      "linear-chain",
+      "wide-fan-out-edit",
+      "scalar-edit-affects-0",
+      "formula-constant-edit",
+      "vlookup-many",
+    ];
+    const factories = Object.fromEntries(
+      sampleIds.map((sampleId) => [sampleId, () => createFormulaFixture(sampleId, size)]),
+    );
     const factory = id === undefined ? undefined : factories[id];
     assert(id !== undefined && factory, "unknown single-sample workload");
     const aggregateText = optionValue(process.argv, "--aggregate-ms");
@@ -816,4 +894,3 @@ if (import.meta.main) {
     }
   }
 }
-

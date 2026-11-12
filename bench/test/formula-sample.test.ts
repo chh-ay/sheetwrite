@@ -56,4 +56,3 @@ it("builds one fixture per sample, restores it between edits and warms up for th
   expect([...statesBeforeRun]).toEqual(["unedited"]);
   expect(restores).toBe(runs - 1);
 });
-

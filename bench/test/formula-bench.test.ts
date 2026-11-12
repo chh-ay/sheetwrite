@@ -1,7 +1,23 @@
 import { describe, expect, it } from "bun:test";
 
-import { ALLOCATION_METHOD, CORRECTNESS_METHOD, type CompleteFormulaBenchmarkResult, FORMULA_BENCHMARK_SCHEMA_VERSION, FORMULA_GATE_TOLERANCE, FORMULA_PROTOCOL, FORMULA_SOURCE_FILES, formulaSourceDigest, TIMING_METHOD } from "../src/formula-artifact.js";
-import { expectedFormulaMemoryKeys, expectedFormulaWorkloadKeys, validateFormulaBenchmark, validateFormulaCapture, validateFormulaRegression } from "../src/formula-bench.js";
+import {
+  ALLOCATION_METHOD,
+  CORRECTNESS_METHOD,
+  type CompleteFormulaBenchmarkResult,
+  FORMULA_BENCHMARK_SCHEMA_VERSION,
+  FORMULA_GATE_TOLERANCE,
+  FORMULA_PROTOCOL,
+  FORMULA_SOURCE_FILES,
+  formulaSourceDigest,
+  TIMING_METHOD,
+} from "../src/formula-artifact.js";
+import {
+  expectedFormulaMemoryKeys,
+  expectedFormulaWorkloadKeys,
+  validateFormulaBenchmark,
+  validateFormulaCapture,
+  validateFormulaRegression,
+} from "../src/formula-bench.js";
 import { expectedFormulaOutput } from "../src/formula-fixtures.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
@@ -174,7 +190,10 @@ describe("formula benchmark schema", () => {
       ],
       [(result) => (result.source.digest = "b".repeat(64)), "digest does not match"],
       [(result) => (result.source.files.unbounded = SOURCE_HASH), "must contain exactly"],
-      [(result) => delete result.source.files["bench/src/formula-fixtures.ts"], "must contain exactly"],
+      [
+        (result) => delete result.source.files["bench/src/formula-fixtures.ts"],
+        "must contain exactly",
+      ],
     ]);
   });
 });
@@ -272,5 +291,3 @@ describe("formula regression gate", () => {
     expect(() => validateFormulaRegression(formulaFixture("smoke"), baseline)).not.toThrow();
   });
 });
-
-

@@ -100,4 +100,3 @@ it("rejects drifted engines, shared workloads, analysis and engine evidence", ()
   ];
   expectRejections(recorded, validateFullEngineResult, rejections);
 });
-

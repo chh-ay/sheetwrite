@@ -176,4 +176,3 @@ it.each([
   if (fault === "rounds") result.rounds = 1;
   expect(() => validateMatchedEngineResult(result)).toThrow();
 });
-

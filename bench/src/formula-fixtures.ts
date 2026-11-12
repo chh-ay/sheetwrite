@@ -1,6 +1,7 @@
 import { SheetwriteStore } from "@sheetwrite/core";
 import type * as formulas from "@sheetwrite/formulas";
 
+import type { FormulaOutput } from "./formula-artifact.js";
 import {
   dependencyClosureFormulas,
   diamondFormulas,
@@ -12,7 +13,6 @@ import {
   sharedRangeFormulas,
 } from "./formula-dataset.js";
 import { CellStore, historyKernel } from "./formula-engine.js";
-import type { FormulaOutput } from "./formula-artifact.js";
 import { now, summarize } from "./stats.js";
 
 function diamondOutput(levels: number): number {
@@ -1389,7 +1389,8 @@ function shapeRowFixture(id: string, count: number): TimedFixture {
         SHAPE_EDITED_SCALE,
         last,
       );
-    default: throw new Error(`unknown formula fixture: ${id}`);
+    default:
+      throw new Error(`unknown formula fixture: ${id}`);
   }
 }
 
@@ -1744,7 +1745,8 @@ function bindingRowFixture(id: string, count: number): TimedFixture {
       return parseLoadTableFixture(count);
     case "memory-import":
       return memoryImportFixture(count);
-    default: throw new Error(`unknown formula fixture: ${id}`);
+    default:
+      throw new Error(`unknown formula fixture: ${id}`);
   }
 }
 
@@ -1955,7 +1957,8 @@ function closureRowFixture(id: string, count: number): TimedFixture {
       );
     case "measure-pivot":
       return measurePivotFixture(count);
-    default: throw new Error(`unknown formula fixture: ${id}`);
+    default:
+      throw new Error(`unknown formula fixture: ${id}`);
   }
 }
 
@@ -2303,7 +2306,8 @@ function fullEngineRowFixture(id: string, size: number): TimedFixture {
       return getPivotDataManyFixture(size);
     case "analysis-calls":
       return analysisCallsFixture(size);
-    default: throw new Error(`unknown formula fixture: ${id}`);
+    default:
+      throw new Error(`unknown formula fixture: ${id}`);
   }
 }
 
@@ -3050,11 +3054,17 @@ function pagedEvictionFixture(pages: number): TimedFixture {
   };
 }
 
-
 /** Build a fresh fixture. Construction and checks are outside the timed run. */
 export function createFormulaFixture(id: string, size: number, rangeSize?: number): TimedFixture {
-  const lookup = LOOKUP_VARIANTS.find((variant) => id === variant.id || id === `${variant.id}${LOOKUP_EDIT_SUFFIX}`);
-  if (lookup !== undefined) return lookupFixture(size, id.endsWith(LOOKUP_EDIT_SUFFIX) ? "key-edit" : "first-recompute", lookup);
+  const lookup = LOOKUP_VARIANTS.find(
+    (variant) => id === variant.id || id === `${variant.id}${LOOKUP_EDIT_SUFFIX}`,
+  );
+  if (lookup !== undefined)
+    return lookupFixture(
+      size,
+      id.endsWith(LOOKUP_EDIT_SUFFIX) ? "key-edit" : "first-recompute",
+      lookup,
+    );
   switch (id) {
     case "round-many":
     case "concat-many":
@@ -3083,53 +3093,98 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "getpivotdata-many":
     case "analysis-calls":
       return fullEngineRowFixture(id, size);
-    case "paged-cell-reads": return pagedCellReadsFixture(size);
-    case "paged-insert-row": return pagedInsertRowFixture(size);
-    case "paged-range-loaded": return pagedRangeLoadedFixture(size);
-    case "paged-eviction": return pagedEvictionFixture(size);
-    case "rank-many": return rankManyFixture(size);
-    case "sort-unique-filter": return sortUniqueFilterFixture(size);
-    case "subtotal-filtered": return subtotalFilteredFixture(size);
-    case "sparse-page-write": return sparsePageWriteFixture(size);
+    case "paged-cell-reads":
+      return pagedCellReadsFixture(size);
+    case "paged-insert-row":
+      return pagedInsertRowFixture(size);
+    case "paged-range-loaded":
+      return pagedRangeLoadedFixture(size);
+    case "paged-eviction":
+      return pagedEvictionFixture(size);
+    case "rank-many":
+      return rankManyFixture(size);
+    case "sort-unique-filter":
+      return sortUniqueFilterFixture(size);
+    case "subtotal-filtered":
+      return subtotalFilteredFixture(size);
+    case "sparse-page-write":
+      return sparsePageWriteFixture(size);
     case "index-match-many":
       assert(rangeSize !== undefined, "INDEX/MATCH range size");
       return indexMatchFixture(size, rangeSize);
-    case "history-diff": return historyDiffFixture();
-    case "independent-parse-load": return independentLoadFixture(size);
-    case "independent-first-recompute": return independentRecomputeFixture(size);
-    case "linear-chain": return chainFixture(size);
-    case "wide-fan-out-edit": return fanOutEditFixture(size);
-    case "scalar-edit-affects-1": return fanOutEditFixture(size);
-    case "scalar-edit-affects-1000": return fanOutEditFixture(size);
-    case "scalar-edit-affects-100000": return fanOutEditFixture(size);
-    case "formula-constant-edit": return constantEditFixture(size);
-    case "diamond-edit": return diamondFixture(size);
-    case "shared-range-edit": return sharedRangeFixture(size);
-    case "distinct-range-edit": return distinctRangeFixture(size);
-    case "cross-sheet-range-edit": return crossSheetFixture(size);
-    case "topology-remove-add": return topologyFixture(size);
-    case "cycles": return cycleFixture(size);
-    case "removed-sheet-ref": return refRemovalFixture(size);
-    case "error-propagation": return errorPropagationFixture(size);
-    case "criteria-range-edit": return criteriaRangeFixture(size);
-    case "lookup-range-edit": return lookupRangeFixture(size);
-    case "xlookup-mixed-exact": return mixedLookupFixture(size);
-    case "spill-filter-resize": return spillFilterResizeFixture(size);
-    case "sumproduct-vector-edit": return sumProductVectorFixture(size);
-    case "sumproduct-matrix-edit": return sumProductMatrixFixture(size);
-    case "criteria-multi-range-edit": return criteriaMultiRangeFixture(size);
-    case "sum-multi-range": return sumMultiRangeFixture(size);
-    case "sumifs-3-criteria": return sumifsCriteriaFixture(size);
-    case "countif-100k": return countifFixture(size);
-    case "unicode-text-date-edit": return unicodeTextDateFixture(size);
-    case "percentile-covariance": return percentileCovarianceFixture(size);
-    case "let-reuse-edit": return letReuseFixture(size);
-    case "let-repeat": return letRepeatFixture(size);
-    case "let-many": return letManyFixture(size);
-    case "iterative-finance": return iterativeFinanceFixture(size);
-    case "incremental-dependency-closure-edit": return incrementalDependencyClosureFixture(size);
-    case "spill-sequence-admission": return spillSequenceAdmissionFixture(size);
-    case "scalar-edit-affects-0": return fanOutEditFixture(size, true);
-    default: throw new Error(`unknown formula fixture: ${id}`);
+    case "history-diff":
+      return historyDiffFixture();
+    case "independent-parse-load":
+      return independentLoadFixture(size);
+    case "independent-first-recompute":
+      return independentRecomputeFixture(size);
+    case "linear-chain":
+      return chainFixture(size);
+    case "wide-fan-out-edit":
+      return fanOutEditFixture(size);
+    case "scalar-edit-affects-1":
+      return fanOutEditFixture(size);
+    case "scalar-edit-affects-1000":
+      return fanOutEditFixture(size);
+    case "scalar-edit-affects-100000":
+      return fanOutEditFixture(size);
+    case "formula-constant-edit":
+      return constantEditFixture(size);
+    case "diamond-edit":
+      return diamondFixture(size);
+    case "shared-range-edit":
+      return sharedRangeFixture(size);
+    case "distinct-range-edit":
+      return distinctRangeFixture(size);
+    case "cross-sheet-range-edit":
+      return crossSheetFixture(size);
+    case "topology-remove-add":
+      return topologyFixture(size);
+    case "cycles":
+      return cycleFixture(size);
+    case "removed-sheet-ref":
+      return refRemovalFixture(size);
+    case "error-propagation":
+      return errorPropagationFixture(size);
+    case "criteria-range-edit":
+      return criteriaRangeFixture(size);
+    case "lookup-range-edit":
+      return lookupRangeFixture(size);
+    case "xlookup-mixed-exact":
+      return mixedLookupFixture(size);
+    case "spill-filter-resize":
+      return spillFilterResizeFixture(size);
+    case "sumproduct-vector-edit":
+      return sumProductVectorFixture(size);
+    case "sumproduct-matrix-edit":
+      return sumProductMatrixFixture(size);
+    case "criteria-multi-range-edit":
+      return criteriaMultiRangeFixture(size);
+    case "sum-multi-range":
+      return sumMultiRangeFixture(size);
+    case "sumifs-3-criteria":
+      return sumifsCriteriaFixture(size);
+    case "countif-100k":
+      return countifFixture(size);
+    case "unicode-text-date-edit":
+      return unicodeTextDateFixture(size);
+    case "percentile-covariance":
+      return percentileCovarianceFixture(size);
+    case "let-reuse-edit":
+      return letReuseFixture(size);
+    case "let-repeat":
+      return letRepeatFixture(size);
+    case "let-many":
+      return letManyFixture(size);
+    case "iterative-finance":
+      return iterativeFinanceFixture(size);
+    case "incremental-dependency-closure-edit":
+      return incrementalDependencyClosureFixture(size);
+    case "spill-sequence-admission":
+      return spillSequenceAdmissionFixture(size);
+    case "scalar-edit-affects-0":
+      return fanOutEditFixture(size, true);
+    default:
+      throw new Error(`unknown formula fixture: ${id}`);
   }
 }

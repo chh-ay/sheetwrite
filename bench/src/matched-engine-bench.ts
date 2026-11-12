@@ -3,9 +3,14 @@ import { readFileSync } from "node:fs";
 import { cpus, release } from "node:os";
 import { resolve } from "node:path";
 
-import { FORMULA_SUPPORT_SOURCE_FILES } from "./formula-artifact.js";
 import { optionValue } from "./cli-options.js";
-import { AGGREGATED_SAMPLE_MAX_ITERATIONS, type AggregatedWorkloadSample, SAMPLE_AGGREGATE_MS, SAMPLE_WARMUP_FIXTURES } from "./formula-bench.js";
+import { FORMULA_SUPPORT_SOURCE_FILES } from "./formula-artifact.js";
+import {
+  AGGREGATED_SAMPLE_MAX_ITERATIONS,
+  type AggregatedWorkloadSample,
+  SAMPLE_AGGREGATE_MS,
+  SAMPLE_WARMUP_FIXTURES,
+} from "./formula-bench.js";
 import { expectedFormulaOutput } from "./formula-fixtures.js";
 import {
   benchmarkEnginePath,
@@ -148,7 +153,15 @@ export function validateMatchedEngineResult(result: MatchedEngineResult): void {
     !Number.isFinite(Date.parse(result.meta.timestamp))
   )
     throw new Error("Invalid matched metadata");
-  validateExactMatrix("matched source files", FORMULA_SUPPORT_SOURCE_FILES.some((path) => path in result.sourceFiles) ? SOURCE_PATHS : SOURCE_PATHS.filter((path) => !(FORMULA_SUPPORT_SOURCE_FILES as readonly string[]).includes(path)), Object.keys(result.sourceFiles));
+  validateExactMatrix(
+    "matched source files",
+    FORMULA_SUPPORT_SOURCE_FILES.some((path) => path in result.sourceFiles)
+      ? SOURCE_PATHS
+      : SOURCE_PATHS.filter(
+          (path) => !(FORMULA_SUPPORT_SOURCE_FILES as readonly string[]).includes(path),
+        ),
+    Object.keys(result.sourceFiles),
+  );
   if (
     Object.values(result.sourceFiles).some((digest) => !/^[0-9a-f]{64}$/u.test(digest)) ||
     result.sourceDigest !== sourceDigest(result)
@@ -315,4 +328,3 @@ if (import.meta.main) {
   }
   await captureMatchedEngines(rounds, resultsDirectory(args));
 }
-

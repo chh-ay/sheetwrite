@@ -266,4 +266,3 @@ if (import.meta.main) {
   const args = process.argv.slice(2).filter((argument) => argument !== "--");
   process.exitCode = await runVerification(args);
 }
-
