@@ -61,8 +61,8 @@ async function collectFiles(sourceRoot: string, directory = ""): Promise<Map<str
 }
 
 export async function prepareDocsDeployment(root = repositoryRoot): Promise<void> {
-  const sourceRoot = join(root, "docs-solid/dist/client");
-  for (const directory of ["docs-solid", "docs-solid/dist", "docs-solid/dist/client"]) {
+  const sourceRoot = join(root, "docs/dist/client");
+  for (const directory of ["docs", "docs/dist", "docs/dist/client"]) {
     await requireDirectory(join(root, directory));
   }
   const files = await collectFiles(sourceRoot);

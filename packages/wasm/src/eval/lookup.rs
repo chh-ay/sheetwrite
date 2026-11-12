@@ -540,7 +540,7 @@ fn classify(list: &ListView<'_>) -> Option<UniformKind> {
             Entry::Number(number) if !number.is_nan() => UniformKind::Numeric,
             Entry::Text(_) => UniformKind::Text,
             Entry::Bool(_) => UniformKind::Logical,
-            _ => return None,
+            Entry::Number(_) | Entry::Error(_) => return None,
         };
         match found {
             None => found = Some(kind),
@@ -727,7 +727,7 @@ impl ExactIndex {
                     consider(CLASS_BLANK, 0);
                 }
             }
-            _ => return None,
+            Entry::Number(_) | Entry::Error(_) => return None,
         }
         Some(found)
     }
@@ -949,6 +949,10 @@ impl CellStore {
             .unwrap_or_else(Value::Error)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_lookup(
         &self,
         func: Func,
@@ -1308,7 +1312,7 @@ impl CellStore {
 
         let key = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
-            key => key,
+            key @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => key,
         };
         let list = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
         let (rows, cols) = list.shape();
@@ -1349,7 +1353,7 @@ impl CellStore {
             .ok_or(FormulaError::Na)?;
         let value = match part {
             ListPart::FirstRow => table.cell(self, rows - 1, found),
-            _ => table.cell(self, found, cols - 1),
+            ListPart::Whole | ListPart::FirstColumn => table.cell(self, found, cols - 1),
         };
 
         value.ok_or(FormulaError::Na)

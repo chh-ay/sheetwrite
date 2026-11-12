@@ -2,7 +2,8 @@ import { expect, it } from "bun:test";
 
 import * as engine from "@sheetwrite/wasm";
 
-import { collectAggregatedSample, constantEditFixture } from "../src/formula-bench.js";
+import { collectAggregatedSample } from "../src/formula-bench.js";
+import { createFormulaFixture } from "../src/formula-fixtures.js";
 
 const FORMULAS = 10;
 const MINIMUM_SAMPLE_MS = 5;
@@ -22,7 +23,7 @@ it("builds one fixture per sample, restores it between edits and warms up for th
     FORMULAS,
     () => {
       builds += 1;
-      const fixture = constantEditFixture(FORMULAS);
+      const fixture = createFormulaFixture("formula-constant-edit", FORMULAS);
       const unedited = fixture.check();
       const { run, restore } = fixture;
       fixture.run = () => {

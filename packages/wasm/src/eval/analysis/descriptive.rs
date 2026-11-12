@@ -428,7 +428,9 @@ mod tests {
                     "{name}: {actual} vs {expected}"
                 );
             }
-            other => panic!("{name}: expected {expected}, got {other:?}"),
+            other @ (Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_)) => {
+                panic!("{name}: expected {expected}, got {other:?}")
+            }
         }
     }
 

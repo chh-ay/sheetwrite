@@ -24,7 +24,6 @@ import { installXlsx } from "../lib/addons.js";
 import { errorText } from "../lib/errors.js";
 import { selectionLabel } from "../lib/selection-label.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { useAction } from "../lib/use-action.js";
 import { fitColumnPixels, rowGutterWidth } from "./column-fit.js";
 import {
   ANALYTICS_COLUMNS,
@@ -38,6 +37,7 @@ import {
   createAnalyticsWorkbook,
 } from "./scenarios/analytics.js";
 import type { RenderingMode } from "./ui/rendering-mode.js";
+import { useAction } from "./ui/use-action.js";
 
 /** Summary-sheet row indexes of the global KPI formulas. */
 const KPI_ROW = { total: 0, average: 1, largest: 2 } as const;

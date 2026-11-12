@@ -34,6 +34,7 @@ mod pass_rule_tests;
 mod random;
 mod range_fold;
 mod range_reader;
+mod range_view;
 mod reference;
 #[cfg(feature = "analysis")]
 pub(crate) mod regex_patterns;
@@ -84,7 +85,7 @@ pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
-use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+use matrix::{optional_ast, range_from_ast, EvalMatrix};
 #[cfg(feature = "analysis")]
 pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
@@ -261,6 +262,10 @@ pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
     expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "two Ast variants exist only with the analysis feature, so a full list differs by build; every node other than a name rejects the LET"
+)]
 fn expand_let_args<'a>(
     args: &'a [Ast],
     bindings: &mut Vec<LetBinding<'a>>,
@@ -322,7 +327,33 @@ fn expand_let_node<'a>(
     let used_name = match ast {
         Ast::Name(name) => Some(name.as_str()),
         Ast::LetName { name, .. } => Some(&**name),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
     };
     if let Some(name) = used_name {
         if let Some((_, expression, visible, slot)) = bindings
@@ -978,7 +1009,12 @@ impl CellStore {
                                     None if has_spill_refs => {
                                         match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
                                             Value::Error(error) => Err(error),
-                                            value => Ok(EvalMatrix::new(1, 1, vec![value])),
+                                            value @ (Value::Number(_)
+                                            | Value::Text(_)
+                                            | Value::Bool(_)
+                                            | Value::Blank) => {
+                                                Ok(EvalMatrix::new(1, 1, vec![value]))
+                                            }
                                         }
                                     }
                                     None => Err(FormulaError::Value),
@@ -1011,8 +1047,17 @@ impl CellStore {
                         Value::Error(error) => Err(error),
                         // A runtime reference that resolved to one cell can
                         // leave a scalar expression; its value is the result.
-                        value if has_spill_refs => Ok(EvalMatrix::new(1, 1, vec![value])),
-                        _ => Err(FormulaError::Value),
+                        value @ (Value::Number(_)
+                        | Value::Text(_)
+                        | Value::Bool(_)
+                        | Value::Blank)
+                            if has_spill_refs =>
+                        {
+                            Ok(EvalMatrix::new(1, 1, vec![value]))
+                        }
+                        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                            Err(FormulaError::Value)
+                        }
                     },
                 };
                 pass.results.visiting.remove(id);
@@ -1441,7 +1486,7 @@ impl CellStore {
 
         let interned = match &result {
             Value::Text(text) => Some(self.intern(text)),
-            _ => None,
+            Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => None,
         };
         let sheet = key.sheet as usize;
         let Some(data) = self.sheets.get_mut(sheet) else {
@@ -1746,7 +1791,33 @@ impl CellStore {
                 let op = match ast {
                     Ast::Neg(_) => operators::UnaryOp::Neg,
                     Ast::Pos(_) => operators::UnaryOp::Pos,
-                    _ => operators::UnaryOp::Percent,
+                    Ast::Num(_)
+                    | Ast::Str(_)
+                    | Ast::Bool(_)
+                    | Ast::Missing
+                    | Ast::Name(_)
+                    | Ast::NamedRange(_)
+                    | Ast::NamedFormula(_)
+                    | Ast::UnresolvedStructured(_)
+                    | Ast::Structured(_)
+                    | Ast::Cell(..)
+                    | Ast::SheetCell(..)
+                    | Ast::AbsCell(..)
+                    | Ast::Range(..)
+                    | Ast::SheetRange(..)
+                    | Ast::AbsRange(..)
+                    | Ast::SheetSpan(_)
+                    | Ast::InvalidRef
+                    | Ast::Func(..)
+                    | Ast::UnknownFunc(..)
+                    | Ast::Bin(..)
+                    | Ast::Cmp(..)
+                    | Ast::Percent(_)
+                    | Ast::LetSlot { .. }
+                    | Ast::LetName { .. }
+                    | Ast::Array { .. } => operators::UnaryOp::Percent,
+                    #[cfg(feature = "analysis")]
+                    Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => operators::UnaryOp::Percent,
                 };
                 operators::unary(op, &self.eval_ast(expr, sheet, pass, depth + 1))
             }
@@ -1874,6 +1945,10 @@ impl CellStore {
     /// every family was inlined into it. `#[inline(never)]` keeps the handlers
     /// out of line in LLVM. wasm-opt inlines one-caller functions again
     /// afterwards, so `packages/wasm/Cargo.toml` passes it `--no-inline=*_family`.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "every function without its own arm takes the generic path; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_func(
         &self,
         func: Func,
@@ -2122,7 +2197,31 @@ impl CellStore {
                 Ast::AbsCell(sheet_ref, row, col, _) if func == Func::Subtotal && index > 0 => {
                     Some(CellRange::new(sheet_ref.handle, *row, *col, *row, *col))
                 }
-                _ => None,
+                Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::Name(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::SheetRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::InvalidRef
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Cmp(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array { .. } => None,
+                #[cfg(feature = "analysis")]
+                Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
             };
             let shape = if let Some(area) = range {
                 let skipped = (func == Func::Subtotal && index > 0).then(|| SkippedCells {
@@ -2208,6 +2307,10 @@ impl CellStore {
     /// `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families live in
     /// out-of-line `*_family` handlers.
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_reference_family(
         &self,
         func: Func,
@@ -2418,6 +2521,10 @@ impl CellStore {
 
     /// The `IS*` tests, `TYPE`, `N`, `T`, and the cell information functions.
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_information_family(
         &self,
         func: Func,
@@ -2530,59 +2637,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let sheet = range.sheet as usize;
-        let Some(data) = self.sheets.get(sheet) else {
-            return Err(FormulaError::Ref);
-        };
-        if data.cells.row_count() == 0
-            || data.cells.n_cols() == 0
-            || range.row_start as usize >= data.cells.row_count()
-            || range.col_start as usize >= data.cells.n_cols()
-        {
-            return Err(FormulaError::Ref);
-        }
-        let row_start = range.row_start as usize;
-        let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
-        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
-        let rows = row_end - row_start + 1;
-        let cols = col_end - col_start + 1;
-        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
-        let mut payload_bytes = total
-            .checked_mul(std::mem::size_of::<Value>())
-            .ok_or(FormulaError::Num)?;
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                let index = data.cells.idx(row, col);
-                if matches!(data.cells.kind_at(index), KIND_STRING | KIND_FORMULA) {
-                    if let Some(text) =
-                        string_from_pool_ref(&self.strings, data.cells.str_id_at(index))
-                    {
-                        payload_bytes = payload_bytes
-                            .checked_add(text.len())
-                            .ok_or(FormulaError::Num)?;
-                        if payload_bytes > SPILL_MAX_BYTES {
-                            return Err(FormulaError::Num);
-                        }
-                    }
-                }
-            }
-        }
-        let mut values = Vec::with_capacity(total);
-        let literals = LiteralSources::new(data, depth);
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                if !data.cells.is_loaded(row, col) {
-                    return Err(FormulaError::Loading);
-                }
-                let index = data.cells.idx(row, col);
-                let value = literals
-                    .and_then(|sources| sources.value_at(&self.strings, index))
-                    .unwrap_or_else(|| self.eval_at(sheet, row, col, pass, depth + 1));
-                values.push(value);
-            }
-        }
-        Ok(EvalMatrix::new(rows, cols, values))
+        range_view::RangeView::new(self, range, depth)?.materialize(pass)
     }
 
     fn eval_criterion(
@@ -2627,6 +2682,10 @@ impl CellStore {
     /// Walks the criteria functions over their ranges instead of
     /// materializing them. `None` keeps the materialized path, which also
     /// handles computed arguments, missing arguments and dynamic arrays.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
     fn streamed_criteria(
         &self,
         func: Func,
@@ -2961,6 +3020,10 @@ impl CellStore {
     }
 
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_criteria_family(
         &self,
         func: Func,

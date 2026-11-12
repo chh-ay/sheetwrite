@@ -1,107 +1,70 @@
-import { Link, useLocation } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import releaseFacts from "@docs/generated/release-facts.json" with { type: "json" };
 
-import releaseFacts from "../generated/release-facts.json" with { type: "json" };
-import type { CapabilityOwnerId } from "../showcases/capabilities.js";
 import { BrandMark } from "./BrandMark.js";
 import { Icon } from "./Icon.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
 const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";
-/**
- * The router marks any link whose path prefixes the URL as the current page
- * (`/docs/` on every release note). The section marker below is the only
- * source of `aria-current`, so the router matches exact paths only.
- */
-const EXACT = { exact: true } as const;
-
-/** Props of {@link SiteTopbar}. */
-interface SiteTopbarProps {
-  /**
-   * Declares showcase context for routes outside `/showcases/` (the framework
-   * workbenches). Routes inside the family are recognised from the URL, so a
-   * page can never lose its "where am I" marker by passing the wrong id.
-   */
-  readonly active?: CapabilityOwnerId | "showcases";
-  /** The documentation search control, on documentation pages. */
-  readonly search?: ReactNode;
-  /**
-   * Controls after the theme toggle, such as the documentation menu button.
-   * A page that brings its own menu holds the site links there on phones;
-   * other pages get the site menu button.
-   */
-  readonly trailing?: ReactNode;
-}
 
 type Section = "docs" | "showcases" | "releases" | undefined;
 
-function currentSection(pathname: string, active: SiteTopbarProps["active"]): Section {
+function currentSection(pathname: string): Section {
   if (pathname.startsWith(releaseFacts.releasesHref)) return "releases";
   if (pathname.startsWith("/docs/")) return "docs";
-  if (pathname.startsWith("/showcases/") || active !== undefined) return "showcases";
+  if (pathname.startsWith("/showcases/")) return "showcases";
   return undefined;
 }
 
 /**
- * The one site header: brand, Docs, Showcases, Releases, GitHub and the theme
- * toggle, on every page. Documentation pages add their search and menu button
- * through the `search` and `trailing` slots. On phones the header is one row;
- * the site links open from the menu button as a native popover (open, close,
- * Escape, light dismiss and focus come from the browser, without script).
+ * The site header outside the documentation, ported from
+ * docs/src/components/SiteTopbar.tsx: brand, Docs, Showcases, Releases, GitHub
+ * and the theme toggle. On phones the site links open from the menu button as
+ * a native popover (open, close, Escape, light dismiss and focus come from the
+ * browser, without script). The theme toggle's behaviour is in lib/shell.ts.
  */
-export function SiteTopbar({ active, search, trailing }: SiteTopbarProps) {
-  const pathname = useLocation({ select: (location) => location.pathname });
-  const section = currentSection(pathname, active);
-  // The landing pages of each section are the destination; deeper pages are
-  // inside the section.
+export function SiteTopbar(props: { readonly pathname: string }) {
+  const section = () => currentSection(props.pathname);
+  // A section's own page is the destination; deeper pages are inside the section.
   const marker = (name: Exclude<Section, undefined>, href: string) =>
-    section !== name ? undefined : pathname === href ? ("page" as const) : ("true" as const);
+    section() !== name ? undefined : props.pathname === href ? "page" : "true";
 
   return (
-    <header className="sw-header" data-has-search={search !== undefined}>
-      <Link aria-label="Sheetwrite home" className="sw-header__brand" to="/">
+    <header class="sw-header" data-has-search="false">
+      <a aria-label="Sheetwrite home" class="sw-header__brand" href="/">
         <BrandMark />
         <span>Sheetwrite</span>
-      </Link>
-      <nav aria-label="Site" className="sw-header__nav" id="site-nav" popover="auto">
-        <Link activeOptions={EXACT} aria-current={marker("docs", "/docs/")} to="/docs/">
+      </a>
+      <nav aria-label="Site" class="sw-header__nav" id="site-nav" popover="auto">
+        <a aria-current={marker("docs", "/docs/")} href="/docs/">
           Docs
-        </Link>
-        <Link
-          activeOptions={EXACT}
-          aria-current={marker("showcases", "/showcases/")}
-          to="/showcases/"
-        >
+        </a>
+        <a aria-current={marker("showcases", "/showcases/")} href="/showcases/">
           Showcases
-        </Link>
-        <Link
-          activeOptions={EXACT}
+        </a>
+        <a
           aria-current={marker("releases", releaseFacts.releasesHref)}
-          to={releaseFacts.releasesHref}
+          href={releaseFacts.releasesHref}
         >
           Releases
-          <span className="sw-header__version">v{releaseFacts.latest.version}</span>
-        </Link>
-        <a className="sw-header__nav-github" href={REPOSITORY_URL}>
+          <span class="sw-header__version">v{releaseFacts.latest.version}</span>
+        </a>
+        <a class="sw-header__nav-github" href={REPOSITORY_URL}>
           GitHub
         </a>
       </nav>
-      {search !== undefined && <div className="sw-header__search">{search}</div>}
-      <div className="sw-header__actions">
-        <a className="sw-header__link" href={REPOSITORY_URL}>
+      <div class="sw-header__actions">
+        <a class="sw-header__link" href={REPOSITORY_URL}>
           GitHub
         </a>
         <ThemeToggle />
-        {trailing ?? (
-          <button
-            aria-label="Site menu"
-            className="sw-icon-button sw-header__menu"
-            popoverTarget="site-nav"
-            type="button"
-          >
-            <Icon name="menu" />
-          </button>
-        )}
+        <button
+          aria-label="Site menu"
+          class="sw-icon-button sw-header__menu"
+          popovertarget="site-nav"
+          type="button"
+        >
+          <Icon name="menu" />
+        </button>
       </div>
     </header>
   );
