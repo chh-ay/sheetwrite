@@ -144,6 +144,15 @@ impl StatisticArgs {
         Ok(())
     }
 
+    /// Room for `cells` more cells.
+    fn reserve(&mut self, cells: usize) -> Result<(), FormulaError> {
+        let reserved = match &mut self.cells {
+            Cells::Numbers(numbers) => numbers.try_reserve(cells),
+            Cells::Paired(paired) => paired.try_reserve(cells),
+        };
+        reserved.map_err(|_| FormulaError::Num)
+    }
+
     fn defer(&mut self, error: FormulaError) {
         if let Some(arg) = &mut self.current {
             arg.deferred.get_or_insert(error);
@@ -275,11 +284,9 @@ impl Reader<'_> {
         }
         self.values.count_cells(cells as usize)?;
 
+        self.values.reserve(cells as usize)?;
         match &mut self.values.cells {
             Cells::Numbers(numbers) => {
-                numbers
-                    .try_reserve(cells as usize)
-                    .map_err(|_| FormulaError::Num)?;
                 let mut sink = NumberList {
                     numbers,
                     non_finite: false,
@@ -290,12 +297,7 @@ impl Reader<'_> {
                     self.values.defer(FormulaError::Num);
                 }
             }
-            Cells::Paired(paired) => {
-                paired
-                    .try_reserve(cells as usize)
-                    .map_err(|_| FormulaError::Num)?;
-                view.scan_numbers(pass, &mut PairedList(paired))?;
-            }
+            Cells::Paired(paired) => view.scan_numbers(pass, &mut PairedList(paired))?,
         }
         Ok(view.cell(0, 0, pass))
     }

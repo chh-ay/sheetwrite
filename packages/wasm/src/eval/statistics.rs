@@ -521,7 +521,7 @@ impl PairedMoments {
     }
 }
 
-fn paired_result(values: &mut StatisticArgs, kind: PairedKind) -> Result<f64, FormulaError> {
+fn paired_result(values: &StatisticArgs, kind: PairedKind) -> Result<f64, FormulaError> {
     require_args(values, 2, 2)?;
     let left = values.paired(0);
     let right = values.paired(1);
