@@ -2050,14 +2050,16 @@ impl CellStore {
         }
 
         if let Some(statistic) = statistics::number_statistic(func) {
-            let call = StatisticCall {
-                statistic,
-                func,
-                args,
-                sheet,
-                depth,
-            };
-            return self.eval_statistics_family(&call, pass);
+            if !statistic_args::views_off() {
+                let call = StatisticCall {
+                    statistic,
+                    func,
+                    args,
+                    sheet,
+                    depth,
+                };
+                return self.eval_statistics_family(&call, pass);
+            }
         }
 
         if func == Func::Sum {
