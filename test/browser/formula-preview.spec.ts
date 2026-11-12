@@ -17,7 +17,7 @@ async function selectCell(page: Page, reference: string): Promise<void> {
 
 function storedFormula(page: Page): Promise<string | null | undefined> {
   return page.evaluate(() =>
-    window.__sheetwriteSpreadsheetGrid?.store.getFormula({ sheet: "sales", row: 2, col: 7 }),
+    window.__sheetwriteSpreadsheetGrid?.store.getFormula({ sheet: "sales", row: 2, col: 6 }),
   );
 }
 
@@ -27,10 +27,11 @@ test("formula help previews the result while typing and leaves the cell unchange
   await page.setViewportSize({ width: 1600, height: 900 });
   await page.goto("/showcases/spreadsheet/");
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
-  await selectCell(page, "H3");
+  // G3 holds =E3*F3; typing replaces it in the editor only.
+  await selectCell(page, "G3");
   const before = await storedFormula(page);
 
-  await page.keyboard.type("=E3*F3");
+  await page.keyboard.type("=E3*F3+0");
   const editor = page.locator("textarea.sheetwrite-editor");
   const preview = page.locator(".sheetwrite-formula-preview");
   await expect(preview).toHaveText("= 719.91");
