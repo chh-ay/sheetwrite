@@ -452,6 +452,26 @@ the sort on the table's header buttons
 | Typing, fill, paste or a remote edit inside a spill keeps the value and shows `#SPILL!` on the anchor. | Nothing; clearing the value restores the array. | [#352](https://github.com/chh-ay/sheetwrite/pull/352) |
 | Saved hidden rows, collapsed groups and filters apply at load. | Nothing; `SUBTOTAL` no longer counts rows that a saved filter hides. | [#330](https://github.com/chh-ay/sheetwrite/pull/330) |
 
+## How 0.7.0 compares with 0.5.4 and 0.6.1
+
+These figures are measured on the release commit, with the same benchmark rows,
+workbooks and machines for all three releases. They are not filled in yet.
+
+| Measure | Engine | Linux 0.5.4 | Linux 0.6.1 | Linux 0.7.0 | Mac 0.5.4 | Mac 0.6.1 | Mac 0.7.0 |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Formula recalculation, geomean time of the shared benchmark rows | default | — | — | — | — | — | — |
+| Formula recalculation, geomean time of the shared benchmark rows | full | — | — | — | — | — | — |
+| Retained memory, 100k formulas | default | — | — | — | — | — | — |
+| Retained memory, 100k formulas | full | — | — | — | — | — | — |
+| Peak memory, 100k formulas | default | — | — | — | — | — | — |
+| Peak memory, 100k formulas | full | — | — | — | — | — | — |
+| Engine download, Brotli | default | — | — | — | — | — | — |
+| Engine download, Brotli | full | — | — | — | — | — | — |
+| XLSX import | default | — | — | — | — | — | — |
+| XLSX import | full | — | — | — | — | — | — |
+| XLSX export | default | — | — | — | — | — | — |
+| XLSX export | full | — | — | — | — | — | — |
+
 ## Upgrade from earlier versions
 
 If you upgrade from a version before 0.6.0, first read
