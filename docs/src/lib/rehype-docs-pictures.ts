@@ -21,7 +21,7 @@ interface HastNode {
   data?: unknown;
 }
 
-const CONTENT_ROOT = "/docs/src/content/docs/";
+const CONTENT_ROOT = new URL("../content/docs/", import.meta.url).pathname;
 const PICTURE_MODULE = new URL("../art/DocsPicture.tsx", import.meta.url).pathname;
 const ART_STYLESHEET = new URL("../art/art.css", import.meta.url).pathname;
 
