@@ -220,10 +220,67 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
-    // Only detached references occupy these maps; ordinary formulas add no
-    // per-slot state. Reverse membership makes replacement/removal local.
-    unresolved_sheets: FxHashMap<String, FxHashSet<FormulaId>>,
-    unresolved_by_formula: FxHashMap<FormulaId, Vec<String>>,
+    /// The formulas that name a sheet the workbook does not have. Absent in
+    /// the usual sheet, so it adds one word per sheet.
+    unresolved: Option<Box<UnresolvedSheetUsers>>,
+}
+
+/// Formulas by the missing sheet names they hold, and the reverse, so a
+/// replaced or removed formula leaves only its own names.
+#[derive(Default)]
+struct UnresolvedSheetUsers {
+    by_name: FxHashMap<String, FxHashSet<FormulaId>>,
+    by_formula: FxHashMap<FormulaId, Vec<String>>,
+}
+
+impl UnresolvedSheetUsers {
+    fn forget(&mut self, id: FormulaId) {
+        let Some(names) = self.by_formula.remove(&id) else {
+            return;
+        };
+        for name in names {
+            if let Some(users) = self.by_name.get_mut(&name) {
+                users.remove(&id);
+                if users.is_empty() {
+                    self.by_name.remove(&name);
+                }
+            }
+        }
+    }
+
+    fn record(&mut self, id: FormulaId, mut names: Vec<String>) {
+        if names.is_empty() {
+            return;
+        }
+        names.sort_unstable();
+        names.dedup();
+        for name in &names {
+            self.by_name.entry(name.clone()).or_default().insert(id);
+        }
+        self.by_formula.insert(id, names);
+    }
+
+    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
+        formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
+        formulas.add_hash_table::<String, FxHashSet<FormulaId>>(
+            self.by_name.len(),
+            self.by_name.capacity(),
+        );
+        for (name, users) in &self.by_name {
+            formulas.add_payload(name.len(), name.capacity());
+            formulas.add_hash_table::<FormulaId, ()>(users.len(), users.capacity());
+        }
+        formulas.add_hash_table::<FormulaId, Vec<String>>(
+            self.by_formula.len(),
+            self.by_formula.capacity(),
+        );
+        for names in self.by_formula.values() {
+            formulas.add_vec::<String>(names.len(), names.capacity());
+            for name in names {
+                formulas.add_payload(name.len(), name.capacity());
+            }
+        }
+    }
 }
 
 impl FormulaStore {
@@ -308,18 +365,8 @@ impl FormulaStore {
         let missing = self.get(id).is_some_and(|entry| {
             entry.ast.is_some() && entry.source_error() == Some(FormulaError::Ref)
         });
-        if !missing && self.unresolved_by_formula.is_empty() {
+        if !missing && self.unresolved.is_none() {
             return;
-        }
-        if let Some(names) = self.unresolved_by_formula.remove(&id) {
-            for name in names {
-                if let Some(users) = self.unresolved_sheets.get_mut(&name) {
-                    users.remove(&id);
-                    if users.is_empty() {
-                        self.unresolved_sheets.remove(&name);
-                    }
-                }
-            }
         }
         let mut names = Vec::new();
         if missing {
@@ -327,19 +374,11 @@ impl FormulaStore {
                 unresolved_sheet_names(ast, &mut names);
             }
         }
-        if !names.is_empty() {
-            names.sort_unstable();
-            names.dedup();
-            for name in &names {
-                self.unresolved_sheets
-                    .entry(name.clone())
-                    .or_default()
-                    .insert(id);
-            }
-            self.unresolved_by_formula.insert(id, names);
-        } else if self.unresolved_by_formula.is_empty() {
-            self.unresolved_by_formula = FxHashMap::default();
-            self.unresolved_sheets = FxHashMap::default();
+        let index = self.unresolved.get_or_insert_with(Box::default);
+        index.forget(id);
+        index.record(id, names);
+        if index.by_formula.is_empty() {
+            self.unresolved = None;
         }
     }
 
@@ -348,8 +387,9 @@ impl FormulaStore {
         &self,
         name: &str,
     ) -> impl Iterator<Item = FormulaId> + '_ {
-        self.unresolved_sheets
-            .get(name)
+        self.unresolved
+            .as_ref()
+            .and_then(|index| index.by_name.get(name))
             .into_iter()
             .flat_map(|users| users.iter().copied())
     }
@@ -532,23 +572,8 @@ impl FormulaStore {
         formulas.add_vec::<Vec<FormulaSlot>>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
-        formulas.add_hash_table::<String, FxHashSet<FormulaId>>(
-            self.unresolved_sheets.len(),
-            self.unresolved_sheets.capacity(),
-        );
-        for (name, users) in &self.unresolved_sheets {
-            formulas.add_payload(name.len(), name.capacity());
-            formulas.add_hash_table::<FormulaId, ()>(users.len(), users.capacity());
-        }
-        formulas.add_hash_table::<FormulaId, Vec<String>>(
-            self.unresolved_by_formula.len(),
-            self.unresolved_by_formula.capacity(),
-        );
-        for names in self.unresolved_by_formula.values() {
-            formulas.add_vec::<String>(names.len(), names.capacity());
-            for name in names {
-                formulas.add_payload(name.len(), name.capacity());
-            }
+        if let Some(index) = &self.unresolved {
+            index.add_memory_stats(formulas);
         }
         for page in &self.entries {
             formulas.add_vec::<FormulaSlot>(page.len(), page.capacity());
