@@ -2810,8 +2810,11 @@ impl CellStore {
     /// Commit staged user or host sources. Admission metadata must be staged
     /// before this barrier; derived values and string roots are complete on return.
     /// Beginning a page load suppresses local dirty tracking until this commit.
+    ///
+    /// Returns [`Self::recalculated_rect_count`] for the commit, so a chart
+    /// tracker learns whether there is a report without another call.
     #[wasm_bindgen(js_name = commitSources)]
-    pub fn commit_sources(&mut self) {
+    pub fn commit_sources(&mut self) -> i32 {
         let was_page_load = self.loading_page > 0;
         self.loading_page = self.loading_page.saturating_sub(1);
 
@@ -2821,6 +2824,7 @@ impl CellStore {
         if !was_page_load {
             self.maybe_collect_strings();
         }
+        self.recalculated_rect_count()
     }
 
     /// Whether a source rectangle can replace its spill cells without cutting

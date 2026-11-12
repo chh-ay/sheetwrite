@@ -699,6 +699,8 @@ export class StoreDataEngine {
 
   private readonly memoryReleaseListeners = new Set<() => void>();
   private chartRecalculationTracked = false;
+  /** Rectangles the last engine commit reported; -1 asks for a conservative refresh. */
+  private recalculatedRectCount = -1;
   /** Epoch of the commit whose report {@link chartRecalculation} holds. */
   private chartRecalculationEpoch: number | undefined;
   /** That commit's rectangles; null when it must refresh conservatively. */
@@ -840,7 +842,7 @@ export class StoreDataEngine {
     if (data) {
       this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
     } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
 
     // After the cells, because filters and sort keys read cell values.
@@ -1120,7 +1122,7 @@ export class StoreDataEngine {
       for (const id of sheets) this.pivotSheetsDirty.add(id);
       this.flushPivots();
     } finally {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
   }
 
@@ -1933,6 +1935,8 @@ export class StoreDataEngine {
       throw storeFailure("invalid-argument", "invalid volatile recalculation date");
     }
     this.wasm.recomputeVolatile(dateToSerial(now));
+    if (this.chartRecalculationTracked)
+      this.recalculatedRectCount = this.wasm.recalculatedRectCount();
   }
 
   /**
@@ -2041,6 +2045,14 @@ export class StoreDataEngine {
     };
   }
 
+  /**
+   * Close the engine mutation. The engine returns the size of its chart
+   * recalculation report with it, so a commit costs no extra boundary call.
+   */
+  private commitEngineSources(): void {
+    this.recalculatedRectCount = this.wasm.commitSources();
+  }
+
   /** Keep one bounded engine report per commit only while charts are observed. */
   trackChartRecalculation(enabled: boolean): void {
     this.chartRecalculationTracked = enabled;
@@ -2055,7 +2067,7 @@ export class StoreDataEngine {
    */
   captureChartRecalculation(epoch: number | undefined): void {
     if (!this.chartRecalculationTracked) return;
-    const count = this.wasm.recalculatedRectCount();
+    const count = this.recalculatedRectCount;
     this.chartRecalculationEpoch = epoch;
     // An event without an epoch cannot be matched to its report later.
     this.chartRecalculation =
@@ -2915,7 +2927,7 @@ export class StoreDataEngine {
       // try on every edit, JavaScriptCore optimized one-cell edits later, and
       // the engine memory probe measured a 27% slower edit median.
       if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
-      else this.wasm.commitSources();
+      else this.commitEngineSources();
     }
   }
 
@@ -2924,7 +2936,7 @@ export class StoreDataEngine {
     try {
       this.view.flushHiddenRows();
     } finally {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
   }
 
@@ -4807,7 +4819,7 @@ export class StoreDataEngine {
       accepted = this.writeSparseBlock(bounds, cells);
     } finally {
       this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.wasm.commitSources();
+      this.commitEngineSources();
       this.resourceOperation = previousOperation;
     }
 
@@ -4845,7 +4857,7 @@ export class StoreDataEngine {
         this.windowReader.conditionalRulesChanged(sourceSheet.id);
       }
     } finally {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
 
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
@@ -5060,7 +5072,7 @@ export class StoreDataEngine {
     }
 
     this.noteRangeMutationFfi();
-    this.wasm.commitSources();
+    this.commitEngineSources();
     this.noteRangeMutationFfi();
     this.wasm.compactStringStorage();
   }
