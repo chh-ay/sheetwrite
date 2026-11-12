@@ -44,14 +44,14 @@ pub(super) fn index_selects_whole_axis(args: &[Ast]) -> bool {
     static_integer(args.get(ROW_ARG)) == Some(0) || static_integer(col_arg(args)) == Some(0)
 }
 
-/// The rows and columns of `matrix` that a 1-based `row` and `col` select;
+/// The rows and columns of an area of `shape` that a 1-based `row` and `col` select;
 /// zero selects every row or column. `None` when a position is outside it.
 fn selection(
     shape: (usize, usize),
     row: usize,
     col: usize,
 ) -> Option<(Range<usize>, Range<usize>)> {
-    let axis = |position: usize, len: usize| match position {
+    let axis = |index: usize, len: usize| match index {
         0 => Some(0..len),
         position if position <= len => Some(position - 1..position),
         _ => None,

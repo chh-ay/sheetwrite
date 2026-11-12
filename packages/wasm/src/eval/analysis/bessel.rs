@@ -238,13 +238,13 @@ fn calculate(name: &str, values: &FuncAccumulator) -> Result<f64, FormulaError> 
     require_arity(values, 2, 2)?;
 
     let x = number_arg(values, 0, None)?;
-    let order = number_arg(values, 1, None)?.trunc();
+    let requested_order = number_arg(values, 1, None)?.trunc();
 
-    if order < 0.0 || order > f64::from(u16::MAX) {
+    if requested_order < 0.0 || requested_order > f64::from(u16::MAX) {
         return Err(FormulaError::Num);
     }
 
-    let order = order as u32;
+    let order = requested_order as u32;
 
     match name {
         "BESSELJ" => Ok(odd_order_sign(order, x) * first_kind(order, x.abs())),

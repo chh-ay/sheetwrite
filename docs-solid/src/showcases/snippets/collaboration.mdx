@@ -1,0 +1,21 @@
+```ts prelude="collaboration" title="collaboration.ts"
+import { SyncCoordinator } from "@sheetwrite/core";
+import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+
+// Each client commits through the server's sequencing link. Its commits carry
+// its person, and unacknowledged ones wait in IndexedDB while it is offline.
+const client = new SyncCoordinator(grid, adapter, {
+  documentId,
+  serverVersion: snapshot.version ?? 0,
+  pendingStorage: new IndexedDbPendingCommitStorage({ databaseName: "forecast-ana" }),
+  authorId: "ana",
+});
+await client.ready();
+
+// The server orders every commit once and broadcasts it; the other client
+// applies it, buffers gaps, and reports conflicts instead of guessing.
+client.subscribe(remoteOperationSource);
+client.on((event) => {
+  if (event.type === "conflict") showConflict(event.response);
+});
+```

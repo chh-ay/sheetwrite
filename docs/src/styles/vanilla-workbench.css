@@ -1,6 +1,5 @@
 /* The Vanilla workbench uses the shared site tokens. */
 .sw-vw {
-  --sw-vw-instrument-width: 22rem;
   display: grid;
   min-height: 38rem;
   grid-template-rows: auto auto;
@@ -144,21 +143,20 @@
   outline-offset: 2px;
 }
 
-/* Product stage first, ownership instrument adjacent. The grid stage keeps a
-   fixed height: a taller instrument must not stretch the grid, or its visible
-   rows would change with the instrument's content. */
+/* The grid takes the stage's full width; the ownership instrument is a band
+   under it. */
 .sw-vw-workspace {
   display: grid;
   min-height: 0;
-  grid-template-columns: minmax(0, 1fr) var(--sw-vw-instrument-width);
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
 .sw-vw-gridstage {
   display: grid;
-  min-height: 0;
+  min-height: 31rem;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  border-right: 1px solid var(--sw-border-strong);
+  border-bottom: 1px solid var(--sw-border-strong);
   background: var(--sw-surface-1);
 }
 
@@ -348,11 +346,14 @@
   line-height: 1.5;
 }
 
-/* Adjacent lifecycle instrument */
+/* The lifecycle instrument under the grid: host state and the resources it
+   owns as one strip, then the open scenario across the band (its steps as
+   cards on wider screens), then the debug controls in a row of their own. */
 .sw-vw-instrument {
-  display: flex;
+  display: grid;
   min-height: 0;
-  flex-direction: column;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
   background: var(--sw-surface-0);
 }
 
@@ -529,6 +530,52 @@
   line-height: 1.5;
 }
 
+@media (min-width: 52rem) {
+  .sw-vw-instrument {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+
+  .sw-vw-instrument > :is(section, .sw-vw-details) {
+    grid-column: 1 / -1;
+  }
+
+  .sw-vw-instrument > :is(.sw-vw-identity, .sw-vw-ownership) {
+    align-self: stretch;
+  }
+
+  .sw-vw-identity > div {
+    grid-template-columns: auto auto;
+    gap: var(--sw-space-3);
+    align-items: center;
+    justify-content: start;
+  }
+
+  .sw-vw-ownership {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sw-space-4);
+    border-left: 1px solid var(--sw-border);
+  }
+
+  .sw-vw-ownership > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sw-space-1);
+    align-content: start;
+  }
+
+  .sw-vw-challenge ol {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--sw-space-3);
+  }
+
+  .sw-vw-challenge li {
+    align-content: start;
+    padding: var(--sw-space-3);
+    border: 1px solid var(--sw-border);
+    border-radius: var(--sw-radius-md);
+    background: var(--sw-surface-1);
+  }
+}
+
 .sw-vw .sw-demo-radio-group {
   grid-template-columns: repeat(2, minmax(max-content, 1fr));
 }
@@ -698,20 +745,32 @@
   cursor: pointer;
 }
 
+/* The checkbox covers the whole label, so the label's full size is the target;
+   the track beside the text draws the switch. */
+.sw-vw-toggle {
+  position: relative;
+}
+
 .sw-vw-toggle input {
+  position: absolute;
+  inset: -1px;
+  margin: 0;
   appearance: none;
+  cursor: pointer;
+  opacity: 0;
+}
+
+.sw-vw-toggle__track {
   position: relative;
   flex: none;
   width: 2.25rem;
   height: 1.25rem;
-  margin: 0;
   border: 1px solid var(--sw-border-strong);
   border-radius: var(--sw-radius-pill);
   background: var(--sw-surface-2);
-  cursor: pointer;
 }
 
-.sw-vw-toggle input::before {
+.sw-vw-toggle__track::before {
   content: "";
   position: absolute;
   top: 2px;
@@ -722,12 +781,12 @@
   background: var(--sw-fg-muted);
 }
 
-.sw-vw-toggle input:checked {
+.sw-vw-toggle input:checked + .sw-vw-toggle__track {
   border-color: var(--sw-accent-strong);
   background: var(--sw-accent-strong);
 }
 
-.sw-vw-toggle input:checked::before {
+.sw-vw-toggle input:checked + .sw-vw-toggle__track::before {
   left: calc(100% - 1rem);
   background: var(--sw-accent-ink);
 }
@@ -783,10 +842,6 @@
 /* The header look (padding, gradient, h2 scale) belongs to the shared
    workbench-stage.css; this file only supplies the page's own chrome. */
 @media (max-width: 64rem) {
-  .sw-vw-workspace {
-    grid-template-columns: minmax(0, 1fr) 17rem;
-  }
-
   .sw-vw-scenarios {
     grid-template-columns: 1fr;
     gap: var(--sw-space-2);
@@ -821,16 +876,6 @@
 
   .sw-vw-tab span {
     display: none;
-  }
-
-  .sw-vw-workspace {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .sw-vw-gridstage {
-    min-height: 31rem;
-    border-right: 0;
-    border-bottom: 1px solid var(--sw-border-strong);
   }
 
   .sw-vw-stagewrap {

@@ -21,6 +21,7 @@
     "docs/src/generated",
     "packages/core/src/generated",
     "docs/src/routeTree.gen.ts",
+    "docs-solid/src/routeTree.gen.ts",
     "**/*.md",
     "**/*.mdx",
     "**/*.html",

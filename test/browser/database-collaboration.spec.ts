@@ -179,8 +179,9 @@ test.describe("database proof", () => {
     await expect(page.getByTestId("dbx-total")).toHaveText(DATABASE_SEED_TOTAL);
     await expect(logEntry(page, "restoreBlock committed as v2")).toHaveCount(1);
 
-    // The oversize path: a dropped entry, an older undo kept.
-    await page.getByTestId("dbx-diagnostics").locator("summary").click();
+    // The oversize path: a dropped entry, an older undo kept. The failure lab
+    // renders open, beside its diagram.
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     await page.getByTestId("dbx-tight-limit").click();
     const limitReport = page.getByTestId("dbx-limit-report");
     await expect(limitReport).toHaveAttribute("data-state", "passed");
@@ -192,7 +193,7 @@ test.describe("database proof", () => {
     page,
   }) => {
     await openDatabase(page);
-    await page.getByTestId("dbx-diagnostics").locator("summary").click();
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     const commit = page.getByRole("button", { name: "Commit sample edit" });
 
     // The server stores v1 but the acknowledgement never arrives. Autosave must
@@ -327,9 +328,8 @@ test.describe("collaboration proof", () => {
 
   test("buffers version gaps and recovers from a base-version conflict", async ({ page }) => {
     await openCollaboration(page);
-    const advanced = page.locator(".sw-clb__advanced");
-    await advanced.locator("summary").click();
-    await expect(advanced).toHaveAttribute("open", "");
+    // The fault panels render open, beside their diagram.
+    await expect(page.locator(".sw-clb__advanced")).toHaveAttribute("open", "");
     const holdNext = (slug: "a" | "b") =>
       page
         .locator(`[data-fault-client="${slug}"]`)
@@ -367,7 +367,7 @@ test("a manual retry of a commit whose acknowledgement was lost applies it once"
   page,
 }) => {
   await openDatabase(page);
-  await page.getByTestId("dbx-diagnostics").locator("summary").click();
+  await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
   // The server stores v1 but the client keeps the commit pending; the retry
   // with the same mutation id must not apply it twice.
   await page.getByRole("button", { name: "Lose next acknowledgement" }).click();

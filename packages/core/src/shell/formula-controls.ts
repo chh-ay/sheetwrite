@@ -4,6 +4,7 @@
 // the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
+import { insertEditorLineBreak, sizeEditorTextarea } from "../editor-textarea.js";
 import { FormulaAssist } from "../formula-assist.js";
 import { Scope } from "../scope.js";
 import { selectionCell } from "../selection.js";
@@ -125,6 +126,8 @@ export function createNameBox(
   };
 }
 
+const FORMULA_BAR_MIN_HEIGHT = 26;
+
 /** Host elements and callbacks used to bind a formula bar to a Grid. */
 export interface FormulaBarOptions {
   /** Called after Enter commits or Escape cancels, so the grid regains focus. */
@@ -152,8 +155,10 @@ export function createFormulaBar(
   grid: Grid,
   options: FormulaBarOptions = {},
 ): FormulaBarPiece {
-  const input = document.createElement("input");
-  input.type = "text";
+  const input = document.createElement("textarea");
+  input.rows = 1;
+  input.wrap = "off";
+  input.setAttribute("aria-multiline", "true");
   input.className = "sheetwrite-shell-formula";
   input.setAttribute("aria-label", options.label ?? "Formula bar");
   input.autocomplete = "off";
@@ -169,6 +174,7 @@ export function createFormulaBar(
   let committed = "";
   let dirty = false;
   let readOnly = false;
+  let composing = false;
 
   const refresh = (): void => {
     if (document.activeElement === input && dirty) return;
@@ -176,6 +182,7 @@ export function createFormulaBar(
     snapshot = focus ? grid.getCellInput(focus.row, focus.col) : null;
     committed = snapshot?.text ?? "";
     input.value = committed;
+    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
     dirty = false;
     if (document.activeElement === input) assist.update();
   };
@@ -188,7 +195,13 @@ export function createFormulaBar(
   };
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (assist.handleKeyDown(event)) {
+    if (composing || event.isComposing) {
+      event.stopPropagation();
+      return;
+    }
+    if (insertEditorLineBreak(event, input)) {
+      event.stopPropagation();
+    } else if (assist.handleKeyDown(event)) {
       event.stopPropagation();
     } else if (event.key === "Enter") {
       event.preventDefault();
@@ -198,6 +211,8 @@ export function createFormulaBar(
       event.preventDefault();
       event.stopPropagation();
       input.value = committed;
+      sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+      assist.update();
       dirty = false;
       options.focusGrid?.();
     }
@@ -206,13 +221,31 @@ export function createFormulaBar(
   // Typing, paste, drop and IME all fire `input`; a key alone does not change the draft.
   const onInput = (): void => {
     dirty = true;
+    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
     assist.update();
   };
-  const onFocus = (): void => assist.attach(input, null);
+  const onFocus = (): void => {
+    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+    assist.attach(input, null);
+  };
   const onBlur = (): void => assist.detach();
 
   const lifetime = new Scope();
   const { signal } = lifetime;
+  input.addEventListener(
+    "compositionstart",
+    () => {
+      composing = true;
+    },
+    { signal },
+  );
+  input.addEventListener(
+    "compositionend",
+    () => {
+      composing = false;
+    },
+    { signal },
+  );
   input.addEventListener("keydown", onKeydown, { signal });
   input.addEventListener("input", onInput, { signal });
   input.addEventListener("focus", onFocus, { signal });
@@ -220,8 +253,8 @@ export function createFormulaBar(
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("change", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
-  refresh();
   host.appendChild(input);
+  refresh();
   lifetime.add(() => input.remove());
   lifetime.add(() => assist.detach());
 
@@ -233,6 +266,8 @@ export function createFormulaBar(
       if (value) {
         // A pending draft cannot commit anymore; restore the stable text.
         input.value = committed;
+        sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+        assist.update();
         dirty = false;
       }
     },

@@ -397,6 +397,8 @@ a {
   color: var(--sw-fg-strong);
   background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
   font: 0.86em var(--sw-font-mono);
+  /* A long identifier breaks inside the chip instead of widening the page. */
+  overflow-wrap: anywhere;
 }
 
 /* Linked inline code (entry points, symbol references) must read as a link. */
@@ -685,4 +687,23 @@ a {
   background: var(--sw-surface-0);
   font-size: var(--sw-text-caption);
   line-height: 1.7;
+}
+
+@media (max-width: 48rem) {
+  /* Narrow screens scroll wide tables locally instead of stretching the page.
+     Markdown tables already scroll inside their frame. */
+  .sw-prose table:not(.sw-table-frame > table) {
+    display: block;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 48rem) {
+  .sw-architecture__step > div {
+    grid-template-columns: 2rem 1fr;
+  }
+
+  .sw-architecture__step p {
+    grid-column: 2;
+  }
 }

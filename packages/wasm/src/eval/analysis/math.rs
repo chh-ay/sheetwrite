@@ -73,8 +73,8 @@ pub(in crate::eval) fn streamed_sum_squares(
         let mut sum = 0.0;
         for row in range.row_start as usize..range.row_start as usize + rows {
             for col in range.col_start as usize..range.col_start as usize + cols {
-                let number = context.number(source_sheet, range.sheet as usize, row, col)?;
-                if let Some(number) = number {
+                let found = context.number(source_sheet, range.sheet as usize, row, col)?;
+                if let Some(number) = found {
                     sum += number * number;
                 }
             }
@@ -306,9 +306,9 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                         if number < 0.0 {
                             return Err(FormulaError::Num);
                         }
-                        let number = number.trunc();
-                        total += number;
-                        result *= combinations(total, number)?;
+                        let whole = number.trunc();
+                        total += whole;
+                        result *= combinations(total, whole)?;
                     }
                 }
             }
@@ -345,8 +345,8 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             let power_step = number_arg(values, 2, None)?;
             let coefficients = values.arg(3).ok_or(FormulaError::Value)?;
             let mut sum = 0.0;
-            for (index, coefficient) in coefficients.iter().enumerate() {
-                let coefficient = match coefficient.value {
+            for (index, coefficient_cell) in coefficients.iter().enumerate() {
+                let coefficient = match coefficient_cell.value {
                     Value::Number(number) => number,
                     Value::Error(error) => return Err(error),
                     _ => return Err(FormulaError::Value),
@@ -380,11 +380,11 @@ fn factorial(number: f64, double: bool) -> NumberResult {
 
 /// Each factor is at least 1, so the product overflows to #NUM! after a few
 /// hundred steps at most.
-fn combinations(total: f64, chosen: f64) -> NumberResult {
-    if chosen > total {
+fn combinations(total: f64, picked: f64) -> NumberResult {
+    if picked > total {
         return Err(FormulaError::Num);
     }
-    let chosen = chosen.min(total - chosen);
+    let chosen = picked.min(total - picked);
     let mut result = 1.0;
     for step in 1..=chosen as usize {
         result *= (total - chosen + step as f64) / step as f64;

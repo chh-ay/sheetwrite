@@ -100,11 +100,11 @@ pub(crate) fn lex_tolerant(src: &str) -> Vec<Spanned<'_>> {
 }
 
 fn token_kind(tok: &Result<Tok<'_>, String>, next: Option<&Spanned<'_>>) -> TokenKind {
-    let Ok(tok) = tok else {
+    let Ok(parsed) = tok else {
         return TokenKind::Bad;
     };
 
-    match tok {
+    match parsed {
         Tok::Num(_) => TokenKind::Number,
         Tok::Str(_) => TokenKind::String,
         Tok::Ident(_, true) => TokenKind::QuotedSheet,

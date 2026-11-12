@@ -11,7 +11,7 @@ use crate::types::{CellRange, ReadSet};
 
 const STORE_TAG: u32 = 0x32524d53;
 
-fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
+fn write_names(out: &mut Writer, names: &FxHashMap<String, usize>) {
     out.usize(names.len());
     for (name, &handle) in names {
         out.text(name);
@@ -35,7 +35,7 @@ fn sheet_handle(input: &mut Reader<'_>, sheets: usize) -> TransferResult<u32> {
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
-fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<String, usize>> {
+fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<FxHashMap<String, usize>> {
     (0..input.count()?)
         .map(|_| Ok((input.text()?, sheet_handle(input, sheets)? as usize)))
         .collect()
@@ -343,8 +343,8 @@ impl CellStore {
                 continue;
             };
             out.bool(scope.is_some());
-            if let Some(scope) = scope {
-                out.u32(*scope);
+            if let Some(scope_sheet) = scope {
+                out.u32(*scope_sheet);
             }
 
             out.text(key);
@@ -364,8 +364,8 @@ impl CellStore {
         );
         for (scope, name, source) in self.named_formula_sources() {
             out.bool(scope.is_some());
-            if let Some(scope) = scope {
-                out.u32(scope);
+            if let Some(scope_sheet) = scope {
+                out.u32(scope_sheet);
             }
             out.text(name);
             out.text(source);

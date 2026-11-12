@@ -1,6 +1,13 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignoreWorkspaces": ["bench", "docs", "examples/*", "packages/wasm", "packages/formulas"],
+  "ignoreWorkspaces": [
+    "bench",
+    "docs",
+    "docs-solid",
+    "examples/*",
+    "packages/wasm",
+    "packages/formulas"
+  ],
   "workspaces": {
     "packages/core": {
       "entry": [
@@ -14,7 +21,8 @@
         "src/shell.ts",
         "src/testing.ts",
         "src/worker.ts",
-        "test/**/*.test.ts"
+        "test/**/*.test.ts",
+        "test/*.full-engine.ts"
       ],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },

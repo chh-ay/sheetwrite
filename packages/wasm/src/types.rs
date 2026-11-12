@@ -481,7 +481,7 @@ impl FormulaEntry {
 
     pub(crate) fn set_source_error(&mut self, error: Option<FormulaError>) {
         self.flags =
-            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |error| (error.slot() + 1) as u16);
+            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |known| (known.slot() + 1) as u16);
     }
 
     pub(crate) fn volatile(&self) -> bool {
@@ -567,11 +567,11 @@ impl FormulaEntry {
         reads: ReadSet,
         is_reference: bool,
     ) -> Self {
-        if let Some(ast) = ast
+        if let Some(tree) = ast
             .as_mut()
-            .filter(|ast| ast_contains_let(ast) && !ast_contains_spill_ref(ast))
+            .filter(|candidate| ast_contains_let(candidate) && !ast_contains_spill_ref(candidate))
         {
-            crate::eval::resolve_let_names(ast);
+            crate::eval::resolve_let_names(tree);
         }
         let mut entry = Self {
             ast,
@@ -903,6 +903,10 @@ const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
+    #[allow(
+        clippy::disallowed_types,
+        reason = "keys are already hashes of the text, so the hasher passes them through unchanged"
+    )]
     lookup:
         std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
     pub(crate) epoch: u32,

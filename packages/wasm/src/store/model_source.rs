@@ -100,16 +100,16 @@ impl<'a> ModelSource<'a> {
     pub(super) fn header(&self, field: usize) -> Value {
         self.fields
             .get(field)
-            .map_or(Value::Blank, |field| Value::text(field.name))
+            .map_or(Value::Blank, |found| Value::text(found.name))
     }
 
     pub(super) fn value(&self, row: usize, field: usize) -> Value {
-        let Some(field) = self.fields.get(field) else {
+        let Some(field_info) = self.fields.get(field) else {
             return Value::Error(FormulaError::Ref);
         };
 
-        match self.row_in(field.route, row as u32) {
-            Ok(matched) => self.store.key_value(field.column, matched),
+        match self.row_in(field_info.route, row as u32) {
+            Ok(matched) => self.store.key_value(field_info.column, matched),
             Err(value) => value,
         }
     }

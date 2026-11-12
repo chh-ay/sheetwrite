@@ -16,7 +16,7 @@ test("host-owned rows keep stable identity across view and reconciliation change
   await expect(first).toContainText("Alder Quay Logistics");
   await expect(first).toContainText("$120,000");
 
-  await page.getByRole("button", { name: "Sort amount" }).click();
+  await page.getByRole("button", { name: "Sort view by amount" }).click();
   await page.getByRole("button", { name: "Filter North" }).click();
   await expect(first).toContainText("$120,000");
   await expect(second).toContainText("$75,000");

@@ -103,6 +103,8 @@
   background: transparent;
   color: inherit;
   font-size: var(--sw-text-caption);
+  /* A path wraps anywhere, even one short enough to be a one-token chip. */
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 
@@ -507,7 +509,9 @@
   text-transform: none;
 }
 
-.api-consumer-list {
+/* Qualified by the prose, so it outranks the prose list's indent: the chips
+   start where their label does. */
+.sw-prose .api-consumer-list {
   display: flex;
   flex-wrap: wrap;
   gap: var(--sw-space-1-5) var(--sw-space-2);
@@ -678,25 +682,6 @@
 
 .sw-test-fixture output {
   min-width: 2ch;
-}
-
-@media (max-width: 48rem) {
-  /* Narrow screens scroll wide tables locally instead of stretching the page.
-     Markdown tables already scroll inside their frame. */
-  .sw-prose table:not(.sw-table-frame > table) {
-    display: block;
-    overflow-x: auto;
-  }
-}
-
-@media (max-width: 48rem) {
-  .sw-architecture__step > div {
-    grid-template-columns: 2rem 1fr;
-  }
-
-  .sw-architecture__step p {
-    grid-column: 2;
-  }
 }
 
 /* Search-target anchors exist for Pagefind sub-results and deep links only;

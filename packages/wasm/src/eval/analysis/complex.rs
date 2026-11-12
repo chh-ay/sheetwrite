@@ -232,7 +232,7 @@ fn complex(values: &FuncAccumulator) -> Result<Value, FormulaError> {
     require_arity(values, 2, 3)?;
     let re = number_arg(values, 0, None)?;
     let im = number_arg(values, 1, None)?;
-    let suffix = match text_arg(values, 2, Some(""))?.as_str() {
+    let suffix = match text_arg(values, 2, Some(""))?.as_ref() {
         "" | "i" => 'i',
         "j" => 'j',
         _ => return Err(FormulaError::Value),

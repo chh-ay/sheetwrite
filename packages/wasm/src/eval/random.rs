@@ -94,12 +94,12 @@ impl RandomSource {
 /// RANDBETWEEN's integer bounds: Excel rounds `bottom` up and `top` down, and
 /// rejects an empty interval with `#NUM!`.
 fn integer_bounds(bottom: f64, top: f64) -> Result<(f64, f64), FormulaError> {
-    let (bottom, top) = (bottom.ceil(), top.floor());
-    if bottom > top {
+    let (low, high) = (bottom.ceil(), top.floor());
+    if low > high {
         return Err(FormulaError::Num);
     }
 
-    Ok((bottom, top))
+    Ok((low, high))
 }
 
 /// An integer drawn uniformly from `bottom..=top`. An interval wider than
@@ -142,10 +142,9 @@ impl CellStore {
                 Value::Text(text) if text.trim().is_empty() => Err(FormulaError::Value),
                 value => number_from_value(&value),
             };
-        let bounds =
-            bound(bottom, pass).and_then(|bottom| integer_bounds(bottom, bound(top, pass)?));
+        let bounds = bound(bottom, pass).and_then(|low| integer_bounds(low, bound(top, pass)?));
 
-        match bounds.and_then(|(bottom, top)| draw_between(self.random.next_unit(), bottom, top)) {
+        match bounds.and_then(|(low, high)| draw_between(self.random.next_unit(), low, high)) {
             Ok(value) => Value::number(value),
             Err(error) => Value::Error(error),
         }

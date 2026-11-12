@@ -2,7 +2,8 @@
 
 use std::cell::Cell;
 use std::cmp::Ordering;
-use std::collections::HashSet;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
@@ -88,7 +89,7 @@ enum ValueSet<'a> {
         /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
         /// equality can match.
         numbers: Vec<u64>,
-        texts: HashSet<&'a str>,
+        texts: FxHashSet<&'a str>,
         /// Picked booleans, as the two bits above.
         bools: u8,
     },
@@ -109,7 +110,7 @@ impl<'a> ValueSet<'a> {
         numbers.sort_unstable();
         numbers.dedup();
 
-        let mut texts = HashSet::with_capacity(picked_texts.len());
+        let mut texts = FxHashSet::with_capacity_and_hasher(picked_texts.len(), FxBuildHasher);
         let mut bools = 0u8;
 
         for picked in picked_texts {
@@ -225,8 +226,8 @@ impl CellStore {
                     }
                     _ => None,
                 };
-                if let Some(value) = value {
-                    acc.add(value, op);
+                if let Some(found) = value {
+                    acc.add(found, op);
                 }
             }
         } else {
@@ -291,7 +292,7 @@ impl CellStore {
         }
 
         let base = col * s.cells.row_count();
-        let needle = needle.to_lowercase();
+        let lower_needle = needle.to_lowercase();
         let mut out: Vec<u32> = Vec::with_capacity(s.cells.row_count().min(1024));
         let mut cache = MatchCache::new();
 
@@ -307,19 +308,19 @@ impl CellStore {
                     KIND_STRING => cache.matches(
                         &self.strings,
                         payload_str_id(payloads[row]),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
                     KIND_NUMBER => number_matches_text(
                         payload_num(payloads[row]),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
                     KIND_BOOL => matches_needle(
                         boolean_text(payload_num(payloads[row]) != 0.0),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
@@ -328,7 +329,7 @@ impl CellStore {
                         s,
                         self,
                         base + row,
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                         &mut cache,
@@ -351,7 +352,7 @@ impl CellStore {
                     cache.matches(
                         &self.strings,
                         payload_str_id(payload),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     )
@@ -362,7 +363,7 @@ impl CellStore {
                         s,
                         self,
                         index,
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                         &mut cache,
@@ -421,10 +422,10 @@ impl CellStore {
         if next < 0 || next as usize > last {
             return if step < 0 { 0 } else { last as u32 };
         }
-        let next = next as usize;
+        let next_index = next as usize;
 
-        if occupied(pos) && occupied(next) {
-            let mut p = next;
+        if occupied(pos) && occupied(next_index) {
+            let mut p = next_index;
             loop {
                 let ahead = p as isize + step;
                 if ahead < 0 || ahead as usize > last || !occupied(ahead as usize) {
@@ -434,7 +435,7 @@ impl CellStore {
             }
         }
 
-        let mut p = next as isize;
+        let mut p = next_index as isize;
         while p >= 0 && p as usize <= last {
             if occupied(p as usize) {
                 return p as u32;
@@ -551,11 +552,11 @@ impl CellStore {
             }
             start = run.end;
         }
-        let keys = keys.rank();
+        let ranked = keys.rank();
 
         let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
         order.sort_unstable_by(|&a, &b| {
-            let ord = keys.compare(a as usize, b as usize, ascending);
+            let ord = ranked.compare(a as usize, b as usize, ascending);
             if ord == Ordering::Equal {
                 a.cmp(&b)
             } else {
@@ -628,13 +629,13 @@ impl CellStore {
                 ));
             }
         }
-        let keys = keys.rank();
+        let ranked = keys.rank();
 
         let mut positions: Vec<u32> = (0..row_count as u32).collect();
         // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
         positions.sort_by(|&left, &right| {
             for key in 0..cols.len() {
-                let order = keys.compare(
+                let order = ranked.compare(
                     key * row_count + left as usize,
                     key * row_count + right as usize,
                     ascending.get(key).copied().unwrap_or(1) != 0,
@@ -681,8 +682,8 @@ impl CellStore {
         for i in 0..cols.len() {
             num_offsets.push(no);
             text_offsets.push(to);
-            no = no.saturating_add(num_counts.get(i).copied().unwrap_or(0) as usize);
-            to = to.saturating_add(text_counts.get(i).copied().unwrap_or(0) as usize);
+            no = no.saturating_add(num_counts.get(i).copied().unwrap_or_default() as usize);
+            to = to.saturating_add(text_counts.get(i).copied().unwrap_or_default() as usize);
         }
         let mut cache_index = vec![usize::MAX; kinds.len()];
         let mut match_caches = Vec::with_capacity(kinds.iter().filter(|&&kind| kind == 1).count());
@@ -704,8 +705,8 @@ impl CellStore {
                 value_sets.push(ValueSet::Linear);
                 continue;
             }
-            let num_count = num_counts.get(i).copied().unwrap_or(0) as usize;
-            let text_count = text_counts.get(i).copied().unwrap_or(0) as usize;
+            let num_count = num_counts.get(i).copied().unwrap_or_default() as usize;
+            let text_count = text_counts.get(i).copied().unwrap_or_default() as usize;
             let picked_numbers = value_nums
                 .get(num_offsets[i]..num_offsets[i] + num_count)
                 .unwrap_or_default();
@@ -721,9 +722,10 @@ impl CellStore {
                 let kind = resolved_kind(data, index, &self.formula_slots);
                 let matches = match kinds[i] {
                     0 => {
-                        let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
-                        let nc = num_counts.get(i).copied().unwrap_or(0) as usize;
-                        let tc = text_counts.get(i).copied().unwrap_or(0) as usize;
+                        let mut hit =
+                            kind == 0 && flags.get(i).copied().unwrap_or_default() & 1 != 0;
+                        let nc = num_counts.get(i).copied().unwrap_or_default() as usize;
+                        let tc = text_counts.get(i).copied().unwrap_or_default() as usize;
                         match &value_sets[i] {
                             ValueSet::Linear => {
                                 if kind == 1 {
@@ -732,7 +734,7 @@ impl CellStore {
                                     {
                                         hit |= value_nums
                                             .get(num_offsets[i]..num_offsets[i] + nc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .contains(&value);
                                     }
                                 } else if kind == 2 {
@@ -744,7 +746,7 @@ impl CellStore {
                                     ) {
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .iter()
                                             .any(|picked| picked == text);
                                     }
@@ -759,7 +761,7 @@ impl CellStore {
                                         };
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .iter()
                                             .any(|picked| picked == expected);
                                     }
@@ -806,26 +808,26 @@ impl CellStore {
                         let needle = value_texts
                             .get(text_offsets[i])
                             .map(String::as_str)
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         cell_matches_text(
                             data,
                             self,
                             index,
                             needle,
-                            flags.get(i).copied().unwrap_or(0) == 0,
+                            flags.get(i).copied().unwrap_or_default() == 0,
                             false,
                             &mut match_caches[cache_index[i]],
                         )
                     }
                     2 => {
                         numeric_cell_value(data, index, &self.formula_slots).is_some_and(|value| {
-                            match flags.get(i).copied().unwrap_or(0) {
-                                0 => value > nums.get(i).copied().unwrap_or(0.0),
-                                1 => value >= nums.get(i).copied().unwrap_or(0.0),
-                                2 => value < nums.get(i).copied().unwrap_or(0.0),
-                                3 => value <= nums.get(i).copied().unwrap_or(0.0),
-                                4 => value == nums.get(i).copied().unwrap_or(0.0),
-                                _ => value != nums.get(i).copied().unwrap_or(0.0),
+                            match flags.get(i).copied().unwrap_or_default() {
+                                0 => value > nums.get(i).copied().unwrap_or_default(),
+                                1 => value >= nums.get(i).copied().unwrap_or_default(),
+                                2 => value < nums.get(i).copied().unwrap_or_default(),
+                                3 => value <= nums.get(i).copied().unwrap_or_default(),
+                                4 => value == nums.get(i).copied().unwrap_or_default(),
+                                _ => value != nums.get(i).copied().unwrap_or_default(),
                             }
                         })
                     }
@@ -875,7 +877,7 @@ impl CellStore {
         let row_count = data.cells.row_count();
         let rows = start_row.min(row_count)..end_row.min(row_count);
         let text_at = |index: usize| {
-            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or("")
+            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or_default()
         };
         // Stored text carries a pool id that stands for its value, so the scan
         // dedupes it through one bit per id instead of hashing the characters.
@@ -887,7 +889,7 @@ impl CellStore {
         loop {
             out = DistinctColumn::default();
             let mut stamps = PoolIdStamps::new();
-            let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
+            let mut seen: FxHashSet<DistinctKey<'_>> = FxHashSet::default();
             let mut needs_content = false;
             for row in rows.clone() {
                 let index = col * data.cells.row_count() + row;
@@ -895,7 +897,7 @@ impl CellStore {
                 let fresh = match kind {
                     1 => seen.insert(DistinctKey::Number(
                         numeric_cell_value(data, index, &self.formula_slots)
-                            .unwrap_or(0.0)
+                            .unwrap_or_default()
                             .to_bits(),
                     )),
                     2 if pooled => match data.cells.str_id_at(index) {
@@ -907,7 +909,7 @@ impl CellStore {
                     },
                     2 => seen.insert(DistinctKey::Text(text_at(index))),
                     3 => seen.insert(DistinctKey::Bool(
-                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false),
+                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
                     )),
                     _ => seen.insert(DistinctKey::Blank),
                 };
@@ -916,11 +918,13 @@ impl CellStore {
                 }
                 out.kinds.push(kind);
                 if kind == 1 {
-                    out.numbers
-                        .push(numeric_cell_value(data, index, &self.formula_slots).unwrap_or(0.0));
+                    out.numbers.push(
+                        numeric_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
+                    );
                 } else if kind == 3 {
                     out.numbers.push(
-                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false) {
+                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default()
+                        {
                             1.0
                         } else {
                             0.0
@@ -970,10 +974,10 @@ impl CellStore {
         let column = data.cells.dense_column(col);
         let occupied = |view: usize| {
             order.get(view).is_some_and(|&r| {
-                let r = r as usize;
-                let index = col * data.cells.row_count() + r;
-                r < data.cells.row_count()
-                    && match column.map(|column| column.raw_kind(r)) {
+                let data_row = r as usize;
+                let index = col * data.cells.row_count() + data_row;
+                data_row < data.cells.row_count()
+                    && match column.map(|dense| dense.raw_kind(data_row)) {
                         Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
                         Some(KIND_EMPTY) => false,
                         _ => resolved_kind(data, index, &self.formula_slots) != 0,
@@ -1133,12 +1137,12 @@ pub(crate) fn matches_needle(
     }
 
     if hay.is_ascii() && needle.is_ascii() {
-        let hay = hay.as_bytes();
-        let needle = needle.as_bytes();
+        let hay_bytes = hay.as_bytes();
+        let needle_bytes = needle.as_bytes();
         return if whole_cell {
-            hay.eq_ignore_ascii_case(needle)
+            hay_bytes.eq_ignore_ascii_case(needle_bytes)
         } else {
-            ascii_contains_ignore_case(hay, needle)
+            ascii_contains_ignore_case(hay_bytes, needle_bytes)
         };
     }
 
@@ -1353,11 +1357,11 @@ fn sort_finite_number_column_comparison(
             }
         };
         let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
-        let ord = if ascending { ord } else { ord.reverse() };
-        if ord == Ordering::Equal {
+        let directed = if ascending { ord } else { ord.reverse() };
+        if directed == Ordering::Equal {
             a.cmp(&b)
         } else {
-            ord
+            directed
         }
     });
     Some(order)
@@ -1479,9 +1483,9 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
     if next < 0 || next as usize > last {
         return if step < 0 { 0 } else { last };
     }
-    let next = next as usize;
-    if occupied(pos) && occupied(next) {
-        pos = next;
+    let next_index = next as usize;
+    if occupied(pos) && occupied(next_index) {
+        pos = next_index;
         loop {
             let ahead = pos as isize + step;
             if ahead < 0 || ahead as usize > last || !occupied(ahead as usize) {
@@ -1490,7 +1494,7 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
             pos = ahead as usize;
         }
     }
-    let mut candidate = next as isize;
+    let mut candidate = next_index as isize;
     while candidate >= 0 && candidate as usize <= last {
         if occupied(candidate as usize) {
             return candidate as usize;
@@ -1566,13 +1570,13 @@ impl<'a> ComparableCell<'a> {
         if sheet.cells.is_paged() {
             return Self::from_cell(sheet, strings, index, slots);
         }
-        let (kind, payload) = run.source(index);
+        let (source_kind, source_payload) = run.source(index);
         // Spill owners install calculated output in these same dense slots.
         // Read the bounded run directly; ownership needs no per-row hash probe.
-        let (kind, payload) = if kind == KIND_EMPTY {
+        let (kind, payload) = if source_kind == KIND_EMPTY {
             run.resolved(index)
         } else {
-            (kind, payload)
+            (source_kind, source_payload)
         };
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
@@ -1710,11 +1714,13 @@ impl SortKeyBuilder {
     }
 
     fn collation_cmp(&self, a: u32, b: u32) -> Ordering {
-        let a = self.texts[a as usize];
-        let b = self.texts[b as usize];
-        let a_key = &self.arena[a.start as usize..a.end as usize];
-        let b_key = &self.arena[b.start as usize..b.end as usize];
-        a_key.cmp(b_key).then(a.has_hyphen.cmp(&b.has_hyphen))
+        let a_text = self.texts[a as usize];
+        let b_text = self.texts[b as usize];
+        let a_key = &self.arena[a_text.start as usize..a_text.end as usize];
+        let b_key = &self.arena[b_text.start as usize..b_text.end as usize];
+        a_key
+            .cmp(b_key)
+            .then(a_text.has_hyphen.cmp(&b_text.has_hyphen))
     }
 }
 
