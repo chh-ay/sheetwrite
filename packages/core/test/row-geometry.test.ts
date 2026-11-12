@@ -166,7 +166,19 @@ describe("row geometry", () => {
     grid.applyTransaction({ patches: [setRowMeta(0, 50)] });
     expect(geometryOf(grid).rowHeight(19)).toBe(50);
     expectCommittedGeometry(grid, store);
+    grid.applyTransaction({ patches: [setRowMeta(1, 41), setRowMeta(2, 42), setRowMeta(1, 43)] });
+    expect(geometryOf(grid).rowHeight(18)).toBe(43);
+    expectCommittedGeometry(grid, store);
     expect(rowIndexOf(grid)).toBe(index);
+    const sort = (ascending: boolean): void => {
+      grid.applyTransaction({
+        patches: [{ op: "setSheetMeta", sheet: "s1", patch: { sortKeys: [{ col: 1, ascending }] } }],
+      });
+    };
+    sort(true);
+    expectCommittedGeometry(grid, store);
+    sort(false);
+    expectCommittedGeometry(grid, store);
     grid.destroy();
   });
 
