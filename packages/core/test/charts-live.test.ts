@@ -406,3 +406,92 @@ describe("resolveChartView", () => {
     expect(series?.truncated).toBe(true);
   });
 });
+
+describe("chart identities and resolution", () => {
+  it("shares the store's definition instead of copying it", () => {
+    const { store } = setup();
+    const stored = store
+      .getWorkbook()
+      .sheets.find((candidate) => candidate.id === "data")
+      ?.charts?.find((candidate) => candidate.id === "sales");
+    const view = resolveChartView(store, "data", "sales");
+    expect(view?.chart).toBe(stored);
+    expect(view?.series[0]?.values).toEqual([10, 20]);
+
+    // An edit replaces the definition; the old view keeps its own.
+    apply(store, [
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: { ...chart("sales", range("data", 0, 1, 1, 1)), title: "New" },
+      },
+    ]);
+    expect(view?.chart.title).toBeUndefined();
+    expect(resolveChartView(store, "data", "sales")?.chart.title).toBe("New");
+  });
+
+  it("names a chart once when a commit both edits its source and redefines it", () => {
+    const { store, events } = setup();
+    apply(store, [
+      set("data", 0, 1, 11),
+      { op: "setChart", sheet: "data", chart: chart("sales", range("data", 0, 1, 1, 1)) },
+      { op: "setChart", sheet: "data", chart: chart("fresh", range("data", 0, 1, 1, 1)) },
+      { op: "setChart", sheet: "data", chart: chart("fresh", range("data", 0, 1, 1, 1)) },
+    ]);
+    expect(events.at(-1)?.charts).toEqual([
+      { sheet: "data", id: "sales" },
+      { sheet: "data", id: "fresh" },
+    ]);
+  });
+
+  it("names no chart left over from an earlier commit", () => {
+    const { store, events } = setup();
+    apply(store, [set("data", 0, 1, 11)]);
+    expect(events.at(-1)?.charts).toEqual([{ sheet: "data", id: "sales" }]);
+    events.length = 0;
+
+    apply(store, [set("data", 9, 3, 1)]);
+    expect(events).toEqual([]);
+  });
+
+  it("names every computed chart on each value commit, once", () => {
+    const { store, events } = setup();
+    apply(store, [
+      formula("data", 0, 2, "=B1*2"),
+      formula("data", 1, 2, "=B2*2"),
+      { op: "setChart", sheet: "data", chart: chart("doubled", range("data", 0, 2, 1, 2)) },
+      { op: "setChart", sheet: "other", chart: chart("cross", range("data", 0, 2, 1, 2)) },
+    ]);
+    events.length = 0;
+
+    apply(store, [set("data", 9, 3, 1), set("data", 8, 3, 2)]);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.charts).toEqual([
+      { sheet: "data", id: "doubled" },
+      { sheet: "other", id: "cross" },
+    ]);
+    apply(store, [set("data", 0, 1, 5)]);
+    expect(resolveChartView(store, "other", "cross")?.series[0]?.values).toEqual([10, 40]);
+  });
+
+  it("finds sheets that were added, moved or removed after the store was created", () => {
+    const { store } = setup();
+    apply(store, [
+      {
+        op: "addSheet",
+        sheet: {
+          ...sheet("report"),
+          order: 1,
+          charts: [chart("added", range("data", 0, 1, 1, 1))],
+          cells: [],
+        },
+      },
+      { op: "moveSheet", sheet: "report", to: 0 },
+    ]);
+    expect(resolveChartView(store, "report", "added")?.series[0]?.values).toEqual([10, 20]);
+
+    apply(store, [{ op: "removeSheet", sheet: "report" }]);
+    expect(resolveChartView(store, "report", "added")).toBeNull();
+    expect(resolveChartView(store, "data", "sales")?.series[0]?.values).toEqual([10, 20]);
+  });
+});

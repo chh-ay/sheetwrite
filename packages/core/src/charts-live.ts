@@ -81,14 +81,10 @@ function categoryLevelLayout(kind: ChartKind, series: ChartSeries): CategoryLeve
  * `MAX_CHART_POINTS` cells. With `allRows`, the columns are clipped first so
  * that every row fits, because each row is one category level.
  */
-function readRect(
-  sheets: ReadonlyMap<SheetId, Sheet>,
-  range: ChartRange,
-  allRows = false,
-): ReadRect | null {
+function readRect(sheets: SheetLookup, range: ChartRange, allRows = false): ReadRect | null {
   if (range === "#REF!") return null;
 
-  const sheet = sheets.get(range.sheet);
+  const sheet = sheets(range.sheet);
   if (!sheet) return null;
 
   const r0 = Math.min(range.start.row, range.end.row);
@@ -110,10 +106,20 @@ function readRect(
   return { sheet, r0, r1, c0, c1, truncated };
 }
 
-function sheetMap(store: Store): Map<SheetId, Sheet> {
+/** Sheet metadata by ID. */
+type SheetLookup = (id: SheetId) => Sheet | undefined;
+
+/**
+ * The engine's index of sheets by ID. Only a custom store, which has no
+ * engine, gets a map built for the one call.
+ */
+function sheetLookup(store: Store): SheetLookup {
+  const engine = storeEngine(store);
+  if (engine) return (id) => engine.sheets.find(id);
+
   const sheets = new Map<SheetId, Sheet>();
   for (const sheet of store.getWorkbook().sheets) sheets.set(sheet.id, sheet);
-  return sheets;
+  return (id) => sheets.get(id);
 }
 
 /**
@@ -122,7 +128,7 @@ function sheetMap(store: Store): Map<SheetId, Sheet> {
  */
 function readRange(
   store: Store,
-  sheets: ReadonlyMap<SheetId, Sheet>,
+  sheets: SheetLookup,
   range: ChartRange,
   allRows = false,
 ): RangeRead {
@@ -195,7 +201,7 @@ function categoryLevels(read: RangeRead, layout: CategoryLevelLayout): CategoryV
 /** The categories of `source` in a chart of `kind`, with their levels. */
 function readCategories(
   store: Store,
-  sheets: ReadonlyMap<SheetId, Sheet>,
+  sheets: SheetLookup,
   kind: ChartKind,
   source: ChartSeries,
 ): CategoryView & { truncated: boolean } {
@@ -216,12 +222,7 @@ function readCategories(
   return { ...categoryLevels(read, layout), truncated: read.truncated };
 }
 
-function seriesName(
-  store: Store,
-  sheets: ReadonlyMap<SheetId, Sheet>,
-  series: ChartSeries,
-  index: number,
-): string {
+function seriesName(store: Store, sheets: SheetLookup, series: ChartSeries, index: number): string {
   if (series.name !== undefined) return series.name;
   if (series.nameRange === "#REF!") return "#REF!";
   if (series.nameRange) {
@@ -295,8 +296,8 @@ function requestPivotViews(store: Store): void {
  * Call it after a {@link subscribeChartChanges} event names the chart, not per frame.
  */
 export function resolveChartView(store: Store, sheet: SheetId, id: string): ChartView | null {
-  const sheets = sheetMap(store);
-  const chart = sheets.get(sheet)?.charts?.find((candidate) => candidate.id === id);
+  const sheets = sheetLookup(store);
+  const chart = sheets(sheet)?.charts?.find((candidate) => candidate.id === id);
   if (!chart) return null;
   if (chart.pivot !== undefined) {
     requestPivotViews(store);
@@ -321,8 +322,9 @@ export function resolveChartView(store: Store, sheet: SheetId, id: string): Char
     };
   });
 
-  // The view is handed to UI code; a copy keeps it from mutating the document.
-  return { chart: structuredClone(chart), series };
+  // The store replaces a chart definition when it changes and never writes
+  // into one, so the view shares it; see `ChartView.chart`.
+  return { chart, series };
 }
 
 /** Index entries per source sheet are grouped in blocks; each block keeps its widest row end. */
@@ -398,11 +400,11 @@ class ChartIndex {
   readonly pivots: ChartRef[] = [];
 
   constructor(store: Store) {
-    const sheets = sheetMap(store);
+    const sheets = sheetLookup(store);
     const engine = storeEngine(store);
     const entries = new Map<SheetId, SourceEntry[]>();
 
-    for (const sheet of sheets.values()) {
+    for (const sheet of store.getWorkbook().sheets) {
       for (const definition of sheet.charts ?? []) {
         const chart = this.charts.length;
         const ref = { sheet: sheet.id, id: definition.id };
@@ -425,11 +427,16 @@ class ChartIndex {
     for (const [sheet, list] of entries) this.sources.set(sheet, new SheetSources(list));
   }
 
+  /** Position of `ref` in {@link charts}, or undefined when this index does not hold it. */
+  find(ref: ChartRef): number | undefined {
+    return this.owned.get(ref.sheet)?.find((chart) => this.charts[chart]?.id === ref.id);
+  }
+
   /** Returns whether the chart reads a computed cell. Custom stores cannot tell, so they always do. */
   private addSources(
     definition: ChartDefinition,
     chart: number,
-    sheets: ReadonlyMap<SheetId, Sheet>,
+    sheets: SheetLookup,
     entries: Map<SheetId, SourceEntry[]>,
     engine: StoreDataEngine | null,
   ): boolean {
@@ -482,9 +489,41 @@ function mayAddComputedSource(patch: DocumentOp): boolean {
   }
 }
 
+/**
+ * The indexed charts one commit names, each once, in the order first named.
+ * A chart is marked by writing the commit's stamp at its position, so a
+ * commit allocates nothing per chart and clears nothing.
+ */
+class ChartHits {
+  private stamps = new Uint32Array(0);
+  private stamp = 0;
+  readonly charts: number[] = [];
+
+  /** Start a commit over an index of `count` charts. */
+  reset(count: number): void {
+    if (this.stamps.length < count) this.stamps = new Uint32Array(count);
+    if (this.stamp === 0xffff_ffff) {
+      this.stamps.fill(0);
+      this.stamp = 0;
+    }
+    this.stamp += 1;
+    this.charts.length = 0;
+  }
+
+  has(chart: number): boolean {
+    return this.stamps[chart] === this.stamp;
+  }
+
+  add(chart: number): void {
+    if (this.stamps[chart] === this.stamp) return;
+    this.stamps[chart] = this.stamp;
+    this.charts.push(chart);
+  }
+}
+
 interface PatchContext {
   readonly index: ChartIndex;
-  readonly hits: Set<number>;
+  readonly hits: ChartHits;
   readonly direct: ChartRef[];
   valuesChanged: boolean;
   rebuild: boolean;
@@ -660,6 +699,7 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
 class ChartTracker {
   readonly listeners = new Set<ChartChangeListener>();
   private index: ChartIndex;
+  private readonly hits = new ChartHits();
   private readonly detach: () => void;
 
   constructor(private readonly store: Store) {
@@ -685,9 +725,11 @@ class ChartTracker {
 
   private onChange(event: ChangeEvent): void {
     const index = this.index;
+    const hits = this.hits;
+    hits.reset(index.charts.length);
     const context: PatchContext = {
       index,
-      hits: new Set<number>(),
+      hits,
       direct: [],
       // Volatile recalculation commits no patches but can change values.
       valuesChanged: event.transaction.patches.length === 0,
@@ -695,30 +737,35 @@ class ChartTracker {
     };
     for (const patch of event.transaction.patches) classifyPatch(patch, context);
 
-    const { hits, direct, valuesChanged, rebuild } = context;
+    const { direct, valuesChanged, rebuild } = context;
     if (valuesChanged) for (const chart of index.computed) hits.add(chart);
 
     if (rebuild) this.index = new ChartIndex(this.store);
 
-    if (hits.size === 0 && direct.length === 0) return;
+    if (hits.charts.length === 0 && direct.length === 0) return;
 
-    const seen = new Map<SheetId, Set<string>>();
     const charts: ChartRef[] = [];
-    const push = (ref: ChartRef) => {
-      let ids = seen.get(ref.sheet);
-      if (!ids) {
-        ids = new Set<string>();
-        seen.set(ref.sheet, ids);
-      }
-      if (ids.has(ref.id)) return;
-      ids.add(ref.id);
-      charts.push(ref);
-    };
-    for (const chart of hits) {
+    for (const chart of hits.charts) {
       const ref = index.charts[chart];
-      if (ref) push(ref);
+      if (ref) charts.push(ref);
     }
-    for (const ref of direct) push(ref);
+
+    // Direct refs are few: chart edits and new sheets. A chart the old index
+    // lacks (a new one) is deduplicated by its key.
+    let unindexed: Set<string> | undefined;
+    for (const ref of direct) {
+      const chart = index.find(ref);
+      if (chart !== undefined) {
+        if (hits.has(chart)) continue;
+        hits.add(chart);
+      } else {
+        unindexed ??= new Set();
+        const key = `${ref.sheet}\u0000${ref.id}`;
+        if (unindexed.has(key)) continue;
+        unindexed.add(key);
+      }
+      charts.push(ref);
+    }
 
     const changeEvent: ChartChangeEvent = { epoch: event.epoch, charts };
     for (const listener of this.listeners) listener(changeEvent);

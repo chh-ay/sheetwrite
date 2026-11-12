@@ -105,6 +105,10 @@ export interface ChartSeriesView {
 
 /** One immutable-by-convention rendering input, refreshed on chart-change events. */
 export interface ChartView {
+  /**
+   * The store's own definition, not a copy. The store replaces a chart when
+   * it changes and never writes into one, so do not modify it either.
+   */
   chart: ChartDefinition;
   series: ChartSeriesView[];
 }
