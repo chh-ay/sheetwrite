@@ -10,8 +10,8 @@
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::calc::{
-    area, lex_token, rewrite_own_sheet_axis, serialize, translate_relative_refs, write_ast,
-    AreaEnd, Ast, Axis, AxisChange, Func, Tok,
+    area, lex_token, rewrite_own_sheet_axis, translate_relative_refs, write_ast,
+    write_ast_with_sheets, AreaEnd, Ast, Axis, AxisChange, Func, Tok,
 };
 use crate::types::FormulaError;
 
@@ -85,7 +85,7 @@ pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: 
             continue;
         };
         let owner = index.checked_sub(1).map(|owner| &lexemes[owner]);
-        let owner_name = match owner.map(|owner| &owner.tok) {
+        let owner_name = match owner.map(|before| &before.tok) {
             Some(Tok::Ident(name, _)) => name.as_ref(),
             _ => "",
         };
@@ -96,16 +96,16 @@ pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: 
         let span = if column.is_empty() {
             owner
                 .filter(|_| !owner_name.is_empty())
-                .map(|owner| owner.start..owner.end)
+                .map(|before| before.start..before.end)
         } else {
             let columns = column_span(raw);
             same_name(&raw[columns.clone()], column)
                 .then(|| lexeme.start + columns.start..lexeme.start + columns.end)
         };
-        if let Some(span) = span {
-            out.push_str(&source[copied..span.start]);
+        if let Some(replaced) = span {
+            out.push_str(&source[copied..replaced.start]);
             out.push_str(to);
-            copied = span.end;
+            copied = replaced.end;
         }
     }
 
@@ -221,7 +221,7 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
 /// When the counts differ, they cannot be paired, and the whole formula is
 /// written from the tree. Out of line: every reader of formula text calls it.
 #[inline(never)]
-pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
+pub(crate) fn write_references(source: &str, ast: &Ast, names: &[String]) -> String {
     let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
     let mut out = String::with_capacity(source.len());
     let mut copied = 0;
@@ -235,7 +235,7 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
         let kept = out.len();
         out.push_str(&source[copied..span.start]);
         let written = out.len();
-        write_ast(node, &mut out);
+        write_ast_with_sheets(node, &mut out, names);
 
         // A deleted spill anchor writes as `#REF!`, without the suffix.
         if span.spills() && !matches!(node, Ast::InvalidRef) {
@@ -250,7 +250,9 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
 
     debug_assert_eq!(count, spans.len(), "references of {source}");
     if count != spans.len() {
-        return serialize(ast);
+        out.clear();
+        write_ast_with_sheets(ast, &mut out, names);
+        return out;
     }
     out.push_str(&source[copied..]);
     out
@@ -258,6 +260,10 @@ pub(crate) fn write_references(source: &str, ast: &Ast) -> String {
 
 /// Visit each reference of `ast` in source order: the nodes that
 /// [`references`] finds in the text.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is walked through its children"
+)]
 fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     match ast {
         Ast::Cell(..)
@@ -279,10 +285,14 @@ fn for_each_reference(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not a deleted reference"
+)]
 fn is_deleted(reference: &Ast) -> bool {
     match reference {
         Ast::InvalidRef => true,
-        Ast::Func(Func::AnchorArray, anchor) => matches!(anchor.as_slice(), [Ast::InvalidRef]),
+        Ast::Func(Func::AnchorArray, anchor) => matches!(anchor.as_ref(), [Ast::InvalidRef]),
         _ => false,
     }
 }
@@ -420,7 +430,7 @@ fn reference_at(lexemes: &[Lexeme<'_>], index: usize) -> Option<(Ast, usize)> {
     };
     let cell = Ast::Cell(row, col, flags);
     if tok(index + 1) == Some(&Tok::Hash) {
-        return Some((Ast::Func(Func::AnchorArray, vec![cell]), index + 2));
+        return Some((Ast::Func(Func::AnchorArray, (vec![cell]).into()), index + 2));
     }
     Some((cell, index + 1))
 }

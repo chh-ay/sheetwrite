@@ -77,7 +77,8 @@ impl CellStore {
             let mut changed = false;
             data.formulas
                 .rewrite_entries(&mut self.formula_slots, |entry| {
-                    changed |= entry.relink_sheet(key, handle, formula_sheet as u32);
+                    changed |=
+                        entry.relink_sheet(key, handle, formula_sheet as u32, &self.sheet_names);
                 });
             if changed {
                 data.formulas.mark_all_dirty();

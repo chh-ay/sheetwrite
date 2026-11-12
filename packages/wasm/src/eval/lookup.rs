@@ -75,7 +75,7 @@ impl<'a> Entry<'a> {
             Value::Blank => Self::Blank,
             Value::Number(number) => Self::Number(*number),
             Value::Text(text) => Self::Text(text),
-            Value::Bool(value) => Self::Bool(*value),
+            Value::Bool(flag) => Self::Bool(*flag),
             Value::Error(error) => Self::Error(*error),
         }
     }
@@ -123,8 +123,8 @@ impl<'a> Entry<'a> {
 
 /// The lookup order of two entries: text without case, an error on either
 /// side fails, and otherwise the order of `compare_values`.
-fn compare(left: Entry<'_>, right: Entry<'_>) -> Result<Ordering, FormulaError> {
-    match (left, right) {
+fn compare(left_entry: Entry<'_>, right_entry: Entry<'_>) -> Result<Ordering, FormulaError> {
+    match (left_entry, right_entry) {
         (Entry::Text(left), Entry::Text(right)) => Ok(compare_text_case_insensitive(left, right)),
         (Entry::Error(error), _) | (_, Entry::Error(error)) => Err(error),
         (Entry::Blank, Entry::Blank) => Ok(Ordering::Equal),
@@ -138,7 +138,7 @@ fn compare(left: Entry<'_>, right: Entry<'_>) -> Result<Ordering, FormulaError> 
             left.partial_cmp(&right).ok_or(FormulaError::Num)
         }
         (Entry::Bool(left), Entry::Bool(right)) => Ok(left.cmp(&right)),
-        _ => Ok(left.rank().cmp(&right.rank())),
+        _ => Ok(left_entry.rank().cmp(&right_entry.rank())),
     }
 }
 
@@ -235,14 +235,14 @@ impl SearchState {
     }
 }
 
-/// Searches `list` with the plain scan's rules. With `state`, the search uses
-/// the pass's index where it proves the same answer.
+/// Searches `list` with the plain scan's rules. With `shared_state`, the
+/// search uses the pass's index where it proves the same answer.
 pub(super) fn find_match(
     list: &ListView<'_>,
-    key: &Value,
+    key_value: &Value,
     match_mode: i32,
     search_mode: i32,
-    state: Option<&mut SearchState>,
+    shared_state: Option<&mut SearchState>,
 ) -> Result<Option<usize>, FormulaError> {
     if list.len() == 0 {
         return Ok(None);
@@ -250,14 +250,14 @@ pub(super) fn find_match(
 
     // Only a list several formulas read has a state, so its index pays off
     // from the first search; a list read once keeps the plain scan.
-    let use_index = state.is_some();
+    let use_index = shared_state.is_some();
     let mut single = SearchState::default();
-    let state = state.unwrap_or(&mut single);
+    let state = shared_state.unwrap_or(&mut single);
     if search_mode.abs() == 2 && !state.sorted_ok(list, search_mode)? {
         return Ok(None);
     }
 
-    let key = Entry::of(key);
+    let key = Entry::of(key_value);
     let search_reverse = search_mode < 0;
     if match_mode == 2 {
         return wildcard_scan(list, key, search_reverse);
@@ -450,10 +450,10 @@ fn wildcard_scan(
     key: Entry<'_>,
     search_reverse: bool,
 ) -> Result<Option<usize>, FormulaError> {
-    let Entry::Text(pattern) = key else {
+    let Entry::Text(pattern_text) = key else {
         return Ok(None);
     };
-    let pattern = WildcardPattern::new(pattern)?;
+    let pattern = WildcardPattern::new(pattern_text)?;
     let matches = |position: usize| {
         list.entry(position)
             .wildcard_text()
@@ -540,7 +540,7 @@ fn classify(list: &ListView<'_>) -> Option<UniformKind> {
             Entry::Number(number) if !number.is_nan() => UniformKind::Numeric,
             Entry::Text(_) => UniformKind::Text,
             Entry::Bool(_) => UniformKind::Logical,
-            _ => return None,
+            Entry::Number(_) | Entry::Error(_) => return None,
         };
         match found {
             None => found = Some(kind),
@@ -611,13 +611,13 @@ impl ExactIndex {
             });
         }
 
-        let folded = folded.into_bytes();
-        let text = |slot: u32| {
-            let slot = slot as usize;
+        let folded_bytes = folded.into_bytes();
+        let text = |slot_id: u32| {
+            let slot = slot_id as usize;
             let start = slot
                 .checked_sub(1)
                 .map_or(0, |previous| folded_ends[previous]);
-            &folded[start as usize..folded_ends[slot] as usize]
+            &folded_bytes[start as usize..folded_ends[slot] as usize]
         };
         let mut order: Vec<u32> = (0..text_positions.len() as u32).collect();
         merge_sort(&mut order, &mut |left, right| text(left).cmp(text(right)));
@@ -640,13 +640,13 @@ impl ExactIndex {
         drop((order, text_positions, folded_ends));
 
         let mut order: Vec<u32> = (0..entries.len() as u32).collect();
-        merge_sort(&mut order, &mut |left, right| {
-            let (left, right) = (entries[left as usize], entries[right as usize]);
+        merge_sort(&mut order, &mut |left_index, right_index| {
+            let (left, right) = (entries[left_index as usize], entries[right_index as usize]);
             (left.class, left.value).cmp(&(right.class, right.value))
         });
-        let entries = order.iter().map(|&index| entries[index as usize]).collect();
+        let sorted_entries = order.iter().map(|&index| entries[index as usize]).collect();
         Some(Self {
-            entries,
+            entries: sorted_entries,
             text_bytes,
             text_ends,
         })
@@ -727,7 +727,7 @@ impl ExactIndex {
                     consider(CLASS_BLANK, 0);
                 }
             }
-            _ => return None,
+            Entry::Number(_) | Entry::Error(_) => return None,
         }
         Some(found)
     }
@@ -949,6 +949,10 @@ impl CellStore {
             .unwrap_or_else(Value::Error)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_lookup(
         &self,
         func: Func,
@@ -1049,8 +1053,8 @@ impl CellStore {
                 };
                 let (match_mode, search_mode) = if sorted { (-1, 2) } else { (0, 1) };
                 self.search_lookup_arg(&table, part, &key, match_mode, search_mode, pass)
-                    .map(|found| {
-                        let Some(found) = found else {
+                    .map(|outcome| {
+                        let Some(found) = outcome else {
                             return Value::Error(FormulaError::Na);
                         };
                         let cell = if func == Func::VLookup {
@@ -1183,10 +1187,9 @@ impl CellStore {
             }
         }
 
-        let matrix: EvalMatrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
+        let mut matrix: EvalMatrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
         let rows = matrix.rows;
         let cols = matrix.cols;
-        let mut matrix = matrix;
         let values = std::mem::take(&mut matrix.values);
         Ok(LookupArg::Values { rows, cols, values })
     }
@@ -1309,7 +1312,7 @@ impl CellStore {
 
         let key = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
-            key => key,
+            key @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => key,
         };
         let list = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
         let (rows, cols) = list.shape();
@@ -1350,7 +1353,7 @@ impl CellStore {
             .ok_or(FormulaError::Na)?;
         let value = match part {
             ListPart::FirstRow => table.cell(self, rows - 1, found),
-            _ => table.cell(self, found, cols - 1),
+            ListPart::Whole | ListPart::FirstColumn => table.cell(self, found, cols - 1),
         };
 
         value.ok_or(FormulaError::Na)

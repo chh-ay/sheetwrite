@@ -388,6 +388,7 @@ export type {
   QueryPredicate,
   QueryStep,
   Range,
+  ReadonlyChartDefinition,
   RelationshipStatus,
   RemoteOperationOptions,
   RemoteOperationSource,

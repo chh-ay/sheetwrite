@@ -4,19 +4,21 @@ import {
   ALLOCATION_METHOD,
   CORRECTNESS_METHOD,
   type CompleteFormulaBenchmarkResult,
-  expectedFormulaMemoryKeys,
-  expectedFormulaOutput,
-  expectedFormulaWorkloadKeys,
   FORMULA_BENCHMARK_SCHEMA_VERSION,
   FORMULA_GATE_TOLERANCE,
   FORMULA_PROTOCOL,
   FORMULA_SOURCE_FILES,
   formulaSourceDigest,
   TIMING_METHOD,
+} from "../src/formula-artifact.js";
+import {
+  expectedFormulaMemoryKeys,
+  expectedFormulaWorkloadKeys,
   validateFormulaBenchmark,
   validateFormulaCapture,
   validateFormulaRegression,
 } from "../src/formula-bench.js";
+import { expectedFormulaOutput } from "../src/formula-fixtures.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
 import { expectRejections, must } from "./gate-fixtures.js";
@@ -108,6 +110,30 @@ function withSamples(samples: number[]): Fixture {
   return result;
 }
 
+describe("formula workload matrix", () => {
+  it("runs the closure rows on the full engine only", () => {
+    const closures = [
+      "map-lambda",
+      "reduce-lambda",
+      "byrow-lambda",
+      "lambda-call",
+      "named-lambda",
+      "measure-pivot",
+    ];
+    const isClosure = (key: string) => closures.some((id) => key.startsWith(`workload=${id};`));
+    const full = expectedFormulaWorkloadKeys("full", "formulas");
+    const base = expectedFormulaWorkloadKeys("full", "wasm");
+    expect(base.filter(isClosure)).toEqual([]);
+    expect(base.filter((key) => !full.includes(key))).toEqual([]);
+    expect(full.filter(isClosure)).toEqual(
+      closures.flatMap((id) => [`workload=${id};size=10000`, `workload=${id};size=100000`]),
+    );
+    expect(expectedFormulaWorkloadKeys("smoke", "formulas").filter(isClosure)).toEqual(
+      closures.map((id) => `workload=${id};size=1000`),
+    );
+  });
+});
+
 describe("formula benchmark schema", () => {
   it("rejects drifted workload identities, raw samples, summaries and provenance", () => {
     const named = (result: Fixture) =>
@@ -164,6 +190,10 @@ describe("formula benchmark schema", () => {
       ],
       [(result) => (result.source.digest = "b".repeat(64)), "digest does not match"],
       [(result) => (result.source.files.unbounded = SOURCE_HASH), "must contain exactly"],
+      [
+        (result) => delete result.source.files["bench/src/formula-fixtures.ts"],
+        "must contain exactly",
+      ],
     ]);
   });
 });
@@ -251,6 +281,7 @@ describe("formula regression gate", () => {
       "sort-unique-filter",
       "subtotal-filtered",
       "sparse-page-write",
+      "history-diff",
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",

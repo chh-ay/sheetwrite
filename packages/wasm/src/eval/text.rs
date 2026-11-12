@@ -10,6 +10,10 @@ use super::wildcard::Wildcard;
 const MAX_TEXT_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_SEARCH_STEPS: usize = 4_000_000;
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Len => unary_text(values, |text| {
@@ -64,18 +68,18 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
 
 fn unary_text(
     values: &FuncAccumulator,
-    operation: impl FnOnce(String) -> Result<Value, FormulaError>,
+    operation: impl FnOnce(&str) -> Result<Value, FormulaError>,
 ) -> Value {
     if let Err(error) = require_arity(values, 1, 1) {
         return Value::Error(error);
     }
-    match text_arg(values, 0, None).and_then(operation) {
+    match text_arg(values, 0, None).and_then(|text| operation(&text)) {
         Ok(value) => value,
         Err(error) => Value::Error(error),
     }
 }
 
-fn bounded_text(text: String) -> Result<Value, FormulaError> {
+fn bounded_text(text: &str) -> Result<Value, FormulaError> {
     if text.len() > MAX_TEXT_OUTPUT_BYTES {
         Err(FormulaError::Num)
     } else {
@@ -110,7 +114,7 @@ fn checked_push_character(output: &mut String, character: char) -> Result<(), Fo
     Ok(())
 }
 
-fn change_case(text: String, uppercase: bool) -> Result<Value, FormulaError> {
+fn change_case(text: &str, uppercase: bool) -> Result<Value, FormulaError> {
     let mut output = String::new();
     output
         .try_reserve(text.len().min(MAX_TEXT_OUTPUT_BYTES))
@@ -129,7 +133,7 @@ fn change_case(text: String, uppercase: bool) -> Result<Value, FormulaError> {
     Ok(Value::text(output))
 }
 
-fn clean_text(text: String) -> Result<Value, FormulaError> {
+fn clean_text(text: &str) -> Result<Value, FormulaError> {
     let mut output = String::new();
     output
         .try_reserve(text.len().min(MAX_TEXT_OUTPUT_BYTES))
@@ -167,13 +171,12 @@ fn left_right(values: &FuncAccumulator, right: bool) -> Value {
         Ok(count) => count,
         Err(error) => return Value::Error(error),
     };
-    let length = text.chars().count();
-    let start = if right {
-        length.saturating_sub(count)
+    let slice = if right {
+        &text[code_point_suffix(&text, count)..]
     } else {
-        0
+        &text[..code_point_prefix(&text, count)]
     };
-    slice_text(&text, start, count).unwrap_or_else(Value::Error)
+    bounded_text(slice).unwrap_or_else(Value::Error)
 }
 
 fn mid(values: &FuncAccumulator) -> Value {
@@ -186,7 +189,7 @@ fn mid(values: &FuncAccumulator) -> Value {
     };
     let start = match integer_arg(values, 1, None) {
         Ok(start) if start > 0 => match usize::try_from(start - 1) {
-            Ok(start) => start,
+            Ok(index) => index,
             Err(_) => return Value::Error(FormulaError::Value),
         },
         Ok(_) => return Value::Error(FormulaError::Value),
@@ -196,15 +199,32 @@ fn mid(values: &FuncAccumulator) -> Value {
         Ok(count) => count,
         Err(error) => return Value::Error(error),
     };
-    slice_text(&text, start, count).unwrap_or_else(Value::Error)
+    // A start past the end gives empty text, as in Excel.
+    let Some(start_byte) = code_point_byte_offset(&text, start) else {
+        return Value::text("");
+    };
+    let rest = &text[start_byte..];
+    bounded_text(&rest[..code_point_prefix(rest, count)]).unwrap_or_else(Value::Error)
 }
 
-fn slice_text(text: &str, start: usize, count: usize) -> Result<Value, FormulaError> {
-    let mut output = String::new();
-    for character in text.chars().skip(start).take(count) {
-        checked_push_character(&mut output, character)?;
-    }
-    bounded_text(output)
+/// The byte length of the first `count` code points of `text`, or of all of
+/// it when it has fewer.
+fn code_point_prefix(text: &str, count: usize) -> usize {
+    text.char_indices()
+        .nth(count)
+        .map_or(text.len(), |(offset, _)| offset)
+}
+
+/// The byte offset where the last `count` code points of `text` start, or 0
+/// when it has fewer.
+fn code_point_suffix(text: &str, count: usize) -> usize {
+    let Some(last) = count.checked_sub(1) else {
+        return text.len();
+    };
+    text.char_indices()
+        .rev()
+        .nth(last)
+        .map_or(0, |(offset, _)| offset)
 }
 
 fn concat(values: &FuncAccumulator) -> Value {
@@ -293,12 +313,12 @@ fn substitute(values: &FuncAccumulator) -> Value {
         Err(error) => return Value::Error(error),
     };
     if old.is_empty() {
-        return bounded_text(text).unwrap_or_else(Value::Error);
+        return bounded_text(&text).unwrap_or_else(Value::Error);
     }
     let instance = if values.arg_count() == 4 {
         match integer_arg(values, 3, None) {
             Ok(value) if value > 0 => match usize::try_from(value) {
-                Ok(value) => Some(value),
+                Ok(converted) => Some(converted),
                 Err(_) => return Value::Error(FormulaError::Value),
             },
             Ok(_) => return Value::Error(FormulaError::Value),
@@ -309,7 +329,7 @@ fn substitute(values: &FuncAccumulator) -> Value {
     };
     let mut output = String::new();
     let mut cursor = 0;
-    for (index, (offset, _)) in text.match_indices(&old).enumerate() {
+    for (index, (offset, _)) in text.match_indices(&*old).enumerate() {
         if instance.is_none_or(|wanted| wanted == index + 1) {
             if let Err(error) = checked_push(&mut output, &text[cursor..offset])
                 .and_then(|_| checked_push(&mut output, &new))
@@ -338,7 +358,7 @@ fn replace(values: &FuncAccumulator) -> Value {
     };
     let start = match integer_arg(values, 1, None) {
         Ok(value) if value > 0 => match usize::try_from(value - 1) {
-            Ok(value) => value,
+            Ok(index) => index,
             Err(_) => return Value::Error(FormulaError::Value),
         },
         Ok(_) => return Value::Error(FormulaError::Value),
@@ -385,31 +405,31 @@ fn find_search(values: &FuncAccumulator, case_sensitive: bool) -> Value {
     if let Err(error) = require_arity(values, 2, 3) {
         return Value::Error(error);
     }
-    let needle = match text_arg(values, 0, None) {
+    let needle_text = match text_arg(values, 0, None) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let haystack = match text_arg(values, 1, None) {
+    let haystack_text = match text_arg(values, 1, None) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
     let start = match integer_arg(values, 2, Some(1)) {
         Ok(value) if value > 0 => match usize::try_from(value - 1) {
-            Ok(value) => value,
+            Ok(index) => index,
             Err(_) => return Value::Error(FormulaError::Value),
         },
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
     };
     if !case_sensitive {
-        return wildcard_search(&haystack, &needle, start);
+        return wildcard_search(&haystack_text, &needle_text, start);
     }
 
-    let haystack = match collect_code_points(&haystack) {
+    let haystack = match collect_code_points(&haystack_text) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let needle = match collect_code_points(&needle) {
+    let needle = match collect_code_points(&needle_text) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
@@ -507,15 +527,15 @@ fn repeat(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let count = match integer_arg(values, 1, None) {
+    let requested = match integer_arg(values, 1, None) {
         Ok(value) if value >= 0 => value,
         Ok(_) => return Value::Error(FormulaError::Value),
         Err(error) => return Value::Error(error),
     };
-    if text.is_empty() || count == 0 {
+    if text.is_empty() || requested == 0 {
         return Value::text("");
     }
-    let count = match usize::try_from(count) {
+    let count = match usize::try_from(requested) {
         Ok(value) => value,
         Err(_) => return Value::Error(FormulaError::Num),
     };
@@ -596,15 +616,15 @@ fn number_value(values: &FuncAccumulator) -> Value {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let decimal = match text_arg(values, 1, Some(".")) {
+    let decimal_text = match text_arg(values, 1, Some(".")) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let group = match text_arg(values, 2, Some(",")) {
+    let group_text = match text_arg(values, 2, Some(",")) {
         Ok(value) => value,
         Err(error) => return Value::Error(error),
     };
-    let Some((decimal, group)) = number_separators(&decimal, &group) else {
+    let Some((decimal, group)) = number_separators(&decimal_text, &group_text) else {
         return Value::Error(FormulaError::Value);
     };
     parse_number(&text, decimal, group, InnerSpaces::Ignore)
@@ -695,11 +715,11 @@ mod tests {
     use super::super::test_support::mixed_arguments;
 
     fn evaluate(func: Func, arguments: Vec<Value>) -> Value {
-        let arguments = arguments
+        let mixed = arguments
             .into_iter()
             .map(|value| (false, vec![value]))
             .collect();
-        apply(func, &mixed_arguments(arguments)).unwrap()
+        apply(func, &mixed_arguments(mixed)).unwrap()
     }
 
     fn assert_number(value: Value, expected: f64) {
@@ -741,6 +761,58 @@ mod tests {
         assert_eq!(
             apply(Func::TextJoin, &error).unwrap(),
             Value::Error(FormulaError::Ref)
+        );
+    }
+
+    #[test]
+    fn left_right_and_mid_slice_whole_code_points() {
+        let text = || Value::text("café😀ü");
+        let count = Value::number;
+        assert_eq!(
+            evaluate(Func::Left, vec![text(), count(4.0)]),
+            Value::text("café")
+        );
+        assert_eq!(
+            evaluate(Func::Left, vec![text(), count(0.0)]),
+            Value::text("")
+        );
+        assert_eq!(
+            evaluate(Func::Left, vec![text(), count(99.0)]),
+            Value::text("café😀ü")
+        );
+        assert_eq!(evaluate(Func::Left, vec![text()]), Value::text("c"));
+        assert_eq!(
+            evaluate(Func::Right, vec![text(), count(2.0)]),
+            Value::text("😀ü")
+        );
+        assert_eq!(
+            evaluate(Func::Right, vec![text(), count(0.0)]),
+            Value::text("")
+        );
+        assert_eq!(
+            evaluate(Func::Right, vec![text(), count(99.0)]),
+            Value::text("café😀ü")
+        );
+        assert_eq!(evaluate(Func::Right, vec![text()]), Value::text("ü"));
+        assert_eq!(
+            evaluate(Func::Mid, vec![text(), count(4.0), count(2.0)]),
+            Value::text("é😀")
+        );
+        assert_eq!(
+            evaluate(Func::Mid, vec![text(), count(6.0), count(9.0)]),
+            Value::text("ü")
+        );
+        assert_eq!(
+            evaluate(Func::Mid, vec![text(), count(7.0), count(1.0)]),
+            Value::text("")
+        );
+        assert_eq!(
+            evaluate(Func::Mid, vec![text(), count(9.0), count(1.0)]),
+            Value::text("")
+        );
+        assert_eq!(
+            evaluate(Func::Mid, vec![Value::number(12.5), count(2.0), count(2.0)]),
+            Value::text("2.")
         );
     }
 
@@ -987,7 +1059,7 @@ mod tests {
             assert_number(evaluate(Func::Unicode, vec![character]), code as f64);
         }
         assert_eq!(
-            clean_text("a".repeat(MAX_TEXT_OUTPUT_BYTES + 1)),
+            clean_text(&"a".repeat(MAX_TEXT_OUTPUT_BYTES + 1)),
             Err(FormulaError::Num)
         );
         assert_eq!(

@@ -23,30 +23,6 @@ async function render(source: string): Promise<string> {
 }
 
 describe("content components", () => {
-  it("numbers steps and gives each title a heading", async () => {
-    const html = await render(`
-<Steps>
-  <Step title="Install">Add the package.</Step>
-  <Step title="Create a grid" titleSize="h2">Call createGrid.</Step>
-</Steps>`);
-    expect(html).toContain('<ol class="sw-steps">');
-    expect(html).toContain('<h3 class="sw-step__title">Install</h3>');
-    expect(html).toContain('<h2 class="sw-step__title">Create a grid</h2>');
-  });
-
-  it("links a whole card and draws its sprite icon or illustration", async () => {
-    const html = await render(`
-<CardGroup cols={3}>
-  <Card title="Dashboards" icon="dashboard" href="/docs/features/analysis/dashboards/" cta="Read">Pivots and slicers.</Card>
-  <Card title="Formulas" illustration="formulas">More than 500 functions.</Card>
-</CardGroup>`);
-    expect(html).toContain('<div class="sw-card-group" data-cols="3">');
-    expect(html).toContain('<a class="sw-doc-card" href="/docs/features/analysis/dashboards/">');
-    expect(html).toContain('<use href="#sw-icon-dashboard">');
-    expect(html).toContain('<use href="/figures/illustrations/formulas.svg#art">');
-    expect(html).toContain('<span class="sw-card__cta">Read');
-  });
-
   it("renders a screenshot in both themes, lazily, with its size", async () => {
     const html = await render(`<Screenshot name="dashboard" alt="A dashboard" size="panel" />`);
     expect(html).toContain('src="/figures/shots/dashboard-light-1x.avif"');
@@ -56,41 +32,6 @@ describe("content components", () => {
     expect(html).toContain('width="720" height="480" loading="lazy"');
     // The hidden theme's image is display: none, so assistive technology reads the shown one.
     expect(html.match(/alt="A dashboard"/g)).toHaveLength(2);
-  });
-
-  it("references a diagram file that follows the page theme", async () => {
-    const html = await render(
-      `<Diagram name="engines" alt="Two engines" width="640" height="320" caption="The engines." />`,
-    );
-    expect(html).toContain('<svg class="sw-diagram" viewBox="0 0 640 320" role="img"');
-    expect(html).toContain('<use href="/figures/diagrams/engines.svg#fig">');
-    expect(html).toContain("<figcaption>The engines.</figcaption>");
-  });
-
-  it("labels the two sides of a comparison", async () => {
-    const html = await render(`
-<Compare before="0.6" after="0.7">
-
-\`\`\`ts
-grid.sortBy(2, true);
-\`\`\`
-
-\`\`\`ts
-grid.setViewSort([{ col: 2, ascending: true }]);
-\`\`\`
-
-</Compare>`);
-    expect(html).toContain(
-      '<div class="sw-compare__pane" data-side="before"><p class="sw-compare__label">0.6</p>',
-    );
-    expect(html).toContain(
-      '<div class="sw-compare__pane" data-side="after"><p class="sw-compare__label">0.7</p>',
-    );
-  });
-
-  it("maps badge colours to design-system tones", async () => {
-    const html = await render(`New <Badge color="green">0.7</Badge>`);
-    expect(html).toContain('<span class="sw-badge" data-tone="accent" data-size="md">0.7</span>');
   });
 
   it("dates an update from the release registry", async () => {

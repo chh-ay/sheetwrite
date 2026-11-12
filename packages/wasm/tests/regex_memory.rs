@@ -1,10 +1,11 @@
 //! The REGEX functions keep no compiled pattern after their formula is gone.
-//! This test binary's allocator counts live heap bytes, so memory that a
-//! workbook leaves behind after it is dropped shows up as a difference.
+//! Count only the engine's test thread: libtest allocates on its runner thread
+//! concurrently, even when this binary has only one test. The exact live-byte
+//! comparison must not include that unrelated work.
 #![cfg(feature = "analysis")]
 
 use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::cell::Cell;
 
 use sheetwrite_wasm::CellStore;
 
@@ -13,7 +14,11 @@ const PATTERNS: [&str; 3] = ["(alpha|beta){40}", "(gamma|delta){40}", "(kappa|si
 
 struct CountingAllocator;
 
-static LIVE_BYTES: AtomicUsize = AtomicUsize::new(0);
+thread_local! {
+    /// Live bytes this thread allocated. Wrapping, because one thread can free
+    /// what another allocated; only the test thread's difference is compared.
+    static LIVE_BYTES: Cell<usize> = const { Cell::new(0) };
+}
 
 // SAFETY: every call forwards to `System` unchanged and only adjusts a counter.
 #[allow(unsafe_code, reason = "the test replaces the global allocator")]
@@ -21,13 +26,13 @@ unsafe impl GlobalAlloc for CountingAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         let pointer = System.alloc(layout);
         if !pointer.is_null() {
-            LIVE_BYTES.fetch_add(layout.size(), Ordering::Relaxed);
+            LIVE_BYTES.with(|bytes| bytes.set(bytes.get().wrapping_add(layout.size())));
         }
         pointer
     }
 
     unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        LIVE_BYTES.fetch_sub(layout.size(), Ordering::Relaxed);
+        LIVE_BYTES.with(|bytes| bytes.set(bytes.get().wrapping_sub(layout.size())));
         System.dealloc(pointer, layout)
     }
 }
@@ -78,11 +83,11 @@ fn evaluate_and_drop(pattern: &str) {
 #[test]
 fn regex_memory_is_released_with_the_formula() {
     evaluate_and_drop(PATTERNS[0]);
-    let settled = LIVE_BYTES.load(Ordering::Relaxed);
+    let settled = LIVE_BYTES.with(Cell::get);
 
     for pattern in &PATTERNS[1..] {
         evaluate_and_drop(pattern);
     }
 
-    assert_eq!(LIVE_BYTES.load(Ordering::Relaxed), settled);
+    assert_eq!(LIVE_BYTES.with(Cell::get), settled);
 }

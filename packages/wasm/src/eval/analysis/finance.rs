@@ -66,11 +66,11 @@ fn calculate(name: &str, arguments: &FuncAccumulator) -> NumberResult {
         "EFFECT" | "NOMINAL" => {
             require_arity(arguments, 2, 2)?;
             let rate = number_arg(arguments, 0, None)?;
-            let periods = integer_arg(arguments, 1, None)?;
-            if rate <= 0.0 || periods < 1 {
+            let whole_periods = integer_arg(arguments, 1, None)?;
+            if rate <= 0.0 || whole_periods < 1 {
                 return Err(FormulaError::Num);
             }
-            let periods = periods as f64;
+            let periods = whole_periods as f64;
             Ok(if name == "EFFECT" {
                 (periods * (rate / periods).ln_1p()).exp_m1()
             } else {
@@ -204,11 +204,11 @@ fn depreciation(arguments: &FuncAccumulator, is_fixed: bool) -> NumberResult {
     }
     if is_fixed {
         let month = integer_arg(arguments, 4, Some(12))? as f64;
-        let period = period.trunc();
+        let whole_period = period.trunc();
         if month < 1.0
             || month > MONTHS_PER_YEAR
-            || period < 1.0
-            || period > life + if month < MONTHS_PER_YEAR { 1.0 } else { 0.0 }
+            || whole_period < 1.0
+            || whole_period > life + if month < MONTHS_PER_YEAR { 1.0 } else { 0.0 }
         {
             return Err(FormulaError::Num);
         }
@@ -218,11 +218,11 @@ fn depreciation(arguments: &FuncAccumulator, is_fixed: bool) -> NumberResult {
         let rate = ((1.0 - (salvage / cost).powf(1.0 / life)) * DB_RATE_PRECISION).round()
             / DB_RATE_PRECISION;
         let first = cost * rate * month / MONTHS_PER_YEAR;
-        if period == 1.0 {
+        if whole_period == 1.0 {
             return Ok(first);
         }
-        let depreciation = (cost - first) * (1.0 - rate).powf(period - 2.0) * rate;
-        Ok(if period > life {
+        let depreciation = (cost - first) * (1.0 - rate).powf(whole_period - 2.0) * rate;
+        Ok(if whole_period > life {
             depreciation * (MONTHS_PER_YEAR - month) / MONTHS_PER_YEAR
         } else {
             depreciation
@@ -281,7 +281,7 @@ fn scheduled_value(arguments: &FuncAccumulator) -> NumberResult {
             Value::Number(rate) => future *= 1.0 + rate,
             Value::Blank => (),
             Value::Error(error) => return Err(*error),
-            _ => return Err(FormulaError::Value),
+            Value::Text(_) | Value::Bool(_) => return Err(FormulaError::Value),
         }
     }
     Ok(future)
@@ -322,7 +322,7 @@ fn list_number(entry: &FuncValue) -> NumberResult {
         Value::Number(number) if number.is_finite() => Ok(*number),
         Value::Blank => Ok(0.0),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) => Err(FormulaError::Value),
     }
 }
 
@@ -339,9 +339,9 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
     let mut has_negative = false;
     let mut cash_scale = 0.0;
     let mut last_date = first_date;
-    for (cash, date) in cash_flows.iter().zip(dates) {
-        let cash = list_number(cash)?;
-        let date = list_number(date)?.trunc();
+    for (cash_cell, date_cell) in cash_flows.iter().zip(dates) {
+        let cash = list_number(cash_cell)?;
+        let date = list_number(date_cell)?.trunc();
         if !(0.0..=LAST_DATE_SERIAL).contains(&date) {
             return Err(FormulaError::Value);
         }
@@ -353,7 +353,7 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
         cash_scale += cash.abs();
         last_date = last_date.max(date);
     }
-    let rate = number_arg(
+    let mut rate = number_arg(
         arguments,
         if is_internal { 2 } else { 0 },
         if is_internal {
@@ -385,7 +385,6 @@ fn dated_return(arguments: &FuncAccumulator, is_internal: bool) -> NumberResult 
     if !has_positive || !has_negative {
         return Err(FormulaError::Num);
     }
-    let mut rate = rate;
     for _ in 0..XIRR_MAX_ITERATIONS {
         let (present, derivative) = discount(rate);
         if !present.is_finite() || !derivative.is_finite() || derivative == 0.0 {
@@ -413,15 +412,15 @@ fn discounted(
 ) -> (f64, f64) {
     let mut present = 0.0;
     let mut derivative = 0.0;
-    for (cash, date) in cash_flows.iter().zip(dates) {
+    for (cash_cell, date_cell) in cash_flows.iter().zip(dates) {
         // Both slices have been validated before the iteration starts.
-        let cash = match &cash.value {
+        let cash = match &cash_cell.value {
             Value::Number(number) => *number,
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
-        let date = match &date.value {
+        let date = match &date_cell.value {
             Value::Number(number) => number.trunc(),
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
         let years = (date - first_date) / DAYS_PER_YEAR;
         let discounted_cash = cash / (1.0 + rate).powf(years);
@@ -445,14 +444,14 @@ fn discounted_cached(
     }
     let mut present = 0.0;
     let mut derivative = 0.0;
-    for (cash, date) in cash_flows.iter().zip(dates) {
-        let cash = match &cash.value {
+    for (cash_cell, date_cell) in cash_flows.iter().zip(dates) {
+        let cash = match &cash_cell.value {
             Value::Number(number) => *number,
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
-        let date = match &date.value {
+        let date = match &date_cell.value {
             Value::Number(number) => number.trunc(),
-            _ => 0.0,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0.0,
         };
         let year_index = (date - first_date) as usize;
         let discounted_cash = cash / powers[year_index];

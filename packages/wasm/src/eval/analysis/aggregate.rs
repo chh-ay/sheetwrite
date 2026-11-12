@@ -104,7 +104,7 @@ impl Context<'_, '_> {
 
     fn code(&mut self, ast: Option<&Ast>, default: i64) -> Result<i64, FormulaError> {
         match ast {
-            Some(ast) => Ok(number_from_value(&self.scalar(ast))?.trunc() as i64),
+            Some(code_ast) => Ok(number_from_value(&self.scalar(code_ast))?.trunc() as i64),
             None => Ok(default),
         }
     }
@@ -157,7 +157,7 @@ fn push_data(
     }
     let matrix = context.matrix(ast)?;
     let source =
-        range.and_then(|range| Some((range, context.store.sheets.get(range.sheet as usize)?)));
+        range.and_then(|area| Some((area, context.store.sheets.get(area.sheet as usize)?)));
     values.reserve(matrix.values.len())?;
     for (index, value) in matrix.values.iter().enumerate() {
         let is_skipped = source.is_some_and(|(range, sheet)| {
@@ -206,7 +206,7 @@ mod tests {
         ];
         for (row, (number, other)) in first.iter().zip(second).enumerate() {
             match number {
-                Some(number) => store.set_number(sheet, row, 0, *number, 0),
+                Some(first_number) => store.set_number(sheet, row, 0, *first_number, 0),
                 None if row == 0 => {
                     store.set_formula(sheet, row, 0, "=1/0", 0);
                 }

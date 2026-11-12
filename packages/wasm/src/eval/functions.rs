@@ -1,5 +1,6 @@
 //! Shared bounded argument accumulation and thin scalar-family dispatch.
 
+use std::borrow::Cow;
 use std::mem::MaybeUninit;
 
 use crate::calc::Func;
@@ -380,6 +381,10 @@ fn financial_family(func: Func, values: &FuncAccumulator) -> EvalResult {
     financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+)]
 fn logical_reduce(func: Func, values: &FuncAccumulator) -> Value {
     if values.len() == 0 {
         return match func {
@@ -458,6 +463,10 @@ pub(super) struct ReductionFold {
 
 impl ReductionFold {
     /// The fold for `func`, or `None` when the function needs its values.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn new(func: Func) -> Option<Self> {
         let kind = match func {
             Func::Sum => ReductionKind::Sum,
@@ -494,7 +503,10 @@ impl ReductionFold {
                     self.count += 1;
                 }
             }
-            _ => {
+            ReductionKind::Sum
+            | ReductionKind::Average
+            | ReductionKind::Minimum
+            | ReductionKind::Maximum => {
                 if let Some(number) = aggregate_number(value, true)? {
                     self.count += 1;
                     self.sum += number;
@@ -515,7 +527,10 @@ impl ReductionFold {
         self.cells += 1;
         match self.kind {
             ReductionKind::Count | ReductionKind::CountA => self.count += 1,
-            _ => {
+            ReductionKind::Sum
+            | ReductionKind::Average
+            | ReductionKind::Minimum
+            | ReductionKind::Maximum => {
                 self.count += 1;
                 self.sum += number;
                 self.min = self.min.min(number);
@@ -713,27 +728,28 @@ pub(super) fn bool_arg(
     }
 }
 
-pub(super) fn text_arg(
-    values: &FuncAccumulator,
+pub(super) fn text_arg<'a>(
+    values: &'a FuncAccumulator,
     index: usize,
-    default: Option<&str>,
-) -> Result<String, FormulaError> {
+    default: Option<&'a str>,
+) -> Result<Cow<'a, str>, FormulaError> {
     if values.arg_missing(index) {
-        return default.map(str::to_string).ok_or(FormulaError::Value);
+        return default.map(Cow::Borrowed).ok_or(FormulaError::Value);
     }
     match values.arg_value(index) {
         Some(value) => text_from_value(value),
-        None => default.map(str::to_string).ok_or(FormulaError::Value),
+        None => default.map(Cow::Borrowed).ok_or(FormulaError::Value),
     }
 }
 
+#[cfg(feature = "analysis")]
 pub(super) fn numeric_entries<'a>(
     entries: impl IntoIterator<Item = &'a FuncValue>,
 ) -> Result<Vec<f64>, FormulaError> {
     let iter = entries.into_iter();
     let mut numbers = Vec::new();
-    let (_, upper) = iter.size_hint();
-    if let Some(upper) = upper {
+    let (_, upper_bound) = iter.size_hint();
+    if let Some(upper) = upper_bound {
         numbers.try_reserve(upper).map_err(|_| FormulaError::Num)?;
     }
     for entry in iter {

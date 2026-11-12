@@ -1,16 +1,18 @@
 //! The workbook-wide store: sheet management, cell reads/writes, bulk loads.
+//! Missing sheet references retain their tree and are indexed by stable formula
+//! identity, so naming a sheet binds only its waiting users without reparsing.
 
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
 use std::mem::size_of;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{
-    ast_contains_sheet_span, external_name_key, moved_index, moved_span, parse,
-    parse_with_features, place_span, resolve_sheet_refs, resolve_structured_refs, sheet_name_key,
-    shift_range, Ast, NamedRangeRef, StructuredRef, TableSection, UnresolvedStructuredRef,
+    ast_contains_sheet_span, bind_sheet_refs, external_name_key, has_unresolved_local_sheets,
+    moved_index, moved_span, parse, parse_bound_with_features, place_span, resolve_structured_refs,
+    sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef, TableSection,
+    UnresolvedStructuredRef,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -133,7 +135,8 @@ impl SourceSnapshot {
 ///
 /// The host may retain this object in undo history, but it is deliberately not
 /// part of the serialized document protocol. A deduplicated local dictionary
-/// owns captured text independently of the store's pool epoch.
+/// owns captured text independently of the store's pool epoch. Formula text
+/// is materialized at capture, so history needs no sheet-name registry.
 #[wasm_bindgen]
 pub struct RangeSnapshot {
     rows: usize,
@@ -213,7 +216,7 @@ impl RangeSnapshot {
                 .map(|(_, _, entry)| {
                     std::mem::size_of::<(u32, u32)>()
                         + if entry.is_formula() {
-                            entry.source().len()
+                            entry.source(&[]).len()
                         } else {
                             std::mem::size_of::<AbsCellKey>()
                         }
@@ -226,7 +229,7 @@ impl RangeSnapshot {
         self.formulas
             .iter()
             .filter(|(_, _, entry)| entry.is_formula())
-            .map(|(_, _, entry)| entry.source().into_owned())
+            .map(|(_, _, entry)| entry.source(&[]).into_owned())
             .collect()
     }
 }
@@ -348,8 +351,8 @@ pub struct CellStore {
     // every store, and most workbooks never reorder tabs.
     #[allow(clippy::box_collection)]
     sheet_order: Option<Box<Vec<u32>>>,
-    pub(crate) sheet_lookup: HashMap<String, usize>,
-    pub(crate) sheet_ids: HashMap<String, usize>,
+    pub(crate) sheet_lookup: FxHashMap<String, usize>,
+    pub(crate) sheet_ids: FxHashMap<String, usize>,
     pub(crate) strings: StringStorage,
     /// Stable ids keep formula passes independent of address-index allocation.
     pub(crate) formula_slots: FormulaStore,
@@ -369,8 +372,8 @@ pub struct CellStore {
     #[cfg(feature = "analysis")]
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
-    defined_names: HashMap<(Option<u32>, String), names::DefinedName>,
-    tables: HashMap<String, TableDefinition>,
+    defined_names: FxHashMap<(Option<u32>, String), names::DefinedName>,
+    tables: FxHashMap<String, TableDefinition>,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
@@ -457,8 +460,8 @@ impl CellStore {
             sheet_names: Vec::new(),
             sheet_alive: Vec::new(),
             sheet_order: None,
-            sheet_lookup: HashMap::new(),
-            sheet_ids: HashMap::new(),
+            sheet_lookup: FxHashMap::default(),
+            sheet_ids: FxHashMap::default(),
             strings: StringStorage::new(),
             formula_slots: FormulaStore::default(),
             formula_results: None,
@@ -471,7 +474,7 @@ impl CellStore {
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
-            defined_names: HashMap::new(),
+            defined_names: FxHashMap::default(),
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
@@ -479,7 +482,7 @@ impl CellStore {
             pivots: None,
             #[cfg(feature = "analysis")]
             relationships: None,
-            tables: HashMap::new(),
+            tables: FxHashMap::default(),
         }
     }
 
@@ -735,11 +738,11 @@ impl CellStore {
 
         self.sheets.get(sheet).is_some_and(|data| {
             cols.iter().all(|&col| {
-                let col = col as usize;
+                let col_index = col as usize;
 
-                data.cells.contains_cell(start_row, col)
-                    && data.cells.contains_cell(end_row - 1, col)
-                    && (start_row..end_row).all(|row| data.cells.is_loaded(row, col))
+                data.cells.contains_cell(start_row, col_index)
+                    && data.cells.contains_cell(end_row - 1, col_index)
+                    && (start_row..end_row).all(|row| data.cells.is_loaded(row, col_index))
             })
         })
     }
@@ -820,6 +823,10 @@ impl CellStore {
         self.sheet_names[sheet] = name.to_owned();
         self.sheet_ids.insert(id.to_owned(), sheet);
         self.sheet_lookup.insert(sheet_name_key(name), sheet);
+        let affected = self.bind_pending_sheet_formulas(id, name);
+        if !affected.is_empty() {
+            self.recompute_seed_sheets(&affected);
+        }
     }
 
     /// Rename a live stable sheet handle and rewrite every resolved formula AST reference.
@@ -828,7 +835,7 @@ impl CellStore {
         let name_key = sheet_name_key(name);
 
         if name.is_empty()
-            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || self.sheet_alive.get(sheet) != Some(&true)
             || self.sheet_ids.get(id) != Some(&sheet)
             || self
                 .sheet_lookup
@@ -857,10 +864,15 @@ impl CellStore {
             }
         }
 
-        self.rename_sheet_in_named_formulas(sheet as u32, name);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_owned();
         self.sheet_lookup.insert(name_key, sheet);
+        self.rename_sheet_in_named_formulas(sheet as u32, name);
+        for pending_sheet in self.bind_pending_sheet_formulas(id, name) {
+            if !affected.contains(&pending_sheet) {
+                affected.push(pending_sheet);
+            }
+        }
         self.graph.invalidate();
 
         self.recompute_with_volatile_sheets(affected);
@@ -871,7 +883,7 @@ impl CellStore {
     /// Tombstone a stable sheet handle and invalidate every formula reference to it.
     #[wasm_bindgen(js_name = removeSheet)]
     pub fn remove_sheet(&mut self, sheet: usize) -> bool {
-        if !self.sheet_alive.get(sheet).copied().unwrap_or(false) {
+        if self.sheet_alive.get(sheet) != Some(&true) {
             return false;
         }
 
@@ -957,7 +969,8 @@ impl CellStore {
         let valid = order.len() == current.len()
             && order.iter().all(|&handle| {
                 let index = handle as usize;
-                let fresh = self.sheet_alive.get(index).copied().unwrap_or(false) && !seen[index];
+                let fresh =
+                    self.sheet_alive.get(index).copied().unwrap_or_default() && !seen[index];
                 if fresh {
                     seen[index] = true;
                 }
@@ -1209,21 +1222,25 @@ impl CellStore {
         }
 
         let mut destination_cells = Vec::with_capacity(offsets.len());
-        let mut entry_offsets = HashSet::with_capacity(offsets.len());
+        let mut entry_offsets = FxHashSet::with_capacity_and_hasher(offsets.len(), FxBuildHasher);
 
         for &offset in offsets {
             if offset as usize >= cell_count || !entry_offsets.insert(offset) {
                 return BLOCK_INVALID;
             }
 
-            let offset = offset as usize;
-            destination_cells.push((start_row + offset / cols, start_col + offset % cols));
+            let cell_offset = offset as usize;
+            destination_cells.push((
+                start_row + cell_offset / cols,
+                start_col + cell_offset % cols,
+            ));
         }
 
-        let mut source_offsets = HashSet::with_capacity(
+        let mut source_offsets = FxHashSet::with_capacity_and_hasher(
             formula_offsets
                 .len()
                 .saturating_add(reference_offsets.len()),
+            FxBuildHasher,
         );
 
         for &offset in formula_offsets {
@@ -1238,7 +1255,8 @@ impl CellStore {
             }
         }
 
-        let mut prepared_sources = HashMap::with_capacity(source_offsets.len());
+        let mut prepared_sources =
+            FxHashMap::with_capacity_and_hasher(source_offsets.len(), FxBuildHasher);
 
         for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
             let offset_index = offset as usize;
@@ -1263,7 +1281,7 @@ impl CellStore {
             };
             let target_sheet = target.sheet as usize;
 
-            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+            if self.sheet_alive.get(target_sheet) != Some(&true)
                 || !self.sheets[target_sheet]
                     .cells
                     .contains_cell(target.row as usize, target.col as usize)
@@ -1271,10 +1289,7 @@ impl CellStore {
                 return BLOCK_SOURCE_INVALID;
             }
 
-            prepared_sources.insert(
-                offset,
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
-            );
+            prepared_sources.insert(offset, FormulaEntry::reference(target, sheet as u32));
         }
 
         if let Some(revision) = dirty_revision {
@@ -1513,14 +1528,15 @@ impl CellStore {
         let mut formulas = Vec::new();
         let mut references = Vec::new();
         for ((row, col), entry) in s.formulas.iter(&self.formula_slots) {
-            let row = row as usize;
-            let col = col as usize;
-            if row < r0 || row >= r0 + rows || col < c0 || col >= c0 + cols {
+            let sheet_row = row as usize;
+            let sheet_col = col as usize;
+            if sheet_row < r0 || sheet_row >= r0 + rows || sheet_col < c0 || sheet_col >= c0 + cols
+            {
                 continue;
             }
-            let offset = ((row - r0) * cols + col - c0) as u32;
+            let offset = ((sheet_row - r0) * cols + sheet_col - c0) as u32;
             if entry.is_formula() {
-                formulas.push((offset, entry.source().into_owned()));
+                formulas.push((offset, entry.source(&self.sheet_names).into_owned()));
             } else if let Some(target) = entry.reference_target(sheet as u32) {
                 references.push((offset, target));
             }
@@ -1592,7 +1608,7 @@ impl CellStore {
                 };
                 if entry.is_formula() {
                     formula_offsets.push(offset as u32);
-                    formula_sources.push(entry.source().into_owned());
+                    formula_sources.push(entry.source(&self.sheet_names).into_owned());
                 } else if let Some(target) = entry.reference_target(sheet as u32) {
                     reference_offsets.push(offset as u32);
                     reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
@@ -1658,12 +1674,12 @@ impl CellStore {
         target_sheet: usize,
         max_entries: usize,
     ) -> Option<Vec<u32>> {
-        if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false) {
+        if self.sheet_alive.get(target_sheet) != Some(&true) {
             return Some(Vec::new());
         }
         let mut sources = Vec::new();
         for (source_sheet, data) in self.sheets.iter().enumerate() {
-            if !self.sheet_alive.get(source_sheet).copied().unwrap_or(false) {
+            if self.sheet_alive.get(source_sheet) != Some(&true) {
                 continue;
             }
             for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
@@ -1712,7 +1728,7 @@ impl CellStore {
         {
             return false;
         }
-        let mapping: HashMap<u32, u32> = old_ids
+        let mapping: FxHashMap<u32, u32> = old_ids
             .iter()
             .copied()
             .zip(new_ids.iter().copied())
@@ -1761,7 +1777,7 @@ impl CellStore {
             let source = s.formulas.get(key, &self.formula_slots);
             let text = source
                 .filter(|entry| entry.is_formula())
-                .map(FormulaEntry::source);
+                .map(|entry| entry.source(&self.sheet_names));
             let reference_target = source
                 .filter(|entry| entry.is_reference())
                 .and_then(|entry| entry.reference_target(sheet as u32));
@@ -1773,7 +1789,7 @@ impl CellStore {
                 0
             };
             let source_length = if source_kind == 1 {
-                text.as_ref().map_or(0, |text| text.len())
+                text.as_ref().map_or(0, |formula_text| formula_text.len())
             } else if source_kind == 2 {
                 3
             } else {
@@ -1789,8 +1805,8 @@ impl CellStore {
                 f64::from(source_kind),
                 source_length as f64,
             ]);
-            if let Some(text) = &text {
-                for chunk in text.as_bytes().chunks(4) {
+            if let Some(formula_text) = &text {
+                for chunk in formula_text.as_bytes().chunks(4) {
                     let mut word = 0u32;
                     for (shift, byte) in chunk.iter().enumerate() {
                         word |= u32::from(*byte) << (shift * 8);
@@ -1855,10 +1871,19 @@ impl CellStore {
             .formulas
             .iter(&self.formula_slots)
             .filter_map(|((row, col), entry)| {
-                let row = row as usize;
-                let col = col as usize;
-                (row >= r0 && row < r0 + rows && col >= c0 && col < c0 + cols)
-                    .then(|| ((row - r0) as u32, (col - c0) as u32, entry.clone()))
+                let sheet_row = row as usize;
+                let sheet_col = col as usize;
+                (sheet_row >= r0
+                    && sheet_row < r0 + rows
+                    && sheet_col >= c0
+                    && sheet_col < c0 + cols)
+                    .then(|| {
+                        (
+                            (sheet_row - r0) as u32,
+                            (sheet_col - c0) as u32,
+                            entry.captured(&self.sheet_names),
+                        )
+                    })
             })
             .collect();
         Some(RangeSnapshot {
@@ -1893,37 +1918,38 @@ impl CellStore {
         {
             return false;
         }
-        let mut sources = HashMap::with_capacity(snapshot.formulas.len());
+        let mut sources =
+            FxHashMap::with_capacity_and_hasher(snapshot.formulas.len(), FxBuildHasher);
         for (row, col, entry) in &snapshot.formulas {
             let Some(key) = cell_key(r0 + *row as usize, c0 + *col as usize) else {
                 return false;
             };
             let source = if entry.is_formula() {
-                self.parse_formula_entry(&entry.source(), sheet as u32, key.0, key.1)
+                self.parse_formula_entry(&entry.source(&[]), sheet as u32, key.0, key.1)
             } else {
                 let Some(target) = entry.reference_target(sheet as u32) else {
                     return false;
                 };
                 let target_sheet = target.sheet as usize;
-                if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+                if self.sheet_alive.get(target_sheet) != Some(&true)
                     || !self.sheets[target_sheet]
                         .cells
                         .contains_cell(target.row as usize, target.col as usize)
                 {
                     return false;
                 }
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32)
+                FormulaEntry::reference(target, sheet as u32)
             };
             sources.insert(key, source);
         }
         let revision = self.local_dirty_revision();
-        if let Some(revision) = revision {
+        if let Some(dirty_revision) = revision {
             if !self.sheets[sheet].cells.prepare_dirty_rect(
                 r0,
                 c0,
                 snapshot.rows,
                 snapshot.cols,
-                revision,
+                dirty_revision,
             ) {
                 return false;
             }
@@ -2140,20 +2166,20 @@ impl CellStore {
         if count == 0 {
             return true;
         }
-        let at = at.min(rows);
+        let clamped_at = at.min(rows);
         if !self.begin_structural_edit(sheet, new_rows, cols)
             || !self.finish_cell_edit(sheet, |data, slots| {
-                data.insert_rows(sheet as u32, at, count, slots)
+                data.insert_rows(sheet as u32, clamped_at, count, slots)
             })
         {
             return false;
         }
-        self.rewrite_formula_rows(sheet as u32, at as u32, count as i64);
+        self.rewrite_formula_rows(sheet as u32, clamped_at as u32, count as i64);
         self.graph.invalidate();
         self.shift_pivots(
             sheet,
             pivot_output::ShiftAxis::Rows,
-            at as u32,
+            clamped_at as u32,
             count as i64,
         );
         true
@@ -2168,21 +2194,21 @@ impl CellStore {
         if count == 0 || at >= rows {
             return true;
         }
-        let count = count.min(rows - at);
-        if !self.begin_structural_edit(sheet, rows - count, cols)
+        let clamped_count = count.min(rows - at);
+        if !self.begin_structural_edit(sheet, rows - clamped_count, cols)
             || !self.finish_cell_edit(sheet, |data, slots| {
-                data.delete_rows(sheet as u32, at, count, slots)
+                data.delete_rows(sheet as u32, at, clamped_count, slots)
             })
         {
             return false;
         }
-        self.rewrite_formula_rows(sheet as u32, at as u32, -(count as i64));
+        self.rewrite_formula_rows(sheet as u32, at as u32, -(clamped_count as i64));
         self.graph.invalidate();
         self.shift_pivots(
             sheet,
             pivot_output::ShiftAxis::Rows,
             at as u32,
-            -(count as i64),
+            -(clamped_count as i64),
         );
         true
     }
@@ -2199,20 +2225,20 @@ impl CellStore {
         if count == 0 {
             return true;
         }
-        let at = at.min(cols);
+        let clamped_at = at.min(cols);
         if !self.begin_structural_edit(sheet, rows, new_cols)
             || !self.finish_cell_edit(sheet, |data, slots| {
-                data.insert_cols(sheet as u32, at, count, slots)
+                data.insert_cols(sheet as u32, clamped_at, count, slots)
             })
         {
             return false;
         }
-        self.rewrite_formula_cols(sheet as u32, at as u32, count as i64);
+        self.rewrite_formula_cols(sheet as u32, clamped_at as u32, count as i64);
         self.graph.invalidate();
         self.shift_pivots(
             sheet,
             pivot_output::ShiftAxis::Cols,
-            at as u32,
+            clamped_at as u32,
             count as i64,
         );
         true
@@ -2227,21 +2253,21 @@ impl CellStore {
         if count == 0 || at >= cols {
             return true;
         }
-        let count = count.min(cols - at);
-        if !self.begin_structural_edit(sheet, rows, cols - count)
+        let clamped_count = count.min(cols - at);
+        if !self.begin_structural_edit(sheet, rows, cols - clamped_count)
             || !self.finish_cell_edit(sheet, |data, slots| {
-                data.delete_cols(sheet as u32, at, count, slots)
+                data.delete_cols(sheet as u32, at, clamped_count, slots)
             })
         {
             return false;
         }
-        self.rewrite_formula_cols(sheet as u32, at as u32, -(count as i64));
+        self.rewrite_formula_cols(sheet as u32, at as u32, -(clamped_count as i64));
         self.graph.invalidate();
         self.shift_pivots(
             sheet,
             pivot_output::ShiftAxis::Cols,
             at as u32,
-            -(count as i64),
+            -(clamped_count as i64),
         );
         true
     }
@@ -2307,7 +2333,8 @@ impl CellStore {
         let key = cell_key(row, col);
 
         if source_kind == KIND_FORMULA || kind == KIND_FORMULA {
-            if let Some(error) = key.and_then(|key| formula_error_at(s, key, &self.formula_slots)) {
+            if let Some(error) = key.and_then(|cell| formula_error_at(s, cell, &self.formula_slots))
+            {
                 return CellOut {
                     kind: KIND_STRING,
                     num: 0.0,
@@ -2318,7 +2345,7 @@ impl CellStore {
         }
 
         let has_formula =
-            source_kind == KIND_FORMULA && key.is_some_and(|key| s.formulas.contains(key));
+            source_kind == KIND_FORMULA && key.is_some_and(|cell| s.formulas.contains(cell));
 
         // The scalar read contract keeps the formula kind for numeric anchors.
         let output_kind = if source_kind == KIND_FORMULA && (!has_formula || kind == KIND_NUMBER) {
@@ -2358,10 +2385,10 @@ impl CellStore {
         row_end: usize,
         col_end: usize,
     ) -> bool {
-        let Some(scope) = self.defined_name_scope(name, scope) else {
+        let Some(name_scope) = self.defined_name_scope(name, scope) else {
             return false;
         };
-        if !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+        if self.sheet_alive.get(sheet) != Some(&true)
             || row_start > row_end
             || col_start > col_end
             || row_end >= self.sheets[sheet].cells.row_count()
@@ -2369,10 +2396,10 @@ impl CellStore {
         {
             return false;
         }
-        let key = (scope, workbook_name_key(name));
+        let key = (name_scope, workbook_name_key(name));
         let definition = NamedRangeRef {
             name: name.to_owned(),
-            scope,
+            scope: name_scope,
             sheet: sheet as u32,
             row_start: row_start as u32,
             col_start: col_start as u32,
@@ -2462,7 +2489,7 @@ impl CellStore {
             || column_ids.is_empty()
             || column_ids.len() > MAX_TABLE_COLUMNS
             || column_ids.len() != column_names.len()
-            || !self.sheet_alive.get(sheet).copied().unwrap_or(false)
+            || self.sheet_alive.get(sheet) != Some(&true)
             || row_start > row_end
             || col_start > col_end
             || row_end >= self.sheets[sheet].cells.row_count()
@@ -2488,8 +2515,8 @@ impl CellStore {
         {
             return false;
         }
-        let mut ids = HashSet::with_capacity(column_ids.len());
-        let mut names = HashSet::with_capacity(column_names.len());
+        let mut ids = FxHashSet::with_capacity_and_hasher(column_ids.len(), FxBuildHasher);
+        let mut names = FxHashSet::with_capacity_and_hasher(column_names.len(), FxBuildHasher);
         let mut columns = Vec::with_capacity(column_ids.len());
         for (column_index, (column_id, column_name)) in
             column_ids.into_iter().zip(column_names).enumerate()
@@ -2644,7 +2671,9 @@ impl CellStore {
             .get(sheet)?
             .formulas
             .get(key, &self.formula_slots)?;
-        entry.is_formula().then(|| entry.source().into_owned())
+        entry
+            .is_formula()
+            .then(|| entry.source(&self.sheet_names).into_owned())
     }
 
     #[wasm_bindgen(js_name = referenceTarget)]
@@ -2723,9 +2752,12 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Vec::new();
         };
-        let row_start = row_start.min(data.cells.row_count());
-        let row_end = row_end.min(data.cells.row_count());
-        let Some(len) = row_end.saturating_sub(row_start).checked_mul(cols.len()) else {
+        let clamped_row_start = row_start.min(data.cells.row_count());
+        let clamped_row_end = row_end.min(data.cells.row_count());
+        let Some(len) = clamped_row_end
+            .saturating_sub(clamped_row_start)
+            .checked_mul(cols.len())
+        else {
             return Vec::new();
         };
         let mut mask = vec![0; len];
@@ -2733,8 +2765,8 @@ impl CellStore {
             if col as usize >= data.cells.n_cols() {
                 continue;
             }
-            for row_index in 0..row_end.saturating_sub(row_start) {
-                let cell = ((row_start + row_index) as u32, col);
+            for row_index in 0..clamped_row_end.saturating_sub(clamped_row_start) {
+                let cell = ((clamped_row_start + row_index) as u32, col);
                 if data.spill.owner(cell).is_some_and(|anchor| anchor != cell) {
                     mask[row_index * cols.len() + col_index] = 1;
                 }
@@ -2958,8 +2990,8 @@ impl CellStore {
         {
             return BLOCK_INVALID;
         }
-        let text_buf = match std::str::from_utf8(text_buf) {
-            Ok(text_buf) => text_buf,
+        let source_text = match std::str::from_utf8(text_buf) {
+            Ok(valid) => valid,
             Err(_) => return BLOCK_SOURCE_INVALID,
         };
         if dirty_revision.is_some()
@@ -2971,30 +3003,31 @@ impl CellStore {
         }
 
         let mut source_kinds = vec![0u8; cell_count];
-        let mut seen_offsets = HashSet::with_capacity(
+        let mut seen_offsets = FxHashSet::with_capacity_and_hasher(
             formula_offsets
                 .len()
                 .saturating_add(reference_offsets.len()),
+            FxBuildHasher,
         );
         for &offset in formula_offsets {
-            let offset = offset as usize;
-            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
+            let cell_offset = offset as usize;
+            if cell_offset >= cell_count || !seen_offsets.insert(cell_offset as u32) {
                 return BLOCK_SOURCE_INVALID;
             }
-            source_kinds[offset] = 1;
+            source_kinds[cell_offset] = 1;
         }
         for &offset in reference_offsets {
-            let offset = offset as usize;
-            if offset >= cell_count || !seen_offsets.insert(offset as u32) {
+            let cell_offset = offset as usize;
+            if cell_offset >= cell_count || !seen_offsets.insert(cell_offset as u32) {
                 return BLOCK_SOURCE_INVALID;
             }
-            source_kinds[offset] = 2;
+            source_kinds[cell_offset] = 2;
         }
 
-        let mut prepared = HashMap::with_capacity(seen_offsets.len());
+        let mut prepared = FxHashMap::with_capacity_and_hasher(seen_offsets.len(), FxBuildHasher);
         for (&offset, source) in formula_offsets.iter().zip(formula_sources.iter()) {
-            let offset = offset as usize;
-            let (row_offset, col_offset) = order.coordinates(offset, rows, cols);
+            let cell_offset = offset as usize;
+            let (row_offset, col_offset) = order.coordinates(cell_offset, rows, cols);
             let row = start_row + row_offset;
             let col = start_col + col_offset;
             let Some(key) = cell_key(row, col) else {
@@ -3013,24 +3046,21 @@ impl CellStore {
                 col: reference_targets[target_index + 2],
             };
             let target_sheet = target.sheet as usize;
-            if !self.sheet_alive.get(target_sheet).copied().unwrap_or(false)
+            if self.sheet_alive.get(target_sheet) != Some(&true)
                 || !self.sheets[target_sheet]
                     .cells
                     .contains_cell(target.row as usize, target.col as usize)
             {
                 return BLOCK_SOURCE_INVALID;
             }
-            let offset = offset as usize;
-            let (row_offset, col_offset) = order.coordinates(offset, rows, cols);
+            let cell_offset = offset as usize;
+            let (row_offset, col_offset) = order.coordinates(cell_offset, rows, cols);
             let row = start_row + row_offset;
             let col = start_col + col_offset;
             let Some(key) = cell_key(row, col) else {
                 return BLOCK_SOURCE_INVALID;
             };
-            prepared.insert(
-                key,
-                FormulaEntry::reference(target, &self.sheet_names[target_sheet], sheet as u32),
-            );
+            prepared.insert(key, FormulaEntry::reference(target, sheet as u32));
         }
 
         // Check every text slice before reserving dirty capacity or interning,
@@ -3040,7 +3070,7 @@ impl CellStore {
         if string_cells != text_count
             || text_offsets
                 .iter()
-                .any(|&bound| !text_buf.is_char_boundary(bound as usize))
+                .any(|&bound| !source_text.is_char_boundary(bound as usize))
         {
             return BLOCK_SOURCE_INVALID;
         }
@@ -3067,7 +3097,7 @@ impl CellStore {
             if source_kinds[offset] != 0 {
                 continue;
             }
-            string_ids[offset] = self.intern(&text_buf[start as usize..end as usize]);
+            string_ids[offset] = self.intern(&source_text[start as usize..end as usize]);
         }
 
         if self.replace_range_sources(
@@ -3111,7 +3141,7 @@ impl CellStore {
         start: (usize, usize),
         dimensions: (usize, usize),
         revision: Option<u64>,
-        sources: HashMap<(u32, u32), FormulaEntry>,
+        sources: FxHashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
         if let Some(rect) = DirtyRect::new(
@@ -3136,7 +3166,7 @@ impl CellStore {
         start: (usize, usize),
         dimensions: (usize, usize),
         revision: Option<u64>,
-        mut sources: HashMap<(u32, u32), FormulaEntry>,
+        mut sources: FxHashMap<(u32, u32), FormulaEntry>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
         // A literal-only dense block needs no per-cell source decision: write
@@ -3213,15 +3243,15 @@ impl CellStore {
         let Some(data) = self.sheets.get(sheet) else {
             return Vec::new();
         };
-        let col = col as usize;
-        if start_row >= end_row || !data.cells.contains_cell(start_row, col) {
+        let col_index = col as usize;
+        if start_row >= end_row || !data.cells.contains_cell(start_row, col_index) {
             return Vec::new();
         }
-        let end_row = end_row.min(data.cells.row_count());
+        let clamped_end_row = end_row.min(data.cells.row_count());
         let mut spans = Vec::new();
         let mut run_start: Option<usize> = None;
-        for row in start_row..end_row {
-            if data.cells.is_loaded(row, col) {
+        for row in start_row..clamped_end_row {
+            if data.cells.is_loaded(row, col_index) {
                 run_start = run_start.or(Some(row));
             } else if let Some(start) = run_start.take() {
                 spans.push(start as u32);
@@ -3230,7 +3260,7 @@ impl CellStore {
         }
         if let Some(start) = run_start {
             spans.push(start as u32);
-            spans.push(end_row as u32);
+            spans.push(clamped_end_row as u32);
         }
         spans
     }
@@ -3713,7 +3743,7 @@ fn refresh_structured_reference(
             }
             (reference.row_start, reference.row_start)
         }
-        _ => return None,
+        TableSection::Headers | TableSection::Totals => return None,
     };
     Some(StructuredRef {
         table_id: table.id.clone(),
@@ -3740,14 +3770,14 @@ impl CellStore {
         {
             return None;
         }
-        let Ok(scope) = u32::try_from(scope) else {
+        let Ok(sheet_scope) = u32::try_from(scope) else {
             return Some(None);
         };
         self.sheet_alive
-            .get(scope as usize)
+            .get(sheet_scope as usize)
             .copied()
-            .unwrap_or(false)
-            .then_some(Some(scope))
+            .unwrap_or_default()
+            .then_some(Some(sheet_scope))
     }
 
     fn table_definition_for_reference(
@@ -3817,7 +3847,7 @@ impl CellStore {
                 }
                 (formula_row, formula_row)
             }
-            _ => return None,
+            TableSection::Headers | TableSection::Totals => return None,
         };
         Some(StructuredRef {
             table_id: table.id.clone(),
@@ -3863,26 +3893,29 @@ impl CellStore {
         formula_col: u32,
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
-            Ok(ast) => FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned()),
+            Ok((ast, detached_sheets)) => {
+                FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned(), detached_sheets)
+            }
             Err(error) => FormulaEntry::error(source, error),
         }
     }
 
     /// Parses a formula and resolves its sheets, defined names and table
     /// references. Each step runs only when the parse found a node it
-    /// rewrites, so a formula of plain cells is parsed in one pass.
+    /// rewrites, so a formula of plain cells is parsed in one pass. The flag
+    /// tells whether a sheet reference stayed detached.
     fn resolve_formula_ast(
         &self,
         source: &str,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
-    ) -> Result<Ast, FormulaError> {
-        let (mut ast, features) = parse_with_features(source).map_err(|_| FormulaError::Value)?;
-
-        if features.sheet_refs {
-            ast = self.resolve_sheets(ast)?;
-        }
+    ) -> Result<ResolvedFormula, FormulaError> {
+        let (mut ast, features) =
+            parse_bound_with_features(source, &|name| self.sheet_handle(name), &|span| {
+                place_span(span, &self.tab_order())
+            })
+            .map_err(|_| FormulaError::Value)?;
 
         if features.names {
             let placement = names::NamePlacement::new(formula_row, formula_col);
@@ -3890,12 +3923,14 @@ impl CellStore {
         }
 
         if features.table_refs {
-            ast = self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col);
+            self.resolve_table_refs(&mut ast, formula_sheet, formula_row, formula_col);
         }
 
         #[cfg(feature = "analysis")]
-        let ast = self.bind_regex_patterns(source, ast);
-        Ok(ast)
+        let resolved = self.bind_regex_patterns(source, ast);
+        #[cfg(not(feature = "analysis"))]
+        let resolved = ast;
+        Ok((resolved, features.detached_sheets))
     }
 
     /// Resolves a parsed formula as if it were in the cell at
@@ -3910,21 +3945,22 @@ impl CellStore {
         formula_row: u32,
         formula_col: u32,
     ) -> Result<Ast, FormulaError> {
-        let ast = self.resolve_sheets(ast)?;
+        let with_sheets = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
-        let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
-        Ok(self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col))
+        let mut with_names = self.resolve_defined_names(with_sheets, formula_sheet, &placement);
+        self.resolve_table_refs(&mut with_names, formula_sheet, formula_row, formula_col);
+        Ok(with_names)
     }
 
     /// Resolves the table references of a formula in the cell at
     /// (`formula_row`, `formula_col`) of `formula_sheet`.
     fn resolve_table_refs(
         &self,
-        ast: Ast,
+        ast: &mut Ast,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
-    ) -> Ast {
+    ) {
         resolve_structured_refs(
             ast,
             formula_sheet,
@@ -3948,36 +3984,95 @@ impl CellStore {
         ast
     }
 
-    /// Resolve the sheet names of a parsed formula to stable handles.
-    fn resolve_sheets(&self, ast: Ast) -> Result<Ast, FormulaError> {
-        resolve_sheet_refs(
-            ast,
-            &|name| {
-                self.sheet_ids
-                    .get(name)
-                    .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
-                    .map(|&index| index as u32)
-            },
-            &|span| place_span(span, &self.tab_order()),
-        )
-        .map_err(|_| FormulaError::Ref)
+    /// Naming a sheet visits only formulas whose retained tree names it.
+    /// Stable ids keep this index correct when formulas move between cells.
+    fn bind_pending_sheet_formulas(&mut self, id: &str, name: &str) -> Vec<usize> {
+        let mut users: FxHashSet<_> = self
+            .formula_slots
+            .unresolved_sheet_users(&sheet_name_key(name))
+            .collect();
+        users.extend(
+            self.formula_slots
+                .unresolved_sheet_users(&sheet_name_key(id)),
+        );
+        if users.is_empty() {
+            return Vec::new();
+        }
+        let order = self.tab_order().into_owned();
+        let mut affected = Vec::new();
+        for formula in users {
+            let Some(location) = self.formula_slots.location(formula) else {
+                continue;
+            };
+            let sheet = location.sheet as usize;
+            let replacement = {
+                let Some(entry) = self.formula_slots.get_mut(formula) else {
+                    continue;
+                };
+                let ids = &self.sheet_ids;
+                let lookup = &self.sheet_lookup;
+                entry.bind_sheets(
+                    location.sheet,
+                    &|name| {
+                        ids.get(name)
+                            .or_else(|| lookup.get(&sheet_name_key(name)))
+                            .map(|&handle| handle as u32)
+                    },
+                    &|span| place_span(span, &order),
+                )
+            };
+            let Some(entry) = replacement else {
+                continue;
+            };
+            let data = &mut self.sheets[sheet];
+            self.graph.replace_entry(
+                &mut data.formulas,
+                &mut self.formula_slots,
+                sheet,
+                location.local(),
+                Some(entry),
+            );
+            data.formulas.mark_cell_dirty(location.local());
+            if !affected.contains(&sheet) {
+                affected.push(sheet);
+            }
+        }
+        affected
+    }
+
+    /// Resolve a sheet id or case-insensitive name to its stable handle.
+    fn sheet_handle(&self, name: &str) -> Option<u32> {
+        self.sheet_ids
+            .get(name)
+            .or_else(|| self.sheet_lookup.get(&sheet_name_key(name)))
+            .map(|&index| index as u32)
+    }
+
+    /// Bind standalone-parsed definitions/measures without rebuilding their tree.
+    /// Such definitions still reject missing local sheets at installation.
+    fn resolve_sheets(&self, mut ast: Ast) -> Result<Ast, FormulaError> {
+        bind_sheet_refs(&mut ast, &|name| self.sheet_handle(name), &|span| {
+            place_span(span, &self.tab_order())
+        });
+        if has_unresolved_local_sheets(&ast) {
+            return Err(FormulaError::Ref);
+        }
+        Ok(ast)
     }
 
     fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
         let mut removed = Vec::new();
         let mut changed = false;
         for (key, definition) in &mut self.defined_names {
-            let names::DefinedName::Range(definition) = definition else {
+            let names::DefinedName::Range(range) = definition else {
                 continue;
             };
-            if definition.sheet != edited_sheet {
+            if range.sheet != edited_sheet {
                 continue;
             }
-            if let Some((start, end)) =
-                shift_range(definition.row_start, definition.row_end, at, delta)
-            {
-                definition.row_start = start;
-                definition.row_end = end;
+            if let Some((start, end)) = shift_range(range.row_start, range.row_end, at, delta) {
+                range.row_start = start;
+                range.row_end = end;
             } else {
                 removed.push(key.clone());
             }
@@ -3993,17 +4088,15 @@ impl CellStore {
         let mut removed = Vec::new();
         let mut changed = false;
         for (key, definition) in &mut self.defined_names {
-            let names::DefinedName::Range(definition) = definition else {
+            let names::DefinedName::Range(range) = definition else {
                 continue;
             };
-            if definition.sheet != edited_sheet {
+            if range.sheet != edited_sheet {
                 continue;
             }
-            if let Some((start, end)) =
-                shift_range(definition.col_start, definition.col_end, at, delta)
-            {
-                definition.col_start = start;
-                definition.col_end = end;
+            if let Some((start, end)) = shift_range(range.col_start, range.col_end, at, delta) {
+                range.col_start = start;
+                range.col_end = end;
             } else {
                 removed.push(key.clone());
             }
@@ -4068,7 +4161,7 @@ impl CellStore {
 
     fn recompute_all_sheets(&mut self) {
         let live: Vec<usize> = (0..self.sheets.len())
-            .filter(|&sheet| self.sheet_alive.get(sheet).copied().unwrap_or(false))
+            .filter(|&sheet| self.sheet_alive.get(sheet).copied().unwrap_or_default())
             .collect();
 
         // One pass for every sheet: a pass per sheet would recalculate the
@@ -4150,19 +4243,14 @@ impl CellStore {
     fn refresh_named_formula_entries(&mut self) {
         self.resolve_name_definitions();
         for formula_sheet in 0..self.sheets.len() {
-            if !self
-                .sheet_alive
-                .get(formula_sheet)
-                .copied()
-                .unwrap_or(false)
-            {
+            if self.sheet_alive.get(formula_sheet) != Some(&true) {
                 continue;
             }
             let sources: Vec<_> = self.sheets[formula_sheet]
                 .formulas
                 .iter(&self.formula_slots)
                 .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (key, entry.source().into_owned()))
+                .map(|(key, entry)| (key, entry.source(&self.sheet_names).into_owned()))
                 .collect();
             let refreshed: Vec<_> = sources
                 .into_iter()
@@ -4184,6 +4272,10 @@ impl CellStore {
         self.graph.invalidate();
     }
 }
+
+/// A resolved formula tree, and whether a sheet reference in it stayed
+/// detached.
+type ResolvedFormula = (Ast, bool);
 
 /// Result of a single-cell read.
 #[wasm_bindgen]

@@ -1,60 +1,68 @@
-import type { CSSProperties } from "react";
+import { For, type JSX } from "solid-js";
 
 export const secs = (seconds: number) => `${seconds.toFixed(2)}s`;
-export const delay = (seconds: number): CSSProperties => ({ animationDelay: secs(seconds) });
+export const delay = (seconds: number): JSX.CSSProperties => ({
+  "animation-delay": secs(seconds),
+});
+
+/** The clip window of a {@link VersionRoll}, in SVG user units. */
+export interface RollClip {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
 
 /**
  * Version numbers roll like an odometer inside a clip window: the old value
  * slides up and out as the new one slides up into place. `changes[k]` is when
  * `values[k]` gives way to `values[k + 1]`.
  */
-export function VersionRoll({
-  className,
-  clipId,
-  values,
-  changes,
-  x,
-  y,
-  clip,
-  center = false,
-}: Readonly<{
-  className: string;
-  clipId: string;
-  values: readonly number[];
-  changes: readonly number[];
-  x: number;
-  y: number;
-  clip: { x: number; y: number; width: number; height: number };
-  center?: boolean;
-}>) {
+export function VersionRoll(
+  props: Readonly<{
+    class: string;
+    clipId: string;
+    values: readonly number[];
+    changes: readonly number[];
+    x: number;
+    y: number;
+    clip: RollClip;
+    center?: boolean;
+  }>,
+) {
   return (
-    <g className="sr-roll-window" clipPath={`url(#${clipId})`}>
-      <clipPath id={clipId}>
-        <rect {...clip} />
+    <g class="sr-roll-window" clip-path={`url(#${props.clipId})`}>
+      <clipPath id={props.clipId}>
+        <rect
+          height={props.clip.height}
+          width={props.clip.width}
+          x={props.clip.x}
+          y={props.clip.y}
+        />
       </clipPath>
-      {values.map((value, step) => {
-        const out = changes[step];
-        return (
-          <text
-            className={`${className} sr-roll`}
-            data-center={center ? "" : undefined}
-            data-final={out === undefined || undefined}
-            data-first={step === 0 || undefined}
-            data-num=""
-            key={value}
-            style={
-              {
-                "--in": step > 0 ? secs(changes[step - 1] ?? 0) : undefined,
-                "--out": out === undefined ? undefined : secs(out),
-              } as CSSProperties
-            }
-            x={x}
-            y={y}
-          >
-            v{value}
-          </text>
-        );
-      })}
+      <For each={props.values}>
+        {(value, step) => {
+          const out = props.changes[step()];
+          // Only the times that apply are set, as React leaves undefined ones out.
+          const style: JSX.CSSProperties = {};
+          if (step() > 0) style["--in"] = secs(props.changes[step() - 1] ?? 0);
+          if (out !== undefined) style["--out"] = secs(out);
+          return (
+            <text
+              class={`${props.class} sr-roll`}
+              data-center={props.center === true ? "" : undefined}
+              data-final={out === undefined ? "true" : undefined}
+              data-first={step() === 0 ? "true" : undefined}
+              data-num=""
+              style={style}
+              x={props.x}
+              y={props.y}
+            >
+              v{value}
+            </text>
+          );
+        }}
+      </For>
     </g>
   );
 }
@@ -68,25 +76,22 @@ export const px = (value: number) => `${value}px`;
  * A change on the wire, labelled with what it is: amber while it is a pending
  * client edit, green once the server has given it a version.
  */
-export function Packet({
-  label,
-  x,
-  y,
-  tone,
-  style,
-}: Readonly<{
-  label: string;
-  x: number;
-  y: number;
-  tone: "pending" | "committed";
-  style: CSSProperties;
-}>) {
-  const width = label.length * PACKET_CHAR_WIDTH + PACKET_PADDING;
+export function Packet(
+  props: Readonly<{
+    label: string;
+    x: number;
+    y: number;
+    tone: "pending" | "committed";
+    style: JSX.CSSProperties;
+  }>,
+) {
+  // Packets are static: the label never changes after the first render.
+  const width = props.label.length * PACKET_CHAR_WIDTH + PACKET_PADDING;
   return (
-    <g className="sr-packet" data-tone={tone} style={style}>
-      <rect height={20} rx={10} width={width} x={x - width / 2} y={y - 10} />
-      <text x={x} y={y + 4} data-center="">
-        {label}
+    <g class="sr-packet" data-tone={props.tone} style={props.style}>
+      <rect height={20} rx={10} width={width} x={props.x - width / 2} y={props.y - 10} />
+      <text x={props.x} y={props.y + 4} data-center="">
+        {props.label}
       </text>
     </g>
   );

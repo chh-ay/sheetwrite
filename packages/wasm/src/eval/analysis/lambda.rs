@@ -45,6 +45,9 @@ const CALL_WORK_LIMIT: usize = 2_000_000;
 /// The call record of no call: a LAMBDA created outside every call.
 const NO_CALL: u32 = u32::MAX;
 
+type Shape = (usize, usize, usize);
+type Definition<'a> = (&'a [Ast], &'a Ast);
+
 /// What one parameter holds during a call.
 #[derive(Clone)]
 pub(crate) enum Slot {
@@ -73,15 +76,15 @@ pub(crate) enum Slot {
 
 impl Slot {
     /// A computed value as an argument: blanks and errors are one-cell arrays.
-    pub(crate) fn element(value: Value) -> Self {
+    pub(crate) const fn element(value: Value) -> Self {
         match value {
-            Value::Blank | Value::Error(_) => Slot::OneCell(value),
-            other => Slot::Value(other),
+            Value::Blank | Value::Error(_) => Self::OneCell(value),
+            other @ (Value::Number(_) | Value::Text(_) | Value::Bool(_)) => Self::Value(other),
         }
     }
 
-    pub(crate) fn array(mut matrix: EvalMatrix) -> Self {
-        Slot::Array {
+    pub(in crate::eval) fn array(mut matrix: EvalMatrix) -> Self {
+        Self::Array {
             rows: matrix.rows,
             cols: matrix.cols,
             values: std::mem::take(&mut matrix.values).into(),
@@ -141,13 +144,13 @@ impl CallFrame {
     }
 
     /// The LAMBDA a closure slot holds.
-    fn closure<'tree>(definition: *const Ast) -> &'tree Ast {
-        // SAFETY: a closure points at a LAMBDA in a tree the pass borrows for
-        // as long as the slot exists (type notes).
+    const fn closure<'tree>(definition: *const Ast) -> &'tree Ast {
         #[allow(
             unsafe_code,
             reason = "closures point into the trees evaluation borrows; see CallFrame"
         )]
+        // SAFETY: a closure points at a LAMBDA in a tree the pass borrows for
+        // as long as the slot exists (type notes).
         unsafe {
             &*definition
         }
@@ -167,7 +170,7 @@ impl CallFrame {
 
     /// Enters a helper or call evaluation; the outermost one starts a new
     /// work budget.
-    fn enter(&mut self) -> Result<(), FormulaError> {
+    const fn enter(&mut self) -> Result<(), FormulaError> {
         if self.nesting >= CALL_DEPTH_LIMIT || self.work >= CALL_WORK_LIMIT {
             return Err(FormulaError::Num);
         }
@@ -178,14 +181,14 @@ impl CallFrame {
         Ok(())
     }
 
-    fn exit(&mut self) {
+    const fn exit(&mut self) {
         self.nesting -= 1;
         if self.nesting == 0 {
             self.work = 0;
         }
     }
 
-    fn charge(&mut self) -> Result<(), FormulaError> {
+    const fn charge(&mut self) -> Result<(), FormulaError> {
         self.work += 1;
         if self.work > CALL_WORK_LIMIT {
             Err(FormulaError::Num)
@@ -235,7 +238,7 @@ impl<'a> Shapes<'a> {
         nesting: 0,
     };
 
-    pub(crate) fn of(frame: Option<&'a CallFrame>) -> Self {
+    pub(crate) const fn of(frame: Option<&'a CallFrame>) -> Self {
         Shapes {
             frame,
             call: NO_CALL,
@@ -263,8 +266,9 @@ impl<'a> Shapes<'a> {
             | Slot::Shaped {
                 is_array: false, ..
             } => Kind::Scalar,
-            Slot::Shaped { is_array: true, .. } => Kind::Array,
-            Slot::OneCell(_) | Slot::Array { .. } => Kind::Array,
+            Slot::Shaped { is_array: true, .. } | Slot::OneCell(_) | Slot::Array { .. } => {
+                Kind::Array
+            }
             Slot::Closure { definition, link } => Kind::Closure(
                 CallFrame::closure(*definition),
                 Shapes {
@@ -288,15 +292,16 @@ impl<'a> Shapes<'a> {
     }
 
     /// The LAMBDA `function` calls and the shapes it was created in.
-    fn callee(self, function: &'a Ast) -> Option<(&'a Ast, Shapes<'a>)> {
-        match function {
-            Ast::Parameter { depth, index, .. } => match self.kind(*depth, *index)? {
+    fn callee(self, function: &'a Ast) -> Option<(&'a Ast, Self)> {
+        if let Ast::Parameter { depth, index, .. } = function {
+            match self.kind(*depth, *index)? {
                 Kind::Closure(definition, created) => Some((definition, created)),
                 Kind::Scalar | Kind::Array => None,
-            },
-            _ => definition(function)
+            }
+        } else {
+            definition(function)
                 .ok()
-                .map(|_| (function.bound_value(), self)),
+                .map(|_| (function.bound_value(), self))
         }
     }
 
@@ -378,9 +383,12 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
             }
             let names = declared
                 .iter()
-                .filter_map(|parameter| match parameter {
-                    Ast::Name(name) => Some(name.as_str().into()),
-                    _ => None,
+                .filter_map(|parameter| {
+                    if let Ast::Name(name) = parameter {
+                        Some(name.clone())
+                    } else {
+                        None
+                    }
                 })
                 .collect();
             scopes.push(Scope::Lambda(names));
@@ -392,15 +400,15 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
             scopes.push(Scope::Let(Vec::new()));
             let last = arguments.len().saturating_sub(1);
             for pair in arguments[..last].chunks_mut(2) {
-                if let [name, expression] = pair {
+                if let [declaration, expression] = pair {
                     resolve_in(expression, scopes);
-                    let bound = match name {
-                        Ast::Name(name) => Some(name.as_str().into()),
-                        Ast::LetName { name, .. } => Some(name.clone()),
-                        _ => None,
+                    let bound = if let Ast::Name(name) | Ast::LetName { name, .. } = declaration {
+                        Some(name.clone())
+                    } else {
+                        None
                     };
-                    if let (Some(bound), Some(Scope::Let(names))) = (bound, scopes.last_mut()) {
-                        names.push(bound);
+                    if let (Some(local), Some(Scope::Let(names))) = (bound, scopes.last_mut()) {
+                        names.push(local);
                     }
                 }
             }
@@ -409,18 +417,51 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
             }
             scopes.truncate(outer);
         }
-        Ast::UnknownFunc(name, arguments) => {
+        Ast::UnknownFunc(call) => {
+            let crate::calc::UnknownCall {
+                name,
+                args: arguments,
+            } = &mut **call;
             for argument in arguments.iter_mut() {
                 resolve_in(argument, scopes);
             }
             if let Some(found) = lookup(scopes, name) {
                 let mut call = Vec::with_capacity(arguments.len() + 1);
                 call.push(parameter(name, found));
-                call.append(arguments);
-                *ast = Ast::UnknownFunc(CALL.into(), call);
+                call.extend(std::mem::take(arguments));
+                *ast = Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                    name: CALL.into(),
+                    args: call.into(),
+                }));
             }
         }
-        _ => {
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Parameter { .. }
+        | Ast::RegexPattern(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(_)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(_)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array(_) => {
             ast.fold_children_mut(&mut |child| {
                 resolve_in(child, scopes);
                 false
@@ -444,7 +485,7 @@ fn valid_parameters(parameters: &[Ast]) -> bool {
         })
 }
 
-fn definition(expression: &Ast) -> Result<(&[Ast], &Ast), FormulaError> {
+fn definition(expression: &Ast) -> Result<Definition<'_>, FormulaError> {
     let Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) = expression.bound_value() else {
         return Err(FormulaError::Value);
     };
@@ -461,12 +502,12 @@ pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
 
 /// The value a parameter use reads.
 pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16) -> Value {
-    match frame.and_then(|frame| frame.slot(depth, index)) {
+    match frame.and_then(|active| active.slot(depth, index)) {
         Some(Slot::Value(value) | Slot::OneCell(value)) => value.clone(),
         Some(Slot::Array { values, .. }) => values.first().cloned().unwrap_or(Value::Blank),
         Some(Slot::Missing) => Value::Blank,
         Some(Slot::Shaped { .. }) => {
-            frame.inspect(|frame| frame.shaped_read.set(true));
+            frame.inspect(|active| active.shaped_read.set(true));
             Value::Error(FormulaError::Value)
         }
         // A LAMBDA is not a value, as `=LAMBDA(x,x)` is not.
@@ -476,7 +517,7 @@ pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16)
 }
 
 /// The values of an array or one-cell parameter.
-pub(crate) fn parameter_matrix(
+pub(in crate::eval) fn parameter_matrix(
     frame: Option<&CallFrame>,
     depth: u16,
     index: u16,
@@ -496,8 +537,8 @@ pub(crate) fn parameter_shape(
 ) -> Option<(usize, usize)> {
     match frame?.slot(depth, index)? {
         Slot::OneCell(_) => Some((1, 1)),
-        Slot::Array { rows, cols, .. } => Some((*rows, *cols)),
-        Slot::Shaped {
+        Slot::Array { rows, cols, .. }
+        | Slot::Shaped {
             rows,
             cols,
             is_array: true,
@@ -554,10 +595,7 @@ fn call_produces_array<'a>(arguments: &'a [Ast], shapes: Shapes<'a>) -> bool {
     )
 }
 
-fn source_shape(
-    context: &mut Context<'_, '_>,
-    expression: &Ast,
-) -> Result<(usize, usize, usize), FormulaError> {
+fn source_shape(context: &mut Context<'_, '_>, expression: &Ast) -> Result<Shape, FormulaError> {
     if ast_produces_array(expression, context.shapes()) {
         context
             .store
@@ -573,7 +611,7 @@ pub(crate) fn shape(
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
-) -> Result<(usize, usize, usize), FormulaError> {
+) -> Result<Shape, FormulaError> {
     pass.results.call_frame_mut().enter()?;
     let mut context = Context {
         store,
@@ -590,7 +628,7 @@ fn helper_shape(
     context: &mut Context<'_, '_>,
     name: &str,
     arguments: &[Ast],
-) -> Result<(usize, usize, usize), FormulaError> {
+) -> Result<Shape, FormulaError> {
     let (rows, cols) = match name {
         // The body's shape with each parameter's shape and no values. A
         // shape that needs a value, such as `SEQUENCE(x)`, comes from the
@@ -600,8 +638,8 @@ fn helper_shape(
             if let Some(shape) = context.static_call_shape(arguments)? {
                 return Ok(shape);
             }
-            return context.call_arguments(arguments, |context, body| {
-                let matrix = context.matrix(body)?;
+            return context.call_arguments(arguments, |call, body| {
+                let matrix = call.matrix(body)?;
                 let cells = EvalMatrix::validate_shape(matrix.rows, matrix.cols, 1, 0)?;
                 Ok((matrix.rows, matrix.cols, cells))
             });
@@ -690,7 +728,7 @@ struct Callee<'t> {
     link: u32,
 }
 
-struct Context<'a, 'p> {
+pub(in crate::eval) struct Context<'a, 'p> {
     store: &'a CellStore,
     sheet: usize,
     pass: &'a mut EvalPass<'p>,
@@ -698,7 +736,22 @@ struct Context<'a, 'p> {
     depth: usize,
 }
 
-impl Context<'_, '_> {
+impl<'a, 'p> Context<'a, 'p> {
+    /// The store, sheet and pass in which a grouping invokes its function.
+    pub(in crate::eval) const fn new(
+        store: &'a CellStore,
+        sheet: usize,
+        pass: &'a mut EvalPass<'p>,
+        depth: usize,
+    ) -> Self {
+        Self {
+            store,
+            sheet,
+            pass,
+            depth,
+        }
+    }
+
     fn shapes(&self) -> Shapes<'_> {
         Shapes::of(self.pass.results.call_frame())
     }
@@ -727,26 +780,21 @@ impl Context<'_, '_> {
         Ok(number as usize)
     }
     fn is_omitted(&self, argument: &Ast) -> bool {
-        match argument {
-            Ast::Missing => true,
-            Ast::Parameter { depth, index, .. } => {
-                matches!(self.slot(*depth, *index), Some(Slot::Missing))
-            }
-            _ => false,
-        }
+        matches!(argument, Ast::Missing)
+            || matches!(argument, Ast::Parameter { depth, index, .. }
+                if matches!(self.slot(*depth, *index), Some(Slot::Missing)))
     }
 
     /// The LAMBDA `function` names: one written in place, one a name or a
     /// LET binding holds, or one a parameter holds.
     fn callee<'t>(&self, function: &'t Ast) -> Result<Callee<'t>, FormulaError> {
-        let (definition_ast, link) = match function {
-            Ast::Parameter { depth, index, .. } => match self.slot(*depth, *index) {
-                Some(Slot::Closure { definition, link }) => {
-                    (CallFrame::closure(*definition), *link)
-                }
-                _ => return Err(FormulaError::Value),
-            },
-            function => (function, self.top()),
+        let (definition_ast, link) = if let Ast::Parameter { depth, index, .. } = function {
+            let Some(Slot::Closure { definition, link }) = self.slot(*depth, *index) else {
+                return Err(FormulaError::Value);
+            };
+            (CallFrame::closure(*definition), *link)
+        } else {
+            (function, self.top())
         };
         let (parameters, body) = definition(definition_ast)?;
         Ok(Callee {
@@ -758,7 +806,7 @@ impl Context<'_, '_> {
 
     /// An argument's value as a parameter, evaluated in the caller's call.
     fn bind(&mut self, argument: &Ast) -> Result<Slot, FormulaError> {
-        if let Ast::Missing = argument {
+        if matches!(argument, Ast::Missing) {
             return Ok(Slot::Missing);
         }
         if let Ast::Parameter { depth, index, .. } = argument {
@@ -839,7 +887,9 @@ impl Context<'_, '_> {
         } else {
             match self.scalar(body) {
                 Value::Error(error) => Err(error),
-                value => Ok(value),
+                value @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => {
+                    Ok(value)
+                }
             }
         }
     }
@@ -869,7 +919,7 @@ pub(crate) fn evaluate(
         },
         "ISOMITTED" if arguments.len() == 1 => Ok(Value::Bool(context.is_omitted(&arguments[0]))),
         "ISOMITTED" => Err(FormulaError::Value),
-        CALL => context.call_arguments(arguments, |context, body| Ok(context.scalar(body))),
+        CALL => context.call_arguments(arguments, |call, body| Ok(call.scalar(body))),
         "REDUCE" => reduce(&mut context, arguments, false).map(EvalMatrix::into_first),
         _ => evaluate_with_context(&mut context, name, arguments).map(EvalMatrix::into_first),
     };
@@ -934,7 +984,7 @@ fn evaluate_with_context(
     arguments: &[Ast],
 ) -> Result<EvalMatrix, FormulaError> {
     match name {
-        CALL => context.call_arguments(arguments, |context, body| context.matrix(body)),
+        CALL => context.call_arguments(arguments, |call, body| call.matrix(body)),
         "SCAN" => reduce(context, arguments, true),
         "MAKEARRAY" => {
             if arguments.len() != 3 {
@@ -1028,10 +1078,7 @@ fn evaluate_with_context(
 impl Context<'_, '_> {
     /// A call's shape from its arguments' shapes, without evaluating the
     /// call or its arguments: `None` when the body's shape needs a value.
-    fn static_call_shape(
-        &mut self,
-        arguments: &[Ast],
-    ) -> Result<Option<(usize, usize, usize)>, FormulaError> {
+    fn static_call_shape(&mut self, arguments: &[Ast]) -> Result<Option<Shape>, FormulaError> {
         let (function, supplied) = arguments.split_first().ok_or(FormulaError::Value)?;
         let callee = self.callee(function)?;
         if callee.parameters.len() != supplied.len() {
@@ -1039,45 +1086,43 @@ impl Context<'_, '_> {
         }
         let mut slots = Vec::with_capacity(supplied.len());
         for argument in supplied {
-            let slot = match argument {
-                Ast::Missing => Slot::Missing,
-                Ast::Parameter { depth, index, .. }
-                    if matches!(self.slot(*depth, *index), Some(Slot::Closure { .. })) =>
-                {
-                    self.bind(argument)?
+            let slot = if matches!(argument, Ast::Missing) {
+                Slot::Missing
+            } else if definition(argument).is_ok()
+                || matches!(argument, Ast::Parameter { depth, index, .. }
+                    if matches!(self.slot(*depth, *index), Some(Slot::Closure { .. })))
+            {
+                self.bind(argument)?
+            } else if ast_produces_array(argument, self.shapes()) {
+                match self.store.matrix_shape(argument, self.sheet, self.pass) {
+                    Ok((rows, cols, _)) => Slot::Shaped {
+                        rows,
+                        cols,
+                        is_array: true,
+                    },
+                    Err(FormulaError::Value) => return Ok(None),
+                    Err(error) => return Err(error),
                 }
-                argument if definition(argument).is_ok() => self.bind(argument)?,
-                argument if ast_produces_array(argument, self.shapes()) => {
-                    match self.store.matrix_shape(argument, self.sheet, self.pass) {
-                        Ok((rows, cols, _)) => Slot::Shaped {
-                            rows,
-                            cols,
-                            is_array: true,
-                        },
-                        Err(FormulaError::Value) => return Ok(None),
-                        Err(error) => return Err(error),
-                    }
-                }
-                _ => Slot::Shaped {
+            } else {
+                Slot::Shaped {
                     rows: 1,
                     cols: 1,
                     is_array: false,
-                },
+                }
             };
             slots.push(slot);
         }
-        let frame = self.pass.results.call_frame_mut();
-        frame.push(callee.link, slots);
-        let frame = self.pass.results.call_frame_mut();
-        let outer_read = frame.shaped_read.replace(false);
-        let shape = self.store.matrix_shape(callee.body, self.sheet, self.pass);
+        let active = self.pass.results.call_frame_mut();
+        active.push(callee.link, slots);
+        let outer_read = active.shaped_read.replace(false);
+        let inferred = self.store.matrix_shape(callee.body, self.sheet, self.pass);
         let frame = self.pass.results.call_frame_mut();
         let read_value = frame.shaped_read.replace(outer_read);
         frame.pop();
         if read_value {
             return Ok(None);
         }
-        match shape {
+        match inferred {
             Ok(shape) => Ok(Some(shape)),
             Err(FormulaError::Value) => Ok(None),
             Err(error) => Err(error),
@@ -1101,28 +1146,17 @@ impl Context<'_, '_> {
 
 /// Calls `function`, a LAMBDA, with `slots`, as GROUPBY and PIVOTBY call a
 /// LAMBDA aggregation.
-pub(crate) fn call_with_slots(
-    store: &CellStore,
+pub(in crate::eval) fn call_with_slots(
+    mut context: Context<'_, '_>,
     function: &Ast,
     slots: Vec<Slot>,
-    sheet: usize,
-    pass: &mut EvalPass<'_>,
-    depth: usize,
 ) -> Result<Value, FormulaError> {
-    pass.results.call_frame_mut().enter()?;
-    let mut context = Context {
-        store,
-        sheet,
-        pass,
-        depth,
-    };
+    context.pass.results.call_frame_mut().enter()?;
     let result = context.callee(function).and_then(|callee| {
         if callee.parameters.len() != slots.len() {
             return Err(FormulaError::Value);
         }
-        context.call_with(callee, slots, |context, body| {
-            context.aggregation_value(body)
-        })
+        context.call_with(callee, slots, |call, body| call.aggregation_value(body))
     });
     context.pass.results.call_frame_mut().exit();
     result
@@ -1130,21 +1164,12 @@ pub(crate) fn call_with_slots(
 
 /// Evaluates `expression`, whose parameter uses at depth 0 read `slots`, as
 /// GROUPBY and PIVOTBY call a built-in aggregation with arrays.
-pub(crate) fn evaluate_with_slots(
-    store: &CellStore,
+pub(in crate::eval) fn evaluate_with_slots(
+    mut context: Context<'_, '_>,
     expression: &Ast,
     slots: Vec<Slot>,
-    sheet: usize,
-    pass: &mut EvalPass<'_>,
-    depth: usize,
 ) -> Result<Value, FormulaError> {
-    pass.results.call_frame_mut().push(NO_CALL, slots);
-    let mut context = Context {
-        store,
-        sheet,
-        pass,
-        depth,
-    };
+    context.pass.results.call_frame_mut().push(NO_CALL, slots);
     let result = context.aggregation_value(expression);
     context.pass.results.call_frame_mut().pop();
     result

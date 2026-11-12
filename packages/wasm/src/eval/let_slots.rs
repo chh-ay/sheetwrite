@@ -43,7 +43,14 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
                 resolve_scope(args, &mut bindings, &mut next);
             }
         }
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+        Ast::Func(_, args) => {
+            for arg in args {
+                resolve_let_names(arg);
+            }
+        }
+        Ast::UnknownFunc(call) => {
+            let args = &mut call.args;
+
             for arg in args {
                 resolve_let_names(arg);
             }
@@ -53,7 +60,28 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
             resolve_let_names(right);
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => resolve_let_names(inner),
-        _ => {}
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {}
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
     }
 }
 
@@ -93,10 +121,13 @@ fn nested_lets_scalar(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(..) => false,
+        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) => false,
         Ast::Func(_, args) => args.iter().all(nested_lets_scalar),
         #[cfg(not(feature = "analysis"))]
-        Ast::UnknownFunc(_, args) => args.iter().all(nested_lets_scalar),
+        Ast::UnknownFunc(call) => {
+            let args = &call.args;
+            args.iter().all(nested_lets_scalar)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             nested_lets_scalar(left) && nested_lets_scalar(right)
         }
@@ -116,7 +147,25 @@ pub(crate) fn scalar_binding(expression: &Ast) -> bool {
             scalar_operand(expression)
         }
         Ast::Func(..) => call_has_scalar_result(expression),
-        _ => false,
+        Ast::Missing
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::UnknownFunc(..)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -134,7 +183,22 @@ fn scalar_operand(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner),
         Ast::Func(..) => call_has_scalar_result(ast),
-        _ => false,
+        Ast::Missing
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::UnknownFunc(..)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -191,10 +255,10 @@ fn resolve_scope(args: &mut [Ast], bindings: &mut Vec<Binding>, next: &mut u32) 
         debug_assert!(valid_let_name(text));
         let slot = *next;
         *next += 1;
-        bindings.push((text.clone(), slot));
+        bindings.push((text.to_string(), slot));
         *name = Ast::LetName {
             slot,
-            name: std::mem::take(text).into_boxed_str(),
+            name: std::mem::take(text),
         };
     }
     resolve_uses(&mut args[last], bindings, next);
@@ -211,12 +275,19 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
             {
                 *ast = Ast::LetName {
                     slot,
-                    name: std::mem::take(name).into_boxed_str(),
+                    name: std::mem::take(name),
                 };
             }
         }
         Ast::Func(Func::Let, args) => resolve_scope(args, bindings, next),
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+        Ast::Func(_, args) => {
+            for arg in args {
+                resolve_uses(arg, bindings, next);
+            }
+        }
+        Ast::UnknownFunc(call) => {
+            let args = &mut call.args;
+
             for arg in args {
                 resolve_uses(arg, bindings, next);
             }
@@ -228,7 +299,27 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
             resolve_uses(inner, bindings, next);
         }
-        _ => {}
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {}
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
     }
 }
 
@@ -404,7 +495,7 @@ mod tests {
 
     fn let_args(source: &str) -> Vec<Ast> {
         match parse(source) {
-            Ok(Ast::Func(Func::Let, args)) => args,
+            Ok(Ast::Func(Func::Let, args)) => args.into_vec(),
             other => panic!("{source} is not a LET: {other:?}"),
         }
     }

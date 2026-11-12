@@ -6,7 +6,7 @@ use super::matrix::{optional_ast, range_from_ast};
 use super::{address_text, current_formula_origin, EvalPass};
 use crate::calc::{sheet_name_key, Ast, Func};
 use crate::store::CellStore;
-use crate::types::{cell_key, AbsCellKey, EvalResult, FormulaEntry, FormulaError, Value};
+use crate::types::{cell_key, AbsCellKey, EvalResult, FormulaError, Value};
 
 /// Excel returns `#N/A` from FORMULATEXT for formulas longer than its
 /// formula-length limit, in characters.
@@ -16,6 +16,10 @@ const MAX_FORMULA_TEXT_CHARS: usize = 8_192;
 const ABSOLUTE_ADDRESS: i32 = 1;
 
 impl CellStore {
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn eval_info_func(
         &self,
         func: Func,
@@ -57,6 +61,10 @@ impl CellStore {
     /// The top-left cell of a reference argument. A deleted reference is
     /// `#REF!`; any other value is `#VALUE!`, after its own error, as Excel
     /// reports a non-reference argument.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "two Ast variants exist only with the analysis feature, so a full list differs by build; every other reference shape takes the last arm"
+    )]
     fn reference_cell(
         &self,
         reference: &Ast,
@@ -68,19 +76,21 @@ impl CellStore {
             Ast::InvalidRef | Ast::SheetCell(..) | Ast::SheetRange(..) => {
                 return Err(FormulaError::Ref)
             }
-            reference => match range_from_ast(reference, sheet) {
+            expression => match range_from_ast(expression, sheet) {
                 Some(range) => range,
                 None => {
                     return match self.eval_ast(reference, sheet, pass, depth + 1) {
                         Value::Error(error) => Err(error),
-                        _ => Err(FormulaError::Value),
+                        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                            Err(FormulaError::Value)
+                        }
                     }
                 }
             },
         };
 
         let target = range.sheet as usize;
-        let in_bounds = self.sheet_alive.get(target).copied().unwrap_or(false)
+        let in_bounds = self.sheet_alive.get(target).copied().unwrap_or_default()
             && self.sheets[target]
                 .cells
                 .contains_cell(range.row_start as usize, range.col_start as usize);
@@ -116,14 +126,14 @@ impl CellStore {
         let source = cell_key(cell.row as usize, cell.col as usize)
             .and_then(|key| data.formulas.get(key, &self.formula_slots))
             .filter(|entry| entry.is_formula())
-            .map(FormulaEntry::source);
+            .map(|entry| entry.source(&self.sheet_names));
         if func == Func::IsFormula {
             return Ok(Value::Bool(source.is_some()));
         }
 
         match source {
-            Some(source) if source.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
-                Ok(Value::text(&*source))
+            Some(formula_text) if formula_text.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
+                Ok(Value::text(&*formula_text))
             }
             _ => Err(FormulaError::Na),
         }
@@ -139,19 +149,19 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        let (link, friendly) = match args {
+        let (link_ast, friendly) = match args {
             [link] => (link, None),
             [link, friendly] => (link, optional_ast(args, 1).map(|_| friendly)),
             _ => return Err(FormulaError::Value),
         };
 
-        let link = self.eval_ast(link, sheet, pass, depth + 1);
+        let link = self.eval_ast(link_ast, sheet, pass, depth + 1);
         if let Value::Error(error) = link {
             return Err(error);
         }
 
         Ok(match friendly {
-            Some(friendly) => self.eval_ast(friendly, sheet, pass, depth + 1),
+            Some(friendly_ast) => self.eval_ast(friendly_ast, sheet, pass, depth + 1),
             None => link,
         })
     }
@@ -175,7 +185,7 @@ impl CellStore {
         let info_type = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
             Value::Text(text) => text,
             Value::Error(error) => return Err(error),
-            _ => return Err(FormulaError::Value),
+            Value::Number(_) | Value::Bool(_) | Value::Blank => return Err(FormulaError::Value),
         };
 
         let cell = if let Some(reference) = optional_ast(args, 1) {
@@ -218,7 +228,7 @@ impl CellStore {
             "type" => Ok(Value::text(match contents(pass) {
                 Value::Blank => "b",
                 Value::Text(_) => "l",
-                _ => "v",
+                Value::Number(_) | Value::Bool(_) | Value::Error(_) => "v",
             })),
             _ => Err(FormulaError::Value),
         }
@@ -255,7 +265,9 @@ impl CellStore {
                 None => match self.eval_ast(value, sheet, pass, depth + 1) {
                     Value::Error(error) => return Err(error),
                     Value::Text(name) => self.sheet_named(&name).ok_or(FormulaError::Na)?,
-                    _ => return Err(FormulaError::Na),
+                    Value::Number(_) | Value::Bool(_) | Value::Blank => {
+                        return Err(FormulaError::Na)
+                    }
                 },
             },
             _ => return Err(FormulaError::Value),
@@ -274,7 +286,7 @@ impl CellStore {
         self.sheet_lookup
             .get(&sheet_name_key(name))
             .copied()
-            .filter(|&handle| self.sheet_alive.get(handle).copied().unwrap_or(false))
+            .filter(|&handle| self.sheet_alive.get(handle).copied().unwrap_or_default())
     }
 
     /// SHEETS([reference]): every sheet of the workbook, or the sheets a
@@ -295,7 +307,9 @@ impl CellStore {
                 } else {
                     return match self.eval_ast(value, sheet, pass, depth + 1) {
                         Value::Error(error) => Err(error),
-                        _ => Err(FormulaError::Ref),
+                        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                            Err(FormulaError::Ref)
+                        }
                     };
                 }
             }
@@ -322,7 +336,7 @@ impl CellStore {
         let kind = match self.eval_ast(type_text, sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
             Value::Text(text) => text.to_ascii_lowercase(),
-            _ => return Err(FormulaError::Value),
+            Value::Number(_) | Value::Bool(_) | Value::Blank => return Err(FormulaError::Value),
         };
 
         match kind.as_str() {
@@ -354,7 +368,9 @@ fn value_information(func: Func, value: Value) -> Value {
         Value::Error(FormulaError::Loading) => 8.0,
         Value::Error(FormulaError::Spill) => 9.0,
         Value::Error(FormulaError::Calc) => 14.0,
-        _ => return Value::Error(FormulaError::Na),
+        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            return Value::Error(FormulaError::Na)
+        }
     };
 
     Value::number(number)

@@ -63,7 +63,8 @@ show `#CYCLE!`. See [Dynamic arrays and spills](/docs/features/formulas/dynamic-
 With a windowed datasource, only some rows are in memory. A formula that reads
 cells that are not loaded yet shows `#LOADING!` and calculates again when they
 arrive. For visible formulas, the Grid asks the engine which same-sheet cells
-they read and loads those cells with the window, within a cell budget. See
+they read and loads those cells with the window, within a cell budget. `INDEX`
+that returns one cell waits only for that cell, not for the rest of its area. See
 [Cells that visible formulas read](/docs/features/data/datasources/#cells-that-visible-formulas-read).
 
 ## Errors are values

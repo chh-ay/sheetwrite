@@ -1,0 +1,5 @@
+/* Every docs page's middle site stylesheet: content components and page
+   actions, in site.css's cascade order between the feature sheets before it
+   and the playground's after it (routes/__root.tsx). */
+@import "@docs/styles/site/content-components.css";
+@import "@docs/styles/site/page-actions.css";

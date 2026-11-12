@@ -84,12 +84,12 @@ struct Asset {
 impl Asset {
     /// The declining balance depreciation of one whole period, as DDB.
     fn declining_balance(&self, cost: f64, period: f64) -> f64 {
-        let rate = self.factor / self.life;
+        let full_rate = self.factor / self.life;
 
-        let (rate, before) = if rate >= 1.0 {
+        let (rate, before) = if full_rate >= 1.0 {
             (1.0, if period == 1.0 { cost } else { 0.0 })
         } else {
-            (rate, cost * (1.0 - rate).powf(period - 1.0))
+            (full_rate, cost * (1.0 - full_rate).powf(period - 1.0))
         };
 
         let after = cost * (1.0 - rate).powf(period);
@@ -244,19 +244,21 @@ impl FrenchAsset {
         let year_days = match self.basis {
             Basis::ActualActual if self.purchased.is_leap_year() => DAYS_PER_LEAP_YEAR,
             Basis::ActualActual => DAYS_PER_YEAR,
-            _ => self.basis.year_days(self.purchased, self.purchased),
+            Basis::UsThirty | Basis::Actual360 | Basis::Actual365 | Basis::EuropeanThirty => {
+                self.basis.year_days(self.purchased, self.purchased)
+            }
         };
         let start = self.shared_february_day(self.purchased);
         let end = self.shared_february_day(self.first_period);
         let share = self.basis.days(start, end) / year_days * rate * self.cost;
 
-        let (depreciation, life) = if share == 0.0 {
+        let (depreciation, periods) = if share == 0.0 {
             (self.cost * rate, life)
         } else {
             (share, life + 1.0)
         };
 
-        (depreciation.min(self.cost - self.salvage), life)
+        (depreciation.min(self.cost - self.salvage), periods)
     }
 
     /// The actual-day bases count 28 and 29 February of a leap year as 28
@@ -306,15 +308,15 @@ impl FrenchAsset {
     /// AMORDEGRC: a declining rate scaled by a coefficient for the asset
     /// life, with half the remaining value in each of the last two years.
     fn degressive(&self, period: f64, rate: f64) -> f64 {
-        let life = (1.0 / rate).ceil();
+        let whole_life = (1.0 / rate).ceil();
 
-        if self.cost == self.salvage || period > life {
+        if self.cost == self.salvage || period > whole_life {
             return 0.0;
         }
 
-        let mut period_rate = rate * life_coefficient(life);
-        let (first, life) = self.first_depreciation(period_rate, life);
-        let first = excel_round(first);
+        let mut period_rate = rate * life_coefficient(whole_life);
+        let (unrounded_first, life) = self.first_depreciation(period_rate, whole_life);
+        let first = excel_round(unrounded_first);
 
         if period == 0.0 {
             return first;

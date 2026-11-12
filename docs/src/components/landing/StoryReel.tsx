@@ -1,12 +1,12 @@
-import { type CSSProperties, useEffect, useState } from "react";
+import { type Component, createEffect, createMemo, createSignal, For, on, Show } from "solid-js";
 
 import { Icon } from "../Icon.js";
 import { onTabListKey } from "../tabKeys.js";
 import { AnalysisStory } from "./AnalysisStory.js";
 import { OfflineStory } from "./OfflineStory.js";
+import { createScenePlayback } from "./scene-playback.js";
 import { SpillStory } from "./SpillStory.js";
 import { UndoStory } from "./UndoStory.js";
-import { useScenePlayback } from "./useScenePlayback.js";
 
 /**
  * A reel of four short animated stories. Each plays one 10-second loop and
@@ -65,96 +65,113 @@ const STORIES: readonly Story[] = [
   },
 ];
 
+const STORY_IDS = STORIES.map((story) => story.id);
+
+const STAGES: Readonly<Record<Story["id"], Component>> = {
+  analysis: AnalysisStory,
+  spill: SpillStory,
+  offline: OfflineStory,
+  undo: UndoStory,
+};
+
+const storyTabId = (id: Story["id"]) => `landing-story-${id}`;
+
 export function StoryReel() {
-  const [active, setActive] = useState<Story["id"]>("analysis");
+  const [active, setActive] = createSignal<Story["id"]>("analysis");
   // The reel holds its story while focus is inside it, so a story change never
   // removes the link or tab the reader is on, and while the reader pauses it.
   // A held reel has no timer; the countdown starts again when the hold ends.
-  const [focusInside, setFocusInside] = useState(false);
-  const [pausedByReader, setPausedByReader] = useState(false);
-  const held = focusInside || pausedByReader;
-  const { ref, sync } = useScenePlayback<HTMLDivElement>();
-  useEffect(() => {
-    void active;
-    requestAnimationFrame(sync);
-  }, [active, sync]);
-  const index = STORIES.findIndex((story) => story.id === active);
-  const story = STORIES[index] ?? (STORIES[0] as Story);
-  const advance = () => setActive(STORIES[(index + 1) % STORIES.length]?.id ?? "analysis");
+  const [focusInside, setFocusInside] = createSignal(false);
+  const [pausedByReader, setPausedByReader] = createSignal(false);
+  const held = () => focusInside() || pausedByReader();
+  const playback = createScenePlayback<HTMLDivElement>();
+  let root: HTMLDivElement | undefined;
+  createEffect(
+    on(active, () => {
+      requestAnimationFrame(playback.sync);
+    }),
+  );
+  const index = createMemo(() => STORIES.findIndex((story) => story.id === active()));
+  const story = createMemo(() => STORIES[index()] ?? (STORIES[0] as Story));
+  const select = (id: Story["id"]) => setActive(id);
+  const advance = () => setActive(STORIES[(index() + 1) % STORIES.length]?.id ?? "analysis");
   return (
     <div
-      className="sw-reel"
-      onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) setFocusInside(false);
+      class="sw-reel"
+      onFocusIn={() => setFocusInside(true)}
+      onFocusOut={(event) => {
+        const next = event.relatedTarget;
+        if (!(next instanceof Node && root?.contains(next) === true)) setFocusInside(false);
       }}
-      onFocus={() => setFocusInside(true)}
-      ref={ref}
-      style={{ "--sr-loop": `${STORY_SECONDS}s` } as CSSProperties}
+      ref={(element) => {
+        root = element;
+        playback.ref(element);
+      }}
+      style={{ "--sr-loop": `${STORY_SECONDS}s` }}
     >
       {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Stories"
-        className="sw-reel__tabs"
-        onKeyDown={(event) =>
-          onTabListKey(
-            event,
-            STORIES.map((item) => item.id),
-            active,
-            setActive,
-            (id) => `landing-story-${id}`,
-          )
-        }
+        class="sw-reel__tabs"
+        onKeyDown={(event) => onTabListKey(event, STORY_IDS, active(), select, storyTabId)}
         role="tablist"
         // The indicator slides to this tab instead of jumping.
-        style={{ "--sr-index": Math.max(index, 0), "--sr-count": STORIES.length } as CSSProperties}
+        style={{ "--sr-index": Math.max(index(), 0), "--sr-count": STORIES.length }}
       >
-        {STORIES.map((item) => (
-          <button
-            aria-controls="landing-story-panel"
-            aria-selected={item.id === active}
-            id={`landing-story-${item.id}`}
-            key={item.id}
-            onClick={() => setActive(item.id)}
-            role="tab"
-            tabIndex={item.id === active ? 0 : -1}
-            type="button"
-          >
-            <span>{item.tab}</span>
-            {item.id === active && !held ? (
-              <i aria-hidden="true" className="sw-reel__timer" onAnimationEnd={advance} />
-            ) : null}
-          </button>
-        ))}
+        <For each={STORIES}>
+          {(item) => (
+            <button
+              aria-controls="landing-story-panel"
+              aria-selected={item.id === active()}
+              id={storyTabId(item.id)}
+              onClick={() => setActive(item.id)}
+              role="tab"
+              tabIndex={item.id === active() ? 0 : -1}
+              type="button"
+            >
+              <span>{item.tab}</span>
+              <Show when={item.id === active() && !held()}>
+                <i aria-hidden="true" class="sw-reel__timer" onAnimationEnd={advance} />
+              </Show>
+            </button>
+          )}
+        </For>
       </div>
       <div
-        aria-labelledby={`landing-story-${story.id}`}
-        className="sw-reel__panel"
+        aria-labelledby={storyTabId(story().id)}
+        class="sw-reel__panel"
         id="landing-story-panel"
         role="tabpanel"
       >
-        {/* The copy key remounts it so its fade plays on each story. Sibling keys must differ. */}
-        <div className="sw-reel__copy" key={`copy-${story.id}`}>
-          <h3>{story.title}</h3>
-          <p>{story.detail}</p>
-          <a href={story.href}>
-            {story.link}
-            <Icon name="arrow-right" />
-          </a>
-          <button
-            aria-pressed={pausedByReader}
-            className="sw-reel__pause"
-            onClick={() => setPausedByReader((paused) => !paused)}
-            type="button"
-          >
-            Pause stories
-          </button>
-        </div>
-        <div className="sw-reel__stage" data-story={story.id} key={`stage-${story.id}`}>
-          {story.id === "analysis" ? <AnalysisStory /> : null}
-          {story.id === "spill" ? <SpillStory /> : null}
-          {story.id === "offline" ? <OfflineStory /> : null}
-          {story.id === "undo" ? <UndoStory /> : null}
-        </div>
+        {/* Keyed on the story, so the copy and the stage are built anew and their fades play on each story. */}
+        <Show keyed when={story()}>
+          {(shown) => {
+            const Stage = STAGES[shown.id];
+            return (
+              <>
+                <div class="sw-reel__copy">
+                  <h3>{shown.title}</h3>
+                  <p>{shown.detail}</p>
+                  <a href={shown.href}>
+                    {shown.link}
+                    <Icon name="arrow-right" />
+                  </a>
+                  <button
+                    aria-pressed={pausedByReader()}
+                    class="sw-reel__pause"
+                    onClick={() => setPausedByReader((paused) => !paused)}
+                    type="button"
+                  >
+                    Pause stories
+                  </button>
+                </div>
+                <div class="sw-reel__stage" data-story={shown.id}>
+                  <Stage />
+                </div>
+              </>
+            );
+          }}
+        </Show>
       </div>
     </div>
   );

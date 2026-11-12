@@ -9,7 +9,7 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 
-import type { LiveScenario } from "../use-live-scenario.js";
+import type { LiveScenario } from "./live-scenario.js";
 import { createListeners, mountShowcaseShell, requireApplied } from "./showcase-shell.js";
 
 // The sort showcase: 40 orders whose revenue is a formula, and a Watch sheet

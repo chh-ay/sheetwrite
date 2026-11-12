@@ -11,6 +11,8 @@
  * {@link installXlsx} so the package boundary stays observable.
  */
 
+import { installXlsx } from "@docs/lib/addons.js";
+import { errorText } from "@docs/lib/errors.js";
 import type {
   Column,
   ColumnarData,
@@ -24,6 +26,7 @@ import type {
 import {
   fromCsv,
   fromXlsxWorkbook,
+  isSheetwriteError,
   parseCsv,
   toCsv,
   toTsv,
@@ -31,26 +34,12 @@ import {
   withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
-import compressionRatioUrl from "../../../../packages/xlsx/test/fixtures/compression-ratio.xlsx?url";
-import corruptDeflateUrl from "../../../../packages/xlsx/test/fixtures/corrupt-deflate.xlsx?url";
-import deepXmlUrl from "../../../../packages/xlsx/test/fixtures/deep-xml.xlsx?url";
-import doctypeUrl from "../../../../packages/xlsx/test/fixtures/doctype.xlsx?url";
-import externalCorpus from "../../../../packages/xlsx/test/fixtures/external-corpus.json";
-import libreofficeMetadataUrl from "../../../../packages/xlsx/test/fixtures/libreoffice-metadata.xlsx?url";
-import libreofficeRichUrl from "../../../../packages/xlsx/test/fixtures/libreoffice-rich.xlsx?url";
-import fixtureManifest from "../../../../packages/xlsx/test/fixtures/manifest.json";
-import positiveUrl from "../../../../packages/xlsx/test/fixtures/sheetwrite-libreoffice-positive.xlsx?url";
-import traversalUrl from "../../../../packages/xlsx/test/fixtures/traversal.xlsx?url";
-import { installXlsx } from "../../lib/addons.js";
-import { errorText } from "../../lib/errors.js";
+import { INTEROP_INJECTION_TEXT, type InteropFixture } from "./interop-fixtures.js";
 
 export const INTEROP_ORDERS_SHEET = "orders";
 export const INTEROP_INVOICE_SHEET = "invoice";
 export const INTEROP_ASSUMPTIONS_SHEET = "assumptions";
 export const INTEROP_ANALYSIS_SHEET = "analysis";
-
-/** Literal text that MUST leave the CSV path neutralized, never executable. */
-export const INTEROP_INJECTION_TEXT = '=HYPERLINK("https://evil.example","Q3 total")';
 
 const PRODUCTS = [
   ["Standing desk", 749.5],
@@ -437,65 +426,6 @@ export async function probeXlsxRegistration(): Promise<{
   }
 }
 
-export interface InteropFixture {
-  id: string;
-  file: string;
-  url: string;
-  sha256: string;
-  producer: string;
-  kind: "positive" | "adversarial";
-  /** Supported features (positive) or the attack the codec must reject. */
-  details: readonly string[];
-  expectedWarnings: readonly string[];
-}
-
-const FIXTURE_URLS: Record<string, string> = {
-  "sheetwrite-libreoffice-positive.xlsx": positiveUrl,
-  "libreoffice-rich.xlsx": libreofficeRichUrl,
-  "libreoffice-metadata.xlsx": libreofficeMetadataUrl,
-  "traversal.xlsx": traversalUrl,
-  "doctype.xlsx": doctypeUrl,
-  "deep-xml.xlsx": deepXmlUrl,
-  "compression-ratio.xlsx": compressionRatioUrl,
-  "corrupt-deflate.xlsx": corruptDeflateUrl,
-};
-
-function fixtureUrl(file: string): string {
-  const url = FIXTURE_URLS[file];
-  if (url === undefined) {
-    throw new Error(`Interoperability scenario is missing bytes for manifest fixture ${file}`);
-  }
-  return url;
-}
-
-/** LibreOffice-produced workbooks whose bytes are committed and run live here. */
-export const POSITIVE_FIXTURES: readonly InteropFixture[] = fixtureManifest.positive.map(
-  (entry) => ({
-    id: entry.file.replace(/\.xlsx$/, ""),
-    file: entry.file,
-    url: fixtureUrl(entry.file),
-    sha256: entry.sha256,
-    producer: `${entry.producer.name} ${entry.producer.version}`,
-    kind: "positive",
-    details: entry.expectedSubset,
-    expectedWarnings: entry.expectedWarnings,
-  }),
-);
-
-/** Hand-authored hostile OPC/SpreadsheetML packages the codec must reject. */
-export const ADVERSARIAL_FIXTURES: readonly InteropFixture[] = fixtureManifest.adversarial.map(
-  (entry) => ({
-    id: entry.file.replace(/\.xlsx$/, ""),
-    file: entry.file,
-    url: fixtureUrl(entry.file),
-    sha256: entry.sha256,
-    producer: fixtureManifest.adversarialProvenance.producer,
-    kind: "adversarial",
-    details: [entry.purpose],
-    expectedWarnings: [],
-  }),
-);
-
 export async function fetchFixtureBytes(fixture: InteropFixture): Promise<Uint8Array> {
   const response = await fetch(fixture.url);
   if (!response.ok) throw new Error(`Failed to fetch ${fixture.file}: HTTP ${response.status}`);
@@ -509,55 +439,6 @@ export async function sha256Hex(bytes: Uint8Array): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", new Uint8Array(bytes));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
-
-export interface ProducerVerification {
-  producer: string;
-  status: "verified-live" | "unverified";
-  detail: string;
-  evidence: string;
-}
-
-const EXCEL_TEST_FILES = externalCorpus.fixtures.length;
-const EXCEL_UNVERIFIED = externalCorpus.unverified["Microsoft Excel"];
-const SHEETS_UNVERIFIED = externalCorpus.unverified["Google Sheets"];
-const GOOGLE_TEST_FILES = externalCorpus.googleFixtures;
-
-/**
- * Honest producer compatibility: only claims backed by real bytes. Every row
- * derives from the checked-in compatibility records, so a producer's status
- * changes here exactly when its evidence changes there.
- */
-export const PRODUCER_MATRIX: readonly ProducerVerification[] = [
-  {
-    producer: `LibreOffice ${fixtureManifest.positive[0]?.producer.version ?? ""}`.trim(),
-    status: "verified-live",
-    detail:
-      "Committed LibreOffice-produced workbooks import on this page, in your browser, after their file hashes match the checked fixture record.",
-    evidence: "packages/xlsx/test/fixtures/manifest.json",
-  },
-  {
-    producer: "Sheetwrite round-trip",
-    status: "verified-live",
-    detail:
-      "The workbench below exports this document to .xlsx bytes and re-imports them live; formulas, formats, the merge, and frozen rows survive.",
-    evidence: "toXlsxWorkbook / fromXlsxWorkbook on this page",
-  },
-  {
-    producer: "Microsoft Excel",
-    status: "unverified",
-    detail: `${EXCEL_TEST_FILES} Excel-produced test files are listed from Apache POI commit ${externalCorpus.commit.slice(0, 10)}, with expected file hashes and download sources. The workbook bytes and reviewed results are not checked in, so no Excel result is available here. Still unverified from Excel files: ${EXCEL_UNVERIFIED.join(", ")}.`,
-    evidence: "packages/xlsx/test/fixtures/external-corpus.json",
-  },
-  {
-    producer: "Google Sheets",
-    status: "unverified",
-    detail:
-      GOOGLE_TEST_FILES.length > 0
-        ? `Metadata lists ${GOOGLE_TEST_FILES.length} Google Sheets-exported test file${GOOGLE_TEST_FILES.length === 1 ? "" : "s"} (${GOOGLE_TEST_FILES.map((fixture) => fixture.file).join(", ")}) with ${GOOGLE_TEST_FILES.length === 1 ? "its" : "their"} file hash recorded. The bytes and reviewed compatibility results are not checked in, so no Google Sheets result is available here. Still unverified from Google Sheets files: ${SHEETS_UNVERIFIED.join(", ")}.`
-        : `No Google Sheets-produced test file or reviewed result is checked in, so no compatibility claim is made for: ${SHEETS_UNVERIFIED.join(", ")}.`,
-    evidence: "packages/xlsx/test/fixtures/external-corpus.json",
-  },
-];
 
 export interface WorkbookImportOutcome {
   snapshot: WorkbookSnapshot;
@@ -991,13 +872,30 @@ export function importDelimitedText(text: string): DelimitedImport {
 export interface RejectionReport {
   rejected: boolean;
   errorName: string | null;
+  /** The `SheetwriteError` code, such as `resource-limit`. */
+  code: string | null;
+  /** The resource limit the input hit, such as `maxCells`, when the error names one. */
+  limit: string | null;
   message: string | null;
 }
 
+/** What a completed import reports: nothing was rejected. */
+const NOT_REJECTED: RejectionReport = {
+  rejected: false,
+  errorName: null,
+  code: null,
+  limit: null,
+  message: null,
+};
+
 function rejectionReport(error: unknown): RejectionReport {
+  const typed = isSheetwriteError(error) ? error : null;
+  const resource = typed?.context?.resource;
   return {
     rejected: true,
     errorName: error instanceof Error ? error.name : typeof error,
+    code: typed?.code ?? null,
+    limit: typeof resource === "string" ? resource : null,
     message: errorText(error),
   };
 }
@@ -1010,7 +908,7 @@ export async function expectRejection(
   await installXlsx();
   try {
     await fromXlsxWorkbook(bytes, options);
-    return { rejected: false, errorName: null, message: null };
+    return NOT_REJECTED;
   } catch (error) {
     return rejectionReport(error);
   }
@@ -1029,7 +927,7 @@ export function delimitedCeilingDemo(): RejectionReport {
   const big = [wide, ...Array.from({ length: 100 }, () => wide)].join("\n");
   try {
     parseCsv(big, { resourceLimits: { maxCells: 1_000 } });
-    return { rejected: false, errorName: null, message: null };
+    return NOT_REJECTED;
   } catch (error) {
     return rejectionReport(error);
   }

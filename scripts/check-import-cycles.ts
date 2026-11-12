@@ -214,6 +214,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ChartViewProvider",
       "ChartRenderer",
       "MountedChart",
+      "ReadonlyChartDefinition",
     ],
   },
   document: {

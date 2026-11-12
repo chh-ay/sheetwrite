@@ -1,3 +1,5 @@
+import { For } from "solid-js";
+
 const layers = [
   {
     label: "Host",
@@ -18,20 +20,22 @@ export default function RuntimeArchitecture() {
     // The figcaption needs <figure>, and the diagram must stay a named region landmark.
     <figure
       aria-label="Sheetwrite runtime ownership and data flow"
-      className="sw-architecture"
+      class="sw-architecture"
       role="region"
     >
-      <div className="sw-architecture__flow">
-        {layers.map((layer, index) => (
-          <div className="sw-architecture__step" key={layer.label}>
-            <div>
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              <strong>{layer.label}</strong>
-              <p>{layer.detail}</p>
+      <div class="sw-architecture__flow">
+        <For each={layers}>
+          {(layer, index) => (
+            <div class="sw-architecture__step">
+              <div>
+                <span>{String(index() + 1).padStart(2, "0")}</span>
+                <strong>{layer.label}</strong>
+                <p>{layer.detail}</p>
+              </div>
+              {index() < layers.length - 1 ? <span aria-hidden="true">↓</span> : null}
             </div>
-            {index < layers.length - 1 ? <span aria-hidden="true">↓</span> : null}
-          </div>
-        ))}
+          )}
+        </For>
       </div>
       <figcaption>
         Ownership moves downward through narrow contracts; events and resolved windows move upward.

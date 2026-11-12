@@ -1,9 +1,25 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
+import { pageMeta } from "@docs/lib/seo.js";
+import {
+  authorName,
+  BASELINE_NAME,
+  BUDGET_ROWS_USED,
+  SAM,
+  YOU,
+} from "@docs/showcases/scenarios/version-history.js";
+import VersionHistorySnippet from "@docs/showcases/snippets/version-history.mdx";
+import VersionHistorySnippetSource from "@docs/showcases/snippets/version-history.mdx?source";
+import { createFileRoute } from "@tanstack/solid-router";
+import { NoHydration } from "solid-js/web";
 
-import { pageMeta } from "../lib/seo.js";
+import { VersionsDiagram } from "../art/explain-diagrams.js";
+import { Island } from "../islands/Island.js";
+import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { VersionHistoryStage } from "../showcases/version-history/VersionHistoryStage.js";
 
-const VersionHistoryShowcase = lazy(() => import("../showcases/VersionHistoryShowcase.js"));
+import artStylesheet from "../art/art.css?url";
+import targetsStylesheet from "../styles/showcases/touch-targets.css?url";
+import featureStylesheet from "@docs/styles/feature-showcases.css?url";
+import layoutStylesheet from "@docs/styles/showcase-layout.css?url";
 
 export const Route = createFileRoute("/showcases/version-history")({
   head: () => ({
@@ -11,10 +27,77 @@ export const Route = createFileRoute("/showcases/version-history")({
       "Version history — Sheetwrite showcases",
       "Edit a shared budget with a teammate, save named versions, compare a version with the current document by author, and restore a range or a sheet.",
     ),
+    links: [
+      { rel: "stylesheet", href: artStylesheet },
+      { rel: "stylesheet", href: targetsStylesheet },
+      { rel: "stylesheet", href: layoutStylesheet },
+      { rel: "stylesheet", href: featureStylesheet },
+    ],
   }),
-  component: () => (
-    <Suspense fallback={<main id="main-content">Loading the budget…</main>}>
-      <VersionHistoryShowcase />
-    </Suspense>
-  ),
+  component: VersionHistoryShowcase,
 });
+
+function VersionHistoryShowcase() {
+  return (
+    <NoHydration>
+      <ShowcasePage
+        explain={
+          <ShowcaseSection
+            id="version-history-rules"
+            figure={<VersionsDiagram />}
+            title="How versions are kept"
+          >
+            <ul>
+              <li>
+                The document authority journals each committed change in the archive, with its
+                author. Edits that are not committed yet never reach a version.
+              </li>
+              <li>
+                Versions are stored in content-addressed chunks, so unchanged cells are shared
+                between them. A compare loads a small WASM kernel the first time it runs.
+              </li>
+              <li>
+                A restore is one undoable change and one synced transaction, so Sam's client
+                receives it like any other edit.
+              </li>
+            </ul>
+          </ShowcaseSection>
+        }
+        code={{
+          title: "The code behind it",
+          Snippet: VersionHistorySnippet,
+          source: VersionHistorySnippetSource,
+        }}
+        eyebrow="Collaboration"
+        facts={[
+          { label: "Authors", value: `${authorName(YOU)}, ${authorName(SAM)}` },
+          { label: "Starts from", value: BASELINE_NAME },
+          { label: "Entry point", value: "@sheetwrite/core/history", code: true },
+        ]}
+        guide={{
+          href: "/docs/features/data/persistence/#opt-in-version-archives",
+          label: "Read the version history guide",
+        }}
+        id="version-history"
+        stage={
+          <Island
+            component={VersionHistoryStage}
+            name="showcase-version-history"
+            props={{
+              baselineName: BASELINE_NAME,
+              teammate: authorName(SAM),
+              rowsUsed: BUDGET_ROWS_USED,
+            }}
+          />
+        }
+        task={
+          <>
+            Edit a shared budget with a teammate, save a version, compare it with the approved
+            budget and restore part of it.
+          </>
+        }
+        title="Save, compare and restore versions"
+      ></ShowcasePage>
+    </NoHydration>
+  );
+}

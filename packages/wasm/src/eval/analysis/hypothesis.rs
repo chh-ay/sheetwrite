@@ -320,9 +320,9 @@ mod tests {
         evaluate(name, &values)
     }
 
-    fn assert_published(name: &str, actual: Value, published: &str) {
-        let Value::Number(actual) = actual else {
-            panic!("{name} returned {actual:?}");
+    fn assert_published(name: &str, value: Value, published: &str) {
+        let Value::Number(actual) = value else {
+            panic!("{name} returned {value:?}");
         };
         let decimals = published
             .split_once('.')

@@ -38,6 +38,7 @@ import { Route as ShowcasesVersionHistoryRouteImport } from './routes/showcases.
 import { Route as TestCollaborationRouteImport } from './routes/test.collaboration'
 import { Route as TestFormulasEngineRouteImport } from './routes/test.formulas-engine'
 import { Route as TestGridMemoryRouteImport } from './routes/test.grid-memory'
+import { Route as TestIslandsRouteImport } from './routes/test.islands'
 import { Route as TestPrefetchRouteImport } from './routes/test.prefetch'
 import { Route as TestXlsxRouteImport } from './routes/test.xlsx'
 import { Route as TestFrameworkLifecycleFrameworkRouteImport } from './routes/test.framework-lifecycle.$framework'
@@ -188,6 +189,11 @@ const TestGridMemoryRoute = TestGridMemoryRouteImport.update({
   path: '/test/grid-memory',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestIslandsRoute = TestIslandsRouteImport.update({
+  id: '/test/islands',
+  path: '/test/islands',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestPrefetchRoute = TestPrefetchRouteImport.update({
   id: '/test/prefetch',
   path: '/test/prefetch',
@@ -233,6 +239,7 @@ export interface FileRoutesByFullPath {
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
+  '/test/islands': typeof TestIslandsRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
@@ -267,6 +274,7 @@ export interface FileRoutesByTo {
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
+  '/test/islands': typeof TestIslandsRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs': typeof DocsIndexRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/test/collaboration': typeof TestCollaborationRoute
   '/test/formulas-engine': typeof TestFormulasEngineRoute
   '/test/grid-memory': typeof TestGridMemoryRoute
+  '/test/islands': typeof TestIslandsRoute
   '/test/prefetch': typeof TestPrefetchRoute
   '/test/xlsx': typeof TestXlsxRoute
   '/docs/': typeof DocsIndexRoute
@@ -338,6 +347,7 @@ export interface FileRouteTypes {
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/grid-memory'
+    | '/test/islands'
     | '/test/prefetch'
     | '/test/xlsx'
     | '/docs/'
@@ -372,6 +382,7 @@ export interface FileRouteTypes {
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/grid-memory'
+    | '/test/islands'
     | '/test/prefetch'
     | '/test/xlsx'
     | '/docs'
@@ -406,6 +417,7 @@ export interface FileRouteTypes {
     | '/test/collaboration'
     | '/test/formulas-engine'
     | '/test/grid-memory'
+    | '/test/islands'
     | '/test/prefetch'
     | '/test/xlsx'
     | '/docs/'
@@ -441,6 +453,7 @@ export interface RootRouteChildren {
   TestCollaborationRoute: typeof TestCollaborationRoute
   TestFormulasEngineRoute: typeof TestFormulasEngineRoute
   TestGridMemoryRoute: typeof TestGridMemoryRoute
+  TestIslandsRoute: typeof TestIslandsRoute
   TestPrefetchRoute: typeof TestPrefetchRoute
   TestXlsxRoute: typeof TestXlsxRoute
   DocsIndexRoute: typeof DocsIndexRoute
@@ -448,7 +461,7 @@ export interface RootRouteChildren {
   TestFrameworkLifecycleFrameworkRoute: typeof TestFrameworkLifecycleFrameworkRoute
 }
 
-declare module '@tanstack/react-router' {
+declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
     '/': {
       id: '/'
@@ -653,6 +666,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestGridMemoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/test/islands': {
+      id: '/test/islands'
+      path: '/test/islands'
+      fullPath: '/test/islands'
+      preLoaderRoute: typeof TestIslandsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/test/prefetch': {
       id: '/test/prefetch'
       path: '/test/prefetch'
@@ -705,6 +725,7 @@ const rootRouteChildren: RootRouteChildren = {
   TestCollaborationRoute: TestCollaborationRoute,
   TestFormulasEngineRoute: TestFormulasEngineRoute,
   TestGridMemoryRoute: TestGridMemoryRoute,
+  TestIslandsRoute: TestIslandsRoute,
   TestPrefetchRoute: TestPrefetchRoute,
   TestXlsxRoute: TestXlsxRoute,
   DocsIndexRoute: DocsIndexRoute,
@@ -716,8 +737,8 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
-declare module '@tanstack/react-start' {
+import type { createStart } from '@tanstack/solid-start'
+declare module '@tanstack/solid-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>

@@ -28,6 +28,10 @@ const MAX_RADIX: f64 = 36.0;
 const BASE_LIMIT: f64 = 9_007_199_254_740_992.0;
 const MAX_MIN_LENGTH: f64 = 255.0;
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "the last function of the group takes the fallback arm; listing the 200 other Func variants adds nothing"
+)]
 pub(in crate::eval) fn apply(func: Func, values: &FuncAccumulator) -> EvalResult {
     let result = match func {
         Func::Roman => roman(values).map(Value::text),
@@ -114,8 +118,8 @@ fn arabic(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         return Err(FormulaError::Value);
     }
 
-    let text = text_arg(values, 0, None)?;
-    let text = text.trim_matches(' ');
+    let raw = text_arg(values, 0, None)?;
+    let text = raw.trim_matches(' ');
 
     if text.len() > MAX_TEXT_LENGTH {
         return Err(FormulaError::Value);

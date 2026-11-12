@@ -34,6 +34,11 @@ export interface AriaMirrorDeps {
 /**
  * Keeps a compact, screen-reader-visible mirror of the rendered window while the
  * canvas and overlay remain hidden from assistive technology.
+ *
+ * A paint only captures the mirror's content (`update`, `setRowCount`); the
+ * paint's last step, `flush`, writes the DOM, after the paint's layout reads.
+ * Writing it earlier would make a later read in the same paint (the editor's
+ * position, a scroll listener) lay out the mirror first.
  */
 export class AriaMirror {
   private readonly host: HTMLElement;
@@ -44,6 +49,23 @@ export class AriaMirror {
   private readonly selection: () => Selection | null;
   private key = "";
   private version = 0;
+
+  // Captured content that the next flush writes.
+  private contentPending = false;
+  private rowCountValue: string;
+  private focusId = "";
+  private rowStart = 0;
+  private rowCount = 0;
+  private focusRow = -1;
+  private focusCol = -1;
+  private selectedRow: number | null = null;
+  private selectedColumn: number | null = null;
+  private readonly cols: number[] = [];
+  private readonly headerTexts: string[] = [];
+  private readonly cellTexts: string[] = [];
+  private readonly cellDescriptions: (string | null)[] = [];
+  /** A paint can destroy the grid (a listener); its flush must not write the host again. */
+  private destroyed = false;
 
   /** Last `aria-activedescendant` written to the host; avoids redundant writes. */
   private lastFocusId: string | null = null;
@@ -73,9 +95,10 @@ export class AriaMirror {
     deps.host.appendChild(aria);
     this.aria = aria;
 
+    this.rowCountValue = String(deps.rowCount + 1);
     deps.host.setAttribute("role", "grid");
     deps.host.setAttribute("aria-multiselectable", "true");
-    deps.host.setAttribute("aria-rowcount", String(deps.rowCount + 1));
+    deps.host.setAttribute("aria-rowcount", this.rowCountValue);
     deps.host.setAttribute("aria-colcount", String(deps.colCount));
     if (deps.readOnly) deps.host.setAttribute("aria-readonly", "true");
     if (!deps.host.hasAttribute("aria-label")) {
@@ -100,34 +123,70 @@ export class AriaMirror {
 
   /** Displayed data rows; the header row adds one to `aria-rowcount`. */
   setRowCount(count: number): void {
-    const value = String(count + 1);
-    if (this.host.getAttribute("aria-rowcount") !== value) {
-      this.host.setAttribute("aria-rowcount", value);
-    }
+    this.rowCountValue = String(count + 1);
   }
 
+  /** Capture the painted window; `flush` writes it. */
   update(view: VisibleWindowView): void {
     const focus = this.focusCell();
     const focusId = focus ? `${this.aria.id}-${focus.row}-${focus.col}` : "";
     const key = `${view.rows.start}:${view.rows.end}:${view.cols.length}:${focusId}:${this.version}`;
-    if (key === this.key) {
-      this.writeActiveDescendant(focusId);
-      return;
-    }
+    if (key === this.key) return;
     this.key = key;
 
+    const selection = this.selection();
     const nCols = view.cols.length;
     const nRows = view.rows.end - view.rows.start;
+    this.focusId = focusId;
+    this.focusRow = focus?.row ?? -1;
+    this.focusCol = focus?.col ?? -1;
+    this.selectedColumn = selection?.kind === "column" ? selection.col : null;
+    this.selectedRow = selection?.kind === "row" ? selection.row : null;
+    this.rowStart = view.rows.start;
+    this.rowCount = nRows;
+    this.cols.length = nCols;
+    this.headerTexts.length = nCols;
+    for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
+      const col = view.cols[columnIndex];
+      if (col === undefined) throw new Error("ARIA header has no visible column");
 
-    if (nRows === this.lastNRows && nCols === this.lastNCols) {
-      this.patchInPlace(view, focus, nCols);
+      this.cols[columnIndex] = col;
+      this.headerTexts[columnIndex] = this.columnHeader(col);
+    }
+    const cells = nRows * nCols;
+    this.cellTexts.length = cells;
+    this.cellDescriptions.length = cells;
+    for (let rowIndex = 0; rowIndex < nRows; rowIndex++) {
+      const row = view.rows.start + rowIndex;
+      for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
+        const index = rowIndex * nCols + columnIndex;
+        const value = view.values[index] ?? null;
+        this.cellTexts[index] = value !== null ? String(value) : "";
+        const note = this.noteAt(row, this.cols[columnIndex] ?? -1);
+        this.cellDescriptions[index] = note ? `Note: ${note}` : null;
+      }
+    }
+    this.contentPending = true;
+  }
+
+  /** Write the captured content to the mirror and the host. */
+  flush(): void {
+    if (this.destroyed) return;
+    if (this.host.getAttribute("aria-rowcount") !== this.rowCountValue) {
+      this.host.setAttribute("aria-rowcount", this.rowCountValue);
+    }
+    if (!this.contentPending) return;
+    this.contentPending = false;
+
+    const nCols = this.cols.length;
+    if (this.rowCount === this.lastNRows && nCols === this.lastNCols) {
+      this.patchInPlace(nCols);
     } else {
-      this.rebuild(view, focus, nRows, nCols);
-      this.lastNRows = nRows;
+      this.rebuild(nCols);
+      this.lastNRows = this.rowCount;
       this.lastNCols = nCols;
     }
-
-    this.writeActiveDescendant(focusId);
+    this.writeActiveDescendant(this.focusId);
   }
 
   private writeActiveDescendant(focusId: string): void {
@@ -136,18 +195,13 @@ export class AriaMirror {
     this.lastFocusId = focusId;
   }
 
-  /** Full teardown: build a fresh header + data grid and cache its nodes. */
-  private rebuild(
-    view: VisibleWindowView,
-    focus: CellRef | null,
-    nRows: number,
-    nCols: number,
-  ): void {
-    const frag = document.createDocumentFragment();
-    const selection = this.selection();
-    const selectedColumn = selection?.kind === "column" ? selection.col : null;
-    const selectedRow = selection?.kind === "row" ? selection.row : null;
+  private isFocused(row: number, col: number): boolean {
+    return this.focusRow === row && this.focusCol === col;
+  }
 
+  /** Full teardown: build a fresh header + data grid and cache its nodes. */
+  private rebuild(nCols: number): void {
+    const frag = document.createDocumentFragment();
     this.headerCells = [];
     this.rowEls = [];
     this.cellEls = [];
@@ -156,35 +210,35 @@ export class AriaMirror {
     headRow.setAttribute("role", "row");
     headRow.setAttribute("aria-rowindex", "1");
     for (let cj = 0; cj < nCols; cj++) {
+      const col = this.cols[cj] ?? -1;
       const cell = document.createElement("div");
       cell.setAttribute("role", "columnheader");
-      if (selectedColumn === view.cols[cj]) cell.setAttribute("aria-selected", "true");
-      cell.setAttribute("aria-colindex", String(view.cols[cj]! + 1));
-      cell.textContent = this.columnHeader(view.cols[cj]!);
+      if (this.selectedColumn === col) cell.setAttribute("aria-selected", "true");
+      cell.setAttribute("aria-colindex", String(col + 1));
+      cell.textContent = this.headerTexts[cj] ?? "";
       headRow.appendChild(cell);
       this.headerCells.push(cell);
     }
     frag.appendChild(headRow);
 
-    for (let ri = 0; ri < nRows; ri++) {
-      const row = view.rows.start + ri;
+    for (let ri = 0; ri < this.rowCount; ri++) {
+      const row = this.rowStart + ri;
       const rowEl = document.createElement("div");
-      if (selectedRow === row) rowEl.setAttribute("aria-selected", "true");
+      if (this.selectedRow === row) rowEl.setAttribute("aria-selected", "true");
       rowEl.setAttribute("role", "row");
       rowEl.setAttribute("aria-rowindex", String(row + 2));
       for (let cj = 0; cj < nCols; cj++) {
-        const col = view.cols[cj]!;
+        const col = this.cols[cj] ?? -1;
+        const index = ri * nCols + cj;
         const cell = document.createElement("div");
         cell.setAttribute("role", "gridcell");
         cell.setAttribute("aria-colindex", String(col + 1));
         cell.id = `${this.aria.id}-${row}-${col}`;
-        const v = view.values[ri * nCols + cj] ?? null;
-        if (v !== null) cell.textContent = String(v);
-        const note = this.noteAt(row, col);
-        if (note) cell.setAttribute("aria-description", `Note: ${note}`);
-        if (focus && focus.row === row && focus.col === col) {
-          cell.setAttribute("aria-selected", "true");
-        }
+        const text = this.cellTexts[index] ?? "";
+        if (text !== "") cell.textContent = text;
+        const description = this.cellDescriptions[index] ?? null;
+        if (description !== null) cell.setAttribute("aria-description", description);
+        if (this.isFocused(row, col)) cell.setAttribute("aria-selected", "true");
         rowEl.appendChild(cell);
         this.cellEls.push(cell);
       }
@@ -200,47 +254,36 @@ export class AriaMirror {
    * labels, per-row `aria-rowindex`, ids, text, and selection state on the
    * retained nodes.
    */
-  private patchInPlace(view: VisibleWindowView, focus: CellRef | null, nCols: number): void {
-    const selection = this.selection();
-    const selectedColumn = selection?.kind === "column" ? selection.col : null;
-    const selectedRow = selection?.kind === "row" ? selection.row : null;
+  private patchInPlace(nCols: number): void {
     for (const [columnIndex, header] of this.headerCells.entries()) {
-      const col = view.cols[columnIndex];
-      if (col === undefined) throw new Error("ARIA header has no visible column");
-
-      updateAttribute(header, "aria-selected", selectedColumn === col ? "true" : null);
-      updateText(header, this.columnHeader(col));
+      const col = this.cols[columnIndex] ?? -1;
+      updateAttribute(header, "aria-selected", this.selectedColumn === col ? "true" : null);
+      updateText(header, this.headerTexts[columnIndex] ?? "");
       updateAttribute(header, "aria-colindex", String(col + 1));
     }
 
     for (const [rowIndex, rowElement] of this.rowEls.entries()) {
-      const row = view.rows.start + rowIndex;
-      updateAttribute(rowElement, "aria-selected", selectedRow === row ? "true" : null);
+      const row = this.rowStart + rowIndex;
+      updateAttribute(rowElement, "aria-selected", this.selectedRow === row ? "true" : null);
       updateAttribute(rowElement, "aria-rowindex", String(row + 2));
 
       for (let columnIndex = 0; columnIndex < nCols; columnIndex++) {
-        const col = view.cols[columnIndex];
-        const cell = this.cellEls[rowIndex * nCols + columnIndex];
-        if (col === undefined || cell === undefined) {
-          throw new Error("ARIA cell has no visible coordinate");
-        }
+        const col = this.cols[columnIndex] ?? -1;
+        const index = rowIndex * nCols + columnIndex;
+        const cell = this.cellEls[index];
+        if (cell === undefined) throw new Error("ARIA cell has no visible coordinate");
 
         updateAttribute(cell, "id", `${this.aria.id}-${row}-${col}`);
         updateAttribute(cell, "aria-colindex", String(col + 1));
-        const value = view.values[rowIndex * nCols + columnIndex] ?? null;
-        updateText(cell, value !== null ? String(value) : "");
-        const note = this.noteAt(row, col);
-        updateAttribute(cell, "aria-description", note ? `Note: ${note}` : null);
-        updateAttribute(
-          cell,
-          "aria-selected",
-          focus && focus.row === row && focus.col === col ? "true" : null,
-        );
+        updateText(cell, this.cellTexts[index] ?? "");
+        updateAttribute(cell, "aria-description", this.cellDescriptions[index] ?? null);
+        updateAttribute(cell, "aria-selected", this.isFocused(row, col) ? "true" : null);
       }
     }
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.aria.remove();
     for (const attr of [
       "role",

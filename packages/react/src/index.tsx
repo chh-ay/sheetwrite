@@ -2,6 +2,7 @@ import type { CellScalar, Grid, GridOptions } from "@sheetwrite/core";
 import {
   type AdapterGridController,
   type AdapterGridInput,
+  assertGridSize,
   createAdapterGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
@@ -319,6 +320,7 @@ const SheetwriteComponent = forwardRef<
   { columns, defaultRows, sheetName, getRowId, createRowId, ...props },
   ref,
 ): ReactElement {
+  assertGridSize({ height: props.height, fill: props.fill });
   const input = useMemo(
     () => createSimpleGridInput({ columns, defaultRows, sheetName }),
     [columns, defaultRows, sheetName],

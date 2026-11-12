@@ -135,7 +135,7 @@ impl Decimal {
 
     /// The digits before the decimal point, without leading zeros.
     fn integer_digits(&self) -> String {
-        let point = usize::try_from(self.point).unwrap_or(0);
+        let point = usize::try_from(self.point).unwrap_or_default();
         let kept = point.min(self.digits.len());
         let mut text = String::with_capacity(point);
         text.push_str(&self.digits[..kept]);
@@ -145,10 +145,10 @@ impl Decimal {
 
     /// The digits after the decimal point, without trailing zeros.
     fn fraction_digits(&self) -> String {
-        let point = usize::try_from(self.point).unwrap_or(0);
+        let point = usize::try_from(self.point).unwrap_or_default();
         let mut text = String::new();
         push_zeros(&mut text, self.point.min(0).unsigned_abs() as usize);
-        text.push_str(self.digits.get(point..).unwrap_or(""));
+        text.push_str(self.digits.get(point..).unwrap_or_default());
         text
     }
 }
@@ -350,13 +350,13 @@ fn resolve_commas(section: &mut Section<'_>) {
         .iter()
         .position(|token| matches!(token, Token::Point | Token::Exponent { .. }))
         .unwrap_or(section.tokens.len());
-    let last_digit = section.tokens[..integer_end]
+    let last_digit_at = section.tokens[..integer_end]
         .iter()
         .rposition(|token| matches!(token, Token::Digit(_)));
-    let first_digit = section.tokens[..integer_end]
+    let first_digit_at = section.tokens[..integer_end]
         .iter()
         .position(|token| matches!(token, Token::Digit(_)));
-    let (Some(first_digit), Some(last_digit)) = (first_digit, last_digit) else {
+    let (Some(first_digit), Some(last_digit)) = (first_digit_at, last_digit_at) else {
         return;
     };
 
@@ -404,7 +404,11 @@ fn render(section: &Section<'_>, value: f64) -> Result<String, FormulaError> {
         for token in &section.tokens {
             match token {
                 Token::General => text.push_str(&general_text(value)),
-                other => text.push_str(literal_text(other)),
+                other @ (Token::Literal(_)
+                | Token::Digit(_)
+                | Token::Point
+                | Token::Percent
+                | Token::Exponent { .. }) => text.push_str(literal_text(other)),
             }
         }
         return Ok(text);
@@ -457,7 +461,7 @@ fn literal_text<'a>(token: &Token<'a>) -> &'a str {
         Token::Literal(text) => text,
         Token::Percent => "%",
         Token::Point => ".",
-        _ => "",
+        Token::Digit(_) | Token::Exponent { .. } | Token::General => "",
     }
 }
 
@@ -490,7 +494,7 @@ impl Layout {
                         layout.integer_zeros += usize::from(*placeholder == '0');
                     }
                 },
-                _ => {}
+                Token::Literal(_) | Token::Percent | Token::General => {}
             }
         }
         layout
@@ -600,7 +604,9 @@ fn write_tokens(section: &Section<'_>, layout: &Layout, digits: &Digits<'_>, tex
                     text.push('+');
                 }
             }
-            other => text.push_str(literal_text(other)),
+            other @ (Token::Literal(_) | Token::Percent | Token::General) => {
+                text.push_str(literal_text(other))
+            }
         }
     }
 }
