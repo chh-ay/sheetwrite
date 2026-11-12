@@ -39,6 +39,26 @@ pub(crate) enum SkippedRows {
 #[derive(Debug, Default)]
 pub(crate) struct RowVisibility(Option<Box<HiddenRuns>>);
 
+/// The hidden rows of one walk, as merged runs, with the position of the
+/// first run that may still hold a later row. Asking about rows in ascending
+/// order costs one step per run, not a search per row.
+#[derive(Debug, Default)]
+pub(crate) struct HiddenRowCursor {
+    runs: Vec<RowRun>,
+    next: usize,
+}
+
+impl HiddenRowCursor {
+    /// Whether `row` is hidden. Rows must come in ascending order.
+    #[inline]
+    pub(crate) fn skips(&mut self, row: u32) -> bool {
+        while self.runs.get(self.next).is_some_and(|run| run.end < row) {
+            self.next += 1;
+        }
+        self.runs.get(self.next).is_some_and(|run| run.start <= row)
+    }
+}
+
 impl RowVisibility {
     /// Replaces both kinds of hidden row. Each slice holds `[start, end]`
     /// pairs of inclusive rows in ascending order without overlap. Returns
@@ -57,6 +77,41 @@ impl RowVisibility {
 
         self.0 = stored;
         Some(true)
+    }
+
+    /// A cursor over the rows that `skipped` leaves out, for a walk down the
+    /// rows in ascending order.
+    pub(crate) fn hidden_rows(&self, skipped: SkippedRows) -> HiddenRowCursor {
+        let Some(runs) = &self.0 else {
+            return HiddenRowCursor::default();
+        };
+        if skipped == SkippedRows::Filtered || runs.manual.is_empty() {
+            return HiddenRowCursor {
+                runs: runs.filtered.clone(),
+                next: 0,
+            };
+        }
+
+        let mut merged = Vec::with_capacity(runs.filtered.len() + runs.manual.len());
+        let (mut filtered, mut manual) = (
+            runs.filtered.iter().peekable(),
+            runs.manual.iter().peekable(),
+        );
+        loop {
+            let run = match (filtered.peek(), manual.peek()) {
+                (Some(left), Some(right)) if left.start <= right.start => filtered.next(),
+                (Some(_), Some(_)) | (None, Some(_)) => manual.next(),
+                (Some(_), None) => filtered.next(),
+                (None, None) => break,
+            };
+            if let Some(&run) = run {
+                push_merged(&mut merged, run);
+            }
+        }
+        HiddenRowCursor {
+            runs: merged,
+            next: 0,
+        }
     }
 
     pub(crate) fn skips(&self, row: u32, skipped: SkippedRows) -> bool {

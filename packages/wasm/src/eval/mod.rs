@@ -2134,6 +2134,12 @@ impl CellStore {
             return self.eval_statistics_family(&call, pass);
         }
 
+        if func == Func::Subtotal && !subtotal::views_off() {
+            if let Some(result) = self.eval_subtotal_family(args, sheet, pass, depth) {
+                return result;
+            }
+        }
+
         if func == Func::Sum {
             if let Some(result) = self.eval_sum_family(args, sheet, pass, depth + 1) {
                 return result;
@@ -3176,9 +3182,10 @@ impl CellStore {
 
         values.reserve(total as usize)?;
         let literals = LiteralSources::new(s, depth);
+        let mut hidden = skipped.map(|filter| filter.hidden_rows(s));
 
         for row in row_start..=row_end {
-            if skipped.is_some_and(|filter| filter.skips_row(s, row as u32)) {
+            if hidden.as_mut().is_some_and(|rows| rows.skips(row as u32)) {
                 for _ in col_start..=col_end {
                     values.push_range(Value::Blank)?;
                 }
@@ -3189,18 +3196,18 @@ impl CellStore {
                 if !s.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
-                if skipped.is_some_and(|filter| {
-                    filter.skips_cell(s, row as u32, col as u32, &self.formula_slots)
-                }) {
-                    values.push_range(Value::Blank)?;
-                    continue;
-                }
 
+                // A literal cell holds no formula, so only the others can be
+                // a nested SUBTOTAL to skip.
                 let i = s.cells.idx(row, col);
                 let value = if let Some(value) =
                     literals.and_then(|sources| sources.value_at(&self.strings, i))
                 {
                     value
+                } else if skipped.is_some_and(|filter| {
+                    filter.skips_cell(s, row as u32, col as u32, &self.formula_slots)
+                }) {
+                    Value::Blank
                 } else if s.cells.kind_at(i) == KIND_EMPTY {
                     Value::Blank
                 } else {
