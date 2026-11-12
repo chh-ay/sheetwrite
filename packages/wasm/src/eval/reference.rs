@@ -130,6 +130,22 @@ thread_local! {
     static RUNTIME_READS: RefCell<Option<RuntimeReads>> = const { RefCell::new(None) };
 }
 
+/// Suspends dependency recording while a read-only preview runs, including
+/// a preview requested from inside an enclosing evaluation.
+pub(super) struct RuntimeReadPause(Option<RuntimeReads>);
+
+impl RuntimeReadPause {
+    pub(super) fn enter() -> Self {
+        Self(RUNTIME_READS.with(|reads| reads.replace(None)))
+    }
+}
+
+impl Drop for RuntimeReadPause {
+    fn drop(&mut self) {
+        drop(RUNTIME_READS.with(|reads| reads.replace(self.0.take())));
+    }
+}
+
 /// Starts recording runtime reads and returns the enclosing recording, which
 /// [`finish_runtime_reads`] restores.
 pub(super) fn start_runtime_reads() -> Option<RuntimeReads> {

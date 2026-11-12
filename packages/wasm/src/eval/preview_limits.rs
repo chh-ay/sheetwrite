@@ -7,7 +7,7 @@
 use std::cell::Cell;
 
 use crate::sheet::SheetData;
-use crate::types::{FormulaError, LITERAL_KIND_BITS};
+use crate::types::{FormulaError, KIND_EMPTY, KIND_NUMBER, LITERAL_KIND_BITS};
 
 /// Cells a preview reads through typed scans of kind and payload arrays.
 pub(super) const PREVIEW_TYPED_CELLS: usize = 1_000_000;
@@ -102,6 +102,9 @@ pub(super) enum RangeRead {
     /// Literal cells are read from the kind and payload arrays; formula and
     /// spill cells are evaluated one by one.
     Typed,
+    /// Only number literals and empty cells bypass per-cell evaluation.
+    #[cfg(feature = "analysis")]
+    Numbers,
     /// Every cell is read one by one.
     Cells,
 }
@@ -132,7 +135,7 @@ fn charge_range(
 ) -> Result<(), FormulaError> {
     let cells = rows.saturating_mul(cols);
     let dense = data.cells.dense_sources();
-    let (Some(sources), RangeRead::Typed) = (dense, read) else {
+    let Some(sources) = dense.filter(|_| read != RangeRead::Cells) else {
         return charge(|budget| add(&mut budget.cells, cells, PREVIEW_CELL_READS));
     };
     if cells > PREVIEW_TYPED_CELLS {
@@ -147,7 +150,12 @@ fn charge_range(
         let column = kinds.get(start..start + rows).unwrap_or_default();
         computed += column
             .iter()
-            .filter(|&&kind| kind & !LITERAL_KIND_BITS != 0)
+            .filter(|&&kind| match read {
+                RangeRead::Typed => kind & !LITERAL_KIND_BITS != 0,
+                #[cfg(feature = "analysis")]
+                RangeRead::Numbers => !matches!(kind, KIND_EMPTY | KIND_NUMBER),
+                RangeRead::Cells => true,
+            })
             .count();
     }
     charge(|budget| {

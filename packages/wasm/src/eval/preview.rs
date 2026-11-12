@@ -223,6 +223,8 @@ impl CellStore {
         };
 
         let scope = PreviewScope::enter();
+        let _origin = FormulaOriginGuard::push((row, col));
+        let _reads = super::reference::RuntimeReadPause::enter();
         let mut walk = SafetyWalk {
             #[cfg(feature = "host-functions")]
             store: self,
@@ -237,7 +239,7 @@ impl CellStore {
             return FormulaPreview::unavailable(refusal);
         }
 
-        let preview = self.evaluate_preview(&ast, sheet, (row, col));
+        let preview = self.evaluate_preview(&ast, sheet);
         if scope.exceeded() {
             return FormulaPreview::unavailable(FormulaPreviewStatus::CostLimit);
         }
@@ -246,14 +248,13 @@ impl CellStore {
 }
 
 impl CellStore {
-    fn evaluate_preview(&self, ast: &Ast, sheet: usize, origin: (u32, u32)) -> FormulaPreview {
+    fn evaluate_preview(&self, ast: &Ast, sheet: usize) -> FormulaPreview {
         let affected = FormulaWork::default();
         let mut results = FormulaResults::default();
         let mut pass = EvalPass {
             affected: &affected,
             results: &mut results,
         };
-        let _origin = FormulaOriginGuard::push(origin);
 
         let resolved = self.resolve_spill_refs(ast, sheet, &mut pass, 0);
         let (status, value, shape) = if ast_produces_array(&resolved) {

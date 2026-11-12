@@ -91,6 +91,12 @@ fn the_store_is_left_exactly_as_it_was() {
     }
 
     assert_eq!(store.export_memory_state(), before);
+    // A nested preview must not add its dynamic references to the enclosing
+    // formula's runtime dependency recording.
+    let enclosing = super::reference::start_runtime_reads();
+    assert_eq!(number(&preview(&store, sheet, r#"=SUM(INDIRECT("A1:A3"))"#)), 54.0);
+    let reads = super::reference::finish_runtime_reads(enclosing);
+    assert!(reads.ranges.is_empty());
     // The pending edit still recalculates as it would have.
     store.commit_sources();
     assert_eq!(store.get_cell(sheet, 0, 1).num(), 54.0);
@@ -192,6 +198,19 @@ fn cell_by_cell_reads_and_arrays_have_smaller_limits() {
         number(&preview(&store, sheet, "=ROWS(SEQUENCE(10000))")),
         10_000.0
     );
+    #[cfg(feature = "analysis")]
+    {
+        // SUMSQ scans numeric payloads directly, but evaluates logical cells
+        // individually; these must use the smaller read budget.
+        for row in 0..50_001 {
+            store.set_bool(sheet, row, 0, true, 0);
+        }
+        store.commit_sources();
+        assert_eq!(
+            preview(&store, sheet, "=SUMSQ(A1:A50001)").status(),
+            FormulaPreviewStatus::CostLimit
+        );
+    }
     // Ordinary evaluation keeps its own, larger limits.
     store.set_formula(sheet, 0, 1, "=ROWS(SEQUENCE(20000))", 0);
     store.commit_sources();
