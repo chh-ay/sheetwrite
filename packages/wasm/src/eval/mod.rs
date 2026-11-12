@@ -19,7 +19,6 @@ mod iteration;
 mod let_slots;
 mod literal_criteria;
 mod literal_products;
-mod literal_statistics;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -38,6 +37,7 @@ mod range_view;
 mod reference;
 #[cfg(feature = "analysis")]
 pub(crate) mod regex_patterns;
+mod statistic_args;
 mod statistics;
 mod subtotal;
 #[cfg(test)]
@@ -84,13 +84,14 @@ use literal_criteria::CriteriaFold;
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
+use matrix::{argument_range, optional_ast, range_from_ast, EvalMatrix};
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
-use matrix::{optional_ast, range_from_ast, EvalMatrix};
 #[cfg(feature = "analysis")]
 pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
+use statistic_args::StatisticCall;
 pub(crate) use subtotal::ast_calls_subtotal;
 use subtotal::SkippedCells;
 use value::{bool_from_value, cached_formula_value, compare_values, text_from_value};
@@ -2122,13 +2123,15 @@ impl CellStore {
             }
         }
 
-        if matches!(
-            func,
-            Func::PercentileInc | Func::Correl | Func::CovarianceS | Func::CovarianceP
-        ) {
-            if let Some(result) = self.literal_statistics_family(func, args, sheet, depth + 1) {
-                return result;
-            }
+        if let Some(statistic) = statistics::number_statistic(func) {
+            let call = StatisticCall {
+                statistic,
+                func,
+                args,
+                sheet,
+                depth,
+            };
+            return self.eval_statistics_family(&call, pass);
         }
 
         if func == Func::Sum {
@@ -2163,65 +2166,15 @@ impl CellStore {
 
         let mut values = FuncAccumulator::default();
         for (index, arg) in args.iter().enumerate() {
-            let range = match arg {
-                Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-                    sheet as u32,
-                    *row_start,
-                    *col_start,
-                    *row_end,
-                    *col_end,
-                )),
-                Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
-                    CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
-                ),
-                Ast::NamedRange(named) => Some(CellRange::new(
-                    named.sheet,
-                    named.row_start,
-                    named.col_start,
-                    named.row_end,
-                    named.col_end,
-                )),
-                Ast::Structured(reference) => Some(CellRange::new(
-                    reference.sheet,
-                    reference.row_start,
-                    reference.col,
-                    reference.row_end,
-                    reference.col,
-                )),
-                Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).ok(),
-                // SUBTOTAL reads a cell argument as a one-cell reference, so
-                // the cell's row can be hidden.
-                Ast::Cell(row, col, _) if func == Func::Subtotal && index > 0 => {
-                    Some(CellRange::new(sheet as u32, *row, *col, *row, *col))
-                }
-                Ast::AbsCell(sheet_ref, row, col, _) if func == Func::Subtotal && index > 0 => {
-                    Some(CellRange::new(sheet_ref.handle, *row, *col, *row, *col))
-                }
-                Ast::Num(_)
-                | Ast::Str(_)
-                | Ast::Bool(_)
-                | Ast::Missing
-                | Ast::Name(_)
-                | Ast::NamedFormula(_)
-                | Ast::UnresolvedStructured(_)
-                | Ast::Cell(..)
-                | Ast::SheetCell(..)
-                | Ast::AbsCell(..)
-                | Ast::SheetRange(..)
-                | Ast::SheetSpan(_)
-                | Ast::InvalidRef
-                | Ast::Func(..)
-                | Ast::UnknownFunc(..)
-                | Ast::Bin(..)
-                | Ast::Cmp(..)
-                | Ast::Neg(_)
-                | Ast::Pos(_)
-                | Ast::Percent(_)
-                | Ast::LetSlot { .. }
-                | Ast::LetName { .. }
-                | Ast::Array { .. } => None,
-                #[cfg(feature = "analysis")]
-                Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
+            // SUBTOTAL reads a cell argument as a one-cell reference, so the
+            // cell's row can be hidden.
+            let subtotal_cell = func == Func::Subtotal
+                && index > 0
+                && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..));
+            let range = if subtotal_cell {
+                range_from_ast(arg, sheet)
+            } else {
+                argument_range(arg, sheet)
             };
             let shape = if let Some(area) = range {
                 let skipped = (func == Func::Subtotal && index > 0).then(|| SkippedCells {
