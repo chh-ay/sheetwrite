@@ -711,7 +711,7 @@ class ChartTracker {
     const { direct, valuesChanged, rebuild } = context;
     const engine = storeEngine(this.store);
     const precise =
-      engine?.visitChartRecalculation(event, (sheet, r0, r1, c0, c1) => {
+      engine?.visitChartRecalculation(event.epoch, (sheet, r0, r1, c0, c1) => {
         index.sources.get(sheet)?.queryBounds(r0, r1 - 1, c0, c1 - 1, (chart) => hits.add(chart));
       }) ?? false;
     if (valuesChanged) {

@@ -72,16 +72,34 @@ impl CellStore {
         self.recalculation = enabled.then(|| Box::new(Recalculation::default()));
     }
 
+    /// Rectangles waiting in the report: `-1` when tracking is off or the
+    /// report overflowed (refresh conservatively), otherwise the count. Core
+    /// asks this first so a commit with nothing to report crosses no array.
+    #[wasm_bindgen(js_name = recalculatedRectCount)]
+    #[must_use]
+    pub fn recalculated_rect_count(&self) -> i32 {
+        self.recalculation
+            .as_deref()
+            .filter(|changes| !changes.overflow)
+            .map_or(-1, |changes| (changes.rects.len() / RECT_WIDTH) as i32)
+    }
+
     /// Take `[sheet, row_start, row_end, col_start, col_end]` half-open rectangles
     /// accumulated since `beginMutation`, standalone `recompute` or `recomputeVolatile`.
     /// Includes selected formulas (even when their value stayed equal), changed
     /// spill/pivot cells and dirty source seeds, which also hold detached spill cells.
-    /// Empty means no work. `None` means disabled or overflow: refresh conservatively.
+    /// Empty after overflow or with tracking off; check `recalculatedRectCount` first.
     /// Taking clears the report but retains its capacity for the next commit.
     #[wasm_bindgen(js_name = recalculatedRects)]
-    pub fn recalculated_rects(&mut self) -> Option<Vec<u32>> {
-        let changes = self.recalculation.as_deref_mut()?;
-        let result = (!changes.overflow).then(|| changes.rects.clone());
+    pub fn recalculated_rects(&mut self) -> Vec<u32> {
+        let Some(changes) = self.recalculation.as_deref_mut() else {
+            return Vec::new();
+        };
+        let result = if changes.overflow {
+            Vec::new()
+        } else {
+            changes.rects.clone()
+        };
         changes.reset();
         result
     }
@@ -117,22 +135,22 @@ mod tests {
         store.set_formula(sheet, 0, 1, "=A1*2", 0);
         store.set_number(sheet, 9, 3, 1.0, 0);
         store.recompute(sheet);
-        assert_eq!(store.recalculated_rects(), None);
+        assert_eq!(store.recalculated_rect_count(), -1);
 
         store.set_recalculation_tracking(true);
         store.begin_mutation();
         store.set_number(sheet, 9, 3, 2.0, 0);
         store.commit_sources();
         // Direct edits are classified by core; no formula reads this cell.
-        assert_eq!(store.recalculated_rects(), Some(Vec::new()));
+        assert_eq!(store.recalculated_rect_count(), 0);
 
         store.begin_mutation();
         store.set_number(sheet, 0, 0, 3.0, 0);
         store.commit_sources();
-        let rects = store.recalculated_rects().unwrap_or_default();
+        let rects = store.recalculated_rects();
         // The dirty source seed A1 and recomputed B1 coalesce into one row run.
         assert_eq!(rects, vec![sheet as u32, 0, 1, 0, 2]);
-        assert_eq!(store.recalculated_rects(), Some(Vec::new()));
+        assert_eq!(store.recalculated_rect_count(), 0);
 
         store.set_recalculation_tracking(false);
         assert!(store.recalculation.is_none());
@@ -150,7 +168,7 @@ mod tests {
         store.begin_mutation();
         store.set_number(sheet, 0, 0, 1.0, 0);
         store.commit_sources();
-        let rects = store.recalculated_rects().unwrap_or_default();
+        let rects = store.recalculated_rects();
         assert!(rects
             .as_chunks::<5>()
             .0

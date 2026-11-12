@@ -77,8 +77,11 @@ export function checkChartEvents(
   required: readonly ChartRef[],
   allowed: readonly ChartRef[] = required,
 ): number {
-  if (events.length > 1 || (required.length > 0 && events.length !== 1)) {
+  if (events.length > 1) {
     throw new Error(`Expected at most one chart event, received ${events.length}`);
+  }
+  if (required.length > 0 && events.length === 0) {
+    throw new Error("Expected one chart event, received 0");
   }
 
   const actual = events.flatMap((event) => event.charts).map((ref) => `${ref.sheet}/${ref.id}`);

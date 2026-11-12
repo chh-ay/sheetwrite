@@ -572,12 +572,14 @@ describe("chart identities and resolution", () => {
     expect(resolveChartView(store, "other", "reference")?.series[0]?.values).toEqual([15]);
   });
 
-  it("keeps each commit's recalculation report across a reentrant earlier listener", () => {
+  it("refreshes conservatively when an earlier listener commits again", () => {
     const store = new SheetwriteStore(workbook(10));
     stores.push(store);
     apply(store, [
       formula("other", 0, 2, "=data!B1*2"),
+      set("other", 5, 0, 1),
       { op: "setChart", sheet: "other", chart: chart("derived", range("other", 0, 2, 0, 2)) },
+      { op: "setChart", sheet: "other", chart: chart("unrelated", range("other", 5, 0, 5, 0)) },
     ]);
     let reentered = false;
     store.on("change", () => {
@@ -588,8 +590,12 @@ describe("chart identities and resolution", () => {
     const events: ChartChangeEvent[] = [];
     subscribeChartChanges(store, (event) => events.push(event));
     apply(store, [set("data", 0, 1, 9)]);
+    // The nested commit replaced the engine report before the tracker saw the outer one.
     expect(events).toHaveLength(1);
-    expect(events[0]?.charts).toEqual([{ sheet: "other", id: "derived" }]);
+    expect(events[0]?.charts).toEqual([
+      { sheet: "other", id: "derived" },
+      { sheet: "other", id: "unrelated" },
+    ]);
     expect(resolveChartView(store, "other", "derived")?.series[0]?.values).toEqual([18]);
   });
 

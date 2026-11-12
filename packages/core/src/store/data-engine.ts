@@ -225,6 +225,11 @@ import {
   CELL_STATE_LOCAL_EDIT,
 } from "./wire-tags.js";
 
+/** Values per engine recalculation rectangle: sheet handle, row start/end, column start/end. */
+const RECALCULATION_RECT_WIDTH = 5;
+/** Shared report of a commit that recalculated nothing; never written. */
+const EMPTY_RECALCULATION = new Uint32Array(0);
+
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
 /** Engine field-type codes, indexed by code. */
@@ -693,7 +698,11 @@ export class StoreDataEngine {
   private pageIdleWaiters: Array<() => void> | undefined;
 
   private readonly memoryReleaseListeners = new Set<() => void>();
-  private chartRecalculations: WeakMap<ChangeEvent, Uint32Array | null> | undefined;
+  private chartRecalculationTracked = false;
+  /** Epoch of the commit whose report {@link chartRecalculation} holds. */
+  private chartRecalculationEpoch: number | undefined;
+  /** That commit's rectangles; null when it must refresh conservatively. */
+  private chartRecalculation: Uint32Array | null = null;
 
   /** Hooks of `@sheetwrite/core/functions`; `undefined` until a host function is registered. */
   hostFunctions: HostFunctionHooks | undefined;
@@ -2034,23 +2043,41 @@ export class StoreDataEngine {
 
   /** Keep one bounded engine report per commit only while charts are observed. */
   trackChartRecalculation(enabled: boolean): void {
-    this.chartRecalculations = enabled ? new WeakMap() : undefined;
+    this.chartRecalculationTracked = enabled;
+    this.chartRecalculationEpoch = undefined;
+    this.chartRecalculation = null;
     this.wasm.setRecalculationTracking(enabled);
   }
 
-  /** Capture before any change listener can reenter the store with another commit. */
-  captureChartRecalculation(event: ChangeEvent): void {
-    this.chartRecalculations?.set(event, this.wasm.recalculatedRects() ?? null);
+  /**
+   * Take the engine report of the commit `epoch` before any change listener runs, so a
+   * listener that commits again replaces it with its own commit's report.
+   */
+  captureChartRecalculation(epoch: number | undefined): void {
+    if (!this.chartRecalculationTracked) return;
+    const count = this.wasm.recalculatedRectCount();
+    this.chartRecalculationEpoch = epoch;
+    // An event without an epoch cannot be matched to its report later.
+    this.chartRecalculation =
+      epoch === undefined || count < 0
+        ? null
+        : count === 0
+          ? EMPTY_RECALCULATION
+          : this.wasm.recalculatedRects();
   }
 
-  /** Visit primitive half-open bounds; false asks the tracker to refresh conservatively. */
+  /**
+   * Visit the half-open bounds the commit `epoch` recalculated. False asks the tracker to
+   * refresh conservatively: tracking off, an overflowing report, or a listener that
+   * committed again before this one ran.
+   */
   visitChartRecalculation(
-    event: ChangeEvent,
+    epoch: number | undefined,
     visit: (sheet: SheetId, r0: number, r1: number, c0: number, c1: number) => void,
   ): boolean {
-    const rects = this.chartRecalculations?.get(event);
-    if (rects == null) return false;
-    for (let offset = 0; offset < rects.length; offset += 5) {
+    const rects = this.chartRecalculation;
+    if (rects === null || epoch !== this.chartRecalculationEpoch) return false;
+    for (let offset = 0; offset < rects.length; offset += RECALCULATION_RECT_WIDTH) {
       const handle = rects[offset];
       const r0 = rects[offset + 1];
       const r1 = rects[offset + 2];
@@ -4923,7 +4950,7 @@ export class StoreDataEngine {
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
-        if (this.chartRecalculations) replacement.setRecalculationTracking(true);
+        if (this.chartRecalculationTracked) replacement.setRecalculationTracking(true);
         this.hostFunctions?.adopt(replacement);
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);
