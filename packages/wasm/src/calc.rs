@@ -595,7 +595,7 @@ pub enum CmpOp {
 
 /// The `$` markers of a cell reference, and whether its sheet name is
 /// written quoted: bit 0 absolute row, bit 1 absolute column, bit 2 quoted.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct RefFlags(u8);
 
 impl RefFlags {
@@ -628,13 +628,13 @@ impl RefFlags {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SheetRef {
     pub handle: u32,
 }
 
 /// One end of a 3-D sheet span such as `Jan:Mar!A1`.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct SheetSpanEndpoint {
     pub(crate) handle: u32,
     /// Present only while this endpoint is detached from a workbook.
@@ -744,7 +744,7 @@ pub struct StructuredRef {
 /// A sheet-qualified cell whose sheet is not one of this workbook's: an
 /// external link, a missing sheet, or standalone syntax. It keeps the
 /// written sheet text so the formula writes back exactly.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DetachedCellRef {
     pub(crate) sheet: UnresolvedSheetRef,
     pub(crate) row: u32,
@@ -755,7 +755,7 @@ pub(crate) struct DetachedCellRef {
 /// A sheet-qualified range whose sheet is not one of this workbook's: an
 /// external link, a missing sheet, or standalone syntax. It keeps the
 /// written sheet text so the formula writes back exactly.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct DetachedRangeRef {
     pub(crate) sheet: UnresolvedSheetRef,
     pub(crate) row_start: u32,
@@ -821,13 +821,13 @@ pub enum Ast {
     /// otherwise grow every node of every formula.
     SheetSpan(Box<SheetSpanRef>),
     InvalidRef,
-    Func(Func, Box<[Ast]>),
+    Func(Func, Box<[Self]>),
     UnknownFunc(Box<UnknownCall>),
-    Bin(Op, Box<Ast>, Box<Ast>),
-    Cmp(CmpOp, Box<Ast>, Box<Ast>),
-    Neg(Box<Ast>),
-    Pos(Box<Ast>),
-    Percent(Box<Ast>),
+    Bin(Op, Box<Self>, Box<Self>),
+    Cmp(CmpOp, Box<Self>, Box<Self>),
+    Neg(Box<Self>),
+    Pos(Box<Self>),
+    Percent(Box<Self>),
     /// One use of a LET binding in an expanded tree. `slot` identifies the
     /// binding for the evaluation in progress, so its expression is evaluated
     /// at most once however many uses the expansion has; `expression` stays
@@ -883,37 +883,37 @@ impl Ast {
     /// listed, so a new kind must say whether it has children.
     pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Self) -> bool) -> bool {
         match self {
-            Ast::Func(_, args) => args.iter().any(test),
-            Ast::UnknownFunc(call) => {
+            Self::Func(_, args) => args.iter().any(test),
+            Self::UnknownFunc(call) => {
                 let args = &call.args;
                 args.iter().any(test)
             }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => test(left) || test(right),
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => test(inner),
-            Ast::LetSlot { expression, .. } => test(expression),
+            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => test(left) || test(right),
+            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => test(inner),
+            Self::LetSlot { expression, .. } => test(expression),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix(_) => false,
+            Self::BoundMatrix(_) => false,
             #[cfg(feature = "analysis")]
-            Ast::RegexPattern(_) => false,
-            Ast::LetName { .. } => false,
-            Ast::Num(_)
-            | Ast::Str(_)
-            | Ast::Bool(_)
-            | Ast::Missing
-            | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
-            | Ast::UnresolvedStructured(_)
-            | Ast::Structured(_)
-            | Ast::Cell(..)
-            | Ast::SheetCell(..)
-            | Ast::AbsCell(..)
-            | Ast::Range(..)
-            | Ast::SheetRange(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_)
-            | Ast::InvalidRef
-            | Ast::Array(_) => false,
+            Self::RegexPattern(_) => false,
+            Self::LetName { .. } => false,
+            Self::Num(_)
+            | Self::Str(_)
+            | Self::Bool(_)
+            | Self::Missing
+            | Self::Name(_)
+            | Self::NamedRange(_)
+            | Self::NamedFormula(_)
+            | Self::UnresolvedStructured(_)
+            | Self::Structured(_)
+            | Self::Cell(..)
+            | Self::SheetCell(..)
+            | Self::AbsCell(..)
+            | Self::Range(..)
+            | Self::SheetRange(..)
+            | Self::AbsRange(..)
+            | Self::SheetSpan(_)
+            | Self::InvalidRef
+            | Self::Array(_) => false,
         }
     }
 
@@ -923,40 +923,40 @@ impl Ast {
     /// kind is listed, so a new kind must say whether it has children.
     pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Self) -> bool) -> bool {
         match self {
-            Ast::Func(_, args) => args
+            Self::Func(_, args) => args
                 .iter_mut()
                 .fold(false, |changed, arg| visit(arg) | changed),
-            Ast::UnknownFunc(call) => {
+            Self::UnknownFunc(call) => {
                 let args = &mut call.args;
                 args.iter_mut()
                     .fold(false, |changed, arg| visit(arg) | changed)
             }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => visit(left) | visit(right),
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => visit(inner),
-            Ast::LetSlot { expression, .. } => visit(expression),
+            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => visit(left) | visit(right),
+            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => visit(inner),
+            Self::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix(_) => false,
+            Self::BoundMatrix(_) => false,
             #[cfg(feature = "analysis")]
-            Ast::RegexPattern(_) => false,
-            Ast::LetName { .. } => false,
-            Ast::Num(_)
-            | Ast::Str(_)
-            | Ast::Bool(_)
-            | Ast::Missing
-            | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
-            | Ast::UnresolvedStructured(_)
-            | Ast::Structured(_)
-            | Ast::Cell(..)
-            | Ast::SheetCell(..)
-            | Ast::AbsCell(..)
-            | Ast::Range(..)
-            | Ast::SheetRange(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_)
-            | Ast::InvalidRef
-            | Ast::Array(_) => false,
+            Self::RegexPattern(_) => false,
+            Self::LetName { .. } => false,
+            Self::Num(_)
+            | Self::Str(_)
+            | Self::Bool(_)
+            | Self::Missing
+            | Self::Name(_)
+            | Self::NamedRange(_)
+            | Self::NamedFormula(_)
+            | Self::UnresolvedStructured(_)
+            | Self::Structured(_)
+            | Self::Cell(..)
+            | Self::SheetCell(..)
+            | Self::AbsCell(..)
+            | Self::Range(..)
+            | Self::SheetRange(..)
+            | Self::AbsRange(..)
+            | Self::SheetSpan(_)
+            | Self::InvalidRef
+            | Self::Array(_) => false,
         }
     }
 
@@ -965,7 +965,7 @@ impl Ast {
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix(reference) => {
+            Self::BoundMatrix(reference) => {
                 let BoundMatrix { values, .. } = &**reference;
 
                 let bytes = std::mem::size_of::<BoundMatrix>();
@@ -974,10 +974,10 @@ impl Ast {
             }
             // The store's pattern index counts each shared pattern once.
             #[cfg(feature = "analysis")]
-            Ast::RegexPattern(_) => {}
-            Ast::Str(value) | Ast::Name(value) => out.add_payload(value.len(), value.len()),
-            Ast::LetName { name, .. } => out.add_payload(name.len(), name.len()),
-            Ast::NamedRange(value) => {
+            Self::RegexPattern(_) => {}
+            Self::Str(value) | Self::Name(value) => out.add_payload(value.len(), value.len()),
+            Self::LetName { name, .. } => out.add_payload(name.len(), name.len()),
+            Self::NamedRange(value) => {
                 let bytes = std::mem::size_of::<NamedRangeRef>();
                 out.add_payload(bytes, bytes);
                 add_string_memory(&value.name, out);
@@ -990,8 +990,8 @@ impl Ast {
                 add_string_memory(&value.name, out);
                 value.expression.heap_memory_stats(out);
             }
-            Ast::NamedFormula(_) => {}
-            Ast::UnresolvedStructured(value) => {
+            Self::NamedFormula(_) => {}
+            Self::UnresolvedStructured(value) => {
                 let bytes = std::mem::size_of::<UnresolvedStructuredRef>();
                 out.add_payload(bytes, bytes);
                 if let Some(name) = &value.table_name {
@@ -1007,18 +1007,18 @@ impl Ast {
                 add_string_memory(&value.column_id, out);
                 add_string_memory(&value.column_name, out);
             }
-            Ast::SheetCell(reference) => {
+            Self::SheetCell(reference) => {
                 let bytes = std::mem::size_of::<DetachedCellRef>();
                 out.add_payload(bytes, bytes);
                 add_string_memory(&reference.sheet.name, out);
             }
-            Ast::SheetRange(reference) => {
+            Self::SheetRange(reference) => {
                 let bytes = std::mem::size_of::<DetachedRangeRef>();
                 out.add_payload(bytes, bytes);
                 add_string_memory(&reference.sheet.name, out);
             }
-            Ast::AbsCell(..) | Ast::AbsRange(..) => {}
-            Ast::SheetSpan(span) => {
+            Self::AbsCell(..) | Self::AbsRange(..) => {}
+            Self::SheetSpan(span) => {
                 let bytes = std::mem::size_of::<SheetSpanRef>();
                 out.add_payload(bytes, bytes);
                 for endpoint in [&span.first, &span.last] {
@@ -1028,8 +1028,8 @@ impl Ast {
                 }
                 out.add_vec::<u32>(span.sheets.len(), span.sheets.capacity());
             }
-            Ast::Func(_, args) => add_ast_slice_memory(args, out),
-            Ast::UnknownFunc(call) => {
+            Self::Func(_, args) => add_ast_slice_memory(args, out),
+            Self::UnknownFunc(call) => {
                 let UnknownCall { name, args } = &**call;
 
                 let bytes = std::mem::size_of::<UnknownCall>();
@@ -1044,8 +1044,8 @@ impl Ast {
             Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => {
                 add_boxed_ast_memory(inner, out);
             }
-            Ast::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
-            Ast::Array(array) => {
+            Self::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
+            Self::Array(array) => {
                 let ArrayLiteral { values, .. } = &**array;
 
                 let payload = std::mem::size_of::<ArrayLiteral>();
@@ -1646,7 +1646,7 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
     Ok(Ast::UnresolvedStructured(Box::new(
         UnresolvedStructuredRef {
             table_name,
-            column_name: column_name.to_string(),
+            column_name: column_name.to_owned(),
             section,
         },
     )))
@@ -2043,9 +2043,12 @@ impl<'a> Parser<'a, '_> {
                 _ => return Err("Use , ; or } between the values of an array constant.".into()),
             }
         }
-        let cols =
-            u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_string())?;
-        Ok(Ast::Array(Box::new(ArrayLiteral { cols, values })))
+        let width =
+            u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_owned())?;
+        Ok(Ast::Array(Box::new(ArrayLiteral {
+            cols: width,
+            values,
+        })))
     }
 
     /// One array-constant element: a number with an optional sign, text, a
@@ -2154,12 +2157,11 @@ impl<'a> Parser<'a, '_> {
                 return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
             }
         }
-        match parse_a1(name.as_ref()) {
-            Some((row, col, flags)) => Ok(self.spill_suffix(Ast::Cell(row, col, flags))),
-            None => {
-                self.features.names = true;
-                Ok(Ast::Name((name.into_owned()).into()))
-            }
+        if let Some((row, col, flags)) = parse_a1(name.as_ref()) {
+            Ok(self.spill_suffix(Ast::Cell(row, col, flags)))
+        } else {
+            self.features.names = true;
+            Ok(Ast::Name((name.into_owned()).into()))
         }
     }
 
@@ -2185,15 +2187,14 @@ impl<'a> Parser<'a, '_> {
         }
         self.close_paren()?;
         let args: Box<[Ast]> = self.args.drain(first..).collect();
-        Ok(match func {
-            Some(func) => Ast::Func(func, args),
-            None => {
-                self.features.names = true;
-                Ast::UnknownFunc(Box::new(UnknownCall {
-                    name: name.into_owned(),
-                    args,
-                }))
-            }
+        Ok(if let Some(known) = func {
+            Ast::Func(known, args)
+        } else {
+            self.features.names = true;
+            Ast::UnknownFunc(Box::new(UnknownCall {
+                name: name.into_owned(),
+                args,
+            }))
         })
     }
 
@@ -2220,7 +2221,7 @@ impl<'a> Parser<'a, '_> {
             .sheets
             .and_then(|binding| (binding.resolve)(&sheet_name));
         self.features.detached_sheets |= bound.is_none();
-        if let Some(Tok::Colon) = self.peek() {
+        if matches!(self.peek(), Some(Tok::Colon)) {
             let _ = self.next();
             let (end_sheet, end) = self.sheet_range_end(&sheet_name)?;
             if sheet_name_key(&end_sheet) != sheet_name_key(&sheet_name) {
@@ -2795,9 +2796,12 @@ where
             .into(),
         ),
         Ast::UnknownFunc(call) => {
-            let UnknownCall { name, args } = *call;
+            let UnknownCall {
+                name,
+                args: unresolved_args,
+            } = *call;
 
-            let args = args
+            let args = unresolved_args
                 .into_vec()
                 .into_iter()
                 .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
@@ -3479,21 +3483,21 @@ pub(crate) fn relink_sheet_refs(
     names: &[String],
 ) -> bool {
     let relinked = match (&*ast, handle) {
-        (Ast::SheetCell(reference), Some(handle))
+        (Ast::SheetCell(reference), Some(linked))
             if sheet_name_key(&reference.sheet.name) == key =>
         {
             Some(Ast::AbsCell(
-                SheetRef { handle },
+                SheetRef { handle: linked },
                 reference.row,
                 reference.col,
                 reference.flags,
             ))
         }
-        (Ast::SheetRange(reference), Some(handle))
+        (Ast::SheetRange(reference), Some(linked))
             if sheet_name_key(&reference.sheet.name) == key =>
         {
             Some(Ast::AbsRange(
-                SheetRef { handle },
+                SheetRef { handle: linked },
                 reference.row_start,
                 reference.col_start,
                 reference.row_end,
@@ -3535,8 +3539,8 @@ pub(crate) fn relink_sheet_refs(
         }
         _ => None,
     };
-    if let Some(relinked) = relinked {
-        *ast = relinked;
+    if let Some(replacement) = relinked {
+        *ast = replacement;
         true
     } else {
         ast.fold_children_mut(&mut |child| relink_sheet_refs(child, key, handle, names))
@@ -4095,11 +4099,11 @@ mod tests {
     fn names_sheet_refs_and_unknown_calls_preserve_source_case() {
         assert_eq!(
             parse("=Revenue_Q1"),
-            Ok(Ast::Name(("Revenue_Q1".to_string()).into()))
+            Ok(Ast::Name("Revenue_Q1".to_owned().into()))
         );
         assert_eq!(
             parse("=Sales.Data"),
-            Ok(Ast::Name(("Sales.Data".to_string()).into()))
+            Ok(Ast::Name("Sales.Data".to_owned().into()))
         );
 
         let sheet_ref = parse("='North East'!a1").expect("quoted sheet ref should parse");
@@ -4110,10 +4114,7 @@ mod tests {
             parse("='München Süd'!b2").expect("UTF-8 quoted sheet ref should parse");
         assert_eq!(serialize(&unicode_sheet), "='München Süd'!B2");
         assert_eq!(parse(&serialize(&unicode_sheet)), Ok(unicode_sheet));
-        assert_eq!(
-            parse("=\"café\""),
-            Ok(Ast::Str(("café".to_string()).into()))
-        );
+        assert_eq!(parse("=\"café\""), Ok(Ast::Str("café".to_owned().into())));
         assert_eq!(
             serialize(&parse("=1\u{2003}+2").expect("Unicode whitespace should parse")),
             "=(1+2)"
@@ -4124,8 +4125,8 @@ mod tests {
         assert_eq!(
             unknown,
             Ast::UnknownFunc(Box::new(UnknownCall {
-                name: "MiXeD.Call".to_string(),
-                args: (vec![Ast::Name(("Revenue_Q1".to_string()).into())]).into()
+                name: "MiXeD.Call".to_owned(),
+                args: (vec![Ast::Name("Revenue_Q1".to_owned().into())]).into()
             }))
         );
         assert_eq!(serialize(&unknown), "=MiXeD.Call(Revenue_Q1)");
@@ -4135,12 +4136,12 @@ mod tests {
     fn heap_memory_stats_accounts_owning_ast_shapes() {
         let boxed = std::mem::size_of::<Ast>();
         let cases: Vec<(&str, Ast, usize)> = vec![
-            ("string", Ast::Str(("abc".to_string()).into()), 3),
-            ("name", Ast::Name(("Total".to_string()).into()), 5),
+            ("string", Ast::Str("abc".to_owned().into()), 3),
+            ("name", Ast::Name("Total".to_owned().into()), 5),
             (
                 "named range",
                 Ast::NamedRange(Box::new(NamedRangeRef {
-                    name: "Band".to_string(),
+                    name: "Band".to_owned(),
                     scope: None,
                     sheet: 1,
                     row_start: 0,
@@ -4162,8 +4163,8 @@ mod tests {
             (
                 "qualified structured ref",
                 Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {
-                    table_name: Some("Table1".to_string()),
-                    column_name: "Amount".to_string(),
+                    table_name: Some("Table1".to_owned()),
+                    column_name: "Amount".to_owned(),
                     section: TableSection::Body,
                 })),
                 std::mem::size_of::<UnresolvedStructuredRef>() + 12,
@@ -4188,7 +4189,7 @@ mod tests {
                 "sheet cell",
                 Ast::SheetCell(Box::new(DetachedCellRef {
                     sheet: UnresolvedSheetRef {
-                        name: "Data".to_string(),
+                        name: "Data".to_owned(),
                         quoted: false,
                     },
                     row: 0,
@@ -4201,7 +4202,7 @@ mod tests {
                 "sheet range",
                 Ast::SheetRange(Box::new(DetachedRangeRef {
                     sheet: UnresolvedSheetRef {
-                        name: "Data".to_string(),
+                        name: "Data".to_owned(),
                         quoted: false,
                     },
                     row_start: 0,
@@ -4230,7 +4231,7 @@ mod tests {
             (
                 "unknown function",
                 Ast::UnknownFunc(Box::new(UnknownCall {
-                    name: "Foo".to_string(),
+                    name: "Foo".to_owned(),
                     args: (vec![Ast::Num(1.0), Ast::Num(2.0)]).into(),
                 })),
                 std::mem::size_of::<UnknownCall>() + 3 + boxed * 2,
