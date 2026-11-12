@@ -72,6 +72,14 @@ export interface GeometryObservation {
   readonly lastRow: number;
   readonly lastTop: number;
 }
+/**
+ * Uniform geometry builds timed as one action. One build takes about 0.1 µs,
+ * far below the browser clock (coarsened to 100 µs without cross-origin
+ * isolation), so timing builds one by one measures clock noise and a fast
+ * machine cannot reach the aggregate minimum within the action cap.
+ */
+export const GEOMETRY_BUILDS_PER_ACTION = 10_000;
+
 export function measureUnresizedMillionRowGeometry(): GeometryObservation {
   const index = new OffsetIndex(1_000_000, 28);
   const middle = index.rowAtOffset(14_000_005);
@@ -188,8 +196,6 @@ export interface RenderBenchDiagnosticAdapter extends RenderBenchAdapter {
   clearConditionalFormats(): void;
   installCurrencyFormat(): void;
   clearCurrencyFormat(): void;
-  installDateSerials(rowCount: number): void;
-  clearDateSerials(): void;
   resolvedStyle(row: number, col: number): ResolvedStyleProbe;
   formattedText(row: number, col: number): string;
 }
@@ -219,10 +225,18 @@ export class ScenarioValidationError extends Error {
 interface ScenarioActions {
   readonly setup?: () => void;
   readonly measureWindowTransfer?: boolean;
+  /** Operations one timed `action` call performs; defaults to one. */
+  readonly operationsPerAction?: number;
   readonly prepare: () => void;
   readonly action: () => void;
   readonly cleanup: () => void;
   readonly validateEffect: (observations: ValidationObservation[]) => void;
+}
+
+/** A value read back for an untimed restore; scenario writes take only scalars. */
+function restorableValue(value: unknown, cell: string): string | number | null {
+  if (value === null || typeof value === "string" || typeof value === "number") return value;
+  throw new ScenarioValidationError(`${cell} holds a ${typeof value} that cannot be restored`);
 }
 
 function usedJsHeapBytes(): number | null {
@@ -826,10 +840,7 @@ function scenarioActions(
       for (const width of columnSteps) adapter.scrollBy("left", width);
     };
     return {
-      setup: () => {
-        diagnostics.installCurrencyFormat();
-        diagnostics.installDateSerials(dataset.rowCount - 1);
-      },
+      setup: () => diagnostics.installCurrencyFormat(),
       prepare,
       action,
       cleanup: () => {},
@@ -872,7 +883,6 @@ function scenarioActions(
           );
         } finally {
           diagnostics.clearCurrencyFormat();
-          diagnostics.clearDateSerials();
         }
       },
     };
@@ -911,9 +921,12 @@ function scenarioActions(
   if (scenarioId === "geometry-unresized.1m") {
     let observed: GeometryObservation | undefined;
     const action = (): void => {
-      observed = adapter.measureUnresizedMillionRowGeometry();
+      for (let build = 0; build < GEOMETRY_BUILDS_PER_ACTION; build++) {
+        observed = adapter.measureUnresizedMillionRowGeometry();
+      }
     };
     return {
+      operationsPerAction: GEOMETRY_BUILDS_PER_ACTION,
       prepare: () => {},
       action,
       cleanup: () => {},
@@ -938,8 +951,11 @@ function scenarioActions(
   }
 
   if (scenarioId === "formatted-paint.top-left") {
-    const originalDate = dataset.date[0]!;
-    const originalAmount = dataset.amount[0]!;
+    // Restore what the cells held, not dataset text: Sheetwrite ingests the
+    // date column's ISO text as serials, and writing the text back would leave
+    // later scenarios a document that differs from a freshly loaded one.
+    let originalDate: string | number | null = null;
+    let originalAmount: string | number | null = null;
     adapter.resetFormatResources();
     const prepare = (): void => {
       adapter.setCellValue(0, 1, 45_351);
@@ -951,6 +967,10 @@ function scenarioActions(
       adapter.setCellValue(0, 4, originalAmount);
     };
     return {
+      setup: () => {
+        originalDate = restorableValue(adapter.cellValue(0, 1), "A1 date cell");
+        originalAmount = restorableValue(adapter.cellValue(0, 4), "A1 amount cell");
+      },
       prepare,
       action,
       cleanup,
@@ -1005,6 +1025,10 @@ function scenarioActions(
   }
 
   if (scenarioId === "merge-heavy.paint") {
+    // Compare against the value before merging, not dataset text: the loaded
+    // date cell holds the ingested serial, so a fixed text expectation passes
+    // only after another scenario has rewritten the cell.
+    const coveredBeforeMerge = adapter.cellValue(0, 1);
     adapter.installMergeHeavy();
     adapter.resetMergeResources();
     const action = (): void => adapter.repaint();
@@ -1018,7 +1042,10 @@ function scenarioActions(
           checkpoint(
             observations,
             "merge-heavy.paint preserves anchor and covered-cell values",
-            JSON.stringify([dataset.id[0], adapter.id === "sheetwrite" ? dataset.date[0] : null]),
+            JSON.stringify([
+              dataset.id[0],
+              adapter.id === "sheetwrite" ? coveredBeforeMerge : null,
+            ]),
             JSON.stringify([adapter.cellValue(0, 0), adapter.cellValue(0, 1)]),
           );
           if (adapter.id === "sheetwrite") {
@@ -1273,6 +1300,9 @@ function stepFailure(step: ScenarioStep, error: unknown): Error {
   return wrapped;
 }
 
+/** Guards against an action that never accumulates measurable time. */
+const MAXIMUM_ACTIONS_PER_SAMPLE = 1_000_000;
+
 function aggregateSample(
   adapter: RenderBenchAdapter,
   actions: ScenarioActions,
@@ -1280,6 +1310,8 @@ function aggregateSample(
 ): MeasuredSample {
   let durationMs = 0;
   let operationCount = 0;
+  let actionCount = 0;
+  const operationsPerAction = actions.operationsPerAction ?? 1;
   const transferCounters = {
     logicalFrames: 0,
     windowReadRequests: 0,
@@ -1326,10 +1358,11 @@ function aggregateSample(
       throw new RangeError(`invalid operation duration: ${elapsed}`);
     }
     durationMs += elapsed;
-    operationCount++;
-    if (operationCount > 1_000_000) {
+    operationCount += operationsPerAction;
+    actionCount++;
+    if (actionCount > MAXIMUM_ACTIONS_PER_SAMPLE) {
       throw new RangeError(
-        `aggregate did not reach ${minimumDurationMs} ms within 1,000,000 operations`,
+        `aggregate did not reach ${minimumDurationMs} ms within ${MAXIMUM_ACTIONS_PER_SAMPLE.toLocaleString("en-US")} actions`,
       );
     }
   } while (durationMs < minimumDurationMs);
