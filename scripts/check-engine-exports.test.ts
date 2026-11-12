@@ -30,10 +30,10 @@ test("engine caller audit resolves aliases, getters and structural callers but r
       export function initSync(): void;
       export default function __wbg_init(): void;
     `,
-    "packages/core/src/external-link.ts": `
     "packages/formulas/pkg/sheetwrite_wasm.d.ts": "export {};",
     "packages/wasm/pkg-history/sheetwrite_history.d.ts": "export {};",
     "packages/queries/pkg/sheetwrite_queries.d.ts": "export {};",
+    "packages/core/src/external-link.ts": `
       export interface ExternalLinkEngine { setNumber(value: number): void; }
       export function installLink(engine: ExternalLinkEngine) { engine.setNumber(12); }
     `,
