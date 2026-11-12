@@ -1,5 +1,8 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
+use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::calc::unresolved_sheet_names;
 use crate::memory::{StoreMemoryStats, FORMULAS};
 use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, FormulaError};
 
@@ -75,13 +78,13 @@ impl FormulaBits {
             self.grow_to(word);
         }
         let mask = 1u64 << (index % BITS_PER_WORD);
-        let Some(word) = self.words.get_mut(word) else {
+        let Some(bits) = self.words.get_mut(word) else {
             return false;
         };
-        if *word & mask != 0 {
+        if *bits & mask != 0 {
             return false;
         }
-        *word |= mask;
+        *bits |= mask;
         self.count += 1;
         true
     }
@@ -217,6 +220,73 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
+    /// The formulas that name a sheet the workbook does not have. Absent in
+    /// the usual sheet, so it adds one word per sheet.
+    unresolved: Option<Box<UnresolvedSheetUsers>>,
+}
+
+/// Formulas by the missing sheet names they hold, and the reverse, so a
+/// replaced or removed formula leaves only its own names.
+#[derive(Default)]
+struct UnresolvedSheetUsers {
+    by_name: FxHashMap<String, FxHashSet<FormulaId>>,
+    by_formula: FxHashMap<FormulaId, Vec<String>>,
+}
+
+impl UnresolvedSheetUsers {
+    fn forget(&mut self, id: FormulaId) {
+        let Some(names) = self.by_formula.remove(&id) else {
+            return;
+        };
+        for name in names {
+            if let Some(users) = self.by_name.get_mut(&name) {
+                users.remove(&id);
+                if users.is_empty() {
+                    self.by_name.remove(&name);
+                }
+            }
+        }
+    }
+
+    fn record(&mut self, id: FormulaId, names: Vec<String>) {
+        if names.is_empty() {
+            return;
+        }
+        // A formula names few sheets, so a scan drops repeats; sorting
+        // strings would add a sort to the engine for this alone.
+        let mut unique: Vec<String> = Vec::with_capacity(names.len());
+        for name in names {
+            if !unique.contains(&name) {
+                unique.push(name);
+            }
+        }
+        for name in &unique {
+            self.by_name.entry(name.clone()).or_default().insert(id);
+        }
+        self.by_formula.insert(id, unique);
+    }
+
+    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
+        formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
+        formulas.add_hash_table::<String, FxHashSet<FormulaId>>(
+            self.by_name.len(),
+            self.by_name.capacity(),
+        );
+        for (name, users) in &self.by_name {
+            formulas.add_payload(name.len(), name.capacity());
+            formulas.add_hash_table::<FormulaId, ()>(users.len(), users.capacity());
+        }
+        formulas.add_hash_table::<FormulaId, Vec<String>>(
+            self.by_formula.len(),
+            self.by_formula.capacity(),
+        );
+        for names in self.by_formula.values() {
+            formulas.add_vec::<String>(names.len(), names.capacity());
+            for name in names {
+                formulas.add_payload(name.len(), name.capacity());
+            }
+        }
+    }
 }
 
 impl FormulaStore {
@@ -277,6 +347,7 @@ impl FormulaStore {
     }
 
     fn track(&mut self, id: FormulaId) {
+        self.track_unresolved_sheets(id);
         let (volatile, subtotal) = self.get(id).map_or((false, false), |entry| {
             (entry.volatile(), entry.calls_subtotal())
         });
@@ -292,6 +363,41 @@ impl FormulaStore {
             self.subtotals.remove(id);
             self.subtotals.release_if_empty();
         }
+    }
+
+    fn track_unresolved_sheets(&mut self, id: FormulaId) {
+        // Only a formula that names a missing local sheet has a #REF! source
+        // error with a tree; every other formula skips the walk.
+        let missing = self.get(id).is_some_and(|entry| {
+            entry.ast.is_some() && entry.source_error() == Some(FormulaError::Ref)
+        });
+        if !missing && self.unresolved.is_none() {
+            return;
+        }
+        let mut names = Vec::new();
+        if missing {
+            if let Some(ast) = self.get(id).and_then(|entry| entry.ast.as_ref()) {
+                unresolved_sheet_names(ast, &mut names);
+            }
+        }
+        let index = self.unresolved.get_or_insert_with(Box::default);
+        index.forget(id);
+        index.record(id, names);
+        if index.by_formula.is_empty() {
+            self.unresolved = None;
+        }
+    }
+
+    /// Stable formula users of one normalized detached sheet name.
+    pub(crate) fn unresolved_sheet_users(
+        &self,
+        name: &str,
+    ) -> impl Iterator<Item = FormulaId> + '_ {
+        self.unresolved
+            .as_ref()
+            .and_then(|index| index.by_name.get(name))
+            .into_iter()
+            .flat_map(|users| users.iter().copied())
     }
 
     /// Reuse a free slot or grow one page; source writes preflight id capacity.
@@ -317,6 +423,7 @@ impl FormulaStore {
                 self.subtotals.insert(id);
             }
         }
+        self.track_unresolved_sheets(id);
         Some(id)
     }
 
@@ -471,6 +578,9 @@ impl FormulaStore {
         formulas.add_vec::<Vec<FormulaSlot>>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
+        if let Some(index) = &self.unresolved {
+            index.add_memory_stats(formulas);
+        }
         for page in &self.entries {
             formulas.add_vec::<FormulaSlot>(page.len(), page.capacity());
             for slot in page {
@@ -864,7 +974,7 @@ impl FormulaResults {
     /// above those in use and drop them before it returns, so the frame comes
     /// back as it was lent.
     #[cfg(feature = "analysis")]
-    pub(crate) fn swap_scratch(&mut self, other: &mut FormulaResults) {
+    pub(crate) fn swap_scratch(&mut self, other: &mut Self) {
         std::mem::swap(&mut self.scratch, &mut other.scratch);
     }
 

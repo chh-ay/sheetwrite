@@ -1,6 +1,6 @@
 //! Bounded grouping and pivot aggregation for the full engine.
+use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
@@ -43,7 +43,7 @@ struct Context<'a, 'p> {
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
     work: usize,
-    sums: HashMap<(usize, usize, usize), Value>,
+    sums: FxHashMap<(usize, usize, usize), Value>,
 }
 impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
@@ -140,7 +140,7 @@ impl Axis {
             rows: Vec::new(),
             parent: None,
         }];
-        let mut buckets: HashMap<Vec<KeyPart>, Vec<usize>> = HashMap::new();
+        let mut buckets: FxHashMap<Vec<KeyPart>, Vec<usize>> = FxHashMap::default();
         // Every included row belongs to the root and one group per prefix.
         let membership_width = fields.cols + 1;
         let mut memberships = vec![
@@ -331,8 +331,8 @@ struct Aggregator {
     label: String,
 }
 impl Aggregator {
-    fn resolve(expression: &Ast) -> Result<Self, FormulaError> {
-        let expression = expression.bound_value();
+    fn resolve(written: &Ast) -> Result<Self, FormulaError> {
+        let expression = written.bound_value();
         if let Ast::Name(name) = expression {
             let label = name.to_ascii_uppercase();
             if !AGGREGATORS.contains(&label.as_str()) {
@@ -376,21 +376,23 @@ impl Aggregator {
                 match (number_from_value(&subset), number_from_value(&total)) {
                     (Err(error), _) | (_, Err(error)) => Value::Error(error),
                     (_, Ok(0.0)) => Value::Error(FormulaError::DivZero),
-                    (Ok(subset), Ok(total)) => Value::number(subset / total),
+                    (Ok(part), Ok(whole)) => Value::number(part / whole),
                 },
             );
         }
-        let source = |indices: &[usize]| Ast::BoundMatrix {
-            rows: indices.len().max(1),
-            cols: 1,
-            values: Rc::new(if indices.is_empty() {
-                vec![Value::Blank]
-            } else {
-                indices
-                    .iter()
-                    .map(|&row| values.values[row * values.cols + column].clone())
-                    .collect()
-            }),
+        let source = |indices: &[usize]| {
+            Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
+                rows: indices.len().max(1),
+                cols: 1,
+                values: Rc::new(if indices.is_empty() {
+                    vec![Value::Blank]
+                } else {
+                    indices
+                        .iter()
+                        .map(|&row| values.values[row * values.cols + column].clone())
+                        .collect()
+                }),
+            }))
         };
         context.charge(rows.len() + if self.arity == 2 { total_rows.len() } else { 0 })?;
         let mut arguments = vec![source(rows)];
@@ -399,9 +401,12 @@ impl Aggregator {
         }
         let invocation = if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
             arguments.insert(0, self.function.clone());
-            Ast::UnknownFunc(super::lambda::CALL.into(), arguments)
+            Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                name: super::lambda::CALL.into(),
+                args: arguments.into(),
+            }))
         } else if let Ast::Func(function, _) = self.function {
-            Ast::Func(function, arguments)
+            Ast::Func(function, arguments.into())
         } else {
             return Err(FormulaError::Value);
         };
@@ -490,7 +495,7 @@ pub(crate) fn evaluate_ast(
     }
     let sum = |expression: &Ast, pass: &mut EvalPass<'_>| {
         store.eval_ast(
-            &Ast::Func(Func::Sum, vec![expression.clone()]),
+            &Ast::Func(Func::Sum, (vec![expression.clone()]).into()),
             sheet,
             pass,
             depth + 1,
@@ -559,7 +564,7 @@ pub(crate) fn evaluate_matrix(
         pass,
         depth,
         work: 0,
-        sums: HashMap::new(),
+        sums: FxHashMap::default(),
     };
     let row_fields = context.matrix(&arguments[0])?;
     let col_fields = if is_pivot {
@@ -664,15 +669,17 @@ pub(crate) fn evaluate_matrix(
         return Err(FormulaError::Calc);
     }
     let mut rows = Axis::build(&mut context, &row_fields, &included, row_total)?;
-    let mut columns = if let Some(fields) = &col_fields {
+    let mut column_axis = if let Some(fields) = &col_fields {
         Some(Axis::build(&mut context, fields, &included, col_total)?)
     } else {
         None
     };
-    let header_rows = columns.as_ref().map_or(usize::from(show_headers), |axis| {
-        axis.width + usize::from(show_headers)
-    });
-    let value_columns = columns
+    let header_rows = column_axis
+        .as_ref()
+        .map_or(usize::from(show_headers), |axis| {
+            axis.width + usize::from(show_headers)
+        });
+    let value_columns = column_axis
         .as_ref()
         .map_or(Some(values.cols), |axis| {
             axis.order.len().checked_mul(values.cols)
@@ -708,8 +715,8 @@ pub(crate) fn evaluate_matrix(
         relationship == 0,
         &row_aggregates,
     )?;
-    let mut intersections: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
-    if let Some(columns) = &mut columns {
+    let mut intersections: FxHashMap<(usize, usize), Vec<usize>> = FxHashMap::default();
+    if let Some(columns) = &mut column_axis {
         let mut col_aggregates = Vec::with_capacity(columns.groups.len());
         for group in &columns.groups {
             let mut aggregated = Vec::with_capacity(values.cols);
@@ -753,7 +760,7 @@ pub(crate) fn evaluate_matrix(
             };
         }
     }
-    if let Some(columns) = &columns {
+    if let Some(columns) = &column_axis {
         for (position, &group) in columns.order.iter().enumerate() {
             for field in 0..columns.width {
                 let label = columns.groups[group]
@@ -806,7 +813,7 @@ pub(crate) fn evaluate_matrix(
                 }
             });
         }
-        if let Some(columns) = &columns {
+        if let Some(columns) = &column_axis {
             for (col_position, &col_group) in columns.order.iter().enumerate() {
                 let subset = intersections
                     .get(&(row_group, col_group))

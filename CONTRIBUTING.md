@@ -16,8 +16,13 @@ Run the narrowest relevant test while editing, then run the full repository gate
 
 ```sh
 bun test path/to/focused.test.ts
+NODE_ENV=development bun test packages/core/test
 bun run verify:ci
 ```
+
+Core unit tests also run with `NODE_ENV=development` in the existing Unit Tests CI job. Development-only checks must not change grid behavior. DOM probes that expect no diagnostics load the real styles; tests of warn-once checks use a fresh process so earlier widgets cannot consume their warnings.
+
+Memory-release tests must separate engine ownership from the runtime. Native allocation counters measure the engine's thread, not concurrent test-runner allocations. JavaScript lifetime checks collect from a fresh timer callback and allow concurrent JIT work to finish before the collection deadline. Keep exact release assertions, and check a negative control with release disabled before changing the measurement or its deadline.
 
 Browser changes also require `bun run test:browser`; Rust changes require `cargo test` from `packages/wasm` and `bun run lint:rust`, which runs rustfmt, then Clippy on every crate for the native and WASM targets and fails when a lint count differs from `scripts/rust-lint-baseline.json`. Before you change Rust code, read [Rust code](docs/contributing/rust.md): the lint policy and the performance conventions every crate follows.
 

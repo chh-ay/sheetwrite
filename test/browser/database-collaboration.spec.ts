@@ -16,8 +16,6 @@ import { expect, test } from "./fixtures.js";
 const READY_TIMEOUT = 30_000;
 /** Covers the showcase's 6 s storm and 30 s drain window, plus remount time. */
 const CHAOS_TIMEOUT = 50_000;
-/** A full rebuild of the usage sheet once took 4.3 s at idle; recovery stays well under. */
-const CONFLICT_RECOVERY_MS = 2_000;
 /** The database showcase's IndexedDB names (docs/src/showcases/DatabaseShowcase.tsx). */
 const DOCUMENT_DATABASE = "sheetwrite-showcase-subscription-revenue";
 const QUEUE_DATABASE = "sheetwrite-showcase-subscription-revenue-queue";
@@ -179,8 +177,9 @@ test.describe("database proof", () => {
     await expect(page.getByTestId("dbx-total")).toHaveText(DATABASE_SEED_TOTAL);
     await expect(logEntry(page, "restoreBlock committed as v2")).toHaveCount(1);
 
-    // The oversize path: a dropped entry, an older undo kept.
-    await page.getByTestId("dbx-diagnostics").locator("summary").click();
+    // The oversize path: a dropped entry, an older undo kept. The failure lab
+    // renders open, beside its diagram.
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     await page.getByTestId("dbx-tight-limit").click();
     const limitReport = page.getByTestId("dbx-limit-report");
     await expect(limitReport).toHaveAttribute("data-state", "passed");
@@ -192,7 +191,7 @@ test.describe("database proof", () => {
     page,
   }) => {
     await openDatabase(page);
-    await page.getByTestId("dbx-diagnostics").locator("summary").click();
+    await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
     const commit = page.getByRole("button", { name: "Commit sample edit" });
 
     // The server stores v1 but the acknowledgement never arrives. Autosave must
@@ -208,20 +207,29 @@ test.describe("database proof", () => {
     // the missed tail and resubmits in place, without a remount.
     await page.getByRole("button", { name: "External writer commit" }).click();
     await expect(commit).toBeEnabled();
-    const recoveryStarted = performance.now();
+    // A remount replaces the Grid element inside the host.
+    const mountedGrid = await page.getByTestId("dbx-grid").evaluateHandle((host) => {
+      const grid = host.firstElementChild;
+      if (!grid) throw new Error("The database Grid is not mounted");
+      return grid;
+    });
     await commit.click();
-    await expect(page.getByTestId("dbx-version")).toHaveText("3", { timeout: READY_TIMEOUT });
+    // Recovery applies the missed v2 operation to the live Grid, and the
+    // rebased commit is resubmitted once, as v3.
+    await expect(
+      logEntry(
+        page,
+        "Recovered at v2: applied 1 missed operation and resubmitted 1 rebased commit",
+      ),
+    ).toHaveCount(1, { timeout: READY_TIMEOUT });
+    expect(await mountedGrid.evaluate((grid) => grid.isConnected)).toBe(true);
+    await expect(page.getByTestId("dbx-version")).toHaveText("3");
     await expect(page.getByTestId("dbx-pending")).toHaveText("0");
     // Seed $92,814 + row 0 seat ($29) + row 1 seat ($49), with row 4's
     // 65 seats repriced from $49 to $1.70 by the external v2 writer.
     await expect(page.getByTestId("dbx-total")).toHaveText("$89,817.5");
     await expect(logEntry(page, "Recovered at v")).toHaveCount(1);
-    const recoveryMs = performance.now() - recoveryStarted;
-    await test.info().attach("conflict-recovery-timing", {
-      body: JSON.stringify({ recoveryMs }),
-      contentType: "application/json",
-    });
-    expect(recoveryMs).toBeLessThan(CONFLICT_RECOVERY_MS);
+    await expect(logEntry(page, "Duplicate acknowledgement")).toHaveCount(1);
   });
 
   test.describe(() => {
@@ -327,9 +335,8 @@ test.describe("collaboration proof", () => {
 
   test("buffers version gaps and recovers from a base-version conflict", async ({ page }) => {
     await openCollaboration(page);
-    const advanced = page.locator(".sw-clb__advanced");
-    await advanced.locator("summary").click();
-    await expect(advanced).toHaveAttribute("open", "");
+    // The fault panels render open, beside their diagram.
+    await expect(page.locator(".sw-clb__advanced")).toHaveAttribute("open", "");
     const holdNext = (slug: "a" | "b") =>
       page
         .locator(`[data-fault-client="${slug}"]`)
@@ -367,7 +374,7 @@ test("a manual retry of a commit whose acknowledgement was lost applies it once"
   page,
 }) => {
   await openDatabase(page);
-  await page.getByTestId("dbx-diagnostics").locator("summary").click();
+  await expect(page.getByTestId("dbx-diagnostics")).toHaveAttribute("open", "");
   // The server stores v1 but the client keeps the commit pending; the retry
   // with the same mutation id must not apply it twice.
   await page.getByRole("button", { name: "Lose next acknowledgement" }).click();

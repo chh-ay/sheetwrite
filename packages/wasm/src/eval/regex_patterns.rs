@@ -132,7 +132,9 @@ impl PatternIndex {
                     self.bind(arg);
                 }
             }
-            Ast::UnknownFunc(_, args) => {
+            Ast::UnknownFunc(call) => {
+                let args = &mut call.args;
+
                 for arg in args {
                     self.bind(arg);
                 }
@@ -143,7 +145,27 @@ impl PatternIndex {
             }
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => self.bind(inner),
             Ast::LetSlot { expression, .. } => self.bind(expression),
-            _ => {}
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::BoundMatrix { .. }
+            | Ast::RegexPattern(_)
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => {}
         }
     }
 

@@ -1,7 +1,7 @@
 import { expect, it } from "bun:test";
 import { createHash } from "node:crypto";
 
-import { expectedFormulaOutput } from "../src/formula-bench.js";
+import { expectedFormulaOutput } from "../src/formula-fixtures.js";
 import {
   MATCHED_ENGINE_WORKLOADS,
   MATCHED_MINIMUM_SAMPLE_MS,

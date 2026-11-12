@@ -39,16 +39,47 @@ export function convertFormulaSources(
   return results;
 }
 
+/** Quoted text, which no OOXML spelling rule changes. */
+const XLSX_STRING = String.raw`"(?:[^"]|"")*"`;
+/** A cell reference with an optional sheet qualifier, such as `A1` or `'My Sheet'!$B$2`. */
+const XLSX_CELL = String.raw`(?:(?:'(?:[^']|'')+'|[A-Za-z_][A-Za-z0-9_.]*)!)?\$?[A-Za-z]{1,3}\$?[0-9]+(?![A-Za-z0-9_.(#\[])`;
+/** A number, never split: digits, a dot or a letter cannot follow it. */
+const XLSX_NUMBER = String.raw`(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?(?![0-9.A-Za-z_])`;
+/** Range, arithmetic, text and comparison operators, and spaces. */
+const XLSX_OPERATOR = "[-+*/^&=<>%: ]";
 /**
- * Convert the workbook's distinct formula sources in one engine call. A
- * workbook without formulas leaves the engine unloaded.
+ * Sources made only of cell and range references, numbers, quoted text and
+ * operators. The engine's OOXML spelling rules change only function names,
+ * local names, spill references and table references, none of which can occur
+ * here, so these sources are their own OOXML spelling.
+ */
+const PLAIN_XLSX_FORMULA = new RegExp(
+  `^=?(?:${XLSX_STRING}|${XLSX_CELL}|${XLSX_NUMBER}|${XLSX_OPERATOR})*$`,
+);
+
+/**
+ * Convert the workbook's distinct formula sources in one engine call. On
+ * export, plain sources skip the call; a workbook with no other formula leaves
+ * the engine unloaded.
  */
 export async function convertWorkbookFormulas(
   snapshot: WorkbookSnapshot,
   direction: "import" | "export",
 ): Promise<ReadonlyMap<string, string>> {
   const formulas = workbookFormulaSources(snapshot);
-  if (formulas.length === 0) return new Map();
+  const pending =
+    direction === "export"
+      ? formulas.filter((source) => !PLAIN_XLSX_FORMULA.test(source))
+      : formulas;
+  const converted =
+    pending.length === 0
+      ? new Map<string, string>()
+      : await withXlsxFormulaEngine((engine) => convertFormulaSources(engine, pending, direction));
+  if (pending.length === formulas.length) return converted;
 
-  return withXlsxFormulaEngine((engine) => convertFormulaSources(engine, formulas, direction));
+  const results = new Map(converted);
+  for (const source of formulas) {
+    if (!results.has(source)) results.set(source, source);
+  }
+  return results;
 }

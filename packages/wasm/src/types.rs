@@ -1,8 +1,10 @@
 //! Shared value model: cell tags, keys, formula errors/values, read-sets.
 
 use crate::calc::{
-    invalidate_sheet_refs, move_refs, refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs,
-    shift_cols, shift_rows, update_structured_refs, Ast, Func, RefFlags, SheetRef, StructuredRef,
+    bind_sheet_refs, has_unresolved_local_sheets, invalidate_sheet_refs, move_refs,
+    refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, shift_cols, shift_rows,
+    update_structured_refs, Ast, Func, RefFlags, SheetRef, SheetResolver, SpanPlacer,
+    StructuredRef,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::formula_rewrite::write_references;
@@ -81,34 +83,34 @@ impl FormulaError {
 
     pub(crate) fn sentinel(self) -> &'static str {
         match self {
-            FormulaError::Cycle => "#CYCLE!",
-            FormulaError::DivZero => "#DIV/0!",
-            FormulaError::Ref => "#REF!",
-            FormulaError::Num => "#NUM!",
-            FormulaError::Value => "#VALUE!",
-            FormulaError::Name => "#NAME?",
-            FormulaError::Na => "#N/A",
-            FormulaError::Spill => "#SPILL!",
-            FormulaError::Calc => "#CALC!",
-            FormulaError::Loading => "#LOADING!",
-            FormulaError::Null => "#NULL!",
+            Self::Cycle => "#CYCLE!",
+            Self::DivZero => "#DIV/0!",
+            Self::Ref => "#REF!",
+            Self::Num => "#NUM!",
+            Self::Value => "#VALUE!",
+            Self::Name => "#NAME?",
+            Self::Na => "#N/A",
+            Self::Spill => "#SPILL!",
+            Self::Calc => "#CALC!",
+            Self::Loading => "#LOADING!",
+            Self::Null => "#NULL!",
         }
     }
 
     /// Dense slot index for per-window scratch tables.
     pub(crate) fn slot(self) -> usize {
         match self {
-            FormulaError::Cycle => 0,
-            FormulaError::DivZero => 1,
-            FormulaError::Ref => 2,
-            FormulaError::Num => 3,
-            FormulaError::Value => 4,
-            FormulaError::Name => 5,
-            FormulaError::Na => 6,
-            FormulaError::Spill => 7,
-            FormulaError::Calc => 8,
-            FormulaError::Loading => 9,
-            FormulaError::Null => 10,
+            Self::Cycle => 0,
+            Self::DivZero => 1,
+            Self::Ref => 2,
+            Self::Num => 3,
+            Self::Value => 4,
+            Self::Name => 5,
+            Self::Na => 6,
+            Self::Spill => 7,
+            Self::Calc => 8,
+            Self::Loading => 9,
+            Self::Null => 10,
         }
     }
 
@@ -155,14 +157,14 @@ const _: () = assert!(
 impl Value {
     pub(crate) fn number(value: f64) -> Self {
         if value.is_finite() {
-            Value::Number(value)
+            Self::Number(value)
         } else {
-            Value::Error(FormulaError::Num)
+            Self::Error(FormulaError::Num)
         }
     }
 
     pub(crate) fn text(text: impl Into<Rc<str>>) -> Self {
-        Value::Text(text.into())
+        Self::Text(text.into())
     }
 }
 
@@ -298,8 +300,13 @@ impl ReadSet {
                     }
                 }
             }
-            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
+            Ast::Func(_, args) => {
                 for arg in args {
+                    self.collect(arg, formula_sheet);
+                }
+            }
+            Ast::UnknownFunc(call) => {
+                for arg in &call.args {
                     self.collect(arg, formula_sheet);
                 }
             }
@@ -320,9 +327,9 @@ impl ReadSet {
             | Ast::LetName { .. }
             | Ast::UnresolvedStructured(_)
             | Ast::Num(_)
-            | Ast::Array { .. } => {}
+            | Ast::Array(_) => {}
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {}
+            Ast::BoundMatrix(_) | Ast::RegexPattern(_) => {}
         }
     }
 
@@ -349,6 +356,10 @@ pub(crate) enum FormulaValueKind {
 
 /// Values, cell references and operators only, with no function, range,
 /// name, array or LET anywhere in the tree.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not plain"
+)]
 fn ast_is_plain(ast: &Ast) -> bool {
     match ast {
         Ast::Num(_)
@@ -388,6 +399,10 @@ fn ast_is_volatile(ast: &Ast) -> bool {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
 fn ast_contains_let(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, _) => true,
@@ -396,6 +411,10 @@ fn ast_contains_let(ast: &Ast) -> bool {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
 fn ast_contains_spill_ref(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
@@ -437,12 +456,12 @@ pub(crate) struct FormulaEntry {
 // One per stored formula, in every workbook's formula table.
 #[cfg(target_arch = "wasm32")]
 const _: () = assert!(
-    std::mem::size_of::<FormulaEntry>() == 88,
+    std::mem::size_of::<FormulaEntry>() == 64,
     "FormulaEntry changed size: measure, then update this number"
 );
 #[cfg(not(target_arch = "wasm32"))]
 const _: () = assert!(
-    std::mem::size_of::<FormulaEntry>() == 144,
+    std::mem::size_of::<FormulaEntry>() == 104,
     "FormulaEntry changed size: measure, then update this number"
 );
 
@@ -461,16 +480,27 @@ impl FormulaEntry {
     /// the text, so a rename or a row edit over many formulas writes none of
     /// them; the text is written when it is read. Out of line: many readers.
     #[inline(never)]
-    pub(crate) fn source(&self) -> Cow<'_, str> {
+    pub(crate) fn source(&self, names: &[String]) -> Cow<'_, str> {
         match &self.ast {
             Some(ast) if self.flags & Self::STALE_REFERENCES != 0 => {
-                Cow::Owned(write_references(&self.source, ast))
+                Cow::Owned(write_references(&self.source, ast, names))
             }
             _ => Cow::Borrowed(&self.source),
         }
     }
 
-    /// Source parse rejection; recalculation never mutates this value.
+    /// Capture a history entry with current source text. Its stale bit is
+    /// cleared, so history can read/export it without retaining the registry.
+    pub(crate) fn captured(&self, names: &[String]) -> Self {
+        Self {
+            ast: self.ast.clone(),
+            source: self.source(names).into_owned(),
+            reads: self.reads.clone(),
+            flags: self.flags & !Self::STALE_REFERENCES,
+        }
+    }
+
+    /// Parse rejection or an unresolved local sheet; binding can clear the latter.
     pub(crate) fn source_error(&self) -> Option<FormulaError> {
         let encoded = self.flags & Self::ERROR_MASK;
 
@@ -481,7 +511,7 @@ impl FormulaEntry {
 
     pub(crate) fn set_source_error(&mut self, error: Option<FormulaError>) {
         self.flags =
-            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |error| (error.slot() + 1) as u16);
+            (self.flags & !Self::ERROR_MASK) | error.map_or(0, |known| (known.slot() + 1) as u16);
     }
 
     pub(crate) fn volatile(&self) -> bool {
@@ -521,17 +551,27 @@ impl FormulaEntry {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
 
-    pub(crate) fn parsed_source(mut ast: Ast, sheet: u32, source: String) -> Self {
+    /// `detached_sheets` tells whether the tree may hold a detached sheet
+    /// reference; only then is it walked for a missing local sheet.
+    pub(crate) fn parsed_source(
+        mut ast: Ast,
+        sheet: u32,
+        source: String,
+        detached_sheets: bool,
+    ) -> Self {
+        let missing_local = detached_sheets && has_unresolved_local_sheets(&ast);
         // A formula of values, cells and operators has no function, range,
         // name or array: every flag below stays clear, and its reads are the
         // only metadata that needs a walk.
         if ast_is_plain(&ast) {
-            return Self {
+            let mut entry = Self {
                 flags: 0,
                 reads: ReadSet::from_ast(&ast, sheet),
                 ast: Some(ast),
                 source,
             };
+            entry.set_source_error(missing_local.then_some(FormulaError::Ref));
+            return entry;
         }
 
         let contains_let = ast_contains_let(&ast);
@@ -553,6 +593,7 @@ impl FormulaEntry {
         if contains_let && !entry.has_spill_refs() {
             crate::eval::resolve_let_names(&mut ast);
         }
+        entry.set_source_error(missing_local.then_some(FormulaError::Ref));
         entry.ast = Some(ast);
 
         entry
@@ -567,11 +608,11 @@ impl FormulaEntry {
         reads: ReadSet,
         is_reference: bool,
     ) -> Self {
-        if let Some(ast) = ast
+        if let Some(tree) = ast
             .as_mut()
-            .filter(|ast| ast_contains_let(ast) && !ast_contains_spill_ref(ast))
+            .filter(|candidate| ast_contains_let(candidate) && !ast_contains_spill_ref(candidate))
         {
-            crate::eval::resolve_let_names(ast);
+            crate::eval::resolve_let_names(tree);
         }
         let mut entry = Self {
             ast,
@@ -590,12 +631,10 @@ impl FormulaEntry {
         entry
     }
 
-    pub(crate) fn reference(target: AbsCellKey, target_name: &str, formula_sheet: u32) -> Self {
+    pub(crate) fn reference(target: AbsCellKey, formula_sheet: u32) -> Self {
         let ast = Ast::AbsCell(
             SheetRef {
                 handle: target.sheet,
-                name: target_name.to_string(),
-                quoted: false,
             },
             target.row,
             target.col,
@@ -617,6 +656,10 @@ impl FormulaEntry {
         self.flags & Self::REFERENCE != 0
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other formula has no target cell"
+    )]
     pub(crate) fn reference_target(&self, formula_sheet: u32) -> Option<AbsCellKey> {
         if !self.is_reference() {
             return None;
@@ -639,7 +682,7 @@ impl FormulaEntry {
     pub(crate) fn error(source: &str, error: FormulaError) -> Self {
         let mut entry = Self {
             ast: None,
-            source: source.to_string(),
+            source: source.to_owned(),
             reads: ReadSet::default(),
             flags: 0,
         };
@@ -670,6 +713,25 @@ impl FormulaEntry {
         self.set_flag(Self::STALE_REFERENCES, has_text);
         self.set_volatile(volatile);
         true
+    }
+
+    /// Bind only retained detached sheet references. Moves the tree and source
+    /// into its replacement, leaving the old read set for the graph edit.
+    pub(crate) fn bind_sheets(
+        &mut self,
+        formula_sheet: u32,
+        resolve: &SheetResolver<'_>,
+        place: &SpanPlacer<'_>,
+    ) -> Option<Self> {
+        let ast = self.ast.as_mut()?;
+        if !bind_sheet_refs(ast, resolve, place) {
+            return None;
+        }
+        let ast = self.ast.take()?;
+        let mut replacement =
+            Self::parsed_source(ast, formula_sheet, std::mem::take(&mut self.source), true);
+        replacement.flags |= self.flags & (Self::REFERENCE | Self::STALE_REFERENCES);
+        Some(replacement)
     }
 
     pub(crate) fn shift_rows(
@@ -726,11 +788,12 @@ impl FormulaEntry {
         key: &str,
         handle: Option<u32>,
         formula_sheet: u32,
+        names: &[String],
     ) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
         };
-        if !relink_sheet_refs(ast, key, handle) {
+        if !relink_sheet_refs(ast, key, handle, names) {
             return false;
         }
 
@@ -814,11 +877,10 @@ mod formula_entry_tests {
                         row: 1,
                         col: 2,
                     },
-                    "Sheet1",
                     0,
                 )
             } else {
-                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_string())
+                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_owned(), false)
             };
 
             for (volatile, spill_refs, produces_array) in [
@@ -865,7 +927,7 @@ pub(crate) enum InternSlot {
 }
 
 /// The intern map's keys are already 64-bit string hashes; re-hashing them
-/// through SipHash on every probe is unnecessary. This hasher passes the key
+/// through `SipHash` on every probe is unnecessary. This hasher passes the key
 /// through untouched.
 #[derive(Default)]
 pub(crate) struct IdentityHasher(u64);
@@ -903,6 +965,10 @@ const STRING_COLLECTION_FLOOR_BYTES: usize = 256 * 1024;
 pub(crate) struct StringStorage {
     bytes: Vec<u8>,
     spans: Vec<PoolSpan>,
+    #[allow(
+        clippy::disallowed_types,
+        reason = "keys are already hashes of the text, so the hasher passes them through unchanged"
+    )]
     lookup:
         std::collections::HashMap<u64, InternSlot, std::hash::BuildHasherDefault<IdentityHasher>>,
     pub(crate) epoch: u32,

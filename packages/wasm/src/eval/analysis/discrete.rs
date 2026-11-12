@@ -148,7 +148,7 @@ pub(super) fn hypergeometric(values: &FuncAccumulator, has_cumulative: bool) -> 
 /// `NEGBINOM.DIST(number_f, number_s, probability_s, cumulative)`, and
 /// `NEGBINOMDIST` without `cumulative`. The cumulative probability of at
 /// most `number_f` failures is the regularized incomplete beta function
-/// I_p(number_s, number_f + 1).
+/// `I_p(number_s`, `number_f` + 1).
 pub(super) fn negative_binomial(values: &FuncAccumulator, has_cumulative: bool) -> NumberResult {
     let arity = if has_cumulative { 4 } else { 3 };
 

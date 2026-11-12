@@ -11,6 +11,10 @@ use super::value::aggregate_number;
 pub(super) mod numerals;
 pub(super) mod trigonometry;
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Abs => unary(values, |value| Ok(value.abs())),

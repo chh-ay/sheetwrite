@@ -23,7 +23,9 @@ fn serial_value(value: &Value) -> DateResult {
             Some(serial) => serial,
             None => number_from_text(text)?,
         },
-        _ => number_from_value(value)?,
+        Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            number_from_value(value)?
+        }
     };
     if !number.is_finite() || !(0.0..=MAX_SERIAL as f64).contains(&number.trunc()) {
         return Err(FormulaError::Num);
@@ -222,11 +224,11 @@ fn datedif(start: i64, end: i64, unit: &str) -> DateResult {
         - start_month
         - i64::from(end_day < start_day);
     match unit {
-        unit if unit.eq_ignore_ascii_case("D") => Ok(end - start),
-        unit if unit.eq_ignore_ascii_case("M") => Ok(months),
-        unit if unit.eq_ignore_ascii_case("Y") => Ok(months / MONTHS_PER_YEAR),
-        unit if unit.eq_ignore_ascii_case("YM") => Ok(months % MONTHS_PER_YEAR),
-        unit if unit.eq_ignore_ascii_case("MD") => {
+        _ if unit.eq_ignore_ascii_case("D") => Ok(end - start),
+        _ if unit.eq_ignore_ascii_case("M") => Ok(months),
+        _ if unit.eq_ignore_ascii_case("Y") => Ok(months / MONTHS_PER_YEAR),
+        _ if unit.eq_ignore_ascii_case("YM") => Ok(months % MONTHS_PER_YEAR),
+        _ if unit.eq_ignore_ascii_case("MD") => {
             if end_day >= start_day {
                 return Ok(end_day - start_day);
             }
@@ -234,7 +236,7 @@ fn datedif(start: i64, end: i64, unit: &str) -> DateResult {
             let previous_days = date_parts(previous_last as f64).ok_or(FormulaError::Num)?.2;
             Ok(previous_days + end_day - start_day)
         }
-        unit if unit.eq_ignore_ascii_case("YD") => {
+        _ if unit.eq_ignore_ascii_case("YD") => {
             let anniversary_year =
                 start_year + i64::from((end_month, end_day) < (start_month, start_day));
             let anniversary = if anniversary_year == 1899 {

@@ -108,15 +108,44 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=parse-load-table;size=100000": 1.2,
   "workload=memory-import;size=10000": 1.2,
   "workload=memory-import;size=100000": 1.2,
+  "workload=paged-cell-reads;size=100000": 1.2,
+  "workload=paged-insert-row;size=1000000": 1.2,
+  "workload=paged-range-loaded;size=1000000": 1.2,
+  "workload=paged-eviction;size=8192": 1.2,
+  "workload=index-match-many;size=200": 1.2,
+  "workload=rank-many;size=4000": 1.2,
+  "workload=sort-unique-filter;size=100000": 1.2,
+  "workload=subtotal-filtered;size=100000": 1.2,
+  "workload=sparse-page-write;size=100000": 1.2,
+  "workload=history-diff;size=100000": 1.2,
+  "workload=groupby-sum;size=100000": 1.2,
+  "workload=pivotby-percentof;size=50000": 1.2,
+  "workload=pivot-rebuild;size=100000": 1.2,
+  "workload=getpivotdata-many;size=1000": 1.2,
+  "workload=analysis-calls;size=10000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,
   "workload=spill-sequence-admission;size=100000": 1.15,
+  // Full engine only. Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  "workload=map-lambda;size=10000": 1.2,
+  "workload=map-lambda;size=100000": 1.2,
+  "workload=reduce-lambda;size=10000": 1.2,
+  "workload=reduce-lambda;size=100000": 1.2,
+  "workload=byrow-lambda;size=10000": 1.2,
+  "workload=byrow-lambda;size=100000": 1.2,
+  "workload=lambda-call;size=10000": 1.2,
+  "workload=lambda-call;size=100000": 1.2,
+  "workload=named-lambda;size=10000": 1.2,
+  "workload=named-lambda;size=100000": 1.2,
+  "workload=measure-pivot;size=10000": 1.2,
+  "workload=measure-pivot;size=100000": 1.2,
 };
 
 export const FORMULA_RATIO_LIMITS: ReadonlyMap<string, number> = new Map(
   Object.entries(MEASURED_RATIO_LIMITS),
 );
-validateExactMatrix("formula gate ratio limits", expectedFormulaWorkloadKeys("full"), [
+// The full engine's matrix holds every row of the default engine's.
+validateExactMatrix("formula gate ratio limits", expectedFormulaWorkloadKeys("full", "formulas"), [
   ...FORMULA_RATIO_LIMITS.keys(),
 ]);
 

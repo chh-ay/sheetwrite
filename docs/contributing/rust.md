@@ -68,9 +68,10 @@ What the lint set asks for, and how to satisfy it here.
 - **No `Mutex` or `RwLock`.** WASM has one thread; use `Cell` or `RefCell`.
 - **No `print!`, `println!`, `eprint!`, `eprintln!` or `dbg!`.** The engine
   reports through return values that the TypeScript side turns into errors.
-- **No `unwrap_or`.** A fallback value hides the empty case and why the
-  fallback is right for it. Handle that case where it shows: `map_or`,
-  `unwrap_or_default`, `if let`, `let ... else` or `?`.
+- **Handle the empty case where it shows.** Prefer `if let`, `let ... else`,
+  `?` or `unwrap_or_default`. Use `unwrap_or` only when the fallback is the
+  right value for that case, and say why in a comment when it is not obvious.
+  `clippy::or_fun_call` catches fallbacks that are computed eagerly.
 - **List enum arms.** A `_ =>` arm on one of our enums hides the new variant
   that should have been handled. Name the variants, even when several share a
   body: `Value::Number(_) | Value::Bool(_) | Value::Blank => ...`.
@@ -151,3 +152,18 @@ row (see [CONTRIBUTING.md](../../CONTRIBUTING.md)).
 The pull request lists the gate results, the Brotli size of each engine and
 the largest function sizes. Changes to `unsafe` or to the layout of a hot type
 also report native instruction counts on Linux (the Mac has no counter).
+
+A change that should not alter generated code (renames, types, docs,
+attributes, visibility) can skip the gate when it is shown to be
+code-neutral. Build both engines before and after (`bun run build` in
+`packages/wasm` and in `packages/formulas`), then compare each packaged
+`.wasm`:
+
+```bash
+bun scripts/wasm-compare.ts <before>/sheetwrite_wasm_bg.wasm <after>/sheetwrite_wasm_bg.wasm
+```
+
+It passes when the code section is byte-identical and the data section keeps
+its length: the only data bytes that may differ are the line and column
+numbers of panic locations, which move with source lines. Put its output in
+the pull request. Any other difference goes through the gate.

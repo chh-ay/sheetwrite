@@ -68,7 +68,9 @@ fn is_array_argument(ast: &Ast, sheet: usize) -> bool {
 fn output_value(value: &Value) -> Value {
     match value {
         Value::Blank => Value::Number(0.0),
-        other => other.clone(),
+        other @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Error(_)) => {
+            other.clone()
+        }
     }
 }
 
@@ -84,7 +86,32 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         Ast::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
         Ast::Neg(inner) => literal_number(inner).map(|value| -value),
         Ast::Pos(inner) => literal_number(inner),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Missing
+        | Ast::BoundMatrix { .. }
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
     }
 }
 
@@ -257,11 +284,13 @@ fn estimate(
                     Estimate::Exact { rows, cols }
                 }
                 // Any wrap gives fewer than twice the source cells.
-                _ => Estimate::Approximate {
-                    rows: cells,
-                    cols: 1,
-                    max_cells: cells.saturating_mul(2).saturating_sub(1),
-                },
+                StaticArgument::Omitted | StaticArgument::Literal(_) | StaticArgument::Computed => {
+                    Estimate::Approximate {
+                        rows: cells,
+                        cols: 1,
+                        max_cells: cells.saturating_mul(2).saturating_sub(1),
+                    }
+                }
             }
         }
         "EXPAND" => match (
@@ -369,7 +398,7 @@ struct Inputs {
 impl Inputs {
     fn read(evaluation: &mut Evaluation<'_, '_>, name: &str) -> Result<Self, FormulaError> {
         let args = evaluation.args;
-        let mut inputs = Inputs {
+        let mut inputs = Self {
             matrices: Vec::with_capacity(sources(name, args).len()),
             cells: 0,
             bytes: 0,
@@ -386,7 +415,7 @@ impl Inputs {
                     bytes
                         .checked_add(match value {
                             Value::Text(text) => text.len(),
-                            _ => 0,
+                            Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0,
                         })
                         .ok_or(FormulaError::Num)
                 },
@@ -480,14 +509,14 @@ fn flatten(
     name: &str,
     inputs: &Inputs,
 ) -> Result<EvalMatrix, FormulaError> {
-    let ignore = match evaluation.scalar(1) {
+    let ignore_code = match evaluation.scalar(1) {
         None => 0.0,
         Some(value) => number_from_value(&value)?.trunc(),
     };
-    if !(0.0..=MAX_IGNORE_CODE).contains(&ignore) {
+    if !(0.0..=MAX_IGNORE_CODE).contains(&ignore_code) {
         return Err(FormulaError::Value);
     }
-    let ignore = ignore as u8;
+    let ignore = ignore_code as u8;
     let scan_by_column = evaluation
         .scalar(2)
         .map_or(Ok(false), |value| bool_from_value(&value))?;
@@ -503,7 +532,7 @@ fn flatten(
         let is_skipped = match value {
             Value::Blank => ignore & IGNORE_BLANKS != 0,
             Value::Error(_) => ignore & IGNORE_ERRORS != 0,
-            _ => false,
+            Value::Number(_) | Value::Text(_) | Value::Bool(_) => false,
         };
         if !is_skipped {
             values.push(value)?;
@@ -537,7 +566,7 @@ fn sort_by(
 ) -> Result<EvalMatrix, FormulaError> {
     let source = &inputs.matrices[0];
     let args = evaluation.args;
-    let mut sorts_rows = None;
+    let mut agreed_sorts_rows = None;
     let mut keys = Vec::with_capacity(args.len() / 2);
     let mut work = inputs.cells;
     for by_index in (1..args.len()).step_by(2) {
@@ -549,7 +578,7 @@ fn sort_by(
             (false, true) => false,
             (false, false) => return Err(FormulaError::Value),
         };
-        if *sorts_rows.get_or_insert(key_sorts_rows) != key_sorts_rows {
+        if *agreed_sorts_rows.get_or_insert(key_sorts_rows) != key_sorts_rows {
             return Err(FormulaError::Value);
         }
         let order = match evaluation.scalar(by_index + 1) {
@@ -565,7 +594,7 @@ fn sort_by(
             is_descending: order == -1.0,
         });
     }
-    let sorts_rows = sorts_rows.unwrap_or(true);
+    let sorts_rows = agreed_sorts_rows.unwrap_or(true);
     let item_count = if sorts_rows { source.rows } else { source.cols };
     // A comparison sort reads about n·log2(n) pairs per key.
     let comparisons = item_count
@@ -591,8 +620,8 @@ fn sort_by(
         }
         Ordering::Equal
     });
-    if let Some(error) = error {
-        return Err(error);
+    if let Some(first_error) = error {
+        return Err(first_error);
     }
 
     let mut output = inputs.reserve(source.rows, source.cols)?;
@@ -649,13 +678,13 @@ fn wrap(
 
 /// EXPAND size: the source size when omitted, `#VALUE!` below it.
 fn expand_size(value: Option<Value>, source: usize) -> Result<usize, FormulaError> {
-    let Some(value) = value else {
+    let Some(given) = value else {
         return Ok(source);
     };
-    if matches!(value, Value::Blank) {
+    if matches!(given, Value::Blank) {
         return Ok(source);
     }
-    let requested = number_from_value(&value)?.trunc();
+    let requested = number_from_value(&given)?.trunc();
     if requested < source as f64 {
         return Err(FormulaError::Value);
     }

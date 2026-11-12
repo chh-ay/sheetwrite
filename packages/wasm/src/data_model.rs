@@ -136,8 +136,8 @@ impl KeyIndex {
             kind = merge_kind(kind, &key).ok_or(KeyProblem::OneSideType { row })?;
             match key {
                 Key::Number(number) => numbers.push(number),
-                Key::Text(key) => {
-                    fold_into(key, &mut text);
+                Key::Text(key_text) => {
+                    fold_into(key_text, &mut text);
                     text_ends.push(text.len() as u32);
                 }
                 Key::Blank | Key::Other => continue,
@@ -161,11 +161,10 @@ impl KeyIndex {
     /// carries the error, as a lookup would.
     fn map_rows<'s>(
         &self,
-        kind: KeyKind,
+        mut kind: KeyKind,
         rows: u32,
         values: impl Fn(u32) -> KeyCell<'s>,
     ) -> Result<Vec<u32>, KeyProblem> {
-        let mut kind = kind;
         let mut scratch = Vec::new();
         // The one-side row of each string pool id seen so far, indexed by
         // id: many-side keys repeat, and equal text shares one id, so each
@@ -205,12 +204,12 @@ impl KeyIndex {
         let order = sorted_entries(numbers.len(), &|left, right| {
             numbers[left as usize].total_cmp(&numbers[right as usize])
         });
-        let numbers: Vec<f64> = order.iter().map(|&entry| numbers[entry as usize]).collect();
-        let rows = order.iter().map(|&entry| rows[entry as usize]).collect();
-        let dense = dense_positions(&numbers);
+        let sorted_numbers: Vec<f64> = order.iter().map(|&entry| numbers[entry as usize]).collect();
+        let sorted_rows = order.iter().map(|&entry| rows[entry as usize]).collect();
+        let dense = dense_positions(&sorted_numbers);
         Self {
-            numbers,
-            rows,
+            numbers: sorted_numbers,
+            rows: sorted_rows,
             dense,
             ..Self::default()
         }
@@ -290,7 +289,7 @@ impl KeyIndex {
             }
             Key::Text(_) | Key::Blank | Key::Other => None,
         };
-        position.map_or(NO_MATCH, |position| self.rows[position])
+        position.map_or(NO_MATCH, |found| self.rows[found])
     }
 
     /// Branch-free lower bound: the loop has a fixed trip count and a

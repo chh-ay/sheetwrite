@@ -81,10 +81,14 @@ impl ConditionalRules {
                 let text = match &rule.pred {
                     CondPred::EqStr(value) => Some(value),
                     CondPred::Contains { needle, .. } => Some(needle),
-                    _ => None,
+                    CondPred::GtNum(_)
+                    | CondPred::LtNum(_)
+                    | CondPred::EqNum(_)
+                    | CondPred::EqEmpty
+                    | CondPred::Formula { .. } => None,
                 };
-                if let Some(text) = text {
-                    metadata.add_payload(text.len(), text.capacity());
+                if let Some(payload) = text {
+                    metadata.add_payload(payload.len(), payload.capacity());
                 }
             }
         }
@@ -137,8 +141,8 @@ impl CellStore {
                 break;
             };
 
-            let num = nums.get(i).copied().unwrap_or(0.0);
-            let flag = flags.get(i).copied().unwrap_or(0);
+            let num = nums.get(i).copied().unwrap_or_default();
+            let flag = flags.get(i).copied().unwrap_or_default();
             let match_case = flag & 1 != 0;
 
             let pred = match kind {
@@ -196,9 +200,9 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return WindowView::empty(self.strings.epoch);
         };
-        let row_start = row_start.min(s.cells.row_count());
-        let row_end = row_end.min(s.cells.row_count());
-        let n_rows = row_end.saturating_sub(row_start);
+        let clamped_row_start = row_start.min(s.cells.row_count());
+        let clamped_row_end = row_end.min(s.cells.row_count());
+        let n_rows = clamped_row_end.saturating_sub(clamped_row_start);
         let n_cols = cols.len();
         let Some(mut cells) = WindowCells::new(n_rows, n_cols) else {
             return WindowView::empty(self.strings.epoch);
@@ -211,8 +215,8 @@ impl CellStore {
             }
 
             if let Some(column) = s.cells.dense_column(col) {
-                for row in row_start..row_end {
-                    let dst = (row - row_start) * n_cols + col_index;
+                for row in clamped_row_start..clamped_row_end {
+                    let dst = (row - clamped_row_start) * n_cols + col_index;
                     cells.fill(
                         s,
                         row,
@@ -225,20 +229,20 @@ impl CellStore {
                 continue;
             }
 
-            let mut start = s.cells.idx(row_start, col);
-            let end = s.cells.idx(row_end, col);
+            let mut start = s.cells.idx(clamped_row_start, col);
+            let end = s.cells.idx(clamped_row_end, col);
             while start < end {
                 let run = s.cells.run(start, end);
                 run.visit_paged(|src, resolved| {
                     let row = src - col * s.cells.row_count();
-                    let dst = (row - row_start) * n_cols + col_index;
+                    let dst = (row - clamped_row_start) * n_cols + col_index;
                     cells.fill(s, row, col, dst, resolved, &self.formula_slots);
                 });
                 start = run.end;
             }
         }
 
-        let row_start_u = row_start as u32;
+        let row_start_u = clamped_row_start as u32;
         let cond_matches =
             cond_matches_for_window(self, sheet, |ri| row_start_u + ri as u32, cols, &cells);
 
@@ -265,15 +269,15 @@ impl CellStore {
 
             if let Some(column) = s.cells.dense_column(col) {
                 for (row_index, &row) in rows.iter().enumerate() {
-                    let row = row as usize;
-                    if row < s.cells.row_count() {
+                    let sheet_row = row as usize;
+                    if sheet_row < s.cells.row_count() {
                         let dst = row_index * n_cols + col_index;
                         cells.fill(
                             s,
-                            row,
+                            sheet_row,
                             col,
                             dst,
-                            Some(column.cell(row)),
+                            Some(column.cell(sheet_row)),
                             &self.formula_slots,
                         );
                     }
@@ -371,12 +375,12 @@ impl WindowCells {
             }
             KIND_FORMULA => {
                 let key = cell_key(row, col);
-                let entry = key.and_then(|key| sheet.formulas.get(key, slots));
-                let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
-                if let Some(error) = error {
+                let entry = key.and_then(|cell| sheet.formulas.get(cell, slots));
+                let error = key.and_then(|cell| formula_error_with_entry(sheet, cell, entry));
+                if let Some(found) = error {
                     self.kind[dst] = KIND_STRING;
                     self.str_local[dst] =
-                        local_error_index(error, &mut self.error_slots, &mut self.strings);
+                        local_error_index(found, &mut self.error_slots, &mut self.strings);
                 } else {
                     self.kind[dst] = KIND_NUMBER;
                     self.num[dst] = payload_num(payload);
@@ -408,7 +412,7 @@ fn local_error_index(
     let slot = &mut slots[error.slot()];
     if *slot < 0 {
         *slot = strings.len() as i32;
-        strings.push(error.sentinel().to_string());
+        strings.push(error.sentinel().to_owned());
     }
     *slot
 }
@@ -466,10 +470,15 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                         ) {
                             Value::Bool(value) => value,
                             Value::Number(value) => value != 0.0,
-                            _ => false,
+                            Value::Text(_) | Value::Blank | Value::Error(_) => false,
                         }
                     }
-                    predicate => cond_pred_matches(
+                    predicate @ (CondPred::GtNum(_)
+                    | CondPred::LtNum(_)
+                    | CondPred::EqNum(_)
+                    | CondPred::EqStr(_)
+                    | CondPred::EqEmpty
+                    | CondPred::Contains { .. }) => cond_pred_matches(
                         predicate,
                         cells.kind[dst],
                         cells.num[dst],
@@ -638,16 +647,19 @@ fn align_to_8(value: usize) -> Option<usize> {
 #[wasm_bindgen]
 impl WindowView {
     #[wasm_bindgen(js_name = stringPoolEpoch)]
+    #[must_use]
     pub fn string_pool_epoch(&self) -> u32 {
         self.string_pool_epoch
     }
 
     #[wasm_bindgen(getter, js_name = nRows)]
+    #[must_use]
     pub fn n_rows(&self) -> u32 {
         self.n_rows
     }
 
     #[wasm_bindgen(getter, js_name = nCols)]
+    #[must_use]
     pub fn n_cols(&self) -> u32 {
         self.n_cols
     }

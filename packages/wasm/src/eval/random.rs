@@ -8,7 +8,7 @@ use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
-/// SplitMix64 increment and output mixers (Steele, Lea and Flood, 2014).
+/// `SplitMix64` increment and output mixers (Steele, Lea and Flood, 2014).
 const GOLDEN_GAMMA: u64 = 0x9E37_79B9_7F4A_7C15;
 const MIX_MULTIPLIER_1: u64 = 0xBF58_476D_1CE4_E5B9;
 const MIX_MULTIPLIER_2: u64 = 0x94D0_49BB_1331_11EB;
@@ -22,7 +22,7 @@ const UNIT_SCALE: f64 = 1.0 / (1u64 << UNIT_BITS) as f64;
 #[cfg(not(target_arch = "wasm32"))]
 const NATIVE_SEED: u64 = 0x5EED_5EED_5EED_5EED;
 
-/// SplitMix64: one word of state, a handful of integer operations per draw,
+/// `SplitMix64`: one word of state, a handful of integer operations per draw,
 /// and a full 2^64 period. Any seed is valid, including zero, because the
 /// state advances by an odd constant before mixing. It is not a
 /// cryptographic generator; spreadsheet RAND makes no such promise.
@@ -60,7 +60,7 @@ pub(crate) struct RandomSource(Cell<SplitMix64>);
 
 impl RandomSource {
     /// Each WASM instance seeds itself from the host, so two workbooks do not
-    /// share one sequence. `Math.random` gives 53 bits; SplitMix64 spreads
+    /// share one sequence. `Math.random` gives 53 bits; `SplitMix64` spreads
     /// them over the whole state on the first draw.
     #[cfg(target_arch = "wasm32")]
     pub(crate) fn from_host() -> Self {
@@ -94,12 +94,12 @@ impl RandomSource {
 /// RANDBETWEEN's integer bounds: Excel rounds `bottom` up and `top` down, and
 /// rejects an empty interval with `#NUM!`.
 fn integer_bounds(bottom: f64, top: f64) -> Result<(f64, f64), FormulaError> {
-    let (bottom, top) = (bottom.ceil(), top.floor());
-    if bottom > top {
+    let (low, high) = (bottom.ceil(), top.floor());
+    if low > high {
         return Err(FormulaError::Num);
     }
 
-    Ok((bottom, top))
+    Ok((low, high))
 }
 
 /// An integer drawn uniformly from `bottom..=top`. An interval wider than
@@ -140,12 +140,15 @@ impl CellStore {
                 // Excel rejects text that is empty, where the shared number
                 // coercion would read zero.
                 Value::Text(text) if text.trim().is_empty() => Err(FormulaError::Value),
-                value => number_from_value(&value),
+                value @ (Value::Number(_)
+                | Value::Text(_)
+                | Value::Bool(_)
+                | Value::Blank
+                | Value::Error(_)) => number_from_value(&value),
             };
-        let bounds =
-            bound(bottom, pass).and_then(|bottom| integer_bounds(bottom, bound(top, pass)?));
+        let bounds = bound(bottom, pass).and_then(|low| integer_bounds(low, bound(top, pass)?));
 
-        match bounds.and_then(|(bottom, top)| draw_between(self.random.next_unit(), bottom, top)) {
+        match bounds.and_then(|(low, high)| draw_between(self.random.next_unit(), low, high)) {
             Ok(value) => Value::number(value),
             Err(error) => Value::Error(error),
         }

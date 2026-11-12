@@ -18,6 +18,8 @@ Formula help needs `@sheetwrite/core/styles/formula-help.css`. The Explain Formu
 
 ## Keys
 
+**Alt+Enter** inserts a line break at the caret (or replaces selected text), even while the function list is open. The cell editor and formula bar grow to show up to eight lines; longer formulas scroll. Lines do not wrap. Autocomplete, argument guidance and reference colours follow the caret across lines. Plain Enter still accepts a completion or commits the edit.
+
 While the function list is open:
 
 | Key | Action |
@@ -30,7 +32,7 @@ While the list is closed, the keys do what the editor does: Enter commits, Tab m
 
 ## Accessibility
 
-- The editor field has `aria-autocomplete="list"`, `aria-controls` names the list, and `aria-activedescendant` names the selected item. The formula bar is an ARIA combobox with `aria-expanded`. The cell editor is a multi-line text field, which cannot take the combobox role, so it uses the same attributes without it.
+- The editor field has `aria-autocomplete="list"`, `aria-controls` names the list, and `aria-activedescendant` names the selected item. Both editors are multi-line text fields (`aria-multiline="true"`), without a combobox role.
 - The list is an ARIA listbox with one option per function.
 - The argument guide is a polite live region (`role="status"`) and describes the field (`aria-describedby`). A screen reader reads the guide when the function, the argument or the first error changes.
 - The field has `aria-invalid="true"` while it shows an error.
@@ -82,6 +84,5 @@ The engine packages export the two reads that `analyzeFormula` uses: `formulaTok
 ## Limits
 
 - Formula help does not show the result of the formula while you type.
-- There is no multi-line formula editor.
 - Reference colours repeat after six distinct references.
 - A reference to a sheet that the workbook does not have gets a colour in the text but no fill on the grid.

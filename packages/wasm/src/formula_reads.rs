@@ -1,7 +1,9 @@
 //! Spill admission needs known-empty destinations as well as loaded inputs.
 //! Windowed datasources must request both beyond the visible window.
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
+
+use rustc_hash::FxHashSet;
 
 use wasm_bindgen::prelude::*;
 
@@ -39,9 +41,9 @@ impl CellStore {
             return Vec::new();
         }
         let mut walk = ReadWalk::new(data, &self.formula_slots, handle, max_cells);
-        let end_row = end_row.min(data.cells.row_count());
+        let clamped_end_row = end_row.min(data.cells.row_count());
         for &col in cols {
-            for row in start_row..end_row {
+            for row in start_row..clamped_end_row {
                 if let Some(key) = cell_key(row, col as usize) {
                     walk.visit(key);
                 }
@@ -57,7 +59,7 @@ struct ReadWalk<'a> {
     slots: &'a FormulaStore,
     handle: u32,
     remaining_cells: usize,
-    visited: HashSet<CellKey>,
+    visited: FxHashSet<CellKey>,
     pending: Vec<CellKey>,
     /// Half-open row intervals per column, unsorted until `into_rectangles`.
     rows_by_col: BTreeMap<u32, Vec<(u32, u32)>>,
@@ -70,17 +72,17 @@ impl<'a> ReadWalk<'a> {
             slots,
             handle,
             remaining_cells: max_cells,
-            visited: HashSet::new(),
+            visited: FxHashSet::default(),
             pending: Vec::new(),
             rows_by_col: BTreeMap::new(),
         }
     }
 
     fn visit(&mut self, key: CellKey) {
-        let key = self.data.spill.owner(key).unwrap_or(key);
+        let owner_key = self.data.spill.owner(key).unwrap_or(key);
 
-        if self.data.formulas.contains(key) && self.visited.insert(key) {
-            self.pending.push(key);
+        if self.data.formulas.contains(owner_key) && self.visited.insert(owner_key) {
+            self.pending.push(owner_key);
         }
     }
 

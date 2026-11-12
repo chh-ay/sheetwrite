@@ -180,6 +180,20 @@ export function gridSizeStyle(size: OptionalGridSizeProps): Record<string, strin
   return {};
 }
 
+/**
+ * Enforces the size rule of the simple `Sheetwrite` components: exactly one of
+ * `height` or `fill`. Adapters call it while rendering, before a Grid mounts.
+ */
+export function assertGridSize(size: OptionalGridSizeProps): void {
+  if ((size.height !== undefined) === (size.fill === true)) {
+    throw new SheetwriteError(
+      "invalid-argument",
+      "create-grid",
+      "Sheetwrite: provide exactly one of height or fill",
+    );
+  }
+}
+
 const GRID_OPTION_KEYS = Object.keys(GRID_OPTION_POLICY) as Array<keyof GridOptions>;
 
 /** Extracts advanced GridOptions from framework adapter props. */

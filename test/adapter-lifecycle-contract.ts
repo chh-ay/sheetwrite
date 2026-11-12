@@ -529,3 +529,53 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
     });
   });
 }
+
+/** Props for an adapter's simple `Sheetwrite` component; the size props may break its rule. */
+export interface SimpleAdapterSizeProps {
+  columns: readonly { key: string; title: string }[];
+  defaultRows: readonly Record<string, string>[];
+  height?: number;
+  fill?: true;
+}
+
+/** Renders the simple component into `host`; `error` is what the framework reported, if anything. */
+export type RenderSimpleAdapter = (
+  host: HTMLElement,
+  props: SimpleAdapterSizeProps,
+) => Promise<{ error: unknown; unmount(): Promise<void> }>;
+
+const BAD_SIZES: ReadonlyArray<[string, Pick<SimpleAdapterSizeProps, "height" | "fill">]> = [
+  ["both height and fill", { height: 200, fill: true }],
+  ["neither height nor fill", {}],
+];
+
+export function runSimpleAdapterSizeContract(adapter: string, render: RenderSimpleAdapter): void {
+  describe(`${adapter} simple component size rule`, () => {
+    for (const [label, size] of BAD_SIZES) {
+      it(`rejects ${label} while rendering, before a grid host exists`, async () => {
+        const errors = spyOn(console, "error").mockImplementation(() => undefined);
+        const warnings = spyOn(console, "warn").mockImplementation(() => undefined);
+        const host = document.body.appendChild(document.createElement("div"));
+        try {
+          const rendered = await render(host, {
+            columns: [{ key: "name", title: "Name" }],
+            defaultRows: [{ name: "Ada" }],
+            ...size,
+          });
+
+          expect(rendered.error).toMatchObject({
+            name: "SheetwriteError",
+            code: "invalid-argument",
+            operation: "create-grid",
+          });
+          expect(host.querySelector(".sheetwrite")).toBeNull();
+          await rendered.unmount();
+        } finally {
+          host.remove();
+          errors.mockRestore();
+          warnings.mockRestore();
+        }
+      });
+    }
+  });
+}

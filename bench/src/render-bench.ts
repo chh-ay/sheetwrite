@@ -1,11 +1,13 @@
 import {
+  type CellFormat,
+  type CellScalar,
   type CellStyle,
   type Column,
   createGrid,
   type DocumentOp,
   type Grid,
   initSheetwrite,
-  parseDateInput,
+  parseCellLiteralInput,
   type Workbook,
 } from "@sheetwrite/core";
 
@@ -29,6 +31,7 @@ import type { PanePaint } from "../../packages/core/src/types/render.js";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import {
+  type BenchColumn,
   COL,
   COLUMNS,
   type ColumnarDataset,
@@ -121,12 +124,17 @@ function dispatchKey(element: Element, key: string): void {
   element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
 
+/** The date column is typed in Sheetwrite, so its ISO text ingests as date serials. */
+function sheetwriteColumnType(column: BenchColumn): CellFormat {
+  return column.key === "date" ? "date" : column.type;
+}
+
 function makeWorkbook(rowCount: number): Workbook {
   const columns: Column[] = COLUMNS.map((column) => ({
     key: column.key,
     header: column.header,
     width: column.width,
-    type: column.key === "date" ? "date" : column.type,
+    type: sheetwriteColumnType(column),
     numberFormat:
       column.key === "amount"
         ? AMOUNT_NUMBER_FORMAT
@@ -143,6 +151,20 @@ function datasetValueAt(dataset: ColumnarDataset, row: number, col: number): str
   if (col === 2) return dataset.customer[row]!;
   if (col === 3) return dataset.city[row]!;
   return dataset.amount[row]!;
+}
+
+/**
+ * The value Sheetwrite's column-aware ingest holds for a dataset cell. Restores
+ * write this rather than the dataset text, so a restored cell matches a freshly
+ * loaded one and no scenario depends on which scenarios ran before it.
+ */
+function ingestedValueAt(dataset: ColumnarDataset, row: number, col: number): CellScalar {
+  const column = COLUMNS[col];
+  if (!column) throw new RangeError(`benchmark column ${col} is missing`);
+  const value = datasetValueAt(dataset, row, col);
+  return typeof value === "string"
+    ? parseCellLiteralInput(value, sheetwriteColumnType(column))
+    : value;
 }
 
 /** Signature of the built-in renderer's frozen-pane paint hook. */
@@ -176,7 +198,6 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   private textHeavyRows = 0;
   private wrapHeavyRows = 0;
   private searchMatchRows = 0;
-  private dateSerialRows = 0;
   private conditionalFormatRows = 0;
   private frozenPaneProbeArmed = false;
   private frozenPaneProbeState: FrozenPaneProbe = emptyFrozenPaneProbe();
@@ -426,7 +447,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
         });
       }
     }
@@ -456,7 +477,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
         });
       }
     }
@@ -495,7 +516,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
         });
       }
     }
@@ -664,43 +685,6 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
       { type: "number", numberFormat: AMOUNT_NUMBER_FORMAT, numberLocale: NUMBER_LOCALE },
       column.width,
     );
-  }
-
-  /**
-   * Write the date column back as UTC serials. Earlier fixture restores leave the
-   * ingested ISO text in those cells, which the paint path prints verbatim; the
-   * serial is what the store's own column-aware ingest produces.
-   */
-  installDateSerials(rowCount: number): void {
-    this.dateSerialRows = Math.min(rowCount, this.initialRowCount - 1);
-    const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.dateSerialRows; row++) {
-      const text = this.dataset.date[row];
-      const serial = typeof text === "string" ? parseDateInput(text) : null;
-      if (serial === null) continue;
-      patches.push({
-        op: "set",
-        addr: { sheet: SHEET, row, col: COL.date },
-        value: { kind: "literal", value: serial },
-      });
-    }
-    this.applyPatches(patches);
-  }
-
-  clearDateSerials(): void {
-    if (this.dateSerialRows === 0) return;
-    const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.dateSerialRows; row++) {
-      const text = this.dataset.date[row];
-      if (text === undefined) continue;
-      patches.push({
-        op: "set",
-        addr: { sheet: SHEET, row, col: COL.date },
-        value: { kind: "literal", value: text },
-      });
-    }
-    this.dateSerialRows = 0;
-    this.applyPatches(patches);
   }
 
   /**

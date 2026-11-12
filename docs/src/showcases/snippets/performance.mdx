@@ -1,0 +1,25 @@
+```ts prelude="core" title="performance.ts"
+declare function cellAt(row: number, col: number): CellScalar;
+
+// A windowed datasource: each request names the rows and the column bands on
+// screen, and the reply holds only those cells
+const datasource: DataSource = {
+  capabilities: { protocol: 2, columns: "windowed" },
+  async getRows({ start, end, columns, revision }) {
+    const rows = [];
+    for (let row = start; row < end; row++) {
+      const values: Record<string, CellScalar> = {};
+      for (const band of columns) {
+        band.keys.forEach((key, offset) => (values[key] = cellAt(row, band.start + offset)));
+      }
+      rows.push(values);
+    }
+    return { protocol: 2, start, columns, rows, revision };
+  },
+};
+
+// The Grid keeps a bounded cache of the tiles it loaded; scrolling is a call
+await initSheetwrite();
+const grid = createGrid(host, { workbook, datasource, presentation: "data-grid" });
+grid.scrollToCell({ sheet: "scale", row: 999_999, col: 999 });
+```

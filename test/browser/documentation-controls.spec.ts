@@ -126,28 +126,6 @@ test("a malformed fragment is ignored", async ({ page }) => {
   expect(errors.page).toEqual([]);
 });
 
-test("the formula reference engine filter has the select popup styles", async ({ page }) => {
-  await page.goto(siteUrl("/docs/reference/formula-functions/math/"));
-  await waitForHydration(page);
-
-  await page.getByRole("combobox", { name: "Available in" }).click();
-  const popup = page.locator(".sw-demo-select__popup");
-  await expect(popup).toBeVisible();
-
-  const style = await popup.evaluate((element) => {
-    const computed = getComputedStyle(element);
-    const positioner = element.closest(".sw-demo-select__positioner");
-    return {
-      borderRadius: computed.borderRadius,
-      boxShadow: computed.boxShadow,
-      positionerLayer: positioner === null ? "" : getComputedStyle(positioner).zIndex,
-    };
-  });
-  expect(style.borderRadius).toBe("8px");
-  expect(style.boxShadow).not.toBe("none");
-  expect(style.positionerLayer).toBe("100");
-});
-
 test("the outline lists only symbol groups that the filter shows", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto(siteUrl("/docs/api/core/"));

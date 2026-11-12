@@ -64,7 +64,7 @@ fn field_column(headers: &[Value], field: &Value) -> Result<usize, FormulaError>
             matches!(header, Value::Text(text) if compare_text_case_insensitive(text, label).is_eq())
         }).ok_or(FormulaError::Value),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Number(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
     }
 }
 
@@ -90,13 +90,12 @@ fn compile_criteria(
             if let Value::Error(error) = value {
                 return Err(*error);
             }
-            let database_column = match columns[column] {
-                Some(database_column) => database_column,
-                None => {
-                    let database_column = field_column(headers, &criteria.values[column])?;
-                    columns[column] = Some(database_column);
-                    database_column
-                }
+            let database_column = if let Some(database_column) = columns[column] {
+                database_column
+            } else {
+                let database_column = field_column(headers, &criteria.values[column])?;
+                columns[column] = Some(database_column);
+                database_column
             };
             conditions.push((database_column, database_criterion(value)?));
         }
@@ -142,11 +141,11 @@ fn aggregate(
         }) {
             continue;
         }
-        let Some(column) = column else {
+        let Some(field) = column else {
             count += 1;
             continue;
         };
-        let value = &record[column];
+        let value = &record[field];
         match name {
             "DGET" => {
                 if single.is_some() {
@@ -203,7 +202,7 @@ fn aggregate(
         "DSUM" => total,
         "DAVERAGE" if count != 0 => total / count as f64,
         "DAVERAGE" => return Value::Error(FormulaError::DivZero),
-        "DMAX" | "DMIN" => extreme.unwrap_or(0.0),
+        "DMAX" | "DMIN" => extreme.unwrap_or_default(),
         "DPRODUCT" => {
             if count == 0 {
                 0.0
@@ -409,10 +408,10 @@ mod tests {
         store.recompute(sheet);
         for (row, (formula, number, text)) in cases.iter().enumerate() {
             let cell = store.get_cell(sheet, row + 18, 8);
-            if let Some(number) = number {
+            if let Some(expected) = number {
                 // An error cell also reads as 0: the number must not be text.
                 assert!(cell.string().is_none(), "{formula}: {:?}", cell.string());
-                assert_eq!(cell.num(), *number, "{formula}");
+                assert_eq!(cell.num(), *expected, "{formula}");
             } else {
                 assert_eq!(cell.string().as_deref(), *text, "{formula}");
             }

@@ -100,11 +100,11 @@ pub(crate) fn lex_tolerant(src: &str) -> Vec<Spanned<'_>> {
 }
 
 fn token_kind(tok: &Result<Tok<'_>, String>, next: Option<&Spanned<'_>>) -> TokenKind {
-    let Ok(tok) = tok else {
+    let Ok(parsed) = tok else {
         return TokenKind::Bad;
     };
 
-    match tok {
+    match parsed {
         Tok::Num(_) => TokenKind::Number,
         Tok::Str(_) => TokenKind::String,
         Tok::Ident(_, true) => TokenKind::QuotedSheet,
@@ -174,6 +174,7 @@ impl<'a> Utf16Offsets<'a> {
 /// 5 quoted sheet name, 6 table reference in brackets, 7 operator, 8 `:`,
 /// 9 `!`, 10 `#`, 11 `,`, 12 `;`, 13 `(`, 14 `)`, 15 `{`, 16 `}`, 17 bad text.
 #[wasm_bindgen(js_name = formulaTokens)]
+#[must_use]
 pub fn formula_tokens(src: &str) -> Vec<u32> {
     let tokens = lex_tolerant(src);
     let mut offsets = Utf16Offsets::new(src);
@@ -213,12 +214,14 @@ pub struct FormulaSyntaxError {
 impl FormulaSyntaxError {
     /// The UTF-16 offset where the marked text starts.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn from(&self) -> u32 {
         self.from
     }
 
     /// The UTF-16 offset where the marked text ends.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn to(&self) -> u32 {
         self.to
     }
@@ -226,11 +229,13 @@ impl FormulaSyntaxError {
     /// The text ends before the formula is complete: a value, a `)` or a
     /// closing quote is missing at the end. Typing on usually completes it.
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn incomplete(&self) -> bool {
         self.incomplete
     }
 
     #[wasm_bindgen(getter)]
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.clone()
     }
@@ -266,6 +271,7 @@ fn first_error(src: &str) -> Option<(usize, usize, bool, String)> {
 /// The first syntax error in formula text, or `undefined` when the engine's
 /// parser reads the whole formula. A leading `=` is optional, as for a cell.
 #[wasm_bindgen(js_name = checkFormulaSyntax)]
+#[must_use]
 pub fn check_formula_syntax(src: &str) -> Option<FormulaSyntaxError> {
     let (start, end, incomplete, message) = first_error(src)?;
     let mut offsets = Utf16Offsets::new(src);

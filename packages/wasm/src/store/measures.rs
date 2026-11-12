@@ -235,7 +235,7 @@ impl CellStore {
     ) -> Vec<(usize, Value)> {
         // Each slot is a table read in one filter context; slot 0 is the
         // base table in the cell's own context.
-        let mut slots = vec![(base.to_string(), 0)];
+        let mut slots = vec![(base.to_owned(), 0)];
         let mut contexts = vec![ContextEdit::default()];
         let mut prepared: Vec<Result<PreparedMeasure, FormulaError>> = cache
             .values()
@@ -254,7 +254,7 @@ impl CellStore {
                     for measure in &mut prepared {
                         if measure
                             .as_ref()
-                            .is_ok_and(|measure| measure.tables.contains(&index))
+                            .is_ok_and(|ready| ready.tables.contains(&index))
                         {
                             *measure = Err(error);
                         }
@@ -264,7 +264,7 @@ impl CellStore {
         }
         let include_empty = prepared
             .iter()
-            .any(|measure| measure.as_ref().is_ok_and(|measure| !measure.base_only));
+            .any(|measure| measure.as_ref().is_ok_and(|ready| !ready.base_only));
 
         let mut cells = Vec::new();
         let mut visible = vec![Vec::new(); related.len()];
@@ -298,7 +298,8 @@ impl CellStore {
             for (index, calculation) in measure.calculations.iter().enumerate() {
                 let key = (calculation.slot != NO_SLOT && calculation.slot != MANY_SLOTS)
                     .then(|| (cell.slot, index, identities[calculation.slot - 1]));
-                let found = key.map(|key| known.binary_search_by_key(&key, |entry| entry.0));
+                let found =
+                    key.map(|slot_key| known.binary_search_by_key(&slot_key, |entry| entry.0));
                 if let Some(Ok(position)) = found {
                     calculated.push(known[position].1.clone());
                     continue;
@@ -306,8 +307,8 @@ impl CellStore {
                 collect_rows(measure, index + 1, &related, &mut visible);
                 let rows_of = |table: usize| visible[table - 1].as_slice();
                 let value = self.measure_family(measure, index + 1, &rows_of, &[]);
-                if let (Some(key), Some(Err(position))) = (key, found) {
-                    known.insert(position, (key, value.clone()));
+                if let (Some(slot_key), Some(Err(position))) = (key, found) {
+                    known.insert(position, (slot_key, value.clone()));
                 }
                 calculated.push(value);
             }
@@ -354,13 +355,13 @@ impl CellStore {
         contexts: &mut Vec<ContextEdit>,
     ) -> Result<PreparedMeasure, FormulaError> {
         let measure = id
-            .and_then(|id| self.measure_by_id(id))
+            .and_then(|measure_id| self.measure_by_id(measure_id))
             .ok_or(FormulaError::Ref)?;
         let mut stack = Vec::new();
-        let expression = self.inlined_measure(measure, &mut stack)?;
+        let inlined = self.inlined_measure(measure, &mut stack)?;
         // Resolved as a cell formula at A1, so names resolve too and a
         // defined name is refused below.
-        let mut expression = self.resolve_parsed_formula(expression, 0, 0, 0)?;
+        let mut expression = self.resolve_parsed_formula(inlined, 0, 0, 0)?;
         let first_context = contexts.len();
         let mut read = Vec::new();
         let mut calculated = Vec::new();
@@ -455,7 +456,11 @@ impl CellStore {
                 *expression = self.inlined_measure(measure, stack)?;
                 Ok(())
             }
-            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => arguments
+            Ast::Func(_, arguments) => arguments
+                .iter_mut()
+                .try_for_each(|argument| self.inline_references(argument, stack)),
+            Ast::UnknownFunc(call) => call
+                .args
                 .iter_mut()
                 .try_for_each(|argument| self.inline_references(argument, stack)),
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
@@ -465,7 +470,28 @@ impl CellStore {
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
                 self.inline_references(inner, stack)
             }
-            _ => Ok(()),
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::BoundMatrix { .. }
+            | Ast::RegexPattern(_)
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => Ok(()),
         }
     }
 
@@ -545,12 +571,11 @@ impl CellStore {
             }
             let start = related.keys.len();
             for field in 0..related.levels.len() {
-                match key_part(&source.value(row, field)) {
-                    Ok(key) => related.keys.push(key),
-                    Err(_) => {
-                        related.keys.truncate(start);
-                        continue 'rows;
-                    }
+                if let Ok(key) = key_part(&source.value(row, field)) {
+                    related.keys.push(key)
+                } else {
+                    related.keys.truncate(start);
+                    continue 'rows;
                 }
             }
             related.rows.push(row as u32);
@@ -583,23 +608,51 @@ impl CellStore {
             // A blank or an error is a one-cell matrix; INDEX reads it as one
             // value, so the expression around it, IFERROR included, sees it
             // as it would the CALCULATE itself.
-            let value = match literal(value) {
-                matrix @ Ast::BoundMatrix { .. } => {
-                    Ast::Func(Func::Index, vec![matrix, Ast::Num(1.0), Ast::Num(1.0)])
-                }
-                value => value,
+            let bound = match literal(value) {
+                matrix @ Ast::BoundMatrix(_) => Ast::Func(
+                    Func::Index,
+                    vec![matrix, Ast::Num(1.0), Ast::Num(1.0)].into(),
+                ),
+                other @ (Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::RegexPattern(_)
+                | Ast::Name(_)
+                | Ast::NamedRange(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(_)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(_)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::InvalidRef
+                | Ast::Func(..)
+                | Ast::UnknownFunc(_)
+                | Ast::Bin(..)
+                | Ast::Cmp(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array(_)) => other,
             };
-            bindings.push((&calculation.name, value));
+            bindings.push((&calculation.name, bound));
         }
 
         let expression = match owner {
             0 => &measure.expression,
-            owner => &measure.calculations[owner - 1].expression,
+            nested => &measure.calculations[nested - 1].expression,
         };
         match capture(expression, &bindings) {
-            Ok(expression) if ast_produces_array(&expression) => Value::Error(FormulaError::Value),
-            Ok(expression) => {
-                self.eval_conditional_ast(&expression, 0, 0, 0, &mut FormulaResults::default())
+            Ok(captured) if ast_produces_array(&captured) => Value::Error(FormulaError::Value),
+            Ok(captured) => {
+                self.eval_conditional_ast(&captured, 0, 0, 0, &mut FormulaResults::default())
             }
             Err(error) => Value::Error(error),
         }
@@ -625,11 +678,11 @@ impl CellStore {
         if values.is_empty() {
             values.push(Value::Blank);
         }
-        Ast::BoundMatrix {
+        Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
             rows: values.len(),
             cols: 1,
             values: Rc::new(values),
-        }
+        }))
     }
 }
 
@@ -670,7 +723,7 @@ fn swapped(op: CmpOp) -> CmpOp {
         CmpOp::Gt => CmpOp::Lt,
         CmpOp::Le => CmpOp::Ge,
         CmpOp::Ge => CmpOp::Le,
-        same => same,
+        same @ (CmpOp::Eq | CmpOp::Ne) => same,
     }
 }
 
@@ -703,7 +756,7 @@ impl CellStore {
                         columns.push(((**reference).clone(), context));
                         columns.len() - 1
                     });
-                *expression = Ast::Name(column_name(index));
+                *expression = Ast::Name(column_name(index).into_boxed_str());
                 Ok(())
             }
             Ast::UnresolvedStructured(reference)
@@ -711,7 +764,8 @@ impl CellStore {
             {
                 Err(FormulaError::Ref)
             }
-            Ast::UnknownFunc(name, arguments) if name.eq_ignore_ascii_case(CALCULATE) => {
+            Ast::UnknownFunc(call) if call.name.eq_ignore_ascii_case(CALCULATE) => {
+                let arguments = &mut call.args;
                 if context != 0 || arguments.is_empty() {
                     return Err(FormulaError::Value);
                 }
@@ -719,7 +773,7 @@ impl CellStore {
                 let inner_context = contexts.len() - 1;
                 let mut inner = std::mem::replace(&mut arguments[0], Ast::Missing);
                 self.name_columns(&mut inner, columns, inner_context, contexts, calculations)?;
-                *expression = Ast::Name(calculation_name(calculations.len()));
+                *expression = Ast::Name(calculation_name(calculations.len()).into_boxed_str());
                 calculations.push((inner_context, inner));
                 Ok(())
             }
@@ -731,12 +785,30 @@ impl CellStore {
                 | Func::Cell
                 | Func::AnchorArray,
                 _,
-            ) => Err(FormulaError::Value),
-            Ast::Func(_, arguments) | Ast::UnknownFunc(_, arguments) => {
-                arguments.iter_mut().try_for_each(|argument| {
-                    self.name_columns(argument, columns, context, contexts, calculations)
-                })
-            }
+            )
+            | Ast::BoundMatrix(_)
+            | Ast::RegexPattern(_)
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(_)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(_)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. } => Err(FormulaError::Value),
+            Ast::Func(_, arguments) => arguments.iter_mut().try_for_each(|argument| {
+                self.name_columns(argument, columns, context, contexts, calculations)
+            }),
+            Ast::UnknownFunc(call) => call.args.iter_mut().try_for_each(|argument| {
+                self.name_columns(argument, columns, context, contexts, calculations)
+            }),
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
                 self.name_columns(left, columns, context, contexts, calculations)?;
                 self.name_columns(right, columns, context, contexts, calculations)
@@ -744,8 +816,7 @@ impl CellStore {
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
                 self.name_columns(inner, columns, context, contexts, calculations)
             }
-            Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array { .. } => Ok(()),
-            _ => Err(FormulaError::Value),
+            Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Missing | Ast::Array(_) => Ok(()),
         }
     }
 
@@ -759,8 +830,8 @@ impl CellStore {
         let mut edit = ContextEdit::default();
         for filter in filters {
             let (column, op, value) = match filter {
-                Ast::UnknownFunc(name, arguments) if name.eq_ignore_ascii_case(ALL) => {
-                    match arguments.as_slice() {
+                Ast::UnknownFunc(call) if call.name.eq_ignore_ascii_case(ALL) => {
+                    match call.args.as_ref() {
                         [Ast::Structured(column)] if is_data_column(column) => {
                             edit.removed.push(column_ref(column));
                             continue;
@@ -773,7 +844,34 @@ impl CellStore {
                     (value, Ast::Structured(column)) => (column, swapped(*op), value),
                     _ => return Err(FormulaError::Value),
                 },
-                _ => return Err(FormulaError::Value),
+                Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::BoundMatrix { .. }
+                | Ast::RegexPattern(_)
+                | Ast::Name(_)
+                | Ast::NamedRange(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(..)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::InvalidRef
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array { .. } => return Err(FormulaError::Value),
             };
             if !is_data_column(column) {
                 return Err(FormulaError::Value);
@@ -781,18 +879,19 @@ impl CellStore {
 
             // Checked in a nested context, so a column or a CALCULATE in the
             // value is refused.
-            let mut value = value.clone();
+            let mut checked = value.clone();
             let mut read = Vec::new();
-            self.name_columns(&mut value, &mut read, 1, &mut Vec::new(), &mut Vec::new())?;
+            self.name_columns(&mut checked, &mut read, 1, &mut Vec::new(), &mut Vec::new())?;
             if !read.is_empty() {
                 return Err(FormulaError::Value);
             }
-            let value = self.eval_conditional_ast(&value, 0, 0, 0, &mut FormulaResults::default());
-            if let Value::Error(error) = value {
+            let result =
+                self.eval_conditional_ast(&checked, 0, 0, 0, &mut FormulaResults::default());
+            if let Value::Error(error) = result {
                 return Err(error);
             }
             edit.removed.push(column_ref(column));
-            edit.predicates.push((column_ref(column), op, value));
+            edit.predicates.push((column_ref(column), op, result));
         }
         Ok(edit)
     }

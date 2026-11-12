@@ -1,0 +1,12 @@
+{
+  "name": "@sheetwrite/docs-svelte-codegen",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Turns the docs' Svelte samples into TypeScript for the code hovers. A package of its own so that svelte2tsx resolves the TypeScript 6 JavaScript API here, while the docs package uses the repository's TypeScript 7.",
+  "dependencies": {
+    "svelte": "5.57.1",
+    "svelte2tsx": "0.7.58",
+    "typescript": "^6"
+  }
+}
