@@ -136,11 +136,13 @@ impl<'a> RangeReader<'a> {
         let index = self.view.data.cells.idx(row, col);
         if self.view.data.cells.source_kind_at(index) != KIND_EMPTY {
             return self
+                .view
                 .store
                 .eval_at(self.view.sheet, row, col, pass, self.view.depth + 1);
         }
 
         match self
+            .view
             .data
             .cells
             .calculated_cell_at(index)
@@ -178,7 +180,7 @@ impl<'a> RangeReader<'a> {
             return Ok(Value::Blank);
         }
 
-        Ok(self.store.eval_at(
+        Ok(self.view.store.eval_at(
             self.view.sheet,
             self.row,
             self.col,
