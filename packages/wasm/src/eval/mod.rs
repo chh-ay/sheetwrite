@@ -1334,7 +1334,8 @@ impl CellStore {
         if vacated.owned_cells() == 0 {
             data.spill.install(range, &mut data.cells, value_at)
         } else {
-            data.spill.reinstall(range, &mut data.cells, vacated, value_at)
+            data.spill
+                .reinstall(range, &mut data.cells, vacated, value_at)
         }
     }
 

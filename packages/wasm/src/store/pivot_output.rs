@@ -153,9 +153,11 @@ impl CellStore {
         }
 
         let strings = &mut self.strings;
-        let mut written = data.spill.reinstall(range, &mut data.cells, &vacated, |offset| {
-            calculated_slot(strings, value_at(offset).borrow())
-        });
+        let mut written = data
+            .spill
+            .reinstall(range, &mut data.cells, &vacated, |offset| {
+                calculated_slot(strings, value_at(offset).borrow())
+            });
         changed.append(&mut written);
         changed.extend(vacated.cleared_outside(Some(range)));
 
