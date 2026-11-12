@@ -11,6 +11,7 @@
     "examples/*",
     "docs",
     "docs/hovers",
+    "docs/svelte-codegen",
     "bench"
   ],
   "engines": {
