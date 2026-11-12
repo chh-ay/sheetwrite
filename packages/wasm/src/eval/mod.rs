@@ -2134,10 +2134,8 @@ impl CellStore {
             return self.eval_statistics_family(&call, pass);
         }
 
-        if func == Func::Subtotal {
-            if let Some(result) = self.eval_subtotal_family(args, sheet, pass, depth) {
-                return result;
-            }
+        if func == Func::Subtotal && !subtotal::views_off() {
+            return self.eval_subtotal_family(args, sheet, pass, depth);
         }
 
         if func == Func::Sum {
