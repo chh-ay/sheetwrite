@@ -100,7 +100,6 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
         }),
         Func::Gcd => gcd_lcm(values, false),
         Func::Lcm => gcd_lcm(values, true),
-        Func::Subtotal => subtotal(values),
         Func::IsEven | Func::IsOdd => parity(values, func == Func::IsOdd),
         Func::CeilingPrecise | Func::IsoCeiling => precise(values, f64::ceil),
         Func::FloorPrecise => precise(values, f64::floor),
@@ -401,45 +400,6 @@ fn gcd(mut left: u64, mut right: u64) -> u64 {
 /// SUBTOTAL's function (1 to 11) and the hidden rows it skips, or the error
 /// of a code that names neither.
 pub(super) type SubtotalCode = Result<(i64, SkippedRows), FormulaError>;
-
-/// Codes 101 to 111 name the same functions as 1 to 11.
-const SKIPS_HIDDEN_ROWS_OFFSET: i64 = 100;
-
-/// SUBTOTAL's function (1 to 11) and the hidden rows it skips: every code
-/// skips rows that a filter hides, and codes 101 to 111 also skip rows hidden
-/// by hand or by a collapsed group.
-///
-/// Out of line: the evaluator calls this from `CellStore::eval_ast`, which in
-/// the default engine is close to 100,000 bytes of WASM. JavaScriptCore does
-/// not compile a larger function with its optimizing tier. A copy of this
-/// function inlined there pushed `eval_ast` over that limit, and a SUM over
-/// 100,000 rows recalculated 63% slower.
-#[inline(never)]
-pub(super) fn subtotal_function(values: &FuncAccumulator) -> SubtotalCode {
-    match integer_arg(values, 0, None)? {
-        code @ 1..=11 => Ok((code, SkippedRows::Filtered)),
-        code @ 101..=111 => Ok((code - SKIPS_HIDDEN_ROWS_OFFSET, SkippedRows::Hidden)),
-        _ => Err(FormulaError::Value),
-    }
-}
-
-/// The evaluator has already left out the cells that SUBTOTAL skips (see
-/// `CellStore::push_range_values`), so this sees only the counted values.
-fn subtotal(values: &FuncAccumulator) -> Value {
-    if let Err(error) = require_arity(values, 2, 254) {
-        return Value::Error(error);
-    }
-    let function = match subtotal_function(values) {
-        Ok((function, _)) => function,
-        Err(error) => return Value::Error(error),
-    };
-
-    let mut fold = SubtotalFold::new(function);
-    for entry in values.entries_from_arg(1) {
-        fold.push(&entry.value, entry.from_range);
-    }
-    fold.finish()
-}
 
 /// SUBTOTAL's running result for one function, fed the counted values in
 /// order. An error that reading a number gives is kept, and the result is
@@ -789,82 +749,6 @@ mod tests {
                 vec![Value::number(1e308), Value::number(1e-308)],
             ),
             1e308,
-        );
-    }
-
-    #[test]
-    fn subtotal_uses_function_specific_error_and_coercion_rules() {
-        let range = vec![
-            Value::number(2.0),
-            Value::number(4.0),
-            Value::Error(FormulaError::DivZero),
-            Value::text("6"),
-            Value::Bool(true),
-            Value::Blank,
-        ];
-        let count = mixed_arguments(vec![
-            (false, vec![Value::number(2.0)]),
-            (true, range.clone()),
-        ]);
-        assert_number(apply(Func::Subtotal, &count).unwrap(), 2.0);
-
-        let count_a = mixed_arguments(vec![
-            (false, vec![Value::number(3.0)]),
-            (true, range.clone()),
-        ]);
-        assert_number(apply(Func::Subtotal, &count_a).unwrap(), 5.0);
-
-        let sum = mixed_arguments(vec![(false, vec![Value::number(9.0)]), (true, range)]);
-        assert_eq!(
-            apply(Func::Subtotal, &sum).unwrap(),
-            Value::Error(FormulaError::DivZero)
-        );
-
-        let variance = mixed_arguments(vec![
-            (false, vec![Value::number(11.0)]),
-            (
-                true,
-                vec![
-                    Value::number(2.0),
-                    Value::number(4.0),
-                    Value::number(4.0),
-                    Value::number(4.0),
-                    Value::number(5.0),
-                    Value::number(5.0),
-                    Value::number(7.0),
-                    Value::number(9.0),
-                ],
-            ),
-        ]);
-        assert_number(apply(Func::Subtotal, &variance).unwrap(), 4.0);
-        let average = mixed_arguments(vec![
-            (false, vec![Value::number(1.0)]),
-            (true, vec![Value::number(1e308), Value::number(1e308)]),
-        ]);
-        assert_number(apply(Func::Subtotal, &average).unwrap(), 1e308);
-
-        let invalid_code = mixed_arguments(vec![
-            (false, vec![Value::number(12.0)]),
-            (true, vec![Value::number(1.0)]),
-        ]);
-        assert_eq!(
-            apply(Func::Subtotal, &invalid_code).unwrap(),
-            Value::Error(FormulaError::Value)
-        );
-
-        let hidden_row_code = mixed_arguments(vec![
-            (false, vec![Value::number(109.0)]),
-            (true, vec![Value::number(1.0), Value::number(2.0)]),
-        ]);
-        assert_number(apply(Func::Subtotal, &hidden_row_code).unwrap(), 3.0);
-
-        let past_hidden_row_codes = mixed_arguments(vec![
-            (false, vec![Value::number(112.0)]),
-            (true, vec![Value::number(1.0)]),
-        ]);
-        assert_eq!(
-            apply(Func::Subtotal, &past_hidden_row_codes).unwrap(),
-            Value::Error(FormulaError::Value)
         );
     }
 }

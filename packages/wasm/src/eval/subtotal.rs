@@ -19,25 +19,6 @@ use crate::formula_slots::FormulaStore;
 use crate::row_visibility::{HiddenRowCursor, SkippedRows};
 use crate::sheet::SheetData;
 
-#[cfg(test)]
-thread_local! {
-    /// Sends SUBTOTAL through the function accumulator, for tests that
-    /// compare the two readers.
-    pub(super) static SUBTOTAL_VIEWS_OFF: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
-}
-
-/// Whether tests have sent SUBTOTAL through the function accumulator.
-#[cfg(test)]
-pub(super) fn views_off() -> bool {
-    SUBTOTAL_VIEWS_OFF.with(std::cell::Cell::get)
-}
-
-/// Whether tests have sent SUBTOTAL through the function accumulator.
-#[cfg(not(test))]
-pub(super) const fn views_off() -> bool {
-    false
-}
-
 /// Whether `ast` calls SUBTOTAL or AGGREGATE anywhere.
 pub(crate) fn ast_calls_subtotal(ast: &Ast) -> bool {
     match ast {
@@ -326,7 +307,7 @@ impl SubtotalReader<'_> {
     }
 
     /// `cells` more cells, against the accumulator's limit.
-    fn count(&mut self, cells: u64) -> Result<(), FormulaError> {
+    const fn count(&mut self, cells: u64) -> Result<(), FormulaError> {
         if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
@@ -336,180 +317,63 @@ impl SubtotalReader<'_> {
 }
 
 #[cfg(test)]
-mod differential {
-    use super::SUBTOTAL_VIEWS_OFF;
+mod tests {
+    use super::{subtotal_code, SubtotalFold};
+    use crate::types::{FormulaError, Value};
 
-    use crate::cells::DEFAULT_MAX_PAGED_DIRTY_CELLS;
-    use crate::store::CellStore;
-
-    const ROWS: usize = 40;
-
-    /// A–C mix numbers, text, logical values, blanks, error formulas,
-    /// nested subtotals and other formulas; D holds a spill.
-    fn dense_sheet(store: &mut CellStore) -> usize {
-        let sheet = store.add_sheet(12, ROWS + 10);
-        for row in 0..ROWS {
-            for col in 0..3 {
-                match (row * 5 + col * 3) % 11 {
-                    0 => {
-                        store.set_string(sheet, row, col, ["7", "x", "", "Ünï"][(row + col) % 4], 0)
-                    }
-                    1 => store.set_bool(sheet, row, col, row % 2 == 0, 0),
-                    2 => {}
-                    3 => {
-                        store.set_formula(sheet, row, col, &format!("=A{}*2", row % 3 + 1), 0);
-                    }
-                    4 => {
-                        store.set_formula(sheet, row, col, "=SUBTOTAL(9,A1:A3)", 0);
-                    }
-                    5 => {
-                        store.set_formula(sheet, row, col, "=\"t\"", 0);
-                    }
-                    _ => store.set_number(
-                        sheet,
-                        row,
-                        col,
-                        (row as f64).mul_add(2.25, -(col as f64) * 7.5),
-                        0,
-                    ),
+    /// SUBTOTAL with `code` over one reference holding `range`.
+    fn subtotal(code: f64, range: &[Value]) -> Value {
+        match subtotal_code(&Value::number(code), false) {
+            Ok((function, _)) => {
+                let mut fold = SubtotalFold::new(function);
+                for value in range {
+                    fold.push(value, true);
                 }
+                fold.finish()
             }
+            Err(error) => Value::Error(error),
         }
-        store.set_formula(sheet, 33, 2, "=1/0", 0);
-        store.set_number(sheet, 37, 1, f64::INFINITY, 0);
-        store.set_formula(sheet, 0, 3, "=SEQUENCE(6,1,2,3)", 0);
-        store.set_number(sheet, 2, 4, 1e308, 0);
-        store.set_number(sheet, 3, 4, 1e308, 0);
-        sheet
     }
 
-    fn dense_formulas() -> Vec<String> {
-        let mut formulas = Vec::new();
-        for code in [
-            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110,
-            111,
-        ] {
-            for args in [
-                "A1:A30",
-                "A1:C30",
-                "B1:B40",
-                "C1:C40",
-                "A1:A20,B5:B25",
-                "A3,B4,A1:A2",
-                "D1:D8",
-                "E1:E5",
-                "A1:A0",
-                "A1:C30,E1:E5",
-            ] {
-                formulas.push(format!("=SUBTOTAL({code},{args})"));
-            }
-        }
-        for code in ["\"9\"", "0", "12", "TRUE", "9.7", "A1", "", "1/0", "-1"] {
-            formulas.push(format!("=SUBTOTAL({code},A1:A30)"));
-        }
-        for source in [
-            "=SUBTOTAL(9,A1:A30,{1,2})",
-            "=SUBTOTAL(9)",
-            "=SUBTOTAL(9,{1,2,3})",
-            "=SUBTOTAL(9,A1:A5,SEQUENCE(3))",
-            "=SUBTOTAL(9,(A1:A3,B1:B3))",
-            "=SUBTOTAL(109,S1:S2!A1:A5)",
-            "=SUBTOTAL(109,A1:A30,{1;\"x\";TRUE})",
-            "=SUBTOTAL(3,{1,2;\"\",TRUE})",
-            "=SUBTOTAL(A1:A2,B1:B5)",
-            "=SUBTOTAL(E3:E4,B1:B5)",
-            "=SUBTOTAL({9},A1:A5)",
-            "=SUBTOTAL({109,1},A1:A30)",
-            "=SUBTOTAL((A1,A2),A1:A5)",
-            "=SUBTOTAL(S1:S2!A1,A1:A5)",
-            "=SUBTOTAL(9,1/0,A1:A5)",
-            "=SUBTOTAL(9,\"3\",TRUE,A1:A5)",
-            "=SUBTOTAL(9,,A1:A5)",
-            "=SUBTOTAL(1,{1E308,1E308})",
-            "=SUBTOTAL(9,{1,2},C1:C40)",
-            "=SUBTOTAL(9,SEQUENCE(2,2)/0)",
-        ] {
-            formulas.push(source.to_owned());
-        }
-        formulas
-    }
-
-    /// A and B loaded in the first page, a formula over them in C, and rows
-    /// past the first page not loaded.
-    fn paged_sheet(store: &mut CellStore) -> usize {
-        let sheet = store.add_paged_sheet(10, 6000, 4096, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
-        let column_a: Vec<f64> = (0..ROWS).map(|row| ((row * 7) % 11) as f64).collect();
-        let column_b: Vec<f64> = (0..ROWS)
-            .map(|row| (row as f64).mul_add(0.5, -3.0))
-            .collect();
-        store.begin_page_load();
-        store.set_column_numbers(sheet, 0, 0, &column_a, 0);
-        store.set_column_numbers(sheet, 1, 0, &column_b, 0);
-        store.commit_sources();
-        for row in 0..5 {
-            store.set_formula(
-                sheet,
-                row,
-                2,
-                &format!("=SUBTOTAL(9,A{}:B{})", row + 1, row + 3),
-                0,
-            );
-        }
-        sheet
-    }
-
-    fn paged_formulas() -> Vec<String> {
-        [
-            "=SUBTOTAL(9,A1:A40)",
-            "=SUBTOTAL(109,A1:B40)",
-            "=SUBTOTAL(1,A1:A5000)",
-            "=SUBTOTAL(9,C1:C5)",
-            "=SUBTOTAL(3,A1:C40)",
-        ]
-        .map(str::to_owned)
-        .to_vec()
-    }
-
-    /// A formula and its result, as kind, number bits and text.
-    type Outcome = (String, u8, u64, Option<String>);
-
-    fn results(views: bool) -> Vec<Outcome> {
-        SUBTOTAL_VIEWS_OFF.with(|off| off.set(!views));
-        let mut store = CellStore::new();
-        let dense = dense_sheet(&mut store);
-        let second = dense_sheet(&mut store);
-        store.set_sheet_name(dense, "s1", "S1");
-        store.set_sheet_name(second, "s2", "S2");
-        let paged = paged_sheet(&mut store);
-        assert!(store.set_hidden_rows(dense, &[3, 5, 20, 22], &[8, 12, 30, 31]));
-        assert!(store.set_hidden_rows(paged, &[2, 3], &[10, 10]));
-
-        let mut cells = Vec::new();
-        for (sheet, sources) in [(dense, dense_formulas()), (paged, paged_formulas())] {
-            for (row, source) in sources.into_iter().enumerate() {
-                store.set_formula(sheet, row, 8, &source, 0);
-                cells.push((sheet, row, source));
-            }
-            store.recompute(sheet);
-        }
-        SUBTOTAL_VIEWS_OFF.with(|off| off.set(false));
-
-        cells
-            .into_iter()
-            .map(|(sheet, row, source)| {
-                let cell = store.get_cell(sheet, row, 8);
-                (source, cell.kind(), cell.num().to_bits(), cell.string())
-            })
-            .collect()
+    fn assert_number(value: Value, expected: f64) {
+        let Value::Number(actual) = value else {
+            panic!("expected {expected}, got {value:?}");
+        };
+        assert!((actual - expected).abs() <= 1e-12 * expected.abs().max(1.0));
     }
 
     #[test]
-    fn subtotal_views_match_the_function_accumulator() {
-        let accumulated = results(false);
-        let viewed = results(true);
-        assert_eq!(accumulated.len(), viewed.len(), "formula counts differ");
-        for (accumulated, viewed) in accumulated.iter().zip(&viewed) {
-            assert_eq!(accumulated, viewed, "{}", accumulated.0);
-        }
+    fn subtotal_uses_function_specific_error_and_coercion_rules() {
+        let range = vec![
+            Value::number(2.0),
+            Value::number(4.0),
+            Value::Error(FormulaError::DivZero),
+            Value::text("6"),
+            Value::Bool(true),
+            Value::Blank,
+        ];
+        assert_number(subtotal(2.0, &range), 2.0);
+        assert_number(subtotal(3.0, &range), 5.0);
+        assert_eq!(subtotal(9.0, &range), Value::Error(FormulaError::DivZero));
+
+        let variance = [2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0].map(Value::number);
+        assert_number(subtotal(11.0, &variance), 4.0);
+        assert_number(
+            subtotal(1.0, &[Value::number(1e308), Value::number(1e308)]),
+            1e308,
+        );
+
+        assert_eq!(
+            subtotal(12.0, &[Value::number(1.0)]),
+            Value::Error(FormulaError::Value)
+        );
+        assert_number(
+            subtotal(109.0, &[Value::number(1.0), Value::number(2.0)]),
+            3.0,
+        );
+        assert_eq!(
+            subtotal(112.0, &[Value::number(1.0)]),
+            Value::Error(FormulaError::Value)
+        );
     }
 }
