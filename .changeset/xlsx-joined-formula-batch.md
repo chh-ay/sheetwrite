@@ -5,9 +5,9 @@
 "@sheetwrite/xlsx": patch
 ---
 
-Batch XLSX formula conversion now passes one joined string and cumulative UTF-16 ends into the engine and returns only changed formulas. Unchanged strings stay in JavaScript. This removes the per-formula WASM string transfer cost on XLSX export (#624).
+Batch XLSX formula conversion now passes one joined string and cumulative UTF-16 ends into the engine and returns only the changed formulas. Unchanged strings stay in JavaScript, which removes the per-formula WASM string transfer cost on XLSX export (#624).
 
-Breaking for direct engine callers: replace `convertXlsxFormulas(sources, exporting)` with `convertXlsxFormulas(sources.join(""), ends, exporting)`. Each end is the sum of JavaScript string lengths through that source, so surrogate pairs count as two units. Read `changes.takeIndices()` first, then consume the result with `changes.takeFormulas()`; replace those input positions and keep the rest unchanged. The result is consumed, so do not call `free()` afterward. Empty input passes `""` and an empty `Uint32Array`.
+Breaking for direct engine callers: `convertXlsxFormulas(sources, exporting)` becomes `convertXlsxFormulas(sources.join(""), ends, exporting, changedIndices)`. Each end is the sum of JavaScript string lengths through that source, so a surrogate pair counts as two units. `changedIndices` is a `Uint32Array` with at least one slot per source; the call returns only the changed formulas and writes their input positions to the front of `changedIndices`. Empty input passes `""` and empty arrays.
 
 Before:
 
@@ -20,11 +20,10 @@ After:
 ```js
 let end = 0;
 const ends = Uint32Array.from(sources, (source) => (end += source.length));
-const changes = engine.convertXlsxFormulas(sources.join(""), ends, true);
-const indices = changes.takeIndices();
-const replacements = changes.takeFormulas();
+const changedIndices = new Uint32Array(sources.length);
+const changed = engine.convertXlsxFormulas(sources.join(""), ends, true, changedIndices);
 const converted = sources.slice();
-indices.forEach((index, position) => { converted[index] = replacements[position]; });
+changed.forEach((formula, position) => { converted[changedIndices[position]] = formula; });
 ```
 
-The scalar `formulaToXlsx` and `formulaFromXlsx` exports are removed. Use the same batch call with one source and `exporting` set to `true` or `false`, respectively. Core's `XlsxFormulaEngine.convert` keeps its array-based interface.
+The scalar `formulaToXlsx` and `formulaFromXlsx` exports are removed. Use the batch call with one source, `exporting` set to `true` or `false`, and keep the source when the result is empty. Core's `XlsxFormulaEngine.convert` keeps its array interface.

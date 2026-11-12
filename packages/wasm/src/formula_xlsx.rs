@@ -451,35 +451,6 @@ fn changed_formula_to_xlsx(source: &str) -> Option<String> {
     })
 }
 
-/// Only the formulas whose OOXML spelling differs, paired by position in the input batch.
-/// Take the indices first, then consume this result to take the formulas.
-#[allow(
-    clippy::disallowed_methods,
-    reason = "wasm-bindgen's generated free path drops this exported result"
-)]
-#[derive(Debug)]
-#[wasm_bindgen]
-pub struct XlsxFormulaChanges {
-    indices: Vec<u32>,
-    formulas: Vec<String>,
-}
-
-#[wasm_bindgen]
-impl XlsxFormulaChanges {
-    /// Move out the input indices, in the same order as takeFormulas.
-    #[wasm_bindgen(js_name = takeIndices)]
-    pub fn take_indices(&mut self) -> Vec<u32> {
-        std::mem::take(&mut self.indices)
-    }
-
-    /// Consume this result and move out only the changed formulas.
-    #[must_use]
-    #[wasm_bindgen(js_name = takeFormulas)]
-    pub fn take_formulas(self) -> Vec<String> {
-        self.formulas
-    }
-}
-
 /// One slice of joined sources, located by cumulative JavaScript string lengths.
 /// ASCII batches use byte offsets directly; other batches walk each UTF-8 character once.
 fn batch_source<'a>(
@@ -520,11 +491,16 @@ fn batch_source<'a>(
     Ok(source)
 }
 
+/// The changed formulas of a joined batch; their input indices go to the front of `changed_indices`.
 fn changed_formula_batch(
     joined: &str,
     ends: &[u32],
     exporting: bool,
-) -> Result<XlsxFormulaChanges, &'static str> {
+    changed_indices: &mut [u32],
+) -> Result<Vec<String>, &'static str> {
+    if changed_indices.len() < ends.len() {
+        return Err("XLSX changed formula indices are shorter than the batch");
+    }
     let convert = if exporting {
         changed_formula_to_xlsx
     } else {
@@ -532,36 +508,38 @@ fn changed_formula_batch(
     };
     let ascii = joined.is_ascii();
     let mut previous = (0, 0);
-    let mut changes = XlsxFormulaChanges {
-        indices: Vec::new(),
-        formulas: Vec::new(),
-    };
+    let mut formulas = Vec::new();
     for (index, &end) in ends.iter().enumerate() {
         let source = batch_source(joined, &mut previous, end, ascii)?;
         if let Some(converted) = convert(source) {
-            changes.indices.push(
-                u32::try_from(index)
-                    .map_err(|_overflow| "XLSX formula batch has too many sources")?,
-            );
-            changes.formulas.push(converted);
+            let Some(slot) = changed_indices.get_mut(formulas.len()) else {
+                return Err("XLSX changed formula indices are shorter than the batch");
+            };
+            *slot = u32::try_from(index)
+                .map_err(|_overflow| "XLSX formula batch has too many sources")?;
+            formulas.push(converted);
         }
     }
     if previous.0 != joined.len() {
         return Err("XLSX formula ends do not cover the joined source");
     }
-    Ok(changes)
+    Ok(formulas)
 }
 
 /// Convert joined formula sources, separated by cumulative UTF-16 ends (JavaScript string lengths).
-/// Return only changed sources; unchanged inputs keep their existing JavaScript strings.
-/// An empty batch has empty text and ends. An end inside a surrogate pair or outside the text fails.
+/// Return only the changed formulas, and write their input indices to the front of
+/// `changed_indices`, which holds at least one slot per source. Unchanged inputs keep their
+/// JavaScript strings. An empty batch has empty text and ends. An end inside a surrogate pair or
+/// outside the text fails.
 #[wasm_bindgen(js_name = convertXlsxFormulas)]
 pub fn convert_xlsx_formulas(
     joined: &str,
     ends: &[u32],
     exporting: bool,
-) -> Result<XlsxFormulaChanges, wasm_bindgen::JsError> {
-    changed_formula_batch(joined, ends, exporting).map_err(wasm_bindgen::JsError::new)
+    changed_indices: &mut [u32],
+) -> Result<Vec<String>, wasm_bindgen::JsError> {
+    changed_formula_batch(joined, ends, exporting, changed_indices)
+        .map_err(wasm_bindgen::JsError::new)
 }
 
 #[cfg(test)]
@@ -648,15 +626,22 @@ mod tests {
                 })
                 .collect();
             let joined = sources.concat();
-            let mut changes = changed_formula_batch(&joined, &ends, true).unwrap();
-            assert_eq!(changes.take_indices(), indices);
-            assert!(changes.take_indices().is_empty());
-            assert_eq!(changes.take_formulas(), formulas);
+            let mut changed_indices = vec![u32::MAX; ends.len()];
+            let changed =
+                changed_formula_batch(&joined, &ends, true, &mut changed_indices).unwrap();
+            assert_eq!(changed_indices[..changed.len()], indices);
+            assert_eq!(changed, formulas);
         }
-        let mut imported =
-            changed_formula_batch("=\"😀\"=_xlfn.IFNA(1,2)", &[5, 21], false).unwrap();
-        assert_eq!(imported.take_indices(), vec![1]);
-        assert_eq!(imported.take_formulas(), vec!["=IFNA(1,2)"]);
+        let mut imported_indices = [u32::MAX; 2];
+        let imported = changed_formula_batch(
+            "=\"😀\"=_xlfn.IFNA(1,2)",
+            &[5, 21],
+            false,
+            &mut imported_indices,
+        )
+        .unwrap();
+        assert_eq!(imported_indices[..imported.len()], [1]);
+        assert_eq!(imported, vec!["=IFNA(1,2)"]);
     }
 
     #[test]
@@ -669,7 +654,9 @@ mod tests {
             ("😀=A1", vec![1, 5]),
             ("😀=A1", vec![6]),
         ] {
-            assert!(changed_formula_batch(source, &ends, true).is_err());
+            let mut changed_indices = vec![0; ends.len()];
+            assert!(changed_formula_batch(source, &ends, true, &mut changed_indices).is_err());
         }
+        assert!(changed_formula_batch("=IFNA(1,2)", &[10], true, &mut []).is_err());
     }
 }

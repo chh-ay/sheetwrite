@@ -329,8 +329,8 @@ export async function restoreLatest(
 ### Direct XLSX formula conversion
 
 Direct callers of `@sheetwrite/wasm` or `@sheetwrite/formulas` now pass joined
-sources and cumulative UTF-16 ends to `convertXlsxFormulas`, then take only the
-changed indices and formulas. The scalar `formulaToXlsx` and `formulaFromXlsx`
+sources, cumulative UTF-16 ends and a changed-index buffer to `convertXlsxFormulas`,
+which returns only the changed formulas. The scalar `formulaToXlsx` and `formulaFromXlsx`
 exports are removed; use a one-source batch instead. Core's
 `XlsxFormulaEngine.convert` keeps its array interface. See
 [Direct engine calls](/docs/start/upgrade-to-0-7-0/#direct-engine-calls).

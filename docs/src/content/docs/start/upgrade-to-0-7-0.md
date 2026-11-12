@@ -357,7 +357,7 @@ Most apps never call the engine directly. If you call `CellStore` from
 | 0.6 | 0.7.0 | Pull request |
 | --- | --- | --- |
 | `setSparseBlock(..., numbers, texts, styles, ...)` with one string per entry | `setSparseBlock(..., numbers, textBuf, textOffsets, styles, ...)`: the UTF-8 bytes of the string entries only, in entry order. The n-th string entry owns bytes `textOffsets[n]` to `textOffsets[n + 1]`; a block without text passes an empty buffer and `[0]`. | [#571](https://github.com/chh-ay/sheetwrite/pull/571) |
-| `convertXlsxFormulas(sources, exporting)`; scalar `formulaToXlsx` / `formulaFromXlsx` | Join the sources and pass cumulative UTF-16 ends: `convertXlsxFormulas(sources.join(""), ends, exporting)`. Take `changes.takeIndices()` first, then consume with `changes.takeFormulas()`. Replace only those input positions. For one source use one end, `source.length`; empty input has empty text and ends. Core's `XlsxFormulaEngine.convert` is unchanged. | #624 |
+| `convertXlsxFormulas(sources, exporting)`; scalar `formulaToXlsx` / `formulaFromXlsx` | `convertXlsxFormulas(sources.join(""), ends, exporting, changedIndices)`: `ends` are cumulative UTF-16 lengths (JavaScript `length`), `changedIndices` is a `Uint32Array` with one slot per source. It returns only the changed formulas and writes their input positions to the front of `changedIndices`; keep every other source. For one source use one end, `source.length`. Core's `XlsxFormulaEngine.convert` is unchanged. | #624 |
 | `PivotFields.names()`, `PivotFields.types()` | `takeNames()`, `takeTypes()`. Each hands the buffer over once and leaves it empty. | [#565](https://github.com/chh-ay/sheetwrite/pull/565) |
 
 Before:

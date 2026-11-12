@@ -36,12 +36,13 @@ function convertSources(
   if (length > 0xffff_ffff) {
     throw new RangeError("Sheetwrite: XLSX formula batch exceeds UTF-16 offset capacity");
   }
-  const changes = engine.convertXlsxFormulas(formulas.join(""), ends, direction === "export");
-  const indices = changes.takeIndices();
-  const converted = changes.takeFormulas();
-  if (indices.length !== converted.length) {
-    throw new Error("Sheetwrite: XLSX formula changes and indices are out of step");
-  }
+  const indices = new Uint32Array(formulas.length);
+  const converted = engine.convertXlsxFormulas(
+    formulas.join(""),
+    ends,
+    direction === "export",
+    indices,
+  );
 
   const results = formulas.slice();
   let indexPosition = 0;
