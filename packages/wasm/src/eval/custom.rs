@@ -6,7 +6,7 @@ use super::matrix::EvalMatrix;
 use super::{ast_produces_array, range_from_ast, CellStore, EvalPass};
 use crate::calc::{parse, Ast};
 use crate::types::{FormulaError, Value};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 /// One evaluated argument: a scalar is a 1 x 1 block. Values are row-major.
@@ -42,7 +42,7 @@ pub(crate) struct CustomFunction {
     pub(crate) volatile: bool,
 }
 
-pub(crate) type CustomFunctions = HashMap<String, CustomFunction>;
+pub(crate) type CustomFunctions = FxHashMap<String, CustomFunction>;
 
 impl CellStore {
     /// Adds or replaces a host function and recalculates the workbook.
@@ -67,8 +67,12 @@ impl CellStore {
     /// as in Excel, because a sheet with more columns would read it as a
     /// reference.
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    pub(crate) fn insert_custom_function(&mut self, name: &str, function: CustomFunction) -> bool {
-        let name = name.to_ascii_uppercase();
+    pub(crate) fn insert_custom_function(
+        &mut self,
+        raw_name: &str,
+        function: CustomFunction,
+    ) -> bool {
+        let name = raw_name.to_ascii_uppercase();
         let is_call = matches!(
             parse(&format!("={name}()")),
             Ok(Ast::UnknownFunc(parsed, arguments)) if parsed == name && arguments.is_empty()
@@ -234,10 +238,11 @@ fn is_reference_like(name: &str) -> bool {
         && bytes.len() > letters
         && bytes[letters..].iter().all(u8::is_ascii_digit);
 
-    let r1c1 = name.strip_prefix('R').is_some_and(|rest| {
-        let rest = rest.trim_start_matches(|character: char| character.is_ascii_digit());
-        rest.strip_prefix('C')
-            .is_some_and(|rest| rest.bytes().all(|byte| byte.is_ascii_digit()))
+    let r1c1 = name.strip_prefix('R').is_some_and(|after_r| {
+        let after_row = after_r.trim_start_matches(|character: char| character.is_ascii_digit());
+        after_row
+            .strip_prefix('C')
+            .is_some_and(|col_digits| col_digits.bytes().all(|byte| byte.is_ascii_digit()))
     });
 
     a1 || r1c1
@@ -363,8 +368,8 @@ mod javascript {
         fn push_text(&mut self, text: &str) {
             self.text.push_str(text);
             // UTF-16 offsets, because the wrapper slices a JavaScript string.
-            let end =
-                self.text_ends.last().copied().unwrap_or(0) + text.encode_utf16().count() as u32;
+            let end = self.text_ends.last().copied().unwrap_or_default()
+                + text.encode_utf16().count() as u32;
             self.text_ends.push(end);
         }
     }
@@ -372,11 +377,11 @@ mod javascript {
     /// A tag the wrapper did not write is `#VALUE!`, so no result can stop
     /// recalculation.
     fn value_from_tagged(result: Option<String>) -> Value {
-        let Some(result) = result else {
+        let Some(tagged) = result else {
             return Value::Blank;
         };
 
-        let (tag, body) = result.split_at(result.chars().next().map_or(0, char::len_utf8));
+        let (tag, body) = tagged.split_at(tagged.chars().next().map_or(0, char::len_utf8));
         match (tag, body) {
             ("n", number) => number
                 .parse()
@@ -421,11 +426,11 @@ mod javascript {
             volatile: bool,
             recalculate: bool,
         ) -> bool {
-            let Some(callback) = callback else {
+            let Some(host_callback) = callback else {
                 return self.remove_custom_function(name);
             };
 
-            let function = host_function(callback.unchecked_into(), volatile);
+            let function = host_function(host_callback.unchecked_into(), volatile);
             if recalculate {
                 self.install_custom_function(name, function)
             } else {

@@ -100,7 +100,7 @@ fn reciprocal(func: Func, number: f64) -> NumberResult {
     Ok(1.0 / denominator)
 }
 
-/// ATAN2(x_num, y_num): the angle of the point (x, y), from -pi to pi. The
+/// `ATAN2(x_num`, `y_num)`: the angle of the point (x, y), from -pi to pi. The
 /// origin is `#DIV/0!`.
 fn point_angle(values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 2, 2)?;

@@ -5,7 +5,9 @@ use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
-use super::super::matrix::{EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS};
+use super::super::matrix::{
+    EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
+};
 use super::super::value::number_from_value;
 use super::super::EvalPass;
 
@@ -87,8 +89,8 @@ pub(crate) fn shape(
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     let (rows, cols) = match (name, args) {
-        ("MUNIT", [dimension]) => {
-            let dimension = literal_dimension(dimension).ok_or(FormulaError::Value)??;
+        ("MUNIT", [dimension_ast]) => {
+            let dimension = literal_dimension(dimension_ast).ok_or(FormulaError::Value)??;
             (dimension, dimension)
         }
         ("MINVERSE", [argument]) => {
@@ -111,8 +113,8 @@ pub(crate) fn shape(
     Ok((rows, cols, cells))
 }
 
-/// An MUNIT size that is known only after evaluation can use the largest
-/// spill, like SEQUENCE.
+/// An MUNIT size that is known only after evaluation is charged once it is
+/// known, like SEQUENCE.
 pub(crate) fn bound(
     store: &CellStore,
     name: &str,
@@ -122,7 +124,7 @@ pub(crate) fn bound(
 ) -> Result<usize, FormulaError> {
     if let ("MUNIT", [dimension]) = (name, args) {
         if literal_dimension(dimension).is_none() {
-            return Ok(SPILL_MAX_CELLS);
+            return Ok(UNKNOWN_SIZE_PRECHARGE);
         }
     }
     shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
@@ -143,8 +145,8 @@ pub(crate) fn evaluate_matrix(
         depth,
     };
     let (rows, cols, numbers) = match (name, args) {
-        ("MUNIT", [dimension]) => {
-            let dimension = dimension_from_number(context.number(dimension)?)?;
+        ("MUNIT", [dimension_ast]) => {
+            let dimension = dimension_from_number(context.number(dimension_ast)?)?;
             EvalMatrix::validate_shape(dimension, dimension, 1, 0)?;
             let mut identity = zeros(dimension * dimension)?;
             for index in 0..dimension {
@@ -157,9 +159,9 @@ pub(crate) fn evaluate_matrix(
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension, inverse(dimension, numbers)?)
         }
-        ("MMULT", [left, right]) => {
-            let (rows, inner, left) = context.numbers(left)?;
-            let (right_rows, cols, right) = context.numbers(right)?;
+        ("MMULT", [left_ast, right_ast]) => {
+            let (rows, inner, left) = context.numbers(left_ast)?;
+            let (right_rows, cols, right) = context.numbers(right_ast)?;
             if inner != right_rows {
                 return Err(FormulaError::Value);
             }

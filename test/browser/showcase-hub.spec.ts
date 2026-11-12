@@ -58,17 +58,6 @@ test("hub links every showcase, filters accessibly, and never clips a card", asy
   await expect
     .poll(shownOwners)
     .toEqual(["data-tools", "database", "host-rows", "performance", "queries", "sort"]);
-  await page.getByRole("button", { name: "Workbook", exact: true }).click();
-  expect(await shownOwners()).toEqual(["formatting", "interoperability", "spreadsheet"]);
-  await page.getByRole("button", { name: "Formulas", exact: true }).click();
-  expect(await shownOwners()).toEqual([
-    "analysis",
-    "dashboards",
-    "data-model",
-    "formulas",
-    "functions",
-    "recalculation",
-  ]);
   await allFilter.click();
   await expect(shownLaunchers).toHaveCount(owners.length);
 

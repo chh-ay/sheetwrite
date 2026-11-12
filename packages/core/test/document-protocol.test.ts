@@ -609,7 +609,10 @@ describe("workbook document protocol", () => {
     const result = validateWorkbookSnapshot(input);
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("wide table unexpectedly accepted");
-    expect(result.errors[0]?.message).toContain("table column limit");
+    expect(result.errors[0]).toMatchObject({
+      code: "resource-limit",
+      path: expect.stringMatching(/\.tables\[0\]\.columns$/),
+    });
   });
 
   it("validates named range scope, identity, and formula-safe names", () => {

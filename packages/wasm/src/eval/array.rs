@@ -1,7 +1,9 @@
 //! Bounded dynamic-array evaluation for FILTER, SORT, UNIQUE, and direct ranges.
 
 use std::cmp::Ordering;
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::hash_map::DefaultHasher;
+
+use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
@@ -13,8 +15,8 @@ use super::expand_let_ast;
 use super::index::index_selects_whole_axis;
 use super::lookup::{integer_arg, option_code};
 use super::matrix::{
-    intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_CELLS,
-    SPILL_MAX_RECOMPUTE_CELLS,
+    intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS,
+    UNKNOWN_SIZE_PRECHARGE,
 };
 use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
@@ -86,13 +88,13 @@ fn sequence_shape(args: &[Ast]) -> Result<(usize, usize, usize), FormulaError> {
     if args.is_empty() || args.len() > 4 {
         return Err(FormulaError::Value);
     }
-    let rows = static_integer(optional_ast(args, 0)).ok_or(FormulaError::Value)?;
-    let cols = static_integer(optional_ast(args, 1)).unwrap_or(1);
-    if rows <= 0 || cols <= 0 {
+    let requested_rows = static_integer(optional_ast(args, 0)).ok_or(FormulaError::Value)?;
+    let requested_cols = static_integer(optional_ast(args, 1)).unwrap_or(1);
+    if requested_rows <= 0 || requested_cols <= 0 {
         return Err(FormulaError::Value);
     }
-    let rows = usize::try_from(rows).map_err(|_| FormulaError::Num)?;
-    let cols = usize::try_from(cols).map_err(|_| FormulaError::Num)?;
+    let rows = usize::try_from(requested_rows).map_err(|_| FormulaError::Num)?;
+    let cols = usize::try_from(requested_cols).map_err(|_| FormulaError::Num)?;
     let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
     Ok((rows, cols, cells))
 }
@@ -115,9 +117,6 @@ fn transformed_axis_bound(size: usize, requested: i64, drop: bool) -> Result<usi
     }
 }
 
-/// Spill-budget cells charged before a runtime reference is evaluated.
-const RUNTIME_REFERENCE_PRECHARGE: usize = 1;
-
 impl CellStore {
     /// The range that the anchor of `A1#` spills into now, or `#REF!` when
     /// the anchor holds no spill.
@@ -134,13 +133,13 @@ impl CellStore {
         else {
             return Ast::InvalidRef;
         };
-        let sheet = SheetRef {
+        let sheet_ref = SheetRef {
             handle: sheet as u32,
             name: String::new(),
             quoted: false,
         };
         Ast::AbsRange(
-            sheet,
+            sheet_ref,
             row,
             col,
             range.row_end,
@@ -158,7 +157,7 @@ impl CellStore {
         match ast {
             // The shape is known only after evaluation, so the pending loop
             // charges the spill budget with the evaluated size instead.
-            Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(RUNTIME_REFERENCE_PRECHARGE)),
+            Ast::Func(Func::Offset | Func::Indirect, _) => Some(Ok(UNKNOWN_SIZE_PRECHARGE)),
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
                 if ast_produces_array(ast) =>
             {
@@ -166,14 +165,11 @@ impl CellStore {
                     self.matrix_shape(ast, formula_sheet, pass)
                         .map(|shape| shape.2)
                         .or_else(|error| {
-                            // An operator over a runtime reference gets its
-                            // shape only after evaluation, which charges it.
-                            if error == FormulaError::Value
-                                && super::reference::ast_contains_runtime_ref(ast)
-                            {
-                                Ok(RUNTIME_REFERENCE_PRECHARGE)
-                            } else if error == FormulaError::Value {
-                                Ok(SPILL_MAX_CELLS)
+                            // An operator over a runtime reference or a size
+                            // read from a cell gets its shape only after
+                            // evaluation, which charges it.
+                            if error == FormulaError::Value {
+                                Ok(UNKNOWN_SIZE_PRECHARGE)
                             } else {
                                 Err(error)
                             }
@@ -228,10 +224,10 @@ impl CellStore {
                 self.dynamic_array_bound(&named.expression, formula_sheet, pass)
             }
             // The selection is at most the whole area; an area that has no
-            // shape before evaluation is charged at the spill limit.
+            // shape before evaluation is charged after it.
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => Some(Ok(self
                 .matrix_shape(&args[0], formula_sheet, pass)
-                .map_or(SPILL_MAX_CELLS, |(_, _, cells)| cells))),
+                .map_or(UNKNOWN_SIZE_PRECHARGE, |(_, _, cells)| cells))),
             Ast::Func(Func::Let, args) => match expand_let_ast(args) {
                 Ok((expanded, _)) => self.dynamic_array_bound(&expanded, formula_sheet, pass),
                 Err(_) => None,
@@ -270,7 +266,7 @@ impl CellStore {
                     }
                     Err(shape_error) => match self.dynamic_array_bound(source, formula_sheet, pass)
                     {
-                        Some(Ok(_)) => Ok(SPILL_MAX_CELLS),
+                        Some(Ok(_)) => Ok(UNKNOWN_SIZE_PRECHARGE),
                         Some(Err(error)) => Err(error),
                         None => Err(shape_error),
                     },
@@ -282,7 +278,7 @@ impl CellStore {
                 || (optional_ast(args, 1).is_some()
                     && static_integer(optional_ast(args, 1)).is_none())
             {
-                Ok(SPILL_MAX_CELLS)
+                Ok(UNKNOWN_SIZE_PRECHARGE)
             } else {
                 sequence_shape(args).map(|shape| shape.2)
             }),
@@ -365,14 +361,14 @@ impl CellStore {
                 return self.eval_dynamic_array(&named.expression, sheet, pass, depth)
             }
             Ast::Func(Func::Let, args) => {
-                let (expanded, slots) = match expand_let_ast(args) {
+                let (expanded_ast, slots) = match expand_let_ast(args) {
                     Ok(expanded) => expanded,
                     Err(error) => return Some(Err(error)),
                 };
                 let enclosing = pass.results.let_frame_mut().open_expanded(slots);
                 let expanded = self.resolve_let_runtime_refs(
                     args,
-                    expanded,
+                    expanded_ast,
                     sheet,
                     pass,
                     depth + 1,
@@ -512,16 +508,19 @@ impl CellStore {
                 // which has bound the slot and is still being evaluated.
                 let frame = pass.results.let_frame();
                 #[allow(unsafe_code, reason = "calls `LetFrame::binding`; see its reason")]
-                let binding = frame.and_then(|frame| unsafe { frame.binding(*slot) });
-                if let Some(binding) = binding {
-                    return self.matrix_shape(binding, formula_sheet, pass);
+                let binding = frame.and_then(|active| unsafe { active.binding(*slot) });
+                if let Some(bound) = binding {
+                    return self.matrix_shape(bound, formula_sheet, pass);
                 }
             }
             Ast::NamedFormula(named) => {
                 return self.matrix_shape(&named.expression, formula_sheet, pass);
             }
-            Ast::Array { cols, values } => {
-                let cols = *cols as usize;
+            Ast::Array {
+                cols: width,
+                values,
+            } => {
+                let cols = *width as usize;
                 let rows = values.len() / cols;
                 return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
@@ -544,9 +543,7 @@ impl CellStore {
                     })?;
                 let output_cols = match optional_ast(args, 2) {
                     Some(requested) => static_integer(Some(requested))
-                        .map_or(Ok(cols), |requested| {
-                            transformed_axis_bound(cols, requested, drop)
-                        })?,
+                        .map_or(Ok(cols), |count| transformed_axis_bound(cols, count, drop))?,
                     None => cols,
                 };
                 let cells = EvalMatrix::validate_shape(output_rows, output_cols, 1, 0)?;
@@ -706,17 +703,19 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(args, 3, false, sheet, pass, depth + 1)?;
+        // FILTER and UNIQUE report their range's shape here, an upper bound
+        // for the budget checks; the rows they return can be fewer.
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
-        let item_count = if by_col { array_cols } else { array_rows };
-        let extra = item_count
+        let item_bound = if by_col { array_cols } else { array_rows };
+        let extra = item_bound
             .checked_mul(size_of::<usize>())
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
-        let comparisons = if item_count < 2 {
+        let comparisons = if item_bound < 2 {
             0
         } else {
-            let log = usize::BITS as usize - item_count.leading_zeros() as usize;
-            item_count.checked_mul(log).ok_or(FormulaError::Num)?
+            let log = usize::BITS as usize - item_bound.leading_zeros() as usize;
+            item_bound.checked_mul(log).ok_or(FormulaError::Num)?
         };
         if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
             return Err(FormulaError::Num);
@@ -739,7 +738,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
 
-        debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
+        let item_count = if by_col { array.cols } else { array.rows };
         let key = sort_index as usize - 1;
         let mut indices: Vec<usize> = (0..item_count).collect();
         let mut error = None;
@@ -770,8 +769,8 @@ impl CellStore {
                 }
             }
         });
-        if let Some(error) = error {
-            return Err(error);
+        if let Some(first_error) = error {
+            return Err(first_error);
         }
 
         let mut values = Vec::with_capacity(array.values.len());
@@ -801,20 +800,22 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let by_col = self.optional_bool_array_arg(args, 1, false, sheet, pass, depth + 1)?;
+        // As in SORT, the shape of a FILTER argument bounds the budget; the
+        // items come from the evaluated array.
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
-        let item_count = if by_col { array_cols } else { array_rows };
+        let item_bound = if by_col { array_cols } else { array_rows };
         const UNIQUE_ITEM_BYTES: usize = 64;
-        let extra = item_count
+        let extra = item_bound
             .checked_mul(UNIQUE_ITEM_BYTES)
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
         let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
         let exactly_once = self.optional_bool_array_arg(args, 2, false, sheet, pass, depth + 1)?;
-        debug_assert_eq!(item_count, if by_col { array.cols } else { array.rows });
+        let item_count = if by_col { array.cols } else { array.rows };
 
         // Store collision chains in insertion order, without an allocation per hash.
-        let mut buckets: HashMap<u64, (usize, usize)> = HashMap::new();
+        let mut buckets: FxHashMap<u64, (usize, usize)> = FxHashMap::default();
         let mut representatives: Vec<(usize, usize, Option<usize>)> =
             Vec::with_capacity(item_count);
         let mut comparisons = 0usize;
@@ -901,7 +902,7 @@ impl CellStore {
         Ok(EvalMatrix::new(source.cols, source.rows, values))
     }
 
-    /// TRIMRANGE(range, [trim_rows], [trim_cols]): the range without its
+    /// TRIMRANGE(range, [`trim_rows`], [`trim_cols`]): the range without its
     /// leading and trailing blank rows and columns. Each trim argument is 0
     /// (none), 1 (leading), 2 (trailing) or 3 (both, the default). A range
     /// with no value left is `#REF!`, as in Excel.
@@ -964,12 +965,12 @@ impl CellStore {
     /// A TRIMRANGE trim argument: a whole number from 0 to 3, 3 when omitted.
     fn trim_mode(
         &self,
-        arg: Option<&Ast>,
+        mode_arg: Option<&Ast>,
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<u8, FormulaError> {
-        let Some(arg) = arg else {
+        let Some(arg) = mode_arg else {
             return Ok(TRIM_BOTH);
         };
         let mode = number_from_value(&self.eval_ast(arg, sheet, pass, depth + 1))?.trunc();
@@ -996,13 +997,13 @@ impl CellStore {
                 self.scalar_array_arg(ast, sheet, pass, depth + 1)
             })
         };
-        let rows = integer_arg(&scalar(0, Value::Number(1.0), pass))?;
-        let cols = integer_arg(&scalar(1, Value::Number(1.0), pass))?;
-        if rows <= 0 || cols <= 0 {
+        let requested_rows = integer_arg(&scalar(0, Value::Number(1.0), pass))?;
+        let requested_cols = integer_arg(&scalar(1, Value::Number(1.0), pass))?;
+        if requested_rows <= 0 || requested_cols <= 0 {
             return Err(FormulaError::Value);
         }
-        let rows = usize::try_from(rows).map_err(|_| FormulaError::Num)?;
-        let cols = usize::try_from(cols).map_err(|_| FormulaError::Num)?;
+        let rows = usize::try_from(requested_rows).map_err(|_| FormulaError::Num)?;
+        let cols = usize::try_from(requested_cols).map_err(|_| FormulaError::Num)?;
         let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
         let start = number_from_value(&scalar(2, Value::Number(1.0), pass))?;
         let step = number_from_value(&scalar(3, Value::Number(1.0), pass))?;
@@ -1210,9 +1211,9 @@ fn runtime_reference_bound(
 ) -> Result<usize, FormulaError> {
     match bound {
         Err(FormulaError::Value) if super::reference::ast_contains_runtime_ref(ast) => {
-            Ok(RUNTIME_REFERENCE_PRECHARGE)
+            Ok(UNKNOWN_SIZE_PRECHARGE)
         }
-        bound => bound,
+        estimate => estimate,
     }
 }
 
@@ -1237,9 +1238,9 @@ fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {
                     character.hash(&mut hasher);
                 }
             }
-            Some(Value::Bool(value)) => {
+            Some(Value::Bool(flag)) => {
                 2u8.hash(&mut hasher);
-                value.hash(&mut hasher);
+                flag.hash(&mut hasher);
             }
             Some(Value::Blank) => 3u8.hash(&mut hasher),
             Some(Value::Error(error)) => {
@@ -1254,26 +1255,26 @@ fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {
 
 fn matrix_items_equal(
     matrix: &EvalMatrix,
-    left: usize,
-    right: usize,
+    left_index: usize,
+    right_index: usize,
     by_col: bool,
 ) -> Result<bool, FormulaError> {
     let count = if by_col { matrix.rows } else { matrix.cols };
     for offset in 0..count {
         let left = if by_col {
-            matrix.get(offset, left)
+            matrix.get(offset, left_index)
         } else {
-            matrix.get(left, offset)
+            matrix.get(left_index, offset)
         }
         .ok_or(FormulaError::Ref)?;
         let right = if by_col {
-            matrix.get(offset, right)
+            matrix.get(offset, right_index)
         } else {
-            matrix.get(right, offset)
+            matrix.get(right_index, offset)
         }
         .ok_or(FormulaError::Ref)?;
         let equal = match (left, right) {
-            (Value::Error(left), Value::Error(right)) => left == right,
+            (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
             (Value::Error(_), _) | (_, Value::Error(_)) => false,
             _ => compare_values(left, right)? == Ordering::Equal,
         };
@@ -1399,5 +1400,35 @@ mod tests {
         store.recompute(sheet);
         assert_eq!(text(&store, sheet, 0, 1).as_deref(), Some("#NUM!"));
         assert_eq!(matrix_resource_stats(), [0, 0, 0]);
+    }
+
+    #[test]
+    fn sort_and_unique_read_the_rows_a_shrinking_array_returns() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 6);
+        for (row, label) in ["b", "a", "b", "c", "a", "d"].into_iter().enumerate() {
+            store.set_string(sheet, row, 0, label, 0);
+            store.set_number(sheet, row, 1, row as f64, 0);
+        }
+
+        // UNIQUE and FILTER return fewer rows than their range; SORT and
+        // UNIQUE read the rows they return, not the rows of the range.
+        for (formula, expected) in [
+            ("=SORT(UNIQUE(A1:A6))", vec!["a", "b", "c", "d"]),
+            ("=SORT(FILTER(A1:A6,B1:B6<3),1,-1)", vec!["b", "b", "a"]),
+            ("=UNIQUE(FILTER(A1:A6,B1:B6<3))", vec!["b", "a"]),
+        ] {
+            store.set_formula(sheet, 0, 2, formula, 0);
+            store.recompute(sheet);
+            let sorted: Vec<Option<String>> = (0..expected.len())
+                .map(|row| text(&store, sheet, row, 2))
+                .collect();
+            let wanted: Vec<Option<String>> = expected
+                .iter()
+                .map(|label| Some((*label).to_owned()))
+                .collect();
+            assert_eq!(sorted, wanted, "{formula}");
+            assert_eq!(store.get_cell(sheet, expected.len(), 2).kind(), KIND_EMPTY);
+        }
     }
 }

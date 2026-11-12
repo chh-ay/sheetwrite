@@ -212,7 +212,7 @@ describe("retained DOM cell renderer overlay", () => {
     expect(shared.parentNode).toBeNull();
   });
 
-  it("refreshes legacy dom-only renderers on value changes without allocating on pure scroll", () => {
+  it("recreates a legacy dom-only renderer on a value change but not on a pure scroll", () => {
     const { workbook, data } = fixture();
     let calls = 0;
     const renderer: CellRenderer = {

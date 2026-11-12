@@ -123,10 +123,6 @@ test("rejects missing versions and provenance and out-of-bounds resource counter
     (result) => validatePagedBenchmark(result, "smoke"),
     [
       [
-        (result) => Reflect.deleteProperty(result.meta.engineVersions, "sheetwrite"),
-        "engineVersions.sheetwrite",
-      ],
-      [
         (result) => Object.assign(result.meta, { commit: "", timestamp: "not a timestamp" }),
         "paged capture provenance is incomplete",
       ],

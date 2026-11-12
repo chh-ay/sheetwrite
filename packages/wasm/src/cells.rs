@@ -125,17 +125,17 @@ fn try_dense_buffers(n_cols: usize, row_count: usize) -> Result<DenseBuffers, St
     })?;
     let mut kind = Vec::new();
     kind.try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell kinds".to_owned())?;
     kind.resize(len, KIND_EMPTY);
     let mut payload = Vec::new();
     payload
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell payloads".to_owned())?;
     payload.resize(len, 0);
     let mut style = Vec::new();
     style
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell styles".to_owned())?;
     style.resize(len, 0);
     Ok((kind, payload, style))
 }
@@ -725,10 +725,10 @@ impl CellStorage {
 
         let rows = self.row_count;
         for new_col in 0..new_cols {
-            let Some(old_col) = old_col(new_col) else {
+            let Some(source_col) = old_col(new_col) else {
                 continue;
             };
-            let old = old_col * rows..(old_col + 1) * rows;
+            let old = source_col * rows..(source_col + 1) * rows;
             let new = new_col * rows..(new_col + 1) * rows;
             kind[new.clone()].copy_from_slice(&self.kind[old.clone()]);
             payload[new.clone()].copy_from_slice(&self.payload[old.clone()]);
@@ -749,7 +749,7 @@ impl CellStorage {
             return Ok(());
         }
 
-        let at = at.min(self.row_count);
+        let clamped_at = at.min(self.row_count);
         let old = self.row_count;
         let new_count = old
             .checked_add(count)
@@ -757,7 +757,7 @@ impl CellStorage {
         if self.is_paged() {
             self.invalidate_derived();
             self.remap_paged(new_count, self.n_cols, |row, col| {
-                Some((if row >= at { row + count } else { row }, col))
+                Some((if row >= clamped_at { row + count } else { row }, col))
             });
             return Ok(());
         }
@@ -768,12 +768,12 @@ impl CellStorage {
                 RowRun {
                     from: 0,
                     to: 0,
-                    len: at,
+                    len: clamped_at,
                 },
                 RowRun {
-                    from: at,
-                    to: at + count,
-                    len: old - at,
+                    from: clamped_at,
+                    to: clamped_at + count,
+                    len: old - clamped_at,
                 },
             ],
         )
@@ -786,22 +786,29 @@ impl CellStorage {
             return Ok(());
         }
 
-        let count = count.min(self.row_count - at);
+        let clamped_count = count.min(self.row_count - at);
         let old = self.row_count;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(old - count, self.n_cols, |row, col| {
-                if row >= at && row < at + count {
+            self.remap_paged(old - clamped_count, self.n_cols, |row, col| {
+                if row >= at && row < at + clamped_count {
                     None
                 } else {
-                    Some((if row >= at + count { row - count } else { row }, col))
+                    Some((
+                        if row >= at + clamped_count {
+                            row - clamped_count
+                        } else {
+                            row
+                        },
+                        col,
+                    ))
                 }
             });
             return Ok(());
         }
 
         self.rebuild_rows(
-            old - count,
+            old - clamped_count,
             &[
                 RowRun {
                     from: 0,
@@ -809,9 +816,9 @@ impl CellStorage {
                     len: at,
                 },
                 RowRun {
-                    from: at + count,
+                    from: at + clamped_count,
                     to: at,
-                    len: old - at - count,
+                    len: old - at - clamped_count,
                 },
             ],
         )
@@ -824,7 +831,7 @@ impl CellStorage {
             return Ok(());
         }
 
-        let at = at.min(self.n_cols);
+        let clamped_at = at.min(self.n_cols);
         let old_cols = self.n_cols;
         let new_cols = old_cols
             .checked_add(count)
@@ -832,16 +839,16 @@ impl CellStorage {
         if self.is_paged() {
             self.invalidate_derived();
             self.remap_paged(self.row_count, new_cols, |row, col| {
-                Some((row, if col >= at { col + count } else { col }))
+                Some((row, if col >= clamped_at { col + count } else { col }))
             });
             return Ok(());
         }
 
         self.rebuild_cols(new_cols, |col| {
-            if col < at {
+            if col < clamped_at {
                 Some(col)
             } else {
-                (col >= at + count).then(|| col - count)
+                (col >= clamped_at + count).then(|| col - count)
             }
         })
     }
@@ -853,22 +860,29 @@ impl CellStorage {
             return Ok(());
         }
 
-        let count = count.min(self.n_cols - at);
-        let new_cols = self.n_cols - count;
+        let clamped_count = count.min(self.n_cols - at);
+        let new_cols = self.n_cols - clamped_count;
         if self.is_paged() {
             self.invalidate_derived();
             self.remap_paged(self.row_count, new_cols, |row, col| {
-                if col >= at && col < at + count {
+                if col >= at && col < at + clamped_count {
                     None
                 } else {
-                    Some((row, if col >= at + count { col - count } else { col }))
+                    Some((
+                        row,
+                        if col >= at + clamped_count {
+                            col - clamped_count
+                        } else {
+                            col
+                        },
+                    ))
                 }
             });
             return Ok(());
         }
 
         self.rebuild_cols(new_cols, |col| {
-            Some(if col < at { col } else { col + count })
+            Some(if col < at { col } else { col + clamped_count })
         })
     }
 
@@ -1053,8 +1067,10 @@ impl CellRun<'_> {
     /// Reads a paged resolved scalar, style and residency.
     #[inline]
     fn paged_cell(&self, index: usize) -> Option<(u8, u64, u32)> {
-        let (kind, payload, style) = self.paged_source(index)?;
-        let (kind, payload) = self.calculated_cell(index).unwrap_or((kind, payload));
+        let (source_kind, source_payload, style) = self.paged_source(index)?;
+        let (kind, payload) = self
+            .calculated_cell(index)
+            .unwrap_or((source_kind, source_payload));
         Some((kind, payload, style))
     }
 
@@ -1154,6 +1170,32 @@ impl CellStorage {
         true
     }
 
+    /// Writes validated rows of one dense column, leaving unlisted cells alone.
+    /// Like `write_dense_block`, replaces sources and discards calculated slots.
+    pub(crate) fn write_dense_column_cells(
+        &mut self,
+        col: usize,
+        cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+    ) {
+        debug_assert!(
+            self.paged.is_none() && col < self.n_cols,
+            "dense column writes need an in-bounds dense column"
+        );
+        let column = col * self.row_count..(col + 1) * self.row_count;
+        let kinds = &mut self.kind[column.clone()];
+        let payloads = &mut self.payload[column.clone()];
+        let styles = &mut self.style[column];
+        let has_calculated = self.dense_calculated_cells != 0;
+        for (row, kind, payload, style) in cells {
+            if has_calculated && kinds[row] & CALCULATED != 0 {
+                self.dense_calculated_cells -= 1;
+            }
+            kinds[row] = kind;
+            payloads[row] = payload;
+            styles[row] = style;
+        }
+    }
+
     /// Releases paged calculated pages that hold no result.
     pub(crate) fn compact_calculated(&mut self) {
         if let Some(paged) = &mut self.paged {
@@ -1198,17 +1240,17 @@ impl CellStorage {
         let mut cached: Option<CellRun<'_>> = None;
 
         for (view_row, &row) in rows.iter().enumerate() {
-            let row = row as usize;
-            if row >= self.row_count {
+            let sheet_row = row as usize;
+            if sheet_row >= self.row_count {
                 continue;
             }
 
-            let index = base + row;
+            let index = base + sheet_row;
             let run = cached.get_or_insert_with(|| self.run(index, base + self.row_count));
             if !run.contains(index) {
                 *run = self.run(index, base + self.row_count);
             }
-            visit(view_row, row, run.paged_cell(index));
+            visit(view_row, sheet_row, run.paged_cell(index));
         }
     }
 
@@ -1248,12 +1290,12 @@ impl CellStorage {
         debug_assert!(start < end && end <= self.row_count * self.n_cols);
         let row = start % self.row_count;
         let col = start / self.row_count;
-        let end = end.min(start + self.row_count - row);
+        let run_end = end.min(start + self.row_count - row);
 
         let Some(paged) = &self.paged else {
             return CellRun {
                 start,
-                end,
+                end: run_end,
                 source_base: 0,
                 dirty_base: 0,
                 calculated_base: 0,
@@ -1271,7 +1313,7 @@ impl CellStorage {
         let view = paged.run_view(row, col, touch);
         CellRun {
             start,
-            end: end.min(column_base + view.end_row),
+            end: run_end.min(column_base + view.end_row),
             source_base: column_base + view.clean_first_row,
             dirty_base: column_base + view.dirty_first_row,
             calculated_base: column_base + view.calculated_first_row,

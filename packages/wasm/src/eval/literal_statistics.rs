@@ -94,10 +94,10 @@ impl CellStore {
                 let range = self.literal_range_argument(values, sheet, depth)?;
                 self.literal_percentile(&range, *fraction)
             }
-            (_, [left, right]) => {
+            (_, [left_ast, right_ast]) => {
                 let kind = PairedKind::of(func)?;
-                let left = self.literal_range_argument(left, sheet, depth)?;
-                let right = self.literal_range_argument(right, sheet, depth)?;
+                let left = self.literal_range_argument(left_ast, sheet, depth)?;
+                let right = self.literal_range_argument(right_ast, sheet, depth)?;
                 if left.rows * left.columns.len() != right.rows * right.columns.len() {
                     return None;
                 }

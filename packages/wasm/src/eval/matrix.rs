@@ -25,6 +25,11 @@ pub(super) const SPILL_MAX_COLS: usize = SHEET_COLS as usize;
 pub(super) const SPILL_MAX_CELLS: usize = 1_000_000;
 pub(super) const SPILL_MAX_BYTES: usize = 64 * 1024 * 1024;
 pub(super) const SPILL_MAX_RECOMPUTE_CELLS: usize = 2_000_000;
+/// Spill-budget cells charged before evaluating a formula whose size is known
+/// only once it runs: a size read from a cell, a runtime reference. The
+/// pending loop charges whatever the result holds beyond this, so the pass
+/// budget still stops a pass that really produces more than it allows.
+pub(super) const UNKNOWN_SIZE_PRECHARGE: usize = 1;
 
 #[derive(Debug)]
 pub(super) struct EvalMatrix {
@@ -38,8 +43,8 @@ impl EvalMatrix {
     pub(super) fn new(rows: usize, cols: usize, values: Vec<Value>) -> Self {
         let bytes = values.capacity().saturating_mul(size_of::<Value>()) as u64;
         MATRIX_RESOURCE_STATS.with(|stats| {
-            let [current, peak, allocations] = stats.get();
-            let current = current.saturating_add(bytes);
+            let [live, peak, allocations] = stats.get();
+            let current = live.saturating_add(bytes);
             stats.set([current, peak.max(current), allocations.saturating_add(1)]);
         });
         Self {
@@ -113,8 +118,8 @@ impl EvalMatrix {
             total.checked_add(payload)
         });
         if bytes
-            .and_then(|bytes| bytes.checked_mul(copies))
-            .is_none_or(|bytes| bytes > SPILL_MAX_BYTES)
+            .and_then(|total| total.checked_mul(copies))
+            .is_none_or(|needed| needed > SPILL_MAX_BYTES)
         {
             return Err(crate::types::FormulaError::Num);
         }
