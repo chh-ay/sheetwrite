@@ -8,11 +8,13 @@ import {
   makeConformanceWorkbook,
   present,
   runSharedAdapterLifecycleContract,
+  runSimpleAdapterSizeContract,
 } from "../../../test/adapter-lifecycle-contract.js";
 import { Sheetwrite, SheetwriteGrid } from "../src/index.js";
-import { mountReact } from "./mount.js";
+import { mountReact, renderReactSimple } from "./mount.js";
 
 runSharedAdapterLifecycleContract("React", mountReact);
+runSimpleAdapterSizeContract("React", renderReactSimple);
 
 function mountRoot() {
   const host = document.body.appendChild(document.createElement("div"));
