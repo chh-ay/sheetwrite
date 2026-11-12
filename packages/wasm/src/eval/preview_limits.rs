@@ -7,7 +7,9 @@
 use std::cell::Cell;
 
 use crate::sheet::SheetData;
-use crate::types::{FormulaError, KIND_EMPTY, KIND_NUMBER, LITERAL_KIND_BITS};
+use crate::types::{FormulaError, LITERAL_KIND_BITS};
+#[cfg(feature = "analysis")]
+use crate::types::{KIND_EMPTY, KIND_NUMBER};
 
 /// Cells a preview reads through typed scans of kind and payload arrays.
 pub(super) const PREVIEW_TYPED_CELLS: usize = 1_000_000;
