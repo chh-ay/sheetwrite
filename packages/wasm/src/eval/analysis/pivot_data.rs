@@ -63,9 +63,9 @@ fn pivot_data(
 
     let mut items = Vec::with_capacity(pair_arguments / 2);
     let (pairs, _) = args[FIXED_ARGUMENTS..].as_chunks::<2>();
-    for [field, item] in pairs {
-        let field = text(field, pass)?;
-        let item = match store.eval_ast(item, sheet, pass, depth + 1) {
+    for [field_ast, item_ast] in pairs {
+        let field = text(field_ast, pass)?;
+        let item = match store.eval_ast(item_ast, sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
             item => item,
         };

@@ -240,8 +240,8 @@ fn percentile_exclusive(mut numbers: Vec<f64>, fraction: f64) -> NumberResult {
     }
     // Only the two adjacent order statistics are needed, not a full sort.
     let lower = rank.floor() as usize;
-    let (_, base, above) = numbers.select_nth_unstable_by(lower - 1, f64::total_cmp);
-    let base = *base;
+    let (_, base_slot, above) = numbers.select_nth_unstable_by(lower - 1, f64::total_cmp);
+    let base = *base_slot;
     let next = above
         .iter()
         .min_by(|left, right| left.total_cmp(right))
@@ -280,9 +280,9 @@ fn percent_rank(
     let position = if has_target {
         below as f64
     } else {
-        let lower = lower.ok_or(FormulaError::Na)?;
-        let upper = upper.ok_or(FormulaError::Na)?;
-        (below - 1) as f64 + (target - lower) / (upper - lower)
+        let low = lower.ok_or(FormulaError::Na)?;
+        let high = upper.ok_or(FormulaError::Na)?;
+        (below - 1) as f64 + (target - low) / (high - low)
     };
     let count = numbers.len() as f64;
     let rank = if exclusive {
@@ -338,8 +338,8 @@ impl Fit {
             syy: 0.0,
             sxy: 0.0,
         };
-        for (x, y) in xs.iter().zip(ys) {
-            match (&x.value, &y.value) {
+        for (x_cell, y_cell) in xs.iter().zip(ys) {
+            match (&x_cell.value, &y_cell.value) {
                 (Value::Error(error), _) | (_, Value::Error(error)) => return Err(*error),
                 (Value::Number(x), Value::Number(y)) if x.is_finite() && y.is_finite() => {
                     fit.count += 1.0;

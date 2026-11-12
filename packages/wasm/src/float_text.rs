@@ -106,35 +106,35 @@ fn rounds_up(half: Ordering, digits: u64) -> bool {
 #[cfg(feature = "analysis")]
 pub(crate) fn fixed_text(number: f64, places: u32) -> String {
     debug_assert!(places <= MAX_FIXED_PLACES, "{places} decimal places");
-    let places = places as usize;
+    let place_count = places as usize;
     let mut text = String::new();
     if number.fract() == 0.0 {
         push_integer(number, &mut text);
-        if places > 0 {
+        if place_count > 0 {
             text.push('.');
-            text.extend(std::iter::repeat_n('0', places));
+            text.extend(std::iter::repeat_n('0', place_count));
         }
         return text;
     }
 
     // A number with a fraction is below 2^52, so it keeps its decimals in
     // 64 bits.
-    let (digits, [half, ..]) = scale(&Binary::of(number), places as i32);
-    let digits = digits as u64 + u64::from(rounds_up(half, digits as u64));
+    let (digits, [half, ..]) = scale(&Binary::of(number), place_count as i32);
+    let rounded_digits = digits as u64 + u64::from(rounds_up(half, digits as u64));
     let mut buffer = [0; U64_DIGITS];
-    let digits = write_integer(digits, &mut buffer);
-    let integer_len = digits.len().saturating_sub(places);
+    let digit_text = write_integer(rounded_digits, &mut buffer);
+    let integer_len = digit_text.len().saturating_sub(place_count);
     if integer_len == 0 {
         text.push('0');
     }
-    push_ascii(&mut text, &digits[..integer_len]);
-    if places > 0 {
+    push_ascii(&mut text, &digit_text[..integer_len]);
+    if place_count > 0 {
         text.push('.');
         text.extend(std::iter::repeat_n(
             '0',
-            places - (digits.len() - integer_len),
+            place_count - (digit_text.len() - integer_len),
         ));
-        push_ascii(&mut text, &digits[integer_len..]);
+        push_ascii(&mut text, &digit_text[integer_len..]);
     }
     text
 }
@@ -339,14 +339,14 @@ impl NumberText {
                 self.push_zeros(point.unsigned_abs() as usize);
                 self.push(text);
             }
-            Ok(point) if point < text.len() => {
-                self.push(&text[..point]);
+            Ok(whole_digits) if whole_digits < text.len() => {
+                self.push(&text[..whole_digits]);
                 self.push(b".");
-                self.push(&text[point..]);
+                self.push(&text[whole_digits..]);
             }
-            Ok(point) => {
+            Ok(whole_digits) => {
                 self.push(text);
-                self.push_zeros(point - text.len());
+                self.push_zeros(whole_digits - text.len());
             }
         }
     }
@@ -536,11 +536,11 @@ fn scale_small(binary: &Binary, places: i32) -> Option<Scale> {
     let (digits, remainder) = if powers.fives_down == 0 {
         (numerator >> powers.twos_down, numerator & (denominator - 1))
     } else {
-        let numerator = u64::try_from(numerator).ok()?;
-        let denominator = u64::try_from(denominator).ok()?;
+        let small_numerator = u64::try_from(numerator).ok()?;
+        let small_denominator = u64::try_from(denominator).ok()?;
         (
-            u128::from(numerator / denominator),
-            u128::from(numerator % denominator),
+            u128::from(small_numerator / small_denominator),
+            u128::from(small_numerator % small_denominator),
         )
     };
 
@@ -648,8 +648,8 @@ impl Big {
         let mut borrow = false;
         for (limb, &subtrahend) in self.limbs[..len].iter_mut().zip(&other.limbs[..len]) {
             let (difference, first) = limb.overflowing_sub(subtrahend);
-            let (difference, second) = difference.overflowing_sub(u32::from(borrow));
-            *limb = difference;
+            let (borrowed, second) = difference.overflowing_sub(u32::from(borrow));
+            *limb = borrowed;
             borrow = first || second;
         }
         self.len = len;
@@ -671,12 +671,12 @@ impl Big {
     /// Divides by `divisor` and returns the remainder.
     #[cfg(feature = "analysis")]
     fn div_small(&mut self, divisor: u32) -> u32 {
-        let divisor = u64::from(divisor);
+        let wide_divisor = u64::from(divisor);
         let mut remainder = 0;
         for limb in self.limbs[..self.len].iter_mut().rev() {
             let value = (remainder << 32) | u64::from(*limb);
-            *limb = (value / divisor) as u32;
-            remainder = value % divisor;
+            *limb = (value / wide_divisor) as u32;
+            remainder = value % wide_divisor;
         }
         remainder as u32
     }
