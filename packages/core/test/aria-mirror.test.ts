@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
+import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
 import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -49,7 +49,10 @@ function flushFrames(): void {
   }
 }
 
-function mount(): { grid: Grid; host: HTMLElement } {
+function mount({ runFrames = true }: { runFrames?: boolean } = {}): {
+  grid: Grid;
+  host: HTMLElement;
+} {
   const host = document.createElement("div");
   Object.defineProperty(host, "clientWidth", { value: HOST_WIDTH });
   Object.defineProperty(host, "clientHeight", { value: HOST_HEIGHT });
@@ -79,7 +82,7 @@ function mount(): { grid: Grid; host: HTMLElement } {
     config: { toolbar: false, find: false, contextMenu: false },
   });
   mounted = { grid, host };
-  flushFrames();
+  if (runFrames) flushFrames();
   return mounted;
 }
 
@@ -177,26 +180,24 @@ it("follows a scrolled window in the frame that paints it, after the paint", () 
   expect(gridCell(host, 0, 0)).toBeNull();
 });
 
-it("writes the mirror of synchronous paints once, in the next frame", () => {
+it("writes the mirror when the grid mounts, before any frame", () => {
+  const { host } = mount({ runFrames: false });
+
+  const headers = [...mirror(host).querySelectorAll('[role="columnheader"]')].slice(0, 2);
+  expect(headers.map((header) => header.textContent)).toEqual(["A", "B"]);
+  expect(gridCell(host, 0, 0)?.textContent).toBe("Item 0");
+});
+
+it("writes the mirror and aria-activedescendant of a synchronous paint in the same task", () => {
   const { grid, host } = mount();
   const id = mirror(host).id;
-  const setAttribute = spyOn(host, "setAttribute");
-  const writes = (): string[] =>
-    setAttribute.mock.calls
-      .filter(([name]) => name === "aria-activedescendant")
-      .map(([, value]) => value);
 
-  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
-  grid.refresh();
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
   grid.refresh();
-  expect(writes()).toEqual([]);
-  expect(gridCell(host, 2, 1)?.hasAttribute("aria-selected")).toBe(false);
 
-  flushFrames();
-  expect(writes()).toEqual([`${id}-2-1`]);
+  expect(host.getAttribute("aria-activedescendant")).toBe(`${id}-2-1`);
   expect(gridCell(host, 2, 1)?.getAttribute("aria-selected")).toBe("true");
-  expect(gridCell(host, 1, 0)?.hasAttribute("aria-selected")).toBe(false);
+  expect(gridCell(host, 0, 0)?.hasAttribute("aria-selected")).toBe(false);
 });
 
 it("leaves the host clean when a listener destroys the grid during a paint", () => {

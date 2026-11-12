@@ -1,4 +1,3 @@
-import { scheduleFrame } from "./scope.js";
 import type { CellRef } from "./selection.js";
 import type { Selection } from "./types/coordinates.js";
 import type { VisibleWindowView } from "./types/store.js";
@@ -36,10 +35,10 @@ export interface AriaMirrorDeps {
  * Keeps a compact, screen-reader-visible mirror of the rendered window while the
  * canvas and overlay remain hidden from assistive technology.
  *
- * A paint only captures the mirror's content (`update`, `setRowCount`); the DOM
- * is written once by `flush`, after the paint's layout reads. Writing it during
- * the paint would make the next layout read in the same frame (the editor's
- * position, a scroll listener, the next scroll step) lay out the mirror first.
+ * A paint only captures the mirror's content (`update`, `setRowCount`); the
+ * paint's last step, `flush`, writes the DOM, after the paint's layout reads.
+ * Writing it earlier would make a later read in the same paint (the editor's
+ * position, a scroll listener) lay out the mirror first.
  */
 export class AriaMirror {
   private readonly host: HTMLElement;
@@ -65,7 +64,6 @@ export class AriaMirror {
   private readonly headerTexts: string[] = [];
   private readonly cellTexts: string[] = [];
   private readonly cellDescriptions: (string | null)[] = [];
-  private cancelScheduledFlush: (() => void) | null = null;
   /** A paint can destroy the grid (a listener); its flush must not write the host again. */
   private destroyed = false;
 
@@ -171,24 +169,8 @@ export class AriaMirror {
     this.contentPending = true;
   }
 
-  /** Write the captured content in the next frame, unless a flush comes first. */
-  scheduleFlush(): void {
-    if (this.cancelScheduledFlush || this.destroyed) return;
-
-    let ran = false;
-    const cancel = scheduleFrame(() => {
-      ran = true;
-      this.cancelScheduledFlush = null;
-      this.flush();
-    });
-    // A synchronous frame source (a test stub) has already flushed; nothing is left to cancel.
-    if (!ran) this.cancelScheduledFlush = cancel;
-  }
-
   /** Write the captured content to the mirror and the host. */
   flush(): void {
-    this.cancelScheduledFlush?.();
-    this.cancelScheduledFlush = null;
     if (this.destroyed) return;
     if (this.host.getAttribute("aria-rowcount") !== this.rowCountValue) {
       this.host.setAttribute("aria-rowcount", this.rowCountValue);
@@ -302,8 +284,6 @@ export class AriaMirror {
 
   destroy(): void {
     this.destroyed = true;
-    this.cancelScheduledFlush?.();
-    this.cancelScheduledFlush = null;
     this.aria.remove();
     for (const attr of [
       "role",

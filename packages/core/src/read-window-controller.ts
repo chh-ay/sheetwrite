@@ -218,29 +218,16 @@ export class ReadWindowController {
     const cancel = scheduleFrame(() => {
       ran = true;
       this.cancelScheduledFrame = null;
-      try {
-        this.paint();
-      } finally {
-        // In the frame that painted, after every layout read of the paint.
-        this.options.ariaMirror.flush();
-      }
+      this.paint();
     });
     // A synchronous frame source (a test stub) has already painted; nothing is left to cancel.
     if (!ran) this.cancelScheduledFrame = cancel;
   }
 
-  /**
-   * Paint now. The ARIA mirror is written in the next frame, so repeated
-   * synchronous paints write it once and no later read in this task lays it out.
-   */
   renderNow(): void {
     if (this.destroyed || this.frozen) return;
     this.cancelFrame();
-    try {
-      this.paint();
-    } finally {
-      this.options.ariaMirror.scheduleFlush();
-    }
+    this.paint();
   }
 
   /** Keep the last frame and stop every later engine read; used after the engine stops. */
@@ -284,6 +271,9 @@ export class ReadWindowController {
       if (!onEngineTrap || !isEngineTrap(error)) throw error;
 
       onEngineTrap(error);
+    } finally {
+      // Last, after every layout read of the paint, in the same task.
+      this.options.ariaMirror.flush();
     }
   }
 

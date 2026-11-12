@@ -53,9 +53,11 @@ const LAYOUT_EVENT = "Layout";
  * Most elements a forced style recalculation may restyle plus layout objects a
  * forced layout may lay out, in one step of each action. Counting nodes, not
  * time, keeps the gate independent of the machine. The screen-reader mirror of
- * the painted window is about 330 nodes; laying it out inside a step fails
- * every row. The editor rows hold what opening, measuring, focusing and closing
- * the textarea itself needs (#625).
+ * the painted window is about 330 nodes; laying it out inside an input step
+ * fails that row. The editor rows hold what opening, measuring, focusing and
+ * closing the textarea itself needs. The `-refresh` rows keep the mirror: a
+ * synchronous `grid.refresh()` writes it in the same task, as assistive
+ * technology expects, so the next step's scroll read lays it out (#625).
  */
 const FORCED_LAYOUT_CEILINGS: Readonly<Record<ForcedLayoutAction, number>> = {
   scroll: 0,
@@ -63,9 +65,9 @@ const FORCED_LAYOUT_CEILINGS: Readonly<Record<ForcedLayoutAction, number>> = {
   "edit-open": 10,
   "edit-commit": 25,
   "editor-scroll": 0,
-  "scroll-refresh": 8,
-  "arrow-down-refresh": 4,
-  "edit-commit-refresh": 27,
+  "scroll-refresh": 341,
+  "arrow-down-refresh": 341,
+  "edit-commit-refresh": 32,
 };
 
 interface TraceEvent {
