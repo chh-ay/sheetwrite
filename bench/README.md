@@ -1024,6 +1024,17 @@ published WASM singleton's `load()`. Core-backed memory probes observe core's
 own engine instance; raw formula-engine probes continue to observe their own
 published singleton.
 
+The core-paths rows `row-resize-100`, `row-resize-100k` and `row-resize-1m`
+drag the first row's border down twenty pixels through pointer events on a
+mounted grid of 100, 100,000 and 1,000,000 rows. The timed run is the whole
+drag: twenty previews and the commit on release. Variants time the undo of
+that commit and the same drag ended by `pointercancel`. Garbage is collected
+before each of the three, so each pays only for its own allocations. Each
+commit is the sheet's first height override. The
+`rowIndexBytesAfterFirstResize` counter is the backing store of a row index
+of that size after one resized row. Smoke runs use the same sheets with fewer
+samples.
+
 The performance showcase reads `results/paged-results.json` and
 `results/interaction-results.json`. `bench:paged` writes the paged capture;
 `bench:interaction` measures the current values of the four interaction metrics

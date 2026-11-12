@@ -1259,6 +1259,7 @@ export class GridImpl implements Grid {
     else if (change === "view") this.notes.hideCard();
 
     if (effects & (REBUILD_ROWS | RECONCILE_VIEW)) this.rebuildIndex();
+    else if (effects & RESIZE_ROWS) this.resizeRows(event.transaction.patches);
     if (effects & REBUILD_COLUMNS) this.rebuildColumnIndex();
     if (effects & (REBUILD_COLUMNS | APPLY_LAYOUT)) this.applyLayout();
     if (effects & GEOMETRY_CHANGED) this.readWindows.invalidateData();
@@ -1339,10 +1340,11 @@ export class GridImpl implements Grid {
         patch.op === "addRows" ||
         patch.op === "removeRows" ||
         patch.op === "moveRows" ||
-        patch.op === "setRowMeta" ||
         (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
       ) {
         effects |= REBUILD_ROWS;
+      } else if (patch.op === "setRowMeta") {
+        effects |= RESIZE_ROWS;
       } else if (
         patch.op === "addColumns" ||
         patch.op === "removeColumns" ||
@@ -1778,6 +1780,16 @@ export class GridImpl implements Grid {
       this.renderer.setTheme(this.theme);
       this.domOverlay.setTheme(this.theme);
     }
+    this.syncSizer();
+  }
+
+  /** Give the row index the committed heights of a change that only resized rows. */
+  private resizeRows(patches: readonly DocumentOp[]): void {
+    const rows: number[] = [];
+    for (const patch of patches) {
+      if (patch.op === "setRowMeta" && patch.sheet === this.activeSheet) rows.push(patch.row);
+    }
+    this.geometry.updateRowHeights(rows);
     this.syncSizer();
   }
 
@@ -4187,9 +4199,11 @@ const REBUILD_COLUMNS = 8;
 const APPLY_LAYOUT = 16;
 const SHEETS_CHANGED = 32;
 const RESET_DATASOURCE = 64;
+/** Row heights changed without moving, hiding or showing rows. */
+const RESIZE_ROWS = 128;
 
 /** Effects that change which cells the view shows or where they sit. */
-const VIEW_EFFECTS = REBUILD_ROWS | RECONCILE_VIEW | REBUILD_COLUMNS | APPLY_LAYOUT;
+const VIEW_EFFECTS = REBUILD_ROWS | RESIZE_ROWS | RECONCILE_VIEW | REBUILD_COLUMNS | APPLY_LAYOUT;
 
 /** Validation, hyperlinks, protection and charts sit on a sheet without moving its cells. */
 function annotatesSheet(patch: DocumentOp): boolean {

@@ -6,8 +6,9 @@
  * identity array, command-state derivation for a large selection, commit
  * admission and change capture for one large block, the offline commit queue,
  * offline rebase, validation lookups, CSV import, undo of a large clear, a
- * paged revisiting round-trip after eviction, and cold WASM initialization in
- * Node.
+ * paged revisiting round-trip after eviction, cold WASM initialization in
+ * Node, and a row-border drag that resizes one row of a 100-, 100,000- or
+ * 1,000,000-row sheet.
  *
  * Each scenario validates its own result before the sample is accepted, so a
  * fast scenario that computes the wrong answer fails the run instead of
@@ -27,6 +28,7 @@ import {
   type GridControllerHandlers,
 } from "../../packages/core/src/adapter.js";
 import { getEngine } from "../../packages/core/src/engine.js";
+import { OffsetIndex } from "../../packages/core/src/fenwick.js";
 import {
   type CellAddress,
   type CellLoadState,
@@ -41,6 +43,7 @@ import {
   type DataSourceRequest,
   type DataSourceStorageOptions,
   type DataValidationRule,
+  DEFAULT_THEME,
   type DocumentOp,
   type DocumentRebaseResult,
   fromCsv,
@@ -114,8 +117,22 @@ export const CORE_PATH_SCENARIOS = [
   "restore-near-ceiling",
   "paged-evicted-revisit",
   "node-cold-init",
+  "row-resize-100",
+  "row-resize-100k",
+  "row-resize-1m",
 ] as const;
 export type CorePathScenarioId = (typeof CORE_PATH_SCENARIOS)[number];
+
+type RowResizeScenarioId = "row-resize-100" | "row-resize-100k" | "row-resize-1m";
+
+/** Sheet rows of each row-resize scenario; smoke runs use the same sheets. */
+const ROW_RESIZE_ROWS: Readonly<Record<RowResizeScenarioId, number>> = {
+  "row-resize-100": 100,
+  "row-resize-100k": 100_000,
+  "row-resize-1m": 1_000_000,
+};
+/** Pointer moves of one row-border drag, one pixel each; every move previews the height. */
+const ROW_RESIZE_DRAG_STEPS = 20;
 
 /**
  * Sizes for one benchmark mode. `full` follows the workload sizes the
@@ -216,6 +233,10 @@ function samplePlan(id: CorePathScenarioId, mode: BenchmarkMode): SamplePlan {
       return { warmup: 1, iters: 3, gcBetween: false };
     case "node-cold-init":
       return { warmup: smoke ? 0 : 1, iters: smoke ? 2 : 6, gcBetween: false };
+    case "row-resize-100":
+    case "row-resize-100k":
+    case "row-resize-1m":
+      return { warmup: smoke ? 1 : 5, iters: smoke ? 5 : 41, gcBetween: true };
   }
 }
 
@@ -1455,6 +1476,103 @@ async function loadWasmInFreshNode(plan: SamplePlan): Promise<CorePathScenarioRe
   );
 }
 
+/**
+ * Drag the first row's lower border down through pointer events, as a user
+ * does: every move previews the height and the release commits one
+ * `setRowMeta`. The sheet has no other resized row, so every commit is the
+ * sheet's first height override. Variants time the undo of that commit and the
+ * same drag ended by `pointercancel`, which must restore the previewed row.
+ * Garbage from one phase is collected before the next one starts, so a phase
+ * pays only for its own allocations.
+ * The counter is the backing store a standalone row index keeps after its
+ * first resize at this sheet size.
+ */
+function resizeFirstRow(id: RowResizeScenarioId, plan: SamplePlan): CorePathScenarioResult {
+  const rows = ROW_RESIZE_ROWS[id];
+  const host = document.createElement("div");
+  // happy-dom has no layout: give the viewport room for the first row.
+  Object.defineProperties(host, { clientWidth: { value: 800 }, clientHeight: { value: 400 } });
+  document.body.appendChild(host);
+  const book = workbook(rows, numberColumns(2));
+  const grid = createGrid(host, {
+    workbook: book,
+    config: { toolbar: false, tabs: false, find: false, contextMenu: false },
+  });
+  const scroller = host.querySelector(".sheetwrite-scroller");
+  const borderY = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
+  const resizedHeight = DEFAULT_THEME.rowHeight + ROW_RESIZE_DRAG_STEPS;
+  const firstRowHeight = (): number | undefined => book.sheets[0]?.rowHeights?.get(0);
+  const commitMs: number[] = [];
+  const undoMs: number[] = [];
+  const cancelMs: number[] = [];
+  try {
+    if (!(scroller instanceof HTMLElement)) fail(`${id} found no grid scroller`);
+    const pointer = (type: string, y: number): void => {
+      scroller.dispatchEvent(
+        new PointerEvent(type, { clientX: 10, clientY: y, pointerId: 1, button: 0, bubbles: true }),
+      );
+    };
+    const drag = (release: "pointerup" | "pointercancel"): void => {
+      pointer("pointerdown", borderY);
+      for (let step = 1; step <= ROW_RESIZE_DRAG_STEPS; step += 1) {
+        pointer("pointermove", borderY + step);
+      }
+      pointer(release, borderY + ROW_RESIZE_DRAG_STEPS);
+    };
+    for (let iteration = 0; iteration < plan.warmup + plan.iters; iteration += 1) {
+      if (plan.gcBetween) forceGc();
+      let started = now();
+      drag("pointerup");
+      const committed = now() - started;
+      if (firstRowHeight() !== resizedHeight) {
+        fail(`${id} drag committed height ${String(firstRowHeight())}, expected ${resizedHeight}`);
+      }
+      if (plan.gcBetween) forceGc();
+      started = now();
+      grid.undo();
+      const undone = now() - started;
+      if (firstRowHeight() !== undefined) fail(`${id} undo kept the first row's height`);
+      if (plan.gcBetween) forceGc();
+      started = now();
+      drag("pointercancel");
+      const cancelled = now() - started;
+      if (firstRowHeight() !== undefined) fail(`${id} cancelled drag committed a height`);
+      if (iteration >= plan.warmup) {
+        commitMs.push(committed);
+        undoMs.push(undone);
+        cancelMs.push(cancelled);
+      }
+    }
+  } finally {
+    grid.destroy();
+    host.remove();
+  }
+
+  const index = new OffsetIndex(rows, DEFAULT_THEME.rowHeight);
+  index.setHeight(0, resizedHeight);
+  if (index.offsetOf(rows) !== rows * DEFAULT_THEME.rowHeight + ROW_RESIZE_DRAG_STEPS) {
+    fail(`${id} row index total disagrees with one resized row`);
+  }
+  return scenarioResult(
+    id,
+    `one ${ROW_RESIZE_DRAG_STEPS}-move drag of row 1's border, released to commit, on a ${rows.toLocaleString("en-US")}-row sheet`,
+    commitMs,
+    {
+      rows,
+      dragSteps: ROW_RESIZE_DRAG_STEPS,
+      rowIndexBytesAfterFirstResize: index.backingStoreBytes,
+    },
+    `each drag commits row 1 at ${resizedHeight} px, its undo removes the height, and a cancelled drag commits nothing`,
+    {
+      variants: [
+        variant("drag-commit", commitMs),
+        variant("undo", undoMs),
+        variant("drag-cancel", cancelMs),
+      ],
+    },
+  );
+}
+
 export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
   Record<
     CorePathScenarioId,
@@ -1476,6 +1594,9 @@ export const CORE_PATH_SCENARIO_RUNNERS: Readonly<
   "restore-near-ceiling": restoreNearCeiling,
   "paged-evicted-revisit": revisitEvictedBand,
   "node-cold-init": (_scale, plan) => loadWasmInFreshNode(plan),
+  "row-resize-100": (_scale, plan) => resizeFirstRow("row-resize-100", plan),
+  "row-resize-100k": (_scale, plan) => resizeFirstRow("row-resize-100k", plan),
+  "row-resize-1m": (_scale, plan) => resizeFirstRow("row-resize-1m", plan),
 };
 
 /** Fail-closed validation of a completed artifact, mirroring the raw evidence. */
