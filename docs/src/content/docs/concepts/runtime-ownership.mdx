@@ -58,9 +58,11 @@ already-painted rows:
 declare function computeWindow(index: unknown, contentTop: number, viewportHeight: number, overscan: number): { start: number; end: number };
 ```
 
-Row positions come from an `OffsetIndex` — a Fenwick (binary-indexed) tree over
-row heights giving `O(log n)` scrollTop ↔ row mapping and `O(log n)` single-row
-height edits, so variable row heights stay cheap.
+Row positions come from an `OffsetIndex`. It keeps only the rows whose height
+differs from the default, with a Fenwick (binary-indexed) tree over the runs
+between them. Mapping scrollTop ↔ row and changing the height of a resized row
+take `O(log k)` for `k` resized rows; resizing another row takes `O(k)`. A
+sheet with no resized rows keeps no arrays, whatever its row count.
 
 Browsers clamp an element's height at an engine-specific ceiling — Chromium sits
 near 33.5 million CSS pixels at 100% zoom, and the ceiling **shrinks with browser
