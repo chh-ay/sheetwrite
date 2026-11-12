@@ -2,7 +2,7 @@
 import { iconHref } from "../../icons/icon-href.js";
 import type { IconName } from "../../icons/icon-names.js";
 
-export type { IconName } from "../icons/icon-names.js";
+export type { IconName } from "../../icons/icon-names.js";
 
 /** Rendered size: 16, 20 or 24 px. */
 export type IconSize = "sm" | "md" | "lg";

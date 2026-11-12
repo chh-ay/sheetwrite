@@ -55,7 +55,6 @@ test("mutation receipts distinguish rejected, warned and host-authorized stored 
   await scenario.ready;
   expect(scenario.snapshot().error).toBeNull();
   scenario.filter("APAC", "Atlas");
-  scenario.run("sort");
   scenario.probe("units");
   const cell = (col: number) =>
     scenario?.grid()?.store.getCell({ sheet: DATA_SHEET, row: 0, col }).resolved;
