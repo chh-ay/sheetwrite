@@ -19,7 +19,7 @@ use crate::types::{
 use super::array::ast_produces_array;
 use super::functions::{treats_cell_as_reference, FuncAccumulator, MAX_FUNCTION_ARGS};
 use super::matrix::argument_range;
-use super::range_view::RangeView;
+use super::range_view::{NumberSink, RangeView};
 use super::statistics::{self, NumberStatistic, PairedCell};
 use super::value::aggregate_number;
 use super::EvalPass;
@@ -30,6 +30,41 @@ enum Cells {
     Numbers(Vec<f64>),
     /// Every cell, for a statistic that pairs cells by position.
     Paired(Vec<PairedCell>),
+}
+
+/// The numbers of a range, and whether one of them isn't finite.
+struct NumberList<'a> {
+    numbers: &'a mut Vec<f64>,
+    non_finite: bool,
+}
+
+impl NumberSink for NumberList<'_> {
+    #[inline]
+    fn number(&mut self, number: f64) {
+        if number.is_finite() {
+            self.numbers.push(number);
+        } else {
+            self.non_finite = true;
+        }
+    }
+
+    #[inline]
+    fn skipped(&mut self) {}
+}
+
+/// Every cell of a range, for a paired statistic.
+struct PairedList<'a>(&'a mut Vec<PairedCell>);
+
+impl NumberSink for PairedList<'_> {
+    #[inline]
+    fn number(&mut self, number: f64) {
+        self.0.push(PairedCell::Number(number));
+    }
+
+    #[inline]
+    fn skipped(&mut self) {
+        self.0.push(PairedCell::Skipped);
+    }
 }
 
 /// One argument: where its cells end, how many cells it has, its first
@@ -115,20 +150,6 @@ impl StatisticArgs {
         }
     }
 
-    /// A number of a range cell, or `None` for a cell that holds no number.
-    fn push_range_number(&mut self, number: Option<f64>) {
-        match &mut self.cells {
-            Cells::Numbers(numbers) => match number {
-                Some(finite) if finite.is_finite() => numbers.push(finite),
-                Some(_) => self.defer(FormulaError::Num),
-                None => {}
-            },
-            Cells::Paired(cells) => {
-                cells.push(number.map_or(PairedCell::Skipped, PairedCell::Number))
-            }
-        }
-    }
-
     /// A value that is not an error, read from a range when `from_range`.
     fn push_value(&mut self, value: &Value, from_range: bool) {
         match &mut self.cells {
@@ -178,15 +199,12 @@ impl StatisticArgs {
 
     /// The numbers of the arguments in `args`, after their cell count is
     /// checked against `max_cells` and the first error that reading their
-    /// numbers gives.
+    /// numbers gives. A statistic may reorder them: it reads them once.
     fn numbers_of(
-        &self,
+        &mut self,
         args: std::ops::Range<usize>,
         max_cells: usize,
-    ) -> Result<&[f64], FormulaError> {
-        let Cells::Numbers(numbers) = &self.cells else {
-            return Err(FormulaError::Value);
-        };
+    ) -> Result<&mut [f64], FormulaError> {
         let selected = self.args.get(args.clone()).unwrap_or_default();
         if selected.iter().map(|arg| arg.cells).sum::<usize>() > max_cells {
             return Err(FormulaError::Num);
@@ -196,17 +214,25 @@ impl StatisticArgs {
         }
         let start = self.start(args.start);
         let end = selected.last().map_or(start, |arg| arg.end);
-        Ok(numbers.get(start..end).unwrap_or_default())
+        let Cells::Numbers(numbers) = &mut self.cells else {
+            return Err(FormulaError::Value);
+        };
+        Ok(numbers.get_mut(start..end).unwrap_or_default())
     }
 
     /// The numbers of argument `index`, or none when it is absent.
-    pub(super) fn numbers(&self, index: usize, max_cells: usize) -> Result<&[f64], FormulaError> {
+    pub(super) fn numbers(
+        &mut self,
+        index: usize,
+        max_cells: usize,
+    ) -> Result<&mut [f64], FormulaError> {
         self.numbers_of(index..index + 1, max_cells)
     }
 
     /// The numbers of every argument.
-    pub(super) fn all_numbers(&self, max_cells: usize) -> Result<&[f64], FormulaError> {
-        self.numbers_of(0..self.args.len(), max_cells)
+    pub(super) fn all_numbers(&mut self, max_cells: usize) -> Result<&mut [f64], FormulaError> {
+        let count = self.args.len();
+        self.numbers_of(0..count, max_cells)
     }
 
     /// The cells of argument `index` of a paired statistic.
@@ -249,8 +275,28 @@ impl Reader<'_> {
         }
         self.values.count_cells(cells as usize)?;
 
-        let values = &mut self.values;
-        view.scan_numbers(pass, |number| values.push_range_number(number))?;
+        match &mut self.values.cells {
+            Cells::Numbers(numbers) => {
+                numbers
+                    .try_reserve(cells as usize)
+                    .map_err(|_| FormulaError::Num)?;
+                let mut sink = NumberList {
+                    numbers,
+                    non_finite: false,
+                };
+                view.scan_numbers(pass, &mut sink)?;
+                let non_finite = sink.non_finite;
+                if non_finite {
+                    self.values.defer(FormulaError::Num);
+                }
+            }
+            Cells::Paired(paired) => {
+                paired
+                    .try_reserve(cells as usize)
+                    .map_err(|_| FormulaError::Num)?;
+                view.scan_numbers(pass, &mut PairedList(paired))?;
+            }
+        }
         Ok(view.cell(0, 0, pass))
     }
 
@@ -371,7 +417,7 @@ impl CellStore {
             values: StatisticArgs::new(call.statistic.is_paired()),
         };
         match reader.read(call.args, pass, call.depth) {
-            Ok(values) => statistics::apply_numbers(call.statistic, &values),
+            Ok(mut values) => statistics::apply_numbers(call.statistic, &mut values),
             Err(error) => Value::Error(error),
         }
     }

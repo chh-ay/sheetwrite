@@ -133,7 +133,7 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
     Some(match statistic(func)? {
         Statistic::Numbers(statistic) => apply_numbers(
             statistic,
-            &StatisticArgs::from_accumulator(values, statistic.is_paired()),
+            &mut StatisticArgs::from_accumulator(values, statistic.is_paired()),
         ),
         Statistic::CountBlank => count_blank(values),
         Statistic::ConditionalExtreme { maximum } => conditional_extreme(values, maximum),
@@ -147,7 +147,7 @@ pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> 
 }
 
 /// `statistic` of `values`.
-pub(super) fn apply_numbers(statistic: NumberStatistic, values: &StatisticArgs) -> EvalResult {
+pub(super) fn apply_numbers(statistic: NumberStatistic, values: &mut StatisticArgs) -> EvalResult {
     aggregate_result(match statistic {
         NumberStatistic::Median => median(values),
         NumberStatistic::Mode => mode_sngl(values),
@@ -211,23 +211,9 @@ fn integer_at(values: &StatisticArgs, index: usize) -> Result<i64, FormulaError>
     Ok(number.trunc() as i64)
 }
 
-/// The numbers of argument `index` as a list the statistic may reorder.
-fn owned_numbers(values: &StatisticArgs, index: usize) -> Result<Vec<f64>, FormulaError> {
-    owned(values.numbers(index, MAX_SELECTION_VALUES)?)
-}
-
-fn owned(numbers: &[f64]) -> Result<Vec<f64>, FormulaError> {
-    let mut owned = Vec::new();
-    owned
-        .try_reserve_exact(numbers.len())
-        .map_err(|_| FormulaError::Num)?;
-    owned.extend_from_slice(numbers);
-    Ok(owned)
-}
-
-fn median(values: &StatisticArgs) -> Result<f64, FormulaError> {
+fn median(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
-    let mut numbers = owned(values.all_numbers(MAX_SELECTION_VALUES)?)?;
+    let numbers = values.all_numbers(MAX_SELECTION_VALUES)?;
     if numbers.is_empty() {
         return Ok(0.0);
     }
@@ -245,9 +231,9 @@ fn median(values: &StatisticArgs) -> Result<f64, FormulaError> {
     Ok(lower * 0.5 + *upper * 0.5)
 }
 
-fn mode_sngl(values: &StatisticArgs) -> Result<f64, FormulaError> {
+fn mode_sngl(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
-    let mut numbers = owned(values.all_numbers(MAX_SELECTION_VALUES)?)?;
+    let numbers = values.all_numbers(MAX_SELECTION_VALUES)?;
     if numbers.len() < 2 {
         return Err(FormulaError::Na);
     }
@@ -277,10 +263,11 @@ fn mode_sngl(values: &StatisticArgs) -> Result<f64, FormulaError> {
     }
 }
 
-fn large_small(values: &StatisticArgs, ascending: bool) -> Result<f64, FormulaError> {
+fn large_small(values: &mut StatisticArgs, ascending: bool) -> Result<f64, FormulaError> {
     require_args(values, 2, 2)?;
-    let mut numbers = owned_numbers(values, 0)?;
+    values.numbers(0, MAX_SELECTION_VALUES)?;
     let k = usize::try_from(integer_at(values, 1)?).map_err(|_| FormulaError::Num)?;
+    let numbers = values.numbers(0, MAX_SELECTION_VALUES)?;
     if k == 0 || k > numbers.len() {
         return Err(FormulaError::Num);
     }
@@ -290,18 +277,16 @@ fn large_small(values: &StatisticArgs, ascending: bool) -> Result<f64, FormulaEr
 }
 
 /// RANK.EQ counts in place: it needs no copy of the numbers.
-fn rank_eq(values: &StatisticArgs) -> Result<f64, FormulaError> {
+fn rank_eq(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_args(values, 2, 3)?;
     let target = number_at(values, 0, None)?;
     let numbers = values.numbers(1, MAX_SELECTION_VALUES)?;
-    if numbers.is_empty() {
-        return Err(FormulaError::Na);
-    }
-    if !numbers.contains(&target) {
+    if numbers.is_empty() || !numbers.contains(&target) {
         return Err(FormulaError::Na);
     }
     let ascending = number_at(values, 2, Some(0.0))? != 0.0;
-    let before = numbers
+    let before = values
+        .numbers(1, MAX_SELECTION_VALUES)?
         .iter()
         .filter(|&&value| {
             if ascending {
@@ -314,24 +299,25 @@ fn rank_eq(values: &StatisticArgs) -> Result<f64, FormulaError> {
     Ok((before + 1) as f64)
 }
 
-fn percentile_inc(values: &StatisticArgs) -> Result<f64, FormulaError> {
+fn percentile_inc(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_args(values, 2, 2)?;
-    let numbers = owned_numbers(values, 0)?;
-    percentile(numbers, number_at(values, 1, None)?)
+    values.numbers(0, MAX_SELECTION_VALUES)?;
+    let fraction = number_at(values, 1, None)?;
+    percentile(values.numbers(0, MAX_SELECTION_VALUES)?, fraction)
 }
 
-fn quartile_inc(values: &StatisticArgs) -> Result<f64, FormulaError> {
+fn quartile_inc(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_args(values, 2, 2)?;
     let quartile = integer_at(values, 1)?;
     if !(0..=4).contains(&quartile) {
         return Err(FormulaError::Num);
     }
-    let numbers = owned_numbers(values, 0)?;
+    let numbers = values.numbers(0, MAX_SELECTION_VALUES)?;
     percentile(numbers, quartile as f64 * 0.25)
 }
 
 /// The `PERCENTILE.INC` of `numbers` at `fraction`.
-pub(super) fn percentile(mut numbers: Vec<f64>, fraction: f64) -> Result<f64, FormulaError> {
+fn percentile(numbers: &mut [f64], fraction: f64) -> Result<f64, FormulaError> {
     if numbers.is_empty() || !(0.0..=1.0).contains(&fraction) {
         return Err(FormulaError::Num);
     }
@@ -373,7 +359,7 @@ impl Moments {
 }
 
 fn variance_result(
-    values: &StatisticArgs,
+    values: &mut StatisticArgs,
     sample: bool,
     standard_deviation: bool,
 ) -> Result<f64, FormulaError> {
@@ -470,7 +456,7 @@ fn counted_variance(
     variance(&counted_numbers(values)?, sample, standard_deviation)
 }
 
-fn geomean(values: &StatisticArgs) -> Result<f64, FormulaError> {
+fn geomean(values: &mut StatisticArgs) -> Result<f64, FormulaError> {
     require_at_least_one_arg(values)?;
     let numbers = values.all_numbers(MAX_SELECTION_VALUES)?;
     if numbers.is_empty() || numbers.iter().any(|&value| value <= 0.0) {
@@ -535,7 +521,7 @@ impl PairedMoments {
     }
 }
 
-fn paired_result(values: &StatisticArgs, kind: PairedKind) -> Result<f64, FormulaError> {
+fn paired_result(values: &mut StatisticArgs, kind: PairedKind) -> Result<f64, FormulaError> {
     require_args(values, 2, 2)?;
     let left = values.paired(0);
     let right = values.paired(1);

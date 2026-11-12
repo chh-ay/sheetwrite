@@ -8,7 +8,7 @@ use crate::cells::{payload_num, payload_str_id};
 use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
-    CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
+    CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
 };
 
 use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
@@ -116,51 +116,91 @@ impl<'a> RangeView<'a> {
         }
     }
 
-    /// Visits every cell in row-major order as a number or a skipped cell,
-    /// as a function that reads only the numbers of a range sees it. The
-    /// first unloaded cell is `#LOADING!` and the first error cell is its
-    /// error, as is a literal number that isn't finite or text missing from
-    /// the string pool; the walk stops there.
+    /// Reads every cell in row-major order into `sink`, as a function that
+    /// reads only the numbers of a range sees it. The first unloaded cell is
+    /// `#LOADING!` and the first error cell is its error, as is a literal
+    /// number that isn't finite or text missing from the string pool; the
+    /// walk stops there.
     pub(super) fn scan_numbers(
         &self,
         pass: &mut EvalPass<'_>,
-        mut visit: impl FnMut(Option<f64>),
+        sink: &mut impl NumberSink,
     ) -> Result<(), FormulaError> {
-        let literals = LiteralSources::new(self.data, self.depth);
+        if let Some(literals) = LiteralSources::new(self.data, self.depth) {
+            return self.scan_dense_numbers(literals, pass, sink);
+        }
+
         for row in self.row_start..self.row_start + self.rows {
             for col in self.col_start..self.col_start + self.cols {
                 if !self.data.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
                 }
 
+                self.scan_computed(row, col, pass, sink)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// [`Self::scan_numbers`] over dense storage, which is always loaded:
+    /// literal cells are read from their kind byte and payload.
+    fn scan_dense_numbers(
+        &self,
+        literals: LiteralSources<'_>,
+        pass: &mut EvalPass<'_>,
+        sink: &mut impl NumberSink,
+    ) -> Result<(), FormulaError> {
+        let (kinds, payloads) = literals.sources.raw();
+        for row in self.row_start..self.row_start + self.rows {
+            for col in self.col_start..self.col_start + self.cols {
                 let index = self.data.cells.idx(row, col);
-                let literal = literals.and_then(|sources| sources.sources.literal(index));
-                let number = match literal {
-                    Some((KIND_NUMBER, payload)) => {
+                let (Some(&kind), Some(&payload)) = (kinds.get(index), payloads.get(index)) else {
+                    return Err(FormulaError::Ref);
+                };
+                match kind {
+                    KIND_NUMBER => {
                         let number = payload_num(payload);
                         if !number.is_finite() {
                             return Err(FormulaError::Num);
                         }
-                        Some(number)
+                        sink.number(number);
                     }
-                    Some((KIND_STRING, payload)) => {
+                    KIND_STRING => {
                         string_from_pool_ref(&self.store.strings, payload_str_id(payload))
                             .ok_or(FormulaError::Ref)?;
-                        None
+                        sink.skipped();
                     }
-                    Some(_) => None,
-                    None if self.data.cells.kind_at(index) == KIND_EMPTY => None,
-                    None => match self
-                        .store
-                        .eval_at(self.sheet, row, col, pass, self.depth + 1)
-                    {
-                        Value::Number(number) => Some(number),
-                        Value::Error(error) => return Err(error),
-                        Value::Text(_) | Value::Bool(_) | Value::Blank => None,
-                    },
-                };
-                visit(number);
+                    KIND_BOOL | KIND_EMPTY => sink.skipped(),
+                    _ => self.scan_computed(row, col, pass, sink)?,
+                }
             }
+        }
+        Ok(())
+    }
+
+    /// One loaded cell without a literal source: blank, or a formula or
+    /// spill result.
+    fn scan_computed(
+        &self,
+        row: usize,
+        col: usize,
+        pass: &mut EvalPass<'_>,
+        sink: &mut impl NumberSink,
+    ) -> Result<(), FormulaError> {
+        let index = self.data.cells.idx(row, col);
+        let literal = LiteralSources::new(self.data, self.depth)
+            .and_then(|sources| sources.value_at(&self.store.strings, index));
+        let value = match literal {
+            Some(value) => value,
+            None if self.data.cells.kind_at(index) == KIND_EMPTY => Value::Blank,
+            None => self
+                .store
+                .eval_at(self.sheet, row, col, pass, self.depth + 1),
+        };
+        match value {
+            Value::Number(number) => sink.number(number),
+            Value::Error(error) => return Err(error),
+            Value::Text(_) | Value::Bool(_) | Value::Blank => sink.skipped(),
         }
         Ok(())
     }
@@ -212,6 +252,16 @@ impl<'a> RangeView<'a> {
         }
         Ok(())
     }
+}
+
+/// Receives the cells of a range as a function that reads only numbers sees
+/// them.
+pub(super) trait NumberSink {
+    /// A cell holding `number`, which a formula may have left non-finite.
+    fn number(&mut self, number: f64);
+
+    /// A cell holding text, a logical value or nothing.
+    fn skipped(&mut self);
 }
 
 /// A function argument read as an array: a written range in place, or the
