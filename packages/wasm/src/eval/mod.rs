@@ -937,7 +937,7 @@ impl CellStore {
         // change inside one makes that anchor stale. Dropped with the pass.
         let mut runtime_readers: FxHashMap<AbsCellKey, RuntimeReads> = FxHashMap::default();
         // The spill each anchor held before it runs again, reused by every anchor.
-        let mut vacated = VacatedSpill::default();
+        let mut vacated_spill = VacatedSpill::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -985,7 +985,9 @@ impl CellStore {
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
                 let data = &mut self.sheets[output_sheet];
-                let vacated_range = data.spill.vacate(local, &mut data.cells, &mut vacated);
+                let vacated_range = data
+                    .spill
+                    .vacate(local, &mut data.cells, &mut vacated_spill);
 
                 memo.unsettle(id);
                 let mut pass = EvalPass {
@@ -1093,7 +1095,7 @@ impl CellStore {
                         pass.results.pull(id, matrix.into_first());
                         Vec::new()
                     }
-                    result => self.install_spill_result(key, result, &vacated, pass.results),
+                    result => self.install_spill_result(key, result, &vacated_spill, pass.results),
                 };
                 if self.iteration.is_some() {
                     if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
@@ -1131,7 +1133,7 @@ impl CellStore {
 
                 // The install reported the cells whose value changed; the
                 // vacated cells it did not write back were cleared.
-                let cleared = vacated.cleared_outside(installed_range);
+                let cleared = vacated_spill.cleared_outside(installed_range);
                 if !cleared.is_empty() {
                     spill_changes.push(SpillChange {
                         sheet: output_sheet,

@@ -51,8 +51,8 @@ impl VacatedSpill {
         self.range = range;
         self.owned_cells = 0;
         self.values.clear();
-        if let Some(range) = range {
-            self.values.resize(range.cells(), NOT_OWNED);
+        if let Some(vacated) = range {
+            self.values.resize(vacated.cells(), NOT_OWNED);
         }
     }
 
@@ -73,8 +73,8 @@ impl VacatedSpill {
     /// The value `cell` held as a reader saw it, or `None` (never equal to a
     /// stored value) when the vacated spill did not own it.
     fn value(&self, cell: CellKey) -> Option<(u8, u64)> {
-        let range = self.range.filter(|range| range.contains(cell))?;
-        let value = *self.values.get(Self::offset(range, cell))?;
+        let vacated = self.range.filter(|vacated| vacated.contains(cell))?;
+        let value = *self.values.get(Self::offset(vacated, cell))?;
         (value != NOT_OWNED && value != NO_VALUE).then_some(value)
     }
 
@@ -90,7 +90,10 @@ impl VacatedSpill {
         let Some(range) = self.range else {
             return Vec::new();
         };
-        debug_assert!(installed.is_none_or(|installed| installed.anchor == range.anchor));
+        debug_assert!(
+            installed.is_none_or(|new| new.anchor == range.anchor),
+            "a spill is reinstalled at its own anchor"
+        );
         let mut cleared = Vec::new();
         let mut push_owned = |row: u32, first_col: u32| {
             for col in first_col..=range.col_end {
@@ -107,7 +110,7 @@ impl VacatedSpill {
         // Both ranges start at the anchor, so the installed one covers the
         // leading rows and columns of the vacated one.
         let (kept_rows_end, kept_cols_end) = match installed {
-            Some(installed) => (installed.row_end, installed.col_end),
+            Some(new) => (new.row_end, new.col_end),
             None => (range.anchor.0, range.anchor.1),
         };
         for row in range.anchor.0..=range.row_end {
@@ -1206,14 +1209,14 @@ mod tests {
             store.recompute(sheet);
 
             let (fresh, fresh_sheet) = oracle_sheet(&values, &kept);
-            for row in 0..ORACLE_ROWS + 2 {
+            for shown_row in 0..ORACLE_ROWS + 2 {
                 for col in 2..8 {
-                    let incremental = store.get_cell(sheet, row, col);
-                    let expected = fresh.get_cell(fresh_sheet, row, col);
+                    let incremental = store.get_cell(sheet, shown_row, col);
+                    let expected = fresh.get_cell(fresh_sheet, shown_row, col);
                     assert_eq!(
                         (incremental.kind(), incremental.num(), incremental.string()),
                         (expected.kind(), expected.num(), expected.string()),
-                        "step {step}, cell {row},{col}"
+                        "step {step}, cell {shown_row},{col}"
                     );
                 }
             }

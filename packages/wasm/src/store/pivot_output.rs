@@ -118,14 +118,16 @@ impl CellStore {
             return (Vec::new(), Err(FormulaError::Ref));
         }
 
-        let mut vacated = VacatedSpill::default();
-        let vacated_range = data.spill.vacate(anchor, &mut data.cells, &mut vacated);
+        let mut vacated_spill = VacatedSpill::default();
+        let vacated_range = data
+            .spill
+            .vacate(anchor, &mut data.cells, &mut vacated_spill);
         let mut changed: Vec<CellKey> = Vec::new();
         if let Some(vacated_range) = vacated_range.filter(|&vacated| vacated != range) {
             changed.extend(data.spill.anchors_colliding_with(anchor, vacated_range));
         }
         let vacated_cells = |changed: &mut Vec<CellKey>| {
-            changed.extend(vacated.cleared_outside(None));
+            changed.extend(vacated_spill.cleared_outside(None));
         };
 
         // An anchor that holds a value or formula cannot show the output.
@@ -141,7 +143,7 @@ impl CellStore {
 
         let cells = range.cells();
         let within_budget = current_owner_cells
-            .map(|total| total - vacated.owned_cells().min(total))
+            .map(|total| total - vacated_spill.owned_cells().min(total))
             .and_then(|total| total.checked_add(cells))
             .is_some_and(|owners| {
                 owners <= self.spill_owner_cell_limit && spill_ownership_within_budget(owners)
@@ -155,11 +157,11 @@ impl CellStore {
         let strings = &mut self.strings;
         let mut written = data
             .spill
-            .reinstall(range, &mut data.cells, &vacated, |offset| {
+            .reinstall(range, &mut data.cells, &vacated_spill, |offset| {
                 calculated_slot(strings, value_at(offset).borrow())
             });
         changed.append(&mut written);
-        changed.extend(vacated.cleared_outside(Some(range)));
+        changed.extend(vacated_spill.cleared_outside(Some(range)));
 
         if set_anchor_value(data, strings, anchor, value_at(0).borrow()) {
             changed.push(anchor);
