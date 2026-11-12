@@ -986,7 +986,10 @@ Initial index construction and correctness assertions are untimed.
 Literal-source outside edits must emit no event and perform no view
 resolution; inside edits must name exactly the one matching chart.
 The listener records chart identities and event time only. View resolution
-runs after the commit timer stops. Inside edits change the literal second
+runs after the commit timer stops and is timed on its own as `resolveMs`: one
+`resolveChartView` per chart the commit named, as a consumer refreshing every
+named chart would. Commit plus resolution is the cost an edit has for a
+consumer that redraws each named chart. Inside edits change the literal second
 cell of chart 0's source. In the formula case, its first cell reads that
 second cell, so the formula stays in place and the index is not rebuilt.
 Outside edits change a literal after the source region. A formula-replacement
