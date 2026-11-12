@@ -6,7 +6,10 @@ import { flushSync, mount, unmount } from "../../../node_modules/svelte/src/inde
 import type {
   AdapterConformanceProps,
   MountAdapter,
+  RenderSimpleAdapter,
 } from "../../../test/adapter-lifecycle-contract.js";
+import type { SheetwriteProps } from "../src/props.js";
+import Sheetwrite from "../src/Sheetwrite.svelte";
 import LifecycleHarness from "./LifecycleHarness.svelte";
 
 interface LifecycleHarnessApi {
@@ -39,6 +42,27 @@ export const mountSvelte: MountAdapter = async (props) => {
     },
     unmount: async () => {
       await unmount(component);
+      flushSync();
+    },
+  };
+};
+
+export const renderSvelteSimple: RenderSimpleAdapter = async (host, props) => {
+  let error: unknown;
+  let component: Record<string, unknown> | undefined;
+  try {
+    component = mount(Sheetwrite, {
+      target: host,
+      props: props as SheetwriteProps<Record<string, string>>,
+    });
+    await settle();
+  } catch (thrown) {
+    error = thrown;
+  }
+  return {
+    error,
+    unmount: async () => {
+      if (component) await unmount(component);
       flushSync();
     },
   };

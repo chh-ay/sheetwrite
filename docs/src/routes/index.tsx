@@ -297,7 +297,12 @@ function Landing() {
               application decides what to save and where.
             </p>
           </header>
-          <Island component={ArchitectureScene} name="landing-architecture" props={{}} />
+          <Island
+            component={ArchitectureScene}
+            hydrate="visible"
+            name="landing-architecture"
+            props={{}}
+          />
           <MoreLink class="sw-lp-more" href="/docs/concepts/runtime-ownership/">
             Read the runtime-ownership model
           </MoreLink>
@@ -324,7 +329,7 @@ function Landing() {
               live example that runs it for real.
             </p>
           </header>
-          <Island component={StoryReel} name="landing-stories" props={{}} />
+          <Island component={StoryReel} hydrate="visible" name="landing-stories" props={{}} />
         </section>
 
         <section aria-labelledby="landing-code" class="sw-lp-section sw-lp-split">

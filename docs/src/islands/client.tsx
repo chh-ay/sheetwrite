@@ -252,7 +252,7 @@ function prefetchWhenVisible(island: HTMLElement): void {
  * acts once, as if the code had been there. Text fields keep working
  * natively; the island reads what was typed when it hydrates.
  */
-function hydrateOnInteraction(island: HTMLElement): void {
+function hydrateOnInteraction(island: HTMLElement): () => void {
   const load = islandLoader(island);
   let code: Promise<IslandRender> | undefined;
   const fetchCode = (): Promise<IslandRender> => (code ??= load());
@@ -262,16 +262,7 @@ function hydrateOnInteraction(island: HTMLElement): void {
   const prefetch = (): void => {
     void fetchCode();
   };
-  const activate = (event: Event): void => {
-    if (isPassThroughKey(event) || isNativeActivationKey(event)) return;
-    if (!isTextEntry(event.target)) {
-      // Pointer presses keep their default, so a touch still produces its
-      // click (and focuses what it presses); clicks and keys are held whole.
-      // Chromium dispatches clicks as PointerEvents, so the test is the type.
-      if (event.type !== "pointerdown" && event.type !== "pointerup") event.preventDefault();
-      event.stopImmediatePropagation();
-      held.push(event);
-    }
+  const start = (): void => {
     if (hydrating) return;
     hydrating = true;
     fetchCode().then(
@@ -284,6 +275,12 @@ function hydrateOnInteraction(island: HTMLElement): void {
           for (const type of PREFETCH_EVENTS) island.removeEventListener(type, prefetch);
           for (const type of ACTIVATION_EVENTS) island.removeEventListener(type, activate, true);
           hydrateWith(island, render);
+          // Focus that moved in before the code arrived (a visible island
+          // hydrates after scrolling, not on focus): its handlers see it now.
+          const focused = document.activeElement;
+          if (focused instanceof HTMLElement && island.contains(focused)) {
+            focused.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+          }
           for (const event of held) {
             // The init dictionary reads key, button, pointerType and coordinates off the original.
             const replay = new (event.constructor as typeof Event)(event.type, event);
@@ -293,10 +290,45 @@ function hydrateOnInteraction(island: HTMLElement): void {
       (error: unknown) => console.error(`Docs island "${island.dataset.island}" failed:`, error),
     );
   };
+  const activate = (event: Event): void => {
+    if (isPassThroughKey(event) || isNativeActivationKey(event)) return;
+    if (!isTextEntry(event.target)) {
+      // Pointer presses keep their default, so a touch still produces its
+      // click (and focuses what it presses); clicks and keys are held whole.
+      // Chromium dispatches clicks as PointerEvents, so the test is the type.
+      if (event.type !== "pointerdown" && event.type !== "pointerup") event.preventDefault();
+      event.stopImmediatePropagation();
+      held.push(event);
+    }
+    start();
+  };
 
   for (const type of PREFETCH_EVENTS) island.addEventListener(type, prefetch, { once: true });
   for (const type of ACTIVATION_EVENTS) island.addEventListener(type, activate, true);
   prefetchWhenVisible(island);
+  return start;
+}
+
+/** Start a visible island's code this far before it scrolls into view. */
+const VISIBLE_MARGIN = "200px";
+
+/**
+ * An island that hydrates when it comes near the screen. Until then it is an
+ * interaction island: a click or key press that reaches it first hydrates it
+ * and is replayed.
+ */
+function hydrateWhenVisible(island: HTMLElement): void {
+  const start = hydrateOnInteraction(island);
+  // The island's wrapper has no box (display: contents); its content does.
+  const observer = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      observer.disconnect();
+      start();
+    },
+    { rootMargin: VISIBLE_MARGIN },
+  );
+  for (const box of Array.from(island.children)) observer.observe(box);
 }
 
 declare global {
@@ -331,11 +363,13 @@ if (forwarded === undefined) {
   revealAnchoredMember();
   injectAnalytics({ framework: "solid" });
   injectSpeedInsights({ framework: "solid" });
-  // Interaction islands listen at once; their code loads ahead or on first use.
+  // Interaction and visible islands listen at once; their code loads ahead,
+  // near the screen or on first use.
   const islands = Array.from(document.querySelectorAll<HTMLElement>("[data-island]"));
-  const onLoad = islands.filter((island) => island.dataset.islandHydrate !== "interaction");
+  const onLoad = islands.filter((island) => island.dataset.islandHydrate === undefined);
   for (const island of islands) {
     if (island.dataset.islandHydrate === "interaction") hydrateOnInteraction(island);
+    else if (island.dataset.islandHydrate === "visible") hydrateWhenVisible(island);
   }
   // After the first frame: the small bundle can arrive before the stylesheets
   // let the page paint, and hydrating then would hold the first paint back.

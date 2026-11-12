@@ -86,7 +86,7 @@ async function openLab(page: Page, lab: string): Promise<void> {
   await expect(page.locator(`#interop-lab-${lab}-panel`)).toBeVisible();
 }
 
-test("@portability the evidence vault answers from the checked data and browses its checks", async ({
+test("the evidence vault answers from the checked data and browses its checks", async ({
   page,
 }) => {
   const errors = collectErrors(page);

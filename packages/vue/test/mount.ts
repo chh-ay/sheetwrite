@@ -1,8 +1,16 @@
 import type { Grid } from "@sheetwrite/core";
 import { createApp, defineComponent, h, nextTick, ref, shallowRef } from "vue";
 
-import type { MountAdapter } from "../../../test/adapter-lifecycle-contract.js";
-import { SheetwriteGrid, type SheetwriteGridExpose } from "../src/index.js";
+import type {
+  MountAdapter,
+  RenderSimpleAdapter,
+} from "../../../test/adapter-lifecycle-contract.js";
+import {
+  Sheetwrite,
+  SheetwriteGrid,
+  type SheetwriteGridExpose,
+  type SheetwriteProps,
+} from "../src/index.js";
 
 async function settle(): Promise<void> {
   await nextTick();
@@ -45,6 +53,27 @@ export const mountVue: MountAdapter = async (props) => {
       currentProps.value = nextProps;
       await settle();
     },
+    unmount: async () => {
+      app.unmount();
+      await nextTick();
+    },
+  };
+};
+
+export const renderVueSimple: RenderSimpleAdapter = async (host, props) => {
+  const errors: unknown[] = [];
+  const app = createApp({ render: () => h(Sheetwrite, props as SheetwriteProps) });
+  app.config.errorHandler = (error) => {
+    errors.push(error);
+  };
+  try {
+    app.mount(host);
+    await settle();
+  } catch (error) {
+    errors.push(error);
+  }
+  return {
+    error: errors[0],
     unmount: async () => {
       app.unmount();
       await nextTick();
