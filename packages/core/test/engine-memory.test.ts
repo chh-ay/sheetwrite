@@ -11,6 +11,9 @@ beforeAll(async () => {
 
 const address = (row: number, col: number) => ({ sheet: "s1", row, col });
 
+const COLLECTION_DEADLINE_MS = 2_000;
+const COLLECTION_INTERVAL_MS = 10;
+
 describe("explicit engine memory release", () => {
   it("moves every live dense store without changing source, style, cached results, or events", async () => {
     const first = new SheetwriteStore(makeWorkbook(10));
@@ -92,13 +95,18 @@ describe("explicit engine memory release", () => {
       expect(releaseEngineMemory()).toBe(first);
       await first;
 
-      for (let cycle = 0; cycle < 5; cycle++) {
-        // A real task boundary ends WeakRef's keep-alive job; fake time cannot force GC.
-        const next = Promise.withResolvers<void>();
-        setImmediate(next.resolve);
-        await next.promise;
-        Bun.gc(true);
-      }
+      // JSC's concurrent compiler can temporarily root a retired instance.
+      // Collect on a fresh timer stack, after WeakRef's keep-alive job ends,
+      // until compilation settles; a real owner still fails the deadline.
+      const deadline = performance.now() + COLLECTION_DEADLINE_MS;
+      do {
+        await new Promise<void>((resolve) => {
+          setTimeout(() => {
+            Bun.gc(true);
+            resolve();
+          }, COLLECTION_INTERVAL_MS);
+        });
+      } while (retired.deref() !== undefined && performance.now() < deadline);
 
       expect(retired.deref()).toBeUndefined();
 
