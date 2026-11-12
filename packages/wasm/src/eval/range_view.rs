@@ -10,7 +10,7 @@ use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
-    KIND_NUMBER, KIND_STRING,
+    KIND_NUMBER, KIND_STRING, LITERAL_KIND_BITS,
 };
 
 use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
@@ -18,14 +18,20 @@ use super::{string_from_pool_ref, EvalPass, LiteralSources};
 
 /// A written range clipped to its sheet's used extent.
 pub(super) struct RangeView<'a> {
-    store: &'a CellStore,
-    data: &'a SheetData,
-    sheet: usize,
-    row_start: usize,
-    col_start: usize,
+    pub(super) store: &'a CellStore,
+    pub(super) data: &'a SheetData,
+    pub(super) sheet: usize,
+    pub(super) row_start: usize,
+    pub(super) col_start: usize,
     rows: usize,
     cols: usize,
-    depth: usize,
+    pub(super) depth: usize,
+}
+
+/// Dense literal cells, as one row slice of kinds and payloads per column.
+pub(super) struct LiteralColumns<'a> {
+    pub(super) rows: usize,
+    pub(super) columns: Vec<(&'a [u8], &'a [u64])>,
 }
 
 impl<'a> RangeView<'a> {
@@ -80,6 +86,41 @@ impl<'a> RangeView<'a> {
     /// The number of rows and columns after clipping.
     pub(super) const fn shape(&self) -> (usize, usize) {
         (self.rows, self.cols)
+    }
+
+    /// Borrows literal kind/payload columns without copying text or numbers.
+    /// Formula, spill, paged and depth-limited reads use the cell cursor instead.
+    pub(super) fn literal_columns(&self) -> Option<LiteralColumns<'a>> {
+        LiteralSources::new(self.data, self.depth)?;
+
+        #[cfg(test)]
+        if super::range_reader::LITERAL_COLUMNS_OFF.with(std::cell::Cell::get) {
+            return None;
+        }
+
+        let rows = self.row_start..self.row_start + self.rows;
+        let mut columns = Vec::new();
+        columns.try_reserve_exact(self.cols).ok()?;
+
+        for col in self.col_start..self.col_start + self.cols {
+            let column = self.data.cells.dense_column(col)?;
+            let (column_kinds, payloads) = column.raw_slices();
+            let kinds = column_kinds.get(rows.clone())?;
+
+            // Literal kinds are 0..=3 (a raw empty kind without the calculated
+            // bit is a plain blank). Any other kind sets a higher bit, so one
+            // OR over the column decides it without a branch per cell.
+            if kinds.iter().fold(0, |any, &kind| any | kind) & !LITERAL_KIND_BITS != 0 {
+                return None;
+            }
+
+            columns.push((kinds, payloads.get(rows.clone())?));
+        }
+
+        Some(LiteralColumns {
+            rows: self.rows,
+            columns,
+        })
     }
 
     /// The value of the cell at a zero-based `row` and `col` of the view:
