@@ -43,7 +43,7 @@
     "missing_docs": 38,
     "redundant_imports": 14,
     "unnameable_types": 6,
-    "unreachable_pub": 25
+    "unreachable_pub": 24
   },
   "history": {},
   "queries": {}
