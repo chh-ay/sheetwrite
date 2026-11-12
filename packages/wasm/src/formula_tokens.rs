@@ -49,9 +49,11 @@ pub(crate) enum TokenKind {
 /// One token of [`lex_tolerant`] and its byte span in the source.
 pub(crate) struct Spanned<'a> {
     /// The token, or the lexer's message for text it cannot read.
-    pub tok: Result<Tok<'a>, String>,
-    pub start: usize,
-    pub end: usize,
+    pub(crate) tok: Result<Tok<'a>, String>,
+    /// Inclusive byte offset into the original formula text.
+    pub(crate) start: usize,
+    /// Exclusive byte offset into the original formula text.
+    pub(crate) end: usize,
 }
 
 /// Where the formula starts in editor text: after leading whitespace and one
@@ -234,6 +236,7 @@ impl FormulaSyntaxError {
         self.incomplete
     }
 
+    /// The parser or lexer's explanation of the marked syntax error.
     #[wasm_bindgen(getter, js_name = message)]
     #[must_use]
     pub fn message(&self) -> String {
