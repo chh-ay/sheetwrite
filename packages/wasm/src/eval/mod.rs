@@ -2344,7 +2344,7 @@ impl CellStore {
             };
             let sheet_name = match optional_ast(args, 4) {
                 Some(ast) => match text_from_value(&scalar(ast, pass)) {
-                    Ok(value) => Some(value),
+                    Ok(value) => Some(value.into_owned()),
                     Err(error) => return Value::Error(error),
                 },
                 None => None,
