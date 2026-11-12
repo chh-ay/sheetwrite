@@ -15,11 +15,10 @@ const PATTERNS: [&str; 3] = ["(alpha|beta){40}", "(gamma|delta){40}", "(kappa|si
 struct CountingAllocator;
 
 thread_local! {
+    /// Live bytes this thread allocated. Wrapping, because one thread can free
+    /// what another allocated; only the test thread's difference is compared.
     static LIVE_BYTES: Cell<usize> = const { Cell::new(0) };
 }
-
-// The harness can free an allocation on a different thread from its owner.
-// Wrapping counts allow that; only the engine thread's before/after delta matters.
 
 // SAFETY: every call forwards to `System` unchanged and only adjusts a counter.
 #[allow(unsafe_code, reason = "the test replaces the global allocator")]

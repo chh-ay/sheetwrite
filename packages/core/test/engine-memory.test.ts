@@ -3,6 +3,7 @@ import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 import { getEngine } from "../src/engine.js";
 import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
 import { storeEngine } from "../src/store/engine-registry.js";
+import { collectUntilFreed } from "./collect-garbage.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -10,9 +11,6 @@ beforeAll(async () => {
 });
 
 const address = (row: number, col: number) => ({ sheet: "s1", row, col });
-
-const COLLECTION_DEADLINE_MS = 2_000;
-const COLLECTION_INTERVAL_MS = 10;
 
 describe("explicit engine memory release", () => {
   it("moves every live dense store without changing source, style, cached results, or events", async () => {
@@ -94,19 +92,7 @@ describe("explicit engine memory release", () => {
       const first = releaseEngineMemory();
       expect(releaseEngineMemory()).toBe(first);
       await first;
-
-      // JSC's concurrent compiler can temporarily root a retired instance.
-      // Collect on a fresh timer stack, after WeakRef's keep-alive job ends,
-      // until compilation settles; a real owner still fails the deadline.
-      const deadline = performance.now() + COLLECTION_DEADLINE_MS;
-      do {
-        await new Promise<void>((resolve) => {
-          setTimeout(() => {
-            Bun.gc(true);
-            resolve();
-          }, COLLECTION_INTERVAL_MS);
-        });
-      } while (retired.deref() !== undefined && performance.now() < deadline);
+      await collectUntilFreed([retired]);
 
       expect(retired.deref()).toBeUndefined();
 
