@@ -344,6 +344,14 @@ samples with inlined frames, at the sizes the rows first had (1,000 lookups,
 
 Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
 
+`spill-filter-same-range` (100,000 rows) is the `spill-filter-resize` spill,
+`=FILTER(A1:A100000,B1:B100000)` with every row kept, where the timed run
+edits A1 instead of the filter. The spill comes back over the same range and
+only its anchor changes, so the row times a recalculation that compares the
+reinstalled values with the old ones and wakes no reader of the other cells
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
 Six rows time grouping, pivots, analysis functions and the version-history
 diff, which no other row reaches. The first five run on the full engine only,
 since the default engine has none of these functions; the default engine's

@@ -29,6 +29,100 @@ pub(crate) fn spill_ownership_within_budget(owner_cells: usize) -> bool {
             .is_some_and(|bytes| bytes <= MAX_SPILL_OWNER_BYTES)
 }
 
+/// What [`SpillState::vacate`] removed: the range a spill held and the value
+/// each cell it owned held. The recalculation pass keeps one and reuses its
+/// buffer for every anchor.
+#[derive(Default)]
+pub(crate) struct VacatedSpill {
+    range: Option<SpillRange>,
+    /// Row-major over `range`: a kept value, [`NOT_OWNED`] or [`NO_VALUE`].
+    values: Vec<(u8, u64)>,
+    owned_cells: usize,
+}
+
+/// A cell of the vacated range that the anchor did not own.
+const NOT_OWNED: (u8, u64) = (u8::MAX, 0);
+/// An owned cell that held no calculated value. Unlike [`NOT_OWNED`] it was
+/// cleared, but like it, it never equals a written value.
+const NO_VALUE: (u8, u64) = (u8::MAX, 1);
+
+impl VacatedSpill {
+    fn reset(&mut self, range: Option<SpillRange>) {
+        self.range = range;
+        self.owned_cells = 0;
+        self.values.clear();
+        if let Some(range) = range {
+            self.values.resize(range.cells(), NOT_OWNED);
+        }
+    }
+
+    fn offset(range: SpillRange, cell: CellKey) -> usize {
+        (cell.0 - range.anchor.0) as usize * range.cols() + (cell.1 - range.anchor.1) as usize
+    }
+
+    fn keep(&mut self, cell: CellKey, value: Option<(u8, u64)>) {
+        let Some(range) = self.range else {
+            return;
+        };
+        if let Some(slot) = self.values.get_mut(Self::offset(range, cell)) {
+            *slot = value.unwrap_or(NO_VALUE);
+            self.owned_cells += 1;
+        }
+    }
+
+    /// The value `cell` held as a reader saw it, or `None` (never equal to a
+    /// stored value) when the vacated spill did not own it.
+    fn value(&self, cell: CellKey) -> Option<(u8, u64)> {
+        let range = self.range.filter(|range| range.contains(cell))?;
+        let value = *self.values.get(Self::offset(range, cell))?;
+        (value != NOT_OWNED && value != NO_VALUE).then_some(value)
+    }
+
+    /// The number of cells the vacated spill owned, its anchor excluded.
+    pub(crate) const fn owned_cells(&self) -> usize {
+        self.owned_cells
+    }
+
+    /// The vacated cells outside `installed`, the range the same anchor
+    /// installed in their place: they were cleared and nothing was written
+    /// back. All of them when nothing was installed.
+    pub(crate) fn cleared_outside(&self, installed: Option<SpillRange>) -> Vec<CellKey> {
+        let Some(range) = self.range else {
+            return Vec::new();
+        };
+        debug_assert!(installed.is_none_or(|installed| installed.anchor == range.anchor));
+        let mut cleared = Vec::new();
+        let mut push_owned = |row: u32, first_col: u32| {
+            for col in first_col..=range.col_end {
+                let cell = (row, col);
+                if self
+                    .values
+                    .get(Self::offset(range, cell))
+                    .is_some_and(|&value| value != NOT_OWNED)
+                {
+                    cleared.push(cell);
+                }
+            }
+        };
+        // Both ranges start at the anchor, so the installed one covers the
+        // leading rows and columns of the vacated one.
+        let (kept_rows_end, kept_cols_end) = match installed {
+            Some(installed) => (installed.row_end, installed.col_end),
+            None => (range.anchor.0, range.anchor.1),
+        };
+        for row in range.anchor.0..=range.row_end {
+            if installed.is_some() && row <= kept_rows_end {
+                if kept_cols_end < range.col_end {
+                    push_owned(row, kept_cols_end + 1);
+                }
+            } else {
+                push_owned(row, range.anchor.1);
+            }
+        }
+        cleared
+    }
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct SpillRange {
     pub(crate) anchor: CellKey,
@@ -509,21 +603,27 @@ impl SpillState {
         changed
     }
 
-    /// [`Self::clear`], also returning the value each cell held, so a spill
-    /// that comes back over the same range can report only changed cells.
-    pub(crate) fn clear_keeping_values(
+    /// [`Self::clear`] of the spill `anchor` has installed, keeping in
+    /// `vacated` the range and the value each removed cell held, so that
+    /// [`Self::reinstall`] reports only the cells whose value changes. Returns
+    /// the vacated range: `None` when `anchor` had no spill installed, which
+    /// also empties `vacated`.
+    pub(crate) fn vacate(
         &mut self,
         anchor: CellKey,
         cells: &mut CellStorage,
-    ) -> Vec<(CellKey, Option<(u8, u64)>)> {
-        let mut changed = Vec::new();
-        self.clear_each::<true>(anchor, cells, |cell, value| changed.push((cell, value)));
-        changed
+        vacated: &mut VacatedSpill,
+    ) -> Option<SpillRange> {
+        let range = self.installed(anchor);
+        vacated.reset(range);
+        if range.is_some() {
+            self.clear_each::<true>(anchor, cells, |cell, value| vacated.keep(cell, value));
+        }
+        range
     }
 
     /// `KEEP_VALUES` reads each value before removing it; other clears skip
-    /// that lookup, which costs a hash probe per cell on paged sheets. Cells
-    /// are visited in row-major order, the order [`Self::install`] writes.
+    /// that lookup, which costs a hash probe per cell on paged sheets.
     fn clear_each<const KEEP_VALUES: bool>(
         &mut self,
         anchor: CellKey,
@@ -757,6 +857,48 @@ impl SpillState {
         changed
     }
 
+    /// [`Self::install`] for an anchor whose previous spill [`Self::vacate`]
+    /// kept in `vacated`. Returns only the non-anchor cells whose value
+    /// differs from what they held in `vacated`: cells outside its range, and
+    /// cells it did not own, always count as changed. A first install keeps
+    /// [`Self::install`]'s loop, which compares nothing.
+    pub(crate) fn reinstall(
+        &mut self,
+        range: SpillRange,
+        cells: &mut CellStorage,
+        vacated: &VacatedSpill,
+        mut value_at: impl FnMut(usize) -> (u8, u64),
+    ) -> Vec<CellKey> {
+        let anchor = range.anchor;
+        let cols = range.cols();
+        let rows = (range.row_end - anchor.0) as usize + 1;
+        let mut changed = Vec::new();
+
+        let owners = self.owners.get_or_insert_with(Box::default);
+        for col in anchor.1..=range.col_end {
+            owners.own(col, anchor, range.row_end);
+        }
+        for row_offset in 0..rows {
+            for col_offset in 0..cols {
+                let cell = (anchor.0 + row_offset as u32, anchor.1 + col_offset as u32);
+                if cell == anchor {
+                    continue;
+                }
+
+                let (kind, payload) = value_at(row_offset * cols + col_offset);
+                let index = cells.idx(cell.0 as usize, cell.1 as usize);
+                cells.set_derived(index, kind, payload);
+                // Compared as stored, as a reader sees the cell.
+                if vacated.value(cell) != cells.calculated_cell_at(index) {
+                    changed.push(cell);
+                }
+            }
+        }
+
+        self.compact(cells);
+        changed
+    }
+
     /// Releases run storage after spills shrink, and empty calculated chunks.
     pub(crate) fn compact(&mut self, cells: &mut CellStorage) {
         if self
@@ -980,5 +1122,101 @@ mod tests {
             }
         }
         assert_eq!(store.get_cell(sheet, 9, 3).num(), 40.0);
+    }
+
+    /// Formula evaluations that `recalculate` runs.
+    fn evaluations(recalculate: impl FnOnce()) -> usize {
+        crate::eval::FORMULA_EVALUATIONS.with(|count| count.set(0));
+        recalculate();
+        crate::eval::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
+    }
+
+    /// A spill that grows or shrinks by a row keeps the values of the rows it
+    /// still covers, so only the anchor, its readers and the readers of the
+    /// gained or released cell recalculate; the others keep their results.
+    #[test]
+    fn a_resized_spill_wakes_only_readers_of_changed_cells() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        for row in 0..6 {
+            store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+            store.set_bool(sheet, row, 1, row < 5, 0);
+            store.set_formula(sheet, row, 3, &format!("=C{}*2", row + 1), 0);
+        }
+        store.set_formula(sheet, 0, 2, "=FILTER(A1:A6,B1:B6)", 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, 5, 3).num(), 0.0);
+
+        // The anchor and D1, which reads it, then D6, which reads the gained cell.
+        store.set_bool(sheet, 5, 1, true, 0);
+        assert_eq!(evaluations(|| store.recompute(sheet)), 3);
+        assert_eq!(anchor(&store, sheet, 5, 2), (0, 2));
+        assert_eq!(store.get_cell(sheet, 5, 3).num(), 12.0);
+        assert_eq!(store.get_cell(sheet, 4, 3).num(), 10.0);
+
+        store.set_bool(sheet, 5, 1, false, 0);
+        assert_eq!(evaluations(|| store.recompute(sheet)), 3);
+        assert_eq!(anchor(&store, sheet, 5, 2), NONE);
+        assert_eq!(store.get_cell(sheet, 5, 3).num(), 0.0);
+        assert_eq!(store.get_cell(sheet, 4, 3).num(), 10.0);
+    }
+
+    const ORACLE_ROWS: usize = 12;
+
+    /// A sheet whose spills read `values` and `kept`, with readers of every
+    /// spilled cell and of each whole spill.
+    fn oracle_sheet(values: &[f64], kept: &[bool]) -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(8, ORACLE_ROWS + 2);
+        for row in 0..ORACLE_ROWS {
+            store.set_number(sheet, row, 0, values[row], 0);
+            store.set_bool(sheet, row, 1, kept[row], 0);
+            store.set_formula(sheet, row, 3, &format!("=C{}*2", row + 1), 0);
+            store.set_formula(sheet, row, 7, &format!("=F{}+1", row + 1), 0);
+        }
+        store.set_formula(sheet, 0, 2, "=FILTER(A1:A12,B1:B12,0)", 0);
+        store.set_formula(sheet, 0, 4, "=SUM(C1#)", 0);
+        store.set_formula(sheet, 0, 5, "=SORT(FILTER(A1:B12,B1:B12,0),1,-1)", 0);
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    /// After each edit, an incrementally recalculated sheet shows exactly
+    /// what a sheet built from the same inputs and calculated once shows: a
+    /// spill reinstalled over the same, a larger or a smaller range wakes
+    /// every formula whose input changed.
+    #[test]
+    fn incremental_spill_changes_match_a_fresh_calculation() {
+        let mut values: Vec<f64> = (0..ORACLE_ROWS).map(|row| (row % 4) as f64).collect();
+        let mut kept: Vec<bool> = (0..ORACLE_ROWS).map(|row| row % 3 != 0).collect();
+        let (mut store, sheet) = oracle_sheet(&values, &kept);
+        let mut seed = 0x2545_f491_u32;
+        for step in 0..300 {
+            seed ^= seed << 13;
+            seed ^= seed >> 17;
+            seed ^= seed << 5;
+            let row = seed as usize % ORACLE_ROWS;
+            if seed & 0x100 == 0 {
+                kept[row] = !kept[row];
+                store.set_bool(sheet, row, 1, kept[row], 0);
+            } else {
+                values[row] = ((seed >> 9) % 5) as f64;
+                store.set_number(sheet, row, 0, values[row], 0);
+            }
+            store.recompute(sheet);
+
+            let (fresh, fresh_sheet) = oracle_sheet(&values, &kept);
+            for row in 0..ORACLE_ROWS + 2 {
+                for col in 2..8 {
+                    let incremental = store.get_cell(sheet, row, col);
+                    let expected = fresh.get_cell(fresh_sheet, row, col);
+                    assert_eq!(
+                        (incremental.kind(), incremental.num(), incremental.string()),
+                        (expected.kind(), expected.num(), expected.string()),
+                        "step {step}, cell {row},{col}"
+                    );
+                }
+            }
+        }
     }
 }
