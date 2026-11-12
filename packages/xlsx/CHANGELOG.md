@@ -1,11 +1,5 @@
 # @sheetwrite/xlsx
 
-## Unreleased
-
-### Patch Changes
-
-- Split workbook loading, worksheet row ingestion, metadata restoration and worksheet XML sections into internal owners. Replace unchecked codec indexes with narrowed records. The public interface and workbook conversion behavior are unchanged.
-
 ## 0.6.1
 
 ### Patch Changes
