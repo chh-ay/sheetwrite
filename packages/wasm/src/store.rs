@@ -3750,7 +3750,7 @@ impl CellStore {
         }
 
         if features.table_refs {
-            ast = self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col);
+            self.resolve_table_refs(&mut ast, formula_sheet, formula_row, formula_col);
         }
 
         #[cfg(feature = "analysis")]
@@ -3772,19 +3772,20 @@ impl CellStore {
     ) -> Result<Ast, FormulaError> {
         let ast = self.resolve_sheets(ast)?;
         let placement = names::NamePlacement::new(formula_row, formula_col);
-        let ast = self.resolve_defined_names(ast, formula_sheet, &placement);
-        Ok(self.resolve_table_refs(ast, formula_sheet, formula_row, formula_col))
+        let mut ast = self.resolve_defined_names(ast, formula_sheet, &placement);
+        self.resolve_table_refs(&mut ast, formula_sheet, formula_row, formula_col);
+        Ok(ast)
     }
 
     /// Resolves the table references of a formula in the cell at
     /// (`formula_row`, `formula_col`) of `formula_sheet`.
     fn resolve_table_refs(
         &self,
-        ast: Ast,
+        ast: &mut Ast,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
-    ) -> Ast {
+    ) {
         resolve_structured_refs(
             ast,
             formula_sheet,

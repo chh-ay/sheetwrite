@@ -311,9 +311,9 @@ impl CellStore {
         if definition.positional {
             translate_name_refs(&mut ast, placement.row, placement.col);
         }
-        let ast = self.resolve_defined_names(ast, formula_sheet, placement);
-        let ast = resolve_structured_refs(
-            ast,
+        let mut ast = self.resolve_defined_names(ast, formula_sheet, placement);
+        resolve_structured_refs(
+            &mut ast,
             formula_sheet,
             placement.row,
             placement.col,

@@ -2876,111 +2876,29 @@ pub(crate) fn named_lambda_call(
     }))
 }
 
-pub fn resolve_structured_refs<F>(
-    ast: Ast,
+/// Resolves the table references in `ast` in place, for a formula in the
+/// cell at (`formula_row`, `formula_col`) of `formula_sheet`. A reference
+/// that `resolve` cannot place stays unresolved.
+pub(crate) fn resolve_structured_refs<F>(
+    ast: &mut Ast,
     formula_sheet: u32,
     formula_row: u32,
     formula_col: u32,
     resolve: &F,
-) -> Ast
-where
+) where
     F: Fn(&UnresolvedStructuredRef, u32, u32, u32) -> Option<StructuredRef>,
 {
-    match ast {
-        Ast::UnresolvedStructured(reference) => {
-            resolve(&reference, formula_sheet, formula_row, formula_col)
-                .map_or(Ast::UnresolvedStructured(reference), |reference| {
-                    Ast::Structured(Box::new(reference))
-                })
+    // Every other node holds table references only through its children.
+    if let Ast::UnresolvedStructured(reference) = ast {
+        if let Some(resolved) = resolve(reference, formula_sheet, formula_row, formula_col) {
+            *ast = Ast::Structured(Box::new(resolved));
         }
-        Ast::Func(func, args) => Ast::Func(
-            func,
-            (args
-                .into_vec()
-                .into_iter()
-                .map(|arg| {
-                    resolve_structured_refs(arg, formula_sheet, formula_row, formula_col, resolve)
-                })
-                .collect::<Vec<_>>())
-            .into(),
-        ),
-        Ast::UnknownFunc(call) => {
-            let UnknownCall { name, args } = *call;
-            Ast::UnknownFunc(Box::new(UnknownCall {
-                name,
-                args: (args
-                    .into_vec()
-                    .into_iter()
-                    .map(|arg| {
-                        resolve_structured_refs(
-                            arg,
-                            formula_sheet,
-                            formula_row,
-                            formula_col,
-                            resolve,
-                        )
-                    })
-                    .collect::<Vec<_>>())
-                .into(),
-            }))
-        }
-        Ast::Bin(op, left, right) => Ast::Bin(
-            op,
-            Box::new(resolve_structured_refs(
-                *left,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-            Box::new(resolve_structured_refs(
-                *right,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-        ),
-        Ast::Cmp(op, left, right) => Ast::Cmp(
-            op,
-            Box::new(resolve_structured_refs(
-                *left,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-            Box::new(resolve_structured_refs(
-                *right,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-        ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_structured_refs(
-            *inner,
-            formula_sheet,
-            formula_row,
-            formula_col,
-            resolve,
-        ))),
-        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_structured_refs(
-            *inner,
-            formula_sheet,
-            formula_row,
-            formula_col,
-            resolve,
-        ))),
-        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_structured_refs(
-            *inner,
-            formula_sheet,
-            formula_row,
-            formula_col,
-            resolve,
-        ))),
-        other => other,
+        return;
     }
+    ast.fold_children_mut(&mut |child| {
+        resolve_structured_refs(child, formula_sheet, formula_row, formula_col, resolve);
+        false
+    });
 }
 
 /// Translate relative A1 references from one formula origin to another.
