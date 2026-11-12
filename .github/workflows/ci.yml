@@ -124,9 +124,9 @@ jobs:
             ~/.cargo/git
           key: ${{ steps.cargo-audit.outputs.cache-primary-key }}
 
-  # Each test suite runs once: the package suites and the analysis, history
-  # and queries Rust tests run only under coverage, and the jobs below split the
-  # rest so that none of them waits on another.
+  # Package suites and the analysis, history and queries Rust tests run under
+  # coverage. Core also runs in development mode to exercise its extra checks;
+  # the jobs below split the rest so that none waits on another.
   unit-coverage:
     name: Unit Tests & Coverage
     needs: artifact-build
@@ -219,6 +219,8 @@ jobs:
           bun scripts/hydrate-release-artifacts.ts test-results/release-artifacts
       - name: Unit suites outside the coverage run
         run: bun run test:unit:uncovered
+      - name: Core unit tests in development mode
+        run: NODE_ENV=development bun test packages/core/test
       - name: Save Bun downloads cache
         if: env.SAVE_CACHE == 'true' && steps.bun-downloads.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0

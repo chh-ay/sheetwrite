@@ -186,6 +186,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
   "scripts/check-local-paths.test.ts",
+  "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
   "scripts/wasm-function-sizes.test.ts",
 ] as const;

@@ -12,7 +12,7 @@ import {
 import { whenNearViewport } from "../lib/near-viewport.js";
 import { Button } from "../ui/Button.js";
 import { createScaleFlight, type ScaleFlight } from "./flight.js";
-import { FlightControls, FlightReadout, ScaleMinimap } from "./Flight.js";
+import { FlightControls, FlightReadout, ScaleMinimap } from "./FlightPanel.js";
 import {
   activeStorage,
   DEFAULT_CEILING_MIB,

@@ -1,4 +1,4 @@
-import { expect, test } from "bun:test";
+import { expect, spyOn, test } from "bun:test";
 
 import { makeColumnar, toAoA } from "../src/dataset.js";
 import {
@@ -158,6 +158,17 @@ function run(scenarioId: ScenarioId, adapter = fakeAdapter()) {
   return runRenderScenario(adapter, dataset, scenarioId, options);
 }
 
+/** Sheetwrite ingests the date column's ISO text as a date serial (2020-10-20). */
+const INGESTED_DATE_SERIAL = 44_124;
+
+/** The fake's first row, with its date cell holding what Sheetwrite's ingest stores. */
+function ingestedFirstRow(adapter: FakeAdapter): unknown[] {
+  const firstRow = adapter.values[0];
+  if (!firstRow) throw new Error("the fake grid has no first row");
+  firstRow[1] = INGESTED_DATE_SERIAL;
+  return firstRow;
+}
+
 test.each([
   [
     "a wrong canonical row count before timing",
@@ -250,4 +261,60 @@ test("separates exact transfer counters from the pixel-data-invalid upper bound"
     copiedBytesPerLogicalRead: null,
     outputAllocationEventsPerLogicalRead: null,
   });
+});
+
+test("checks merged cells against the loaded values when merge-heavy runs alone", () => {
+  const adapter = fakeAdapter();
+  ingestedFirstRow(adapter);
+  const result = run("merge-heavy.paint", adapter);
+  if (result.status !== "success") throw new Error(result.message);
+  expect(result.validation).toContainEqual(
+    expect.objectContaining({
+      checkpoint: "merge-heavy.paint preserves anchor and covered-cell values",
+      passed: true,
+    }),
+  );
+});
+
+test("formatted-paint restores the values the cells held, not dataset text", () => {
+  const adapter = fakeAdapter();
+  const firstRow = ingestedFirstRow(adapter);
+  const loaded = [...firstRow];
+  const result = run("formatted-paint.top-left", adapter);
+  if (result.status !== "success") throw new Error(result.message);
+  expect(firstRow).toEqual(loaded);
+});
+
+test("times sub-microsecond geometry builds in batches the clock can resolve", () => {
+  // A 50 ns build: 1,000,000 builds timed one by one add up to only 50 ms.
+  const buildMs = 0.000_05;
+  const minimumSampleDurationMs = 100;
+  let clockMs = 0;
+  const clock = spyOn(performance, "now").mockImplementation(() => clockMs);
+  try {
+    const adapter: FakeAdapter = {
+      ...fakeAdapter(),
+      measureUnresizedMillionRowGeometry: () => {
+        clockMs += buildMs;
+        return {
+          count: 1_000_000,
+          backingStoreBytes: 0,
+          totalHeight: 28_000_000,
+          middleRow: 500_000,
+          middleTop: 14_000_000,
+          lastRow: 999_999,
+          lastTop: 27_999_972,
+        };
+      },
+    };
+    const result = runRenderScenario(adapter, dataset, "geometry-unresized.1m", {
+      ...options,
+      minimumSampleDurationMs,
+    });
+    if (result.status !== "success") throw new Error(result.message);
+    expect(result.rawSamples[0]?.durationMs).toBeGreaterThanOrEqual(minimumSampleDurationMs);
+    expect(result.medianMs).toBeCloseTo(buildMs, 9);
+  } finally {
+    clock.mockRestore();
+  }
 });

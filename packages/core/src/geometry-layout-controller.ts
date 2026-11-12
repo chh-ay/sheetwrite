@@ -57,7 +57,8 @@ export class GeometryLayoutController {
   private rowGeometryLength = 0;
   private previewColumn = -1;
   private previewWidth = 0;
-  private hasRowPreview = false;
+  /** View row whose height a resize drag previews, or -1. */
+  private previewRow = -1;
 
   previewColumnWidth(column: number, width: number): void {
     this.previewColumn = column;
@@ -72,7 +73,10 @@ export class GeometryLayoutController {
   }
 
   previewRowHeight(row: number, height: number): void {
-    this.hasRowPreview = true;
+    if (this.previewRow !== -1 && this.previewRow !== row) {
+      this.rowIndex.setHeight(this.previewRow, this.committedRowHeight(this.previewRow));
+    }
+    this.previewRow = row;
     this.rowIndex.setHeight(row, height * this.options.zoom());
   }
 
@@ -82,9 +86,10 @@ export class GeometryLayoutController {
       this.previewColumn = -1;
       this.columnIndex.setWidth(column, this.columnWidth(column) * this.options.zoom());
     }
-    if (this.hasRowPreview) {
-      this.hasRowPreview = false;
-      this.rebuildRows(this.rowIndex.count);
+    if (this.previewRow !== -1) {
+      const row = this.previewRow;
+      this.previewRow = -1;
+      this.rowIndex.setHeight(row, this.committedRowHeight(row));
     }
   }
 
@@ -321,7 +326,7 @@ export class GeometryLayoutController {
     rowHeights: Float64Array;
   } | null {
     const sheet = this.options.sheet();
-    if (!this.hasRowPreview && (!sheet.rowHeights || sheet.rowHeights.size === 0)) return null;
+    if (this.previewRow === -1 && (!sheet.rowHeights || sheet.rowHeights.size === 0)) return null;
 
     const count = Math.max(0, window.end - window.start);
     if (this.rowTopsScratch.length < count) {
@@ -348,7 +353,9 @@ export class GeometryLayoutController {
     rowTops: Float64Array;
     rowHeights: Float64Array;
   } | null {
-    if (count <= 0 || (!this.hasRowPreview && !this.options.sheet().rowHeights?.size)) return null;
+    if (count <= 0 || (this.previewRow === -1 && !this.options.sheet().rowHeights?.size)) {
+      return null;
+    }
     assertGeometryDimensions(count, 0);
     let rowTops: Float64Array;
     let rowHeights: Float64Array;
@@ -383,6 +390,22 @@ export class GeometryLayoutController {
     this.rowIndex = this.createRowIndex(sheet, rowCount);
   }
 
+  /** Apply the committed heights of `dataRows` to the row index without rebuilding it. */
+  updateRowHeights(dataRows: readonly number[]): void {
+    if (dataRows.length === 1) {
+      const viewRow = this.toViewRow(dataRows[0] ?? -1);
+      if (viewRow !== null) this.rowIndex.setHeight(viewRow, this.committedRowHeight(viewRow));
+      return;
+    }
+    const rowHeights = this.options.sheet().rowHeights;
+    const { rows, heights } = this.committedHeights(
+      dataRows.map((dataRow) => [dataRow, rowHeights?.get(dataRow)] as const),
+      dataRows.length,
+      this.rowIndex.count,
+    );
+    this.rowIndex.setHeights(rows, heights);
+  }
+
   rebuildColumns(): void {
     const sheet = this.options.sheet();
     assertGeometryDimensions(sheet.rowCount, sheet.columns.length);
@@ -410,25 +433,62 @@ export class GeometryLayoutController {
 
   private createRowIndex(sheet: Sheet, rowCount: number): OffsetIndex {
     const index = new OffsetIndex(rowCount, this.options.theme().rowHeight);
-    try {
-      if (sheet.rowHeights) {
-        for (const [dataRow, height] of sheet.rowHeights) {
-          const viewRow = this.toViewRow(dataRow);
-          if (viewRow !== null && viewRow < index.count) {
-            index.setHeight(viewRow, height * this.options.zoom());
-          }
-        }
-      }
-    } catch (error) {
-      if (!(error instanceof RangeError)) throw error;
-      throw new SnapshotResourceError(
-        "maxRowsPerSheet",
-        DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxRowsPerSheet,
-        rowCount,
-        { cause: error },
-      );
+    const rowHeights = sheet.rowHeights;
+    if (rowHeights && rowHeights.size > 0) {
+      const { rows, heights } = this.committedHeights(rowHeights, rowHeights.size, rowCount);
+      index.load(rows, heights);
     }
     return index;
+  }
+
+  /**
+   * View rows, ascending and distinct, and zoomed heights of the committed
+   * `[dataRow, height]` pairs whose view rows fall below `rowCount`. `size`
+   * bounds how many pairs there are. Pairs that arrive in view order, as a
+   * loaded sheet's do without a view, skip the sort.
+   */
+  private committedHeights(
+    entries: Iterable<readonly [dataRow: number, height: number | undefined]>,
+    size: number,
+    rowCount: number,
+  ): { rows: Int32Array<ArrayBuffer>; heights: Float64Array<ArrayBuffer> } {
+    const zoom = this.options.zoom();
+    const defaultHeight = this.options.theme().rowHeight;
+    const viewRows = new Int32Array(size);
+    const heights = new Float64Array(size);
+    let count = 0;
+    let ascending = true;
+    for (const [dataRow, height] of entries) {
+      const viewRow = this.toViewRow(dataRow);
+      if (viewRow === null || viewRow >= rowCount) continue;
+      if (count > 0 && viewRow <= (viewRows[count - 1] ?? -1)) ascending = false;
+      viewRows[count] = viewRow;
+      heights[count] = height === undefined ? defaultHeight : height * zoom;
+      count++;
+    }
+    if (ascending)
+      return { rows: viewRows.subarray(0, count), heights: heights.subarray(0, count) };
+    // A view row comes from one data row, so equal view rows carry equal heights.
+    const order = Uint32Array.from({ length: count }, (_, position) => position).sort(
+      (a, b) => (viewRows[a] ?? 0) - (viewRows[b] ?? 0),
+    );
+    const sortedRows = new Int32Array(count);
+    const sortedHeights = new Float64Array(count);
+    let unique = 0;
+    for (const position of order) {
+      const viewRow = viewRows[position] ?? 0;
+      if (unique > 0 && sortedRows[unique - 1] === viewRow) continue;
+      sortedRows[unique] = viewRow;
+      sortedHeights[unique] = heights[position] ?? defaultHeight;
+      unique++;
+    }
+    return { rows: sortedRows.subarray(0, unique), heights: sortedHeights.subarray(0, unique) };
+  }
+
+  /** Committed height of view row `row` at the current zoom. */
+  private committedRowHeight(row: number): number {
+    const height = this.options.sheet().rowHeights?.get(this.toDataRow(row));
+    return height === undefined ? this.options.theme().rowHeight : height * this.options.zoom();
   }
 }
 

@@ -9,10 +9,11 @@ import type { DocumentOp, PivotDefinition } from "../src/index.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import { elementAdded } from "./fixtures.js";
+import { elementAdded, installCoreStyles } from "./fixtures.js";
 
 await initSheetwrite({ engine: formulas });
 const restore = installCanvasTestStubs();
+const removeStyles = installCoreStyles();
 const host = document.createElement("div");
 Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
 document.body.appendChild(host);
@@ -288,5 +289,6 @@ try {
   );
 } finally {
   grid.destroy();
+  removeStyles();
   restore();
 }
