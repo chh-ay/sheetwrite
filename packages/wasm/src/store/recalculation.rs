@@ -148,8 +148,8 @@ mod tests {
         store.set_number(sheet, 0, 0, 3.0, 0);
         store.commit_sources();
         let rects = store.recalculated_rects();
-        // The dirty source seed A1 and recomputed B1 coalesce into one row run.
-        assert_eq!(rects, vec![sheet as u32, 0, 1, 0, 2]);
+        // Only recomputed B1: the edited A1 holds a source value, which core matches itself.
+        assert_eq!(rects, vec![sheet as u32, 0, 1, 1, 2]);
         assert_eq!(store.recalculated_rect_count(), 0);
 
         store.set_recalculation_tracking(false);
