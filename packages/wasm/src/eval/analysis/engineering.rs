@@ -143,7 +143,9 @@ fn digits_argument(values: &FuncAccumulator) -> Result<String, FormulaError> {
     match values.arg_value(0).unwrap_or(&Value::Blank) {
         Value::Bool(_) => Err(FormulaError::Value),
         Value::Number(number) if *number < 0.0 || number.fract() != 0.0 => Err(FormulaError::Num),
-        value => text_from_value(value).map(Cow::into_owned),
+        value @ (Value::Number(_) | Value::Text(_) | Value::Blank | Value::Error(_)) => {
+            text_from_value(value).map(Cow::into_owned)
+        }
     }
 }
 

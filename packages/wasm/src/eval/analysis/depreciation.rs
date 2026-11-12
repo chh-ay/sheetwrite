@@ -244,7 +244,9 @@ impl FrenchAsset {
         let year_days = match self.basis {
             Basis::ActualActual if self.purchased.is_leap_year() => DAYS_PER_LEAP_YEAR,
             Basis::ActualActual => DAYS_PER_YEAR,
-            _ => self.basis.year_days(self.purchased, self.purchased),
+            Basis::UsThirty | Basis::Actual360 | Basis::Actual365 | Basis::EuropeanThirty => {
+                self.basis.year_days(self.purchased, self.purchased)
+            }
         };
         let start = self.shared_february_day(self.purchased);
         let end = self.shared_february_day(self.first_period);

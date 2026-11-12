@@ -349,7 +349,9 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 let coefficient = match coefficient_cell.value {
                     Value::Number(number) => number,
                     Value::Error(error) => return Err(error),
-                    _ => return Err(FormulaError::Value),
+                    Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                        return Err(FormulaError::Value)
+                    }
                 };
                 sum += coefficient * x.powf(first_power + index as f64 * power_step);
             }
@@ -439,7 +441,9 @@ mod tests {
                 (number - expected).abs() <= tolerance,
                 "{number} != {expected}"
             ),
-            other => panic!("expected {expected}, got {other:?}"),
+            other @ (Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_)) => {
+                panic!("expected {expected}, got {other:?}")
+            }
         }
     }
 

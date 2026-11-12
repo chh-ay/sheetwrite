@@ -90,7 +90,9 @@ impl Criterion {
     pub(super) fn number_comparison(&self) -> Option<(CmpOp, f64)> {
         match self.operand {
             Value::Number(operand) if self.wildcard.is_none() => Some((self.op, operand)),
-            _ => None,
+            Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+                None
+            }
         }
     }
 
@@ -107,7 +109,9 @@ impl Criterion {
                 .map_or(self.op == CmpOp::Ne, |ordering| {
                     ordering_matches(ordering, self.op)
                 }),
-            _ => self.op == CmpOp::Ne,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+                self.op == CmpOp::Ne
+            }
         }
     }
 
@@ -120,7 +124,7 @@ impl Criterion {
         let ordering = match &self.operand {
             Value::Text(operand) => Some(compare_text_case_insensitive(text, operand)),
             Value::Blank if text.is_empty() => Some(Ordering::Equal),
-            _ => None,
+            Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => None,
         };
 
         match ordering {
