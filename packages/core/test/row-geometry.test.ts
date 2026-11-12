@@ -172,7 +172,9 @@ describe("row geometry", () => {
     expect(rowIndexOf(grid)).toBe(index);
     const sort = (ascending: boolean): void => {
       grid.applyTransaction({
-        patches: [{ op: "setSheetMeta", sheet: "s1", patch: { sortKeys: [{ col: 1, ascending }] } }],
+        patches: [
+          { op: "setSheetMeta", sheet: "s1", patch: { sortKeys: [{ col: 1, ascending }] } },
+        ],
       });
     };
     sort(true);
