@@ -45,9 +45,9 @@ impl CriteriaRead<'_, '_, '_> {
                 .iter()
                 .map(|(range, criterion)| Some((range.literal_columns()?, *criterion)))
                 .collect();
-            let values = self.values.as_ref().map(|range| range.literal_columns());
-            if let (Some(criteria), None | Some(Some(_))) = (columns, &values) {
-                let values = values.as_ref().and_then(Option::as_ref);
+            let value_columns = self.values.as_ref().map(|range| range.literal_columns());
+            if let (Some(criteria), None | Some(Some(_))) = (columns, &value_columns) {
+                let values = value_columns.as_ref().and_then(Option::as_ref);
                 if let Some(result) = store.criteria_literals_family(self.fold, values, &criteria) {
                     return result;
                 }
