@@ -22,11 +22,6 @@ import artStylesheet from "../art/art.css?url";
 /** Build-inserted components; the interactive ones are islands. */
 const DOCUMENT_COMPONENTS: DocumentComponents = { FormulaReference, PackageCommand, PerfFigure };
 
-/** Prefetch a docs page when a reader hovers or presses its link: pages navigate by document. */
-const SPECULATION_RULES = JSON.stringify({
-  prefetch: [{ where: { href_matches: "/docs/*" }, eagerness: "moderate" }],
-});
-
 export type DocumentMetadata = DocumentRecord & { readonly href: string };
 
 export function documentHead(metadata: DocumentMetadata) {
@@ -51,7 +46,6 @@ export function documentHead(metadata: DocumentMetadata) {
           trail: breadcrumbsFor(href, title),
         }),
       },
-      { type: "speculationrules", children: SPECULATION_RULES },
     ],
   };
 }

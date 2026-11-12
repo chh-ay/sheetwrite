@@ -23,11 +23,12 @@ export type CoreIslandName =
 
 /**
  * When an island's code loads and hydrates. `load`: after the page's first
- * paint, on every page that holds it. `interaction`: when the reader first
- * reaches for it (islands/client.tsx); its code is fetched ahead at low
- * priority once the island is on screen and the page is idle.
+ * paint, on every page that holds it. `visible`: when it comes near the
+ * screen, for self-contained islands far down a page. `interaction`: when the
+ * reader first reaches for it (islands/client.tsx); its code is fetched ahead
+ * at low priority once the island is on screen and the page is idle.
  */
-export type IslandHydration = "load" | "interaction";
+export type IslandHydration = "load" | "visible" | "interaction";
 
 interface IslandProps<Props extends object> {
   readonly name: IslandName;
@@ -63,7 +64,7 @@ export function Island<Props extends object>(props: IslandProps<Props>): JSX.Ele
   return (
     <div
       data-island={props.name}
-      data-island-hydrate={props.hydrate === "interaction" ? "interaction" : undefined}
+      data-island-hydrate={props.hydrate === "load" ? undefined : props.hydrate}
       data-island-id={id}
       data-props={Object.keys(pageProps).length === 0 ? undefined : JSON.stringify(pageProps)}
       style={{ display: "contents" }}

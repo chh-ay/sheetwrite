@@ -62,9 +62,11 @@ const ROUTER_TAGS = [
   /<script\b[^>]*>(?:(?!<\/script>).)*?(?:\$tsr-stream-boundary|__TSR_key|\$_TSR)(?:(?!<\/script>).)*?<\/script>/gs,
 ];
 
-/** An island's opening tag (islands/Island.tsx), its name, and whether it hydrates on interaction. */
+/** An island's opening tag (islands/Island.tsx), its name, and when it hydrates. */
 const ISLAND_MARKER = /<div\b[^>]*\bdata-island="([^"]+)"[^>]*>/g;
 const ON_INTERACTION = /\bdata-island-hydrate="interaction"/;
+/** Islands that hydrate after load (on interaction or when visible). */
+const DEFERRED = /\bdata-island-hydrate="/;
 
 const STYLESHEET_LINK = /<link\b[^>]*\brel="stylesheet"[^>]*>/g;
 const FEATURE_ATTRIBUTE = /\sdata-feature(?:="")?/;
@@ -101,16 +103,16 @@ function pageScripts(manifest: Manifest, html: string): string {
   if (entry === undefined) throw new Error(`${ISLANDS_ENTRY} is missing from ${ISLANDS_MANIFEST}`);
   const islands = Array.from(html.matchAll(ISLAND_MARKER)).flatMap(([tag, name]) =>
     name !== undefined && isOnDemandIsland(name)
-      ? [{ source: ON_DEMAND_ISLANDS[name], onInteraction: ON_INTERACTION.test(tag) }]
+      ? [{ source: ON_DEMAND_ISLANDS[name], deferred: DEFERRED.test(tag) }]
       : [],
   );
-  // Islands that hydrate on interaction fetch their code later (islands/client.tsx);
-  // preloading it would cost every visit. Their markup is in the page, so their
-  // stylesheets are linked like every other island's.
+  // Islands that hydrate on interaction or when visible fetch their code later
+  // (islands/client.tsx); preloading it would cost every visit. Their markup is
+  // in the page, so their stylesheets are linked like every other island's.
   const preloads = new Set([
     ...chunkFiles(manifest, ISLANDS_ENTRY),
     ...islands
-      .filter((island) => !island.onInteraction)
+      .filter((island) => !island.deferred)
       .flatMap((island) => chunkFiles(manifest, island.source)),
   ]);
   // The script tag loads the entry itself.
