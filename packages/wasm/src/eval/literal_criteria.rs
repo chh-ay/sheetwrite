@@ -237,13 +237,18 @@ impl CellStore {
         // One column per range is the common shape: match whole columns into
         // a row mask, then fold the matched rows in row order, as below.
         if cols == 1 {
-            let columns: Option<Vec<_>> = tests
+            let column_tests: Option<Vec<_>> = tests
                 .iter()
                 .map(|(range, test)| Some((column_rows(range, rows)?, test)))
                 .collect();
-            let values = values.map(|values| column_rows(values, rows));
-            if let (Some(columns), None | Some(Some(_))) = (columns, values) {
-                return self.literal_criteria_column_family(fold, values.flatten(), &columns, rows);
+            let column_values = values.map(|source| column_rows(source, rows));
+            if let (Some(columns), None | Some(Some(_))) = (column_tests, column_values) {
+                return self.literal_criteria_column_family(
+                    fold,
+                    column_values.flatten(),
+                    &columns,
+                    rows,
+                );
             }
         }
 
@@ -268,12 +273,12 @@ impl CellStore {
                         Ok(())
                     }
                     (_, None) => Err(FormulaError::Value),
-                    (CriteriaFold::Sum { .. }, Some(values)) => {
-                        let (kinds, payloads) = values.columns[col];
+                    (CriteriaFold::Sum { .. }, Some(value_range)) => {
+                        let (kinds, payloads) = value_range.columns[col];
                         sums.add(&folded_value(strings, kinds[row], payloads[row]))
                     }
-                    (CriteriaFold::Extreme { .. }, Some(values)) => {
-                        let (kinds, payloads) = values.columns[col];
+                    (CriteriaFold::Extreme { .. }, Some(value_range)) => {
+                        let (kinds, payloads) = value_range.columns[col];
                         extremes.add(&folded_value(strings, kinds[row], payloads[row]))
                     }
                 };
@@ -314,15 +319,15 @@ impl CellStore {
             test.mask_column(strings, column, &mut mask, index == 0);
         }
 
-        if let CriteriaFold::Count = fold {
+        if matches!(fold, CriteriaFold::Count) {
             let count: u64 = mask.iter().map(|word| u64::from(word.count_ones())).sum();
             return Value::number(count as f64);
         }
 
         let mut sums = IfSum::new();
         let mut extremes = IfExtreme::new(matches!(fold, CriteriaFold::Extreme { maximum: true }));
-        for (word, &bits) in mask.iter().enumerate() {
-            let mut bits = bits;
+        for (word, &word_bits) in mask.iter().enumerate() {
+            let mut bits = word_bits;
             while bits != 0 {
                 let row = word * MASK_ROWS + bits.trailing_zeros() as usize;
                 bits &= bits - 1;

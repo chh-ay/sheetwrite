@@ -162,7 +162,7 @@ impl CellStore {
     /// names a missing sheet.
     #[wasm_bindgen(js_name = setNamedFormula)]
     pub fn set_named_formula(&mut self, name: &str, scope: i32, source: &str) -> bool {
-        let Some(scope) = self.defined_name_scope(name, scope) else {
+        let Some(name_scope) = self.defined_name_scope(name, scope) else {
             return false;
         };
         let Some(ast) = parse(source)
@@ -172,10 +172,10 @@ impl CellStore {
             return false;
         };
 
-        let key = (scope, workbook_name_key(name));
+        let key = (name_scope, workbook_name_key(name));
         let definition = Definition {
-            name: name.to_string(),
-            source: source.to_string(),
+            name: name.to_owned(),
+            source: source.to_owned(),
             positional: is_positional(&ast),
             ast,
             resolved: None,
@@ -193,8 +193,11 @@ impl CellStore {
     /// rename, a sheet removal or a row or column edit can rewrite it.
     #[wasm_bindgen(js_name = namedFormulaSource)]
     pub fn named_formula_source(&self, name: &str, scope: i32) -> Option<String> {
-        let scope = u32::try_from(scope).ok();
-        match self.defined_names.get(&(scope, workbook_name_key(name)))? {
+        let name_scope = u32::try_from(scope).ok();
+        match self
+            .defined_names
+            .get(&(name_scope, workbook_name_key(name)))?
+        {
             DefinedName::Formula(definition) => Some(definition.source.clone()),
             DefinedName::Range(_) => None,
         }
@@ -230,7 +233,7 @@ impl CellStore {
         // `#REF!`, as in Excel.
         name.contains('!').then(|| {
             NameTarget::Formula(Rc::new(NamedFormulaRef {
-                name: name.to_string(),
+                name: name.to_owned(),
                 expression: Ast::InvalidRef,
                 nodes: 1,
             }))
@@ -274,7 +277,7 @@ impl CellStore {
     ) -> Option<NameTarget> {
         let depth = {
             let expanding = placement.expanding.borrow();
-            if let Some(index) = expanding.iter().position(|expanding| *expanding == key) {
+            if let Some(index) = expanding.iter().position(|open| *open == key) {
                 placement
                     .lowest_cut
                     .set(placement.lowest_cut.get().min(index));
@@ -311,9 +314,9 @@ impl CellStore {
         if definition.positional {
             translate_name_refs(&mut ast, placement.row, placement.col);
         }
-        let mut ast = self.resolve_defined_names(ast, formula_sheet, placement);
+        let mut resolved = self.resolve_defined_names(ast, formula_sheet, placement);
         resolve_structured_refs(
-            &mut ast,
+            &mut resolved,
             formula_sheet,
             placement.row,
             placement.col,
@@ -329,9 +332,9 @@ impl CellStore {
         placement.sheet_bound.set(outer_sheet_bound || sheet_bound);
         placement.lowest_cut.set(outer_cut.min(cut));
 
-        let target = match reference_target(&ast, &definition.name, scope, formula_sheet) {
+        let target = match reference_target(&resolved, &definition.name, scope, formula_sheet) {
             Some(range) => place_range(range, formula_sheet, depth),
-            None => NameTarget::Formula(Rc::new(bounded_expansion(&definition.name, ast))),
+            None => NameTarget::Formula(Rc::new(bounded_expansion(&definition.name, resolved))),
         };
         if cut >= depth {
             placement.placed.borrow_mut().push(Placed {
@@ -352,9 +355,9 @@ impl CellStore {
     pub(super) fn resolve_name_definitions(&mut self) {
         let mut keys = Vec::new();
         for (key, definition) in &mut self.defined_names {
-            if let DefinedName::Formula(definition) = definition {
-                definition.resolved = None;
-                definition.visit.set(Visit::Unvisited);
+            if let DefinedName::Formula(formula) = definition {
+                formula.resolved = None;
+                formula.visit.set(Visit::Unvisited);
                 keys.push(key.clone());
             }
         }
@@ -443,7 +446,7 @@ impl CellStore {
         if self.defined_names.is_empty() {
             return None;
         }
-        let (row, col) = crate::eval::current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
         match self.name_target(name, sheet as u32, &NamePlacement::new(row, col))? {
             NameTarget::Formula(formula) => Some(formula),
             NameTarget::Range(_) | NameTarget::Reference(_) => None,
@@ -463,11 +466,11 @@ impl CellStore {
     ) -> bool {
         let mut refresh = false;
         for definition in self.defined_names.values_mut() {
-            let DefinedName::Formula(definition) = definition else {
+            let DefinedName::Formula(formula) = definition else {
                 continue;
             };
-            refresh |= definition.positional
-                | definition.rewrite(&self.sheet_names, |ast| {
+            refresh |= formula.positional
+                | formula.rewrite(&self.sheet_names, |ast| {
                     if columns {
                         shift_cols(ast, at, delta, NO_SHEET, edited_sheet)
                     } else {
@@ -491,9 +494,9 @@ impl CellStore {
         let mut refresh = false;
         for definition in self.defined_names.values_mut() {
             refresh |= match definition {
-                DefinedName::Formula(definition) => {
-                    definition.positional
-                        | definition.rewrite(&self.sheet_names, |ast| {
+                DefinedName::Formula(formula) => {
+                    formula.positional
+                        | formula.rewrite(&self.sheet_names, |ast| {
                             move_refs(ast, edited_sheet, NO_SHEET, columns, (from, count, to))
                         })
                 }
@@ -519,8 +522,8 @@ impl CellStore {
     /// Follow a sheet rename in every name's formula.
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         for definition in self.defined_names.values_mut() {
-            if let DefinedName::Formula(definition) = definition {
-                definition.rewrite(&self.sheet_names, |ast| {
+            if let DefinedName::Formula(formula) = definition {
+                formula.rewrite(&self.sheet_names, |ast| {
                     rename_sheet_refs(ast, handle, name)
                 });
             }
@@ -532,9 +535,9 @@ impl CellStore {
     pub(super) fn remove_sheet_from_named_formulas(&mut self, handle: u32) -> bool {
         let mut changed = false;
         for definition in self.defined_names.values_mut() {
-            if let DefinedName::Formula(definition) = definition {
+            if let DefinedName::Formula(formula) = definition {
                 changed |=
-                    definition.rewrite(&self.sheet_names, |ast| invalidate_sheet_refs(ast, handle));
+                    formula.rewrite(&self.sheet_names, |ast| invalidate_sheet_refs(ast, handle));
             }
         }
         changed
@@ -547,7 +550,7 @@ impl CellStore {
         );
         for ((_, key), definition) in &self.defined_names {
             metadata.add_payload(key.len(), key.capacity());
-            let DefinedName::Formula(definition) = definition else {
+            let DefinedName::Formula(formula) = definition else {
                 if let DefinedName::Range(range) = definition {
                     metadata.add_payload(range.name.len(), range.name.capacity());
                 }
@@ -555,10 +558,10 @@ impl CellStore {
             };
             let bytes = std::mem::size_of::<Definition>();
             metadata.add_payload(bytes, bytes);
-            metadata.add_payload(definition.name.len(), definition.name.capacity());
-            metadata.add_payload(definition.source.len(), definition.source.capacity());
-            definition.ast.heap_memory_stats(metadata);
-            match &definition.resolved {
+            metadata.add_payload(formula.name.len(), formula.name.capacity());
+            metadata.add_payload(formula.source.len(), formula.source.capacity());
+            formula.ast.heap_memory_stats(metadata);
+            match &formula.resolved {
                 Some(NameTarget::Range(range)) => {
                     metadata.add_payload(range.name.len(), range.name.capacity());
                 }
@@ -578,8 +581,8 @@ impl CellStore {
         self.defined_names
             .iter()
             .filter_map(|((scope, _), definition)| match definition {
-                DefinedName::Formula(definition) => {
-                    Some((*scope, definition.name.as_str(), definition.source.as_str()))
+                DefinedName::Formula(formula) => {
+                    Some((*scope, formula.name.as_str(), formula.source.as_str()))
                 }
                 DefinedName::Range(_) => None,
             })
@@ -646,7 +649,7 @@ fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTa
 /// [`EXPANSION_NODE_LIMIT`].
 fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
     let nodes = expanded_nodes(&expression);
-    let expression = if nodes > EXPANSION_NODE_LIMIT {
+    let bounded = if nodes > EXPANSION_NODE_LIMIT {
         Ast::Array(Box::new(crate::calc::ArrayLiteral {
             cols: 1,
             values: vec![Value::Error(FormulaError::Num)],
@@ -655,8 +658,8 @@ fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
         expression
     };
     NamedFormulaRef {
-        name: name.to_string(),
-        expression,
+        name: name.to_owned(),
+        expression: bounded,
         nodes,
     }
 }
@@ -700,7 +703,7 @@ fn reference_target(
         _ => return None,
     };
     Some(NamedRangeRef {
-        name: name.to_string(),
+        name: name.to_owned(),
         scope,
         sheet,
         row_start,

@@ -68,7 +68,7 @@ impl CellStore {
             Ast::InvalidRef | Ast::SheetCell(..) | Ast::SheetRange(..) => {
                 return Err(FormulaError::Ref)
             }
-            reference => match range_from_ast(reference, sheet) {
+            expression => match range_from_ast(expression, sheet) {
                 Some(range) => range,
                 None => {
                     return match self.eval_ast(reference, sheet, pass, depth + 1) {
@@ -80,7 +80,7 @@ impl CellStore {
         };
 
         let target = range.sheet as usize;
-        let in_bounds = self.sheet_alive.get(target).copied().unwrap_or(false)
+        let in_bounds = self.sheet_alive.get(target).copied().unwrap_or_default()
             && self.sheets[target]
                 .cells
                 .contains_cell(range.row_start as usize, range.col_start as usize);
@@ -122,8 +122,8 @@ impl CellStore {
         }
 
         match source {
-            Some(source) if source.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
-                Ok(Value::text(&*source))
+            Some(formula_text) if formula_text.chars().count() <= MAX_FORMULA_TEXT_CHARS => {
+                Ok(Value::text(&*formula_text))
             }
             _ => Err(FormulaError::Na),
         }
@@ -139,19 +139,19 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        let (link, friendly) = match args {
+        let (link_ast, friendly) = match args {
             [link] => (link, None),
             [link, friendly] => (link, optional_ast(args, 1).map(|_| friendly)),
             _ => return Err(FormulaError::Value),
         };
 
-        let link = self.eval_ast(link, sheet, pass, depth + 1);
+        let link = self.eval_ast(link_ast, sheet, pass, depth + 1);
         if let Value::Error(error) = link {
             return Err(error);
         }
 
         Ok(match friendly {
-            Some(friendly) => self.eval_ast(friendly, sheet, pass, depth + 1),
+            Some(friendly_ast) => self.eval_ast(friendly_ast, sheet, pass, depth + 1),
             None => link,
         })
     }
@@ -160,7 +160,7 @@ impl CellStore {
     /// exactly: `address`, `col`, `contents`, `row` and `type`. Number formats,
     /// widths, colors and file names live in the host, so those types are
     /// `#VALUE!`. Without a reference, CELL describes the formula's own cell,
-    /// as LibreOffice does; Excel would use the last changed cell instead.
+    /// as `LibreOffice` does; Excel would use the last changed cell instead.
     fn cell_info(
         &self,
         args: &[Ast],
@@ -178,15 +178,14 @@ impl CellStore {
             _ => return Err(FormulaError::Value),
         };
 
-        let cell = match optional_ast(args, 1) {
-            Some(reference) => self.reference_cell(reference, sheet, pass, depth)?,
-            None => {
-                let (row, col) = current_formula_origin().ok_or(FormulaError::Value)?;
-                AbsCellKey {
-                    sheet: sheet as u32,
-                    row,
-                    col,
-                }
+        let cell = if let Some(reference) = optional_ast(args, 1) {
+            self.reference_cell(reference, sheet, pass, depth)?
+        } else {
+            let (row, col) = current_formula_origin().ok_or(FormulaError::Value)?;
+            AbsCellKey {
+                sheet: sheet as u32,
+                row,
+                col,
             }
         };
 
@@ -275,7 +274,7 @@ impl CellStore {
         self.sheet_lookup
             .get(&sheet_name_key(name))
             .copied()
-            .filter(|&handle| self.sheet_alive.get(handle).copied().unwrap_or(false))
+            .filter(|&handle| self.sheet_alive.get(handle).copied().unwrap_or_default())
     }
 
     /// SHEETS([reference]): every sheet of the workbook, or the sheets a
@@ -306,7 +305,7 @@ impl CellStore {
         Ok(Value::number(count as f64))
     }
 
-    /// INFO(type_text), for the types that do not depend on the program
+    /// `INFO(type_text)`, for the types that do not depend on the program
     /// that runs the workbook: "numfile" is the number of sheets and
     /// "recalc" is "Automatic", since the engine always recalculates.
     /// "memavail", "memused" and "totmem" are `#N/A`, as in current Excel.

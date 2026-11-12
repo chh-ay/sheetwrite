@@ -94,11 +94,11 @@ pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
 }
 
 pub(crate) fn capture(expression: &Ast, bindings: &[(&str, Ast)]) -> Result<Ast, FormulaError> {
-    let bindings: Vec<_> = bindings
+    let borrowed: Vec<_> = bindings
         .iter()
         .map(|(name, value)| (*name, value))
         .collect();
-    substitute(expression, &bindings, &mut 0)
+    substitute(expression, &borrowed, &mut 0)
 }
 fn substitute(
     expression: &Ast,
@@ -190,7 +190,9 @@ fn substitute(
         Ast::Neg(inner) => Ast::Neg(Box::new(substitute(inner, bindings, nodes)?)),
         Ast::Pos(inner) => Ast::Pos(Box::new(substitute(inner, bindings, nodes)?)),
         Ast::Percent(inner) => Ast::Percent(Box::new(substitute(inner, bindings, nodes)?)),
-        Ast::LetSlot { expression, .. } => substitute(expression, bindings, nodes)?,
+        Ast::LetSlot {
+            expression: bound, ..
+        } => substitute(bound, bindings, nodes)?,
         _ => expression.clone(),
     })
 }

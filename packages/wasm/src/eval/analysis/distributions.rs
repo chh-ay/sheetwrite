@@ -809,8 +809,8 @@ mod tests {
         evaluate(name, &values)
     }
 
-    fn assert_number(name: &str, arguments: &[f64], expected: f64, tolerance: f64) {
-        let arguments: Vec<Value> = arguments.iter().copied().map(Value::number).collect();
+    fn assert_number(name: &str, numbers: &[f64], expected: f64, tolerance: f64) {
+        let arguments: Vec<Value> = numbers.iter().copied().map(Value::number).collect();
         let Value::Number(actual) = call(name, &arguments) else {
             panic!("{name} returned an error");
         };
@@ -1030,7 +1030,7 @@ mod tests {
             Value::Error(FormulaError::Value)
         );
         // Domain rules from the "Remarks" section of each Microsoft Support page.
-        for (name, arguments, error) in [
+        for (name, inputs, error) in [
             ("NORM.DIST", vec![0.0, 0.0, 0.0, 1.0], FormulaError::Num),
             ("NORM.INV", vec![1.0, 0.0, 1.0], FormulaError::Num),
             ("T.DIST", vec![1.0, 0.5, 1.0], FormulaError::Num),
@@ -1070,7 +1070,7 @@ mod tests {
             ("GAMMALN", vec![0.0], FormulaError::Num),
             ("NORM.S.INV", vec![0.0], FormulaError::Num),
         ] {
-            let arguments: Vec<Value> = arguments.into_iter().map(Value::number).collect();
+            let arguments: Vec<Value> = inputs.into_iter().map(Value::number).collect();
             assert_eq!(call(name, &arguments), Value::Error(error), "{name}");
         }
     }

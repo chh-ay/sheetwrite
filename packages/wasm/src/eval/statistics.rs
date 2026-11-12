@@ -174,11 +174,11 @@ pub(super) fn percentile(mut numbers: Vec<f64>, fraction: f64) -> Result<f64, Fo
     let rank = (numbers.len() - 1) as f64 * fraction;
     let lower_index = rank.floor() as usize;
     let interpolation = rank - lower_index as f64;
-    let (_, lower, right) = numbers.select_nth_unstable_by(lower_index, f64::total_cmp);
+    let (_, lower_slot, right) = numbers.select_nth_unstable_by(lower_index, f64::total_cmp);
     if interpolation == 0.0 {
-        return Ok(*lower);
+        return Ok(*lower_slot);
     }
-    let lower = *lower;
+    let lower = *lower_slot;
     let upper = right
         .iter()
         .copied()
@@ -261,14 +261,14 @@ fn counted_numbers(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
     let mut numbers = Vec::new();
 
     for entry in entries {
-        let number = match &entry.value {
+        let counted = match &entry.value {
             Value::Bool(value) => Some(if *value { 1.0 } else { 0.0 }),
             Value::Text(_) if entry.from_range => Some(0.0),
             Value::Text(text) if text.is_empty() => Some(0.0),
             value => aggregate_number(value, entry.from_range)?,
         };
 
-        if let Some(number) = number {
+        if let Some(number) = counted {
             numbers.push(number);
         }
     }
@@ -295,7 +295,7 @@ fn counted_extreme(values: &FuncAccumulator, is_maximum: bool) -> Result<f64, Fo
         numbers.iter().copied().reduce(f64::min)
     };
 
-    Ok(extreme.unwrap_or(0.0))
+    Ok(extreme.unwrap_or_default())
 }
 
 fn counted_variance(
@@ -390,10 +390,12 @@ fn paired_result(values: &FuncAccumulator, kind: PairedKind) -> Result<f64, Form
     if left.len() != right.len() {
         return Err(FormulaError::Na);
     }
-    let pairs = left
-        .iter()
-        .zip(right)
-        .map(|(left, right)| (PairedCell::of(&left.value), PairedCell::of(&right.value)));
+    let pairs = left.iter().zip(right).map(|(left_cell, right_cell)| {
+        (
+            PairedCell::of(&left_cell.value),
+            PairedCell::of(&right_cell.value),
+        )
+    });
     paired_statistic(pairs, kind)
 }
 
@@ -495,10 +497,10 @@ fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
         if values.arg_shape(pair) != target_shape {
             return Value::Error(FormulaError::Value);
         }
-        let Some(criterion) = values.arg_value(pair + 1) else {
+        let Some(criterion_value) = values.arg_value(pair + 1) else {
             return Value::Error(FormulaError::Value);
         };
-        match Criterion::parse(criterion.clone()) {
+        match Criterion::parse(criterion_value.clone()) {
             Ok(criterion) => criteria.push((range, criterion)),
             Err(error) => return Value::Error(error),
         }
@@ -525,7 +527,7 @@ fn conditional_extreme(values: &FuncAccumulator, maximum: bool) -> Value {
             Value::Text(_) | Value::Bool(_) | Value::Blank => {}
         }
     }
-    Value::number(result.unwrap_or(0.0))
+    Value::number(result.unwrap_or_default())
 }
 
 #[cfg(test)]
@@ -551,9 +553,9 @@ mod tests {
         apply(func, &range_arguments(args)).unwrap()
     }
 
-    fn assert_near(actual: Value, expected: f64) {
-        let Value::Number(actual) = actual else {
-            panic!("expected number, got {actual:?}");
+    fn assert_near(value: Value, expected: f64) {
+        let Value::Number(actual) = value else {
+            panic!("expected number, got {value:?}");
         };
         assert!((actual - expected).abs() <= 1e-12 * expected.abs().max(1.0));
     }

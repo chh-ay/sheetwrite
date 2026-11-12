@@ -75,7 +75,7 @@ fn rewrite_own_sheet(source: &str, columns: bool, change: AxisChange) -> String 
 #[wasm_bindgen(js_name = renameStructuredReference)]
 pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: &str) -> String {
     let Some(lexemes) = lex(source) else {
-        return source.to_string();
+        return source.to_owned();
     };
 
     let mut out = String::with_capacity(source.len());
@@ -85,7 +85,7 @@ pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: 
             continue;
         };
         let owner = index.checked_sub(1).map(|owner| &lexemes[owner]);
-        let owner_name = match owner.map(|owner| &owner.tok) {
+        let owner_name = match owner.map(|before| &before.tok) {
             Some(Tok::Ident(name, _)) => name.as_ref(),
             _ => "",
         };
@@ -96,16 +96,16 @@ pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: 
         let span = if column.is_empty() {
             owner
                 .filter(|_| !owner_name.is_empty())
-                .map(|owner| owner.start..owner.end)
+                .map(|before| before.start..before.end)
         } else {
             let columns = column_span(raw);
             same_name(&raw[columns.clone()], column)
                 .then(|| lexeme.start + columns.start..lexeme.start + columns.end)
         };
-        if let Some(span) = span {
-            out.push_str(&source[copied..span.start]);
+        if let Some(replaced) = span {
+            out.push_str(&source[copied..replaced.start]);
             out.push_str(to);
-            copied = span.end;
+            copied = replaced.end;
         }
     }
 
@@ -179,7 +179,7 @@ impl Reference {
 /// accepts, so it is returned unchanged.
 fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> String {
     let Some(lexemes) = lex(source) else {
-        return source.to_string();
+        return source.to_owned();
     };
 
     let mut out = String::with_capacity(source.len());

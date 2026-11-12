@@ -109,13 +109,13 @@ impl Date {
     /// is not a date is `#VALUE!`, as the function pages say.
     #[inline(never)]
     pub(crate) fn from_serial(serial: f64) -> Result<Self, FormulaError> {
-        let serial = serial.trunc();
+        let whole = serial.trunc();
 
-        if serial < 1.0 {
+        if whole < 1.0 {
             return Err(FormulaError::Value);
         }
 
-        let (year, month, day) = date_parts(serial).ok_or(FormulaError::Value)?;
+        let (year, month, day) = date_parts(whole).ok_or(FormulaError::Value)?;
 
         Ok(Self { year, month, day })
     }

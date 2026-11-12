@@ -1,7 +1,9 @@
 //! Bounded dynamic-array evaluation for FILTER, SORT, UNIQUE, and direct ranges.
 
 use std::cmp::Ordering;
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::hash_map::DefaultHasher;
+
+use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
@@ -88,13 +90,13 @@ fn sequence_shape(args: &[Ast]) -> Result<(usize, usize, usize), FormulaError> {
     if args.is_empty() || args.len() > 4 {
         return Err(FormulaError::Value);
     }
-    let rows = static_integer(optional_ast(args, 0)).ok_or(FormulaError::Value)?;
-    let cols = static_integer(optional_ast(args, 1)).unwrap_or(1);
-    if rows <= 0 || cols <= 0 {
+    let requested_rows = static_integer(optional_ast(args, 0)).ok_or(FormulaError::Value)?;
+    let requested_cols = static_integer(optional_ast(args, 1)).unwrap_or(1);
+    if requested_rows <= 0 || requested_cols <= 0 {
         return Err(FormulaError::Value);
     }
-    let rows = usize::try_from(rows).map_err(|_| FormulaError::Num)?;
-    let cols = usize::try_from(cols).map_err(|_| FormulaError::Num)?;
+    let rows = usize::try_from(requested_rows).map_err(|_| FormulaError::Num)?;
+    let cols = usize::try_from(requested_cols).map_err(|_| FormulaError::Num)?;
     let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
     Ok((rows, cols, cells))
 }
@@ -133,11 +135,11 @@ impl CellStore {
         else {
             return Ast::InvalidRef;
         };
-        let sheet = SheetRef {
+        let sheet_ref = SheetRef {
             handle: sheet as u32,
         };
         Ast::AbsRange(
-            sheet,
+            sheet_ref,
             row,
             col,
             range.row_end,
@@ -369,14 +371,14 @@ impl CellStore {
                 return self.eval_dynamic_array(&named.expression, sheet, pass, depth)
             }
             Ast::Func(Func::Let, args) => {
-                let (expanded, slots) = match expand_let_ast(args) {
+                let (expanded_ast, slots) = match expand_let_ast(args) {
                     Ok(expanded) => expanded,
                     Err(error) => return Some(Err(error)),
                 };
                 let enclosing = pass.results.let_frame_mut().open_expanded(slots);
                 let expanded = self.resolve_let_runtime_refs(
                     args,
-                    expanded,
+                    expanded_ast,
                     sheet,
                     pass,
                     depth + 1,
@@ -520,18 +522,20 @@ impl CellStore {
                 // which has bound the slot and is still being evaluated.
                 let frame = pass.results.let_frame();
                 #[allow(unsafe_code, reason = "calls `LetFrame::binding`; see its reason")]
-                let binding = frame.and_then(|frame| unsafe { frame.binding(*slot) });
-                if let Some(binding) = binding {
-                    return self.matrix_shape(binding, formula_sheet, pass);
+                let binding = frame.and_then(|active| unsafe { active.binding(*slot) });
+                if let Some(bound) = binding {
+                    return self.matrix_shape(bound, formula_sheet, pass);
                 }
             }
             Ast::NamedFormula(named) => {
                 return self.matrix_shape(&named.expression, formula_sheet, pass);
             }
             Ast::Array(array) => {
-                let crate::calc::ArrayLiteral { cols, values } = &**array;
-
-                let cols = *cols as usize;
+                let crate::calc::ArrayLiteral {
+                    cols: width,
+                    values,
+                } = &**array;
+                let cols = *width as usize;
                 let rows = values.len() / cols;
                 return Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 1, 0)?));
             }
@@ -554,9 +558,7 @@ impl CellStore {
                     })?;
                 let output_cols = match optional_ast(args, 2) {
                     Some(requested) => static_integer(Some(requested))
-                        .map_or(Ok(cols), |requested| {
-                            transformed_axis_bound(cols, requested, drop)
-                        })?,
+                        .map_or(Ok(cols), |count| transformed_axis_bound(cols, count, drop))?,
                     None => cols,
                 };
                 let cells = EvalMatrix::validate_shape(output_rows, output_cols, 1, 0)?;
@@ -782,8 +784,8 @@ impl CellStore {
                 }
             }
         });
-        if let Some(error) = error {
-            return Err(error);
+        if let Some(first_error) = error {
+            return Err(first_error);
         }
 
         let mut values = Vec::with_capacity(array.values.len());
@@ -828,7 +830,7 @@ impl CellStore {
         let item_count = if by_col { array.cols } else { array.rows };
 
         // Store collision chains in insertion order, without an allocation per hash.
-        let mut buckets: HashMap<u64, (usize, usize)> = HashMap::new();
+        let mut buckets: FxHashMap<u64, (usize, usize)> = FxHashMap::default();
         let mut representatives: Vec<(usize, usize, Option<usize>)> =
             Vec::with_capacity(item_count);
         let mut comparisons = 0usize;
@@ -915,7 +917,7 @@ impl CellStore {
         Ok(EvalMatrix::new(source.cols, source.rows, values))
     }
 
-    /// TRIMRANGE(range, [trim_rows], [trim_cols]): the range without its
+    /// TRIMRANGE(range, [`trim_rows`], [`trim_cols`]): the range without its
     /// leading and trailing blank rows and columns. Each trim argument is 0
     /// (none), 1 (leading), 2 (trailing) or 3 (both, the default). A range
     /// with no value left is `#REF!`, as in Excel.
@@ -978,12 +980,12 @@ impl CellStore {
     /// A TRIMRANGE trim argument: a whole number from 0 to 3, 3 when omitted.
     fn trim_mode(
         &self,
-        arg: Option<&Ast>,
+        mode_arg: Option<&Ast>,
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<u8, FormulaError> {
-        let Some(arg) = arg else {
+        let Some(arg) = mode_arg else {
             return Ok(TRIM_BOTH);
         };
         let mode = number_from_value(&self.eval_ast(arg, sheet, pass, depth + 1))?.trunc();
@@ -1010,13 +1012,13 @@ impl CellStore {
                 self.scalar_array_arg(ast, sheet, pass, depth + 1)
             })
         };
-        let rows = integer_arg(&scalar(0, Value::Number(1.0), pass))?;
-        let cols = integer_arg(&scalar(1, Value::Number(1.0), pass))?;
-        if rows <= 0 || cols <= 0 {
+        let requested_rows = integer_arg(&scalar(0, Value::Number(1.0), pass))?;
+        let requested_cols = integer_arg(&scalar(1, Value::Number(1.0), pass))?;
+        if requested_rows <= 0 || requested_cols <= 0 {
             return Err(FormulaError::Value);
         }
-        let rows = usize::try_from(rows).map_err(|_| FormulaError::Num)?;
-        let cols = usize::try_from(cols).map_err(|_| FormulaError::Num)?;
+        let rows = usize::try_from(requested_rows).map_err(|_| FormulaError::Num)?;
+        let cols = usize::try_from(requested_cols).map_err(|_| FormulaError::Num)?;
         let cells = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
         let start = number_from_value(&scalar(2, Value::Number(1.0), pass))?;
         let step = number_from_value(&scalar(3, Value::Number(1.0), pass))?;
@@ -1226,7 +1228,7 @@ fn runtime_reference_bound(
         Err(FormulaError::Value) if super::reference::ast_contains_runtime_ref(ast) => {
             Ok(UNKNOWN_SIZE_PRECHARGE)
         }
-        bound => bound,
+        estimate => estimate,
     }
 }
 
@@ -1251,9 +1253,9 @@ fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {
                     character.hash(&mut hasher);
                 }
             }
-            Some(Value::Bool(value)) => {
+            Some(Value::Bool(flag)) => {
                 2u8.hash(&mut hasher);
-                value.hash(&mut hasher);
+                flag.hash(&mut hasher);
             }
             Some(Value::Blank) => 3u8.hash(&mut hasher),
             Some(Value::Error(error)) => {
@@ -1268,26 +1270,26 @@ fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {
 
 fn matrix_items_equal(
     matrix: &EvalMatrix,
-    left: usize,
-    right: usize,
+    left_index: usize,
+    right_index: usize,
     by_col: bool,
 ) -> Result<bool, FormulaError> {
     let count = if by_col { matrix.rows } else { matrix.cols };
     for offset in 0..count {
         let left = if by_col {
-            matrix.get(offset, left)
+            matrix.get(offset, left_index)
         } else {
-            matrix.get(left, offset)
+            matrix.get(left_index, offset)
         }
         .ok_or(FormulaError::Ref)?;
         let right = if by_col {
-            matrix.get(offset, right)
+            matrix.get(offset, right_index)
         } else {
-            matrix.get(right, offset)
+            matrix.get(right_index, offset)
         }
         .ok_or(FormulaError::Ref)?;
         let equal = match (left, right) {
-            (Value::Error(left), Value::Error(right)) => left == right,
+            (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
             (Value::Error(_), _) | (_, Value::Error(_)) => false,
             _ => compare_values(left, right)? == Ordering::Equal,
         };
