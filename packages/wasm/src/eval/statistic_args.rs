@@ -428,8 +428,8 @@ impl CellStore {
 
         let mut moments = PairedMoments::default();
         let mut moment_error = None;
-        let read = left.literal_pairs(&right, |x, y| {
-            if let (Some(x), Some(y), None) = (x, y, moment_error) {
+        let read = left.literal_pairs(&right, |left_cell, right_cell| {
+            if let (Some(x), Some(y), None) = (left_cell, right_cell, moment_error) {
                 if let Err(error) = moments.push(x, y) {
                     moment_error = Some(error);
                 }

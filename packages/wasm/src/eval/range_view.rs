@@ -289,6 +289,10 @@ impl<'a> RangeView<'a> {
     }
 }
 
+/// A cell as a function that reads only numbers sees it: its number, `None`
+/// for text, a logical value or a blank, or the error that stops the read.
+type NumberCell = Result<Option<f64>, FormulaError>;
+
 /// A dense cell as a function that reads only numbers sees it: a number,
 /// `None` for text, a logical value or a blank, or the error of a number that
 /// isn't finite or text missing from the string pool. `None` for a formula
@@ -299,7 +303,7 @@ fn literal_number(
     kinds: &[u8],
     payloads: &[u64],
     index: usize,
-) -> Option<Result<Option<f64>, FormulaError>> {
+) -> Option<NumberCell> {
     let (Some(&kind), Some(&payload)) = (kinds.get(index), payloads.get(index)) else {
         return Some(Err(FormulaError::Ref));
     };
