@@ -1,3 +1,4 @@
+/** @jsxImportSource react */
 import type { GridConfig } from "@sheetwrite/core";
 /**
  * React controlled-analytics workbench. Consumes the shared analytics scenario
@@ -8,7 +9,6 @@ import type { GridConfig } from "@sheetwrite/core";
  */
 import workerUrl from "@sheetwrite/core/worker?worker&url";
 import { SheetwriteGrid } from "@sheetwrite/react";
-import { Link } from "@tanstack/react-router";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -404,13 +404,13 @@ export default function ReactWorkbench() {
                       onChange={onImportChange}
                     />
                   </label>
-                  <Link
+                  <a
                     className="sw-rwb-workflow__link"
                     data-testid="interop-link"
-                    to="/showcases/interoperability/"
+                    href="/showcases/interoperability/"
                   >
                     Fidelity proofs
-                  </Link>
+                  </a>
                 </fieldset>
               </div>
               <ActionError
