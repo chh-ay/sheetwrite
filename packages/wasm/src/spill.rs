@@ -40,7 +40,8 @@ pub(crate) struct VacatedSpill {
     owned_cells: usize,
 }
 
-/// A cell of the vacated range that the anchor did not own.
+/// A cell of the vacated range that the anchor did not own. No calculated
+/// value has kind `u8::MAX`, so a written value never equals it.
 const NOT_OWNED: (u8, u64) = (u8::MAX, 0);
 /// An owned cell that held no calculated value. Unlike [`NOT_OWNED`] it was
 /// cleared, but like it, it never equals a written value.
@@ -70,12 +71,16 @@ impl VacatedSpill {
         }
     }
 
-    /// The value `cell` held as a reader saw it, or `None` (never equal to a
-    /// stored value) when the vacated spill did not own it.
-    fn value(&self, cell: CellKey) -> Option<(u8, u64)> {
-        let vacated = self.range.filter(|vacated| vacated.contains(cell))?;
-        let value = *self.values.get(Self::offset(vacated, cell))?;
-        (value != NOT_OWNED && value != NO_VALUE).then_some(value)
+    /// The kept values of the vacated row `row_offset` rows below `anchor`,
+    /// which must be the vacated anchor: empty past its last row. Cells it did
+    /// not own, or that held nothing, keep a marker no written value equals.
+    fn row(&self, anchor: CellKey, row_offset: usize) -> &[(u8, u64)] {
+        let Some(range) = self.range.filter(|vacated| vacated.anchor == anchor) else {
+            return &[];
+        };
+        let cols = range.cols();
+        let start = row_offset * cols;
+        self.values.get(start..start + cols).unwrap_or_default()
     }
 
     /// The number of cells the vacated spill owned, its anchor excluded.
@@ -882,17 +887,24 @@ impl SpillState {
             owners.own(col, anchor, range.row_end);
         }
         for row_offset in 0..rows {
+            let previous = vacated.row(anchor, row_offset);
             for col_offset in 0..cols {
                 let cell = (anchor.0 + row_offset as u32, anchor.1 + col_offset as u32);
                 if cell == anchor {
                     continue;
                 }
 
-                let (kind, payload) = value_at(row_offset * cols + col_offset);
+                let value = value_at(row_offset * cols + col_offset);
                 let index = cells.idx(cell.0 as usize, cell.1 as usize);
-                cells.set_derived(index, kind, payload);
-                // Compared as stored, as a reader sees the cell.
-                if vacated.value(cell) != cells.calculated_cell_at(index) {
+                cells.set_derived(index, value.0, value.1);
+                // A calculated slot stores a value exactly as `calculated_slot`
+                // made it, so it compares with the kept one without a read back.
+                debug_assert_eq!(
+                    cells.calculated_cell_at(index),
+                    Some(value),
+                    "a calculated slot reads back the value written to it"
+                );
+                if previous.get(col_offset) != Some(&value) {
                     changed.push(cell);
                 }
             }
