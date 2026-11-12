@@ -94,7 +94,10 @@ fn the_store_is_left_exactly_as_it_was() {
     // A nested preview must not add its dynamic references to the enclosing
     // formula's runtime dependency recording.
     let enclosing = super::reference::start_runtime_reads();
-    assert_eq!(number(&preview(&store, sheet, r#"=SUM(INDIRECT("A1:A3"))"#)), 54.0);
+    assert_eq!(
+        number(&preview(&store, sheet, r#"=SUM(INDIRECT("A1:A3"))"#)),
+        54.0
+    );
     let reads = super::reference::finish_runtime_reads(enclosing);
     assert!(reads.ranges.is_empty());
     // The pending edit still recalculates as it would have.
