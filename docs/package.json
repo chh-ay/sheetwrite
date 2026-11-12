@@ -5,6 +5,7 @@
   "description": "The docs site: TanStack Start with Solid, static pages with islands.",
   "type": "module",
   "scripts": {
+    "dev": "bun run generate && node node_modules/vite/bin/vite.js dev",
     "generate": "bun ../scripts/docs-cli.ts generate",
     "build": "bun run generate && node node_modules/vite/bin/vite.js build && node node_modules/vite/bin/vite.js build --config vite.islands.config.ts && bun src/islands/page-scripts.ts && bun src/figures/og-images.ts dist/client && bun ../scripts/normalize-sitemap.ts dist/client && bunx pagefind --site dist/client",
     "build:test": "SHEETWRITE_DOCS_FIXTURES=1 bun run build",

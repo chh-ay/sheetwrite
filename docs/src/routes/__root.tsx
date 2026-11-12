@@ -127,7 +127,12 @@ export const Route = createRootRoute({
         { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT },
         { title: SITE_TITLE },
       ],
-      scripts: [{ type: "application/ld+json", children: STRUCTURED_DATA }],
+      scripts: [
+        { type: "application/ld+json", children: STRUCTURED_DATA },
+        // The build links the islands client from each page (page-scripts.ts);
+        // the dev server loads it from source so islands hydrate there too.
+        ...(import.meta.env.DEV ? [{ type: "module", src: "/src/islands/client.tsx" }] : []),
+      ],
     };
   },
   shellComponent: RootDocument,
