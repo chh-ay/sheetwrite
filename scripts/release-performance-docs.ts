@@ -72,6 +72,8 @@ interface ChartTrackingEvidence {
     commitMs: Timing;
     baselineMs: Timing;
     eventMs: Timing | null;
+    /** Absent in captures made before resolution was timed. */
+    resolveMs?: Timing | null;
     expectedEvents: number;
     expectedCharts: number;
     resolutionsPerCommit: number;
@@ -157,6 +159,7 @@ export function validateChartTrackingArtifact(
       !timing(row.baselineMs) ||
       row.commitMs.iters !== artifact.samples ||
       (row.eventMs !== null && !timing(row.eventMs)) ||
+      (row.resolveMs !== undefined && row.resolveMs !== null && !timing(row.resolveMs)) ||
       ![row.expectedEvents, row.expectedCharts, row.resolutionsPerCommit].every(nonnegative)
     ) {
       return "chart-tracking capture contains invalid or duplicate measurements";

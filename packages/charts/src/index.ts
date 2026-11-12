@@ -11,6 +11,7 @@ export type {
   ChartSeriesView,
   ChartView,
   MountedChart,
+  ReadonlyChartDefinition,
 } from "@sheetwrite/core";
 export { type ChartViewCache, createChartViewCache } from "./view-cache.js";
 export { createChartRenderer } from "./chart-renderer.js";

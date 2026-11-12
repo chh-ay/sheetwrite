@@ -4341,7 +4341,7 @@ export class StoreDataEngine {
     }
 
     this.view.queueHiddenRows(snapshot.id);
-    this.workbook.sheets.splice(snapshot.order, 0, sheet);
+    this.sheets.insertSheet(sheet, snapshot.order);
     this.syncSheetOrder();
     for (const table of sheet.tables ?? []) {
       if (!this.syncTable(table)) return false;
@@ -4397,7 +4397,7 @@ export class StoreDataEngine {
     this.authoritativeSnapshotSheets.delete(sheetId);
     this.view.removeSheet(sheetId);
     this.windowReader.removeSheet(sheetId);
-    this.workbook.sheets.splice(index, 1);
+    this.sheets.removeSheetAt(index);
     if (fallback) this.workbook.activeSheet = fallback;
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
       (range) => range.range?.sheet !== sheetId && range.scope !== sheetId,
