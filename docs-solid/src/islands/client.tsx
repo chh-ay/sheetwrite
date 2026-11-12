@@ -275,6 +275,12 @@ function hydrateOnInteraction(island: HTMLElement): () => void {
           for (const type of PREFETCH_EVENTS) island.removeEventListener(type, prefetch);
           for (const type of ACTIVATION_EVENTS) island.removeEventListener(type, activate, true);
           hydrateWith(island, render);
+          // Focus that moved in before the code arrived (a visible island
+          // hydrates after scrolling, not on focus): its handlers see it now.
+          const focused = document.activeElement;
+          if (focused instanceof HTMLElement && island.contains(focused)) {
+            focused.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+          }
           for (const event of held) {
             // The init dictionary reads key, button, pointerType and coordinates off the original.
             const replay = new (event.constructor as typeof Event)(event.type, event);
