@@ -94,8 +94,9 @@ function decodeXmlEntities(value: string, part: string): string {
     else {
       const numeric = /^#(\d+)$/.exec(entity);
       const hexadecimal = /^#x([\da-f]+)$/i.exec(entity);
-      if (!numeric && !hexadecimal) return xmlFailure(part, `unknown entity &${entity};`);
-      const codePoint = Number.parseInt(numeric?.[1] ?? hexadecimal![1]!, numeric ? 10 : 16);
+      const digits = numeric?.[1] ?? hexadecimal?.[1];
+      if (digits === undefined) return xmlFailure(part, `unknown entity &${entity};`);
+      const codePoint = Number.parseInt(digits, numeric ? 10 : 16);
       const validXmlCharacter =
         codePoint === 0x9 ||
         codePoint === 0xa ||
@@ -666,18 +667,20 @@ export function decodeXstring(value: string): string {
   let output = "";
   for (let index = 0; index < value.length;) {
     const literalEscape = /^_x005F_(x[\da-f]{4}_)/i.exec(value.slice(index));
-    if (literalEscape) {
-      output += `_${literalEscape[1]}`;
+    const literal = literalEscape?.[1];
+    if (literalEscape && literal !== undefined) {
+      output += `_${literal}`;
       index += literalEscape[0].length;
       continue;
     }
     const encoded = /^_x([\da-f]{4})_/i.exec(value.slice(index));
-    if (encoded) {
-      output += String.fromCharCode(Number.parseInt(encoded[1]!, 16));
+    const code = encoded?.[1];
+    if (encoded && code !== undefined) {
+      output += String.fromCharCode(Number.parseInt(code, 16));
       index += encoded[0].length;
       continue;
     }
-    output += value[index]!;
+    output += value.charAt(index);
     index += 1;
   }
   return output;
@@ -708,8 +711,8 @@ export function encodeXstring(value: string): string {
     ) {
       output += `_x${code.toString(16).toUpperCase().padStart(4, "0")}_`;
     } else {
-      output += value[index]!;
-      if (code >= 0xd800 && code <= 0xdbff) output += value[++index]!;
+      output += value.charAt(index);
+      if (code >= 0xd800 && code <= 0xdbff) output += value.charAt(++index);
     }
   }
   return output;
