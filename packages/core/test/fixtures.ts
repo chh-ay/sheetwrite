@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+
 import { GridImpl } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type {
@@ -17,6 +19,22 @@ import {
   xlsxTableImportBackend,
   xlsxWorkbookBackend,
 } from "../src/xlsx-slots.js";
+
+/** styles.css with its parts inlined, as served by a bundler. */
+export function coreStyles(): string {
+  const index = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
+  return index.replace(/@import "\.\/(styles\/[a-z-]+\.css)";/g, (_, part: string) =>
+    readFileSync(new URL(`../${part}`, import.meta.url), "utf8"),
+  );
+}
+
+/** Load the real styles so a DOM probe is also a valid development-mode consumer. */
+export function installCoreStyles(): () => void {
+  const style = document.createElement("style");
+  style.textContent = coreStyles();
+  document.head.appendChild(style);
+  return () => style.remove();
+}
 
 /**
  * Keep the XLSX backends installed now, and return the function that puts them
