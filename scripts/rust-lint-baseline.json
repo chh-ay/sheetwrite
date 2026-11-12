@@ -4,7 +4,7 @@
     "clippy::clone_on_ref_ptr": 2,
     "clippy::cognitive_complexity": 29,
     "clippy::default_trait_access": 1,
-    "clippy::disallowed_methods": 16,
+    "clippy::disallowed_methods": 17,
     "clippy::doc_markdown": 2,
     "clippy::expect_used": 28,
     "clippy::fn_params_excessive_bools": 1,
@@ -43,7 +43,7 @@
     "missing_docs": 45,
     "redundant_imports": 14,
     "unnameable_types": 6,
-    "unreachable_pub": 25
+    "unreachable_pub": 24
   },
   "history": {},
   "queries": {}
