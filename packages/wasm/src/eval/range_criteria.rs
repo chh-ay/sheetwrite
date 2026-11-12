@@ -322,12 +322,14 @@ impl CellStore {
         #[cfg(test)]
         KERNEL_CALLS.with(|calls| calls.set(calls.get() + 1));
 
-        Some(self.criteria_column_family(fold, column_values, &columns, rows))
+        Some(self.fold_matched_rows(fold, column_values, &columns, rows))
     }
 
     /// [`Self::criteria_literals_family`]'s mask and fold over matched rows.
-    #[inline(never)]
-    fn criteria_column_family(
+    /// Always inlined: as a separate wasm function, JavaScriptCore's
+    /// optimizing tier ran `criteria-multi-range-edit` about 15% slower.
+    #[inline(always)]
+    fn fold_matched_rows(
         &self,
         fold: CriteriaFold,
         values: Option<LiteralColumn<'_>>,
