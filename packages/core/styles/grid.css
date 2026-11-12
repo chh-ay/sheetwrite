@@ -75,7 +75,7 @@
   padding: 0 4px;
   box-sizing: border-box;
   z-index: 3;
-  overflow: hidden;
+  overflow: auto;
   white-space: pre;
 }
 
