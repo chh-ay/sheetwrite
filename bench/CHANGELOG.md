@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Compare published releases with one workload script (`bench:version-comparison`): formula recalculation, retained and peak memory of 100,000 formulas, engine download size and XLSX import and export, for both engines, with interleaved rounds and an A/A spread.
 - Separate formula fixture construction and artifact checks from the command runner. Keep one ordered gate row table shared by capture and validation; preserve CLI modes, allocation checks and baseline policy.
 - Capture live chart tracking at 200, 2,000, and 20,000 charts, with exact notification checks and separate conservative formula-source evidence. Include chart tracking and the 100,000-row pivot matrix in the stamped release capture.
 - Gate engine reader changes with a paired ABBA harness over 39 `CellStore` readers (windows, queries, batched cell reads, formula ranges). A reader fails only when its digests disagree, or when its median paired ratio exceeds its A/A noise limit and the candidate is slower in every pair. `--write-floor` turns an A/A report into the committed per-reader limits.
