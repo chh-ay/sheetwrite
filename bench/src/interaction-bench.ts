@@ -576,7 +576,9 @@ async function main(): Promise<void> {
       String(DOCS_PORT),
       "--strictPort",
     ],
-    { cwd: DOCS_ROOT, stdout: "ignore", stderr: "pipe" },
+    // A process group of its own: `bun run dev` does not pass SIGTERM on to
+    // Vite, which would otherwise keep the port and the stderr pipe open.
+    { cwd: DOCS_ROOT, stdout: "ignore", stderr: "pipe", detached: true },
   );
   const serverErrors = forwardServerErrors(server.stderr);
   const browser = await chromium.launch();
@@ -613,7 +615,7 @@ async function main(): Promise<void> {
     throw new Error(`${message}\nthe docs server reported:\n${recentErrors}`, { cause: error });
   } finally {
     await browser.close();
-    server.kill();
+    if (server.exitCode === null) process.kill(-server.pid, "SIGTERM");
     await server.exited;
     await serverErrors.drained;
   }
