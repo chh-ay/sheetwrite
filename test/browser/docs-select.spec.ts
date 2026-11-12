@@ -2,9 +2,8 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { siteUrl } from "./playwright.config.js";
 
-// The Solid site's select (docs-solid/src/components/Select.tsx), the WAI-ARIA
-// select-only combobox, through the formula reference's engine filter. The
-// React site's filter is Base UI, so these skip there.
+// The docs site's select (docs/src/components/Select.tsx), the WAI-ARIA
+// select-only combobox, through the formula reference's engine filter.
 
 const FORMULA_PAGE = siteUrl("/docs/reference/formula-functions/math/");
 
@@ -24,12 +23,7 @@ interface EngineFilter {
 async function openFormulaPage(page: Page): Promise<EngineFilter> {
   await page.goto(FORMULA_PAGE);
   await waitForHydration(page);
-  const field = page.getByRole("combobox", { name: "Available in" });
-  test.skip(
-    !(await field.evaluate((element) => element.classList.contains("sw-select__trigger"))),
-    "The React site's engine filter is Base UI.",
-  );
-  return engineFilter(page, field);
+  return engineFilter(page, page.getByRole("combobox", { name: "Available in" }));
 }
 
 function engineFilter(page: Page, field: Locator): EngineFilter {
@@ -52,7 +46,8 @@ async function rowCount(page: Page, engine: "default" | "full"): Promise<number>
   return page.locator(`tr[data-engine="${engine}"]`).count();
 }
 
-test("the engine filter has its name, role and state in the accessibility tree @portability", async ({
+// Chromium only: Playwright computes the ARIA snapshot itself, so no engine differs here.
+test("the engine filter has its name, role and state in the accessibility tree", async ({
   page,
 }) => {
   const { field, list } = await openFormulaPage(page);

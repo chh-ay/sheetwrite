@@ -109,9 +109,11 @@ export function staticDashboard(
     }
 
     if (exported.chart !== undefined) {
-      const { pivot: _pivot, ...chart } = exported.chart.chart;
+      // The view shares the store's read-only definition; the written chart gets its own arrays.
+      const { pivot: _pivot, pivotValues, ...chart } = exported.chart.chart;
       chartDefinitions.push({
         ...chart,
+        ...(pivotValues === undefined ? {} : { pivotValues: [...pivotValues] }),
         anchor: {
           row: item.box.y,
           col: item.box.x,

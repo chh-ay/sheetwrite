@@ -60,23 +60,42 @@ impl RewriteScope {
 pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Offset | Func::Indirect, _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::Func(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::UnknownFunc(call) => {
+            let args = &call.args;
+            args.iter().any(ast_contains_runtime_ref)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_contains_runtime_ref(left) || ast_contains_runtime_ref(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_runtime_ref(inner),
         Ast::LetSlot { expression, .. } => ast_contains_runtime_ref(expression),
         Ast::NamedFormula(named) => ast_contains_runtime_ref(&named.expression),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
     }
 }
 
 fn sheet_ref(handle: u32) -> SheetRef {
-    SheetRef {
-        handle,
-        name: String::new(),
-        quoted: false,
-    }
+    SheetRef { handle }
 }
 
 fn range_ast(range: CellRange) -> Ast {
@@ -142,6 +161,10 @@ fn record_runtime_read(reads: &mut RuntimeReads, range: CellRange) {
 
 impl CellStore {
     /// The range an OFFSET or INDIRECT call refers to now.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn runtime_range(
         &self,
         func: Func,
@@ -277,15 +300,22 @@ impl CellStore {
                     Ok(range) => *ast = range_ast(range),
                     Err(FormulaError::Ref) => *ast = Ast::InvalidRef,
                     Err(error) if scope == RewriteScope::Root => {
-                        *ast = Ast::Array {
+                        *ast = Ast::Array(Box::new(crate::calc::ArrayLiteral {
                             cols: 1,
                             values: vec![Value::Error(error)],
-                        };
+                        }));
                     }
                     Err(_) => {}
                 }
             }
-            Ast::Func(Func::Let, args) | Ast::UnknownFunc(_, args) => {
+            Ast::Func(Func::Let, args) => {
+                for arg in args {
+                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
+                }
+            }
+            Ast::UnknownFunc(call) => {
+                let args = &mut call.args;
+
                 for arg in args {
                     self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
                 }
@@ -338,7 +368,9 @@ impl CellStore {
             None => {
                 return Err(match self.eval_ast(&args[0], sheet, pass, depth + 1) {
                     Value::Error(error) => error,
-                    _ => FormulaError::Value,
+                    Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                        FormulaError::Value
+                    }
                 });
             }
         };
@@ -456,7 +488,33 @@ impl CellStore {
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             ast @ (Ast::NamedRange(_) | Ast::Structured(_)) => range_from_ast(ast, sheet),
-            _ => None,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => None,
+            #[cfg(feature = "analysis")]
+            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
         }
     }
 }

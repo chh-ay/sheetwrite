@@ -1,20 +1,31 @@
 import { beforeAll, expect, it } from "bun:test";
+import { readdirSync, readFileSync } from "node:fs";
 
 import {
   fromXlsxWorkbook,
   initSheetwrite,
   SheetwriteStore,
   toXlsxWorkbook,
+  withXlsxFormulaEngine,
 } from "@sheetwrite/core";
 
+import {
+  generateConformanceEvidence,
+  readFormulaInventory,
+} from "../../../scripts/conformance/generate.js";
+import { convertWorkbookFormulas, workbookFormulaSources } from "../src/formula.js";
 import { xlsxAddon } from "../src/index.js";
 import { escapeXml } from "../src/xml.js";
 import { rawXlsx, worksheet } from "./raw-opc.js";
 import { book, formula, partText, sheet, sheetNamed, valuesOf } from "./workbook-fixtures.js";
 
-const INVENTORY = (await Bun.file(
-  new URL("../../../test/conformance/formula-contract.inventory.json", import.meta.url),
-).json()) as { functions: { canonical: string; contractStatus: string }[] };
+const INVENTORY_PATH = new URL(
+  "../../../test/conformance/formula-contract.inventory.json",
+  import.meta.url,
+).pathname;
+const INVENTORY = (await Bun.file(INVENTORY_PATH).json()) as {
+  functions: { canonical: string; contractStatus: string }[];
+};
 
 beforeAll(async () => {
   await initSheetwrite({ addons: [xlsxAddon()] });
@@ -54,6 +65,61 @@ it("round-trips every required function source and writes Excel's native spellin
     if (expected) expect(native).toContain(`<f>${escapeXml(expected)}</f>`);
   }
   expect(valuesOf(await fromXlsxWorkbook(encoded))).toEqual(sources.map(formula));
+});
+
+// Export skips the engine for plain sources (references, numbers, text and
+// operators). Every formula the conformance corpus and the XLSX fixtures hold,
+// and the table, name and intersection forms the skip must leave to the
+// engine, gets the same spelling from that path as from the engine.
+it("spells plain export formulas as the engine does", async () => {
+  const sources = new Set<string>([
+    "=A1+B1",
+    "='My Sheet'!$A$1:$B$2*2",
+    "=Sheet1!A1 B2:B4",
+    '="a(b)#[c]"&A1',
+    "=1.5E+3%-.5",
+    "=Table1[@Amount]",
+    "=[@Amount]*2",
+    "=Table1[[#This Row],[Amount]]",
+    "=@A1:A3",
+    "=A1#",
+    "=Rate*2",
+    "=LET(x,1,x)",
+    "=LOG10(A1)",
+    "=A1:INDEX(B:B,2)",
+    "=[Budget.xlsx]Annual!C10",
+    "={1,2;3,4}",
+    "=TRUE",
+    "=12345678901234567890123456789x",
+  ]);
+  const { corpus } = generateConformanceEvidence(await readFormulaInventory(INVENTORY_PATH));
+  const collect = (value: unknown): void => {
+    if (typeof value === "string" && value.startsWith("=")) sources.add(value);
+    else if (value && typeof value === "object") Object.values(value).forEach(collect);
+  };
+  collect(corpus.cases);
+  const fixtures = new URL("./fixtures/", import.meta.url);
+  for (const name of readdirSync(fixtures).filter((file) => /\.xls[xm]$/.test(file))) {
+    const snapshot = await fromXlsxWorkbook(readFileSync(new URL(name, fixtures))).catch(
+      (error: unknown) => {
+        if (
+          error instanceof Error &&
+          error.name !== "SheetwriteError" &&
+          error.name !== "XlsxResourceError"
+        ) {
+          throw error;
+        }
+        return undefined;
+      },
+    );
+    for (const source of snapshot ? workbookFormulaSources(snapshot) : []) sources.add(source);
+  }
+  expect(sources.size).toBeGreaterThan(1_000);
+
+  const all = [...sources];
+  const spelled = await convertWorkbookFormulas(book([sheet("all", "All", column(all))]), "export");
+  const engine = await withXlsxFormulaEngine((formulas) => formulas.convert(all, "export"));
+  expect(all.map((source) => spelled.get(source))).toEqual(engine);
 });
 
 it("strips prefixes after expanding shared formulas without shifting local names", async () => {

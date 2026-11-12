@@ -1,38 +1,20 @@
-import { useEffect, useState } from "react";
-
-import { writePreference } from "../lib/preference-storage.js";
 import { Icon } from "./Icon.js";
 
-type Theme = "light" | "dark";
-
-function currentTheme(): Theme {
-  if (typeof document === "undefined") return "dark";
-  return document.documentElement.dataset.theme === "light" ? "light" : "dark";
-}
-
-/** Switches between the light and dark theme and remembers the choice. */
+/**
+ * Switches between the light and dark theme. The server renders the dark
+ * theme's button; lib/shell.ts relabels it for the theme the head script
+ * chose and switches the theme on click.
+ */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
-
-  useEffect(() => setTheme(currentTheme()), []);
-
-  const toggle = () => {
-    const next = currentTheme() === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    writePreference("sheetwrite-theme", next);
-    setTheme(next);
-  };
-  const label = `Use ${theme === "dark" ? "light" : "dark"} theme`;
-
   return (
     <button
-      aria-label={label}
-      className="sw-icon-button"
-      onClick={toggle}
-      title={label}
+      aria-label="Use light theme"
+      class="sw-icon-button"
+      data-theme-toggle=""
+      title="Use light theme"
       type="button"
     >
-      <Icon name={theme === "dark" ? "sun" : "moon"} size="md" />
+      <Icon name="sun" size="md" />
     </button>
   );
 }

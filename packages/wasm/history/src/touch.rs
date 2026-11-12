@@ -85,13 +85,26 @@ impl Touches {
         std::mem::swap(&mut self.list, &mut self.scratch);
     }
 
-    /// The last person who wrote the cell, or `NONE` when no logged write reaches it.
-    pub(crate) fn last_author(&self, row: u32, col: u32) -> u32 {
-        self.list
-            .iter()
-            .rev()
-            .find(|touch| touch.contains(row, col))
-            .map_or(NONE, |touch| touch.author)
+    /// The last person who wrote each cell `(rows[i], cols[i])`, into
+    /// `authors[i]`, which holds `NONE` until a logged write reaches the cell.
+    /// `rows` is in ascending order. One sweep over the log, newest write
+    /// first, finds each write's rows by binary search and stops once every
+    /// cell has its author, instead of sweeping the log once per cell.
+    pub(crate) fn last_authors(&self, rows: &[u32], cols: &[u32], authors: &mut [u32]) {
+        let mut missing = rows.len();
+        for touch in self.list.iter().rev() {
+            if missing == 0 {
+                return;
+            }
+            let first = rows.partition_point(|&row| row < touch.r0);
+            let last = rows.partition_point(|&row| row <= touch.r1);
+            for index in first..last {
+                if authors[index] == NONE && touch.c0 <= cols[index] && cols[index] <= touch.c1 {
+                    authors[index] = touch.author;
+                    missing -= 1;
+                }
+            }
+        }
     }
 
     /// Every person who wrote the cell, in the order of their first write.
@@ -107,6 +120,26 @@ impl Touches {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn last_author(touches: &Touches, row: u32, col: u32) -> u32 {
+        let mut authors = [NONE];
+        touches.last_authors(&[row], &[col], &mut authors);
+        authors[0]
+    }
+
+    #[test]
+    fn one_sweep_finds_the_newest_writer_of_each_cell() {
+        let mut touches = Touches::default();
+        touches.add(rect(0, 0, 9, 3, 1));
+        touches.add(rect(2, 1, 4, 1, 2));
+        touches.add(rect(4, 0, 4, 3, 3));
+
+        let rows = [0, 2, 3, 4, 12];
+        let cols = [0, 1, 2, 1, 0];
+        let mut authors = [NONE; 5];
+        touches.last_authors(&rows, &cols, &mut authors);
+        assert_eq!(authors, [1, 2, 1, 3, NONE]);
+    }
 
     fn rect(r0: u32, c0: u32, r1: u32, c1: u32, author: u32) -> Touch {
         Touch {
@@ -124,9 +157,9 @@ mod tests {
         touches.add(rect(0, 0, 9, 3, 1));
         touches.add(rect(2, 1, 2, 1, 2));
 
-        assert_eq!(touches.last_author(2, 1), 2);
-        assert_eq!(touches.last_author(5, 0), 1);
-        assert_eq!(touches.last_author(10, 0), NONE);
+        assert_eq!(last_author(&touches, 2, 1), 2);
+        assert_eq!(last_author(&touches, 5, 0), 1);
+        assert_eq!(last_author(&touches, 10, 0), NONE);
 
         let mut authors = Vec::new();
         touches.authors(2, 1, &mut authors);
@@ -139,11 +172,11 @@ mod tests {
         touches.add(rect(4, 0, 4, 0, 7));
 
         touches.apply_rows(AxisOp::Insert { at: 1, count: 3 });
-        assert_eq!(touches.last_author(7, 0), 7);
-        assert_eq!(touches.last_author(4, 0), NONE);
+        assert_eq!(last_author(&touches, 7, 0), 7);
+        assert_eq!(last_author(&touches, 4, 0), NONE);
 
         touches.apply_rows(AxisOp::Remove { at: 7, count: 1 });
-        assert_eq!(touches.last_author(7, 0), NONE);
+        assert_eq!(last_author(&touches, 7, 0), NONE);
     }
 
     #[test]
@@ -154,6 +187,6 @@ mod tests {
         touches.apply_cols(AxisOp::Insert { at: 2, count: 1 });
         touches.add(rect(3, 2, 3, 2, 4));
 
-        assert_eq!(touches.last_author(3, 2), 4);
+        assert_eq!(last_author(&touches, 3, 2), 4);
     }
 }

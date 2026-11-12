@@ -1242,7 +1242,7 @@ export const CAPABILITY_INVENTORY: readonly Capability[] = [
     accessibility:
       "The account store and the delta log are text tables beside the Grid; every row action is a labelled button.",
     testPath: HOST_ROWS_SPEC,
-    sharedModules: ["docs/src/showcases/HostRowsShowcase.tsx"],
+    sharedModules: ["docs/src/showcases/host-rows/HostRowsStage.tsx"],
     boundary:
       "The entity store, its persistence, and the write policy are host-owned; Sheetwrite keeps row identity and reports deltas.",
   },

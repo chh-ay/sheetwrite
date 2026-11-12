@@ -113,7 +113,7 @@ impl EvalMatrix {
         let bytes = self.values.iter().try_fold(base, |total, value| {
             let payload = match value {
                 Value::Text(text) => text.len(),
-                _ => 0,
+                Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0,
             };
             total.checked_add(payload)
         });
@@ -151,7 +151,95 @@ pub(super) fn optional_ast(args: &[Ast], index: usize) -> Option<&Ast> {
 pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match ast {
         Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(ast, formula_sheet),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::SheetRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
+    }
+}
+
+/// The range an argument of an aggregate or statistic names: a written
+/// range, a defined name of one, a table column or an intersection. A lone
+/// cell is a value there, not a range.
+pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRange> {
+    match arg {
+        Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
+            formula_sheet as u32,
+            *row_start,
+            *col_start,
+            *row_end,
+            *col_end,
+        )),
+        Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
+            sheet.handle,
+            *row_start,
+            *col_start,
+            *row_end,
+            *col_end,
+        )),
+        Ast::NamedRange(named) => Some(CellRange::new(
+            named.sheet,
+            named.row_start,
+            named.col_start,
+            named.row_end,
+            named.col_end,
+        )),
+        Ast::Structured(reference) => Some(CellRange::new(
+            reference.sheet,
+            reference.row_start,
+            reference.col,
+            reference.row_end,
+            reference.col,
+        )),
+        Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::SheetRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -186,7 +274,27 @@ pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
             reference.col,
         )),
         Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::SheetCell(..)
+        | Ast::SheetRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -207,7 +315,34 @@ pub(crate) fn intersection_range(
         let Some(range) = range_from_ast(operand, formula_sheet) else {
             return Err(match operand {
                 Ast::InvalidRef => FormulaError::Ref,
-                _ => FormulaError::Value,
+                Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::Name(_)
+                | Ast::NamedRange(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(..)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Cmp(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array { .. } => FormulaError::Value,
+                #[cfg(feature = "analysis")]
+                Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => FormulaError::Value,
             });
         };
         let Some(current) = common else {

@@ -75,7 +75,7 @@ impl CellStore {
         let name = raw_name.to_ascii_uppercase();
         let is_call = matches!(
             parse(&format!("={name}()")),
-            Ok(Ast::UnknownFunc(parsed, arguments)) if parsed == name && arguments.is_empty()
+            Ok(Ast::UnknownFunc(call)) if call.name == name && call.args.is_empty()
         );
         if !is_call || is_reference_like(&name) {
             return false;
@@ -255,7 +255,12 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
             .any(|argument| calls_volatile_custom(argument, functions))
     };
     match ast {
-        Ast::UnknownFunc(name, arguments) => {
+        Ast::UnknownFunc(call) => {
+            let crate::calc::UnknownCall {
+                name,
+                args: arguments,
+            } = &**call;
+
             functions
                 .get(&name.to_ascii_uppercase())
                 .is_some_and(|function| function.volatile)
@@ -270,7 +275,26 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
         }
         Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions),
         Ast::NamedFormula(named) => calls_volatile_custom(&named.expression, functions),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -473,7 +497,8 @@ mod tests {
             "TaxRate",
             function(|arguments| match arguments[0].values()[0] {
                 Value::Number(number) => Value::Number(number / 10.0),
-                _ => Value::Error(FormulaError::Value),
+                Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) =>
+                    Value::Error(FormulaError::Value),
             }),
         ));
         assert!((store.get_cell(sheet, 0, 1).num() - 0.6).abs() < 1e-12);

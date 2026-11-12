@@ -14,6 +14,7 @@ import type {
 } from "@sheetwrite/core";
 import {
   type AdapterGridInput,
+  assertGridSize,
   createAdapterGridController,
   createSimpleGridInput,
   createSimpleRowBridge,
@@ -22,6 +23,7 @@ import {
   type GridControllerHandlers,
   type GridPublicationAdapter,
   type GridReadyEvent,
+  type GridSizeProps,
   gridSizeStyle,
   type RowBridge,
   type RowBridgeHandler,
@@ -52,6 +54,7 @@ export interface SheetwriteGridExpose {
   /** Live Grid after readiness, or `null` before initialization and during teardown. */
   grid: Grid | null;
 }
+
 /** Advanced Vue adapter props for workbook data or datasource ownership. */
 export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   /** Live workbook schema adopted by the Grid. */
@@ -99,25 +102,29 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId> {
   /** Host height in CSS pixels for numbers or any CSS length string. */
   height?: number | string;
   /** Fills the parent's available width and height. */
-  fill?: boolean;
+  fill?: true;
 }
 
 /** Simple Vue adapter props for columns and default row objects. */
-export interface SheetwriteProps<
+export type SheetwriteProps<
   Row extends Record<string, CellScalar> = Record<string, CellScalar>,
   Id extends RowBridgeId = RowBridgeId,
-> extends Omit<SheetwriteGridProps<Id>, "workbook" | "data" | "datasource" | "rowBridge"> {
-  /** Ordered schema used to derive the component-owned sheet. */
-  columns: readonly SimpleColumn<Row>[];
-  /** Rows converted to initial columnar data; missing keys become `null`. */
-  defaultRows: readonly Row[];
-  /** Generated sheet name; defaults to `Sheet 1`. */
-  sheetName?: string;
-  /** Opt-in stable identity for each host row. */
-  getRowId?: (row: Row, index: number) => Id;
-  /** Creates stable identities for Grid-inserted rows. */
-  createRowId?: Parameters<typeof createSimpleRowBridge<Row, Id>>[0]["createRowId"];
-}
+> = Omit<
+  SheetwriteGridProps<Id>,
+  "workbook" | "data" | "datasource" | "height" | "fill" | "rowBridge"
+> &
+  GridSizeProps & {
+    /** Ordered schema used to derive the component-owned sheet. */
+    columns: readonly SimpleColumn<Row>[];
+    /** Rows converted to initial columnar data; missing keys become `null`. */
+    defaultRows: readonly Row[];
+    /** Generated sheet name; defaults to `Sheet 1`. */
+    sheetName?: string;
+    /** Opt-in stable identity for each host row. */
+    getRowId?: (row: Row, index: number) => Id;
+    /** Creates stable identities for Grid-inserted rows. */
+    createRowId?: Parameters<typeof createSimpleRowBridge<Row, Id>>[0]["createRowId"];
+  };
 
 /** Event payloads emitted by the Vue components, keyed by template event name. */
 export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
@@ -433,16 +440,7 @@ const SheetwriteSimpleComponent = defineComponent({
     let inputCreateRowId: typeof props.createRowId;
 
     return () => {
-      if (
-        (props.height === undefined && !props.fill) ||
-        (props.height !== undefined && props.fill)
-      ) {
-        throw new SheetwriteError(
-          "invalid-argument",
-          "create-grid",
-          "Sheetwrite: provide exactly one of height or fill",
-        );
-      }
+      assertGridSize({ height: props.height, fill: props.fill || undefined });
       if (
         input === null ||
         inputColumns !== props.columns ||
@@ -470,7 +468,7 @@ const SheetwriteSimpleComponent = defineComponent({
       }
       return h(
         SheetwriteGrid,
-        { ...attrs, height: props.height, fill: props.fill, ...input, rowBridge },
+        { ...attrs, height: props.height, fill: props.fill || undefined, ...input, rowBridge },
         slots,
       );
     };

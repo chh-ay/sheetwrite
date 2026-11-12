@@ -159,11 +159,12 @@ fn push_data(
     let source =
         range.and_then(|area| Some((area, context.store.sheets.get(area.sheet as usize)?)));
     values.reserve(matrix.values.len())?;
+    let mut hidden = source.map(|(_, sheet)| options.skipped.hidden_rows(sheet));
     for (index, value) in matrix.values.iter().enumerate() {
         let is_skipped = source.is_some_and(|(range, sheet)| {
             let row = range.row_start + (index / matrix.cols) as u32;
             let col = range.col_start + (index % matrix.cols) as u32;
-            options.skipped.skips_row(sheet, row)
+            hidden.as_mut().is_some_and(|rows| rows.skips(row))
                 || options
                     .skipped
                     .skips_cell(sheet, row, col, &context.store.formula_slots)

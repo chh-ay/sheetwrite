@@ -138,6 +138,7 @@ function findEocd(bytes: Uint8Array, view: DataView): number {
   }
   return fail("end-of-central-directory record not found");
 }
+
 export function normalizeDecodedPartName(decoded: string, source = decoded): string {
   if (
     decoded.length === 0 ||

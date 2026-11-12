@@ -1,6 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { createEffect, createSignal, For, onCleanup, Show } from "solid-js";
+import { isServer } from "solid-js/web";
 
 import { Icon } from "./Icon.js";
+
+/*
+ * Documentation search, ported from docs/src/components/DocsSearch.tsx. An
+ * island that hydrates on first use; lib/shell.ts opens it from ⌘K, Ctrl K
+ * and "/" before then.
+ */
 
 interface PagefindSubResult {
   url: string;
@@ -15,15 +22,16 @@ interface PagefindResultData {
   sub_results?: PagefindSubResult[];
 }
 
-interface PagefindResult {
-  data(): Promise<PagefindResultData>;
-}
-
 interface PagefindResponse {
-  results: PagefindResult[];
+  results: { data(): Promise<PagefindResultData> }[];
 }
 
-/** One rendered hit: pages plus their anchored members/headings. */
+interface PagefindModule {
+  options(options: { noWorker: boolean }): Promise<void>;
+  search(query: string): Promise<PagefindResponse>;
+}
+
+/** One rendered hit: pages plus their anchored members and headings. */
 interface SearchEntry {
   url: string;
   title: string;
@@ -49,11 +57,6 @@ function entriesFor(data: PagefindResultData): SearchEntry[] {
   return [page, ...anchored];
 }
 
-interface PagefindModule {
-  options(options: { noWorker: boolean }): Promise<void>;
-  search(query: string): Promise<PagefindResponse>;
-}
-
 let pagefindModule: Promise<PagefindModule> | undefined;
 
 /**
@@ -64,7 +67,7 @@ let pagefindModule: Promise<PagefindModule> | undefined;
  */
 function loadPagefind(): Promise<PagefindModule> {
   pagefindModule ??= (async () => {
-    // Pagefind creates this browser module after Vite finishes, so no static import exists.
+    // Pagefind writes this module after the site build, so no static import exists.
     const pagefindPath = "/pagefind/pagefind.js";
     const pagefind = (await import(/* @vite-ignore */ pagefindPath)) as PagefindModule;
     await pagefind.options({ noWorker: true });
@@ -77,61 +80,43 @@ function loadPagefind(): Promise<PagefindModule> {
   return pagefindModule;
 }
 
-/** Apple platforms name the Command key; others use Ctrl. */
-function isApplePlatform(): boolean {
-  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+/** The key cap: lib/shell.ts writes the platform's shortcut into the page before this hydrates. */
+function shortcutLabel(): string {
+  if (isServer) return "⌘K";
+  return document.querySelector(".sw-search-button kbd")?.textContent ?? "⌘K";
 }
 
 export function DocsSearch() {
-  const dialog = useRef<HTMLDialogElement>(null);
-  // The prerendered page shows the Command key; other platforms switch to
-  // Ctrl after hydration, in a key cap of fixed width.
-  const [shortcut, setShortcut] = useState("⌘K");
-  useEffect(() => {
-    if (!isApplePlatform()) setShortcut("Ctrl K");
-  }, []);
-  const input = useRef<HTMLInputElement>(null);
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchEntry[]>([]);
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  let dialog: HTMLDialogElement | undefined;
+  let input: HTMLInputElement | undefined;
+  const [query, setQuery] = createSignal("");
+  const [results, setResults] = createSignal<SearchEntry[]>([]);
+  const [status, setStatus] = createSignal("");
+  const [error, setError] = createSignal("");
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
-      const slash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
-      if (!commandK && !slash) return;
-      const target = event.target;
-      // "/" must keep typing semantics inside fields; Ctrl+K may not.
-      if (slash && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
-        return;
-      }
-      event.preventDefault();
-      dialog.current?.showModal();
-      input.current?.focus();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  const open = (): void => {
+    dialog?.showModal();
+    requestAnimationFrame(() => input?.focus());
+  };
 
-  useEffect(() => {
+  createEffect(() => {
+    const current = query();
     setError("");
-    if (query.trim().length < 2) {
+    if (current.trim().length < 2) {
       setResults([]);
       setStatus("");
       return;
     }
-
     const controller = new AbortController();
-    const search = async () => {
+    onCleanup(() => controller.abort());
+    const search = async (): Promise<void> => {
       try {
         setStatus("Searching…");
         const pagefind = await loadPagefind();
-        const response = await pagefind.search(query);
+        const response = await pagefind.search(current);
         const pages = await Promise.all(
           response.results.slice(0, 8).map((result) => result.data()),
         );
-
         const seen = new Set<string>();
         const data: SearchEntry[] = [];
         for (const page of pages) {
@@ -141,57 +126,44 @@ export function DocsSearch() {
             data.push(entry);
           }
         }
-
         if (controller.signal.aborted) return;
-
         setResults(data);
         setStatus(data.length === 0 ? "No matching pages." : "");
       } catch (searchError) {
-        if (!controller.signal.aborted) {
-          console.error("Documentation search failed", searchError);
-          setResults([]);
-          setStatus("");
-
-          try {
-            const index = await fetch("/pagefind/pagefind-entry.json", {
-              signal: controller.signal,
-            });
-            if (controller.signal.aborted) return;
-
-            if (index.status === 404) {
-              setStatus("Search becomes available after the static index is built.");
-              return;
-            }
-          } catch (indexError) {
-            if (controller.signal.aborted) return;
-            console.error("Cannot check the documentation search index", indexError);
+        if (controller.signal.aborted) return;
+        console.error("Documentation search failed", searchError);
+        setResults([]);
+        setStatus("");
+        try {
+          const index = await fetch("/pagefind/pagefind-entry.json", {
+            signal: controller.signal,
+          });
+          if (controller.signal.aborted) return;
+          if (index.status === 404) {
+            setStatus("Search becomes available after the static index is built.");
+            return;
           }
-          setError("Search failed; check your connection and change the query to try again.");
+        } catch (indexError) {
+          if (controller.signal.aborted) return;
+          console.error("Cannot check the documentation search index", indexError);
         }
+        setError("Search failed; check your connection and change the query to try again.");
       }
     };
     void search();
-    return () => controller.abort();
-  }, [query]);
+  });
 
   return (
     <>
-      <button
-        className="sw-search-button"
-        onClick={() => {
-          dialog.current?.showModal();
-          requestAnimationFrame(() => input.current?.focus());
-        }}
-        type="button"
-      >
+      <button class="sw-search-button" data-search-open="" onClick={open} type="button">
         <Icon name="search" />
         <span>Search docs</span>
-        <kbd>{shortcut}</kbd>
+        <kbd>{shortcutLabel()}</kbd>
       </button>
       {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- only a backdrop click closes the dialog; Escape is the keyboard path. */}
       <dialog
         aria-label="Search documentation"
-        className="sw-search-dialog"
+        class="sw-search-dialog"
         onClick={(event) => {
           // Clicks on children land on the form; only the backdrop hits the
           // dialog element itself (it has no padding).
@@ -200,40 +172,50 @@ export function DocsSearch() {
         onKeyDown={(event) => {
           if (event.key === "Escape") event.currentTarget.close();
         }}
-        ref={dialog}
+        ref={(element) => {
+          dialog = element;
+        }}
       >
         <form method="dialog">
           <label>
-            <span className="sw-visually-hidden">Search documentation</span>
+            <span class="sw-visually-hidden">Search documentation</span>
             <Icon name="search" size="md" />
             <input
-              autoComplete="off"
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              autocomplete="off"
+              onInput={(event) => setQuery(event.currentTarget.value)}
               placeholder="Search APIs, guides, and examples"
-              ref={input}
+              ref={(element) => {
+                input = element;
+              }}
               type="search"
-              value={query}
+              value={query()}
             />
           </label>
           <button aria-label="Close search" type="submit">
             Esc
           </button>
         </form>
-        <p role="alert" data-action-error hidden={error.length === 0}>
-          {error}
+        <p data-action-error="" hidden={error().length === 0} role="alert">
+          {error()}
         </p>
-        <div aria-live="polite" className="sw-search-results">
-          {status.length > 0 ? <p>{status}</p> : null}
-          {results.map((result) => (
-            <a href={result.url} key={result.url}>
-              <strong>
-                {result.title}
-                {result.package ? <code>{result.package}</code> : null}
-              </strong>
-              {/* Pagefind excerpts are our own indexed text with <mark> highlights. */}
-              <span dangerouslySetInnerHTML={{ __html: result.excerpt }} />
-            </a>
-          ))}
+        <div aria-live="polite" class="sw-search-results">
+          <Show when={status().length > 0}>
+            <p>{status()}</p>
+          </Show>
+          <For each={results()}>
+            {(result) => (
+              <a href={result.url}>
+                <strong>
+                  {result.title}
+                  <Show when={result.package}>
+                    <code>{result.package}</code>
+                  </Show>
+                </strong>
+                {/* Pagefind excerpts are our own indexed text with <mark> highlights. */}
+                <span innerHTML={result.excerpt} />
+              </a>
+            )}
+          </For>
         </div>
       </dialog>
     </>

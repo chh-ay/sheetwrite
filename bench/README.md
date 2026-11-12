@@ -941,6 +941,38 @@ records both commits, the command, the CPUs, the power profile and the times,
 go to `results/engine-comparison/<linux|darwin>/`. A machine without that
 directory reads "pending" on the page.
 
+### Releases against each other
+
+The upgrade guide's table "How 0.7.0 compares with 0.5.4 and 0.6.1" comes from
+`src/version-comparison.ts`. It runs one workload against each release's
+published packages, so every version is measured the way an app installs it:
+
+```sh
+# One empty folder per version with @sheetwrite/core, wasm, formulas and xlsx:
+mkdir v0.5.4 && (cd v0.5.4 && echo '{"type":"module"}' > package.json && \
+  npm install @sheetwrite/core@0.5.4 @sheetwrite/wasm@0.5.4 \
+  @sheetwrite/formulas@0.5.4 @sheetwrite/xlsx@0.5.4)
+# The same for 0.6.1. For an unpublished commit, build its packages, run
+# `bun pm pack` in packages/{wasm,formulas,core,xlsx} and install the tarballs.
+
+# On an otherwise idle machine (Linux: `<bench-run> --exclusive taskset -c 0-19`;
+# Mac: `<mac-quiet> <name>`, the Mac timing lock):
+bun run bench:version-comparison -- run --machine Linux --rounds 8 \
+  --version 0.5.4=v0.5.4 --version 0.6.1=v0.6.1 --version 0.7.0=v0.7.0 \
+  --commit 0.7.0=<sha> --output linux.json
+bun run bench:version-comparison -- report --input linux.json --input mac.json \
+  --output table.md
+```
+
+The script imports nothing from this repository, so it can be copied next to
+the version folders. The only per-version code is the setup call:
+`initSheetwrite(undefined, engine)` plus `registerXlsxBackends()` before 0.7.0,
+`initSheetwrite({ engine, addons: [xlsxAddon()] })` from 0.7.0. Each round runs
+every version and engine in a fresh process, ABC in even rounds and CBA in odd
+ones; the tables use medians over rounds, and the artifact states the A/A
+spread (median of the ABC rounds against median of the CBA rounds). Results go
+to `results/version-comparison/`.
+
 ### Chart tracking and pivot evidence
 
 `bench:charts` writes `results/chart-tracking-results.json`. Its full matrix
@@ -954,7 +986,10 @@ Initial index construction and correctness assertions are untimed.
 Literal-source outside edits must emit no event and perform no view
 resolution; inside edits must name exactly the one matching chart.
 The listener records chart identities and event time only. View resolution
-runs after the commit timer stops. Inside edits change the literal second
+runs after the commit timer stops and is timed on its own as `resolveMs`: one
+`resolveChartView` per chart the commit named, as a consumer refreshing every
+named chart would. Commit plus resolution is the cost an edit has for a
+consumer that redraws each named chart. Inside edits change the literal second
 cell of chart 0's source. In the formula case, its first cell reads that
 second cell, so the formula stays in place and the index is not rebuilt.
 Outside edits change a literal after the source region. A formula-replacement
@@ -989,6 +1024,17 @@ published WASM singleton's `load()`. Core-backed memory probes observe core's
 own engine instance; raw formula-engine probes continue to observe their own
 published singleton.
 
+The core-paths rows `row-resize-100`, `row-resize-100k` and `row-resize-1m`
+drag the first row's border down twenty pixels through pointer events on a
+mounted grid of 100, 100,000 and 1,000,000 rows. The timed run is the whole
+drag: twenty previews and the commit on release. Variants time the undo of
+that commit and the same drag ended by `pointercancel`. Garbage is collected
+before each of the three, so each pays only for its own allocations. Each
+commit is the sheet's first height override. The
+`rowIndexBytesAfterFirstResize` counter is the backing store of a row index
+of that size after one resized row. Smoke runs use the same sheets with fewer
+samples.
+
 The performance showcase reads `results/paged-results.json` and
 `results/interaction-results.json`. `bench:paged` writes the paged capture;
 `bench:interaction` measures the current values of the four interaction metrics
@@ -1021,6 +1067,29 @@ locked commands so other checkouts can acquire the shared lock.
 
 ```sh
 taskset -c <idle-core> bun run bench:interaction-sessions
+```
+
+`bench:forced-layout` counts forced style and layout in Chromium, which happy-dom
+cannot. A forced recalculation is an `UpdateLayoutTree` or `Layout` trace event
+that runs inside script: script read a style or a geometry while the DOM had
+writes the browser had not applied yet. The browser's own update before it
+paints a frame is not forced. Each action runs on a 100,000-row grid in a fresh
+page. Five are input followed by the two frames that paint it: a scroll step of
+three rows (the painted window moves), an arrow key, opening the cell editor,
+an edit commit (open, type, Enter), and a scroll step while the editor is open.
+Three repeat the render benchmark's timed loop, where `grid.refresh()` paints
+and the steps run back to back with no frame between them: scroll, arrow key
+and edit commit. Two User Timing marks bracket each step; ten warm-up steps run
+first. The table gives, per action, the median forced styles and layouts per
+step, the nodes they touched (elements restyled plus layout objects laid out,
+as the trace reports them), the most nodes in any step, the median forced time,
+the frame's own style and layout time, and the script time. The run fails when
+the forced recalculations of one step touch more nodes than the action's
+ceiling in `src/forced-layout-bench.ts`; node counts do not depend on the
+machine's speed.
+
+```sh
+bun run bench:forced-layout -- --runs 3 --steps 40 --output forced-layout.json
 ```
 
 A change to a harness source file, to the sampling flags, or to the protocol
@@ -1272,6 +1341,8 @@ bench/
     render-protocol.ts     # result schema, completeness, Markdown generator
     render-driver.ts       # fresh-process Playwright runner and persistence
     render-bench.html      # render benchmark page shell
+    forced-layout-bench.ts # forced style and layout per input step (Chromium trace)
+    forced-layout-page.ts  # its page: one grid, one action per page load
     check.ts               # regression checks against captured results
     controlled-baseline.ts # reviewed baseline schema and raw-round reduction
     gate-protocol.ts       # exact matrices, resource/stat checks, fingerprints
@@ -1280,6 +1351,7 @@ bench/
     reader-bench.ts        # one-engine CellStore reader timing (40 readers)
     reader-gate.ts         # paired ABBA reader gate and noise-floor writer
     verify.ts              # deterministic CI smoke orchestration and artifacts
+    version-comparison.ts  # published releases against each other (upgrade guide table)
   results/
     data-results.{md,json} # generated by bench:data
     formula-results.{md,json} # generated by bench:formula[:smoke]
@@ -1287,4 +1359,5 @@ bench/
     render-results.{md,json} # generated by bench:render
     reader-noise-floor.json # per-reader limits, written by reader-gate --write-floor
     reader-baseline-0.5.x.json # 0.5.x-vs-tip reader summary (documentation only)
+    version-comparison/    # bench:version-comparison per machine, and the table
 ```

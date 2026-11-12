@@ -5,6 +5,8 @@
  * widget warns once instead. Production builds skip the check.
  */
 
+import { isDevelopmentBuild } from "./development-build.js";
+
 /** One stylesheet part; `@sheetwrite/core/styles/<part>.css`. */
 export type StylePart =
   | "grid"
@@ -18,25 +20,8 @@ export type StylePart =
   | "icons"
   | "dashboard";
 
-/** Set by bundlers; the core package does not depend on Node's types. */
-declare const process: { readonly env: { readonly NODE_ENV?: string } };
-
 /** Parts already found or warned about; each part is checked until one of those happens. */
 const settledParts = new Set<StylePart>();
-
-/**
- * True when the bundler built for development. Bundlers replace
- * `process.env.NODE_ENV` with a string; without a bundler `process` does not
- * exist in a browser, and such a page is not a development build.
- */
-function isDevelopmentBuild(): boolean {
-  try {
-    return process.env.NODE_ENV === "development";
-  } catch (error) {
-    if (error instanceof ReferenceError) return false;
-    throw error;
-  }
-}
 
 /**
  * Warn once when `part` is not loaded for `element`, a connected element that
