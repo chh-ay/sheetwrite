@@ -91,6 +91,31 @@ export class OffsetIndex {
     this.mergeSorted(rows, heights);
   }
 
+  /**
+   * Give an index without resized rows the heights of `rows`, which must be
+   * ascending, distinct and inside the index. The index keeps both arrays.
+   */
+  load(rows: Int32Array<ArrayBuffer>, heights: Float64Array<ArrayBuffer>): void {
+    if (this.size > 0 || (this.queued?.size ?? 0) > 0) {
+      this.setHeights(rows, heights);
+      return;
+    }
+    let size = 0;
+    for (let position = 0; position < rows.length; position++) {
+      const height = heights[position] ?? this.defaultHeight;
+      if (height === this.defaultHeight) continue;
+      rows[size] = rows[position] ?? 0;
+      heights[size] = height;
+      size++;
+    }
+    if (size === 0) return;
+    this.rows = rows;
+    this.heights = heights;
+    this.tree = new Float64Array(rows.length + 1);
+    this.size = size;
+    this.rebuildTree();
+  }
+
   /** Sum of heights of rows [0, row); i.e. the top Y of `row`. */
   offsetOf(row: number): number {
     this.merge();

@@ -397,12 +397,13 @@ export class GeometryLayoutController {
       if (viewRow !== null) this.rowIndex.setHeight(viewRow, this.committedRowHeight(viewRow));
       return;
     }
-    this.setCommittedHeights(
-      this.rowIndex,
-      dataRows,
+    const rowHeights = this.options.sheet().rowHeights;
+    const { rows, heights } = this.committedHeights(
+      dataRows.map((dataRow) => [dataRow, rowHeights?.get(dataRow)] as const),
       dataRows.length,
-      this.options.sheet().rowHeights,
+      this.rowIndex.count,
     );
+    this.rowIndex.setHeights(rows, heights);
   }
 
   rebuildColumns(): void {
@@ -434,41 +435,39 @@ export class GeometryLayoutController {
     const index = new OffsetIndex(rowCount, this.options.theme().rowHeight);
     const rowHeights = sheet.rowHeights;
     if (rowHeights && rowHeights.size > 0) {
-      this.setCommittedHeights(index, rowHeights.keys(), rowHeights.size, rowHeights);
+      const { rows, heights } = this.committedHeights(rowHeights, rowHeights.size, rowCount);
+      index.load(rows, heights);
     }
     return index;
   }
 
   /**
-   * Give the view rows of `dataRows` that `index` holds their committed heights
-   * in one merge. `size` bounds how many data rows there are. Rows that arrive
-   * in view order, as a loaded sheet's do without a view, skip the sort.
+   * View rows, ascending and distinct, and zoomed heights of the committed
+   * `[dataRow, height]` pairs whose view rows fall below `rowCount`. `size`
+   * bounds how many pairs there are. Pairs that arrive in view order, as a
+   * loaded sheet's do without a view, skip the sort.
    */
-  private setCommittedHeights(
-    index: OffsetIndex,
-    dataRows: Iterable<number>,
+  private committedHeights(
+    entries: Iterable<readonly [dataRow: number, height: number | undefined]>,
     size: number,
-    rowHeights: ReadonlyMap<number, number> | undefined,
-  ): void {
+    rowCount: number,
+  ): { rows: Int32Array<ArrayBuffer>; heights: Float64Array<ArrayBuffer> } {
     const zoom = this.options.zoom();
     const defaultHeight = this.options.theme().rowHeight;
     const viewRows = new Int32Array(size);
     const heights = new Float64Array(size);
     let count = 0;
     let ascending = true;
-    for (const dataRow of dataRows) {
+    for (const [dataRow, height] of entries) {
       const viewRow = this.toViewRow(dataRow);
-      if (viewRow === null || viewRow >= index.count) continue;
+      if (viewRow === null || viewRow >= rowCount) continue;
       if (count > 0 && viewRow <= (viewRows[count - 1] ?? -1)) ascending = false;
-      const height = rowHeights?.get(dataRow);
       viewRows[count] = viewRow;
       heights[count] = height === undefined ? defaultHeight : height * zoom;
       count++;
     }
-    if (ascending) {
-      index.setHeights(viewRows.subarray(0, count), heights.subarray(0, count));
-      return;
-    }
+    if (ascending)
+      return { rows: viewRows.subarray(0, count), heights: heights.subarray(0, count) };
     // A view row comes from one data row, so equal view rows carry equal heights.
     const order = Uint32Array.from({ length: count }, (_, position) => position).sort(
       (a, b) => (viewRows[a] ?? 0) - (viewRows[b] ?? 0),
@@ -483,7 +482,7 @@ export class GeometryLayoutController {
       sortedHeights[unique] = heights[position] ?? defaultHeight;
       unique++;
     }
-    index.setHeights(sortedRows.subarray(0, unique), sortedHeights.subarray(0, unique));
+    return { rows: sortedRows.subarray(0, unique), heights: sortedHeights.subarray(0, unique) };
   }
 
   /** Committed height of view row `row` at the current zoom. */

@@ -154,6 +154,20 @@ describe("OffsetIndex", () => {
     expect(index.backingStoreBytes).toBe(0);
   });
 
+  it("loads sorted rows into an empty index, skipping rows at the default", () => {
+    const heights = Array<number>(10).fill(DEFAULT_HEIGHT);
+    const index = new OffsetIndex(heights.length, DEFAULT_HEIGHT);
+    index.load(Int32Array.of(0, 3, 7, 9), Float64Array.of(40, DEFAULT_HEIGHT, 50, 12));
+    heights[0] = 40;
+    heights[7] = 50;
+    heights[9] = 12;
+    expectHeights(index, heights);
+    index.load(Int32Array.of(1, 7), Float64Array.of(33, DEFAULT_HEIGHT));
+    heights[1] = 33;
+    heights[7] = DEFAULT_HEIGHT;
+    expectHeights(index, heights);
+  });
+
   it("answers heights and the total between single-row resizes without a read", () => {
     const heights = Array<number>(2_000).fill(DEFAULT_HEIGHT);
     const index = new OffsetIndex(heights.length, DEFAULT_HEIGHT);
