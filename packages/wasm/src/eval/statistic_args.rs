@@ -16,12 +16,11 @@ use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
 };
 
-use super::areas::{accepts_sheet_span, accepts_union};
 use super::array::ast_produces_array;
 use super::functions::{treats_cell_as_reference, FuncAccumulator, MAX_FUNCTION_ARGS};
-use super::matrix::{intersection_range, range_from_ast};
+use super::matrix::argument_range;
 use super::range_view::RangeView;
-use super::statistics::{self, PairedCell, PairedKind};
+use super::statistics::{self, NumberStatistic, PairedCell};
 use super::value::aggregate_number;
 use super::EvalPass;
 
@@ -54,7 +53,7 @@ pub(super) struct StatisticArgs {
 }
 
 impl StatisticArgs {
-    fn new(paired: bool) -> Self {
+    const fn new(paired: bool) -> Self {
         Self {
             cells: if paired {
                 Cells::Paired(Vec::new())
@@ -98,7 +97,7 @@ impl StatisticArgs {
     }
 
     /// One more cell, against the accumulator's limit of cells per call.
-    fn count_cells(&mut self, cells: usize) -> Result<(), FormulaError> {
+    const fn count_cells(&mut self, cells: usize) -> Result<(), FormulaError> {
         let total = self.total_cells.saturating_add(cells);
         if total > RANGE_CELL_LIMIT as usize {
             return Err(FormulaError::Num);
@@ -120,7 +119,7 @@ impl StatisticArgs {
     fn push_range_number(&mut self, number: Option<f64>) {
         match &mut self.cells {
             Cells::Numbers(numbers) => match number {
-                Some(number) if number.is_finite() => numbers.push(number),
+                Some(finite) if finite.is_finite() => numbers.push(finite),
                 Some(_) => self.defer(FormulaError::Num),
                 None => {}
             },
@@ -156,7 +155,7 @@ impl StatisticArgs {
     }
 
     /// The number of arguments.
-    pub(super) fn arg_count(&self) -> usize {
+    pub(super) const fn arg_count(&self) -> usize {
         self.args.len()
     }
 
@@ -240,58 +239,138 @@ pub(super) const fn views_off() -> bool {
     false
 }
 
-/// Whether `func` reads its arguments through [`StatisticArgs`].
-pub(super) const fn reads_numbers(func: Func) -> bool {
-    matches!(
-        func,
-        Func::Median
-            | Func::ModeSngl
-            | Func::Large
-            | Func::Small
-            | Func::RankEq
-            | Func::PercentileInc
-            | Func::QuartileInc
-            | Func::StdevS
-            | Func::StdevP
-            | Func::VarS
-            | Func::VarP
-            | Func::GeoMean
-            | Func::Correl
-            | Func::CovarianceS
-            | Func::CovarianceP
-    )
+/// Reads the arguments of one statistic call.
+struct Reader<'a> {
+    store: &'a CellStore,
+    func: Func,
+    sheet: usize,
+    values: StatisticArgs,
 }
 
-/// The range an argument names, as the function accumulator resolves it.
-fn written_area(arg: &Ast, sheet: usize) -> Option<CellRange> {
-    match arg {
-        Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-            sheet as u32,
-            *row_start,
-            *col_start,
-            *row_end,
-            *col_end,
-        )),
-        Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
-            CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
-        ),
-        Ast::NamedRange(named) => Some(CellRange::new(
-            named.sheet,
-            named.row_start,
-            named.col_start,
-            named.row_end,
-            named.col_end,
-        )),
-        Ast::Structured(reference) => Some(CellRange::new(
-            reference.sheet,
-            reference.row_start,
-            reference.col,
-            reference.row_end,
-            reference.col,
-        )),
-        Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).ok(),
-        _ => None,
+impl Reader<'_> {
+    /// Reads `area` as the function accumulator does, keeping only what the
+    /// statistic reads. Returns the area's first value.
+    fn range(
+        &mut self,
+        area: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        if depth > FORMULA_RECURSION_LIMIT {
+            return Err(FormulaError::Num);
+        }
+
+        let view = RangeView::clipped(self.store, area, depth)?;
+        let (rows, cols) = view.shape();
+        let cells = (rows as u64).saturating_mul(cols as u64);
+        if cells > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.values.count_cells(cells as usize)?;
+
+        let values = &mut self.values;
+        view.scan_numbers(pass, |number| values.push_range_number(number))?;
+        Ok(view.cell(0, 0, pass))
     }
+
+    /// The areas of a union or a 3-D reference, area by area. Returns the
+    /// first value of the first area.
+    fn areas(
+        &mut self,
+        reference: &Ast,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        let mut first = None;
+        for area in self
+            .store
+            .area_ranges(self.func, reference, self.sheet, depth)
+        {
+            let (range, range_depth) = area?;
+            let value = self.range(range, pass, range_depth)?;
+            first.get_or_insert(value);
+        }
+
+        if let Some(value) = first {
+            return Ok(value);
+        }
+        // Every sheet of the span is smaller than the range: one blank keeps
+        // the argument.
+        self.values.count_cells(1)?;
+        self.values.push_value(&Value::Blank, true);
+        Ok(Value::Blank)
+    }
+
+    /// An argument that is not a written range: an array, or one value.
+    /// Returns its first value.
+    fn value(
+        &mut self,
+        arg: &Ast,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<Value, FormulaError> {
+        if ast_produces_array(arg) {
+            if let Some(result) = self
+                .store
+                .eval_dynamic_array(arg, self.sheet, pass, depth + 1)
+            {
+                let matrix = result?;
+                matrix.validate_copies(2)?;
+                for value in &matrix.values {
+                    if let Value::Error(error) = value {
+                        return Err(*error);
+                    }
+                    self.values.count_cells(1)?;
+                    self.values.push_value(value, true);
+                }
+                return Ok(matrix.values.first().map_or(Value::Blank, Clone::clone));
+            }
+        }
+
+        let value = self.store.eval_ast(arg, self.sheet, pass, depth + 1);
+        if let Value::Error(error) = value {
+            return Err(error);
+        }
+        let from_range =
+            treats_cell_as_reference(self.func) && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..));
+        self.values.count_cells(1)?;
+        self.values.push_value(&value, from_range);
+        Ok(value)
+    }
+
+    /// Reads every argument in order, as the function accumulator does.
+    fn read(
+        mut self,
+        args: &[Ast],
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<StatisticArgs, FormulaError> {
+        for arg in args {
+            self.values.start_arg();
+            let first = if let Some(area) = argument_range(arg, self.sheet) {
+                self.range(area, pass, depth + 1)?
+            } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
+                self.areas(arg, pass, depth + 1)?
+            } else {
+                self.value(arg, pass, depth)?
+            };
+
+            if self.values.args.len() >= MAX_FUNCTION_ARGS {
+                return Err(FormulaError::Value);
+            }
+            self.values.finish_arg(first, matches!(arg, Ast::Missing));
+        }
+        Ok(self.values)
+    }
+}
+
+/// One call of a statistic that reads numbers.
+pub(super) struct StatisticCall<'a> {
+    pub(super) statistic: NumberStatistic,
+    pub(super) func: Func,
+    pub(super) args: &'a [Ast],
+    pub(super) sheet: usize,
+    pub(super) depth: usize,
 }
 
 impl CellStore {
@@ -301,188 +380,19 @@ impl CellStore {
     #[inline(never)]
     pub(super) fn eval_statistics_family(
         &self,
-        func: Func,
-        args: &[Ast],
-        sheet: usize,
+        call: &StatisticCall<'_>,
         pass: &mut EvalPass<'_>,
-        depth: usize,
     ) -> EvalResult {
-        match self.statistic_args(func, args, sheet, pass, depth) {
-            Ok(values) => statistics::apply_numbers(func, &values),
+        let reader = Reader {
+            store: self,
+            func: call.func,
+            sheet: call.sheet,
+            values: StatisticArgs::new(call.statistic.is_paired()),
+        };
+        match reader.read(call.args, pass, call.depth) {
+            Ok(values) => statistics::apply_numbers(call.statistic, &values),
             Err(error) => Value::Error(error),
         }
-    }
-
-    fn statistic_args(
-        &self,
-        func: Func,
-        args: &[Ast],
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> Result<StatisticArgs, FormulaError> {
-        let mut values = StatisticArgs::new(PairedKind::of(func).is_some());
-        for arg in args {
-            values.start_arg();
-
-            let first = if let Some(area) = written_area(arg, sheet) {
-                self.push_statistic_range(area, pass, depth + 1, &mut values)?
-            } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
-                self.push_statistic_areas(func, arg, sheet, pass, depth + 1, &mut values)?;
-                if values
-                    .current
-                    .as_ref()
-                    .is_some_and(|current| current.cells == 0)
-                {
-                    // Every sheet of the span is smaller than the range: one
-                    // blank keeps the argument.
-                    values.count_cells(1)?;
-                    values.push_value(&Value::Blank, true);
-                }
-                values
-                    .current
-                    .as_ref()
-                    .map_or(Value::Blank, |current| current.first.clone())
-            } else {
-                self.push_statistic_value(func, arg, sheet, pass, depth, &mut values)?
-            };
-
-            if values.args.len() >= MAX_FUNCTION_ARGS {
-                return Err(FormulaError::Value);
-            }
-            values.finish_arg(first, matches!(arg, Ast::Missing));
-        }
-        Ok(values)
-    }
-
-    /// Reads `area` as the function accumulator does, keeping only what the
-    /// statistic reads. Returns the area's first value.
-    fn push_statistic_range(
-        &self,
-        area: CellRange,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-        values: &mut StatisticArgs,
-    ) -> Result<Value, FormulaError> {
-        if depth > FORMULA_RECURSION_LIMIT {
-            return Err(FormulaError::Num);
-        }
-
-        let view = RangeView::clipped(self, area, depth)?;
-        let (rows, cols) = view.shape();
-        let cells = (rows as u64).saturating_mul(cols as u64);
-        if cells > RANGE_CELL_LIMIT {
-            return Err(FormulaError::Num);
-        }
-        let first_of_arg = values
-            .current
-            .as_ref()
-            .is_some_and(|current| current.cells == 0);
-        values.count_cells(cells as usize)?;
-
-        view.scan_numbers(pass, |number| values.push_range_number(number))?;
-
-        let first = view.cell(0, 0, pass);
-        if first_of_arg {
-            if let Some(current) = &mut values.current {
-                current.first = first.clone();
-            }
-        }
-        Ok(first)
-    }
-
-    /// The areas of a union or a 3-D reference, area by area.
-    fn push_statistic_areas(
-        &self,
-        func: Func,
-        reference: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-        values: &mut StatisticArgs,
-    ) -> Result<(), FormulaError> {
-        if depth > FORMULA_RECURSION_LIMIT {
-            return Err(FormulaError::Num);
-        }
-
-        match reference {
-            Ast::Func(Func::Union, areas) if accepts_union(func) => {
-                for area in areas {
-                    match range_from_ast(area, sheet) {
-                        Some(range) => {
-                            self.push_statistic_range(range, pass, depth + 1, values)?;
-                        }
-                        None => {
-                            self.push_statistic_areas(func, area, sheet, pass, depth + 1, values)?;
-                        }
-                    }
-                }
-                Ok(())
-            }
-            Ast::SheetSpan(span) if accepts_sheet_span(func) => {
-                for &handle in &span.sheets {
-                    let Some(data) = self.sheets.get(handle as usize) else {
-                        continue;
-                    };
-                    if span.row_start as usize >= data.cells.row_count()
-                        || span.col_start as usize >= data.cells.n_cols()
-                    {
-                        continue;
-                    }
-                    let range = CellRange::new(
-                        handle,
-                        span.row_start,
-                        span.col_start,
-                        span.row_end,
-                        span.col_end,
-                    );
-                    self.push_statistic_range(range, pass, depth + 1, values)?;
-                }
-                Ok(())
-            }
-            Ast::Func(Func::Intersect, operands) => Err(intersection_range(operands, sheet)
-                .err()
-                .unwrap_or(FormulaError::Value)),
-            Ast::InvalidRef => Err(FormulaError::Ref),
-            _ => Err(FormulaError::Value),
-        }
-    }
-
-    /// An argument that is not a written range: an array, or one value.
-    /// Returns its first value.
-    fn push_statistic_value(
-        &self,
-        func: Func,
-        arg: &Ast,
-        sheet: usize,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-        values: &mut StatisticArgs,
-    ) -> Result<Value, FormulaError> {
-        if ast_produces_array(arg) {
-            if let Some(matrix) = self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
-                let matrix = matrix?;
-                matrix.validate_copies(2)?;
-                for value in &matrix.values {
-                    if let Value::Error(error) = value {
-                        return Err(*error);
-                    }
-                    values.count_cells(1)?;
-                    values.push_value(value, true);
-                }
-                return Ok(matrix.values.first().cloned().unwrap_or(Value::Blank));
-            }
-        }
-
-        let value = self.eval_ast(arg, sheet, pass, depth + 1);
-        if let Value::Error(error) = value {
-            return Err(error);
-        }
-        let from_range =
-            treats_cell_as_reference(func) && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..));
-        values.count_cells(1)?;
-        values.push_value(&value, from_range);
-        Ok(value)
     }
 }
 
@@ -569,6 +479,12 @@ mod differential {
                 formulas.push(format!("={func}({args})"));
             }
         }
+        formulas.extend(selection_formulas());
+        formulas
+    }
+
+    fn selection_formulas() -> Vec<String> {
+        let mut formulas = Vec::new();
         for func in ["LARGE", "SMALL"] {
             for args in [
                 "A1:A30,3",
@@ -605,6 +521,12 @@ mod differential {
         ] {
             formulas.push(format!("=RANK.EQ({args})"));
         }
+        formulas.extend(order_formulas());
+        formulas
+    }
+
+    fn order_formulas() -> Vec<String> {
+        let mut formulas = Vec::new();
         for args in [
             "A1:A30,0.9",
             "A1:B30,0",
@@ -676,8 +598,11 @@ mod differential {
         .to_vec()
     }
 
-    /// Each formula's result, as kind, number bits and text.
-    fn results(views: bool) -> Vec<(String, u8, u64, Option<String>)> {
+    /// A formula and its result, as kind, number bits and text.
+    type Outcome = (String, u8, u64, Option<String>);
+
+    /// Each formula's result.
+    fn results(views: bool) -> Vec<Outcome> {
         STATISTIC_VIEWS_OFF.with(|off| off.set(!views));
         let mut store = CellStore::new();
         let dense = dense_sheet(&mut store);

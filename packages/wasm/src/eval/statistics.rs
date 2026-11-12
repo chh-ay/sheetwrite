@@ -5,59 +5,164 @@ use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
 use super::criteria::Criterion;
 use super::functions::{require_arity, FuncAccumulator};
-use super::statistic_args::{reads_numbers, StatisticArgs};
+use super::statistic_args::StatisticArgs;
 use super::value::{aggregate_number, number_from_value};
 
 /// The most values `MEDIAN`, `PERCENTILE.INC` and the other selections read.
 pub(super) const MAX_SELECTION_VALUES: usize = RANGE_CELL_LIMIT as usize;
 const MAX_CRITERIA_PAIRS: usize = 126;
 
-pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
-    if reads_numbers(func) {
-        let paired = PairedKind::of(func).is_some();
-        return Some(apply_numbers(
-            func,
-            &StatisticArgs::from_accumulator(values, paired),
-        ));
-    }
-
-    let result = match func {
-        Func::CountBlank => count_blank(values),
-        Func::MaxIfs => conditional_extreme(values, true),
-        Func::MinIfs => conditional_extreme(values, false),
-        Func::AverageA => aggregate_result(counted_average(values)),
-        Func::MaxA => aggregate_result(counted_extreme(values, true)),
-        Func::MinA => aggregate_result(counted_extreme(values, false)),
-        Func::StdevA => aggregate_result(counted_variance(values, true, true)),
-        Func::StdevPA => aggregate_result(counted_variance(values, false, true)),
-        Func::VarA => aggregate_result(counted_variance(values, true, false)),
-        Func::VarPA => aggregate_result(counted_variance(values, false, false)),
-        _ => return None,
-    };
-    Some(result)
+/// A statistic that reads only numbers, through [`StatisticArgs`].
+#[derive(Clone, Copy)]
+pub(super) enum NumberStatistic {
+    Median,
+    Mode,
+    Large,
+    Small,
+    Rank,
+    Percentile,
+    Quartile,
+    Variance {
+        sample: bool,
+        standard_deviation: bool,
+    },
+    GeoMean,
+    Paired(PairedKind),
 }
 
-/// A statistic that [`reads_numbers`]; `#VALUE!` for any other function.
-pub(super) fn apply_numbers(func: Func, values: &StatisticArgs) -> EvalResult {
-    let result = match func {
-        Func::Median => median(values),
-        Func::ModeSngl => mode_sngl(values),
-        Func::Large => large_small(values, false),
-        Func::Small => large_small(values, true),
-        Func::RankEq => rank_eq(values),
-        Func::PercentileInc => percentile_inc(values),
-        Func::QuartileInc => quartile_inc(values),
-        Func::StdevS => variance_result(values, true, true),
-        Func::StdevP => variance_result(values, false, true),
-        Func::VarS => variance_result(values, true, false),
-        Func::VarP => variance_result(values, false, false),
-        Func::GeoMean => geomean(values),
-        Func::Correl => paired_result(values, PairedKind::Correlation),
-        Func::CovarianceS => paired_result(values, PairedKind::SampleCovariance),
-        Func::CovarianceP => paired_result(values, PairedKind::PopulationCovariance),
-        _ => Err(FormulaError::Value),
-    };
-    aggregate_result(result)
+impl NumberStatistic {
+    /// Whether the statistic pairs the cells of two arguments by position.
+    pub(super) const fn is_paired(self) -> bool {
+        matches!(self, Self::Paired(_))
+    }
+}
+
+/// What a statistical function computes.
+enum Statistic {
+    Numbers(NumberStatistic),
+    CountBlank,
+    ConditionalExtreme {
+        maximum: bool,
+    },
+    CountedAverage,
+    CountedExtreme {
+        maximum: bool,
+    },
+    CountedVariance {
+        sample: bool,
+        standard_deviation: bool,
+    },
+}
+
+/// The statistic `func` computes, or `None` for a function of another family.
+const fn statistic(func: Func) -> Option<Statistic> {
+    Some(match func {
+        Func::Median => Statistic::Numbers(NumberStatistic::Median),
+        Func::ModeSngl => Statistic::Numbers(NumberStatistic::Mode),
+        Func::Large => Statistic::Numbers(NumberStatistic::Large),
+        Func::Small => Statistic::Numbers(NumberStatistic::Small),
+        Func::RankEq => Statistic::Numbers(NumberStatistic::Rank),
+        Func::PercentileInc => Statistic::Numbers(NumberStatistic::Percentile),
+        Func::QuartileInc => Statistic::Numbers(NumberStatistic::Quartile),
+        Func::StdevS => Statistic::Numbers(NumberStatistic::Variance {
+            sample: true,
+            standard_deviation: true,
+        }),
+        Func::StdevP => Statistic::Numbers(NumberStatistic::Variance {
+            sample: false,
+            standard_deviation: true,
+        }),
+        Func::VarS => Statistic::Numbers(NumberStatistic::Variance {
+            sample: true,
+            standard_deviation: false,
+        }),
+        Func::VarP => Statistic::Numbers(NumberStatistic::Variance {
+            sample: false,
+            standard_deviation: false,
+        }),
+        Func::GeoMean => Statistic::Numbers(NumberStatistic::GeoMean),
+        Func::Correl => Statistic::Numbers(NumberStatistic::Paired(PairedKind::Correlation)),
+        Func::CovarianceS => {
+            Statistic::Numbers(NumberStatistic::Paired(PairedKind::SampleCovariance))
+        }
+        Func::CovarianceP => {
+            Statistic::Numbers(NumberStatistic::Paired(PairedKind::PopulationCovariance))
+        }
+        Func::CountBlank => Statistic::CountBlank,
+        Func::MaxIfs => Statistic::ConditionalExtreme { maximum: true },
+        Func::MinIfs => Statistic::ConditionalExtreme { maximum: false },
+        Func::AverageA => Statistic::CountedAverage,
+        Func::MaxA => Statistic::CountedExtreme { maximum: true },
+        Func::MinA => Statistic::CountedExtreme { maximum: false },
+        Func::StdevA => Statistic::CountedVariance {
+            sample: true,
+            standard_deviation: true,
+        },
+        Func::StdevPA => Statistic::CountedVariance {
+            sample: false,
+            standard_deviation: true,
+        },
+        Func::VarA => Statistic::CountedVariance {
+            sample: true,
+            standard_deviation: false,
+        },
+        Func::VarPA => Statistic::CountedVariance {
+            sample: false,
+            standard_deviation: false,
+        },
+        _ => return None,
+    })
+}
+
+/// The statistic of `func` that reads only numbers, if it is one.
+pub(super) const fn number_statistic(func: Func) -> Option<NumberStatistic> {
+    match statistic(func) {
+        Some(Statistic::Numbers(statistic)) => Some(statistic),
+        Some(
+            Statistic::CountBlank
+            | Statistic::ConditionalExtreme { .. }
+            | Statistic::CountedAverage
+            | Statistic::CountedExtreme { .. }
+            | Statistic::CountedVariance { .. },
+        )
+        | None => None,
+    }
+}
+
+pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
+    Some(match statistic(func)? {
+        Statistic::Numbers(statistic) => apply_numbers(
+            statistic,
+            &StatisticArgs::from_accumulator(values, statistic.is_paired()),
+        ),
+        Statistic::CountBlank => count_blank(values),
+        Statistic::ConditionalExtreme { maximum } => conditional_extreme(values, maximum),
+        Statistic::CountedAverage => aggregate_result(counted_average(values)),
+        Statistic::CountedExtreme { maximum } => aggregate_result(counted_extreme(values, maximum)),
+        Statistic::CountedVariance {
+            sample,
+            standard_deviation,
+        } => aggregate_result(counted_variance(values, sample, standard_deviation)),
+    })
+}
+
+/// `statistic` of `values`.
+pub(super) fn apply_numbers(statistic: NumberStatistic, values: &StatisticArgs) -> EvalResult {
+    aggregate_result(match statistic {
+        NumberStatistic::Median => median(values),
+        NumberStatistic::Mode => mode_sngl(values),
+        NumberStatistic::Large => large_small(values, false),
+        NumberStatistic::Small => large_small(values, true),
+        NumberStatistic::Rank => rank_eq(values),
+        NumberStatistic::Percentile => percentile_inc(values),
+        NumberStatistic::Quartile => quartile_inc(values),
+        NumberStatistic::Variance {
+            sample,
+            standard_deviation,
+        } => variance_result(values, sample, standard_deviation),
+        NumberStatistic::GeoMean => geomean(values),
+        NumberStatistic::Paired(kind) => paired_result(values, kind),
+    })
 }
 
 fn aggregate_result(result: Result<f64, FormulaError>) -> Value {
@@ -396,18 +501,6 @@ pub(super) enum PairedKind {
     PopulationCovariance,
 }
 
-impl PairedKind {
-    /// The statistic of `func`, or `None` when it is not a paired function.
-    pub(super) fn of(func: Func) -> Option<Self> {
-        match func {
-            Func::Correl => Some(Self::Correlation),
-            Func::CovarianceS => Some(Self::SampleCovariance),
-            Func::CovarianceP => Some(Self::PopulationCovariance),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Default)]
 struct PairedMoments {
     count: usize,
@@ -463,7 +556,7 @@ pub(super) enum PairedCell {
 
 impl PairedCell {
     /// The cell holding `value`.
-    pub(super) fn of(value: &Value) -> Self {
+    pub(super) const fn of(value: &Value) -> Self {
         match value {
             Value::Number(number) => Self::Number(*number),
             Value::Error(error) => Self::Error(*error),

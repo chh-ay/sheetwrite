@@ -155,6 +155,44 @@ pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange
     }
 }
 
+/// The range an argument of an aggregate or statistic names: a written
+/// range, a defined name of one, a table column or an intersection. A lone
+/// cell is a value there, not a range.
+pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRange> {
+    match arg {
+        Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
+            formula_sheet as u32,
+            *row_start,
+            *col_start,
+            *row_end,
+            *col_end,
+        )),
+        Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
+            sheet.handle,
+            *row_start,
+            *col_start,
+            *row_end,
+            *col_end,
+        )),
+        Ast::NamedRange(named) => Some(CellRange::new(
+            named.sheet,
+            named.row_start,
+            named.col_start,
+            named.row_end,
+            named.col_end,
+        )),
+        Ast::Structured(reference) => Some(CellRange::new(
+            reference.sheet,
+            reference.row_start,
+            reference.col,
+            reference.row_end,
+            reference.col,
+        )),
+        Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
+        _ => None,
+    }
+}
+
 pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),

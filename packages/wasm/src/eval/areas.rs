@@ -16,8 +16,12 @@ use super::lookup::positive_index;
 use super::matrix::{intersection_range, range_from_ast};
 use super::EvalPass;
 
+/// One range of a multi-area reference and the depth to read it at, or the
+/// error of a part that can't be read.
+pub(super) type AreaRange = Result<(CellRange, usize), FormulaError>;
+
 /// The functions that Excel lets read a 3-D reference.
-pub(super) fn accepts_sheet_span(func: Func) -> bool {
+fn accepts_sheet_span(func: Func) -> bool {
     match func {
         Func::Sum
         | Func::Avg
@@ -46,7 +50,7 @@ pub(super) fn accepts_sheet_span(func: Func) -> bool {
 /// The functions that read a union as one list of values. Functions that pair
 /// cells by position, such as SUMPRODUCT and CORREL, need one range, so a
 /// union there is `#VALUE!`, as in Excel.
-pub(super) fn accepts_union(func: Func) -> bool {
+fn accepts_union(func: Func) -> bool {
     match func {
         Func::Small
         | Func::Large
@@ -168,54 +172,74 @@ impl CellStore {
         depth: usize,
         values: &mut FuncAccumulator,
     ) -> Result<(), FormulaError> {
+        for area in self.area_ranges(func, reference, sheet, depth) {
+            let (range, range_depth) = area?;
+            self.eval_range_values(range, pass, range_depth, values)?;
+        }
+        Ok(())
+    }
+
+    /// The ranges of a union or 3-D reference that `func` reads, in order,
+    /// each with the depth to read it at. A part that `func` can't read ends
+    /// the list with its error, so the ranges before it are still read first.
+    pub(super) fn area_ranges(
+        &self,
+        func: Func,
+        reference: &Ast,
+        sheet: usize,
+        depth: usize,
+    ) -> Vec<AreaRange> {
         if depth > FORMULA_RECURSION_LIMIT {
-            return Err(FormulaError::Num);
+            return vec![Err(FormulaError::Num)];
         }
 
         match reference {
             Ast::Func(Func::Union, areas) if accepts_union(func) => {
+                let mut ranges = Vec::new();
                 for area in areas {
-                    match range_from_ast(area, sheet) {
-                        Some(range) => {
-                            self.eval_range_values(range, pass, depth + 1, values)?;
-                        }
-                        None => {
-                            self.push_area_values(func, area, sheet, pass, depth + 1, values)?
-                        }
+                    if let Some(range) = range_from_ast(area, sheet) {
+                        ranges.push(Ok((range, depth + 1)));
+                        continue;
+                    }
+
+                    ranges.extend(self.area_ranges(func, area, sheet, depth + 1));
+                    if ranges.last().is_some_and(Result::is_err) {
+                        break;
                     }
                 }
-                Ok(())
+                ranges
             }
-            Ast::SheetSpan(span) if accepts_sheet_span(func) => {
-                for &handle in &span.sheets {
-                    let Some(data) = self.sheets.get(handle as usize) else {
-                        continue;
-                    };
+            Ast::SheetSpan(span) if accepts_sheet_span(func) => span
+                .sheets
+                .iter()
+                .filter(|&&handle| {
                     // Sheets here have their own sizes, unlike Excel's fixed
                     // grid: cells beyond a smaller sheet are blank, so they
                     // add nothing instead of turning the span into #REF!.
-                    if span.row_start as usize >= data.cells.row_count()
-                        || span.col_start as usize >= data.cells.n_cols()
-                    {
-                        continue;
-                    }
-                    let range = CellRange::new(
-                        handle,
-                        span.row_start,
-                        span.col_start,
-                        span.row_end,
-                        span.col_end,
-                    );
-                    self.eval_range_values(range, pass, depth + 1, values)?;
-                }
-                Ok(())
-            }
+                    self.sheets.get(handle as usize).is_some_and(|data| {
+                        (span.row_start as usize) < data.cells.row_count()
+                            && (span.col_start as usize) < data.cells.n_cols()
+                    })
+                })
+                .map(|&handle| {
+                    Ok((
+                        CellRange::new(
+                            handle,
+                            span.row_start,
+                            span.col_start,
+                            span.row_end,
+                            span.col_end,
+                        ),
+                        depth + 1,
+                    ))
+                })
+                .collect(),
             // A resolvable intersection never reaches here: it is one range.
-            Ast::Func(Func::Intersect, operands) => Err(intersection_range(operands, sheet)
+            Ast::Func(Func::Intersect, operands) => vec![Err(intersection_range(operands, sheet)
                 .err()
-                .unwrap_or(FormulaError::Value)),
-            Ast::InvalidRef => Err(FormulaError::Ref),
-            _ => Err(FormulaError::Value),
+                .unwrap_or(FormulaError::Value))],
+            Ast::InvalidRef => vec![Err(FormulaError::Ref)],
+            _ => vec![Err(FormulaError::Value)],
         }
     }
 
