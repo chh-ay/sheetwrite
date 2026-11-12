@@ -142,17 +142,6 @@ fn number_columns_total(ranges: &[LiteralColumns<'_>], rows: usize) -> Option<f6
     };
     let mut total = 0.0;
 
-    // Two ranges are the common call; zipped slices need no index checks.
-    // `1.0 * a * b` rounds as `a * b`, so the product matches the item loop.
-    if let [(left_kinds, left_payloads), (right_kinds, right_payloads)] = columns[..] {
-        let left = left_kinds.iter().zip(left_payloads);
-        let right = right_kinds.iter().zip(right_payloads);
-        for ((&left_kind, &left), (&right_kind, &right)) in left.zip(right) {
-            total += factor(left_kind, left) * factor(right_kind, right);
-        }
-        return Some(total);
-    }
-
     for row in 0..rows {
         let mut product = 1.0;
         for &(kinds, payloads) in &columns {
