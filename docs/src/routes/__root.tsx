@@ -1,36 +1,24 @@
+import headingFont from "@docs/fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
+import { SITE_URL } from "@docs/lib/seo.js";
 import bodyFont from "@fontsource-variable/instrument-sans/files/instrument-sans-latin-wght-normal.woff2?url";
-import {
-  createRootRoute,
-  HeadContent,
-  Outlet,
-  Scripts,
-  ScriptOnce,
-  useLocation,
-} from "@tanstack/react-router";
-import { Analytics } from "@vercel/analytics/react";
-import { SpeedInsights } from "@vercel/speed-insights/react";
-import { type ReactNode, useEffect, useLayoutEffect } from "react";
-import { preload } from "react-dom";
-import { installExpressiveCodeScripts } from "virtual:expressive-code-scripts";
+import { createRootRoute, HeadContent, Outlet, ScriptOnce } from "@tanstack/solid-router";
+import type { JSX } from "solid-js";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
-import { installFigureTips } from "../components/figures/figure-tips.ts";
 import { IconSprite } from "../components/IconSprite.js";
-import { SiteError, SiteNotFound } from "../components/RouteFallbacks.js";
-import headingFont from "../fonts/bricolage-grotesque-latin-650-opsz.woff2?url";
-import { initializeCodeEnhancements } from "../lib/code-enhancements.ts";
-import { installGridScrollHints } from "../lib/grid-scroll-hint.ts";
-import { installAnchorReveal } from "../lib/reveal-anchor.ts";
-import { SITE_URL } from "../lib/seo.js";
 
-import demoSelectStylesheet from "../styles/demo-select.css?url";
-import docsFiguresStylesheet from "../styles/docs-figures.css?url";
-import showcaseStylesheet from "../styles/showcase.css?url";
-import siteShellStylesheet from "../styles/site-shell.css?url";
-import siteStylesheet from "../styles/site.css?url";
+import performanceStylesheet from "../styles/performance.css?url";
+import siteCoreStylesheet from "../styles/site-core.css?url";
+import siteMidStylesheet from "../styles/site-mid.css?url";
+import siteTailStylesheet from "../styles/site-tail.css?url";
+import docsFiguresStylesheet from "@docs/styles/docs-figures.css?url";
+import showcaseStylesheet from "@docs/styles/showcase.css?url";
+import apiReferenceStylesheet from "@docs/styles/site/api-reference.css?url";
+import formulaReferenceStylesheet from "@docs/styles/site/formula-reference.css?url";
+import playgroundStylesheet from "@docs/styles/site/playground.css?url";
+import upgradeGuideStylesheet from "@docs/styles/site/upgrade-guide.css?url";
 // Expressive Code base and theme styles, shared by every page with code.
 import "virtual:expressive-code.css";
-import tokensStylesheet from "../styles/tokens.css?url";
 
 // Blocked storage throws a DOMException; the saved theme is optional, so the
 // script then follows the system color scheme.
@@ -69,27 +57,43 @@ const STRUCTURED_DATA = JSON.stringify({
   ],
 });
 
+/** Fonts first in the head, so they load with the stylesheets and are ready for the first paint. */
+const FONT_PRELOAD = {
+  rel: "preload",
+  as: "font",
+  type: "font/woff2",
+  crossOrigin: "anonymous",
+  fetchPriority: "high",
+} as const;
+
+const stylesheet = (href: string) => ({ rel: "stylesheet", href });
+/**
+ * A stylesheet only some pages use. `data-feature` marks it for the page
+ * script (islands/page-scripts.ts), which keeps it only where the page's
+ * markup uses its classes.
+ */
+const featureStylesheet = (href: string) => ({ rel: "stylesheet", href, "data-feature": "" });
+
 export const Route = createRootRoute({
   head: ({ matches }) => {
     const pathname = matches.at(-1)?.pathname ?? "/";
-    const canonicalPath = pathname.endsWith("/") ? pathname : `${pathname}/`;
-    const canonical = new URL(canonicalPath, SITE_URL).href;
-    // Documentation pages never render showcase chrome; skip its stylesheet.
-    const showcaseChrome = !canonicalPath.startsWith("/docs/");
+    const canonical = new URL(pathname.endsWith("/") ? pathname : `${pathname}/`, SITE_URL).href;
     return {
       links: [
-        // Explicit head links are render-blocking in dev and production. Plain
-        // CSS imports are injected by Vite only after hydration in dev, which
-        // exposed a half-styled SSR frame on full-page route navigation.
-        { rel: "stylesheet", href: tokensStylesheet },
-        { rel: "stylesheet", href: siteStylesheet },
-        // Shell refinements layer over site.css; link order is the cascade.
-        { rel: "stylesheet", href: siteShellStylesheet },
-        // Showcases and the formula reference both render DemoSelect.
-        { rel: "stylesheet", href: demoSelectStylesheet },
-        ...(showcaseChrome ? [{ rel: "stylesheet", href: showcaseStylesheet }] : []),
-        // Result figures and section cards exist only on documentation pages.
-        ...(showcaseChrome ? [] : [{ rel: "stylesheet", href: docsFiguresStylesheet }]),
+        { ...FONT_PRELOAD, href: headingFont },
+        { ...FONT_PRELOAD, href: bodyFont },
+        // Head links are render-blocking; link order is the cascade (site.css's order).
+        stylesheet(siteCoreStylesheet),
+        featureStylesheet(apiReferenceStylesheet),
+        featureStylesheet(performanceStylesheet),
+        featureStylesheet(upgradeGuideStylesheet),
+        featureStylesheet(formulaReferenceStylesheet),
+        stylesheet(siteMidStylesheet),
+        featureStylesheet(playgroundStylesheet),
+        stylesheet(siteTailStylesheet),
+        // The site chrome outside the docs (the 404 page).
+        featureStylesheet(showcaseStylesheet),
+        featureStylesheet(docsFiguresStylesheet),
         { rel: "canonical", href: canonical },
         { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
         // The changelog feed, written by the docs build (scripts/docs-feed.ts).
@@ -109,10 +113,7 @@ export const Route = createRootRoute({
         { property: "og:type", content: "website" },
         { property: "og:site_name", content: "Sheetwrite" },
         { property: "og:locale", content: "en_US" },
-        {
-          property: "og:title",
-          content: SITE_TITLE,
-        },
+        { property: "og:title", content: SITE_TITLE },
         { property: "og:description", content: SITE_DESCRIPTION },
         { property: "og:url", content: canonical },
         { property: "og:image", content: `${SITE_URL}/og-sheetwrite.webp` },
@@ -120,87 +121,40 @@ export const Route = createRootRoute({
         { property: "og:image:height", content: "630" },
         { property: "og:image:alt", content: SOCIAL_IMAGE_ALT },
         { name: "twitter:card", content: "summary_large_image" },
-        {
-          name: "twitter:title",
-          content: SITE_TITLE,
-        },
+        { name: "twitter:title", content: SITE_TITLE },
         { name: "twitter:description", content: SITE_DESCRIPTION },
         { name: "twitter:image", content: `${SITE_URL}/og-sheetwrite.webp` },
         { name: "twitter:image:alt", content: SOCIAL_IMAGE_ALT },
         { title: SITE_TITLE },
       ],
-      scripts: [{ type: "application/ld+json", children: STRUCTURED_DATA }],
+      scripts: [
+        { type: "application/ld+json", children: STRUCTURED_DATA },
+        // The build links the islands client from each page (page-scripts.ts);
+        // the dev server loads it from source so islands hydrate there too.
+        ...(import.meta.env.DEV ? [{ type: "module", src: "/src/islands/client.tsx" }] : []),
+      ],
     };
   },
   shellComponent: RootDocument,
-  component: RootComponent,
-  errorComponent: SiteError,
-  notFoundComponent: SiteNotFound,
+  component: Outlet,
 });
 
-function RootComponent() {
-  const path = useLocation({ select: (location) => location.pathname });
-  useLayoutEffect(() => {
-    // A client-side route change must not reuse the previous page's signal.
-    delete document.documentElement.dataset.hydrated;
-  }, [path]);
-
-  useEffect(() => {
-    const cleanup = initializeCodeEnhancements();
-    // Copy buttons on every code block, also on pages reached client-side.
-    installExpressiveCodeScripts();
-    const uninstallReveal = installAnchorReveal();
-    const uninstallScrollHints = installGridScrollHints();
-    const uninstallFigureTips = installFigureTips();
-    return () => {
-      cleanup();
-      uninstallFigureTips();
-      uninstallReveal();
-      uninstallScrollHints();
-    };
-  }, []);
-
-  useEffect(() => {
-    // A documentation page has a nested Suspense boundary. Its prerendered
-    // controls are visible before their listeners hydrate; it marks readiness
-    // itself when that boundary commits.
-    if (!path.startsWith("/docs/") || path === "/docs/") {
-      document.documentElement.dataset.hydrated = "true";
-    }
-  }, [path]);
-
-  return <Outlet />;
-}
-
-const FONT_PRELOAD = {
-  as: "font",
-  type: "font/woff2",
-  crossOrigin: "anonymous",
-  fetchPriority: "high",
-} as const;
-
-/** The `<html>` document: always rendered on the server, around every page, error, and 404. */
-function RootDocument({ children }: Readonly<{ children: ReactNode }>) {
-  // React writes these preloads first in the head, ahead of the module
-  // preloads, so the heading and body fonts load with the stylesheets and are
-  // ready for the first paint on slow links.
-  preload(headingFont, FONT_PRELOAD);
-  preload(bodyFont, FONT_PRELOAD);
+/**
+ * The `<html>` document around every page. Pages are static: the islands
+ * client (islands/client.tsx) is their only script, linked by the build's
+ * page-scripts step, so the router's scripts are not rendered.
+ */
+function RootDocument(props: { children?: JSX.Element }) {
   return (
-    <html lang="en" data-theme="dark" suppressHydrationWarning>
+    <html data-theme="dark" lang="en">
       <head>
         <HeadContent />
-        {/* Sets the theme before first paint. ScriptOnce renders it on the server
-            only, so a client re-render (after a browser extension edits the page
-            and breaks hydration) never creates a script element React refuses. */}
+        {/* Sets the theme before first paint. */}
         <ScriptOnce>{THEME_SCRIPT}</ScriptOnce>
       </head>
       <body>
         <IconSprite />
-        {children}
-        <Analytics />
-        <SpeedInsights />
-        <Scripts />
+        {props.children}
       </body>
     </html>
   );

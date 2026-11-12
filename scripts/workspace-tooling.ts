@@ -115,8 +115,8 @@ const GENERATED_SOURCE_NODES: readonly CommandNode[] = [
 /** The docs build checks the docs, then generates them and builds the site. */
 export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
   {
-    id: "build:@sheetwrite/docs-start",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "build"],
+    id: "build:@sheetwrite/docs",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs", "build"],
   },
   {
     id: "verify:example-xlsx-isolation",
@@ -126,12 +126,8 @@ export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
 
 export const EXAMPLE_TYPECHECK_NODES: readonly CommandNode[] = [
   {
-    id: "typecheck:@sheetwrite/docs-start",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "typecheck"],
-  },
-  {
-    id: "typecheck:@sheetwrite/docs-solid",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-solid", "typecheck"],
+    id: "typecheck:@sheetwrite/docs",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs", "typecheck"],
   },
 ];
 

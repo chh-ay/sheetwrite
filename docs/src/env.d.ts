@@ -1,31 +1,40 @@
 /// <reference types="vite/client" />
 
-declare module "*.mdx" {
-  import type { ComponentType } from "react";
-
-  const Component: ComponentType;
-  export default Component;
-}
-
-/** Expressive Code's code-block scripts; see `expressiveCodeAssets` in vite.config.ts. */
+/** Expressive Code's code-block scripts; see `expressiveCodeAssets` in lib/mdx-pipeline.ts. */
 declare module "virtual:expressive-code-scripts" {
   export function installExpressiveCodeScripts(): void;
 }
 
-/** Formula family tables; see `formulaTables` in src/lib/formula-tables.ts. */
-/** The landing page's speed story; see `speedStoryMarkup` in src/lib/speed-story-markup.ts. */
-/** Performance page figures; see `perfFigureMarkup` in src/lib/perf-figure-markup.ts. */
+/** Performance page figures; see `perfFigureMarkup` in docs/src/lib/perf-figure-markup.ts. */
 declare module "virtual:perf-figures" {
   export function perfFigureHtml(name: string): string | null;
   export function perfFigureUrl(name: string): string | null;
 }
 
-declare module "virtual:speed-story" {
-  export const speedStoryHtml: string | null;
-  export const speedStoryUrl: string | null;
-}
-
+/** Formula family tables; see `formulaTables` in docs/src/lib/formula-tables.ts. */
 declare module "virtual:formula-tables" {
   export function formulaTableHtml(family: string): string | null;
   export function formulaTableUrl(family: string): string | null;
+}
+
+/** A Svelte component: the /svelte/ workbench (vite.config.ts `frameworkWorkbenches`). */
+declare module "*.svelte" {
+  import type { Component } from "svelte";
+
+  const component: Component;
+  export default component;
+}
+
+/** A Markdown module compiled through Solid (vite.config.ts `docsPages`); it renders on the server. */
+/** A snippet file's text (vite.config.ts `snippetSources`). */
+declare module "*.mdx?source" {
+  const text: string;
+  export default text;
+}
+
+declare module "*.mdx" {
+  import type { JSX } from "solid-js";
+
+  const MDXContent: (props: Record<string, unknown>) => JSX.Element;
+  export default MDXContent;
 }

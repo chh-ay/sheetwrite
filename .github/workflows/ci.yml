@@ -724,7 +724,7 @@ jobs:
       - name: Build production docs
         # This build only feeds Browser Smoke (docs-deploy.yml builds the
         # published site), so it includes the test fixture pages.
-        run: bun run --filter '@sheetwrite/docs-solid' build:test
+        run: bun run --filter '@sheetwrite/docs' build:test
       - name: Example XLSX isolation
         run: bun scripts/verify-example-xlsx-isolation.ts
       - name: Package prebuilt deployment

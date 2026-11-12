@@ -2,7 +2,7 @@ import { expect, type Locator, type Page, test } from "@playwright/test";
 
 import { siteUrl } from "./playwright.config.js";
 
-// The Solid site's select (docs-solid/src/components/Select.tsx), the WAI-ARIA
+// The docs site's select (docs/src/components/Select.tsx), the WAI-ARIA
 // select-only combobox, through the formula reference's engine filter. The
 // React site's filter is Base UI, so these skip there.
 

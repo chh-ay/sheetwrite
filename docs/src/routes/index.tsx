@@ -1,25 +1,37 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { lazy, Suspense } from "react";
+import ReactSnippet from "@docs/components/landing/snippets/react.mdx";
+import SvelteSnippet from "@docs/components/landing/snippets/svelte.mdx";
+import VanillaSnippet from "@docs/components/landing/snippets/vanilla.mdx";
+import VueSnippet from "@docs/components/landing/snippets/vue.mdx";
+// Named imports, so only these three numbers are read.
+import { localPassed, regressions, totalTests } from "@docs/generated/compatibility-summary.json";
+import landingBench from "@docs/generated/landing-bench.json";
+// The speed story: markup the docs generator built from the committed captures.
+import speedStory from "@docs/generated/landing-story.html?raw";
+import releaseFacts from "@docs/generated/release-facts.json" with { type: "json" };
+import { pageMeta } from "@docs/lib/seo.js";
+import { createFileRoute } from "@tanstack/solid-router";
+import { For, type JSX, Show } from "solid-js";
+import { NoHydration, resolveSSRNode } from "solid-js/web";
 
 import corePackage from "../../../packages/core/package.json" with { type: "json" };
 import { Icon } from "../components/Icon.js";
 import { ArchitectureScene } from "../components/landing/ArchitectureScene.js";
 import { CodeTabs } from "../components/landing/CodeTabs.js";
 import { FeatureGlyph, type FeatureGlyphKind } from "../components/landing/FeatureGlyph.js";
-import { GridGlow } from "../components/landing/GridGlow.js";
 import { HeroApp } from "../components/landing/HeroApp.js";
 import { StoryReel } from "../components/landing/StoryReel.js";
-import { useScenePlayback } from "../components/landing/useScenePlayback.js";
-import { PackageCommand } from "../components/PackageCommand.js";
 import { SiteTopbar } from "../components/SiteTopbar.js";
-// Named imports, so only these three numbers ship in the page bundle.
-import { localPassed, regressions, totalTests } from "../generated/compatibility-summary.json";
-import landingBench from "../generated/landing-bench.json";
-import releaseFacts from "../generated/release-facts.json" with { type: "json" };
-import { pageMeta } from "../lib/seo.js";
-import { opensFreshDocument } from "../lib/site-links.js";
+import { PackageCommand } from "../islands/content.js";
+import { Island } from "../islands/Island.js";
 
-import landingStylesheet from "../styles/landing.css?url";
+import landingStylesheet from "@docs/styles/landing.css?url";
+
+/*
+ * The product landing, ported from docs/src/routes/index.tsx. The page is
+ * static; the hero, the architecture scene, the story reel and the framework
+ * snippets are islands. The grid glow and the feature cards' animations are
+ * plain DOM (lib/landing.ts).
+ */
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,7 +41,7 @@ export const Route = createFileRoute("/")({
     ),
     links: [{ rel: "stylesheet", href: landingStylesheet }],
   }),
-  component: Landing,
+  component: LandingRoute,
 });
 
 interface LandingBenchSize {
@@ -147,41 +159,52 @@ const SAMPLE_ROWS = [
   ["Folder", 9],
 ] as const;
 
-/** The story sits below the fold: its markup is in the prerendered page, its small component loads later. */
-const SpeedupBars = lazy(() => import("../components/SpeedupBars.js"));
+/** Each framework's snippet, in CodeTabs' tab order, rendered once as markup. */
+const SNIPPETS = [VanillaSnippet, ReactSnippet, VueSnippet, SvelteSnippet];
 
-function BenchmarkBars() {
+/** A link to another page of the site, with its trailing arrow. */
+function MoreLink(props: {
+  readonly href: string;
+  readonly class?: string;
+  children: JSX.Element;
+}) {
   return (
-    <Suspense fallback={null}>
-      <SpeedupBars />
-    </Suspense>
+    <a class={props.class} href={props.href}>
+      {props.children}
+      <Icon name="arrow-right" />
+    </a>
   );
 }
 
 function FeatureCards() {
-  const { ref } = useScenePlayback<HTMLOListElement>();
   return (
-    <ol className="sw-features" ref={ref}>
-      {FEATURES.map((feature) => (
-        <li key={feature.kind}>
-          <Link
-            data-feature={feature.kind}
-            reloadDocument={opensFreshDocument(feature.href)}
-            to={feature.href}
-          >
-            <span className="sw-features__art">
-              <FeatureGlyph kind={feature.kind} />
-            </span>
-            <strong>{feature.label}</strong>
-            <span className="sw-features__summary">{feature.summary}</span>
-            <span className="sw-features__cta">
-              Open the live example
-              <Icon name="arrow-right" />
-            </span>
-          </Link>
-        </li>
-      ))}
+    <ol class="sw-features">
+      <For each={FEATURES}>
+        {(feature) => (
+          <li>
+            <a data-feature={feature.kind} href={feature.href}>
+              <span class="sw-features__art">
+                <FeatureGlyph kind={feature.kind} />
+              </span>
+              <strong>{feature.label}</strong>
+              <span class="sw-features__summary">{feature.summary}</span>
+              <span class="sw-features__cta">
+                Open the live example
+                <Icon name="arrow-right" />
+              </span>
+            </a>
+          </li>
+        )}
+      </For>
     </ol>
+  );
+}
+
+function LandingRoute() {
+  return (
+    <NoHydration>
+      <Landing />
+    </NoHydration>
   );
 }
 
@@ -189,148 +212,141 @@ function Landing() {
   const bench = landingBench as LandingBenchData;
   const evidence: LandingEvidence | undefined =
     bench.available && bench.sizes && bench.heroStats && bench.capture
-      ? {
-          sizes: bench.sizes,
-          heroStats: bench.heroStats,
-          capture: bench.capture,
-        }
+      ? { sizes: bench.sizes, heroStats: bench.heroStats, capture: bench.capture }
       : undefined;
   const millionRow = evidence?.sizes.find((entry) => entry.size === 1_000_000);
   const { downloads } = bench;
+  const highlighted = releaseFacts.highlighted;
   return (
-    <div className="sw-landing">
-      <GridGlow />
-      <SiteTopbar />
+    <div class="sw-landing">
+      <canvas class="sw-landing__glow" />
+      <SiteTopbar pathname="/" />
 
       <main id="main-content">
-        <section aria-labelledby="landing-title" className="sw-lp-hero">
-          <div className="sw-lp-hero__copy">
-            <p className="sw-lp-eyebrow">
+        <section aria-labelledby="landing-title" class="sw-lp-hero">
+          <div class="sw-lp-hero__copy">
+            <p class="sw-lp-eyebrow">
               Open source · MIT · v{corePackage.version}
-              <span className="sw-lp-eyebrow__extra"> · Rust/WASM engine</span>
+              <span class="sw-lp-eyebrow__extra"> · Rust/WASM engine</span>
             </p>
             <h1 id="landing-title">The spreadsheet engine for your web app.</h1>
-            <p className="sw-lp-hero__lede">
+            <p class="sw-lp-hero__lede">
               A real calculation engine and a canvas Grid in your page, with the ribbon, charts and
               pivot tables of a spreadsheet app. Your application keeps the data, the UI, and the
               server.
             </p>
           </div>
-          <div className="sw-lp-hero__start">
-            <div className="sw-lp-actions">
-              <Link
-                className="sw-lp-button"
-                to="/docs/$/"
-                params={{ _splat: "start/installation" }}
-              >
+          <div class="sw-lp-hero__start">
+            <div class="sw-lp-actions">
+              <a class="sw-lp-button" href="/docs/start/installation/">
                 Get started
-              </Link>
-              <Link className="sw-lp-button sw-lp-button--ghost" to="/showcases/">
+              </a>
+              <a class="sw-lp-button sw-lp-button--ghost" href="/showcases/">
                 Explore showcases
-              </Link>
+              </a>
             </div>
-            <div className="sw-lp-hero__install">
+            <div class="sw-lp-hero__install">
               <PackageCommand packages="@sheetwrite/core" />
             </div>
           </div>
-          <HeroApp />
+          <Island component={HeroApp} name="landing-hero" props={{}} />
         </section>
 
-        {evidence ? (
-          <section aria-label="Measured results" className="sw-lp-facts">
-            <dl>
-              <div>
-                <dt>{evidence.heroStats.millionRowMedianMs} ms</dt>
-                <dd>median interaction at 1,000,000 rows, Linux x86-64</dd>
-              </div>
-              {millionRow ? (
+        <Show when={evidence}>
+          {(measured) => (
+            <section aria-label="Measured results" class="sw-lp-facts">
+              <dl>
                 <div>
-                  <dt>{millionRow.medianRatio}×</dt>
-                  <dd>faster than Handsontable at 1,000,000 rows, same Linux capture</dd>
+                  <dt>{measured().heroStats.millionRowMedianMs} ms</dt>
+                  <dd>median interaction at 1,000,000 rows, Linux x86-64</dd>
                 </div>
-              ) : null}
-              <div>
-                <dt>
-                  {localPassed.toLocaleString("en")} / {totalTests.toLocaleString("en")}
-                </dt>
-                <dd>Excel compatibility checks pass, {regressions} regressions</dd>
-              </div>
-              {downloads ? (
+                <Show when={millionRow}>
+                  {(row) => (
+                    <div>
+                      <dt>{row().medianRatio}×</dt>
+                      <dd>faster than Handsontable at 1,000,000 rows, same Linux capture</dd>
+                    </div>
+                  )}
+                </Show>
                 <div>
-                  <dt>{kib(downloads.coreFirstLoadBrotliBytes)}</dt>
-                  <dd>first load with the default engine, Brotli, in a Vite app</dd>
+                  <dt>
+                    {localPassed.toLocaleString("en")} / {totalTests.toLocaleString("en")}
+                  </dt>
+                  <dd>Excel compatibility checks pass, {regressions} regressions</dd>
                 </div>
-              ) : null}
-            </dl>
-            <a href="#benchmarks">
-              How we measured
-              <Icon name="arrow-right" />
-            </a>
-          </section>
-        ) : null}
+                <Show when={downloads}>
+                  {(sizes) => (
+                    <div>
+                      <dt>{kib(sizes().coreFirstLoadBrotliBytes)}</dt>
+                      <dd>first load with the default engine, Brotli, in a Vite app</dd>
+                    </div>
+                  )}
+                </Show>
+              </dl>
+              <MoreLink href="#benchmarks">How we measured</MoreLink>
+            </section>
+          )}
+        </Show>
 
-        <section aria-labelledby="landing-how" className="sw-lp-section">
-          <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">How it works</p>
+        <section aria-labelledby="landing-how" class="sw-lp-section">
+          <header class="sw-lp-head">
+            <p class="sw-lp-eyebrow">How it works</p>
             <h2 id="landing-how">Three layers. One clear line of ownership.</h2>
             <p>
               The Grid handles input and painting. The engine stores cells and recalculates. Your
               application decides what to save and where.
             </p>
           </header>
-          <ArchitectureScene />
-          <Link
-            className="sw-lp-more"
-            to="/docs/$/"
-            params={{ _splat: "concepts/runtime-ownership" }}
-          >
+          <Island component={ArchitectureScene} name="landing-architecture" props={{}} />
+          <MoreLink class="sw-lp-more" href="/docs/concepts/runtime-ownership/">
             Read the runtime-ownership model
-            <Icon name="arrow-right" />
-          </Link>
+          </MoreLink>
         </section>
 
-        <section aria-labelledby="landing-features" className="sw-lp-section">
-          <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">What you can build</p>
+        <section aria-labelledby="landing-features" class="sw-lp-section">
+          <header class="sw-lp-head">
+            <p class="sw-lp-eyebrow">What you can build</p>
             <h2 id="landing-features">Real workbooks, not a table with formulas on top.</h2>
             <p>
               Every card opens a live example that runs the real engine in your browser.{" "}
-              <Link to="/showcases/">
-                See all showcases
-                <Icon name="arrow-right" />
-              </Link>
+              <MoreLink href="/showcases/">See all showcases</MoreLink>
             </p>
           </header>
           <FeatureCards />
         </section>
 
-        <section aria-labelledby="landing-stories" className="sw-lp-section">
-          <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">See it happen</p>
+        <section aria-labelledby="landing-stories" class="sw-lp-section">
+          <header class="sw-lp-head">
+            <p class="sw-lp-eyebrow">See it happen</p>
             <h2 id="landing-stories">The hard parts of a spreadsheet, handled.</h2>
             <p>
               Short stories about work that a table component leaves to you. Each one links to the
               live example that runs it for real.
             </p>
           </header>
-          <StoryReel />
+          <Island component={StoryReel} name="landing-stories" props={{}} />
         </section>
 
-        <section aria-labelledby="landing-code" className="sw-lp-section sw-lp-split">
-          <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">Start in minutes</p>
+        <section aria-labelledby="landing-code" class="sw-lp-section sw-lp-split">
+          <header class="sw-lp-head">
+            <p class="sw-lp-eyebrow">Start in minutes</p>
             <h2 id="landing-code">Mount a Grid in the framework you already use.</h2>
             <p>
               One engine, four entry points. The adapters share one lifecycle: create on mount,
               apply live option changes, and destroy on unmount.
             </p>
-            <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "start/first-grid" }}>
+            <MoreLink class="sw-lp-more" href="/docs/start/first-grid/">
               Build your first grid
-              <Icon name="arrow-right" />
-            </Link>
+            </MoreLink>
           </header>
-          <CodeTabs />
-          <figure className="sw-lp-result">
+          <Island
+            component={CodeTabs}
+            hydrate="interaction"
+            name="landing-code"
+            omitFromPage={["panels"]}
+            props={{ panels: SNIPPETS.map((Snippet) => resolveSSRNode(<Snippet />)) }}
+          />
+          <figure class="sw-lp-result">
             <table aria-label="The Grid the snippet renders">
               <thead>
                 <tr>
@@ -340,13 +356,15 @@ function Landing() {
                 </tr>
               </thead>
               <tbody>
-                {SAMPLE_ROWS.map(([product, amount], index) => (
-                  <tr key={product}>
-                    <th scope="row">{index + 1}</th>
-                    <td>{product}</td>
-                    <td>{amount}</td>
-                  </tr>
-                ))}
+                <For each={SAMPLE_ROWS}>
+                  {([product, amount], index) => (
+                    <tr>
+                      <th scope="row">{index() + 1}</th>
+                      <td>{product}</td>
+                      <td>{amount}</td>
+                    </tr>
+                  )}
+                </For>
               </tbody>
             </table>
             <figcaption>
@@ -356,27 +374,29 @@ function Landing() {
           </figure>
         </section>
 
-        <section aria-labelledby="landing-engine" className="sw-lp-section sw-lp-engines">
-          <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">Formula engines</p>
+        <section aria-labelledby="landing-engine" class="sw-lp-section sw-lp-engines">
+          <header class="sw-lp-head">
+            <p class="sw-lp-eyebrow">Formula engines</p>
             <h2 id="landing-engine">Pick the formula engine that fits your download budget.</h2>
           </header>
-          <div className="sw-lp-engines__choices">
+          <div class="sw-lp-engines__choices">
             <article>
               <span>Default</span>
               <strong>@sheetwrite/wasm</strong>
               <p>
                 Included by the core package. The standard function set and the smaller download.
               </p>
-              {downloads ? (
-                <p className="sw-lp-engines__size">
-                  <b>{kib(downloads.defaultEngineBrotliBytes)}</b> WASM, Brotli
-                </p>
-              ) : null}
-              <pre className="sw-lp-engines__code">
+              <Show when={downloads}>
+                {(sizes) => (
+                  <p class="sw-lp-engines__size">
+                    <b>{kib(sizes().defaultEngineBrotliBytes)}</b> WASM, Brotli
+                  </p>
+                )}
+              </Show>
+              <pre class="sw-lp-engines__code">
                 <code>
-                  <span className="sw-code-keyword">await</span>{" "}
-                  <span className="sw-code-function">initSheetwrite</span>();
+                  <span class="sw-code-keyword">await</span>{" "}
+                  <span class="sw-code-function">initSheetwrite</span>();
                 </code>
               </pre>
             </article>
@@ -387,39 +407,40 @@ function Landing() {
                 The same engine with the analysis families: grouping, pivots, LAMBDA, statistics,
                 regression, finance, regex, and matrices.
               </p>
-              {downloads ? (
-                <p className="sw-lp-engines__size">
-                  <b>{kib(downloads.fullEngineBrotliBytes)}</b> WASM, Brotli
-                </p>
-              ) : null}
-              <pre className="sw-lp-engines__code">
+              <Show when={downloads}>
+                {(sizes) => (
+                  <p class="sw-lp-engines__size">
+                    <b>{kib(sizes().fullEngineBrotliBytes)}</b> WASM, Brotli
+                  </p>
+                )}
+              </Show>
+              <pre class="sw-lp-engines__code">
                 <code>
-                  <span className="sw-code-keyword">await</span>{" "}
-                  <span className="sw-code-function">initSheetwrite</span>
+                  <span class="sw-code-keyword">await</span>{" "}
+                  <span class="sw-code-function">initSheetwrite</span>
                   {"({ engine: formulas });"}
                 </code>
               </pre>
             </article>
           </div>
-          {releaseFacts.highlighted !== null ? (
-            <aside aria-labelledby="landing-new" className="sw-lp-new">
-              <h3 id="landing-new">New in {releaseFacts.highlighted.minor}</h3>
-              <ul>
-                {releaseFacts.highlighted.highlights.map((highlight) => (
-                  <li key={highlight}>{highlight}</li>
-                ))}
-              </ul>
-              <Link to={releaseFacts.highlighted.href}>
-                Read what is new and the upgrade checklist
-                <Icon name="arrow-right" />
-              </Link>
-            </aside>
-          ) : null}
+          <Show when={highlighted}>
+            {(release) => (
+              <aside aria-labelledby="landing-new" class="sw-lp-new">
+                <h3 id="landing-new">New in {release().minor}</h3>
+                <ul>
+                  <For each={release().highlights}>{(highlight) => <li>{highlight}</li>}</For>
+                </ul>
+                <MoreLink href={release().href}>
+                  Read what is new and the upgrade checklist
+                </MoreLink>
+              </aside>
+            )}
+          </Show>
         </section>
 
-        <section aria-labelledby="landing-bench" className="sw-lp-section" id="benchmarks">
-          <header className="sw-lp-head">
-            <p className="sw-lp-eyebrow">Results you can check</p>
+        <section aria-labelledby="landing-bench" class="sw-lp-section" id="benchmarks">
+          <header class="sw-lp-head">
+            <p class="sw-lp-eyebrow">Results you can check</p>
             <h2 id="landing-bench">Measured, not promised.</h2>
             <p>
               How many times faster Sheetwrite is than Handsontable
@@ -428,22 +449,25 @@ function Landing() {
               runs stay failed.
             </p>
           </header>
-          {evidence ? (
-            <BenchmarkBars />
-          ) : (
-            <p className="sw-lp-note">
-              No saved benchmark results are available yet. Run{" "}
-              <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and then{" "}
-              <code>bun run docs:generate</code> to publish measured numbers here.
-            </p>
-          )}
-          <Link className="sw-lp-more" to="/docs/$/" params={{ _splat: "performance" }}>
+          <Show
+            fallback={
+              <p class="sw-lp-note">
+                No saved benchmark results are available yet. Run{" "}
+                <code>bun run --filter @sheetwrite/bench bench:render:scale</code> and then{" "}
+                <code>bun run docs:generate</code> to publish measured numbers here.
+              </p>
+            }
+            when={evidence}
+          >
+            {/* Built at docs generation from committed captures; every text value is escaped. */}
+            <div class="speed-story-host" id="speed-story" innerHTML={speedStory} />
+          </Show>
+          <MoreLink class="sw-lp-more" href="/docs/performance/">
             See the full method and every result
-            <Icon name="arrow-right" />
-          </Link>
+          </MoreLink>
         </section>
 
-        <section aria-labelledby="landing-close" className="sw-lp-close">
+        <section aria-labelledby="landing-close" class="sw-lp-close">
           <div>
             <h2 id="landing-close">Put a real spreadsheet in your product.</h2>
             <p>
@@ -451,57 +475,46 @@ function Landing() {
               need them.
             </p>
           </div>
-          <div className="sw-lp-actions">
-            <Link className="sw-lp-button" to="/docs/$/" params={{ _splat: "start/installation" }}>
+          <div class="sw-lp-actions">
+            <a class="sw-lp-button" href="/docs/start/installation/">
               Read the docs
-            </Link>
-            <a
-              className="sw-lp-button sw-lp-button--ghost"
-              href="https://github.com/chh-ay/sheetwrite"
-            >
+            </a>
+            <a class="sw-lp-button sw-lp-button--ghost" href="https://github.com/chh-ay/sheetwrite">
               View on GitHub
             </a>
           </div>
         </section>
       </main>
 
-      <footer className="sw-landing-footer">
-        <div className="sw-landing-footer__inner">
-          <div className="sw-landing-footer__brand">
+      <footer class="sw-landing-footer">
+        <div class="sw-landing-footer__inner">
+          <div class="sw-landing-footer__brand">
             <strong>Sheetwrite</strong>
             <p>A spreadsheet engine for the browser. Rust and WebAssembly, any framework.</p>
-            <span className="sw-landing-footer__meta">v{corePackage.version} · MIT licensed</span>
+            <span class="sw-landing-footer__meta">v{corePackage.version} · MIT licensed</span>
           </div>
-          <nav aria-label="Footer" className="sw-landing-footer__nav">
+          <nav aria-label="Footer" class="sw-landing-footer__nav">
             <div>
-              <p className="sw-landing-footer__title">Start</p>
-              <Link to="/docs/$/" params={{ _splat: "start/installation" }}>
-                Installation
-              </Link>
-              <Link to="/docs/$/" params={{ _splat: "start/first-grid" }}>
-                First grid
-              </Link>
-              <Link to={releaseFacts.latest.href}>What's new</Link>
+              <p class="sw-landing-footer__title">Start</p>
+              <a href="/docs/start/installation/">Installation</a>
+              <a href="/docs/start/first-grid/">First grid</a>
+              <a href={releaseFacts.latest.href}>What's new</a>
             </div>
             <div>
-              <p className="sw-landing-footer__title">Frameworks</p>
-              <Link to="/vanilla/">Vanilla</Link>
-              <Link to="/react/">React</Link>
-              <Link to="/vue/">Vue</Link>
-              <Link to="/svelte/">Svelte</Link>
+              <p class="sw-landing-footer__title">Frameworks</p>
+              <a href="/vanilla/">Vanilla</a>
+              <a href="/react/">React</a>
+              <a href="/vue/">Vue</a>
+              <a href="/svelte/">Svelte</a>
             </div>
             <div>
-              <p className="sw-landing-footer__title">Explore</p>
-              <Link to="/showcases/">Showcases</Link>
-              <Link to="/docs/$/" params={{ _splat: "reference/formula-functions" }}>
-                Formula functions
-              </Link>
-              <Link to="/docs/$/" params={{ _splat: "performance" }}>
-                Benchmarks
-              </Link>
+              <p class="sw-landing-footer__title">Explore</p>
+              <a href="/showcases/">Showcases</a>
+              <a href="/docs/reference/formula-functions/">Formula functions</a>
+              <a href="/docs/performance/">Benchmarks</a>
             </div>
             <div>
-              <p className="sw-landing-footer__title">Project</p>
+              <p class="sw-landing-footer__title">Project</p>
               <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
               <a href="https://github.com/chh-ay/sheetwrite/issues">Issues</a>
               <a href="https://www.npmjs.com/package/@sheetwrite/core">npm</a>

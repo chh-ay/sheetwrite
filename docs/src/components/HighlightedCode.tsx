@@ -1,9 +1,8 @@
-import { type ComponentProps, useMemo } from "react";
-
-import { type RuntimeCodeLanguage, tokenizeCode } from "../lib/code-tokens.js";
+import { type RuntimeCodeLanguage, tokenizeCode } from "@docs/lib/code-tokens.js";
+import { createMemo, For, type JSX, splitProps } from "solid-js";
 
 /** Props of {@link HighlightedCode}. */
-type HighlightedCodeProps = Omit<ComponentProps<"code">, "children"> & {
+type HighlightedCodeProps = Omit<JSX.HTMLAttributes<HTMLElement>, "children"> & {
   readonly code: string;
   readonly language: RuntimeCodeLanguage;
 };
@@ -13,20 +12,20 @@ type HighlightedCodeProps = Omit<ComponentProps<"code">, "children"> & {
  * live workbook), coloured with the site's code roles. Wrap it in `<pre>` for
  * a block.
  */
-export function HighlightedCode({ code, language, ...props }: HighlightedCodeProps) {
-  const tokens = useMemo(() => tokenizeCode(code, language), [code, language]);
+export function HighlightedCode(props: HighlightedCodeProps) {
+  const [local, rest] = splitProps(props, ["code", "language"]);
+  const tokens = createMemo(() => tokenizeCode(local.code, local.language));
   return (
-    <code {...props}>
-      {tokens.map((token, index) =>
-        token.role === undefined ? (
-          token.text
-        ) : (
-          // oxlint-disable-next-line react/no-array-index-key -- tokens repeat; their position is their identity.
-          <span className={`sw-code-${token.role}`} key={index}>
-            {token.text}
-          </span>
-        ),
-      )}
+    <code {...rest}>
+      <For each={tokens()}>
+        {(token) =>
+          token.role === undefined ? (
+            token.text
+          ) : (
+            <span class={`sw-code-${token.role}`}>{token.text}</span>
+          )
+        }
+      </For>
     </code>
   );
 }

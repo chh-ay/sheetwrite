@@ -1,8 +1,8 @@
-/** @jsxImportSource react */
-import { iconHref } from "../icons/icon-href.js";
-import type { IconName } from "../icons/icon-names.js";
+import { iconHref } from "@docs/icons/icon-href.js";
+import type { IconName } from "@docs/icons/icon-names.js";
+import { mergeProps } from "solid-js";
 
-export type { IconName } from "../icons/icon-names.js";
+export type { IconName } from "@docs/icons/icon-names.js";
 
 /** Rendered size: 16, 20 or 24 px. */
 export type IconSize = "sm" | "md" | "lg";
@@ -17,22 +17,23 @@ export interface IconProps {
    * or text next to it must carry the meaning.
    */
   readonly label?: string;
-  readonly className?: string;
+  readonly class?: string;
 }
 
 /** One icon from the Sheetwrite sprite. */
-export function Icon({ name, size = "sm", label, className }: IconProps) {
-  const labelled = label !== undefined;
+export function Icon(props: IconProps) {
+  const merged = mergeProps({ size: "sm" as IconSize }, props);
+  const labelled = () => merged.label !== undefined;
   return (
     <svg
-      aria-hidden={labelled ? undefined : true}
-      aria-label={label}
-      className={className === undefined ? "sw-icon" : `sw-icon ${className}`}
-      data-size={size}
+      aria-hidden={labelled() ? undefined : true}
+      aria-label={merged.label}
+      class={merged.class === undefined ? "sw-icon" : `sw-icon ${merged.class}`}
+      data-size={merged.size}
       focusable="false"
-      role={labelled ? "img" : undefined}
+      role={labelled() ? "img" : undefined}
     >
-      <use href={iconHref(name)} />
+      <use href={iconHref(merged.name)} />
     </svg>
   );
 }

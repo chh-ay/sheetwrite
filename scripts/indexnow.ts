@@ -79,7 +79,7 @@ async function submitProductionSitemap(): Promise<void> {
   const outputRoot = resolve(
     import.meta.dir,
     "..",
-    process.env.DOCS_OUTPUT_DIR ?? "docs-solid/dist/client",
+    process.env.DOCS_OUTPUT_DIR ?? "docs/dist/client",
   );
   const sitemap = await readFile(resolve(outputRoot, "sitemap.xml"), "utf8");
   const urls = urlsFromSitemap(sitemap);

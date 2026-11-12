@@ -75,7 +75,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
   );
   await writeFile(
     join(root, "docs/package.json"),
-    `${JSON.stringify({ name: "@sheetwrite/docs-start", scripts: { typecheck: "typecheck" } })}\n`,
+    `${JSON.stringify({ name: "@sheetwrite/docs", scripts: { typecheck: "typecheck" } })}\n`,
   );
   return root;
 }

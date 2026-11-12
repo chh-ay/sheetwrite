@@ -1,6 +1,6 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { readPreference, writePreference } from "@docs/lib/preference-storage.js";
+import { createMemo, createSignal, createUniqueId, For, onCleanup, onMount, Show } from "solid-js";
 
-import { readPreference, writePreference } from "../lib/preference-storage.js";
 import { ActionError, pendingProps, useAction } from "../lib/use-action.js";
 import { Icon } from "./Icon.js";
 import { onTabListKey } from "./tabKeys.js";
@@ -36,30 +36,30 @@ interface PackageCommandProps {
  * fences become this component at build time (see `installCommandsAsTerminals`
  * in vite.config.ts); release pages render it for the upgrade command.
  */
-export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>) {
-  const [manager, setManager] = useState<ManagerId>("npm");
+export function PackageCommand(props: Readonly<PackageCommandProps>) {
+  const [manager, setManager] = createSignal<ManagerId>("npm");
   // The feedback names the copied text, so it shows only while that same
   // command is on screen; another manager's command is not on the clipboard.
-  const [copiedCommand, setCopiedCommand] = useState<string | null>(null);
-  const copiedTimer = useRef<number | undefined>(undefined);
+  const [copiedCommand, setCopiedCommand] = createSignal<string | null>(null);
+  let copiedTimer: number | undefined;
   const copy = useAction();
-  const id = useId();
-  const { program, subcommand } = MANAGERS.find((entry) => entry.id === manager) ?? MANAGERS[0];
-  const command = `${program} ${subcommand} ${packages}`;
-  const copied = copiedCommand === command;
+  const id = createUniqueId();
+  const entry = createMemo(() => MANAGERS.find((item) => item.id === manager()) ?? MANAGERS[0]);
+  const command = () => `${entry().program} ${entry().subcommand} ${props.packages}`;
+  const copied = () => copiedCommand() === command();
 
-  useEffect(() => {
+  onMount(() => {
     const stored = readPreference(MANAGER_STORAGE_KEY);
     if (isManagerId(stored)) setManager(stored);
     const onChange = (event: Event) => {
       if (event instanceof CustomEvent && isManagerId(event.detail)) setManager(event.detail);
     };
     window.addEventListener(MANAGER_EVENT, onChange);
-    return () => {
+    onCleanup(() => {
       window.removeEventListener(MANAGER_EVENT, onChange);
-      window.clearTimeout(copiedTimer.current);
-    };
-  }, []);
+      window.clearTimeout(copiedTimer);
+    });
+  });
 
   const choose = (next: ManagerId) => {
     setManager(next);
@@ -68,54 +68,56 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
   };
 
   return (
-    <figure className="sw-terminal" data-pagefind-ignore>
-      <div className="sw-terminal__bar">
-        <Icon className="sw-terminal__icon" name="terminal" />
-        <div aria-label="Package manager" className="sw-terminal__tabs" role="tablist">
-          {MANAGERS.map((entry) => (
-            <button
-              aria-controls={`${id}-command`}
-              id={`${id}-${entry.id}`}
-              aria-selected={entry.id === manager}
-              key={entry.id}
-              onClick={() => choose(entry.id)}
-              onKeyDown={(event) =>
-                onTabListKey(event, MANAGER_IDS, entry.id, choose, (next) => `${id}-${next}`)
-              }
-              role="tab"
-              tabIndex={entry.id === manager ? 0 : -1}
-              type="button"
-            >
-              {entry.id}
-            </button>
-          ))}
+    <figure class="sw-terminal" data-pagefind-ignore="true">
+      <div class="sw-terminal__bar">
+        <Icon class="sw-terminal__icon" name="terminal" />
+        <div aria-label="Package manager" class="sw-terminal__tabs" role="tablist">
+          <For each={MANAGERS}>
+            {(item) => (
+              <button
+                aria-controls={`${id}-command`}
+                id={`${id}-${item.id}`}
+                aria-selected={item.id === manager()}
+                onClick={() => choose(item.id)}
+                onKeyDown={(event) =>
+                  onTabListKey(event, MANAGER_IDS, item.id, choose, (next) => `${id}-${next}`)
+                }
+                role="tab"
+                tabIndex={item.id === manager() ? 0 : -1}
+                type="button"
+              >
+                {item.id}
+              </button>
+            )}
+          </For>
         </div>
         <button
-          className="sw-terminal__copy"
+          class="sw-terminal__copy"
           {...pendingProps(copy.pending)}
-          onClick={() =>
+          onClick={() => {
+            // The command at click time, as the copied text.
+            const text = command();
             void copy.run(
               async () => {
-                await navigator.clipboard.writeText(command);
-                setCopiedCommand(command);
-                window.clearTimeout(copiedTimer.current);
-                copiedTimer.current = window.setTimeout(
-                  () => setCopiedCommand(null),
-                  COPIED_FEEDBACK_MS,
-                );
+                await navigator.clipboard.writeText(text);
+                setCopiedCommand(text);
+                window.clearTimeout(copiedTimer);
+                copiedTimer = window.setTimeout(() => setCopiedCommand(null), COPIED_FEEDBACK_MS);
               },
               () => "Cannot copy the command. Allow clipboard access and try again.",
-            )
-          }
+            );
+          }}
           type="button"
         >
-          {copied ? <Icon name="check" /> : <Icon name="copy" />}
-          <span aria-live="polite">{copied ? "Copied" : "Copy"}</span>
+          <Show when={copied()} fallback={<Icon name="copy" />}>
+            <Icon name="check" />
+          </Show>
+          <span aria-live="polite">{copied() ? "Copied" : "Copy"}</span>
         </button>
       </div>
       <pre
-        aria-labelledby={`${id}-${manager}`}
-        className="sw-terminal__body"
+        aria-labelledby={`${id}-${manager()}`}
+        class="sw-terminal__body"
         id={`${id}-command`}
         role="tabpanel"
         tabIndex={0}
@@ -123,15 +125,17 @@ export function PackageCommand({ packages, note }: Readonly<PackageCommandProps>
         {/* Highlighted with the code theme's roles: the shell program, its
             subcommand and the package specifiers. */}
         <code>
-          <span aria-hidden="true" className="sw-terminal__prompt">
+          <span aria-hidden="true" class="sw-terminal__prompt">
             ${" "}
           </span>
-          <span className="sw-code-function">{program}</span>{" "}
-          <span className="sw-code-keyword">{subcommand}</span>{" "}
-          <span className="sw-code-string">{packages}</span>
+          <span class="sw-code-function">{entry().program}</span>{" "}
+          <span class="sw-code-keyword">{entry().subcommand}</span>{" "}
+          <span class="sw-code-string">{props.packages}</span>
         </code>
       </pre>
-      {note ? <figcaption className="sw-terminal__note">{note}</figcaption> : null}
+      <Show when={props.note}>
+        <figcaption class="sw-terminal__note">{props.note}</figcaption>
+      </Show>
       <ActionError error={copy.error} />
     </figure>
   );
