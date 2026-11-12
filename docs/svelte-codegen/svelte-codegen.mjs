@@ -1,6 +1,6 @@
 // Turns Svelte samples into TypeScript for the hover engine, in a process of its own:
-// svelte2tsx loads TypeScript 5.9 (about 85 MiB), which the docs build should not keep
-// for the rest of the run. Reads a JSON array of sources on stdin and writes a JSON array
+// svelte2tsx loads the TypeScript 6 JavaScript API (about 85 MiB, resolved from this
+// package), which the docs build should not keep for the rest of the run. Reads a JSON array of sources on stdin and writes a JSON array
 // of `{ code, map }` or `{ error }` to stdout, then exits.
 import { svelte2tsx } from "svelte2tsx";
 

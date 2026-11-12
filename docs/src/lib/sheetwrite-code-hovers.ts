@@ -435,7 +435,7 @@ let svelteQueue: { source: string; resolve(code: SvelteCode): void; reject(error
 
 /**
  * TypeScript for a Svelte sample, from svelte2tsx in a short-lived child process
- * (`svelte-codegen.mjs`). Samples requested in the same turn of the event loop share one
+ * (`docs/svelte-codegen/svelte-codegen.mjs`). Samples requested in the same turn of the event loop share one
  * process, so a cold `docs:check` starts it once.
  */
 function svelteCode(source: string): Promise<SvelteCode> {
@@ -445,7 +445,9 @@ function svelteCode(source: string): Promise<SvelteCode> {
     setTimeout(() => {
       const batch = svelteQueue;
       svelteQueue = [];
-      const script = fileURLToPath(new URL("./svelte-codegen.mjs", import.meta.url));
+      const script = fileURLToPath(
+        new URL("../../svelte-codegen/svelte-codegen.mjs", import.meta.url),
+      );
       const child = spawn(process.execPath, [script], { stdio: ["pipe", "pipe", "inherit"] });
       let output = "";
       child.stdout.setEncoding("utf8");
