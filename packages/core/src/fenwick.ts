@@ -3,8 +3,10 @@
 // ends in one resized row, then a tail of default rows. A Fenwick tree over the
 // segment heights gives offsets, row lookups and height changes of resized rows
 // in O(log k), k being the resized rows. Resizing a default row, or giving a
-// row the default height back, shifts the sorted arrays and rebuilds the tree
-// in O(k). A sheet without resized rows allocates nothing.
+// row the default height back, is queued in O(1); the next offset or lookup
+// merges the queue into the sorted rows in O(k + m log m) for m queued rows, so
+// a run of single-row changes between two reads costs one merge. A sheet
+// without resized rows allocates nothing.
 
 const NO_ROWS = new Int32Array(0);
 const NO_HEIGHTS = new Float64Array(0);
@@ -21,6 +23,9 @@ export class OffsetIndex {
   /** 1-indexed Fenwick tree of segment heights; segment `i` ends at `rows[i]`. */
   private tree = NO_HEIGHTS;
   private size = 0;
+  /** Heights not merged into `rows` yet: new resized rows and rows back at the default. */
+  private queued: Map<number, number> | undefined;
+  /** Sum of every height, queued ones included. */
   private total: number;
 
   constructor(count: number, defaultHeight: number) {
@@ -39,34 +44,37 @@ export class OffsetIndex {
 
   /** Bytes reserved by the resized-row arrays and their tree. */
   get backingStoreBytes(): number {
+    this.merge();
     return this.rows.byteLength + this.heights.byteLength + this.tree.byteLength;
   }
 
   heightOf(row: number): number {
-    const index = this.lowerBound(row);
-    return index < this.size && this.rows[index] === row
-      ? (this.heights[index] ?? this.defaultHeight)
-      : this.defaultHeight;
+    return this.queued?.get(row) ?? this.storedHeight(row);
   }
 
   setHeight(row: number, h: number): void {
     if (!Number.isInteger(row) || row < 0 || row >= this.n) return;
+    const queued = this.queued?.get(row);
+    if (queued !== undefined) {
+      if (h === queued) return;
+      this.total += h - queued;
+      this.queued?.set(row, h);
+      return;
+    }
     const index = this.lowerBound(row);
     const resized = index < this.size && this.rows[index] === row;
     const current = resized ? (this.heights[index] ?? this.defaultHeight) : this.defaultHeight;
     const delta = h - current;
     if (delta === 0) return;
-    if (!resized) {
-      this.insertAt(index, row, h);
-    } else if (h === this.defaultHeight) {
-      this.removeAt(index);
-    } else {
+    this.total += delta;
+    if (resized && h !== this.defaultHeight) {
       this.heights[index] = h;
-      this.total += delta;
       for (let i = index + 1; i <= this.size; i += i & -i) {
         this.tree[i] = (this.tree[i] ?? 0) + delta;
       }
+      return;
     }
+    (this.queued ??= new Map()).set(row, h);
   }
 
   /**
@@ -74,12 +82,109 @@ export class OffsetIndex {
    * `rows` must be ascending, distinct and inside the index.
    */
   setHeights(rows: ArrayLike<number>, heights: ArrayLike<number>): void {
-    const count = rows.length;
-    if (count === 0) return;
-    if (count === 1) {
+    if (rows.length === 0) return;
+    if (rows.length === 1) {
       this.setHeight(rows[0] ?? -1, heights[0] ?? this.defaultHeight);
       return;
     }
+    this.merge();
+    this.mergeSorted(rows, heights);
+  }
+
+  /** Sum of heights of rows [0, row); i.e. the top Y of `row`. */
+  offsetOf(row: number): number {
+    this.merge();
+    const r = Math.max(0, Math.min(row, this.n));
+    if (this.size === 0) return r * this.defaultHeight;
+    const index = this.lowerBound(r);
+    return this.prefix(index) + (r - this.segmentStart(index)) * this.defaultHeight;
+  }
+
+  /**
+   * Row whose band contains content-space `offset`, with that row's top Y.
+   * Clamps to the last row when `offset` is past the end.
+   */
+  rowAtOffset(offset: number): { row: number; top: number } {
+    if (this.n === 0) return { row: 0, top: 0 };
+    if (offset <= 0) return { row: 0, top: 0 };
+    if (offset >= this.total) {
+      const last = this.n - 1;
+      return { row: last, top: this.offsetOf(last) };
+    }
+    this.merge();
+    const defaultHeight = this.defaultHeight;
+    if (this.size === 0) {
+      const row = Math.floor(offset / defaultHeight);
+      return { row, top: row * defaultHeight };
+    }
+    // Largest segment count whose segments all end at or before `offset`.
+    let index = 0;
+    let remaining = offset;
+    for (let step = 1 << (31 - Math.clz32(this.size)); step > 0; step >>= 1) {
+      const next = index + step;
+      if (next <= this.size && (this.tree[next] ?? 0) <= remaining) {
+        index = next;
+        remaining -= this.tree[next] ?? 0;
+      }
+    }
+    // `offset` is inside segment `index`: in its default run or on its resized row.
+    const start = this.segmentStart(index);
+    const end = index < this.size ? (this.rows[index] ?? this.n) : this.n;
+    const segmentTop = offset - remaining;
+    const defaultRows = Math.floor(remaining / defaultHeight);
+    if (defaultRows < end - start) {
+      return { row: start + defaultRows, top: segmentTop + defaultRows * defaultHeight };
+    }
+    if (index < this.size) return { row: end, top: segmentTop + (end - start) * defaultHeight };
+    const last = this.n - 1;
+    return { row: last, top: this.offsetOf(last) };
+  }
+
+  /** Height of `row` in the sorted rows, ignoring queued changes. */
+  private storedHeight(row: number): number {
+    const index = this.lowerBound(row);
+    return index < this.size && this.rows[index] === row
+      ? (this.heights[index] ?? this.defaultHeight)
+      : this.defaultHeight;
+  }
+
+  /** Merge queued heights into the sorted rows and rebuild the tree. */
+  private merge(): void {
+    const queued = this.queued;
+    if (queued === undefined || queued.size === 0) return;
+    if (queued.size === 1) {
+      for (const [row, h] of queued) {
+        queued.clear();
+        this.mergeOne(row, h);
+      }
+      return;
+    }
+    const rows = Int32Array.from(queued.keys()).sort();
+    const heights = new Float64Array(rows.length);
+    for (let position = 0; position < rows.length; position++) {
+      heights[position] = queued.get(rows[position] ?? 0) ?? this.defaultHeight;
+    }
+    queued.clear();
+    this.mergeSorted(rows, heights);
+  }
+
+  /** One queued row, in place: no new arrays unless they must grow. */
+  private mergeOne(row: number, h: number): void {
+    const index = this.lowerBound(row);
+    const resized = index < this.size && this.rows[index] === row;
+    if (!resized) {
+      if (h !== this.defaultHeight) this.insertAt(index, row, h);
+    } else if (h === this.defaultHeight) {
+      this.removeAt(index);
+    } else {
+      this.heights[index] = h;
+      this.rebuildTree();
+    }
+  }
+
+  /** Merge ascending, distinct `rows` into the sorted rows in O(k + m). */
+  private mergeSorted(rows: ArrayLike<number>, heights: ArrayLike<number>): void {
+    const count = rows.length;
     const capacity = this.size + count;
     const nextRows = new Int32Array(capacity);
     const nextHeights = new Float64Array(capacity);
@@ -115,53 +220,6 @@ export class OffsetIndex {
     this.tree = new Float64Array(capacity + 1);
     this.size = size;
     this.rebuildTree();
-  }
-
-  /** Sum of heights of rows [0, row); i.e. the top Y of `row`. */
-  offsetOf(row: number): number {
-    const r = Math.max(0, Math.min(row, this.n));
-    if (this.size === 0) return r * this.defaultHeight;
-    const index = this.lowerBound(r);
-    return this.prefix(index) + (r - this.segmentStart(index)) * this.defaultHeight;
-  }
-
-  /**
-   * Row whose band contains content-space `offset`, with that row's top Y.
-   * Clamps to the last row when `offset` is past the end.
-   */
-  rowAtOffset(offset: number): { row: number; top: number } {
-    if (this.n === 0) return { row: 0, top: 0 };
-    if (offset <= 0) return { row: 0, top: 0 };
-    if (offset >= this.total) {
-      const last = this.n - 1;
-      return { row: last, top: this.offsetOf(last) };
-    }
-    const defaultHeight = this.defaultHeight;
-    if (this.size === 0) {
-      const row = Math.floor(offset / defaultHeight);
-      return { row, top: row * defaultHeight };
-    }
-    // Largest segment count whose segments all end at or before `offset`.
-    let index = 0;
-    let remaining = offset;
-    for (let step = 1 << (31 - Math.clz32(this.size)); step > 0; step >>= 1) {
-      const next = index + step;
-      if (next <= this.size && (this.tree[next] ?? 0) <= remaining) {
-        index = next;
-        remaining -= this.tree[next] ?? 0;
-      }
-    }
-    // `offset` is inside segment `index`: in its default run or on its resized row.
-    const start = this.segmentStart(index);
-    const end = index < this.size ? (this.rows[index] ?? this.n) : this.n;
-    const segmentTop = offset - remaining;
-    const defaultRows = Math.floor(remaining / defaultHeight);
-    if (defaultRows < end - start) {
-      return { row: start + defaultRows, top: segmentTop + defaultRows * defaultHeight };
-    }
-    if (index < this.size) return { row: end, top: segmentTop + (end - start) * defaultHeight };
-    const last = this.n - 1;
-    return { row: last, top: this.offsetOf(last) };
   }
 
   /** Resized rows before `row`, which is also the segment that holds `row`. */

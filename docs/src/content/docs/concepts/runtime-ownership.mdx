@@ -61,8 +61,10 @@ declare function computeWindow(index: unknown, contentTop: number, viewportHeigh
 Row positions come from an `OffsetIndex`. It keeps only the rows whose height
 differs from the default, with a Fenwick (binary-indexed) tree over the runs
 between them. Mapping scrollTop ↔ row and changing the height of a resized row
-take `O(log k)` for `k` resized rows; resizing another row takes `O(k)`. A
-sheet with no resized rows keeps no arrays, whatever its row count.
+take `O(log k)` for `k` resized rows. Resizing other rows is queued, and the
+next position lookup merges the queue in one `O(k + m log m)` pass for `m`
+queued rows. A sheet with no resized rows keeps no arrays, whatever its row
+count.
 
 Browsers clamp an element's height at an engine-specific ceiling — Chromium sits
 near 33.5 million CSS pixels at 100% zoom, and the ceiling **shrinks with browser

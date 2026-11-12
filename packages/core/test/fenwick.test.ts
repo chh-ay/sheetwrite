@@ -153,6 +153,37 @@ describe("OffsetIndex", () => {
     expectHeights(index, Array(12).fill(DEFAULT_HEIGHT));
     expect(index.backingStoreBytes).toBe(0);
   });
+
+  it("answers heights and the total between single-row resizes without a read", () => {
+    const heights = Array<number>(2_000).fill(DEFAULT_HEIGHT);
+    const index = new OffsetIndex(heights.length, DEFAULT_HEIGHT);
+    let total = heights.length * DEFAULT_HEIGHT;
+    for (let row = heights.length - 1; row >= 0; row -= 2) {
+      const height = 20 + (row % 9);
+      index.setHeight(row, height);
+      total += height - heights[row]!;
+      heights[row] = height;
+      expect(index.heightOf(row)).toBe(height);
+      expect(index.totalHeight).toBe(total);
+    }
+    index.setHeight(1_999, 70);
+    index.setHeight(1_999, DEFAULT_HEIGHT);
+    index.setHeight(3, DEFAULT_HEIGHT);
+    index.setHeight(3, 44);
+    heights[1_999] = DEFAULT_HEIGHT;
+    heights[3] = 44;
+    expectHeights(index, heights);
+    for (let row = 0; row < heights.length; row += 3) {
+      index.setHeight(row, DEFAULT_HEIGHT);
+      heights[row] = DEFAULT_HEIGHT;
+    }
+    index.setHeight(10, 90);
+    heights[10] = 90;
+    expectHeights(index, heights);
+    for (let row = 0; row < heights.length; row++) index.setHeight(row, DEFAULT_HEIGHT);
+    expectHeights(index, Array(heights.length).fill(DEFAULT_HEIGHT));
+    expect(index.backingStoreBytes).toBe(0);
+  });
 });
 
 describe("ScaledScroll", () => {
