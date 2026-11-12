@@ -22,9 +22,12 @@ struct Sheet {
     touches: Touches,
 }
 
-/// One page of changes as parallel columns.
+/// One page of changes as parallel columns. Each `compare` call fills in the
+/// authors of the changes it adds; reading hands each column over to
+/// JavaScript.
 #[derive(Debug, Default)]
 struct Page {
+    len: usize,
     sheet: Vec<u32>,
     row: Vec<u32>,
     col: Vec<u32>,
@@ -32,14 +35,18 @@ struct Page {
     before_col: Vec<u32>,
     flags: Vec<u8>,
     author: Vec<u32>,
+    /// A getter has run: columns may have been handed over, so the next
+    /// `compare` starts a new page.
+    read: bool,
 }
 
 impl Page {
     const fn len(&self) -> usize {
-        self.flags.len()
+        self.len
     }
 
     fn clear(&mut self) {
+        self.len = 0;
         self.sheet.clear();
         self.row.clear();
         self.col.clear();
@@ -47,6 +54,7 @@ impl Page {
         self.before_col.clear();
         self.flags.clear();
         self.author.clear();
+        self.read = false;
     }
 }
 
@@ -228,16 +236,16 @@ impl DiffKernel {
         let Some(Some(sheet)) = self.sheets.get(slot as usize) else {
             return rows * cols;
         };
+        if self.page.read {
+            self.page.clear();
+        }
 
         let window_rows = self.after.rows;
         let total = rows * cols;
         let mut ordinal = from;
+        let run_start = self.page.len();
 
-        while ordinal < total {
-            if self.page.len() >= self.limit {
-                break;
-            }
-
+        while ordinal < total && self.page.len() < self.limit {
             let row = ordinal / cols;
             let col = ordinal % cols;
             let after_index = (piece_col + col) as usize * window_rows + (piece_row + row) as usize;
@@ -246,7 +254,6 @@ impl DiffKernel {
                 index: after_index,
                 style: compare::style(&self.after_styles, self.after.styles[after_index]),
             };
-
             let before = earlier.then(|| {
                 let index = col as usize * self.before.rows + row as usize;
                 compare::Cell {
@@ -255,9 +262,9 @@ impl DiffKernel {
                     style: compare::style(&self.before_styles, self.before.styles[index]),
                 }
             });
-
             let flags = compare::flags(before, after);
             if flags != 0 {
+                self.page.len += 1;
                 self.page.sheet.push(slot);
                 self.page.row.push(row0 + row);
                 self.page.col.push(col0 + col);
@@ -268,14 +275,19 @@ impl DiffKernel {
                     .before_col
                     .push(if earlier { before_col0 + col } else { NONE });
                 self.page.flags.push(flags);
-                self.page
-                    .author
-                    .push(sheet.touches.last_author(row0 + row, col0 + col));
+                self.page.author.push(NONE);
             }
-
             ordinal += 1;
         }
 
+        // One sweep over the write log for this call's changes, which are
+        // in row order, instead of one per change.
+        let page = &mut self.page;
+        sheet.touches.last_authors(
+            &page.row[run_start..],
+            &page.col[run_start..],
+            &mut page.author[run_start..],
+        );
         ordinal
     }
 
@@ -290,53 +302,62 @@ impl DiffKernel {
         self.page.len() as u32
     }
 
-    /// The sheet slot of each change.
+    /// The sheet slot of each change. This and the other page getters hand
+    /// their column over: a second read is empty, and the next `compare`
+    /// starts a new page.
     #[wasm_bindgen(js_name = pageSheets)]
     #[must_use]
-    pub fn page_sheets(&self) -> Vec<u32> {
-        self.page.sheet.clone()
+    pub fn page_sheets(&mut self) -> Vec<u32> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.sheet)
     }
 
     /// The later row of each change.
     #[wasm_bindgen(js_name = pageRows)]
     #[must_use]
-    pub fn page_rows(&self) -> Vec<u32> {
-        self.page.row.clone()
+    pub fn page_rows(&mut self) -> Vec<u32> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.row)
     }
 
     /// The later column of each change.
     #[wasm_bindgen(js_name = pageCols)]
     #[must_use]
-    pub fn page_cols(&self) -> Vec<u32> {
-        self.page.col.clone()
+    pub fn page_cols(&mut self) -> Vec<u32> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.col)
     }
 
     /// The earlier row of each change; `0xFFFFFFFF` for a new row.
     #[wasm_bindgen(js_name = pageBeforeRows)]
     #[must_use]
-    pub fn page_before_rows(&self) -> Vec<u32> {
-        self.page.before_row.clone()
+    pub fn page_before_rows(&mut self) -> Vec<u32> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.before_row)
     }
 
     /// The earlier column of each change; `0xFFFFFFFF` for a new column.
     #[wasm_bindgen(js_name = pageBeforeCols)]
     #[must_use]
-    pub fn page_before_cols(&self) -> Vec<u32> {
-        self.page.before_col.clone()
+    pub fn page_before_cols(&mut self) -> Vec<u32> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.before_col)
     }
 
     /// What changed in each cell, as `VALUE`, `FORMULA`, `STYLE`, `ADDED` and `REMOVED` bits.
     #[wasm_bindgen(js_name = pageFlags)]
     #[must_use]
-    pub fn page_flags(&self) -> Vec<u8> {
-        self.page.flags.clone()
+    pub fn page_flags(&mut self) -> Vec<u8> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.flags)
     }
 
     /// The last writer of each changed cell; `0xFFFFFFFF` when no logged write reaches it.
     #[wasm_bindgen(js_name = pageAuthors)]
     #[must_use]
-    pub fn page_authors(&self) -> Vec<u32> {
-        self.page.author.clone()
+    pub fn page_authors(&mut self) -> Vec<u32> {
+        self.page.read = true;
+        std::mem::take(&mut self.page.author)
     }
 
     /// Empty the page so `compare` can fill it again.
@@ -434,6 +455,124 @@ mod tests {
         assert_eq!(kernel.page_flags(), vec![compare::ADDED, compare::VALUE]);
         assert_eq!(kernel.page_authors(), vec![4, 5]);
         assert_eq!(kernel.cell_authors(sheet, 2, 0), vec![5]);
+    }
+
+    /// The later and the earlier window's bytes.
+    type Versions = (Vec<u8>, Vec<u8>);
+
+    /// A later window of `rows` × `cols` numbers where every `stride`-th cell,
+    /// row by row, differs from the earlier one.
+    fn changed_every(rows: u32, cols: u32, stride: u32) -> Versions {
+        let count = rows * cols;
+        // `block_bytes` takes cells row by row, so a cell's index is its ordinal.
+        let cell_at = |ordinal: u32, changed: bool| {
+            Cell::Number(
+                f64::from(ordinal)
+                    + if changed && ordinal.is_multiple_of(stride) {
+                        0.5
+                    } else {
+                        0.0
+                    },
+            )
+        };
+        let after: Vec<Cell> = (0..count).map(|index| cell_at(index, true)).collect();
+        let before: Vec<Cell> = (0..count).map(|index| cell_at(index, false)).collect();
+        (
+            block_bytes(rows as usize, cols as usize, &after, &[]),
+            block_bytes(rows as usize, cols as usize, &before, &[]),
+        )
+    }
+
+    #[test]
+    fn pages_in_row_order_and_resumes_at_the_returned_cell() {
+        let (rows, cols, stride) = (133, 3, 7);
+        let (after, before) = changed_every(rows, cols, stride);
+        let expected: Vec<u32> = (0..rows * cols)
+            .filter(|ordinal| ordinal.is_multiple_of(stride))
+            .collect();
+
+        let mut kernel = DiffKernel::new(10);
+        let sheet = kernel.add_sheet(rows, cols, true);
+        assert!(kernel.load_after(&after) && kernel.load_before(&before));
+
+        let mut seen = Vec::new();
+        let mut from = 0;
+        while from < rows * cols {
+            from = kernel.compare(sheet, true, 0, 0, rows, cols, 0, 0, 0, 0, from);
+            let page_rows = kernel.page_rows();
+            let page_cols = kernel.page_cols();
+            seen.extend(
+                page_rows
+                    .iter()
+                    .zip(&page_cols)
+                    .map(|(row, col)| row * cols + col),
+            );
+        }
+        assert_eq!(seen, expected);
+    }
+
+    #[test]
+    fn authors_match_a_lookup_per_cell() {
+        let (rows, cols) = (40, 5);
+        let (after, before) = changed_every(rows, cols, 3);
+        let mut kernel = DiffKernel::new(1_000);
+        let sheet = kernel.add_sheet(rows, cols, true);
+        // Overlapping rectangles in log order; later ones win.
+        for index in 0..60_u32 {
+            let (r0, c0) = ((index * 7) % rows, (index * 3) % cols);
+            let (r1, c1) = (
+                (r0 + index % 4).min(rows - 1),
+                (c0 + index % 2).min(cols - 1),
+            );
+            kernel.touch(sheet, r0, c0, r1, c1, index % 5);
+        }
+        assert!(kernel.load_after(&after) && kernel.load_before(&before));
+        kernel.compare(sheet, true, 0, 0, rows, cols, 0, 0, 0, 0, 0);
+
+        let page_rows = kernel.page_rows();
+        let page_cols = kernel.page_cols();
+        let authors = kernel.page_authors();
+        assert!(!authors.is_empty());
+        for ((&row, &col), &author) in page_rows.iter().zip(&page_cols).zip(&authors) {
+            let newest = (0..60_u32).rev().find(|&index| {
+                let (r0, c0) = ((index * 7) % rows, (index * 3) % cols);
+                let (r1, c1) = (
+                    (r0 + index % 4).min(rows - 1),
+                    (c0 + index % 2).min(cols - 1),
+                );
+                (r0..=r1).contains(&row) && (c0..=c1).contains(&col)
+            });
+            assert_eq!(author, newest.map_or(NONE, |index| index % 5));
+        }
+    }
+
+    #[test]
+    fn a_read_page_hands_its_columns_over_and_the_next_compare_starts_anew() {
+        let mut kernel = DiffKernel::new(1);
+        let sheet = kernel.add_sheet(1, 3, false);
+        let after = block_bytes(
+            1,
+            3,
+            &[Cell::Number(1.0), Cell::Empty, Cell::Number(3.0)],
+            &[],
+        );
+        assert!(kernel.load_after(&after));
+
+        assert_eq!(
+            kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 0),
+            1
+        );
+        assert_eq!(kernel.page_cols(), vec![0]);
+        assert!(kernel.page_cols().is_empty());
+        assert_eq!(kernel.page_length(), 1);
+
+        assert_eq!(
+            kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 1),
+            3
+        );
+        assert_eq!(kernel.page_length(), 1);
+        assert_eq!(kernel.page_cols(), vec![2]);
+        assert_eq!(kernel.page_authors(), vec![NONE]);
     }
 
     #[test]
