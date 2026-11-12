@@ -1608,6 +1608,41 @@ fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounti
 }
 
 #[test]
+fn scalar_index_does_not_charge_unselected_text_to_its_result_budget() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 72);
+    store.set_string(sheet, 0, 0, "short", 0);
+    let long = "x".repeat(1024 * 1024);
+    for row in 1..72 {
+        store.set_string(sheet, row, 0, &long, 0);
+    }
+    store.set_formula(sheet, 0, 1, "=INDEX(A1:A72,1)", 0);
+    store.recompute(sheet);
+    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("short"));
+}
+
+#[test]
+fn scalar_index_only_waits_for_its_selected_paged_cell() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(3, 6000, 4096, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 0, &[17.0], 0);
+    store.commit_sources();
+    store.set_formula(sheet, 0, 1, "=INDEX(A1:A6000,1)", 0);
+    store.set_formula(sheet, 0, 2, "=INDEX(A1:A6000,5001)", 0);
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 17.0);
+    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#LOADING!"));
+
+    store.begin_page_load();
+    store.set_column_numbers(sheet, 0, 5000, &[41.0], 0);
+    store.commit_sources();
+    store.recompute(sheet);
+    assert_close(number(&store, sheet, 0, 1), 17.0);
+    assert_close(number(&store, sheet, 0, 2), 41.0);
+}
+
+#[test]
 fn paged_formulas_propagate_loading_until_dependencies_arrive() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(2, 6000, 4096, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
