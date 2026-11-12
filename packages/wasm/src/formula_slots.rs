@@ -2,7 +2,7 @@
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::calc::unresolved_sheet_names;
+use crate::calc::{for_each_table_ref, unresolved_sheet_names, Ast, TableSection};
 use crate::memory::{StoreMemoryStats, FORMULAS};
 use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, FormulaError};
 
@@ -220,9 +220,9 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
-    /// The formulas that name a sheet the workbook does not have. Absent in
-    /// the usual sheet, so it adds one word per sheet.
-    unresolved: Option<Box<UnresolvedSheetUsers>>,
+    /// The formulas that name a sheet the workbook does not have or use a
+    /// table. Absent in the usual workbook, so it adds one word.
+    references: Option<Box<ReferenceUsers>>,
 }
 
 /// Formulas by the missing sheet names they hold, and the reverse, so a
@@ -260,8 +260,11 @@ impl UnresolvedSheetUsers {
         self.by_formula.insert(id, names);
     }
 
+    fn is_empty(&self) -> bool {
+        self.by_formula.is_empty()
+    }
+
     fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
-        formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
         formulas.add_hash_table::<String, FxHashSet<FormulaId>>(
             self.by_name.len(),
             self.by_name.capacity(),
@@ -283,12 +286,90 @@ impl UnresolvedSheetUsers {
     }
 }
 
+/// Formulas by the table slots they use. A table edit changes the cells of
+/// its `spanning` users, and of its `row` users only when the rows of the
+/// table move or shrink, so appending a row touches no `[@Column]` formula.
+#[derive(Default)]
+struct TableUsers {
+    /// Formulas that read rows of the table: a whole column, its header or
+    /// its totals.
+    spanning: FxHashMap<u16, FxHashSet<FormulaId>>,
+    /// Formulas that read only their own row of the table (`[@Column]`).
+    row: FxHashMap<u16, FxHashSet<FormulaId>>,
+    /// Formulas that hold a table reference no table binds yet.
+    unbound: FxHashSet<FormulaId>,
+}
+
+impl TableUsers {
+    fn forget(&mut self, id: FormulaId) {
+        for users in [&mut self.spanning, &mut self.row] {
+            users.retain(|_, formulas| {
+                formulas.remove(&id);
+                !formulas.is_empty()
+            });
+        }
+        self.unbound.remove(&id);
+    }
+
+    fn record(&mut self, id: FormulaId, ast: &Ast) {
+        for_each_table_ref(ast, &mut |reference| match reference {
+            Some((slot, TableSection::CurrentRow)) => {
+                self.row.entry(slot).or_default().insert(id);
+            }
+            Some((slot, TableSection::Body | TableSection::Headers | TableSection::Totals)) => {
+                self.spanning.entry(slot).or_default().insert(id);
+            }
+            None => {
+                self.unbound.insert(id);
+            }
+        });
+    }
+
+    fn is_empty(&self) -> bool {
+        self.spanning.is_empty() && self.row.is_empty() && self.unbound.is_empty()
+    }
+
+    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
+        for users in [&self.spanning, &self.row] {
+            formulas.add_hash_table::<u16, FxHashSet<FormulaId>>(users.len(), users.capacity());
+            for formulas_of_table in users.values() {
+                formulas.add_hash_table::<FormulaId, ()>(
+                    formulas_of_table.len(),
+                    formulas_of_table.capacity(),
+                );
+            }
+        }
+        formulas.add_hash_table::<FormulaId, ()>(self.unbound.len(), self.unbound.capacity());
+    }
+}
+
+/// The formulas an edit elsewhere has to find: those that name a sheet the
+/// workbook does not have, and those that use a table.
+#[derive(Default)]
+struct ReferenceUsers {
+    sheets: UnresolvedSheetUsers,
+    tables: TableUsers,
+}
+
+impl ReferenceUsers {
+    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
+        formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
+        self.sheets.add_memory_stats(formulas);
+        self.tables.add_memory_stats(formulas);
+    }
+}
+
+/// The slot of `id` in the entry pages, borrowing only the pages.
+fn slot_in(entries: &[Vec<FormulaSlot>], id: FormulaId) -> Option<&FormulaSlot> {
+    let index = id.index();
+    entries
+        .get(index / SLOT_PAGE_LEN)?
+        .get(index % SLOT_PAGE_LEN)
+}
+
 impl FormulaStore {
     fn slot(&self, id: FormulaId) -> Option<&FormulaSlot> {
-        let index = id.index();
-        self.entries
-            .get(index / SLOT_PAGE_LEN)?
-            .get(index % SLOT_PAGE_LEN)
+        slot_in(&self.entries, id)
     }
 
     fn slot_mut(&mut self, id: FormulaId) -> Option<&mut FormulaSlot> {
@@ -341,7 +422,7 @@ impl FormulaStore {
     }
 
     fn track(&mut self, id: FormulaId) {
-        self.track_unresolved_sheets(id);
+        self.track_references(id);
         let (volatile, subtotal) = self.get(id).map_or((false, false), |entry| {
             (entry.volatile(), entry.calls_subtotal())
         });
@@ -359,26 +440,38 @@ impl FormulaStore {
         }
     }
 
-    fn track_unresolved_sheets(&mut self, id: FormulaId) {
+    fn track_references(&mut self, id: FormulaId) {
+        let stored = match slot_in(&self.entries, id) {
+            Some(FormulaSlot::Occupied(entry)) => Some(entry),
+            Some(FormulaSlot::Vacant(_)) | None => None,
+        };
         // Only a formula that names a missing local sheet has a #REF! source
-        // error with a tree; every other formula skips the walk.
-        let missing = self.get(id).is_some_and(|entry| {
+        // error with a tree, and only one with a table reference has the
+        // table flag; every other formula skips the walks.
+        let missing = stored.is_some_and(|entry| {
             entry.ast.is_some() && entry.source_error() == Some(FormulaError::Ref)
         });
-        if !missing && self.unresolved.is_none() {
+        let table_tree = stored
+            .filter(|entry| entry.uses_tables())
+            .and_then(|entry| entry.ast.as_ref());
+        if !missing && table_tree.is_none() && self.references.is_none() {
             return;
         }
         let mut names = Vec::new();
         if missing {
-            if let Some(ast) = self.get(id).and_then(|entry| entry.ast.as_ref()) {
+            if let Some(ast) = stored.and_then(|entry| entry.ast.as_ref()) {
                 unresolved_sheet_names(ast, &mut names);
             }
         }
-        let index = self.unresolved.get_or_insert_with(Box::default);
-        index.forget(id);
-        index.record(id, names);
-        if index.by_formula.is_empty() {
-            self.unresolved = None;
+        let index = self.references.get_or_insert_with(Box::default);
+        index.sheets.forget(id);
+        index.sheets.record(id, names);
+        index.tables.forget(id);
+        if let Some(ast) = table_tree {
+            index.tables.record(id, ast);
+        }
+        if index.sheets.is_empty() && index.tables.is_empty() {
+            self.references = None;
         }
     }
 
@@ -387,11 +480,36 @@ impl FormulaStore {
         &self,
         name: &str,
     ) -> impl Iterator<Item = FormulaId> + '_ {
-        self.unresolved
+        self.references
             .as_ref()
-            .and_then(|index| index.by_name.get(name))
+            .and_then(|index| index.sheets.by_name.get(name))
             .into_iter()
             .flat_map(|users| users.iter().copied())
+    }
+
+    /// The formulas that use table slot `table`: those that read its rows,
+    /// and with `own_rows` also the `[@Column]` formulas.
+    pub(crate) fn table_users(&self, table: u16, own_rows: bool) -> Vec<FormulaId> {
+        let Some(index) = &self.references else {
+            return Vec::new();
+        };
+        let spanning = index.tables.spanning.get(&table).into_iter().flatten();
+        let row = index
+            .tables
+            .row
+            .get(&table)
+            .filter(|_| own_rows)
+            .into_iter()
+            .flatten();
+        spanning.chain(row).copied().collect()
+    }
+
+    /// The formulas that hold a table reference no table binds yet.
+    pub(crate) fn unbound_table_users(&self) -> Vec<FormulaId> {
+        self.references
+            .as_ref()
+            .map(|index| index.tables.unbound.iter().copied().collect())
+            .unwrap_or_default()
     }
 
     /// Reuse a free slot or grow one page; source writes preflight id capacity.
@@ -417,7 +535,7 @@ impl FormulaStore {
                 self.subtotals.insert(id);
             }
         }
-        self.track_unresolved_sheets(id);
+        self.track_references(id);
         Some(id)
     }
 
@@ -572,7 +690,7 @@ impl FormulaStore {
         formulas.add_vec::<Vec<FormulaSlot>>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
-        if let Some(index) = &self.unresolved {
+        if let Some(index) = &self.references {
             index.add_memory_stats(formulas);
         }
         for page in &self.entries {

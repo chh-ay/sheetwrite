@@ -30,6 +30,7 @@
 
 use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;
+use crate::tables::{TableSlots, WrittenTableRef};
 use crate::types::{FormulaError, Value};
 use std::{borrow::Cow, cmp::Ordering};
 
@@ -727,18 +728,31 @@ pub struct UnresolvedStructuredRef {
     pub section: TableSection,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StructuredRef {
-    pub table_id: String,
-    pub table_name: String,
-    pub column_id: String,
-    pub column_name: String,
-    pub sheet: u32,
-    pub row_start: u32,
-    pub row_end: u32,
-    pub col: u32,
-    pub section: TableSection,
-    pub qualified: bool,
+impl UnresolvedStructuredRef {
+    /// The reference as it is written, to bind it to a table.
+    pub(crate) fn written(&self) -> WrittenTableRef<'_> {
+        WrittenTableRef {
+            table: self.table_name.as_deref(),
+            column: &self.column_name,
+            section: self.section,
+        }
+    }
+}
+
+/// A table reference bound to a table slot of the store. It holds the cells
+/// it covers, so evaluation reads it like a range; the table's names live
+/// once, in the slot, and an edit of the table refreshes the cells of only
+/// the formulas that use it. The column is the one at `col` in the table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct StructuredRef {
+    pub(crate) table: u16,
+    pub(crate) section: TableSection,
+    /// Written with its table name (`Sales[Amount]`).
+    pub(crate) qualified: bool,
+    pub(crate) sheet: u32,
+    pub(crate) row_start: u32,
+    pub(crate) row_end: u32,
+    pub(crate) col: u32,
 }
 
 /// A sheet-qualified cell whose sheet is not one of this workbook's: an
@@ -810,7 +824,7 @@ pub enum Ast {
     /// used by many formulas; never mutated in place.
     NamedFormula(std::rc::Rc<NamedFormulaRef>),
     UnresolvedStructured(Box<UnresolvedStructuredRef>),
-    Structured(Box<StructuredRef>),
+    Structured(StructuredRef),
     Cell(u32, u32, RefFlags),
     SheetCell(Box<DetachedCellRef>),
     AbsCell(SheetRef, u32, u32, RefFlags),
@@ -1025,14 +1039,7 @@ impl Ast {
                 }
                 add_string_memory(&value.column_name, out);
             }
-            Self::Structured(value) => {
-                let bytes = std::mem::size_of::<StructuredRef>();
-                out.add_payload(bytes, bytes);
-                add_string_memory(&value.table_id, out);
-                add_string_memory(&value.table_name, out);
-                add_string_memory(&value.column_id, out);
-                add_string_memory(&value.column_name, out);
-            }
+            Self::Structured(_) | Self::AbsCell(..) | Self::AbsRange(..) => {}
             Self::SheetCell(reference) => {
                 let bytes = std::mem::size_of::<DetachedCellRef>();
                 out.add_payload(bytes, bytes);
@@ -1043,7 +1050,6 @@ impl Ast {
                 out.add_payload(bytes, bytes);
                 add_string_memory(&reference.sheet.name, out);
             }
-            Self::AbsCell(..) | Self::AbsRange(..) => {}
             Self::SheetSpan(span) => {
                 let bytes = std::mem::size_of::<SheetSpanRef>();
                 out.add_payload(bytes, bytes);
@@ -1657,7 +1663,11 @@ fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
     Ok(src[start..*index].to_string())
 }
 
-fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
+/// The section and column name of a table reference.
+type StructuredParts<'a> = (TableSection, &'a str);
+
+/// The section and column name of a `[...]` table reference token.
+fn structured_parts(raw: &str) -> Result<StructuredParts<'_>, String> {
     if !raw.starts_with('[') || !raw.ends_with(']') {
         return Err("This table reference is not valid.".into());
     }
@@ -1685,13 +1695,7 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
     if column_name.is_empty() {
         return Err("Enter a column name in the table reference.".into());
     }
-    Ok(Ast::UnresolvedStructured(Box::new(
-        UnresolvedStructuredRef {
-            table_name,
-            column_name: column_name.to_owned(),
-            section,
-        },
-    )))
+    Ok((section, column_name))
 }
 
 /// Most tokens the parser looks ahead of the next one: `Sheet1:Sheet3!`
@@ -1821,6 +1825,11 @@ pub(crate) type SheetResolver<'a> = dyn Fn(&str) -> Option<u32> + 'a;
 /// an endpoint is not in the tab order.
 pub(crate) type SpanPlacer<'a> = dyn Fn(&mut SheetSpanRef) -> bool + 'a;
 
+/// Binds a table reference to a table slot while the formula is parsed.
+/// `None` keeps the reference unbound, an error when read, until a table
+/// edit binds it.
+pub(crate) type TableBinder<'a> = dyn Fn(WrittenTableRef<'_>) -> Option<StructuredRef> + 'a;
+
 /// Which resolution steps a parsed formula needs: each is set when the
 /// formula holds a node that the step rewrites, so ingest skips the others.
 #[derive(Clone, Copy, Default)]
@@ -1829,7 +1838,7 @@ pub(crate) struct ParseFeatures {
     pub(crate) sheet_refs: bool,
     /// A bare name or an unknown function, which may name a defined name.
     pub(crate) names: bool,
-    /// A table reference.
+    /// A table reference, bound or not.
     pub(crate) table_refs: bool,
     /// A sheet reference left detached: an external link or a sheet that the
     /// workbook does not have.
@@ -1884,6 +1893,7 @@ fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
 struct SheetBinding<'a> {
     resolve: &'a SheetResolver<'a>,
     place_span: &'a SpanPlacer<'a>,
+    bind_table: &'a TableBinder<'a>,
 }
 
 struct Parser<'a, 's> {
@@ -2134,9 +2144,27 @@ impl<'a> Parser<'a, '_> {
         Ok(value)
     }
 
-    fn structured_ref(&mut self, raw: String, table_name: Option<String>) -> Result<Ast, String> {
+    fn structured_ref(&mut self, raw: &str, table_name: Option<&str>) -> Result<Ast, String> {
         self.features.table_refs = true;
-        parse_structured_ref(raw, table_name)
+        let (section, column_name) = structured_parts(raw)?;
+        let written = WrittenTableRef {
+            table: table_name,
+            column: column_name,
+            section,
+        };
+        let bound = self
+            .sheets
+            .and_then(|binding| (binding.bind_table)(written));
+        Ok(bound.map_or_else(
+            || {
+                Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {
+                    table_name: table_name.map(str::to_owned),
+                    column_name: column_name.to_owned(),
+                    section,
+                }))
+            },
+            Ast::Structured,
+        ))
     }
 
     /// A `[...]` that starts an operand. Before `Sheet1!`, it is the workbook
@@ -2154,7 +2182,7 @@ impl<'a> Parser<'a, '_> {
                 let _ = self.next();
                 return self.external_name_at(raw);
             }
-            return self.structured_ref(raw, None);
+            return self.structured_ref(&raw, None);
         }
 
         let Some(Tok::Ident(sheet, _)) = self.next() else {
@@ -2171,7 +2199,7 @@ impl<'a> Parser<'a, '_> {
                 let Some(Tok::Structured(raw)) = self.next() else {
                     unreachable!("peeked structured token");
                 };
-                return self.structured_ref(raw, Some(name.into_owned()));
+                return self.structured_ref(&raw, Some(&name));
             }
             Some(Tok::Colon) => {
                 let spans_sheets = matches!(self.cursor.peek_at(1), Some(Tok::Ident(..)))
@@ -2512,12 +2540,14 @@ pub(crate) fn parse_bound_with_features(
     src: &str,
     resolve: &SheetResolver<'_>,
     place_span: &SpanPlacer<'_>,
+    bind_table: &TableBinder<'_>,
 ) -> ParseResult {
     parse_source(
         src,
         Some(SheetBinding {
             resolve,
             place_span,
+            bind_table,
         }),
     )
 }
@@ -2976,27 +3006,29 @@ pub(crate) fn named_lambda_call(
 
 /// Resolves the table references in `ast` in place, for a formula in the
 /// cell at (`formula_row`, `formula_col`) of `formula_sheet`. A reference
-/// that `resolve` cannot place stays unresolved.
+/// that `resolve` cannot place stays unresolved. Returns whether any
+/// reference was bound.
 pub(crate) fn resolve_structured_refs<F>(
     ast: &mut Ast,
     formula_sheet: u32,
     formula_row: u32,
     formula_col: u32,
     resolve: &F,
-) where
-    F: Fn(&UnresolvedStructuredRef, u32, u32, u32) -> Option<StructuredRef>,
+) -> bool
+where
+    F: Fn(&UnresolvedStructuredRef, u32, u32, u32) -> Option<StructuredRef> + ?Sized,
 {
     // Every other node holds table references only through its children.
     if let Ast::UnresolvedStructured(reference) = ast {
-        if let Some(resolved) = resolve(reference, formula_sheet, formula_row, formula_col) {
-            *ast = Ast::Structured(Box::new(resolved));
-        }
-        return;
+        let Some(resolved) = resolve(reference, formula_sheet, formula_row, formula_col) else {
+            return false;
+        };
+        *ast = Ast::Structured(resolved);
+        return true;
     }
     ast.fold_children_mut(&mut |child| {
-        resolve_structured_refs(child, formula_sheet, formula_row, formula_col, resolve);
-        false
-    });
+        resolve_structured_refs(child, formula_sheet, formula_row, formula_col, resolve)
+    })
 }
 
 /// Translate relative A1 references from one formula origin to another.
@@ -3607,19 +3639,40 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
     }
 }
 
-pub(crate) fn update_structured_refs<F>(ast: &mut Ast, table_id: &str, resolve: &F) -> bool
-where
-    F: Fn(&StructuredRef) -> Option<StructuredRef>,
-{
+/// The cells of a table reference after an edit of its table; `None` when
+/// the reference no longer reads anything.
+pub(crate) type TableRefresh<'a> = dyn Fn(&StructuredRef) -> Option<StructuredRef> + 'a;
+
+/// Refresh each reference to table slot `table` with `refresh`; a reference
+/// it drops becomes `#REF!`. Returns whether the tree names the table.
+pub(crate) fn refresh_table_refs(ast: &mut Ast, table: u16, refresh: &TableRefresh<'_>) -> bool {
     if let Ast::Structured(reference) = ast {
-        if reference.table_id == table_id {
-            *ast = resolve(reference).map_or(Ast::InvalidRef, |resolved| {
-                Ast::Structured(Box::new(resolved))
-            });
-            return true;
+        if reference.table != table {
+            return false;
         }
+        *ast = refresh(reference).map_or(Ast::InvalidRef, Ast::Structured);
+        return true;
     }
-    ast.fold_children_mut(&mut |child| update_structured_refs(child, table_id, resolve))
+    ast.fold_children_mut(&mut |child| refresh_table_refs(child, table, refresh))
+}
+
+/// The slot and section of a bound table reference; `None` for one that no
+/// table binds.
+pub(crate) type TableUse = Option<(u16, TableSection)>;
+
+/// Visit each table reference of `ast`: see [`TableUse`].
+pub(crate) fn for_each_table_ref(ast: &Ast, visit: &mut dyn FnMut(TableUse)) {
+    // Every other node holds table references only through its children.
+    if let Ast::Structured(reference) = ast {
+        visit(Some((reference.table, reference.section)));
+    } else if let Ast::UnresolvedStructured(_) = ast {
+        visit(None);
+    } else {
+        ast.any_child(&mut |child| {
+            for_each_table_ref(child, visit);
+            false
+        });
+    }
 }
 
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
@@ -3755,11 +3808,28 @@ fn span_endpoint_name<'a>(endpoint: &'a SheetSpanEndpoint, names: &'a [String]) 
         .or_else(|| names.get(endpoint.handle as usize).map(String::as_str))
 }
 
-pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
-    write_ast_with_sheets(ast, out, &[]);
+/// What bound references write: the current name of each sheet handle, and
+/// the table and column names of each table slot. Without tables, a bound
+/// table reference writes `#REF!`.
+#[derive(Clone, Copy)]
+pub(crate) struct WrittenNames<'a> {
+    pub(crate) sheets: &'a [String],
+    pub(crate) tables: Option<&'a TableSlots>,
 }
 
-pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String]) {
+impl WrittenNames<'_> {
+    /// For text written with no workbook: every bound reference is `#REF!`.
+    pub(crate) const NONE: WrittenNames<'static> = WrittenNames {
+        sheets: &[],
+        tables: None,
+    };
+}
+
+pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
+    write_ast_with_names(ast, out, &WrittenNames::NONE);
+}
+
+pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenNames<'_>) {
     match ast {
         Ast::Num(value) => out.push_str(NumberText::of(*value).as_str()),
         Ast::Str(value) => write_text(value, out),
@@ -3774,12 +3844,22 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
             reference.section,
             out,
         ),
-        Ast::Structured(reference) => write_structured_ref(
-            reference.qualified.then_some(reference.table_name.as_str()),
-            &reference.column_name,
-            reference.section,
-            out,
-        ),
+        Ast::Structured(reference) => {
+            let bound = names.tables.and_then(|tables| {
+                let table = tables.get(reference.table)?;
+                Some((table.name.as_str(), table.column_at(reference.col)?))
+            });
+            let Some((table_name, column)) = bound else {
+                out.push_str("#REF!");
+                return;
+            };
+            write_structured_ref(
+                reference.qualified.then_some(table_name),
+                &column.name,
+                reference.section,
+                out,
+            );
+        }
         Ast::Cell(row, col, flags) => write_a1(*row, *col, *flags, out),
         Ast::SheetCell(reference) => {
             let DetachedCellRef {
@@ -3794,7 +3874,7 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
             write_a1(*row, *col, *flags, out);
         }
         Ast::AbsCell(sheet, row, col, flags) => {
-            let Some(name) = names.get(sheet.handle as usize) else {
+            let Some(name) = names.sheets.get(sheet.handle as usize) else {
                 out.push_str("#REF!");
                 return;
             };
@@ -3818,7 +3898,7 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
             write_area(*r0, *c0, *r1, *c1, flags, out);
         }
         Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
-            let Some(name) = names.get(sheet.handle as usize) else {
+            let Some(name) = names.sheets.get(sheet.handle as usize) else {
                 out.push_str("#REF!");
                 return;
             };
@@ -3828,8 +3908,8 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
         }
         Ast::SheetSpan(span) => {
             let (Some(first), Some(last)) = (
-                span_endpoint_name(&span.first, names),
-                span_endpoint_name(&span.last, names),
+                span_endpoint_name(&span.first, names.sheets),
+                span_endpoint_name(&span.last, names.sheets),
             ) else {
                 out.push_str("#REF!");
                 return;
@@ -3888,9 +3968,9 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
             }
             out.push('}');
         }
-        Ast::LetSlot { expression, .. } => write_ast_with_sheets(expression, out, names),
+        Ast::LetSlot { expression, .. } => write_ast_with_names(expression, out, names),
         Ast::Func(Func::AnchorArray, args) if args.len() == 1 => {
-            write_ast_with_sheets(&args[0], out, names);
+            write_ast_with_names(&args[0], out, names);
             // A deleted anchor writes as #REF!, which has no spill suffix.
             if !matches!(args[0], Ast::InvalidRef) {
                 out.push('#');
@@ -3902,7 +3982,7 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast_with_sheets(area, out, names);
+                write_ast_with_names(area, out, names);
             }
             out.push(')');
         }
@@ -3917,7 +3997,7 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
                 if signed {
                     out.push('(');
                 }
-                write_ast_with_sheets(operand, out, names);
+                write_ast_with_names(operand, out, names);
                 if signed {
                     out.push(')');
                 }
@@ -3930,7 +4010,7 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast_with_sheets(arg, out, names);
+                write_ast_with_names(arg, out, names);
             }
             out.push(')');
         }
@@ -3939,14 +4019,14 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
             let UnknownCall { args, .. } = &**call;
 
             if let Some(callee) = args.first() {
-                write_ast_with_sheets(callee, out, names);
+                write_ast_with_names(callee, out, names);
             }
             out.push('(');
             for (index, argument) in args.iter().skip(1).enumerate() {
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast_with_sheets(argument, out, names);
+                write_ast_with_names(argument, out, names);
             }
             out.push(')');
         }
@@ -3959,13 +4039,13 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast_with_sheets(arg, out, names);
+                write_ast_with_names(arg, out, names);
             }
             out.push(')');
         }
         Ast::Bin(op, left, right) => {
             out.push('(');
-            write_ast_with_sheets(left, out, names);
+            write_ast_with_names(left, out, names);
             out.push(match op {
                 Op::Add => '+',
                 Op::Sub => '-',
@@ -3974,12 +4054,12 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
                 Op::Pow => '^',
                 Op::Concat => '&',
             });
-            write_ast_with_sheets(right, out, names);
+            write_ast_with_names(right, out, names);
             out.push(')');
         }
         Ast::Cmp(op, left, right) => {
             out.push('(');
-            write_ast_with_sheets(left, out, names);
+            write_ast_with_names(left, out, names);
             out.push_str(match op {
                 CmpOp::Eq => "=",
                 CmpOp::Ne => "<>",
@@ -3988,22 +4068,22 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
                 CmpOp::Gt => ">",
                 CmpOp::Ge => ">=",
             });
-            write_ast_with_sheets(right, out, names);
+            write_ast_with_names(right, out, names);
             out.push(')');
         }
         Ast::Neg(inner) => {
             out.push_str("-(");
-            write_ast_with_sheets(inner, out, names);
+            write_ast_with_names(inner, out, names);
             out.push(')');
         }
         Ast::Pos(inner) => {
             out.push_str("+(");
-            write_ast_with_sheets(inner, out, names);
+            write_ast_with_names(inner, out, names);
             out.push(')');
         }
         Ast::Percent(inner) => {
             out.push('(');
-            write_ast_with_sheets(inner, out, names);
+            write_ast_with_names(inner, out, names);
             out.push_str(")%");
         }
     }
@@ -4322,20 +4402,17 @@ mod tests {
                 std::mem::size_of::<UnresolvedStructuredRef>() + 12,
             ),
             (
-                "resolved structured ref",
-                Ast::Structured(Box::new(StructuredRef {
-                    table_id: "t1".to_owned(),
-                    table_name: "Table1".to_owned(),
-                    column_id: "c1".to_owned(),
-                    column_name: "Amount".to_owned(),
+                "bound structured ref, inline",
+                Ast::Structured(StructuredRef {
+                    table: 0,
+                    section: TableSection::Body,
+                    qualified: true,
                     sheet: 1,
                     row_start: 0,
                     row_end: 3,
                     col: 0,
-                    section: TableSection::Body,
-                    qualified: true,
-                })),
-                std::mem::size_of::<StructuredRef>() + 16,
+                }),
+                0,
             ),
             (
                 "sheet cell",

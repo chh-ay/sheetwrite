@@ -2,7 +2,7 @@
 //! references are written again: the formula keeps its operators, spacing
 //! and parentheses, and gets no new ones.
 
-use crate::calc::parse;
+use crate::calc::{parse, WrittenNames};
 use crate::formula_rewrite::write_references;
 use crate::store::CellStore;
 
@@ -146,7 +146,7 @@ fn each_reference_of_the_text_pairs_with_the_tree() {
     let ast = parse(source).expect("formula parses");
 
     assert_eq!(
-        write_references(source, &ast, &[]),
+        write_references(source, &ast, &WrittenNames::NONE),
         "= sum( A1 , B1:C2 ) & {1,#REF!;TRUE,\"x\"} & 'My Sheet'!B2:C3 \
          + First:Last!A1 + [Book.xlsx]S!A1 + A1# + #REF! + 1:3 + A:B \
          + T[[#Headers],[C]] + [@C] + Name + LOG10(A1) + (A1,B1) + A1 B1"
@@ -245,4 +245,156 @@ fn overwritten_and_moved_pending_formulas_do_not_leave_stale_sheet_users() {
     store.recompute(report);
     assert_eq!(store.get_cell(report, 1, 0).num(), 17.0);
     assert_eq!(store.get_cell(report, 2, 0).num(), 7.0);
+}
+
+/// The tree of the formula at (`row`, `col`), as an address that changes
+/// when the formula is parsed or rebuilt again.
+fn tree_address(
+    store: &CellStore,
+    sheet: usize,
+    row: u32,
+    col: u32,
+) -> Option<*const crate::calc::Ast> {
+    let entry = store.sheets[sheet]
+        .formulas
+        .get((row, col), &store.formula_slots)?;
+    entry.ast.as_ref().map(std::ptr::from_ref)
+}
+
+/// Table Sales over A1:B`last_row + 1` of `sheet`, with a header row and
+/// columns `amount` (ID `a`, A) and Double (ID `d`, B).
+fn set_sales(store: &mut CellStore, sheet: usize, last_row: usize, amount: &str) -> bool {
+    store.set_table(
+        "sales",
+        "Sales",
+        sheet,
+        0,
+        0,
+        last_row,
+        1,
+        true,
+        false,
+        vec!["a".to_owned(), "d".to_owned()],
+        vec![amount.to_owned(), "Double".to_owned()],
+    )
+}
+
+/// A sheet with Sales over amounts 2, 3 and 4, `[@Amount]*2` in B2,
+/// `SUM(sales[amount])` in D1, a formula without tables in D2, and one
+/// that names a table that does not exist yet in D3.
+fn sales_sheet() -> (CellStore, usize) {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(8, 8);
+    store.set_sheet_name(sheet, "data", "Data");
+    for (row, amount) in [(1, 2.0), (2, 3.0), (3, 4.0)] {
+        store.set_number(sheet, row, 0, amount, 0);
+    }
+    assert!(set_sales(&mut store, sheet, 3, "Amount"), "Sales is set");
+    store.set_formula(sheet, 1, 1, "=[@Amount]*2", 0);
+    store.set_formula(sheet, 0, 3, "=SUM(sales[amount])", 0);
+    store.set_formula(sheet, 1, 3, "=(2+3)*4", 0);
+    store.set_formula(sheet, 2, 3, "=later[x]+1", 0);
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 1, 1).num(), 4.0, "[@Amount]*2 in B2");
+    assert_eq!(store.get_cell(sheet, 0, 3).num(), 9.0, "SUM(sales[amount])");
+    assert_eq!(
+        store.get_cell(sheet, 2, 3).string().as_deref(),
+        Some("#NAME?"),
+        "a table that does not exist yet is an unknown name"
+    );
+    (store, sheet)
+}
+
+#[test]
+fn appending_table_rows_rebuilds_only_whole_column_users() {
+    let (mut store, sheet) = sales_sheet();
+    let unrelated = tree_address(&store, sheet, 1, 3);
+    let own_row = tree_address(&store, sheet, 1, 1);
+    assert!(unrelated.is_some() && own_row.is_some());
+
+    store.set_number(sheet, 4, 0, 10.0, 0);
+    assert!(set_sales(&mut store, sheet, 4, "Amount"));
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 0, 3).num(), 19.0);
+    assert_eq!(tree_address(&store, sheet, 1, 3), unrelated);
+    assert_eq!(tree_address(&store, sheet, 1, 1), own_row);
+    // An edited table's users name it as it is now, as before slots.
+    assert_eq!(
+        store.formula_source(sheet, 0, 3).as_deref(),
+        Some("=SUM(Sales[Amount])")
+    );
+    store.set_number(sheet, 4, 0, 20.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        store.get_cell(sheet, 0, 3).num(),
+        29.0,
+        "the new row is read"
+    );
+}
+
+#[test]
+fn a_new_table_binds_only_the_formulas_waiting_for_it() {
+    let (mut store, sheet) = sales_sheet();
+    let unrelated = tree_address(&store, sheet, 1, 3);
+    assert!(unrelated.is_some());
+
+    store.set_number(sheet, 1, 5, 5.0, 0);
+    assert!(store.set_table(
+        "later",
+        "Later",
+        sheet,
+        0,
+        5,
+        1,
+        5,
+        true,
+        false,
+        vec!["x".to_owned()],
+        vec!["X".to_owned()],
+    ));
+    store.recompute(sheet);
+    assert_eq!(store.get_cell(sheet, 2, 3).num(), 6.0);
+    assert_eq!(
+        store.formula_source(sheet, 2, 3).as_deref(),
+        Some("=later[x]+1")
+    );
+    assert_eq!(tree_address(&store, sheet, 1, 3), unrelated);
+    store.set_number(sheet, 1, 5, 7.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        store.get_cell(sheet, 2, 3).num(),
+        8.0,
+        "bound reads reach the graph"
+    );
+}
+
+#[test]
+fn renaming_and_removing_a_table_rewrite_only_its_users() {
+    let (mut store, sheet) = sales_sheet();
+    let unrelated = tree_address(&store, sheet, 1, 3);
+    assert!(unrelated.is_some());
+
+    assert!(set_sales(&mut store, sheet, 3, "Total"));
+    store.recompute(sheet);
+    assert_eq!(
+        store.formula_source(sheet, 0, 3).as_deref(),
+        Some("=SUM(Sales[Total])")
+    );
+    assert_eq!(
+        store.formula_source(sheet, 1, 1).as_deref(),
+        Some("=[@Total]*2")
+    );
+    assert_eq!(store.get_cell(sheet, 1, 1).num(), 4.0);
+
+    assert!(store.remove_table("sales"));
+    store.recompute(sheet);
+    assert_eq!(
+        store.get_cell(sheet, 0, 3).string().as_deref(),
+        Some("#REF!")
+    );
+    assert_eq!(
+        store.formula_source(sheet, 0, 3).as_deref(),
+        Some("=SUM(#REF!)")
+    );
+    assert_eq!(tree_address(&store, sheet, 1, 3), unrelated);
 }
