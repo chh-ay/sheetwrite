@@ -742,6 +742,7 @@ pub(super) fn text_arg<'a>(
     }
 }
 
+#[cfg(feature = "analysis")]
 pub(super) fn numeric_entries<'a>(
     entries: impl IntoIterator<Item = &'a FuncValue>,
 ) -> Result<Vec<f64>, FormulaError> {
