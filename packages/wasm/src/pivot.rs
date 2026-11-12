@@ -1245,6 +1245,97 @@ pub(crate) struct MeasureCell<'a> {
     pub(crate) groups: (u32, u32),
 }
 
+/// The base rows of a pivot grouped by their row-axis and column-axis
+/// ancestors at one pair of depths: the rows of each group pair the cache
+/// already has, found by two counting passes over the rows, without hashing
+/// or comparing keys. A measure's `CALCULATE` that removes every axis level
+/// below those depths reads them (see `store::measures`).
+pub(crate) struct AncestorRows {
+    depths: (u32, u32),
+    /// Dense id of each row-axis group at `depths.0`, or `NO_GROUP`.
+    row_ids: Vec<u32>,
+    /// Dense id of each column-axis group at `depths.1`, or `NO_GROUP`.
+    col_ids: Vec<u32>,
+    /// The runs of row id `r` are `row_runs[r]..row_runs[r + 1]`.
+    row_runs: Vec<u32>,
+    /// The column id of each run, ascending within one row id.
+    run_cols: Vec<u32>,
+    /// The start of each run in `order`, then the end of the last.
+    run_starts: Vec<u32>,
+    /// Base rows ordered by row id, then column id, then row.
+    order: Vec<u32>,
+}
+
+impl AncestorRows {
+    pub(crate) const fn depths(&self) -> (u32, u32) {
+        self.depths
+    }
+
+    /// The run of the ancestors of `groups`, whose depths are at least
+    /// [`AncestorRows::depths`]; `None` when that pair has no rows.
+    pub(crate) fn run(&self, cache: &PivotCache, groups: (u32, u32)) -> Option<usize> {
+        let row = self.row_ids[cache.row_axis.ancestor(groups.0, self.depths.0) as usize];
+        let col = self.col_ids[cache.col_axis.ancestor(groups.1, self.depths.1) as usize];
+        let first = *self.row_runs.get(row as usize)? as usize;
+        let end = *self.row_runs.get(row as usize + 1)? as usize;
+        let offset = self.run_cols[first..end].binary_search(&col).ok()?;
+        Some(first + offset)
+    }
+
+    /// The base rows of run `run`, ascending.
+    pub(crate) fn rows(&self, run: usize) -> &[u32] {
+        &self.order[self.run_starts[run] as usize..self.run_starts[run + 1] as usize]
+    }
+}
+
+/// For the groups of one axis at one depth: the dense id of each group at
+/// that depth with rows (`NO_GROUP` for others), the dense id of each leaf
+/// group's ancestor there, and how many ids there are.
+type DenseAncestors = (Vec<u32>, Vec<u32>, usize);
+
+fn dense_ancestors(axis: &Axis, depth: u32) -> DenseAncestors {
+    let mut ids = vec![NO_GROUP; axis.groups.len()];
+    let mut count = 0;
+    for (id, group) in ids.iter_mut().zip(&axis.groups) {
+        if group.depth == depth && group.rows > 0 {
+            *id = count;
+            count += 1;
+        }
+    }
+    let leaves = axis
+        .groups
+        .iter()
+        .enumerate()
+        .map(|(group, entry)| {
+            if entry.depth as usize == axis.width && entry.rows > 0 {
+                ids[axis.ancestor(group as u32, depth) as usize]
+            } else {
+                NO_GROUP
+            }
+        })
+        .collect();
+    (ids, leaves, count as usize)
+}
+
+/// Orders `rows` stably by `key(row)`, which is below `keys`.
+fn counting_sort(rows: &[u32], keys: usize, key_of: &[u32]) -> Vec<u32> {
+    let key = |row: u32| key_of[row as usize];
+    let mut starts = vec![0u32; keys + 1];
+    for &row in rows {
+        starts[key(row) as usize + 1] += 1;
+    }
+    for index in 1..starts.len() {
+        starts[index] += starts[index - 1];
+    }
+    let mut sorted = vec![0; rows.len()];
+    for &row in rows {
+        let slot = &mut starts[key(row) as usize];
+        sorted[*slot as usize] = row;
+        *slot += 1;
+    }
+    sorted
+}
+
 fn pair_key(row_group: u32, col_group: u32) -> u64 {
     (u64::from(row_group) << 32) | u64::from(col_group)
 }
@@ -1273,6 +1364,60 @@ impl PivotCache {
     /// Depth of a row (`on_rows`) or column group: 0 for the grand total.
     pub(crate) fn group_depth(&self, on_rows: bool, group: u32) -> usize {
         self.axis(on_rows).groups[group as usize].depth as usize
+    }
+
+    /// The base rows grouped by their ancestors at `depths`; see
+    /// [`AncestorRows`].
+    #[inline(never)]
+    pub(crate) fn ancestor_rows(&self, depths: (u32, u32)) -> AncestorRows {
+        let (row_ids, row_leaves, row_count) = dense_ancestors(&self.row_axis, depths.0);
+        let (col_ids, col_leaves, col_count) = dense_ancestors(&self.col_axis, depths.1);
+        // The dense ancestor ids of each grouped base row.
+        let mut row_of = vec![NO_GROUP; self.row_leaf.len()];
+        let mut col_of = vec![NO_GROUP; self.row_leaf.len()];
+        let mut grouped = Vec::with_capacity(self.row_leaf.len());
+        for (row, (&row_leaf, &col_leaf)) in self.row_leaf.iter().zip(&self.col_leaf).enumerate() {
+            if row_leaf == NO_GROUP || col_leaf == NO_GROUP {
+                continue;
+            }
+            let (row_id, col_id) = (row_leaves[row_leaf as usize], col_leaves[col_leaf as usize]);
+            if row_id != NO_GROUP && col_id != NO_GROUP {
+                row_of[row] = row_id;
+                col_of[row] = col_id;
+                grouped.push(row as u32);
+            }
+        }
+        // Column ids first, then a stable pass by row id: each pair's rows
+        // are one run, in row order.
+        let by_col = counting_sort(&grouped, col_count, &col_of);
+        let order = counting_sort(&by_col, row_count, &row_of);
+
+        let mut row_runs = vec![0u32; row_count + 1];
+        let mut run_cols = Vec::new();
+        let mut run_starts = Vec::new();
+        let mut previous = None;
+        for (position, &row) in order.iter().enumerate() {
+            let pair = (row_of[row as usize], col_of[row as usize]);
+            if previous != Some(pair) {
+                previous = Some(pair);
+                row_runs[pair.0 as usize + 1] += 1;
+                run_cols.push(pair.1);
+                run_starts.push(position as u32);
+            }
+        }
+        run_starts.push(order.len() as u32);
+        for index in 1..row_runs.len() {
+            row_runs[index] += row_runs[index - 1];
+        }
+        AncestorRows {
+            depths,
+            row_ids,
+            col_ids,
+            row_runs,
+            run_cols,
+            run_starts,
+            order,
+        }
     }
 
     /// The label of a row or column group's ancestor at axis level `level`,

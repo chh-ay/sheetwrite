@@ -13,6 +13,7 @@
 //! table included, then finds its rows as another table does.
 
 use std::hash::{Hash, Hasher};
+use std::rc::Rc;
 
 use rustc_hash::FxHasher;
 
@@ -22,9 +23,9 @@ use super::CellStore;
 use crate::calc::{parse, Ast, CmpOp, Func, StructuredRef, TableSection};
 use crate::eval::analysis::grouping::{key_part, KeyPart};
 use crate::eval::analysis::lambda::{bind_slots, unbind_slots, Shapes, Slot};
-use crate::eval::{ast_produces_array, comparison, settled_cell_value};
+use crate::eval::{ast_produces_array, comparison};
 use crate::formula_slots::FormulaResults;
-use crate::pivot::{MeasureCell, PivotCache, PivotLayout};
+use crate::pivot::{AncestorRows, MeasureCell, PivotCache, PivotLayout};
 use crate::types::{FormulaError, Value};
 
 /// A measure resolved once per pivot pass: its formula with each model
@@ -193,19 +194,90 @@ impl RelatedRows {
     }
 }
 
+/// The axis depths a slot's `CALCULATE` keeps when the pivot cache's groups
+/// give its rows (see [`kept_depths`]); `None` when they do not.
+type KeptDepths = Option<(u32, u32)>;
+/// For a kept slot in the current cell: the entry of the grouped rows and
+/// the run of the cell's ancestor pair in it, `None` when it has no rows.
+type CellRun = (usize, Option<usize>);
+/// The identity half of a kept slot's cell that has no rows.
+const NO_RUN: u64 = 0xFFFF_FFFF;
+
+/// A table slot and its rows in the current cell, shared by the columns of
+/// that table a measure reads.
+type SlotRows = (usize, Rc<[u32]>);
+
 /// Lists the rows of every table slot other than the base that the
-/// expression `owner` of `measure` reads (see [`CellStore::measure_family`]).
+/// expression `owner` of `measure` reads (see [`CellStore::measure_family`]),
+/// except the slots whose rows are a group of the pivot cache (`kept`).
 fn collect_rows(
     measure: &PreparedMeasure,
     owner: usize,
     related: &[RelatedRows],
+    kept: &[KeptDepths],
     visible: &mut [Vec<u32>],
 ) {
     for (&slot, &reader) in measure.tables.iter().zip(&measure.owners) {
-        if reader == owner && slot > 0 {
+        if reader == owner && slot > 0 && kept[slot].is_none() {
             related[slot - 1].collect(&mut visible[slot - 1]);
         }
     }
+}
+
+/// The axis depths a `CALCULATE` keeps when its rows are those of a group
+/// pair of the pivot cache: it changes the context of the base table, has
+/// no comparison, removes no report filter, and on each axis removes every
+/// level from some depth down. `None` for any other edit.
+fn kept_depths(cache: &PivotCache, fields: &[ColumnRef], edit: &ContextEdit) -> KeptDepths {
+    let definition = cache.definition();
+    let removed = |field: usize| {
+        fields
+            .get(field)
+            .is_some_and(|column| edit.removed.contains(column))
+    };
+    if !edit.predicates.is_empty()
+        || definition
+            .filters
+            .iter()
+            .any(|filter| removed(filter.field))
+    {
+        return None;
+    }
+    let kept = |levels: &[usize]| -> Option<u32> {
+        let depth = levels
+            .iter()
+            .position(|&field| removed(field))
+            .unwrap_or(levels.len());
+        levels[depth..]
+            .iter()
+            .all(|&field| removed(field))
+            .then_some(depth as u32)
+    };
+    Some((kept(&definition.rows)?, kept(&definition.columns)?))
+}
+
+/// For a slot whose `CALCULATE` keeps `keep` depths: the entry of
+/// `ancestors` grouped at the cell's kept depths, built when first met, and
+/// the run of the cell's ancestor pair in it (`None` when it has no rows).
+#[inline(never)]
+fn kept_run(
+    cache: &PivotCache,
+    ancestors: &mut Vec<AncestorRows>,
+    keep: (u32, u32),
+    groups: (u32, u32),
+) -> CellRun {
+    let depths = (
+        keep.0.min(cache.group_depth(true, groups.0) as u32),
+        keep.1.min(cache.group_depth(false, groups.1) as u32),
+    );
+    let entry = ancestors
+        .iter()
+        .position(|grouped| grouped.depths() == depths)
+        .unwrap_or_else(|| {
+            ancestors.push(cache.ancestor_rows(depths));
+            ancestors.len() - 1
+        });
+    (entry, ancestors[entry].run(cache, groups))
 }
 
 /// The local name of calculation `index` in a prepared measure.
@@ -245,8 +317,23 @@ impl CellStore {
                 self.prepare_pivot_measure(value.measure.as_deref(), &mut slots, &mut contexts)
             })
             .collect();
+        // A CALCULATE over the base table that only removes inner axis
+        // levels sees the rows of the cell's ancestor group pair at the kept
+        // depths, which the pivot cache groups already (C2).
+        let kept: Vec<KeptDepths> = slots
+            .iter()
+            .map(|(table, context)| {
+                (*context > 0 && table == base)
+                    .then(|| kept_depths(cache, fields, &contexts[*context]))
+                    .flatten()
+            })
+            .collect();
         let mut related = Vec::with_capacity(slots.len() - 1);
         for (index, (table, context)) in slots.iter().enumerate().skip(1) {
+            if kept[index].is_some() {
+                related.push(RelatedRows::default());
+                continue;
+            }
             match self.related_rows(cache, table, fields, &contexts[*context]) {
                 Ok(rows) => related.push(rows),
                 // A measure over a table whose rows cannot be read shows the error.
@@ -276,6 +363,10 @@ impl CellStore {
         // evaluation; the values are freed with the update.
         let mut identities = vec![u64::MAX; related.len()];
         let mut known: Vec<((usize, usize, u64), Value)> = Vec::new();
+        // Rows grouped by ancestors, one entry per pair of kept depths met,
+        // and for each kept slot the entry and run of the current cell.
+        let mut ancestors: Vec<AncestorRows> = Vec::new();
+        let mut runs: Vec<CellRun> = vec![(0, None); related.len()];
         let mut current = None;
         cache.visit_measure_cells(layout, include_empty, &mut |cell: &MeasureCell<'_>| {
             let measure = match &prepared[cell.slot] {
@@ -286,7 +377,13 @@ impl CellStore {
             if current != Some(cell.groups) {
                 current = Some(cell.groups);
                 for (index, table) in related.iter_mut().enumerate() {
-                    let identity = table.locate(cache, cell.groups);
+                    let identity = if let Some(keep) = kept[index + 1] {
+                        let (entry, run) = kept_run(cache, &mut ancestors, keep, cell.groups);
+                        runs[index] = (entry, run);
+                        (entry as u64) << 32 | run.map_or(NO_RUN, |position| position as u64)
+                    } else {
+                        table.locate(cache, cell.groups)
+                    };
                     // A new sort gives new identities; drop the old values.
                     if identity >> 32 != identities[index] >> 32 {
                         known.clear();
@@ -294,7 +391,6 @@ impl CellStore {
                     identities[index] = identity;
                 }
             }
-
             let mut calculated = Vec::with_capacity(measure.calculations.len());
             for (index, calculation) in measure.calculations.iter().enumerate() {
                 let key = (calculation.slot != NO_SLOT && calculation.slot != MANY_SLOTS)
@@ -305,8 +401,15 @@ impl CellStore {
                     calculated.push(known[position].1.clone());
                     continue;
                 }
-                collect_rows(measure, index + 1, &related, &mut visible);
-                let rows_of = |table: usize| visible[table - 1].as_slice();
+                collect_rows(measure, index + 1, &related, &kept, &mut visible);
+                let rows_of = |table: usize| {
+                    if kept[table].is_some() {
+                        let (entry, run) = runs[table - 1];
+                        run.map_or(&[][..], |position| ancestors[entry].rows(position))
+                    } else {
+                        visible[table - 1].as_slice()
+                    }
+                };
                 let value = self.measure_family(measure, index + 1, &rows_of, &[]);
                 if let (Some(slot_key), Some(Err(position))) = (key, found) {
                     known.insert(position, (slot_key, value.clone()));
@@ -314,7 +417,7 @@ impl CellStore {
                 calculated.push(value);
             }
 
-            collect_rows(measure, 0, &related, &mut visible);
+            collect_rows(measure, 0, &related, &kept, &mut visible);
             let rows_of = |table: usize| {
                 table
                     .checked_sub(1)
@@ -601,10 +704,24 @@ impl CellStore {
         calculated: &[Value],
     ) -> Value {
         let mut slots = Vec::with_capacity(measure.columns.len() + calculated.len());
+        // Columns of one table slot share its row list.
+        let mut shared: Vec<SlotRows> = Vec::new();
         for (index, column) in measure.columns.iter().enumerate() {
             if measure.owners[index] == owner {
-                let rows = rows_of(measure.tables[index]);
-                slots.push(self.bind_column(column, rows));
+                let table = measure.tables[index];
+                let rows = if let Some((_, rows)) = shared.iter().find(|(read, _)| *read == table) {
+                    Rc::clone(rows)
+                } else {
+                    let rows: Rc<[u32]> = rows_of(table).into();
+                    shared.push((table, Rc::clone(&rows)));
+                    rows
+                };
+                slots.push(Slot::Rows {
+                    sheet: column.sheet,
+                    col: column.col,
+                    first_row: column.row_start,
+                    rows,
+                });
             }
         }
         // A calculated value reads as one value, blanks and errors included,
@@ -626,33 +743,6 @@ impl CellStore {
         };
         unbind_slots(&mut results);
         value
-    }
-
-    /// The settled values of one column at `rows`, as a one-column matrix.
-    /// No rows bind one blank, as an empty range reads.
-    #[inline(never)]
-    fn bind_column(&self, column: &StructuredRef, rows: &[u32]) -> Slot {
-        let sheet = &self.sheets[column.sheet as usize];
-        let mut values: Vec<Value> = rows
-            .iter()
-            .map(|&row| {
-                settled_cell_value(
-                    sheet,
-                    &self.strings,
-                    column.row_start as usize + row as usize,
-                    column.col as usize,
-                    &self.formula_slots,
-                )
-            })
-            .collect();
-        if values.is_empty() {
-            values.push(Value::Blank);
-        }
-        Slot::Array {
-            rows: values.len(),
-            cols: 1,
-            values: values.into(),
-        }
     }
 }
 
