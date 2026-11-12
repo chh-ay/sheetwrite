@@ -1,0 +1,45 @@
+{
+  "candidateEngineDigest": "ea5eac6af57747c8d1fdd485d752d92f2db7eac9ffe766a8a7b18be4972765ec",
+  "rows": [
+    {
+      "key": "workload=history-diff;size=100000.allocation.retainedBytes",
+      "maximum": 1301040,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=measure-pivot;size=10000.allocation.retainedBytes",
+      "maximum": 618582,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=measure-pivot;size=100000.allocation.retainedBytes",
+      "maximum": 6018582,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=paged-eviction;size=8192.allocation.retainedBytes",
+      "maximum": 94744,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=paged-insert-row;size=1000000.allocation.retainedBytes",
+      "maximum": 26478032,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=paged-range-loaded;size=1000000.allocation.retainedBytes",
+      "maximum": 26486224,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=pivot-rebuild;size=100000.allocation.retainedBytes",
+      "maximum": 12927076,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    },
+    {
+      "key": "workload=sparse-page-write;size=100000.allocation.retainedBytes",
+      "maximum": 13005424,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): binding sheet references while parsing keeps formulas that name a missing sheet in a boxed index on the formula store, one more pointer per store (8 B), with no per-formula growth; each formula saves 24 B (FormulaEntry 88 -> 64 B, Ast 48 -> 24 B on wasm32). Accepted on #325 (comment 6813201640)."
+    }
+  ]
+}
