@@ -403,7 +403,8 @@ const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
   plugins: [
     codeHangingIndent(),
     sheetwriteCodeHovers({
-      cwd: new URL(".", import.meta.url).pathname,
+      // The docs package: the samples resolve its packages and its tsconfig.
+      cwd: new URL("../..", import.meta.url).pathname,
       shouldTransform: (codeBlock) => !/\bgenerated\b/.test(codeBlock.meta),
     }),
   ],
