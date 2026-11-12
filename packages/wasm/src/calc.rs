@@ -32,7 +32,7 @@ use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;
 use crate::tables::{TableSlots, WrittenTableRef};
 use crate::types::{FormulaError, Value};
-use std::{borrow::Cow, cmp::Ordering};
+use std::{borrow::Cow, cmp::Ordering, rc::Rc};
 
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
 /// expression traverses the complete precedence stack.
@@ -805,7 +805,7 @@ pub(crate) struct ArrayLiteral {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
     Num(f64),
-    Str(Box<str>),
+    Str(Rc<str>),
     Bool(bool),
     Missing,
     /// A helper parameter value. It exists only during full-engine evaluation.
@@ -1015,7 +1015,13 @@ impl Ast {
             // The store's pattern index counts each shared pattern once.
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => {}
-            Self::Str(value) | Self::Name(value) => out.add_payload(value.len(), value.len()),
+            Self::Str(value) => {
+                // The shared string owns its strong and weak counts as well
+                // as its UTF-8 bytes; the inline Rc handle is in the AST root.
+                let allocated = value.len().saturating_add(2 * std::mem::size_of::<usize>());
+                out.add_payload(value.len(), allocated);
+            }
+            Self::Name(value) => out.add_payload(value.len(), value.len()),
             Self::LetName { name, .. } => out.add_payload(name.len(), name.len()),
             Self::NamedRange(value) => {
                 let bytes = std::mem::size_of::<NamedRangeRef>();
@@ -4362,6 +4368,17 @@ mod tests {
             }))
         );
         assert_eq!(serialize(&unknown), "=MiXeD.Call(Revenue_Q1)");
+    }
+
+    #[test]
+    fn text_literal_memory_counts_reference_counts() {
+        let literal = parse("=\"abc\"").unwrap();
+        let mut stats = MemoryOwnerStats::default();
+        literal.heap_memory_stats(&mut stats);
+        assert_eq!(stats.logical_bytes, 3);
+        assert_eq!(stats.allocated_bytes, 3 + 2 * std::mem::size_of::<usize>());
+        // A cloned tree shares the literal and writes it back unchanged.
+        assert_eq!(serialize(&literal.clone()), "=\"abc\"");
     }
 
     #[test]
