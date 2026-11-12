@@ -55,7 +55,9 @@ export interface EngineExportAudit {
 function sourceFiles(directory: string): string[] {
   const paths: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
-    if (["node_modules", "dist", "pkg", "pkg-history", "target"].includes(entry.name)) continue;
+    if (entry.name.startsWith(".") || [
+      "node_modules", "dist", "pkg", "pkg-history", "target", "out", "build", "coverage", "test-results",
+    ].includes(entry.name)) continue;
     const path = join(directory, entry.name);
     if (entry.isDirectory()) paths.push(...sourceFiles(path));
     else if (/\.[cm]?[jt]sx?$/.test(entry.name) && !entry.name.endsWith(".d.ts")) paths.push(path);
@@ -173,8 +175,8 @@ async function collectCallers(root: string, project: Project, callers: readonly 
 }
 
 /** Audit built bindings. Only executable package/test sources count, not generated glue or declarations. */
-export async function auditEngineExports(root: string, bindings: readonly string[] = BINDINGS): Promise<EngineExportAudit> {
-  const bindingPaths = bindings.map((binding) => resolve(root, binding));
+export async function auditEngineExports(root: string): Promise<EngineExportAudit> {
+  const bindingPaths = BINDINGS.map((binding) => resolve(root, binding));
   for (const binding of bindingPaths) {
     if (!existsSync(binding)) throw new Error(`Missing ${relative(root, binding)}; run bun run build:packages first`);
   }

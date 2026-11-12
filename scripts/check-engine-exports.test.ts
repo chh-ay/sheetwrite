@@ -7,7 +7,7 @@ import { auditEngineExports } from "./check-engine-exports.js";
 
 test("engine caller audit resolves aliases, getters and structural callers but rejects dead exports", async () => {
   const root = mkdtempSync(join(tmpdir(), "sheetwrite-engine-exports-"));
-  const binding = "packages/engine/pkg/engine.d.ts";
+  const binding = "packages/wasm/pkg/sheetwrite_wasm.d.ts";
   const files = {
     [binding]: `
       export class CellStore {
@@ -31,14 +31,17 @@ test("engine caller audit resolves aliases, getters and structural callers but r
       export default function __wbg_init(): void;
     `,
     "packages/core/src/external-link.ts": `
+    "packages/formulas/pkg/sheetwrite_wasm.d.ts": "export {};",
+    "packages/wasm/pkg-history/sheetwrite_history.d.ts": "export {};",
+    "packages/queries/pkg/sheetwrite_queries.d.ts": "export {};",
       export interface ExternalLinkEngine { setNumber(value: number): void; }
       export function installLink(engine: ExternalLinkEngine) { engine.setNumber(12); }
     `,
-    "packages/engine/loader.d.ts": `export { CellStore, convert } from "./pkg/engine.js";`,
+    "packages/wasm/loader.d.ts": `export { CellStore, convert } from "./pkg/sheetwrite_wasm.js";`,
     "packages/client/src/caller.ts": `
-      import { convert as convertFormula } from "../../engine/loader.js";
-      const { CellStore } = await import("../../engine/loader.js");
+      import { convert as convertFormula } from "../../wasm/loader.js";
       // Exercise the destructured lazy-loading boundary used by version history.
+      const { CellStore } = await import("../../wasm/loader.js");
       const engine = new CellStore();
       engine.write();
       const { aliasWrite: writeAlias } = engine;
@@ -60,7 +63,7 @@ test("engine caller audit resolves aliases, getters and structural callers but r
       mkdirSync(dirname(target), { recursive: true });
       writeFileSync(target, contents);
     }
-    const audit = await auditEngineExports(root, [binding]);
+    const audit = await auditEngineExports(root);
     expect(audit.issues).toHaveLength(3);
     expect(audit.issues.join("\n")).toContain("CellStore.unused has no package/test caller");
     expect(audit.issues.join("\n")).toContain("CellStore.missingReason has no package/test caller");
