@@ -18,10 +18,12 @@ use crate::formula_slots::{FormulaResults, FormulaWork};
 use std::rc::Rc;
 
 use super::super::array::ast_produces_array;
-use super::super::matrix::{EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE};
+use super::super::matrix::{
+    range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
+};
 use super::super::value::number_from_value;
 use super::super::EvalPass;
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, LambdaDefinition};
 use crate::memory::MemoryOwnerStats;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
@@ -46,7 +48,6 @@ const CALL_WORK_LIMIT: usize = 2_000_000;
 const NO_CALL: u32 = u32::MAX;
 
 type Shape = (usize, usize, usize);
-type Definition<'a> = (&'a [Ast], &'a Ast);
 
 /// What one parameter holds during a call.
 #[derive(Clone)]
@@ -61,8 +62,12 @@ pub(crate) enum Slot {
         cols: usize,
         values: Rc<[Value]>,
     },
-    /// A LAMBDA and the call record it was created in.
-    Closure { definition: *const Ast, link: u32 },
+    /// A LAMBDA and the call record it was created in. The definition is
+    /// shared with the tree that wrote it, so a closure costs one handle.
+    Closure {
+        definition: Rc<LambdaDefinition>,
+        link: u32,
+    },
     /// An argument left out (`ISOMITTED` is TRUE); it reads as a blank.
     Missing,
     /// Shape analysis only: an argument's shape, known without evaluating
@@ -100,14 +105,6 @@ struct CallRecord {
 
 /// The parameter values of the calls in progress in one pass, and the call
 /// budget of the outermost helper.
-///
-/// # Safety of closure definitions
-///
-/// A [`Slot::Closure`] holds a pointer to a LAMBDA inside a formula tree or a
-/// defined name. Evaluation borrows the whole store immutably, so no tree can
-/// change or drop while a pass runs, and a closure lives only in the slots of
-/// a call, which end before the evaluation that created them returns. Only
-/// [`CallFrame::closure`] reads them.
 #[derive(Default)]
 pub(crate) struct CallFrame {
     calls: Vec<CallRecord>,
@@ -116,9 +113,6 @@ pub(crate) struct CallFrame {
     nesting: usize,
     /// Calls made since the outermost of them began.
     work: usize,
-    /// Set when shape analysis reads the value of a [`Slot::Shaped`]
-    /// parameter: the shape it found depended on a value it did not have.
-    shaped_read: std::cell::Cell<bool>,
 }
 
 impl CallFrame {
@@ -143,23 +137,11 @@ impl CallFrame {
         self.slot_from(self.top(), depth, index)
     }
 
-    /// The LAMBDA a closure slot holds.
-    const fn closure<'tree>(definition: *const Ast) -> &'tree Ast {
-        #[allow(
-            unsafe_code,
-            reason = "closures point into the trees evaluation borrows; see CallFrame"
-        )]
-        // SAFETY: a closure points at a LAMBDA in a tree the pass borrows for
-        // as long as the slot exists (type notes).
-        unsafe {
-            &*definition
-        }
-    }
-
-    fn push(&mut self, link: u32, slots: impl IntoIterator<Item = Slot>) {
+    /// Starts a call record over `slots`, which it takes and leaves empty.
+    fn push(&mut self, link: u32, slots: &mut Vec<Slot>) {
         let base = self.slots.len() as u32;
         self.calls.push(CallRecord { base, link });
-        self.slots.extend(slots);
+        self.slots.append(slots);
     }
 
     fn pop(&mut self) {
@@ -226,7 +208,7 @@ pub(crate) struct ShapeScope<'a> {
 enum Kind<'a> {
     Scalar,
     Array,
-    Closure(&'a Ast, Shapes<'a>),
+    Closure(&'a LambdaDefinition, Shapes<'a>),
 }
 
 impl<'a> Shapes<'a> {
@@ -270,7 +252,7 @@ impl<'a> Shapes<'a> {
                 Kind::Array
             }
             Slot::Closure { definition, link } => Kind::Closure(
-                CallFrame::closure(*definition),
+                definition,
                 Shapes {
                     frame: Some(frame),
                     call: *link,
@@ -292,16 +274,14 @@ impl<'a> Shapes<'a> {
     }
 
     /// The LAMBDA `function` calls and the shapes it was created in.
-    fn callee(self, function: &'a Ast) -> Option<(&'a Ast, Self)> {
+    fn callee(self, function: &'a Ast) -> Option<(&'a LambdaDefinition, Self)> {
         if let Ast::Parameter { depth, index, .. } = function {
             match self.kind(*depth, *index)? {
                 Kind::Closure(definition, created) => Some((definition, created)),
                 Kind::Scalar | Kind::Array => None,
             }
         } else {
-            definition(function)
-                .ok()
-                .map(|_| (function.bound_value(), self))
+            definition(function).ok().map(|shared| (&**shared, self))
         }
     }
 
@@ -311,8 +291,8 @@ impl<'a> Shapes<'a> {
                 return kind;
             }
         }
-        if definition(argument).is_ok() {
-            return Kind::Closure(argument.bound_value(), self);
+        if let Ok(shared) = definition(argument) {
+            return Kind::Closure(shared, self);
         }
         if ast_produces_array(argument, self) {
             Kind::Array
@@ -331,29 +311,25 @@ pub(crate) fn resolve_parameters(ast: &mut Ast) {
 }
 
 /// A scope while resolving: a LAMBDA's parameters, or the names a LET binds.
-enum Scope {
-    Lambda(Vec<Box<str>>),
-    Let(Vec<Box<str>>),
+struct Scope {
+    names: Vec<Box<str>>,
+    is_lambda: bool,
 }
 
+/// Where parameter `name` is declared, or `None` when no LAMBDA declares it
+/// or a LET binding of that name hides it.
 fn lookup(scopes: &[Scope], name: &str) -> Option<(u16, u16)> {
     let mut depth = 0u16;
     for scope in scopes.iter().rev() {
-        match scope {
-            Scope::Let(names) => {
-                if names.iter().any(|bound| bound.eq_ignore_ascii_case(name)) {
-                    return None;
-                }
-            }
-            Scope::Lambda(parameters) => {
-                if let Some(index) = parameters
-                    .iter()
-                    .position(|parameter| parameter.eq_ignore_ascii_case(name))
-                {
-                    return Some((depth, index as u16));
-                }
-                depth += 1;
-            }
+        if let Some(index) = scope
+            .names
+            .iter()
+            .position(|declared| declared.eq_ignore_ascii_case(name))
+        {
+            return scope.is_lambda.then_some((depth, index as u16));
+        }
+        if scope.is_lambda {
+            depth += 1;
         }
     }
     None
@@ -375,48 +351,13 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
             }
         }
         Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) => {
-            let Some((body, declared)) = arguments.split_last_mut() else {
-                return;
-            };
-            if !valid_parameters(declared) {
-                return;
+            if let Some(definition) = resolve_lambda(arguments, scopes) {
+                *ast = definition;
             }
-            let names = declared
-                .iter()
-                .filter_map(|parameter| {
-                    if let Ast::Name(name) = parameter {
-                        Some(name.clone())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            scopes.push(Scope::Lambda(names));
-            resolve_in(body, scopes);
-            scopes.pop();
         }
-        Ast::Func(Func::Let, arguments) => {
-            let outer = scopes.len();
-            scopes.push(Scope::Let(Vec::new()));
-            let last = arguments.len().saturating_sub(1);
-            for pair in arguments[..last].chunks_mut(2) {
-                if let [declaration, expression] = pair {
-                    resolve_in(expression, scopes);
-                    let bound = if let Ast::Name(name) | Ast::LetName { name, .. } = declaration {
-                        Some(name.clone())
-                    } else {
-                        None
-                    };
-                    if let (Some(local), Some(Scope::Let(names))) = (bound, scopes.last_mut()) {
-                        names.push(local);
-                    }
-                }
-            }
-            if let Some(result) = arguments.last_mut() {
-                resolve_in(result, scopes);
-            }
-            scopes.truncate(outer);
-        }
+        // Already numbered when its own formula was entered.
+        Ast::Lambda(_) => {}
+        Ast::Func(Func::Let, arguments) => resolve_let(arguments, scopes),
         Ast::UnknownFunc(call) => {
             let crate::calc::UnknownCall {
                 name,
@@ -470,6 +411,65 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
     }
 }
 
+/// The shared definition of a well-formed LAMBDA, its body numbered; `None`
+/// when its parameters cannot declare one, so it stays as written.
+fn resolve_lambda(arguments: &mut Box<[Ast]>, scopes: &mut Vec<Scope>) -> Option<Ast> {
+    let (body, declared) = arguments.split_last_mut()?;
+    if !valid_parameters(declared) {
+        return None;
+    }
+    let names = declared
+        .iter()
+        .filter_map(|parameter| {
+            if let Ast::Name(name) = parameter {
+                Some(name.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    scopes.push(Scope {
+        names,
+        is_lambda: true,
+    });
+    resolve_in(body, scopes);
+    scopes.pop();
+    let mut parameters = std::mem::take(arguments).into_vec();
+    let body = parameters.pop()?;
+    Some(Ast::Lambda(Rc::new(LambdaDefinition {
+        parameters: parameters.into(),
+        body,
+    })))
+}
+
+/// Numbers the parameter uses in a LET's arguments; each binding hides a
+/// parameter of its name from the bindings after it and the result.
+fn resolve_let(arguments: &mut [Ast], scopes: &mut Vec<Scope>) {
+    let outer = scopes.len();
+    scopes.push(Scope {
+        names: Vec::new(),
+        is_lambda: false,
+    });
+    let last = arguments.len().saturating_sub(1);
+    for pair in arguments[..last].chunks_mut(2) {
+        if let [declaration, expression] = pair {
+            resolve_in(expression, scopes);
+            let bound = if let Ast::Name(name) | Ast::LetName { name, .. } = declaration {
+                Some(name.clone())
+            } else {
+                None
+            };
+            if let (Some(local), Some(scope)) = (bound, scopes.last_mut()) {
+                scope.names.push(local);
+            }
+        }
+    }
+    if let Some(result) = arguments.last_mut() {
+        resolve_in(result, scopes);
+    }
+    scopes.truncate(outer);
+}
+
 /// Whether `parameters` can declare a LAMBDA: names without a period, none
 /// repeated, at most [`PARAMETER_LIMIT`].
 fn valid_parameters(parameters: &[Ast]) -> bool {
@@ -485,19 +485,16 @@ fn valid_parameters(parameters: &[Ast]) -> bool {
         })
 }
 
-fn definition(expression: &Ast) -> Result<Definition<'_>, FormulaError> {
-    let Ast::Func(Func::Analysis(super::LAMBDA_ID), arguments) = expression.bound_value() else {
-        return Err(FormulaError::Value);
-    };
-    let (body, parameters) = arguments.split_last().ok_or(FormulaError::Value)?;
-    if !valid_parameters(parameters) {
-        return Err(FormulaError::Value);
+fn definition(expression: &Ast) -> Result<&Rc<LambdaDefinition>, FormulaError> {
+    if let Ast::Lambda(definition) = expression.bound_value() {
+        Ok(definition)
+    } else {
+        Err(FormulaError::Value)
     }
-    Ok((parameters, body))
 }
 
 pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
-    definition(expression).map(|(parameters, _)| parameters.len())
+    definition(expression).map(|shared| shared.parameters.len())
 }
 
 /// The value a parameter use reads.
@@ -506,10 +503,8 @@ pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16)
         Some(Slot::Value(value) | Slot::OneCell(value)) => value.clone(),
         Some(Slot::Array { values, .. }) => values.first().cloned().unwrap_or(Value::Blank),
         Some(Slot::Missing) => Value::Blank,
-        Some(Slot::Shaped { .. }) => {
-            frame.inspect(|active| active.shaped_read.set(true));
-            Value::Error(FormulaError::Value)
-        }
+        // Shape analysis binds shapes only; it never reads a value.
+        Some(Slot::Shaped { .. }) => Value::Error(FormulaError::Value),
         // A LAMBDA is not a value, as `=LAMBDA(x,x)` is not.
         Some(Slot::Closure { .. }) => Value::Error(FormulaError::Calc),
         None => Value::Error(FormulaError::Name),
@@ -567,17 +562,18 @@ fn call_produces_array<'a>(arguments: &'a [Ast], shapes: Shapes<'a>) -> bool {
     let Some((callee, created)) = shapes.callee(function) else {
         return false;
     };
-    let Ok((parameters, body)) = definition(callee) else {
-        return false;
-    };
+    let LambdaDefinition { parameters, body } = callee;
     if parameters.len() != supplied.len() {
         return false;
     }
     let kinds: Vec<Kind<'a>> = supplied
         .iter()
-        .map(|argument| match argument {
-            Ast::Missing => Kind::Scalar,
-            argument => shapes.argument_kind(argument),
+        .map(|argument| {
+            if matches!(argument, Ast::Missing) {
+                Kind::Scalar
+            } else {
+                shapes.argument_kind(argument)
+            }
         })
         .collect();
     let scope = ShapeScope {
@@ -638,11 +634,9 @@ fn helper_shape(
             if let Some(shape) = context.static_call_shape(arguments)? {
                 return Ok(shape);
             }
-            return context.call_arguments(arguments, |call, body| {
-                let matrix = call.matrix(body)?;
-                let cells = EvalMatrix::validate_shape(matrix.rows, matrix.cols, 1, 0)?;
-                Ok((matrix.rows, matrix.cols, cells))
-            });
+            let matrix = context.call_matrix(arguments)?;
+            let cells = EvalMatrix::validate_shape(matrix.rows, matrix.cols, 1, 0)?;
+            return Ok((matrix.rows, matrix.cols, cells));
         }
         "MAKEARRAY" => {
             if arguments.len() != 3 {
@@ -721,10 +715,8 @@ pub(crate) fn bound(
 }
 
 /// The LAMBDA a call runs and the call record it was created in.
-#[derive(Clone, Copy)]
-struct Callee<'t> {
-    parameters: &'t [Ast],
-    body: &'t Ast,
+struct Callee {
+    definition: Rc<LambdaDefinition>,
     link: u32,
 }
 
@@ -787,19 +779,17 @@ impl<'a, 'p> Context<'a, 'p> {
 
     /// The LAMBDA `function` names: one written in place, one a name or a
     /// LET binding holds, or one a parameter holds.
-    fn callee<'t>(&self, function: &'t Ast) -> Result<Callee<'t>, FormulaError> {
-        let (definition_ast, link) = if let Ast::Parameter { depth, index, .. } = function {
+    fn callee(&self, function: &Ast) -> Result<Callee, FormulaError> {
+        let (shared, link) = if let Ast::Parameter { depth, index, .. } = function {
             let Some(Slot::Closure { definition, link }) = self.slot(*depth, *index) else {
                 return Err(FormulaError::Value);
             };
-            (CallFrame::closure(*definition), *link)
+            (definition, *link)
         } else {
-            (function, self.top())
+            (definition(function)?, self.top())
         };
-        let (parameters, body) = definition(definition_ast)?;
         Ok(Callee {
-            parameters,
-            body,
+            definition: Rc::clone(shared),
             link,
         })
     }
@@ -814,9 +804,9 @@ impl<'a, 'p> Context<'a, 'p> {
                 return Ok(closure.clone());
             }
         }
-        if definition(argument).is_ok() {
+        if let Ok(shared) = definition(argument) {
             return Ok(Slot::Closure {
-                definition: argument.bound_value(),
+                definition: Rc::clone(shared),
                 link: self.top(),
             });
         }
@@ -828,52 +818,70 @@ impl<'a, 'p> Context<'a, 'p> {
         Ok(Slot::element(self.scalar(argument)))
     }
 
-    /// Runs `run` over the callee's body with `slots` bound to its parameters.
-    fn call_with<R>(
-        &mut self,
-        callee: Callee<'_>,
-        slots: impl IntoIterator<Item = Slot>,
-        run: impl FnOnce(&mut Self, &Ast) -> Result<R, FormulaError>,
-    ) -> Result<R, FormulaError> {
+    /// Starts a call of `callee` with `slots` bound to its parameters; the
+    /// caller evaluates the body and then calls [`Context::leave_call`].
+    /// `slots` is left empty, so a helper reuses it for its next element.
+    fn enter_call(&mut self, callee: &Callee, slots: &mut Vec<Slot>) -> Result<(), FormulaError> {
         let frame = self.pass.results.call_frame_mut();
-        frame.charge()?;
+        if let Err(error) = frame.charge() {
+            slots.clear();
+            return Err(error);
+        }
         if self.depth >= FORMULA_RECURSION_LIMIT {
+            slots.clear();
             return Err(FormulaError::Num);
         }
         frame.push(callee.link, slots);
-        let result = run(self, callee.body);
-        self.pass.results.call_frame_mut().pop();
-        result
+        Ok(())
     }
 
-    /// `LAMBDA(…)(…)`, a named LAMBDA's call or a call of a parameter, with
-    /// the function first.
-    fn call_arguments<R>(
-        &mut self,
-        arguments: &[Ast],
-        run: impl FnOnce(&mut Self, &Ast) -> Result<R, FormulaError>,
-    ) -> Result<R, FormulaError> {
+    fn leave_call(&mut self) {
+        self.pass.results.call_frame_mut().pop();
+    }
+
+    /// Starts `LAMBDA(…)(…)`, a named LAMBDA's call or a call of a
+    /// parameter, with the function first: binds its arguments in the
+    /// caller's call and enters the call.
+    fn enter_arguments(&mut self, arguments: &[Ast]) -> Result<Callee, FormulaError> {
         let (function, supplied) = arguments.split_first().ok_or(FormulaError::Value)?;
         let callee = self.callee(function)?;
-        if callee.parameters.len() != supplied.len() {
+        if callee.definition.parameters.len() != supplied.len() {
             return Err(FormulaError::Value);
         }
-        let slots = supplied
+        let mut slots = supplied
             .iter()
             .map(|argument| self.bind(argument))
             .collect::<Result<Vec<_>, _>>()?;
-        self.call_with(callee, slots, run)
+        self.enter_call(&callee, &mut slots)?;
+        Ok(callee)
+    }
+
+    /// A call's value as a scalar.
+    fn call_value(&mut self, arguments: &[Ast]) -> Result<Value, FormulaError> {
+        let callee = self.enter_arguments(arguments)?;
+        let value = self.scalar(&callee.definition.body);
+        self.leave_call();
+        Ok(value)
+    }
+
+    /// A call's value as an array.
+    fn call_matrix(&mut self, arguments: &[Ast]) -> Result<EvalMatrix, FormulaError> {
+        let callee = self.enter_arguments(arguments)?;
+        let matrix = self.matrix(&callee.definition.body);
+        self.leave_call();
+        matrix
     }
 
     /// A helper's call of its function with one element's values.
-    fn invoke(&mut self, callee: Callee<'_>, slots: &mut Vec<Slot>) -> Result<Value, FormulaError> {
-        if callee.parameters.len() != slots.len() {
+    fn invoke(&mut self, callee: &Callee, slots: &mut Vec<Slot>) -> Result<Value, FormulaError> {
+        if callee.definition.parameters.len() != slots.len() {
             slots.clear();
             return Err(FormulaError::Value);
         }
-        self.call_with(callee, slots.drain(..), |context, body| {
-            context.single_value(body)
-        })
+        self.enter_call(callee, slots)?;
+        let value = self.single_value(&callee.definition.body);
+        self.leave_call();
+        value
     }
 
     /// The one value of a body: an array body must produce one cell.
@@ -919,7 +927,7 @@ pub(crate) fn evaluate(
         },
         "ISOMITTED" if arguments.len() == 1 => Ok(Value::Bool(context.is_omitted(&arguments[0]))),
         "ISOMITTED" => Err(FormulaError::Value),
-        CALL => context.call_arguments(arguments, |call, body| Ok(call.scalar(body))),
+        CALL => context.call_value(arguments),
         "REDUCE" => reduce(&mut context, arguments, false).map(EvalMatrix::into_first),
         _ => evaluate_with_context(&mut context, name, arguments).map(EvalMatrix::into_first),
     };
@@ -966,7 +974,7 @@ fn reduce(
     for value in &array.values {
         slots.push(Slot::element(accumulator));
         slots.push(Slot::element(value.clone()));
-        accumulator = context.invoke(callee, &mut slots)?;
+        accumulator = context.invoke(&callee, &mut slots)?;
         if scan {
             results.push(accumulator.clone());
         }
@@ -984,7 +992,7 @@ fn evaluate_with_context(
     arguments: &[Ast],
 ) -> Result<EvalMatrix, FormulaError> {
     match name {
-        CALL => context.call_arguments(arguments, |call, body| call.matrix(body)),
+        CALL => context.call_matrix(arguments),
         "SCAN" => reduce(context, arguments, true),
         "MAKEARRAY" => {
             if arguments.len() != 3 {
@@ -1000,7 +1008,7 @@ fn evaluate_with_context(
                 for col in 1..=cols {
                     slots.push(Slot::Value(Value::number(row as f64)));
                     slots.push(Slot::Value(Value::number(col as f64)));
-                    values.push(context.invoke(callee, &mut slots)?);
+                    values.push(context.invoke(&callee, &mut slots)?);
                 }
             }
             Ok(EvalMatrix::new(rows, cols, values))
@@ -1036,7 +1044,7 @@ fn evaluate_with_context(
                         .iter()
                         .map(|array| Slot::element(array.values[index].clone())),
                 );
-                values.push(context.invoke(callee, &mut slots)?);
+                values.push(context.invoke(&callee, &mut slots)?);
             }
             Ok(EvalMatrix::new(first.rows, first.cols, values))
         }
@@ -1063,7 +1071,7 @@ fn evaluate_with_context(
                     cols: if by_row { array.cols } else { 1 },
                     values: line,
                 });
-                values.push(context.invoke(callee, &mut slots)?);
+                values.push(context.invoke(&callee, &mut slots)?);
             }
             Ok(EvalMatrix::new(
                 if by_row { count } else { 1 },
@@ -1077,11 +1085,13 @@ fn evaluate_with_context(
 
 impl Context<'_, '_> {
     /// A call's shape from its arguments' shapes, without evaluating the
-    /// call or its arguments: `None` when the body's shape needs a value.
+    /// call or its arguments: `None` when the shape is not written in the
+    /// formula. Shape hooks are not used, because some of them evaluate
+    /// (`TEXTSPLIT`, `SEQUENCE(TICK())`), and the call would then run twice.
     fn static_call_shape(&mut self, arguments: &[Ast]) -> Result<Option<Shape>, FormulaError> {
         let (function, supplied) = arguments.split_first().ok_or(FormulaError::Value)?;
         let callee = self.callee(function)?;
-        if callee.parameters.len() != supplied.len() {
+        if callee.definition.parameters.len() != supplied.len() {
             return Err(FormulaError::Value);
         }
         let mut slots = Vec::with_capacity(supplied.len());
@@ -1094,14 +1104,13 @@ impl Context<'_, '_> {
             {
                 self.bind(argument)?
             } else if ast_produces_array(argument, self.shapes()) {
-                match self.store.matrix_shape(argument, self.sheet, self.pass) {
-                    Ok((rows, cols, _)) => Slot::Shaped {
-                        rows,
-                        cols,
-                        is_array: true,
-                    },
-                    Err(FormulaError::Value) => return Ok(None),
-                    Err(error) => return Err(error),
+                let Some((rows, cols)) = self.written_shape(argument, 0) else {
+                    return Ok(None);
+                };
+                Slot::Shaped {
+                    rows,
+                    cols,
+                    is_array: true,
                 }
             } else {
                 Slot::Shaped {
@@ -1112,21 +1121,72 @@ impl Context<'_, '_> {
             };
             slots.push(slot);
         }
-        let active = self.pass.results.call_frame_mut();
-        active.push(callee.link, slots);
-        let outer_read = active.shaped_read.replace(false);
-        let inferred = self.store.matrix_shape(callee.body, self.sheet, self.pass);
-        let frame = self.pass.results.call_frame_mut();
-        let read_value = frame.shaped_read.replace(outer_read);
-        frame.pop();
-        if read_value {
-            return Ok(None);
+        self.pass
+            .results
+            .call_frame_mut()
+            .push(callee.link, &mut slots);
+        let inferred = self.written_shape(&callee.definition.body, 0);
+        self.pass.results.call_frame_mut().pop();
+        inferred
+            .map(|(rows, cols)| {
+                EvalMatrix::validate_shape(rows, cols, 1, 0).map(|cells| (rows, cols, cells))
+            })
+            .transpose()
+    }
+
+    /// The shape `expression` has from what is written and the parameters'
+    /// shapes alone: references, array constants, parameters, operators over
+    /// them, and scalars. `None` for anything whose shape needs a value.
+    fn written_shape(&self, expression: &Ast, depth: usize) -> Option<(usize, usize)> {
+        if depth >= FORMULA_RECURSION_LIMIT {
+            return None;
         }
-        match inferred {
-            Ok(shape) => Ok(Some(shape)),
-            Err(FormulaError::Value) => Ok(None),
-            Err(error) => Err(error),
+        if let Some(range) = range_from_ast(expression, self.sheet) {
+            return Some((
+                (range.row_end - range.row_start) as usize + 1,
+                (range.col_end - range.col_start) as usize + 1,
+            ));
         }
+        if !ast_produces_array(expression, self.shapes()) {
+            return Some((1, 1));
+        }
+        if let Ast::Parameter {
+            depth: outer,
+            index,
+            ..
+        } = expression
+        {
+            return parameter_shape(self.pass.results.call_frame(), *outer, *index);
+        }
+        if let Ast::Array(array) = expression {
+            let cols = array.cols as usize;
+            return array
+                .values
+                .len()
+                .checked_div(cols)
+                .map(|rows| (rows, cols));
+        }
+        if let Ast::LetSlot {
+            expression: bound, ..
+        } = expression
+        {
+            return self.written_shape(bound, depth + 1);
+        }
+        if let Ast::NamedFormula(named) = expression {
+            return self.written_shape(&named.expression, depth + 1);
+        }
+        if let Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) = expression {
+            return self.written_shape(inner, depth + 1);
+        }
+        if let Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) = expression {
+            let (left_rows, left_cols) = self.written_shape(left, depth + 1)?;
+            let (right_rows, right_cols) = self.written_shape(right, depth + 1)?;
+            // Sizes that do not broadcast are left to the evaluation.
+            let broadcasts = |left: usize, right: usize| left == right || left == 1 || right == 1;
+            return (broadcasts(left_rows, right_rows) && broadcasts(left_cols, right_cols))
+                .then(|| (left_rows.max(right_rows), left_cols.max(right_cols)));
+        }
+        None
     }
 
     /// One aggregation's value: an array must hold one cell; a scalar is
@@ -1149,14 +1209,17 @@ impl Context<'_, '_> {
 pub(in crate::eval) fn call_with_slots(
     mut context: Context<'_, '_>,
     function: &Ast,
-    slots: Vec<Slot>,
+    mut slots: Vec<Slot>,
 ) -> Result<Value, FormulaError> {
     context.pass.results.call_frame_mut().enter()?;
     let result = context.callee(function).and_then(|callee| {
-        if callee.parameters.len() != slots.len() {
+        if callee.definition.parameters.len() != slots.len() {
             return Err(FormulaError::Value);
         }
-        context.call_with(callee, slots, |call, body| call.aggregation_value(body))
+        context.enter_call(&callee, &mut slots)?;
+        let value = context.aggregation_value(&callee.definition.body);
+        context.leave_call();
+        value
     });
     context.pass.results.call_frame_mut().exit();
     result
@@ -1167,9 +1230,13 @@ pub(in crate::eval) fn call_with_slots(
 pub(in crate::eval) fn evaluate_with_slots(
     mut context: Context<'_, '_>,
     expression: &Ast,
-    slots: Vec<Slot>,
+    mut slots: Vec<Slot>,
 ) -> Result<Value, FormulaError> {
-    context.pass.results.call_frame_mut().push(NO_CALL, slots);
+    context
+        .pass
+        .results
+        .call_frame_mut()
+        .push(NO_CALL, &mut slots);
     let result = context.aggregation_value(expression);
     context.pass.results.call_frame_mut().pop();
     result
@@ -1177,8 +1244,8 @@ pub(in crate::eval) fn evaluate_with_slots(
 
 /// Binds `slots` as the parameters of a call made outside every LAMBDA, for
 /// the measures of a pivot cell; [`unbind_slots`] ends it.
-pub(crate) fn bind_slots(results: &mut FormulaResults, slots: Vec<Slot>) {
-    results.call_frame_mut().push(NO_CALL, slots);
+pub(crate) fn bind_slots(results: &mut FormulaResults, mut slots: Vec<Slot>) {
+    results.call_frame_mut().push(NO_CALL, &mut slots);
 }
 
 pub(crate) fn unbind_slots(results: &mut FormulaResults) {
@@ -1379,6 +1446,11 @@ mod tests {
         for (formula, cells) in [
             ("=LAMBDA(x,x*TICK())(A1:A3)", 3),
             ("=LAMBDA(x,SEQUENCE(x)*TICK())(A3)", 3),
+            (
+                "=LAMBDA(x,TRANSPOSE(--TEXTSPLIT(TICK()&\",2,3\",\",\")))(0)",
+                3,
+            ),
+            ("=LAMBDA(x,x*2)(SEQUENCE(TICK()+2))", 3),
             ("=LAMBDA(x,y,x+y*TICK())(A1:A3,B1)", 3),
         ] {
             let calls = Rc::new(Cell::new(0));
@@ -1412,6 +1484,35 @@ mod tests {
                 calls.get()
             );
         }
+    }
+
+    /// A shared LAMBDA definition follows value changes, written in a cell or
+    /// held by a defined name, and a cell's LAMBDA follows row edits. (The
+    /// engine does not move defined names on row edits; core redefines them.)
+    #[test]
+    fn shared_lambda_references_follow_value_and_row_edits() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 8);
+        store.set_number(sheet, 0, 0, 7.0, 0);
+        assert!(store.set_named_formula("Add", -1, "=LAMBDA(x,x+$A$1)"));
+        store.set_formula(sheet, 2, 1, "= LAMBDA(x, x + A1)(2)", 0);
+        store.set_formula(sheet, 2, 2, "=Add(3)", 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, 2, 1).num(), 9.0);
+        assert_eq!(store.get_cell(sheet, 2, 2).num(), 10.0);
+
+        store.set_number(sheet, 0, 0, 11.0, 0);
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, 2, 1).num(), 13.0);
+        assert_eq!(store.get_cell(sheet, 2, 2).num(), 14.0);
+
+        assert!(store.add_rows(sheet, 0, 1));
+        store.recompute(sheet);
+        assert_eq!(store.get_cell(sheet, 3, 1).num(), 13.0);
+        assert_eq!(
+            store.formula_source(sheet, 3, 1).as_deref(),
+            Some("= LAMBDA(x, x + A2)(2)")
+        );
     }
 
     #[test]

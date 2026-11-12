@@ -362,7 +362,7 @@ impl Aggregator {
                 label,
             });
         }
-        if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = expression {
+        if let Ast::Lambda(_) = expression {
             let arity = super::lambda::parameter_count(expression)?;
             if !(1..=2).contains(&arity) {
                 return Err(FormulaError::Value);
@@ -398,7 +398,7 @@ impl Aggregator {
             );
         }
         let source = |indices: &[usize]| {
-            let values: std::rc::Rc<[Value]> = if indices.is_empty() {
+            let column_values: std::rc::Rc<[Value]> = if indices.is_empty() {
                 [Value::Blank].into()
             } else {
                 indices
@@ -407,9 +407,9 @@ impl Aggregator {
                     .collect()
             };
             Slot::Array {
-                rows: values.len(),
+                rows: column_values.len(),
                 cols: 1,
-                values,
+                values: column_values,
             }
         };
         context.charge(rows.len() + if self.arity == 2 { total_rows.len() } else { 0 })?;
@@ -419,7 +419,7 @@ impl Aggregator {
         }
         let call =
             super::lambda::Context::new(context.store, context.sheet, context.pass, context.depth);
-        if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
+        if let Ast::Lambda(_) = &self.function {
             super::lambda::call_with_slots(call, &self.function, slots)
         } else if let Ast::Func(_, _) = &self.function {
             super::lambda::evaluate_with_slots(call, &self.function, slots)

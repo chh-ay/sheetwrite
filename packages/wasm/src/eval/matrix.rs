@@ -177,7 +177,7 @@ pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -239,7 +239,7 @@ pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRang
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -294,7 +294,7 @@ pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -342,7 +342,9 @@ pub(crate) fn intersection_range(
                 | Ast::LetName { .. }
                 | Ast::Array { .. } => FormulaError::Value,
                 #[cfg(feature = "analysis")]
-                Ast::Parameter { .. } | Ast::RegexPattern(_) => FormulaError::Value,
+                Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+                    FormulaError::Value
+                }
             });
         };
         let Some(current) = common else {

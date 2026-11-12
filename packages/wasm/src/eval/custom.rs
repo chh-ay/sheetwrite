@@ -296,6 +296,8 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => calls_volatile_custom(&definition.body, functions),
     }
 }
 

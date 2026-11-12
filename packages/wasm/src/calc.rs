@@ -779,6 +779,18 @@ pub(crate) struct ArrayLiteral {
     pub(crate) values: Vec<Value>,
 }
 
+/// A well-formed LAMBDA after its parameters are numbered
+/// (`eval::analysis::lambda::resolve_parameters`). It is shared, so a
+/// closure that holds it clones a handle instead of the body.
+#[cfg(feature = "analysis")]
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LambdaDefinition {
+    /// The parameter declarations as written (`Ast::Name`), for writing
+    /// the formula back.
+    pub(crate) parameters: Box<[Ast]>,
+    pub(crate) body: Ast,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Ast {
     Num(f64),
@@ -796,6 +808,11 @@ pub enum Ast {
         index: u16,
         name: Box<str>,
     },
+    /// A well-formed LAMBDA whose parameter uses are numbered. Calls and the
+    /// closures they create share its body.
+    #[cfg(feature = "analysis")]
+    #[allow(private_interfaces)] // LAMBDA definitions are not part of the public AST API.
+    Lambda(std::rc::Rc<LambdaDefinition>),
     /// The literal pattern of a REGEX call, shared by every formula in the
     /// store with the same pattern text. Its compiled programs live as long
     /// as the formulas that hold it.
@@ -874,6 +891,7 @@ impl Ast {
                 | Self::Bool(_)
                 | Self::Missing
                 | Self::Parameter { .. }
+                | Self::Lambda(_)
                 | Self::RegexPattern(_)
                 | Self::Name(_)
                 | Self::NamedRange(_)
@@ -918,6 +936,8 @@ impl Ast {
             #[cfg(feature = "analysis")]
             Self::Parameter { .. } => false,
             #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => test(&definition.body),
+            #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => false,
             Self::LetName { .. } => false,
             Self::Num(_)
@@ -960,6 +980,10 @@ impl Ast {
             Self::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
             Self::Parameter { .. } => false,
+            // Writing through a shared definition gives this formula its own
+            // copy; outside evaluation no closure shares it.
+            #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => visit(&mut std::rc::Rc::make_mut(definition).body),
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => false,
             Self::LetName { .. } => false,
@@ -990,6 +1014,16 @@ impl Ast {
         match self {
             #[cfg(feature = "analysis")]
             Self::Parameter { name, .. } => out.add_payload(name.len(), name.len()),
+            #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => {
+                // An `Rc` allocation holds its strong and weak counts first.
+                const RC_COUNT_BYTES: usize = std::mem::size_of::<(usize, usize)>();
+                let bytes = RC_COUNT_BYTES + std::mem::size_of::<LambdaDefinition>();
+                out.add_payload(bytes, bytes);
+                let LambdaDefinition { parameters, body } = &**definition;
+                add_ast_slice_memory(parameters, out);
+                body.heap_memory_stats(out);
+            }
             // The store's pattern index counts each shared pattern once.
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => {}
@@ -2740,7 +2774,7 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
             ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
         }
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => {
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
             ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
         }
     }
@@ -3193,6 +3227,11 @@ fn translate_relative_refs_inner(
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } => true,
         #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            inner(&mut std::rc::Rc::make_mut(definition).body);
+            true
+        }
+        #[cfg(feature = "analysis")]
         Ast::RegexPattern(_) => true,
     }
 }
@@ -3415,7 +3454,7 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
             return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
         }
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => {
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
             return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
         }
     };
@@ -3593,7 +3632,7 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
             ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
         }
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => {
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
             ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
         }
     }
@@ -3855,6 +3894,17 @@ pub(crate) fn write_ast_with_sheets(ast: &Ast, out: &mut String, names: &[String
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
         Ast::Parameter { name, .. } => out.push_str(name),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            out.push_str(func_name(Func::Analysis(crate::eval::analysis::LAMBDA_ID)));
+            out.push('(');
+            for parameter in &definition.parameters {
+                write_ast_with_sheets(parameter, out, names);
+                out.push(',');
+            }
+            write_ast_with_sheets(&definition.body, out, names);
+            out.push(')');
+        }
         #[cfg(feature = "analysis")]
         Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),

@@ -145,6 +145,7 @@ impl PatternIndex {
             }
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => self.bind(inner),
             Ast::LetSlot { expression, .. } => self.bind(expression),
+            Ast::Lambda(definition) => self.bind(&mut std::rc::Rc::make_mut(definition).body),
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)

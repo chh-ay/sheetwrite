@@ -57,7 +57,7 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -653,7 +653,7 @@ impl CellStore {
             | Ast::LetName { .. }
             | Ast::Array { .. } => range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?,
             #[cfg(feature = "analysis")]
-            Ast::Parameter { .. } | Ast::RegexPattern(_) => {
+            Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
                 range_from_ast(ast, formula_sheet).ok_or(FormulaError::Value)?
             }
         };

@@ -82,6 +82,8 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
         | Ast::Array { .. } => {}
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => resolve_let_names(&mut std::rc::Rc::make_mut(definition).body),
     }
 }
 
@@ -121,7 +123,7 @@ fn nested_lets_scalar(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) => false,
+        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
         Ast::Func(_, args) => args.iter().all(nested_lets_scalar),
         #[cfg(not(feature = "analysis"))]
         Ast::UnknownFunc(call) => {
@@ -165,7 +167,7 @@ pub(crate) fn scalar_binding(expression: &Ast) -> bool {
         | Ast::LetName { .. }
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -198,7 +200,7 @@ fn scalar_operand(ast: &Ast) -> bool {
         | Ast::LetName { .. }
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -320,6 +322,10 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
         | Ast::Array { .. } => {}
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            resolve_uses(&mut std::rc::Rc::make_mut(definition).body, bindings, next);
+        }
     }
 }
 

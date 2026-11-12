@@ -64,10 +64,15 @@ const NO_SLOT: usize = 0;
 /// [`Calculation::slot`] of a calculation over several table slots.
 const MANY_SLOTS: usize = usize::MAX;
 
-/// The local name of column `index` in a prepared measure. Measure formulas
-/// may not use names, so it cannot meet one of the user's.
+/// The prefix of the local name of a column in a prepared measure, followed
+/// by the column's index. Measure formulas may not use names, so it cannot
+/// meet one of the user's.
+const COLUMN_PREFIX: &str = "_measure_column_";
+/// The prefix of the local name of a calculation, followed by its index.
+const CALCULATION_PREFIX: &str = "_measure_calculate_";
+
 fn column_name(index: usize) -> String {
-    format!("_measure_column_{index}")
+    format!("{COLUMN_PREFIX}{index}")
 }
 
 /// The rows of one non-base table `T` that pass the pivot's report filters
@@ -205,7 +210,7 @@ fn collect_rows(
 
 /// The local name of calculation `index` in a prepared measure.
 fn calculation_name(index: usize) -> String {
-    format!("_measure_calculate_{index}")
+    format!("{CALCULATION_PREFIX}{index}")
 }
 
 /// A 32-bit hash of a sequence of keys.
@@ -399,7 +404,6 @@ impl CellStore {
             columns.push(column);
             owners.push(owner);
         }
-        let mut expression = expression;
         number_parameters(&mut expression, 0, &owners, calculations.len());
         for (index, calculation) in calculations.iter_mut().enumerate() {
             number_parameters(&mut calculation.expression, index + 1, &owners, 0);
@@ -473,6 +477,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Parameter { .. }
+            | Ast::Lambda(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
             | Ast::NamedRange(_)
@@ -730,13 +735,12 @@ impl CellStore {
                 Err(FormulaError::Ref)
             }
             Ast::UnknownFunc(call) if call.name.eq_ignore_ascii_case(CALCULATE) => {
-                let arguments = &mut call.args;
-                if context != 0 || arguments.is_empty() {
+                if context != 0 || call.args.is_empty() {
                     return Err(FormulaError::Value);
                 }
-                contexts.push(self.calculate_family(&arguments[1..])?);
+                contexts.push(self.calculate_family(&call.args[1..])?);
                 let inner_context = contexts.len() - 1;
-                let mut inner = std::mem::replace(&mut arguments[0], Ast::Missing);
+                let mut inner = std::mem::replace(&mut call.args[0], Ast::Missing);
                 self.name_columns(&mut inner, columns, inner_context, contexts, calculations)?;
                 *expression = Ast::Name(calculation_name(calculations.len()).into_boxed_str());
                 calculations.push((inner_context, inner));
@@ -752,6 +756,7 @@ impl CellStore {
                 _,
             )
             | Ast::Parameter { .. }
+            | Ast::Lambda(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
             | Ast::NamedRange(_)
@@ -814,6 +819,7 @@ impl CellStore {
                 | Ast::Bool(_)
                 | Ast::Missing
                 | Ast::Parameter { .. }
+                | Ast::Lambda(_)
                 | Ast::RegexPattern(_)
                 | Ast::Name(_)
                 | Ast::NamedRange(_)
@@ -867,40 +873,34 @@ impl CellStore {
 /// `k`) binds its columns in order, then, for the measure's own, the
 /// `calculated` values of its calculations.
 fn number_parameters(ast: &mut Ast, owner: usize, owners: &[usize], calculated: usize) {
-    let mut positions = vec![None; owners.len()];
-    let mut next = 0u16;
-    for (column, &read_by) in owners.iter().enumerate() {
-        if read_by == owner {
-            positions[column] = Some(next);
-            next += 1;
+    let read_here = |read_by: &&usize| **read_by == owner;
+    let columns = owners.iter().filter(read_here).count();
+    let index_of = |local: &str| -> Option<usize> {
+        if let Some(digits) = local.strip_prefix(COLUMN_PREFIX) {
+            let column: usize = digits.parse().ok()?;
+            (*owners.get(column)? == owner)
+                .then(|| owners[..column].iter().filter(read_here).count())
+        } else {
+            let calculation: usize = local.strip_prefix(CALCULATION_PREFIX)?.parse().ok()?;
+            (calculation < calculated).then_some(columns + calculation)
         }
-    }
-    let calculations = (0..calculated).map(|index| next + index as u16);
-    let parameters: Vec<(String, u16)> = positions
-        .iter()
-        .enumerate()
-        .filter_map(|(column, position)| position.map(|index| (column_name(column), index)))
-        .chain((0..calculated).map(calculation_name).zip(calculations))
-        .collect();
-    rename(ast, &parameters);
+    };
+    rename(ast, &index_of);
 }
 
-fn rename(ast: &mut Ast, parameters: &[(String, u16)]) {
+fn rename(ast: &mut Ast, index_of: &dyn Fn(&str) -> Option<usize>) {
     if let Ast::Name(name) = ast {
-        if let Some((_, index)) = parameters
-            .iter()
-            .find(|(local, _)| local.as_str() == name.as_ref())
-        {
+        if let Some(index) = index_of(name) {
             *ast = Ast::Parameter {
                 depth: 0,
-                index: *index,
+                index: index as u16,
                 name: std::mem::take(name),
             };
         }
         return;
     }
     ast.fold_children_mut(&mut |child| {
-        rename(child, parameters);
+        rename(child, index_of);
         false
     });
 }

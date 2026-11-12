@@ -204,6 +204,7 @@ fn literal_dimension(ast: &Ast) -> Option<Result<usize, FormulaError>> {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)
@@ -238,6 +239,7 @@ const fn number_literal(ast: &Ast) -> Option<f64> {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)

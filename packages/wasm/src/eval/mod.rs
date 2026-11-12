@@ -372,7 +372,7 @@ fn expand_let_node<'a>(
         | Ast::LetSlot { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     };
     if let Some(name) = used_name {
         if let Some((_, expression, visible, slot, bound_in)) = bindings
@@ -425,21 +425,15 @@ fn expand_let_node<'a>(
          nodes: &mut usize,
          next_slot: &mut u32| { expand_let_node(arg, bindings, nodes, next_slot, lambdas) };
     Ok(match ast {
-        // The parameters stay as declared; the body sits one LAMBDA deeper.
+        // The body sits one LAMBDA deeper; the expansion is this tree's own
+        // definition.
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(analysis::LAMBDA_ID), args) if !args.is_empty() => {
-            let Some((body, parameters)) = args.split_last() else {
-                return Err(FormulaError::Value);
-            };
-            let mut definition = parameters.to_vec();
-            definition.push(expand_let_node(
+        Ast::Lambda(definition) => {
+            let body = expand_let_node(&definition.body, bindings, nodes, next_slot, lambdas + 1)?;
+            Ast::Lambda(std::rc::Rc::new(crate::calc::LambdaDefinition {
+                parameters: definition.parameters.clone(),
                 body,
-                bindings,
-                nodes,
-                next_slot,
-                lambdas + 1,
-            )?);
-            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), definition.into())
+            }))
         }
         Ast::Func(Func::Let, args) => {
             return expand_let_args(args, bindings, nodes, next_slot, lambdas)
@@ -484,10 +478,8 @@ fn shift_parameters(ast: &mut Ast, by: u16) {
     fn shift(ast: &mut Ast, by: u16, inside: u16) {
         match ast {
             Ast::Parameter { depth, .. } if *depth >= inside => *depth += by,
-            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), args) => {
-                if let Some(body) = args.last_mut() {
-                    shift(body, by, inside + 1);
-                }
+            Ast::Lambda(definition) => {
+                shift(&mut std::rc::Rc::make_mut(definition).body, by, inside + 1);
             }
             Ast::Num(_)
             | Ast::Str(_)
@@ -1789,6 +1781,9 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(pattern) => Value::text(pattern.text()),
+            // A LAMBDA is not a value until it is called.
+            #[cfg(feature = "analysis")]
+            Ast::Lambda(_) => Value::Error(FormulaError::Calc),
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(call) if call.name == analysis::lambda::CALL => {
                 let crate::calc::UnknownCall { args, .. } = &**call;
@@ -1911,7 +1906,9 @@ impl CellStore {
                     | Ast::LetName { .. }
                     | Ast::Array { .. } => operators::UnaryOp::Percent,
                     #[cfg(feature = "analysis")]
-                    Ast::Parameter { .. } | Ast::RegexPattern(_) => operators::UnaryOp::Percent,
+                    Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+                        operators::UnaryOp::Percent
+                    }
                 };
                 operators::unary(op, &self.eval_ast(expr, sheet, pass, depth + 1))
             }

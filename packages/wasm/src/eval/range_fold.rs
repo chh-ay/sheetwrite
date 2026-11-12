@@ -285,7 +285,9 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize, shapes: Shapes<'_>) -> Option<Su
         | Ast::LetName { .. }
         | Ast::Array { .. } => Some(SumArg::Scalar { reference: false }),
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => Some(SumArg::Scalar { reference: false }),
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+            Some(SumArg::Scalar { reference: false })
+        }
     }
 }
 

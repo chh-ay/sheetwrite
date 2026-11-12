@@ -90,6 +90,7 @@ fn argument_shape(
         _ if !is_reference(ast) && !ast_produces_array(ast, pass.shapes()) => Ok((1, 1, 1)),
         Ast::Missing
         | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)
@@ -503,6 +504,7 @@ fn is_reference(ast: &Ast) -> bool {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::UnresolvedStructured(_)

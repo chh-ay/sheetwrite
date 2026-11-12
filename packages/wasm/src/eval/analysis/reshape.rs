@@ -90,6 +90,7 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         | Ast::Str(_)
         | Ast::Missing
         | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)

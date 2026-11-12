@@ -330,6 +330,8 @@ impl ReadSet {
             | Ast::Array(_) => {}
             #[cfg(feature = "analysis")]
             Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+            #[cfg(feature = "analysis")]
+            Ast::Lambda(definition) => self.collect(&definition.body, formula_sheet),
         }
     }
 
@@ -616,14 +618,14 @@ impl FormulaEntry {
         is_reference: bool,
     ) -> Self {
         #[cfg(feature = "analysis")]
-        if let Some(ast) = ast.as_mut() {
-            crate::eval::analysis::lambda::resolve_parameters(ast);
+        if let Some(tree) = ast.as_mut() {
+            crate::eval::analysis::lambda::resolve_parameters(tree);
         }
-        if let Some(ast) = ast
+        if let Some(tree) = ast
             .as_mut()
             .filter(|candidate| ast_contains_let(candidate) && !ast_contains_spill_ref(candidate))
         {
-            crate::eval::resolve_let_names(ast);
+            crate::eval::resolve_let_names(tree);
         }
         let mut entry = Self {
             ast,
