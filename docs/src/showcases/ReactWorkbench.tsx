@@ -12,8 +12,8 @@ import { SheetwriteGrid } from "@sheetwrite/react";
 import type { KeyboardEvent, ChangeEvent as ReactChangeEvent } from "react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { Icon } from "../components/Icon.js";
-import { ActionError, pendingProps } from "../lib/use-action.js";
+import { Icon } from "./ui/Icon.js";
+import { ActionError, pendingProps } from "./ui/use-action.js";
 import { money, useAnalyticsWorkbench } from "./react-analytics.js";
 import { ANALYTICS_MARKETS, ANALYTICS_SEGMENTS, ANALYTICS_THEME } from "./scenarios/analytics.js";
 import { DemoButton } from "./ui/DemoButton.js";

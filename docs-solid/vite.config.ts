@@ -11,7 +11,7 @@ import solid from "vite-plugin-solid";
 import { formulaTables } from "../docs/src/lib/formula-tables.ts";
 import { perfFigureMarkup } from "../docs/src/lib/perf-figure-markup.ts";
 import { SITE_URL } from "../docs/src/lib/seo.ts";
-import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "../docs/vite.config.ts";
+import { DOCS_MDX_OPTIONS, expressiveCodeAssets } from "../docs/src/lib/mdx-pipeline.ts";
 import { SOLID_MDX_OPTIONS } from "./src/lib/recma-solid-elements.ts";
 import { rehypeDocsPictures } from "./src/lib/rehype-docs-pictures.ts";
 
@@ -70,8 +70,8 @@ export const REACT_WORKBENCH_FILES = [
   "showcases/ui/DemoRadioGroup.tsx",
   "showcases/ui/DemoRenderingMode.tsx",
   "showcases/ui/DemoSelect.tsx",
-  "components/Icon.tsx",
-  "lib/use-action.tsx",
+  "showcases/ui/Icon.tsx",
+  "showcases/ui/use-action.tsx",
   // The React fixture of /test/framework-lifecycle/react/ (test builds only).
   "test-fixtures/framework-lifecycle/ReactFixture.tsx",
 ].map((file) => `${DOCS_SOURCE}${file}`);

@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import solid from "vite-plugin-solid";
 
-import { expressiveCodeAssets } from "../docs/vite.config.ts";
+import { expressiveCodeAssets } from "../docs/src/lib/mdx-pipeline.ts";
 import { CSS_OPTIONS, frameworkWorkbenches, REACT_WORKBENCH_FILES } from "./vite.config.ts";
 
 const DOCS_SOURCE = new URL("../docs/src/", import.meta.url).pathname;

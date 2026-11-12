@@ -24,7 +24,7 @@ import { installXlsx } from "../lib/addons.js";
 import { errorText } from "../lib/errors.js";
 import { selectionLabel } from "../lib/selection-label.js";
 import { observeSiteTheme } from "../lib/site-theme.js";
-import { useAction } from "../lib/use-action.js";
+import { useAction } from "./ui/use-action.js";
 import { fitColumnPixels, rowGutterWidth } from "./column-fit.js";
 import {
   ANALYTICS_COLUMNS,

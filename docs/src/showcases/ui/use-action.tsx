@@ -1,7 +1,7 @@
 /** @jsxImportSource react */
 import { useRef, useState } from "react";
 
-import { type ActionGuard, type ActionState, createActionGuard } from "./action-guard.js";
+import { type ActionGuard, type ActionState, createActionGuard } from "../../lib/action-guard.js";
 
 /** React binding for {@link createActionGuard}: one guard per component instance. */
 function useAction(): ActionGuard & ActionState {

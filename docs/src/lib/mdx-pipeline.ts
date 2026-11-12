@@ -1,10 +1,6 @@
 import type { ExpressiveCodeTheme } from "@expressive-code/core";
 import { nodeTypes } from "@mdx-js/mdx";
-import mdx, { type Options as MdxOptions } from "@mdx-js/rollup";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
-import { tanstackStart } from "@tanstack/react-start/plugin/vite";
-import viteReact from "@vitejs/plugin-react";
-import vue from "@vitejs/plugin-vue";
+import type { Options as MdxOptions } from "@mdx-js/rollup";
 import rehypeExpressiveCode, {
   createRenderer,
   type RehypeExpressiveCodeOptions,
@@ -15,28 +11,24 @@ import rehypeSlug from "rehype-slug";
 import remarkFrontmatter from "remark-frontmatter";
 import remarkGfm from "remark-gfm";
 import remarkMdxFrontmatter from "remark-mdx-frontmatter";
-import { defineConfig, type Plugin } from "vite";
+import type { Plugin } from "vite";
 
-import { inlineIcon } from "./src/icons/inline-icon.ts";
-import { codeHangingIndent } from "./src/lib/code-indent.ts";
-import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./src/lib/code-theme.ts";
-import { CALLOUTS, callout, contentComponents } from "./src/lib/content-components.ts";
-import { dedupeCodePopovers } from "./src/lib/dedupe-code-popovers.ts";
-import { scopeCopyButtonStates } from "./src/lib/expressive-code-styles.ts";
-import { formulaTables } from "./src/lib/formula-tables.ts";
-import { markGeneratedPages } from "./src/lib/generated-content.ts";
-import { renderGridResults } from "./src/lib/grid-result.ts";
-import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./src/lib/inline-code.ts";
-import { exportOutline } from "./src/lib/outline.ts";
-import { renderPerfBars } from "./src/lib/perf-bars.ts";
-import { isPerfCompare, parsePerfCompare } from "./src/lib/perf-compare.ts";
-import { perfFigureMarkup } from "./src/lib/perf-figure-markup.ts";
-import { rovingCodeFocus } from "./src/lib/roving-code-focus.ts";
-import { runnableCodeBlocks } from "./src/lib/runnable-code.ts";
-import { renderSectionCards } from "./src/lib/section-cards.ts";
-import { SITE_URL } from "./src/lib/seo.ts";
-import { sheetwriteCodeHovers } from "./src/lib/sheetwrite-code-hovers.ts";
-import { speedStoryMarkup } from "./src/lib/speed-story-markup.ts";
+import { inlineIcon } from "../icons/inline-icon.ts";
+import { codeHangingIndent } from "./code-indent.ts";
+import { FORMULA_LANGUAGE, siteCodeThemes, tsMemberLanguage } from "./code-theme.ts";
+import { CALLOUTS, callout, contentComponents } from "./content-components.ts";
+import { dedupeCodePopovers } from "./dedupe-code-popovers.ts";
+import { scopeCopyButtonStates } from "./expressive-code-styles.ts";
+import { markGeneratedPages } from "./generated-content.ts";
+import { renderGridResults } from "./grid-result.ts";
+import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./inline-code.ts";
+import { exportOutline } from "./outline.ts";
+import { renderPerfBars } from "./perf-bars.ts";
+import { isPerfCompare, parsePerfCompare } from "./perf-compare.ts";
+import { rovingCodeFocus } from "./roving-code-focus.ts";
+import { runnableCodeBlocks } from "./runnable-code.ts";
+import { renderSectionCards } from "./section-cards.ts";
+import { sheetwriteCodeHovers } from "./sheetwrite-code-hovers.ts";
 
 interface HastNode {
   type: string;
@@ -470,11 +462,11 @@ export function expressiveCodeAssets(): Plugin {
   };
 }
 
-/** The docs Markdown pipeline; the Solid prototype (docs-solid/) compiles the same pages. */
+/** The docs Markdown pipeline: docs-solid/vite.config.ts compiles every page with it. */
 export const DOCS_MDX_OPTIONS = {
   remarkPlugins: [
     remarkFrontmatter,
-    [markGeneratedPages, { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname }],
+    [markGeneratedPages, { contentRoot: new URL("../content/docs/", import.meta.url).pathname }],
     remarkMdxFrontmatter,
     remarkGfm,
   ],
@@ -502,7 +494,7 @@ export const DOCS_MDX_OPTIONS = {
     [rehypeRaw, { passThrough: nodeTypes }],
     uncontrolledCheckedInputs,
     renderGridResults,
-    [renderSectionCards, { contentRoot: new URL("./src/content/docs/", import.meta.url).pathname }],
+    [renderSectionCards, { contentRoot: new URL("../content/docs/", import.meta.url).pathname }],
     hydrateFormulaReference,
     hydratePerfFigure,
     dedupeCodePopovers,
@@ -517,74 +509,3 @@ export const DOCS_MDX_OPTIONS = {
     markLinkRows,
   ],
 } satisfies MdxOptions;
-
-export default defineConfig({
-  // Keep one document-wide stylesheet. TanStack route transitions otherwise
-  // swap route CSS links after the next route has painted, producing a visible
-  // half-styled frame on showcase navigation.
-  build: {
-    cssCodeSplit: false,
-  },
-  // Module workers (core's renderer worker) and the playground runtime
-  // (src/playground/run-example.ts) are ES bundles: the runtime loads the
-  // packages an example imports as separate chunks, only in its frame.
-  worker: {
-    format: "es",
-  },
-  plugins: [
-    {
-      ...mdx(DOCS_MDX_OPTIONS),
-      enforce: "pre",
-    },
-    expressiveCodeAssets(),
-    formulaTables(),
-    speedStoryMarkup(),
-    perfFigureMarkup(),
-    tanstackStart({
-      pages: [
-        { path: "/" },
-        { path: "/docs/" },
-        // The capability hub and its proofs are build gates: prerendering them
-        // must not depend on crawl reachability from the landing page.
-        { path: "/showcases/" },
-        { path: "/showcases/database/" },
-        { path: "/showcases/interoperability/" },
-        { path: "/showcases/performance/" },
-        { path: "/showcases/collaboration/" },
-        // The explicit route renders successfully during prerender; the
-        // deployment fallback supplies the 404 status for unknown URLs.
-        {
-          path: "/404/",
-          prerender: { enabled: true, outputPath: "/404.html" },
-          sitemap: { exclude: true },
-        },
-        // Test fixtures stay reachable for Playwright but out of search surfaces.
-        { path: "/test/xlsx/", sitemap: { exclude: true } },
-        { path: "/test/collaboration/", sitemap: { exclude: true } },
-        { path: "/test/formulas-engine/", sitemap: { exclude: true } },
-        {
-          path: "/test/framework-lifecycle/react/",
-          sitemap: { exclude: true },
-        },
-        { path: "/test/framework-lifecycle/vue/", sitemap: { exclude: true } },
-        {
-          path: "/test/framework-lifecycle/svelte/",
-          sitemap: { exclude: true },
-        },
-      ],
-      prerender: {
-        enabled: true,
-        crawlLinks: true,
-        failOnError: true,
-        autoSubfolderIndex: true,
-      },
-      sitemap: {
-        enabled: true,
-        host: SITE_URL,
-      },
-    }),
-    vue(),
-    svelte(),
-    viteReact({ include: /\.(?:js|jsx|ts|tsx|md|mdx)$/ }),
-  ],
-});
