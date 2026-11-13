@@ -12,7 +12,8 @@
 //! order, so the total is the same.
 
 use super::matrix::written_range;
-use super::range_reader::{LiteralColumns, RangeReader};
+use super::preview_limits::RangeRead;
+use super::range_view::{LiteralColumns, RangeView};
 
 use crate::calc::Ast;
 use crate::cells::{payload_num, payload_str_id};
@@ -34,7 +35,7 @@ impl CellStore {
     ///
     /// Out of line, and named `*_family`, so its loops stay out of `eval_ast`.
     #[inline(never)]
-    pub(super) fn literal_sum_product_family(
+    pub(super) fn sum_product_range_family(
         &self,
         args: &[Ast],
         sheet: usize,
@@ -45,7 +46,12 @@ impl CellStore {
         let mut shape = None;
 
         for arg in args {
-            let reader = RangeReader::new(self, written_range(arg, sheet)?, depth).ok()?;
+            let reader = RangeView::clipped(self, written_range(arg, sheet)?, depth).ok()?;
+            let (rows, cols) = reader.shape();
+            if (rows as u64).saturating_mul(cols as u64) > crate::types::RANGE_CELL_LIMIT {
+                return None;
+            }
+            reader.charge_preview(RangeRead::Typed).ok()?;
             if *shape.get_or_insert(reader.shape()) != reader.shape() {
                 return None;
             }
