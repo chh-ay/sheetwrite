@@ -41,7 +41,12 @@ fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<FxHashMap
         .collect()
 }
 
-pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32, names: &[String]) {
+pub(super) fn write_formula(
+    out: &mut Writer,
+    entry: &FormulaEntry,
+    sheet: u32,
+    names: &WrittenNames<'_>,
+) {
     out.text(&entry.source(names));
     out.bool(entry.is_reference());
 
@@ -108,18 +113,17 @@ impl CellStore {
             None
         };
 
-        let ast = if input.bool()? {
+        let (ast, uses_tables) = if input.bool()? {
             if is_reference {
-                reference_ast
+                (reference_ast, false)
             } else {
-                Some(
-                    self.resolve_formula_ast(&source, sheet, row, col)
-                        .map_err(|_| "invalid transferred formula".to_owned())?
-                        .0,
-                )
+                let (tree, features) = self
+                    .resolve_formula_ast(&source, sheet, row, col)
+                    .map_err(|_| "invalid transferred formula".to_owned())?;
+                (Some(tree), features.table_refs)
             }
         } else {
-            None
+            (None, false)
         };
         let source_error = input.error()?;
         let volatile = input.bool()?;
@@ -148,8 +152,13 @@ impl CellStore {
             })
             .collect::<TransferResult<Vec<_>>>()?;
 
-        let mut entry =
-            FormulaEntry::transferred_source(ast, source, ReadSet { cells, ranges }, is_reference);
+        let mut entry = FormulaEntry::transferred_source(
+            ast,
+            source,
+            ReadSet { cells, ranges },
+            is_reference,
+            uses_tables,
+        );
         entry.set_source_error(source_error);
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(has_spill_refs);
@@ -237,8 +246,7 @@ impl CellStore {
         }
 
         for _ in 0..input.count()? {
-            let key = input.text()?;
-            let mut table = TableDefinition {
+            let mut table = Table {
                 id: input.text()?,
                 name: input.text()?,
                 sheet: sheet_handle(&mut input, sheets)?,
@@ -252,14 +260,14 @@ impl CellStore {
             };
 
             for _ in 0..input.count()? {
-                table.columns.push(TableColumnDefinition {
+                table.columns.push(TableColumn {
                     id: input.text()?,
                     name: input.text()?,
                     col: input.u32()?,
                 });
             }
 
-            store.tables.insert(key, table);
+            store.tables.insert(table);
         }
 
         // The formulas below bind to the names, so resolve them first.
@@ -372,8 +380,7 @@ impl CellStore {
 
         out.usize(self.tables.len());
 
-        for (key, table) in &self.tables {
-            out.text(key);
+        for (_, table) in self.tables.iter() {
             out.text(&table.id);
             out.text(&table.name);
             out.u32(table.sheet);
@@ -408,7 +415,7 @@ impl CellStore {
             for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
                 out.u32(row);
                 out.u32(col);
-                write_formula(&mut out, entry, sheet as u32, &self.sheet_names);
+                write_formula(&mut out, entry, sheet as u32, &self.written_names());
             }
         }
 

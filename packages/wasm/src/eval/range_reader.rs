@@ -7,6 +7,7 @@
 //! both stop the walk at the same cell. `next_allow_errors` instead returns
 //! error cells as values for criteria ranges.
 
+use super::preview_limits::{self, RangeRead};
 use super::{EvalPass, LiteralSources};
 
 use crate::sheet::SheetData;
@@ -59,6 +60,25 @@ impl<'a> RangeReader<'a> {
         range: CellRange,
         depth: usize,
     ) -> Result<Self, FormulaError> {
+        Self::with_read(store, range, depth, RangeRead::Typed)
+    }
+
+    /// Prepares a numeric scan whose non-number cells use per-cell evaluation.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn numbers(
+        store: &'a CellStore,
+        range: CellRange,
+        depth: usize,
+    ) -> Result<Self, FormulaError> {
+        Self::with_read(store, range, depth, RangeRead::Numbers)
+    }
+
+    fn with_read(
+        store: &'a CellStore,
+        range: CellRange,
+        depth: usize,
+        read: RangeRead,
+    ) -> Result<Self, FormulaError> {
         let sheet = range.sheet as usize;
         let Some(data) = store.sheets.get(sheet) else {
             return Err(FormulaError::Ref);
@@ -82,6 +102,7 @@ impl<'a> RangeReader<'a> {
         if (rows as u64).saturating_mul(cols as u64) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
+        preview_limits::range(data, (row_start, col_start), (rows, cols), read)?;
 
         Ok(Self {
             store,

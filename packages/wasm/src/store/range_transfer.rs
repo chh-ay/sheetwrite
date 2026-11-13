@@ -23,7 +23,8 @@ impl RangeSnapshot {
         for (row, col, entry) in &self.formulas {
             out.u32(*row);
             out.u32(*col);
-            super::transfer::write_formula(&mut out, entry, sheet, &[]);
+            // Captured entries hold written text, so no names are needed.
+            super::transfer::write_formula(&mut out, entry, sheet, &WrittenNames::NONE);
         }
 
         out.0
