@@ -1017,6 +1017,8 @@ mod tests {
             70_000,
             "=PIVOTBY(A1:B70000,D1:D70000,C1:C70000,PERCENTOF,0,2,,1,,,2)",
         );
+        // The corner above the row labels is blank, not #NUM!.
+        assert_eq!(store.get_cell(sheet, 0, 5).string(), None);
         assert_eq!(store.get_cell(sheet, 0, 7).string().as_deref(), Some("Q1"));
         assert_eq!(
             store.get_cell(sheet, 0, 11).string().as_deref(),
