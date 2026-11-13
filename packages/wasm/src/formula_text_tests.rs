@@ -5,6 +5,7 @@
 use crate::calc::{parse, WrittenNames};
 use crate::formula_rewrite::write_references;
 use crate::store::CellStore;
+use crate::types::AbsCellKey;
 
 const COLS: usize = 4;
 const ROWS: usize = 8;
@@ -397,4 +398,117 @@ fn renaming_and_removing_a_table_rewrite_only_its_users() {
         Some("=SUM(#REF!)")
     );
     assert_eq!(tree_address(&store, sheet, 1, 3), unrelated);
+}
+
+/// Table1 over A`row + 1`:B`row + 3` of `sheet`, with a header row, ID `id`
+/// and columns Amount and Other; its amounts are 2 and 3.
+fn table_one(store: &mut CellStore, sheet: usize, row: usize, id: &str) -> bool {
+    store.set_number(sheet, row + 1, 0, 2.0, 0);
+    store.set_number(sheet, row + 2, 0, 3.0, 0);
+    store.set_table(
+        id,
+        "Table1",
+        sheet,
+        row,
+        0,
+        row + 2,
+        1,
+        true,
+        false,
+        vec!["a".to_owned(), "o".to_owned()],
+        vec!["Amount".to_owned(), "Other".to_owned()],
+    )
+}
+
+/// A store with Data, Report and Other, Table1 on Data from row `row`, and
+/// `SUM(Table1[Amount])` in Report!A1.
+fn table_on_data(row: usize) -> (CellStore, usize, usize, usize) {
+    let mut store = CellStore::new();
+    let data = store.add_sheet(4, 8);
+    let report = store.add_sheet(4, 8);
+    let other = store.add_sheet(4, 8);
+    store.set_sheet_name(data, "data", "Data");
+    store.set_sheet_name(report, "report", "Report");
+    store.set_sheet_name(other, "other", "Other");
+    assert!(table_one(&mut store, data, row, "old"));
+    store.set_formula(report, 0, 0, "=SUM(Table1[Amount])", 0);
+    store.recompute(report);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
+    (store, data, report, other)
+}
+
+/// After the table that Report!A1 read is gone with its cells, a new table
+/// of the same name in the freed slot leaves the old formula as `#REF!`:
+/// the edit that removed the cells made the reference `#REF!` and dropped
+/// the formula from the slot's users, so editing the new table does not
+/// rebuild it either.
+fn assert_reused_slot_leaves_ref_error(mut store: CellStore, report: usize, other: usize) {
+    let stale = AbsCellKey {
+        sheet: report as u32,
+        row: 0,
+        col: 0,
+    };
+    let ref_error = |store: &CellStore| {
+        assert_eq!(
+            store.get_cell(report, 0, 0).string().as_deref(),
+            Some("#REF!")
+        );
+        assert_eq!(
+            store.formula_source(report, 0, 0).as_deref(),
+            Some("=SUM(#REF!)")
+        );
+    };
+    store.recompute(report);
+    ref_error(&store);
+    let tree = tree_address(&store, report, 0, 0);
+
+    // The only live table, so it takes the freed slot 0.
+    assert!(table_one(&mut store, other, 0, "new"));
+    store.recompute(report);
+    ref_error(&store);
+    let id = store.formula_id(stale).expect("the old formula stays");
+    assert!(!store.formula_slots.table_users(0, true).contains(&id));
+
+    store.set_number(other, 3, 0, 10.0, 0);
+    assert!(store.set_table(
+        "new",
+        "Table1",
+        other,
+        0,
+        0,
+        3,
+        1,
+        true,
+        false,
+        vec!["a".to_owned(), "o".to_owned()],
+        vec!["Amount".to_owned(), "Other".to_owned()],
+    ));
+    store.recompute(report);
+    ref_error(&store);
+    assert_eq!(tree_address(&store, report, 0, 0), tree);
+
+    store.set_formula(report, 1, 0, "=SUM(Table1[Amount])", 0);
+    store.recompute(report);
+    assert_eq!(store.get_cell(report, 1, 0).num(), 15.0, "new formulas bind");
+}
+
+#[test]
+fn a_table_slot_freed_by_removing_its_sheet_does_not_rebind_old_users() {
+    let (mut store, data, report, other) = table_on_data(0);
+    assert!(store.remove_sheet(data));
+    assert_reused_slot_leaves_ref_error(store, report, other);
+}
+
+#[test]
+fn a_table_slot_freed_by_removing_its_rows_does_not_rebind_old_users() {
+    let (mut store, data, report, other) = table_on_data(2);
+    assert!(store.remove_rows(data, 2, 3));
+    assert_reused_slot_leaves_ref_error(store, report, other);
+}
+
+#[test]
+fn a_table_slot_freed_by_removing_its_columns_does_not_rebind_old_users() {
+    let (mut store, data, report, other) = table_on_data(0);
+    assert!(store.remove_cols(data, 0, 2));
+    assert_reused_slot_leaves_ref_error(store, report, other);
 }
