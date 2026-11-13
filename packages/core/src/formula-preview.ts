@@ -2,6 +2,7 @@
 // cell, read from the engine without changing the store (`previewFormula` in
 // packages/wasm/src/eval/preview.rs).
 
+import { SheetwriteError } from "./errors.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { FormulaPreview } from "./store/formula-preview-result.js";
 import type { CellAddress } from "./types/coordinates.js";
@@ -23,6 +24,11 @@ export type {
  * range scans or 50,000 cells one by one, or builds an array of more than
  * 10,000 cells, gives `cost-limit` rather than a partial answer.
  *
+ * Throws a `SheetwriteError` with code `invalid-argument` when `store` is not
+ * a `SheetwriteStore` or `cell.row` or `cell.col` is not a whole number from 0
+ * to 4,294,967,295, and with code `not-found` when the workbook has no
+ * `cell.sheet`.
+ *
  * @example
  * ```ts
  * import type { Store } from "@sheetwrite/core";
@@ -37,7 +43,18 @@ export type {
  */
 export function previewFormula(store: Store, cell: CellAddress, text: string): FormulaPreview {
   const engine = storeEngine(store);
-  if (engine === null) throw new Error("Sheetwrite: previewFormula needs a SheetwriteStore");
+  if (engine === null) throw invalidPreview("previewFormula needs a SheetwriteStore");
+  if (!isCellIndex(cell.row) || !isCellIndex(cell.col)) {
+    throw invalidPreview("previewFormula needs a whole-number row and column from 0");
+  }
 
   return engine.previewFormula(cell, text);
+}
+
+function isCellIndex(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= 0xff_ff_ff_ff;
+}
+
+function invalidPreview(message: string): SheetwriteError {
+  return new SheetwriteError("invalid-argument", "store", `Sheetwrite: ${message}`);
 }

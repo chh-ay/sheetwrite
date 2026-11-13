@@ -32,6 +32,8 @@ if (preview.status === "value") console.log(preview.value);
 
 The result is `{ status: "value", value }`, `{ status: "array", rows, cols, first }` or `{ status: "unavailable", reason }`, where `reason` is `"unsafe-function"`, `"cost-limit"`, `"loading"` or `"syntax"`. A value is a number, text, `true` or `false`, `null` for an empty result, or `{ error: "#DIV/0!" }`.
 
+`previewFormula` throws a `SheetwriteError` with code `invalid-argument` when the store is not a `SheetwriteStore` or the row or column is not a whole number from 0, and with code `not-found` when the workbook has no such sheet.
+
 The rest of formula help does not calculate. It reads the text and the function metadata only.
 
 ## Styles
