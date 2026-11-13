@@ -521,6 +521,18 @@ impl SheetFormulas {
         true
     }
 
+    /// A transfer stores each formula it reads at its cell.
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) fn insert(
+        &mut self,
+        key: CellKey,
+        entry: FormulaEntry,
+        sheet: usize,
+        slots: &mut FormulaStore,
+    ) {
+        self.replace(key, Some(entry), sheet, slots);
+    }
+
     /// Retire a removed id until its old graph reads are owned.
     pub(crate) fn remove(&mut self, key: CellKey, slots: &mut FormulaStore) {
         self.replace(key, None, 0, slots);
