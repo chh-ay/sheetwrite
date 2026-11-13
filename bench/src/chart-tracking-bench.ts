@@ -32,6 +32,14 @@ const FULL_COUNTS = [200, 2_000, 20_000] as const;
 const COLD_COUNTS = [2_000, 20_000] as const;
 /** Fresh processes per cold row. */
 const COLD_SAMPLES = 21;
+/**
+ * Pause between loading a cold workbook and its first commit. The engine's
+ * WebAssembly keeps compiling on background threads after load; a commit
+ * inside that window times its race with the compiler (0.8 or 4 ms for the
+ * same 2,000-chart commit on Linux) instead of first-use work in core or
+ * the engine.
+ */
+const COLD_SETTLE_MS = 1_000;
 const SAMPLES = 101;
 /**
  * Untimed commits before each row's samples, at most. Rows time microsecond
@@ -226,6 +234,15 @@ type ChartSource = "literal" | "formula";
 const SOURCES: readonly ChartSource[] = ["literal", "formula"];
 
 /**
+ * Collect the garbage of building a fixture before its row starts. Loading
+ * 20,000 formulas leaves enough of it that a collection inside the warm-up
+ * took most of its time budget on Linux.
+ */
+function settleHeap(): void {
+  Bun.gc(true);
+}
+
+/**
  * The untimed commits before a row's samples: {@link WARMUPS} of them, or as
  * many as fit in {@link WARMUP_BUDGET_MS}. A row whose commit resolves
  * thousands of charts runs the shared paths thousands of times per commit,
@@ -249,6 +266,7 @@ class WarmUp {
 /** Commit time of the no-chart control workbook of `count` charts' size. */
 function measureControl(count: number, samples: number, warmups: number): Stat {
   const control = fixture(count, "literal", false);
+  settleHeap();
   const controlTimes: number[] = [];
   try {
     // Keep the subscription and workbook shape identical in the no-chart control.
@@ -294,6 +312,7 @@ function measureSource({
 }: SourceRun): ChartTrackingRow[] {
   const rows: ChartTrackingRow[] = [];
   const store = fixture(count, source, true);
+  settleHeap();
   const events: ChartChangeEvent[] = [];
   let started = 0;
   let eventLatency = 0;
@@ -407,6 +426,8 @@ async function coldSample(
   const store = fixture(count, source, true);
   const events: ChartChangeEvent[] = [];
   const detach = subscribeChartChanges(store, (event) => events.push(event));
+  settleHeap();
+  await Bun.sleep(COLD_SETTLE_MS);
   try {
     const patch: DocumentOp = {
       op: "set",

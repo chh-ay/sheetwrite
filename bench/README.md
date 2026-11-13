@@ -1018,7 +1018,11 @@ resolution count.
 Cold rows time the first commit after load plus resolving the charts it
 names, for inside and outside edits at 2,000 and 20,000 charts and each
 selected source. Every sample is a fresh process (`--cold-sample`), 21 per
-row, so a first-use cost that warm rows amortize away stays visible.
+row, so a first-use cost that warm rows amortize away stays visible. A cold
+sample waits one second after load, because the engine's WebAssembly is still
+compiling on background threads right after load and a commit inside that
+window measured the race with the compiler. Every row (warm or cold) starts
+after a full garbage collection of its fixture's setup.
 
 Smoke admits both full-size 20,000-chart fixtures before it records the
 200-chart timing rows, with five samples and two warmups. Setup transactions
