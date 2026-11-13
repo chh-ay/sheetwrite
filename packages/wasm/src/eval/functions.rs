@@ -12,7 +12,10 @@ use super::{date, financial, math, statistics, text};
 
 // The column fold tells empty and number kinds apart from the rest by their
 // bits alone.
-const _: () = assert!(KIND_EMPTY == 0 && KIND_NUMBER == 1);
+const _: () = assert!(
+    KIND_EMPTY == 0 && KIND_NUMBER == 1,
+    "the column fold tells empty and number kinds apart by their bits"
+);
 
 pub(super) const MAX_FUNCTION_ARGS: usize = 254;
 

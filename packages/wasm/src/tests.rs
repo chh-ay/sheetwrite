@@ -21,7 +21,10 @@ fn string(store: &CellStore, sheet: usize, row: usize, col: usize) -> Option<Str
 }
 
 fn put_number(sheet: &mut SheetData, row: usize, col: usize, value: f64) {
-    assert!(sheet.write_cell(row, col, KIND_NUMBER, encode_num(value), 0, None));
+    assert!(
+        sheet.write_cell(row, col, KIND_NUMBER, encode_num(value), 0, None),
+        "the number is written"
+    );
 }
 
 struct DecodedWindow {
@@ -35,7 +38,10 @@ struct DecodedWindow {
 
 fn decode_window(mut view: WindowView) -> DecodedWindow {
     let packed = view.take_packed();
-    assert!(packed.len() >= 40);
+    assert!(
+        packed.len() >= 40,
+        "the packed window holds its 40-byte header"
+    );
     let word = |index: usize| {
         u32::from_le_bytes(
             packed[index * 4..index * 4 + 4]
@@ -43,18 +49,29 @@ fn decode_window(mut view: WindowView) -> DecodedWindow {
                 .expect("complete packed header word"),
         )
     };
-    assert_eq!(word(0), 0x3157_4e53);
-    assert_eq!(word(1), 1);
-    assert_eq!(word(2), 40);
-    assert_eq!(word(3) as usize, packed.len());
+    assert_eq!(word(0), 0x3157_4e53, "the packed window magic");
+    assert_eq!(word(1), 1, "the packed window version");
+    assert_eq!(word(2), 40, "the packed window header length");
+    assert_eq!(
+        word(3) as usize,
+        packed.len(),
+        "the packed window total length"
+    );
     let rows = word(4) as usize;
     let cols = word(5) as usize;
     let cells = word(6) as usize;
     let styles = word(7) as usize;
     let cond_matches = word(8) as usize;
     let strings = word(9) as usize;
-    assert_eq!(rows.checked_mul(cols), Some(cells));
-    assert!(cond_matches == 0 || cond_matches == cells);
+    assert_eq!(
+        rows.checked_mul(cols),
+        Some(cells),
+        "the cell count is rows times columns"
+    );
+    assert!(
+        cond_matches == 0 || cond_matches == cells,
+        "conditional matches are absent or one per cell"
+    );
 
     let kinds_start = 40;
     let numbers_start = (kinds_start + cells + 7) & !7;
@@ -63,7 +80,11 @@ fn decode_window(mut view: WindowView) -> DecodedWindow {
     let style_index_start = string_index_start + cells * 4;
     let style_dict_start = style_index_start + cells * 4;
     let cond_matches_start = style_dict_start + styles * 4;
-    assert_eq!(cond_matches_start + cond_matches * 4, packed.len());
+    assert_eq!(
+        cond_matches_start + cond_matches * 4,
+        packed.len(),
+        "the conditional matches end the buffer"
+    );
 
     let decode_u32 = |start: usize, len: usize| {
         (0..len)
@@ -77,7 +98,11 @@ fn decode_window(mut view: WindowView) -> DecodedWindow {
             .collect::<Vec<_>>()
     };
     let decoded_strings = view.take_strings();
-    assert_eq!(decoded_strings.len(), strings);
+    assert_eq!(
+        decoded_strings.len(),
+        strings,
+        "one decoded string per string id"
+    );
     DecodedWindow {
         kinds: packed[kinds_start..kinds_start + cells].to_vec(),
         string_index: decode_u32(string_index_start, cells)
@@ -750,7 +775,7 @@ fn deep_formula_evaluation_returns_num_error() {
     let sheet = store.add_sheet(2, FORMULA_RECURSION_LIMIT + 5);
     store.set_number(sheet, 0, 0, 1.0, 0);
     for row in 1..FORMULA_RECURSION_LIMIT + 4 {
-        let src = format!("=A{}+1", row);
+        let src = format!("=A{row}+1");
         store.set_formula(sheet, row, 0, &src, 0);
     }
     store.recompute(sheet);
@@ -776,7 +801,7 @@ fn public_api_bounds_checks_do_not_panic() {
         store.clear_cell(sheet, 9, 9, 0);
         store.set_formula(sheet, 9, 0, "=A1", 0);
         store.set_column_numbers(sheet, 9, 0, &[1.0, 2.0], 0);
-        store.set_column_strings(sheet, 9, 0, vec!["x".to_string()], 0);
+        store.set_column_strings(sheet, 9, 0, vec!["x".to_owned()], 0);
         store.add_rows(99, 0, 1);
         store.remove_rows(99, 0, 1);
 
@@ -1021,18 +1046,18 @@ fn structural_edits_rewrite_cross_sheet_targets_and_preserve_qualifiers() {
 fn packed_string_loader_survives_hostile_utf16_lengths() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(4, 6);
-    store.set_column_strings_packed(sheet, 0, 0, "abc".to_string(), &[2, 5, 3], 0);
+    store.set_column_strings_packed(sheet, 0, 0, "abc".to_owned(), &[2, 5, 3], 0);
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("ab"));
     assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("c"));
     assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some(""));
-    store.set_column_strings_packed(sheet, 1, 0, "abcdef".to_string(), &[2, 1], 0);
+    store.set_column_strings_packed(sheet, 1, 0, "abcdef".to_owned(), &[2, 1], 0);
     assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("ab"));
     assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("c"));
     assert_eq!(string(&store, sheet, 2, 1), None);
-    store.set_column_strings_packed(sheet, 2, 0, "𝄞x".to_string(), &[1, 1], 0);
+    store.set_column_strings_packed(sheet, 2, 0, "𝄞x".to_owned(), &[1, 1], 0);
     assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("𝄞"));
     assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("x"));
-    store.set_column_strings_packed(sheet, 3, 0, "é漢z".to_string(), &[1, 1, 1], 0);
+    store.set_column_strings_packed(sheet, 3, 0, "é漢z".to_owned(), &[1, 1, 1], 0);
     assert_eq!(string(&store, sheet, 0, 3).as_deref(), Some("é"));
     assert_eq!(string(&store, sheet, 1, 3).as_deref(), Some("漢"));
     assert_eq!(string(&store, sheet, 2, 3).as_deref(), Some("z"));
@@ -1084,11 +1109,11 @@ fn conditional_format_window_masks_cover_predicates_bounds_and_row_order() {
         &[7.0, 0.0, 10.0, 10.0, 0.0, 0.0],
         vec![
             String::new(),
-            "tokyo".to_string(),
+            "tokyo".to_owned(),
             String::new(),
             String::new(),
-            "Tokyo".to_string(),
-            "TOK".to_string(),
+            "Tokyo".to_owned(),
+            "TOK".to_owned(),
         ],
         &[0, 0, 0, 0, 0, 1],
     );
@@ -1113,7 +1138,7 @@ fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edit
         &[6, 6],
         &[0, 2, 2, 2, 0, 2, 2, 2],
         &[0.0, 0.0],
-        vec!["=A1>$B$1".to_string(), "=TRUE".to_string()],
+        vec!["=A1>$B$1".to_owned(), "=TRUE".to_owned()],
         &[2, 0],
     );
 
@@ -1789,7 +1814,7 @@ fn multi_filter_kinds_match_resolved_cell_values() {
             &[0],
             &[1],
             &[],
-            vec!["Alpha".to_string()],
+            vec!["Alpha".to_owned()],
         ),
         vec![2]
     );
@@ -1803,7 +1828,7 @@ fn multi_filter_kinds_match_resolved_cell_values() {
             &[0],
             &[1],
             &[],
-            vec!["\0TRUE".to_string()],
+            vec!["\0TRUE".to_owned()],
         ),
         vec![3]
     );
@@ -1821,7 +1846,7 @@ fn multi_filter_kinds_match_resolved_cell_values() {
             &[0],
             &[1],
             &[],
-            vec!["div/0".to_string()],
+            vec!["div/0".to_owned()],
         ),
         vec![5]
     );
@@ -1949,7 +1974,7 @@ fn mixed_block_owns_formula_and_reference_sources_and_recomputes_once() {
             &[0, 4],
             &[1, 2, 3, 4],
             &[1],
-            vec!["=A1*3".to_string()],
+            vec!["=A1*3".to_owned()],
             &[2],
             &[sheet as u32, 0, 1],
         ),
@@ -2647,7 +2672,7 @@ fn column_major_block_input_rejects_metadata_that_row_major_rejects() {
             &[0],
             &[0],
             &[4],
-            vec!["=A1".to_string()],
+            vec!["=A1".to_owned()],
             &[],
             &[],
         ),
@@ -2667,7 +2692,7 @@ fn column_major_block_input_rejects_metadata_that_row_major_rejects() {
             &[0],
             &[0, 0],
             &[0, 0],
-            vec!["=A1".to_string(), "=A2".to_string()],
+            vec!["=A1".to_owned(), "=A2".to_owned()],
             &[],
             &[],
         ),
@@ -2787,7 +2812,7 @@ mod value_set_filter {
             &[numbers.len() as u32],
             &[texts.len() as u32],
             numbers,
-            texts.iter().map(|text| (*text).to_string()).collect(),
+            texts.iter().map(|text| (*text).to_owned()).collect(),
         )
     }
 

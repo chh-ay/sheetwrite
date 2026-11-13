@@ -186,7 +186,7 @@ fn text_outputs(numbers: &[f64], code: &str) -> Vec<String> {
         .map(
             |&number| match format_basic_text(&Value::Number(number), code) {
                 Ok(text) => text,
-                Err(error) => error.sentinel().to_string(),
+                Err(error) => error.sentinel().to_owned(),
             },
         )
         .collect()
@@ -198,7 +198,7 @@ fn views(numbers: &[f64]) -> Vec<(String, u64)> {
 
     let general: Vec<String> = numbers.iter().map(|&number| general_text(number)).collect();
     views.push((
-        "general text".to_string(),
+        "general text".to_owned(),
         digest(general.iter().map(String::as_str)),
     ));
 
@@ -207,7 +207,7 @@ fn views(numbers: &[f64]) -> Vec<(String, u64)> {
         .map(|&number| significant(number).to_bits().to_string())
         .collect();
     views.push((
-        "significant".to_string(),
+        "significant".to_owned(),
         digest(shown.iter().map(String::as_str)),
     ));
 
