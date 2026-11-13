@@ -165,20 +165,19 @@ impl Axis {
                 let found = bucket.iter().copied().find(|&group| {
                     compare_group_values(&groups[group].fields[width - 1], value) == Ordering::Equal
                 });
-                let group = match found {
-                    Some(group) => group,
-                    None => {
-                        // A new group stores its key: work per group, not per row.
-                        context.charge(width)?;
-                        let index = groups.len();
-                        groups.push(Group {
-                            fields: values.to_vec(),
-                            rows: Vec::new(),
-                            parent: Some(parent),
-                        });
-                        bucket.push(index);
-                        index
-                    }
+                let group = if let Some(group) = found {
+                    group
+                } else {
+                    // A new group stores its key: work per group, not per row.
+                    context.charge(width)?;
+                    let index = groups.len();
+                    groups.push(Group {
+                        fields: values.to_vec(),
+                        rows: Vec::new(),
+                        parent: Some(parent),
+                    });
+                    bucket.push(index);
+                    index
                 };
                 groups[group].rows.push(row);
                 memberships[row * membership_width + width] = group;
@@ -525,7 +524,7 @@ fn check_placements(
         None => Some(row_levels),
     };
     per_row
-        .and_then(|per_row| per_row.checked_mul(rows))
+        .and_then(|count| count.checked_mul(rows))
         .and_then(|placements| placements.checked_mul(value_cols))
         .filter(|placements| *placements <= GROUPING_MAX_PLACEMENTS)
         .map(|_| ())
