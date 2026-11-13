@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 use super::model_source::ModelSource;
 use super::pivot_output::{attempt_cut, shift_anchor, ShiftAxis};
 use super::relationships::ColumnRef;
-use super::{CellStore, TableColumnDefinition, TableDefinition};
+use super::CellStore;
 use crate::calc::shift_range;
 use crate::eval::{calculated_slot, settled_cell_value};
 use crate::formula_slots::{FormulaStore, FormulaWork};
@@ -31,6 +31,7 @@ use crate::pivot::{
 };
 use crate::sheet::SheetData;
 use crate::spill::SpillRange;
+use crate::tables::{Table, TableColumn};
 use crate::types::{CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
 /// Value field whose field slot names a measure ID in the string payload.
 const MEASURE_VALUE_CODE: u32 = 7;
@@ -357,7 +358,7 @@ pub(super) struct SourceRect {
 }
 
 impl SourceRect {
-    pub(super) fn table(table: &TableDefinition) -> Self {
+    pub(super) fn table(table: &Table) -> Self {
         let first = table.row_start + u32::from(table.header_row);
         let end = table.row_end + 1 - u32::from(table.totals_row);
         Self {
@@ -438,7 +439,7 @@ struct StoreSource<'a> {
     slots: &'a FormulaStore,
     rect: SourceRect,
     /// A table's column names, which are its field names.
-    names: Option<&'a [TableColumnDefinition]>,
+    names: Option<&'a [TableColumn]>,
     model: Option<ModelSource<'a>>,
 }
 
@@ -943,7 +944,7 @@ impl CellStore {
     fn resolve_pivot_source(
         &self,
         source: &SourceRef,
-    ) -> Result<(SourceRect, Option<&[TableColumnDefinition]>), FormulaError> {
+    ) -> Result<(SourceRect, Option<&[TableColumn]>), FormulaError> {
         match source {
             SourceRef::Range { sheet, rows, cols } => {
                 let data = self
@@ -1245,8 +1246,12 @@ impl CellStore {
                 pivot.source = None;
                 // A failed model still reads its tables, so fixing a key or
                 // a missing table must wake it.
-                pivot.related = matches!(pivot.saved.source, SourceRef::Model { .. })
-                    .then(|| self.tables.values().map(SourceRect::table).collect());
+                pivot.related = matches!(pivot.saved.source, SourceRef::Model { .. }).then(|| {
+                    self.tables
+                        .iter()
+                        .map(|(_, table)| SourceRect::table(table))
+                        .collect()
+                });
                 return Err(error);
             }
         };
@@ -1266,7 +1271,11 @@ impl CellStore {
                 .any(|value| value.measure.is_some())
         }) {
             let mut rects = related.to_vec();
-            for rect in self.tables.values().map(SourceRect::table) {
+            for rect in self
+                .tables
+                .iter()
+                .map(|(_, table)| SourceRect::table(table))
+            {
                 if !rects.contains(&rect) {
                     rects.push(rect);
                 }
