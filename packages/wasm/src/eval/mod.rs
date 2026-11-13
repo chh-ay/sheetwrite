@@ -30,6 +30,10 @@ mod number_format_corpus_tests;
 mod operators;
 #[cfg(test)]
 mod pass_rule_tests;
+mod preview;
+mod preview_limits;
+#[cfg(test)]
+mod preview_tests;
 mod random;
 mod range_fold;
 mod range_reader;
@@ -3163,6 +3167,12 @@ impl CellStore {
         if total > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
+        preview_limits::range(
+            s,
+            (row_start, col_start),
+            (row_len, col_len),
+            preview_limits::RangeRead::Cells,
+        )?;
 
         values.reserve(total as usize)?;
         let literals = LiteralSources::new(s, depth);

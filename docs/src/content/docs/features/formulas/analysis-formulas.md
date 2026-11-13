@@ -346,5 +346,6 @@ Limits of the full engine:
 
 - `LAMBDA` parameters bind lexically, and `LET` can bind a `LAMBDA`. An uncalled `LAMBDA` returns `#CALC!`. A call with the wrong number of arguments returns `#VALUE!`. Calls are limited to a depth of 64 and 2,000,000 work units per outer helper; more returns `#NUM!`.
 - `GROUPBY` and `PIVOTBY` accept one built-in function name, such as `SUM`, or a `LAMBDA` with one or two parameters. A vector of functions, such as `HSTACK(SUM,AVERAGE)`, returns `#VALUE!`.
+- `GROUPBY` and `PIVOTBY` read every source row of a full worksheet. The source rows do not count against the 2,000,000-operation limit; the groups, the sorting, the result cells and the rows passed to each `LAMBDA` or other function do. Each source value also counts once for every group, subtotal and total it belongs to, up to 16,777,216 in all (with two row fields, one column field and one value column, a source row counts 11). Past either limit, or past the 1,000,000-cell result limit, they return `#NUM!`.
 - Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
 
