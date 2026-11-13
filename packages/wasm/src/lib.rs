@@ -63,6 +63,8 @@ mod spill;
 #[cfg(feature = "formula-engine")]
 mod store;
 #[cfg(feature = "formula-engine")]
+mod tables;
+#[cfg(feature = "formula-engine")]
 mod transfer;
 #[cfg(feature = "formula-engine")]
 mod types;
