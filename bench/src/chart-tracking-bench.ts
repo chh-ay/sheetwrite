@@ -184,140 +184,181 @@ function fixture(
   return store;
 }
 
+type ChartSource = "literal" | "formula";
+/**
+ * Literal-source rows first: they are the control, and formula rows resolve
+ * hundreds of charts per commit, which leaves the resolution path warmed up
+ * for whatever runs after them. `--source` runs one source per process.
+ */
+const SOURCES: readonly ChartSource[] = ["literal", "formula"];
+
+/** Commit time of the no-chart control workbook of `count` charts' size. */
+function measureControl(count: number, samples: number, warmups: number): Stat {
+  const control = fixture(count, "literal", false);
+  const controlTimes: number[] = [];
+  try {
+    // Keep the subscription and workbook shape identical in the no-chart control.
+    const detach = subscribeChartChanges(control, () => {
+      throw new Error("No-chart control emitted an event");
+    });
+    for (let iteration = -warmups; iteration < samples; iteration++) {
+      const patch: DocumentOp = {
+        op: "set",
+        addr: { sheet: SOURCE_SHEET, row: count + 1, col: OUTSIDE_COL },
+        value: { kind: "literal", value: iteration },
+      };
+      const start = now();
+      apply(control, [patch]);
+      const elapsed = now() - start;
+      if (iteration >= 0) controlTimes.push(elapsed);
+    }
+    detach();
+  } finally {
+    control.dispose();
+  }
+  return summarize(controlTimes);
+}
+
+interface SourceRun {
+  readonly count: number;
+  readonly source: ChartSource;
+  readonly baselineMs: Stat;
+  readonly samples: number;
+  readonly warmups: number;
+}
+
+/** The outside and inside rows of one workbook. */
+function measureSource({
+  count,
+  source,
+  baselineMs,
+  samples,
+  warmups,
+}: SourceRun): ChartTrackingRow[] {
+  const rows: ChartTrackingRow[] = [];
+  const store = fixture(count, source, true);
+  const events: ChartChangeEvent[] = [];
+  let started = 0;
+  let eventLatency = 0;
+  let resolutions = 0;
+  const detach = subscribeChartChanges(store, (event) => {
+    eventLatency = now() - started;
+    events.push(event);
+    // Resolving views is consumer work, not chart invalidation.
+  });
+  try {
+    for (const scenario of ["outside", "inside"] as const) {
+      const required = scenario === "inside" ? [reference(0)] : [];
+      const allowed =
+        source === "formula"
+          ? Array.from({ length: count }, (_, index) => reference(index))
+          : required;
+      const commits: number[] = [];
+      const latencies: number[] = [];
+      const resolveTimes: number[] = [];
+      const named: number[] = [];
+      for (let iteration = -warmups; iteration < samples; iteration++) {
+        events.length = 0;
+        resolutions = 0;
+        // The literal dependency is inside the chart source, so no index rebuild is needed.
+        const row = scenario === "outside" ? count + 1 : 0;
+        const col = scenario === "outside" ? OUTSIDE_COL : EDIT_VALUE_COL;
+        const value = iteration + samples + warmups + 1;
+        const patch: DocumentOp = {
+          op: "set",
+          addr: { sheet: SOURCE_SHEET, row, col },
+          value: { kind: "literal", value },
+        };
+        started = now();
+        apply(store, [patch]);
+        const elapsed = now() - started;
+        const namedCharts = checkChartEvents(events, required, allowed);
+        // Resolution is what a consumer does with the event; it is timed on its own.
+        const resolved: Array<{ ref: ChartRef; view: ChartView | null }> = [];
+        const resolveStart = now();
+        for (const event of events) {
+          for (const ref of event.charts) {
+            resolved.push({ ref, view: resolveChartView(store, ref.sheet, ref.id) });
+          }
+        }
+        const resolveElapsed = now() - resolveStart;
+        for (const { ref, view } of resolved) {
+          if (view === null) {
+            throw new Error(`Reported chart did not resolve: ${ref.sheet}/${ref.id}`);
+          }
+          if (scenario === "inside" && ref.id === reference(0).id) {
+            const values = view.series[0]?.values;
+            if (
+              values?.[EDIT_VALUE_COL] !== value ||
+              (source === "formula" && values?.[SOURCE_VALUE_COL] !== value * FORMULA_FACTOR)
+            ) {
+              throw new Error("Reported chart did not contain the committed source value");
+            }
+          }
+          resolutions++;
+        }
+        if (resolutions !== namedCharts) throw new Error("Incorrect chart resolution count");
+        if (iteration >= 0) {
+          commits.push(elapsed);
+          named.push(namedCharts);
+          if (namedCharts > 0) {
+            latencies.push(eventLatency);
+            resolveTimes.push(resolveElapsed);
+          }
+        }
+      }
+      rows.push({
+        chartCount: count,
+        source,
+        scenario:
+          source === "formula" && scenario === "inside" ? "literal-dependency-edit" : scenario,
+        commitMs: summarize(commits),
+        baselineMs,
+        eventMs: latencies.length > 0 ? summarize(latencies) : null,
+        resolveMs: resolveTimes.length > 0 ? summarize(resolveTimes) : null,
+        expectedEvents: summarize(named).median > 0 ? 1 : 0,
+        expectedCharts: summarize(named).median,
+        resolutionsPerCommit: summarize(named).median,
+        requiredCharts: required.length,
+      });
+    }
+  } finally {
+    detach();
+    store.dispose();
+  }
+  return rows;
+}
+
 /** Setup, index construction, and correctness checks are outside the timed interval. */
-export async function captureChartTracking(smoke: boolean): Promise<ChartTrackingArtifact> {
+export async function captureChartTracking(
+  smoke: boolean,
+  only?: ChartSource,
+): Promise<ChartTrackingArtifact> {
   await initSheetwrite({ engine: formulas });
   // Smoke must check full-size admission even though it records only short timing rows.
   if (smoke) {
     const largest = Math.max(...FULL_COUNTS);
-    for (const source of ["literal", "formula"] as const) {
+    for (const source of SOURCES) {
       fixture(largest, source, true).dispose();
     }
   }
   const samples = smoke ? 5 : SAMPLES;
   const warmups = smoke ? 2 : WARMUPS;
+  const counts: readonly number[] = smoke ? [200] : FULL_COUNTS;
+  const baselines = new Map<number, Stat>();
+  for (const count of counts) baselines.set(count, measureControl(count, samples, warmups));
+
   const rows: ChartTrackingRow[] = [];
-  let baseline: Stat | undefined;
-
-  for (const count of smoke ? [200] : FULL_COUNTS) {
-    const control = fixture(count, "literal", false);
-    const controlTimes: number[] = [];
-    try {
-      // Keep the subscription and workbook shape identical in the no-chart control.
-      const detach = subscribeChartChanges(control, () => {
-        throw new Error("No-chart control emitted an event");
-      });
-      for (let iteration = -warmups; iteration < samples; iteration++) {
-        const patch: DocumentOp = {
-          op: "set",
-          addr: { sheet: SOURCE_SHEET, row: count + 1, col: OUTSIDE_COL },
-          value: { kind: "literal", value: iteration },
-        };
-        const start = now();
-        apply(control, [patch]);
-        const elapsed = now() - start;
-        if (iteration >= 0) controlTimes.push(elapsed);
-      }
-      detach();
-    } finally {
-      control.dispose();
-    }
-    const baselineMs = summarize(controlTimes);
-    if (count === 2_000 || baseline === undefined) baseline = baselineMs;
-
-    for (const source of ["literal", "formula"] as const) {
-      const store = fixture(count, source, true);
-      const events: ChartChangeEvent[] = [];
-      let started = 0;
-      let eventLatency = 0;
-      let resolutions = 0;
-      const detach = subscribeChartChanges(store, (event) => {
-        eventLatency = now() - started;
-        events.push(event);
-        // Resolving views is consumer work, not chart invalidation.
-      });
-      try {
-        for (const scenario of ["outside", "inside"] as const) {
-          const required = scenario === "inside" ? [reference(0)] : [];
-          const allowed =
-            source === "formula"
-              ? Array.from({ length: count }, (_, index) => reference(index))
-              : required;
-          const commits: number[] = [];
-          const latencies: number[] = [];
-          const resolveTimes: number[] = [];
-          const named: number[] = [];
-          for (let iteration = -warmups; iteration < samples; iteration++) {
-            events.length = 0;
-            resolutions = 0;
-            // The literal dependency is inside the chart source, so no index rebuild is needed.
-            const row = scenario === "outside" ? count + 1 : 0;
-            const col = scenario === "outside" ? OUTSIDE_COL : EDIT_VALUE_COL;
-            const value = iteration + samples + warmups + 1;
-            const patch: DocumentOp = {
-              op: "set",
-              addr: { sheet: SOURCE_SHEET, row, col },
-              value: { kind: "literal", value },
-            };
-            started = now();
-            apply(store, [patch]);
-            const elapsed = now() - started;
-            const namedCharts = checkChartEvents(events, required, allowed);
-            // Resolution is what a consumer does with the event; it is timed on its own.
-            const resolved: Array<{ ref: ChartRef; view: ChartView | null }> = [];
-            const resolveStart = now();
-            for (const event of events) {
-              for (const ref of event.charts) {
-                resolved.push({ ref, view: resolveChartView(store, ref.sheet, ref.id) });
-              }
-            }
-            const resolveElapsed = now() - resolveStart;
-            for (const { ref, view } of resolved) {
-              if (view === null) {
-                throw new Error(`Reported chart did not resolve: ${ref.sheet}/${ref.id}`);
-              }
-              if (scenario === "inside" && ref.id === reference(0).id) {
-                const values = view.series[0]?.values;
-                if (
-                  values?.[EDIT_VALUE_COL] !== value ||
-                  (source === "formula" && values?.[SOURCE_VALUE_COL] !== value * FORMULA_FACTOR)
-                ) {
-                  throw new Error("Reported chart did not contain the committed source value");
-                }
-              }
-              resolutions++;
-            }
-            if (resolutions !== namedCharts) throw new Error("Incorrect chart resolution count");
-            if (iteration >= 0) {
-              commits.push(elapsed);
-              named.push(namedCharts);
-              if (namedCharts > 0) {
-                latencies.push(eventLatency);
-                resolveTimes.push(resolveElapsed);
-              }
-            }
-          }
-          rows.push({
-            chartCount: count,
-            source,
-            scenario:
-              source === "formula" && scenario === "inside" ? "literal-dependency-edit" : scenario,
-            commitMs: summarize(commits),
-            baselineMs,
-            eventMs: latencies.length > 0 ? summarize(latencies) : null,
-            resolveMs: resolveTimes.length > 0 ? summarize(resolveTimes) : null,
-            expectedEvents: summarize(named).median > 0 ? 1 : 0,
-            expectedCharts: summarize(named).median,
-            resolutionsPerCommit: summarize(named).median,
-            requiredCharts: required.length,
-          });
-        }
-      } finally {
-        detach();
-        store.dispose();
-      }
+  for (const source of only === undefined ? SOURCES : [only]) {
+    for (const count of counts) {
+      const baselineMs = baselines.get(count);
+      if (baselineMs === undefined) throw new Error(`Missing no-chart baseline for ${count}`);
+      rows.push(...measureSource({ count, source, baselineMs, samples, warmups }));
     }
   }
+  // Report rows by chart count, as before; the measurement order is above.
+  rows.sort((left, right) => left.chartCount - right.chartCount);
+  const baseline = baselines.get(2_000) ?? baselines.get(counts[0] ?? 0);
 
   if (baseline === undefined) throw new Error("Missing no-chart baseline");
   return {
@@ -341,10 +382,15 @@ if (import.meta.main) {
   const { values } = parseArgs({
     options: {
       smoke: { type: "boolean", default: false },
+      source: { type: "string" },
       output: { type: "string", default: "results/chart-tracking-results.json" },
     },
   });
-  const result = await captureChartTracking(values.smoke);
+  const { source } = values;
+  if (source !== undefined && source !== "literal" && source !== "formula") {
+    throw new Error("--source must be literal or formula");
+  }
+  const result = await captureChartTracking(values.smoke, source);
   const json = `${JSON.stringify(result, null, 2)}\n`;
   mkdirSync(dirname(values.output), { recursive: true });
   writeFileSync(values.output, json);

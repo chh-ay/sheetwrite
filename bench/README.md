@@ -979,8 +979,12 @@ to `results/version-comparison/`.
 uses 200, 2,000, and 20,000 charts, at most 100 per owner sheet, sourcing
 distinct two-cell rows in one contiguous region of the data sheet. The no-chart
 control has the same sheets and data as its corresponding literal-source
-workbook. Each measured operation is one committed cell edit, not an
-amortized batch. Median and p95 summarize 101 samples after 20 warmups.
+workbook. All no-chart controls run first, then every literal-source row,
+then every formula-source row: formula rows resolve hundreds of charts per
+commit and leave that path warmed up for whatever runs after them, so the
+literal rows (the control for chart work) never follow them. `--source
+literal` or `--source formula` runs one source in its own process. Each
+measured operation is one committed cell edit, not an amortized batch. Median and p95 summarize 101 samples after 20 warmups.
 Initial index construction and correctness assertions are untimed.
 
 Literal-source outside edits must emit no event and perform no view
