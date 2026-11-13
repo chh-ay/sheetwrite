@@ -3833,12 +3833,43 @@ impl CellStore {
         }
     }
 
+    /// Parses a formula as [`Self::resolve_unbound_formula`] does, then binds
+    /// its literal REGEX patterns to the patterns the store's formulas share.
+    /// The features tell whether a sheet reference stayed detached and
+    /// whether the formula has a table reference.
+    fn resolve_formula_ast(
+        &self,
+        source: &str,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Result<ResolvedFormula, FormulaError> {
+        let (ast, features) =
+            self.resolve_unbound_formula(source, formula_sheet, formula_row, formula_col)?;
+        #[cfg(feature = "analysis")]
+        let resolved = self.bind_regex_patterns(source, ast);
+        #[cfg(not(feature = "analysis"))]
+        let resolved = ast;
+        Ok((resolved, features))
+    }
+
+    /// A formula resolved as [`Self::resolve_formula_ast`] does, without
+    /// touching the store's shared REGEX patterns, for a result preview.
+    pub(crate) fn resolve_preview_ast(
+        &self,
+        source: &str,
+        formula_sheet: u32,
+        formula_row: u32,
+        formula_col: u32,
+    ) -> Result<Ast, FormulaError> {
+        self.resolve_unbound_formula(source, formula_sheet, formula_row, formula_col)
+            .map(|(ast, _)| ast)
+    }
+
     /// Parses a formula, binding its sheet and table references as it goes,
     /// then resolves its defined names when the parse found a name, so a
-    /// formula of plain cells is parsed in one pass. The features tell
-    /// whether a sheet reference stayed detached and whether the formula has
-    /// a table reference.
-    fn resolve_formula_ast(
+    /// formula of plain cells is parsed in one pass.
+    fn resolve_unbound_formula(
         &self,
         source: &str,
         formula_sheet: u32,
@@ -3863,11 +3894,7 @@ impl CellStore {
             ast = self.resolve_defined_names(ast, formula_sheet, &placement);
         }
 
-        #[cfg(feature = "analysis")]
-        let resolved = self.bind_regex_patterns(source, ast);
-        #[cfg(not(feature = "analysis"))]
-        let resolved = ast;
-        Ok((resolved, features))
+        Ok((ast, features))
     }
 
     /// Resolves a parsed formula as if it were in the cell at

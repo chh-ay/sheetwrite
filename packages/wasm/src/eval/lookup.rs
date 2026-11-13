@@ -1221,7 +1221,7 @@ impl CellStore {
         let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
-        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+        let total = EvalMatrix::validate_reference_shape(rows, cols)?;
         let (Some(sources), true) = (data.cells.dense_sources(), depth < FORMULA_RECURSION_LIMIT)
         else {
             return Ok(None);
@@ -1264,6 +1264,12 @@ impl CellStore {
         if payload_bytes > SPILL_MAX_BYTES {
             return Err(FormulaError::Num);
         }
+        super::preview_limits::range(
+            data,
+            (row_start, col_start),
+            (rows, cols),
+            super::preview_limits::RangeRead::Typed,
+        )?;
 
         Ok(Some(StorageRange {
             sheet,

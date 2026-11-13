@@ -364,6 +364,7 @@ struct Context<'a, 'p> {
 
 impl Context<'_, '_> {
     fn call_body(&mut self, arguments: &[Ast]) -> Result<Ast, FormulaError> {
+        super::super::preview_limits::work(1)?;
         let function = arguments.first().ok_or(FormulaError::Value)?;
         let (parameters, _) = definition(function)?;
         if parameters.len() != arguments.len() - 1 {
@@ -407,6 +408,8 @@ impl Context<'_, '_> {
     }
     fn invoke(&mut self, function: &Ast, arguments: &[Ast]) -> Result<Value, FormulaError> {
         CallBudget::charge(1)?;
+        // A result preview counts calls, not the nodes each call substitutes.
+        super::super::preview_limits::work(1)?;
         if self.depth >= FORMULA_RECURSION_LIMIT {
             return Err(FormulaError::Num);
         }
