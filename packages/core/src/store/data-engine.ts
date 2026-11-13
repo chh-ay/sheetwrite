@@ -225,8 +225,6 @@ import {
   CELL_STATE_LOCAL_EDIT,
 } from "./wire-tags.js";
 
-/** Values per engine recalculation rectangle: sheet handle, row start/end, column start/end. */
-const RECALCULATION_RECT_WIDTH = 5;
 /** Shared report of a commit that recalculated nothing; never written. */
 const EMPTY_RECALCULATION = new Uint32Array(0);
 
@@ -2079,33 +2077,19 @@ export class StoreDataEngine {
   }
 
   /**
-   * Visit the half-open bounds the commit `epoch` recalculated. False asks the tracker to
-   * refresh conservatively: tracking off, an overflowing report, or a listener that
-   * committed again before this one ran.
+   * The half-open `[sheet handle, row start, row end, col start, col end)`
+   * rectangles the commit `epoch` recalculated, or null to refresh
+   * conservatively: tracking off, an overflowing report, or a listener that
+   * committed again before this one ran. Read-only; resolve handles with
+   * {@link sheetIdOfHandle}.
    */
-  visitChartRecalculation(
-    epoch: number | undefined,
-    visit: (sheet: SheetId, r0: number, r1: number, c0: number, c1: number) => void,
-  ): boolean {
-    const rects = this.chartRecalculation;
-    if (rects === null || epoch !== this.chartRecalculationEpoch) return false;
-    for (let offset = 0; offset < rects.length; offset += RECALCULATION_RECT_WIDTH) {
-      const handle = rects[offset];
-      const r0 = rects[offset + 1];
-      const r1 = rects[offset + 2];
-      const c0 = rects[offset + 3];
-      const c1 = rects[offset + 4];
-      const sheet = handle === undefined ? undefined : this.sheetIdsByHandle[handle];
-      if (
-        sheet !== undefined &&
-        r0 !== undefined &&
-        r1 !== undefined &&
-        c0 !== undefined &&
-        c1 !== undefined
-      )
-        visit(sheet, r0, r1, c0, c1);
-    }
-    return true;
+  recalculatedRects(epoch: number | undefined): Uint32Array | null {
+    return epoch === this.chartRecalculationEpoch ? this.chartRecalculation : null;
+  }
+
+  /** The sheet an engine handle names, or undefined for a removed sheet. */
+  sheetIdOfHandle(handle: number): SheetId | undefined {
+    return this.sheetIdsByHandle[handle];
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {

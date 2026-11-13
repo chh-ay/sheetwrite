@@ -471,6 +471,11 @@ class ChartIndex {
   }
 }
 
+/** Values per engine recalculation rectangle: sheet handle, row start/end, column start/end. */
+const RECALCULATION_RECT_WIDTH = 5;
+/** A handle no sheet has; `sheetIdOfHandle` returns undefined for it. */
+const NO_SHEET_HANDLE = -1;
+
 /** Upper bound for open-ended index queries; larger than any row or column index. */
 const UNBOUNDED = Number.MAX_SAFE_INTEGER;
 
@@ -669,17 +674,21 @@ class ChartTracker {
   readonly listeners = new Set<ChartChangeListener>();
   private index: ChartIndex;
   private readonly hits = new ChartHits();
+  /** One bound callback for every index query, so a commit allocates none. */
+  private readonly addHit = (chart: number): void => this.hits.add(chart);
+  private readonly engine: StoreDataEngine | null;
   private readonly detach: () => void;
 
   constructor(private readonly store: Store) {
     this.index = new ChartIndex(store);
-    storeEngine(store)?.trackChartRecalculation(true);
+    this.engine = storeEngine(store);
+    this.engine?.trackChartRecalculation(true);
     this.detach = store.on("change", (event) => this.onChange(event));
   }
 
   dispose(): void {
     this.detach();
-    storeEngine(this.store)?.trackChartRecalculation(false);
+    this.engine?.trackChartRecalculation(false);
   }
 
   /**
@@ -692,6 +701,33 @@ class ChartTracker {
 
     const event: ChartChangeEvent = { epoch: undefined, charts: [...charts] };
     for (const listener of this.listeners) listener(event);
+  }
+
+  /**
+   * Name the indexed charts whose sources meet a rectangle the engine
+   * recalculated in commit `epoch`. False when the engine cannot tell, so
+   * the caller names every chart.
+   */
+  private queryRecalculated(epoch: number | undefined, index: ChartIndex): boolean {
+    const engine = this.engine;
+    const rects = engine?.recalculatedRects(epoch);
+    if (!engine || !rects) return false;
+    for (
+      let offset = 0;
+      offset + RECALCULATION_RECT_WIDTH <= rects.length;
+      offset += RECALCULATION_RECT_WIDTH
+    ) {
+      const sheet = engine.sheetIdOfHandle(rects[offset] ?? NO_SHEET_HANDLE);
+      const sources = sheet === undefined ? undefined : index.sources.get(sheet);
+      sources?.queryBounds(
+        rects[offset + 1] ?? 0,
+        (rects[offset + 2] ?? 0) - 1,
+        rects[offset + 3] ?? 0,
+        (rects[offset + 4] ?? 0) - 1,
+        this.addHit,
+      );
+    }
+    return true;
   }
 
   private onChange(event: ChangeEvent): void {
@@ -709,11 +745,7 @@ class ChartTracker {
     for (const patch of event.transaction.patches) classifyPatch(patch, context);
 
     const { direct, valuesChanged, rebuild } = context;
-    const engine = storeEngine(this.store);
-    const precise =
-      engine?.visitChartRecalculation(event.epoch, (sheet, r0, r1, c0, c1) => {
-        index.sources.get(sheet)?.queryBounds(r0, r1 - 1, c0, c1 - 1, (chart) => hits.add(chart));
-      }) ?? false;
+    const precise = this.queryRecalculated(event.epoch, index);
     if (valuesChanged) {
       if (precise) {
         // Pivot views have no worksheet source rectangle; their asynchronous
