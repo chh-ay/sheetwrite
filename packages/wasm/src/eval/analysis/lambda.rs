@@ -436,7 +436,7 @@ impl Context<'_, '_> {
 pub(crate) fn literal(value: &Value) -> Ast {
     match value {
         Value::Number(number) => Ast::Num(*number),
-        Value::Text(text) => Ast::Str((text.to_string()).into()),
+        Value::Text(text) => Ast::Str(std::rc::Rc::clone(text)),
         Value::Bool(boolean) => Ast::Bool(*boolean),
         Value::Blank | Value::Error(_) => Ast::BoundMatrix(Box::new(crate::calc::BoundMatrix {
             rows: 1,
