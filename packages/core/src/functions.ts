@@ -17,6 +17,13 @@ export {
   type FormulaTokenKind,
 } from "./formula-analysis.js";
 
+export {
+  previewFormula,
+  type FormulaPreview,
+  type FormulaPreviewUnavailable,
+  type FormulaPreviewValue,
+} from "./formula-preview.js";
+
 export type {
   FormulaArgument,
   FormulaArgumentMetadata,

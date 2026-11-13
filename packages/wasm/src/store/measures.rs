@@ -381,11 +381,12 @@ impl CellStore {
             })
             .collect();
         for (column, context) in read {
+            let table_id = &self.tables.get(column.table).ok_or(FormulaError::Ref)?.id;
             let slot = slots
                 .iter()
-                .position(|slot| slot.0 == column.table_id && slot.1 == context)
+                .position(|slot| slot.0 == *table_id && slot.1 == context)
                 .unwrap_or_else(|| {
-                    slots.push((column.table_id.clone(), context));
+                    slots.push((table_id.clone(), context));
                     slots.len() - 1
                 });
             let owner = context
@@ -703,10 +704,15 @@ struct ContextEdit {
     predicates: Vec<(ColumnRef, CmpOp, Value)>,
 }
 
-fn column_ref(column: &StructuredRef) -> ColumnRef {
-    ColumnRef {
-        table: column.table_id.clone(),
-        column: column.column_id.clone(),
+impl CellStore {
+    /// The stable table and column ids of a bound model column.
+    fn column_ref(&self, column: &StructuredRef) -> Result<ColumnRef, FormulaError> {
+        let table = self.tables.get(column.table).ok_or(FormulaError::Ref)?;
+        let id = &table.column_at(column.col).ok_or(FormulaError::Ref)?.id;
+        Ok(ColumnRef {
+            table: table.id.clone(),
+            column: id.clone(),
+        })
     }
 }
 
@@ -748,12 +754,12 @@ impl CellStore {
                 let index = columns
                     .iter()
                     .position(|(column, read_in)| {
-                        column.table_id == reference.table_id
+                        column.table == reference.table
                             && column.col == reference.col
                             && *read_in == context
                     })
                     .unwrap_or_else(|| {
-                        columns.push(((**reference).clone(), context));
+                        columns.push((*reference, context));
                         columns.len() - 1
                     });
                 *expression = Ast::Name(column_name(index).into_boxed_str());
@@ -833,7 +839,7 @@ impl CellStore {
                 Ast::UnknownFunc(call) if call.name.eq_ignore_ascii_case(ALL) => {
                     match call.args.as_ref() {
                         [Ast::Structured(column)] if is_data_column(column) => {
-                            edit.removed.push(column_ref(column));
+                            edit.removed.push(self.column_ref(column)?);
                             continue;
                         }
                         _ => return Err(FormulaError::Value),
@@ -890,8 +896,9 @@ impl CellStore {
             if let Value::Error(error) = result {
                 return Err(error);
             }
-            edit.removed.push(column_ref(column));
-            edit.predicates.push((column_ref(column), op, result));
+            let filtered = self.column_ref(column)?;
+            edit.removed.push(filtered.clone());
+            edit.predicates.push((filtered, op, result));
         }
         Ok(edit)
     }
