@@ -3993,10 +3993,10 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
             out.push_str(func_name(Func::Analysis(crate::eval::analysis::LAMBDA_ID)));
             out.push('(');
             for parameter in &definition.parameters {
-                write_ast_with_sheets(parameter, out, names);
+                write_ast_with_names(parameter, out, names);
                 out.push(',');
             }
-            write_ast_with_sheets(&definition.body, out, names);
+            write_ast_with_names(&definition.body, out, names);
             out.push(')');
         }
         #[cfg(feature = "analysis")]
