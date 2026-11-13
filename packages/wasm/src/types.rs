@@ -636,10 +636,6 @@ impl FormulaEntry {
         is_reference: bool,
         uses_tables: bool,
     ) -> Self {
-        #[cfg(feature = "analysis")]
-        if let Some(tree) = ast.as_mut() {
-            crate::eval::analysis::lambda::resolve_parameters(tree);
-        }
         if let Some(tree) = ast
             .as_mut()
             .filter(|candidate| ast_contains_let(candidate) && !ast_contains_spill_ref(candidate))
