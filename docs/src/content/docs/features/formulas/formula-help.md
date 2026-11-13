@@ -18,7 +18,7 @@ The preview evaluates the formula as if it were in the cell you are editing, so 
 
 - Functions that only read are previewed, the volatile ones too: `TODAY`, `NOW`, `OFFSET`, `INDIRECT`, `CELL` and `INFO`.
 - `RAND`, `RANDBETWEEN` and [custom functions](/docs/features/formulas/custom-functions/) are never run for a preview, even in a branch that would not be chosen. The line says that the formula has no preview.
-- A formula that reads more than 1,000,000 cells in fast range scans or 50,000 cells one by one, builds an array of more than 10,000 cells, makes more than 50,000 `LAMBDA` calls or processes more than 1 MB of text has no preview. The cell still calculates it in full when you commit.
+- A formula that reads more than 1,000,000 cells in fast range scans or 50,000 cells one by one, builds an array of more than 10,000 cells, makes more than 50,000 `LAMBDA` calls or builds and reads more than about 1 MB of text in total has no preview. The cell still calculates it in full when you commit.
 - A formula that reads cells that are not loaded yet shows that the preview waits for them.
 
 Host editors read the same result with `previewFormula(store, cell, text)` from `@sheetwrite/core/functions`.

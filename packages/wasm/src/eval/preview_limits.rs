@@ -20,7 +20,8 @@ pub(super) const PREVIEW_CELL_READS: usize = 50_000;
 pub(super) const PREVIEW_ARRAY_CELLS: usize = 10_000;
 /// LAMBDA calls and the source-tree nodes the safety walk visits.
 pub(super) const PREVIEW_WORK: usize = 50_000;
-/// Text bytes the preview's text functions may produce in total.
+/// Text bytes a preview may build and read in total; text is charged when a
+/// function builds it and again when a function or the result reads it.
 pub(super) const PREVIEW_TEXT_BYTES: usize = 1 << 20;
 
 #[derive(Clone, Copy, Default)]

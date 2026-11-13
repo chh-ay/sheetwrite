@@ -22,7 +22,8 @@ export type {
  * previewed; RAND, RANDBETWEEN and host functions are not called, and give
  * `unsafe-function`. A formula that reads more than 1,000,000 cells in typed
  * range scans or 50,000 cells one by one, or builds an array of more than
- * 10,000 cells, gives `cost-limit` rather than a partial answer.
+ * 10,000 cells, or builds and reads more than about 1 MB of text in total,
+ * gives `cost-limit` rather than a partial answer.
  *
  * Throws a `SheetwriteError` with code `invalid-argument` when `store` is not
  * a `SheetwriteStore` or `cell.row` or `cell.col` is not a whole number from 0
