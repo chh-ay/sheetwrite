@@ -5,5 +5,8 @@
     "jsx": "react-jsx",
     "types": ["bun"]
   },
-  "include": ["src", "test"]
+  "include": ["src", "test"],
+  // Recorded evidence harness: it runs against the pinned 77c4198 and 27be344 engines,
+  // and bench/results/formula-regression-raw.json pins its bytes by hash.
+  "exclude": ["src/matched-formula-harness.ts"]
 }
