@@ -598,7 +598,7 @@ impl CellStorage {
     pub(crate) fn range_fully_loaded(&self, r0: usize, c0: usize, r1: usize, c1: usize) -> bool {
         self.paged
             .as_ref()
-            .is_none_or(|paged| (c0..=c1).all(|col| (r0..=r1).all(|row| paged.read(row, col).3)))
+            .is_none_or(|paged| paged.range_loaded(r0, c0, r1, c1))
     }
 
     #[inline]
@@ -756,9 +756,10 @@ impl CellStorage {
             .ok_or_else(|| format!("{old} rows plus {count} rows overflow the row count"))?;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(new_count, self.n_cols, |row, col| {
-                Some((if row >= clamped_at { row + count } else { row }, col))
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.move_rows(clamped_at, clamped_at + count, old);
+            }
+            self.row_count = new_count;
             return Ok(());
         }
 
@@ -790,20 +791,10 @@ impl CellStorage {
         let old = self.row_count;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(old - clamped_count, self.n_cols, |row, col| {
-                if row >= at && row < at + clamped_count {
-                    None
-                } else {
-                    Some((
-                        if row >= at + clamped_count {
-                            row - clamped_count
-                        } else {
-                            row
-                        },
-                        col,
-                    ))
-                }
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.move_rows(at + clamped_count, at, old);
+            }
+            self.row_count = old - clamped_count;
             return Ok(());
         }
 
