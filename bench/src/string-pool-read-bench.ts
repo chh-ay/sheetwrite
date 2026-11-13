@@ -74,6 +74,9 @@ const store = new SheetwriteStore(workbook, {
 try {
   const samples: number[] = [];
   for (let sample = 0; sample <= 7; sample++) {
+    // Start each read sample from a collected heap, as string-pool-bench's
+    // read row does (#651).
+    Bun.gc(true);
     const start = performance.now();
     for (let read = 0; read < READS; read++) {
       const row = (read * 32) % (ROWS - 64);
