@@ -122,6 +122,22 @@ it("spells plain export formulas as the engine does", async () => {
   expect(all.map((source) => spelled.get(source))).toEqual(engine);
 });
 
+it("converts empty and Unicode batches without shifting changed formula positions", async () => {
+  const sources = ['="😀"', "=IFNA(1,2)", "", "='😀'!A1#"];
+  const exported = ['="😀"', "=_xlfn.IFNA(1,2)", "", "=_xlfn.ANCHORARRAY('😀'!A1)"];
+  await withXlsxFormulaEngine((engine) => {
+    expect(engine.convert([], "export")).toEqual([]);
+    expect(engine.convert(["", "=A1+B1", '="😀"', ""], "export")).toEqual([
+      "",
+      "=A1+B1",
+      '="😀"',
+      "",
+    ]);
+    expect(engine.convert(sources, "export")).toEqual(exported);
+    expect(engine.convert(exported, "import")).toEqual(sources);
+  });
+});
+
 it("strips prefixes after expanding shared formulas without shifting local names", async () => {
   const encoded = rawXlsx({
     sheets: [

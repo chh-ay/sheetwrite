@@ -2,13 +2,14 @@
 
 use crate::calc::{
     bind_sheet_refs, has_unresolved_local_sheets, invalidate_sheet_refs, move_refs,
-    refresh_sheet_spans, relink_sheet_refs, rename_sheet_refs, shift_cols, shift_rows,
-    update_structured_refs, Ast, Func, RefFlags, SheetRef, SheetResolver, SpanPlacer,
-    StructuredRef,
+    refresh_sheet_spans, refresh_table_refs, relink_sheet_refs, rename_sheet_refs,
+    resolve_structured_refs, shift_cols, shift_rows, Ast, Func, ParseFeatures, RefFlags, SheetRef,
+    SheetResolver, SpanPlacer, TableRefresh, UnresolvedStructuredRef, WrittenNames,
 };
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
+use crate::tables::TableSlots;
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -476,13 +477,21 @@ impl FormulaEntry {
     const CALLS_SUBTOTAL: u16 = 1 << 8;
     /// An edit changed the references of the tree after `source` was set.
     const STALE_REFERENCES: u16 = 1 << 9;
+    /// The tree holds a table reference, bound or not.
+    const TABLE_REFS: u16 = 1 << 10;
+
+    /// Whether the tree holds a table reference, so its tables list it
+    /// among their users.
+    pub(crate) const fn uses_tables(&self) -> bool {
+        self.flags & Self::TABLE_REFS != 0
+    }
 
     /// The formula text: the text the user wrote, with each reference that
     /// an edit has changed since written from the tree. An edit only marks
     /// the text, so a rename or a row edit over many formulas writes none of
     /// them; the text is written when it is read. Out of line: many readers.
     #[inline(never)]
-    pub(crate) fn source(&self, names: &[String]) -> Cow<'_, str> {
+    pub(crate) fn source(&self, names: &WrittenNames<'_>) -> Cow<'_, str> {
         match &self.ast {
             Some(ast) if self.flags & Self::STALE_REFERENCES != 0 => {
                 Cow::Owned(write_references(&self.source, ast, names))
@@ -493,13 +502,24 @@ impl FormulaEntry {
 
     /// Capture a history entry with current source text. Its stale bit is
     /// cleared, so history can read/export it without retaining the registry.
-    pub(crate) fn captured(&self, names: &[String]) -> Self {
+    pub(crate) fn captured(&self, names: &WrittenNames<'_>) -> Self {
         Self {
             ast: self.ast.clone(),
             source: self.source(names).into_owned(),
             reads: self.reads.clone(),
             flags: self.flags & !Self::STALE_REFERENCES,
         }
+    }
+
+    /// The text of an entry from [`Self::captured`], which is already
+    /// written out, so it needs no sheet or table names.
+    pub(crate) fn captured_source(&self) -> &str {
+        debug_assert_eq!(
+            self.flags & Self::STALE_REFERENCES,
+            0,
+            "a captured entry has written text"
+        );
+        &self.source
     }
 
     /// Parse rejection or an unresolved local sheet; binding can clear the latter.
@@ -553,15 +573,16 @@ impl FormulaEntry {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
 
-    /// `detached_sheets` tells whether the tree may hold a detached sheet
-    /// reference; only then is it walked for a missing local sheet.
+    /// `features` are the parse's: only a tree that may hold a detached
+    /// sheet reference is walked for a missing local sheet, and only one
+    /// with a table reference is listed among its tables' users.
     pub(crate) fn parsed_source(
         mut ast: Ast,
         sheet: u32,
         source: String,
-        detached_sheets: bool,
+        features: ParseFeatures,
     ) -> Self {
-        let missing_local = detached_sheets && has_unresolved_local_sheets(&ast);
+        let missing_local = features.detached_sheets && has_unresolved_local_sheets(&ast);
         // A formula of values, cells and operators has no function, range,
         // name or array: every flag below stays clear, and its reads are the
         // only metadata that needs a walk.
@@ -593,6 +614,7 @@ impl FormulaEntry {
             crate::eval::Shapes::NONE,
         ));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
+        entry.set_flag(Self::TABLE_REFS, features.table_refs);
         // The flags and reads above come from the tree as written; resolving
         // LET names afterwards changes how it evaluates, not what it reads.
         if contains_let && !entry.has_spill_refs() {
@@ -612,6 +634,7 @@ impl FormulaEntry {
         source: String,
         reads: ReadSet,
         is_reference: bool,
+        uses_tables: bool,
     ) -> Self {
         #[cfg(feature = "analysis")]
         if let Some(tree) = ast.as_mut() {
@@ -630,6 +653,7 @@ impl FormulaEntry {
             flags: 0,
         };
         entry.set_flag(Self::REFERENCE, is_reference);
+        entry.set_flag(Self::TABLE_REFS, uses_tables);
         entry.set_flag(
             Self::CALLS_SUBTOTAL,
             entry
@@ -736,9 +760,58 @@ impl FormulaEntry {
         if !bind_sheet_refs(ast, resolve, place) {
             return None;
         }
+        self.rebound(formula_sheet)
+    }
+
+    /// Bind the table references that no table bound when the formula in
+    /// cell `at` was written. Like [`Self::bind_sheets`], the text stays as
+    /// typed.
+    pub(crate) fn bind_tables(&mut self, at: AbsCellKey, tables: &TableSlots) -> Option<Self> {
+        let ast = self.ast.as_mut()?;
+        let bind = |reference: &UnresolvedStructuredRef, sheet: u32, row: u32, col: u32| {
+            tables.bind(reference.written(), AbsCellKey { sheet, row, col })
+        };
+        if !resolve_structured_refs(ast, at.sheet, at.row, at.col, &bind) {
+            return None;
+        }
+        self.rebound(at.sheet)
+    }
+
+    /// Refresh the entry's references to table slot `table` after an edit of
+    /// the table, with `refresh` (see [`refresh_table_refs`]). The text then
+    /// names the table and its columns as they are now.
+    pub(crate) fn refresh_table(
+        &mut self,
+        table: u16,
+        formula_sheet: u32,
+        refresh: &TableRefresh<'_>,
+    ) -> Option<Self> {
+        let ast = self.ast.as_mut()?;
+        if !refresh_table_refs(ast, table, refresh) {
+            return None;
+        }
+        let mut replacement = self.rebound(formula_sheet)?;
+        let has_text = replacement.flags & Self::REFERENCE == 0;
+        replacement.set_flag(Self::STALE_REFERENCES, has_text);
+        Some(replacement)
+    }
+
+    /// The entry rebuilt around its edited tree, with its text and its
+    /// reference and stale-text bits. Moves the tree and source into the
+    /// replacement, leaving the old read set for the graph edit.
+    fn rebound(&mut self, formula_sheet: u32) -> Option<Self> {
         let ast = self.ast.take()?;
-        let mut replacement =
-            Self::parsed_source(ast, formula_sheet, std::mem::take(&mut self.source), true);
+        let features = ParseFeatures {
+            detached_sheets: true,
+            table_refs: self.uses_tables(),
+            ..ParseFeatures::default()
+        };
+        let mut replacement = Self::parsed_source(
+            ast,
+            formula_sheet,
+            std::mem::take(&mut self.source),
+            features,
+        );
         replacement.flags |= self.flags & (Self::REFERENCE | Self::STALE_REFERENCES);
         Some(replacement)
     }
@@ -825,20 +898,6 @@ impl FormulaEntry {
         self.rewrite_ast(formula_sheet, |ast| refresh_sheet_spans(ast, order, names))
     }
 
-    pub(crate) fn update_table<F>(
-        &mut self,
-        table_id: &str,
-        formula_sheet: u32,
-        resolve: &F,
-    ) -> bool
-    where
-        F: Fn(&StructuredRef) -> Option<StructuredRef>,
-    {
-        self.rewrite_ast(formula_sheet, |ast| {
-            update_structured_refs(ast, table_id, resolve)
-        })
-    }
-
     /// Heap allocations owned by this formula entry. The inline entry is
     /// accounted by the workbook's formula slot array.
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
@@ -889,7 +948,12 @@ mod formula_entry_tests {
                     0,
                 )
             } else {
-                FormulaEntry::parsed_source(Ast::Num(1.0), 0, "=1".to_owned(), false)
+                FormulaEntry::parsed_source(
+                    Ast::Num(1.0),
+                    0,
+                    "=1".to_owned(),
+                    ParseFeatures::default(),
+                )
             };
 
             for (volatile, spill_refs, produces_array) in [
