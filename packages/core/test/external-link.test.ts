@@ -1,5 +1,6 @@
 import { beforeAll, describe, expect, it } from "bun:test";
 
+import { formulaCallsExternalData, rewriteExternalSheets } from "../src/external-link-formula.js";
 import {
   type ExternalLink,
   type ExternalLinkCell,
@@ -50,6 +51,44 @@ function resolvedAfter(store: SheetwriteStore, src: string): unknown {
   store.applyTransaction({ patches: [{ op: "set", addr, value: { kind: "formula", src } }] });
   return store.getCell(addr).resolved;
 }
+
+describe("external formula text", () => {
+  it("finds every live external-data call outside quoted text", () => {
+    for (const name of [
+      "DDE",
+      "RTD",
+      "WEBSERVICE",
+      "FILTERXML",
+      "CUBEMEMBER",
+      "CUBEVALUE",
+      "CUBESET",
+      "CUBESETCOUNT",
+      "CUBERANKEDMEMBER",
+    ]) {
+      expect(formulaCallsExternalData(`IF(1,_xlfn.${name.toLowerCase()} ("a"),0)`)).toBe(true);
+      expect(formulaCallsExternalData(`"${name}(1)"&A1`)).toBe(false);
+    }
+    expect(formulaCallsExternalData('RTD"x"(1)')).toBe(true);
+  });
+
+  it("rewrites only the names of other workbooks", () => {
+    const names: string[] = [];
+    const rewrite = (formula: string) =>
+      rewriteExternalSheets(formula, ({ book, sheet }) => {
+        names.push(`${book}|${sheet}`);
+        return sheet ? `[9]${sheet}` : "[9]";
+      });
+
+    expect(rewrite('IF(A1>1,"[1]Annual!B2",SUM(B1:C2))')).toBe(
+      'IF(A1>1,"[1]Annual!B2",SUM(B1:C2))',
+    );
+    expect(names).toEqual([]);
+    expect(rewrite("[1]Annual!B2+Budget.xlsx!Total+Sheet2!A1+Sales[@Amount]")).toBe(
+      "[9]Annual!B2+[9]!Total+Sheet2!A1+Sales[@Amount]",
+    );
+    expect(names).toEqual(["1|Annual", "Budget.xlsx|"]);
+  });
+});
 
 describe("external workbook links", () => {
   it("shows the saved values of a linked workbook in formulas", () => {

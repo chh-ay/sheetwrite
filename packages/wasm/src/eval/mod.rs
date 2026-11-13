@@ -56,7 +56,6 @@ use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
-use crate::row_visibility::SkippedRows;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::spill::{spill_ownership_within_budget, SpillRange};
 use crate::store::CellStore;
@@ -93,7 +92,6 @@ use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use statistic_args::StatisticCall;
 pub(crate) use subtotal::ast_calls_subtotal;
-use subtotal::SkippedCells;
 use value::{bool_from_value, cached_formula_value, compare_values, text_from_value};
 
 const LET_BINDING_LIMIT: usize = 126;
@@ -1744,7 +1742,7 @@ impl CellStore {
                 )
             }
             Ast::Num(n) => Value::number(*n),
-            Ast::Str(text) => Value::text(text.as_ref()),
+            Ast::Str(text) => Value::Text(std::rc::Rc::clone(text)),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
             Ast::Array(array) => {
@@ -2168,6 +2166,10 @@ impl CellStore {
             return self.eval_statistics_family(&call, pass);
         }
 
+        if func == Func::Subtotal {
+            return self.eval_subtotal_family(args, sheet, pass, depth);
+        }
+
         if func == Func::Sum {
             if let Some(result) = self.eval_sum_family(args, sheet, pass, depth + 1) {
                 return result;
@@ -2199,26 +2201,9 @@ impl CellStore {
         }
 
         let mut values = FuncAccumulator::default();
-        for (index, arg) in args.iter().enumerate() {
-            // SUBTOTAL reads a cell argument as a one-cell reference, so the
-            // cell's row can be hidden.
-            let subtotal_cell = func == Func::Subtotal
-                && index > 0
-                && matches!(arg, Ast::Cell(..) | Ast::AbsCell(..));
-            let range = if subtotal_cell {
-                range_from_ast(arg, sheet)
-            } else {
-                argument_range(arg, sheet)
-            };
-            let shape = if let Some(area) = range {
-                let skipped = (func == Func::Subtotal && index > 0).then(|| SkippedCells {
-                    rows: Some(
-                        math::subtotal_function(&values)
-                            .map_or(SkippedRows::Filtered, |(_, rows)| rows),
-                    ),
-                    nested_subtotals: true,
-                });
-                match self.push_range_values(area, skipped, pass, depth + 1, &mut values) {
+        for arg in args {
+            let shape = if let Some(area) = argument_range(arg, sheet) {
+                match self.eval_range_values(area, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
@@ -3160,22 +3145,10 @@ impl CellStore {
         }
     }
 
+    /// Pushes the cells of `range` as one argument.
     fn eval_range_values(
         &self,
         range: CellRange,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-        values: &mut FuncAccumulator,
-    ) -> Result<(usize, usize), FormulaError> {
-        self.push_range_values(range, None, pass, depth, values)
-    }
-
-    /// Pushes the cells of `range` as one argument. A cell that `skipped`
-    /// names is pushed as blank without evaluation, which keeps the shape.
-    fn push_range_values(
-        &self,
-        range: CellRange,
-        skipped: Option<SkippedCells>,
         pass: &mut EvalPass<'_>,
         depth: usize,
         values: &mut FuncAccumulator,
@@ -3212,22 +3185,9 @@ impl CellStore {
         let literals = LiteralSources::new(s, depth);
 
         for row in row_start..=row_end {
-            if skipped.is_some_and(|filter| filter.skips_row(s, row as u32)) {
-                for _ in col_start..=col_end {
-                    values.push_range(Value::Blank)?;
-                }
-                continue;
-            }
-
             for col in col_start..=col_end {
                 if !s.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
-                }
-                if skipped.is_some_and(|filter| {
-                    filter.skips_cell(s, row as u32, col as u32, &self.formula_slots)
-                }) {
-                    values.push_range(Value::Blank)?;
-                    continue;
                 }
 
                 let i = s.cells.idx(row, col);
