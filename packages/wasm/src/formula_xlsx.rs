@@ -232,11 +232,21 @@ fn anchor_reference(tokens: &[Spanned<'_>], function: usize) -> Option<(usize, u
 
 /// Remove only identifier prefixes. Quoted text, sheet names and structured
 /// references are not function or parameter names and must remain unchanged.
-#[wasm_bindgen(js_name = formulaFromXlsx)]
-#[must_use]
-pub fn formula_from_xlsx(source: &str) -> String {
+/// Append unchanged source text before a rewritten token, starting the output on the first change.
+fn changed_output<'a>(
+    result: &'a mut Option<String>,
+    source: &str,
+    previous: usize,
+    start: usize,
+) -> &'a mut String {
+    let output = result.get_or_insert_with(|| String::with_capacity(source.len()));
+    output.push_str(&source[previous..start]);
+    output
+}
+
+fn changed_formula_from_xlsx(source: &str) -> Option<String> {
     let tokens = lex_tolerant(source);
-    let mut result = String::with_capacity(source.len());
+    let mut result = None;
     let mut previous = 0;
     for (index, token) in tokens.iter().enumerate() {
         if token.start < previous {
@@ -250,9 +260,9 @@ pub fn formula_from_xlsx(source: &str) -> String {
         }
         if name.eq_ignore_ascii_case("_xlfn.ANCHORARRAY") {
             if let Some((start, end, close)) = anchor_reference(&tokens, index) {
-                result.push_str(&source[previous..token.start]);
-                result.push_str(&source[start..end]);
-                result.push('#');
+                let output = changed_output(&mut result, source, previous, token.start);
+                output.push_str(&source[start..end]);
+                output.push('#');
                 previous = close;
                 continue;
             }
@@ -261,12 +271,14 @@ pub fn formula_from_xlsx(source: &str) -> String {
         if bare.len() == name.len() {
             continue;
         }
-        result.push_str(&source[previous..token.start]);
-        result.push_str(bare);
+        let output = changed_output(&mut result, source, previous, token.start);
+        output.push_str(bare);
         previous = token.end;
     }
-    result.push_str(&source[previous..]);
-    result
+    result.map(|mut output| {
+        output.push_str(&source[previous..]);
+        output
+    })
 }
 
 struct Binding<'a> {
@@ -362,12 +374,10 @@ fn bindings<'a>(tokens: &'a [Spanned<'_>]) -> Vec<Binding<'a>> {
 /// Write future-function, local-binding and spill spellings for OOXML formulas.
 /// This is lexical: unknown future functions and incomplete formulas still
 /// round-trip without a parse/serialize pass changing their source text.
-#[wasm_bindgen(js_name = formulaToXlsx)]
-#[must_use]
-pub fn formula_to_xlsx(source: &str) -> String {
+fn changed_formula_to_xlsx(source: &str) -> Option<String> {
     let tokens = lex_tolerant(source);
     let bindings = bindings(&tokens);
-    let mut result = String::with_capacity(source.len());
+    let mut result = None;
     let mut previous = 0;
     for (index, token) in tokens.iter().enumerate() {
         if token.start < previous {
@@ -378,10 +388,10 @@ pub fn formula_to_xlsx(source: &str) -> String {
             Some(Ok(Tok::Hash))
         ) {
             if let Some(start) = reference_start(&tokens, index) {
-                result.push_str(&source[previous..start]);
-                result.push_str("_xlfn.ANCHORARRAY(");
-                result.push_str(&source[start..token.end]);
-                result.push(')');
+                let output = changed_output(&mut result, source, previous, start);
+                output.push_str("_xlfn.ANCHORARRAY(");
+                output.push_str(&source[start..token.end]);
+                output.push(')');
                 previous = tokens[index + 1].end;
                 continue;
             }
@@ -430,30 +440,119 @@ pub fn formula_to_xlsx(source: &str) -> String {
         if prefix.is_empty() || name.starts_with(prefix) {
             continue;
         }
-        result.push_str(&source[previous..token.start]);
-        result.push_str(prefix);
-        result.push_str(bare);
+        let output = changed_output(&mut result, source, previous, token.start);
+        output.push_str(prefix);
+        output.push_str(bare);
         previous = token.end;
     }
-    result.push_str(&source[previous..]);
-    result
+    result.map(|mut output| {
+        output.push_str(&source[previous..]);
+        output
+    })
 }
 
-/// Convert a workbook's formula sources in one JavaScript-to-WASM call.
-/// The consumed input vector can release each source as its result is produced.
-#[wasm_bindgen(js_name = convertXlsxFormulas)]
-pub fn convert_xlsx_formulas(sources: Vec<String>, exporting: bool) -> Vec<String> {
-    let convert: fn(&str) -> String = if exporting {
-        formula_to_xlsx
+/// One slice of joined sources, located by cumulative JavaScript string lengths.
+/// ASCII batches use byte offsets directly; other batches walk each UTF-8 character once.
+fn batch_source<'a>(
+    joined: &'a str,
+    previous: &mut (usize, usize),
+    end: u32,
+    ascii: bool,
+) -> Result<&'a str, &'static str> {
+    let end_utf16 = end as usize;
+    let (start_byte, start_utf16) = *previous;
+    if end_utf16 < start_utf16 {
+        return Err("XLSX formula ends must be nondecreasing");
+    }
+    let end_byte = if ascii {
+        end_utf16
     } else {
-        formula_from_xlsx
+        let mut units = start_utf16;
+        let mut bytes = start_byte;
+        for character in joined[start_byte..].chars() {
+            if units == end_utf16 {
+                break;
+            }
+            units += character.len_utf16();
+            bytes += character.len_utf8();
+            if units > end_utf16 {
+                return Err("XLSX formula end splits a surrogate pair");
+            }
+        }
+        if units != end_utf16 {
+            return Err("XLSX formula end is outside the joined source");
+        }
+        bytes
     };
-    sources.into_iter().map(|source| convert(&source)).collect()
+    let source = joined
+        .get(start_byte..end_byte)
+        .ok_or("XLSX formula end is outside the joined source")?;
+    *previous = (end_byte, end_utf16);
+    Ok(source)
+}
+
+/// The changed formulas of a joined batch; their input indices go to the front of `changed_indices`.
+fn changed_formula_batch(
+    joined: &str,
+    ends: &[u32],
+    exporting: bool,
+    changed_indices: &mut [u32],
+) -> Result<Vec<String>, &'static str> {
+    if changed_indices.len() < ends.len() {
+        return Err("XLSX changed formula indices are shorter than the batch");
+    }
+    let convert = if exporting {
+        changed_formula_to_xlsx
+    } else {
+        changed_formula_from_xlsx
+    };
+    let ascii = joined.is_ascii();
+    let mut previous = (0, 0);
+    let mut formulas = Vec::new();
+    for (index, &end) in ends.iter().enumerate() {
+        let source = batch_source(joined, &mut previous, end, ascii)?;
+        if let Some(converted) = convert(source) {
+            let Some(slot) = changed_indices.get_mut(formulas.len()) else {
+                return Err("XLSX changed formula indices are shorter than the batch");
+            };
+            *slot = u32::try_from(index)
+                .map_err(|_overflow| "XLSX formula batch has too many sources")?;
+            formulas.push(converted);
+        }
+    }
+    if previous.0 != joined.len() {
+        return Err("XLSX formula ends do not cover the joined source");
+    }
+    Ok(formulas)
+}
+
+/// Convert joined formula sources, separated by cumulative UTF-16 ends (JavaScript string lengths).
+/// Return only the changed formulas, and write their input indices to the front of
+/// `changed_indices`, which holds at least one slot per source. Unchanged inputs keep their
+/// JavaScript strings. An empty batch has empty text and ends. An end inside a surrogate pair or
+/// outside the text fails.
+#[wasm_bindgen(js_name = convertXlsxFormulas)]
+pub fn convert_xlsx_formulas(
+    joined: &str,
+    ends: &[u32],
+    exporting: bool,
+    changed_indices: &mut [u32],
+) -> Result<Vec<String>, wasm_bindgen::JsError> {
+    changed_formula_batch(joined, ends, exporting, changed_indices)
+        .map_err(wasm_bindgen::JsError::new)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{formula_from_xlsx, formula_to_xlsx};
+    use super::{changed_formula_batch, changed_formula_from_xlsx, changed_formula_to_xlsx};
+
+    fn formula_from_xlsx(source: &str) -> String {
+        changed_formula_from_xlsx(source).unwrap_or_else(|| source.to_owned())
+    }
+
+    fn formula_to_xlsx(source: &str) -> String {
+        changed_formula_to_xlsx(source).unwrap_or_else(|| source.to_owned())
+    }
 
     #[test]
     fn future_functions_and_bindings_keep_lexical_scopes() {
@@ -505,5 +604,59 @@ mod tests {
             formula_from_xlsx("='_xlfn.Sheet'!A1+_xlfn.FUTURE(1)"),
             "='_xlfn.Sheet'!A1+FUTURE(1)"
         );
+    }
+    #[test]
+    fn joined_batches_return_only_changed_sources() {
+        let cases = [
+            (Vec::new(), Vec::new(), Vec::new()),
+            (vec!["", "=A1+B1", "=\"😀\"", ""], Vec::new(), Vec::new()),
+            (
+                vec!["=\"😀\"", "=IFNA(1,2)", "", "='😀'!A1#"],
+                vec![1, 3],
+                vec!["=_xlfn.IFNA(1,2)", "=_xlfn.ANCHORARRAY('😀'!A1)"],
+            ),
+        ];
+        for (sources, indices, formulas) in cases {
+            let mut end = 0;
+            let ends: Vec<u32> = sources
+                .iter()
+                .map(|source| {
+                    end += u32::try_from(source.encode_utf16().count()).unwrap();
+                    end
+                })
+                .collect();
+            let joined = sources.concat();
+            let mut changed_indices = vec![u32::MAX; ends.len()];
+            let changed =
+                changed_formula_batch(&joined, &ends, true, &mut changed_indices).unwrap();
+            assert_eq!(changed_indices[..changed.len()], indices);
+            assert_eq!(changed, formulas);
+        }
+        let mut imported_indices = [u32::MAX; 2];
+        let imported = changed_formula_batch(
+            "=\"😀\"=_xlfn.IFNA(1,2)",
+            &[5, 21],
+            false,
+            &mut imported_indices,
+        )
+        .unwrap();
+        assert_eq!(imported_indices[..imported.len()], [1]);
+        assert_eq!(imported, vec!["=IFNA(1,2)"]);
+    }
+
+    #[test]
+    fn joined_batches_reject_incomplete_or_split_ends() {
+        for (source, ends) in [
+            ("=A1", vec![]),
+            ("=A1", vec![2]),
+            ("=A1", vec![4]),
+            ("=A1", vec![2, 1, 3]),
+            ("😀=A1", vec![1, 5]),
+            ("😀=A1", vec![6]),
+        ] {
+            let mut changed_indices = vec![0; ends.len()];
+            assert!(changed_formula_batch(source, &ends, true, &mut changed_indices).is_err());
+        }
+        assert!(changed_formula_batch("=IFNA(1,2)", &[10], true, &mut []).is_err());
     }
 }
