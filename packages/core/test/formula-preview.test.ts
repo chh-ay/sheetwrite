@@ -23,14 +23,18 @@ describe("previewFormula", () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     try {
       const cases: readonly [() => unknown, string][] = [
-        [() => previewFormula({} as Store, { sheet: "s1", row: 0, col: 0 }, "=1"), "invalid-argument"],
+        [
+          () => previewFormula({} as Store, { sheet: "s1", row: 0, col: 0 }, "=1"),
+          "invalid-argument",
+        ],
         [() => previewFormula(store, { sheet: "s1", row: -1, col: 0 }, "=1"), "invalid-argument"],
         [() => previewFormula(store, { sheet: "s1", row: 0, col: 1.5 }, "=1"), "invalid-argument"],
         [() => previewFormula(store, { sheet: "missing", row: 0, col: 0 }, "=1"), "not-found"],
       ];
       for (const [run, code] of cases) {
         const error = failure(run);
-        expect(isSheetwriteError(error) && error.code).toBe(code);
+        expect(isSheetwriteError(error)).toBe(true);
+        expect(error).toMatchObject({ code });
       }
 
       expect(previewFormula(store, { sheet: "s1", row: 0, col: 0 }, "=ROW()*10")).toEqual({
