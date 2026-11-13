@@ -1010,6 +1010,11 @@ comparisons with a conservative base, `expectedCharts` and
 checks event count, required and permitted identities, duplicates and
 resolution count.
 
+Cold rows time the first commit after load plus resolving the charts it
+names, for inside and outside edits at 2,000 and 20,000 charts and each
+selected source. Every sample is a fresh process (`--cold-sample`), 21 per
+row, so a first-use cost that warm rows amortize away stays visible.
+
 Smoke admits both full-size 20,000-chart fixtures before it records the
 200-chart timing rows, with five samples and two warmups. Setup transactions
 use the core operation limit and check the encoded byte limit. This makes a

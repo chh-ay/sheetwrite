@@ -2,6 +2,7 @@ import "./dom-setup.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { cpus, hostname } from "node:os";
 import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 
 import * as formulas from "@sheetwrite/formulas";
@@ -27,6 +28,10 @@ import { now, summarize, type Stat } from "./stats.js";
 
 const CHARTS_PER_SHEET = 100;
 const FULL_COUNTS = [200, 2_000, 20_000] as const;
+/** Cold rows load the larger workbooks, where a first-use cost would show. */
+const COLD_COUNTS = [2_000, 20_000] as const;
+/** Fresh processes per cold row. */
+const COLD_SAMPLES = 21;
 const SAMPLES = 101;
 /**
  * Untimed commits before each row's samples. A row times microsecond commits,
@@ -60,6 +65,18 @@ export interface ChartTrackingRow {
   readonly requiredCharts: number;
 }
 
+/**
+ * The first commit after load, plus resolving the charts it names, each sample
+ * in a fresh process. Warm rows hide a first-use regression; this row keeps it
+ * visible.
+ */
+export interface ChartColdRow {
+  readonly chartCount: number;
+  readonly source: ChartSource;
+  readonly scenario: "outside" | "inside";
+  readonly firstMs: Stat;
+}
+
 export interface ChartTrackingArtifact {
   readonly schemaVersion: 1;
   readonly protocol: "sheetwrite-chart-tracking-v2";
@@ -73,6 +90,9 @@ export interface ChartTrackingArtifact {
   readonly warmups: number;
   readonly baseline: Stat;
   readonly rows: readonly ChartTrackingRow[];
+  /** One fresh process per sample; `coldSamples` of them per row. */
+  readonly coldSamples: number;
+  readonly coldRows: readonly ChartColdRow[];
 }
 
 /**
@@ -336,6 +356,77 @@ function measureSource({
   return rows;
 }
 
+type ColdScenario = ChartColdRow["scenario"];
+
+/**
+ * One cold sample, in this process: load the workbook, then time its first
+ * commit and the resolution of every chart that commit names.
+ */
+async function coldSample(
+  source: ChartSource,
+  count: number,
+  scenario: ColdScenario,
+): Promise<number> {
+  await initSheetwrite({ engine: formulas });
+  const store = fixture(count, source, true);
+  const events: ChartChangeEvent[] = [];
+  const detach = subscribeChartChanges(store, (event) => events.push(event));
+  try {
+    const patch: DocumentOp = {
+      op: "set",
+      addr:
+        scenario === "inside"
+          ? { sheet: SOURCE_SHEET, row: 0, col: EDIT_VALUE_COL }
+          : { sheet: SOURCE_SHEET, row: count + 1, col: OUTSIDE_COL },
+      value: { kind: "literal", value: -1 },
+    };
+    const start = now();
+    apply(store, [patch]);
+    for (const event of events) {
+      for (const ref of event.charts) {
+        if (resolveChartView(store, ref.sheet, ref.id) === null) {
+          throw new Error(`Reported chart did not resolve: ${ref.sheet}/${ref.id}`);
+        }
+      }
+    }
+    const elapsed = now() - start;
+    const required = scenario === "inside" ? [reference(0)] : [];
+    const allowed =
+      source === "formula"
+        ? Array.from({ length: count }, (_, index) => reference(index))
+        : required;
+    checkChartEvents(events, required, allowed);
+    return elapsed;
+  } finally {
+    detach();
+    store.dispose();
+  }
+}
+
+/** Run `samples` cold samples of one row, each in a fresh process. */
+function measureCold(
+  source: ChartSource,
+  count: number,
+  scenario: ColdScenario,
+  samples: number,
+): ChartColdRow {
+  const times: number[] = [];
+  const script = fileURLToPath(import.meta.url);
+  for (let sample = 0; sample < samples; sample++) {
+    const child = Bun.spawnSync(
+      [process.execPath, script, "--cold-sample", `${source}:${count}:${scenario}`],
+      { stdout: "pipe", stderr: "pipe" },
+    );
+    const output = child.stdout.toString().trim();
+    const elapsed = Number(output);
+    if (child.exitCode !== 0 || !Number.isFinite(elapsed)) {
+      throw new Error(`Cold sample failed: ${child.stderr.toString() || output}`);
+    }
+    times.push(elapsed);
+  }
+  return { chartCount: count, source, scenario, firstMs: summarize(times) };
+}
+
 /** Setup, index construction, and correctness checks are outside the timed interval. */
 export async function captureChartTracking(
   smoke: boolean,
@@ -368,6 +459,16 @@ export async function captureChartTracking(
   const baseline = baselines.get(2_000) ?? baselines.get(counts[0] ?? 0);
 
   if (baseline === undefined) throw new Error("Missing no-chart baseline");
+
+  const coldSamples = smoke ? 3 : COLD_SAMPLES;
+  const coldRows: ChartColdRow[] = [];
+  for (const source of only === undefined ? SOURCES : [only]) {
+    for (const count of smoke ? [200] : COLD_COUNTS) {
+      for (const scenario of ["outside", "inside"] as const) {
+        coldRows.push(measureCold(source, count, scenario, coldSamples));
+      }
+    }
+  }
   return {
     schemaVersion: 1,
     protocol: "sheetwrite-chart-tracking-v2",
@@ -382,7 +483,22 @@ export async function captureChartTracking(
     warmups,
     baseline,
     rows,
+    coldSamples,
+    coldRows,
   };
+}
+
+/** Parse `<source>:<count>:<scenario>` of a cold sample child process. */
+function coldSampleArgs(value: string): [ChartSource, number, ColdScenario] {
+  const [source, count, scenario] = value.split(":");
+  if (
+    (source !== "literal" && source !== "formula") ||
+    (scenario !== "inside" && scenario !== "outside") ||
+    !Number.isInteger(Number(count))
+  ) {
+    throw new Error(`Invalid cold sample: ${value}`);
+  }
+  return [source, Number(count), scenario];
 }
 
 if (import.meta.main) {
@@ -390,9 +506,15 @@ if (import.meta.main) {
     options: {
       smoke: { type: "boolean", default: false },
       source: { type: "string" },
+      "cold-sample": { type: "string" },
       output: { type: "string", default: "results/chart-tracking-results.json" },
     },
   });
+  const coldArgs = values["cold-sample"];
+  if (coldArgs !== undefined) {
+    process.stdout.write(`${await coldSample(...coldSampleArgs(coldArgs))}\n`);
+    process.exit(0);
+  }
   const { source } = values;
   if (source !== undefined && source !== "literal" && source !== "formula") {
     throw new Error("--source must be literal or formula");
