@@ -11,7 +11,7 @@ use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::calc::{
     area, lex_token, rewrite_own_sheet_axis, translate_relative_refs, write_ast,
-    write_ast_with_sheets, AreaEnd, Ast, Axis, AxisChange, Func, Tok,
+    write_ast_with_names, AreaEnd, Ast, Axis, AxisChange, Func, Tok, WrittenNames,
 };
 use crate::types::FormulaError;
 
@@ -221,7 +221,7 @@ fn rewrite_references(source: &str, mut rewrite: impl FnMut(&mut Ast, bool)) -> 
 /// When the counts differ, they cannot be paired, and the whole formula is
 /// written from the tree. Out of line: every reader of formula text calls it.
 #[inline(never)]
-pub(crate) fn write_references(source: &str, ast: &Ast, names: &[String]) -> String {
+pub(crate) fn write_references(source: &str, ast: &Ast, names: &WrittenNames<'_>) -> String {
     let spans = lex(source).map_or_else(Vec::new, |lexemes| references(&lexemes));
     let mut out = String::with_capacity(source.len());
     let mut copied = 0;
@@ -235,7 +235,7 @@ pub(crate) fn write_references(source: &str, ast: &Ast, names: &[String]) -> Str
         let kept = out.len();
         out.push_str(&source[copied..span.start]);
         let written = out.len();
-        write_ast_with_sheets(node, &mut out, names);
+        write_ast_with_names(node, &mut out, names);
 
         // A deleted spill anchor writes as `#REF!`, without the suffix.
         if span.spills() && !matches!(node, Ast::InvalidRef) {
@@ -251,7 +251,7 @@ pub(crate) fn write_references(source: &str, ast: &Ast, names: &[String]) -> Str
     debug_assert_eq!(count, spans.len(), "references of {source}");
     if count != spans.len() {
         out.clear();
-        write_ast_with_sheets(ast, &mut out, names);
+        write_ast_with_names(ast, &mut out, names);
         return out;
     }
     out.push_str(&source[copied..]);

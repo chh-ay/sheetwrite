@@ -10,9 +10,9 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{
     ast_contains_sheet_span, bind_sheet_refs, external_name_key, has_unresolved_local_sheets,
-    moved_index, moved_span, parse, parse_bound_with_features, place_span, resolve_structured_refs,
-    sheet_name_key, shift_range, Ast, NamedRangeRef, StructuredRef, TableSection,
-    UnresolvedStructuredRef,
+    moved_index, moved_span, parse, parse_bound_with_features, place_span, sheet_name_key,
+    shift_range, Ast, NamedRangeRef, ParseFeatures, StructuredRef, UnresolvedStructuredRef,
+    WrittenNames,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -26,6 +26,7 @@ use crate::memory::{
 };
 use crate::sheet::{formula_error_at, SheetData};
 use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
+use crate::tables::{Table, TableColumn, TableSlots};
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, StringStorage, KIND_BOOL,
     KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
@@ -216,7 +217,7 @@ impl RangeSnapshot {
                 .map(|(_, _, entry)| {
                     std::mem::size_of::<(u32, u32)>()
                         + if entry.is_formula() {
-                            entry.source(&[]).len()
+                            entry.captured_source().len()
                         } else {
                             std::mem::size_of::<AbsCellKey>()
                         }
@@ -229,7 +230,7 @@ impl RangeSnapshot {
         self.formulas
             .iter()
             .filter(|(_, _, entry)| entry.is_formula())
-            .map(|(_, _, entry)| entry.source(&[]).into_owned())
+            .map(|(_, _, entry)| entry.captured_source().to_owned())
             .collect()
     }
 }
@@ -317,27 +318,6 @@ pub(crate) fn workbook_name_key(value: &str) -> String {
     external_name_key(value).unwrap_or_else(|| value.to_uppercase())
 }
 
-#[derive(Clone, Debug)]
-struct TableColumnDefinition {
-    id: String,
-    name: String,
-    col: u32,
-}
-
-#[derive(Clone, Debug)]
-struct TableDefinition {
-    id: String,
-    name: String,
-    sheet: u32,
-    row_start: u32,
-    col_start: u32,
-    row_end: u32,
-    col_end: u32,
-    header_row: bool,
-    totals_row: bool,
-    columns: Vec<TableColumnDefinition>,
-}
-
 /// The workbook-wide store: every sheet, one string pool.
 #[wasm_bindgen]
 pub struct CellStore {
@@ -373,7 +353,7 @@ pub struct CellStore {
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
     defined_names: FxHashMap<(Option<u32>, String), names::DefinedName>,
-    tables: FxHashMap<String, TableDefinition>,
+    tables: TableSlots,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
@@ -482,7 +462,7 @@ impl CellStore {
             pivots: None,
             #[cfg(feature = "analysis")]
             relationships: None,
-            tables: FxHashMap::default(),
+            tables: TableSlots::default(),
         }
     }
 
@@ -914,16 +894,11 @@ impl CellStore {
         let removed_names = self.remove_sheet_from_named_formulas(sheet as u32)
             || self.defined_names.len() != before_names;
 
-        let removed_table_keys: Vec<_> = self
-            .tables
-            .iter()
-            .filter(|(_, table)| table.sheet == sheet as u32)
-            .map(|(key, _)| key.clone())
-            .collect();
-
-        for key in &removed_table_keys {
-            self.tables.remove(key);
-        }
+        // The references to these tables are on the removed sheet, so the
+        // walk above already made them `#REF!`.
+        let tables_before = self.tables.len();
+        self.tables.retain_mut(|table| table.sheet != sheet as u32);
+        let removed_tables = self.tables.len() != tables_before;
 
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
@@ -945,7 +920,7 @@ impl CellStore {
         }
         self.graph.invalidate();
 
-        if removed_names || !removed_table_keys.is_empty() {
+        if removed_names || removed_tables {
             self.refresh_named_formula_entries();
             self.recompute_all_sheets();
         } else {
@@ -1536,7 +1511,7 @@ impl CellStore {
             }
             let offset = ((sheet_row - r0) * cols + sheet_col - c0) as u32;
             if entry.is_formula() {
-                formulas.push((offset, entry.source(&self.sheet_names).into_owned()));
+                formulas.push((offset, entry.source(&self.written_names()).into_owned()));
             } else if let Some(target) = entry.reference_target(sheet as u32) {
                 references.push((offset, target));
             }
@@ -1608,7 +1583,7 @@ impl CellStore {
                 };
                 if entry.is_formula() {
                     formula_offsets.push(offset as u32);
-                    formula_sources.push(entry.source(&self.sheet_names).into_owned());
+                    formula_sources.push(entry.source(&self.written_names()).into_owned());
                 } else if let Some(target) = entry.reference_target(sheet as u32) {
                     reference_offsets.push(offset as u32);
                     reference_targets.extend_from_slice(&[target.sheet, target.row, target.col]);
@@ -1777,7 +1752,7 @@ impl CellStore {
             let source = s.formulas.get(key, &self.formula_slots);
             let text = source
                 .filter(|entry| entry.is_formula())
-                .map(|entry| entry.source(&self.sheet_names));
+                .map(|entry| entry.source(&self.written_names()));
             let reference_target = source
                 .filter(|entry| entry.is_reference())
                 .and_then(|entry| entry.reference_target(sheet as u32));
@@ -1881,7 +1856,7 @@ impl CellStore {
                         (
                             (sheet_row - r0) as u32,
                             (sheet_col - c0) as u32,
-                            entry.captured(&self.sheet_names),
+                            entry.captured(&self.written_names()),
                         )
                     })
             })
@@ -1925,7 +1900,7 @@ impl CellStore {
                 return false;
             };
             let source = if entry.is_formula() {
-                self.parse_formula_entry(&entry.source(&[]), sheet as u32, key.0, key.1)
+                self.parse_formula_entry(entry.captured_source(), sheet as u32, key.0, key.1)
             } else {
                 let Some(target) = entry.reference_target(sheet as u32) else {
                     return false;
@@ -2476,12 +2451,8 @@ impl CellStore {
         column_ids: Vec<String>,
         column_names: Vec<String>,
     ) -> bool {
-        let existing_key = self
-            .tables
-            .iter()
-            .find_map(|(key, table)| (table.id == id).then(|| key.clone()));
-        let is_new = existing_key.is_none();
-        if (is_new && self.tables.len() >= MAX_TABLES)
+        let existing = self.tables.with_id(id).map(|(slot, _)| slot);
+        if (existing.is_none() && self.tables.len() >= MAX_TABLES)
             || id.is_empty()
             || id.encode_utf16().count() > MAX_TABLE_ID_BYTES
             || name.is_empty()
@@ -2510,8 +2481,8 @@ impl CellStore {
         }
         if self
             .tables
-            .get(&name_key)
-            .is_some_and(|table| table.id != id)
+            .named(name)
+            .is_some_and(|(_, table)| table.id != id)
         {
             return false;
         }
@@ -2533,13 +2504,13 @@ impl CellStore {
             {
                 return false;
             }
-            columns.push(TableColumnDefinition {
+            columns.push(TableColumn {
                 id: column_id,
                 name: column_name,
                 col: col_start as u32 + column_index as u32,
             });
         }
-        let definition = TableDefinition {
+        let definition = Table {
             id: id.to_owned(),
             name: name.to_owned(),
             sheet: sheet as u32,
@@ -2551,7 +2522,7 @@ impl CellStore {
             totals_row,
             columns,
         };
-        if self.tables.values().any(|other| {
+        if self.tables.iter().any(|(_, other)| {
             other.id != id
                 && other.sheet == definition.sheet
                 && definition.row_start <= other.row_end
@@ -2561,12 +2532,11 @@ impl CellStore {
         }) {
             return false;
         }
-        if let Some(previous_key) = existing_key {
-            self.rewrite_table_formula_entries(id, Some(&definition));
-            self.tables.remove(&previous_key);
-        }
-        self.tables.insert(name_key, definition);
-        self.refresh_formula_entries();
+        let (slot, previous) = match existing {
+            Some(slot) => (slot, self.tables.replace(slot, definition)),
+            None => (self.tables.insert(definition), None),
+        };
+        self.after_table_edit(slot, previous.as_ref());
         #[cfg(feature = "analysis")]
         self.invalidate_table_pivots();
         self.recompute_all_sheets();
@@ -2575,16 +2545,11 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = removeTable)]
     pub fn remove_table(&mut self, id: &str) -> bool {
-        let Some(key) = self
-            .tables
-            .iter()
-            .find_map(|(key, table)| (table.id == id).then(|| key.clone()))
-        else {
+        let Some(slot) = self.tables.with_id(id).map(|(slot, _)| slot) else {
             return false;
         };
-        self.tables.remove(&key);
-        self.rewrite_table_formula_entries(id, None);
-        self.refresh_formula_entries();
+        let removed = self.tables.remove(slot);
+        self.after_table_edit(slot, removed.as_ref());
         #[cfg(feature = "analysis")]
         self.invalidate_table_pivots();
         self.recompute_all_sheets();
@@ -2673,7 +2638,7 @@ impl CellStore {
             .get(key, &self.formula_slots)?;
         entry
             .is_formula()
-            .then(|| entry.source(&self.sheet_names).into_owned())
+            .then(|| entry.source(&self.written_names()).into_owned())
     }
 
     #[wasm_bindgen(js_name = referenceTarget)]
@@ -3647,10 +3612,10 @@ impl CellStore {
         }
 
         let (from, count, to) = block;
-        for table in self
+        for (_, table) in self
             .tables
-            .values_mut()
-            .filter(|table| table.sheet == edited_sheet)
+            .iter_mut()
+            .filter(|(_, table)| table.sheet == edited_sheet)
         {
             let span = if columns {
                 (&mut table.col_start, &mut table.col_end)
@@ -3663,7 +3628,7 @@ impl CellStore {
             // Core refuses a move that splits a table, so the moved columns
             // fill the table's span again; each takes its new place.
             if columns {
-                let mut placed: Vec<Option<TableColumnDefinition>> =
+                let mut placed: Vec<Option<TableColumn>> =
                     table.columns.iter().map(|_| None).collect();
                 for mut column in std::mem::take(&mut table.columns) {
                     column.col = moved_index(column.col, from, count, to);
@@ -3715,48 +3680,31 @@ impl CellStore {
     }
 }
 
-fn refresh_structured_reference(
-    table: &TableDefinition,
-    reference: &StructuredRef,
-) -> Option<StructuredRef> {
-    let column_index = table
-        .columns
-        .iter()
-        .position(|column| column.id == reference.column_id)?;
-    let column = &table.columns[column_index];
-    let (row_start, row_end) = match reference.section {
-        TableSection::Headers if table.header_row => (table.row_start, table.row_start),
-        TableSection::Totals if table.totals_row => (table.row_end, table.row_end),
-        TableSection::Body => {
-            let start = table.row_start + u32::from(table.header_row);
-            let end = table.row_end.checked_sub(u32::from(table.totals_row))?;
-            if start > end {
-                return None;
-            }
-            (start, end)
-        }
-        TableSection::CurrentRow => {
-            let start = table.row_start + u32::from(table.header_row);
-            let end = table.row_end.checked_sub(u32::from(table.totals_row))?;
-            if reference.row_start < start || reference.row_start > end {
-                return None;
-            }
-            (reference.row_start, reference.row_start)
-        }
-        TableSection::Headers | TableSection::Totals => return None,
-    };
-    Some(StructuredRef {
-        table_id: table.id.clone(),
-        table_name: table.name.clone(),
-        column_id: column.id.clone(),
-        column_name: column.name.clone(),
-        sheet: table.sheet,
-        row_start,
-        row_end,
-        col: column.col,
-        section: reference.section,
-        qualified: reference.qualified,
-    })
+/// Makes the new entry of the formula in the cell it is given after a table
+/// edit, reading the tables as they are now; `None` leaves it unchanged.
+type TableRebind<'a> =
+    dyn Fn(&mut FormulaEntry, AbsCellKey, &TableSlots) -> Option<FormulaEntry> + 'a;
+
+/// Whether an edit of a table from `previous` to `table` only added rows
+/// around its data, keeping its sheet, columns, names, header and totals:
+/// the rows a `[@Column]` reads are still in the table, so only the
+/// formulas that read whole sections need new cells.
+fn rows_only_grew(previous: &Table, table: &Table) -> bool {
+    let same_columns = previous.columns.len() == table.columns.len()
+        && previous
+            .columns
+            .iter()
+            .zip(&table.columns)
+            .all(|(before, after)| {
+                before.id == after.id && before.name == after.name && before.col == after.col
+            });
+    same_columns
+        && previous.name == table.name
+        && previous.sheet == table.sheet
+        && previous.header_row == table.header_row
+        && previous.totals_row == table.totals_row
+        && table.row_start <= previous.row_start
+        && table.row_end >= previous.row_end
 }
 
 impl CellStore {
@@ -3766,7 +3714,7 @@ impl CellStore {
     fn defined_name_scope(&self, name: &str, scope: i32) -> Option<Option<u32>> {
         if name.is_empty()
             || !matches!(parse(name), Ok(Ast::Name(_)))
-            || self.tables.contains_key(&workbook_name_key(name))
+            || self.tables.named(name).is_some()
         {
             return None;
         }
@@ -3780,109 +3728,94 @@ impl CellStore {
             .then_some(Some(sheet_scope))
     }
 
-    fn table_definition_for_reference(
-        &self,
-        reference: &UnresolvedStructuredRef,
-        formula_sheet: u32,
-        formula_row: u32,
-        formula_col: u32,
-    ) -> Option<&TableDefinition> {
-        if let Some(name) = &reference.table_name {
-            return self.tables.get(&workbook_name_key(name));
-        }
-        let mut matches = self.tables.values().filter(|table| {
-            table.sheet == formula_sheet
-                && formula_row >= table.row_start
-                && formula_row <= table.row_end
-                && formula_col >= table.col_start
-                && formula_col <= table.col_end
-        });
-        let table = matches.next()?;
-        if matches.next().is_some() {
-            return None;
-        }
-        Some(table)
-    }
-
-    fn resolve_structured_reference(
+    pub(super) fn resolve_structured_reference(
         &self,
         reference: &UnresolvedStructuredRef,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,
     ) -> Option<StructuredRef> {
-        let table = self.table_definition_for_reference(
-            reference,
-            formula_sheet,
-            formula_row,
-            formula_col,
-        )?;
-        let column_key = workbook_name_key(&reference.column_name);
-        let column_index = table
-            .columns
-            .iter()
-            .position(|column| workbook_name_key(&column.name) == column_key)?;
-        let column = &table.columns[column_index];
-        let (row_start, row_end) = match reference.section {
-            TableSection::Headers if table.header_row => (table.row_start, table.row_start),
-            TableSection::Totals if table.totals_row => (table.row_end, table.row_end),
-            TableSection::Body => {
-                let start = table.row_start + u32::from(table.header_row);
-                let end = table.row_end.checked_sub(u32::from(table.totals_row))?;
-                if start > end {
-                    return None;
-                }
-                (start, end)
-            }
-            TableSection::CurrentRow => {
-                let start = table.row_start + u32::from(table.header_row);
-                let end = table.row_end.checked_sub(u32::from(table.totals_row))?;
-                if formula_sheet != table.sheet
-                    || formula_row < start
-                    || formula_row > end
-                    || formula_col < table.col_start
-                    || formula_col > table.col_end
-                {
-                    return None;
-                }
-                (formula_row, formula_row)
-            }
-            TableSection::Headers | TableSection::Totals => return None,
-        };
-        Some(StructuredRef {
-            table_id: table.id.clone(),
-            table_name: table.name.clone(),
-            column_id: column.id.clone(),
-            column_name: column.name.clone(),
-            sheet: table.sheet,
-            row_start,
-            row_end,
-            col: column.col,
-            section: reference.section,
-            qualified: reference.table_name.is_some(),
-        })
+        self.tables.bind(
+            reference.written(),
+            AbsCellKey {
+                sheet: formula_sheet,
+                row: formula_row,
+                col: formula_col,
+            },
+        )
     }
 
-    fn rewrite_table_formula_entries(
-        &mut self,
-        table_id: &str,
-        definition: Option<&TableDefinition>,
-    ) {
-        for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
-            sheet
-                .formulas
-                .rewrite_entries(&mut self.formula_slots, |entry| {
-                    entry.update_table(table_id, formula_sheet as u32, &|reference| {
-                        definition.and_then(|table| refresh_structured_reference(table, reference))
-                    });
-                });
-            sheet.formulas.mark_all_dirty();
+    /// Follow an edit of the table in `slot`, which held `replaced` (`None`
+    /// for a new table): refresh the cells of the formulas that use it, by
+    /// stable column id, and bind the formulas whose table reference waited
+    /// for a table. Only those formulas change; their reads are patched in
+    /// the dependency index and they recalculate. A defined name's formula
+    /// uses tables through expansions the index does not list, so while one
+    /// does, every formula is resolved again after that.
+    fn after_table_edit(&mut self, slot: u16, replaced: Option<&Table>) {
+        if let Some(previous) = replaced {
+            let own_rows = !self
+                .tables
+                .get(slot)
+                .is_some_and(|table| rows_only_grew(previous, table));
+            let users = self.formula_slots.table_users(slot, own_rows);
+            self.rebind_table_users(users, &|entry, location, tables| {
+                let refresh = |reference: &StructuredRef| {
+                    let table = tables.get(slot)?;
+                    let column_id = &previous.column_at(reference.col)?.id;
+                    let column = table
+                        .columns
+                        .iter()
+                        .find(|column| column.id == *column_id)?;
+                    let refreshed =
+                        table.reference(slot, column, reference.section, reference.row_start)?;
+                    Some(StructuredRef {
+                        qualified: reference.qualified,
+                        ..refreshed
+                    })
+                };
+                entry.refresh_table(slot, location.sheet, &refresh)
+            });
         }
-        self.graph.invalidate();
+        // The formulas holding a table reference that no table bound may
+        // bind now. Their text stays as typed.
+        let waiting = self.formula_slots.unbound_table_users();
+        self.rebind_table_users(waiting, &|entry, location, tables| {
+            entry.bind_tables(location, tables)
+        });
+        if self.names_use_tables() {
+            self.refresh_named_formula_entries();
+        }
     }
 
-    fn refresh_formula_entries(&mut self) {
-        self.refresh_named_formula_entries();
+    /// Give each of `formulas` the entry `rebind` makes of it, if any: the
+    /// dependency index patches its reads and the formula recalculates.
+    /// Out of line, so the two table passes share one copy of the loop.
+    #[inline(never)]
+    fn rebind_table_users(&mut self, formulas: Vec<FormulaId>, rebind: &TableRebind<'_>) {
+        for formula in formulas {
+            let Some(location) = self.formula_slots.location(formula) else {
+                continue;
+            };
+            let tables = &self.tables;
+            let Some(entry) = self
+                .formula_slots
+                .get_mut(formula)
+                .and_then(|entry| rebind(entry, location, tables))
+            else {
+                continue;
+            };
+            let sheet = location.sheet as usize;
+            let data = &mut self.sheets[sheet];
+            self.graph.replace_entry(
+                &mut data.formulas,
+                &mut self.formula_slots,
+                sheet,
+                location.local(),
+                Some(entry),
+            );
+            data.formulas.mark_cell_dirty(location.local());
+        }
     }
 
     pub(crate) fn parse_formula_entry(
@@ -3893,17 +3826,18 @@ impl CellStore {
         formula_col: u32,
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
-            Ok((ast, detached_sheets)) => {
-                FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned(), detached_sheets)
+            Ok((ast, features)) => {
+                FormulaEntry::parsed_source(ast, formula_sheet, source.to_owned(), features)
             }
             Err(error) => FormulaEntry::error(source, error),
         }
     }
 
-    /// Parses a formula and resolves its sheets, defined names and table
-    /// references. Each step runs only when the parse found a node it
-    /// rewrites, so a formula of plain cells is parsed in one pass. The flag
-    /// tells whether a sheet reference stayed detached.
+    /// Parses a formula, binding its sheet and table references as it goes,
+    /// then resolves its defined names when the parse found a name, so a
+    /// formula of plain cells is parsed in one pass. The features tell
+    /// whether a sheet reference stayed detached and whether the formula has
+    /// a table reference.
     fn resolve_formula_ast(
         &self,
         source: &str,
@@ -3911,26 +3845,29 @@ impl CellStore {
         formula_row: u32,
         formula_col: u32,
     ) -> Result<ResolvedFormula, FormulaError> {
-        let (mut ast, features) =
-            parse_bound_with_features(source, &|name| self.sheet_handle(name), &|span| {
-                place_span(span, &self.tab_order())
-            })
-            .map_err(|_| FormulaError::Value)?;
+        let at = AbsCellKey {
+            sheet: formula_sheet,
+            row: formula_row,
+            col: formula_col,
+        };
+        let (mut ast, features) = parse_bound_with_features(
+            source,
+            &|name| self.sheet_handle(name),
+            &|span| place_span(span, &self.tab_order()),
+            &|written| self.tables.bind(written, at),
+        )
+        .map_err(|_| FormulaError::Value)?;
 
         if features.names {
             let placement = names::NamePlacement::new(formula_row, formula_col);
             ast = self.resolve_defined_names(ast, formula_sheet, &placement);
         }
 
-        if features.table_refs {
-            self.resolve_table_refs(&mut ast, formula_sheet, formula_row, formula_col);
-        }
-
         #[cfg(feature = "analysis")]
         let resolved = self.bind_regex_patterns(source, ast);
         #[cfg(not(feature = "analysis"))]
         let resolved = ast;
-        Ok((resolved, features.detached_sheets))
+        Ok((resolved, features))
     }
 
     /// Resolves a parsed formula as if it were in the cell at
@@ -3954,6 +3891,7 @@ impl CellStore {
 
     /// Resolves the table references of a formula in the cell at
     /// (`formula_row`, `formula_col`) of `formula_sheet`.
+    #[cfg(feature = "analysis")]
     fn resolve_table_refs(
         &self,
         ast: &mut Ast,
@@ -3961,7 +3899,7 @@ impl CellStore {
         formula_row: u32,
         formula_col: u32,
     ) {
-        resolve_structured_refs(
+        crate::calc::resolve_structured_refs(
             ast,
             formula_sheet,
             formula_row,
@@ -3969,7 +3907,7 @@ impl CellStore {
             &|reference, sheet, row, col| {
                 self.resolve_structured_reference(reference, sheet, row, col)
             },
-        )
+        );
     }
 
     /// Points the literal REGEX patterns of a new formula at the patterns the
@@ -4048,6 +3986,14 @@ impl CellStore {
             .map(|&index| index as u32)
     }
 
+    /// The names formula text writes for bound sheet and table references.
+    pub(crate) fn written_names(&self) -> WrittenNames<'_> {
+        WrittenNames {
+            sheets: &self.sheet_names,
+            tables: Some(&self.tables),
+        }
+    }
+
     /// Bind standalone-parsed definitions/measures without rebuilding their tree.
     /// Such definitions still reject missing local sheets at installation.
     fn resolve_sheets(&self, mut ast: Ast) -> Result<Ast, FormulaError> {
@@ -4108,55 +4054,41 @@ impl CellStore {
         changed
     }
 
+    // A table's references follow the edit in each formula tree, so moving
+    // or removing the table here leaves no formula naming a removed slot.
     fn rebase_table_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
-        let removed: Vec<_> = self
-            .tables
-            .iter_mut()
-            .filter_map(|(id, table)| {
-                if table.sheet != edited_sheet {
-                    return None;
-                }
-                if let Some((start, end)) = shift_range(table.row_start, table.row_end, at, delta) {
-                    table.row_start = start;
-                    table.row_end = end;
-                    None
-                } else {
-                    Some(id.clone())
-                }
-            })
-            .collect();
-        for id in removed {
-            self.tables.remove(&id);
-        }
+        self.tables.retain_mut(|table| {
+            if table.sheet != edited_sheet {
+                return true;
+            }
+            let Some((start, end)) = shift_range(table.row_start, table.row_end, at, delta) else {
+                return false;
+            };
+            table.row_start = start;
+            table.row_end = end;
+            true
+        });
     }
 
     fn rebase_table_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
-        let removed: Vec<_> = self
-            .tables
-            .iter_mut()
-            .filter_map(|(id, table)| {
-                if table.sheet != edited_sheet {
-                    return None;
-                }
-                let Some((start, end)) = shift_range(table.col_start, table.col_end, at, delta)
-                else {
-                    return Some(id.clone());
+        self.tables.retain_mut(|table| {
+            if table.sheet != edited_sheet {
+                return true;
+            }
+            let Some((start, end)) = shift_range(table.col_start, table.col_end, at, delta) else {
+                return false;
+            };
+            table.col_start = start;
+            table.col_end = end;
+            table.columns.retain_mut(|column| {
+                let Some((col, _)) = shift_range(column.col, column.col, at, delta) else {
+                    return false;
                 };
-                table.col_start = start;
-                table.col_end = end;
-                table.columns.retain_mut(|column| {
-                    let Some((col, _)) = shift_range(column.col, column.col, at, delta) else {
-                        return false;
-                    };
-                    column.col = col;
-                    true
-                });
-                table.columns.is_empty().then(|| id.clone())
-            })
-            .collect();
-        for id in removed {
-            self.tables.remove(&id);
-        }
+                column.col = col;
+                true
+            });
+            !table.columns.is_empty()
+        });
     }
 
     fn recompute_all_sheets(&mut self) {
@@ -4250,7 +4182,7 @@ impl CellStore {
                 .formulas
                 .iter(&self.formula_slots)
                 .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (key, entry.source(&self.sheet_names).into_owned()))
+                .map(|(key, entry)| (key, entry.source(&self.written_names()).into_owned()))
                 .collect();
             let refreshed: Vec<_> = sources
                 .into_iter()
@@ -4273,9 +4205,9 @@ impl CellStore {
     }
 }
 
-/// A resolved formula tree, and whether a sheet reference in it stayed
-/// detached.
-type ResolvedFormula = (Ast, bool);
+/// A resolved formula tree, and what its parse found: whether a sheet
+/// reference stayed detached and whether it has a table reference.
+type ResolvedFormula = (Ast, ParseFeatures);
 
 /// Result of a single-cell read.
 #[wasm_bindgen]

@@ -326,6 +326,15 @@ export async function restoreLatest(
 - A WebAssembly trap throws `engine-failed` and makes every grid on that engine read-only
   ([#296](https://github.com/chh-ay/sheetwrite/pull/296)).
 
+### Direct XLSX formula conversion
+
+Direct callers of `@sheetwrite/wasm` or `@sheetwrite/formulas` now pass joined
+sources, cumulative UTF-16 ends and a changed-index buffer to `convertXlsxFormulas`,
+which returns only the changed formulas. The scalar `formulaToXlsx` and `formulaFromXlsx`
+exports are removed; use a one-source batch instead. Core's
+`XlsxFormulaEngine.convert` keeps its array interface. See
+[Direct engine calls](/docs/start/upgrade-to-0-7-0/#direct-engine-calls).
+
 <Card title="Upgrade to 0.7.0" icon="arrow-right" href="/docs/start/upgrade-to-0-7-0/" cta="Open the guide">
   Every removed and changed API with its replacement, the document operations to accept on your
   server, and the behavior changes you will notice.
