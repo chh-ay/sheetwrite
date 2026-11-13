@@ -28,7 +28,14 @@ import { now, summarize, type Stat } from "./stats.js";
 const CHARTS_PER_SHEET = 100;
 const FULL_COUNTS = [200, 2_000, 20_000] as const;
 const SAMPLES = 101;
-const WARMUPS = 20;
+/**
+ * Untimed commits before each row's samples. A row times microsecond commits,
+ * so twenty warmups left JavaScriptCore still tiering up the commit and
+ * resolution paths, and a row then measured how much earlier rows had warmed
+ * them rather than its own cost. A thousand commits reach steady tiering on
+ * every row, so the order rows run in no longer shows in their times.
+ */
+const WARMUPS = 1_000;
 const SOURCE_SHEET = "data";
 const SOURCE_VALUE_COL = 0;
 const EDIT_VALUE_COL = 1;

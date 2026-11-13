@@ -984,7 +984,7 @@ then every formula-source row: formula rows resolve hundreds of charts per
 commit and leave that path warmed up for whatever runs after them, so the
 literal rows (the control for chart work) never follow them. `--source
 literal` or `--source formula` runs one source in its own process. Each
-measured operation is one committed cell edit, not an amortized batch. Median and p95 summarize 101 samples after 20 warmups.
+measured operation is one committed cell edit, not an amortized batch. Median and p95 summarize 101 samples after 1,000 warmup commits per row; with 20, microsecond rows were still tiering up and partly measured what earlier rows had warmed.
 Initial index construction and correctness assertions are untimed.
 
 Literal-source outside edits must emit no event and perform no view
