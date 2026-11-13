@@ -997,7 +997,7 @@ mod tests {
     /// of rows in every quarter.
     fn sales(rows: usize, formula: &str) -> (CellStore, usize) {
         let mut store = CellStore::new();
-        let sheet = store.add_sheet(rows, 16);
+        let sheet = store.add_sheet(16, rows);
         for row in 0..rows {
             let product = row % 100;
             store.set_string(sheet, row, 0, &format!("Region {}", product % 10), 0);
