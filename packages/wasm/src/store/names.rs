@@ -27,9 +27,9 @@ use wasm_bindgen::prelude::*;
 
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
-    invalidate_sheet_refs, move_refs, moved_span, parse, rename_sheet_refs, resolve_named_ranges,
-    resolve_structured_refs, shift_cols, shift_rows, translate_name_refs, Ast, NameTarget,
-    NamedFormulaRef, NamedRangeRef, RangeFlags, RefFlags,
+    for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse, rename_sheet_refs,
+    resolve_named_ranges, resolve_structured_refs, shift_cols, shift_rows, translate_name_refs,
+    Ast, NameTarget, NamedFormulaRef, NamedRangeRef, RangeFlags, RefFlags, WrittenNames,
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
@@ -83,12 +83,17 @@ enum Visit {
 
 impl Definition {
     /// Rewrite the tree with `rewrite`; the source follows a changed tree in
-    /// the references it writes differently.
-    fn rewrite(&mut self, names: &[String], rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+    /// the references it writes differently. A definition's table
+    /// references stay unbound, so only sheet names are needed.
+    fn rewrite(&mut self, sheets: &[String], rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         if !rewrite(&mut self.ast) {
             return false;
         }
-        self.source = write_references(&self.source, &self.ast, names);
+        let names = WrittenNames {
+            sheets,
+            tables: None,
+        };
+        self.source = write_references(&self.source, &self.ast, &names);
         true
     }
 }
@@ -345,6 +350,20 @@ impl CellStore {
             });
         }
         Some(target)
+    }
+
+    /// Whether a defined name's formula has a table reference. Its
+    /// expansions are in the formulas that use the name, which the tables'
+    /// users index does not list.
+    pub(super) fn names_use_tables(&self) -> bool {
+        self.defined_names.values().any(|definition| {
+            let DefinedName::Formula(formula) = definition else {
+                return false;
+            };
+            let mut uses_table = false;
+            for_each_table_ref(&formula.ast, &mut |_| uses_table = true);
+            uses_table
+        })
     }
 
     /// Resolve every name definition once, for every formula that uses it.

@@ -126,7 +126,7 @@ impl CellStore {
         let source = cell_key(cell.row as usize, cell.col as usize)
             .and_then(|key| data.formulas.get(key, &self.formula_slots))
             .filter(|entry| entry.is_formula())
-            .map(|entry| entry.source(&self.sheet_names));
+            .map(|entry| entry.source(&self.written_names()));
         if func == Func::IsFormula {
             return Ok(Value::Bool(source.is_some()));
         }
