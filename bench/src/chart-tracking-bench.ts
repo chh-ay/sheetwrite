@@ -34,13 +34,16 @@ const COLD_COUNTS = [2_000, 20_000] as const;
 const COLD_SAMPLES = 21;
 const SAMPLES = 101;
 /**
- * Untimed commits before each row's samples. A row times microsecond commits,
- * so twenty warmups left JavaScriptCore still tiering up the commit and
- * resolution paths, and a row then measured how much earlier rows had warmed
- * them rather than its own cost. A thousand commits reach steady tiering on
- * every row, so the order rows run in no longer shows in their times.
+ * Untimed commits before each row's samples, at most. Rows time microsecond
+ * commits, and JavaScriptCore keeps tiering the commit and resolution paths
+ * for thousands of commits: on develop, a literal commit at 2,000 and 20,000
+ * charts is still 1.3-1.7 times its later time after 1,000 commits and within
+ * 5% of it from about 5,000, on Linux and on the Mac. With 20 warmups a row
+ * partly measured how far earlier rows had warmed those paths. See #639.
  */
-const WARMUPS = 1_000;
+const WARMUPS = 5_000;
+/** Wall-clock cap on one row's warm-up; see {@link WarmUp}. */
+const WARMUP_BUDGET_MS = 5_000;
 const SOURCE_SHEET = "data";
 const SOURCE_VALUE_COL = 0;
 const EDIT_VALUE_COL = 1;
@@ -63,6 +66,8 @@ export interface ChartTrackingRow {
   readonly resolutionsPerCommit: number;
   /** Charts whose source value necessarily changed. */
   readonly requiredCharts: number;
+  /** Untimed commits before the samples; see {@link WarmUp}. */
+  readonly warmupCommits: number;
 }
 
 /**
@@ -219,6 +224,27 @@ type ChartSource = "literal" | "formula";
  */
 const SOURCES: readonly ChartSource[] = ["literal", "formula"];
 
+/**
+ * The untimed commits before a row's samples: {@link WARMUPS} of them, or as
+ * many as fit in {@link WARMUP_BUDGET_MS}. A row whose commit resolves
+ * thousands of charts runs the shared paths thousands of times per commit,
+ * so it reaches steady tiering long before the count and stops at the budget.
+ */
+class WarmUp {
+  commits = 0;
+  private readonly start = now();
+
+  constructor(private readonly limit: number) {}
+
+  running(): boolean {
+    return this.commits < this.limit && now() - this.start < WARMUP_BUDGET_MS;
+  }
+
+  count(): void {
+    this.commits += 1;
+  }
+}
+
 /** Commit time of the no-chart control workbook of `count` charts' size. */
 function measureControl(count: number, samples: number, warmups: number): Stat {
   const control = fixture(count, "literal", false);
@@ -228,16 +254,19 @@ function measureControl(count: number, samples: number, warmups: number): Stat {
     const detach = subscribeChartChanges(control, () => {
       throw new Error("No-chart control emitted an event");
     });
-    for (let iteration = -warmups; iteration < samples; iteration++) {
+    const warmup = new WarmUp(warmups);
+    for (let value = 1; controlTimes.length < samples; value++) {
+      const warming = warmup.running();
       const patch: DocumentOp = {
         op: "set",
         addr: { sheet: SOURCE_SHEET, row: count + 1, col: OUTSIDE_COL },
-        value: { kind: "literal", value: iteration },
+        value: { kind: "literal", value },
       };
       const start = now();
       apply(control, [patch]);
       const elapsed = now() - start;
-      if (iteration >= 0) controlTimes.push(elapsed);
+      if (warming) warmup.count();
+      else controlTimes.push(elapsed);
     }
     detach();
   } finally {
@@ -284,13 +313,16 @@ function measureSource({
       const latencies: number[] = [];
       const resolveTimes: number[] = [];
       const named: number[] = [];
-      for (let iteration = -warmups; iteration < samples; iteration++) {
+      const warmup = new WarmUp(warmups);
+      let value = 0;
+      while (commits.length < samples) {
+        const warming = warmup.running();
+        value += 1;
         events.length = 0;
         resolutions = 0;
         // The literal dependency is inside the chart source, so no index rebuild is needed.
         const row = scenario === "outside" ? count + 1 : 0;
         const col = scenario === "outside" ? OUTSIDE_COL : EDIT_VALUE_COL;
-        const value = iteration + samples + warmups + 1;
         const patch: DocumentOp = {
           op: "set",
           addr: { sheet: SOURCE_SHEET, row, col },
@@ -325,7 +357,9 @@ function measureSource({
           resolutions++;
         }
         if (resolutions !== namedCharts) throw new Error("Incorrect chart resolution count");
-        if (iteration >= 0) {
+        if (warming) {
+          warmup.count();
+        } else {
           commits.push(elapsed);
           named.push(namedCharts);
           if (namedCharts > 0) {
@@ -347,6 +381,7 @@ function measureSource({
         expectedCharts: summarize(named).median,
         resolutionsPerCommit: summarize(named).median,
         requiredCharts: required.length,
+        warmupCommits: warmup.commits,
       });
     }
   } finally {

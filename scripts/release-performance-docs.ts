@@ -79,6 +79,8 @@ interface ChartTrackingEvidence {
     /** Minimum charts whose source value changed; absent in older captures. */
     requiredCharts?: number;
     resolutionsPerCommit: number;
+    /** Untimed commits before the samples; absent in older captures. */
+    warmupCommits?: number;
   }>;
   /** Absent in captures made before cold rows were measured. */
   coldSamples?: number;
@@ -172,7 +174,8 @@ export function validateChartTrackingArtifact(
       (row.resolveMs !== undefined && row.resolveMs !== null && !timing(row.resolveMs)) ||
       ![row.expectedEvents, row.expectedCharts, row.resolutionsPerCommit].every(nonnegative) ||
       (row.requiredCharts !== undefined &&
-        (!nonnegative(row.requiredCharts) || row.requiredCharts > row.expectedCharts))
+        (!nonnegative(row.requiredCharts) || row.requiredCharts > row.expectedCharts)) ||
+      (row.warmupCommits !== undefined && !nonnegative(row.warmupCommits))
     ) {
       return "chart-tracking capture contains invalid or duplicate measurements";
     }
