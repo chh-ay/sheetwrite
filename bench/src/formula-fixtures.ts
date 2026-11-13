@@ -975,8 +975,7 @@ function spillFilterSameRangeFixture(count: number): TimedFixture {
       store.setNumber(sheet, 0, 0, SAME_RANGE_EDITED_FIRST, 0);
       store.recompute(sheet);
     },
-    check: () =>
-      `${numberAt(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
+    check: () => `${numberAt(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
   };
