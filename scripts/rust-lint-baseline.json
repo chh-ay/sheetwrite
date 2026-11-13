@@ -29,7 +29,7 @@
     "clippy::str_to_string": 23,
     "clippy::suspicious_operation_groupings": 3,
     "clippy::too_many_arguments": 106,
-    "clippy::too_many_lines": 57,
+    "clippy::too_many_lines": 56,
     "clippy::tuple_array_conversions": 2,
     "clippy::type_complexity": 136,
     "clippy::undocumented_unsafe_blocks": 2,
