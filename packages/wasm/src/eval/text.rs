@@ -4,6 +4,7 @@ use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
 
 use super::functions::{bool_arg, integer_arg, require_arity, text_arg, FuncAccumulator};
+use super::preview_limits;
 use super::value::{format_basic_text, number_from_text, text_from_value};
 use super::wildcard::Wildcard;
 
@@ -73,7 +74,10 @@ fn unary_text(
     if let Err(error) = require_arity(values, 1, 1) {
         return Value::Error(error);
     }
-    match text_arg(values, 0, None).and_then(|text| operation(&text)) {
+    match text_arg(values, 0, None).and_then(|text| {
+        preview_limits::text(text.len())?;
+        operation(&text)
+    }) {
         Ok(value) => value,
         Err(error) => Value::Error(error),
     }
@@ -83,6 +87,7 @@ fn bounded_text(text: &str) -> Result<Value, FormulaError> {
     if text.len() > MAX_TEXT_OUTPUT_BYTES {
         Err(FormulaError::Num)
     } else {
+        preview_limits::text(text.len())?;
         Ok(Value::text(text))
     }
 }
@@ -93,6 +98,7 @@ fn checked_push(output: &mut String, text: &str) -> Result<(), FormulaError> {
         .checked_add(text.len())
         .filter(|length| *length <= MAX_TEXT_OUTPUT_BYTES)
         .ok_or(FormulaError::Num)?;
+    preview_limits::text(text.len())?;
     output
         .try_reserve(length - output.len())
         .map_err(|_| FormulaError::Num)?;
@@ -479,6 +485,7 @@ fn collect_code_points(text: &str) -> Result<Vec<char>, FormulaError> {
     if text.len() > MAX_TEXT_OUTPUT_BYTES {
         return Err(FormulaError::Num);
     }
+    preview_limits::text(text.len())?;
     let count = text.chars().count();
     let mut characters = Vec::new();
     characters
@@ -543,6 +550,9 @@ fn repeat(values: &FuncAccumulator) -> Value {
         Some(length) if length <= MAX_TEXT_OUTPUT_BYTES => length,
         _ => return Value::Error(FormulaError::Num),
     };
+    if let Err(error) = preview_limits::text(length) {
+        return Value::Error(error);
+    }
     let mut output = String::new();
     if output.try_reserve_exact(length).is_err() {
         return Value::Error(FormulaError::Num);

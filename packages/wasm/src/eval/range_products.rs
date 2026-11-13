@@ -12,6 +12,7 @@
 //! order, so the total is the same.
 
 use super::matrix::written_range;
+use super::preview_limits::RangeRead;
 use super::range_view::{LiteralColumns, RangeView};
 
 use crate::calc::Ast;
@@ -50,6 +51,7 @@ impl CellStore {
             if (rows as u64).saturating_mul(cols as u64) > crate::types::RANGE_CELL_LIMIT {
                 return None;
             }
+            reader.charge_preview(RangeRead::Typed).ok()?;
             if *shape.get_or_insert(reader.shape()) != reader.shape() {
                 return None;
             }
