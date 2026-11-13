@@ -576,10 +576,6 @@ impl FormulaEntry {
             return entry;
         }
 
-        // A LAMBDA reads its parameters from the call frame; numbering them
-        // first lets the shape below see which ones a call binds to arrays.
-        #[cfg(feature = "analysis")]
-        crate::eval::analysis::lambda::resolve_parameters(&mut ast);
         let contains_let = ast_contains_let(&ast);
         let (reads, volatile) = formula_metadata(&ast, sheet, contains_let);
 

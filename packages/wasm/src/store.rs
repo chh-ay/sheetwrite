@@ -3900,10 +3900,11 @@ impl CellStore {
         }
     }
 
-    /// Parses a formula and resolves its sheets, defined names and table
-    /// references. Each step runs only when the parse found a node it
-    /// rewrites, so a formula of plain cells is parsed in one pass. The flag
-    /// tells whether a sheet reference stayed detached.
+    /// Parses a formula, resolves its sheets, defined names and table
+    /// references, and numbers its LAMBDA parameters. Each step runs only
+    /// when the parse found a node it rewrites, so a formula of plain cells
+    /// is parsed in one pass. The flag tells whether a sheet reference stayed
+    /// detached.
     fn resolve_formula_ast(
         &self,
         source: &str,
@@ -3927,7 +3928,16 @@ impl CellStore {
         }
 
         #[cfg(feature = "analysis")]
-        let resolved = self.bind_regex_patterns(source, ast);
+        let resolved = {
+            let mut bound = self.bind_regex_patterns(source, ast);
+            // A LAMBDA reads its parameters from the call frame. Numbering
+            // them before the formula is stored lets its shape checks see
+            // which ones a call binds to arrays.
+            if features.lambdas {
+                crate::eval::analysis::lambda::resolve_parameters(&mut bound);
+            }
+            bound
+        };
         #[cfg(not(feature = "analysis"))]
         let resolved = ast;
         Ok((resolved, features.detached_sheets))

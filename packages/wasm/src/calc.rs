@@ -1866,6 +1866,10 @@ pub(crate) struct ParseFeatures {
     /// A sheet reference left detached: an external link or a sheet that the
     /// workbook does not have.
     pub(crate) detached_sheets: bool,
+    /// A LAMBDA, whose parameter uses are numbered before the formula is
+    /// stored.
+    #[cfg(feature = "analysis")]
+    pub(crate) lambdas: bool,
 }
 
 /// Binary operator levels, loosest first. A comparison does not chain.
@@ -2258,6 +2262,10 @@ impl<'a> Parser<'a, '_> {
     /// The arguments of a call to `name` after its `(`.
     fn call_at(&mut self, name: Cow<'a, str>, depth: usize) -> Result<Ast, String> {
         let func = lookup_func(name.as_ref());
+        #[cfg(feature = "analysis")]
+        if func == Some(Func::Analysis(crate::eval::analysis::LAMBDA_ID)) {
+            self.features.lambdas = true;
+        }
         let first = self.args.len();
         if self.peek() != Some(&Tok::RParen) {
             loop {
