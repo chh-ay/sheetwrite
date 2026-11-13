@@ -4,6 +4,12 @@
 
 const EXTERNAL_DATA_FUNCTION =
   /(^|[^A-Z0-9_.])(?:_xlfn\.)?(DDE|RTD|WEBSERVICE|FILTERXML|CUBEMEMBER|CUBEVALUE|CUBESET|CUBESETCOUNT|CUBERANKEDMEMBER)\s*\(/i;
+/**
+ * Text every `EXTERNAL_DATA_FUNCTION` name contains. Without it, a formula cannot call one.
+ */
+const EXTERNAL_DATA_NAME = /DDE|RTD|WEBSERVICE|FILTERXML|CUBE/i;
+/** `[` opens every external book and `!` follows every workbook qualifier. */
+const EXTERNAL_NAME_MARK = /[[!]/;
 /** An external-book qualifier: a link index (`[1]`) or a workbook file name (`[Budget.xlsx]`). */
 const EXTERNAL_BOOK = /^(?:\d+|[^\]]+\.(?:xlsx?|xlsm|xlsb|xlam|ods|csv))$/i;
 /** Characters that end a table name, so a following `[` opens a structured reference. */
@@ -109,7 +115,10 @@ export function formulaContainsExternalReference(formula: string): boolean {
 
 /** Whether the formula calls a function that reads live external data, such as `RTD` or `DDE`. */
 export function formulaCallsExternalData(formula: string): boolean {
-  return EXTERNAL_DATA_FUNCTION.test(formula.replace(/"(?:[^"]|"")*"?/g, " "));
+  return (
+    EXTERNAL_DATA_NAME.test(formula) &&
+    EXTERNAL_DATA_FUNCTION.test(formula.replace(/"(?:[^"]|"")*"?/g, " "))
+  );
 }
 
 /** A sheet of another workbook as a formula names it. */
@@ -173,6 +182,7 @@ export function rewriteExternalSheets(
   formula: string,
   replace: (name: ExternalSheetName) => string | undefined,
 ): string | undefined {
+  if (!EXTERNAL_NAME_MARK.test(formula)) return formula;
   let output = "";
   let index = 0;
   while (index < formula.length) {
