@@ -430,10 +430,10 @@ fn table_on_data(row: usize) -> (CellStore, usize, usize, usize) {
     store.set_sheet_name(data, "data", "Data");
     store.set_sheet_name(report, "report", "Report");
     store.set_sheet_name(other, "other", "Other");
-    assert!(table_one(&mut store, data, row, "old"));
+    assert!(table_one(&mut store, data, row, "old"), "Table1 is set");
     store.set_formula(report, 0, 0, "=SUM(Table1[Amount])", 0);
     store.recompute(report);
-    assert_eq!(store.get_cell(report, 0, 0).num(), 5.0);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 5.0, "the table is read");
     (store, data, report, other)
 }
 
@@ -451,11 +451,13 @@ fn assert_reused_slot_leaves_ref_error(mut store: CellStore, report: usize, othe
     let ref_error = |store: &CellStore| {
         assert_eq!(
             store.get_cell(report, 0, 0).string().as_deref(),
-            Some("#REF!")
+            Some("#REF!"),
+            "the old formula reads nothing"
         );
         assert_eq!(
             store.formula_source(report, 0, 0).as_deref(),
-            Some("=SUM(#REF!)")
+            Some("=SUM(#REF!)"),
+            "the old formula names no table"
         );
     };
     store.recompute(report);
@@ -463,14 +465,21 @@ fn assert_reused_slot_leaves_ref_error(mut store: CellStore, report: usize, othe
     let tree = tree_address(&store, report, 0, 0);
 
     // The only live table, so it takes the freed slot 0.
-    assert!(table_one(&mut store, other, 0, "new"));
+    assert!(
+        table_one(&mut store, other, 0, "new"),
+        "the new Table1 is set"
+    );
     store.recompute(report);
     ref_error(&store);
-    let id = store.formula_id(stale).expect("the old formula stays");
-    assert!(!store.formula_slots.table_users(0, true).contains(&id));
+    assert!(
+        store
+            .formula_id(stale)
+            .is_some_and(|id| !store.formula_slots.table_users(0, true).contains(&id)),
+        "the old formula stays, and slot 0 does not list it"
+    );
 
     store.set_number(other, 3, 0, 10.0, 0);
-    assert!(store.set_table(
+    let grown = store.set_table(
         "new",
         "Table1",
         other,
@@ -482,33 +491,45 @@ fn assert_reused_slot_leaves_ref_error(mut store: CellStore, report: usize, othe
         false,
         vec!["a".to_owned(), "o".to_owned()],
         vec!["Amount".to_owned(), "Other".to_owned()],
-    ));
+    );
+    assert!(grown, "the new table grows");
     store.recompute(report);
     ref_error(&store);
-    assert_eq!(tree_address(&store, report, 0, 0), tree);
+    assert_eq!(
+        tree_address(&store, report, 0, 0),
+        tree,
+        "editing the new table leaves the old formula alone"
+    );
 
     store.set_formula(report, 1, 0, "=SUM(Table1[Amount])", 0);
     store.recompute(report);
-    assert_eq!(store.get_cell(report, 1, 0).num(), 15.0, "new formulas bind");
+    assert_eq!(
+        store.get_cell(report, 1, 0).num(),
+        15.0,
+        "new formulas bind"
+    );
 }
 
 #[test]
 fn a_table_slot_freed_by_removing_its_sheet_does_not_rebind_old_users() {
     let (mut store, data, report, other) = table_on_data(0);
-    assert!(store.remove_sheet(data));
+    assert!(store.remove_sheet(data), "Data is removed");
     assert_reused_slot_leaves_ref_error(store, report, other);
 }
 
 #[test]
 fn a_table_slot_freed_by_removing_its_rows_does_not_rebind_old_users() {
     let (mut store, data, report, other) = table_on_data(2);
-    assert!(store.remove_rows(data, 2, 3));
+    assert!(store.remove_rows(data, 2, 3), "Table1's rows are removed");
     assert_reused_slot_leaves_ref_error(store, report, other);
 }
 
 #[test]
 fn a_table_slot_freed_by_removing_its_columns_does_not_rebind_old_users() {
     let (mut store, data, report, other) = table_on_data(0);
-    assert!(store.remove_cols(data, 0, 2));
+    assert!(
+        store.remove_cols(data, 0, 2),
+        "Table1's columns are removed"
+    );
     assert_reused_slot_leaves_ref_error(store, report, other);
 }
