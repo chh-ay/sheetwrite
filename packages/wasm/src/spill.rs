@@ -832,6 +832,11 @@ impl SpillState {
     /// `offset` is its row-major position in the range. The anchor's own value
     /// is the formula result and is stored by the caller. Returns the
     /// non-anchor cells written.
+    // Inlined into the recalculation pass, where develop had it. Left to
+    // LLVM, `install` became its own WASM function once `reinstall` existed,
+    // and a first install of 100,000 cells ran up to 15% slower on Linux
+    // (spill-sequence-admission) with identical native instruction counts.
+    #[inline(always)]
     pub(crate) fn install(
         &mut self,
         range: SpillRange,
