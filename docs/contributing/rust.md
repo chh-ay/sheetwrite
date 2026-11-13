@@ -47,7 +47,7 @@ What the lint set asks for, and how to satisfy it here.
   version was slower on the formula gate or in instruction counts, on Linux
   and on the Mac. It carries a narrow `#[allow(unsafe_code, reason = "...")]`
   on the smallest item possible and a `// SAFETY:` comment that proves the
-  invariant, like `payload_unchecked` in `cells.rs`.
+  invariant, like `zeroed_vec` in `transfer.rs`.
 - **Every `allow` has a reason.** `#[allow(lint, reason = "...")]`, on the
   item, never on a whole module. When the reason is speed or code size, say
   what was measured.
