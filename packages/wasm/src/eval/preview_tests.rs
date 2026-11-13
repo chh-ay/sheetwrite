@@ -252,6 +252,83 @@ fn long_sources_are_not_previewed() {
     );
 }
 
+/// A store with spills, lookups, criteria, a defined name and settled results.
+fn settled_store() -> (CellStore, usize) {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(6, 20);
+    for row in 0..3 {
+        store.set_number(sheet, row, 0, (row + 1) as f64, 0);
+    }
+    store.set_formula(sheet, 0, 1, "=SEQUENCE(3)", 0);
+    store.set_formula(sheet, 0, 2, "=XLOOKUP(2,A1:A3,B1:B3)", 0);
+    store.set_formula(sheet, 1, 2, "=COUNTIF(A1:A3,\">1\")", 0);
+    store.set_formula(sheet, 2, 2, "=SUM(B1#)", 0);
+    store.set_string(sheet, 3, 0, "text", 0);
+    assert!(store.set_named_formula("Base", -1, "=$A$1+1"));
+    store.commit_sources();
+    (store, sheet)
+}
+
+/// Formula evaluations a recalculation runs.
+fn evaluations(recalculate: impl FnOnce()) -> usize {
+    super::FORMULA_EVALUATIONS.with(|count| count.set(0));
+    recalculate();
+    super::FORMULA_EVALUATIONS.with(std::cell::Cell::get)
+}
+
+#[test]
+fn previews_leave_values_spills_dirty_state_strings_and_dependencies_unchanged() {
+    let (mut previewed, sheet) = settled_store();
+    let (mut untouched, _) = settled_store();
+    let before = previewed.export_memory_state();
+    let strings = previewed.strings.len();
+
+    let mut sources = vec![
+        (
+            "=INDIRECT(\"E5\")+INDIRECT(\"A2\")",
+            FormulaPreviewStatus::Value,
+        ),
+        ("=OFFSET(A1,2,0)", FormulaPreviewStatus::Value),
+        ("=SUM(B1#)*2", FormulaPreviewStatus::Value),
+        ("=XLOOKUP(3,A1:A3,B1:B3)", FormulaPreviewStatus::Value),
+        ("=COUNTIF(A1:A4,\"new text\")", FormulaPreviewStatus::Value),
+        ("=Base*2&\"other text\"", FormulaPreviewStatus::Value),
+        ("=SEQUENCE(2,2)", FormulaPreviewStatus::Array),
+        ("=SEQUENCE(20000)", FormulaPreviewStatus::CostLimit),
+        ("=A1+RAND()", FormulaPreviewStatus::UnsafeFunction),
+    ];
+    if cfg!(feature = "analysis") {
+        sources.push(("=LAMBDA(x,x*2)(A1)", FormulaPreviewStatus::Value));
+        sources.push(("=MAP(A1:A3,LAMBDA(v,v&\"!\"))", FormulaPreviewStatus::Array));
+    }
+    for (source, status) in sources {
+        assert_eq!(
+            preview(&previewed, sheet, source).status(),
+            status,
+            "{source}"
+        );
+    }
+
+    // Cells, formula results, spills, dirty sets, the string pool and the
+    // random state are all in the exported state.
+    assert_eq!(previewed.export_memory_state(), before);
+    assert_eq!(previewed.strings.len(), strings);
+
+    // The same edits recalculate the same formulas in a store that was never
+    // previewed: no preview read registered a dependency.
+    for (row, col, value) in [(4, 4, 5.0), (1, 0, 10.0), (0, 0, 7.0)] {
+        previewed.set_number(sheet, row, col, value, 0);
+        untouched.set_number(sheet, row, col, value, 0);
+        let previewed_runs = evaluations(|| previewed.recompute(sheet));
+        let untouched_runs = evaluations(|| untouched.recompute(sheet));
+        assert_eq!(previewed_runs, untouched_runs, "edit at {row},{col}");
+        assert_eq!(
+            previewed.export_memory_state(),
+            untouched.export_memory_state()
+        );
+    }
+}
+
 #[cfg(feature = "analysis")]
 mod full_engine {
     use std::rc::Rc;
