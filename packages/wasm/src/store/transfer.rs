@@ -113,17 +113,17 @@ impl CellStore {
             None
         };
 
-        let (ast, uses_tables) = if input.bool()? {
+        let (ast, features) = if input.bool()? {
             if is_reference {
-                (reference_ast, false)
+                (reference_ast, ParseFeatures::default())
             } else {
                 let (tree, features) = self
                     .resolve_formula_ast(&source, sheet, row, col)
                     .map_err(|_| "invalid transferred formula".to_owned())?;
-                (Some(tree), features.table_refs)
+                (Some(tree), features)
             }
         } else {
-            (None, false)
+            (None, ParseFeatures::default())
         };
         let source_error = input.error()?;
         let volatile = input.bool()?;
@@ -157,7 +157,7 @@ impl CellStore {
             source,
             ReadSet { cells, ranges },
             is_reference,
-            uses_tables,
+            features,
         );
         entry.set_source_error(source_error);
         entry.set_volatile(volatile);

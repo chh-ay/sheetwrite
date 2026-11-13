@@ -96,6 +96,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=let-calls;size=100000": 1.2,
   "workload=name-define;size=10000": 1.2,
   "workload=name-define;size=100000": 1.2,
+  "workload=name-define-unused;size=10000": 1.2,
+  "workload=name-define-unused;size=100000": 1.2,
   "workload=row-insert-names;size=10000": 1.2,
   "workload=row-insert-names;size=100000": 1.2,
   "workload=table-append-row;size=10000": 1.2,

@@ -317,3 +317,163 @@ fn recursion_past_the_call_limit_is_a_num_error() {
     assert_eq!(number(&store, sheet, 0, 3), 55.0);
     assert_eq!(text(&store, sheet, 1, 3).as_deref(), Some("#NUM!"));
 }
+
+/// The tree of the formula at (`row`, `col`), as an address that changes
+/// when the formula is bound again.
+fn tree_address(
+    store: &CellStore,
+    sheet: usize,
+    row: u32,
+    col: u32,
+) -> Option<*const crate::calc::Ast> {
+    let entry = store.sheets[sheet]
+        .formulas
+        .get((row, col), &store.formula_slots)?;
+    entry.ast.as_ref().map(std::ptr::from_ref)
+}
+
+/// `=SUM(Rate)*A1` in D1, `=Total*2` in D2, `=B1*2` in D3 and `=Ratio+1`
+/// in D4, where `Total` is `=Rate*10` and `Ratio` is not defined yet.
+fn name_users() -> (CellStore, usize) {
+    let (mut store, sheet) = data_store();
+    assert!(
+        store.set_named_range("Rate", -1, sheet, 0, 1, 0, 1),
+        "Rate is B1"
+    );
+    assert!(
+        store.set_named_formula("Total", -1, "=Rate*10"),
+        "Total is set"
+    );
+    store.set_formula(sheet, 0, 3, "=SUM(Rate)*A1", 0);
+    store.set_formula(sheet, 1, 3, "=Total*2", 0);
+    store.set_formula(sheet, 2, 3, "=B1*2", 0);
+    store.set_formula(sheet, 3, 3, "=Ratio+1", 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 10.0, "SUM(Rate)*A1");
+    assert_eq!(number(&store, sheet, 1, 3), 200.0, "Total*2");
+    assert_eq!(
+        text(&store, sheet, 3, 3).as_deref(),
+        Some("#NAME?"),
+        "Ratio is not defined yet"
+    );
+    (store, sheet)
+}
+
+#[test]
+fn a_name_change_binds_only_the_formulas_that_use_it() {
+    let (mut store, sheet) = name_users();
+    let unrelated = tree_address(&store, sheet, 2, 3);
+    let waiting = tree_address(&store, sheet, 3, 3);
+    assert!(unrelated.is_some(), "B1*2 has a tree");
+
+    // Rate moves to B2; Total uses Rate, so `=Total*2` follows it too.
+    assert!(
+        store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),
+        "Rate is B2"
+    );
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 20.0, "SUM(Rate)*A1 reads B2");
+    assert_eq!(number(&store, sheet, 1, 3), 400.0, "Total*2 reads B2");
+    assert_eq!(tree_address(&store, sheet, 2, 3), unrelated, "B1*2 is kept");
+    assert_eq!(
+        tree_address(&store, sheet, 3, 3),
+        waiting,
+        "Ratio+1 is kept"
+    );
+
+    store.set_number(sheet, 1, 1, 5.0, 0);
+    store.recompute(sheet);
+    assert_eq!(
+        number(&store, sheet, 1, 3),
+        100.0,
+        "the new reads reach the graph"
+    );
+}
+
+#[test]
+fn a_name_defined_after_its_formulas_binds_them() {
+    let (mut store, sheet) = name_users();
+    assert!(
+        store.set_named_formula("Ratio", -1, "=Total/2"),
+        "Ratio is set"
+    );
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 3, 3), 51.0, "Ratio+1");
+    assert_eq!(
+        store.formula_source(sheet, 3, 3).as_deref(),
+        Some("=Ratio+1"),
+        "the text stays as typed"
+    );
+
+    // Redefining a name that another name uses rebinds that name's users.
+    assert!(
+        store.set_named_formula("Total", -1, "=Rate*100"),
+        "Total changes"
+    );
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 1, 3), 2000.0, "Total*2");
+    assert_eq!(number(&store, sheet, 3, 3), 501.0, "Ratio+1 through Total");
+
+    assert!(store.remove_named_range("Ratio", -1), "Ratio is removed");
+    store.recompute(sheet);
+    assert_eq!(
+        text(&store, sheet, 3, 3).as_deref(),
+        Some("#NAME?"),
+        "a removed name is unknown again"
+    );
+}
+
+#[test]
+fn a_sheets_own_name_binds_the_formulas_on_that_sheet() {
+    let (mut store, sheet) = name_users();
+    let other = store.add_sheet(2, 2);
+    store.set_sheet_name(other, "other", "Other");
+    store.set_formula(other, 0, 0, "=Rate*3", 0);
+    store.recompute(other);
+    assert_eq!(number(&store, other, 0, 0), 30.0, "the workbook's Rate");
+
+    assert!(
+        store.set_named_formula("Rate", other as i32, "=7"),
+        "Other has its own Rate"
+    );
+    store.recompute(other);
+    store.recompute(sheet);
+    assert_eq!(number(&store, other, 0, 0), 21.0, "Other's own Rate");
+    assert_eq!(
+        number(&store, sheet, 0, 3),
+        10.0,
+        "Data keeps the workbook's"
+    );
+}
+
+#[test]
+fn a_name_over_a_table_follows_the_table() {
+    let (mut store, sheet) = data_store();
+    let table = |store: &mut CellStore, last_row: usize| {
+        store.set_table(
+            "amounts",
+            "Amounts",
+            sheet,
+            0,
+            0,
+            last_row,
+            0,
+            false,
+            false,
+            vec!["a".to_owned()],
+            vec!["Amount".to_owned()],
+        )
+    };
+    assert!(table(&mut store, 1), "Amounts is A1:A2");
+    assert!(
+        store.set_named_formula("Sum", -1, "=SUM(Amounts[Amount])"),
+        "Sum is set"
+    );
+    store.set_formula(sheet, 0, 3, "=Sum*2", 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 6.0, "Sum of A1:A2");
+
+    assert!(table(&mut store, 2), "Amounts grows to A1:A3");
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 0, 3), 12.0, "Sum of A1:A3");
+}

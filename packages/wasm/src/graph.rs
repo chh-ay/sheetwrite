@@ -521,17 +521,6 @@ impl SheetFormulas {
         true
     }
 
-    /// Source import and rewrites keep an existing formula id when possible.
-    pub(crate) fn insert(
-        &mut self,
-        key: CellKey,
-        entry: FormulaEntry,
-        sheet: usize,
-        slots: &mut FormulaStore,
-    ) {
-        self.replace(key, Some(entry), sheet, slots);
-    }
-
     /// Retire a removed id until its old graph reads are owned.
     pub(crate) fn remove(&mut self, key: CellKey, slots: &mut FormulaStore) {
         self.replace(key, None, 0, slots);
