@@ -4,10 +4,11 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use super::{CellStore, TableColumnDefinition, TableDefinition};
+use super::CellStore;
 use crate::cells::payload_str_id;
 use crate::data_model::{KeyCell, KeyIndex, KeyProblem, KEY_ERROR, NO_MATCH};
 use crate::eval::settled_cell_value;
+use crate::tables::{Table, TableColumn};
 use crate::types::{string_from_pool_ref, KIND_STRING};
 
 /// Most relationships one workbook may hold; twin of `MAX_RELATIONSHIPS` in
@@ -71,7 +72,7 @@ pub(crate) struct KeyColumn {
 }
 
 impl KeyColumn {
-    fn of(table: &TableDefinition, column_id: &str) -> Result<Self, RelationshipError> {
+    fn of(table: &Table, column_id: &str) -> Result<Self, RelationshipError> {
         let column = table
             .columns
             .iter()
@@ -81,7 +82,7 @@ impl KeyColumn {
     }
 
     /// The data rows of `column`, which belongs to `table`.
-    pub(super) fn at(table: &TableDefinition, column: &TableColumnDefinition) -> Self {
+    pub(super) fn at(table: &Table, column: &TableColumn) -> Self {
         let first_row = table.row_start + u32::from(table.header_row);
         let end = table.row_end + 1 - u32::from(table.totals_row);
         Self {
@@ -179,10 +180,10 @@ impl CellStore {
 }
 
 impl CellStore {
-    /// The table with stable ID `id`. Tables are keyed by name, so this scans.
+    /// The table with stable ID `id`. Tables are kept by slot, so this scans.
     #[inline(never)]
-    pub(super) fn table_by_id(&self, id: &str) -> Option<&TableDefinition> {
-        self.tables.values().find(|table| table.id == id)
+    pub(super) fn table_by_id(&self, id: &str) -> Option<&Table> {
+        self.tables.with_id(id).map(|(_, table)| table)
     }
 
     /// The key column `column` names, if its table and column exist.
