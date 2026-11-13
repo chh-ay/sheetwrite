@@ -43,17 +43,6 @@ pub(crate) fn compare_group_values(left: &Value, right: &Value) -> Ordering {
     compare_values(left, right).expect("group keys are checked before comparison")
 }
 
-/// Orders two key tuples field by field.
-pub(crate) fn compare_fields(left: &[Value], right: &[Value]) -> Ordering {
-    for (left_value, right_value) in left.iter().zip(right) {
-        let order = compare_group_values(left_value, right_value);
-        if order != Ordering::Equal {
-            return order;
-        }
-    }
-    Ordering::Equal
-}
-
 /// How a value from a range takes part in `SUM`, `AVERAGE`, `MIN` and `MAX`:
 /// a number counts, text, booleans and blanks are skipped, and an error
 /// stops the aggregate.
