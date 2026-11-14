@@ -838,37 +838,37 @@ impl CellStore {
                 array.get(item, key)
             }
         };
-        let indices: Vec<u32> = match packed_sort_keys((0..item_count).map(key_value), order == -1)
-        {
-            Some(mut packed) => {
-                sort_u128(&mut packed);
-                packed.into_iter().map(key_index).collect()
-            }
-            None => {
-                let mut indices: Vec<u32> = (0..item_count as u32).collect();
-                let mut error = None;
-                sort_indices_by(&mut indices, &mut |left, right| {
-                    if error.is_some() {
-                        return Ordering::Equal;
-                    }
-                    let compared = match (key_value(left as usize), key_value(right as usize)) {
-                        (Some(left), Some(right)) => compare_values(left, right),
-                        _ => Err(FormulaError::Ref),
-                    };
-                    match compared {
-                        Ok(value) if order == -1 => value.reverse(),
-                        Ok(value) => value,
-                        Err(found) => {
-                            error = Some(found);
-                            Ordering::Equal
-                        }
-                    }
-                });
-                if let Some(first_error) = error {
-                    return Err(first_error);
+        let packed_keys = packed_sort_keys((0..item_count).map(key_value), order == -1);
+        let indices: Vec<u32> = if let Some(mut packed) = packed_keys {
+            sort_u128(&mut packed);
+            packed.into_iter().map(key_index).collect()
+        } else {
+            let mut indices: Vec<u32> = (0..item_count as u32).collect();
+            let mut error = None;
+            sort_indices_by(&mut indices, &mut |left_item, right_item| {
+                if error.is_some() {
+                    return Ordering::Equal;
                 }
-                indices
+                let compared = match (
+                    key_value(left_item as usize),
+                    key_value(right_item as usize),
+                ) {
+                    (Some(left), Some(right)) => compare_values(left, right),
+                    _ => Err(FormulaError::Ref),
+                };
+                match compared {
+                    Ok(value) if order == -1 => value.reverse(),
+                    Ok(value) => value,
+                    Err(found) => {
+                        error = Some(found);
+                        Ordering::Equal
+                    }
+                }
+            });
+            if let Some(first_error) = error {
+                return Err(first_error);
             }
+            indices
         };
 
         let mut values = Vec::with_capacity(array.values.len());
