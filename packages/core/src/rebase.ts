@@ -21,9 +21,13 @@ export type RebaseConflictCode =
 
 /** Reason and affected operations for an unsafe document rebase. */
 export interface RebaseConflict {
+  /** Why the two operations cannot both apply. */
   code: RebaseConflictCode;
+  /** Zero-based index of the local operation in conflict. */
   localOperationIndex: number;
+  /** Zero-based index of the remote operation in conflict. */
   remoteOperationIndex: number;
+  /** A readable explanation of the conflict, for logs. */
   message: string;
 }
 
@@ -66,6 +70,9 @@ interface TransformFailure {
  * only when a remote row or column change rewrites it, and the copy shares
  * every payload the transform does not write; every other operation in the
  * result is the caller's own object, so treat the result as read-only.
+ *
+ * @param localOperations - This client's operations the server has not yet accepted, in order.
+ * @param remoteOperations - Operations the server accepted first, in order.
  */
 export function rebaseDocumentOperations(
   localOperations: readonly DocumentOp[],

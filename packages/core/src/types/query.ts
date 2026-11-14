@@ -9,8 +9,11 @@ export type QueryColumnType = "number" | "logical" | "text" | "date" | "dateTime
 
 /** Stable identity is separate from the field name used by source records. */
 export interface QueryColumnSpec {
+  /** Stable ID that query steps use to refer to the column. */
   readonly id: string;
+  /** Field name in the source records, such as a CSV header or a JSON member name. */
   readonly name: string;
+  /** Type the column's values are read as. */
   readonly type: QueryColumnType;
 }
 
@@ -40,9 +43,13 @@ export type QueryJoinKind =
 
 /** Column is required except for countRows; numeric aggregates ignore nulls. */
 export interface QueryAggregate {
+  /** Stable ID of the output column the aggregate makes. */
   readonly id: string;
+  /** Header text of that output column. */
   readonly name: string;
+  /** `countRows` counts rows; `count` counts non-null values; the others work on numbers. */
   readonly op: "countRows" | "count" | "sum" | "average" | "min" | "max";
+  /** ID of the column the aggregate reads. */
   readonly column?: string;
 }
 
@@ -122,6 +129,7 @@ export interface SavedQueryOutput {
   readonly table: WorkbookTableId;
   /** Structured-reference name used when refresh creates the table. */
   readonly tableName: string;
+  /** Top-left cell of the output table, where its header row starts. */
   readonly anchor: CellAddress;
 }
 
@@ -131,7 +139,9 @@ export interface SavedQuery {
   readonly id: string;
   /** Display name, unique in the workbook when ASCII letter case is ignored. */
   readonly name: string;
+  /** Where the query reads its rows, and their columns. */
   readonly source: SavedQuerySource;
+  /** Transformations applied to the source rows, in order. */
   readonly steps: readonly QueryStep[];
   /** Absent for a query that only feeds other queries. */
   readonly output?: SavedQueryOutput;
@@ -149,14 +159,17 @@ export interface PowerQueryLoss {
 
 /** A `Section1.m` document and the member name each query was written under. */
 export interface PowerQueryExport {
+  /** The full M text of the `section Section1;` document. */
   readonly section: string;
   /** Section member name for each query, in the order the queries were given. */
   readonly members: readonly string[];
+  /** Places where Excel will run the written M differently from Sheetwrite. */
   readonly losses: readonly PowerQueryLoss[];
 }
 
 /** An imported section member outside the supported subset, kept as text. */
 export interface PowerQueryUnsupported {
+  /** Name of the section member that could not be read as a query. */
   readonly member: string;
   /** Stable code, such as `syntax`, `source`, `step` or `dependency`. */
   readonly reason: string;
@@ -168,7 +181,9 @@ export interface PowerQueryUnsupported {
 
 /** Queries read from M, without outputs; the XLSX reader binds them to tables. */
 export interface PowerQueryImport {
+  /** Queries read from the members the codec supports. */
   readonly queries: readonly SavedQuery[];
+  /** Members the codec could not read, kept with their original text. */
   readonly unsupported: readonly PowerQueryUnsupported[];
 }
 
@@ -177,6 +192,7 @@ export interface PowerQueryImport {
  * it never evaluates M or fetches a source. `@sheetwrite/queries` provides one.
  */
 export interface PowerQueryCodec {
+  /** Writes the queries as one `section Section1;` M document. */
   encode(queries: readonly SavedQuery[]): PowerQueryExport;
   /** Throws when the text is not a `section Section1;` document. */
   decode(section: string): PowerQueryImport;

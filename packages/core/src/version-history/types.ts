@@ -36,12 +36,15 @@ export interface HistoryLimits {
 export interface HistoryVersion {
   /** Content ID of the marker fields. */
   id: string;
+  /** Document revision the version restores to. */
   revision: number;
+  /** `named` when a user saved it; `automatic` when the archive made it on its schedule. */
   kind: "named" | "automatic";
   /** Present on named versions. */
   name?: string;
   /** Who saved a named version, or who made the last change of an automatic one. */
   authorId: string;
+  /** When the version was made, in milliseconds since the Unix epoch. */
   time: number;
   /** Record ID of the checkpoint the version rebuilds from. */
   checkpoint: string;
@@ -56,10 +59,13 @@ export interface HistoryVersion {
 
 /** Immutable, content-addressed history payload and the records it refers to. */
 export interface HistoryStoredRecord {
+  /** Format version of the record; always `1` today. */
   schemaVersion: 1;
   /** SHA-256 over the header and compressed bytes, as 64 lowercase hex digits. */
   id: string;
+  /** What the payload holds, such as a checkpoint snapshot or one transaction. */
   kind: "cells" | "metadata" | "sheet" | "checkpoint" | "segment" | "transaction";
+  /** How `bytes` decode: deflated JSON or deflated raw bytes. */
   encoding: "deflate-json-v1" | "deflate-bytes-v1";
   /** Exact size after inflate. */
   decodedBytes: number;
@@ -71,8 +77,11 @@ export interface HistoryStoredRecord {
 
 /** Durable recorder cursor: the newest checkpoint, the log tail since it, and cadence counters. */
 export interface HistoryHead {
+  /** Revision of the last archived commit. */
   revision: number;
+  /** Record ID of the newest checkpoint. */
   checkpoint: string;
+  /** Transaction record IDs archived after that checkpoint, in order. */
   tail: readonly string[];
   /** Checkpoints made since the newest version marker; the next marker takes them over. */
   checkpoints: readonly string[];
@@ -92,9 +101,13 @@ export interface HistoryHead {
 
 /** Retained storage of one document, including headers and index entries. */
 export interface HistoryStorageUsage {
+  /** Bytes the document's history takes in storage. */
   encodedBytes: number;
+  /** Number of stored records. */
   recordCount: number;
+  /** Number of versions, named and automatic. */
   versionCount: number;
+  /** Number of named versions. */
   namedVersionCount: number;
 }
 
@@ -102,28 +115,39 @@ export interface HistoryStorageUsage {
 export interface HistoryManifest extends HistoryStorageUsage {
   /** Increases on each publication or prune; writers compare it to detect a concurrent writer. */
   generation: number;
+  /** The recorder's position; absent before the first commit is archived. */
   head?: HistoryHead;
 }
 
 /** Common document identity, ceilings, and cancellation for adapter calls. */
 export interface HistoryStorageRequest {
+  /** ID of the document whose history the call is about. */
   documentId: string;
+  /** The archive's limits; the adapter must refuse work that goes over them. */
   limits: Readonly<HistoryLimits>;
+  /** Aborts when the archive stops waiting for the call. */
   signal?: AbortSignal;
 }
 
 /** Atomically publish immutable records and a new head or version marker. */
 export interface HistoryPublishRequest extends HistoryStorageRequest {
+  /** Always `"publish"`. */
   kind: "publish";
+  /** Generation the writer read; refuse the call when storage is at another one. */
   expectedGeneration: number;
+  /** New records to store, all or none. */
   records: readonly HistoryStoredRecord[];
+  /** The new head, when the call moves it. */
   head?: HistoryHead;
+  /** A new version marker, when the call adds one. */
   version?: HistoryVersion;
 }
 
 /** Acquire or release a five-minute renewable reader lease through the storage seam. */
 export interface HistoryPinRequest extends HistoryStorageRequest {
+  /** `pin` takes or renews the lease; `release` gives it up. */
   kind: "pin" | "release";
+  /** The reader's lease ID; the same token renews or releases it. */
   token: string;
   /** Marker ID, or `"head"` to lease the committed head returned in the manifest. */
   versionId: string;
@@ -142,50 +166,75 @@ export type HistoryGetRequest = HistoryStorageRequest &
 
 /** Metadata for one immutable record; listings never return payload bytes. */
 export interface HistoryRecordMetadata {
+  /** Content ID of the record. */
   id: string;
+  /** What the record holds. */
   kind: HistoryStoredRecord["kind"];
+  /** Stored, compressed size in bytes. */
   encodedBytes: number;
+  /** Size in bytes once inflated. */
   decodedBytes: number;
 }
 
 /** Bounded metadata-only page. Cursors are scoped to a manifest generation. */
 export interface HistoryListRequest extends HistoryStorageRequest {
+  /** List version markers (the default), or records of one kind. */
   kind?: "versions" | HistoryStoredRecord["kind"];
+  /** Lowest revision to include. */
   fromRevision?: number;
+  /** Highest revision to include. */
   toRevision?: number;
+  /** The largest number of entries the page may hold. */
   maxEntries: number;
+  /** The largest size of the page as JSON, in bytes. */
   maxBytes: number;
+  /** Where to continue, from the previous page's `cursor`. */
   cursor?: string;
 }
 
 /** Metadata-only response in newest-first order. */
 export interface HistoryListPage {
+  /** Version markers on this page, newest first. */
   versions: readonly HistoryVersion[];
+  /** Record metadata on this page, when records of one kind were asked for. */
   records?: readonly HistoryRecordMetadata[];
+  /** Pass it back to get the next page; absent on the last page. */
   cursor?: string;
+  /** Storage generation the page was read at; a cursor is valid only for it. */
   generation: number;
 }
 
 /** Retention removes automatic markers, or one explicitly selected named marker. */
 export interface HistoryPruneRequest extends HistoryStorageRequest {
+  /** Generation the writer read; refuse the call when storage is at another one. */
   expectedGeneration: number;
+  /** Remove automatic versions made before this time, in milliseconds since the Unix epoch. */
   beforeTime: number;
+  /** ID of one named version to remove as well. */
   deleteVersionId?: string;
+  /** Keep removing the oldest automatic versions until storage is at or under this size in bytes. */
   targetBytes?: number;
 }
 
 /** Atomic storage seam for local databases and host-owned history backends. */
 export interface HistoryStorageAdapter {
+  /** Publishes records atomically, or takes or releases a reader lease; returns the new manifest. */
   put(request: HistoryPutRequest): Promise<HistoryManifest>;
+  /** Returns the manifest, one version marker, or one record, as `request.kind` asks. */
   get(request: HistoryGetRequest): Promise<HistoryManifest | HistoryVersion | HistoryStoredRecord>;
+  /** Returns one page of version or record metadata, newest first. */
   list(request: HistoryListRequest): Promise<HistoryListPage>;
+  /** Removes expired versions and the records only they used; returns the new manifest. */
   prune(request: HistoryPruneRequest): Promise<HistoryManifest>;
 }
 
 /** Host-controlled archive configuration. No history is created until explicitly opened. */
 export interface HistoryArchiveOptions {
+  /** ID of the document whose history the archive keeps. */
   documentId: string;
+  /** Where the archive stores its records, such as IndexedDB storage from `@sheetwrite/core/browser-history`. */
   storage: HistoryStorageAdapter;
+  /** Overrides for the default limits. */
   limits?: Partial<HistoryLimits>;
 }
 

@@ -9,8 +9,11 @@ export type ExternalLinkValue = number | string | boolean | { error: string };
 
 /** One saved cell of a linked sheet; `row` and `col` start at 0. */
 export interface ExternalLinkCell {
+  /** Zero-based row in the linked sheet. */
   row: number;
+  /** Zero-based column in the linked sheet. */
   col: number;
+  /** The saved value; an error is `{ error: "#N/A" }` and the like. */
   value: ExternalLinkValue;
 }
 
