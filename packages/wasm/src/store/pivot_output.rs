@@ -9,11 +9,10 @@
 use std::borrow::Borrow;
 
 use super::CellStore;
-use crate::cells::CellStorage;
 use crate::eval::calculated_slot;
 use crate::graph::{DirtyRect, DirtySeeds};
 use crate::sheet::SheetData;
-use crate::spill::{spill_ownership_within_budget, SpillRange};
+use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::types::{CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
 
 #[cfg(not(feature = "analysis"))]
@@ -96,35 +95,6 @@ pub(super) fn shift_anchor(index: u32, at: u32, delta: i64, extent_after: usize)
     }
 }
 
-/// The cells an output install changed, reusing the `written` buffer.
-/// Output back over the same cells reports only changed values, so a
-/// recalculation that leaves the output alone does not wake the formulas
-/// that read it.
-fn installed_changes(
-    cells: &CellStorage,
-    same_range: bool,
-    vacated: &[(CellKey, Option<(u8, u64)>)],
-    mut written: Vec<CellKey>,
-) -> Vec<CellKey> {
-    let reinstalled = same_range
-        && vacated.len() == written.len()
-        && vacated
-            .iter()
-            .zip(&written)
-            .all(|((vacated_cell, _), cell)| vacated_cell == cell);
-
-    if reinstalled {
-        written.clear();
-        written.extend(vacated.iter().filter_map(|&(cell, previous)| {
-            let index = cells.idx(cell.0 as usize, cell.1 as usize);
-            (cells.calculated_cell_at(index) != previous).then_some(cell)
-        }));
-    } else {
-        written.extend(vacated.iter().map(|&(cell, _)| cell));
-    }
-    written
-}
-
 impl CellStore {
     /// Clears the output of the pivot at `range.anchor`, then admits and
     /// installs `range` with `value_at(offset)` row-major, as a formula
@@ -148,14 +118,16 @@ impl CellStore {
             return (Vec::new(), Err(FormulaError::Ref));
         }
 
-        let vacated_range = data.spill.installed(anchor);
-        let vacated = data.spill.clear_keeping_values(anchor, &mut data.cells);
+        let mut vacated_spill = VacatedSpill::default();
+        let vacated_range = data
+            .spill
+            .vacate(anchor, &mut data.cells, &mut vacated_spill);
         let mut changed: Vec<CellKey> = Vec::new();
         if let Some(vacated_range) = vacated_range.filter(|&vacated| vacated != range) {
             changed.extend(data.spill.anchors_colliding_with(anchor, vacated_range));
         }
         let vacated_cells = |changed: &mut Vec<CellKey>| {
-            changed.extend(vacated.iter().map(|&(cell, _)| cell));
+            changed.extend(vacated_spill.cleared_outside(None));
         };
 
         // An anchor that holds a value or formula cannot show the output.
@@ -171,7 +143,7 @@ impl CellStore {
 
         let cells = range.cells();
         let within_budget = current_owner_cells
-            .map(|total| total - vacated.len().min(total))
+            .map(|total| total - vacated_spill.owned_cells().min(total))
             .and_then(|total| total.checked_add(cells))
             .is_some_and(|owners| {
                 owners <= self.spill_owner_cell_limit && spill_ownership_within_budget(owners)
@@ -183,12 +155,13 @@ impl CellStore {
         }
 
         let strings = &mut self.strings;
-        let written = data.spill.install(range, &mut data.cells, |offset| {
-            calculated_slot(strings, value_at(offset).borrow())
-        });
-        let mut installed =
-            installed_changes(&data.cells, vacated_range == Some(range), &vacated, written);
-        changed.append(&mut installed);
+        let mut written = data
+            .spill
+            .reinstall(range, &mut data.cells, &vacated_spill, |offset| {
+                calculated_slot(strings, value_at(offset).borrow())
+            });
+        changed.append(&mut written);
+        changed.extend(vacated_spill.cleared_outside(Some(range)));
 
         if set_anchor_value(data, strings, anchor, value_at(0).borrow()) {
             changed.push(anchor);
@@ -262,6 +235,7 @@ impl CellStore {
     /// pivots whose source holds them, update. Returns whether any changed.
     pub(super) fn mark_pivot_cells_dirty(&mut self, owner: usize, changed: Vec<CellKey>) -> bool {
         let any = !changed.is_empty();
+        self.record_recalculated_cells(owner, &changed);
         self.sheets[owner].formulas.mark_cells_dirty(changed);
         any
     }

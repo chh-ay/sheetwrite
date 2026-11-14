@@ -17,8 +17,6 @@ mod index;
 mod info;
 mod iteration;
 mod let_slots;
-mod literal_criteria;
-mod literal_products;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -35,7 +33,9 @@ mod preview_limits;
 #[cfg(test)]
 mod preview_tests;
 mod random;
+mod range_criteria;
 mod range_fold;
+mod range_products;
 mod range_reader;
 mod range_view;
 mod reference;
@@ -61,7 +61,7 @@ use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, Dense
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
-use crate::spill::{spill_ownership_within_budget, SpillRange};
+use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -72,7 +72,7 @@ use crate::types::{
 pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
 pub(crate) use criteria::sum_range_extent;
-use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
+use criteria::{aggregate_if, extreme_if, Criterion};
 use date::host_clock_serial;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{
@@ -83,7 +83,6 @@ use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, Reduction
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
 pub(crate) use let_slots::{resolve_let_names, LetFrame};
-use literal_criteria::CriteriaFold;
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
@@ -92,6 +91,7 @@ pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_
 #[cfg(feature = "analysis")]
 pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
+use range_criteria::{CriteriaFold, CriteriaRead};
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use statistic_args::StatisticCall;
@@ -807,12 +807,20 @@ impl CellStore {
     where
         I: IntoIterator<Item = usize> + Clone,
     {
+        if let (Some(changes), Some(work)) = (self.recalculation.as_deref_mut(), affected) {
+            for key in work.keys(&self.formula_slots) {
+                changes.cell(key.sheet, key.row, key.col);
+            }
+        }
         if self.pivots.is_some() {
             self.capture_pivot_changes(sheets.clone(), affected);
         }
 
         for sheet in sheets {
             if let Some(data) = self.sheets.get_mut(sheet) {
+                if let Some(changes) = self.recalculation.as_deref_mut() {
+                    changes.dirty_seeds(sheet, data);
+                }
                 data.finish_recompute();
             }
         }
@@ -940,6 +948,8 @@ impl CellStore {
         // evaluation of this pass. The graph does not list them, so a spill
         // change inside one makes that anchor stale. Dropped with the pass.
         let mut runtime_readers: FxHashMap<AbsCellKey, RuntimeReads> = FxHashMap::default();
+        // The spill each anchor held before it runs again, reused by every anchor.
+        let mut vacated_spill = VacatedSpill::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -987,8 +997,9 @@ impl CellStore {
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
                 let data = &mut self.sheets[output_sheet];
-                let vacated_range = data.spill.installed(local);
-                let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
+                let vacated_range = data
+                    .spill
+                    .vacate(local, &mut data.cells, &mut vacated_spill);
 
                 memo.unsettle(id);
                 let mut pass = EvalPass {
@@ -1084,7 +1095,7 @@ impl CellStore {
                     }
                 }
 
-                let mut changed = match evaluated {
+                let changed = match evaluated {
                     // A reference that resolved to one cell is a plain value,
                     // as in Excel: it owns no spill cell and spends none of
                     // the spill-owner budget.
@@ -1096,7 +1107,7 @@ impl CellStore {
                         pass.results.pull(id, matrix.into_first());
                         Vec::new()
                     }
-                    result => self.install_spill_result(key, result, pass.results),
+                    result => self.install_spill_result(key, result, &vacated_spill, pass.results),
                 };
                 if self.iteration.is_some() {
                     if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
@@ -1132,31 +1143,17 @@ impl CellStore {
                     }
                 }
 
-                // A spill that comes back over the same cells reports only the
-                // cells whose value changed. Otherwise every vacated cell
-                // changed too, before the new spill was installed.
-                let reinstalled = installed_range == vacated_range
-                    && vacated.len() == changed.len()
-                    && vacated
-                        .iter()
-                        .zip(&changed)
-                        .all(|((vacated_cell, _), cell)| vacated_cell == cell);
-                if reinstalled {
-                    let cells = &self.sheets[output_sheet].cells;
-                    let mut previous = vacated.iter().map(|&(_, value)| value);
-                    changed.retain(|&(row, col)| {
-                        let current =
-                            cells.calculated_cell_at(cells.idx(row as usize, col as usize));
-                        previous.next().flatten() != current
-                    });
-                } else if !vacated.is_empty() {
-                    let cleared: Vec<(u32, u32)> = vacated.iter().map(|&(cell, _)| cell).collect();
+                // The install reported the cells whose value changed; the
+                // vacated cells it did not write back were cleared.
+                let cleared = vacated_spill.cleared_outside(installed_range);
+                if !cleared.is_empty() {
                     spill_changes.push(SpillChange {
                         sheet: output_sheet,
                         sequence,
                         output_cells: cleared.len(),
                         cells: cleared.clone(),
                     });
+                    self.record_recalculated_cells(output_sheet, &cleared);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1174,6 +1171,7 @@ impl CellStore {
                 }
 
                 if !changed.is_empty() {
+                    self.record_recalculated_cells(output_sheet, &changed);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1297,6 +1295,7 @@ impl CellStore {
         &mut self,
         key: AbsCellKey,
         result: Result<EvalMatrix, FormulaError>,
+        vacated: &VacatedSpill,
         results: &mut FormulaResults,
     ) -> Vec<(u32, u32)> {
         let sheet = key.sheet as usize;
@@ -1347,9 +1346,13 @@ impl CellStore {
         let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
         results.pull(id, first);
         let strings = &mut self.strings;
-        data.spill.install(range, &mut data.cells, |offset| {
-            calculated_slot(strings, &matrix.values[offset])
-        })
+        let value_at = |offset: usize| calculated_slot(strings, &matrix.values[offset]);
+        if vacated.owned_cells() == 0 {
+            data.spill.install(range, &mut data.cells, value_at)
+        } else {
+            data.spill
+                .reinstall(range, &mut data.cells, vacated, value_at)
+        }
     }
 
     /// Whether no selected formula can read another one during the pass: no
@@ -1991,22 +1994,22 @@ impl CellStore {
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
             let name = analysis::name(id);
-            if let Some(family) = analysis::family(name) {
-                if let Some(hooks) = &family.array {
-                    if (hooks.produces_array)(name, args) {
-                        return match (hooks.evaluate)(self, name, args, sheet, pass, depth)
-                            .and_then(|matrix| {
-                                matrix.validate_bytes()?;
-                                Ok(matrix)
-                            }) {
-                            Ok(matrix) => matrix.into_first(),
-                            Err(error) => Value::Error(error),
-                        };
-                    }
+            let family = analysis::family(id);
+            if let Some(hooks) = &family.array {
+                if (hooks.produces_array)(name, args) {
+                    return match (hooks.evaluate)(self, name, args, sheet, pass, depth).and_then(
+                        |matrix| {
+                            matrix.validate_bytes()?;
+                            Ok(matrix)
+                        },
+                    ) {
+                        Ok(matrix) => matrix.into_first(),
+                        Err(error) => Value::Error(error),
+                    };
                 }
-                if let Some(evaluate) = family.evaluate_ast {
-                    return evaluate(self, name, args, sheet, pass, depth);
-                }
+            }
+            if let Some(evaluate) = family.evaluate_ast {
+                return evaluate(self, name, args, sheet, pass, depth);
             }
         }
 
@@ -2144,7 +2147,7 @@ impl CellStore {
         }
 
         if func == Func::SumProduct {
-            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+            if let Some(result) = self.sum_product_range_family(args, sheet, depth + 1) {
                 return result;
             }
         }
@@ -2177,16 +2180,20 @@ impl CellStore {
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
             let name = analysis::name(id);
-            let result = match name {
-                "SUMSQ" => analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1),
-                "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => analysis::math::streamed_paired_squares(
-                    self,
-                    name,
-                    args,
-                    sheet,
-                    pass,
-                    depth + 1,
-                ),
+            let result = match id {
+                analysis::SUMSQ_ID => {
+                    analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1)
+                }
+                analysis::SUMX2MY2_ID | analysis::SUMX2PY2_ID | analysis::SUMXMY2_ID => {
+                    analysis::math::streamed_paired_squares(
+                        self,
+                        name,
+                        args,
+                        sheet,
+                        pass,
+                        depth + 1,
+                    )
+                }
                 _ => None,
             };
             if let Some(handled) = result {
@@ -2683,7 +2690,7 @@ impl CellStore {
         }
         let range = range_from_ast(&args[0], sheet)?;
         let reader_depth = depth + 1;
-        let mut reader = match RangeReader::new(self, range, reader_depth) {
+        let reader = match RangeReader::new(self, range, reader_depth) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2694,26 +2701,15 @@ impl CellStore {
         if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
             return Some(Value::number(count as f64));
         }
-        if let Some(cells) = reader.literal_columns() {
-            return Some(self.literal_criteria_family(
-                CriteriaFold::Count,
-                None,
-                &[(cells, &criterion)],
-            ));
-        }
-        let mut matches = 0.0;
-        loop {
-            match reader.next_allow_errors(pass) {
-                Ok(Some(value)) => {
-                    if criterion.matches(&value) {
-                        matches += 1.0;
-                    }
-                }
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut [(reader, &criterion)],
+                value_first: false,
             }
-        }
-        Some(Value::number(matches))
+            .finish(self, pass),
+        )
     }
 
     /// COUNTIF with a numeric criterion over dense columns that hold only
@@ -2791,39 +2787,16 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
-        if let Some(ranges) = readers
-            .iter()
-            .map(RangeReader::literal_columns)
-            .collect::<Option<Vec<_>>>()
-        {
-            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
-            return Some(self.literal_criteria_family(CriteriaFold::Count, None, &pairs));
-        }
-        let mut matches = 0.0;
-        loop {
-            let first = match readers[0].next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let mut row_matches = criteria[0].matches(&first);
-            for index in 1..readers.len() {
-                let candidate = match readers[index].next_allow_errors(pass) {
-                    Ok(Some(value)) => value,
-                    // The shapes are checked equal, so every reader ends on
-                    // the same row.
-                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                    Err(error) => return Some(Value::Error(error)),
-                };
-                if !criteria[index].matches(&candidate) {
-                    row_matches = false;
-                }
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut pairs,
+                value_first: false,
             }
-            if row_matches {
-                matches += 1.0;
-            }
-        }
-        Some(Value::number(matches))
+            .finish(self, pass),
+        )
     }
 
     fn streamed_sum_if(
@@ -2838,7 +2811,7 @@ impl CellStore {
             return None;
         }
         let criteria_range = range_from_ast(&args[0], sheet)?;
-        let mut criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
+        let criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2861,35 +2834,17 @@ impl CellStore {
         if criteria_reader.shape() != value_reader.shape() {
             return Some(Value::Error(FormulaError::Value));
         }
-        if let (Some(cells), Some(values)) = (
-            criteria_reader.literal_columns(),
-            value_reader.literal_columns(),
-        ) {
-            let fold = CriteriaFold::Sum {
-                average: func == Func::AverageIf,
-            };
-            return Some(self.literal_criteria_family(fold, Some(&values), &[(cells, &criterion)]));
-        }
-        let mut fold = IfSum::new();
-        loop {
-            let candidate = match criteria_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let value = match value_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                // The shapes are checked equal, so both readers end together.
-                Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                Err(error) => return Some(Value::Error(error)),
-            };
-            if criterion.matches(&candidate) {
-                if let Err(error) = fold.add(&value) {
-                    return Some(Value::Error(error));
-                }
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Sum {
+                    average: func == Func::AverageIf,
+                },
+                values: Some(&mut value_reader),
+                criteria: &mut [(criteria_reader, &criterion)],
+                value_first: false,
             }
-        }
-        Some(fold.finish(func == Func::AverageIf))
+            .finish(self, pass),
+        )
     }
 
     fn streamed_sum_ifs_or_extreme(
@@ -2926,63 +2881,25 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
-        let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
-        if let (Some(values), Some(ranges)) = (
-            value_reader.literal_columns(),
-            readers
-                .iter()
-                .map(RangeReader::literal_columns)
-                .collect::<Option<Vec<_>>>(),
-        ) {
-            let fold = if extreme {
-                CriteriaFold::Extreme {
-                    maximum: func == Func::MaxIfs,
-                }
-            } else {
-                CriteriaFold::Sum {
-                    average: func == Func::AverageIfs,
-                }
-            };
-            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
-            return Some(self.literal_criteria_family(fold, Some(&values), &pairs));
-        }
-        let mut sums = IfSum::new();
-        let mut extremes = IfExtreme::new(func == Func::MaxIfs);
-        loop {
-            let value = match value_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let mut row_matches = true;
-            for index in 0..readers.len() {
-                let candidate = match readers[index].next_allow_errors(pass) {
-                    Ok(Some(value)) => value,
-                    // The shapes are checked equal, so every reader ends on
-                    // the same row.
-                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                    Err(error) => return Some(Value::Error(error)),
-                };
-                if !criteria[index].matches(&candidate) {
-                    row_matches = false;
-                }
+        let fold = if matches!(func, Func::MaxIfs | Func::MinIfs) {
+            CriteriaFold::Extreme {
+                maximum: func == Func::MaxIfs,
             }
-            if row_matches {
-                let folded = if extreme {
-                    extremes.add(&value)
-                } else {
-                    sums.add(&value)
-                };
-                if let Err(error) = folded {
-                    return Some(Value::Error(error));
-                }
-            }
-        }
-        Some(if extreme {
-            extremes.finish()
         } else {
-            sums.finish(func == Func::AverageIfs)
-        })
+            CriteriaFold::Sum {
+                average: func == Func::AverageIfs,
+            }
+        };
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold,
+                values: Some(&mut value_reader),
+                criteria: &mut pairs,
+                value_first: true,
+            }
+            .finish(self, pass),
+        )
     }
 
     #[inline(never)]

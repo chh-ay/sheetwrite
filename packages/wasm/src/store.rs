@@ -46,6 +46,7 @@ pub(crate) mod pivot_output;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
+mod recalculation;
 #[cfg(all(test, feature = "analysis"))]
 mod related_measure_tests;
 #[cfg(feature = "analysis")]
@@ -56,6 +57,7 @@ mod sparse_tests;
 mod tests;
 mod transfer;
 
+#[cfg(not(feature = "analysis"))]
 fn utf16_slices<'a>(buf: &'a str, utf16_lens: &[u32], limit: usize) -> Vec<&'a str> {
     let mut slices = Vec::with_capacity(limit);
 
@@ -338,6 +340,8 @@ pub struct CellStore {
     pub(crate) formula_slots: FormulaStore,
     /// Moving one pointer keeps pass setup independent of scratch-header size.
     pub(crate) formula_results: Option<Box<FormulaResults>>,
+    /// Optional bounded commit output; absent until a chart tracker subscribes.
+    pub(crate) recalculation: Option<Box<recalculation::Recalculation>>,
     pub(crate) graph: FormulaGraph,
     pub(crate) conditional_rules: ConditionalRules,
     /// Host functions of this store. `None` until the host registers one, so
@@ -445,6 +449,7 @@ impl CellStore {
             strings: StringStorage::new(),
             formula_slots: FormulaStore::default(),
             formula_results: None,
+            recalculation: None,
             graph: FormulaGraph::default(),
             conditional_rules: ConditionalRules::default(),
             #[cfg(feature = "host-functions")]
@@ -781,6 +786,7 @@ impl CellStore {
 
     #[wasm_bindgen(js_name = beginMutation)]
     pub fn begin_mutation(&mut self) -> u64 {
+        self.reset_recalculation();
         let revision = self.next_mutation_revision();
         self.active_mutation_revision = Some(revision);
         revision
@@ -983,11 +989,13 @@ impl CellStore {
             .collect()
     }
 
+    /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = rowCount)]
     pub fn row_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.row_count())
     }
 
+    /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = colCount)]
     pub fn col_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.n_cols())
@@ -1059,6 +1067,7 @@ impl CellStore {
         });
     }
 
+    /// @enginePublic Scalar clearing complements the public scalar value setters.
     #[wasm_bindgen(js_name = clearCell)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {
         let revision = self.local_dirty_revision();
@@ -1960,174 +1969,6 @@ impl CellStore {
         )
     }
 
-    /// Bulk-load one column with numbers starting at `start_row`.
-    #[wasm_bindgen(js_name = setColumnNumbers)]
-    pub fn set_column_numbers(
-        &mut self,
-        sheet: usize,
-        col: usize,
-        start_row: usize,
-        values: &[f64],
-        style: u32,
-    ) {
-        let dirty_revision = self.local_dirty_revision();
-        let Some(s) = self.sheets.get_mut(sheet) else {
-            return;
-        };
-        if col >= s.cells.n_cols() || start_row >= s.cells.row_count() {
-            return;
-        }
-
-        let limit = values.len().min(s.cells.row_count() - start_row);
-        if let Some(revision) = dirty_revision {
-            if !s
-                .cells
-                .prepare_dirty_rect(start_row, col, limit, 1, revision)
-            {
-                return;
-            }
-        }
-        if limit > 0 {
-            if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
-                prepare_rect_write(s, rect);
-            }
-        }
-
-        for (offset, &value) in values.iter().take(limit).enumerate() {
-            let row = start_row + offset;
-            let Some(key) = cell_key(row, col) else {
-                continue;
-            };
-            if !s.cells.write_cell(
-                row,
-                col,
-                KIND_NUMBER,
-                encode_num(value),
-                style,
-                dirty_revision,
-            ) {
-                return;
-            }
-            self.graph
-                .replace_entry(&mut s.formulas, &mut self.formula_slots, sheet, key, None);
-        }
-    }
-
-    /// Bulk-load one column with strings starting at `start_row`.
-    #[wasm_bindgen(js_name = setColumnStrings)]
-    pub fn set_column_strings(
-        &mut self,
-        sheet: usize,
-        col: usize,
-        start_row: usize,
-        values: Vec<String>,
-        style: u32,
-    ) {
-        let dirty_revision = self.local_dirty_revision();
-        let Some(existing) = self.sheets.get(sheet) else {
-            return;
-        };
-        if col >= existing.cells.n_cols() || start_row >= existing.cells.row_count() {
-            return;
-        }
-
-        let limit = values.len().min(existing.cells.row_count() - start_row);
-        if let Some(revision) = dirty_revision {
-            if !self.sheets[sheet]
-                .cells
-                .prepare_dirty_rect(start_row, col, limit, 1, revision)
-            {
-                return;
-            }
-        }
-        if limit > 0 {
-            if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
-                prepare_rect_write(&mut self.sheets[sheet], rect);
-            }
-        }
-
-        for (offset, value) in values.into_iter().take(limit).enumerate() {
-            let row = start_row + offset;
-            if cell_key(row, col).is_none() {
-                continue;
-            }
-            let id = self.intern(&value);
-            if !self.replace_prepared_cell_source(CellSourceWrite {
-                sheet,
-                row,
-                col,
-                kind: KIND_STRING,
-                payload: encode_str_id(id),
-                style,
-                source: None,
-                revision: dirty_revision,
-                hydrating: false,
-            }) {
-                return;
-            }
-        }
-    }
-
-    /// Bulk-load one column of strings from a single concatenated buffer plus
-    /// per-row lengths in UTF-16 code units (the JS `string.length` unit).
-    /// One boundary decode and one Rust allocation for the whole column,
-    /// instead of one per row — the dominant ingest cost for text columns.
-    #[wasm_bindgen(js_name = setColumnStringsPacked)]
-    pub fn set_column_strings_packed(
-        &mut self,
-        sheet: usize,
-        col: usize,
-        start_row: usize,
-        buf: String,
-        utf16_lens: &[u32],
-        style: u32,
-    ) {
-        let dirty_revision = self.local_dirty_revision();
-        let Some(existing) = self.sheets.get(sheet) else {
-            return;
-        };
-        if col >= existing.cells.n_cols() || start_row >= existing.cells.row_count() {
-            return;
-        }
-
-        let limit = utf16_lens.len().min(existing.cells.row_count() - start_row);
-        if let Some(revision) = dirty_revision {
-            if !self.sheets[sheet]
-                .cells
-                .prepare_dirty_rect(start_row, col, limit, 1, revision)
-            {
-                return;
-            }
-        }
-        let slices = utf16_slices(&buf, utf16_lens, limit);
-
-        if limit > 0 {
-            if let Some(rect) = DirtyRect::new(start_row, col, start_row + limit - 1, col) {
-                prepare_rect_write(&mut self.sheets[sheet], rect);
-            }
-        }
-        for (offset, text) in slices.iter().enumerate() {
-            let row = start_row + offset;
-            let Some(key) = cell_key(row, col) else {
-                continue;
-            };
-            let id = self.intern(text);
-            let s = &mut self.sheets[sheet];
-            if !s.cells.write_cell(
-                row,
-                col,
-                KIND_STRING,
-                encode_str_id(id),
-                style,
-                dirty_revision,
-            ) {
-                return;
-            }
-            self.graph
-                .replace_entry(&mut s.formulas, &mut self.formula_slots, sheet, key, None);
-        }
-    }
-
     /// Insert `count` rows at `at`. Returns `false` and changes nothing when
     /// the sheet is missing or cannot hold the rows.
     #[wasm_bindgen(js_name = addRows)]
@@ -2567,6 +2408,7 @@ impl CellStore {
         if !serial.is_finite() {
             return false;
         }
+        self.reset_recalculation();
         self.volatile_serial = serial;
         self.recompute_volatile_formulas();
         true
@@ -2762,14 +2604,20 @@ impl CellStore {
     /// per-pass memo table to reuse formula results across dependent reads.
     #[wasm_bindgen(js_name = recompute)]
     pub fn recompute(&mut self, sheet: usize) {
+        if self.active_mutation_revision.is_none() {
+            self.reset_recalculation();
+        }
         self.recompute_sheet(sheet);
     }
 
     /// Commit staged user or host sources. Admission metadata must be staged
     /// before this barrier; derived values and string roots are complete on return.
     /// Beginning a page load suppresses local dirty tracking until this commit.
+    ///
+    /// Returns [`Self::recalculated_rect_count`] for the commit, so a chart
+    /// tracker learns whether there is a report without another call.
     #[wasm_bindgen(js_name = commitSources)]
-    pub fn commit_sources(&mut self) {
+    pub fn commit_sources(&mut self) -> i32 {
         let was_page_load = self.loading_page > 0;
         self.loading_page = self.loading_page.saturating_sub(1);
 
@@ -2779,6 +2627,7 @@ impl CellStore {
         if !was_page_load {
             self.maybe_collect_strings();
         }
+        self.recalculated_rect_count()
     }
 
     /// Whether a source rectangle can replace its spill cells without cutting
@@ -3482,6 +3331,12 @@ impl CellStore {
             .owner_mut(STRING_INDEX)
             .add(self.strings.index_memory_stats());
         self.formula_slots.add_memory_stats(&mut stats);
+        if let Some(changes) = &self.recalculation {
+            let (used, retained) = changes.bytes();
+            stats
+                .owner_mut(crate::memory::FORMULAS)
+                .add_payload(used, retained);
+        }
         if let Some(results) = &self.formula_results {
             let bytes = size_of::<FormulaResults>();
             stats
@@ -4260,25 +4115,25 @@ impl CellOut {
 
 #[wasm_bindgen]
 impl CellOut {
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = kind)]
     #[must_use]
     pub fn kind(&self) -> u8 {
         self.kind
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = num)]
     #[must_use]
     pub fn num(&self) -> f64 {
         self.num
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = string)]
     #[must_use]
     pub fn string(&self) -> Option<String> {
         self.string.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = style)]
     #[must_use]
     pub fn style(&self) -> u32 {
         self.style
@@ -4301,17 +4156,17 @@ pub struct CellSnapshot {
 
 #[wasm_bindgen]
 impl CellSnapshot {
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kinds.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = numbers)]
     pub fn numbers(&self) -> Vec<f64> {
         self.numbers.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = styles)]
     pub fn styles(&self) -> Vec<u32> {
         self.styles.clone()
     }
@@ -4322,7 +4177,7 @@ impl CellSnapshot {
         self.text_index.clone()
     }
 
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = strings)]
     pub fn strings(&self) -> Vec<String> {
         self.strings.clone()
     }
