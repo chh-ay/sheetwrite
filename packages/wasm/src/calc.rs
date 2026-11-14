@@ -810,13 +810,19 @@ pub(crate) enum Ast {
     Missing,
     /// A helper parameter value. It exists only during full-engine evaluation.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Transient values are not part of the public AST API.
+    #[allow(
+        private_interfaces,
+        reason = "transient values are not part of the public AST API"
+    )]
     BoundMatrix(Box<BoundMatrix>),
     /// The literal pattern of a REGEX call, shared by every formula in the
     /// store with the same pattern text. Its compiled programs live as long
     /// as the formulas that hold it.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    #[allow(
+        private_interfaces,
+        reason = "shared patterns are not part of the public AST API"
+    )]
     RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
     Name(Box<str>),
     NamedRange(Box<NamedRangeRef>),
@@ -2099,7 +2105,7 @@ impl<'a> Parser<'a, '_> {
             values.push(self.array_element()?);
             row_len += 1;
             match self.next() {
-                Some(Tok::Comma) => continue,
+                Some(Tok::Comma) => {}
                 Some(separator @ (Tok::Semicolon | Tok::RBrace)) => {
                     if cols == 0 {
                         cols = row_len;

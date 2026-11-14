@@ -36,7 +36,7 @@ fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
     match cell.string() {
         Some(text) => text,
         None if cell.kind() == KIND_EMPTY => String::new(),
-        None if cell.kind() == KIND_BOOL => if cell.num() != 0.0 { "TRUE" } else { "FALSE" }.into(),
+        None if cell.kind() == KIND_BOOL => if cell.num() == 0.0 { "FALSE" } else { "TRUE" }.into(),
         None => cell.num().to_string(),
     }
 }
