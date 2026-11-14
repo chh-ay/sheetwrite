@@ -1036,7 +1036,7 @@ impl CellRun<'_> {
 
     /// A paged run's clean kinds and payloads, when every cell is loaded and
     /// no dirty or calculated block overlays the run.
-    pub(crate) fn clean_sources(&self) -> Option<(&[u8], &[u64])> {
+    pub(crate) fn clean_sources(&self) -> Option<SourceSlices<'_>> {
         if self.is_dense || self.dirty.is_some() || !self.calculated.is_empty() {
             return None;
         }

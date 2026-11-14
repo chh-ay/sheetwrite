@@ -78,7 +78,7 @@ fn store(storage: Storage) -> (CellStore, usize) {
     store.set_number(sheet, 0, 7, 1.0, 0);
     store.set_number(sheet, 1, 7, f64::INFINITY, 0);
     store.set_number(sheet, 2, 7, 2.0, 0);
-    if let Storage::Paged = storage {
+    if matches!(storage, Storage::Paged) {
         store.commit_sources();
     }
     (store, sheet)
