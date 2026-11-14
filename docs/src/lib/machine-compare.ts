@@ -9,7 +9,7 @@
  */
 import { type FigureShape, type FigureTone, scalePosition } from "../components/figures/scale.js";
 import { laneHtml, legendMark } from "../components/figures/static.js";
-import { escapeHtml, formatTimes, type PerfIconMarkup, type PerfMachine } from "./perf-bars.js";
+import { escapeHtml, type PerfIconMarkup, type PerfMachine } from "./perf-bars.js";
 
 /** One machine's result for one row: a ratio above 1 is faster, or pending. */
 export type MachineResult =
@@ -163,24 +163,18 @@ function row(entry: MachineRow, comparison: MachineComparison, axis: RatioAxis):
 }
 
 function table(comparison: MachineComparison): string {
-  const head = [
-    comparison.rowHeader,
-    ...comparison.machines.map((key) => `${key.name}: ${comparison.measure.toLowerCase()}`),
-  ]
+  // The caption and the axis title above name the measure, so each column is its machine.
+  const head = [comparison.rowHeader, ...comparison.machines.map((key) => key.name)]
     .map((column) => `<th scope="col">${escapeHtml(column)}</th>`)
     .join("");
   const body = [...comparison.rows, ...(comparison.quiet?.rows ?? [])]
     .map(
       (entry) =>
         `<tr><th scope="row">${escapeHtml(entry.label)}</th>${comparison.machines
-          .map((key) => {
-            const result = entry.results[key.machine];
-            const text = resultText(
-              result,
-              (value) => `${formatTimes(value.ratio)} · ${value.text}`,
-            );
-            return `<td>${escapeHtml(text)}</td>`;
-          })
+          .map(
+            (key) =>
+              `<td>${escapeHtml(resultText(entry.results[key.machine], (value) => value.text))}</td>`,
+          )
           .join("")}</tr>`,
     )
     .join("");
