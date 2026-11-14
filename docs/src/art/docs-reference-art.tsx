@@ -129,7 +129,7 @@ export function LimitsDiagram() {
         { title: "Delimited text", lines: ["Above 32 MiB", "of input:", "throws"] },
         {
           title: "Sync",
-          lines: ["Version above", "10,000 operations", "needs a reload"],
+          lines: ["A version above", "10,000", "operations", "needs a reload"],
           tone: "muted",
         },
       ]}
