@@ -12,7 +12,7 @@
     "clippy::map_err_ignore": 60,
     "clippy::match_same_arms": 6,
     "clippy::missing_assert_message": 12,
-    "clippy::missing_const_for_fn": 97,
+    "clippy::missing_const_for_fn": 96,
     "clippy::naive_bytecount": 2,
     "clippy::needless_bitwise_bool": 1,
     "clippy::needless_continue": 1,
