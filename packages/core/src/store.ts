@@ -711,7 +711,7 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches: plan.operations }, "sort");
   }
 
-  /** Sets or (with `null`) removes the filter on one column, as one change. */
+  /** Sets the filter on one column, or removes it when `filter` is `null`, as one change. */
   setColumnFilter(
     sheet: SheetId,
     col: number,
@@ -1093,7 +1093,7 @@ export class SheetwriteStore implements Store {
     return this.engine.removeSheetFormulaIdentity(sheet);
   }
 
-  /** Writes rows a data source returned, starting at row `start`; cells `protect` returns `true` for keep their value. */
+  /** Writes rows a data source returned, starting at row `start`. Cells for which `protect` returns `true` keep their value. */
   loadPage(
     sheet: SheetId,
     start: number,
