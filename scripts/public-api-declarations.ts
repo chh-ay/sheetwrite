@@ -9,6 +9,8 @@ import {
   isExportSpecifier,
   isInterfaceDeclaration,
   isJSDoc,
+  isJSDocParameterTag,
+  isJSDocReturnTag,
   isJSDocSeeTag,
   isTypeAliasDeclaration,
   isVariableStatement,
@@ -123,8 +125,17 @@ function jsDocCommentTexts(node: Node): string[] {
     // Inherited framework props keep their summaries, not upstream documentation tags.
     if (host.getSourceFile().fileName.includes("node_modules")) continue;
     for (const tag of block.tags ?? []) {
-      if (!["example", "see"].includes(tag.tagName.text)) continue;
       const comment = getTextOfJSDocComment(tag.comment) ?? "";
+      // `@param {Type} name - text` keeps the name and text: the reference shows the declared type.
+      if (isJSDocParameterTag(tag)) {
+        if (comment.trim() !== "") comments.push(`@param ${tag.name.getText()} ${comment.trim()}`);
+        continue;
+      }
+      if (isJSDocReturnTag(tag)) {
+        if (comment.trim() !== "") comments.push(`@returns ${comment.trim()}`);
+        continue;
+      }
+      if (!["example", "see"].includes(tag.tagName.text)) continue;
       const reference = isJSDocSeeTag(tag) ? tag.nameExpression?.getText() : undefined;
       const text = [reference, comment].filter(Boolean).join(" ");
       comments.push(`@${tag.tagName.text}\n${text}`);
@@ -142,7 +153,7 @@ export function mergeDocumentation(sources: readonly string[]): string {
   const summaries: string[] = [];
   const tags: string[] = [];
   for (const source of sources) {
-    for (const block of source.split(/(?=^@(?:example|see)\b)/m)) {
+    for (const block of source.split(/(?=^@(?:example|see|param|returns)\b)/m)) {
       const text = block.trim();
       if (text.length === 0) continue;
       (text.startsWith("@") ? tags : summaries).push(text);
