@@ -50,24 +50,16 @@
   font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-formula-family[hidden],
-.sw-prose .sw-formula-table tr[hidden] {
+.sw-prose [data-formula-name][hidden] {
   display: none;
 }
-/* Fixed layout with set column widths: opening a Contract disclosure grows
-   only its row, instead of re-flowing every column in the family. */
+/* Fixed layout: the syntax column keeps its width as the filter hides rows. */
 .sw-prose .sw-formula-table {
   width: 100%;
   table-layout: fixed;
 }
-/* Fixed tracks for the short columns; the description takes the rest. */
 .sw-prose .sw-formula-table :is(th, td):nth-child(1) {
-  width: 32%;
-}
-.sw-prose .sw-formula-table :is(th, td):nth-child(3) {
-  width: 8rem;
-}
-.sw-prose .sw-formula-table :is(th, td):nth-child(4) {
-  width: 9.5rem;
+  width: 42%;
 }
 .sw-prose .sw-formula-table .sw-formula-summary {
   color: var(--sw-fg);
@@ -78,12 +70,10 @@
 .sw-prose .sw-formula-table td {
   padding-block: var(--sw-space-2);
   vertical-align: top;
-  overflow-wrap: anywhere;
 }
 /* The call syntax, the row's name: the function name and the argument
    names (`var`) take the code roles, the bare punctuation the punctuation
-   colour. Long syntax wraps after an argument instead of running into the
-   next column. */
+   colour. A long line wraps between arguments, never inside one. */
 .sw-prose .sw-formula-table .sw-formula-syntax {
   padding: 0;
   border: 0;
@@ -91,11 +81,19 @@
   color: var(--sw-code-punctuation);
   font-size: var(--sw-text-small);
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .sw-prose .sw-formula-table .sw-formula-syntax var {
   color: var(--sw-code-property);
   font-style: normal;
+}
+.sw-prose .sw-formula-arg {
+  white-space: nowrap;
+}
+/* Optional arguments read quieter than the ones a call needs. */
+.sw-prose .sw-formula-arg[data-optional],
+.sw-prose .sw-formula-table .sw-formula-arg[data-optional] var {
+  color: var(--sw-fg-muted);
 }
 .sw-prose .sw-formula-table small {
   display: block;
@@ -103,31 +101,193 @@
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-caption);
 }
-.sw-prose .sw-formula-table details {
-  margin: 0;
-  border: 0;
-  padding: 0;
-  background: none;
+.sw-prose .sw-formula-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1-5);
+  margin-top: var(--sw-space-1);
 }
-.sw-prose .sw-formula-table summary {
-  white-space: nowrap;
-  font-size: var(--sw-text-caption);
-}
-.sw-prose .sw-formula-table details a {
-  font-size: var(--sw-text-caption);
-}
-.sw-formula-build {
+.sw-formula-build,
+.sw-prose .sw-formula-differs {
   display: inline-block;
   padding: var(--sw-space-0-5) var(--sw-space-2);
   border-radius: var(--sw-radius-xs);
-  background: color-mix(in srgb, var(--sw-accent) 10%, transparent);
-  color: var(--sw-accent);
   font-size: var(--sw-text-eyebrow);
+  line-height: 1.4;
   white-space: nowrap;
 }
 .sw-formula-build[data-build="full"] {
   background: color-mix(in srgb, var(--sw-code-keyword) 10%, transparent);
   color: var(--sw-code-keyword);
+}
+.sw-prose .sw-formula-differs {
+  background: color-mix(in srgb, var(--sw-fg) 6%, transparent);
+  color: var(--sw-fg-muted);
+  text-decoration: none;
+}
+.sw-prose .sw-formula-differs:hover {
+  color: var(--sw-accent);
+}
+.sw-prose .sw-formula-differences li {
+  scroll-margin-top: var(--sw-space-16, 4rem);
+}
+.sw-prose .sw-formula-differences li:target {
+  background: color-mix(in srgb, var(--sw-accent) 8%, transparent);
+}
+
+/* ---- Overview: one card per family ---- */
+
+.sw-prose ul.sw-function-families {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--sw-space-3);
+  margin: var(--sw-space-5) 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-prose .sw-function-family {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: var(--sw-space-4);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+.sw-prose .sw-function-family p {
+  margin: 0;
+}
+.sw-prose .sw-function-family__title {
+  display: flex;
+  align-items: center;
+  gap: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+  text-decoration: none;
+}
+.sw-prose .sw-function-family__title .sw-icon {
+  flex: none;
+  color: var(--sw-accent);
+}
+.sw-prose .sw-function-family__title:hover span {
+  text-decoration: underline;
+}
+.sw-prose .sw-function-family__purpose {
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-ui);
+}
+.sw-prose .sw-function-family__count {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  font-variant-numeric: tabular-nums;
+}
+.sw-prose .sw-function-family__common {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1) var(--sw-space-3);
+  font-size: var(--sw-text-small);
+}
+.sw-prose .sw-function-family__common a {
+  color: var(--sw-fg-strong);
+  text-decoration: none;
+}
+.sw-prose .sw-function-family__common a:hover {
+  color: var(--sw-accent);
+}
+.sw-prose .sw-function-family__more {
+  margin-top: auto;
+  padding-top: var(--sw-space-1);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
+  text-decoration: none;
+}
+
+/* ---- Overview: every function from A to Z ---- */
+
+.sw-prose .sw-function-index {
+  margin-top: var(--sw-space-4);
+}
+.sw-prose .sw-function-index h3 {
+  margin: 0 0 var(--sw-space-1);
+  padding-bottom: var(--sw-space-1);
+  border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+.sw-prose .sw-function-index ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  gap: 0 var(--sw-space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-prose .sw-function-index li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sw-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: var(--sw-space-1) 0;
+  font-size: var(--sw-text-small);
+}
+.sw-prose .sw-function-index li a {
+  flex: none;
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-body, inherit);
+  font-weight: var(--sw-weight-semibold);
+  text-decoration: none;
+}
+.sw-prose .sw-function-index li a:hover {
+  color: var(--sw-accent);
+}
+/* One line per function: the description gives way to the name and badge. */
+.sw-prose .sw-function-index li span:not(.sw-formula-build) {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--sw-fg-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sw-prose .sw-function-index .sw-formula-build {
+  flex: none;
+  margin-left: auto;
+}
+
+/* ---- Overview: unsupported functions ---- */
+
+.sw-prose ul.sw-unsupported {
+  display: grid;
+  gap: var(--sw-space-3);
+  margin: var(--sw-space-4) 0;
+  padding: 0;
+  list-style: none;
+}
+.sw-prose .sw-unsupported > li {
+  margin: 0;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  border-left: 2px solid var(--sw-border-strong);
+}
+.sw-prose .sw-unsupported p {
+  margin: 0 0 var(--sw-space-1);
+  font-size: var(--sw-text-small);
+}
+.sw-prose .sw-unsupported .sw-unsupported__name {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-body);
+  font-weight: var(--sw-weight-semibold);
+}
+.sw-prose .sw-unsupported__facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  color: var(--sw-fg-muted);
+}
+.sw-prose .sw-unsupported__more {
+  font-size: var(--sw-text-caption);
 }
 
 .sw-prose .sw-memory-comparison {
@@ -268,8 +428,7 @@
   .sw-prose ol.sw-command-states {
     grid-template-columns: 1fr;
   }
-  /* Phones: each function is a stacked card-row; Engine and Contract carry
-     their column names as labels. */
+  /* Phones: each function is a stacked card-row: its syntax, then what it does. */
   .sw-prose .sw-formula-table,
   .sw-prose .sw-formula-table tbody,
   .sw-prose .sw-formula-table tr,
@@ -290,17 +449,5 @@
   .sw-prose .sw-formula-table td {
     padding: var(--sw-space-0-5) 0;
     border: 0;
-  }
-  .sw-prose .sw-formula-table td[data-label] {
-    display: flex;
-    gap: var(--sw-space-2);
-    align-items: baseline;
-  }
-  .sw-prose .sw-formula-table td[data-label]::before {
-    content: attr(data-label);
-    flex: none;
-    width: 5rem;
-    color: var(--sw-fg-muted);
-    font-size: var(--sw-text-caption);
   }
 }
