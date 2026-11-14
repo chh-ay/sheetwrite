@@ -394,9 +394,9 @@ function allocationAt(store: CellStore): FormulaAllocationSample {
   const ownerCount = memory[1];
   assert(
     memory[0] === STORE_MEMORY_SCHEMA &&
-    Number.isInteger(ownerCount) &&
-    ownerCount! > 0 &&
-    memory.length === 5 + ownerCount! * 3,
+      Number.isInteger(ownerCount) &&
+      ownerCount! > 0 &&
+      memory.length === 5 + ownerCount! * 3,
     "store memory stats schema",
   );
   const retainedBytes = memory.at(-1)!;
@@ -528,7 +528,7 @@ export function collectAggregatedSample(
   let totalMs = 0;
   let iterations = 0;
   let allocation: FormulaAllocationSample | undefined;
-  for (; ;) {
+  for (;;) {
     fixture.store.resetFormulaMatrixResourceStats();
     const started = now();
     fixture.run();
@@ -778,10 +778,12 @@ function markdown(result: CompleteFormulaBenchmarkResult): string {
   lines.push(
     "",
     result.gates.passed
-      ? `Regression gate passed against ${(result.gates.regression as PassedRegressionGate).baselineCommit
-      }.`
-      : `Evidence without a baseline comparison; gate blocked: ${(result.gates.regression as BlockedRegressionGate).blocker
-      }.`,
+      ? `Regression gate passed against ${
+          (result.gates.regression as PassedRegressionGate).baselineCommit
+        }.`
+      : `Evidence without a baseline comparison; gate blocked: ${
+          (result.gates.regression as BlockedRegressionGate).blocker
+        }.`,
     "",
   );
   return lines.join("\n");
@@ -812,14 +814,14 @@ async function runBenchmark(
   const baselineIdentity = baseline ? formulaRegressionBaselineIdentity(baseline) : undefined;
   const regression: PassedRegressionGate | BlockedRegressionGate = baselineIdentity
     ? {
-      status: "passed",
-      baselineCommit: baselineIdentity.commit,
-      baselineSourceDigest: baselineIdentity.sourceDigest,
-    }
+        status: "passed",
+        baselineCommit: baselineIdentity.commit,
+        baselineSourceDigest: baselineIdentity.sourceDigest,
+      }
     : {
-      status: "blocked",
-      blocker: captureKind === "output" ? OUTPUT_CAPTURE_BLOCKER : PRELIMINARY_BLOCKER,
-    };
+        status: "blocked",
+        blocker: captureKind === "output" ? OUTPUT_CAPTURE_BLOCKER : PRELIMINARY_BLOCKER,
+      };
   const result: CompleteFormulaBenchmarkResult = {
     protocolVersion: PERFORMANCE_GATE_PROTOCOL_VERSION,
     mode,

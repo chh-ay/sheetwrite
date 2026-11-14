@@ -395,7 +395,7 @@ export function gridConstantEditSample(count: number) {
       assert(result.status === "applied", "Grid constant edit must apply");
       assert(
         store.getCell({ sheet: "constant-edit", row: 0, col: 2 }).resolved ===
-        CONSTANT_EDIT_FILL + constant,
+          CONSTANT_EDIT_FILL + constant,
         "Grid constant edit output",
       );
       if (sample >= 2) samplesMs.push(elapsedMs);
@@ -2624,9 +2624,9 @@ function historyDiffFixture(): TimedFixture {
         const authors = kernel.pageAuthors();
         assert(
           kernel.pageSheets().length === rows.length &&
-          kernel.pageBeforeRows().length === rows.length &&
-          kernel.pageBeforeCols().length === rows.length &&
-          kernel.pageFlags().length === rows.length,
+            kernel.pageBeforeRows().length === rows.length &&
+            kernel.pageBeforeCols().length === rows.length &&
+            kernel.pageFlags().length === rows.length,
           "page columns have one entry per change",
         );
         checksum = 0;
@@ -3232,9 +3232,9 @@ const PAGED_EVICTION_PINNED = 16;
 /** Bytes of one resident page: kind, payload and style per row, plus the loaded bits. */
 const PAGED_EVICTION_PAGE_BYTES =
   PAGED_EVICTION_CHUNK_ROWS *
-  (Uint8Array.BYTES_PER_ELEMENT +
-    Float64Array.BYTES_PER_ELEMENT +
-    Uint32Array.BYTES_PER_ELEMENT) +
+    (Uint8Array.BYTES_PER_ELEMENT +
+      Float64Array.BYTES_PER_ELEMENT +
+      Uint32Array.BYTES_PER_ELEMENT) +
   BigUint64Array.BYTES_PER_ELEMENT;
 
 /** Column A holds `row`, column B `row + 1`, and `$C$1` the scale. */
@@ -3347,7 +3347,7 @@ function pagedRangeLoadedFixture(rows: number): TimedFixture {
     },
     check: () => (loaded ? 1 : 0),
     dispose: () => store.free(),
-    restore: () => { },
+    restore: () => {},
   };
 }
 
@@ -3383,7 +3383,7 @@ function pagedEvictionFixture(pages: number): TimedFixture {
     check: () =>
       `${store.pagedStats(sheet)[0]}:${numberAt(store, sheet, rows - 1, 0)}:${numberAt(store, sheet, 0, 0)}`,
     dispose: () => store.free(),
-    restore: () => { },
+    restore: () => {},
   };
 }
 
