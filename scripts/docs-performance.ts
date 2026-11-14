@@ -854,10 +854,28 @@ const STORY_ROWS = 100_000;
 const STORY_CATEGORY_OF: ReadonlyArray<readonly [RegExp, (typeof STORY_CATEGORIES)[number]]> = [
   [/^scroll-/u, "Scroll"],
   [/^edit-/u, "Edit"],
-  [/^altering\./u, "Altering"],
+  [/^altering\./u, "Insert/remove rows"],
   [/paint/u, "Paint"],
-  [/^arrow-/u, "Arrow"],
+  [/^arrow-/u, "Keyboard"],
 ];
+
+/** Each render scenario named within its kind, for the speed story's numbers table. */
+const STORY_SHORT_LABELS: Readonly<Record<string, string>> = {
+  "scroll-down.top-left": "Down 50 px from the top",
+  "scroll-down.middle": "Down 50 px from the middle",
+  "scroll-smooth.same-window": "1 px, same rows",
+  "scroll-right.top-left": "Right 50 px",
+  "edit-open.top-left": "Open editor, top left",
+  "edit-open.middle": "Open editor, middle",
+  "edit-open.bottom-right": "Open editor, last cell",
+  "edit-commit.middle": "Commit a value",
+  "altering.insert-5-rows-top": "Insert 5 rows at the top",
+  "altering.remove-5-rows-top": "Remove 5 rows at the top",
+  "arrow-down.top-left": "Arrow down, top left",
+  "arrow-right.middle": "Arrow right, middle",
+  "formatted-paint.top-left": "Formatted cells",
+  "merge-heavy.paint": "Merged cells",
+};
 
 /** Each machine's interactions at `STORY_ROWS`: the speed story's data, on the pages and the landing. */
 function storyMachines(
@@ -888,6 +906,7 @@ function storyMachines(
           {
             id: scenario,
             label: readableId(scenario),
+            shortLabel: STORY_SHORT_LABELS[scenario] ?? readableId(scenario),
             category: STORY_CATEGORY_OF.find(([pattern]) => pattern.test(scenario))?.[1] ?? "Paint",
             measured: {
               value: median(ours),

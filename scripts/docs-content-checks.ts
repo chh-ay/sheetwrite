@@ -102,6 +102,28 @@ export async function siteLinkIssues(documents: readonly MarkdownDocument[]): Pr
   return unresolvedSiteLinks(links, documents);
 }
 
+const TRACKER_REFERENCE =
+  /github\.com\/chh-ay\/sheetwrite\/(?:pull|issues)\b|\bPR #\d+|\[#\d+\](?=\()|(?<![\w&])\(#\d+\)/g;
+
+/**
+ * Readers need what a page says, not which pull request or issue changed it,
+ * so docs pages do not link the tracker or cite pull request numbers.
+ */
+export function trackerReferenceIssues(documents: readonly MarkdownDocument[]): string[] {
+  const failures: string[] = [];
+  for (const document of documents) {
+    const source = posix(relative(repositoryRoot, document.path));
+    document.content.split("\n").forEach((line, index) => {
+      for (const match of line.matchAll(TRACKER_REFERENCE)) {
+        failures.push(
+          `${source}:${index + 1} cites the tracker (${match[0]}); describe the change instead`,
+        );
+      }
+    });
+  }
+  return failures;
+}
+
 export async function markdownDocuments(root: string): Promise<MarkdownDocument[]> {
   const documents: MarkdownDocument[] = [];
   const visit = async (directory: string): Promise<void> => {
