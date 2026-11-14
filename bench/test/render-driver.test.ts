@@ -1,7 +1,12 @@
 import { expect, test } from "bun:test";
 
-import { createCombinationFailures, renderCaptureExitCode } from "../src/render-driver.js";
-import { RENDER_SCENARIOS } from "../src/render-protocol.js";
+import {
+  createCombinationFailures,
+  markdownPathFor,
+  parseConfiguration,
+  renderCaptureExitCode,
+} from "../src/render-driver.js";
+import { RENDER_SCENARIOS, WINDOW_TRANSFER_SCENARIO_IDS } from "../src/render-protocol.js";
 import { must } from "./gate-fixtures.js";
 
 const configuration = {
@@ -59,4 +64,41 @@ test("completes a capture with only the known comparison overflow and fails any 
   ]) {
     expect(renderCaptureExitCode([...known, { ...failure, ...changed }])).toBe(1);
   }
+});
+
+test("a diagnostic subset without the window-transfer pair runs without its counterbalance", () => {
+  const subset = parseConfiguration([
+    "--scenario-set",
+    "diagnostic",
+    "--scenarios",
+    "wrap-unicode.paint.200,wrap-unicode.paint.20000",
+  ]);
+  expect(subset.scenarios).toEqual(["wrap-unicode.paint.200", "wrap-unicode.paint.20000"]);
+  expect(subset.windowTransfer).toBe(false);
+
+  const pair = parseConfiguration([
+    "--scenario-set",
+    "diagnostic",
+    "--scenarios",
+    `wrap-unicode.paint.200,${WINDOW_TRANSFER_SCENARIO_IDS.join(",")}`,
+  ]);
+  expect(pair.windowTransfer).toBe(true);
+  expect(parseConfiguration(["--scenario-set", "diagnostic"]).windowTransfer).toBe(true);
+
+  for (const half of WINDOW_TRANSFER_SCENARIO_IDS) {
+    expect(() => parseConfiguration(["--scenario-set", "diagnostic", "--scenarios", half])).toThrow(
+      "run together or not at all",
+    );
+  }
+});
+
+test("the Markdown view never overwrites the JSON output", () => {
+  expect(parseConfiguration(["--output", "/tmp/render.json"]).markdownPath).toBe("/tmp/render.md");
+  const temporary = parseConfiguration(["--output", "/tmp/aa1-1.json.tmp"]);
+  expect(temporary.markdownPath).toBe("/tmp/aa1-1.json.tmp.md");
+  expect(temporary.markdownPath).not.toBe(temporary.outputPath);
+  expect(
+    parseConfiguration(["--output", "/tmp/out", "--markdown-output", "/tmp/view.md"]).markdownPath,
+  ).toBe("/tmp/view.md");
+  expect(markdownPathFor("results/render-results.json")).toBe("results/render-results.md");
 });
