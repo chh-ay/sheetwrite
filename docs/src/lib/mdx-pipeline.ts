@@ -25,6 +25,7 @@ import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./inline-code.ts";
 import { exportOutline } from "./outline.ts";
 import { renderPerfBars } from "./perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./perf-compare.ts";
+import { isVersionCompare, renderVersionCompare } from "./version-bars.ts";
 import { rovingCodeFocus } from "./roving-code-focus.ts";
 import { runnableCodeBlocks } from "./runnable-code.ts";
 import { renderSectionCards } from "./section-cards.ts";
@@ -199,9 +200,10 @@ function uncontrolledCheckedInputs() {
 }
 
 /**
- * Release-note comparisons (`<perf-compare>` blocks) become the shared
- * performance bars before raw HTML is parsed, so release notes and the
- * Performance pages draw the same figure.
+ * Release-note comparisons become figures before raw HTML is parsed:
+ * `<perf-compare>` blocks the shared performance bars, so release notes and
+ * the Performance pages draw the same figure, and `<version-compare>` the
+ * release comparison drawn from the committed version-comparison reports.
  */
 function renderPerfCompares() {
   return (tree: HastNode): void => {
@@ -213,6 +215,11 @@ function renderPerfCompares() {
           child.value = renderPerfBars(
             parsePerfCompare(child.value ?? "", `perf-compare-${figures}`),
             (name) => inlineIcon(name),
+          );
+        } else if (child.type === "raw" && isVersionCompare(child.value ?? "")) {
+          figures += 1;
+          child.value = renderVersionCompare(`version-compare-${figures}`, (name) =>
+            inlineIcon(name),
           );
         } else {
           visit(child);
