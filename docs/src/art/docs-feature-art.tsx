@@ -29,8 +29,10 @@ export function GridHandleDiagram() {
           code: ["sortBy", "setViewSort", "filterBy", "hideRows", "groupRows"],
           tone: "muted",
         },
-        { title: "Layout", code: ["setFrozen", "setZoom", "setColumnWidth", "setTheme"] },
-        { title: "Lifecycle", code: ["on", "refresh", "destroy"] },
+        {
+          title: "Layout and lifecycle",
+          code: ["setFrozen", "setZoom", "setColumnWidth", "setTheme", "on · refresh", "destroy"],
+        },
       ]}
     />
   );

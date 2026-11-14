@@ -151,13 +151,11 @@ function Sheet(props: Readonly<{ sheet: BlueprintSheet; x: number; y: number; wi
       </For>
       <For each={props.sheet.ranges}>
         {(range) => (
-          <rect
+          // A path, not a rect: ranges overlap on purpose (an intersection), and they aren't boxes.
+          <path
             class="bp-sheet__range"
+            d={`M${left + range.from[0] * cw} ${top + range.from[1] * CELL.h}h${(range.to[0] - range.from[0] + 1) * cw}v${(range.to[1] - range.from[1] + 1) * CELL.h}h${-(range.to[0] - range.from[0] + 1) * cw}z`}
             data-tone={range.tone}
-            height={(range.to[1] - range.from[1] + 1) * CELL.h}
-            width={(range.to[0] - range.from[0] + 1) * cw}
-            x={left + range.from[0] * cw}
-            y={top + range.from[1] * CELL.h}
           />
         )}
       </For>

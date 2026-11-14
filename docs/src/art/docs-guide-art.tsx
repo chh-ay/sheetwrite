@@ -227,7 +227,7 @@ export function ShellTutorialDiagram() {
     <FanFigure
       source={{
         title: "createSpreadsheetShell(host, { grid, ribbon })",
-        lines: ["One shell owns one Grid and its chrome; shell.destroy() removes them all"],
+        lines: ["One shell owns one Grid and its chrome;", "shell.destroy() removes them all"],
       }}
       text={{
         title: "What the spreadsheet shell owns",
@@ -255,11 +255,15 @@ function MigrationDiagram(props: Readonly<{ text: BlueprintText; changes: readon
   return (
     <PairsFigure
       pairs={props.changes.map(([before, after], index) => ({
-        from: { ...(index === 0 ? { eyebrow: "Before" } : {}), title: "", code: [before] },
+        from: {
+          ...(index === 0 ? { eyebrow: "Before" } : {}),
+          title: "",
+          code: before.split("\n"),
+        },
         to: {
           ...(index === 0 ? { eyebrow: "After" } : {}),
           title: "",
-          code: [after],
+          code: after.split("\n"),
           tone: "accent",
         },
       }))}
@@ -274,7 +278,7 @@ export function Upgrade070Diagram() {
       changes={[
         ["grid.setSort(keys)", "grid.setViewSort(keys)"],
         ["grid.sortBy(col) sorted the view", "grid.sortBy(col) sorts the cells"],
-        ["new RevisionCoordinator(…)", "HistoryArchive.open({ documentId, storage })"],
+        ["new RevisionCoordinator(…)", "HistoryArchive.open(\n  { documentId, storage })"],
         ['import "@sheetwrite/xlsx/register"', "initSheetwrite({ addons: [xlsxAddon()] })"],
         ["initSheetwrite(source, engine)", "initSheetwrite({ source, engine })"],
       ]}

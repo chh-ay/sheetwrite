@@ -137,7 +137,7 @@ export function ReferenceOperatorsDiagram() {
             { from: [0, 0], to: [0, 1], tone: "accent" },
             { from: [2, 0], to: [2, 1], tone: "accent" },
           ],
-          notes: ["Adds both ranges.", "A comma between arguments isn't one."],
+          notes: ["Adds both ranges. A comma", "between arguments isn't one."],
         },
         {
           title: "3-D: a span of sheets",
@@ -187,8 +187,10 @@ export function CriteriaRowsDiagram() {
             { from: [0, 3], to: [2, 3], tone: "accent" },
           ],
           notes: [
-            "Rows 1 and 4 meet both criteria, so the result is 500.",
-            "Every range has the same shape; a different shape is #VALUE!",
+            "Rows 1 and 4 meet both criteria,",
+            "so the result is 500. Every range",
+            "has the same shape; another shape",
+            "is #VALUE!",
           ],
         },
       ]}
@@ -280,7 +282,12 @@ export function CustomFunctionsDiagram() {
         },
         {
           title: "On recalculation",
-          lines: ["volatile: true runs", "on every edit; others", "when arguments change"],
+          lines: [
+            "volatile: true runs",
+            "on every edit; the",
+            "rest when their",
+            "arguments change",
+          ],
           tone: "muted",
         },
         { title: "On failure", lines: ["A thrown error or a", "promise shows #VALUE!"] },
