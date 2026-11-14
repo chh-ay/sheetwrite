@@ -85,7 +85,7 @@ impl<'a> RangeReader<'a> {
 
     /// The number of rows and columns the walk covers, after clamping to the
     /// sheet's used extent.
-    pub(crate) fn shape(&self) -> (usize, usize) {
+    pub(crate) const fn shape(&self) -> (usize, usize) {
         (
             self.row_end - self.row_start + 1,
             self.col_end - self.col_start + 1,

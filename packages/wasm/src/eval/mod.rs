@@ -1782,7 +1782,7 @@ impl CellStore {
         match ast {
             #[cfg(feature = "analysis")]
             Ast::Parameter { depth, index, .. } => {
-                analysis::lambda::parameter_value(pass.results.call_frame(), *depth, *index)
+                analysis::lambda::parameter_value(self, pass.results.call_frame(), *depth, *index)
             }
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(pattern) => Value::text(pattern.text()),
@@ -2269,6 +2269,26 @@ impl CellStore {
 
         let mut values = FuncAccumulator::default();
         for arg in args {
+            // An array parameter's values go straight into the accumulator.
+            #[cfg(feature = "analysis")]
+            if let Some(read) = analysis::lambda::read_parameter_values(
+                self,
+                pass.results.call_frame(),
+                arg,
+                &mut |value| {
+                    if let Value::Error(error) = value {
+                        return Err(error);
+                    }
+                    values.push_range(value)
+                },
+            ) {
+                let finished =
+                    read.and_then(|(rows, cols)| values.finish_arg_with_missing(rows, cols, false));
+                if let Err(error) = finished {
+                    return Value::Error(error);
+                }
+                continue;
+            }
             let shape = if let Some(area) = argument_range(arg, sheet) {
                 match self.eval_range_values(area, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
