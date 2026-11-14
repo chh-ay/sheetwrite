@@ -335,15 +335,17 @@ function pivotSheet(): SheetSnapshot {
       { key: "a", header: "A", width: 120, type: "text" },
       { key: "b", header: "B", width: 112, type: "number" },
       { key: "c", header: "C", width: 88, type: "number" },
+      // The PivotChart's anchor column: a chart must sit on a cell of its sheet.
+      { key: "d", header: "D", width: 88, type: "text" },
     ],
     pivots: [ORDERS_PIVOT],
     charts: [
       {
         id: "orders-by-region-chart",
-        kind: "bar",
+        kind: "column",
         title: "Revenue by region",
         legend: "none",
-        anchor: { row: 0, col: 3, offsetX: 16, offsetY: 0, width: 400, height: 220 },
+        anchor: { row: 0, col: 3, offsetX: 16, offsetY: 0, width: 520, height: 280 },
         series: [],
         pivot: ORDERS_PIVOT.id,
         pivotValues: [0],

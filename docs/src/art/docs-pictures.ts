@@ -294,7 +294,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       after: AT_START,
       shot: {
         name: "pivot-chart",
-        alt: "A Pivot sheet with a pivot table of revenue and units by region and, beside it, a bar chart of the pivot's revenue by region.",
+        alt: "A Pivot sheet with a pivot table of revenue and units by region and, beside it, a column chart of the pivot's revenue by region.",
         caption: "A pivot table of the orders and a PivotChart that plots it.",
       },
     },
@@ -304,7 +304,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       after: AFTER_LEAD,
       shot: {
         name: "chart",
-        size: "panel",
+        size: "app",
         alt: "A column chart of revenue by region floating over the Report sheet, below the cells it reads.",
         caption: "A chart floats over the cells and redraws when the cells it reads change.",
       },
