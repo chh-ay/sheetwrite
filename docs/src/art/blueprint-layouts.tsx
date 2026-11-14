@@ -450,8 +450,19 @@ function sequenceLayout(
     const rightward = to.rect.x > from.rect.x;
     const fromSide = rightward ? "right" : "left";
     if (step.lost) {
-      const mid = (from.rect.x + to.rect.x) / 2;
-      const mark = box(`lost-${index}`, { title: "✕ lost" }, mid - 30, level - 12, 60, 24);
+      // The mark sits in the middle of the gap between the two lifelines and names the message.
+      const start = rightward ? from.rect.x + from.rect.w : from.rect.x;
+      const end = rightward ? to.rect.x : to.rect.x + to.rect.w;
+      const mid = (start + end) / 2;
+      const markWidth = Math.min(84, Math.abs(end - start) - 24);
+      const mark = box(
+        `lost-${index}`,
+        { title: `${step.message} lost` },
+        mid - markWidth / 2,
+        level - 12,
+        markWidth,
+        24,
+      );
       nodes.push({ ...mark, tone: "danger" });
       edges.push({
         from: from.id,
@@ -460,8 +471,6 @@ function sequenceLayout(
         to: mark.id,
         toT: 0.5,
         kind: "fail",
-        label: step.message,
-        labelSide: "above",
       });
       return;
     }
