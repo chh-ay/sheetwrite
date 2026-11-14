@@ -216,7 +216,9 @@ function panelArea(): Box {
  * block inside a tab panel (the landing's framework tabs), that tab list.
  */
 function blockChrome(trigger: HTMLElement): Element[] {
-  const chrome = [...(trigger.closest(".expressive-code")?.querySelectorAll("figcaption") ?? [])];
+  const chrome: Element[] = [
+    ...(trigger.closest(".expressive-code")?.querySelectorAll("figcaption") ?? []),
+  ];
   const tabId = trigger.closest('[role="tabpanel"]')?.getAttribute("aria-labelledby");
   const tabList = tabId ? document.getElementById(tabId)?.closest('[role="tablist"]') : null;
   if (tabList) chrome.push(tabList);
