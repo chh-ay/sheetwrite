@@ -290,12 +290,18 @@ const SHOTS: readonly Shot[] = [
   },
   { name: "ribbon", size: "wide", query: { sheet: "orders" } },
   // The formatting, analysis, data and formula pages, on the Report, Pivot and Formulas sheets.
-  { name: "report", size: "app", query: { sheet: "report" } },
+  // The compact ribbon leaves room for the whole chart under the table.
+  { name: "report", size: "app", query: { sheet: "report", ribbon: "compact" } },
   {
     name: "fonts",
     size: "panel",
     query: { sheet: "report" },
-    steps: (page) => select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 6 } }),
+    steps: async (page) => {
+      // The comment cell in G3, scrolled into view.
+      const comment = { sheet: "report", row: 2, col: 6 };
+      await page.evaluate((addr) => window.__sheetwriteFigureGrid?.scrollToCell(addr), comment);
+      await select(page, { kind: "cell", addr: comment });
+    },
   },
   {
     name: "number-formats",
@@ -313,7 +319,16 @@ const SHOTS: readonly Shot[] = [
     },
   },
   // The app size is tall enough to show the table and the chart under it.
-  { name: "chart", size: "app", query: { sheet: "report", ribbon: "compact" } },
+  // The chart selected, so its frame and handles show it floating over the cells.
+  {
+    name: "chart",
+    size: "app",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: async (page) => {
+      await page.locator(".sheetwrite-object").first().click();
+      await settle(page);
+    },
+  },
   {
     name: "validation",
     size: "panel",
