@@ -16,7 +16,8 @@ import { NoHydration } from "solid-js/web";
 import { ChartReadsCellsDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { AnalysisStage } from "../showcases/analysis/AnalysisStage.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import { ANALYSIS_WORKBOOK_TITLE } from "../showcases/scenarios/analysis.js";
 
 import artStylesheet from "../art/art.css?url";

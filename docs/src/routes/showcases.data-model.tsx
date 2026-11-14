@@ -16,7 +16,8 @@ import { NoHydration } from "solid-js/web";
 import { DataModelDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
 import { DataModelStage } from "../showcases/data-model/DataModelStage.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 
 import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";

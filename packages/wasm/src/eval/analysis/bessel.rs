@@ -20,7 +20,12 @@
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &["BESSELI", "BESSELJ", "BESSELK", "BESSELY"];
+family_functions! {
+    BESSELI,
+    BESSELJ,
+    BESSELK,
+    BESSELY,
+}
 
 /// J and Y switch from the rational functions to the asymptotic form here.
 const ASYMPTOTIC_START: f64 = 8.0;
@@ -230,11 +235,11 @@ const K1_LARGE: [f64; 7] = [
     -0.682_45e-3,
 ];
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).map_or_else(Value::Error, Value::number)
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).map_or_else(Value::Error, Value::number)
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> Result<f64, FormulaError> {
+fn calculate(function: Function, values: &FuncAccumulator) -> Result<f64, FormulaError> {
     require_arity(values, 2, 2)?;
 
     let x = number_arg(values, 0, None)?;
@@ -246,13 +251,12 @@ fn calculate(name: &str, values: &FuncAccumulator) -> Result<f64, FormulaError> 
 
     let order = requested_order as u32;
 
-    match name {
-        "BESSELJ" => Ok(odd_order_sign(order, x) * first_kind(order, x.abs())),
-        "BESSELI" => Ok(odd_order_sign(order, x) * modified_first_kind(order, x.abs())),
-        "BESSELY" if x > 0.0 => Ok(second_kind(order, x)),
-        "BESSELK" if x > 0.0 => Ok(modified_second_kind(order, x)),
-        "BESSELY" | "BESSELK" => Err(FormulaError::Num),
-        _ => Err(FormulaError::Name),
+    match function {
+        Function::BESSELJ => Ok(odd_order_sign(order, x) * first_kind(order, x.abs())),
+        Function::BESSELI => Ok(odd_order_sign(order, x) * modified_first_kind(order, x.abs())),
+        Function::BESSELY if x > 0.0 => Ok(second_kind(order, x)),
+        Function::BESSELK if x > 0.0 => Ok(modified_second_kind(order, x)),
+        Function::BESSELY | Function::BESSELK => Err(FormulaError::Num),
     }
 }
 
@@ -487,7 +491,7 @@ fn downward(order: u32, x: f64, start: u32, sign: f64) -> (f64, f64, f64) {
 mod tests {
     use super::*;
 
-    fn call(name: &str, x: f64, order: f64) -> Value {
+    fn call(function: Function, x: f64, order: f64) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in [x, order] {
@@ -495,12 +499,12 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
-    fn number(name: &str, x: f64, order: f64) -> f64 {
-        let Value::Number(actual) = call(name, x, order) else {
-            panic!("{name}({x},{order}) returned an error");
+    fn number(function: Function, x: f64, order: f64) -> f64 {
+        let Value::Number(actual) = call(function, x, order) else {
+            panic!("{function}({x},{order}) returned an error");
         };
 
         actual
@@ -510,17 +514,17 @@ mod tests {
     /// published to nine decimal places.
     #[test]
     fn microsoft_published_examples() {
-        for (name, x, order, published) in [
-            ("BESSELI", 1.5, 1.0, 0.981_666_428),
-            ("BESSELJ", 1.9, 2.0, 0.329_925_829),
-            ("BESSELK", 1.5, 1.0, 0.277_387_804),
-            ("BESSELY", 2.5, 1.0, 0.145_918_138),
+        for (function, x, order, published) in [
+            (Function::BESSELI, 1.5, 1.0, 0.981_666_428),
+            (Function::BESSELJ, 1.9, 2.0, 0.329_925_829),
+            (Function::BESSELK, 1.5, 1.0, 0.277_387_804),
+            (Function::BESSELY, 2.5, 1.0, 0.145_918_138),
         ] {
-            let actual = number(name, x, order);
+            let actual = number(function, x, order);
 
             assert!(
                 (actual - published).abs() <= 5e-10,
-                "{name}({x},{order}): {actual}"
+                "{function}({x},{order}): {actual}"
             );
         }
     }
@@ -530,40 +534,61 @@ mod tests {
     /// branch limit.
     #[test]
     fn approximations_stay_close_to_reference_tables() {
-        for (name, x, order, expected) in [
-            ("BESSELJ", 1.0, 0.0, 0.765_197_686_557_966_6),
-            ("BESSELJ", 10.0, 0.0, -0.245_935_764_451_348_3),
-            ("BESSELJ", 10.0, 3.0, 0.058_379_379_305_186_81),
-            ("BESSELJ", 1.0, 10.0, 2.630_615_123_687_453e-10),
-            ("BESSELY", 1.0, 0.0, 0.088_256_964_215_676_96),
-            ("BESSELY", 1.0, 1.0, -0.781_212_821_300_288_7),
-            ("BESSELY", 10.0, 1.0, 0.249_015_424_206_953_9),
-            ("BESSELI", 1.0, 0.0, 1.266_065_877_752_008_4),
-            ("BESSELI", 10.0, 1.0, 2_670.988_303_701_254_7),
-            ("BESSELI", 1.0, 3.0, 0.022_168_424_924_331_9),
-            ("BESSELK", 1.0, 0.0, 0.421_024_438_240_708_3),
-            ("BESSELK", 10.0, 0.0, 1.778_006_231_616_917e-5),
-            ("BESSELK", 0.5, 2.0, 7.550_183_551_240_869),
+        for (function, x, order, expected) in [
+            (Function::BESSELJ, 1.0, 0.0, 0.765_197_686_557_966_6),
+            (Function::BESSELJ, 10.0, 0.0, -0.245_935_764_451_348_3),
+            (Function::BESSELJ, 10.0, 3.0, 0.058_379_379_305_186_81),
+            (Function::BESSELJ, 1.0, 10.0, 2.630_615_123_687_453e-10),
+            (Function::BESSELY, 1.0, 0.0, 0.088_256_964_215_676_96),
+            (Function::BESSELY, 1.0, 1.0, -0.781_212_821_300_288_7),
+            (Function::BESSELY, 10.0, 1.0, 0.249_015_424_206_953_9),
+            (Function::BESSELI, 1.0, 0.0, 1.266_065_877_752_008_4),
+            (Function::BESSELI, 10.0, 1.0, 2_670.988_303_701_254_7),
+            (Function::BESSELI, 1.0, 3.0, 0.022_168_424_924_331_9),
+            (Function::BESSELK, 1.0, 0.0, 0.421_024_438_240_708_3),
+            (Function::BESSELK, 10.0, 0.0, 1.778_006_231_616_917e-5),
+            (Function::BESSELK, 0.5, 2.0, 7.550_183_551_240_869),
         ] {
-            let actual = number(name, x, order);
+            let actual = number(function, x, order);
 
             assert!(
                 (actual - expected).abs() <= 1e-7 * expected.abs().max(1.0),
-                "{name}({x},{order}): {actual} != {expected}"
+                "{function}({x},{order}): {actual} != {expected}"
             );
         }
     }
 
     #[test]
     fn arguments_follow_the_microsoft_remarks() {
-        assert_eq!(call("BESSELJ", 1.9, 2.9), call("BESSELJ", 1.9, 2.0));
-        assert_eq!(call("BESSELJ", 1.0, -1.0), Value::Error(FormulaError::Num));
-        assert_eq!(call("BESSELY", 0.0, 1.0), Value::Error(FormulaError::Num));
-        assert_eq!(call("BESSELK", -1.0, 1.0), Value::Error(FormulaError::Num));
-        assert_eq!(call("BESSELJ", 0.0, 2.0), Value::Number(0.0));
-        assert_eq!(call("BESSELI", 0.0, 2.0), Value::Number(0.0));
-        assert_eq!(number("BESSELJ", -2.0, 1.0), -number("BESSELJ", 2.0, 1.0));
-        assert_eq!(number("BESSELI", -2.0, 3.0), -number("BESSELI", 2.0, 3.0));
-        assert_eq!(number("BESSELI", -2.0, 2.0), number("BESSELI", 2.0, 2.0));
+        assert_eq!(
+            call(Function::BESSELJ, 1.9, 2.9),
+            call(Function::BESSELJ, 1.9, 2.0)
+        );
+        assert_eq!(
+            call(Function::BESSELJ, 1.0, -1.0),
+            Value::Error(FormulaError::Num)
+        );
+        assert_eq!(
+            call(Function::BESSELY, 0.0, 1.0),
+            Value::Error(FormulaError::Num)
+        );
+        assert_eq!(
+            call(Function::BESSELK, -1.0, 1.0),
+            Value::Error(FormulaError::Num)
+        );
+        assert_eq!(call(Function::BESSELJ, 0.0, 2.0), Value::Number(0.0));
+        assert_eq!(call(Function::BESSELI, 0.0, 2.0), Value::Number(0.0));
+        assert_eq!(
+            number(Function::BESSELJ, -2.0, 1.0),
+            -number(Function::BESSELJ, 2.0, 1.0)
+        );
+        assert_eq!(
+            number(Function::BESSELI, -2.0, 3.0),
+            -number(Function::BESSELI, 2.0, 3.0)
+        );
+        assert_eq!(
+            number(Function::BESSELI, -2.0, 2.0),
+            number(Function::BESSELI, 2.0, 2.0)
+        );
     }
 }

@@ -61,6 +61,7 @@ use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, Dense
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
+use crate::sorting::{key96, sort_by_key96};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::CellStore;
 use crate::types::{
@@ -199,19 +200,18 @@ pub(crate) fn settled_cell_value(
     if !sheet.cells.contains_cell(row, col) {
         return Value::Error(FormulaError::Ref);
     }
-    if !sheet.cells.is_loaded(row, col) {
+    let Some((source_kind, source_payload)) = sheet.cells.loaded_source_at(row, col) else {
         return Value::Error(FormulaError::Loading);
-    }
+    };
 
     let index = sheet.cells.idx(row, col);
-    let source_kind = sheet.cells.source_kind_at(index);
     let (kind, payload) = if source_kind == KIND_EMPTY {
         sheet
             .cells
             .calculated_cell_at(index)
             .unwrap_or((KIND_EMPTY, 0))
     } else {
-        (source_kind, sheet.cells.source_payload_at(index))
+        (source_kind, source_payload)
     };
     if kind != KIND_FORMULA {
         return literal_cell_value(strings, kind, payload);
@@ -681,7 +681,9 @@ impl ChangedOutputs {
                 Some((bounds, change.sequence))
             })
             .collect();
-        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+        sort_by_key96(&mut outputs, |(bounds, _)| {
+            key96(0, bounds.sheet, bounds.row_start)
+        });
 
         let leaves = outputs.len().next_power_of_two();
         let mut last_rows = vec![0; leaves * 2];
@@ -1045,7 +1047,7 @@ impl CellStore {
                 break;
             }
 
-            pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
+            sort_by_key96(&mut pending, |(key, ..)| key96(key.sheet, key.row, key.col));
 
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
@@ -1614,18 +1616,17 @@ impl CellStore {
             return Value::Error(FormulaError::Ref);
         }
 
-        if !s.cells.is_loaded(row, col) {
+        let Some((source_kind, source_payload)) = s.cells.loaded_source_at(row, col) else {
             return Value::Error(FormulaError::Loading);
-        }
+        };
 
         let i = s.cells.idx(row, col);
         // Literal sources cannot be shadowed by calculated output. Decode their
         // payload directly instead of resolving the overlay a second time.
-        let source_kind = s.cells.source_kind_at(i);
         let (kind, payload) = if source_kind == KIND_EMPTY {
             s.cells.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
         } else {
-            (source_kind, s.cells.source_payload_at(i))
+            (source_kind, source_payload)
         };
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
@@ -1797,7 +1798,7 @@ impl CellStore {
 
                 analysis::lambda::evaluate(
                     self,
-                    analysis::lambda::CALL,
+                    analysis::lambda::Invocation::Call,
                     args,
                     sheet,
                     pass,
@@ -2061,11 +2062,10 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
             let family = analysis::family(id);
             if let Some(hooks) = &family.array {
-                if (hooks.produces_array)(name, args, pass.shapes()) {
-                    return match (hooks.evaluate)(self, name, args, sheet, pass, depth).and_then(
+                if (hooks.produces_array)(id, args, pass.shapes()) {
+                    return match (hooks.evaluate)(self, id, args, sheet, pass, depth).and_then(
                         |matrix| {
                             matrix.validate_bytes()?;
                             Ok(matrix)
@@ -2077,7 +2077,7 @@ impl CellStore {
                 }
             }
             if let Some(evaluate) = family.evaluate_ast {
-                return evaluate(self, name, args, sheet, pass, depth);
+                return evaluate(self, id, args, sheet, pass, depth);
             }
         }
 
@@ -2247,7 +2247,6 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
             let result = match id {
                 analysis::SUMSQ_ID => {
                     analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1)
@@ -2255,7 +2254,7 @@ impl CellStore {
                 analysis::SUMX2MY2_ID | analysis::SUMX2PY2_ID | analysis::SUMXMY2_ID => {
                     analysis::math::streamed_paired_squares(
                         self,
-                        name,
+                        analysis::math::Function::of(id),
                         args,
                         sheet,
                         pass,
