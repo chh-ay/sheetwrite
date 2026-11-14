@@ -563,7 +563,7 @@ impl<'a> RowReader<'a> {
     }
 
     /// The values of output row `row`, which must be below the row count.
-    fn row(&self, row: usize) -> &'a [Value] {
+    pub(super) fn row(&self, row: usize) -> &'a [Value] {
         let base = match self.list {
             Some(list) => list[row] as usize,
             None => self.start + row,

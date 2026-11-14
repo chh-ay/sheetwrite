@@ -1449,41 +1449,45 @@ fn runtime_reference_bound(
     }
 }
 
+/// A row of a by-row array is one slice; a column is read value by value.
 fn item_hash(array: RowReader<'_>, item: usize, by_col: bool) -> u64 {
     let mut hasher = DefaultHasher::new();
-    let (rows, cols) = array.shape();
-    let count = if by_col { rows } else { cols };
-    for offset in 0..count {
-        let value = if by_col {
-            array.value(offset, item)
-        } else {
-            array.value(item, offset)
-        };
-        match value {
-            Some(Value::Number(number)) => {
-                0u8.hash(&mut hasher);
-                let bits = if *number == 0.0 { 0 } else { number.to_bits() };
-                bits.hash(&mut hasher);
-            }
-            Some(Value::Text(text)) => {
-                1u8.hash(&mut hasher);
-                for character in text.chars().flat_map(char::to_lowercase) {
-                    character.hash(&mut hasher);
-                }
-            }
-            Some(Value::Bool(flag)) => {
-                2u8.hash(&mut hasher);
-                flag.hash(&mut hasher);
-            }
-            Some(Value::Blank) => 3u8.hash(&mut hasher),
-            Some(Value::Error(error)) => {
-                4u8.hash(&mut hasher);
-                error.slot().hash(&mut hasher);
-            }
-            None => 5u8.hash(&mut hasher),
+    if by_col {
+        for row in 0..array.shape().0 {
+            hash_item_value(array.value(row, item), &mut hasher);
+        }
+    } else {
+        for value in array.row(item) {
+            hash_item_value(Some(value), &mut hasher);
         }
     }
     hasher.finish()
+}
+
+fn hash_item_value(value: Option<&Value>, hasher: &mut DefaultHasher) {
+    match value {
+        Some(Value::Number(number)) => {
+            0u8.hash(hasher);
+            let bits = if *number == 0.0 { 0 } else { number.to_bits() };
+            bits.hash(hasher);
+        }
+        Some(Value::Text(text)) => {
+            1u8.hash(hasher);
+            for character in text.chars().flat_map(char::to_lowercase) {
+                character.hash(hasher);
+            }
+        }
+        Some(Value::Bool(flag)) => {
+            2u8.hash(hasher);
+            flag.hash(hasher);
+        }
+        Some(Value::Blank) => 3u8.hash(hasher),
+        Some(Value::Error(error)) => {
+            4u8.hash(hasher);
+            error.slot().hash(hasher);
+        }
+        None => 5u8.hash(hasher),
+    }
 }
 
 fn items_equal(
@@ -1492,31 +1496,30 @@ fn items_equal(
     right_index: usize,
     by_col: bool,
 ) -> Result<bool, FormulaError> {
-    let (rows, cols) = array.shape();
-    let count = if by_col { rows } else { cols };
-    for offset in 0..count {
-        let left = if by_col {
-            array.value(offset, left_index)
-        } else {
-            array.value(left_index, offset)
+    if !by_col {
+        for (left, right) in array.row(left_index).iter().zip(array.row(right_index)) {
+            if !item_values_equal(left, right)? {
+                return Ok(false);
+            }
         }
-        .ok_or(FormulaError::Ref)?;
-        let right = if by_col {
-            array.value(offset, right_index)
-        } else {
-            array.value(right_index, offset)
-        }
-        .ok_or(FormulaError::Ref)?;
-        let equal = match (left, right) {
-            (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
-            (Value::Error(_), _) | (_, Value::Error(_)) => false,
-            _ => compare_values(left, right)? == Ordering::Equal,
-        };
-        if !equal {
+        return Ok(true);
+    }
+    for row in 0..array.shape().0 {
+        let left = array.value(row, left_index).ok_or(FormulaError::Ref)?;
+        let right = array.value(row, right_index).ok_or(FormulaError::Ref)?;
+        if !item_values_equal(left, right)? {
             return Ok(false);
         }
     }
     Ok(true)
+}
+
+fn item_values_equal(left: &Value, right: &Value) -> Result<bool, FormulaError> {
+    Ok(match (left, right) {
+        (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
+        (Value::Error(_), _) | (_, Value::Error(_)) => false,
+        _ => compare_values(left, right)? == Ordering::Equal,
+    })
 }
 
 /// TRIMRANGE trims leading blanks for mode 1, trailing blanks for mode 2
