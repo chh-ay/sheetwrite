@@ -25,11 +25,11 @@ import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./inline-code.ts";
 import { exportOutline } from "./outline.ts";
 import { renderPerfBars } from "./perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./perf-compare.ts";
-import { isVersionCompare, renderVersionCompare } from "./version-bars.ts";
 import { rovingCodeFocus } from "./roving-code-focus.ts";
 import { runnableCodeBlocks } from "./runnable-code.ts";
 import { renderSectionCards } from "./section-cards.ts";
 import { sheetwriteCodeHovers } from "./sheetwrite-code-hovers.ts";
+import { isVersionCompare, renderVersionCompare } from "./version-bars.ts";
 
 interface HastNode {
   type: string;
