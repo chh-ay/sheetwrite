@@ -637,7 +637,11 @@ fn pack_window(cells: &WindowCells, cond_matches: &[u32]) -> Option<Vec<u8>> {
     for value in cond_matches {
         packed.extend_from_slice(&value.to_le_bytes());
     }
-    debug_assert_eq!(packed.len(), total_bytes);
+    debug_assert_eq!(
+        packed.len(),
+        total_bytes,
+        "the packed buffer has the length computed before packing"
+    );
     Some(packed)
 }
 
