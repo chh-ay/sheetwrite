@@ -12,7 +12,7 @@ import {
   symbolDescription,
 } from "./docs-api.js";
 import { renderCompatibilityResults } from "./docs-compatibility.js";
-import { parseFences, unresolvedSiteLinks } from "./docs-content-checks.js";
+import { parseFences, trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
 import {
   landingBenchPayload,
   landingDownloads,
@@ -338,6 +338,34 @@ describe("documentation content", () => {
       "README.md links moved page /docs/guides/old/; link /docs/features/grid/search/ instead",
       "README.md links missing page /docs/missing/",
       "README.md links missing anchor /docs/features/grid/search/#nope",
+    ]);
+  });
+
+  it("rejects pull request and issue references in docs pages", () => {
+    const document = (name: string, content: string) => ({
+      path: resolve(import.meta.dir, "../docs/src/content/docs", name),
+      content,
+    });
+    const documents = [
+      document(
+        "a.md",
+        [
+          "Sorting changed ([#393](https://github.com/chh-ay/sheetwrite/pull/393)).",
+          "PR #186 measured memory.",
+          "See [the issues](https://github.com/chh-ay/sheetwrite/issues/12) and (#624).",
+        ].join("\n"),
+      ),
+      document(
+        "b.md",
+        "Sorting changed. See [the guide](#sorting), `#REF!`, color #123456 and &#91;1&#93;.",
+      ),
+    ];
+    expect(trackerReferenceIssues(documents)).toEqual([
+      "docs/src/content/docs/a.md:1 cites the tracker ([#393]); describe the change instead",
+      "docs/src/content/docs/a.md:1 cites the tracker (github.com/chh-ay/sheetwrite/pull); describe the change instead",
+      "docs/src/content/docs/a.md:2 cites the tracker (PR #186); describe the change instead",
+      "docs/src/content/docs/a.md:3 cites the tracker (github.com/chh-ay/sheetwrite/issues); describe the change instead",
+      "docs/src/content/docs/a.md:3 cites the tracker ((#624)); describe the change instead",
     ]);
   });
 });
