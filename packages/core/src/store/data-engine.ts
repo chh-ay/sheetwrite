@@ -1458,6 +1458,11 @@ export class StoreDataEngine {
     return this.wasm.loadedSpans(this.sheets.handleOf(sheet), startRow, endRow, column);
   }
 
+  /** Clean-chunk cache budget of each paged sheet, in bytes. */
+  pagedCacheBytes(): number {
+    return this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES;
+  }
+
   /**
    * Same-sheet cells that the formulas of a window read, as flat
    * `[rowStart, rowEnd, columnStart, columnEnd)` rectangles. The walk follows

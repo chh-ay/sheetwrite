@@ -360,7 +360,7 @@ describe("DatasourceController revision retention", () => {
 
     now = 16.7;
     controller.updateViewport(5, 15, [0]);
-    expect(pending).toHaveLength(4);
+    expect(pending).toHaveLength(5);
     expect(controller.getTelemetry().promotions).toBe(1);
     for (let left = 0; left < pending.length; left++) {
       for (let right = left + 1; right < pending.length; right++) {
@@ -587,6 +587,272 @@ describe("DatasourceController revision retention", () => {
     controller.destroy();
     expect(retained).toBe(0);
     store.dispose();
+  });
+});
+
+describe("DatasourceController scroll-speed lookahead", () => {
+  const FRAME_MS = 16.7;
+  const VIEW_ROWS = 30;
+  const ROW_COUNT = 200_000;
+  /** The paged store's default clean-chunk cache budget. */
+  const DEFAULT_CACHE_BYTES = 32 * 1024 * 1024;
+
+  interface PendingFetch {
+    readonly request: DataSourceRequest;
+    readonly result: PromiseWithResolvers<ProtocolPage>;
+  }
+
+  /** A controller over a windowed datasource whose fetches stay pending until answered. */
+  class ScrollHarness {
+    readonly fetches: PendingFetch[] = [];
+    readonly store: SheetwriteStore;
+    readonly controller: DatasourceController;
+    now = 0;
+
+    constructor(options: { columns?: number; cacheBytes?: number } = {}) {
+      const columns = makeProtocolColumns(options.columns ?? 4);
+      this.store = new SheetwriteStore(
+        { activeSheet: "s1", sheets: [{ id: "s1", name: "S1", rowCount: ROW_COUNT, columns }] },
+        undefined,
+        {
+          storage: "paged",
+          chunkRows: 64,
+          cacheBytes: options.cacheBytes ?? DEFAULT_CACHE_BYTES,
+        },
+      );
+      this.controller = new DatasourceController(
+        {
+          datasource: {
+            capabilities: { protocol: 2, columns: "windowed" },
+            getRows: (request) => {
+              const result = Promise.withResolvers<ProtocolPage>();
+              this.fetches.push({ request, result });
+              return result.promise;
+            },
+          },
+          loadable: this.store,
+          activeSheet: () => "s1",
+          rowCount: () => ROW_COUNT,
+          columns: () => columns,
+          revision: () => 0,
+          isCellNewerThan: () => false,
+          retainRevision: () => () => {},
+          onRowsLoaded: () => {},
+          onError: () => {},
+          now: () => this.now,
+        },
+        ROW_COUNT,
+      );
+    }
+
+    /** One rendered frame with the view at row `top` and its first column at `left`. */
+    frame(top: number, left = 0, columnCount = 4): void {
+      this.now += FRAME_MS;
+      this.view(top, left, columnCount);
+    }
+
+    view(top: number, left = 0, columnCount = 4): void {
+      this.controller.updateViewport(
+        top,
+        top + VIEW_ROWS,
+        Array.from({ length: columnCount }, (_, offset) => left + offset),
+      );
+    }
+
+    /** Answers every pending fetch in full. */
+    async resolveAll(): Promise<void> {
+      for (const { request, result } of this.fetches) {
+        if (request.signal.aborted) continue;
+        result.resolve({
+          protocol: 2,
+          start: request.start,
+          columns: request.columns,
+          rows: protocolRows(request.columns, request.start, request.end),
+        });
+      }
+      this.fetches.length = 0;
+      await flushRequest();
+    }
+
+    all(): DataSourceRequest[] {
+      return this.fetches.map(({ request }) => request);
+    }
+
+    live(): DataSourceRequest[] {
+      return this.all().filter((request) => !request.signal.aborted);
+    }
+
+    farthestLiveEnd(): number {
+      return Math.max(...this.live().map((request) => request.end));
+    }
+
+    dispose(): void {
+      this.controller.destroy();
+      this.store.dispose();
+    }
+  }
+
+  it("looks ahead by speed times the measured p90 fetch time", async () => {
+    const reach: number[] = [];
+    for (const fetchMs of [20, 300]) {
+      const harness = new ScrollHarness();
+      // The first view's fetches answer after `fetchMs`, which teaches the fetch time.
+      harness.view(10_000);
+      harness.now += fetchMs;
+      await harness.resolveAll();
+      expect(harness.controller.getTelemetry().fetchTimeP90Ms).toBe(fetchMs);
+
+      // Two rows a frame (0.12 rows/ms) is below fling speed for both fetch times.
+      for (let frame = 1; frame <= 8; frame++) harness.frame(10_000 + frame * 2);
+      const viewEnd = 10_000 + 16 + VIEW_ROWS;
+      expect(harness.controller.getTelemetry().velocityRowsPerMs).toBeCloseTo(2 / FRAME_MS, 5);
+      reach.push(harness.farthestLiveEnd() - viewEnd);
+      harness.dispose();
+    }
+    const [fast = 0, slow = 0] = reach;
+    // 0.12 rows/ms × 20 ms ≈ 2 rows and × 300 ms ≈ 36 rows, each plus a 30-row view of margin.
+    expect(fast).toBeLessThanOrEqual(2 * VIEW_ROWS);
+    expect(slow).toBeGreaterThanOrEqual(36 + VIEW_ROWS);
+  });
+
+  it("turns the lookahead around on a direction change and cancels the old one", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    for (let frame = 1; frame <= 8; frame++) harness.frame(10_000 + frame * 6);
+    const turnTop = 10_000 + 8 * 6;
+    const below = harness.live().filter((request) => request.start >= turnTop + VIEW_ROWS);
+    expect(below.length).toBeGreaterThan(0);
+
+    harness.frame(turnTop - 6);
+    const telemetry = harness.controller.getTelemetry();
+    expect(telemetry.direction).toBe(-1);
+    expect(telemetry.reversalAborts).toBeGreaterThan(0);
+    expect(below.every((request) => request.signal.aborted)).toBe(true);
+    expect(harness.live().some((request) => request.end <= turnTop - 6)).toBe(true);
+    harness.dispose();
+  });
+
+  it("treats a lone jump as parked", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    for (let frame = 1; frame <= 4; frame++) harness.frame(10_000 + frame * 6);
+    harness.frame(150_000);
+    harness.frame(150_000);
+    expect(harness.controller.getTelemetry().jumpAborts).toBeGreaterThan(0);
+    expect(harness.controller.getTelemetry().velocityRowsPerMs).toBe(0);
+    // Parked after the jump: one view of margin, nothing far past the landing.
+    expect(harness.farthestLiveEnd()).toBeLessThanOrEqual(150_000 + 3 * VIEW_ROWS);
+    harness.dispose();
+  });
+
+  it("fetches only where a scrollbar drag comes to rest, once it slows down", () => {
+    // A scrollbar drag moves about 285 rows a frame: the view shows a sliver of what it
+    // crosses, so nothing along the way is prefetched.
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    let top = 10_000;
+    for (let frame = 1; frame <= 6; frame++) {
+      top += 285;
+      harness.frame(top);
+    }
+    expect(harness.controller.getTelemetry().velocityRowsPerMs).toBeGreaterThan(0);
+    expect(harness.live().every((request) => request.start < top + VIEW_ROWS)).toBe(true);
+
+    // Slowing for a whole velocity window predicts the resting point well ahead of the view.
+    let step = 285;
+    for (let frame = 1; frame <= 10; frame++) {
+      step = Math.round(step * 0.85);
+      top += step;
+      harness.frame(top);
+    }
+    expect(harness.live().some((request) => request.start >= top + 2 * VIEW_ROWS)).toBe(true);
+    harness.dispose();
+  });
+
+  it("fetches ahead of a fling's landing point and cancels bands the view passed", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    let top = 10_000;
+    for (let frame = 1; frame <= 30; frame++) {
+      top += 25;
+      harness.frame(top);
+    }
+    // 25 rows a frame travels about 150 rows during the default 100 ms fetch, so the
+    // lookahead skips the stretch next to the view that it passes before a fetch returns.
+    expect(harness.live().some((request) => request.start >= top + 3 * VIEW_ROWS)).toBe(true);
+    const passed = harness.all().filter((request) => request.end <= top);
+    expect(passed.length).toBeGreaterThan(0);
+    expect(passed.every((request) => request.signal.aborted)).toBe(true);
+    harness.dispose();
+  });
+
+  it("shrinks the lookahead as a fling slows down", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    let top = 10_000;
+    let speed = 25;
+    for (let frame = 1; frame <= 10; frame++) {
+      top += speed;
+      harness.frame(top);
+    }
+    const peakReach = harness.farthestLiveEnd() - (top + VIEW_ROWS);
+    const abortsAtPeak = harness.controller.getTelemetry().aborts;
+    for (let frame = 1; frame <= 20; frame++) {
+      speed *= 0.85;
+      top += Math.round(speed);
+      harness.frame(top);
+    }
+    const slowReach = harness.farthestLiveEnd() - (top + VIEW_ROWS);
+    expect(slowReach).toBeLessThan(peakReach);
+    expect(harness.controller.getTelemetry().aborts).toBeGreaterThan(abortsAtPeak);
+    harness.dispose();
+  });
+
+  it("caps speculation by the paged cache budget", () => {
+    const columns = 8;
+    const cacheBytes = 8 * 1024;
+    // 8 KiB at 16 bytes a cell, less the 30 × 8 view, over 8 columns.
+    const budgetRows = Math.floor((cacheBytes / 16 - VIEW_ROWS * columns) / columns);
+    const peaks: number[] = [];
+    for (const budget of [cacheBytes, DEFAULT_CACHE_BYTES]) {
+      const harness = new ScrollHarness({ columns, cacheBytes: budget });
+      harness.view(10_000, 0, columns);
+      let peak = 0;
+      for (let frame = 1; frame <= 12; frame++) {
+        harness.frame(10_000 + frame * 3, 0, columns);
+        peak = Math.max(peak, harness.controller.getTelemetry().activeSpeculativeRows);
+      }
+      peaks.push(peak);
+      harness.dispose();
+    }
+    const [capped = 0, uncapped = 0] = peaks;
+    expect(capped).toBeGreaterThan(0);
+    expect(capped).toBeLessThanOrEqual(budgetRows);
+    expect(uncapped).toBeGreaterThan(budgetRows);
+  });
+
+  it("looks ahead sideways while the view scrolls across columns", async () => {
+    const harness = new ScrollHarness({ columns: 60 });
+    harness.view(10_000, 0, 8);
+    // Pages answer between frames, so each frame's speculation can start.
+    for (let left = 1; left <= 5; left++) {
+      harness.frame(10_000, left, 8);
+      await harness.resolveAll();
+    }
+    harness.frame(10_000, 6, 8);
+    expect(harness.controller.getTelemetry().velocityColumnsPerMs).toBeGreaterThan(0);
+    const ahead = harness
+      .live()
+      .filter((request) => request.columns.some((band) => band.start >= 6 + 8));
+    expect(ahead.length).toBeGreaterThan(0);
+    expect(
+      ahead.every((request) => request.start >= 10_000 && request.end <= 10_000 + VIEW_ROWS),
+    ).toBe(true);
+
+    // Turning back left drops the columns to the right that are still in flight.
+    for (let left = 5; left >= 2; left--) harness.frame(10_000, left, 8);
+    expect(ahead.every((request) => request.signal.aborted)).toBe(true);
+    harness.dispose();
   });
 });
 
