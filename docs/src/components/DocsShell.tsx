@@ -94,16 +94,23 @@ function DocumentPager(props: DocumentNeighbours) {
 
 /**
  * The page's eyebrow: the group it sits in (the nearest group, else its
- * section), or the package of a generated symbol page.
+ * section), or the package of a generated symbol page. None where it would
+ * repeat the title: on a tab's landing page, whose section mark and title
+ * already name the section, or when it reads the same as the title.
  */
-function eyebrowFor(activeHref: string | undefined, titlePackage: string | undefined): string {
+function eyebrowFor(
+  activeHref: string | undefined,
+  title: string,
+  titlePackage: string | undefined,
+): string | undefined {
   if (titlePackage !== undefined) return titlePackage;
+  if (activeHref !== undefined && activeHref in SECTION_MARKS) return undefined;
   const location = nearestNavigationItem(activeHref);
   if (location === undefined) return "Documentation";
   const group = location.ancestors.at(-1);
   // A group's own page is the group: the section names its place.
-  if (group === undefined || group.href === activeHref) return location.section;
-  return group.label;
+  const eyebrow = group === undefined || group.href === activeHref ? location.section : group.label;
+  return eyebrow.toLowerCase() === title.toLowerCase() ? undefined : eyebrow;
 }
 
 /** A section page's illustration beside its title (art/docs-pictures.ts); nothing elsewhere. */
@@ -151,9 +158,13 @@ export function DocsShell(props: DocsShellProps) {
           <Show when={SECTION_MARKS[props.activeHref ?? ""]}>
             {(mark) => <SectionMark name={mark()} />}
           </Show>
-          <p class="sw-document__eyebrow" data-pagefind-ignore>
-            {eyebrowFor(props.activeHref, titlePackage)}
-          </p>
+          <Show when={eyebrowFor(props.activeHref, titleMain, titlePackage)}>
+            {(eyebrow) => (
+              <p class="sw-document__eyebrow" data-pagefind-ignore>
+                {eyebrow()}
+              </p>
+            )}
+          </Show>
           <SectionArt href={props.activeHref} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
