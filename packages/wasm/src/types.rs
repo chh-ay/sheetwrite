@@ -27,7 +27,8 @@ pub(crate) const KIND_FORMULA: u8 = 4;
 pub(crate) const LITERAL_KIND_BITS: u8 = 0b11;
 const _: () = assert!(
     KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL == LITERAL_KIND_BITS
-        && KIND_FORMULA & !LITERAL_KIND_BITS != 0
+        && KIND_FORMULA & !LITERAL_KIND_BITS != 0,
+    "literal kinds fit in LITERAL_KIND_BITS and the formula kind does not"
 );
 
 pub(crate) const NO_STRING: u32 = u32::MAX;
@@ -925,7 +926,10 @@ impl FormulaEntry {
 }
 
 // Include the no-error sentinel in the low nibble's capacity.
-const _: () = assert!(FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize);
+const _: () = assert!(
+    FormulaError::COUNT <= FormulaEntry::ERROR_MASK as usize,
+    "every formula error code fits in the error bits of FormulaEntry"
+);
 
 #[cfg(test)]
 mod formula_entry_tests {
