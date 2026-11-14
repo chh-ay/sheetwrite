@@ -192,7 +192,9 @@ describe("SheetwriteStore facade contract", () => {
     local.dispose();
     expect(
       () =>
-        new SheetwriteStore(large, undefined, { snapshotResourceLimits: { maxLocalPagedCells: 5_999_999 } }),
+        new SheetwriteStore(large, undefined, {
+          snapshotResourceLimits: { maxLocalPagedCells: 5_999_999 },
+        }),
     ).toThrow(SnapshotResourceError);
     const paged = new SheetwriteStore(large, undefined, { storage: "paged" });
     expect(paged.isPaged("s1")).toBe(true);

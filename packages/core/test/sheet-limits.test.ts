@@ -122,7 +122,9 @@ describe("row and column inserts are held to the document limits", () => {
     const store = new SheetwriteStore(workbook(rows, 10));
     try {
       const last = { sheet: SHEET, row: rows - 1, col: 9 };
-      store.applyTransaction({ patches: [{ op: "set", addr: last, value: { kind: "literal", value: 7 } }] });
+      store.applyTransaction({
+        patches: [{ op: "set", addr: last, value: { kind: "literal", value: 7 } }],
+      });
       expect(store.isPaged(SHEET)).toBe(false);
       const grown = store.applyTransaction({
         patches: [{ op: "addRows", sheet: SHEET, at: 0, count: 1 }],

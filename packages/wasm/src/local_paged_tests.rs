@@ -143,8 +143,14 @@ fn a_local_sheet_stays_local_through_a_memory_transfer() {
     let original = &store.sheets[dense].cells;
     for index in 0..SHORT_ROWS * COLS {
         assert_eq!(
-            (restored.source_kind_at(index), restored.source_payload_at(index)),
-            (original.source_kind_at(index), original.source_payload_at(index)),
+            (
+                restored.source_kind_at(index),
+                restored.source_payload_at(index)
+            ),
+            (
+                original.source_kind_at(index),
+                original.source_payload_at(index)
+            ),
             "cell {index}"
         );
     }
@@ -194,7 +200,12 @@ fn column_folds_over_absent_local_pages_match_the_dense_sheet() {
         store.set_number(sheet, ROWS - 1, 0, -4.0, 0);
     }
     store.convert_sheet_to_local_paged(local);
-    let folds = ["=SUM(A1:A9000)", "=COUNT(A1:A9000)", "=COUNTA(A1:A9000)", "=MIN(A2:A9000)"];
+    let folds = [
+        "=SUM(A1:A9000)",
+        "=COUNT(A1:A9000)",
+        "=COUNTA(A1:A9000)",
+        "=MIN(A2:A9000)",
+    ];
     for sheet in [dense, local] {
         for (row, source) in folds.iter().enumerate() {
             store.set_formula(sheet, row, 1, source, 0);

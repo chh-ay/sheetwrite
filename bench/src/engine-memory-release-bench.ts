@@ -413,7 +413,11 @@ async function memory() {
           patches: Array.from({ length: 10 }, (_, row) => ({
             op: "setBlock" as const,
             range: { sheet: "s1", start: { row, col: 0 }, end: { row, col: LOCAL_COLUMNS - 1 } },
-            block: { rowCount: 1, colCount: LOCAL_COLUMNS, values: Array.from({ length: LOCAL_COLUMNS }, (_, col) => col) },
+            block: {
+              rowCount: 1,
+              colCount: LOCAL_COLUMNS,
+              values: Array.from({ length: LOCAL_COLUMNS }, (_, col) => col),
+            },
           })),
         });
       }
