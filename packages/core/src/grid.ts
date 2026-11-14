@@ -2939,6 +2939,7 @@ export class GridImpl implements Grid {
     this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
     this.renderer.setTheme(this.theme);
     this.domOverlay.setTheme(this.theme);
+    this.objectLayer.setTheme(this.theme);
     this.syncTabBarTheme();
     this.rebuildIndex();
     this.rebuildColumnIndex();
