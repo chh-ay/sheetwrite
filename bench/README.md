@@ -791,6 +791,9 @@ bun run bench:render
 bun run bench:render:smoke -- --engine sheetwrite
 bun run bench:render:smoke -- --engine handsontable
 
+# Only some scenarios of a set, for example the wrapped Unicode paint rows:
+bun run bench:render:diagnostic -- --scenarios wrap-unicode.paint.200,wrap-unicode.paint.20000
+
 # Fail-closed schema, completeness, and byte-stable Markdown validation:
 bun run bench:render:validate
 

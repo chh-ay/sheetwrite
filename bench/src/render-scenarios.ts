@@ -41,6 +41,16 @@ const FROZEN_PANE_COUNT = 4;
 export const WRAP_HEAVY_TEXT_LENGTH = 200;
 /** Marker prefix of the wrapped body text installed by `wrap-heavy.scroll`. */
 export const WRAP_HEAVY_TEXT_PREFIX = "diagnostic-wrap-";
+/** One grapheme of two code units (a letter and a combining accent), repeated by `wrap-unicode.paint.*`. */
+const WRAP_UNICODE_GRAPHEME = "e\u0301";
+/** Grapheme count of the one wrapped cell each `wrap-unicode.paint.*` scenario paints. */
+const WRAP_UNICODE_GRAPHEMES: Partial<Record<ScenarioId, number>> = {
+  "wrap-unicode.paint.200": 200,
+  "wrap-unicode.paint.2000": 2_000,
+  "wrap-unicode.paint.20000": 20_000,
+};
+/** Body cell that holds the wrapped text: visible at the top-left of the first frame. */
+export const WRAP_UNICODE_CELL = { row: 1, col: 2 } as const;
 /** Marker prefix of the searchable body text installed by `search-many.scroll`. */
 export const SEARCH_MATCH_PREFIX = "diagnostic-search-";
 /** Amount that separates the two conditional-format style rules. */
@@ -183,6 +193,9 @@ export interface FrozenPaneProbe {
 export interface RenderBenchDiagnosticAdapter extends RenderBenchAdapter {
   installWrapHeavy(rowCount: number): void;
   clearWrapHeavy(): void;
+  /** Writes `text` with wrapping into {@link WRAP_UNICODE_CELL}. */
+  installWrapUnicode(text: string): void;
+  clearWrapUnicode(): void;
   installSearchMatches(rowCount: number): void;
   clearSearchMatches(): void;
   beginSearch(query: string): void;
@@ -613,6 +626,48 @@ function scenarioActions(
           "wrap-heavy.scroll restores unwrapped body cells",
           false,
           diagnostics.resolvedStyle(observedRow, 2).wrap,
+        );
+      },
+    };
+  }
+
+  const wrapUnicodeGraphemes = WRAP_UNICODE_GRAPHEMES[scenarioId];
+  if (wrapUnicodeGraphemes !== undefined) {
+    const diagnostics = diagnosticAdapter(adapter);
+    const text = WRAP_UNICODE_GRAPHEME.repeat(wrapUnicodeGraphemes);
+    const { row, col } = WRAP_UNICODE_CELL;
+    const action = (): void => adapter.repaint();
+    return {
+      setup: () => {
+        adapter.prepareScroll("top", false);
+        diagnostics.installWrapUnicode(text);
+      },
+      prepare: () => {},
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          action();
+          checkpoint(
+            observations,
+            `${scenarioId} paints the whole wrapped text`,
+            true,
+            adapter.cellValue(row, col) === text,
+          );
+          checkpoint(
+            observations,
+            `${scenarioId} keeps the wrap flag on the painted cell`,
+            true,
+            diagnostics.resolvedStyle(row, col).wrap,
+          );
+        } finally {
+          diagnostics.clearWrapUnicode();
+        }
+        checkpoint(
+          observations,
+          `${scenarioId} restores the unwrapped body cell`,
+          false,
+          diagnostics.resolvedStyle(row, col).wrap,
         );
       },
     };

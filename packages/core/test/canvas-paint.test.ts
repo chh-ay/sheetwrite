@@ -428,6 +428,18 @@ describe("layoutTextLines", () => {
     // The fake measure counts code units, so a cluster is wider than the cell.
     ["keeps an emoji ZWJ sequence whole", "ab 👨‍👩‍👧‍👦 cd", 4, ["ab ", "👨‍👩‍👧‍👦", " cd"]],
     ["keeps a combining mark with its letter", "cafe\u0301s", 4, ["caf", "e\u0301s"]],
+    [
+      "ends a clustered paragraph whose last line fills the cell",
+      "e\u0301".repeat(6),
+      4,
+      ["e\u0301e\u0301", "e\u0301e\u0301", "e\u0301e\u0301"],
+    ],
+    [
+      "breaks a clustered paragraph after its last whitespace",
+      "e\u0301e\u0301 e\u0301e\u0301 e\u0301",
+      10,
+      ["e\u0301e\u0301 e\u0301e\u0301 ", "e\u0301"],
+    ],
   ])("%s", (_, text, width, expected) => {
     expect(layoutTextLines(monospace, text, width)).toEqual(expected);
   });
@@ -452,6 +464,26 @@ describe("paintFrame typography and wrapping", () => {
     expect(painted.map((call) => call.text).join("")).toBe("abcdef");
     expect(painted.length).toBeGreaterThan(1);
     expect(painted.every((call) => call.x >= 0 && call.x < 26)).toBe(true);
+  });
+
+  it("paints the first lines of a long clustered paragraph without splitting a cluster", () => {
+    const layout = makeLayout([{ key: "a", header: "A", width: 40, type: "text" }]);
+    const styleIds = Uint32Array.from([1, 0, 0]);
+    const view = makeView(styleIds, [{}, { wrap: true }], [0]);
+    (view.values as string[])[0] = "e\u0301".repeat(20_000);
+    const viewport = {
+      ...UNIFORM_VIEWPORT,
+      rowTops: Float64Array.from([0, 48, 72]),
+      rowHeights: Float64Array.from([48, 24, 24]),
+    };
+
+    const ctx = render(view, layout, viewport);
+    const painted = ctx.fillTexts
+      .filter((call) => call.y >= HEADER_HEIGHT && call.y < HEADER_HEIGHT + 48)
+      .map((call) => call.text);
+    expect(painted.length).toBeGreaterThan(1);
+    expect(painted.length).toBeLessThan(5);
+    expect(painted.every((line) => /^(?:e\u0301)+$/u.test(line))).toBe(true);
   });
 });
 
