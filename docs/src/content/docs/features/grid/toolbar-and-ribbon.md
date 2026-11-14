@@ -112,23 +112,23 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 
 | Tab | Group | Command | Glyph | Feature |
 | --- | --- | --- | --- | --- |
-| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="chart" aria-hidden="true"></span> `chart` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Formulas | Function Library | Insert Function | <span class="sheetwrite-icon" data-icon="insertFunction" aria-hidden="true"></span> `insertFunction` | Custom functions ([#220](https://github.com/chh-ay/sheetwrite/issues/220)) |
-| Formulas | Defined Names | Name Manager | <span class="sheetwrite-icon" data-icon="nameManager" aria-hidden="true"></span> `nameManager` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
-| Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
-| Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) |
-| Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)); shows only for a workbook with links |
-| Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
-| Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
-| Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures ([#230](https://github.com/chh-ay/sheetwrite/issues/230)) |
-| Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
-| Review | Version History | Save Version | <span class="sheetwrite-icon" data-icon="saveVersion" aria-hidden="true"></span> `saveVersion` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
+| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="chart" aria-hidden="true"></span> `chart` | Dashboards |
+| Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards |
+| Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards |
+| Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards |
+| Formulas | Function Library | Insert Function | <span class="sheetwrite-icon" data-icon="insertFunction" aria-hidden="true"></span> `insertFunction` | Custom functions |
+| Formulas | Defined Names | Name Manager | <span class="sheetwrite-icon" data-icon="nameManager" aria-hidden="true"></span> `nameManager` | Named LAMBDAs |
+| Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs |
+| Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help |
+| Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer |
+| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer |
+| Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer |
+| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links; shows only for a workbook with links |
+| Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model |
+| Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model |
+| Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures |
+| Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history |
+| Review | Version History | Save Version | <span class="sheetwrite-icon" data-icon="saveVersion" aria-hidden="true"></span> `saveVersion` | Version history |
 
 | Tab | Group order, left to right | Folds first to last |
 | --- | --- | --- |
@@ -139,9 +139,9 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 
 Three 0.7 features add no ribbon command, because the user reaches them in cells or files that the ribbon already covers:
 
-- Formula autocomplete and the argument guide ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) work in the cell and formula bar editors.
-- Array formula editing ([#225](https://github.com/chh-ay/sheetwrite/issues/225)) changes how edits inside a spill behave.
-- XLSX chart import and export ([#215](https://github.com/chh-ay/sheetwrite/issues/215)) use Insert › Charts and Export XLSX.
+- Formula autocomplete and the argument guide work in the cell and formula bar editors.
+- Array formula editing changes how edits inside a spill behave.
+- XLSX chart import and export use Insert › Charts and Export XLSX.
 
 ### Narrow widths
 

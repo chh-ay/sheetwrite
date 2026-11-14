@@ -260,5 +260,5 @@ saved output back when no fresh rendered values replace it.
 
 Unsupported or opaque imported pivots are different: their original parts are
 preserved only while the workbook is unchanged. Editing the workbook drops those
-opaque parts under the XLSX preservation policy (#179), with a warning. This does
+opaque parts under the [XLSX preservation policy](/docs/import-export/kept-parts-and-round-trips/), with a warning. This does
 not drop represented pivot definitions.

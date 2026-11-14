@@ -252,8 +252,7 @@ body {
   border-radius: var(--sw-radius-pill);
   background: var(--sw-surface-2);
   color: var(--sw-fg);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-mono);
-  letter-spacing: 0.02em;
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
   white-space: nowrap;
 }
 

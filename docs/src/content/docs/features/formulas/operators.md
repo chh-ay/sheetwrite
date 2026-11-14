@@ -156,4 +156,3 @@ XLSX import and export keep the Excel formula text of intersections, unions and 
 - [References, ranges, and named ranges](/docs/features/formulas/authoring-and-references/#references-ranges-and-named-ranges)
 - [Dynamic arrays and spills](/docs/features/formulas/dynamic-arrays-and-spills/#dynamic-arrays-and-spills)
 - [Formula function reference](/docs/reference/formula-functions/)
-- [Reference-operator pull request](https://github.com/chh-ay/sheetwrite/pull/187)
