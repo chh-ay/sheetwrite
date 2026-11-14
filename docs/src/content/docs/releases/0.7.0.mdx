@@ -212,17 +212,17 @@ formula IDs ([#367](https://github.com/chh-ay/sheetwrite/pull/367)), and 0.835�
 flat dependency arrays ([#389](https://github.com/chh-ay/sheetwrite/pull/389)), on Linux and Mac
 with both engines. Selected workloads:
 
-| Workload | Faster by | Pull request |
-| --- | --- | --- |
-| 200 `INDEX`/`MATCH` lookups over 100,000 rows | 85–132× | [#594](https://github.com/chh-ay/sheetwrite/pull/594) |
-| `COUNTIF` with a number criterion, 100k cells | 11.5–18× | [#385](https://github.com/chh-ay/sheetwrite/pull/385) |
-| `SUM` over two 100k ranges | 2.15–6.62× | [#402](https://github.com/chh-ay/sheetwrite/pull/402) |
-| Row edit in a 100,000-formula workbook | 3.80× | [#497](https://github.com/chh-ay/sheetwrite/pull/497) |
-| Range formulas over loaded pages | 3.01–3.10× | [#423](https://github.com/chh-ay/sheetwrite/pull/423) |
-| One-formula range edit, 100k workbook | 2.53–3.26× | [#389](https://github.com/chh-ay/sheetwrite/pull/389) |
-| Lookup edits and repeated lookups | 1.2–3.0× | [#428](https://github.com/chh-ay/sheetwrite/pull/428) |
-| First recalculation of 100k formulas | 1.55–1.87× | [#389](https://github.com/chh-ay/sheetwrite/pull/389) |
-| Loading formulas | 1.21–1.46× | [#463](https://github.com/chh-ay/sheetwrite/pull/463) |
+| Workload | Faster by |
+| --- | --- |
+| 200 `INDEX`/`MATCH` lookups over 100,000 rows | 85–132× |
+| `COUNTIF` with a number criterion, 100k cells | 11.5–18× |
+| `SUM` over two 100k ranges | 2.15–6.62× |
+| Row edit in a 100,000-formula workbook | 3.80× |
+| Range formulas over loaded pages | 3.01–3.10× |
+| One-formula range edit, 100k workbook | 2.53–3.26× |
+| Lookup edits and repeated lookups | 1.2–3.0× |
+| First recalculation of 100k formulas | 1.55–1.87× |
+| Loading formulas | 1.21–1.46× |
 
 The dependency index for 100k formulas shrinks from 7.67 MB to 1.21 MB.
 
