@@ -2936,10 +2936,22 @@ export class GridImpl implements Grid {
 
   insertRows(at: number, count = 1): void {
     if (count <= 0) return;
-    this.document.commit(
-      [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
-      "structure",
+    this.reportRejectedInsert(
+      this.document.commit(
+        [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
+        "structure",
+      ),
     );
+  }
+
+  /**
+   * A row or column insert past a document limit is refused; the user reads
+   * which limit in the grid's alert, beside the `mutation-rejected` event.
+   */
+  private reportRejectedInsert(outcome: ApplyTransactionResult): void {
+    if (outcome.status !== "rejected") return;
+    const issue = outcome.issues.find((candidate) => candidate.kind === "resource-limit");
+    if (issue) this.actionFeedback.show(issue.message);
   }
 
   removeRows(at: number, count = 1): void {
@@ -2961,16 +2973,18 @@ export class GridImpl implements Grid {
   insertColumns(at: number, count = 1): void {
     if (count <= 0) return;
     const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
-    this.document.commit(
-      [
-        {
-          op: "addColumns",
-          sheet: this.activeSheet,
-          at: insertAt,
-          columns: this.makeBlankColumns(insertAt, count),
-        },
-      ],
-      "structure",
+    this.reportRejectedInsert(
+      this.document.commit(
+        [
+          {
+            op: "addColumns",
+            sheet: this.activeSheet,
+            at: insertAt,
+            columns: this.makeBlankColumns(insertAt, count),
+          },
+        ],
+        "structure",
+      ),
     );
   }
 
