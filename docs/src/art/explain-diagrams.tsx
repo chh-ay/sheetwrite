@@ -188,7 +188,7 @@ export function EngineApiDiagram() {
         },
         {
           title: "Create the grid",
-          code: ["createGrid(host, { workbook })"],
+          code: ["createGrid(host,", "  { workbook })"],
           lines: ["Calculates with that engine"],
         },
       ]}
