@@ -338,7 +338,7 @@ impl Reader<'_> {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        if ast_produces_array(arg) {
+        if ast_produces_array(arg, pass.shapes()) {
             if let Some(result) = self
                 .store
                 .eval_dynamic_array(arg, self.sheet, pass, depth + 1)

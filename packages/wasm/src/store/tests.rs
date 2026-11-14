@@ -1550,6 +1550,7 @@ fn getpivotdata_reads_the_value_cell_of_the_named_items() {
         ("=GETPIVOTDATA(\"Sales\",Output!A1)", 78.0),
         ("=GETPIVOTDATA(\"Sum of Sales\",Output!$C$4)", 78.0),
         ("=GETPIVOTDATA(\"sales\",Output!B2)", 78.0),
+        ("=GETPIVOTDATA(\"sUM oF sALES\",Output!A1)", 78.0),
         // Odd rows: 1 + 3 + 5 + 7 + 9 + 11.
         ("=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)", 36.0),
         // Rows divisible by 3: 3 + 6 + 9 + 12.
