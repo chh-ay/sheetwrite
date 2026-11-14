@@ -40,7 +40,7 @@ impl SplitMix64 {
         self.state
     }
 
-    fn next_u64(&mut self) -> u64 {
+    const fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(GOLDEN_GAMMA);
         let mut mixed = self.state;
         mixed = (mixed ^ (mixed >> 30)).wrapping_mul(MIX_MULTIPLIER_1);
@@ -73,13 +73,13 @@ impl RandomSource {
         Self::from_state(NATIVE_SEED)
     }
 
-    pub(crate) fn from_state(state: u64) -> Self {
+    pub(crate) const fn from_state(state: u64) -> Self {
         Self(Cell::new(SplitMix64::new(state)))
     }
 
     /// Memory release carries the state, so the replacement instance
     /// continues the same sequence.
-    pub(crate) fn state(&self) -> u64 {
+    pub(crate) const fn state(&self) -> u64 {
         self.0.get().state()
     }
 

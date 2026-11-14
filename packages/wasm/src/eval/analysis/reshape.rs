@@ -309,7 +309,7 @@ fn estimate(
     })
 }
 
-pub(super) fn produces_array(_: &str, _: &[Ast], _: Shapes<'_>) -> bool {
+pub(super) const fn produces_array(_: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     true
 }
 
