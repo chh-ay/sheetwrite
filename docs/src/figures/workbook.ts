@@ -1,8 +1,12 @@
 import type {
   CellBlock,
-  ChartDefinition,
   CellScalar,
+  CellStyle,
+  CellValue,
+  ChartDefinition,
+  GridPresentation,
   PivotDefinition,
+  RowMetadata,
   SavedQuery,
   SheetSnapshot,
   WorkbookSnapshot,
@@ -12,14 +16,30 @@ import type {
  * The workbook the docs screenshots show (scripts/docs-figure-shots.ts): a
  * year of orders by month, region and product, a table of regions with their
  * managers, a data model that relates the two with revenue measures, and a
- * dashboard over it. Every value comes from fixed numbers, so each capture of
- * the same release draws the same pictures.
+ * dashboard over it; for the formatting, analysis and formula pages, a
+ * formatted regional report with a chart, a pivot of the orders with its
+ * PivotChart, and a GROUPBY formula. Every value comes from fixed numbers, so
+ * each capture of the same release draws the same pictures.
  */
 export const FIGURE_SHEETS = {
   orders: "orders",
   regions: "regions",
   dashboard: "dashboard",
+  report: "report",
+  pivot: "pivot",
+  formulas: "formulas",
 } as const;
+
+/**
+ * The sheets only some captures open. A workbook holds them only when one of
+ * them is the active sheet, so the sheet tabs of the other captures stay as
+ * they were.
+ */
+const ANALYSIS_SHEETS: readonly string[] = [
+  FIGURE_SHEETS.report,
+  FIGURE_SHEETS.pivot,
+  FIGURE_SHEETS.formulas,
+];
 
 const REGIONS = [
   { name: "Americas", manager: "Avery Brooks", target: 4_200_000, weight: 1.32 },
@@ -87,14 +107,19 @@ function block(rows: readonly (readonly CellScalar[])[]): CellBlock {
   };
 }
 
-function ordersSheet(): SheetSnapshot {
+/**
+ * The Orders sheet. In the data-grid presentation the column headers name the
+ * fields, so the cells start at the first order and the table has no header row.
+ */
+function ordersSheet(presentation: GridPresentation): SheetSnapshot {
   const rows = ordersRows();
+  const headerRows = presentation === "data-grid" ? 0 : 1;
   return {
     id: FIGURE_SHEETS.orders,
     name: "Orders",
     order: 0,
-    rowCount: rows.length + 1,
-    frozenRows: 1,
+    rowCount: rows.length + headerRows,
+    frozenRows: headerRows,
     columns: [
       { key: "month", header: "Month", width: 96, type: "text" },
       { key: "region", header: "Region", width: 104, type: "text" },
@@ -109,14 +134,14 @@ function ordersSheet(): SheetSnapshot {
         range: {
           sheet: FIGURE_SHEETS.orders,
           start: { row: 0, col: 0 },
-          end: { row: rows.length, col: ORDER_HEADERS.length - 1 },
+          end: { row: rows.length + headerRows - 1, col: ORDER_HEADERS.length - 1 },
         },
         columns: ORDER_HEADERS.map((name) => ({ id: name.toLowerCase(), name })),
-        headerRow: true,
+        headerRow: headerRows === 1,
         totalsRow: false,
       },
     ],
-    cells: [block([[...ORDER_HEADERS], ...rows])],
+    cells: [block(headerRows === 1 ? [[...ORDER_HEADERS], ...rows] : rows)],
   };
 }
 
@@ -154,6 +179,208 @@ function regionsSheet(): SheetSnapshot {
       },
     ],
     cells: [block(rows)],
+  };
+}
+
+/** A report cell's value and style, before it becomes a snapshot cell. */
+type ReportCell = readonly [value: CellValue, style?: CellStyle];
+
+const formula = (src: string): CellValue => ({ kind: "formula", src });
+const literal = (value: CellScalar): CellValue => ({ kind: "literal", value });
+
+/** The statuses the report's list rule offers, and each region's status and comment. */
+const REPORT_STATUS = ["On track", "At risk", "Behind"] as const;
+const REPORT_NOTES: Readonly<Record<string, readonly [status: string, comment: string]>> = {
+  Americas: ["At risk", "Two large desk orders moved from December to January."],
+  EMEA: ["At risk", "Screen deliveries ran short in March and June."],
+  APAC: ["On track", "Chairs ahead of plan; lamps flat."],
+  LATAM: ["On track", "On pace since September."],
+};
+const HEADER_STYLE: CellStyle = {
+  bold: true,
+  backgroundColor: "#e6f2ec",
+  border: { bottom: { color: "#1f7a4d", width: 2, style: "solid" } },
+};
+const TOTAL_STYLE: CellStyle = {
+  bold: true,
+  border: { top: { color: "#1f2937", width: 2, style: "solid" } },
+};
+/** The report's columns that hold numbers, right-aligned in the header as in the cells. */
+const REPORT_NUMBER_COLUMNS = new Set([2, 3, 4]);
+
+/**
+ * A formatted regional report: a merged title, a styled header, revenue that
+ * SUMIFS reads from the Orders table, wrapped comments, a status list, a note,
+ * a total row and a column chart of revenue by region.
+ */
+function reportSheet(): SheetSnapshot {
+  const sheet = FIGURE_SHEETS.report;
+  const header = ["Region", "Manager", "Revenue", "Target", "Attainment", "Status", "Comment"];
+  const rows: ReportCell[][] = [
+    [[literal("Regional revenue, 2026"), { bold: true, fontSize: 18 }]],
+    header.map((text, col): ReportCell => [
+      literal(text),
+      REPORT_NUMBER_COLUMNS.has(col) ? { ...HEADER_STYLE, align: "right" } : HEADER_STYLE,
+    ]),
+    ...REGIONS.map((region, index): ReportCell[] => {
+      const row = index + 3;
+      const [status, comment] = REPORT_NOTES[region.name] ?? ["", ""];
+      return [
+        [literal(region.name)],
+        [literal(region.manager), { italic: true }],
+        [formula(`=SUMIFS(Orders[Revenue],Orders[Region],A${row})`)],
+        [literal(region.target)],
+        [formula(`=C${row}/D${row}`)],
+        [literal(status), { align: "center" }],
+        [literal(comment), { wrap: true, verticalAlign: "top" }],
+      ];
+    }),
+    [
+      [literal("Total"), TOTAL_STYLE],
+      [literal(null), TOTAL_STYLE],
+      [formula("=SUM(C3:C6)"), TOTAL_STYLE],
+      [formula("=SUM(D3:D6)"), TOTAL_STYLE],
+      [formula("=C7/D7"), TOTAL_STYLE],
+      [literal(null), TOTAL_STYLE],
+      [literal(null), TOTAL_STYLE],
+    ],
+  ];
+  return {
+    id: sheet,
+    name: "Report",
+    order: 3,
+    rowCount: 24,
+    columns: [
+      { key: "region", header: "Region", width: 96, type: "text" },
+      { key: "manager", header: "Manager", width: 112, type: "text" },
+      { key: "revenue", header: "Revenue", width: 104, type: "number", numberFormat: "$#,##0" },
+      { key: "target", header: "Target", width: 104, type: "number", numberFormat: "$#,##0" },
+      { key: "attainment", header: "Attainment", width: 96, type: "number", numberFormat: "0.0%" },
+      { key: "status", header: "Status", width: 88, type: "text" },
+      { key: "comment", header: "Comment", width: 208, type: "text" },
+    ],
+    rowMeta: [
+      [0, { height: 44 }],
+      ...REGIONS.map((_, index): [number, RowMetadata] => [index + 2, { height: 48 }]),
+    ],
+    merges: [{ r0: 0, c0: 0, r1: 0, c1: 6 }],
+    validationRules: [
+      {
+        id: "status",
+        range: { sheet, start: { row: 2, col: 5 }, end: { row: 5, col: 5 } },
+        condition: { kind: "list", values: REPORT_STATUS },
+        policy: "reject",
+        helpText: "Pick a status.",
+      },
+    ],
+    notes: [{ addr: { sheet, row: 2, col: 3 }, text: "Raised from $3,900,000 in May." }],
+    charts: [
+      {
+        id: "revenue-by-region",
+        kind: "column",
+        title: "Revenue by region",
+        legend: "none",
+        anchor: { row: 8, col: 0, offsetX: 0, offsetY: 8, width: 520, height: 240 },
+        series: [
+          {
+            name: "Revenue",
+            values: { sheet, start: { row: 2, col: 2 }, end: { row: 5, col: 2 } },
+            categories: { sheet, start: { row: 2, col: 0 }, end: { row: 5, col: 0 } },
+          },
+        ],
+      },
+    ],
+    cells: [
+      {
+        startRow: 0,
+        startCol: 0,
+        rowCount: rows.length,
+        colCount: header.length,
+        cells: rows.flatMap((row, rowOffset) =>
+          row.map(([value, style], colOffset) => ({
+            rowOffset,
+            colOffset,
+            value,
+            ...(style === undefined ? {} : { style }),
+          })),
+        ),
+      },
+    ],
+  };
+}
+
+/** A pivot of the Orders table: revenue and units by region. */
+const ORDERS_PIVOT: PivotDefinition = {
+  id: "orders-by-region",
+  name: "Orders by region",
+  source: { table: "orders" },
+  anchor: { row: 0, col: 0 },
+  // The Orders fields: Month 0, Region 1, Product 2, Units 3, Revenue 4.
+  rows: [1],
+  columns: [],
+  values: [
+    { field: 4, aggregation: "SUM", name: "Revenue", numberFormat: "$#,##0" },
+    { field: 3, aggregation: "SUM", name: "Units", numberFormat: "#,##0" },
+  ],
+};
+
+/** The pivot, and a PivotChart of its revenue beside it. */
+function pivotSheet(): SheetSnapshot {
+  return {
+    id: FIGURE_SHEETS.pivot,
+    name: "Pivot",
+    order: 4,
+    rowCount: 40,
+    columns: [
+      { key: "a", header: "A", width: 120, type: "text" },
+      { key: "b", header: "B", width: 112, type: "number" },
+      { key: "c", header: "C", width: 88, type: "number" },
+      // The PivotChart's anchor column: a chart must sit on a cell of its sheet.
+      { key: "d", header: "D", width: 88, type: "text" },
+    ],
+    pivots: [ORDERS_PIVOT],
+    charts: [
+      {
+        id: "orders-by-region-chart",
+        kind: "column",
+        title: "Revenue by region",
+        legend: "none",
+        anchor: { row: 0, col: 3, offsetX: 16, offsetY: 0, width: 520, height: 280 },
+        series: [],
+        pivot: ORDERS_PIVOT.id,
+        pivotValues: [0],
+      },
+    ],
+    cells: [],
+  };
+}
+
+/** A GROUPBY that totals revenue by region from the Orders table, spilled from A1. */
+function formulasSheet(): SheetSnapshot {
+  return {
+    id: FIGURE_SHEETS.formulas,
+    name: "Formulas",
+    order: 5,
+    rowCount: 20,
+    columns: [
+      { key: "a", header: "A", width: 120, type: "text" },
+      { key: "b", header: "B", width: 120, type: "number", numberFormat: "$#,##0" },
+    ],
+    cells: [
+      {
+        startRow: 0,
+        startCol: 0,
+        rowCount: 1,
+        colCount: 1,
+        cells: [
+          {
+            rowOffset: 0,
+            colOffset: 0,
+            value: formula("=GROUPBY(Orders[Region],Orders[Revenue],SUM)"),
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -325,10 +552,14 @@ const SAVED_QUERIES: SavedQuery[] = [
   },
 ];
 
-/** The screenshot workbook, opened on `activeSheet`, with the dashboard in `layout`. */
+/**
+ * The screenshot workbook, opened on `activeSheet`, with the dashboard in
+ * `layout` and Orders laid out for `presentation`.
+ */
 export function figureWorkbook(
   activeSheet: string = FIGURE_SHEETS.dashboard,
   layout: DashboardLayout = "wide",
+  presentation: GridPresentation = "spreadsheet",
 ): WorkbookSnapshot {
   return {
     schemaVersion: 1,
@@ -362,9 +593,12 @@ export function figureWorkbook(
       },
     },
     sheets: [
-      ordersSheet(),
+      ordersSheet(presentation),
       regionsSheet(),
       layout === "wide" ? dashboardSheet() : narrowLayout(dashboardSheet(), layout),
+      ...(ANALYSIS_SHEETS.includes(activeSheet)
+        ? [reportSheet(), pivotSheet(), formulasSheet()]
+        : []),
     ],
   };
 }

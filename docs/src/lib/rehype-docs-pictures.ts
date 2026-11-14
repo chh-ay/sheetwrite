@@ -5,10 +5,12 @@
 // build, so the table can't drift from the pages.
 import {
   AFTER_LEAD,
+  AT_START,
   CARD_ART_NAMES,
   DOCS_PICTURE_PLACEMENTS,
   REPLACED_DIAGRAMS,
 } from "../art/docs-pictures.js";
+import { FIGURES_STYLESHEET, framedShot } from "./content-components.js";
 
 interface HastNode {
   type: string;
@@ -87,25 +89,49 @@ function replaceImages(node: HastNode): boolean {
   return changed;
 }
 
-/** Inserts each placed diagram after its heading, or after the lead paragraph. */
-function placeDiagrams(tree: HastNode, address: string): boolean {
+/** What a page's placements put in: drawn diagrams, screenshots, or both. */
+interface Placed {
+  readonly diagrams: boolean;
+  readonly shots: boolean;
+}
+
+/** Where a placement goes in the body's children: the index to insert at, or -1 when its anchor is missing. */
+function insertionIndex(children: readonly HastNode[], after: string): number {
+  if (after === AT_START) return children.findIndex((child) => child.type === "element");
+  const anchor =
+    after === AFTER_LEAD
+      ? children.findIndex((child) => child.tagName === "p")
+      : children.findIndex(
+          (child) => /^h[2-4]$/.test(child.tagName ?? "") && child.properties?.id === after,
+        );
+  return anchor < 0 ? -1 : anchor + 1;
+}
+
+/** Inserts each placed diagram or screenshot at the top, after its heading, or after the lead paragraph. */
+function placePictures(tree: HastNode, address: string): Placed {
   const placements = DOCS_PICTURE_PLACEMENTS[address] ?? [];
   const children = tree.children ?? [];
-  for (const { after, picture: name } of placements) {
-    const index =
-      after === AFTER_LEAD
-        ? children.findIndex((child) => child.tagName === "p")
-        : children.findIndex(
-            (child) => /^h[2-4]$/.test(child.tagName ?? "") && child.properties?.id === after,
-          );
-    if (index < 0)
-      throw new Error(
-        `${address}: no ${after === AFTER_LEAD ? "lead paragraph" : `heading #${after}`} for the ${name} diagram`,
-      );
-    children.splice(index + 1, 0, picture({ name }, true));
+  for (const placement of placements) {
+    const { after } = placement;
+    const index = insertionIndex(children, after);
+    const what =
+      "picture" in placement ? `${placement.picture} diagram` : `${placement.shot.name} screenshot`;
+    if (index < 0) {
+      const anchor =
+        after === AT_START ? "body" : after === AFTER_LEAD ? "lead paragraph" : `heading #${after}`;
+      throw new Error(`${address}: no ${anchor} for the ${what}`);
+    }
+    const node =
+      "picture" in placement
+        ? picture({ name: placement.picture }, true)
+        : framedShot(placement.shot);
+    children.splice(index, 0, node);
   }
   tree.children = children;
-  return placements.length > 0;
+  return {
+    diagrams: placements.some((placement) => "picture" in placement),
+    shots: placements.some((placement) => "shot" in placement),
+  };
 }
 
 function esm(body: unknown[]): HastNode {
@@ -118,23 +144,44 @@ function esm(body: unknown[]): HastNode {
 
 const literal = (value: string) => ({ type: "Literal", value, raw: JSON.stringify(value) });
 
-/** Imports DocsPicture and adds the art stylesheet to the page's `stylesheets` export. */
-function linkArt(tree: HastNode): void {
-  const sheet = { type: "Identifier", name: "artStylesheet" };
-  const imports = esm([
-    {
-      type: "ImportDeclaration",
-      specifiers: [
-        { type: "ImportDefaultSpecifier", local: { type: "Identifier", name: "DocsPicture" } },
-      ],
-      source: literal(PICTURE_MODULE),
-    },
-    {
-      type: "ImportDeclaration",
-      specifiers: [{ type: "ImportDefaultSpecifier", local: sheet }],
-      source: literal(`${ART_STYLESHEET}?url`),
-    },
-  ]);
+/** `import <name> from "<sheet>?url"`, as an import declaration. */
+function stylesheetImport(name: string, sheet: string) {
+  return {
+    type: "ImportDeclaration",
+    specifiers: [{ type: "ImportDefaultSpecifier", local: { type: "Identifier", name } }],
+    source: literal(`${sheet}?url`),
+  };
+}
+
+/**
+ * Imports DocsPicture and the art stylesheet when the page draws art, and the
+ * figures stylesheet when it places screenshots, and adds those stylesheets to
+ * the page's `stylesheets` export.
+ */
+function linkPictures(
+  tree: HastNode,
+  { art, shots }: Readonly<{ art: boolean; shots: boolean }>,
+): void {
+  const declarations: unknown[] = [];
+  const sheets: { type: string; name: string }[] = [];
+  if (art) {
+    declarations.push(
+      {
+        type: "ImportDeclaration",
+        specifiers: [
+          { type: "ImportDefaultSpecifier", local: { type: "Identifier", name: "DocsPicture" } },
+        ],
+        source: literal(PICTURE_MODULE),
+      },
+      stylesheetImport("artStylesheet", ART_STYLESHEET),
+    );
+    sheets.push({ type: "Identifier", name: "artStylesheet" });
+  }
+  if (shots) {
+    declarations.push(stylesheetImport("shotStylesheet", FIGURES_STYLESHEET));
+    sheets.push({ type: "Identifier", name: "shotStylesheet" });
+  }
+  const imports = esm(declarations);
   const children = tree.children ?? [];
   type Program = {
     body: {
@@ -152,7 +199,7 @@ function linkArt(tree: HastNode): void {
     )
     .find((declaration) => declaration.id.name === "stylesheets");
   if (exported !== undefined) {
-    exported.init.elements.push(sheet);
+    exported.init.elements.push(...sheets);
     tree.children = [imports, ...children];
     return;
   }
@@ -168,7 +215,7 @@ function linkArt(tree: HastNode): void {
           {
             type: "VariableDeclarator",
             id: { type: "Identifier", name: "stylesheets" },
-            init: { type: "ArrayExpression", elements: [sheet] },
+            init: { type: "ArrayExpression", elements: sheets },
           },
         ],
       },
@@ -177,13 +224,14 @@ function linkArt(tree: HastNode): void {
   tree.children = [imports, exportSheets, ...children];
 }
 
-/** The rehype plugin: art in the docs pages that have it. */
+/** The rehype plugin: art and screenshots in the docs pages that have them. */
 export function rehypeDocsPictures() {
   return (tree: HastNode, file: { path?: string }): void => {
     const address = pageAddress(file.path ?? "");
     if (address === undefined) return;
     const replaced = replaceImages(tree);
-    const placed = placeDiagrams(tree, address);
-    if (replaced || placed) linkArt(tree);
+    const placed = placePictures(tree, address);
+    if (replaced || placed.diagrams || placed.shots)
+      linkPictures(tree, { art: replaced || placed.diagrams, shots: placed.shots });
   };
 }
