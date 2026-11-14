@@ -15,6 +15,8 @@
 
 use std::cell::Cell;
 
+mod rows;
+
 use super::{StorageEntry, MAX_PAGE_CHUNK_ROWS};
 use crate::derived::{decode_cell, encode_cell, ABSENT_TAG};
 use crate::memory::{
@@ -196,6 +198,10 @@ pub(super) struct CleanPage {
 }
 
 impl CleanPage {
+    // Row moves also call the `#[inline(always)]` page and dirty-cell helpers
+    // in this file. With two callers wasm-opt left them out of line, which made
+    // a page load that evicts 6-8% slower on the Mac than with them inline.
+    #[inline(always)]
     fn new(rows: usize) -> Self {
         Self {
             kind: vec![KIND_EMPTY; rows],
@@ -299,6 +305,7 @@ impl DirtyBlock {
         self.position(offset).ok().map(|at| self.slots[at])
     }
 
+    #[inline(always)]
     fn insert(&mut self, offset: usize, slot: u32) {
         match self.position(offset) {
             Ok(at) => self.slots[at] = slot,
@@ -524,6 +531,7 @@ impl PagedStorage {
         ((clean != NONE).then(|| &self.clean[clean as usize]), offset)
     }
 
+    #[inline(always)]
     fn record_or_insert(&mut self, col: usize, page: usize) -> u32 {
         let existing = self.page_id(col, page);
         if existing != NONE {
@@ -921,6 +929,7 @@ impl PagedStorage {
         Some((slots.len() - 1) as u32)
     }
 
+    #[inline(always)]
     fn remove_revision_slot(&mut self, revision: u64, index: u32) {
         let Ok(list) = self
             .revisions
@@ -942,6 +951,7 @@ impl PagedStorage {
     }
 
     /// The dirty block holding (`row`, `col`), allocating it when absent.
+    #[inline(always)]
     fn dirty_block_or_insert(&mut self, row: usize, col: usize) -> u32 {
         let existing = self.dirty_block_id(row, col);
         if existing != NONE {

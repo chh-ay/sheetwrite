@@ -167,6 +167,7 @@ export function createFormulaBar(
   const assist = new FormulaAssist({
     highlightCells: (ranges) => grid.highlightCells(ranges),
     sheet: () => grid.getActiveSheet(),
+    cell: () => snapshot?.address ?? null,
     store: grid.store,
   });
 

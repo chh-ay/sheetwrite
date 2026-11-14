@@ -13,6 +13,7 @@ import {
   sharedRangeFormulas,
 } from "./formula-dataset.js";
 import { CellStore, historyKernel } from "./formula-engine.js";
+import { writeNumberColumn, writeStringColumn } from "./packed-fixture.js";
 import { now, summarize } from "./stats.js";
 
 function diamondOutput(levels: number): number {
@@ -210,7 +211,8 @@ function numericColumn(count: number, value: (row: number) => number): Float64Ar
 function independentLoadFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -232,7 +234,8 @@ function independentLoadFixture(count: number): TimedFixture {
 function independentRecomputeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -296,14 +299,16 @@ const CONSTANT_EDIT_EDITED_BASE = 2;
 function constantEditFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -431,7 +436,8 @@ function diamondFixture(levels: number): TimedFixture {
 function sharedRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, Math.max(count, 100));
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -456,7 +462,8 @@ function distinctRangeFixture(count: number): TimedFixture {
   const rows = count * 10;
   const store = new CellStore();
   const sheet = store.addSheet(2, rows);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -483,7 +490,8 @@ function crossSheetFixture(count: number): TimedFixture {
   const summary = store.addSheet(1, count);
   store.setSheetName(source, "source", "Source");
   store.setSheetName(summary, "summary", "Summary");
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     source,
     0,
     0,
@@ -509,7 +517,8 @@ function crossSheetFixture(count: number): TimedFixture {
 function topologyFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -583,14 +592,16 @@ function errorPropagationFixture(count: number): TimedFixture {
 function criteriaRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -615,14 +626,16 @@ function criteriaRangeFixture(count: number): TimedFixture {
 function lookupRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -663,14 +676,16 @@ const TEXT_LOOKUP_APPROXIMATE_ROW = 36;
 function lookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
   const sheet = store.addSheet(4, tableRows);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(tableRows, (row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -702,7 +717,8 @@ function textLookupTableStore(tableRows: number): { store: CellStore; sheet: num
   for (let row = 0; row < tableRows; row++) {
     store.setString(sheet, row, 0, textLookupKeyAt(row), 0);
   }
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -879,7 +895,8 @@ function mixedLookupFixture(tableRows: number): TimedFixture {
     if (typeof key === "number") store.setNumber(sheet, row, 0, key, 0);
     else store.setString(sheet, row, 0, key, 0);
   }
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -922,7 +939,8 @@ function mixedLookupFixture(tableRows: number): TimedFixture {
 function spillFilterResizeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -964,14 +982,16 @@ function spillSequenceAdmissionFixture(count: number): TimedFixture {
 function sumProductVectorFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => (row % 10) + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -999,14 +1019,16 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(columns * 2 + 1, rows);
   for (let col = 0; col < columns; col++) {
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       col,
       0,
       numericColumn(rows, () => 1),
       0,
     );
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       columns + col,
       0,
@@ -1031,21 +1053,24 @@ function sumProductMatrixFixture(elements: number): TimedFixture {
 function criteriaMultiRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
     numericColumn(count, (row) => row % 2),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     2,
     0,
@@ -1080,14 +1105,16 @@ const COUNTIF_MATCH_SHARE = 2;
 function sumMultiRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -1121,14 +1148,16 @@ function sumifsCriteriaTotal(count: number): number {
 function sumifsCriteriaFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(5, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -1144,7 +1173,8 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
       0,
     );
   }
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     3,
     0,
@@ -1169,7 +1199,8 @@ function sumifsCriteriaFixture(count: number): TimedFixture {
 function countifFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -1217,14 +1248,16 @@ function unicodeTextDateFixture(count: number): TimedFixture {
 function percentileCovarianceFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -1249,7 +1282,8 @@ function percentileCovarianceFixture(count: number): TimedFixture {
 function letReuseFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -1330,7 +1364,8 @@ function shapeRowsFixture(
 
 function numbersInA(fraction = 0): (store: CellStore, sheet: number, rows: number) => void {
   return (store, sheet, rows) =>
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       0,
       0,
@@ -1447,14 +1482,16 @@ function defineBindingNames(store: CellStore, sheet: number): void {
  */
 function namedFormulasSheet(store: CellStore, count: number, usesNames = true): number {
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     2,
     0,
@@ -1570,7 +1607,8 @@ function salesSheet(store: CellStore, count: number): number {
   const sheet = store.addSheet(4, count + 2);
   store.setString(sheet, 0, 0, "Amount", 0);
   store.setString(sheet, 0, 1, "Double", 0);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     1,
@@ -1625,7 +1663,8 @@ function sortedSourceRow(rows: number, row: number): number {
 function sortFormulaColumnFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -1661,14 +1700,16 @@ function parseLoadQualifiedFixture(count: number): TimedFixture {
   const calc = store.addSheet(1, count);
   store.setSheetName(data, "data", "Data");
   store.setSheetName(calc, "calc", "Calc");
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     data,
     0,
     0,
     numericColumn(count, (row) => row),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     data,
     1,
     0,
@@ -1719,14 +1760,16 @@ function memoryImportFixture(count: number): TimedFixture {
   const calc = store.addSheet(1, count);
   store.setSheetName(data, "data", "Data");
   store.setSheetName(calc, "calc", "Calc");
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     data,
     0,
     0,
     numericColumn(count, (row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     data,
     2,
     0,
@@ -1809,7 +1852,8 @@ function closureRangeFixture(
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
   for (const col of [0, 1]) {
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       col,
       0,
@@ -1886,7 +1930,7 @@ function measurePivotFixture(count: number): TimedFixture {
     store.setString(orders, row + 1, 0, `R${orderRegion(row)}`, 0);
   }
   for (const [col, value] of [orderQuarter, orderAmount, orderQty].entries()) {
-    store.setColumnNumbers(orders, col + 1, 1, numericColumn(count, value), 0);
+    writeNumberColumn(store, orders, col + 1, 1, numericColumn(count, value), 0);
   }
   assert(
     store.setTable(
@@ -2052,7 +2096,8 @@ function groupingFixture(
   const store = new CellStore();
   const sheet = store.addSheet(GROUPING_FORMULA_COL + GROUPING_OUTPUT_COLS, rows);
   const textColumn = (col: number, text: (row: number) => string) =>
-    store.setColumnStrings(
+    writeStringColumn(
+      store,
       sheet,
       col,
       0,
@@ -2061,7 +2106,8 @@ function groupingFixture(
     );
   textColumn(0, (row) => `R${row % GROUPING_REGIONS}`);
   textColumn(1, (row) => `P${String(row % GROUPING_PRODUCTS).padStart(2, "0")}`);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     GROUPING_AMOUNT_COL,
     0,
@@ -2138,7 +2184,7 @@ function pivotSourceSheet(store: CellStore, rows: number): number {
         ? Math.floor(row / PIVOT_DIGITS ** field) % PIVOT_DIGITS
         : row + field,
     );
-    store.setColumnNumbers(sheet, field, 1, values, 0);
+    writeNumberColumn(store, sheet, field, 1, values, 0);
   }
   return sheet;
 }
@@ -2416,7 +2462,8 @@ function historyVersion(changes: readonly HistoryWrite[]): { store: CellStore; s
   const store = new CellStore();
   const sheet = store.addSheet(HISTORY_COLS, HISTORY_ROWS);
   for (let col = 0; col < HISTORY_COLS; col++) {
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       col,
       0,
@@ -2602,14 +2649,16 @@ function sparsePageOutput(rows: number): string {
 function indexMatchFixture(formulas: number, rows: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, rows);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(rows, (row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -2647,7 +2696,8 @@ function indexMatchFixture(formulas: number, rows: number): TimedFixture {
 function rankManyFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -2684,7 +2734,8 @@ function sortUniqueFilterFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
   for (let row = 0; row < count; row++) store.setString(sheet, row, 0, sortUniqueKey(row), 0);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -2714,7 +2765,8 @@ function sortUniqueFilterFixture(count: number): TimedFixture {
 function subtotalFilteredFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(2, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -2814,7 +2866,8 @@ function sparsePageWriteFixture(rows: number): TimedFixture {
 function letManyFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -2844,14 +2897,16 @@ const LET_REPEAT_FACTOR = 3;
 function letRepeatFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(4, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     numericColumn(count, (row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -2892,7 +2947,8 @@ function iterativeFinanceFixture(count: number): TimedFixture {
 function incrementalDependencyClosureFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
@@ -2969,7 +3025,8 @@ function loadedPagedSheet(
   const sheet = store.addPagedSheet(cols, rows, chunkRows, byteBudget, 0);
   store.beginPageLoad();
   for (let col = 0; col < loaded; col++) {
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       col,
       0,
@@ -3073,7 +3130,7 @@ function pagedEvictionFixture(pages: number): TimedFixture {
   const values = numericColumn(rows, (row) => row);
   const load = (start: number, end: number) => {
     store.beginPageLoad();
-    store.setColumnNumbers(sheet, 0, start, values.subarray(start, end), 0);
+    writeNumberColumn(store, sheet, 0, start, values.subarray(start, end), 0);
     store.commitSources();
   };
   load(0, pinnedRows);

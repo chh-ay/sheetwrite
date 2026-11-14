@@ -598,7 +598,7 @@ impl CellStorage {
     pub(crate) fn range_fully_loaded(&self, r0: usize, c0: usize, r1: usize, c1: usize) -> bool {
         self.paged
             .as_ref()
-            .is_none_or(|paged| (c0..=c1).all(|col| (r0..=r1).all(|row| paged.read(row, col).3)))
+            .is_none_or(|paged| paged.range_loaded(r0, c0, r1, c1))
     }
 
     #[inline]
@@ -609,21 +609,6 @@ impl CellStorage {
     #[inline]
     pub(crate) fn str_id_at(&self, i: usize) -> u32 {
         payload_str_id(self.resolved_payload_at(i))
-    }
-
-    /// Reads the source payload without checking calculated values.
-    /// Literal kinds cannot have a calculated value; formulas must resolve it.
-    ///
-    /// # Safety
-    /// `i` must be in-bounds for the dense cell vectors.
-    #[inline]
-    #[allow(
-        unsafe_code,
-        reason = "skips the bounds check in the numeric sort comparator of query.rs; the safe version is not yet measured on both machines"
-    )]
-    pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
-        // SAFETY: the caller keeps `i` in bounds, as `# Safety` requires.
-        unsafe { *self.payload.get_unchecked(i) }
     }
 
     #[inline]
@@ -756,9 +741,10 @@ impl CellStorage {
             .ok_or_else(|| format!("{old} rows plus {count} rows overflow the row count"))?;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(new_count, self.n_cols, |row, col| {
-                Some((if row >= clamped_at { row + count } else { row }, col))
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.move_rows(clamped_at, clamped_at + count, old);
+            }
+            self.row_count = new_count;
             return Ok(());
         }
 
@@ -790,20 +776,10 @@ impl CellStorage {
         let old = self.row_count;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(old - clamped_count, self.n_cols, |row, col| {
-                if row >= at && row < at + clamped_count {
-                    None
-                } else {
-                    Some((
-                        if row >= at + clamped_count {
-                            row - clamped_count
-                        } else {
-                            row
-                        },
-                        col,
-                    ))
-                }
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.move_rows(at + clamped_count, at, old);
+            }
+            self.row_count = old - clamped_count;
             return Ok(());
         }
 

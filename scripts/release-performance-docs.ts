@@ -76,7 +76,19 @@ interface ChartTrackingEvidence {
     resolveMs?: Timing | null;
     expectedEvents: number;
     expectedCharts: number;
+    /** Minimum charts whose source value changed; absent in older captures. */
+    requiredCharts?: number;
     resolutionsPerCommit: number;
+    /** Untimed commits before the samples; absent in older captures. */
+    warmupCommits?: number;
+  }>;
+  /** Absent in captures made before cold rows were measured. */
+  coldSamples?: number;
+  coldRows?: Array<{
+    chartCount: number;
+    source: "literal" | "formula";
+    scenario: "outside" | "inside";
+    firstMs: Timing;
   }>;
 }
 
@@ -160,12 +172,32 @@ export function validateChartTrackingArtifact(
       row.commitMs.iters !== artifact.samples ||
       (row.eventMs !== null && !timing(row.eventMs)) ||
       (row.resolveMs !== undefined && row.resolveMs !== null && !timing(row.resolveMs)) ||
-      ![row.expectedEvents, row.expectedCharts, row.resolutionsPerCommit].every(nonnegative)
+      ![row.expectedEvents, row.expectedCharts, row.resolutionsPerCommit].every(nonnegative) ||
+      (row.requiredCharts !== undefined &&
+        (!nonnegative(row.requiredCharts) || row.requiredCharts > row.expectedCharts)) ||
+      (row.warmupCommits !== undefined && !nonnegative(row.warmupCommits))
     ) {
       return "chart-tracking capture contains invalid or duplicate measurements";
     }
 
     keys.add(key);
+  }
+
+  const coldKeys = new Set<string>();
+  for (const row of artifact.coldRows ?? []) {
+    const key = `${row.chartCount}/${row.source}/${row.scenario}`;
+    if (
+      coldKeys.has(key) ||
+      !Number.isInteger(row.chartCount) ||
+      row.chartCount < 0 ||
+      !["literal", "formula"].includes(row.source) ||
+      !["outside", "inside"].includes(row.scenario) ||
+      !timing(row.firstMs) ||
+      row.firstMs.iters !== artifact.coldSamples
+    ) {
+      return "chart-tracking capture contains invalid or duplicate cold measurements";
+    }
+    coldKeys.add(key);
   }
 
   return artifact;

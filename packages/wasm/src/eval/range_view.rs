@@ -10,22 +10,29 @@ use crate::sheet::SheetData;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA,
-    KIND_NUMBER, KIND_STRING,
+    KIND_NUMBER, KIND_STRING, LITERAL_KIND_BITS,
 };
 
 use super::matrix::{EvalMatrix, SPILL_MAX_BYTES};
+use super::preview_limits::{self, RangeRead};
 use super::{string_from_pool_ref, EvalPass, LiteralSources};
 
 /// A written range clipped to its sheet's used extent.
 pub(super) struct RangeView<'a> {
-    store: &'a CellStore,
-    data: &'a SheetData,
-    sheet: usize,
-    row_start: usize,
-    col_start: usize,
+    pub(super) store: &'a CellStore,
+    pub(super) data: &'a SheetData,
+    pub(super) sheet: usize,
+    pub(super) row_start: usize,
+    pub(super) col_start: usize,
     rows: usize,
     cols: usize,
-    depth: usize,
+    pub(super) depth: usize,
+}
+
+/// Dense literal cells, as one row slice of kinds and payloads per column.
+pub(super) struct LiteralColumns<'a> {
+    pub(super) rows: usize,
+    pub(super) columns: Vec<(&'a [u8], &'a [u64])>,
 }
 
 impl<'a> RangeView<'a> {
@@ -38,7 +45,7 @@ impl<'a> RangeView<'a> {
         depth: usize,
     ) -> Result<Self, FormulaError> {
         let view = Self::clipped(store, range, depth)?;
-        EvalMatrix::validate_shape(view.rows, view.cols, 1, 0)?;
+        EvalMatrix::validate_reference_shape(view.rows, view.cols)?;
         Ok(view)
     }
 
@@ -82,11 +89,50 @@ impl<'a> RangeView<'a> {
         (self.rows, self.cols)
     }
 
+    /// Borrows literal kind/payload columns without copying text or numbers.
+    /// Formula, spill, paged and depth-limited reads use the cell cursor instead.
+    pub(super) fn literal_columns(&self) -> Option<LiteralColumns<'a>> {
+        LiteralSources::new(self.data, self.depth)?;
+
+        #[cfg(test)]
+        if super::range_reader::LITERAL_COLUMNS_OFF.with(std::cell::Cell::get) {
+            return None;
+        }
+
+        let rows = self.row_start..self.row_start + self.rows;
+        let mut columns = Vec::new();
+        columns.try_reserve_exact(self.cols).ok()?;
+
+        for col in self.col_start..self.col_start + self.cols {
+            let column = self.data.cells.dense_column(col)?;
+            let (column_kinds, payloads) = column.raw_slices();
+            let kinds = column_kinds.get(rows.clone())?;
+
+            // Literal kinds are 0..=3 (a raw empty kind without the calculated
+            // bit is a plain blank). Any other kind sets a higher bit, so one
+            // OR over the column decides it without a branch per cell.
+            if kinds.iter().fold(0, |any, &kind| any | kind) & !LITERAL_KIND_BITS != 0 {
+                return None;
+            }
+
+            columns.push((kinds, payloads.get(rows.clone())?));
+        }
+
+        Some(LiteralColumns {
+            rows: self.rows,
+            columns,
+        })
+    }
+
     /// The value of the cell at a zero-based `row` and `col` of the view:
     /// `#REF!` outside it, `#LOADING!` when its page isn't loaded.
     pub(super) fn cell(&self, row: usize, col: usize, pass: &mut EvalPass<'_>) -> Value {
         if row >= self.rows || col >= self.cols {
             return Value::Error(FormulaError::Ref);
+        }
+
+        if let Err(error) = preview_limits::cell() {
+            return Value::Error(error);
         }
 
         let sheet_row = self.row_start + row;
@@ -128,6 +174,7 @@ impl<'a> RangeView<'a> {
         pass: &mut EvalPass<'_>,
         sink: &mut impl NumberSink,
     ) -> Result<(), FormulaError> {
+        self.charge_preview(RangeRead::Typed)?;
         if let Some(literals) = LiteralSources::new(self.data, self.depth) {
             return self.scan_dense_numbers(literals, pass, sink);
         }
@@ -186,6 +233,12 @@ impl<'a> RangeView<'a> {
     ) -> Option<Result<(), FormulaError>> {
         if self.rows * self.cols != other.rows * other.cols {
             return None;
+        }
+        if let Err(error) = self
+            .charge_preview(RangeRead::Typed)
+            .and_then(|()| other.charge_preview(RangeRead::Typed))
+        {
+            return Some(Err(error));
         }
         let (left_kinds, left_payloads) = LiteralSources::new(self.data, self.depth)?.sources.raw();
         let (right_kinds, right_payloads) =
@@ -254,6 +307,7 @@ impl<'a> RangeView<'a> {
         pass: &mut EvalPass<'_>,
         sink: &mut impl CellSink,
     ) -> Result<(), FormulaError> {
+        self.charge_preview(RangeRead::Typed)?;
         let literals =
             LiteralSources::new(self.data, self.depth).map(|sources| sources.sources.raw());
         for row in self.row_start..self.row_start + self.rows {
@@ -298,6 +352,8 @@ impl<'a> RangeView<'a> {
     /// with `#LOADING!` when any cell isn't loaded.
     pub(super) fn materialize(&self, pass: &mut EvalPass<'_>) -> Result<EvalMatrix, FormulaError> {
         let total = self.rows * self.cols;
+        self.charge_preview(RangeRead::Cells)?;
+        preview_limits::array(total)?;
         self.check_text_budget(total)?;
 
         let literals = LiteralSources::new(self.data, self.depth);
@@ -312,6 +368,16 @@ impl<'a> RangeView<'a> {
             }
         }
         Ok(EvalMatrix::new(self.rows, self.cols, values))
+    }
+
+    /// Charges one whole read of the view against a result preview's limits.
+    pub(super) fn charge_preview(&self, read: RangeRead) -> Result<(), FormulaError> {
+        preview_limits::range(
+            self.data,
+            (self.row_start, self.col_start),
+            (self.rows, self.cols),
+            read,
+        )
     }
 
     /// Charges `cells` values plus the text stored in the view against the

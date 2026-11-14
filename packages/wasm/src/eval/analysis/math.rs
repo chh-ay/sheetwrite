@@ -67,7 +67,7 @@ pub(in crate::eval) fn streamed_sum_squares(
         if depth > FORMULA_RECURSION_LIMIT {
             return Err(FormulaError::Num);
         }
-        let (rows, cols) = RangeReader::new(store, range, depth)?.shape();
+        let (rows, cols) = RangeReader::numbers(store, range, depth)?.shape();
         let source_sheet = &store.sheets[range.sheet as usize];
         let mut context = RangeContext { store, pass, depth };
         let mut sum = 0.0;
@@ -180,11 +180,11 @@ pub(in crate::eval) fn streamed_paired_squares(
     if depth > FORMULA_RECURSION_LIMIT {
         return Some(Value::Error(FormulaError::Num));
     }
-    let (left_rows, left_cols) = match RangeReader::new(store, left_range, depth) {
+    let (left_rows, left_cols) = match RangeReader::numbers(store, left_range, depth) {
         Ok(reader) => reader.shape(),
         Err(error) => return Some(Value::Error(error)),
     };
-    let right_shape = RangeReader::new(store, right_range, depth).map(|reader| reader.shape());
+    let right_shape = RangeReader::numbers(store, right_range, depth).map(|reader| reader.shape());
     let left_length = left_rows * left_cols;
     let right_length = right_shape.as_ref().map_or(0, |&(rows, cols)| rows * cols);
     if left_length.saturating_add(right_length) > crate::types::RANGE_CELL_LIMIT as usize {
