@@ -26,6 +26,7 @@
     "bench:engine-comparison": "bun run src/engine-comparison.ts",
     "bench:version-comparison": "bun run src/version-comparison.ts",
     "bench:prefetch": "bun run src/datasource-prefetch-bench.ts",
+    "bench:scroll-traces": "bun run src/scroll-trace-bench.ts",
     "bench:billion-cell": "bun run src/billion-cell-bench.ts",
     "bench:formula": "bun run src/formula-bench.ts",
     "bench:pivot": "bun run src/pivot-bench.ts --output results/pivot-results.json",
