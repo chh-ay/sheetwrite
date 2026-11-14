@@ -116,6 +116,8 @@ const LOOKUP_ROW_IDS = [
   "xlookup-many-sorted",
   "text-lookup-many",
   "text-lookup-many-sorted",
+  "paged-vlookup-many",
+  "paged-xlookup-many",
 ] as const;
 
 const CLOSURE_ROW_IDS = [
