@@ -1075,12 +1075,15 @@ function conditionalFormatWindowFixture(size: number): TimedFixture {
       CONDITIONAL_GREATER_KIND,
     ]),
     Uint32Array.from(Array.from({ length: ruleCount }, () => bounds).flat()),
-    Float64Array.from([...CONDITIONAL_WINDOW_FORMULAS.map(() => 0), CONDITIONAL_WINDOW_GREATER_THAN]),
+    Float64Array.from([
+      ...CONDITIONAL_WINDOW_FORMULAS.map(() => 0),
+      CONDITIONAL_WINDOW_GREATER_THAN,
+    ]),
     [...CONDITIONAL_WINDOW_FORMULAS, ""],
     new Uint8Array(ruleCount),
   );
   const cols = Uint32Array.from({ length: CONDITIONAL_WINDOW_COLS }, (_, col) => col);
-  let packed = new Uint8Array();
+  let packed: Uint8Array = new Uint8Array();
   return {
     store,
     run: () => {
