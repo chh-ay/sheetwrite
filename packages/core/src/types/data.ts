@@ -15,7 +15,12 @@ export type RowData = Record<string, DataCell>;
 
 /** Eager column-oriented values used to initialize a sheet. */
 export interface ColumnarData {
+  /** Number of rows to load; rows past the sheet's own `rowCount` are ignored. */
   rowCount: number;
+  /**
+   * Values by column key, entry `i` for row `i`. A key the sheet does not
+   * define is ignored; a missing key or a short array leaves those cells empty.
+   */
   columns: Record<string, ArrayLike<CellScalar | CellValue>>;
 }
 
@@ -33,6 +38,7 @@ export interface DataSourceColumnBand {
 export interface DataSourceRequest {
   /** Paging contract version. */
   protocol: 2;
+  /** Stable ID of the sheet the rows are for. */
   sheet: SheetId;
   /** Inclusive row index. */
   start: number;
@@ -40,7 +46,12 @@ export interface DataSourceRequest {
   end: number;
   /** Exact visible, frozen, or prefetched column runs required by the Grid. */
   columns: readonly DataSourceColumnBand[];
+  /** Aborts when the grid no longer needs the rows, for example after a scroll away. */
   signal: AbortSignal;
+  /**
+   * The grid's data revision when it asked; cells changed after it keep their
+   * local value when the page arrives.
+   */
   revision: number;
 }
 
@@ -52,13 +63,20 @@ export interface DataSourcePage {
   start: number;
   /** Exact column runs represented by every returned row. */
   columns: readonly DataSourceColumnBand[];
+  /** One object per row from `start` on, keyed by the column keys in `columns`. */
   rows: RowData[];
+  /** Your own version tag for the data the page was read from; the grid does not read it. */
   revision?: string | number;
 }
 
 /** Declares whether a source can load only the requested column runs. */
 export interface DataSourceCapabilities {
+  /** Paging contract version; must be `2`. */
   protocol: 2;
+  /**
+   * `"windowed"` when `getRows` can return only the requested column runs;
+   * `"full-width"` when every request must cover all columns.
+   */
   columns: "windowed" | "full-width";
 }
 
@@ -87,6 +105,7 @@ export interface DataSourceCapabilities {
  * @see DataSourceRequest
  */
 export interface DataSource {
+  /** Which requests this source can answer. */
   readonly capabilities: DataSourceCapabilities;
   /** Loads the requested rows and columns; implementations should stop work when its signal aborts. */
   getRows(request: DataSourceRequest): Promise<DataSourcePage>;

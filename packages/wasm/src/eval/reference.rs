@@ -22,6 +22,7 @@
 //! (ROWS, SUMIF, INDEX, ...) see one.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::CellStore;
@@ -29,7 +30,7 @@ use crate::types::{CellRange, FormulaError, Value};
 
 use super::matrix::{range_from_ast, EvalMatrix, SPILL_MAX_COLS, SPILL_MAX_ROWS};
 use super::value::{bool_from_value, number_from_value, text_from_value};
-use super::{current_formula_origin, sheet_envelopes, EvalPass};
+use super::{current_formula_origin, read_shifted, sheet_envelopes, EvalPass};
 
 const OFFSET_MIN_ARGS: usize = 3;
 const OFFSET_MAX_ARGS: usize = 5;
@@ -68,14 +69,14 @@ impl RewriteScope {
                 sheet_ref(range.sheet),
                 range.row_start,
                 range.col_start,
-                RefFlags::default(),
+                RefFlags::ABSOLUTE,
             )),
             Ok(range) => Some(range_ast(range)),
             Err(FormulaError::Ref) => Some(Ast::InvalidRef),
             Err(error) if self == Self::Root => {
                 Some(Ast::Array(Box::new(crate::calc::ArrayLiteral {
                     cols: 1,
-                    values: vec![Value::Error(error)],
+                    values: Rc::from([Value::Error(error)]),
                 })))
             }
             Err(_) => None,
@@ -126,14 +127,16 @@ const fn sheet_ref(handle: u32) -> SheetRef {
     SheetRef { handle }
 }
 
-fn range_ast(range: CellRange) -> Ast {
+/// A reference this evaluation computed. It names the cells it was computed
+/// for, so it is `$`-fixed and a reference shift does not move it again.
+const fn range_ast(range: CellRange) -> Ast {
     Ast::AbsRange(
         sheet_ref(range.sheet),
         range.row_start,
         range.col_start,
         range.row_end,
         range.col_end,
-        RangeFlags::default(),
+        RangeFlags::ABSOLUTE,
     )
 }
 
@@ -510,7 +513,7 @@ impl CellStore {
         entry
             .ast
             .as_ref()
-            .and_then(|ast| range_from_ast(ast, sheet))
+            .and_then(|ast| read_shifted((0, 0), || range_from_ast(ast, sheet)))
             .or_else(|| self.indirect_named_reference(source, sheet))
             .ok_or(FormulaError::Ref)
     }

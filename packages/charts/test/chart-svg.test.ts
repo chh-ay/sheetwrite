@@ -144,6 +144,130 @@ describe("renderChartSvg", () => {
     });
   });
 
+  // #700: the value axis of a wide bar chart drew labels into each other.
+  describe("value-axis labels", () => {
+    /** The renderer's font size, and its estimate of a glyph's width as a share of it. */
+    const FONT_SIZE = 11;
+    const GLYPH_WIDTH_RATIO = 0.6;
+    /**
+     * A browser's text box is taller than the font size: it runs about this
+     * share of it above and below a centered label, and below the baseline of
+     * other labels. The boxes here use these generous heights so labels that
+     * merely touch count as overlapping.
+     */
+    const CENTERED_HALF_HEIGHT = 0.6;
+    const DESCENT = 0.25;
+    /** Every 40 px from 200 to 2,600: tick rounding packs labels tightest at some widths only. */
+    const LENGTHS = Array.from({ length: 61 }, (_, index) => 200 + index * 40);
+    const MONEY = ["$#,##0", "$#,##0", "$#,##0"];
+    const REVENUE = seriesView("Revenue", [1_234_567, 2_345_678, 987_654], {
+      categories: ["Americas", "APAC", "EMEA"],
+      numberFormats: MONEY,
+    });
+    const SPEND = seriesView("Revenue", [3, 5, 2], {
+      categories: [1_250_000, 2_500_000, 4_750_000],
+      categoryFormats: MONEY,
+    });
+
+    interface LabelBox {
+      text: string;
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
+    }
+
+    /** The box of an unrotated label from its anchor, baseline and estimated width. */
+    function labelBox(node: Element): LabelBox {
+      const text = node.textContent ?? "";
+      const width = text.length * FONT_SIZE * GLYPH_WIDTH_RATIO;
+      const x = numberAttribute(node, "x");
+      const y = numberAttribute(node, "y");
+      const anchor = node.getAttribute("text-anchor");
+      const left = anchor === "start" ? x : anchor === "end" ? x - width : x - width / 2;
+      const centered = node.getAttribute("dominant-baseline") === "central";
+      return {
+        text,
+        left,
+        right: left + width,
+        top: centered ? y - FONT_SIZE * CENTERED_HALF_HEIGHT : y - FONT_SIZE,
+        bottom: centered ? y + FONT_SIZE * CENTERED_HALF_HEIGHT : y + FONT_SIZE * DESCENT,
+      };
+    }
+
+    function horizontalSpans(svg: Element, selector: string): Array<[number, number]> {
+      return [...svg.querySelectorAll(selector)]
+        .map(labelBox)
+        .map((box): [number, number] => [box.left, box.right]);
+    }
+
+    function verticalSpans(svg: Element, selector: string): Array<[number, number]> {
+      return [...svg.querySelectorAll(selector)]
+        .map(labelBox)
+        .map((box): [number, number] => [box.top, box.bottom])
+        .sort(([top], [otherTop]) => top - otherTop);
+    }
+
+    function expectApart(spans: Array<[number, number]>, end: number): void {
+      expect(spans.length).toBeGreaterThan(0);
+      spans.slice(1).forEach(([start], index) => {
+        expect(start).toBeGreaterThanOrEqual(spans[index]?.[1] ?? Number.POSITIVE_INFINITY);
+      });
+      expect(spans[0]?.[0]).toBeGreaterThanOrEqual(0);
+      expect(spans.at(-1)?.[1]).toBeLessThanOrEqual(end);
+    }
+
+    it.each<[ChartKind, ChartView, string]>([
+      ["bar", chartView("bar", [REVENUE]), ".sheetwrite-chart-value-axis text"],
+      ["scatter", chartView("scatter", [SPEND]), ".sheetwrite-chart-category-axis text"],
+    ])("keeps the %s chart's horizontal value labels apart at every width", (_, view, selector) => {
+      const counts = LENGTHS.map((width) => {
+        const spans = horizontalSpans(renderChartSvg(view, { width, height: 300 }), selector);
+        expectApart(spans, width);
+        return spans.length;
+      });
+
+      // Wider charts still get more labels, not just the two ends.
+      expect(counts.at(-1)).toBeGreaterThan(counts[0] ?? 0);
+      expect(counts.at(-1)).toBeGreaterThan(2);
+    });
+
+    it("keeps the column chart's vertical value labels apart at every height", () => {
+      for (const height of LENGTHS) {
+        const svg = renderChartSvg(chartView("column", [REVENUE]), { width: 400, height });
+        expectApart(verticalSpans(svg, ".sheetwrite-chart-value-axis text"), height);
+      }
+    });
+
+    // A scatter chart is the one kind with two value axes; its lowest y label
+    // and its first x label both sit at the corner where the axes meet.
+    it("keeps the scatter chart's x and y labels apart where the axes meet, at every width", () => {
+      for (const width of LENGTHS) {
+        const svg = renderChartSvg(chartView("scatter", [SPEND]), { width, height: 300 });
+        const boxes = [
+          ...svg.querySelectorAll(
+            ".sheetwrite-chart-value-axis text, .sheetwrite-chart-category-axis text",
+          ),
+        ].map(labelBox);
+        const touching = boxes.flatMap((box, index) =>
+          boxes
+            .slice(index + 1)
+            .filter(
+              (other) =>
+                box.left < other.right &&
+                other.left < box.right &&
+                box.top < other.bottom &&
+                other.top < box.bottom,
+            )
+            .map((other) => `${box.text} / ${other.text} at ${width} px`),
+        );
+
+        expect(touching).toEqual([]);
+        expect(boxes.every((box) => box.left >= 0 && box.right <= width)).toBe(true);
+      }
+    });
+  });
+
   it("leaves a gap for each null value and notes a truncated series", () => {
     const sales = seriesView("Sales", [1, null, 3, 4, null], { truncated: true });
     const svg = render(chartView("line", [sales]));

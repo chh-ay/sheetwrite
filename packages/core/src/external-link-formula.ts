@@ -79,7 +79,12 @@ function isExternalBook(formula: string, open: number, end: number): boolean {
   return EXTERNAL_BOOK.test(content) && QUALIFIED_NAME_START.test(formula.charAt(end));
 }
 
-/** Detect formula constructs that would keep an external workbook/data source live. */
+/**
+ * Detect formula constructs that would keep an external workbook/data source live.
+ *
+ * @param formula - Formula text, with or without the leading `=`.
+ * @returns `true` when the formula names another workbook or calls a live-data function.
+ */
 export function formulaContainsExternalReference(formula: string): boolean {
   let executable = "";
   let index = 0;
@@ -113,7 +118,12 @@ export function formulaContainsExternalReference(formula: string): boolean {
   return EXTERNAL_DATA_FUNCTION.test(executable);
 }
 
-/** Whether the formula calls a function that reads live external data, such as `RTD` or `DDE`. */
+/**
+ * Whether the formula calls a function that reads live external data, such as `RTD` or `DDE`.
+ *
+ * @param formula - Formula text, with or without the leading `=`.
+ * @returns `true` when such a call appears outside quoted text.
+ */
 export function formulaCallsExternalData(formula: string): boolean {
   return (
     EXTERNAL_DATA_NAME.test(formula) &&
@@ -143,6 +153,10 @@ const PLAIN_NAME = /^[\p{L}\p{N}_.]+$/u;
  * `[book]sheet`, in quotes when either part needs them, as Excel writes it
  * before `!`. Without a sheet, the book alone, as Excel writes it before a
  * defined name of that workbook: `Budget.xlsx` in `Budget.xlsx!Total`.
+ *
+ * @param book - The workbook's file name, such as `Budget.xlsx`.
+ * @param sheet - The sheet name, or `""` for the book alone.
+ * @returns The text to write before `!`, such as `[Budget.xlsx]Q1` or `'[Budget 2024.xlsx]Q1'`.
  */
 export function externalSheetText(book: string, sheet: string): string {
   if (!sheet) return PLAIN_NAME.test(book) ? book : `'${book.replaceAll("'", "''")}'`;
@@ -177,6 +191,10 @@ function bookName(qualifier: string, text: string): ExternalSheetName | undefine
  * which returns the new text before `!`, or undefined when the formula cannot
  * be written that way. Text in quotes and structured references stay as they
  * are. A folder before `[` in a quoted name is left out.
+ *
+ * @param formula - Formula text, with or without the leading `=`.
+ * @param replace - Called for each name of another workbook; returns its new text.
+ * @returns The new formula, or `undefined` when `replace` returned `undefined` for any name.
  */
 export function rewriteExternalSheets(
   formula: string,

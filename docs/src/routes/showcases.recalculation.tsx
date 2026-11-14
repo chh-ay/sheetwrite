@@ -13,7 +13,8 @@ import { NoHydration } from "solid-js/web";
 
 import { RecalculationDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import { FirstCalculationFact } from "../showcases/recalculation/FirstCalculationFact.js";
 import { RecalculationStage } from "../showcases/recalculation/RecalculationStage.js";
 

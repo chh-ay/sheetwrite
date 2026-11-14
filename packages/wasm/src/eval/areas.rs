@@ -7,14 +7,14 @@
 //! area by area here, INDEX picks one area of a union, AREAS counts areas, and
 //! every other position gives `#VALUE!`, as a union does in Excel.
 
-use crate::calc::{Ast, Func};
+use crate::calc::{Ast, Func, SheetSpanRef};
 use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
 use super::functions::FuncAccumulator;
 use super::lookup::positive_index;
 use super::matrix::{intersection_range, range_from_ast};
-use super::EvalPass;
+use super::{placed_range, EvalPass};
 
 /// One range of a multi-area reference and the depth to read it at, or the
 /// error of a part that can't be read.
@@ -240,31 +240,7 @@ impl CellStore {
                 }
                 ranges
             }
-            Ast::SheetSpan(span) if accepts_sheet_span(func) => span
-                .sheets
-                .iter()
-                .filter(|&&handle| {
-                    // Sheets here have their own sizes, unlike Excel's fixed
-                    // grid: cells beyond a smaller sheet are blank, so they
-                    // add nothing instead of turning the span into #REF!.
-                    self.sheets.get(handle as usize).is_some_and(|data| {
-                        (span.row_start as usize) < data.cells.row_count()
-                            && (span.col_start as usize) < data.cells.n_cols()
-                    })
-                })
-                .map(|&handle| {
-                    Ok((
-                        CellRange::new(
-                            handle,
-                            span.row_start,
-                            span.col_start,
-                            span.row_end,
-                            span.col_end,
-                        ),
-                        depth + 1,
-                    ))
-                })
-                .collect(),
+            Ast::SheetSpan(span) if accepts_sheet_span(func) => self.sheet_span_ranges(span, depth),
             // A resolvable intersection never reaches here: it is one range.
             Ast::Func(Func::Intersect, operands) => vec![Err(intersection_range(operands, sheet)
                 .err()
@@ -301,6 +277,38 @@ impl CellStore {
                 vec![Err(FormulaError::Value)]
             }
         }
+    }
+
+    /// The range of a 3-D reference on each of its sheets, each with the
+    /// depth to read it at.
+    fn sheet_span_ranges(&self, span: &SheetSpanRef, depth: usize) -> Vec<AreaRange> {
+        let placed = placed_range(
+            0,
+            (span.row_start, span.col_start),
+            (span.row_end, span.col_end),
+            span.flags,
+        );
+        span.sheets
+            .iter()
+            .filter(|&&handle| {
+                // Sheets here have their own sizes, unlike Excel's fixed
+                // grid: cells beyond a smaller sheet are blank, so they
+                // add nothing instead of turning the span into #REF!.
+                self.sheets.get(handle as usize).is_some_and(|data| {
+                    (placed.row_start as usize) < data.cells.row_count()
+                        && (placed.col_start as usize) < data.cells.n_cols()
+                })
+            })
+            .map(|&handle| {
+                Ok((
+                    CellRange {
+                        sheet: handle,
+                        ..placed
+                    },
+                    depth + 1,
+                ))
+            })
+            .collect()
     }
 
     /// The area that INDEX reads: area `area_num` (from 1, default 1) of a

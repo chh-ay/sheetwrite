@@ -61,6 +61,9 @@ function convertSources(
  * session. XLSX codecs can run before `initSheetwrite()`: an initialized
  * document lends its engine, and otherwise a temporary instance releases its
  * memory when `use` returns.
+ *
+ * @param use - Called once with the formula operations; do not keep them after it returns.
+ * @returns A promise of what `use` returned.
  */
 export function withXlsxFormulaEngine<T>(use: (formulas: XlsxFormulaEngine) => T): Promise<T> {
   return lendEngine((engine) =>

@@ -280,7 +280,7 @@ function reportSheet(): SheetSnapshot {
         kind: "column",
         title: "Revenue by region",
         legend: "none",
-        anchor: { row: 8, col: 0, offsetX: 0, offsetY: 8, width: 520, height: 240 },
+        anchor: { row: 7, col: 0, offsetX: 0, offsetY: 4, width: 520, height: 220 },
         series: [
           {
             name: "Revenue",

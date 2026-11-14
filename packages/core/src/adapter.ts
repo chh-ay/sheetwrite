@@ -164,11 +164,17 @@ export type GridSizeProps =
 
 /** Optional width and height accepted by advanced framework adapters. */
 export interface OptionalGridSizeProps {
+  /** Host height: a number of CSS pixels or any CSS length string. */
   height?: number | string;
+  /** Fill the parent's width and height instead of using `height`. */
   fill?: true;
 }
 
-/** Converts adapter size props into a host element style object. */
+/**
+ * Converts adapter size props into a host element style object.
+ *
+ * @returns CSS properties for the host, in camel case; empty when neither prop is set.
+ */
 export function gridSizeStyle(size: OptionalGridSizeProps): Record<string, string> {
   if (size.fill) return { width: "100%", height: "100%", minHeight: "0" };
   if (size.height !== undefined) {
@@ -196,7 +202,11 @@ export function assertGridSize(size: OptionalGridSizeProps): void {
 
 const GRID_OPTION_KEYS = Object.keys(GRID_OPTION_POLICY) as Array<keyof GridOptions>;
 
-/** Extracts advanced GridOptions from framework adapter props. */
+/**
+ * Extracts advanced GridOptions from framework adapter props.
+ *
+ * @param source - The component's props; keys that are not grid options are left out.
+ */
 export function extractGridOptions(source: Record<string, unknown>): GridOptions {
   const options: Partial<GridOptions> = {};
   for (const key of GRID_OPTION_KEYS) {
@@ -205,7 +215,12 @@ export function extractGridOptions(source: Record<string, unknown>): GridOptions
   return options as GridOptions;
 }
 
-/** Returns the first reset-sensitive adapter input that changed, if any. */
+/**
+ * Returns the first reset-sensitive adapter input that changed, if any.
+ *
+ * @returns `renderer-reset` for a renderer change, `input-reset` for another
+ *   option that needs a new grid, or `null` when the grid can stay.
+ */
 export function getGridResetReason(
   previous: GridOptions,
   next: GridOptions,
@@ -234,8 +249,11 @@ export function applyChangedLiveGridOptions(
 
 /** Committed inputs to a framework adapter lifetime. */
 export interface AdapterGridInput<Id extends RowBridgeId = RowBridgeId> {
+  /** Options for the grid; the renderer defaults to `canvas` and `readOnly` to `false`. */
   options: GridOptions;
+  /** Turns grid changes into row changes; a different bridge creates a new grid. */
   rowBridge?: RowBridgeInstance<Id>;
+  /** Where to load the engine's WASM from; a different source initializes again. */
   wasmSource?: SheetwriteInitializationProps["wasmSource"];
 }
 
@@ -243,6 +261,7 @@ export interface AdapterGridInput<Id extends RowBridgeId = RowBridgeId> {
 export interface GridPublicationAdapter {
   /** Resolves only after the imperative handle is visible to consumers. */
   publish(grid: Grid | null): void | Promise<void>;
+  /** Called when WASM initialization starts, succeeds or fails. */
   setInitializationState(state: "loading" | "ready" | "error"): void;
   /**
    * Receives asynchronous construction or consumer failures unchanged.
@@ -254,13 +273,21 @@ export interface GridPublicationAdapter {
 
 /** Owns adapter attachment and monotonically numbered Grid generations. */
 export interface AdapterGridController<Id extends RowBridgeId = RowBridgeId> {
+  /** Attaches to `host` and creates the first grid; throws when already mounted. */
   mount(host: HTMLElement, input: AdapterGridInput<Id>): void;
+  /** Applies new inputs: live options update the grid; others replace it. */
   update(input: AdapterGridInput<Id>): void;
   /** Idempotent; a later mount preserves generation numbering. */
   unmount(): void;
 }
 
-/** Owns initialization, replacement, publication, and retirement for framework adapters. */
+/**
+ * Owns initialization, replacement, publication, and retirement for framework adapters.
+ *
+ * @param handlers - Event callbacks, read on each event, so the adapter can change them in place.
+ * @param publication - The adapter's hooks for publishing the grid and its loading state.
+ * @returns A controller the component mounts, updates and unmounts with its own lifecycle.
+ */
 export function createAdapterGridController<Id extends RowBridgeId = RowBridgeId>(
   handlers: GridAdapterEventHandlers<Id>,
   publication: GridPublicationAdapter,
@@ -451,8 +478,11 @@ export interface SimpleSheetwriteOptions<
   Row extends Record<string, CellScalar>,
   Id extends RowBridgeId = RowBridgeId,
 > {
+  /** The columns, in display order; keys and titles must be non-empty and keys unique. */
   columns: readonly SimpleColumn<Row>[];
+  /** The rows the grid starts with; later changes to this array are not read. */
   defaultRows: readonly Row[];
+  /** Name of the one sheet; defaults to `Sheet 1`. */
   sheetName?: string;
   /** Opt-in stable data-row identity extractor. */
   getRowId?: (row: Row, index: number) => Id;
@@ -460,7 +490,12 @@ export interface SimpleSheetwriteOptions<
   createRowId?: RowBridgeOptions<Row, Id>["createRowId"];
 }
 
-/** Creates the optional row bridge for a simple data-first input. */
+/**
+ * Creates the optional row bridge for a simple data-first input.
+ *
+ * @param options - The simple columns and rows, with `getRowId` for row identity.
+ * @returns A row bridge, or `undefined` when `options.getRowId` is not set.
+ */
 export function createSimpleRowBridge<
   Row extends Record<string, CellScalar>,
   Id extends RowBridgeId = RowBridgeId,
@@ -476,7 +511,9 @@ export function createSimpleRowBridge<
 
 /** Normalized workbook and columnar data produced from simple adapter props. */
 export interface SimpleGridInput {
+  /** A one-sheet workbook with a column for each simple column. */
   workbook: Workbook;
+  /** The rows' values, column by column. */
   data: ColumnarData;
   /** Simple row-object input always opts into semantic data-grid presentation. */
   presentation: "data-grid";
@@ -486,7 +523,13 @@ function invalidSimpleColumn(message: string): SheetwriteError {
   return new SheetwriteError("invalid-argument", "create-grid", message);
 }
 
-/** Converts simple columns and row objects into canonical workbook and columnar input. */
+/**
+ * Converts simple columns and row objects into canonical workbook and columnar input.
+ *
+ * @param options - The simple columns, rows and sheet name.
+ * @throws SheetwriteError with code `invalid-argument` when a column has no key or
+ *   title, or two columns share a key.
+ */
 export function createSimpleGridInput<Row extends Record<string, CellScalar>>(
   options: SimpleSheetwriteOptions<Row>,
 ): SimpleGridInput {
