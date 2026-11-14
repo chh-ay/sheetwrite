@@ -22,7 +22,10 @@ const ALLOCATIONS_PER_WINDOW_READ = 7;
 
 interface FakeFaults {
   readonly corruptNavigation?: boolean;
-  /** Mirrors a competitor whose row removal overflows the stack above some size. */
+  /**
+   * Mirrors a competitor whose row removal at the top overflows the stack;
+   * the altering rows' untimed headroom removal near the end still works.
+   */
   readonly failRowRemoval?: boolean;
   readonly formattedSentinels?: readonly [string, string];
   readonly indexConstructions?: number;
@@ -108,7 +111,9 @@ function fakeAdapter(faults: FakeFaults = {}): FakeAdapter {
     insertRows: (at, count) =>
       values.splice(at, 0, ...Array.from({ length: count }, () => Array(5).fill(null))),
     removeRows: (at, count) => {
-      if (faults.failRowRemoval) throw new RangeError("Maximum call stack size exceeded");
+      if (faults.failRowRemoval && at === 1) {
+        throw new RangeError("Maximum call stack size exceeded");
+      }
       values.splice(at, count);
     },
     resetFormatResources: inert,

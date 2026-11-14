@@ -878,23 +878,28 @@ impl<'a, 'p> Context<'a, 'p> {
     fn shapes(&self) -> Shapes<'_> {
         Shapes::of(self.pass.results.call_frame())
     }
+
     fn slot(&self, depth: u16, index: u16) -> Option<&Slot> {
         self.pass.results.call_frame()?.slot(depth, index)
     }
+
     fn top(&self) -> u32 {
         self.pass
             .results
             .call_frame()
             .map_or(NO_CALL, CallFrame::top)
     }
+
     fn scalar(&mut self, expression: &Ast) -> Value {
         self.store
             .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
         self.store
             .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn dimension(&mut self, expression: &Ast) -> Result<usize, FormulaError> {
         let number = number_from_value(&self.scalar(expression))?;
         if !number.is_finite() || number < 1.0 || number.fract() != 0.0 {
@@ -902,6 +907,7 @@ impl<'a, 'p> Context<'a, 'p> {
         }
         Ok(number as usize)
     }
+
     fn is_omitted(&self, argument: &Ast) -> bool {
         matches!(argument, Ast::Missing)
             || matches!(argument, Ast::Parameter { depth, index, .. }
