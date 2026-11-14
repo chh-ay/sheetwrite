@@ -1478,26 +1478,26 @@ export function movedPageIssues(
 }
 
 /** What a package's reference pages show without a description. */
-export interface UndocumentedCounts {
+export interface UndocumentedApi {
   readonly packageName: string;
-  /** Members of interfaces and classes with no doc comment (overloads count once). */
-  readonly members: number;
-  /** Function parameters with neither an `@param` nor a documented type to fall back on. */
-  readonly parameters: number;
-  /** Function return values with neither `@returns` nor a documented type. */
-  readonly returns: number;
+  /** Members of interfaces and classes with no doc comment (`Owner.member`; overloads once). */
+  readonly members: readonly string[];
+  /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
+  readonly parameters: readonly string[];
+  /** Functions whose return value has neither `@returns` nor a documented type. */
+  readonly returns: readonly string[];
 }
 
 /**
- * Counts, per package, the members, parameters and return values its
- * reference shows without a description, by the rules the pages render with.
+ * The members, parameters and return values each package's reference shows
+ * without a description, by the rules the pages render with.
  * A symbol re-exported from several entry points counts once. Declaration
  * shapes must be prepared ({@link prepareDeclarationShapes}).
  */
-export function undocumentedCounts(
+export function undocumentedApi(
   manifest: PublicApiManifest,
   routes: DocumentationLinkRoutes = documentationLinkRoutes(manifest),
-): UndocumentedCounts[] {
+): UndocumentedApi[] {
   return manifest.packages.map((pkg) => {
     const members = new Set<string>();
     const parameters = new Set<string>();
@@ -1528,9 +1528,9 @@ export function undocumentedCounts(
     }
     return {
       packageName: pkg.name,
-      members: members.size,
-      parameters: parameters.size,
-      returns: returns.size,
+      members: [...members].sort(),
+      parameters: [...parameters].sort(),
+      returns: [...returns].sort(),
     };
   });
 }

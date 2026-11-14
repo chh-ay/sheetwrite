@@ -12,7 +12,7 @@ import {
   renderEntryPage,
   renderSymbolPage,
   symbolDescription,
-  undocumentedCounts,
+  undocumentedApi,
 } from "./docs-api.js";
 import { renderCompatibilityResults } from "./docs-compatibility.js";
 import { parseFences, trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
@@ -177,7 +177,7 @@ describe("API reference pages", () => {
     expect(page).not.toMatch(/@(?:example|see)\b/);
   });
 
-  it("counts members, parameters and return values the reference shows without a description", async () => {
+  it("lists members, parameters and return values the reference shows without a description", async () => {
     const shape = apiExport(
       "CountShape",
       "interface",
@@ -199,10 +199,14 @@ describe("API reference pages", () => {
       packages: [{ name: "@sheetwrite/core", entryPoints: [entry, adapter] }],
     };
     await prepareDeclarationShapes([shape, make].map((item) => parseableDeclaration(item)));
-    expect(undocumentedCounts(manifest)).toEqual([
-      // `bare` and `call` (one name for both overloads); `label` (no @param, no
-      // documented type) and the number return value. `shape` reads CountShape's summary.
-      { packageName: "@sheetwrite/core", members: 2, parameters: 1, returns: 1 },
+    expect(undocumentedApi(manifest)).toEqual([
+      // `call` once for both overloads; `shape` reads CountShape's summary.
+      {
+        packageName: "@sheetwrite/core",
+        members: ["CountShape.bare", "CountShape.call"],
+        parameters: ["makeThing(label)"],
+        returns: ["makeThing"],
+      },
     ]);
   });
 

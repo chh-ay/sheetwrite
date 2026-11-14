@@ -32,7 +32,7 @@ import {
   renderEntryPointInventory,
   renderMovedGuides,
   renderSymbolPage,
-  undocumentedCounts,
+  undocumentedApi,
   unresolvedDocumentationLinks,
 } from "./docs-api.js";
 import {
@@ -672,11 +672,11 @@ export async function generateDocs(analysis: PublicApiAnalysis): Promise<string>
       count + pkg.entryPoints.reduce((subtotal, entry) => subtotal + entry.exports.length, 0),
     0,
   );
-  const undocumented = undocumentedCounts(analysis.manifest)
-    .filter((counts) => counts.members + counts.parameters + counts.returns > 0)
+  const undocumented = undocumentedApi(analysis.manifest)
+    .filter((api) => api.members.length + api.parameters.length + api.returns.length > 0)
     .map(
-      (counts) =>
-        `  ${counts.packageName}: ${counts.members} members, ${counts.parameters} parameters, ${counts.returns} return values`,
+      (api) =>
+        `  ${api.packageName}: ${api.members.length} members, ${api.parameters.length} parameters, ${api.returns.length} return values`,
     );
   return [
     `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`,
