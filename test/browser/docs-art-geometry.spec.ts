@@ -27,45 +27,6 @@ function pagesWithArt(directory = SITE): string[] {
   });
 }
 
-/**
- * Pictures that predate the check and are being redrawn (#504). Each entry
- * is a picture's title or file; remove it when its redraw lands. New
- * pictures can't be added here.
- */
-const KNOWN_DEFECTS: ReadonlySet<string> = new Set([
-  "the Analysis picture",
-  "the Atomic multi-version batches picture",
-  "the Atomic sequencing picture",
-  "the Bounded storage picture",
-  "the Collaboration protocol picture",
-  "the Construction-bound truth picture",
-  "the Controlled queries picture",
-  "the Convergence under ordering picture",
-  "the Data tools picture",
-  "the Data workflows picture",
-  "the Database & document lifecycle picture",
-  "the Durable outbox picture",
-  "the Explicit lifecycle picture",
-  "the Explicit recovery picture",
-  "the Formulas and KPIs picture",
-  "the Honest Worker fallback picture",
-  "the Host acknowledgement picture",
-  "the Host-owned paging picture",
-  "the Host-owned rows picture",
-  "the Large undo picture",
-  "the React workbench picture",
-  "the Reload recovery picture",
-  "the Reset reconciliation picture",
-  "the Saved queries picture",
-  "the Sort in place picture",
-  "the Spreadsheet interoperability picture",
-  "the Svelte workbench picture",
-  "the Vanilla workbench picture",
-  "the Version history picture",
-  "the Vue workbench picture",
-  "the Vue-native authority picture",
-]);
-
 const WIDTHS = [
   { name: "wide", width: 1440 },
   { name: "phone", width: 390 },
@@ -86,10 +47,7 @@ for (const { name, width } of WIDTHS) {
         await page.goto(path, { waitUntil: "load" });
         await page.evaluate(() => document.fonts.ready);
         const defects: ArtDefect[] = await page.evaluate(findArtDefects);
-        for (const defect of defects) {
-          if (!KNOWN_DEFECTS.has(defect.picture))
-            found.push(`${path} ${defect.picture}: ${defect.problem}`);
-        }
+        for (const defect of defects) found.push(`${path} ${defect.picture}: ${defect.problem}`);
         await page.close();
       }
       await context.close();

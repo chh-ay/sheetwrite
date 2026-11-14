@@ -278,7 +278,7 @@ function ConstructionArt() {
           </>
         )}
       </For>
-      <path class="hue-line" d={`M108 50h68${head(176, 50, 0)}`} />
+      <path class="hue-line" d={`M108 36h68${head(176, 36, 0)}`} />
       <text class="small hue-text" text-anchor="middle" x={138} y={42}>
         rebuild
       </text>
@@ -454,7 +454,8 @@ function BoundedStorageArt() {
           <rect class="alt-soft" height={30} rx={4} width={18} x={110 + index * 24} y={30} />
         )}
       </For>
-      <path class="hue-line" d={`M190 60c0 26-70 26-98 2${head(92, 62, -160)}`} />
+      <path class="rule" d="M110 64h88" />
+      <path class="hue-line" d={`M190 64c0 22-70 22-98-2${head(92, 62, -160)}`} />
       <text class="small" x={14} y={112}>
         records
       </text>

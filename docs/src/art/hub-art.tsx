@@ -542,13 +542,13 @@ function DatabaseArt() {
       <For each={[80, 100, 120, 140, 160]}>
         {(y, index) => (
           <>
-            <rect class="panel" height={14} rx={7} width={128} x={164} y={y} />
-            <circle class="alt" cx={175} cy={y + 7} r={3} />
-            <Bar w={44 + ((index() * 17) % 40)} x={186} y={y + 5} />
+            <rect class="panel" height={16} rx={8} width={128} x={164} y={y} />
+            <circle class="alt" cx={175} cy={y + 8} r={3} />
+            <Bar w={44 + ((index() * 17) % 40)} x={186} y={y + 6} />
           </>
         )}
       </For>
-      <path class="hue-line" d={`M164 167c-24 0-24-123 0-123${head(164, 44, 0)}`} />
+      <path class="hue-line" d={`M164 168c-24 0-24-124 0-124${head(164, 44, 0)}`} />
     </CardArt>
   );
 }
