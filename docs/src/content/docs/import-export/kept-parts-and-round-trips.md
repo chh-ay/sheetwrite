@@ -106,4 +106,3 @@ Import and store hydration verify payload CRCs and sizes by inflating and discar
 - [XLSX export](/docs/import-export/xlsx-export/)
 - [LibreOffice comparison limits](/docs/import-export/libreoffice-compatibility/#what-the-comparison-proves)
 - [Resource limits](/docs/import-export/large-files-and-streaming/#resource-limits)
-- [Preservation and streaming implementation details (PR #179)](https://github.com/chh-ay/sheetwrite/pull/179)

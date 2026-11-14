@@ -252,6 +252,41 @@ function restorableValue(value: unknown, cell: string): string | number | null {
   throw new ScenarioValidationError(`${cell} holds a ${typeof value} that cannot be restored`);
 }
 
+/**
+ * Room for the altering rows to insert `ALTER_COUNT` rows. A sheet at the
+ * row or dense-cell limit refuses an insert, so `make` removes `ALTER_COUNT`
+ * rows just above the last one (untimed, once per scenario) and `restore`
+ * puts them back with their values. Rows near the top, the middle sentinel
+ * and the last row stay where they are.
+ */
+function rowHeadroom(
+  adapter: RenderBenchAdapter,
+  dataset: ColumnarDataset,
+): { make: () => void; restore: () => void } {
+  const start = dataset.rowCount - 1 - ALTER_COUNT;
+  const saved: (string | number | null)[] = [];
+  return {
+    make: () => {
+      saved.length = 0;
+      for (let row = start; row < start + ALTER_COUNT; row++) {
+        for (let col = 0; col < adapter.colCount; col++) {
+          saved.push(restorableValue(adapter.cellValue(row, col), `row ${row} column ${col}`));
+        }
+      }
+      adapter.removeRows(start, ALTER_COUNT);
+    },
+    restore: () => {
+      adapter.insertRows(start, ALTER_COUNT);
+      let index = 0;
+      for (let row = start; row < start + ALTER_COUNT; row++) {
+        for (let col = 0; col < adapter.colCount; col++) {
+          adapter.setCellValue(row, col, saved[index++] ?? null);
+        }
+      }
+    },
+  };
+}
+
 function usedJsHeapBytes(): number | null {
   const candidate: unknown = performance;
   if (candidate !== null && typeof candidate === "object" && "memory" in candidate) {
@@ -1255,60 +1290,77 @@ function scenarioActions(
   }
 
   if (scenarioId === "altering.insert-5-rows-top") {
+    const headroom = rowHeadroom(adapter, dataset);
     const action = (): void => adapter.insertRows(1, ALTER_COUNT);
     const cleanup = (): void => adapter.removeRows(1, ALTER_COUNT);
     return {
+      setup: headroom.make,
       prepare: () => {},
       action,
       cleanup,
       validateEffect: (observations) => {
-        withEffectCleanup(action, cleanup, () => {
-          checkpoint(
-            observations,
-            "insert increases row count",
-            dataset.rowCount + ALTER_COUNT,
-            adapter.rowCount(),
-          );
-          checkpoint(
-            observations,
-            "insert preserves preceding sentinel",
-            dataset.id[0],
-            adapter.cellValue(0, 0),
-          );
-          checkpoint(
-            observations,
-            "insert shifts following sentinel",
-            dataset.id[1],
-            adapter.cellValue(6, 0),
-          );
-        });
+        try {
+          withEffectCleanup(action, cleanup, () => {
+            checkpoint(
+              observations,
+              "insert increases row count",
+              dataset.rowCount,
+              adapter.rowCount(),
+            );
+            checkpoint(
+              observations,
+              "insert preserves preceding sentinel",
+              dataset.id[0],
+              adapter.cellValue(0, 0),
+            );
+            checkpoint(
+              observations,
+              "insert shifts following sentinel",
+              dataset.id[1],
+              adapter.cellValue(6, 0),
+            );
+          });
+        } finally {
+          headroom.restore();
+        }
       },
     };
   }
 
   if (scenarioId === "altering.remove-5-rows-top") {
+    const headroom = rowHeadroom(adapter, dataset);
     const prepare = (): void => adapter.insertRows(1, ALTER_COUNT);
     const action = (): void => adapter.removeRows(1, ALTER_COUNT);
     return {
+      setup: headroom.make,
       prepare,
       action,
       cleanup: () => {},
       validateEffect: (observations) => {
-        prepare();
-        action();
-        checkpoint(observations, "remove restores row count", dataset.rowCount, adapter.rowCount());
-        checkpoint(
-          observations,
-          "remove preserves preceding sentinel",
-          dataset.id[0],
-          adapter.cellValue(0, 0),
-        );
-        checkpoint(
-          observations,
-          "remove restores following sentinel",
-          dataset.id[1],
-          adapter.cellValue(1, 0),
-        );
+        try {
+          prepare();
+          action();
+          checkpoint(
+            observations,
+            "remove restores row count",
+            dataset.rowCount - ALTER_COUNT,
+            adapter.rowCount(),
+          );
+          checkpoint(
+            observations,
+            "remove preserves preceding sentinel",
+            dataset.id[0],
+            adapter.cellValue(0, 0),
+          );
+          checkpoint(
+            observations,
+            "remove restores following sentinel",
+            dataset.id[1],
+            adapter.cellValue(1, 0),
+          );
+        } finally {
+          headroom.restore();
+        }
       },
     };
   }

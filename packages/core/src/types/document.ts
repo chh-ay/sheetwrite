@@ -346,7 +346,9 @@ export type MutationIssue =
       severity: "error";
       /**
        * Resource dimension exceeded by the transaction, its server versions,
-       * or the durable pending queue.
+       * or the durable pending queue; or the document limit a row or column
+       * insert would pass (`sheet-rows`, `sheet-columns` and `sheet-cells`
+       * per sheet, `dense-cells` across the workbook's dense sheets).
        */
       resource:
         | "operations"
@@ -356,7 +358,11 @@ export type MutationIssue =
         | "pending-operations"
         | "pending-encoded-bytes"
         | "paged-dirty-cells"
-        | "paged-reference-simulation";
+        | "paged-reference-simulation"
+        | "sheet-rows"
+        | "sheet-columns"
+        | "sheet-cells"
+        | "dense-cells";
       /** Count or incrementally observed encoded bytes at rejection. */
       actual: number;
       /** Configured inclusive ceiling for the resource. */

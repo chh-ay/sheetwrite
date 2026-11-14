@@ -424,12 +424,25 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   }
 
   insertRows(at: number, count: number): void {
-    this.grid.store.applyTransaction({ patches: [{ op: "addRows", sheet: SHEET, at, count }] });
-    this.grid.refresh();
+    this.applyRowEdit({ op: "addRows", sheet: SHEET, at, count });
   }
 
   removeRows(at: number, count: number): void {
-    this.grid.store.applyTransaction({ patches: [{ op: "removeRows", sheet: SHEET, at, count }] });
+    this.applyRowEdit({ op: "removeRows", sheet: SHEET, at, count });
+  }
+
+  /** A row edit the store refuses fails the scenario instead of timing a no-op. */
+  private applyRowEdit(patch: DocumentOp): void {
+    const result = this.grid.store.applyTransaction({ patches: [patch] });
+    if (result.status !== "applied") {
+      const detail =
+        result.status === "rejected"
+          ? result.issues.map((issue) => issue.message).join("; ")
+          : result.status === "noop"
+            ? result.reason
+            : "conflict";
+      throw new Error(`${patch.op} was ${result.status}: ${detail}`);
+    }
     this.grid.refresh();
   }
 
