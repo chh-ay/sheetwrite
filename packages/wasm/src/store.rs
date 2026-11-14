@@ -108,26 +108,35 @@ pub struct SourceSnapshot {
 
 #[wasm_bindgen]
 impl SourceSnapshot {
+    /// Row-major offset, among the captured cells, of each cell with formula
+    /// text, ascending; [`Self::formula_sources`] holds the matching text.
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         self.formula_offsets.clone()
     }
 
+    /// The formula text of each cell in [`Self::formula_offsets`], in order.
     #[wasm_bindgen(js_name = formulaSources)]
     pub fn formula_sources(&self) -> Vec<String> {
         self.formula_sources.clone()
     }
 
+    /// Row-major offset of each cell that refers to one other cell by
+    /// position instead of by formula text, ascending.
     #[wasm_bindgen(js_name = referenceOffsets)]
     pub fn reference_offsets(&self) -> Vec<u32> {
         self.reference_offsets.clone()
     }
 
+    /// The cell each of [`Self::reference_offsets`] refers to, as packed
+    /// `[sheet_handle, row, col]` triples in the same order.
     #[wasm_bindgen(js_name = referenceTargets)]
     pub fn reference_targets(&self) -> Vec<u32> {
         self.reference_targets.clone()
     }
 
+    /// One byte per captured cell, row-major: 1 where another cell's spill
+    /// fills it. Empty when no captured cell is spill-filled.
     #[wasm_bindgen(js_name = spillDerived)]
     pub fn spill_derived(&self) -> Vec<u8> {
         self.spill_derived.clone()
@@ -153,6 +162,8 @@ pub struct RangeSnapshot {
 
 #[wasm_bindgen]
 impl RangeSnapshot {
+    /// Packed `[row, col]` pairs, relative to the range's first cell, of the
+    /// cells with formula text; [`Self::formula_sources`] holds the text.
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -167,6 +178,8 @@ impl RangeSnapshot {
         offsets
     }
 
+    /// Packed `[row, col]` pairs, relative to the range's first cell, of the
+    /// cells that refer to one other cell by position instead of by formula text.
     #[wasm_bindgen(js_name = referenceOffsets)]
     pub fn reference_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -181,6 +194,8 @@ impl RangeSnapshot {
         offsets
     }
 
+    /// The cell each of [`Self::reference_offsets`] refers to, as packed
+    /// `[sheet_handle, row, col]` triples in the same order.
     #[wasm_bindgen(js_name = referenceTargets)]
     pub fn reference_targets(&self) -> Vec<u32> {
         let mut targets = Vec::new();
@@ -196,16 +211,21 @@ impl RangeSnapshot {
         targets
     }
 
+    /// The kind of each cell's stored value (`KIND_*`), one byte per cell,
+    /// column by column.
     #[wasm_bindgen(js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kind.clone()
     }
 
+    /// The style id of each cell, column by column, as in [`Self::kinds`].
     #[wasm_bindgen(js_name = styleIds)]
     pub fn style_ids(&self) -> Vec<u32> {
         self.style.clone()
     }
 
+    /// Bytes the snapshot holds: cell data, its text and formulas. History
+    /// counts it against its memory budget.
     #[wasm_bindgen(js_name = byteLength)]
     pub fn byte_length(&self) -> usize {
         self.kind.len()
@@ -227,6 +247,7 @@ impl RangeSnapshot {
                 .sum::<usize>()
     }
 
+    /// The formula text of each cell in [`Self::formula_offsets`], in order.
     #[wasm_bindgen(js_name = formulaSources)]
     pub fn formula_sources(&self) -> Vec<String> {
         self.formulas
@@ -1033,12 +1054,16 @@ impl CellStore {
             .collect()
     }
 
+    /// Rows in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = rowCount)]
     pub fn row_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.row_count())
     }
 
+    /// Columns in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = colCount)]
     pub fn col_count(&self, sheet: usize) -> usize {
@@ -1117,6 +1142,9 @@ impl CellStore {
         });
     }
 
+    /// Empties the cell at `row`, `col` of `sheet`, removing its value or
+    /// formula, and gives it style `style`.
+    ///
     /// @enginePublic Scalar clearing complements the public scalar value setters.
     #[wasm_bindgen(js_name = clearCell)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {
@@ -4230,16 +4258,19 @@ pub struct CellSnapshot {
 
 #[wasm_bindgen]
 impl CellSnapshot {
+    /// The kind of each cell's value (`KIND_*`), as [`CellOut::kind`] reports it.
     #[wasm_bindgen(getter, js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kinds.clone()
     }
 
+    /// Each cell's number, for number and boolean cells.
     #[wasm_bindgen(getter, js_name = numbers)]
     pub fn numbers(&self) -> Vec<f64> {
         self.numbers.clone()
     }
 
+    /// Each cell's style id.
     #[wasm_bindgen(getter, js_name = styles)]
     pub fn styles(&self) -> Vec<u32> {
         self.styles.clone()
@@ -4251,6 +4282,8 @@ impl CellSnapshot {
         self.text_index.clone()
     }
 
+    /// The text of each cell that has one, in cell order; [`Self::text_index`]
+    /// gives a cell's entry.
     #[wasm_bindgen(getter, js_name = strings)]
     pub fn strings(&self) -> Vec<String> {
         self.strings.clone()
