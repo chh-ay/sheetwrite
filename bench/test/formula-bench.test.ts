@@ -266,6 +266,7 @@ describe("formula regression gate", () => {
       "indirect-many",
       "let-calls",
       "name-define",
+      "name-define-unused",
       "row-insert-names",
       "table-append-row",
       "sort-formula-column",
