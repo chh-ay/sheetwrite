@@ -407,7 +407,7 @@ describe("export", () => {
     expect(data.rowCount).toBe(fields.length);
     for (const type of types) {
       const expected = texts.map((row) => parseCellLiteralInput(row[0] ?? "", type));
-      const actual = data.columns[type] ?? [];
+      const actual = Array.from(data.columns[type] ?? []);
       const mismatches = actual.flatMap((value, row) =>
         Object.is(value, expected[row]) ? [] : [{ row, field: fields[row], value }],
       );
