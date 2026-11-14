@@ -12,7 +12,7 @@ export function SpillDiagram() {
       pairs={[
         {
           from: { eyebrow: "The spill", title: "A1", code: ["=SEQUENCE(4)"] },
-          to: { title: "A1:A4 show 1, 2, 3, 4", lines: ["A1# is this range"], tone: "accent" },
+          to: { title: "A1:A4 hold 1 to 4", lines: ["A1# is this range"], tone: "accent" },
         },
         {
           from: {
@@ -155,7 +155,7 @@ export function VirtualScrollDiagram() {
         { title: "Scroll sizer, capped", lines: ["Measured by a probe,", "again on zoom"] },
         {
           title: "ScaledScroll",
-          lines: ["Maps the capped position", "onto every row"],
+          lines: ["Maps the capped bar", "onto every row"],
           tone: "accent",
         },
         {
@@ -300,7 +300,7 @@ export function KeptPartsDiagram() {
           code: ["workbook.xlsxSource"],
           tone: "accent",
         },
-        { title: "Always kept", lines: ["VBA, customXml, theme,", "connections, properties"] },
+        { title: "Always kept", lines: ["VBA, customXml,", "theme, connections,", "properties"] },
         {
           title: "If the sheet's shape",
           lines: ["didn't change: images,", "drawings, XML tables"],
@@ -502,7 +502,7 @@ export function PendingCommitsDiagram() {
           tone: "accent",
         },
         { title: "2 · Restore", lines: ["On startup, reapplied", "as remote, not echoed"] },
-        { title: "3 · Retry", lines: ["After reconnect or", "reload, same mutation id"] },
+        { title: "3 · Retry", lines: ["After reconnect or reload,", "with the same mutation id"] },
         { title: "4 · Remove", lines: ["Only after applied", "or duplicate"], tone: "muted" },
       ]}
       text={{

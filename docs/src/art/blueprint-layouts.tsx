@@ -54,15 +54,34 @@ function box(
   return { id, ...node, rect: { x, y, w, h: h ?? nodeHeight(step) } };
 }
 
+/** About how wide a box must be for its longest line: mono code is wider per character than the body face. */
+function textWidth(step: FigureStep): number {
+  const body = Math.max(
+    step.title.length * 7,
+    ...(step.lines ?? []).map((line) => line.length * 6.2),
+  );
+  const code = Math.max(0, ...(step.code ?? []).map((line) => line.length * 6.7));
+  return Math.max(body, code) + 30;
+}
+
 function flowWide(
   steps: readonly FigureStep[],
   outcome: FigureOutcome | undefined,
 ): BlueprintLayout {
-  const w = (WIDE - 2 * MARGIN - (steps.length - 1) * ROW_GAP) / steps.length;
+  // Each box gets the width its longest line needs, and the rest of the row is shared evenly.
+  const room = WIDE - 2 * MARGIN - (steps.length - 1) * ROW_GAP;
+  const needs = steps.map(textWidth);
+  const spare = Math.max(0, room - needs.reduce((sum, need) => sum + need, 0)) / steps.length;
+  const widths = needs.map((need) => need + spare);
+  const scale = Math.min(1, room / widths.reduce((sum, width) => sum + width, 0));
   const h = Math.max(...steps.map(nodeHeight));
-  const nodes = steps.map((step, index) =>
-    box(`s${index}`, step, MARGIN + index * (w + ROW_GAP), MARGIN, w, h),
-  );
+  let x = MARGIN;
+  const nodes = steps.map((step, index) => {
+    const w = (widths[index] ?? 0) * scale;
+    const placed = box(`s${index}`, step, x, MARGIN, w, h);
+    x += w + ROW_GAP;
+    return placed;
+  });
   const edges: BlueprintEdge[] = steps.slice(1).map((_, index) => ({
     from: `s${index}`,
     fromSide: "right",
@@ -275,7 +294,7 @@ export interface FigurePair {
   readonly to: FigureStep;
 }
 
-function pairsLayout(pairs: readonly FigurePair[], width: number, share: number): BlueprintLayout {
+function pairsWide(pairs: readonly FigurePair[], width: number, share: number): BlueprintLayout {
   const gap = ROW_GAP + 16;
   const left = (width - 2 * MARGIN - gap) * share;
   const right = width - 2 * MARGIN - gap - left;
@@ -292,16 +311,46 @@ function pairsLayout(pairs: readonly FigurePair[], width: number, share: number)
   return { width, height: y - ROW_GAP / 2 + MARGIN, nodes, edges };
 }
 
+/** On phones each pair stacks: what goes in, and under it, indented, what comes out. */
+function pairsNarrow(pairs: readonly FigurePair[]): BlueprintLayout {
+  const nodes: BlueprintNode[] = [];
+  const edges: BlueprintEdge[] = [];
+  const full = NARROW - 2 * MARGIN;
+  let y = MARGIN;
+  pairs.forEach((pair, index) => {
+    const from = box(`a${index}`, pair.from, MARGIN, y, full);
+    const to = box(
+      `b${index}`,
+      pair.to,
+      MARGIN + INDENT,
+      y + from.rect.h + ROW_GAP / 2,
+      full - INDENT,
+    );
+    nodes.push(from, to);
+    edges.push({
+      from: from.id,
+      fromSide: "bottom",
+      t: INDENT / 2 / full,
+      to: to.id,
+      toSide: "left",
+      toT: 0.5,
+      kind: "main",
+    });
+    y = to.rect.y + to.rect.h + ROW_GAP;
+  });
+  return { width: NARROW, height: y - ROW_GAP + MARGIN, nodes, edges };
+}
+
 /** Pairs: what goes in on the left and what comes out on the right, one row each. */
 export function PairsFigure(
   props: Readonly<{ text: BlueprintText; pairs: readonly FigurePair[]; note?: string }>,
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={pairsLayout(props.pairs, NARROW, 0.55)}
+      narrow={pairsNarrow(props.pairs)}
       note={props.note}
       text={props.text}
-      wide={pairsLayout(props.pairs, WIDE, 0.55)}
+      wide={pairsWide(props.pairs, WIDE, 0.55)}
     />
   );
 }
@@ -327,7 +376,7 @@ export type SequenceStep =
 /** The vertical space one message takes, room for its label above the line. */
 const MESSAGE_STEP = 36;
 /** A lane's lifeline is a bar this wide: messages start and end on its edges. */
-const LIFELINE = 24;
+const LIFELINE = 28;
 
 function sequenceLayout(
   lanes: readonly SequenceLane[],
@@ -339,9 +388,11 @@ function sequenceLayout(
   const centre = new Map(
     lanes.map((lane, index) => [lane.id, MARGIN + noteWidth / 2 + index * span]),
   );
+  // Heads stay apart however wide the notes are; notes sit only on the outer lanes.
+  const headWidth = Math.min(noteWidth, span - 12);
   const heads = lanes.map((lane) => {
-    const x = (centre.get(lane.id) ?? 0) - noteWidth / 2;
-    return box(`head-${lane.id}`, { title: lane.name }, x, MARGIN, noteWidth, 32);
+    const x = (centre.get(lane.id) ?? 0) - headWidth / 2;
+    return box(`head-${lane.id}`, { title: lane.name }, x, MARGIN, headWidth, 32);
   });
   const top = MARGIN + 32;
   // Each lane is a column of segments: lifeline bars, broken where a note sits.
@@ -440,7 +491,7 @@ export function SequenceFigure(
 ): JSX.Element {
   return (
     <BlueprintDiagram
-      narrow={sequenceLayout(props.lanes, props.steps, NARROW, 104)}
+      narrow={sequenceLayout(props.lanes, props.steps, NARROW, 124)}
       note={props.note}
       text={props.text}
       wide={sequenceLayout(props.lanes, props.steps, WIDE, 168)}
