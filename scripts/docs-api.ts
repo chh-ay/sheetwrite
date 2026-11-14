@@ -58,6 +58,36 @@ interface DeclarationShape {
   variants: string[];
 }
 
+/**
+ * Exports shown as one card with no member list. `InitOutput` is the raw module
+ * output wasm-bindgen generates for the loader: its members are ABI glue with no
+ * doc source, not API to call (#504).
+ */
+const OPAQUE_EXPORTS: ReadonlySet<string> = new Set(["InitOutput"]);
+
+/** The members an export's reference page lists. */
+function renderedMembers(item: Pick<ApiExport, "name" | "signature">): DeclarationMember[] {
+  return OPAQUE_EXPORTS.has(item.name) ? [] : declarationShape(parseableDeclaration(item)).members;
+}
+
+/**
+ * wasm-bindgen gives every class it generates a `free()` method with no doc
+ * source, so the reference describes it the same way on each of them.
+ */
+const WASM_BINDGEN_FREE =
+  "Releases the object's WASM memory now instead of at garbage collection; the object can't be used afterwards.";
+
+/** An export's member doc comments, with wasm-bindgen's `free()` described for generated classes. */
+function renderedMemberDocs(item: ApiExport): ApiExport["memberDocs"] {
+  const generated =
+    item.kind === "class" &&
+    /^pkg[^/]*\//.test(item.source) &&
+    !item.memberDocs.some((member) => member.name === "free" && member.documentation.trim() !== "");
+  return generated
+    ? [...item.memberDocs, { name: "free", documentation: WASM_BINDGEN_FREE }]
+    : item.memberDocs;
+}
+
 interface DocumentationLinkCandidate {
   readonly packageName: string;
   readonly entry: ApiEntryPoint;
@@ -112,9 +142,7 @@ function closestCandidate<
 }
 
 function hasRenderedMember(item: ApiExport, memberName: string): boolean {
-  return declarationShape(parseableDeclaration(item)).members.some(
-    (member) => member.name === memberName,
-  );
+  return renderedMembers(item).some((member) => member.name === memberName);
 }
 
 function documentationLinkRoute(
@@ -1060,7 +1088,9 @@ function renderMembers(
         target.owner === item.name,
     ).map(({ term }) => term),
   );
-  const memberDocs = new Map(item.memberDocs.map((member) => [member.name, member.documentation]));
+  const memberDocs = new Map(
+    renderedMemberDocs(item).map((member) => [member.name, member.documentation]),
+  );
   const documented = new Set<string>();
   const indexLinks: string[] = [];
   const usedIds = new Set<string>();
@@ -1221,8 +1251,9 @@ export async function renderSymbolPage(
       "",
     );
   }
-  if (shape.members.length > 0) {
-    body.push(renderMembers(pkg, entry, item, shape.members, routes, aliases), "");
+  const members = renderedMembers(item);
+  if (members.length > 0) {
+    body.push(renderMembers(pkg, entry, item, members, routes, aliases), "");
   }
 
   // A variants section earns its space only for structured unions; scalar
@@ -1516,11 +1547,11 @@ export function undocumentedApi(
     for (const entry of pkg.entryPoints) {
       for (const item of entry.exports) {
         const memberDocs = new Set(
-          item.memberDocs
+          renderedMemberDocs(item)
             .filter((member) => member.documentation.trim() !== "")
             .map((member) => member.name),
         );
-        for (const member of declarationShape(parseableDeclaration(item)).members) {
+        for (const member of renderedMembers(item)) {
           if (!memberDocs.has(member.name)) members.add(`${item.name}.${member.name}`);
         }
         const fields =
