@@ -1645,6 +1645,11 @@ fn getpivotdata_skips_edits_that_leave_its_pivot_unchanged() {
     let (mut store, _, output, report) = pivot_reader_fixture();
     let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
     assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
+    let entry = store.sheets[report]
+        .formulas
+        .get((0, 0), &store.formula_slots)
+        .expect("the formula is stored");
+    assert!(!entry.volatile(), "GETPIVOTDATA is not volatile");
     let reads = store.pivot_output_reads(output, 0);
 
     store.set_number(report, 5, 3, 1.0, 0);
