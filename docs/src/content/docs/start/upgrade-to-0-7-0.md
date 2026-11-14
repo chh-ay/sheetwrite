@@ -458,7 +458,7 @@ the sort on the table's header buttons
 
 | Change | What to do | Pull request |
 | --- | --- | --- |
-| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction` reads each entry of a `setBlock`'s `values` and `styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Holes, non-finite numbers, byte limits and every other check are unchanged. | Nothing, unless you relied on the rejection. The `change` event carries the copied operation, not your object. | [#PR](https://github.com/chh-ay/sheetwrite/pull/PR) |
+| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction` reads each entry of a `setBlock`'s `values` and `styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Holes, non-finite numbers, byte limits and every other check are unchanged. | Nothing, unless you relied on the rejection. The `change` event carries the copied operation, not your object. | [#690](https://github.com/chh-ay/sheetwrite/pull/690) |
 
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
