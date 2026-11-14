@@ -16,6 +16,9 @@ const CHART = "revenue-trend";
 const DIP_REGION = "EMEA";
 const DIP_MONTH = "2026-03";
 const REVENUE_INCREASE = 50_000;
+/** A chart about as wide as the docs figure workbook, in a window that shows all of it. */
+const WIDE_CHART = { width: 1_200, height: 420 };
+const WIDE_VIEWPORT = { width: 1_920, height: 1_080 };
 
 async function open(page: Page) {
   await page.goto("/showcases/analysis/");
@@ -116,6 +119,39 @@ test("the Chart menu inserts the picked kind", async ({ page }) => {
     .poll(async () => (await charts(page)).map((entry) => entry.kind))
     .toEqual(["line", "pie"]);
   await expect(chartObjects(page)).toHaveCount(2);
+});
+
+// #700: a wide bar chart drew its value-axis labels into each other.
+test("a wide bar PivotChart keeps its value-axis labels apart", async ({ page }, testInfo) => {
+  await page.setViewportSize(WIDE_VIEWPORT);
+  await open(page);
+  await page.evaluate(
+    ([sheet, id, pivot, size]) => {
+      const grid = window.__sheetwriteAnalysisGrid;
+      const current = grid?.getCharts(sheet).find((entry) => entry.id === id);
+      if (!grid || !current) throw new Error(`Chart ${id} is missing`);
+      const anchor = { ...current.anchor, width: size.width, height: size.height };
+      grid.setChart({ ...current, kind: "bar", pivot, series: [], anchor }, sheet);
+    },
+    [SUMMARY, CHART, PIVOT, WIDE_CHART] as const,
+  );
+  const image = page.getByRole("img", { name: /Monthly revenue by region \(Bar chart\)/ });
+  await expect(image.locator(".sheetwrite-chart-bar").first()).toBeAttached();
+
+  const labels = await image.locator(".sheetwrite-chart-value-axis text").evaluateAll((nodes) =>
+    nodes
+      .map((node) => node.getBoundingClientRect())
+      .map((box) => ({ left: box.left, right: box.right }))
+      .sort((first, second) => first.left - second.left),
+  );
+  expect(labels.length).toBeGreaterThan(2);
+  labels.slice(1).forEach((label, index) => {
+    expect(label.left).toBeGreaterThanOrEqual(labels[index]?.right ?? Number.POSITIVE_INFINITY);
+  });
+
+  const screenshot = testInfo.outputPath("wide-bar-pivot-chart.png");
+  await image.screenshot({ path: screenshot });
+  await testInfo.attach("wide bar PivotChart", { path: screenshot, contentType: "image/png" });
 });
 
 test("a chart's right-click menu deletes it, and undo brings it back", async ({ page }) => {
