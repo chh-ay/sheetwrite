@@ -61,7 +61,8 @@ function findElement(
 /**
  * The outline of a page's content, by the same rules the browser applies to
  * the rendered article (`useDocumentOutline`): h2 and h3 headings with ids,
- * and member rows on API pages without their own member index; a member's
+ * and member cards on API pages without their own member index (where the
+ * group headings, Properties and Methods, stand in for them); a member's
  * inner headings and search anchors are left out.
  */
 export function collectOutline(tree: HastElement): OutlineItem[] {
@@ -72,16 +73,15 @@ export function collectOutline(tree: HastElement): OutlineItem[] {
     for (const child of node.children ?? []) {
       if (child.type !== "element") continue;
       const id = child.properties?.id;
-      const isMember = child.tagName === "details" && hasClass(child, "api-member");
+      const isMember = child.tagName === "article" && hasClass(child, "api-member");
       const isHeading = child.tagName === "h2" || child.tagName === "h3";
-      if (typeof id === "string" && !hasClass(child, "api-search-anchor")) {
+      const skipped =
+        hasClass(child, "api-search-anchor") ||
+        (listsMembers && hasClass(child, "api-member-group"));
+      if (typeof id === "string" && !skipped) {
         const label = isMember
           ? listsMembers
-            ? textOf(
-                findElement(child, (element) => element.tagName === "summary")?.children?.find(
-                  (element) => element.tagName === "code",
-                ) ?? { type: "root" },
-              ).trim()
+            ? String(child.properties?.dataMember ?? "")
             : ""
           : isHeading && !insideMember
             ? textOf(child, (element) => hasClass(element, "api-count")).trim()

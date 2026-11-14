@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { validateTransactionResources } from "../src/document-protocol.js";
+import { SheetwriteError } from "../src/errors.js";
 import {
   AUTO_FIT_CHUNK_CELLS,
   createGrid,
@@ -12,7 +13,9 @@ import {
 import { releaseEngineMemory } from "../src/index.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { registerGridTransactionAdmission } from "../src/transaction-admission.js";
 import type {
+  ApplyTransactionResult,
   CellScalar,
   ChangeEvent,
   DataSourcePage,
@@ -622,6 +625,213 @@ describe("Grid transaction resource ingress", () => {
       grid.destroy();
     }
   }, 30_000);
+});
+
+describe("setBlock arrays at every entry point", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
+  const setBlock = (values: CellScalar[], styleIds?: number[]): DocumentOp => ({
+    op: "setBlock",
+    range,
+    block: {
+      rowCount: 1,
+      colCount: 2,
+      values,
+      ...(styleIds ? { styleTable: [{}, { bold: true }], styleIds } : {}),
+    },
+  });
+  const cellAt = (grid: GridImpl, col: number) =>
+    grid.store.getCell({ sheet: "s1", row: 0, col }).resolved;
+  /** An array whose entry `index` is a getter that counts its reads. */
+  const withGetter = <T>(entries: T[], index: number, read: (count: number) => T) => {
+    const counter = { reads: 0 };
+    Object.defineProperty(entries, index, {
+      enumerable: true,
+      get() {
+        counter.reads++;
+        return read(counter.reads);
+      },
+    });
+    return { entries, counter };
+  };
+  const entryPoints: Array<
+    [string, (grid: GridImpl, patches: DocumentOp[]) => ApplyTransactionResult]
+  > = [
+    ["grid.applyTransaction", (grid, patches) => grid.applyTransaction({ patches })],
+    ["grid.applyRemoteOperations", (grid, patches) => grid.applyRemoteOperations(patches)],
+    ["store.applyTransaction", (grid, patches) => grid.store.applyTransaction({ patches })],
+  ];
+
+  for (const [name, apply] of entryPoints) {
+    it(`${name} reads each values and styleIds entry once and uses that value everywhere`, () => {
+      const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+      const emitted: DocumentOp[] = [];
+      grid.on("change", (event) => emitted.push(...event.transaction.patches));
+      // Each read returns a new number, so any second read would store a different value.
+      const values = withGetter<CellScalar>(["kept", 0], 1, (count) => count * 10);
+      const styleIds = withGetter([0, 0], 1, (count) => count);
+
+      expect(apply(grid, [setBlock(values.entries, styleIds.entries)]).status).toBe("applied");
+      expect(values.counter.reads).toBe(1);
+      expect(styleIds.counter.reads).toBe(1);
+      expect(cellAt(grid, 1)).toBe(10);
+      expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toMatchObject({
+        bold: true,
+      });
+      const operation = emitted[0];
+      if (operation?.op !== "setBlock") throw new Error("expected the copied setBlock");
+      expect(operation.block.values).toEqual(["kept", 10]);
+      expect(operation.block.values).not.toBe(values.entries);
+      expect(operation.block.styleIds).toEqual([0, 1]);
+      expect(values.counter.reads).toBe(1);
+      grid.destroy();
+    });
+
+    it(`${name} throws invalid-argument for an entry whose getter throws, and changes nothing`, () => {
+      const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+      let changes = 0;
+      grid.on("change", () => {
+        changes++;
+      });
+      const cause = new Error("entry unavailable");
+      const values = withGetter<CellScalar>(["kept", 0], 1, () => {
+        throw cause;
+      });
+
+      let failure: unknown;
+      try {
+        apply(grid, [setBlock(values.entries)]);
+      } catch (error) {
+        failure = error;
+      }
+      expect(failure).toBeInstanceOf(SheetwriteError);
+      expect(failure).toMatchObject({ code: "invalid-argument", operation: "transaction", cause });
+      expect(cellAt(grid, 0)).toBeNull();
+      expect(changes).toBe(0);
+      grid.destroy();
+    });
+
+    it(`${name} still rejects holes, non-finite numbers and getters outside values and styleIds`, () => {
+      const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+      const holey: CellScalar[] = ["kept"];
+      holey.length = 2;
+      let otherReads = 0;
+      const counted = <T>(value: T) => ({
+        enumerable: true,
+        get() {
+          otherReads++;
+          return value;
+        },
+      });
+      const blockAccessor = Object.defineProperty(
+        { rowCount: 1, colCount: 2 },
+        "values",
+        counted(["a", "b"]),
+      );
+      const formulas: Array<[number, string]> = [[0, "=1"]];
+      Object.defineProperty(formulas, 0, counted([0, "=1"]));
+      const start = Object.defineProperty({ col: 0 }, "row", counted(0));
+      const setRangeCells = [{ rowOffset: 0, colOffset: 0, value: { kind: "literal", value: 1 } }];
+      Object.defineProperty(setRangeCells, 0, counted(setRangeCells[0]));
+      const invalid = [
+        setBlock(holey),
+        setBlock(["kept", Number.NaN]),
+        setBlock(["kept", Number.POSITIVE_INFINITY]),
+        { op: "setBlock", range, block: blockAccessor },
+        { op: "setBlock", range, block: { rowCount: 1, colCount: 2, values: [1, 2], formulas } },
+        {
+          op: "setBlock",
+          range: { ...range, start },
+          block: { rowCount: 1, colCount: 2, values: [1, 2] },
+        },
+        { op: "setRange", range, cells: setRangeCells },
+      ] as unknown as DocumentOp[];
+      for (const operation of invalid) {
+        expect(apply(grid, [operation]).status).toBe("rejected");
+      }
+      expect(otherReads).toBe(0);
+      expect(cellAt(grid, 0)).toBeNull();
+      grid.destroy();
+    });
+
+    it(`${name} applies a block at the byte limit and rejects it one byte below`, () => {
+      const exact = validateTransactionResources([setBlock(["kept", "text"])]);
+      if (!exact.ok) throw new Error("expected a measurable block");
+      const limited = (maxEncodedBytes: number) =>
+        new GridImpl(mountHost(), {
+          workbook: makeWorkbook(4),
+          transactionResourceLimits: { maxEncodedBytes },
+        });
+      const atLimit = limited(exact.encodedBytes);
+      expect(apply(atLimit, [setBlock(["kept", "text"])]).status).toBe("applied");
+      atLimit.destroy();
+      const belowLimit = limited(exact.encodedBytes - 1);
+      expect(apply(belowLimit, [setBlock(["kept", "text"])])).toMatchObject({
+        status: "rejected",
+        issues: [{ kind: "resource-limit", resource: "encoded-bytes" }],
+      });
+      belowLimit.destroy();
+    });
+  }
+
+  it("grid.applyTransaction sends, undoes and redoes the value an entry getter returned once", () => {
+    const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+    const sent: DocumentOp[] = [];
+    const disposeAdmission = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        sent.push(...operations);
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+    const emitted: DocumentOp[] = [];
+    grid.on("change", (event) => emitted.push(...event.transaction.patches));
+    const before = cellAt(grid, 1);
+
+    // Each read returns a new number, so any second read would store a different value.
+    let valueReads = 0;
+    const values: CellScalar[] = ["kept", 0];
+    Object.defineProperty(values, 1, {
+      enumerable: true,
+      get() {
+        valueReads++;
+        return valueReads * 10;
+      },
+    });
+    let styleReads = 0;
+    const styleIds = [0, 0];
+    Object.defineProperty(styleIds, 1, {
+      enumerable: true,
+      get() {
+        styleReads++;
+        return styleReads;
+      },
+    });
+
+    expect(grid.applyTransaction({ patches: [setBlock(values, styleIds)] }).status).toBe("applied");
+    expect(valueReads).toBe(1);
+    expect(styleReads).toBe(1);
+    expect(cellAt(grid, 1)).toBe(10);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toMatchObject({
+      bold: true,
+    });
+    for (const operation of [emitted[0], sent[0]]) {
+      if (operation?.op !== "setBlock") throw new Error("expected the copied setBlock");
+      expect(operation.block.values).toEqual(["kept", 10]);
+      expect(operation.block.values).not.toBe(values);
+      expect(operation.block.styleIds).toEqual([0, 1]);
+    }
+
+    grid.undo();
+    expect(cellAt(grid, 1)).toBe(before);
+    grid.redo();
+    expect(cellAt(grid, 1)).toBe(10);
+    expect(valueReads).toBe(1);
+    disposeAdmission();
+    grid.destroy();
+  });
 });
 
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {

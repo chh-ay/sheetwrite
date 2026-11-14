@@ -10,7 +10,9 @@
 use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulator};
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &["CONVERT"];
+family_functions! {
+    CONVERT,
+}
 
 /// Excel's unit groups. Units of different groups do not convert.
 #[derive(Clone, Copy)]
@@ -453,7 +455,7 @@ impl Resolved {
     }
 }
 
-pub(crate) fn evaluate(_name: &str, values: &FuncAccumulator) -> EvalResult {
+pub(crate) fn evaluate(_: Function, values: &FuncAccumulator) -> EvalResult {
     convert(values).map_or_else(Value::Error, Value::number)
 }
 
@@ -557,7 +559,7 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate("CONVERT", &values)
+        evaluate(Function::CONVERT, &values)
     }
 
     fn assert_close(number: f64, from: &str, to: &str, expected: f64) {
