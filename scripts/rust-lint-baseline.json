@@ -39,11 +39,10 @@
     "clippy::while_float": 7,
     "clippy::wildcard_enum_match_arm": 11,
     "E0133": 6,
-    "missing_debug_implementations": 10,
-    "missing_docs": 38,
-    "redundant_imports": 14,
-    "unnameable_types": 6,
-    "unreachable_pub": 23
+    "missing_debug_implementations": 7,
+    "missing_docs": 33,
+    "redundant_imports": 11,
+    "unnameable_types": 5
   },
   "history": {},
   "queries": {}
