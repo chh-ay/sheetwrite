@@ -197,6 +197,7 @@ function formulaWorkloads(
   }
   add("spill-filter-resize", range);
   add("spill-filter-same-range", range);
+  add("take-sort-filter", range);
   add("sumproduct-vector-edit", range);
   add("sumproduct-matrix-edit", range);
   add("criteria-multi-range-edit", range);
@@ -310,6 +311,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
   "spill-filter-same-range",
+  "take-sort-filter",
   "paged-cell-reads",
   "paged-insert-row",
   "paged-range-loaded",

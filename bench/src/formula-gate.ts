@@ -130,6 +130,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=spill-sequence-admission;size=100000": 1.15,
   // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
   "workload=spill-filter-same-range;size=100000": 1.2,
+  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  "workload=take-sort-filter;size=100000": 1.2,
   // Full engine only. Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
   "workload=map-lambda;size=10000": 1.2,
   "workload=map-lambda;size=100000": 1.2,

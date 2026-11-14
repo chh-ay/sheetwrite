@@ -132,6 +132,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return `1:${size}:0`;
     case "spill-filter-same-range":
       return `${SAME_RANGE_EDITED_FIRST}:0`;
+    case "take-sort-filter":
+      return `${takeSortFilterFirst(size)}:0`;
     case "paged-cell-reads":
       return pagedCellReadsOutput(size);
     case "paged-insert-row":
@@ -999,6 +1001,63 @@ function spillFilterSameRangeFixture(count: number): TimedFixture {
     check: () => `${numberAt(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
+  };
+}
+
+/** `take-sort-filter` columns: A holds each key twice, B counts down, C cycles through 0..99. */
+const TAKE_SORT_FILTER_KEYS_PER_VALUE = 2;
+const TAKE_SORT_FILTER_FLAGS = 100;
+const TAKE_SORT_FILTER_FLAG_STEP = 7;
+/** The rows the formula keeps after sorting: the spill's height. */
+const TAKE_SORT_FILTER_TAKEN = 1_000;
+/** The threshold in E1 before and after the timed edit; C must be above it. */
+const TAKE_SORT_FILTER_THRESHOLD = 10;
+const TAKE_SORT_FILTER_EDITED_THRESHOLD = 11;
+const takeSortFilterFlag = (row: number) =>
+  (row * TAKE_SORT_FILTER_FLAG_STEP) % TAKE_SORT_FILTER_FLAGS;
+
+/** Column B of the first spilled row: the largest B among rows above the edited threshold. */
+function takeSortFilterFirst(count: number): number {
+  for (let row = 0; row < count; row++) {
+    if (takeSortFilterFlag(row) > TAKE_SORT_FILTER_EDITED_THRESHOLD) return count - row;
+  }
+  throw new Error("take-sort-filter keeps no row");
+}
+
+/**
+ * A chain of three row steps over a three-column range,
+ * `=TAKE(SORT(FILTER(A1:C100000,C1:C100000>$E$1),2,-1),1000)`, where the
+ * timed run edits the threshold in E1. Each step picks rows of the range it
+ * read instead of copying them, so the chain copies only the 1,000 rows it
+ * spills (#325, R4).
+ */
+function takeSortFilterFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(9, count);
+  const keys = Math.floor(count / TAKE_SORT_FILTER_KEYS_PER_VALUE);
+  const columns = [(row: number) => row % keys, (row: number) => count - row, takeSortFilterFlag];
+  columns.forEach((value, col) =>
+    writeNumberColumn(store, sheet, col, 0, numericColumn(count, value), 0),
+  );
+  store.setNumber(sheet, 0, 4, TAKE_SORT_FILTER_THRESHOLD, 0);
+  store.setFormula(
+    sheet,
+    0,
+    5,
+    `=TAKE(SORT(FILTER(A1:C${count},C1:C${count}>$E$1),2,-1),${TAKE_SORT_FILTER_TAKEN})`,
+    0,
+  );
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 4, TAKE_SORT_FILTER_EDITED_THRESHOLD, 0);
+      store.recompute(sheet);
+    },
+    check: () =>
+      `${numberAt(store, sheet, 0, 6)}:${store.spillAnchorRow(sheet, TAKE_SORT_FILTER_TAKEN - 1, 5)}`,
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 4, value: TAKE_SORT_FILTER_THRESHOLD }),
   };
 }
 
@@ -3366,6 +3425,8 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
       return spillSequenceAdmissionFixture(size);
     case "spill-filter-same-range":
       return spillFilterSameRangeFixture(size);
+    case "take-sort-filter":
+      return takeSortFilterFixture(size);
     case "scalar-edit-affects-0":
       return fanOutEditFixture(size, true);
     default:
