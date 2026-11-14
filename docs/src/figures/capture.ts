@@ -306,17 +306,8 @@ const SHOTS: readonly Shot[] = [
       await settle(page);
     },
   },
-  {
-    name: "chart",
-    size: "panel",
-    query: { sheet: "report", ribbon: "compact" },
-    steps: async (page) => {
-      await page.evaluate(() =>
-        window.__sheetwriteFigureGrid?.scrollToCell({ sheet: "report", row: 6, col: 0 }),
-      );
-      await settle(page);
-    },
-  },
+  // The app size is tall enough to show the table and the chart under it.
+  { name: "chart", size: "app", query: { sheet: "report", ribbon: "compact" } },
   {
     name: "validation",
     size: "panel",
