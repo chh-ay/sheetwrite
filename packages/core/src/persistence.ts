@@ -68,6 +68,12 @@ export class PersistenceError extends SheetwriteError {
 /**
  * Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes
  * the hydrated store just like one created through `createGrid`.
+ *
+ * @param host - Element the grid renders into. The grid fills it and follows its
+ *   size, so give it a height.
+ * @param snapshot - A saved `WorkbookSnapshot`, as `Grid.exportSnapshot` or
+ *   `fromXlsxWorkbook` returns it. It is validated first; an invalid one throws
+ *   a `PersistenceError` with code `invalid-snapshot`.
  */
 export function createGridFromSnapshot(
   host: HTMLElement,

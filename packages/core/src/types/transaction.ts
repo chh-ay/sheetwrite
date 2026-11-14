@@ -260,6 +260,7 @@ export interface RemoteOperationSource {
  * that participate in read-only policy and undo/redo history.
  */
 export interface GridTransaction {
+  /** Document operations, applied in order as one undo step. */
   patches: DocumentOp[];
 }
 
