@@ -825,13 +825,19 @@ pub(crate) enum Ast {
     /// A well-formed LAMBDA whose parameter uses are numbered. Calls and the
     /// closures they create share its body.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // LAMBDA definitions are not part of the public AST API.
+    #[allow(
+        private_interfaces,
+        reason = "LAMBDA definitions are not part of the public AST API"
+    )]
     Lambda(std::rc::Rc<LambdaDefinition>),
     /// The literal pattern of a REGEX call, shared by every formula in the
     /// store with the same pattern text. Its compiled programs live as long
     /// as the formulas that hold it.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    #[allow(
+        private_interfaces,
+        reason = "shared patterns are not part of the public AST API"
+    )]
     RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
     Name(Box<str>),
     NamedRange(Box<NamedRangeRef>),
