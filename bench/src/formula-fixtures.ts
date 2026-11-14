@@ -150,6 +150,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return sortUniqueOutput(SORT_UNIQUE_EDITED_ROWS);
     case "subtotal-filtered":
       return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
+    case "sort-mixed-blanks":
+      return sortMixedBlanksOutput(size);
     case "sparse-page-write":
       return sparsePageOutput(size);
     case "map-lambda":
@@ -2694,6 +2696,19 @@ const SORT_UNIQUE_KEYS = 997;
 const SORT_UNIQUE_STEP = 7_919;
 /** The timed edit keeps only the rows before this one. */
 const SORT_UNIQUE_EDITED_ROWS = 500;
+/**
+ * `sort-mixed-blanks` cycles through a number, a text, a logical value and a
+ * blank cell. Numbers and labels follow a prime step, so the column is not
+ * already in order.
+ */
+const SORT_MIXED_KINDS = 4;
+const SORT_MIXED_STEP = 7_919;
+const SORT_MIXED_NUMBERS = 2_000;
+const SORT_MIXED_LABELS = 997;
+/** Logical values are TRUE in one row of this many. */
+const SORT_MIXED_TRUE_EVERY = 8;
+/** The timed edit writes this number into A1. */
+const SORT_MIXED_EDITED_FIRST = 12_345;
 /** `subtotal-filtered` hides every other block of this many rows. */
 const SUBTOTAL_BLOCK_ROWS = 10;
 const SUBTOTAL_EDITED_FIRST = 2;
@@ -2712,6 +2727,39 @@ function sortUniqueKey(row: number): string {
 function sortUniqueOutput(rows: number): string {
   const keys = [...new Set(Array.from({ length: rows }, (_, row) => sortUniqueKey(row)))].sort();
   return `${keys[0]}:${keys.at(-1)}:${keys.length}`;
+}
+
+/** The `sort-mixed-blanks` cell of one row; `null` is a blank cell. */
+function sortMixedValue(row: number): number | string | boolean | null {
+  const step = row * SORT_MIXED_STEP;
+  switch (row % SORT_MIXED_KINDS) {
+    case 0:
+      return (step % SORT_MIXED_NUMBERS) - SORT_MIXED_NUMBERS / 2;
+    case 1:
+      return `t${step % SORT_MIXED_LABELS}`;
+    case 2:
+      return row % SORT_MIXED_TRUE_EVERY === 2;
+    default:
+      return null;
+  }
+}
+
+/**
+ * The sorted spill's text count and the sum of its other values, TRUE as 1
+ * and a blank as 0, after the edit. Neither depends on the order: a blank
+ * compares equal to 0, "" and FALSE at once, so the order of this column
+ * depends on the sort algorithm, and the row checks only what it must keep.
+ */
+function sortMixedBlanksOutput(count: number): string {
+  let texts = 0;
+  let sum = SORT_MIXED_EDITED_FIRST;
+  for (let row = 1; row < count; row++) {
+    const value = sortMixedValue(row);
+    if (typeof value === "string") texts++;
+    else if (typeof value === "number") sum += value;
+    else if (value === true) sum++;
+  }
+  return `${texts}:${sum}`;
 }
 
 function subtotalVisible(row: number): boolean {
@@ -2853,6 +2901,45 @@ function sortUniqueFilterFixture(count: number): TimedFixture {
     },
     dispose: () => store.free(),
     restore: restoreNumber(store, sheet, { row: 0, col: 3, value: count }),
+  };
+}
+
+/**
+ * `=SORT(A1:An)` over numbers, text, logical values and blank cells in turn.
+ * The timed edit changes the number in A1.
+ */
+function sortMixedBlanksFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  for (let row = 0; row < count; row++) {
+    const value = sortMixedValue(row);
+    if (typeof value === "number") store.setNumber(sheet, row, 0, value, 0);
+    else if (typeof value === "string") store.setString(sheet, row, 0, value, 0);
+    else if (typeof value === "boolean") store.setBool(sheet, row, 0, value, 0);
+  }
+  store.setFormula(sheet, 0, 2, `=SORT(A1:A${count})`, 0);
+  store.recompute(sheet);
+  const first = sortMixedValue(0);
+  assert(typeof first === "number", "sort-mixed-blanks: A1 holds a number");
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, SORT_MIXED_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => {
+      let texts = 0;
+      let sum = 0;
+      for (let row = 0; row < count; row++) {
+        const cell = store.getCell(sheet, row, 2);
+        if (cell.string === undefined) sum += cell.num;
+        else texts++;
+        cell.free();
+      }
+      return `${texts}:${sum}`;
+    },
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: first }),
   };
 }
 
@@ -3293,6 +3380,8 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
       return sortUniqueFilterFixture(size);
     case "subtotal-filtered":
       return subtotalFilteredFixture(size);
+    case "sort-mixed-blanks":
+      return sortMixedBlanksFixture(size);
     case "sparse-page-write":
       return sparsePageWriteFixture(size);
     case "index-match-many":
