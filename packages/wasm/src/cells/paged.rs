@@ -2134,11 +2134,26 @@ mod tests {
         assert_eq!(restored.dirty_cells(), 0);
     }
 
+    /// One page of the eviction model.
+    #[derive(Clone, Copy, Default)]
+    struct ModelPage {
+        resident: bool,
+        access: u64,
+        read_pinned: bool,
+        viewport_pinned: bool,
+    }
+
+    impl ModelPage {
+        const fn is_evictable(self) -> bool {
+            self.resident && !self.read_pinned && !self.viewport_pinned
+        }
+    }
+
     /// The eviction order before access stamps: every access moves the page
     /// to the newest place, and eviction takes the oldest unpinned page.
     struct EvictionModel {
-        /// `(access, read pinned, viewport pinned)` per resident page.
-        pages: Vec<Vec<Option<(u64, bool, bool)>>>,
+        /// Pages by column, then page.
+        columns: Vec<Vec<ModelPage>>,
         clock: u64,
         resident_limit: usize,
     }
@@ -2149,39 +2164,72 @@ mod tests {
             self.clock
         }
 
-        fn resident(&self) -> usize {
-            self.pages.iter().flatten().flatten().count()
+        fn pages(&mut self) -> impl Iterator<Item = (usize, usize, &mut ModelPage)> {
+            self.columns
+                .iter_mut()
+                .enumerate()
+                .flat_map(|(col, pages)| {
+                    pages
+                        .iter_mut()
+                        .enumerate()
+                        .map(move |(page, state)| (col, page, state))
+                })
         }
 
         fn load(&mut self, page: usize, col: usize) {
-            if self.pages[col][page].is_some() {
+            if self.columns[col][page].resident {
                 self.read(page, col);
                 return;
             }
 
-            while self.resident() >= self.resident_limit {
-                let oldest = (0..self.pages.len())
-                    .flat_map(|col| (0..self.pages[col].len()).map(move |page| (col, page)))
-                    .filter_map(|(col, page)| match self.pages[col][page] {
-                        Some((access, false, false)) => Some((access, col, page)),
-                        _ => None,
-                    })
-                    .min();
-                let Some((_, col, page)) = oldest else {
+            // Evicts until the new page fits or no unpinned page is left.
+            while self
+                .columns
+                .iter()
+                .flatten()
+                .filter(|page| page.resident)
+                .count()
+                >= self.resident_limit
+            {
+                let oldest = self
+                    .pages()
+                    .filter(|(_, _, page)| page.is_evictable())
+                    .min_by_key(|&(col, page, ref state)| (state.access, col, page))
+                    .map(|(col, page, _)| (col, page));
+                let Some((col, page)) = oldest else {
                     break;
                 };
-                self.pages[col][page] = None;
+                self.columns[col][page].resident = false;
             }
 
-            // The caller sets the pins after each operation.
             let access = self.access();
-            self.pages[col][page] = Some((access, false, false));
+            let loaded = &mut self.columns[col][page];
+            loaded.resident = true;
+            loaded.access = access;
         }
 
         fn read(&mut self, page: usize, col: usize) {
             let access = self.access();
-            if let Some(state) = &mut self.pages[col][page] {
-                state.0 = access;
+            let read = &mut self.columns[col][page];
+            if read.resident {
+                read.access = access;
+            }
+        }
+
+        /// Read pins replace the previous ones and share one access.
+        fn pin_read_window(&mut self, col: usize, pages: std::ops::Range<usize>) {
+            let access = self.access();
+            for (pinned_col, page, state) in self.pages() {
+                state.read_pinned = pinned_col == col && pages.contains(&page);
+                if state.read_pinned && state.resident {
+                    state.access = access;
+                }
+            }
+        }
+
+        fn pin_viewport(&mut self, col: usize, pages: std::ops::Range<usize>) {
+            for (pinned_col, page, state) in self.pages() {
+                state.viewport_pinned = pinned_col == col && pages.contains(&page);
             }
         }
     }
@@ -2191,6 +2239,15 @@ mod tests {
         *seed ^= *seed >> 17;
         *seed ^= *seed << 5;
         *seed as usize % bound
+    }
+
+    fn transferred(storage: &PagedStorage) -> PagedStorage {
+        let mut out = Writer::new(TRANSFER_TAG);
+        storage.write_transfer(&mut out);
+        let mut input = Reader::new(&out.0, TRANSFER_TAG).unwrap();
+        let restored = PagedStorage::read_transfer(&mut input).unwrap();
+        input.finish().unwrap();
+        restored
     }
 
     /// Random loads, reads, pins and transfers on 400 paged sheets keep the
@@ -2207,16 +2264,15 @@ mod tests {
             let resident_limit = 1 + next_random(&mut seed, 6);
             let mut storage = PagedStorage::new(ROWS, budget_for(resident_limit), 0).unwrap();
             let mut model = EvictionModel {
-                pages: vec![vec![None; PAGES]; COLS],
+                columns: vec![vec![ModelPage::default(); PAGES]; COLS],
                 clock: 0,
                 resident_limit,
             };
-            let mut read_pinned = vec![vec![false; PAGES]; COLS];
-            let mut viewport_pinned = vec![vec![false; PAGES]; COLS];
 
             for step in 0..STEPS {
                 let col = next_random(&mut seed, COLS);
                 let page = next_random(&mut seed, PAGES);
+                let pages = page..(page + next_random(&mut seed, 3)).min(PAGES);
                 match next_random(&mut seed, 10) {
                     0..=3 => {
                         load(&mut storage, page, col, step as u64);
@@ -2227,73 +2283,25 @@ mod tests {
                         model.read(page, col);
                     }
                     7 => {
-                        let pages = next_random(&mut seed, 3);
-                        let end = (page + pages).min(PAGES);
-                        storage.pin_read_window(page * ROWS, end * ROWS, &[], &[col as u32]);
-                        let access = model.access();
-                        for (pinned_col, pinned) in read_pinned.iter_mut().enumerate() {
-                            for (pinned_page, flag) in pinned.iter_mut().enumerate() {
-                                *flag = pinned_col == col && (page..end).contains(&pinned_page);
-                            }
-                        }
-                        for (pinned_col, pages) in model.pages.iter_mut().enumerate() {
-                            for (pinned_page, state) in pages.iter_mut().enumerate() {
-                                if let Some(state) = state {
-                                    state.1 = read_pinned[pinned_col][pinned_page];
-                                    if state.1 {
-                                        state.0 = access;
-                                    }
-                                }
-                            }
-                        }
+                        let rows = pages.start * ROWS..pages.end * ROWS;
+                        storage.pin_read_window(rows.start, rows.end, &[], &[col as u32]);
+                        model.pin_read_window(col, pages);
                     }
                     8 => {
-                        let pages = next_random(&mut seed, 3) as u32;
-                        let first = page as u32 * ROWS as u32;
-                        let end = first + pages * ROWS as u32;
-                        let band = [first, end, col as u32, col as u32 + 1];
-                        storage.pin_viewport_bands(&band);
-                        for (pinned_col, pinned) in viewport_pinned.iter_mut().enumerate() {
-                            for (pinned_page, flag) in pinned.iter_mut().enumerate() {
-                                *flag = pinned_col == col
-                                    && (page..page + pages as usize).contains(&pinned_page);
-                            }
-                        }
-                        for (pinned_col, pages) in model.pages.iter_mut().enumerate() {
-                            for (pinned_page, state) in pages.iter_mut().enumerate() {
-                                if let Some(state) = state {
-                                    state.2 = viewport_pinned[pinned_col][pinned_page];
-                                }
-                            }
-                        }
+                        let [first, end] =
+                            [pages.start, pages.end].map(|page| (page * ROWS) as u32);
+                        storage.pin_viewport_bands(&[first, end, col as u32, col as u32 + 1]);
+                        model.pin_viewport(col, pages);
                     }
-                    _ => {
-                        let mut out = Writer::new(TRANSFER_TAG);
-                        storage.write_transfer(&mut out);
-                        let mut input = Reader::new(&out.0, TRANSFER_TAG).unwrap();
-                        storage = PagedStorage::read_transfer(&mut input).unwrap();
-                        input.finish().unwrap();
-                    }
+                    _ => storage = transferred(&storage),
                 }
 
-                // A page that loads while pinned holds its pins from the start.
-                for (col, pages) in model.pages.iter_mut().enumerate() {
-                    for (page, state) in pages.iter_mut().enumerate() {
-                        if let Some(state) = state {
-                            state.1 = read_pinned[col][page];
-                            state.2 = viewport_pinned[col][page];
-                        }
-                    }
-                }
-
-                for col in 0..COLS {
-                    for page in 0..PAGES {
-                        assert_eq!(
-                            is_resident(&storage, page, col),
-                            model.pages[col][page].is_some(),
-                            "sheet {sheet}, step {step}, page {page}, col {col}"
-                        );
-                    }
+                for (col, page, state) in model.pages() {
+                    assert_eq!(
+                        is_resident(&storage, page, col),
+                        state.resident,
+                        "sheet {sheet}, step {step}, page {page}, col {col}"
+                    );
                 }
             }
         }
