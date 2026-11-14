@@ -39,9 +39,13 @@ const WINDOW_CELLS = 65_536;
 
 /** Where the next page of a diff starts. Pass it back unchanged. */
 export interface HistoryDiffCursor {
+  /** Position of the sheet the next page starts in. */
   readonly sheet: number;
+  /** First row of the block of rows the next page starts in. */
   readonly row: number;
+  /** Index of the rectangle in that block where the next page starts. */
   readonly piece: number;
+  /** Position of the next cell in that rectangle. */
   readonly cell: number;
 }
 
@@ -55,6 +59,7 @@ export interface HistoryDiffRequest {
   cursor?: HistoryDiffCursor;
   /** Changes per page, from 1 to 1,000; default 1,000. */
   maxEntries?: number;
+  /** Stops the diff; the call then rejects. */
   signal?: AbortSignal;
   /** Where the diff kernel WASM comes from; see `@sheetwrite/wasm/history`. */
   kernel?: BufferSource | URL | string | Request | WebAssembly.Module;
@@ -67,10 +72,13 @@ export interface HistoryDiffRequest {
 export interface HistoryDiffCells {
   /** Index into `HistoryDiffPage.sheetIds`. */
   readonly sheet: Uint32Array;
+  /** Zero-based row of each changed cell. */
   readonly row: Uint32Array;
+  /** Zero-based column of each changed cell. */
   readonly col: Uint32Array;
   /** Position in the earlier version, or `HISTORY_DIFF_NONE` on an added row or column. */
   readonly beforeRow: Uint32Array;
+  /** Column in the earlier version, or `HISTORY_DIFF_NONE` on an added column. */
   readonly beforeCol: Uint32Array;
   /** `HistoryDiffFlag` bits. */
   readonly flags: Uint8Array;
@@ -82,7 +90,9 @@ export interface HistoryDiffCells {
 export interface HistoryDiffCell {
   /** Calculated value in that version, for preview. */
   value: CellScalar;
+  /** Formula source, when the cell held a formula. */
   formula?: string;
+  /** The cell's own style, when it had one. */
   style?: CellStyle;
 }
 
@@ -90,6 +100,7 @@ export interface HistoryDiffCell {
 export interface HistoryDiffDetail {
   /** `null` on a row or column that the earlier version did not have. */
   before: HistoryDiffCell | null;
+  /** The cell in the later version. */
   after: HistoryDiffCell;
   /** Everyone who wrote the cell between the versions, as `authors` indexes, first writer first. */
   writers: readonly number[];
@@ -97,9 +108,11 @@ export interface HistoryDiffDetail {
 
 /** A sheet that was added, removed, or changed outside its cell values. */
 export interface HistoryDiffSheet {
+  /** Stable ID of the sheet. */
   sheet: SheetId;
   /** Name in the later version, or in the earlier one for a removed sheet. */
   name: string;
+  /** Whether the later version added, removed or changed the sheet. */
   change: "added" | "removed" | "changed";
   /** For `changed`: the sheet fields that differ, such as `name`, `rowCount` or `merges`. */
   fields: readonly string[];
@@ -117,6 +130,7 @@ export interface HistoryDiffPage {
   sheetIds: readonly SheetId[];
   /** Author IDs that the `author` and `writers` indexes name. */
   authors: readonly string[];
+  /** The changed cells of this page, at most `maxEntries`. */
   cells: HistoryDiffCells;
   /** Before and after of each changed cell, in `cells` order. */
   details: readonly HistoryDiffDetail[];

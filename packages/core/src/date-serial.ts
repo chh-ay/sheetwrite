@@ -31,6 +31,9 @@ export const FICTIONAL_LEAP_DAY_SERIAL = 60;
  * of {@link serialToDate} except for synthetic serial 60, which JavaScript
  * cannot represent as a Date. Construct calendar dates with `Date.UTC(...)`
  * (or via {@link parseDateInput}) to avoid host-timezone shifts.
+ *
+ * @param date - The moment to convert, read in UTC.
+ * @returns The serial: 1 is 1900-01-01, and the fraction is the time of day.
  */
 export function dateToSerial(date: Date): number {
   const milliseconds = date.getTime();
@@ -42,6 +45,9 @@ export function dateToSerial(date: Date): number {
  * Convert a date serial back to a `Date`. Read the result with the UTC accessors
  * (`getUTCFullYear`, `getUTCMonth`, …) — which is what the renderer does — so the
  * calendar fields are stable regardless of the host time zone.
+ *
+ * @param serial - Excel 1900-system date serial; the fraction is the time of day.
+ * @returns The date, in UTC.
  */
 export function serialToDate(serial: number): Date {
   const realSerial = serial >= FICTIONAL_LEAP_DAY_SERIAL ? serial - 1 : serial;
@@ -113,6 +119,9 @@ const SLASH_DATE = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
  *
  * Anything else (bare numbers, free text) returns `null` so callers can fall back
  * to a text literal.
+ *
+ * @param raw - Text the user typed, such as `2026-05-04`.
+ * @returns The date serial, or `null` when the text is not a date.
  */
 export function parseDateInput(raw: string): number | null {
   const s = raw.trim();

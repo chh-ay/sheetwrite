@@ -4,9 +4,13 @@ import { SheetwriteError } from "./errors.js";
 
 /** A complete engine module from `@sheetwrite/wasm` or `@sheetwrite/formulas`. */
 export interface SheetwriteEngine {
+  /** The engine's cell store class. */
   CellStore: defaultEngine.EngineInstance["CellStore"];
+  /** Loads and starts the engine's WASM, from the given source or the bundled file. */
   load: typeof defaultEngine.load;
+  /** Whether `load` has finished. */
   isLoaded: typeof defaultEngine.isLoaded;
+  /** Creates a separate engine instance with its own WASM memory. */
   createEngine: typeof defaultEngine.createEngine;
   /** The optional full engine reports its accepted function names. */
   functionNames?: () => string[];

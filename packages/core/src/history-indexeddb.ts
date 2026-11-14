@@ -160,6 +160,7 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
   private readonly databaseName: string;
   private readonly factory: IDBFactory | undefined;
 
+  /** Creates the storage; each call opens the database, so nothing opens yet. */
   constructor(options: IndexedDbHistoryStorageOptions = {}) {
     super();
 
@@ -167,6 +168,7 @@ export class IndexedDbHistoryStorage extends AtomicHistoryStorage {
     this.factory = options.indexedDB;
   }
 
+  /** Runs `action` in one atomic transaction over the stored archive; a failure leaves it unchanged. */
   protected async transact<T>(
     request: HistoryStorageRequest,
     action: (transaction: HistoryStorageTransaction) => Promise<T>,
