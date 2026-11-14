@@ -127,7 +127,11 @@ export function LimitsDiagram() {
         { title: "Transactions", lines: ["Above 10,000", "operations:", "rejected"] },
         { title: "Snapshots", lines: ["Above 256", "sheets:", "rejected"] },
         { title: "Delimited text", lines: ["Above 32 MiB", "of input:", "throws"] },
-        { title: "Sync", lines: ["Version above", "10,000 operations", "needs a reload"], tone: "muted" },
+        {
+          title: "Sync",
+          lines: ["Version above", "10,000 operations", "needs a reload"],
+          tone: "muted",
+        },
       ]}
     />
   );
