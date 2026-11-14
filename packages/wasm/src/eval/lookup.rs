@@ -142,7 +142,26 @@ fn compare(left_entry: Entry<'_>, right_entry: Entry<'_>) -> Result<Ordering, Fo
     }
 }
 
-/// A search list: a range's literal sources read in place, or values.
+/// What every search reads: a list's length and its entries by position.
+/// Each list type gets its own copy of the searches, so the dense loops
+/// stay as tight as they are without paged sheets.
+pub(super) trait SearchList {
+    fn len(&self) -> usize;
+
+    fn entry(&self, position: usize) -> Entry<'_>;
+
+    /// [`exact_match`]'s plain scan for a finite number key, when the list
+    /// has a faster one than an entry per position.
+    fn number_scan(
+        &self,
+        _key: f64,
+        _search_reverse: bool,
+    ) -> Option<Result<Option<usize>, FormulaError>> {
+        None
+    }
+}
+
+/// A search list: a dense range's literal sources read in place, or values.
 /// Matching on the list kind per entry keeps one copy of every search.
 pub(super) enum ListView<'a> {
     /// Entry `i` is the slot `first + i * step` of a dense sheet's sources.
@@ -154,22 +173,13 @@ pub(super) enum ListView<'a> {
         step: usize,
         len: usize,
     },
-    /// Entry `i` is the cell `first + i * step` of a paged sheet, read one
-    /// lookup at a time; the range is known to be loaded literal sources.
-    Paged {
-        cells: &'a CellStorage,
-        strings: &'a StringStorage,
-        first: usize,
-        step: usize,
-        len: usize,
-    },
     Values(&'a [Value]),
 }
 
-impl ListView<'_> {
-    const fn len(&self) -> usize {
+impl SearchList for ListView<'_> {
+    fn len(&self) -> usize {
         match self {
-            Self::Storage { len, .. } | Self::Paged { len, .. } => *len,
+            Self::Storage { len, .. } => *len,
             Self::Values(values) => values.len(),
         }
     }
@@ -188,20 +198,44 @@ impl ListView<'_> {
                 let index = first + position * step;
                 Entry::literal(strings, kinds[index], payloads[index])
             }
-            Self::Paged {
-                cells,
-                strings,
-                first,
-                step,
-                ..
-            } => paged_entry(cells, strings, first + position * step),
             Self::Values(values) => Entry::of(&values[position]),
+        }
+    }
+
+    fn number_scan(
+        &self,
+        key: f64,
+        search_reverse: bool,
+    ) -> Option<Result<Option<usize>, FormulaError>> {
+        match self {
+            Self::Storage { .. } => Some(storage_number_scan(self, key, search_reverse)),
+            Self::Values(_) => None,
         }
     }
 }
 
-/// One entry of a paged list, out of line: searches inline `ListView::entry`
-/// into their loops, and the paged read would make it too large for that.
+/// A paged sheet's range as a search list: entry `i` is the cell
+/// `first + i * step`, and the range is known to be loaded literal sources.
+struct PagedList<'a> {
+    cells: &'a CellStorage,
+    strings: &'a StringStorage,
+    first: usize,
+    step: usize,
+    len: usize,
+}
+
+impl SearchList for PagedList<'_> {
+    fn len(&self) -> usize {
+        self.len
+    }
+
+    fn entry(&self, position: usize) -> Entry<'_> {
+        paged_entry(self.cells, self.strings, self.first + position * self.step)
+    }
+}
+
+/// One entry of a paged list, out of line, so the paged copies of the
+/// searches stay small.
 #[inline(never)]
 fn paged_entry<'s>(cells: &CellStorage, strings: &'s StringStorage, index: usize) -> Entry<'s> {
     let (kind, payload) = cells.source_at(index);
@@ -229,7 +263,11 @@ pub(crate) struct SearchState {
 }
 
 impl SearchState {
-    fn sorted_ok(&mut self, list: &ListView<'_>, search_mode: i32) -> Result<bool, FormulaError> {
+    fn sorted_ok<L: SearchList>(
+        &mut self,
+        list: &L,
+        search_mode: i32,
+    ) -> Result<bool, FormulaError> {
         let requires_ascending = search_mode == 2;
         let slot = if requires_ascending {
             &mut self.ascending
@@ -239,20 +277,20 @@ impl SearchState {
         *slot.get_or_insert_with(|| monotonicity_walk(list, requires_ascending))
     }
 
-    fn uniform_kind(&mut self, list: &ListView<'_>) -> Option<UniformKind> {
+    fn uniform_kind<L: SearchList>(&mut self, list: &L) -> Option<UniformKind> {
         *self.kind.get_or_insert_with(|| classify(list))
     }
 
     /// Whether the boundary search can answer for `key`: the list is one
     /// comparison domain, ascending, and the key belongs to that domain.
-    fn boundary_gate(&mut self, list: &ListView<'_>, key: Entry<'_>) -> bool {
+    fn boundary_gate<L: SearchList>(&mut self, list: &L, key: Entry<'_>) -> bool {
         let Some(kind) = self.uniform_kind(list) else {
             return false;
         };
         key_fits_domain(key, kind) && matches!(self.sorted_ok(list, 2), Ok(true))
     }
 
-    fn exact_index(&mut self, list: &ListView<'_>) -> Option<&ExactIndex> {
+    fn exact_index<L: SearchList>(&mut self, list: &L) -> Option<&ExactIndex> {
         self.exact
             .get_or_insert_with(|| ExactIndex::build(list))
             .as_ref()
@@ -261,8 +299,8 @@ impl SearchState {
 
 /// Searches `list` with the plain scan's rules. With `shared_state`, the
 /// search uses the pass's index where it proves the same answer.
-pub(super) fn find_match(
-    list: &ListView<'_>,
+pub(super) fn find_match<L: SearchList>(
+    list: &L,
     key_value: &Value,
     match_mode: i32,
     search_mode: i32,
@@ -302,8 +340,8 @@ pub(super) fn find_match(
 /// ascending single-domain list, the class index on any other list without
 /// an error, and the plain scan decides everything else, including its error
 /// order.
-fn exact_match(
-    list: &ListView<'_>,
+fn exact_match<L: SearchList>(
+    list: &L,
     key: Entry<'_>,
     search_reverse: bool,
     use_index: bool,
@@ -326,9 +364,11 @@ fn exact_match(
         }
     }
 
-    if let (ListView::Storage { .. }, Entry::Number(number)) = (list, key) {
+    if let Entry::Number(number) = key {
         if number.is_finite() {
-            return storage_number_scan(list, number, search_reverse);
+            if let Some(found) = list.number_scan(number, search_reverse) {
+                return found;
+            }
         }
     }
 
@@ -416,8 +456,8 @@ fn storage_number_scan(
 
 /// Nearest value across the key, on the side `match_mode` asks for, at the
 /// first position of the nearest value.
-fn approximate_scan(
-    list: &ListView<'_>,
+fn approximate_scan<L: SearchList>(
+    list: &L,
     key: Entry<'_>,
     match_mode: i32,
 ) -> Result<Option<usize>, FormulaError> {
@@ -454,7 +494,10 @@ fn approximate_scan(
 
 /// The plain scan's pair walk: the first non-monotone pair is `Ok(false)`,
 /// the first failed comparison is its error, and a clean walk is `Ok(true)`.
-fn monotonicity_walk(list: &ListView<'_>, requires_ascending: bool) -> Result<bool, FormulaError> {
+fn monotonicity_walk<L: SearchList>(
+    list: &L,
+    requires_ascending: bool,
+) -> Result<bool, FormulaError> {
     let violation = if requires_ascending {
         Ordering::Greater
     } else {
@@ -469,8 +512,8 @@ fn monotonicity_walk(list: &ListView<'_>, requires_ascending: bool) -> Result<bo
 }
 
 /// First (or last) wildcard match. A non-text key matches nothing.
-fn wildcard_scan(
-    list: &ListView<'_>,
+fn wildcard_scan<L: SearchList>(
+    list: &L,
     key: Entry<'_>,
     search_reverse: bool,
 ) -> Result<Option<usize>, FormulaError> {
@@ -494,8 +537,8 @@ fn wildcard_scan(
 /// neighbours are contiguous there, so the first position not below the key
 /// and the first position above it bound the equal run; without an equal
 /// entry the answer is the first position of the nearest value.
-fn approximate_boundary(
-    list: &ListView<'_>,
+fn approximate_boundary<L: SearchList>(
+    list: &L,
     key: Entry<'_>,
     match_mode: i32,
 ) -> Result<Option<usize>, FormulaError> {
@@ -514,7 +557,7 @@ fn approximate_boundary(
 }
 
 /// First position whose entry is not below `probe`.
-fn first_not_below(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, FormulaError> {
+fn first_not_below<L: SearchList>(list: &L, probe: Entry<'_>) -> Result<usize, FormulaError> {
     let (mut low, mut high) = (0, list.len());
     while low < high {
         let middle = low + (high - low) / 2;
@@ -528,7 +571,7 @@ fn first_not_below(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, Formu
 }
 
 /// First position whose entry is above `probe`.
-fn first_above(list: &ListView<'_>, probe: Entry<'_>) -> Result<usize, FormulaError> {
+fn first_above<L: SearchList>(list: &L, probe: Entry<'_>) -> Result<usize, FormulaError> {
     let (mut low, mut high) = (0, list.len());
     while low < high {
         let middle = low + (high - low) / 2;
@@ -556,7 +599,7 @@ fn key_fits_domain(key: Entry<'_>, kind: UniformKind) -> bool {
 
 /// The domain every entry shares, or `None` when the list mixes domains or
 /// holds an error or NaN. Blanks belong to every domain.
-fn classify(list: &ListView<'_>) -> Option<UniformKind> {
+fn classify<L: SearchList>(list: &L) -> Option<UniformKind> {
     let mut found: Option<UniformKind> = None;
     for position in 0..list.len() {
         let kind = match list.entry(position) {
@@ -607,7 +650,7 @@ struct ExactIndex {
 impl ExactIndex {
     /// The index of `list`, or `None` for a list with an error or NaN, whose
     /// scan order must decide.
-    fn build(list: &ListView<'_>) -> Option<Self> {
+    fn build<L: SearchList>(list: &L) -> Option<Self> {
         let mut entries = Vec::with_capacity(list.len());
         // Folded texts end to end, in list order, with their positions.
         let mut folded = String::new();
@@ -1149,29 +1192,28 @@ impl CellStore {
                     ListPart::Whole if range.rows == 1 => (range.row_count, range.cols),
                     ListPart::Whole => (1, range.rows * range.cols),
                 };
-                let list = match cells.dense_sources() {
-                    Some(sources) => {
-                        let (kinds, payloads) = sources.raw();
-                        ListView::Storage {
-                            kinds,
-                            payloads,
-                            strings: &self.strings,
-                            first: range.first,
-                            step,
-                            len,
-                        }
-                    }
-                    None => ListView::Paged {
+                let state = shared.map(|(group, groups)| {
+                    &mut pass.results.lookup_states().get(group, groups, part).search
+                });
+                let Some(sources) = cells.dense_sources() else {
+                    let list = PagedList {
                         cells,
                         strings: &self.strings,
                         first: range.first,
                         step,
                         len,
-                    },
+                    };
+                    return find_match(&list, key, match_mode, search_mode, state);
                 };
-                let state = shared.map(|(group, groups)| {
-                    &mut pass.results.lookup_states().get(group, groups, part).search
-                });
+                let (kinds, payloads) = sources.raw();
+                let list = ListView::Storage {
+                    kinds,
+                    payloads,
+                    strings: &self.strings,
+                    first: range.first,
+                    step,
+                    len,
+                };
                 find_match(&list, key, match_mode, search_mode, state)
             }
             LookupArg::Values { rows, cols, values } => {
