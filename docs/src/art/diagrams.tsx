@@ -5,7 +5,7 @@
 import { For, type JSX } from "solid-js";
 
 import { DiagramArt, head } from "./Art.js";
-import { SequenceFigure } from "./blueprint-layouts.js";
+import { FlowFigure, SequenceFigure } from "./blueprint-layouts.js";
 import { Arrow, Box, type DiagramText, Responsive } from "./diagram-kit.js";
 
 const INTEROP_STEPS = [
@@ -535,95 +535,6 @@ export function CollaborationRecoveryDiagram() {
   );
 }
 
-/** Pages in memory around the viewport, top to bottom. */
-const PAGE_BANDS = [
-  "evicted",
-  "evicted",
-  "kept",
-  "view",
-  "view",
-  "kept",
-  "kept",
-  "evicted",
-] as const;
-const BAND_CLASS = { evicted: "panel", kept: "hue-tint", view: "hue" } as const;
-const BAND_LABEL = { evicted: "evicted", kept: "kept in memory", view: "in view" } as const;
-
-/** The address-space bar, its zoom lines and the page bands. */
-function PageBands(props: Readonly<{ barX: number; x: number; w: number }>) {
-  return (
-    <>
-      <text class="heading" x={props.barX - 4} y={20}>
-        1,000,000 rows
-      </text>
-      <rect class="panel" height={232} rx={6} width={32} x={props.barX} y={36} />
-      <path
-        class="rule"
-        d={[66, 96, 126, 156, 186, 216, 246].map((y) => `M${props.barX} ${y}h32`).join("")}
-      />
-      <rect class="hue" height={10} rx={2} width={32} x={props.barX} y={140} />
-      <path
-        class="ink-line dash"
-        d={`M${props.barX + 32} 140L${props.x - 6} 44M${props.barX + 32} 150L${props.x - 6} 250`}
-      />
-      <For each={PAGE_BANDS}>
-        {(band, index) => (
-          <>
-            <rect
-              class={BAND_CLASS[band]}
-              height={22}
-              rx={4}
-              width={props.w}
-              x={props.x}
-              y={44 + index() * 26}
-            />
-            {(index() === 0 || index() === 2 || index() === 3) && (
-              <text
-                class={band === "view" ? "small on-hue" : "small"}
-                x={props.x + 10}
-                y={59 + index() * 26}
-              >
-                {BAND_LABEL[band]}
-              </text>
-            )}
-          </>
-        )}
-      </For>
-      <rect
-        class="alt-line"
-        height={56}
-        rx={6}
-        stroke-width={2.5}
-        width={props.w + 12}
-        x={props.x - 6}
-        y={117}
-      />
-      <text class="caption" x={props.x} y={278}>
-        Each band is a page of 4,096 rows
-      </text>
-    </>
-  );
-}
-
-/** The page budget bar and what happens over it. */
-function PageBudget(props: Readonly<{ x: number; y: number; w: number }>) {
-  return (
-    <>
-      <text class="caption strong" x={props.x} y={props.y}>
-        Unedited pages: up to 32 MiB
-      </text>
-      <rect class="soft" height={12} rx={6} width={props.w} x={props.x} y={props.y + 8} />
-      <rect class="hue" height={12} rx={6} width={props.w * 0.65} x={props.x} y={props.y + 8} />
-      <text class="caption" x={props.x} y={props.y + 40}>
-        Over the budget, the farthest
-      </text>
-      <text class="caption" x={props.x} y={props.y + 56}>
-        pages are evicted
-      </text>
-    </>
-  );
-}
-
 const PAGING_TEXT: DiagramText = {
   hue: "amber",
   alt: "blue",
@@ -635,47 +546,29 @@ const PAGING_TEXT: DiagramText = {
 /** Performance: the address space, the pages kept near the viewport, and the host's page provider. */
 export function PagingDiagram() {
   return (
-    <Responsive
-      narrow={{
-        height: 470,
-        draw: () => (
-          <>
-            <PageBands barX={12} w={266} x={86} />
-            <Box
-              h={62}
-              lines={["Fetched on demand: a network", "or database call you write"]}
-              title="Your page provider"
-              w={344}
-              x={8}
-              y={300}
-            />
-            <Arrow class="hue-line" x1={330} x2={330} y1={298} y2={260} />
-            <PageBudget w={344} x={8} y={396} />
-          </>
-        ),
+    <FlowFigure
+      outcome={{
+        from: 2,
+        kind: "back",
+        step: {
+          title: "Your page provider",
+          lines: ["Fetches a page again", "when you come back"],
+        },
       }}
-      text={PAGING_TEXT}
-      wide={{
-        height: 300,
-        draw: () => (
-          <>
-            <PageBands barX={36} w={320} x={200} />
-            <Box
-              h={62}
-              lines={["A network or database", "call that you write"]}
-              title="Your page provider"
-              w={220}
-              x={590}
-              y={24}
-            />
-            <path class="hue-line" d={`M640 90c0 80-40 110-104 110${head(536, 200, 180)}`} />
-            <text class="caption" x={652} y={150}>
-              fetch on demand
-            </text>
-            <PageBudget w={220} x={590} y={228} />
-          </>
-        ),
-      }}
+      steps={[
+        { title: "1,000,000 rows", lines: ["In pages of", "4,096 rows"] },
+        {
+          title: "Pages in view",
+          lines: ["And the pages near", "them stay in memory"],
+          tone: "accent",
+        },
+        {
+          title: "Over 32 MiB",
+          lines: ["The farthest unedited", "pages are evicted"],
+          tone: "muted",
+        },
+      ]}
+      text={{ title: PAGING_TEXT.title, description: PAGING_TEXT.description }}
     />
   );
 }
