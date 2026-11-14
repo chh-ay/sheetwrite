@@ -22,6 +22,7 @@
 //! (ROWS, SUMIF, INDEX, ...) see one.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::CellStore;
@@ -75,7 +76,7 @@ impl RewriteScope {
             Err(error) if self == Self::Root => {
                 Some(Ast::Array(Box::new(crate::calc::ArrayLiteral {
                     cols: 1,
-                    values: vec![Value::Error(error)],
+                    values: Rc::from([Value::Error(error)]),
                 })))
             }
             Err(_) => None,

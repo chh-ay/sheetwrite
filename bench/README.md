@@ -350,6 +350,14 @@ A1. A blank compares equal to 0, "" and FALSE at once, so only a comparison
 sort gives this order: no sort key can. The row checks the spilled text count
 and value sum, which don't depend on the order. Its limit is the 1.2 default.
 
+`take-sort-filter` (100,000 rows) times a chain of three row steps over a
+three-column range,
+`=TAKE(SORT(FILTER(A1:C100000,C1:C100000>$E$1),2,-1),1000)`, where the timed
+run edits the threshold in E1. Each step picks rows of the range it read
+instead of copying them, so the chain copies only the 1,000 rows it spills
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
 `sort-rows-labels` (100,000 rows) and `sort-rows-numbers` (4,000 rows) sort
 one column through `sortRowsMulti`, ascending then descending, as the sort
 command does: labels like `L00042`, and numbers with many ties, below the

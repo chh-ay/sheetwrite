@@ -6,6 +6,7 @@ use std::collections::hash_map::DefaultHasher;
 use rustc_hash::FxHashMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
+use std::rc::Rc;
 
 use crate::calc::{Ast, Func, RangeFlags, SheetRef};
 use crate::store::CellStore;
@@ -18,6 +19,7 @@ use super::matrix::{
     intersection_range, optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS,
     UNKNOWN_SIZE_PRECHARGE,
 };
+use super::range_view::{RowReader, ValueRows};
 use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
 use super::EvalPass;
@@ -359,6 +361,7 @@ impl CellStore {
         }
     }
 
+    /// An array expression as one matrix. `None` for a scalar expression.
     pub(super) fn eval_dynamic_array(
         &self,
         ast: &Ast,
@@ -366,6 +369,34 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<Result<EvalMatrix, FormulaError>> {
+        self.eval_array(ast, sheet, pass, depth)
+    }
+
+    /// An array expression as rows of one base. The row steps (FILTER, SORT,
+    /// UNIQUE, TAKE, DROP, CHOOSEROWS) pick rows of their argument's rows
+    /// instead of copying them, and an array constant shares its values with
+    /// the formula tree; any other array is one computed matrix. `None` for a
+    /// scalar expression.
+    pub(super) fn eval_rows(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<Result<ValueRows, FormulaError>> {
+        self.eval_array(ast, sheet, pass, depth)
+    }
+
+    /// The one array dispatch, built once per result form so that a caller
+    /// that wants a matrix gets a computed one as it is, and a row step's
+    /// argument keeps the rows of its base.
+    fn eval_array<T: ArrayResult>(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Option<Result<T, FormulaError>> {
         let result = match ast {
             Ast::Bin(_, _, _) | Ast::Cmp(_, _, _) | Ast::Neg(_) | Ast::Pos(_) | Ast::Percent(_)
                 if ast_produces_array(ast, pass.shapes()) =>
@@ -374,15 +405,22 @@ impl CellStore {
             }
             Ast::Func(Func::AnchorArray, args) => {
                 let range = self.spill_reference(args, sheet);
-                return self.eval_dynamic_array(&range, sheet, pass, depth);
+                return self.eval_array(&range, sheet, pass, depth);
             }
             Ast::Func(func @ (Func::Offset | Func::Indirect), args) => {
                 self.eval_runtime_reference_matrix(*func, args, sheet, pass, depth + 1)
             }
             Ast::InvalidRef => Err(FormulaError::Ref),
+            // An array argument shares its values with the call frame, so a
+            // row step over it copies none.
             #[cfg(feature = "analysis")]
             Ast::Parameter { depth, index, .. } => {
                 let frame = pass.results.call_frame();
+                if let Some(super::analysis::lambda::Slot::Array { rows, cols, values }) =
+                    frame.and_then(|call_frame| call_frame.slot(*depth, *index))
+                {
+                    return Some(T::shared(*rows, *cols, values));
+                }
                 Ok(super::analysis::lambda::parameter_matrix(
                     self, frame, *depth, *index,
                 )?)
@@ -418,14 +456,16 @@ impl CellStore {
                 .and_then(|_| self.eval_matrix_arg(ast, sheet, pass, depth + 1)),
             Ast::Array(array) => {
                 let crate::calc::ArrayLiteral { values, .. } = &**array;
-                self.matrix_shape(ast, sheet, pass)
-                    .map(|(rows, cols, _)| EvalMatrix::new(rows, cols, values.clone()))
+                return Some(
+                    self.matrix_shape(ast, sheet, pass)
+                        .and_then(|(rows, cols, _)| T::shared(rows, cols, values)),
+                );
             }
             Ast::LetSlot { expression, .. } => {
-                return self.eval_dynamic_array(expression, sheet, pass, depth)
+                return self.eval_array(expression, sheet, pass, depth)
             }
             Ast::NamedFormula(named) => {
-                return self.eval_dynamic_array(&named.expression, sheet, pass, depth)
+                return self.eval_array(&named.expression, sheet, pass, depth)
             }
             Ast::Func(Func::Let, args) => {
                 let (expanded_ast, slots) = match expand_let_ast(args) {
@@ -441,35 +481,76 @@ impl CellStore {
                     depth + 1,
                     RewriteScope::Root,
                 );
-                let matrix = self.eval_dynamic_array(&expanded, sheet, pass, depth + 1);
+                let array = self.eval_array(&expanded, sheet, pass, depth + 1);
                 pass.results.let_frame_mut().close_expanded(enclosing);
-                return matrix;
+                return array;
             }
-            Ast::Func(Func::Filter, args) => self.eval_filter(args, sheet, pass, depth + 1),
-            Ast::Func(Func::Sort, args) => self.eval_sort(args, sheet, pass, depth + 1),
-            Ast::Func(Func::Unique, args) => self.eval_unique(args, sheet, pass, depth + 1),
+            Ast::Func(Func::Filter, args) => {
+                return Some(
+                    self.eval_filter(args, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
+            Ast::Func(Func::Sort, args) => {
+                return Some(
+                    self.eval_sort(args, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
+            Ast::Func(Func::Unique, args) => {
+                return Some(
+                    self.eval_unique(args, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
+            Ast::Func(Func::Take, args) => {
+                return Some(
+                    self.eval_take_drop(args, false, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
+            Ast::Func(Func::Drop, args) => {
+                return Some(
+                    self.eval_take_drop(args, true, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
+            Ast::Func(Func::ChooseCols, args) => {
+                return Some(
+                    self.eval_choose_axis(args, false, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
+            Ast::Func(Func::ChooseRows, args) => {
+                return Some(
+                    self.eval_choose_axis(args, true, sheet, pass, depth + 1)
+                        .and_then(T::rows),
+                )
+            }
             Ast::Func(Func::Transpose, args) => self.eval_transpose(args, sheet, pass, depth + 1),
             Ast::Func(Func::TrimRange, args) => self.eval_trim_range(args, sheet, pass, depth + 1),
             Ast::Func(Func::Sequence, args) => self.eval_sequence(args, sheet, pass, depth + 1),
-            Ast::Func(Func::Take, args) => self.eval_take_drop(args, false, sheet, pass, depth + 1),
-            Ast::Func(Func::Drop, args) => self.eval_take_drop(args, true, sheet, pass, depth + 1),
-            Ast::Func(Func::ChooseCols, args) => {
-                self.eval_choose_axis(args, false, sheet, pass, depth + 1)
-            }
-            Ast::Func(Func::ChooseRows, args) => {
-                self.eval_choose_axis(args, true, sheet, pass, depth + 1)
-            }
             Ast::Func(Func::Choose, args) => self.eval_choose(args, sheet, pass, depth + 1),
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => {
                 self.eval_index_array(args, sheet, pass, depth + 1)
             }
             _ => return None,
         };
-        Some(result.and_then(|matrix| {
-            matrix.validate_bytes()?;
-            Ok(matrix)
-        }))
+        Some(result.and_then(T::computed))
     }
+    fn eval_rows_arg(
+        &self,
+        ast: &Ast,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> Result<ValueRows, FormulaError> {
+        let Some(rows) = self.eval_rows(ast, sheet, pass, depth + 1) else {
+            return Err(FormulaError::Value);
+        };
+        rows
+    }
+
     fn eval_array_matrix_arg(
         &self,
         ast: &Ast,
@@ -726,7 +807,7 @@ impl CellStore {
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
+    ) -> Result<ValueRows, FormulaError> {
         if !(2..=3).contains(&args.len()) {
             return Err(FormulaError::Value);
         }
@@ -748,19 +829,23 @@ impl CellStore {
         {
             return Err(FormulaError::Num);
         }
-        let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
+        let array = self.eval_rows_arg(&args[0], sheet, pass, depth + 1)?;
         let include = self.eval_array_matrix_arg(&args[1], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
         // Value-dependent arrays can shrink from their static shape bound.
-        debug_assert!(array.values.len() <= array_cells);
+        debug_assert!(
+            array.cells() <= array_cells,
+            "an array is no larger than its shape bound"
+        );
+        let (array_rows, array_cols) = array.shape();
 
-        let filter_rows = include.rows == array.rows && include.cols == 1;
-        let filter_cols = include.rows == 1 && include.cols == array.cols;
+        let filter_rows = include.rows == array_rows && include.cols == 1;
+        let filter_cols = include.rows == 1 && include.cols == array_cols;
         if !filter_rows && !filter_cols {
             return Err(FormulaError::Value);
         }
 
-        let mut selected = Vec::with_capacity(if filter_rows { array.rows } else { array.cols });
+        let mut selected = Vec::with_capacity(if filter_rows { array_rows } else { array_cols });
         for (index, value) in include.values.iter().enumerate() {
             if bool_from_value(value)? {
                 selected.push(index);
@@ -770,33 +855,26 @@ impl CellStore {
             let Some(empty) = optional_ast(args, 2) else {
                 return Err(FormulaError::Calc);
             };
-            return Ok(EvalMatrix::new(
+            return Ok(ValueRows::matrix(EvalMatrix::new(
                 1,
                 1,
                 vec![self.scalar_array_arg(empty, sheet, pass, depth + 1)],
-            ));
+            )));
         }
-
-        let (rows, cols) = if filter_rows {
-            (selected.len(), array.cols)
-        } else {
-            (array.rows, selected.len())
-        };
+        if filter_rows {
+            return Ok(array.pick(selected.into_iter()));
+        }
+        // Columns are picked by copying, as before.
+        let matrix = array.into_matrix();
+        let (rows, cols) = (matrix.rows, selected.len());
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
         let mut values = Vec::with_capacity(cells);
-        if filter_rows {
-            for row in selected {
-                let start = row * array.cols;
-                values.extend_from_slice(&array.values[start..start + array.cols]);
-            }
-        } else {
-            for row in 0..array.rows {
-                for &col in &selected {
-                    values.push(array.values[row * array.cols + col].clone());
-                }
+        for row in 0..matrix.rows {
+            for &col in &selected {
+                values.push(matrix.values[row * matrix.cols + col].clone());
             }
         }
-        Ok(EvalMatrix::new(rows, cols, values))
+        Ok(ValueRows::matrix(EvalMatrix::new(rows, cols, values)))
     }
 
     fn eval_sort(
@@ -805,7 +883,7 @@ impl CellStore {
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
+    ) -> Result<ValueRows, FormulaError> {
         if args.is_empty() || args.len() > 4 {
             return Err(FormulaError::Value);
         }
@@ -814,8 +892,9 @@ impl CellStore {
         // for the budget checks; the rows they return can be fewer.
         let (array_rows, array_cols, _) = self.matrix_shape(&args[0], sheet, pass)?;
         let item_bound = if by_col { array_cols } else { array_rows };
+        // The sort order and each item's key.
         let extra = item_bound
-            .checked_mul(size_of::<usize>())
+            .checked_mul(size_of::<usize>() + size_of::<Option<&Value>>())
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
         let comparisons = if item_bound < 2 {
@@ -827,9 +906,10 @@ impl CellStore {
         if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
             return Err(FormulaError::Num);
         }
-        let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
+        let array = self.eval_rows_arg(&args[0], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
-        let dimension = if by_col { array.rows } else { array.cols };
+        let (array_rows, array_cols) = array.shape();
+        let dimension = if by_col { array_rows } else { array_cols };
         let sort_index = match optional_ast(args, 1) {
             Some(ast) => integer_arg(&self.scalar_array_arg(ast, sheet, pass, depth + 1))?,
             None => 1,
@@ -845,26 +925,28 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
 
-        let item_count = if by_col { array.cols } else { array.rows };
+        let item_count = if by_col { array_cols } else { array_rows };
         let key = sort_index as usize - 1;
         let mut indices: Vec<usize> = (0..item_count).collect();
+        // Each item's key, looked up once instead of twice per comparison.
+        let reader = array.reader();
+        let keys: Vec<Option<&Value>> = indices
+            .iter()
+            .map(|&item| {
+                if by_col {
+                    reader.value(key, item)
+                } else {
+                    reader.value(item, key)
+                }
+            })
+            .collect();
         let mut error = None;
         indices.sort_by(|left, right| {
             if error.is_some() {
                 return Ordering::Equal;
             }
-            let left_value = if by_col {
-                array.get(key, *left)
-            } else {
-                array.get(*left, key)
-            };
-            let right_value = if by_col {
-                array.get(key, *right)
-            } else {
-                array.get(*right, key)
-            };
-            let compared = match (left_value, right_value) {
-                (Some(left), Some(right)) => compare_values(left, right),
+            let compared = match (keys[*left], keys[*right]) {
+                (Some(left_key), Some(right_key)) => compare_values(left_key, right_key),
                 _ => Err(FormulaError::Ref),
             };
             match compared {
@@ -879,21 +961,23 @@ impl CellStore {
         if let Some(first_error) = error {
             return Err(first_error);
         }
+        if !by_col {
+            return Ok(array.pick(indices.into_iter()));
+        }
 
-        let mut values = Vec::with_capacity(array.values.len());
-        if by_col {
-            for row in 0..array.rows {
-                for &col in &indices {
-                    values.push(array.values[row * array.cols + col].clone());
-                }
-            }
-        } else {
-            for row in indices {
-                let start = row * array.cols;
-                values.extend_from_slice(&array.values[start..start + array.cols]);
+        // Columns are reordered by copying, as before.
+        let matrix = array.into_matrix();
+        let mut values = Vec::with_capacity(matrix.values.len());
+        for row in 0..matrix.rows {
+            for &col in &indices {
+                values.push(matrix.values[row * matrix.cols + col].clone());
             }
         }
-        Ok(EvalMatrix::new(array.rows, array.cols, values))
+        Ok(ValueRows::matrix(EvalMatrix::new(
+            matrix.rows,
+            matrix.cols,
+            values,
+        )))
     }
 
     fn eval_unique(
@@ -902,7 +986,7 @@ impl CellStore {
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
+    ) -> Result<ValueRows, FormulaError> {
         if args.is_empty() || args.len() > 3 {
             return Err(FormulaError::Value);
         }
@@ -916,10 +1000,12 @@ impl CellStore {
             .checked_mul(UNIQUE_ITEM_BYTES)
             .ok_or(FormulaError::Num)?;
         EvalMatrix::validate_shape(array_rows, array_cols, 2, extra)?;
-        let array = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
+        let array = self.eval_rows_arg(&args[0], sheet, pass, depth + 1)?;
         array.validate_copies(2)?;
         let exactly_once = self.optional_bool_array_arg(args, 2, false, sheet, pass, depth + 1)?;
-        let item_count = if by_col { array.cols } else { array.rows };
+        let (array_rows, array_cols) = array.shape();
+        let item_count = if by_col { array_cols } else { array_rows };
+        let reader = array.reader();
 
         // Store collision chains in insertion order, without an allocation per hash.
         let mut buckets: FxHashMap<u64, (usize, usize)> = FxHashMap::default();
@@ -927,7 +1013,7 @@ impl CellStore {
             Vec::with_capacity(item_count);
         let mut comparisons = 0usize;
         for item in 0..item_count {
-            let hash = matrix_item_hash(&array, item, by_col);
+            let hash = item_hash(reader, item, by_col);
             let mut position = buckets.get(&hash).map(|&(first, _)| first);
             let mut found = None;
             while let Some(index) = position {
@@ -936,7 +1022,7 @@ impl CellStore {
                 if comparisons > SPILL_MAX_RECOMPUTE_CELLS {
                     return Err(FormulaError::Num);
                 }
-                if matrix_items_equal(&array, representative, item, by_col)? {
+                if items_equal(reader, representative, item, by_col)? {
                     found = Some(index);
                     break;
                 }
@@ -963,26 +1049,21 @@ impl CellStore {
         if retained.is_empty() {
             return Err(FormulaError::Calc);
         }
-        let (rows, cols) = if by_col {
-            (array.rows, retained.len())
-        } else {
-            (retained.len(), array.cols)
-        };
+        if !by_col {
+            return Ok(array.pick(retained.into_iter()));
+        }
+
+        // Columns are kept by copying, as before.
+        let matrix = array.into_matrix();
+        let (rows, cols) = (matrix.rows, retained.len());
         let cells = rows.checked_mul(cols).ok_or(FormulaError::Num)?;
         let mut values = Vec::with_capacity(cells);
-        if by_col {
-            for row in 0..array.rows {
-                for &col in &retained {
-                    values.push(array.values[row * array.cols + col].clone());
-                }
-            }
-        } else {
-            for row in retained {
-                let start = row * array.cols;
-                values.extend_from_slice(&array.values[start..start + array.cols]);
+        for row in 0..matrix.rows {
+            for &col in &retained {
+                values.push(matrix.values[row * matrix.cols + col].clone());
             }
         }
-        Ok(EvalMatrix::new(rows, cols, values))
+        Ok(ValueRows::matrix(EvalMatrix::new(rows, cols, values)))
     }
     fn eval_transpose(
         &self,
@@ -1137,7 +1218,7 @@ impl CellStore {
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
+    ) -> Result<ValueRows, FormulaError> {
         if !(2..=3).contains(&args.len()) {
             return Err(FormulaError::Value);
         }
@@ -1151,21 +1232,22 @@ impl CellStore {
         if rows == 0 || requested_cols == Some(0) {
             return Err(FormulaError::Calc);
         }
-        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
-        let cols = requested_cols.unwrap_or(source.cols as i64);
-        let output_rows = transformed_axis_bound(source.rows, rows, drop)?;
+        let source = self.eval_rows_arg(&args[0], sheet, pass, depth + 1)?;
+        let (source_rows, source_cols) = source.shape();
+        let cols = requested_cols.unwrap_or(source_cols as i64);
+        let output_rows = transformed_axis_bound(source_rows, rows, drop)?;
         let output_cols = match requested_cols {
-            Some(cols) => transformed_axis_bound(source.cols, cols, drop)?,
-            None => source.cols,
+            Some(cols) => transformed_axis_bound(source_cols, cols, drop)?,
+            None => source_cols,
         };
         let cells = EvalMatrix::validate_shape(output_rows, output_cols, 2, 0)?;
         source.validate_copies(2)?;
         let row_magnitude = usize::try_from(rows.unsigned_abs())
             .unwrap_or(usize::MAX)
-            .min(source.rows);
+            .min(source_rows);
         let col_magnitude = usize::try_from(cols.unsigned_abs())
             .unwrap_or(usize::MAX)
-            .min(source.cols);
+            .min(source_cols);
         let row_start = if drop {
             if rows > 0 {
                 row_magnitude
@@ -1173,7 +1255,7 @@ impl CellStore {
                 0
             }
         } else if rows < 0 {
-            source.rows - row_magnitude
+            source_rows - row_magnitude
         } else {
             0
         };
@@ -1186,19 +1268,29 @@ impl CellStore {
                     0
                 }
             }
-            Some(_) if cols < 0 => source.cols - col_magnitude,
+            Some(_) if cols < 0 => source_cols - col_magnitude,
             Some(_) => 0,
         };
+        if output_cols == source_cols {
+            return Ok(source.span(row_start, output_rows));
+        }
+
+        // A column cut copies, as before.
+        let matrix = source.into_matrix();
         let mut values = Vec::new();
         values
             .try_reserve_exact(cells)
             .map_err(|_| FormulaError::Num)?;
         for row in row_start..row_start + output_rows {
             for col in col_start..col_start + output_cols {
-                values.push(source.values[row * source.cols + col].clone());
+                values.push(matrix.values[row * matrix.cols + col].clone());
             }
         }
-        Ok(EvalMatrix::new(output_rows, output_cols, values))
+        Ok(ValueRows::matrix(EvalMatrix::new(
+            output_rows,
+            output_cols,
+            values,
+        )))
     }
 
     fn eval_choose_axis(
@@ -1208,7 +1300,7 @@ impl CellStore {
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
-    ) -> Result<EvalMatrix, FormulaError> {
+    ) -> Result<ValueRows, FormulaError> {
         if args.len() < 2 {
             return Err(FormulaError::Value);
         }
@@ -1233,12 +1325,13 @@ impl CellStore {
             }
             indices.push(index);
         }
-        let source = self.eval_array_matrix_arg(&args[0], sheet, pass, depth + 1)?;
-        let dimension = if rows_axis { source.rows } else { source.cols };
+        let source = self.eval_rows_arg(&args[0], sheet, pass, depth + 1)?;
+        let (source_rows, source_cols) = source.shape();
+        let dimension = if rows_axis { source_rows } else { source_cols };
         let (output_rows, output_cols) = if rows_axis {
-            (selector_count, source.cols)
+            (selector_count, source_cols)
         } else {
-            (source.rows, selector_count)
+            (source_rows, selector_count)
         };
         let cells = EvalMatrix::validate_shape(output_rows, output_cols, 2, index_bytes)?;
         source.validate_copies(2)?;
@@ -1257,23 +1350,26 @@ impl CellStore {
             }
             *index = i32::try_from(normalized).map_err(|_| FormulaError::Num)?;
         }
+        if rows_axis {
+            return Ok(source.pick(indices.into_iter().map(|row| row as usize)));
+        }
+
+        // Columns are chosen by copying, as before.
+        let matrix = source.into_matrix();
         let mut values = Vec::new();
         values
             .try_reserve_exact(cells)
             .map_err(|_| FormulaError::Num)?;
-        if rows_axis {
-            for row in indices {
-                let start = row as usize * source.cols;
-                values.extend_from_slice(&source.values[start..start + source.cols]);
-            }
-        } else {
-            for row in 0..source.rows {
-                for &col in &indices {
-                    values.push(source.values[row * source.cols + col as usize].clone());
-                }
+        for row in 0..matrix.rows {
+            for &col in &indices {
+                values.push(matrix.values[row * matrix.cols + col as usize].clone());
             }
         }
-        Ok(EvalMatrix::new(output_rows, output_cols, values))
+        Ok(ValueRows::matrix(EvalMatrix::new(
+            output_rows,
+            output_cols,
+            values,
+        )))
     }
 
     fn eval_choose(
@@ -1303,6 +1399,50 @@ impl CellStore {
     }
 }
 
+/// The form an array dispatch returns, each checked against the array byte
+/// budget: a matrix for callers that read every value, or rows of one base
+/// for a row step's argument and for a spill.
+trait ArrayResult: Sized {
+    /// A matrix a function computed.
+    fn computed(matrix: EvalMatrix) -> Result<Self, FormulaError>;
+    /// The rows a row step kept.
+    fn rows(rows: ValueRows) -> Result<Self, FormulaError>;
+    /// An array constant's `values`, `cols` per row.
+    fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError>;
+}
+
+impl ArrayResult for EvalMatrix {
+    fn computed(matrix: Self) -> Result<Self, FormulaError> {
+        matrix.validate_copies(1)?;
+        Ok(matrix)
+    }
+
+    fn rows(rows: ValueRows) -> Result<Self, FormulaError> {
+        Self::computed(rows.into_matrix())
+    }
+
+    fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError> {
+        Self::computed(Self::new(rows, cols, values.to_vec()))
+    }
+}
+
+impl ArrayResult for ValueRows {
+    fn computed(matrix: EvalMatrix) -> Result<Self, FormulaError> {
+        matrix.validate_copies(1)?;
+        Ok(Self::matrix(matrix))
+    }
+
+    fn rows(rows: Self) -> Result<Self, FormulaError> {
+        rows.validate_copies(1)?;
+        Ok(rows)
+    }
+
+    /// Shared with the formula tree, so nothing is copied or counted.
+    fn shared(rows: usize, cols: usize, values: &Rc<[Value]>) -> Result<Self, FormulaError> {
+        Ok(Self::shared(rows, cols, Rc::clone(values)))
+    }
+}
+
 pub(super) fn dynamic_recompute_within_limit(total: usize, next: usize) -> Option<usize> {
     total
         .checked_add(next)
@@ -1326,72 +1466,77 @@ fn runtime_reference_bound(
     }
 }
 
-fn matrix_item_hash(matrix: &EvalMatrix, item: usize, by_col: bool) -> u64 {
+/// A row of a by-row array is one slice; a column is read value by value.
+fn item_hash(array: RowReader<'_>, item: usize, by_col: bool) -> u64 {
     let mut hasher = DefaultHasher::new();
-    let count = if by_col { matrix.rows } else { matrix.cols };
-    for offset in 0..count {
-        let value = if by_col {
-            matrix.get(offset, item)
-        } else {
-            matrix.get(item, offset)
-        };
-        match value {
-            Some(Value::Number(number)) => {
-                0u8.hash(&mut hasher);
-                let bits = if *number == 0.0 { 0 } else { number.to_bits() };
-                bits.hash(&mut hasher);
-            }
-            Some(Value::Text(text)) => {
-                1u8.hash(&mut hasher);
-                for character in text.chars().flat_map(char::to_lowercase) {
-                    character.hash(&mut hasher);
-                }
-            }
-            Some(Value::Bool(flag)) => {
-                2u8.hash(&mut hasher);
-                flag.hash(&mut hasher);
-            }
-            Some(Value::Blank) => 3u8.hash(&mut hasher),
-            Some(Value::Error(error)) => {
-                4u8.hash(&mut hasher);
-                error.slot().hash(&mut hasher);
-            }
-            None => 5u8.hash(&mut hasher),
+    if by_col {
+        for row in 0..array.shape().0 {
+            hash_item_value(array.value(row, item), &mut hasher);
+        }
+    } else {
+        for value in array.row(item) {
+            hash_item_value(Some(value), &mut hasher);
         }
     }
     hasher.finish()
 }
 
-fn matrix_items_equal(
-    matrix: &EvalMatrix,
+fn hash_item_value(value: Option<&Value>, hasher: &mut DefaultHasher) {
+    match value {
+        Some(Value::Number(number)) => {
+            0u8.hash(hasher);
+            let bits = if *number == 0.0 { 0 } else { number.to_bits() };
+            bits.hash(hasher);
+        }
+        Some(Value::Text(text)) => {
+            1u8.hash(hasher);
+            for character in text.chars().flat_map(char::to_lowercase) {
+                character.hash(hasher);
+            }
+        }
+        Some(Value::Bool(flag)) => {
+            2u8.hash(hasher);
+            flag.hash(hasher);
+        }
+        Some(Value::Blank) => 3u8.hash(hasher),
+        Some(Value::Error(error)) => {
+            4u8.hash(hasher);
+            error.slot().hash(hasher);
+        }
+        None => 5u8.hash(hasher),
+    }
+}
+
+fn items_equal(
+    array: RowReader<'_>,
     left_index: usize,
     right_index: usize,
     by_col: bool,
 ) -> Result<bool, FormulaError> {
-    let count = if by_col { matrix.rows } else { matrix.cols };
-    for offset in 0..count {
-        let left = if by_col {
-            matrix.get(offset, left_index)
-        } else {
-            matrix.get(left_index, offset)
+    if !by_col {
+        for (left, right) in array.row(left_index).iter().zip(array.row(right_index)) {
+            if !item_values_equal(left, right)? {
+                return Ok(false);
+            }
         }
-        .ok_or(FormulaError::Ref)?;
-        let right = if by_col {
-            matrix.get(offset, right_index)
-        } else {
-            matrix.get(right_index, offset)
-        }
-        .ok_or(FormulaError::Ref)?;
-        let equal = match (left, right) {
-            (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
-            (Value::Error(_), _) | (_, Value::Error(_)) => false,
-            _ => compare_values(left, right)? == Ordering::Equal,
-        };
-        if !equal {
+        return Ok(true);
+    }
+    for row in 0..array.shape().0 {
+        let left = array.value(row, left_index).ok_or(FormulaError::Ref)?;
+        let right = array.value(row, right_index).ok_or(FormulaError::Ref)?;
+        if !item_values_equal(left, right)? {
             return Ok(false);
         }
     }
     Ok(true)
+}
+
+fn item_values_equal(left: &Value, right: &Value) -> Result<bool, FormulaError> {
+    Ok(match (left, right) {
+        (Value::Error(left_error), Value::Error(right_error)) => left_error == right_error,
+        (Value::Error(_), _) | (_, Value::Error(_)) => false,
+        _ => compare_values(left, right)? == Ordering::Equal,
+    })
 }
 
 /// TRIMRANGE trims leading blanks for mode 1, trailing blanks for mode 2
@@ -1509,6 +1654,46 @@ mod tests {
         store.recompute(sheet);
         assert_eq!(text(&store, sheet, 0, 1).as_deref(), Some("#NUM!"));
         assert_eq!(matrix_resource_stats(), [0, 0, 0]);
+    }
+
+    /// Row steps pick rows of the matrix their range was read into: the
+    /// chain below reads its two ranges into matrices and copies its picked
+    /// rows once, into the matrix that spills. An array constant is read
+    /// where the formula keeps it, so its sorted rows are the only copy.
+    #[test]
+    fn chained_row_steps_copy_their_result_once() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(4, 20);
+        for row in 0..20 {
+            store.set_number(sheet, row, 0, (20 - row) as f64, 0);
+            store.set_bool(sheet, row, 1, row % 2 == 0, 0);
+        }
+        store.set_formula(
+            sheet,
+            0,
+            2,
+            "=CHOOSEROWS(DROP(TAKE(UNIQUE(SORT(FILTER(A1:A20,B1:B20))),6),1),2,1)",
+            0,
+        );
+        reset_matrix_resource_stats();
+        store.recompute(sheet);
+        assert_eq!(number(&store, sheet, 0, 2), 6.0);
+        assert_eq!(number(&store, sheet, 1, 2), 4.0);
+        assert_eq!(
+            matrix_resource_stats()[2],
+            3,
+            "the two ranges and the spilled rows are the only matrices"
+        );
+
+        store.set_formula(sheet, 0, 3, "=SORT({3;1;2},1,-1)", 0);
+        reset_matrix_resource_stats();
+        store.recompute(sheet);
+        assert_eq!(number(&store, sheet, 2, 3), 1.0);
+        assert_eq!(
+            matrix_resource_stats()[2],
+            1,
+            "only the spilled rows are copied"
+        );
     }
 
     #[test]
