@@ -11,7 +11,8 @@ import {
   LEAD_LOAD_BATCH_ROWS,
 } from "../showcases/host-rows/accounts.js";
 import { HostRowsStage } from "../showcases/host-rows/HostRowsStage.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import HostRowsSnippet from "../showcases/snippets/host-rows.mdx";
 import HostRowsSnippetSource from "../showcases/snippets/host-rows.mdx?source";
 

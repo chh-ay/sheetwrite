@@ -11,7 +11,8 @@ import { NoHydration } from "solid-js/web";
 import { EngineApiDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { FormulasStage } from "../showcases/formulas/FormulasStage.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 
 import artStylesheet from "../art/art.css?url";
 import stylesheet from "../styles/showcases/formulas.css?url";

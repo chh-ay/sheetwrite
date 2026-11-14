@@ -7,7 +7,8 @@ import { NoHydration } from "solid-js/web";
 
 import { SortModesDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import { SortStage } from "../showcases/sort/SortStage.js";
 
 import artStylesheet from "../art/art.css?url";

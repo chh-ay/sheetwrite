@@ -10,8 +10,8 @@ import {
 /*
  * The calls a showcase snippet makes, for the aside beside its code: each
  * call's API reference page and the first sentence of its docs. Server only:
- * the showcase page renders on the server, and the manifest stays out of the
- * scripts the page loads.
+ * the showcase page renders on the server, and client bundles, which never
+ * call `showcaseCalls`, leave the manifest out.
  */
 
 /** One call listed beside a showcase's code. */
@@ -33,9 +33,23 @@ const CALL =
 const BUILT_IN = /^new (?:Promise|Map|Set|Error|URL|Date|Uint8Array)$/;
 
 const manifest = publicApi as ApiManifestShape;
-const routes = apiReferenceRoutes(manifest);
-const previews = apiSymbolPreviews(manifest);
-const members = apiMemberReferences(manifest);
+let index:
+  | {
+      readonly routes: ReturnType<typeof apiReferenceRoutes>;
+      readonly previews: ReturnType<typeof apiSymbolPreviews>;
+      readonly members: ReturnType<typeof apiMemberReferences>;
+    }
+  | undefined;
+
+/** Built on first use, so a bundle that never calls `showcaseCalls` drops the manifest. */
+function apiIndex(): NonNullable<typeof index> {
+  index ??= {
+    routes: apiReferenceRoutes(manifest),
+    previews: apiSymbolPreviews(manifest),
+    members: apiMemberReferences(manifest),
+  };
+  return index;
+}
 
 /** The first sentence of a doc comment, with `{@link X}` written as `X`. */
 function firstSentence(documentation: string | undefined): string | undefined {
@@ -56,6 +70,7 @@ export function showcaseCalls(
   code: string,
   notes: Readonly<Record<string, string>> = {},
 ): ShowcaseCall[] {
+  const { routes, previews, members } = apiIndex();
   return [...new Set(code.match(CALL) ?? [])]
     .filter((call) => !BUILT_IN.test(call))
     .map((call) => call.replace(/^new /, ""))

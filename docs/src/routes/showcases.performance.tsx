@@ -16,7 +16,8 @@ import { NoHydration } from "solid-js/web";
 
 import { PagingDiagram } from "../art/diagrams.js";
 import { Island } from "../islands/Island.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import { PerformanceDiagnostics } from "../showcases/performance/PerformanceDiagnostics.js";
 import { PerformanceStage } from "../showcases/performance/PerformanceStage.js";
 import PerformanceSnippet from "../showcases/snippets/performance.mdx";

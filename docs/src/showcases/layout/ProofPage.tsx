@@ -1,7 +1,8 @@
 import { For, type JSX } from "solid-js";
 
 import { BoundarySeam } from "../../art/diagrams.js";
-import { type ShowcaseCode, ShowcasePage, ShowcaseSection } from "./ShowcaseLayout.js";
+import { ShowcaseSection } from "./ShowcaseLayout.js";
+import { type ShowcaseCode, ShowcasePage } from "./ShowcasePage.js";
 
 export interface ProofFact {
   label: string;
