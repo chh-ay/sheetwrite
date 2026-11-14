@@ -1105,6 +1105,9 @@ function conditionalFormatWindowFixture(size: number): TimedFixture {
     dispose: () => store.free(),
     // A read changes nothing, so the next read needs no undo.
     restore: () => {},
+  };
+}
+
 /** `take-sort-filter` columns: A holds each key twice, B counts down, C cycles through 0..99. */
 const TAKE_SORT_FILTER_KEYS_PER_VALUE = 2;
 const TAKE_SORT_FILTER_FLAGS = 100;
