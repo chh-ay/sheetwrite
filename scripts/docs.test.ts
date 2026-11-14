@@ -191,16 +191,18 @@ describe("API reference pages", () => {
       "(shape: CountShape, size: number, label?: string): number",
       "Makes a thing.\n@param size - How big.",
     );
-    const entry = entryPoint(".", [shape, make]);
+    const run = apiExport("runThing", "function", "(): Promise<void>", "Runs a thing.");
+    const entry = entryPoint(".", [shape, make, run]);
     // A re-export from a second entry point counts once.
     const adapter = entryPoint("./adapter", [make]);
     const manifest: PublicApiManifest = {
       formatVersion: 2,
       packages: [{ name: "@sheetwrite/core", entryPoints: [entry, adapter] }],
     };
-    await prepareDeclarationShapes([shape, make].map((item) => parseableDeclaration(item)));
+    await prepareDeclarationShapes([shape, make, run].map((item) => parseableDeclaration(item)));
     expect(undocumentedApi(manifest)).toEqual([
-      // `call` once for both overloads; `shape` reads CountShape's summary.
+      // `call` once for both overloads; `shape` reads CountShape's summary;
+      // `runThing` returns nothing to describe.
       {
         packageName: "@sheetwrite/core",
         members: ["CountShape.bare", "CountShape.call"],
@@ -208,6 +210,8 @@ describe("API reference pages", () => {
         returns: ["makeThing"],
       },
     ]);
+    const runPage = await renderSymbolPage(manifest.packages[0]!, entry, run);
+    expect(runPage).not.toContain("## Returns");
   });
 
   it("groups members into properties, methods and events, function-typed properties as methods", async () => {
