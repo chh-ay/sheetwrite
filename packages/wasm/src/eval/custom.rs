@@ -306,7 +306,6 @@ mod javascript {
     use super::{CellStore, CustomArgument, CustomFunction, FormulaError, Value};
     use std::rc::Rc;
     use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
 
     /// Cell kinds in the flat argument buffers; `@sheetwrite/core/functions`
     /// reads the same codes.
