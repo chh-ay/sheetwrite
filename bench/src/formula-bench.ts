@@ -89,6 +89,8 @@ const SHAPE_ROW_IDS = [
   "let-calls",
 ] as const;
 const SHAPE_ROW_SIZES = [10_000, 100_000] as const;
+/** Visible cells of the `conditional-format-window` reads: a large screen and a very large one. */
+const CONDITIONAL_WINDOW_SIZES = [10_000, 100_000] as const;
 /**
  * Rows for binding formulas to sheets, names and tables: defining names, a
  * row insert in a workbook with names, a table that grows by a row, a sort
@@ -195,6 +197,9 @@ function formulaWorkloads(
   }
   add("spill-filter-resize", range);
   add("spill-filter-same-range", range);
+  for (const size of smoke ? [1_000] : CONDITIONAL_WINDOW_SIZES) {
+    add("conditional-format-window", size);
+  }
   add("sumproduct-vector-edit", range);
   add("sumproduct-matrix-edit", range);
   add("criteria-multi-range-edit", range);
@@ -305,6 +310,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
   "spill-filter-same-range",
+  "conditional-format-window",
   "paged-cell-reads",
   "paged-insert-row",
   "paged-range-loaded",

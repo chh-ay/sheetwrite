@@ -132,6 +132,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return `1:${size}:0`;
     case "spill-filter-same-range":
       return `${SAME_RANGE_EDITED_FIRST}:0`;
+    case "conditional-format-window":
+      return conditionalWindowOutput(size);
     case "paged-cell-reads":
       return pagedCellReadsOutput(size);
     case "paged-insert-row":
@@ -997,6 +999,97 @@ function spillFilterSameRangeFixture(count: number): TimedFixture {
     check: () => `${numberAt(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
     dispose: () => store.free(),
     restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
+  };
+}
+
+/** Columns of the `conditional-format-window` read; the row size is its visible cell count. */
+const CONDITIONAL_WINDOW_COLS = 100;
+/**
+ * Formula rules of `conditional-format-window`, each over the whole window
+ * and written for A1: a relative cell against an absolute one, two relative
+ * cells with ROW(), and a range with absolute column edges and relative rows.
+ */
+const CONDITIONAL_WINDOW_FORMULAS = [
+  "=A1>$A$2",
+  "=AND(A1>B1,MOD(ROW(),2)=1)",
+  "=SUM($A1:$C1)>12",
+] as const;
+/** The window's one value rule: greater than this number. */
+const CONDITIONAL_WINDOW_GREATER_THAN = 4;
+const CONDITIONAL_FORMULA_KIND = 6;
+const CONDITIONAL_GREATER_KIND = 0;
+
+/** The window's cell values; the column right of the sheet reads as blank. */
+function conditionalWindowValue(row: number, col: number): number {
+  return col < CONDITIONAL_WINDOW_COLS ? (row * 7 + col * 3) % 10 : 0;
+}
+
+/** Matched rule bits over the window, counted here from the same rules. */
+function conditionalWindowOutput(size: number): number {
+  const value = conditionalWindowValue;
+  let matches = 0;
+  for (let row = 0; row < size / CONDITIONAL_WINDOW_COLS; row++) {
+    const rowSum = value(row, 0) + value(row, 1) + value(row, 2);
+    for (let col = 0; col < CONDITIONAL_WINDOW_COLS; col++) {
+      const cell = value(row, col);
+      if (cell > value(1, 0)) matches++;
+      if (cell > value(row, col + 1) && row % 2 === 0) matches++;
+      if (rowSum > 12) matches++;
+      if (cell > CONDITIONAL_WINDOW_GREATER_THAN) matches++;
+    }
+  }
+  return matches;
+}
+
+/** Set bits in the conditional-match words at the end of a packed window. */
+function packedConditionalMatches(packed: Uint8Array): number {
+  const view = new DataView(packed.buffer, packed.byteOffset, packed.byteLength);
+  const words = view.getUint32(32, true);
+  let matches = 0;
+  for (let offset = packed.byteLength - words * 4; offset < packed.byteLength; offset += 4) {
+    for (let word = view.getUint32(offset, true); word !== 0; word &= word - 1) matches++;
+  }
+  return matches;
+}
+
+/**
+ * One render-window read of `size` visible cells, 100 columns wide, under
+ * three formula rules and one value rule. Nothing changes between reads.
+ */
+function conditionalFormatWindowFixture(size: number): TimedFixture {
+  const rows = size / CONDITIONAL_WINDOW_COLS;
+  const store = new CellStore();
+  const sheet = store.addSheet(CONDITIONAL_WINDOW_COLS, rows);
+  for (let col = 0; col < CONDITIONAL_WINDOW_COLS; col++) {
+    const values = numericColumn(rows, (row) => conditionalWindowValue(row, col));
+    store.setColumnNumbers(sheet, col, 0, values, 0);
+  }
+  const ruleCount = CONDITIONAL_WINDOW_FORMULAS.length + 1;
+  const bounds = [0, 0, rows - 1, CONDITIONAL_WINDOW_COLS - 1];
+  store.setConditionalRules(
+    sheet,
+    Uint8Array.from([
+      ...CONDITIONAL_WINDOW_FORMULAS.map(() => CONDITIONAL_FORMULA_KIND),
+      CONDITIONAL_GREATER_KIND,
+    ]),
+    Uint32Array.from(Array.from({ length: ruleCount }, () => bounds).flat()),
+    Float64Array.from([...CONDITIONAL_WINDOW_FORMULAS.map(() => 0), CONDITIONAL_WINDOW_GREATER_THAN]),
+    [...CONDITIONAL_WINDOW_FORMULAS, ""],
+    new Uint8Array(ruleCount),
+  );
+  const cols = Uint32Array.from({ length: CONDITIONAL_WINDOW_COLS }, (_, col) => col);
+  let packed = new Uint8Array();
+  return {
+    store,
+    run: () => {
+      const view = store.getWindow(sheet, 0, rows, cols);
+      packed = view.takePacked();
+      view.free();
+    },
+    check: () => packedConditionalMatches(packed),
+    dispose: () => store.free(),
+    // A read changes nothing, so the next read needs no undo.
+    restore: () => {},
   };
 }
 
@@ -3277,6 +3370,8 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
       return spillSequenceAdmissionFixture(size);
     case "spill-filter-same-range":
       return spillFilterSameRangeFixture(size);
+    case "conditional-format-window":
+      return conditionalFormatWindowFixture(size);
     case "scalar-edit-affects-0":
       return fanOutEditFixture(size, true);
     default:
