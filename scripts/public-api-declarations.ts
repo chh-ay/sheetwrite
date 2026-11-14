@@ -138,7 +138,7 @@ function jsDocCommentTexts(node: Node): string[] {
       }
       // `@throws {TypeError} when …` keeps its type as code: it may not be a linkable export.
       if (isJSDocThrowsTag(tag)) {
-        const type = tag.typeExpression?.type.getText();
+        const type = tag.typeExpression?.getText().replace(/^\{\s*|\s*\}$/g, "");
         const text = [type === undefined ? undefined : `\`${type}\``, comment.trim()]
           .filter(Boolean)
           .join(" ");
