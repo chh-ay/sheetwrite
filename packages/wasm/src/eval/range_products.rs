@@ -116,7 +116,10 @@ impl CellStore {
 
 // The slice loop tells empty and number kinds apart from the rest by their
 // bits alone.
-const _: () = assert!(KIND_EMPTY == 0 && KIND_NUMBER == 1);
+const _: () = assert!(
+    KIND_EMPTY == 0 && KIND_NUMBER == 1,
+    "the slice loop tells empty and number kinds apart by their bits"
+);
 
 /// The `SUMPRODUCT` total of single columns that hold only numbers and
 /// blanks, a blank counting as zero, with the products and the running total

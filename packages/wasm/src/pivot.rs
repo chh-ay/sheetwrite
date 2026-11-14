@@ -16,6 +16,7 @@
 //! Group keys, their order and the numbers that aggregates count come from
 //! [`crate::eval::analysis::grouping`], which `GROUPBY` and `PIVOTBY` share.
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::mem::size_of;
@@ -35,6 +36,8 @@ pub(crate) const MAX_PIVOT_GROUPS: usize = 100_000;
 
 /// A row outside the pivot: filtered out, or with an error in a key field.
 const NO_GROUP: u32 = u32::MAX;
+/// Between the aggregation and the field in a value field's caption.
+const CAPTION_JOIN: &str = " of ";
 /// Group 0 of each axis is the grand total.
 const ROOT: u32 = 0;
 
@@ -1097,18 +1100,47 @@ pub(crate) struct PivotLayout {
     /// `value_slots` value columns.
     row_groups: Vec<u32>,
     col_groups: Vec<u32>,
-    /// Each group's index in `row_groups` / `col_groups`, so a changed pair
-    /// finds its output cells without a scan.
-    row_positions: FxHashMap<u32, u32>,
-    col_positions: FxHashMap<u32, u32>,
+    /// Each axis group's index in `row_groups` / `col_groups`, `NO_GROUP`
+    /// when the layout hides it, so a changed pair finds its output cells
+    /// without a scan. Indexed by group id: ids are dense.
+    row_positions: Vec<u32>,
+    col_positions: Vec<u32>,
 }
 
 impl PivotLayout {
-    pub(crate) fn retained_bytes(&self) -> usize {
+    pub(crate) const fn retained_bytes(&self) -> usize {
         (self.row_groups.capacity() + self.col_groups.capacity()) * size_of::<u32>()
-            + (self.row_positions.capacity() + self.col_positions.capacity())
-                * (2 * size_of::<u32>() + 1)
+            + (self.row_positions.capacity() + self.col_positions.capacity()) * size_of::<u32>()
     }
+}
+
+/// The output position of `group` in `positions`, unless the layout hides
+/// it. A group added after the layout was built is hidden too.
+fn shown_position(positions: &[u32], group: u32) -> Option<usize> {
+    positions
+        .get(group as usize)
+        .filter(|&&position| position != NO_GROUP)
+        .map(|&position| position as usize)
+}
+
+/// Whether two names are equal without case. Text that is all ASCII
+/// compares in place; other text compares lower-cased, as before.
+fn same_name(left: &str, right: &str) -> bool {
+    if left.is_ascii() && right.is_ascii() {
+        left.eq_ignore_ascii_case(right)
+    } else {
+        left.to_lowercase() == right.to_lowercase()
+    }
+}
+
+/// [`field_name`], borrowing a text header instead of copying it.
+fn field_name_ref(header: &Value, field: usize) -> Cow<'_, str> {
+    if let Value::Text(text) = header {
+        if !text.is_empty() {
+            return Cow::Borrowed(text);
+        }
+    }
+    Cow::Owned(field_name(header, field))
 }
 
 /// The name of a source field: its header, or `ColumnN` for a blank header.
@@ -1306,8 +1338,6 @@ impl PivotCache {
             return;
         }
 
-        let row_positions = group_positions(&layout.row_groups, &self.row_axis);
-        let col_positions = group_positions(&layout.col_groups, &self.col_axis);
         // Cell index `row position * width + column position` stays under
         // the output cell bound, so it fits in `u32`.
         let width = layout.col_groups.len();
@@ -1319,10 +1349,14 @@ impl PivotCache {
 
         for row_depth in 0..=self.row_axis.width as u32 {
             let row_cells =
-                self.ancestor_positions(&self.row_axis, row_depth, &row_positions, true);
+                self.ancestor_positions(&self.row_axis, row_depth, &layout.row_positions, true);
             for col_depth in 0..=self.col_axis.width as u32 {
-                let col_cells =
-                    self.ancestor_positions(&self.col_axis, col_depth, &col_positions, false);
+                let col_cells = self.ancestor_positions(
+                    &self.col_axis,
+                    col_depth,
+                    &layout.col_positions,
+                    false,
+                );
                 scratch.starts.fill(0);
                 scratch.depths = (row_depth, col_depth);
                 for (row, cell) in scratch.cell_of_row.iter_mut().enumerate() {
@@ -1416,7 +1450,10 @@ impl PivotCache {
             }
             let ancestor = axis.ancestor(group as u32, depth);
             if !rows || self.shows_values(ancestor) {
-                *leaf_position = positions[ancestor as usize];
+                *leaf_position = positions
+                    .get(ancestor as usize)
+                    .copied()
+                    .unwrap_or(NO_GROUP);
             }
         }
         leaf_positions
@@ -1767,13 +1804,6 @@ impl PivotCache {
             return Err(FormulaError::Num);
         }
 
-        let positions = |groups: &[u32]| -> FxHashMap<u32, u32> {
-            groups
-                .iter()
-                .enumerate()
-                .map(|(position, &group)| (group, position as u32))
-                .collect()
-        };
         let (rows, cols, header_rows) = if cols == 0 {
             // Nothing to show: one blank cell keeps the anchor visible.
             (1, 1, 0)
@@ -1786,8 +1816,8 @@ impl PivotCache {
             header_rows,
             label_cols,
             value_slots,
-            row_positions: positions(&row_groups),
-            col_positions: positions(&col_groups),
+            row_positions: group_positions(&row_groups, &self.row_axis),
+            col_positions: group_positions(&col_groups, &self.col_axis),
             row_groups,
             col_groups,
         })
@@ -1893,11 +1923,35 @@ impl PivotCache {
         let value = &self.outputs[slot];
         value.name.clone().unwrap_or_else(|| {
             format!(
-                "{} of {}",
+                "{}{CAPTION_JOIN}{}",
                 value.aggregation.caption(),
                 field_name(&self.headers[value.field], value.field)
             )
         })
+    }
+
+    /// Whether `wanted` is the caption of value field `slot`, without case.
+    /// An ASCII caption "Sum of Field" is matched part by part instead of
+    /// being built.
+    fn caption_is(&self, slot: usize, wanted: &str) -> bool {
+        let value = &self.outputs[slot];
+        if let Some(name) = &value.name {
+            return same_name(name, wanted);
+        }
+        let aggregation = value.aggregation.caption();
+        let field = field_name_ref(&self.headers[value.field], value.field);
+        if !(wanted.is_ascii() && field.is_ascii()) {
+            return same_name(&self.value_caption(slot), wanted);
+        }
+        let (start, rest) = wanted
+            .split_at_checked(aggregation.len())
+            .unwrap_or_default();
+        let (of, end) = rest
+            .split_at_checked(CAPTION_JOIN.len())
+            .unwrap_or_default();
+        start.eq_ignore_ascii_case(aggregation)
+            && of.eq_ignore_ascii_case(CAPTION_JOIN)
+            && end.eq_ignore_ascii_case(&field)
     }
 
     /// `GETPIVOTDATA`: the value cell of `data_field` in the row and column
@@ -1916,25 +1970,25 @@ impl PivotCache {
         measure_value: &dyn Fn(usize) -> Value,
     ) -> Result<Value, FormulaError> {
         let definition = &self.definition;
-        let wanted = data_field.to_lowercase();
         let slot = (0..self.outputs.len())
             .find(|&slot| {
                 let value = &self.outputs[slot];
-                self.value_caption(slot).to_lowercase() == wanted
+                self.caption_is(slot, data_field)
                     || (value.measure.is_none()
-                        && field_name(&self.headers[value.field], value.field).to_lowercase()
-                            == wanted)
+                        && same_name(
+                            &field_name_ref(&self.headers[value.field], value.field),
+                            data_field,
+                        ))
             })
             .ok_or(FormulaError::Ref)?;
 
         let row_group = self.named_group(&self.row_axis, &definition.rows, items)?;
         let col_group = self.named_group(&self.col_axis, &definition.columns, items)?;
         let named = items.iter().filter(|(field, _)| {
-            let field = field.to_lowercase();
             let on = |fields: &[usize]| {
                 fields
                     .iter()
-                    .any(|&index| field_name(&self.headers[index], index).to_lowercase() == field)
+                    .any(|&index| same_name(&field_name_ref(&self.headers[index], index), field))
             };
             on(&definition.rows) || on(&definition.columns)
         });
@@ -1942,14 +1996,8 @@ impl PivotCache {
             return Err(FormulaError::Ref);
         }
 
-        let row = *layout
-            .row_positions
-            .get(&row_group)
-            .ok_or(FormulaError::Ref)? as usize;
-        let col = *layout
-            .col_positions
-            .get(&col_group)
-            .ok_or(FormulaError::Ref)? as usize;
+        let row = shown_position(&layout.row_positions, row_group).ok_or(FormulaError::Ref)?;
+        let col = shown_position(&layout.col_positions, col_group).ok_or(FormulaError::Ref)?;
         let offset = (layout.header_rows + row) * layout.cols
             + layout.label_cols
             + col * layout.value_slots
@@ -1976,10 +2024,10 @@ impl PivotCache {
         let mut group = ROOT;
         let mut ended = false;
         for &field in fields {
-            let name = field_name(&self.headers[field], field).to_lowercase();
+            let name = field_name_ref(&self.headers[field], field);
             let mut matching = items
                 .iter()
-                .filter(|(item_field, _)| item_field.to_lowercase() == name);
+                .filter(|(item_field, _)| same_name(&name, item_field));
             let Some((_, item)) = matching.next() else {
                 ended = true;
                 continue;
@@ -2018,15 +2066,15 @@ impl PivotCache {
         let values = self.outputs.len();
         let mut offsets = Vec::with_capacity(pairs.len() * values);
         for (row_group, col_group) in pairs {
-            let (Some(&row), Some(&col)) = (
-                layout.row_positions.get(&row_group),
-                layout.col_positions.get(&col_group),
+            let (Some(row), Some(col)) = (
+                shown_position(&layout.row_positions, row_group),
+                shown_position(&layout.col_positions, col_group),
             ) else {
                 continue;
             };
-            let start = (layout.header_rows + row as usize) * layout.cols
+            let start = (layout.header_rows + row) * layout.cols
                 + layout.label_cols
-                + col as usize * layout.value_slots;
+                + col * layout.value_slots;
             offsets.extend(start..start + values);
         }
         Some(offsets)
