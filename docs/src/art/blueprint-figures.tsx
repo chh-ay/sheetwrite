@@ -12,11 +12,11 @@ import {
 import { spread } from "./layout.js";
 
 /** Wide drawings span the reading column; narrow ones a phone's width. */
-const WIDE = 720;
-const NARROW = 360;
+export const WIDE = 720;
+export const NARROW = 360;
 
 /** A node sized to its text at the given position and width. */
-function node(
+export function node(
   spec: Omit<BlueprintNode, "rect"> & {
     readonly x: number;
     readonly y: number;
@@ -29,7 +29,7 @@ function node(
 }
 
 /** The fraction along a wide box's side that lines up with `x`. */
-const along = (target: BlueprintNode, x: number) => (x - target.rect.x) / target.rect.w;
+export const along = (target: BlueprintNode, x: number) => (x - target.rect.x) / target.rect.w;
 
 // ---- Runtime ownership: architecture at a glance ---------------------------------
 

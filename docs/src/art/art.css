@@ -290,11 +290,12 @@
 }
 
 /* ---- Blueprint figures (art/blueprint.tsx) ----------------------------------- */
-/* A dotted canvas inside the figure frame; boxes on the surface colour with a
-   coloured inline-start edge; connectors by kind. Names and labels use the
-   body face, which every page preloads; only code lines use the mono face. Every label carries a halo in
-   the canvas colour, so it reads over the dots and the lines. */
-.sw-art-figure:has(.sw-blueprint) {
+/* A dotted canvas inside the figure frame, on docs pages and showcases; boxes
+   on the surface colour with a coloured inline-start edge; connectors by kind.
+   Names and labels use the body face, which every page preloads; only code
+   lines use the mono face. Every label carries a halo in the canvas colour,
+   so it reads over the dots and the lines. */
+:is(.sw-art-figure, .sw-showcase__figure):has(.sw-blueprint) {
   --bp-canvas: var(--sw-surface-0);
   border-radius: var(--sw-radius-md);
   background:
