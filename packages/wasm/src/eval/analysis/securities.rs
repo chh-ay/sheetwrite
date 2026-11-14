@@ -96,7 +96,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
     }
 }
 
-fn ensure(is_valid: bool) -> Result<(), FormulaError> {
+const fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     if is_valid {
         Ok(())
     } else {

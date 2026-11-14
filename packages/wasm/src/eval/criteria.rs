@@ -87,7 +87,7 @@ impl Criterion {
     /// The operator and number a finite number cell is compared with, or
     /// `None` when the criterion is text, a boolean or a pattern: then every
     /// finite number gets the same answer, [`Self::matches_number`]'s.
-    pub(super) fn number_comparison(&self) -> Option<(CmpOp, f64)> {
+    pub(super) const fn number_comparison(&self) -> Option<(CmpOp, f64)> {
         match self.operand {
             Value::Number(operand) if self.wildcard.is_none() => Some((self.op, operand)),
             Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
@@ -244,7 +244,7 @@ pub(super) struct IfSum {
 }
 
 impl IfSum {
-    pub(super) fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self { sum: 0.0, count: 0 }
     }
 
@@ -291,7 +291,7 @@ pub(super) struct IfExtreme {
 }
 
 impl IfExtreme {
-    pub(super) fn new(maximum: bool) -> Self {
+    pub(super) const fn new(maximum: bool) -> Self {
         Self {
             found: None,
             maximum,

@@ -81,7 +81,9 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
         | Ast::LetName { .. }
         | Ast::Array { .. } => {}
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {}
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => resolve_let_names(&mut std::rc::Rc::make_mut(definition).body),
     }
 }
 
@@ -121,7 +123,7 @@ fn nested_lets_scalar(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, args) => lets_have_scalar_bindings(args),
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) => false,
+        Ast::Func(Func::Analysis(_), _) | Ast::UnknownFunc(_) | Ast::Lambda(_) => false,
         Ast::Func(_, args) => args.iter().all(nested_lets_scalar),
         #[cfg(not(feature = "analysis"))]
         Ast::UnknownFunc(call) => {
@@ -165,7 +167,7 @@ pub(crate) fn scalar_binding(expression: &Ast) -> bool {
         | Ast::LetName { .. }
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -198,7 +200,7 @@ fn scalar_operand(ast: &Ast) -> bool {
         | Ast::LetName { .. }
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => false,
     }
 }
 
@@ -233,7 +235,7 @@ fn call_has_scalar_result(call: &Ast) -> bool {
     ) {
         return false;
     }
-    !ast_produces_array(call) && args.iter().all(nested_lets_scalar)
+    !ast_produces_array(call, super::Shapes::NONE) && args.iter().all(nested_lets_scalar)
 }
 
 /// One visible binding while resolving: its name and slot.
@@ -322,7 +324,11 @@ fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
         | Ast::LetName { .. }
         | Ast::Array { .. } => {}
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {}
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            resolve_uses(&mut std::rc::Rc::make_mut(definition).body, bindings, next);
+        }
     }
 }
 
@@ -411,7 +417,7 @@ impl LetFrame {
     /// first binding zero; it opens slots above any in use. A nested LET's
     /// slots follow its enclosing LET's, so it shares the open ones. Returns
     /// what [`LetFrame::close_resolved`] restores.
-    pub(crate) fn open_resolved(&mut self, first_slot: u32) -> ResolvedScope {
+    pub(crate) const fn open_resolved(&mut self, first_slot: u32) -> ResolvedScope {
         if first_slot != 0 {
             return ResolvedScope::Nested;
         }

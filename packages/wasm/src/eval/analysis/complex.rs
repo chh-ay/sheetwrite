@@ -53,7 +53,7 @@ impl Complex {
     const ZERO: Self = Self { re: 0.0, im: 0.0 };
     const ONE: Self = Self { re: 1.0, im: 0.0 };
 
-    fn new(re: f64, im: f64) -> Self {
+    const fn new(re: f64, im: f64) -> Self {
         Self { re, im }
     }
 
@@ -161,7 +161,7 @@ impl Complex {
         ))
     }
 
-    fn is_finite(self) -> bool {
+    const fn is_finite(self) -> bool {
         self.re.is_finite() && self.im.is_finite()
     }
 }
@@ -180,7 +180,7 @@ struct Suffix(Option<char>);
 
 impl Suffix {
     /// Records a suffix. Arguments with different suffixes are `#VALUE!`.
-    fn merge(&mut self, suffix: Option<char>) -> Result<(), FormulaError> {
+    const fn merge(&mut self, suffix: Option<char>) -> Result<(), FormulaError> {
         match (self.0, suffix) {
             (Some(current), Some(next)) if current != next => Err(FormulaError::Value),
             (None, Some(next)) => {

@@ -4,7 +4,7 @@
 use super::functions::{treats_cell_as_reference, ReductionFold, MAX_FUNCTION_ARGS};
 use super::range_reader::RangeReader;
 use super::value::aggregate_number;
-use super::{ast_produces_array, literal_cell_value, EvalPass};
+use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
 
 use crate::calc::{Ast, Func};
 use crate::cells::payload_num;
@@ -67,7 +67,7 @@ impl CellStore {
                 .all(|arg| super::matrix::range_from_ast(arg, sheet).is_some())
             || !args
                 .iter()
-                .all(|arg| sum_scalar_or_range(arg, sheet).is_some())
+                .all(|arg| sum_scalar_or_range(arg, sheet, pass.shapes()).is_some())
         {
             return None;
         }
@@ -75,7 +75,7 @@ impl CellStore {
         let mut fold = ReductionFold::new(Func::Sum)?;
         let mut deferred = None;
         for arg in args {
-            let result = match sum_scalar_or_range(arg, sheet)? {
+            let result = match sum_scalar_or_range(arg, sheet, pass.shapes())? {
                 SumArg::Range(range) => self
                     .fold_range(range, &mut fold, true, pass, depth)
                     .map(|_| ()),
@@ -255,7 +255,7 @@ enum SumArg {
 /// The accumulator's reading of `arg`, or `None` for arguments the mixed
 /// path leaves to it: arrays, unions, sheet spans, intersections and
 /// missing arguments.
-fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
+fn sum_scalar_or_range(arg: &Ast, sheet: usize, shapes: Shapes<'_>) -> Option<SumArg> {
     match arg {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(_) | Ast::Structured(_) => {
             super::matrix::range_from_ast(arg, sheet).map(SumArg::Range)
@@ -264,7 +264,7 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
             reference: treats_cell_as_reference(Func::Sum),
         }),
         Ast::Missing | Ast::Func(Func::Union | Func::Intersect, _) | Ast::SheetSpan(_) => None,
-        _ if ast_produces_array(arg) => None,
+        _ if ast_produces_array(arg, shapes) => None,
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -285,11 +285,13 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
         | Ast::LetName { .. }
         | Ast::Array { .. } => Some(SumArg::Scalar { reference: false }),
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => Some(SumArg::Scalar { reference: false }),
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+            Some(SumArg::Scalar { reference: false })
+        }
     }
 }
 
-fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
+const fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
     match sum {
         Ok(total) => Value::Number(total),
         Err(error) => Value::Error(error),

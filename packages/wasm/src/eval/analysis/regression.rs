@@ -1,6 +1,6 @@
 //! Least-squares arrays, FREQUENCY, MODE.MULT, PROB and legacy statistical names.
 
-use super::super::array::ast_produces_array;
+use super::super::array::{ast_produces_array, Shapes};
 use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAccumulator};
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
@@ -70,7 +70,7 @@ fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         .sum())
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
+pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     matches!(
         name,
         "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND"
@@ -87,9 +87,10 @@ fn argument_shape(
         Ast::Num(_) | Ast::Bool(_) | Ast::Str(_) => Ok((1, 1, 1)),
         // A scalar expression such as 1/0 or A1*2 gives one value; its
         // error, if any, appears when it is evaluated.
-        _ if !is_reference(ast) && !ast_produces_array(ast) => Ok((1, 1, 1)),
+        _ if !is_reference(ast) && !ast_produces_array(ast, pass.shapes()) => Ok((1, 1, 1)),
         Ast::Missing
-        | Ast::BoundMatrix { .. }
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)
@@ -192,7 +193,7 @@ fn statistics_rows_bound(args: &[Ast]) -> usize {
 
 /// One predictor maps each cell of `new_x` to one result. More predictors use
 /// one `new_x` row (vertical data) or column (horizontal data) per result.
-fn prediction_shape(
+const fn prediction_shape(
     predictors: usize,
     is_vertical: bool,
     new_rows: usize,
@@ -388,7 +389,7 @@ pub(crate) fn evaluate_array(
 
 /// Regression inputs must be numbers: blank cells, text and logical values
 /// give #VALUE!, as in Excel.
-fn strict_number(value: &Value) -> Result<f64, FormulaError> {
+const fn strict_number(value: &Value) -> Result<f64, FormulaError> {
     match value {
         Value::Number(number) => Ok(*number),
         Value::Error(error) => Err(*error),
@@ -445,7 +446,7 @@ fn frequency(
 fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let mut numbers = Vec::new();
     for arg in args {
-        let from_range = is_reference(arg) || ast_produces_array(arg);
+        let from_range = is_reference(arg) || ast_produces_array(arg, evaluation.pass.shapes());
         for value in &evaluation.matrix(arg)?.values {
             if let Some(number) = aggregate_number(value, from_range)? {
                 // -0 and 0 are the same value.
@@ -502,7 +503,8 @@ fn is_reference(ast: &Ast) -> bool {
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
-        | Ast::BoundMatrix { .. }
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::UnresolvedStructured(_)
@@ -535,7 +537,7 @@ struct FitStatistics {
     rank: usize,
 }
 
-fn predictor_count(
+const fn predictor_count(
     y_rows: usize,
     y_cols: usize,
     x_rows: usize,
@@ -564,7 +566,7 @@ struct PredictorLayout {
 }
 
 impl PredictorLayout {
-    fn index(self, observation: usize, predictor: usize) -> usize {
+    const fn index(self, observation: usize, predictor: usize) -> usize {
         if self.predictors == 1 {
             observation
         } else if self.is_vertical {

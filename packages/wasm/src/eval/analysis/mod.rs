@@ -61,7 +61,7 @@ pub(super) type BoundEvaluator =
 
 /// Array hooks must use the same shape, byte and work limits as built-in arrays.
 pub(super) struct ArrayHooks {
-    pub(super) produces_array: fn(&str, &[Ast]) -> bool,
+    pub(super) produces_array: for<'a> fn(&str, &[Ast], super::array::Shapes<'a>) -> bool,
     pub(super) shape: ShapeEvaluator,
     pub(super) bound: BoundEvaluator,
     pub(super) evaluate: MatrixEvaluator,

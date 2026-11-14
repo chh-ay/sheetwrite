@@ -47,7 +47,7 @@ pub(crate) struct AbsCellKey {
 }
 
 impl AbsCellKey {
-    pub(crate) fn new(sheet: usize, row: u32, col: u32) -> Self {
+    pub(crate) const fn new(sheet: usize, row: u32, col: u32) -> Self {
         Self {
             sheet: sheet as u32,
             row,
@@ -59,7 +59,7 @@ impl AbsCellKey {
         Self::new(sheet, row, col)
     }
 
-    pub(crate) fn local(self) -> CellKey {
+    pub(crate) const fn local(self) -> CellKey {
         (self.row, self.col)
     }
 }
@@ -83,7 +83,7 @@ pub(crate) enum FormulaError {
 impl FormulaError {
     pub(crate) const COUNT: usize = 11;
 
-    pub(crate) fn sentinel(self) -> &'static str {
+    pub(crate) const fn sentinel(self) -> &'static str {
         match self {
             Self::Cycle => "#CYCLE!",
             Self::DivZero => "#DIV/0!",
@@ -100,7 +100,7 @@ impl FormulaError {
     }
 
     /// Dense slot index for per-window scratch tables.
-    pub(crate) fn slot(self) -> usize {
+    pub(crate) const fn slot(self) -> usize {
         match self {
             Self::Cycle => 0,
             Self::DivZero => 1,
@@ -116,7 +116,7 @@ impl FormulaError {
         }
     }
 
-    pub(crate) fn from_slot(slot: u64) -> Option<Self> {
+    pub(crate) const fn from_slot(slot: u64) -> Option<Self> {
         match slot {
             0 => Some(Self::Cycle),
             1 => Some(Self::DivZero),
@@ -157,7 +157,7 @@ const _: () = assert!(
 );
 
 impl Value {
-    pub(crate) fn number(value: f64) -> Self {
+    pub(crate) const fn number(value: f64) -> Self {
         if value.is_finite() {
             Self::Number(value)
         } else {
@@ -180,7 +180,7 @@ pub(crate) struct CellRange {
 }
 
 impl CellRange {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         sheet: u32,
         row_start: u32,
         col_start: u32,
@@ -196,7 +196,7 @@ impl CellRange {
         }
     }
 
-    pub(crate) fn contains(self, cell: AbsCellKey) -> bool {
+    pub(crate) const fn contains(self, cell: AbsCellKey) -> bool {
         cell.sheet == self.sheet
             && cell.row >= self.row_start
             && cell.row <= self.row_end
@@ -331,7 +331,9 @@ impl ReadSet {
             | Ast::Num(_)
             | Ast::Array(_) => {}
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix(_) | Ast::RegexPattern(_) => {}
+            Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+            #[cfg(feature = "analysis")]
+            Ast::Lambda(definition) => self.collect(&definition.body, formula_sheet),
         }
     }
 
@@ -540,7 +542,7 @@ impl FormulaEntry {
             (self.flags & !Self::ERROR_MASK) | error.map_or(0, |known| (known.slot() + 1) as u16);
     }
 
-    pub(crate) fn volatile(&self) -> bool {
+    pub(crate) const fn volatile(&self) -> bool {
         self.flags & Self::VOLATILE != 0
     }
 
@@ -550,7 +552,7 @@ impl FormulaEntry {
 
     /// Runtime references share the existing spill-resolution path and flag.
     /// This avoids a new entry field or checks on formulas without these calls.
-    pub(crate) fn has_spill_refs(&self) -> bool {
+    pub(crate) const fn has_spill_refs(&self) -> bool {
         self.flags & Self::SPILL_REFS != 0
     }
 
@@ -558,7 +560,7 @@ impl FormulaEntry {
         self.set_flag(Self::SPILL_REFS, has_spill_refs);
     }
 
-    pub(crate) fn produces_array(&self) -> bool {
+    pub(crate) const fn produces_array(&self) -> bool {
         self.flags & Self::PRODUCES_ARRAY != 0
     }
 
@@ -569,7 +571,7 @@ impl FormulaEntry {
     /// Whether the formula calls SUBTOTAL or AGGREGATE. Such a formula reads
     /// the hidden rows of the sheets it reads, and a SUBTOTAL or AGGREGATE
     /// over its cell skips it, as Excel does to avoid double counting.
-    pub(crate) fn calls_subtotal(&self) -> bool {
+    pub(crate) const fn calls_subtotal(&self) -> bool {
         self.flags & Self::CALLS_SUBTOTAL != 0
     }
 
@@ -580,7 +582,7 @@ impl FormulaEntry {
         self.flags & Self::CALLS_PIVOT_DATA != 0
     }
 
-    fn set_flag(&mut self, flag: u16, enabled: bool) {
+    const fn set_flag(&mut self, flag: u16, enabled: bool) {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
 
@@ -620,7 +622,10 @@ impl FormulaEntry {
 
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
-        entry.set_produces_array(crate::eval::ast_produces_array(&ast));
+        entry.set_produces_array(crate::eval::ast_produces_array(
+            &ast,
+            crate::eval::Shapes::NONE,
+        ));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
         #[cfg(feature = "analysis")]
         entry.set_flag(
@@ -702,7 +707,7 @@ impl FormulaEntry {
         !self.is_reference()
     }
 
-    pub(crate) fn is_reference(&self) -> bool {
+    pub(crate) const fn is_reference(&self) -> bool {
         self.flags & Self::REFERENCE != 0
     }
 
@@ -1142,11 +1147,11 @@ impl StringStorage {
         id
     }
 
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.spans.len()
     }
 
-    pub(crate) fn retained_bytes(&self) -> usize {
+    pub(crate) const fn retained_bytes(&self) -> usize {
         self.bytes.len() + self.spans.len() * std::mem::size_of::<PoolSpan>()
     }
 
@@ -1213,7 +1218,7 @@ impl StringStorage {
     }
 
     /// Destructive bulk changes may leave no subsequent unique-string growth.
-    pub(crate) fn request_collection(&mut self) {
+    pub(crate) const fn request_collection(&mut self) {
         self.next_collection_bytes = STRING_COLLECTION_FLOOR_BYTES;
     }
 }

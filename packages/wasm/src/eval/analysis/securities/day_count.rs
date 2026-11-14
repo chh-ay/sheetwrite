@@ -130,11 +130,11 @@ impl Date {
         date_serial(self.year, self.month, self.day).unwrap_or(f64::NAN)
     }
 
-    pub(crate) fn month(self) -> i64 {
+    pub(crate) const fn month(self) -> i64 {
         self.month
     }
 
-    pub(crate) fn day(self) -> i64 {
+    pub(crate) const fn day(self) -> i64 {
         self.day
     }
 
@@ -168,7 +168,7 @@ impl Date {
     }
 
     /// The same date with another day of the month.
-    pub(crate) fn with_day(self, day: i64) -> Self {
+    pub(crate) const fn with_day(self, day: i64) -> Self {
         Self { day, ..self }
     }
 
@@ -216,7 +216,7 @@ impl Coupons {
 }
 
 /// The months in one coupon period.
-pub(crate) fn period_months(frequency: f64) -> i64 {
+pub(crate) const fn period_months(frequency: f64) -> i64 {
     MONTHS_PER_YEAR / frequency as i64
 }
 
@@ -257,7 +257,7 @@ fn days_360_european(start: Date, end: Date) -> f64 {
     )
 }
 
-fn days_360(start: Date, start_day: i64, end: Date, end_day: i64) -> f64 {
+const fn days_360(start: Date, start_day: i64, end: Date, end_day: i64) -> f64 {
     let years = end.year - start.year;
     let months = end.month - start.month;
 
@@ -310,7 +310,7 @@ fn holds_leap_day(start: Date, end: Date) -> bool {
     }
 }
 
-fn is_leap_year(year: i64) -> bool {
+const fn is_leap_year(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 

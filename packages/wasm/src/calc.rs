@@ -44,7 +44,7 @@ pub(crate) const SHEET_ROWS: u32 = 1_048_576;
 pub(crate) const SHEET_COLS: u32 = 16_384;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Op {
+pub(crate) enum Op {
     Add,
     Sub,
     Mul,
@@ -54,7 +54,7 @@ pub enum Op {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Func {
+pub(crate) enum Func {
     Sum,
     Avg,
     Min,
@@ -585,7 +585,7 @@ define_function_registry! {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CmpOp {
+pub(crate) enum CmpOp {
     Eq,
     Ne,
     Lt,
@@ -630,7 +630,7 @@ impl RefFlags {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SheetRef {
+pub(crate) struct SheetRef {
     pub handle: u32,
 }
 
@@ -644,13 +644,13 @@ pub(crate) struct SheetSpanEndpoint {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnresolvedSheetRef {
+pub(crate) struct UnresolvedSheetRef {
     pub name: String,
     pub quoted: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct RangeFlags {
+pub(crate) struct RangeFlags {
     pub start: RefFlags,
     pub end: RefFlags,
 }
@@ -661,7 +661,7 @@ pub(crate) const UNRESOLVED_SHEET: u32 = u32::MAX;
 /// `Sheet1:Sheet3!A1:B2`: one range on every sheet from `first` to `last` in
 /// tab order.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheetSpanRef {
+pub(crate) struct SheetSpanRef {
     pub first: SheetSpanEndpoint,
     pub last: SheetSpanEndpoint,
     /// The handles from `first` to `last` in tab order when the span was last
@@ -679,7 +679,7 @@ pub struct SheetSpanRef {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NamedRangeRef {
+pub(crate) struct NamedRangeRef {
     pub name: String,
     pub scope: Option<u32>,
     pub sheet: u32,
@@ -694,7 +694,7 @@ pub struct NamedRangeRef {
 /// it. Formulas share one expansion when it does not depend on where they
 /// are; see `CellStore::name_target`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct NamedFormulaRef {
+pub(crate) struct NamedFormulaRef {
     pub name: String,
     pub expression: Ast,
     /// Nodes of `expression`, counting each name in it at its own count:
@@ -704,7 +704,7 @@ pub struct NamedFormulaRef {
 
 /// What a defined name stands for in one formula.
 #[derive(Clone)]
-pub enum NameTarget {
+pub(crate) enum NameTarget {
     Range(NamedRangeRef),
     Formula(std::rc::Rc<NamedFormulaRef>),
     /// A reference with no sheet inside another name's expansion. It is
@@ -714,7 +714,7 @@ pub enum NameTarget {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TableSection {
+pub(crate) enum TableSection {
     Body,
     Headers,
     Totals,
@@ -722,7 +722,7 @@ pub enum TableSection {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnresolvedStructuredRef {
+pub(crate) struct UnresolvedStructuredRef {
     pub table_name: Option<String>,
     pub column_name: String,
     pub section: TableSection,
@@ -779,15 +779,6 @@ pub(crate) struct DetachedRangeRef {
     pub(crate) flags: RangeFlags,
 }
 
-/// A helper parameter value bound during full-engine evaluation.
-#[cfg(feature = "analysis")]
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct BoundMatrix {
-    pub(crate) rows: usize,
-    pub(crate) cols: usize,
-    pub(crate) values: std::rc::Rc<Vec<crate::types::Value>>,
-}
-
 /// An uncommon call whose function name is not a built-in.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct UnknownCall {
@@ -802,21 +793,51 @@ pub(crate) struct ArrayLiteral {
     pub(crate) values: Vec<Value>,
 }
 
+/// A well-formed LAMBDA after its parameters are numbered
+/// (`eval::analysis::lambda::resolve_parameters`). It is shared, so a
+/// closure that holds it clones a handle instead of the body.
+#[cfg(feature = "analysis")]
 #[derive(Clone, Debug, PartialEq)]
-pub enum Ast {
+pub(crate) struct LambdaDefinition {
+    /// The parameter declarations as written (`Ast::Name`), for writing
+    /// the formula back.
+    pub(crate) parameters: Box<[Ast]>,
+    pub(crate) body: Ast,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) enum Ast {
     Num(f64),
     Str(Rc<str>),
     Bool(bool),
     Missing,
-    /// A helper parameter value. It exists only during full-engine evaluation.
+    /// A use of a LAMBDA parameter, numbered when the formula was entered
+    /// (`eval::analysis::lambda::resolve_parameters`). `depth` counts the
+    /// LAMBDAs between the use and the one that declares the parameter;
+    /// `index` is the parameter's position. A call reads the value from the
+    /// pass's call frame. The name stays for writing the formula back.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Transient values are not part of the public AST API.
-    BoundMatrix(Box<BoundMatrix>),
+    Parameter {
+        depth: u16,
+        index: u16,
+        name: Box<str>,
+    },
+    /// A well-formed LAMBDA whose parameter uses are numbered. Calls and the
+    /// closures they create share its body.
+    #[cfg(feature = "analysis")]
+    #[allow(
+        private_interfaces,
+        reason = "LAMBDA definitions are not part of the public AST API"
+    )]
+    Lambda(std::rc::Rc<LambdaDefinition>),
     /// The literal pattern of a REGEX call, shared by every formula in the
     /// store with the same pattern text. Its compiled programs live as long
     /// as the formulas that hold it.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    #[allow(
+        private_interfaces,
+        reason = "shared patterns are not part of the public AST API"
+    )]
     RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
     Name(Box<str>),
     NamedRange(Box<NamedRangeRef>),
@@ -889,7 +910,8 @@ impl Ast {
                 | Self::Str(_)
                 | Self::Bool(_)
                 | Self::Missing
-                | Self::BoundMatrix { .. }
+                | Self::Parameter { .. }
+                | Self::Lambda(_)
                 | Self::RegexPattern(_)
                 | Self::Name(_)
                 | Self::NamedRange(_)
@@ -932,7 +954,9 @@ impl Ast {
             Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => test(inner),
             Self::LetSlot { expression, .. } => test(expression),
             #[cfg(feature = "analysis")]
-            Self::BoundMatrix(_) => false,
+            Self::Parameter { .. } => false,
+            #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => test(&definition.body),
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => false,
             Self::LetName { .. } => false,
@@ -975,7 +999,11 @@ impl Ast {
             Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => visit(inner),
             Self::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
-            Self::BoundMatrix(_) => false,
+            Self::Parameter { .. } => false,
+            // Writing through a shared definition gives this formula its own
+            // copy; outside evaluation no closure shares it.
+            #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => visit(&mut std::rc::Rc::make_mut(definition).body),
             #[cfg(feature = "analysis")]
             Self::RegexPattern(_) => false,
             Self::LetName { .. } => false,
@@ -1005,12 +1033,16 @@ impl Ast {
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
             #[cfg(feature = "analysis")]
-            Self::BoundMatrix(reference) => {
-                let BoundMatrix { values, .. } = &**reference;
-
-                let bytes = std::mem::size_of::<BoundMatrix>();
+            Self::Parameter { name, .. } => out.add_payload(name.len(), name.len()),
+            #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => {
+                // An `Rc` allocation holds its strong and weak counts first.
+                const RC_COUNT_BYTES: usize = std::mem::size_of::<(usize, usize)>();
+                let bytes = RC_COUNT_BYTES + std::mem::size_of::<LambdaDefinition>();
                 out.add_payload(bytes, bytes);
-                out.add_vec::<crate::types::Value>(values.len(), values.capacity());
+                let LambdaDefinition { parameters, body } = &**definition;
+                add_ast_slice_memory(parameters, out);
+                body.heap_memory_stats(out);
             }
             // The store's pattern index counts each shared pattern once.
             #[cfg(feature = "analysis")]
@@ -1274,12 +1306,12 @@ pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, 
 }
 
 /// Whether a range spans every row of the sheet: a whole-column range.
-fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
+const fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
     row_start == 0 && row_end == SHEET_ROWS - 1
 }
 
 /// Whether a range spans every column of the sheet: a whole-row range.
-fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
+const fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
     col_start == 0 && col_end == SHEET_COLS - 1
 }
 
@@ -1424,7 +1456,7 @@ pub(crate) enum ReferenceEdge {
 impl ReferenceEdge {
     /// `#REF!` is a reference operand too: a deleted operand serializes as
     /// it, and the formula must parse back to the same intersection.
-    pub(crate) fn after(previous: Option<&Tok<'_>>) -> Self {
+    pub(crate) const fn after(previous: Option<&Tok<'_>>) -> Self {
         match previous {
             Some(Tok::Ident(..)) => Self::Name,
             Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => {
@@ -1496,7 +1528,7 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
 }
 
 /// The token of one ASCII punctuation byte, or `None` for any other byte.
-fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
+const fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
     Some(match byte {
         b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => Tok::Op(byte as char),
         b'(' => Tok::LParen,
@@ -1728,7 +1760,7 @@ struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    fn over_text(src: &'a str) -> Self {
+    const fn over_text(src: &'a str) -> Self {
         Self {
             src,
             index: 0,
@@ -1849,6 +1881,10 @@ pub(crate) struct ParseFeatures {
     /// A sheet reference left detached: an external link or a sheet that the
     /// workbook does not have.
     pub(crate) detached_sheets: bool,
+    /// A LAMBDA, whose parameter uses are numbered before the formula is
+    /// stored.
+    #[cfg(feature = "analysis")]
+    pub(crate) lambdas: bool,
 }
 
 /// Binary operator levels, loosest first. A comparison does not chain.
@@ -1866,7 +1902,7 @@ enum BinaryOperator {
 
 /// The level and operator of a binary operator token.
 #[inline]
-fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
+const fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
     Some(match tok {
         Tok::Cmp(op) => (COMPARISON, BinaryOperator::Cmp(*op)),
         Tok::Op('&') => (CONCATENATION, BinaryOperator::Op(Op::Concat)),
@@ -2260,6 +2296,10 @@ impl<'a> Parser<'a, '_> {
     /// The arguments of a call to `name` after its `(`.
     fn call_at(&mut self, name: Cow<'a, str>, depth: usize) -> Result<Ast, String> {
         let func = lookup_func(name.as_ref());
+        #[cfg(feature = "analysis")]
+        if func == Some(Func::Analysis(crate::eval::analysis::LAMBDA_ID)) {
+            self.features.lambdas = true;
+        }
         let first = self.args.len();
         if self.peek() != Some(&Tok::RParen) {
             loop {
@@ -2532,7 +2572,7 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
 }
 
 /// Parse a formula source (with or without a leading `=`) into an AST.
-pub fn parse(src: &str) -> Result<Ast, String> {
+pub(crate) fn parse(src: &str) -> Result<Ast, String> {
     parse_with_features(src).map(|(ast, _)| ast)
 }
 
@@ -2784,7 +2824,7 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
             ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
         }
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
             ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
         }
     }
@@ -2832,7 +2872,7 @@ fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Opt
 
 /// Resolve workbook/sheet-scoped defined names after sheet references have
 /// stable handles. A LET or LAMBDA name shadows a defined name in its scope.
-pub fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
+pub(crate) fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
 where
     F: Fn(&str, u32) -> Option<NameTarget>,
 {
@@ -3042,7 +3082,7 @@ where
 /// Conditional-format expressions store one parsed AST at the rule range's
 /// top-left. Window evaluation clones that bounded AST and applies the target
 /// cell delta here; absolute row/column markers remain fixed.
-pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
+pub(crate) fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
     if !translate_relative_refs_inner(ast, row_delta, col_delta, false) {
         *ast = Ast::InvalidRef;
     }
@@ -3053,7 +3093,7 @@ pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
 /// formula uses the name. As in Excel, a reference that passes the last row
 /// or column wraps around to the first, so a name can refer to cells above
 /// or left of the cell that uses it.
-pub fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
+pub(crate) fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
     translate_relative_refs_inner(ast, i64::from(row), i64::from(col), true);
 }
 
@@ -3082,7 +3122,7 @@ fn translated_coordinate(
 
 /// Put one axis of a range back in order after a wrapping translation moved
 /// one edge past the other; each edge keeps its `$` marker.
-fn order_wrapped_edges(start: &mut u32, end: &mut u32, flags: &mut RangeFlags, row: bool) {
+const fn order_wrapped_edges(start: &mut u32, end: &mut u32, flags: &mut RangeFlags, row: bool) {
     if *start > *end {
         std::mem::swap(start, end);
         let axis_mask = if row { 1 } else { 2 };
@@ -3237,7 +3277,12 @@ fn translate_relative_refs_inner(
         | Ast::InvalidRef
         | Ast::Array(_) => true,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix(_) => true,
+        Ast::Parameter { .. } => true,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            inner(&mut std::rc::Rc::make_mut(definition).body);
+            true
+        }
         #[cfg(feature = "analysis")]
         Ast::RegexPattern(_) => true,
     }
@@ -3251,14 +3296,14 @@ pub(crate) enum Axis {
 
 impl Axis {
     /// The rows or columns of a sheet.
-    fn len(self) -> u32 {
+    const fn len(self) -> u32 {
         match self {
             Self::Row => SHEET_ROWS,
             Self::Col => SHEET_COLS,
         }
     }
 
-    fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
+    const fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
         match self {
             Self::Row => row,
             Self::Col => col,
@@ -3339,7 +3384,7 @@ impl AxisEdit {
 
 /// Rewrite row references affected by an edit on `edited_sheet`. Returns
 /// whether any reference changed.
-pub fn shift_rows(
+pub(crate) fn shift_rows(
     ast: &mut Ast,
     at: u32,
     delta: i64,
@@ -3359,7 +3404,7 @@ pub fn shift_rows(
 
 /// Rewrite column references affected by an edit on `edited_sheet`. Returns
 /// whether any reference changed.
-pub fn shift_cols(
+pub(crate) fn shift_cols(
     ast: &mut Ast,
     at: u32,
     delta: i64,
@@ -3461,7 +3506,7 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
             return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
         }
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
             return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
         }
     };
@@ -3639,7 +3684,7 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
             ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
         }
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => {
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
             ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
         }
     }
@@ -3948,7 +3993,18 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
         }
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix(_) => out.push_str("#CALC!"),
+        Ast::Parameter { name, .. } => out.push_str(name),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            out.push_str(func_name(Func::Analysis(crate::eval::analysis::LAMBDA_ID)));
+            out.push('(');
+            for parameter in &definition.parameters {
+                write_ast_with_names(parameter, out, names);
+                out.push(',');
+            }
+            write_ast_with_names(&definition.body, out, names);
+            out.push(')');
+        }
         #[cfg(feature = "analysis")]
         Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),

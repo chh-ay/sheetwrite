@@ -39,7 +39,7 @@ struct PoolIdStamps {
 }
 
 impl PoolIdStamps {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self { words: Vec::new() }
     }
 
@@ -150,7 +150,7 @@ struct NumericAccumulator {
 }
 
 impl NumericAccumulator {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             sum: 0.0,
             count: 0,
@@ -179,6 +179,8 @@ impl CellStore {
         QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
     }
 
+    /// Zeroes the counters that `queryResourceStats` reports.
+    ///
     /// @enginePublic Reset the resource counters before each benchmark probe.
     #[wasm_bindgen(js_name = resetQueryResourceStats)]
     pub fn reset_query_resource_stats(&self) {
@@ -571,6 +573,11 @@ impl CellStore {
 
 #[wasm_bindgen]
 impl CellStore {
+    /// The rows of `sheet` sorted by the columns `cols`, the first column
+    /// deciding first. Key `i` sorts ascending unless `ascending[i]` is 0; a
+    /// missing entry sorts ascending. When `candidates` is not empty, only
+    /// those rows take part. Equal rows keep their order. Empty when the
+    /// sheet or a column does not exist.
     #[wasm_bindgen(js_name = sortRowsMulti)]
     pub fn sort_rows_multi(
         &self,
@@ -654,6 +661,19 @@ impl CellStore {
             .collect()
     }
 
+    /// The rows of `sheet` that pass every column filter. Filter `i` reads
+    /// column `cols[i]`, and `kinds[i]` says what it keeps:
+    ///
+    /// - 0, a value list: its next `num_counts[i]` numbers in `value_nums` and
+    ///   next `text_counts[i]` texts in `value_texts` (booleans as `\0TRUE` and
+    ///   `\0FALSE`); bit 1 of `flags[i]` also keeps empty cells.
+    /// - 1, text that contains its one text in `value_texts`; `flags[i]` 1
+    ///   matches case.
+    /// - 2, numbers compared with `nums[i]`; `flags[i]` is 0 `>`, 1 `>=`, 2 `<`,
+    ///   3 `<=`, 4 `=`, anything else `<>`.
+    /// - 3, empty cells; 4, cells that are not empty.
+    ///
+    /// Empty when the sheet or a column does not exist.
     #[wasm_bindgen(js_name = filterRowsMulti)]
     #[expect(
         clippy::too_many_arguments,
@@ -952,6 +972,11 @@ impl CellStore {
         out
     }
 
+    /// `dataEdge` in a view order, where `order[i]` is the data row shown at
+    /// view position `i` and `row` is a view position. A vertical move scans
+    /// view positions and returns one; a horizontal move returns a column, as
+    /// `dataEdge` does on the data row at `row`. 0 when the sheet, the
+    /// position or the column does not exist.
     #[wasm_bindgen(js_name = dataEdgeOrdered)]
     pub fn data_edge_ordered(
         &self,
@@ -1013,7 +1038,7 @@ fn resolved_kind(sheet: &SheetData, index: usize, slots: &FormulaStore) -> u8 {
     }
 }
 
-fn boolean_text(value: bool) -> &'static str {
+const fn boolean_text(value: bool) -> &'static str {
     if value {
         "TRUE"
     } else {
@@ -1056,7 +1081,7 @@ fn resolved_text<'a>(
 
 /// Distinct-value scan result for one column: parallel kind/number/text
 /// arrays whose buffers are surrendered once through the `take*` accessors.
-#[derive(Default)]
+#[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
     kinds: Vec<u8>,
@@ -1198,7 +1223,7 @@ pub(crate) fn number_matches_text(
     )
 }
 
-fn is_number_text_byte(byte: u8) -> bool {
+const fn is_number_text_byte(byte: u8) -> bool {
     byte.is_ascii_digit() || byte == b'-' || byte == b'.'
 }
 
@@ -1219,7 +1244,7 @@ pub(crate) struct MatchCache {
 }
 
 impl MatchCache {
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         // `NO_STRING` (u32::MAX) is the empty sentinel: a real pool id never
         // reaches it, so an untouched slot never spuriously reports a hit.
         Self {

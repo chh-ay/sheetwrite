@@ -43,7 +43,7 @@ impl Options {
     }
 }
 
-fn operation(function_number: i64) -> Option<Func> {
+const fn operation(function_number: i64) -> Option<Func> {
     Some(match function_number {
         1 => Func::Avg,
         2 => Func::Count,
@@ -152,7 +152,7 @@ fn push_data(
     values: &mut FuncAccumulator,
 ) -> Result<(), FormulaError> {
     let range = range_from_ast(ast, context.sheet);
-    if range.is_none() && !super::super::array::ast_produces_array(ast) {
+    if range.is_none() && !super::super::array::ast_produces_array(ast, context.pass.shapes()) {
         return Err(FormulaError::Value);
     }
     let matrix = context.matrix(ast)?;

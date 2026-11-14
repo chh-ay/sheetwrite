@@ -424,7 +424,7 @@ struct Binary {
 }
 
 impl Binary {
-    fn of(number: f64) -> Self {
+    const fn of(number: f64) -> Self {
         let bits = number.to_bits();
         let stored_exponent = ((bits >> MANTISSA_BITS) & EXPONENT_MASK) as i32;
         let fraction = bits & ((1 << MANTISSA_BITS) - 1);
@@ -447,7 +447,7 @@ impl Binary {
 
     /// The power of ten of the first digit, `floor(log2 × log10(2))`, which
     /// is the right one or one too small.
-    fn exponent_guess(&self) -> i32 {
+    const fn exponent_guess(&self) -> i32 {
         let binary_log =
             (u64::BITS - 1 - self.mantissa.leading_zeros()) as i32 + self.binary_exponent;
         (binary_log * LOG10_2_NUMERATOR) >> LOG10_2_SHIFT
@@ -614,7 +614,7 @@ struct Big {
 }
 
 impl Big {
-    fn from(value: u64) -> Self {
+    const fn from(value: u64) -> Self {
         let mut limbs = [0; BIG_LIMBS];
         limbs[0] = value as u32;
         limbs[1] = (value >> 32) as u32;
