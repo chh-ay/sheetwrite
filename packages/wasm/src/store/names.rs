@@ -109,6 +109,13 @@ pub(super) struct Definition {
     /// The nodes a read of `expression` walks, counting the names in it at
     /// their own sizes; worked out when the formulas are bound.
     nodes: Cell<Option<usize>>,
+    /// Whether `expression` uses a name or calls a function that may be one,
+    /// so a read of it can come back to this name; a read of any other
+    /// formula that is not positional needs no cycle guard.
+    follows_names: bool,
+    /// Whether every read of `expression` is the formula as it is: not
+    /// positional, not following names, and not one reference.
+    shared: bool,
 }
 
 /// What a defined name stands for in the formula being read.
@@ -201,6 +208,18 @@ impl<'a> NameScope<'a> {
         }
     }
 
+    /// The formula `id` holds for this sheet when every cell reads it the
+    /// same way, it is not one reference, and reading it needs no cycle
+    /// guard: what evaluation reads without [`Self::read`]. Inline, since
+    /// evaluation calls it for every use of a name.
+    #[inline]
+    pub(crate) fn shared_formula(self, id: NameId) -> Option<&'a Ast> {
+        match NameTable::definition_for(self.table.entry(id)?, self.sheet)? {
+            DefinedName::Formula(formula) if formula.shared => Some(&formula.expression),
+            DefinedName::Formula(_) | DefinedName::Range(_) => None,
+        }
+    }
+
     /// Read the name `id` for the formula on [`Self::sheet`] at the cell that
     /// is being evaluated or bound (`current_formula_origin`). Out of line:
     /// every walk that meets a name calls it.
@@ -217,6 +236,16 @@ impl<'a> NameScope<'a> {
                 followed: None,
             };
         };
+        if let Some(DefinedName::Formula(formula)) = NameTable::definition_for(entry, self.sheet) {
+            if !formula.positional && !formula.follows_names {
+                let view = reference_target(&formula.expression, self.sheet)
+                    .map_or(NameView::Formula(&formula.expression), NameView::Range);
+                return NameRead {
+                    view,
+                    followed: None,
+                };
+            }
+        }
         let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
         let cell = (self.sheet, row, col);
         if entry.followed_by.get() == Some(cell) {
@@ -500,6 +529,7 @@ impl NameTable {
 
     /// The definition a formula on `sheet` reads: the sheet's own, then the
     /// workbook's.
+    #[inline]
     fn definition_for(entry: &NameEntry, sheet: u32) -> Option<&DefinedName> {
         let mut workbook = None;
         for (scope, definition) in &entry.definitions {
@@ -614,6 +644,8 @@ impl CellStore {
             ast,
             expression: Ast::Missing,
             nodes: Cell::new(None),
+            follows_names: true,
+            shared: false,
         };
         self.names.insert(
             name_scope,
@@ -802,6 +834,10 @@ impl CellStore {
         for (at, expression) in &mut bound {
             if let Some(formula) = table.formula_at_position(*at) {
                 formula.expression = std::mem::replace(expression, Ast::Missing);
+                formula.follows_names = follows_names(&formula.expression);
+                formula.shared = !formula.positional
+                    && !formula.follows_names
+                    && reference_target(&formula.expression, NO_SHEET).is_none();
                 formula.nodes.set(None);
             }
         }
@@ -974,6 +1010,8 @@ impl CellStore {
             ast,
             expression: Ast::Missing,
             nodes: Cell::new(None),
+            follows_names: true,
+            shared: false,
         };
         self.names.insert(
             scope,
@@ -1080,6 +1118,12 @@ fn walk(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
         walk(child, visit);
         false
     });
+}
+
+/// Whether `ast` uses a defined name or calls a function that may be one.
+fn follows_names(ast: &Ast) -> bool {
+    matches!(ast, Ast::DefinedName(_) | Ast::UnknownFunc(_))
+        || ast.any_child(&mut |child| follows_names(child))
 }
 
 /// A name's formula that is one cell or range reference, read as a range

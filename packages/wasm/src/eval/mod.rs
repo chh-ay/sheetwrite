@@ -2022,7 +2022,11 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        let read = self.name_scope(sheet).read(id);
+        let names = self.name_scope(sheet);
+        if let Some(expression) = names.shared_formula(id) {
+            return self.eval_ast(expression, sheet, pass, depth + 1);
+        }
+        let read = names.read(id);
         if let Some(expression) = read.formula() {
             return self.eval_ast(expression, sheet, pass, depth + 1);
         }
