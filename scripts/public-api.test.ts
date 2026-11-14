@@ -132,6 +132,8 @@ describe("re-export documentation", () => {
       " * @see DataSource",
       " */",
       "export declare class Service {",
+      "  /** Make a service for `name`. */",
+      "  constructor(name: string);",
       "  /** Run the service.",
       "   * @example",
       "   * ```ts",
@@ -158,6 +160,37 @@ describe("re-export documentation", () => {
       documentation:
         "Run the service.\n@example\n```ts\nservice.run();\n```\n@see\nhttps://example.com/run",
     });
+    expect(service?.memberDocs).toContainEqual({
+      name: "constructor",
+      documentation: "Make a service for `name`.",
+    });
+  });
+
+  it("keeps param and returns tags without their JSDoc types, and drops empty ones", async () => {
+    const tagged = [
+      "/**",
+      " * Mounts a widget.",
+      " * @param {object} host - Element the widget mounts into.",
+      " * @param size",
+      " * @returns {number} The widget's id.",
+      " */",
+      "export declare function mount(host: object, size: number): number;",
+      "/**",
+      " * Reads nothing.",
+      " * @returns {number}",
+      " */",
+      "export declare function nothing(): number;",
+    ].join("\n");
+    const { manifest } = await analyzePublicApi(
+      await fixture(`${canonicalDeclarations}\n${tagged}`),
+    );
+    const exports = manifest.packages[0]?.entryPoints[0]?.exports ?? [];
+    const documentation = (name: string) =>
+      exports.find((candidate) => candidate.name === name)?.documentation;
+    expect(documentation("mount")).toBe(
+      "Mounts a widget.\n@param host - Element the widget mounts into.\n@returns The widget's id.",
+    );
+    expect(documentation("nothing")).toBe("Reads nothing.");
   });
 });
 describe("interface heritage flattening", () => {
