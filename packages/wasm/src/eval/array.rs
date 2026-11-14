@@ -103,8 +103,9 @@ pub(crate) fn ast_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(id), args) => {
             let name = super::analysis::name(*id);
-            super::analysis::family(name)
-                .and_then(|family| family.array.as_ref())
+            super::analysis::family(*id)
+                .array
+                .as_ref()
                 .is_some_and(|hooks| (hooks.produces_array)(name, args, _shapes))
         }
         Ast::Func(
@@ -247,7 +248,7 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
                 let name = super::analysis::name(*id);
-                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                let hooks = super::analysis::family(*id).array.as_ref()?;
                 if !(hooks.produces_array)(name, args, pass.shapes()) {
                     return None;
                 }
@@ -391,7 +392,7 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
                 let name = super::analysis::name(*id);
-                let hooks = super::analysis::family(name)?.array.as_ref()?;
+                let hooks = super::analysis::family(*id).array.as_ref()?;
                 if !(hooks.produces_array)(name, args, pass.shapes()) {
                     return None;
                 }
@@ -532,8 +533,9 @@ impl CellStore {
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
                 let name = super::analysis::name(*id);
-                let hooks = super::analysis::family(name)
-                    .and_then(|family| family.array.as_ref())
+                let hooks = super::analysis::family(*id)
+                    .array
+                    .as_ref()
                     .ok_or(FormulaError::Value)?;
                 if !(hooks.produces_array)(name, args, pass.shapes()) {
                     return Err(FormulaError::Value);
