@@ -55,7 +55,9 @@ const LAYOUT_EVENT = "Layout";
  * time, keeps the gate independent of the machine. The screen-reader mirror of
  * the painted window is about 330 nodes; laying it out inside an input step
  * fails that row. The editor rows hold what opening, measuring, focusing and
- * closing the textarea itself needs. The `-refresh` rows keep the mirror: a
+ * closing the textarea itself needs. The typing rows type one character per
+ * step, into the open cell editor or into a formula bar beside the grid; they
+ * hold what sizing the typed field needs. The `-refresh` rows keep the mirror: a
  * synchronous `grid.refresh()` writes it in the same task, as assistive
  * technology expects, so the next step's scroll read lays it out (#625).
  */
@@ -65,6 +67,8 @@ const FORCED_LAYOUT_CEILINGS: Readonly<Record<ForcedLayoutAction, number>> = {
   "edit-open": 10,
   "edit-commit": 25,
   "editor-scroll": 0,
+  "edit-type": 11,
+  "bar-type": 1,
   "scroll-refresh": 341,
   "arrow-down-refresh": 341,
   "edit-commit-refresh": 32,
@@ -344,6 +348,8 @@ async function runBenchmark(args: readonly string[]): Promise<void> {
     "edit-open": [],
     "edit-commit": [],
     "editor-scroll": [],
+    "edit-type": [],
+    "bar-type": [],
     "scroll-refresh": [],
     "arrow-down-refresh": [],
     "edit-commit-refresh": [],
