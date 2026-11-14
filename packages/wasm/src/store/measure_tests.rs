@@ -4,7 +4,7 @@
 
 use super::*;
 use crate::eval::settled_cell_value;
-use crate::types::{FormulaError, Value};
+use crate::types::Value;
 
 const ROWS: usize = 72;
 const REGION: usize = 0;
@@ -103,19 +103,22 @@ impl MeasureFixture {
         let output = store.add_sheet(40, 80);
         let scratch = store.add_sheet(3, ROWS + 1);
         let ids: Vec<String> = COLUMN_IDS.map(String::from).to_vec();
-        assert!(store.set_table(
-            "orders",
-            "orders",
-            orders,
-            0,
-            0,
-            ROWS,
-            COLUMN_IDS.len() - 1,
-            true,
-            false,
-            ids.clone(),
-            ids
-        ));
+        assert!(
+            store.set_table(
+                "orders",
+                "orders",
+                orders,
+                0,
+                0,
+                ROWS,
+                COLUMN_IDS.len() - 1,
+                true,
+                false,
+                ids.clone(),
+                ids
+            ),
+            "the orders table installs"
+        );
         for (col, header) in COLUMN_IDS.iter().enumerate() {
             store.set_string(orders, 0, col, header, 0);
         }
@@ -188,7 +191,10 @@ impl MeasureFixture {
                 ]
             })
             .collect();
-        assert!(self.store.set_relationships(strings));
+        assert!(
+            self.store.set_relationships(strings),
+            "the relationships install"
+        );
     }
 
     /// Model pivot over `orders` with every measure as a value field.
@@ -217,7 +223,10 @@ impl MeasureFixture {
         }
         numbers.extend([0.0, f64::from(flags)]);
 
-        assert!(self.store.set_pivots(self.output, &numbers, strings));
+        assert!(
+            self.store.set_pivots(self.output, &numbers, strings),
+            "the pivots install"
+        );
         self.store.recompute_changed();
     }
 
