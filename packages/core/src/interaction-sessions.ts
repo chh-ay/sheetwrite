@@ -943,6 +943,11 @@ export class InteractionSessions {
 
     switch (e.key) {
       case "ArrowDown":
+        // Alt+Down opens a list rule's list, as in Excel and as on a combobox.
+        if (e.altKey && !mod && focus && this.hasListRule(focus.row, focus.col)) {
+          this.beginEdit(focus.row, focus.col);
+          break;
+        }
         this.navigate(
           focus,
           mod ? this.dataEdgeRow(focus, 1) : (focus?.row ?? 0) + 1,
@@ -1015,6 +1020,23 @@ export class InteractionSessions {
 
     e.preventDefault();
   };
+
+  /** Whether a list validation rule covers the cell at view `row`, `col`. */
+  private hasListRule(row: number, col: number): boolean {
+    const cell = this.deps.anchorCell(row, col);
+    const addr = {
+      sheet: this.deps.activeSheet(),
+      row: this.deps.toDataRow(cell.row),
+      col: cell.col,
+    };
+    return (
+      this.deps
+        .sheet()
+        .validationRules?.some(
+          (rule) => rule.condition.kind === "list" && rangeContains(rule.range, addr),
+        ) ?? false
+    );
+  }
 
   private navigate(
     focus: CellRef | null,
