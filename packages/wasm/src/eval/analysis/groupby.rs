@@ -475,8 +475,10 @@ pub(crate) fn bound(
         return Err(FormulaError::Value);
     }
     let mut extent = |expression: &Ast| -> Result<(usize, usize), FormulaError> {
-        if !super::super::array::ast_produces_array(expression, pass.shapes(store.name_scope(sheet)))
-        {
+        if !super::super::array::ast_produces_array(
+            expression,
+            pass.shapes(store.name_scope(sheet)),
+        ) {
             return Ok((1, 1));
         }
         let (rows, cols, cells) = store.matrix_shape(expression, sheet, pass)?;

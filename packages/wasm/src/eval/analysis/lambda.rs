@@ -537,7 +537,10 @@ fn definition<'a>(
     }
 }
 
-pub(crate) fn parameter_count(expression: &Ast, names: NameScope<'_>) -> Result<usize, FormulaError> {
+pub(crate) fn parameter_count(
+    expression: &Ast,
+    names: NameScope<'_>,
+) -> Result<usize, FormulaError> {
     definition(expression, names).map(|shared| shared.parameters.len())
 }
 
@@ -961,7 +964,10 @@ impl<'a, 'p> Context<'a, 'p> {
             };
             (Rc::clone(definition), *link)
         } else {
-            (self.lambda(function).ok_or(FormulaError::Value)?, self.top())
+            (
+                self.lambda(function).ok_or(FormulaError::Value)?,
+                self.top(),
+            )
         };
         Ok(Callee {
             definition: shared,

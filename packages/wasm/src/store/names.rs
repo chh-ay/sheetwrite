@@ -277,9 +277,22 @@ impl<'a> NameScope<'a> {
                 let mut placed = formula.expression.clone();
                 translate_name_refs(&mut placed, row, col);
                 let tables = self.tables;
-                resolve_structured_refs(&mut placed, sheet, row, col, &|reference, at, row, col| {
-                    tables.bind(reference.written(), AbsCellKey { sheet: at, row, col })
-                });
+                resolve_structured_refs(
+                    &mut placed,
+                    sheet,
+                    row,
+                    col,
+                    &|reference, at, row, col| {
+                        tables.bind(
+                            reference.written(),
+                            AbsCellKey {
+                                sheet: at,
+                                row,
+                                col,
+                            },
+                        )
+                    },
+                );
                 reference_target(&placed, sheet).map_or(NameView::Placed(placed), NameView::Range)
             }
             Some(DefinedName::Formula(formula)) => reference_target(&formula.expression, sheet)
@@ -447,8 +460,16 @@ impl NameTable {
 
     /// The formula at `(entry, definition)` positions of the table, to bind
     /// it again.
-    fn formula_at_position(&mut self, (entry, definition): (usize, usize)) -> Option<&mut Definition> {
-        match self.entries.get_mut(entry)?.definitions.get_mut(definition)? {
+    fn formula_at_position(
+        &mut self,
+        (entry, definition): (usize, usize),
+    ) -> Option<&mut Definition> {
+        match self
+            .entries
+            .get_mut(entry)?
+            .definitions
+            .get_mut(definition)?
+        {
             (_, DefinedName::Formula(formula)) => Some(formula),
             (_, DefinedName::Range(_)) => None,
         }
@@ -486,10 +507,7 @@ impl NameTable {
 
     /// Remove the definition of `key` in `scope`; whether there was one.
     pub(super) fn remove(&mut self, scope: Option<u32>, key: &str) -> bool {
-        let Some(entry) = self
-            .id(key)
-            .and_then(|id| self.entries.get_mut(id.index()))
-        else {
+        let Some(entry) = self.id(key).and_then(|id| self.entries.get_mut(id.index())) else {
             return false;
         };
         let before = entry.definitions.len();
@@ -519,7 +537,10 @@ impl NameTable {
     /// Keep only the definitions `keep` accepts; it gets each one's scope and
     /// folded name, and may change it. Takes a `dyn` closure so each caller
     /// shares one copy of the walk.
-    pub(super) fn retain(&mut self, keep: &mut dyn FnMut(Option<u32>, &str, &mut DefinedName) -> bool) {
+    pub(super) fn retain(
+        &mut self,
+        keep: &mut dyn FnMut(Option<u32>, &str, &mut DefinedName) -> bool,
+    ) {
         for entry in &mut self.entries {
             let key = &entry.key;
             entry
@@ -569,16 +590,13 @@ impl NameTable {
     fn add_memory(&self, metadata: &mut MemoryOwnerStats) {
         metadata.add_hash_table::<Box<str>, NameId>(self.ids.len(), self.ids.capacity());
         let bytes = self.entries.capacity() * std::mem::size_of::<NameEntry>();
-        metadata.add_payload(
-            self.entries.len() * std::mem::size_of::<NameEntry>(),
-            bytes,
-        );
+        metadata.add_payload(self.entries.len() * std::mem::size_of::<NameEntry>(), bytes);
         for entry in &self.entries {
             // The key is held twice: by the entry and by the id lookup.
             metadata.add_payload(2 * entry.key.len(), 2 * entry.key.len());
             metadata.add_payload(entry.spelling.len(), entry.spelling.len());
-            let bytes = entry.definitions.capacity()
-                * std::mem::size_of::<(Option<u32>, DefinedName)>();
+            let bytes =
+                entry.definitions.capacity() * std::mem::size_of::<(Option<u32>, DefinedName)>();
             metadata.add_payload(bytes, bytes);
             for (_, definition) in &entry.definitions {
                 match definition {
@@ -1141,7 +1159,9 @@ fn reference_target(ast: &Ast, formula_sheet: u32) -> Option<CellRange> {
         Ast::AbsRange(sheet, r0, c0, r1, c1, _) => (sheet.handle, *r0, *c0, *r1, *c1),
         _ => return None,
     };
-    Some(CellRange::new(sheet, row_start, col_start, row_end, col_end))
+    Some(CellRange::new(
+        sheet, row_start, col_start, row_end, col_end,
+    ))
 }
 
 /// The names that `ast` uses, as a name or as a function it calls.

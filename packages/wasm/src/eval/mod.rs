@@ -1872,10 +1872,9 @@ impl CellStore {
                 pass,
                 depth + 1,
             ),
-            Ast::Structured(_)
-            | Ast::Range(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
+            Ast::Structured(_) | Ast::Range(..) | Ast::AbsRange(..) | Ast::SheetSpan(_) => {
+                Value::Error(FormulaError::Value)
+            }
             Ast::Neg(expr) | Ast::Pos(expr) | Ast::Percent(expr) => {
                 let op = match ast {
                     Ast::Neg(_) => operators::UnaryOp::Neg,
@@ -3089,13 +3088,16 @@ impl CellStore {
                 let value_range = if let Some(ast) = args.get(2) {
                     let matrix = match range_from_ast(ast, self.name_scope(sheet)) {
                         Some(range) => {
-                            let (rows, cols) = match range_from_ast(&args[0], self.name_scope(sheet)) {
-                                Some(criteria) => (
-                                    criteria.row_end - criteria.row_start + 1,
-                                    criteria.col_end - criteria.col_start + 1,
-                                ),
-                                None => (criteria_range.rows as u32, criteria_range.cols as u32),
-                            };
+                            let (rows, cols) =
+                                match range_from_ast(&args[0], self.name_scope(sheet)) {
+                                    Some(criteria) => (
+                                        criteria.row_end - criteria.row_start + 1,
+                                        criteria.col_end - criteria.col_start + 1,
+                                    ),
+                                    None => {
+                                        (criteria_range.rows as u32, criteria_range.cols as u32)
+                                    }
+                                };
                             let sum_range = sum_range_extent(range, rows, cols);
                             self.eval_range_matrix(sum_range, pass, depth + 1)
                         }

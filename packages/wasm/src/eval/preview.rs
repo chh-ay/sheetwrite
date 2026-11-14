@@ -255,22 +255,23 @@ impl CellStore {
         };
 
         let resolved = self.resolve_spill_refs(ast, sheet, &mut pass, 0);
-        let (status, value, shape) = if ast_produces_array(&resolved, pass.shapes(self.name_scope(sheet))) {
-            match self.eval_matrix_arg(&resolved, sheet, &mut pass, 0) {
-                // A one-cell array, such as a one-cell OFFSET, shows as its value.
-                Ok(matrix) if matrix.rows == 1 && matrix.cols == 1 => {
-                    (FormulaPreviewStatus::Value, matrix.into_first(), (1, 1))
+        let (status, value, shape) =
+            if ast_produces_array(&resolved, pass.shapes(self.name_scope(sheet))) {
+                match self.eval_matrix_arg(&resolved, sheet, &mut pass, 0) {
+                    // A one-cell array, such as a one-cell OFFSET, shows as its value.
+                    Ok(matrix) if matrix.rows == 1 && matrix.cols == 1 => {
+                        (FormulaPreviewStatus::Value, matrix.into_first(), (1, 1))
+                    }
+                    Ok(matrix) => {
+                        let shape = (matrix.rows, matrix.cols);
+                        (FormulaPreviewStatus::Array, matrix.into_first(), shape)
+                    }
+                    Err(error) => (FormulaPreviewStatus::Value, Value::Error(error), (1, 1)),
                 }
-                Ok(matrix) => {
-                    let shape = (matrix.rows, matrix.cols);
-                    (FormulaPreviewStatus::Array, matrix.into_first(), shape)
-                }
-                Err(error) => (FormulaPreviewStatus::Value, Value::Error(error), (1, 1)),
-            }
-        } else {
-            let value = self.eval_ast(&resolved, sheet, &mut pass, 0);
-            (FormulaPreviewStatus::Value, value, (1, 1))
-        };
+            } else {
+                let value = self.eval_ast(&resolved, sheet, &mut pass, 0);
+                (FormulaPreviewStatus::Value, value, (1, 1))
+            };
 
         if value == Value::Error(FormulaError::Loading) {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);

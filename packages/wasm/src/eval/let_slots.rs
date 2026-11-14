@@ -79,12 +79,12 @@ pub(crate) fn let_resolvable(args: &[Ast], names: NameScope<'_>) -> bool {
 /// bindings, and nothing outside the core function set is called.
 fn lets_have_scalar_bindings(args: &[Ast], names: NameScope<'_>) -> bool {
     let last = args.len().saturating_sub(1);
-    args[..last]
-        .chunks(2)
-        .all(|pair| pair.get(1).is_some_and(|binding| scalar_binding(binding, names)))
-        && args
-            .get(last)
-            .is_some_and(|result| nested_lets_scalar(result, names))
+    args[..last].chunks(2).all(|pair| {
+        pair.get(1)
+            .is_some_and(|binding| scalar_binding(binding, names))
+    }) && args
+        .get(last)
+        .is_some_and(|result| nested_lets_scalar(result, names))
 }
 
 fn nested_lets_scalar(ast: &Ast, names: NameScope<'_>) -> bool {

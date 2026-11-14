@@ -414,7 +414,10 @@ fn a_name_change_keeps_the_trees_of_the_formulas_that_read_it() {
     let (mut store, sheet) = name_users();
     let reader = first_operand_address(&store, sheet, 0, 3);
     let through_total = first_operand_address(&store, sheet, 1, 3);
-    assert!(reader.is_some() && through_total.is_some(), "both have operands");
+    assert!(
+        reader.is_some() && through_total.is_some(),
+        "both have operands"
+    );
 
     assert!(
         store.set_named_range("Rate", -1, sheet, 1, 1, 1, 1),

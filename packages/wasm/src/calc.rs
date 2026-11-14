@@ -4283,11 +4283,7 @@ mod tests {
         let cases: Vec<(&str, Ast, usize)> = vec![
             ("string", Ast::Str("abc".to_owned().into()), 3),
             ("name", Ast::Name("Total".to_owned().into()), 5),
-            (
-                "defined name",
-                Ast::DefinedName(NameId::at(0).unwrap()),
-                0,
-            ),
+            ("defined name", Ast::DefinedName(NameId::at(0).unwrap()), 0),
             (
                 "unqualified structured ref",
                 Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {

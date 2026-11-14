@@ -779,7 +779,11 @@ impl FormulaEntry {
     /// rest stays as the user wrote it, as in Excel. Returns whether anything
     /// changed. Out of line, so the edits that call it share one copy.
     #[inline(never)]
-    fn rewrite_ast(&mut self, names: NameScope<'_>, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+    fn rewrite_ast(
+        &mut self,
+        names: NameScope<'_>,
+        rewrite: impl FnOnce(&mut Ast) -> bool,
+    ) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
         };

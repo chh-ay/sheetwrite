@@ -24,13 +24,13 @@ use crate::memory::{
 };
 use crate::sheet::{formula_error_at, SheetData};
 use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
-use names::NameScope;
 use crate::tables::{Table, TableColumn, TableSlots};
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, StringStorage, KIND_BOOL,
     KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 use crate::window::ConditionalRules;
+use names::NameScope;
 
 mod external_links;
 mod hidden_rows;
@@ -2301,12 +2301,8 @@ impl CellStore {
             col_end: col_end as u32,
         };
         let changed = vec![key.clone()];
-        self.names.insert(
-            name_scope,
-            key,
-            name,
-            names::DefinedName::Range(definition),
-        );
+        self.names
+            .insert(name_scope, key, name, names::DefinedName::Range(definition));
         self.rebind_name_users(changed);
         self.recompute_all_sheets();
         true

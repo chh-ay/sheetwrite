@@ -267,12 +267,11 @@ impl CellStore {
                 })
                 .collect(),
             // A resolvable intersection never reaches here: it is one range.
-            Ast::Func(Func::Intersect, operands) => vec![Err(intersection_range(
-                operands,
-                self.name_scope(sheet),
-            )
-            .err()
-            .unwrap_or(FormulaError::Value))],
+            Ast::Func(Func::Intersect, operands) => {
+                vec![Err(intersection_range(operands, self.name_scope(sheet))
+                    .err()
+                    .unwrap_or(FormulaError::Value))]
+            }
             Ast::InvalidRef => vec![Err(FormulaError::Ref)],
             Ast::Num(_)
             | Ast::Str(_)

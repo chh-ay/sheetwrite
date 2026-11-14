@@ -543,8 +543,7 @@ impl CellStore {
                 } else {
                     (1, 1, 1)
                 };
-                let (right_rows, right_cols, _) = if ast_produces_array(right, pass.shapes(names))
-                {
+                let (right_rows, right_cols, _) = if ast_produces_array(right, pass.shapes(names)) {
                     self.matrix_shape(right, formula_sheet, pass)?
                 } else {
                     (1, 1, 1)
@@ -711,8 +710,9 @@ impl CellStore {
             | Ast::Percent(_)
             | Ast::LetSlot { .. }
             | Ast::LetName { .. }
-            | Ast::Array { .. } => range_from_ast(ast, self.name_scope(formula_sheet))
-                .ok_or(FormulaError::Value)?,
+            | Ast::Array { .. } => {
+                range_from_ast(ast, self.name_scope(formula_sheet)).ok_or(FormulaError::Value)?
+            }
             #[cfg(feature = "analysis")]
             Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
                 range_from_ast(ast, self.name_scope(formula_sheet)).ok_or(FormulaError::Value)?
