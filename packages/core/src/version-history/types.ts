@@ -184,9 +184,9 @@ export interface HistoryListRequest extends HistoryStorageRequest {
   fromRevision?: number;
   /** Highest revision to include. */
   toRevision?: number;
-  /** Most entries the page may hold. */
+  /** The largest number of entries the page may hold. */
   maxEntries: number;
-  /** Most JSON bytes the page may take. */
+  /** The largest size of the page as JSON, in bytes. */
   maxBytes: number;
   /** Where to continue, from the previous page's `cursor`. */
   cursor?: string;

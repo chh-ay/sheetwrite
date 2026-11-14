@@ -36,7 +36,7 @@ export interface RowBridgeOptions<
 > {
   /** The row properties shown as columns, in column order. */
   readonly columns: readonly RowBridgeColumn<Row>[];
-  /** Your rows at start, in row order; the bridge reads their IDs and never changes them. */
+  /** The rows the grid starts with, in row order; the bridge reads their IDs and never changes them. */
   readonly defaultRows: readonly Row[];
   /** Returns the stable ID of a row; IDs must be unique. */
   readonly getRowId: (row: Row, index: number) => Id;
