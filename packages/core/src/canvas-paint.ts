@@ -1,4 +1,5 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
+import { automaticTextColor } from "./color-contrast.js";
 import { formatNumber } from "./number-format.js";
 import type {
   CellAlign,
@@ -391,6 +392,10 @@ interface PaintState {
   digitWidth: number;
   hashWidth: number;
   fontCache: Map<string, string>;
+  /** Automatic text colour per explicit cell fill, for this frame's theme. */
+  cellTextOnFill: Map<string, string>;
+  /** Automatic text colour per explicit header fill, for this frame's theme. */
+  headerTextOnFill: Map<string, string>;
 }
 
 function applyFont(ctx: Ctx, state: PaintState, font: string): void {
@@ -405,6 +410,28 @@ function applyFill(ctx: Ctx, state: PaintState, fill: string): void {
     ctx.fillStyle = fill;
     state.lastFill = fill;
   }
+}
+
+/**
+ * Automatic text colour on an explicit fill, chosen by contrast against it and
+ * computed once per distinct fill a frame paints. Resolving a named colour
+ * goes through `ctx.fillStyle`, so the applied fill is forgotten afterwards.
+ */
+function textOnFill(
+  ctx: Ctx,
+  state: PaintState,
+  cache: Map<string, string>,
+  fill: string,
+  foreground: string,
+  background: string,
+): string {
+  let color = cache.get(fill);
+  if (color === undefined) {
+    color = automaticTextColor(fill, foreground, background, ctx);
+    state.lastFill = "";
+    cache.set(fill, color);
+  }
+  return color;
 }
 
 export interface PaintDamage {
@@ -524,6 +551,8 @@ export function paintFrame(
     digitWidth: 0,
     hashWidth: 0,
     fontCache: new Map(),
+    cellTextOnFill: new Map(),
+    headerTextOnFill: new Map(),
   };
 
   const styleCache = new Map<number, CellStyle>();
@@ -860,7 +889,21 @@ function paintCell(
 
   const effectiveFont = fontFor(theme, effective, layout.zoom ?? 1, state.fontCache);
   applyFont(ctx, state, effectiveFont);
-  applyFill(ctx, state, effective.color ?? theme.fg);
+  applyFill(
+    ctx,
+    state,
+    effective.color ??
+      (effective.backgroundColor
+        ? textOnFill(
+            ctx,
+            state,
+            state.cellTextOnFill,
+            effective.backgroundColor,
+            theme.fg,
+            theme.bg,
+          )
+        : theme.fg),
+  );
 
   const align =
     effective.align ??
@@ -1029,7 +1072,21 @@ function paintHeader(
         state.fontCache,
       ),
     );
-    applyFill(ctx, state, headerStyle?.color ?? theme.headerFg);
+    applyFill(
+      ctx,
+      state,
+      headerStyle?.color ??
+        (headerStyle?.backgroundColor
+          ? textOnFill(
+              ctx,
+              state,
+              state.headerTextOnFill,
+              headerStyle.backgroundColor,
+              theme.headerFg,
+              theme.headerBg,
+            )
+          : theme.headerFg),
+    );
 
     const align = headerStyle?.align ?? "center";
     ctx.save();
