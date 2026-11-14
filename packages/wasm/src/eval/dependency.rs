@@ -2007,7 +2007,10 @@ mod tests {
 
         super::super::FORMULA_EVALUATIONS.with(|count| count.set(0));
         store.recompute(sheet);
-        assert_eq!(super::super::FORMULA_EVALUATIONS.with(std::cell::Cell::get), 0);
+        assert_eq!(
+            super::super::FORMULA_EVALUATIONS.with(std::cell::Cell::get),
+            0
+        );
     }
 
     #[test]
