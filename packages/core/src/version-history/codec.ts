@@ -60,9 +60,12 @@ export type HistoryErrorCode =
 
 /** Expected archive failure; cancellation preserves the caller's abort reason. */
 export class HistoryError extends SheetwriteError {
+  /** Always `"HistoryError"`. */
   override readonly name = "HistoryError";
+  /** What failed, such as a limit or a damaged record. */
   declare readonly code: HistoryErrorCode;
 
+  /** Creates the error; `options.cause` keeps the underlying error. */
   constructor(code: HistoryErrorCode, message: string, options?: ErrorOptions) {
     super(code, "history", message, { cause: options?.cause });
   }

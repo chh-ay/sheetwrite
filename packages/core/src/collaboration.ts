@@ -7,22 +7,31 @@ import type { Grid } from "./types/grid.js";
 
 /** Public collaborator identity attached to presence updates. */
 export interface PresenceActor {
+  /** Stable user ID; required, and unique among collaborators. */
   id: string;
+  /** Name shown next to the user's selection. */
   displayName?: string;
+  /** CSS colour of the user's selection; defaults to blue (`#2563eb`). */
   color?: string;
 }
 
 /** Ephemeral collaborator selection and activity update. */
 export interface PresenceMessage {
+  /** Who sent the message. */
   actor: PresenceActor;
+  /** Stable ID of the sheet the sender is looking at. */
   activeSheet: string;
+  /** The sender's selected ranges; empty when the sender does not share them. */
   selections: readonly Range[];
+  /** When the message was sent, in milliseconds since the Unix epoch. */
   sentAt: number;
 }
 
 /** Host transport contract for ephemeral presence messages. */
 export interface PresenceTransport {
+  /** Sends this user's presence to the other collaborators. */
   publish(message: PresenceMessage, signal?: AbortSignal): void | Promise<void>;
+  /** Calls `listener` for each message from another collaborator; may return a function that stops it. */
   subscribe(
     listener: (message: PresenceMessage) => void,
     signal?: AbortSignal,
@@ -31,15 +40,21 @@ export interface PresenceTransport {
 
 /** Controls which ephemeral collaborator details may be transmitted. */
 export interface PresencePrivacyOptions {
+  /** Set to `false` to leave the display name out of sent messages. */
   shareDisplayName?: boolean;
+  /** Set to `false` to send no selected ranges. */
   shareSelection?: boolean;
+  /** Set to `false` to ignore other collaborators' presence. */
   receivePresence?: boolean;
+  /** Return `false` to ignore a collaborator's messages. */
   allowActor?: (actor: Readonly<PresenceActor>) => boolean;
 }
 
 /** Identity, privacy, and timing options for presence coordination. */
 export interface PresenceCoordinatorOptions {
+  /** This user, as other collaborators see them. */
   actor: PresenceActor;
+  /** What this user shares and receives; by default, everything. */
   privacy?: PresencePrivacyOptions;
   /** Publish/prune interval in milliseconds; defaults to 15,000. Use 0 to disable the timer. */
   heartbeatMs?: number;
@@ -49,6 +64,7 @@ export interface PresenceCoordinatorOptions {
   maxActors?: number;
   /** Selection ranges sent or accepted per actor; defaults to 8 and is clamped to at least 1. */
   maxRangesPerActor?: number;
+  /** Clock in milliseconds; defaults to `Date.now`. Replace it in tests. */
   now?: () => number;
 }
 
@@ -91,6 +107,11 @@ export class PresenceCoordinator {
   private heartbeatTimer?: number;
   private destroyed = false;
 
+  /**
+   * Starts sharing `grid`'s selection and showing other collaborators' selections.
+   *
+   * @throws SheetwriteError with code `invalid-argument` when `options.actor.id` is empty.
+   */
   constructor(
     private readonly grid: Grid,
     private readonly transport: PresenceTransport,
@@ -119,15 +140,18 @@ export class PresenceCoordinator {
     this.queuePublish();
   }
 
+  /** Calls `listener` on each presence event; returns a function that removes it. */
   on(listener: PresenceListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
+  /** The latest message of each collaborator that has not expired. */
   remotePresence(): readonly PresenceMessage[] {
     return [...this.remote.values()].map(({ message }) => clonePresenceMessage(message));
   }
 
+  /** Sends this user's presence at once; a failure is reported as an `error` event. */
   async publishNow(): Promise<void> {
     if (this.destroyed) return;
     try {
@@ -163,6 +187,7 @@ export class PresenceCoordinator {
     }
   }
 
+  /** Removes collaborators silent for longer than `timeoutMs`; the heartbeat also calls it. */
   pruneStale(): void {
     if (this.destroyed) return;
     const cutoff = this.now() - this.timeoutMs;
@@ -176,6 +201,7 @@ export class PresenceCoordinator {
     if (changed) this.paintPresence();
   }
 
+  /** Stops sharing, removes other collaborators' selections from the grid, and drops listeners. */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -245,8 +271,11 @@ export class PresenceCoordinator {
 
 /** Stable host-provided identity displayed on a comment message. */
 export interface CommentAuthorRef {
+  /** Stable user ID, set by the server. */
   id: string;
+  /** Name shown on the message. */
   displayName?: string;
+  /** URL of the author's picture. */
   avatarUrl?: string;
 }
 
@@ -257,22 +286,35 @@ export type CommentAnchor =
 
 /** One immutable author message in a comment thread. */
 export interface CommentMessage {
+  /** Stable message ID, unique in the thread. */
   id: string;
+  /** Who wrote the message; the server sets it. */
   author: CommentAuthorRef;
+  /** The message text. */
   body: string;
+  /** When the message was written, as a timestamp string the server sets. */
   createdAt: string;
+  /** When the message was last edited, as a timestamp string the server sets. */
   editedAt?: string;
 }
 
 /** Versioned discussion anchored to a document location. */
 export interface CommentThread {
+  /** Stable thread ID. */
   id: string;
+  /** ID of the document the thread belongs to. */
   documentId: string;
+  /** The cell or range the thread is attached to. */
   anchor: CommentAnchor;
+  /** The thread's version number, an integer the server sets. */
   version: number;
+  /** The messages, oldest first; there is always at least one. */
   messages: readonly CommentMessage[];
+  /** Whether the thread is marked as resolved. */
   resolved: boolean;
+  /** Who resolved the thread; required when `resolved` is `true`. */
   resolvedBy?: CommentAuthorRef;
+  /** When the thread was resolved, as a timestamp string; required when `resolved` is `true`. */
   resolvedAt?: string;
 }
 
@@ -290,10 +332,15 @@ export type CommentMutation =
 
 /** Versioned comment mutation submitted to a host adapter. */
 export interface CommentMutationRequest {
+  /** ID of the document the comment belongs to. */
   documentId: string;
+  /** The comment version the client last saw. */
   baseVersion: number;
+  /** Client-chosen ID; a retried request with the same ID must apply only once. */
   clientMutationId: string;
+  /** The change to make. */
   mutation: CommentMutation;
+  /** Aborts when the coordinator stops waiting for the call. */
   signal?: AbortSignal;
 }
 
@@ -310,21 +357,29 @@ export type CommentMutationResponse =
 
 /** Versioned comment-thread listing returned by a host adapter. */
 export interface CommentListResult {
+  /** The document's comment version at the time of the listing. */
   version: number;
+  /** Every comment thread of the document. */
   threads: readonly CommentThread[];
 }
 
 /** Comment mutation paired with its assigned server version. */
 export interface VersionedCommentEvent {
+  /** The comment version this change made; one more than the previous one. */
   version: number;
+  /** The thread after the change. */
   thread: CommentThread;
+  /** ID of the client request that made the change, when known. */
   clientMutationId?: string;
 }
 
 /** Host persistence contract for versioned comment threads. */
 export interface CommentAdapter {
+  /** Fetches every comment thread of the document. */
   listComments(documentId: string, signal?: AbortSignal): Promise<CommentListResult>;
+  /** Sends one change to the server and returns its answer. */
   mutateComment(request: CommentMutationRequest): Promise<CommentMutationResponse>;
+  /** Calls `listener` for each change other clients make; may return a function that stops it. */
   subscribeComments?(
     documentId: string,
     listener: (event: VersionedCommentEvent) => void,
@@ -334,7 +389,9 @@ export interface CommentAdapter {
 
 /** Document identity and initial version for comment coordination. */
 export interface CommentCoordinatorOptions {
+  /** ID of the document whose comments to coordinate. */
   documentId: string;
+  /** The comment version already known, such as from server-rendered data; defaults to 0. */
   serverVersion?: number;
 }
 
@@ -357,6 +414,7 @@ export class CommentCoordinator {
   private version: number;
   private destroyed = false;
 
+  /** Creates the coordinator and subscribes to other clients' changes; call `load` next. */
   constructor(
     private readonly adapter: CommentAdapter,
     private readonly options: CommentCoordinatorOptions,
@@ -369,19 +427,27 @@ export class CommentCoordinator {
     );
   }
 
+  /** The newest comment version this client has seen. */
   get serverVersion(): number {
     return this.version;
   }
 
+  /** Calls `listener` on each comment event; returns a function that removes it. */
   on(listener: CommentListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
+  /** Copies of the current threads. */
   commentThreads(): readonly CommentThread[] {
     return [...this.threads.values()].map(cloneCommentThread);
   }
 
+  /**
+   * Fetches every thread through the adapter and replaces the local ones.
+   *
+   * @throws SheetwriteError with code `comment-failed` when the adapter fails or returns invalid data.
+   */
   async load(signal?: AbortSignal): Promise<readonly CommentThread[]> {
     signal = signal
       ? AbortSignal.any([signal, this.abortController.signal])
@@ -414,6 +480,7 @@ export class CommentCoordinator {
     }
   }
 
+  /** Starts a new thread at `anchor` with its first message. */
   create(
     threadId: string,
     messageId: string,
@@ -429,6 +496,7 @@ export class CommentCoordinator {
     );
   }
 
+  /** Adds a message to an existing thread. */
   reply(
     threadId: string,
     messageId: string,
@@ -439,6 +507,7 @@ export class CommentCoordinator {
     return this.mutate({ kind: "reply", threadId, messageId, body }, clientMutationId, signal);
   }
 
+  /** Marks a thread as resolved, or as open again with `resolved: false`. */
   resolve(
     threadId: string,
     resolved: boolean,
@@ -448,6 +517,11 @@ export class CommentCoordinator {
     return this.mutate({ kind: "resolve", threadId, resolved }, clientMutationId, signal);
   }
 
+  /**
+   * Sends one change through the adapter; `create`, `reply` and `resolve` call it.
+   *
+   * @throws SheetwriteError with code `comment-failed` when the adapter fails or returns invalid data.
+   */
   async mutate(
     mutation: CommentMutation,
     clientMutationId: string,
@@ -503,6 +577,7 @@ export class CommentCoordinator {
     }
   }
 
+  /** Cancels pending calls, stops the subscription and drops threads and listeners. */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;
