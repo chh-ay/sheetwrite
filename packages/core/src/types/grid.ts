@@ -760,6 +760,14 @@ export interface GridEvents {
   };
   "edit-begin": { addr: CellAddress };
   "edit-commit": { addr: CellAddress; value: CellValue };
+  /**
+   * The cell editor's text changed: the opened text, then every keystroke,
+   * paste, IME step, undo or picked reference in the editor. A formula bar
+   * shows it. Text set through {@link Grid.setEditText} is not repeated here.
+   */
+  "edit-input": { addr: CellAddress; text: string };
+  /** The cell edit ended: committed (whether or not the value changed) or cancelled. */
+  "edit-end": { addr: CellAddress; reason: "commit" | "cancel" };
   search: SearchResult;
   /** Command availability or formatting activity changed. */
   "command-state-change": GridCommandStateChangeEvent;
@@ -1238,6 +1246,20 @@ export interface Grid {
   styleRange(range: Range, style: Partial<CellStyle> | null): void;
   /** Open the cell editor at a view cell, optionally seeding text / selecting all. */
   beginEdit(row: number, col: number, initial?: string, selectAll?: boolean): void;
+  /**
+   * Type `text` into the cell edit from another surface, such as a formula
+   * bar, with that surface's caret (`selectionStart`, `selectionEnd`). Opens
+   * the editor on the focused cell without taking focus when none is open,
+   * so the cell shows the draft as it is typed. Mark the surface with
+   * `data-sheetwrite-edit-surface` so moving focus between it and the editor
+   * keeps the edit open. Returns false when the cell cannot be edited as text
+   * (read-only, no focused cell, or a custom editor).
+   */
+  setEditText(text: string, selectionStart: number, selectionEnd: number): boolean;
+  /** Commit the open cell edit in place. */
+  commitEdit(): void;
+  /** Cancel the open cell edit; `edit-end` reports the cancel. */
+  cancelEdit(): void;
   /**
    * Ctrl+Arrow-style jump target: the data-run edge from (row, col) on the
    * moved axis (row for vertical moves, col for horizontal), or null when the

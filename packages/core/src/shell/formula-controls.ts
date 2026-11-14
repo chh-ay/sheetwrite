@@ -4,7 +4,12 @@
 // the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
-import { insertEditorLineBreak, sizeEditorTextarea } from "../editor-textarea.js";
+import {
+  EDIT_SURFACE_ATTRIBUTE,
+  editorLineCount,
+  insertEditorLineBreak,
+  sizeEditorTextarea,
+} from "../editor-textarea.js";
 import { FormulaAssist } from "../formula-assist.js";
 import { Scope } from "../scope.js";
 import { selectionCell } from "../selection.js";
@@ -145,10 +150,14 @@ export interface FormulaBarPiece extends ShellPiece {
  * Detached formula bar: mirrors the focused cell's editable text (exact
  * formula source, else literal text) and commits on Enter through the grid's
  * undoable transaction path, targeting the data address captured with the
- * draft — correct even under an active sort/filter view. A focused, dirty
- * draft is never overwritten by selection/change events; Escape restores the
- * last stable text. While focused, it shows formula help as the cell editor
- * does.
+ * draft — correct even under an active sort/filter view.
+ *
+ * During a cell edit the bar and the cell editor share one draft, as in
+ * Excel: typing in the editor shows in the bar keystroke by keystroke, and
+ * typing in the bar shows in the cell, which opens its editor without taking
+ * focus. Escape in either restores the stored text in both. A focused draft
+ * is never overwritten by selection/change events. While focused, the bar
+ * shows formula help as the cell editor does.
  */
 export function createFormulaBar(
   host: HTMLElement,
@@ -159,6 +168,7 @@ export function createFormulaBar(
   input.rows = 1;
   input.wrap = "off";
   input.setAttribute("aria-multiline", "true");
+  input.setAttribute(EDIT_SURFACE_ATTRIBUTE, "");
   input.className = "sheetwrite-shell-formula";
   input.setAttribute("aria-label", options.label ?? "Formula bar");
   input.autocomplete = "off";
@@ -176,21 +186,43 @@ export function createFormulaBar(
   let dirty = false;
   let readOnly = false;
   let composing = false;
+  /** A cell edit is open and the bar shows its draft. */
+  let editing = false;
+  /** Lines the bar was last sized for. */
+  let sizedLines = -1;
+
+  const size = (): void => {
+    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+    sizedLines = editorLineCount(input.value);
+  };
 
   const refresh = (): void => {
-    if (document.activeElement === input && dirty) return;
+    if (editing || (document.activeElement === input && dirty)) return;
     const focus = selectionCell(grid.getSelection());
     snapshot = focus ? grid.getCellInput(focus.row, focus.col) : null;
     committed = snapshot?.text ?? "";
     input.value = committed;
-    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+    size();
     dirty = false;
     if (document.activeElement === input) assist.update();
   };
 
+  const restore = (): void => {
+    dirty = false;
+    if (editing) {
+      // The grid reports the cancel through `edit-end`, which restores the bar.
+      grid.cancelEdit();
+      return;
+    }
+    input.value = committed;
+    size();
+    assist.update();
+  };
+
   const commit = (): void => {
     if (readOnly || !snapshot) return;
-    commitCellInput(grid, snapshot, input.value);
+    if (editing) grid.commitEdit();
+    else commitCellInput(grid, snapshot, input.value);
     dirty = false;
     options.focusGrid?.();
   };
@@ -211,10 +243,7 @@ export function createFormulaBar(
     } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      input.value = committed;
-      sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
-      assist.update();
-      dirty = false;
+      restore();
       options.focusGrid?.();
     }
   };
@@ -222,14 +251,31 @@ export function createFormulaBar(
   // Typing, paste, drop and IME all fire `input`; a key alone does not change the draft.
   const onInput = (): void => {
     dirty = true;
-    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+    size();
     assist.update();
+    if (readOnly) return;
+    editing = grid.setEditText(input.value, input.selectionStart, input.selectionEnd);
   };
   const onFocus = (): void => {
-    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+    size();
     assist.attach(input, null);
   };
   const onBlur = (): void => assist.detach();
+
+  /** The cell editor's draft: shown here unless the user is typing in the bar. */
+  const onEditInput = ({ text }: { text: string }): void => {
+    editing = true;
+    if (document.activeElement === input || input.value === text) return;
+    input.value = text;
+    dirty = true;
+    // Typing within a line keeps the bar's height, so it is laid out only at a line break.
+    if (editorLineCount(text) !== sizedLines) size();
+  };
+  const onEditEnd = (): void => {
+    editing = false;
+    dirty = false;
+    refresh();
+  };
 
   const lifetime = new Scope();
   const { signal } = lifetime;
@@ -254,6 +300,8 @@ export function createFormulaBar(
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("change", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
+  lifetime.add(grid.on("edit-input", onEditInput));
+  lifetime.add(grid.on("edit-end", onEditEnd));
   host.appendChild(input);
   refresh();
   lifetime.add(() => input.remove());
@@ -264,13 +312,8 @@ export function createFormulaBar(
     setReadOnly(value: boolean) {
       readOnly = value;
       input.readOnly = value;
-      if (value) {
-        // A pending draft cannot commit anymore; restore the stable text.
-        input.value = committed;
-        sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
-        assist.update();
-        dirty = false;
-      }
+      // A pending draft cannot commit anymore; restore the stable text.
+      if (value) restore();
     },
     destroy: () => lifetime.close(),
   };

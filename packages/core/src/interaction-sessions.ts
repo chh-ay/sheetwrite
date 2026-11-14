@@ -41,7 +41,9 @@ interface InteractionDependencies {
   columnHeader: (col: number) => string;
   toViewRow: (dataRow: number) => number | null;
   editListeners: {
-    readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
+    readonly [K in "edit-begin" | "edit-commit" | "edit-input" | "edit-end"]: ReadonlySet<
+      (payload: GridEvents[K]) => void
+    >;
   };
   /** Open the find bar; it may load first. `replace: true` focuses the replace field. */
   openFind: (options?: { replace?: boolean }) => void;
@@ -257,11 +259,18 @@ export class InteractionSessions {
     return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
   }
 
-  private endEditor(): void {
+  private endEditor(viewAddress: Readonly<CellAddress>): void {
     this.editingAddress = null;
     this.activeEditor = null;
     this.deps.host.focus();
     this.deps.scheduleRender();
+    this.emitEditEnd(viewAddress, "cancel");
+  }
+
+  private emitEditEnd(viewAddress: Readonly<CellAddress>, reason: "commit" | "cancel"): void {
+    for (const listener of this.deps.editListeners["edit-end"]) {
+      listener({ addr: { ...viewAddress }, reason });
+    }
   }
 
   private cancelEditor(): void {
@@ -274,18 +283,24 @@ export class InteractionSessions {
 
   private finishEdit(
     address: Readonly<CellAddress>,
+    viewAddress: Readonly<CellAddress>,
     input: string | CellValue,
     navigate: EditNavigate,
   ): void {
     if (this.editingAddress !== address) return;
     this.editingAddress = null;
     this.activeEditor = null;
-    if (address.sheet !== this.deps.activeSheet()) return;
-    const viewRow = this.deps.toViewRow(address.row);
-    if (viewRow === null) return;
-    const column = this.deps.sheet().columns[address.col];
-    const value = typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
-    this.commitCellEditAt(address, viewRow, value, navigate);
+    try {
+      if (address.sheet !== this.deps.activeSheet()) return;
+      const viewRow = this.deps.toViewRow(address.row);
+      if (viewRow === null) return;
+      const column = this.deps.sheet().columns[address.col];
+      const value =
+        typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
+      this.commitCellEditAt(address, viewRow, value, navigate);
+    } finally {
+      this.emitEditEnd(viewAddress, "commit");
+    }
   }
 
   private cancelPointer(): void {
@@ -295,7 +310,11 @@ export class InteractionSessions {
     else this.detachDrag();
   }
 
-  beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
+  /**
+   * Open the cell editor on `row`, `col`. With `focus` false it opens as the
+   * cell's view of a draft another edit surface types (see `setEditText`).
+   */
+  beginEdit(row: number, col: number, initial?: string, selectAll = false, focus = true): void {
     if (this.deps.readOnly()) return;
 
     const editCell = this.deps.anchorCell(row, col);
@@ -325,8 +344,9 @@ export class InteractionSessions {
     this.deps.scheduleRender();
     if (selectionChanged) this.deps.emitSelection();
     if (generation !== this.generation || this.deps.readOnly()) return;
+    const viewAddress = { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col };
     for (const listener of this.deps.editListeners["edit-begin"]) {
-      listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
+      listener({ addr: { ...viewAddress } });
     }
 
     // edit-begin remains a before-open notification. Reentrant callbacks can
@@ -341,6 +361,11 @@ export class InteractionSessions {
 
     const custom = column.editor ? this.deps.customEditors.get(column.editor) : undefined;
     if (custom) {
+      // A custom editor owns its own input; another surface cannot type its draft.
+      if (!focus) {
+        this.editingAddress = null;
+        return;
+      }
       this.activeEditor = this.customEditor;
       this.customEditor.begin({
         editor: custom,
@@ -359,8 +384,8 @@ export class InteractionSessions {
           contentTop,
           this.deps.scroller.scrollLeft,
         ),
-        onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
-        onCancel: () => this.endEditor(),
+        onCommit: (value, navigate) => this.finishEdit(dataAddr, viewAddress, value, navigate),
+        onCancel: () => this.endEditor(viewAddress),
       });
 
       return;
@@ -381,20 +406,25 @@ export class InteractionSessions {
         ),
         theme: this.deps.theme(),
         onCommit: (value, navigate) =>
-          this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
-        onCancel: () => this.endEditor(),
+          this.finishEdit(dataAddr, viewAddress, { kind: "literal", value }, navigate),
+        onCancel: () => this.endEditor(viewAddress),
       });
 
       return;
     }
 
     this.activeEditor = this.editor;
+    const emitText = (value: string): void => {
+      for (const listener of this.deps.editListeners["edit-input"]) {
+        listener({ addr: { ...viewAddress }, text: value });
+      }
+    };
     this.editor.begin({
       row: editCell.row,
       col: editCell.col,
       type: column.type,
       initial: text,
-      selectAll: selectAll || initial === undefined,
+      selectAll: focus && (selectAll || initial === undefined),
       rect: this.deps.screenRect(
         editCell.row,
         editCell.col,
@@ -403,10 +433,41 @@ export class InteractionSessions {
       ),
       label: this.editorLabel(editCell.row, editCell.col),
       theme: this.deps.theme(),
-      onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
-      onCancel: () => this.endEditor(),
+      focus,
+      onCommit: (value, navigate) => this.finishEdit(dataAddr, viewAddress, value, navigate),
+      onCancel: () => this.endEditor(viewAddress),
+      onText: emitText,
       onShortcut: (event) => this.runCustomShortcut(event, true),
     });
+    // Surfaces that show the draft, such as a formula bar, start from the opened text.
+    emitText(text);
+  }
+
+  /**
+   * Show `text`, typed in another edit surface such as a formula bar, in the
+   * cell editor, with that surface's caret. Opens the editor on the focused
+   * cell without taking focus when no edit is open. False when the cell
+   * cannot be edited as text: read-only, or a custom editor owns it.
+   */
+  setEditText(text: string, selectionStart: number, selectionEnd: number): boolean {
+    if (!this.isEditing) {
+      const focus = this.deps.selection().focusCell;
+      if (!focus) return false;
+      this.beginEdit(focus.row, focus.col, text, false, false);
+    }
+    if (this.activeEditor !== this.editor || !this.editor.isEditing) return false;
+    this.editor.setText(text, selectionStart, selectionEnd);
+    return true;
+  }
+
+  /** Commit the open cell edit in place, as Enter does in a formula bar. */
+  commitEdit(): void {
+    if (this.activeEditor === this.editor) this.editor.commit("none");
+  }
+
+  /** Cancel the open cell edit; both the editor and any formula bar show the stored value again. */
+  cancelEdit(): void {
+    if (this.isEditing) this.cancelEditor();
   }
 
   private commitCellEditAt(
@@ -524,6 +585,11 @@ export class InteractionSessions {
       };
       this.attachDrag(e, move, up, up);
       return;
+    }
+    // A draft typed in a formula bar commits when the user clicks a cell, as
+    // the focused editor's blur would.
+    if (this.activeEditor === editor && editor.isEditing && !editor.isFocused) {
+      editor.commit("none");
     }
     // A selected cell must own subsequent keyboard input across browsers.
     // Keep touch and active-editor gestures focused where they already are.

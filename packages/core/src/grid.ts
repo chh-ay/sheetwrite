@@ -575,6 +575,8 @@ export class GridImpl implements Grid {
     scroll: new Set(),
     "edit-begin": new Set(),
     "edit-commit": new Set(),
+    "edit-input": new Set(),
+    "edit-end": new Set(),
     search: new Set(),
     "command-state-change": new Set(),
     "active-sheet": new Set(),
@@ -1847,6 +1849,18 @@ export class GridImpl implements Grid {
 
   beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
     this.interactions.beginEdit(row, col, initial, selectAll);
+  }
+
+  setEditText(text: string, selectionStart: number, selectionEnd: number): boolean {
+    return this.interactions.setEditText(text, selectionStart, selectionEnd);
+  }
+
+  commitEdit(): void {
+    this.interactions.commitEdit();
+  }
+
+  cancelEdit(): void {
+    this.interactions.cancelEdit();
   }
 
   private clearSelection(): void {

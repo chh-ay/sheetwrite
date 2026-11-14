@@ -30,6 +30,8 @@ Framework `onGridChange` / `grid-change` callbacks carry the same committed even
 | `scroll` | `{ scrollTop; firstRow; lastRow; scrollLeft; firstVisibleColumn; lastVisibleColumn }`; the visible-column fields are `number \| null`. |
 | `edit-begin` | `{ addr: CellAddress }` |
 | `edit-commit` | `{ addr: CellAddress; value: CellValue }` |
+| `edit-input` | `{ addr: CellAddress; text: string }`: the cell editor's text, when it opens and on every change the user makes in it (typing, paste, IME, undo, a picked reference). Text set with `setEditText` is not repeated. |
+| `edit-end` | `{ addr: CellAddress; reason: "commit" \| "cancel" }`, when a cell edit closes. |
 | `search` | `SearchResult`: `{ query: string; matches: CellAddress[]; active: number }` |
 | `command-state-change` | `{ states }`: every command's `GridCommandState`. See [Host-owned command state](/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state). |
 | `mutation-rejected` | `{ issues: MutationIssue[] }` |
