@@ -1108,7 +1108,7 @@ pub(crate) struct PivotLayout {
 }
 
 impl PivotLayout {
-    pub(crate) fn retained_bytes(&self) -> usize {
+    pub(crate) const fn retained_bytes(&self) -> usize {
         (self.row_groups.capacity() + self.col_groups.capacity()) * size_of::<u32>()
             + (self.row_positions.capacity() + self.col_positions.capacity()) * size_of::<u32>()
     }
@@ -1137,7 +1137,9 @@ fn same_name(left: &str, right: &str) -> bool {
 fn field_name_ref(header: &Value, field: usize) -> Cow<'_, str> {
     match header {
         Value::Text(text) if !text.is_empty() => Cow::Borrowed(text),
-        _ => Cow::Owned(field_name(header, field)),
+        Value::Text(_) | Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            Cow::Owned(field_name(header, field))
+        }
     }
 }
 
