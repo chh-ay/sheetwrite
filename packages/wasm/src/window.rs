@@ -652,12 +652,14 @@ impl WindowView {
         self.string_pool_epoch
     }
 
+    /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nRows)]
     #[must_use]
     pub fn n_rows(&self) -> u32 {
         self.n_rows
     }
 
+    /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nCols)]
     #[must_use]
     pub fn n_cols(&self) -> u32 {

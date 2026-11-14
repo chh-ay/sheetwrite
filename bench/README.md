@@ -979,8 +979,17 @@ to `results/version-comparison/`.
 uses 200, 2,000, and 20,000 charts, at most 100 per owner sheet, sourcing
 distinct two-cell rows in one contiguous region of the data sheet. The no-chart
 control has the same sheets and data as its corresponding literal-source
-workbook. Each measured operation is one committed cell edit, not an
-amortized batch. Median and p95 summarize 101 samples after 20 warmups.
+workbook. All no-chart controls run first, then every literal-source row,
+then every formula-source row: formula rows resolve hundreds of charts per
+commit and leave that path warmed up for whatever runs after them, so the
+literal rows (the control for chart work) never follow them. `--source
+literal` or `--source formula` runs one source in its own process. Each
+measured operation is one committed cell edit, not an amortized batch. Median and p95 summarize 101 samples after up to 7,000 warmup commits per
+row, capped at 5 seconds of warm-up (rows record `warmupCommits`). On develop a
+literal commit is still 1.3-1.7 times its later time after 1,000 commits and
+stays within 5% of it from 3,800-6,800 commits, depending on the row, on both
+machines; a row whose commit resolves thousands of charts warms its paths far
+sooner and stops at the time cap.
 Initial index construction and correctness assertions are untimed.
 
 Literal-source outside edits must emit no event and perform no view
@@ -994,12 +1003,26 @@ cell of chart 0's source. In the formula case, its first cell reads that
 second cell, so the formula stays in place and the index is not rebuilt.
 Outside edits change a literal after the source region. A formula-replacement
 edit, which rebuilds the chart index, is not measured in 0.6. The formula rows
-are named `literal-dependency-edit`. The conservative policy reports every
-computed chart on both inside
-and outside value commits. Their cost can grow with chart count. Outside
-literal edits still query the source index; a silent event stream is not a
-claim of constant time. Every sample checks event count, exact identities,
-and resolution count.
+are named `literal-dependency-edit`. The engine reports half-open rectangles of
+formulas selected by the recompute pass and of changed spill and pivot cells;
+the tracker queries the same source index with them. An outside edit therefore
+names no formula chart, and an inside edit names chart 0. A recomputed formula
+whose value stayed equal can still name its chart. Custom stores, disabled
+tracking and a full 4,096-rectangle engine report keep the conservative
+all-chart refresh. `requiredCharts` is the minimum correct set; for paired
+comparisons with a conservative base, `expectedCharts` and
+`resolutionsPerCommit` are the median charts actually named. Every sample
+checks event count, required and permitted identities, duplicates and
+resolution count.
+
+Cold rows time the first commit after load plus resolving the charts it
+names, for inside and outside edits at 2,000 and 20,000 charts and each
+selected source. Every sample is a fresh process (`--cold-sample`), 21 per
+row, so a first-use cost that warm rows amortize away stays visible. A cold
+sample waits one second after load, because the engine's WebAssembly is still
+compiling on background threads right after load and a commit inside that
+window measured the race with the compiler. Every row (warm or cold) starts
+after a full garbage collection of its fixture's setup.
 
 Smoke admits both full-size 20,000-chart fixtures before it records the
 200-chart timing rows, with five samples and two warmups. Setup transactions
@@ -1298,6 +1321,11 @@ and retained text ownership after clearing and unique edits. That mode records
 the cold sweep and seven additional sweeps; its maximum includes the cold
 sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
 ingest and the public cached `getVisibleWindow` path.
+
+Both harnesses run `Bun.gc(true)` before each timed read, outside the timed
+span. Without it the read row timed the JS heap the write fixture left behind:
+on Linux, develop's `setSparseBlock` read 1.22× slower than 0.6.1's with
+identical engine state, and 0.989× after one collection (#651).
 
 Run each sample in a fresh process. To select a built baseline without changing
 its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for

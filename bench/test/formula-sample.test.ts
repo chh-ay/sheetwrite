@@ -4,6 +4,7 @@ import * as engine from "@sheetwrite/wasm";
 
 import { collectAggregatedSample } from "../src/formula-bench.js";
 import { createFormulaFixture } from "../src/formula-fixtures.js";
+import { writeNumberColumn, writeStringColumn } from "../src/packed-fixture.js";
 
 const FORMULAS = 10;
 const MINIMUM_SAMPLE_MS = 5;
@@ -55,4 +56,31 @@ it("builds one fixture per sample, restores it between edits and warms up for th
   expect(runs).toBeGreaterThan(sample.iterations + WARMUP_FIXTURES);
   expect([...statesBeforeRun]).toEqual(["unedited"]);
   expect(restores).toBe(runs - 1);
+});
+
+it("packed fixture columns preserve offsets, styles and Unicode text", async () => {
+  await engine.load();
+  const store = new engine.CellStore();
+  try {
+    const sheet = store.addSheet(2, 5);
+    writeNumberColumn(store, sheet, 0, 1, Float64Array.of(-2.5, 42), 7);
+    writeStringColumn(store, sheet, 1, 2, ["", "é🙂", "尾"], 9);
+    const values = [
+      [1, 0, 1, -2.5, undefined, 7],
+      [2, 0, 1, 42, undefined, 7],
+      [2, 1, 2, 0, "", 9],
+      [3, 1, 2, 0, "é🙂", 9],
+      [4, 1, 2, 0, "尾", 9],
+    ] as const;
+    for (const [row, col, kind, number, text, style] of values) {
+      const cell = store.getCell(sheet, row, col);
+      try {
+        expect([cell.kind, cell.num, cell.string, cell.style]).toEqual([kind, number, text, style]);
+      } finally {
+        cell.free();
+      }
+    }
+  } finally {
+    store.free();
+  }
 });

@@ -262,6 +262,7 @@ impl CellStore {
     /// pivots whose source holds them, update. Returns whether any changed.
     pub(super) fn mark_pivot_cells_dirty(&mut self, owner: usize, changed: Vec<CellKey>) -> bool {
         let any = !changed.is_empty();
+        self.record_recalculated_cells(owner, &changed);
         self.sheets[owner].formulas.mark_cells_dirty(changed);
         any
     }
