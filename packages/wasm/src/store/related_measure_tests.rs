@@ -6,7 +6,7 @@
 
 use super::*;
 use crate::eval::settled_cell_value;
-use crate::types::{FormulaError, Value};
+use crate::types::Value;
 
 const ORDERS: usize = 60;
 const MONTHS: f64 = 4.0;
@@ -144,19 +144,22 @@ impl Fixture {
             ),
         ] {
             let names: Vec<String> = ids.map(String::from).to_vec();
-            assert!(store.set_table(
-                table,
-                table,
-                sheet,
-                0,
-                0,
-                rows,
-                2,
-                true,
-                false,
-                names.clone(),
-                names
-            ));
+            assert!(
+                store.set_table(
+                    table,
+                    table,
+                    sheet,
+                    0,
+                    0,
+                    rows,
+                    2,
+                    true,
+                    false,
+                    names.clone(),
+                    names
+                ),
+                "the table installs"
+            );
             for (col, id) in ids.iter().enumerate() {
                 store.set_string(sheet, 0, col, id, 0);
             }
@@ -187,7 +190,10 @@ impl Fixture {
         for (id, name, formula) in MEASURES {
             model.extend([id, "customers", formula, "", name].map(String::from));
         }
-        assert!(fixture.store.set_relationships(model));
+        assert!(
+            fixture.store.set_relationships(model),
+            "the relationships install"
+        );
         fixture.install();
         fixture
     }
@@ -211,7 +217,7 @@ impl Fixture {
             .map(String::from)
             .to_vec();
         let measure_strings = strings.len();
-        strings.extend(VALUES.map(|index| MEASURES[index].0.to_string()));
+        strings.extend(VALUES.map(|index| MEASURES[index].0.to_owned()));
         strings.extend(KEPT_REGIONS.map(String::from));
         let region_strings = measure_strings + VALUES.len();
 
@@ -237,7 +243,10 @@ impl Fixture {
         }
         numbers.extend([0.0, f64::from(ROW_TOTALS | COLUMN_TOTALS)]);
 
-        assert!(self.store.set_pivots(self.output, &numbers, strings));
+        assert!(
+            self.store.set_pivots(self.output, &numbers, strings),
+            "the pivots install"
+        );
         self.store.recompute_changed();
     }
 

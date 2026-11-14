@@ -39,7 +39,11 @@ fn number(store: &CellStore, sheet: usize, row: usize, col: usize) -> f64 {
 fn after_row_move(formula: &str, from: usize, count: usize, to: usize) -> String {
     let (mut store, data, summary) = store();
     store.set_formula(summary, 0, 0, formula, 0);
-    assert_eq!(store.move_rows(data, from, count, to), BLOCK_OK);
+    assert_eq!(
+        store.move_rows(data, from, count, to),
+        BLOCK_OK,
+        "the row move succeeds"
+    );
     text(&store, summary, 0, 0)
 }
 

@@ -24,13 +24,22 @@ fn sheet_with_reference() -> (CellStore, usize, usize) {
 }
 
 fn assert_unchanged(store: &CellStore, sheet: usize, reader: usize) {
-    assert_eq!(store.row_count(sheet), ROWS);
-    assert_eq!(store.formula_source(sheet, 0, 1).as_deref(), Some("=A2"));
+    assert_eq!(store.row_count(sheet), ROWS, "the row count");
+    assert_eq!(
+        store.formula_source(sheet, 0, 1).as_deref(),
+        Some("=A2"),
+        "the same-sheet reference"
+    );
     assert_eq!(
         store.formula_source(reader, 0, 0).as_deref(),
-        Some("=Grid!A2")
+        Some("=Grid!A2"),
+        "the cross-sheet reference"
     );
-    assert_eq!(store.get_cell(sheet, 1, 0).num(), 7.0);
+    assert_eq!(
+        store.get_cell(sheet, 1, 0).num(),
+        7.0,
+        "the referenced value"
+    );
 }
 
 #[test]
