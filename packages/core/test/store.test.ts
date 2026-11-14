@@ -804,6 +804,57 @@ describe("stable formula sheet identity", () => {
 });
 
 describe("range-native mutations", () => {
+  it("stores every block string across text packing chunks, ASCII or not", () => {
+    // More strings than one packing chunk (65,536), with non-ASCII text only
+    // in the second chunk and an empty string on each side of the boundary.
+    const rows = 70_000;
+    const textAt = (row: number): string => {
+      if (row === 65_535 || row === 65_536) return "";
+      if (row > 65_536 && row % 1_000 === 7) return `é😀${row}`;
+      return `r${row}`;
+    };
+    const store = new SheetwriteStore(makeWorkbook(rows));
+    const outcome = store.applyTransaction({
+      patches: [
+        {
+          op: "setBlock",
+          range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: rows - 1, col: 0 } },
+          block: {
+            rowCount: rows,
+            colCount: 1,
+            values: Array.from({ length: rows }, (_, row) => textAt(row)),
+          },
+        },
+      ],
+    });
+    expect(outcome.status).toBe("applied");
+    const mismatches: number[] = [];
+    for (let row = 0; row < rows; row++) {
+      if (store.getCell(addr(row, 0)).resolved !== textAt(row)) mismatches.push(row);
+    }
+    expect(mismatches).toEqual([]);
+
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: addr(0, 2), value: { kind: "literal", value: "naïve ✓" } },
+        { op: "set", addr: addr(1, 2), value: { kind: "literal", value: "plain" } },
+      ],
+    });
+    expect(store.getCell(addr(0, 2)).resolved).toBe("naïve ✓");
+    expect(store.getCell(addr(1, 2)).resolved).toBe("plain");
+
+    const imported = new SheetwriteStore(makeWorkbook(3), {
+      rowCount: 3,
+      columns: { name: ["plain", "Zürich", "naïve"], amount: [1, 2, 3], city: ["東京", "x", "y"] },
+    });
+    expect([0, 1, 2].map((row) => imported.getCell(addr(row, 0)).resolved)).toEqual([
+      "plain",
+      "Zürich",
+      "naïve",
+    ]);
+    expect(imported.getCell(addr(0, 2)).resolved).toBe("東京");
+  });
+
   it("keeps styles that differ only in font family, vertical alignment, or number format apart", () => {
     const store = new SheetwriteStore(makeWorkbook(4));
     const styles: CellStyle[] = [
