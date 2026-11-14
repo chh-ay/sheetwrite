@@ -283,6 +283,100 @@ describe("createFormulaBar", () => {
     grid.destroy();
     store.dispose();
   });
+
+  describe("shares one draft with the cell editor", () => {
+    function setup() {
+      const { grid, store, host } = makeGrid();
+      const piece = createFormulaBar(host, grid, {});
+      const bar = piece.element;
+      if (!(bar instanceof HTMLTextAreaElement)) throw new Error("formula bar must be a textarea");
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+      const cellEditor = (): HTMLTextAreaElement | null =>
+        host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+      const type = (field: HTMLTextAreaElement, value: string, inputType = "insertText") => {
+        field.value = value;
+        field.dispatchEvent(new InputEvent("input", { inputType }));
+      };
+      const done = () => {
+        piece.destroy();
+        grid.destroy();
+        store.dispose();
+      };
+      return { grid, store, bar, cellEditor, type, done };
+    }
+
+    it("shows every change in the cell editor in the bar, and Escape restores both", () => {
+      const { grid, bar, cellEditor, type, done } = setup();
+      expect(bar.value).toBe("Customer 2");
+      grid.beginEdit(2, 0, "=");
+      expect(bar.value).toBe("=");
+      const editor = cellEditor();
+      if (!editor) throw new Error("the cell editor did not open");
+      type(editor, "=SUM(");
+      expect(bar.value).toBe("=SUM(");
+      type(editor, "=SUM(\nB1)", "insertLineBreak");
+      expect(bar.value).toBe("=SUM(\nB1)");
+      type(editor, "=SUM(", "historyUndo");
+      expect(bar.value).toBe("=SUM(");
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(bar.value).toBe("Customer 2");
+      done();
+    });
+
+    it("shows typing in the bar in the cell without moving focus, and commits from the bar", () => {
+      const { store, bar, cellEditor, type, done } = setup();
+      bar.focus();
+      type(bar, "Typed");
+      expect(cellEditor()?.value).toBe("Typed");
+      expect(document.activeElement).toBe(bar);
+      type(bar, "Typed in bar", "insertFromPaste");
+      expect(cellEditor()?.value).toBe("Typed in bar");
+      bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Typed in bar");
+      expect(bar.value).toBe("Typed in bar");
+      done();
+    });
+
+    it("cancels the cell's draft when Escape is pressed in the bar", () => {
+      const { store, bar, cellEditor, type, done } = setup();
+      bar.focus();
+      type(bar, "draft");
+      bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(bar.value).toBe("Customer 2");
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Customer 2");
+      done();
+    });
+
+    it("keeps the edit open when focus moves from the cell editor into the bar", () => {
+      const { grid, store, bar, cellEditor, type, done } = setup();
+      grid.beginEdit(2, 0, "a");
+      const editor = cellEditor();
+      if (!editor) throw new Error("the cell editor did not open");
+      type(editor, "ab");
+      bar.focus();
+      expect(cellEditor()).toBe(editor);
+      type(bar, "abc");
+      expect(editor.value).toBe("abc");
+      editor.focus();
+      type(editor, "abcd");
+      expect(bar.value).toBe("abcd");
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("abcd");
+      done();
+    });
+
+    it("does not open the cell editor from the bar in read-only mode", () => {
+      const { grid, bar, cellEditor, type, done } = setup();
+      grid.setReadOnly(true);
+      bar.focus();
+      type(bar, "x");
+      expect(cellEditor()).toBeNull();
+      done();
+    });
+  });
 });
 
 describe("createSpreadsheetShell", () => {
