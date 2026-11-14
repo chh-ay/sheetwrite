@@ -14,8 +14,16 @@
  * resident memory. `retainedHeapMiB` is the JS heap the queued commits keep
  * alive (pending records plus the Grid's own history of them), after a full GC.
  *
+ * Each depth also times draining a pending-record queue of that depth the way
+ * acknowledgements remove records: `drainMs` acknowledges the head every time,
+ * `drainSwappedMs` acknowledges each pair of records second-first, so every
+ * other removal is not the head. Both are the whole drain, median of
+ * {@link DRAIN_SAMPLES} fresh queues; a drain that leaves the queue out of
+ * order or not empty fails the run.
+ *
  * Timing: `bun run src/sync-queue-depth-bench.ts [--depths 0,1000,5000,10000]`.
- * Prints one JSON line per depth: median and p95 per commit, and memory.
+ * Prints one JSON line per depth: median and p95 per commit, memory, and the
+ * two drain medians.
  */
 import "./dom-setup.js";
 import { fullGC, heapStats } from "bun:jsc";
@@ -32,7 +40,9 @@ import {
   SyncCoordinator,
   type WorkbookSnapshot,
 } from "../../packages/core/src/index.js";
+import { PendingRecordQueue } from "../../packages/core/src/sync-queue.js";
 import { installCanvasTestStubs } from "../../packages/core/src/testing.js";
+import type { SyncMutationRecord } from "../../packages/core/src/types/transaction.js";
 import { optionValue } from "./cli-options.js";
 import { collect, forceGc, summarize } from "./stats.js";
 
@@ -52,6 +62,8 @@ const TIMED_COMMITS = 101;
 const JIT_WARMUP_DEPTH = 1_000;
 /** Room for the deepest queue plus every warm-up and timed commit. */
 const PENDING_HEADROOM = WARMUP_COMMITS + TIMED_COMMITS;
+const DRAIN_WARMUPS = 5;
+const DRAIN_SAMPLES = 21;
 
 interface DepthResult {
   readonly depth: number;
@@ -60,6 +72,8 @@ interface DepthResult {
   readonly samples: number;
   readonly retainedHeapMiB: number;
   readonly maxRssMiB: number;
+  readonly drainMs: number;
+  readonly drainSwappedMs: number;
 }
 
 function fail(message: string): never {
@@ -139,7 +153,7 @@ function collectGarbage(): void {
   fullGC();
 }
 
-function measureDepth(depth: number): Omit<DepthResult, "maxRssMiB"> {
+function measureDepth(depth: number): Omit<DepthResult, "maxRssMiB" | "drainMs" | "drainSwappedMs"> {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGrid(host, {
@@ -182,6 +196,80 @@ function measureDepth(depth: number): Omit<DepthResult, "maxRssMiB"> {
   }
 }
 
+function drainRecords(depth: number): SyncMutationRecord[] {
+  return Array.from({ length: depth }, (_, index) => ({
+    documentId: DOCUMENT_ID,
+    baseVersion: index,
+    clientMutationId: `drain-${index}`,
+    operations: [],
+    status: "pending",
+  }));
+}
+
+/** Mutation IDs in acknowledgement order; `swapped` exchanges each pair. */
+function acknowledgementOrder(records: readonly SyncMutationRecord[], swapped: boolean): string[] {
+  const ids = records.map((record) => record.clientMutationId);
+  if (swapped) {
+    for (let index = 0; index + 1 < ids.length; index += 2) {
+      const first = ids[index];
+      const second = ids[index + 1];
+      if (first === undefined || second === undefined) fail("drain lost a mutation identity");
+      ids[index] = second;
+      ids[index + 1] = first;
+    }
+  }
+  return ids;
+}
+
+function filledQueue(records: readonly SyncMutationRecord[]): PendingRecordQueue {
+  const queue = new PendingRecordQueue();
+  for (const record of records) queue.add(record);
+  return queue;
+}
+
+function assertDrained(queue: PendingRecordQueue): void {
+  if (queue.head() !== undefined || queue.versionCount !== 0 || queue.count("pending") !== 0) {
+    fail("drain left records in the queue");
+  }
+}
+
+/** Untimed: after every acknowledgement the head is the oldest record still queued. */
+function validateDrain(records: readonly SyncMutationRecord[], acks: readonly string[]): void {
+  const queue = filledQueue(records);
+  const acknowledged = new Set<string>();
+  let oldest = 0;
+  for (const id of acks) {
+    queue.remove(id);
+    acknowledged.add(id);
+    while (oldest < records.length && acknowledged.has(records[oldest]?.clientMutationId ?? "")) {
+      oldest += 1;
+    }
+    if (queue.head() !== records[oldest]) fail(`drain head is wrong after ${id}`);
+  }
+  assertDrained(queue);
+}
+
+function measureDrain(depth: number, swapped: boolean): number {
+  const records = drainRecords(depth);
+  const acks = acknowledgementOrder(records, swapped);
+  validateDrain(records, acks);
+  let queue = filledQueue([]);
+  const samplesMs = collect(
+    () => {
+      for (const id of acks) queue.remove(id);
+    },
+    {
+      warmup: DRAIN_WARMUPS,
+      iters: DRAIN_SAMPLES,
+      before: () => {
+        queue = filledQueue(records);
+      },
+      after: () => assertDrained(queue),
+    },
+  );
+  return summarize(samplesMs).median;
+}
+
 async function runWorker(depth: number): Promise<DepthResult> {
   await initSheetwrite({ source: readFileSync(WASM_PATH) });
   const restoreCanvas = installCanvasTestStubs();
@@ -190,7 +278,13 @@ async function runWorker(depth: number): Promise<DepthResult> {
     // every depth is measured against an equally warm JIT.
     measureDepth(JIT_WARMUP_DEPTH);
     const result = measureDepth(depth);
-    return { ...result, maxRssMiB: process.resourceUsage().maxRSS / KIB_PER_MIB };
+    const maxRssMiB = process.resourceUsage().maxRSS / KIB_PER_MIB;
+    return {
+      ...result,
+      maxRssMiB,
+      drainMs: measureDrain(depth, false),
+      drainSwappedMs: measureDrain(depth, true),
+    };
   } finally {
     restoreCanvas();
   }
