@@ -153,7 +153,9 @@ function collectGarbage(): void {
   fullGC();
 }
 
-function measureDepth(depth: number): Omit<DepthResult, "maxRssMiB" | "drainMs" | "drainSwappedMs"> {
+function measureDepth(
+  depth: number,
+): Omit<DepthResult, "maxRssMiB" | "drainMs" | "drainSwappedMs"> {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const grid = createGrid(host, {
