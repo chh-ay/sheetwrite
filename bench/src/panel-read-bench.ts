@@ -160,26 +160,28 @@ function measureOpenPanelEdits(body: HTMLElement): Record<string, number[]> {
   const otherSheetEditMs = measure(editEach(other));
   const sourceEditMs = measure(editEach(source));
   const cleanup = pivotPanel(grid, SHEET, pivot.id, false).render(body);
+  let openPanelOtherSheetEditMs: number[];
+  let openPanelSourceEditMs: number[];
   try {
     const list = body.querySelector(".sheetwrite-panel-fields");
     if (list === null) throw new Error("the pivot field list is missing");
-    const openPanelOtherSheetEditMs = measure(editEach(other));
-    const openPanelSourceEditMs = measure(editEach(source));
+    openPanelOtherSheetEditMs = measure(editEach(other));
+    openPanelSourceEditMs = measure(editEach(source));
     if (body.querySelector(".sheetwrite-panel-fields") !== list) {
       throw new Error("a cell edit rebuilt the open pivot field list");
     }
-    return { otherSheetEditMs, sourceEditMs, openPanelOtherSheetEditMs, openPanelSourceEditMs };
   } finally {
     cleanup?.();
     body.replaceChildren();
-    const restored = grid.applyTransaction({
-      patches: [
-        { op: "set", addr: source, value: { kind: "literal", value: amounts[1] ?? null } },
-        { op: "set", addr: other, value: { kind: "literal", value: null } },
-      ],
-    });
-    if (restored.status !== "applied") throw new Error("edited cells were not restored");
   }
+  const restored = grid.applyTransaction({
+    patches: [
+      { op: "set", addr: source, value: { kind: "literal", value: amounts[1] ?? null } },
+      { op: "set", addr: other, value: { kind: "literal", value: null } },
+    ],
+  });
+  if (restored.status !== "applied") throw new Error("edited cells were not restored");
+  return { otherSheetEditMs, sourceEditMs, openPanelOtherSheetEditMs, openPanelSourceEditMs };
 }
 
 try {
