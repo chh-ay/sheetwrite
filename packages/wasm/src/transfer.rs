@@ -199,7 +199,7 @@ impl<'a> Reader<'a> {
         Ok(input)
     }
 
-    const fn remaining(&self) -> usize {
+    fn remaining(&self) -> usize {
         #[cfg(target_arch = "wasm32")]
         {
             self.source.length() as usize - self.offset
