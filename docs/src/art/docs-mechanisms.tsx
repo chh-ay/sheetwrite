@@ -376,7 +376,7 @@ export function AriaMirrorDiagram() {
       pairs={rows.map(([row, index], position) => ({
         from: { ...(position === 0 ? { eyebrow: "Visible window" } : {}), title: row },
         to: {
-          ...(position === 0 ? { eyebrow: "div.sheetwrite-aria · rowgroup" } : {}),
+          ...(position === 0 ? { eyebrow: "Screen-reader mirror" } : {}),
           title: "",
           code: [`row · aria-rowindex="${index}"`],
           tone: "accent",
