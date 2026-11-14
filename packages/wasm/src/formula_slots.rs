@@ -820,6 +820,9 @@ struct PassScratch {
     /// The regex programs this pass compiled.
     #[cfg(feature = "analysis")]
     regexes: PassRegexes,
+    /// LAMBDA parameter values of the calls in progress.
+    #[cfg(feature = "analysis")]
+    call_frame: crate::eval::analysis::lambda::CallFrame,
 }
 
 /// Compiled regex programs one pass keeps at once. Formulas that alternate
@@ -1080,6 +1083,18 @@ impl FormulaResults {
         &mut self.scratch.get_or_insert_with(Box::default).let_frame
     }
 
+    /// The LAMBDA call frame of this pass, once a call has created it.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn call_frame(&self) -> Option<&crate::eval::analysis::lambda::CallFrame> {
+        self.scratch.as_deref().map(|scratch| &scratch.call_frame)
+    }
+
+    /// The LAMBDA call frame of this pass, created on first use.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn call_frame_mut(&mut self) -> &mut crate::eval::analysis::lambda::CallFrame {
+        &mut self.scratch.get_or_insert_with(Box::default).call_frame
+    }
+
     /// Clears this pass's pulled results and any bits left set. A finished
     /// pass has already cleared its own settled bits, so a small edit does
     /// not touch every word.
@@ -1143,6 +1158,10 @@ impl FormulaResults {
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
         if let Some(frame) = self.let_frame() {
+            frame.add_memory_stats(formulas);
+        }
+        #[cfg(feature = "analysis")]
+        if let Some(frame) = self.call_frame() {
             frame.add_memory_stats(formulas);
         }
         formulas.add_vec::<u32>(

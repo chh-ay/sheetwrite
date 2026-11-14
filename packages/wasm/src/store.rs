@@ -328,9 +328,10 @@ pub struct CellStore {
     /// Live sheet handles in workbook tab order, which 3-D references span.
     /// `None` means ascending handle order: tabs that were only ever appended
     /// cost one pointer and no heap. The list exists once the host reorders.
-    // Boxed so the field stays one pointer: a bare `Vec` header would grow
-    // every store, and most workbooks never reorder tabs.
-    #[allow(clippy::box_collection)]
+    #[allow(
+        clippy::box_collection,
+        reason = "boxed so the field stays one pointer: a bare `Vec` header would grow every store, and most workbooks never reorder tabs"
+    )]
     sheet_order: Option<Box<Vec<u32>>>,
     pub(crate) sheet_lookup: FxHashMap<String, usize>,
     pub(crate) sheet_ids: FxHashMap<String, usize>,
@@ -376,9 +377,11 @@ pub struct CellStore {
     pub(crate) pivots: Option<Box<pivot_output::SavedPivots>>,
     /// Table relationships of the full engine (#229). `None` until the host
     /// sends one, so a workbook without relationships pays one pointer.
-    // Boxed so the field stays one pointer: most workbooks have no model.
     #[cfg(feature = "analysis")]
-    #[allow(clippy::box_collection)]
+    #[allow(
+        clippy::box_collection,
+        reason = "boxed so the field stays one pointer: most workbooks have no model"
+    )]
     pub(crate) relationships: Option<Box<Vec<relationships::Relationship>>>,
 }
 
@@ -3808,8 +3811,9 @@ impl CellStore {
     }
 
     /// Parses a formula, binding its sheet and table references as it goes,
-    /// then resolves its defined names when the parse found a name, so a
-    /// formula of plain cells is parsed in one pass.
+    /// then resolves its defined names when the parse found a name and
+    /// numbers its LAMBDA parameters when it found a LAMBDA, so a formula of
+    /// plain cells is parsed in one pass.
     fn resolve_unbound_formula(
         &self,
         source: &str,
@@ -3835,6 +3839,13 @@ impl CellStore {
             ast = self.resolve_defined_names(ast, formula_sheet, &placement);
         }
 
+        // A LAMBDA reads its parameters from the call frame. Numbering them
+        // before the formula is stored or previewed lets its shape checks see
+        // which ones a call binds to arrays.
+        #[cfg(feature = "analysis")]
+        if features.lambdas {
+            crate::eval::analysis::lambda::resolve_parameters(&mut ast);
+        }
         Ok((ast, features))
     }
 

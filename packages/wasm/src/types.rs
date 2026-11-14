@@ -331,7 +331,9 @@ impl ReadSet {
             | Ast::Num(_)
             | Ast::Array(_) => {}
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix(_) | Ast::RegexPattern(_) => {}
+            Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+            #[cfg(feature = "analysis")]
+            Ast::Lambda(definition) => self.collect(&definition.body, formula_sheet),
         }
     }
 
@@ -617,7 +619,10 @@ impl FormulaEntry {
 
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
-        entry.set_produces_array(crate::eval::ast_produces_array(&ast));
+        entry.set_produces_array(crate::eval::ast_produces_array(
+            &ast,
+            crate::eval::Shapes::NONE,
+        ));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
         entry.set_flag(Self::TABLE_REFS, features.table_refs);
         entry.set_flag(Self::NAME_REFS, features.names);
