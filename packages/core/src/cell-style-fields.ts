@@ -19,6 +19,9 @@ const FONT_FAMILY_RE = /^[\p{L}\p{N}](?:[\p{L}\p{N} ._-]*[\p{L}\p{N}._-])?$/u;
  * Whether `value` is a valid cell `fontFamily`: 1-128 letters, digits,
  * spaces, `.`, `_` or `-`, starting with a letter or digit and not ending in a
  * space. The same rule guards snapshots, hyperlinks, clipboard and XLSX import.
+ *
+ * @param value - A font family name, such as `Courier New`.
+ * @returns `true` when a cell style may use it.
  */
 export function isCellFontFamily(value: string): boolean {
   return value.length <= MAX_FONT_FAMILY_LENGTH && FONT_FAMILY_RE.test(value);
@@ -125,6 +128,9 @@ function isCellFontSize(value: unknown): value is number {
  * A plain, bounded copy of an untrusted cell style, or null when `value` is
  * not a plain object of known style fields or any field breaks its rule. The
  * same rule guards hyperlinks, table styles and pasted cells.
+ *
+ * @param value - A style from outside your code, such as parsed JSON.
+ * @returns A new style with only the known fields, or `null` when any field is invalid.
  */
 export function sanitizeCellStyle(value: unknown): CellStyle | null {
   const style = dataProperties(value, STYLE_KEYS);

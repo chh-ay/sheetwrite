@@ -1164,14 +1164,25 @@ function drawScatter(context: DrawContext, axis: Axis, plot: Box, x: ScatterX): 
     { class: "sheetwrite-chart-category-axis", "font-size": FONT_SIZE },
     context.root,
   );
-  xAxis.scale.ticks.forEach((tick, index) => {
-    if (index % stride !== 0) return;
+  // The lowest y label ends AXIS_LABEL_GAP left of the plot at its bottom
+  // edge, so a first x label centered on that corner would run into it. As
+  // other chart libraries do, the first x label starts at the plot's left
+  // edge instead, and is left out when that would reach the next x label.
+  const ticks = xAxis.scale.ticks;
+  const nextTick = ticks[stride];
+  const nextLeft =
+    nextTick === undefined
+      ? Number.POSITIVE_INFINITY
+      : axisPixel(xAxis, nextTick) - textWidth(x.ticks.labels[stride] ?? "") / 2;
+  const firstFits = plot.left + textWidth(x.ticks.labels[0] ?? "") + AXIS_LABEL_GAP <= nextLeft;
+  ticks.forEach((tick, index) => {
+    if (index % stride !== 0 || (index === 0 && !firstFits)) return;
     context.svg.text(
       x.ticks.labels[index] ?? "",
       {
-        x: axisPixel(xAxis, tick),
+        x: index === 0 ? plot.left : axisPixel(xAxis, tick),
         y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE,
-        "text-anchor": "middle",
+        "text-anchor": index === 0 ? "start" : "middle",
       },
       group,
     );

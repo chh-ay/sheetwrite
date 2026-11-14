@@ -41,6 +41,7 @@ export interface SheetwriteAddonContext {
 
 /** One new grid, with the settings it was created with for one add-on. */
 export interface SheetwriteAddonGridContext<Settings> {
+  /** The new grid the add-on is attached to. */
   readonly grid: Grid;
   /** Settings from `createGrid(host, { addons: { [name]: settings } })`, or `undefined`. */
   readonly settings: Settings | undefined;
