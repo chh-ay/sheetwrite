@@ -57,9 +57,12 @@ export type PersistenceErrorCode =
 
 /** Typed failure of grid restore from a saved snapshot and of `MemoryPersistenceAdapter`. */
 export class PersistenceError extends SheetwriteError {
+  /** Always `"PersistenceError"`. */
   override readonly name = "PersistenceError";
+  /** Why persistence failed, such as `"not-found"` or `"invalid-snapshot"`. */
   declare readonly code: PersistenceErrorCode;
 
+  /** Creates the error; `options.cause` keeps the underlying failure. */
   constructor(code: PersistenceErrorCode, message: string, options?: ErrorOptions) {
     super(code, "persistence", message, { cause: options?.cause });
   }
@@ -68,6 +71,12 @@ export class PersistenceError extends SheetwriteError {
 /**
  * Mount a grid over a validated, non-dirty snapshot. The grid owns and disposes
  * the hydrated store just like one created through `createGrid`.
+ *
+ * @param host - Element the grid renders into. The grid fills it and follows its
+ *   size, so give it a height.
+ * @param snapshot - A saved `WorkbookSnapshot`, as `Grid.exportSnapshot` or
+ *   `fromXlsxWorkbook` returns it. It is validated first; an invalid one throws
+ *   a `PersistenceError` with code `invalid-snapshot`.
  */
 export function createGridFromSnapshot(
   host: HTMLElement,
@@ -117,6 +126,10 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
   /** Commits run one at a time, so a journal write cannot interleave with another commit. */
   private commitTail: Promise<unknown> = Promise.resolve();
 
+  /**
+   * Starts with one document per snapshot. Each needs a `documentId`; an
+   * invalid one throws a `PersistenceError` with code `invalid-snapshot`.
+   */
   constructor(...snapshots: readonly WorkbookSnapshot[]) {
     for (const snapshot of snapshots) {
       const checked = validateWorkbookSnapshot(snapshot);
@@ -141,6 +154,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     }
   }
 
+  /** Returns a copy of the document at its latest version; an unknown ID throws `not-found`. */
   async load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot> {
     throwIfAborted(signal);
     const document = this.documents.get(documentId);
@@ -165,6 +179,7 @@ export class MemoryPersistenceAdapter implements PersistenceAdapter {
     document.journal = journal;
   }
 
+  /** Applies the commit at the next version, or answers `duplicate` or `conflict`. */
   async commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
     return this.commitVersions(request, [request.operations]);
   }
