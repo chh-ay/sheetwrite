@@ -208,7 +208,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
         name: "formula-help",
         size: "panel",
         alt: "A SUMIFS formula being typed in the formula bar above the Regions sheet, and the argument guide below it showing the signature with the current argument, rangeAndCriteria, in bold.",
-        caption: "Formula help in the formula bar: the argument guide follows the argument being typed.",
+        caption:
+          "Formula help in the formula bar: the argument guide follows the argument being typed.",
       },
     },
   ],
