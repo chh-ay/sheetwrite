@@ -210,6 +210,9 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     copiedBytes: 0,
     outputAllocationEvents: 0,
   };
+  /** Canvas frames the renderer has drawn; `repaint()` fails when one call draws none. */
+  private canvasFrames = 0;
+  private readWindows!: { invalidateData(): void };
   constructor(
     dataset: ColumnarDataset,
     private readonly windowTransferDiagnostic: boolean,
@@ -234,7 +237,46 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
       workbook: makeWorkbook(this.initialRowCount),
       data: this.data,
     });
+    this.installFrameCounter();
     if (this.windowTransferDiagnostic) this.installWindowTransferDiagnostic();
+  }
+
+  /**
+   * Resolve the internals `repaint()` drives and count every canvas frame. An
+   * internal that was renamed or removed fails the mount instead of turning a
+   * timed repaint into a no-op.
+   */
+  private installFrameCounter(): void {
+    const readWindows: unknown = Reflect.get(this.grid, "readWindows");
+    if (
+      typeof readWindows !== "object" ||
+      readWindows === null ||
+      typeof Reflect.get(readWindows, "invalidateData") !== "function"
+    ) {
+      throw new Error("repaint requires the grid's read-window controller");
+    }
+    this.readWindows = readWindows as { invalidateData(): void };
+    const renderer = Reflect.get(this.grid, "renderer") as
+      | {
+          paint?: (view: InstrumentedVisibleWindowView) => void;
+          paintPanes?: PanePaintFn;
+        }
+      | undefined;
+    if (!renderer || typeof renderer.paint !== "function") {
+      throw new Error("repaint requires a canvas renderer");
+    }
+    const paint = renderer.paint.bind(renderer);
+    renderer.paint = (view) => {
+      this.canvasFrames++;
+      paint(view);
+    };
+    if (typeof renderer.paintPanes === "function") {
+      const paintPanes = renderer.paintPanes.bind(renderer);
+      renderer.paintPanes = (panes, divider) => {
+        this.canvasFrames++;
+        paintPanes(panes, divider);
+      };
+    }
   }
 
   private installWindowTransferDiagnostic(): void {
@@ -394,13 +436,16 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     resetNumberFormatResourcesForTest();
   }
 
+  /**
+   * One full frame, as `hot.render()` re-renders every visible cell from its
+   * data: the visible window is read again and the canvas painted. Fails when
+   * the call draws no canvas frame, so a timed repaint can never be a no-op.
+   */
   repaint(): void {
+    const before = this.canvasFrames;
+    this.readWindows.invalidateData();
     this.grid.refresh();
-    const coordinator = Reflect.get(this.grid, "renderCoordinator") as
-      | { invalidate(): void; renderNow(): void }
-      | undefined;
-    coordinator?.invalidate();
-    coordinator?.renderNow();
+    if (this.canvasFrames === before) throw new Error("repaint drew no canvas frame");
   }
 
   formattedSentinels(): readonly [string, string] {
