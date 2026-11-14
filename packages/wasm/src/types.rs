@@ -379,6 +379,10 @@ fn ast_is_plain(ast: &Ast) -> bool {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
 fn ast_is_volatile(ast: &Ast) -> bool {
     match ast {
         Ast::Func(
@@ -571,7 +575,7 @@ impl FormulaEntry {
     /// Whether the formula calls GETPIVOTDATA. It reads pivot output that
     /// no reference names, so a pivot update recalculates it.
     #[cfg(feature = "analysis")]
-    pub(crate) fn calls_pivot_data(&self) -> bool {
+    pub(crate) const fn calls_pivot_data(&self) -> bool {
         self.flags & Self::CALLS_PIVOT_DATA != 0
     }
 
