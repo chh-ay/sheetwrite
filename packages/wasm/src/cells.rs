@@ -1137,14 +1137,18 @@ impl CellRun<'_> {
     }
 
     /// A paged run's clean kinds and payloads, when every cell is loaded and
-    /// no dirty or calculated block overlays the run.
+    /// no dirty or calculated block overlays the run. A local sheet's run
+    /// without a page is all empty cells: `Some` with empty slices.
     pub(crate) fn clean_sources(&self) -> Option<(&[u8], &[u64])> {
         if self.is_dense || self.dirty.is_some() || !self.calculated.is_empty() {
             return None;
         }
+        if self.kinds.is_empty() {
+            return self.is_local.then_some((&[], &[]));
+        }
         let offset = self.start - self.source_base;
         let len = self.end - self.start;
-        if !self.loaded.is_some_and(|bits| all_bits(bits, offset, len)) {
+        if !self.is_local && !self.loaded.is_some_and(|bits| all_bits(bits, offset, len)) {
             return None;
         }
         Some((

@@ -149,3 +149,63 @@ fn a_local_sheet_stays_local_through_a_memory_transfer() {
         );
     }
 }
+
+#[test]
+fn lookups_on_a_local_sheet_match_the_dense_sheet() {
+    let (mut store, dense, local) = twin_sheets(ROWS);
+    let lookups = [
+        "=VLOOKUP(A100,A1:B9000,2,FALSE)",
+        "=VLOOKUP(500,A1:B9000,1,TRUE)",
+        "=MATCH(A4000,A1:A9000,0)",
+        "=XMATCH(\"k5\",B1:B9000)",
+        "=XLOOKUP(\"k12\",B1:B9000,A1:A9000,\"none\")",
+        "=XLOOKUP(-1,A1:A9000,B1:B9000,\"none\")",
+        "=HLOOKUP(A1,A1:C3,2,FALSE)",
+        "=INDEX(A1:B9000,MATCH(A2500,A1:A9000,0),2)",
+        "=COUNTIF(B1:B9000,\"k1*\")",
+    ];
+    for sheet in [dense, local] {
+        for (row, source) in lookups.iter().enumerate() {
+            store.set_formula(sheet, row + 1, 2, source, 0);
+            // A second formula over the same range shares the pass's index.
+            store.set_formula(sheet, row + 21, 2, source, 0);
+        }
+        store.recompute(sheet);
+    }
+    for (index, source) in lookups.iter().enumerate() {
+        for row in [index + 1, index + 21] {
+            let cell = |sheet| {
+                let out = store.get_cell(sheet, row, 2);
+                (out.kind(), out.num(), out.string())
+            };
+            assert_eq!(cell(local), cell(dense), "{source}");
+        }
+    }
+}
+
+#[test]
+fn column_folds_over_absent_local_pages_match_the_dense_sheet() {
+    let mut store = CellStore::new();
+    let dense = store.add_sheet(COLS, ROWS);
+    let local = store.add_sheet(COLS, ROWS);
+    for sheet in [dense, local] {
+        // Only the first and last pages of column A hold a cell.
+        store.set_number(sheet, 0, 0, 2.5, 0);
+        store.set_number(sheet, ROWS - 1, 0, -4.0, 0);
+    }
+    store.convert_sheet_to_local_paged(local);
+    let folds = ["=SUM(A1:A9000)", "=COUNT(A1:A9000)", "=COUNTA(A1:A9000)", "=MIN(A2:A9000)"];
+    for sheet in [dense, local] {
+        for (row, source) in folds.iter().enumerate() {
+            store.set_formula(sheet, row, 1, source, 0);
+        }
+        store.recompute(sheet);
+    }
+    for (row, source) in folds.iter().enumerate() {
+        assert_eq!(
+            store.get_cell(local, row, 1).num(),
+            store.get_cell(dense, row, 1).num(),
+            "{source}"
+        );
+    }
+}
