@@ -595,54 +595,55 @@ function literalOf(value: CellScalar): CellValue {
 /** Shared empty style; keeps change capture from allocating a style per cell. */
 const EMPTY_STYLE: CellStyle = {};
 const TEXT_ENCODER = new TextEncoder();
-/** Worst-case UTF-8 bytes of one UTF-16 code unit, used to size a retry. */
+/** Worst-case UTF-8 bytes of one UTF-16 code unit. */
 const MAX_UTF8_BYTES_PER_CODE_UNIT = 3;
+/** Strings joined per `encodeInto` call, which bounds the temporary joined string. */
+const TEXT_PACK_CHUNK = 65_536;
+const NON_ASCII = /[^\0-\x7f]/;
 
 /**
  * Cell strings of one block packed into a single UTF-8 buffer.
  *
- * Text crosses into WASM once per block instead of once per cell: `add` appends
- * each string after the previous one and `offsets` records the byte boundary of
- * every string, so the native side slices the buffer and never re-encodes.
- * Strings must be added in the flat input order of their cells: row-major for
- * document blocks and column-major for columnar imports.
+ * Text crosses into WASM once per block instead of once per cell: `bytes`
+ * holds every string after the previous one and `offsets` records the byte
+ * boundary of every string, so the native side slices the buffer and never
+ * re-encodes. `texts` must be in the flat input order of their cells:
+ * row-major for document blocks and column-major for columnar imports.
  */
-class PackedTextBuffer {
-  private written = 0;
-  private count = 0;
-  private bytes: Uint8Array;
-  /** Start of each string, plus the packed length as the final entry. */
-  readonly offsets: Uint32Array;
-
-  constructor(byteCapacity: number, textCount: number) {
-    this.bytes = new Uint8Array(Math.max(byteCapacity, 1));
-    this.offsets = new Uint32Array(textCount + 1);
-  }
-
-  add(value: string): void {
-    this.offsets[this.count] = this.written;
-    let encoded = TEXT_ENCODER.encodeInto(value, this.bytes.subarray(this.written));
-    if (encoded.read < value.length) {
-      // The initial capacity assumes ASCII text; non-ASCII needs more bytes.
-      this.grow(this.written + value.length * MAX_UTF8_BYTES_PER_CODE_UNIT);
-      encoded = TEXT_ENCODER.encodeInto(value, this.bytes.subarray(this.written));
+function packTexts(texts: readonly string[]): { bytes: Uint8Array; offsets: Uint32Array } {
+  // Start of each string, plus the packed length as the final entry.
+  const offsets = new Uint32Array(texts.length + 1);
+  let bytes = new Uint8Array(0);
+  let written = 0;
+  for (let start = 0; start < texts.length; start += TEXT_PACK_CHUNK) {
+    const end = Math.min(texts.length, start + TEXT_PACK_CHUNK);
+    // One encode per chunk: ASCII strings take one byte per code unit, so the
+    // offsets follow from their lengths.
+    const joined = texts.slice(start, end).join("");
+    const ascii = !NON_ASCII.test(joined);
+    const required = written + joined.length * (ascii ? 1 : MAX_UTF8_BYTES_PER_CODE_UNIT);
+    if (required > bytes.length) {
+      const grown = new Uint8Array(Math.max(required, bytes.length * 2));
+      grown.set(bytes.subarray(0, written));
+      bytes = grown;
     }
-    this.written += encoded.written;
-    this.count += 1;
-    this.offsets[this.count] = this.written;
-  }
 
-  packedBytes(): Uint8Array {
-    return this.written === this.bytes.length ? this.bytes : this.bytes.subarray(0, this.written);
-  }
+    if (ascii) {
+      for (let index = start; index < end; index++) {
+        offsets[index] = written;
+        written += (texts[index] ?? "").length;
+      }
+      TEXT_ENCODER.encodeInto(joined, bytes.subarray(offsets[start] ?? 0, written));
+      continue;
+    }
 
-  private grow(requiredBytes: number): void {
-    let capacity = this.bytes.length;
-    while (capacity < requiredBytes) capacity *= 2;
-    const grown = new Uint8Array(capacity);
-    grown.set(this.bytes.subarray(0, this.written));
-    this.bytes = grown;
+    for (let index = start; index < end; index++) {
+      offsets[index] = written;
+      written += TEXT_ENCODER.encodeInto(texts[index] ?? "", bytes.subarray(written)).written;
+    }
   }
+  offsets[texts.length] = written;
+  return { bytes: bytes.subarray(0, written), offsets };
 }
 
 /** What `@sheetwrite/core/functions` installs on an engine; core only calls it. */
@@ -2676,25 +2677,11 @@ export class StoreDataEngine {
     const wasmStyles = new Uint32Array(cellCount);
     const styleTable = block.styleTable ?? [];
 
-    // Sizing the text buffer up front costs one extra pass over `values` and
-    // keeps the packing pass free of reallocations for ASCII text.
-    let textCount = 0;
-    let textBytes = 0;
-
-    for (let offset = 0; offset < cellCount; offset += 1) {
-      const value = values[offset];
-      if (typeof value !== "string") continue;
-
-      textCount += 1;
-      textBytes += value.length;
-    }
-
-    const texts = new PackedTextBuffer(textBytes, textCount);
-
+    const texts: string[] = [];
     for (let offset = 0; offset < cellCount; offset++) {
       const value = values[offset];
       writeScalarWire(kinds, numbers, offset, value);
-      if (typeof value === "string") texts.add(value);
+      if (typeof value === "string") texts.push(value);
 
       const styleId = styleIds === undefined ? undefined : styleIds[offset];
       wasmStyles[offset] = this.styles.intern(
@@ -2717,6 +2704,7 @@ export class StoreDataEngine {
       referenceTargets[packed + 2] = target.col;
     }
 
+    const packedText = packTexts(texts);
     this.noteRangeMutationFfi(cellCount);
 
     return (
@@ -2728,8 +2716,8 @@ export class StoreDataEngine {
         cols,
         kinds,
         numbers,
-        texts.packedBytes(),
-        texts.offsets,
+        packedText.bytes,
+        packedText.offsets,
         wasmStyles,
         Uint32Array.from(formulas, ([offset]) => offset),
         formulas.map(([, source]) => source),
@@ -2776,10 +2764,7 @@ export class StoreDataEngine {
 
     // One UTF-8 buffer for the text cells, so a block does not cross the
     // boundary as one JS string per cell.
-    let textBytes = 0;
-    for (const text of literalTexts) textBytes += text.length;
-    const packedText = new PackedTextBuffer(textBytes, literalTexts.length);
-    for (const text of literalTexts) packedText.add(text);
+    const packedText = packTexts(literalTexts);
 
     this.noteRangeMutationFfi(cells.length);
 
@@ -2793,7 +2778,7 @@ export class StoreDataEngine {
         offsets,
         kinds,
         numbers,
-        packedText.packedBytes(),
+        packedText.bytes,
         packedText.offsets,
         styles,
         Uint32Array.from(formulaOffsets),
@@ -5038,10 +5023,7 @@ export class StoreDataEngine {
       referenceTargets[packed + 2] = target.col;
     }
 
-    let textBytes = 0;
-    for (const text of texts) textBytes += text.length;
-    const packedText = new PackedTextBuffer(textBytes, texts.length);
-    for (const text of texts) packedText.add(text);
+    const packedText = packTexts(texts);
 
     this.noteRangeMutationFfi(cellCount);
     const applied = this.wasm.setColumnBlockPacked(
@@ -5052,7 +5034,7 @@ export class StoreDataEngine {
       colCount,
       kinds,
       numbers,
-      packedText.packedBytes(),
+      packedText.bytes,
       packedText.offsets,
       wasmStyles,
       Uint32Array.from(formulas, ([offset]) => offset),
