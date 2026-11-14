@@ -75,6 +75,7 @@ import {
   type WindowTransferCounters,
   WRAP_HEAVY_TEXT_LENGTH,
   WRAP_HEAVY_TEXT_PREFIX,
+  WRAP_UNICODE_CELL,
 } from "./render-scenarios.js";
 
 const SHEET = "bench";
@@ -522,6 +523,29 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     }
     this.wrapHeavyRows = 0;
     this.applyPatches(patches);
+  }
+
+  installWrapUnicode(text: string): void {
+    const { row, col } = WRAP_UNICODE_CELL;
+    this.applyPatches([
+      {
+        op: "set",
+        addr: { sheet: SHEET, row, col },
+        value: { kind: "literal", value: text },
+        style: { wrap: true },
+      },
+    ]);
+  }
+
+  clearWrapUnicode(): void {
+    const { row, col } = WRAP_UNICODE_CELL;
+    this.applyPatches([
+      {
+        op: "set",
+        addr: { sheet: SHEET, row, col },
+        value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
+      },
+    ]);
   }
 
   installSearchMatches(rowCount: number): void {
