@@ -40,7 +40,7 @@ redundant_lifetimes = "warn"
 rust_2018_idioms = { level = "deny", priority = -1 }
 rust_2024_incompatible_pat = "warn"
 unnameable_types = "warn"
-unreachable_pub = "warn"
+unreachable_pub = "deny"
 unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "warn"
 unused_extern_crates = "warn"
