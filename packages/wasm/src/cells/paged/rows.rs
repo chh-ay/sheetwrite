@@ -3,7 +3,7 @@
 #[cfg(test)]
 mod tests;
 
-use crate::sorting::{key96, sort_by_key96, sort_usize_pairs};
+use crate::sorting::{key96, sort_by_key96};
 
 use super::{CleanPage, Directory, PagedStorage, BITS_PER_WORD, FREE_SLOT, NONE};
 
@@ -128,7 +128,7 @@ impl PagedStorage {
                 pages.push((col, last / self.chunk_rows));
             }
         }
-        sort_usize_pairs(&mut pages);
+        pages.sort_unstable();
         pages.dedup();
         if movement.to > movement.from {
             pages.reverse();

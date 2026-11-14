@@ -7,7 +7,6 @@ use crate::formula_slots::FormulaStore;
 use crate::graph::SheetFormulas;
 use crate::memory::StoreMemoryStats;
 use crate::row_visibility::RowVisibility;
-use crate::sorting::sort_u32_pairs;
 use crate::spill::SpillState;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
@@ -58,7 +57,7 @@ impl SheetData {
     pub(crate) fn persisted_coordinates(&self) -> Vec<CellKey> {
         let mut coordinates = self.cells.persisted_coordinates();
         coordinates.extend(self.formulas.keys());
-        sort_u32_pairs(&mut coordinates);
+        coordinates.sort_unstable();
         coordinates.dedup();
         coordinates
     }

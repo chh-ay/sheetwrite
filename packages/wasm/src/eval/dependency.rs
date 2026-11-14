@@ -9,10 +9,7 @@ use rustc_hash::FxHashSet;
 use crate::graph::{offset_or_search, DirtyRect, DirtySeeds, FORMULA_INDEX_PAGE_ROWS};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
-use crate::sorting::{
-    key96, sort_by_key96, sort_cell_formulas_column_major, sort_cells_row_major,
-    sort_range_formulas, sort_row_formulas, sort_u128,
-};
+use crate::sorting::{key96, sort_by_key96, sort_cell_formulas_column_major, sort_cells_row_major};
 use crate::types::{
     AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, FORMULA_RECURSION_LIMIT,
 };
@@ -511,7 +508,7 @@ impl DepIndex {
                     .filter(|change| change.2)
                     .map(|&(cell, reader, _)| (cell.row, reader)),
             );
-            sort_row_formulas(&mut edges);
+            edges.sort_unstable();
 
             match (search, edges.is_empty()) {
                 (Ok(position), true) => {
@@ -546,8 +543,8 @@ impl DepIndex {
         if removals.is_empty() && additions.is_empty() {
             return;
         }
-        sort_range_formulas(removals);
-        sort_range_formulas(additions);
+        removals.sort_unstable();
+        additions.sort_unstable();
         if removals.len() + additions.len() <= IN_PLACE_EDGES {
             let mut regrouped = false;
             for &(range, reader) in removals.iter() {
@@ -885,7 +882,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
     }
     drop(exact_edges);
 
-    sort_range_formulas(&mut range_edges);
+    range_edges.sort_unstable();
     let mut range_groups = Vec::with_capacity(range_edges.chunk_by(|a, b| a.0 == b.0).count());
     let range_readers: Vec<FormulaId> = range_edges.iter().map(|&(_, reader)| reader).collect();
     let mut end = 0;
@@ -931,21 +928,8 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
 }
 
 fn prepare_interval_index(intervals: &mut [RangeInterval]) {
-    sort_intervals(intervals);
+    intervals.sort_unstable_by(interval_order);
     accumulate_max_end(intervals);
-}
-
-/// Sorts intervals by [`interval_order`]. Each comes back with `max_end` =
-/// `end`, for [`accumulate_max_end`] to fill in.
-fn sort_intervals(intervals: &mut [RangeInterval]) {
-    let mut keys: Vec<u128> = intervals
-        .iter()
-        .map(|interval| key96(interval.start, interval.end, interval.group as u32))
-        .collect();
-    sort_u128(&mut keys);
-    for (interval, key) in intervals.iter_mut().zip(keys) {
-        *interval = RangeInterval::new((key >> 64) as u32, (key >> 32) as u32, key as u32 as usize);
-    }
 }
 
 fn interval_order(a: &RangeInterval, b: &RangeInterval) -> Ordering {
@@ -968,7 +952,7 @@ fn merge_intervals(intervals: &mut Vec<RangeInterval>, mut added: Vec<RangeInter
         return;
     };
 
-    sort_intervals(&mut added);
+    added.sort_unstable_by(interval_order);
     let mut kept = intervals.len();
     intervals.resize(kept + added.len(), filler);
     for write in (0..intervals.len()).rev() {

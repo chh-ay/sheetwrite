@@ -23,7 +23,6 @@ use crate::memory::{
     MemoryOwnerStats, StoreMemoryStats, FORMULAS, PAGED_DIRTY_BITMAPS, PAGED_INDEXES, PAGED_KINDS,
     PAGED_LOADED_BITMAPS, PAGED_PAYLOADS, PAGED_STYLES,
 };
-use crate::sorting::sort_usize_pairs;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
@@ -1611,7 +1610,7 @@ impl PagedStorage {
     pub(super) fn dirty_coordinates(&self) -> Vec<f64> {
         let mut keys: Vec<(usize, usize)> =
             self.live_slots().map(|slot| self.slot_cell(slot)).collect();
-        sort_usize_pairs(&mut keys);
+        keys.sort_unstable();
 
         let mut coordinates = Vec::with_capacity(keys.len().saturating_mul(2));
         for (row, col) in keys {

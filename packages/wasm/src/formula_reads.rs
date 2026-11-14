@@ -9,7 +9,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::formula_slots::FormulaStore;
 use crate::sheet::SheetData;
-use crate::sorting::sort_u32_pairs;
 use crate::store::CellStore;
 use crate::types::{cell_key, CellKey, CellRange};
 
@@ -172,7 +171,7 @@ impl<'a> ReadWalk<'a> {
         let mut merged: Vec<(u32, Vec<(u32, u32)>)> = Vec::with_capacity(self.rows_by_col.len());
 
         for (col, mut rows) in self.rows_by_col {
-            sort_u32_pairs(&mut rows);
+            rows.sort_unstable();
             let mut disjoint: Vec<(u32, u32)> = Vec::with_capacity(rows.len());
 
             for (start, end) in rows {

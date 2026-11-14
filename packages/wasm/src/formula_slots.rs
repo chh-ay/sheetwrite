@@ -53,11 +53,6 @@ impl FormulaId {
     pub(crate) const fn raw(self) -> u32 {
         self.0
     }
-
-    /// The id that [`Self::raw`] returned `raw` for.
-    pub(crate) const fn from_raw(raw: u32) -> Self {
-        Self(raw)
-    }
 }
 
 /// Primary membership bits shared by dirty work and active evaluation state.
