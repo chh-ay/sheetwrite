@@ -5,7 +5,7 @@ import { NoHydration } from "solid-js/web";
 import { Island } from "../islands/Island.js";
 import { DataEvents } from "../showcases/data-tools/DataEvents.js";
 import { DataToolsStage } from "../showcases/data-tools/DataToolsStage.js";
-import { ShowcasePage } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import {
   DATA_COLUMNS,
   DATA_ROWS,

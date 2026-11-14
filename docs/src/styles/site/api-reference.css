@@ -1,11 +1,11 @@
 /* Generated API reference. These rules intentionally sit after the shared
    .sw-prose code-frame styling: signature fences dock flush inside their
-   disclosures, so the generic frame border/radius/margins must lose the
+   cards and panels, so the generic frame border/radius/margins must lose the
    cascade here. Generated markup must never widen the document; long
    identifiers wrap or scroll locally. */
 .api-metadata,
-.api-member-list,
-.api-member,
+.api-cards,
+.api-card,
 .api-declaration,
 .api-symbol-grid,
 .api-symbol-card,
@@ -108,58 +108,22 @@
   overflow-wrap: anywhere;
 }
 
-/* Long member lists open with a collapsed index: one row that opens to a
-   grid of every member name, each a link to its row. */
+/* Long member lists open with an index: a wrapping row of pill links, one
+   per member name. */
 .sw-prose .api-member-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1-5);
   margin: 0 0 var(--sw-space-6);
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.sw-prose .api-member-index > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sw-space-2);
-  min-height: var(--sw-control-height);
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-body);
-  cursor: pointer;
-  list-style: none;
-}
-
-.sw-prose .api-member-index > summary::-webkit-details-marker {
-  display: none;
-}
-
-.sw-prose .api-member-index > summary::before {
-  content: "";
-  width: var(--sw-icon-sm);
-  height: var(--sw-icon-sm);
-  background: var(--sw-fg-muted);
-  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
-  transition: transform var(--sw-motion-fast) var(--sw-motion-standard);
-}
-
-.sw-prose .api-member-index[open] > summary::before {
-  transform: rotate(90deg);
-}
-
-.sw-prose .api-member-index > nav {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-  gap: var(--sw-space-0-5) var(--sw-space-5);
-  margin-top: var(--sw-space-2);
-  font-size: var(--sw-text-caption);
 }
 
 .sw-prose .api-member-index a {
-  overflow: hidden;
-  padding: var(--sw-space-0-5) 0;
-  color: var(--sw-fg-muted);
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-pill);
+  color: var(--sw-fg);
   text-decoration: none;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  transition: border-color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
 .sw-prose .api-member-index a code {
@@ -167,13 +131,12 @@
   padding: 0;
   background: transparent;
   color: inherit;
-  font-size: inherit;
+  font-size: var(--sw-text-caption);
 }
 
-.sw-prose .api-member-index a:hover,
-.sw-prose .api-member-index a:focus-visible {
-  color: var(--sw-accent);
-  text-decoration: underline;
+.sw-prose .api-member-index a:hover {
+  border-color: var(--sw-border-strong);
+  color: var(--sw-accent-strong);
 }
 
 /* Entry-point tables: editorial rules instead of a boxed grid; the numeric
@@ -320,21 +283,169 @@
   line-height: 1.55;
 }
 
-/* Members: a dense flat property list — hairline rows, not stacked cards.
-   Every row keeps a real top border and an opaque background (contract-
-   checked); the background matches the page so the list reads flat. */
-.api-member-list {
-  margin: var(--sw-space-4) 0 var(--sw-space-10);
-  border-bottom: 1px solid var(--sw-border);
+/* Members, parameters and the return value: signature cards. A card's
+   header is the declaration on the code surface (wrapping, never scrolling),
+   its flags (optional, read-only) at the end; the documentation follows,
+   always visible. */
+.sw-prose .api-member-group {
+  margin: var(--sw-space-8) 0 var(--sw-space-3);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-ui) var(--sw-font-body);
 }
 
-.api-member {
-  border-top: 1px solid var(--sw-border);
-  background: var(--sw-surface-0);
+.sw-prose .api-cards {
+  display: grid;
+  gap: var(--sw-space-3);
+  margin: var(--sw-space-3) 0 var(--sw-space-8);
 }
 
-.api-member[open] {
-  border-top-color: var(--sw-border-strong);
+.sw-prose .api-card {
+  overflow: hidden;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+}
+
+.sw-prose .api-card__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--sw-space-1) var(--sw-space-3);
+  align-items: start;
+  padding: var(--sw-space-2) var(--sw-space-4);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-code-bg);
+}
+
+.sw-prose .api-card:not(:has(> :not(.api-card__head))) > .api-card__head {
+  border-bottom: 0;
+}
+
+.sw-prose .api-card__flags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: end;
+  gap: var(--sw-space-1-5);
+  padding-top: var(--sw-space-0-5);
+}
+
+.sw-prose .api-card__flags > span {
+  border-radius: var(--sw-radius-pill);
+  padding: 0 var(--sw-space-2);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.6 var(--sw-font-body);
+  white-space: nowrap;
+}
+
+/* The member's declaration docks flush in the header: no frame of its own. */
+.sw-prose .api-card__head .expressive-code {
+  margin: 0;
+}
+
+.sw-prose .api-card__head .expressive-code figure.frame,
+.sw-prose .api-card__head .expressive-code pre {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sw-prose .api-card__head .expressive-code pre {
+  font-size: var(--sw-text-code);
+}
+
+.api-card__head .expressive-code pre > code {
+  padding: 0;
+}
+
+/* The declaration starts at the card's edge; a wrapped line hangs 2ch in. */
+.sw-prose .api-card__head .ec-line .code {
+  padding-inline-start: 2ch;
+  text-indent: -2ch;
+}
+
+/* Markdown wraps the flags in a paragraph; it sits flush in the header. */
+.sw-prose .api-card__head > p {
+  margin: 0;
+}
+
+/* A parameter or return value: the same header, built from its name and
+   linked type. */
+.sw-prose .api-sig {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--sw-code-fg);
+  font: var(--sw-text-code) / var(--sw-leading-code) var(--sw-font-mono);
+  overflow-wrap: anywhere;
+}
+
+.sw-prose .api-sig__name {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-prose .api-sig__punct {
+  color: var(--sw-fg-muted);
+}
+
+.sw-prose .api-sig__type a {
+  color: var(--sw-accent-strong);
+  text-decoration: none;
+}
+
+.sw-prose .api-sig__type a:hover {
+  text-decoration: underline;
+}
+
+.sw-prose .api-card__doc,
+.sw-prose .api-card > :not(.api-card__head) {
+  max-width: none;
+  margin-inline: var(--sw-space-4);
+}
+
+.sw-prose .api-card__doc,
+.sw-prose .api-card > p,
+.sw-prose .api-card > ul {
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+}
+
+.sw-prose .api-card__doc {
+  margin-block: var(--sw-space-3);
+}
+
+.sw-prose .api-card > :not(.api-card__head):first-of-type {
+  margin-top: var(--sw-space-3);
+}
+
+.sw-prose .api-card > :last-child:not(.api-card__head) {
+  margin-bottom: var(--sw-space-3);
+}
+
+/* An aliased union keeps a quiet link to its alias among the flags. */
+.sw-prose .api-card__flags > .api-member-alias {
+  padding: 0;
+  background: transparent;
+}
+
+.sw-prose .api-member-alias a {
+  text-decoration: none;
+}
+
+.sw-prose .api-member-alias code {
+  border: var(--sw-border-width) solid
+    color-mix(in srgb, var(--sw-code-function) 30%, var(--sw-border));
+  padding: var(--sw-space-0-5) var(--sw-space-1);
+  border-radius: var(--sw-radius-pill);
+  background: color-mix(in srgb, var(--sw-code-function) 8%, var(--sw-surface-2));
+  color: color-mix(in srgb, var(--sw-code-function) 74%, var(--sw-fg));
+  font: var(--sw-weight-medium) var(--sw-text-caption) / 1.5 var(--sw-font-mono);
+}
+
+.sw-prose .api-member-alias a:hover code {
+  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
+  color: var(--sw-accent-strong);
 }
 
 /* The declaration stays a single docked panel: summary header, flush fence. */
@@ -350,41 +461,25 @@
   border-color: var(--sw-border-strong);
 }
 
-.api-member summary,
 .api-declaration summary {
   display: flex;
   gap: var(--sw-space-2);
   align-items: baseline;
-  border-radius: var(--sw-radius-sm);
-  /* Member rows are a scan list: the name, then the one-line meaning. */
-  padding: var(--sw-space-1-5) var(--sw-space-1-5);
+  border-radius: calc(var(--sw-radius-md) - var(--sw-border-width));
+  padding: var(--sw-space-3) var(--sw-space-4);
   color: var(--sw-fg-strong);
   cursor: pointer;
   list-style: none;
   transition: background-color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
-.api-declaration summary {
-  border-radius: calc(var(--sw-radius-md) - var(--sw-border-width));
-  padding: var(--sw-space-3) var(--sw-space-4);
-}
-
-/* An open row keeps its name where the reader left it and tints its own
-   header, so the revealed signature reads as part of that row. */
-.api-member[open] > summary {
-  background: color-mix(in srgb, var(--sw-surface-2) 80%, transparent);
-}
-
-.api-member summary::-webkit-details-marker,
 .api-declaration summary::-webkit-details-marker {
   display: none;
 }
 
-.api-member summary::before,
 .api-declaration summary::before {
-  /* A zero-width character gives the marker a text baseline: it lines up
-     with the member name's baseline, and the chevron is centred in its
-     line box, on the first line of a row that wraps. */
+  /* A zero-width character gives the marker a text baseline: the chevron
+     lines up with the label's baseline. */
   content: "\200b";
   flex: none;
   width: var(--sw-icon-sm);
@@ -398,29 +493,17 @@
     color var(--sw-motion-fast) var(--sw-motion-standard);
 }
 
-.api-member[open] > summary::before,
 .api-declaration[open] > summary::before {
   color: var(--sw-accent);
   transform: rotate(90deg);
 }
 
-/* Hover tints the row; keyboard focus keeps a quiet inset ring — the loud
-   outer ring read as a selection state on a full-width row. */
-.api-member summary:hover,
 .api-declaration summary:hover {
   background: color-mix(in srgb, var(--sw-surface-2) 75%, transparent);
 }
 
-/* Focus wraps the WHOLE disclosure (summary + revealed body), never just the
-   summary strip: a quiet inset ring on flat member rows, an outer ring
-   following the declaration panel's radius. */
-.api-member summary:focus-visible,
 .api-declaration summary:focus-visible {
   box-shadow: none;
-}
-
-.api-member:has(> summary:focus-visible) {
-  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--sw-accent) 30%, transparent);
 }
 
 .api-declaration:has(> summary:focus-visible) {
@@ -432,65 +515,6 @@
   border-bottom: 1px solid var(--sw-border);
   border-radius: calc(0.6rem - 1px) calc(0.6rem - 1px) 0 0;
   background: var(--sw-surface-2);
-}
-
-/* The name never shrinks below its own width (the summary text wraps
-   instead), but a pathologically long identifier still breaks rather than
-   widening the page. */
-.sw-prose .api-member summary > code {
-  flex: 0 0 auto;
-  max-width: 100%;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1.5 var(--sw-font-mono);
-  overflow-wrap: anywhere;
-}
-
-.api-member[open] > summary > code {
-  color: var(--sw-accent-strong);
-}
-
-.api-member-summary {
-  color: var(--sw-fg-muted);
-  font-family: var(--sw-font-body);
-  font-size: var(--sw-text-caption);
-  line-height: 1.45;
-}
-
-/* Parameter and property names in a summary: the prose inline-code chip, at
-   the summary's size and weight. */
-.sw-prose .api-member-summary code {
-  border-radius: var(--sw-radius-sm);
-  padding: 0.08em 0.32em;
-  color: var(--sw-fg);
-  background: color-mix(in srgb, var(--sw-fg) 7%, transparent);
-  font: var(--sw-weight-regular) 0.92em var(--sw-font-mono);
-}
-
-/* An aliased union prints as the alias name beside the member name; the chip
-   stays quiet so the member name and its summary still lead the row. */
-.sw-prose .api-member-alias {
-  flex: 0 0 auto;
-}
-
-.sw-prose .api-member-alias a {
-  text-decoration: none;
-}
-
-.sw-prose .api-member-alias code {
-  border: 1px solid color-mix(in srgb, var(--sw-code-function) 30%, var(--sw-border));
-  padding: var(--sw-space-0-5) var(--sw-space-1);
-  border-radius: var(--sw-radius-xs);
-  background: color-mix(in srgb, var(--sw-code-function) 8%, var(--sw-surface-2));
-  color: color-mix(in srgb, var(--sw-code-function) 74%, var(--sw-fg));
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / 1.5 var(--sw-font-mono);
-}
-
-.sw-prose .api-member-alias a:hover code {
-  border-color: color-mix(in srgb, var(--sw-accent) 45%, var(--sw-border));
-  color: var(--sw-accent-strong);
 }
 
 /* Referenced by: who depends on the owning package, and which documented
@@ -583,34 +607,13 @@
   border-radius: 0 0 calc(0.6rem - 1px) calc(0.6rem - 1px);
 }
 
-/* Member signatures sit as one compact framed line indented under the name;
-   docs follow as plain prose, not another surface. */
-.sw-prose .api-member .expressive-code {
-  margin: var(--sw-space-0-5) 0 var(--sw-space-3) var(--sw-space-5);
-}
-
-.sw-prose .api-member .expressive-code figure.frame {
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-}
-
-/* Short signatures must not float in a tall empty frame. */
-.sw-prose .api-member .expressive-code pre,
+/* Short declarations must not float in a tall empty frame. */
 .sw-prose .api-declaration .expressive-code pre {
   font-size: var(--sw-text-caption);
 }
 
-.api-member .expressive-code pre > code,
 .api-declaration .expressive-code pre > code {
   padding-block: var(--sw-space-2);
-}
-
-.api-member .api-member-doc {
-  max-width: 47rem;
-  margin: calc(var(--sw-space-1) * -1) 0 var(--sw-space-3);
-  padding: 0 var(--sw-space-1) 0 var(--sw-space-5);
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
 }
 
 /* Union variants: one surface with hairline dividers; each variant is a
@@ -648,24 +651,42 @@
   padding-block: var(--sw-space-2);
 }
 
+/* Phones: the member index is one row that scrolls sideways (a long class
+   would otherwise stack a screen of names), the cards are tighter, and the
+   flags drop under the declaration. */
 @media (max-width: 30rem) {
-  /* The summary line drops below the member name instead of squeezing into a
-     ragged column beside it, and the signature loses its indent. */
-  .api-member summary {
-    flex-wrap: wrap;
+  .sw-prose .api-member-index {
+    flex-wrap: nowrap;
+    padding-bottom: var(--sw-space-1);
+    overflow-x: auto;
+    scrollbar-width: thin;
   }
 
-  .api-member-summary {
-    flex: 1 0 100%;
-    padding-left: var(--sw-space-4);
+  .sw-prose .api-member-index a {
+    flex: none;
   }
 
-  .sw-prose .api-member .expressive-code {
-    margin-left: 0;
+  .sw-prose .api-cards {
+    gap: var(--sw-space-2);
   }
 
-  .api-member .api-member-doc {
-    padding-left: var(--sw-space-1);
+  .sw-prose .api-card__head {
+    grid-template-columns: minmax(0, 1fr);
+    padding: var(--sw-space-1-5) var(--sw-space-3);
+  }
+
+  .sw-prose .api-card__flags {
+    justify-content: start;
+    padding-top: 0;
+  }
+
+  .sw-prose .api-card__doc,
+  .sw-prose .api-card > :not(.api-card__head) {
+    margin-inline: var(--sw-space-3);
+  }
+
+  .sw-prose .api-card__doc {
+    margin-block: var(--sw-space-2);
   }
 }
 
@@ -696,71 +717,17 @@
   scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-6));
 }
 
-/* ToC deep links target member rows; keep them clear of the fixed header. */
-.sw-prose .api-member[id] {
+/* ToC deep links target member cards; keep them clear of the fixed header. */
+.sw-prose .api-card[id] {
   scroll-margin-top: calc(var(--sw-header-height) + var(--sw-space-6));
 }
 
-/* A deep-linked member stands out via a quiet accent tint - no ring. */
-.sw-prose .api-member:target,
-.sw-prose .api-member[data-revealed] {
+/* A deep-linked card: the accent tint and a 2px accent edge at its start. */
+.sw-prose .api-card:target,
+.sw-prose .api-card[data-revealed] {
   border-color: color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
-  background: color-mix(in srgb, var(--sw-accent) 4%, var(--sw-surface-1));
-}
-
-/* Reference fields: parameters and the return value, one row each. */
-.sw-prose .api-fields {
-  display: grid;
-  margin: var(--sw-space-4) 0 var(--sw-space-8);
-  border-top: var(--sw-border-width) solid var(--sw-border);
-}
-.sw-prose .api-field {
-  padding: var(--sw-space-4) 0;
-  border-bottom: var(--sw-border-width) solid var(--sw-border);
-}
-.sw-prose .api-field__head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--sw-space-1) var(--sw-space-3);
-}
-.sw-prose .api-field__name {
-  padding: 0;
-  background: transparent;
-  color: var(--sw-fg-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-small) / var(--sw-leading-ui) var(--sw-font-mono);
-}
-.sw-prose .api-field__type {
-  padding: 0;
-  background: transparent;
-  color: var(--sw-fg-muted);
-  font: var(--sw-weight-regular) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-mono);
-  overflow-wrap: anywhere;
-}
-/* A return value has no name: its type leads the row. */
-.sw-prose .api-field__type:first-child {
-  color: var(--sw-fg-strong);
-  font-size: var(--sw-text-small);
-  font-weight: var(--sw-weight-semibold);
-}
-.sw-prose .api-field__type a {
-  color: var(--sw-accent-strong);
-  text-decoration: none;
-}
-.sw-prose .api-field__type a:hover {
-  text-decoration: underline;
-}
-.sw-prose .api-field__marker {
-  border-radius: var(--sw-radius-pill);
-  padding: 0 var(--sw-space-2);
-  color: var(--sw-fg-muted);
-  background: var(--sw-surface-2);
-  font: var(--sw-weight-medium) var(--sw-text-eyebrow) / var(--sw-leading-ui) var(--sw-font-body);
-}
-.sw-prose .api-field__doc {
-  margin: var(--sw-space-2) 0 0;
-  color: var(--sw-fg);
-  font-size: var(--sw-text-small);
+  background: var(--sw-accent-soft);
+  box-shadow: inset 2px 0 0 var(--sw-accent);
 }
 
 /* The example aside: right after the summary on narrow screens; on wide ones
