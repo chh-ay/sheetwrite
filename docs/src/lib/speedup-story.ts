@@ -26,6 +26,8 @@ export interface StoryInteraction {
   readonly id: string;
   /** "Scroll down · top left". */
   readonly label: string;
+  /** The interaction within its kind, for the numbers table: "Down 50 px from the top". */
+  readonly shortLabel: string;
   /** One of `STORY_CATEGORIES`. */
   readonly category: string;
   /** Sheetwrite's median, with the lowest and highest round as `[low, high]`. */
@@ -53,10 +55,16 @@ export interface SpeedupStory {
 }
 
 /** The kinds of interaction, in reading order. */
-export const STORY_CATEGORIES = ["Scroll", "Edit", "Altering", "Arrow", "Paint"] as const;
+export const STORY_CATEGORIES = [
+  "Scroll",
+  "Edit",
+  "Insert/remove rows",
+  "Keyboard",
+  "Paint",
+] as const;
 
 /** The headline cards: the largest speedup of each of these kinds. */
-const HEADLINE_CATEGORIES = ["Scroll", "Edit", "Altering", "Paint"] as const;
+const HEADLINE_CATEGORIES = ["Scroll", "Edit", "Insert/remove rows", "Paint"] as const;
 
 /** A ratio chip's fill reaches full length at this speedup. */
 const CHIP_FULL_RATIO = 1000;
@@ -227,73 +235,74 @@ function laneTable(machine: StoryMachine, baseName: string, id: string): string 
   return `<ul class="lane-table">${groups}</ul>`;
 }
 
-/** The numbers as a plain table: one column per tool and per machine. */
-function numbersTable(
-  machines: readonly StoryMachine[],
-  baseName: string,
-  caption: string,
-): string {
-  const labels = [
-    ...new Map(
-      machines.flatMap((machine) =>
-        machine.interactions.map((interaction) => [interaction.id, interaction.label] as const),
-      ),
-    ),
+/** A time without its unit: "1.16" from "1.16 ms". */
+function withoutUnit(text: string): string {
+  return text.replace(/\s\S+$/u, "");
+}
+
+function unitOf(text: string): string {
+  return text.slice(withoutUnit(text).length);
+}
+
+/** "1.23 ms (1.16–1.51)": the median, then its lowest and highest round, with the unit once when they share it. */
+export function timeWithSpread(median: number, low: number, high: number): string {
+  const [medianText, lowText, highText] = [median, low, high].map(formatTime) as [
+    string,
+    string,
+    string,
   ];
-  const head = [
-    "Interaction",
-    ...machines.flatMap((machine) => [
-      `Sheetwrite, ${machine.name}`,
-      `${baseName}, ${machine.name}`,
-      `Speedup, ${machine.name}`,
-    ]),
-  ]
-    .map((column) => `<th scope="col">${escapeHtml(column)}</th>`)
-    .join("");
-  const rows = labels
-    .map(([id, label]) => {
-      const cells = machines.flatMap((machine) => {
-        const interaction = machine.interactions.find((entry) => entry.id === id);
-        if (interaction === undefined) return ["<td>no result</td>", "<td></td>", "<td></td>"];
-        const ratio = ratioOf(interaction);
-        const [low, high] = spreadOf(interaction);
-        return [
-          `<td>${formatTime(interaction.measured.value)}<small>${formatTime(low)}–${formatTime(high)}</small></td>`,
-          `<td>${interaction.base === undefined ? "did not complete" : formatTime(interaction.base)}</td>`,
-          `<td>${ratio === undefined ? "" : `${formatTimes(ratio)} faster`}</td>`,
-        ];
-      });
-      return `<tr><th scope="row">${escapeHtml(label)}</th>${cells.join("")}</tr>`;
-    })
-    .join("");
-  return `<div class="speed-story__table" tabindex="0" role="region" aria-label="${escapeHtml(caption)}"><table class="speed-story__data"><caption>${escapeHtml(caption)}</caption><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  const unit = unitOf(medianText);
+  const shared = unitOf(lowText) === unit && unitOf(highText) === unit;
+  const spread = shared
+    ? `${withoutUnit(lowText)}–${withoutUnit(highText)}`
+    : `${lowText}–${highText}`;
+  return `${escapeHtml(medianText)} <small>(${escapeHtml(spread)})</small>`;
 }
 
 /**
- * Every number on demand: the lanes, with a "Numbers only" switch to a plain
- * table; without lanes (every machine at once), the table alone.
+ * One machine's numbers as a plain table, grouped by kind. The cells carry
+ * their column name, so a phone shows each row as a card.
  */
-function details(
-  machines: readonly StoryMachine[],
-  baseName: string,
-  id: string,
-  lanes: string,
-): string {
-  const names = machines.map((machine) => machine.name).join(" and ");
-  const numbers = numbersTable(machines, baseName, `Every interaction, ${names}`);
-  const toggle = `${id}-numbers`;
-  const body =
-    lanes === ""
-      ? numbers
-      : `<input type="checkbox" class="speed-story__toggle" id="${toggle}"><label class="speed-story__toggle-label" for="${toggle}">Numbers only</label>${lanes}${numbers}`;
-  return `<details class="speed-story__details"><summary>Show all numbers</summary><div class="speed-story__numbers">${body}</div></details>`;
+export function numbersTable(machine: StoryMachine, baseName: string): string {
+  const columns = ["Interaction", "Sheetwrite", baseName, "Speedup"];
+  const head = columns.map((column) => `<th scope="col">${escapeHtml(column)}</th>`).join("");
+  // The value sits in a span so a phone card lays it out beside its column name.
+  const cell = (column: string, html: string) =>
+    `<td data-label="${escapeHtml(column)}">${html === "" ? "" : `<span>${html}</span>`}</td>`;
+  const groups = STORY_CATEGORIES.map((category) => {
+    const interactions = machine.interactions.filter(
+      (interaction) => interaction.category === category,
+    );
+    if (interactions.length === 0) return "";
+    const rows = interactions.map((interaction) => {
+      const ratio = ratioOf(interaction);
+      const [low, high] = spreadOf(interaction);
+      return `<tr><th scope="row" title="${escapeHtml(interaction.label)}">${escapeHtml(interaction.shortLabel)}</th>${[
+        cell("Sheetwrite", timeWithSpread(interaction.measured.value, low, high)),
+        cell(
+          baseName,
+          interaction.base === undefined ? "did not complete" : formatTime(interaction.base),
+        ),
+        cell("Speedup", ratio === undefined ? "" : `${formatTimes(ratio)} faster`),
+      ].join("")}</tr>`;
+    });
+    return `<tbody><tr class="speed-story__kind"><th scope="rowgroup" colspan="${columns.length}">${escapeHtml(category)}</th></tr>${rows.join("")}</tbody>`;
+  }).join("");
+  const caption = `Every interaction on ${machine.name}`;
+  return `<div class="speed-story__table" tabindex="0" role="region" aria-label="${escapeHtml(caption)}"><table class="speed-story__data"><caption>${escapeHtml(caption)}</caption><thead><tr>${head}</tr></thead>${groups}</table></div>`;
+}
+
+/** Every number on demand: the lanes, with a "Numbers only" switch to the plain table. */
+function details(machine: StoryMachine, baseName: string, id: string): string {
+  const toggle = `${id}-${machine.machine}-numbers`;
+  return `<details class="speed-story__details"><summary>Show all numbers</summary><div class="speed-story__numbers"><input type="checkbox" class="speed-story__toggle" id="${toggle}"><label class="speed-story__toggle-label" for="${toggle}">Numbers only</label>${legend(baseName)}${laneTable(machine, baseName, id)}${numbersTable(machine, baseName)}</div></details>`;
 }
 
 function legend(baseName: string): string {
   return `<p class="lane-legend"><span>${legendMark("circle", "accent")}Sheetwrite median</span><span><i class="lane-legend__range" aria-hidden="true"></i>Lowest–highest round</span><span>${legendMark("diamond", "muted")}${escapeHtml(baseName)} median</span><span class="lane-legend__hint">Hover, focus or tap a name for every value</span></p>`;
 }
 
-/** Every machine's speedups side by side, and every machine's numbers. */
+/** Every machine's speedups side by side; each machine's own panel has its numbers. */
 function allPanel(story: SpeedupStory, icon: PerfIconMarkup): string {
   const rows: MachineRow[] = [
     ...new Map(
@@ -331,7 +340,7 @@ function allPanel(story: SpeedupStory, icon: PerfIconMarkup): string {
       rows,
     },
     icon,
-  )}${details(story.machines, story.baseName, `${story.id}-all`, "")}</section>`;
+  )}</section>`;
 }
 
 /** The story as HTML: a machine switch over one panel per machine and one for all. */
@@ -339,7 +348,7 @@ export function renderSpeedupStory(story: SpeedupStory, icon: PerfIconMarkup): s
   const panels = story.machines
     .map(
       (machine) =>
-        `<section class="speed-story__panel" data-machine="${machine.machine}" aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta"><b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine)}${overview(machine, story.baseName)}${details([machine], story.baseName, `${story.id}-${machine.machine}`, `${legend(story.baseName)}${laneTable(machine, story.baseName, story.id)}`)}</section>`,
+        `<section class="speed-story__panel" data-machine="${machine.machine}" aria-label="${escapeHtml(machine.name)} results"><p class="speed-story__meta"><b>${escapeHtml(machine.name)}</b><span>${escapeHtml(machine.detail)}</span><span class="speed-story__note">${escapeHtml(machine.note)}</span></p>${headlineCards(machine)}${overview(machine, story.baseName)}${details(machine, story.baseName, story.id)}</section>`,
     )
     .join("");
   const switcher = machineSwitch(
