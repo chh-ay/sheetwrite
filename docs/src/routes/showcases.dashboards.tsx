@@ -9,7 +9,8 @@ import { DashboardDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { DashboardsStage } from "../showcases/dashboards/DashboardsStage.js";
 import { ItemCountFact } from "../showcases/dashboards/ItemCountFact.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 
 import artStylesheet from "../art/art.css?url";
 import targetsStylesheet from "../styles/showcases/touch-targets.css?url";

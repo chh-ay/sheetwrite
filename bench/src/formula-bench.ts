@@ -91,14 +91,18 @@ const SHAPE_ROW_IDS = [
 const SHAPE_ROW_SIZES = [10_000, 100_000] as const;
 /** `SORT` over numbers, text, logical values and blanks: sizes of its row. */
 const SORT_MIXED_BLANKS_SIZES = [10_000, 100_000] as const;
+/** Below the 4,096 rows where a number column switches to a radix sort. */
+const SORT_ROWS_NUMBERS_SIZE = 4_000;
 /**
- * Rows for binding formulas to sheets, names and tables: defining names, a
- * row insert in a workbook with names, a table that grows by a row, a sort
- * that moves formulas, loading formulas that name another sheet or a table
- * column, and restoring a released engine from its memory state.
+ * Rows for binding formulas to sheets, names and tables: defining names
+ * over formulas that use them and over formulas that do not, a row insert
+ * in a workbook with names, a table that grows by a row, a sort that moves
+ * formulas, loading formulas that name another sheet or a table column, and
+ * restoring a released engine from its memory state.
  */
 const BINDING_ROW_IDS = [
   "name-define",
+  "name-define-unused",
   "row-insert-names",
   "table-append-row",
   "sort-formula-column",
@@ -133,6 +137,7 @@ const FULL_ENGINE_ROWS = [
   { id: "pivotby-percentof", size: 50_000, smokeSize: 1_000 },
   { id: "pivot-rebuild", size: 100_000, smokeSize: 1_000 },
   { id: "getpivotdata-many", size: 1_000, smokeSize: 100 },
+  { id: "getpivotdata-source-edit", size: 1_000, smokeSize: 100 },
   // 100,000 formulas took 0.19 s per edit natively on the Mac; 10,000 make 40,000 calls.
   { id: "analysis-calls", size: 10_000, smokeSize: 1_000 },
 ] as const;
@@ -197,6 +202,7 @@ function formulaWorkloads(
   }
   add("spill-filter-resize", range);
   add("spill-filter-same-range", range);
+  add("take-sort-filter", range);
   add("sumproduct-vector-edit", range);
   add("sumproduct-matrix-edit", range);
   add("criteria-multi-range-edit", range);
@@ -237,6 +243,8 @@ function formulaWorkloads(
   for (const size of smoke ? [1_000] : SORT_MIXED_BLANKS_SIZES) {
     add("sort-mixed-blanks", size);
   }
+  add("sort-rows-labels", range);
+  add("sort-rows-numbers", smoke ? 1_000 : SORT_ROWS_NUMBERS_SIZE);
   add("sparse-page-write", range);
   add("spill-sequence-admission", large);
   add("history-diff", HISTORY_CELLS);
@@ -287,6 +295,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "indirect-many",
   "let-calls",
   "name-define",
+  "name-define-unused",
   "row-insert-names",
   "table-append-row",
   "sort-formula-column",
@@ -298,6 +307,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "pivotby-percentof",
   "pivot-rebuild",
   "getpivotdata-many",
+  "getpivotdata-source-edit",
   "analysis-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",
@@ -310,6 +320,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
   "spill-filter-same-range",
+  "take-sort-filter",
   "paged-cell-reads",
   "paged-insert-row",
   "paged-range-loaded",
@@ -319,6 +330,8 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "sort-unique-filter",
   "subtotal-filtered",
   "sort-mixed-blanks",
+  "sort-rows-labels",
+  "sort-rows-numbers",
   "sparse-page-write",
   "map-lambda",
   "reduce-lambda",

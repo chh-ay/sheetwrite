@@ -521,7 +521,8 @@ impl SheetFormulas {
         true
     }
 
-    /// Source import and rewrites keep an existing formula id when possible.
+    /// A transfer stores each formula it reads at its cell.
+    #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn insert(
         &mut self,
         key: CellKey,

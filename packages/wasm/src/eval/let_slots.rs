@@ -35,56 +35,20 @@ pub(crate) fn resolve_let_names(ast: &mut Ast) {
         return;
     }
 
-    match ast {
-        Ast::Func(Func::Let, args) => {
-            if let_resolvable(args) {
-                let mut bindings = Vec::new();
-                let mut next = 0;
-                resolve_scope(args, &mut bindings, &mut next);
-            }
+    // A LET resolves its own nested LETs, or none of them when it is not
+    // resolvable.
+    if let Ast::Func(Func::Let, args) = ast {
+        if let_resolvable(args) {
+            let mut bindings = Vec::new();
+            let mut next = 0;
+            resolve_scope(args, &mut bindings, &mut next);
         }
-        Ast::Func(_, args) => {
-            for arg in args {
-                resolve_let_names(arg);
-            }
-        }
-        Ast::UnknownFunc(call) => {
-            let args = &mut call.args;
-
-            for arg in args {
-                resolve_let_names(arg);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            resolve_let_names(left);
-            resolve_let_names(right);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => resolve_let_names(inner),
-        Ast::Num(_)
-        | Ast::Str(_)
-        | Ast::Bool(_)
-        | Ast::Missing
-        | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
-        | Ast::UnresolvedStructured(_)
-        | Ast::Structured(_)
-        | Ast::Cell(..)
-        | Ast::SheetCell(..)
-        | Ast::AbsCell(..)
-        | Ast::Range(..)
-        | Ast::SheetRange(..)
-        | Ast::AbsRange(..)
-        | Ast::SheetSpan(_)
-        | Ast::InvalidRef
-        | Ast::LetSlot { .. }
-        | Ast::LetName { .. }
-        | Ast::Array { .. } => {}
-        #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
-        #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => resolve_let_names(&mut std::rc::Rc::make_mut(definition).body),
+        return;
     }
+    ast.fold_children_mut(&mut |child| {
+        resolve_let_names(child);
+        false
+    });
 }
 
 #[cfg(test)]
@@ -271,65 +235,27 @@ fn resolve_scope(args: &mut [Ast], bindings: &mut Vec<Binding>, next: &mut u32) 
 }
 
 fn resolve_uses(ast: &mut Ast, bindings: &mut Vec<Binding>, next: &mut u32) {
-    match ast {
-        Ast::Name(name) => {
-            if let Some(&(_, slot)) = bindings
-                .iter()
-                .rev()
-                .find(|(binding, _)| binding.eq_ignore_ascii_case(name))
-            {
-                *ast = Ast::LetName {
-                    slot,
-                    name: std::mem::take(name),
-                };
-            }
+    if let Ast::Name(name) = ast {
+        if let Some(&(_, slot)) = bindings
+            .iter()
+            .rev()
+            .find(|(binding, _)| binding.eq_ignore_ascii_case(name))
+        {
+            *ast = Ast::LetName {
+                slot,
+                name: std::mem::take(name),
+            };
         }
-        Ast::Func(Func::Let, args) => resolve_scope(args, bindings, next),
-        Ast::Func(_, args) => {
-            for arg in args {
-                resolve_uses(arg, bindings, next);
-            }
-        }
-        Ast::UnknownFunc(call) => {
-            let args = &mut call.args;
-
-            for arg in args {
-                resolve_uses(arg, bindings, next);
-            }
-        }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            resolve_uses(left, bindings, next);
-            resolve_uses(right, bindings, next);
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            resolve_uses(inner, bindings, next);
-        }
-        Ast::Num(_)
-        | Ast::Str(_)
-        | Ast::Bool(_)
-        | Ast::Missing
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
-        | Ast::UnresolvedStructured(_)
-        | Ast::Structured(_)
-        | Ast::Cell(..)
-        | Ast::SheetCell(..)
-        | Ast::AbsCell(..)
-        | Ast::Range(..)
-        | Ast::SheetRange(..)
-        | Ast::AbsRange(..)
-        | Ast::SheetSpan(_)
-        | Ast::InvalidRef
-        | Ast::LetSlot { .. }
-        | Ast::LetName { .. }
-        | Ast::Array { .. } => {}
-        #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
-        #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => {
-            resolve_uses(&mut std::rc::Rc::make_mut(definition).body, bindings, next);
-        }
+        return;
     }
+    if let Ast::Func(Func::Let, args) = ast {
+        resolve_scope(args, bindings, next);
+        return;
+    }
+    ast.fold_children_mut(&mut |child| {
+        resolve_uses(child, bindings, next);
+        false
+    });
 }
 
 /// The values of the LET slots of one pass, and the binding expression each

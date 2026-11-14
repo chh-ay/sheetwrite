@@ -14,34 +14,34 @@ use super::super::functions::{bool_arg, number_arg, require_arity, FuncAccumulat
 use crate::types::{EvalResult, FormulaError, Value};
 use day_count::{period_months, Coupons};
 
-pub(crate) const NAMES: &[&str] = &[
-    "ACCRINT",
-    "ACCRINTM",
-    "COUPDAYBS",
-    "COUPDAYS",
-    "COUPDAYSNC",
-    "COUPNCD",
-    "COUPNUM",
-    "COUPPCD",
-    "DISC",
-    "DURATION",
-    "INTRATE",
-    "MDURATION",
-    "ODDFPRICE",
-    "ODDFYIELD",
-    "ODDLPRICE",
-    "ODDLYIELD",
-    "PRICE",
-    "PRICEDISC",
-    "PRICEMAT",
-    "RECEIVED",
-    "TBILLEQ",
-    "TBILLPRICE",
-    "TBILLYIELD",
-    "YIELD",
-    "YIELDDISC",
-    "YIELDMAT",
-];
+family_functions! {
+    ACCRINT,
+    ACCRINTM,
+    COUPDAYBS,
+    COUPDAYS,
+    COUPDAYSNC,
+    COUPNCD,
+    COUPNUM,
+    COUPPCD,
+    DISC,
+    DURATION,
+    INTRATE,
+    MDURATION,
+    ODDFPRICE,
+    ODDFYIELD,
+    ODDLPRICE,
+    ODDLYIELD,
+    PRICE,
+    PRICEDISC,
+    PRICEMAT,
+    RECEIVED,
+    TBILLEQ,
+    TBILLPRICE,
+    TBILLYIELD,
+    YIELD,
+    YIELDDISC,
+    YIELDMAT,
+}
 
 /// Prices and yields are per 100 of face value.
 const FACE_VALUE: f64 = 100.0;
@@ -69,30 +69,46 @@ const LOWEST_RATE: f64 = -1.0;
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    match calculate(name, values) {
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    match calculate(function, values) {
         Ok(number) if number.is_finite() => Value::number(number),
         Ok(_) => Value::Error(FormulaError::Num),
         Err(error) => Value::Error(error),
     }
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
-    match name {
-        "COUPDAYBS" | "COUPDAYS" | "COUPDAYSNC" | "COUPNCD" | "COUPNUM" | "COUPPCD" => {
-            coupon(name, values)
+fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
+    match function {
+        Function::COUPDAYBS
+        | Function::COUPDAYS
+        | Function::COUPDAYSNC
+        | Function::COUPNCD
+        | Function::COUPNUM
+        | Function::COUPPCD => coupon(function, values),
+        Function::ACCRINT => accrued_interest(values),
+        Function::ACCRINTM => accrued_at_maturity(values),
+        Function::PRICE => price(values),
+        Function::YIELD => bond_yield(values),
+        Function::DURATION | Function::MDURATION => {
+            duration(values, function == Function::MDURATION)
         }
-        "ACCRINT" => accrued_interest(values),
-        "ACCRINTM" => accrued_at_maturity(values),
-        "PRICE" => price(values),
-        "YIELD" => bond_yield(values),
-        "DURATION" | "MDURATION" => duration(values, name == "MDURATION"),
-        "DISC" | "INTRATE" | "PRICEDISC" | "RECEIVED" | "YIELDDISC" => discounted(name, values),
-        "PRICEMAT" | "YIELDMAT" => interest_at_maturity(values, name == "PRICEMAT"),
-        "TBILLEQ" | "TBILLPRICE" | "TBILLYIELD" => treasury_bill(name, values),
-        "ODDFPRICE" | "ODDFYIELD" => odd::first_period(values, name == "ODDFYIELD"),
-        "ODDLPRICE" | "ODDLYIELD" => odd::last_period(values, name == "ODDLYIELD"),
-        _ => Err(FormulaError::Name),
+        Function::DISC
+        | Function::INTRATE
+        | Function::PRICEDISC
+        | Function::RECEIVED
+        | Function::YIELDDISC => discounted(function, values),
+        Function::PRICEMAT | Function::YIELDMAT => {
+            interest_at_maturity(values, function == Function::PRICEMAT)
+        }
+        Function::TBILLEQ | Function::TBILLPRICE | Function::TBILLYIELD => {
+            treasury_bill(function, values)
+        }
+        Function::ODDFPRICE | Function::ODDFYIELD => {
+            odd::first_period(values, function == Function::ODDFYIELD)
+        }
+        Function::ODDLPRICE | Function::ODDLYIELD => {
+            odd::last_period(values, function == Function::ODDLYIELD)
+        }
     }
 }
 
@@ -127,7 +143,7 @@ fn basis_arg(values: &FuncAccumulator, index: usize) -> Result<Basis, FormulaErr
 
 /// COUPDAYBS, COUPDAYS, COUPDAYSNC, COUPNCD, COUPNUM and COUPPCD.
 #[inline(never)]
-fn coupon(name: &str, values: &FuncAccumulator) -> NumberResult {
+fn coupon(function: Function, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 3, 4)?;
 
     let settlement = date_arg(values, 0)?;
@@ -139,13 +155,18 @@ fn coupon(name: &str, values: &FuncAccumulator) -> NumberResult {
 
     let coupons = Coupons::find(settlement, maturity, frequency);
 
-    Ok(match name {
-        "COUPDAYBS" => basis.days_before_settlement(coupons),
-        "COUPDAYS" => basis.period_days(coupons.previous, coupons.next, frequency),
-        "COUPDAYSNC" => basis.days_after_settlement(coupons),
-        "COUPNCD" => coupons.next.serial(),
-        "COUPPCD" => coupons.previous.serial(),
-        _ => coupons.remaining,
+    Ok(if function == Function::COUPDAYBS {
+        basis.days_before_settlement(coupons)
+    } else if function == Function::COUPDAYS {
+        basis.period_days(coupons.previous, coupons.next, frequency)
+    } else if function == Function::COUPDAYSNC {
+        basis.days_after_settlement(coupons)
+    } else if function == Function::COUPNCD {
+        coupons.next.serial()
+    } else if function == Function::COUPPCD {
+        coupons.previous.serial()
+    } else {
+        coupons.remaining
     })
 }
 
@@ -442,7 +463,7 @@ fn duration(values: &FuncAccumulator, is_modified: bool) -> NumberResult {
 /// DISC, INTRATE, PRICEDISC, RECEIVED and YIELDDISC(settlement, maturity,
 /// first, second, [basis]): securities that pay no coupon.
 #[inline(never)]
-fn discounted(name: &str, values: &FuncAccumulator) -> NumberResult {
+fn discounted(function: Function, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 4, 5)?;
 
     let settlement = date_arg(values, 0)?;
@@ -455,18 +476,18 @@ fn discounted(name: &str, values: &FuncAccumulator) -> NumberResult {
 
     let year_share = basis.days(settlement, maturity) / basis.year_days(settlement, maturity);
 
-    match name {
-        "DISC" => Ok((1.0 - first / second) / year_share),
-        "INTRATE" => Ok((second - first) / first / year_share),
-        "PRICEDISC" => Ok(second - first * second * year_share),
-        "YIELDDISC" => Ok((second - first) / first / year_share),
-        _ => {
-            let discount = second * year_share;
+    if function == Function::DISC {
+        Ok((1.0 - first / second) / year_share)
+    } else if function == Function::INTRATE || function == Function::YIELDDISC {
+        Ok((second - first) / first / year_share)
+    } else if function == Function::PRICEDISC {
+        Ok(second - first * second * year_share)
+    } else {
+        let discount = second * year_share;
 
-            ensure(discount < 1.0)?;
+        ensure(discount < 1.0)?;
 
-            Ok(first / (1.0 - discount))
-        }
+        Ok(first / (1.0 - discount))
     }
 }
 
@@ -512,7 +533,7 @@ fn interest_at_maturity(values: &FuncAccumulator, is_price: bool) -> NumberResul
 /// TBILLEQ, TBILLPRICE and TBILLYIELD(settlement, maturity, discount or
 /// pr). Maturity must be at most one year after settlement.
 #[inline(never)]
-fn treasury_bill(name: &str, values: &FuncAccumulator) -> NumberResult {
+fn treasury_bill(function: Function, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 3, 3)?;
 
     let settlement = date_arg(values, 0)?;
@@ -525,16 +546,16 @@ fn treasury_bill(name: &str, values: &FuncAccumulator) -> NumberResult {
 
     let days = day_count::actual_days(settlement, maturity);
 
-    match name {
-        "TBILLPRICE" => {
-            let price = FACE_VALUE * (1.0 - rate_or_price * days / BILL_YEAR_DAYS);
+    if function == Function::TBILLPRICE {
+        let price = FACE_VALUE * (1.0 - rate_or_price * days / BILL_YEAR_DAYS);
 
-            ensure(price > 0.0)?;
+        ensure(price > 0.0)?;
 
-            Ok(price)
-        }
-        "TBILLYIELD" => Ok((FACE_VALUE - rate_or_price) / rate_or_price * BILL_YEAR_DAYS / days),
-        _ => bond_equivalent(rate_or_price, days),
+        Ok(price)
+    } else if function == Function::TBILLYIELD {
+        Ok((FACE_VALUE - rate_or_price) / rate_or_price * BILL_YEAR_DAYS / days)
+    } else {
+        bond_equivalent(rate_or_price, days)
     }
 }
 
@@ -649,7 +670,7 @@ mod tests {
     use super::super::{evaluate_scalar, lookup};
     use super::*;
 
-    fn call(name: &str, arguments: &[f64]) -> Value {
+    fn call(function: &str, arguments: &[f64]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in arguments {
@@ -657,12 +678,15 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate_scalar(lookup(name).unwrap(), &values)
+        evaluate_scalar(lookup(function).unwrap(), &values)
     }
 
-    fn number(name: &str, arguments: &[f64]) -> f64 {
-        let Value::Number(actual) = call(name, arguments) else {
-            panic!("{name}{arguments:?} returned {:?}", call(name, arguments));
+    fn number(function: &str, arguments: &[f64]) -> f64 {
+        let Value::Number(actual) = call(function, arguments) else {
+            panic!(
+                "{function}{arguments:?} returned {:?}",
+                call(function, arguments)
+            );
         };
 
         actual
@@ -807,14 +831,14 @@ mod tests {
     fn microsoft_published_examples() {
         let mismatches: Vec<String> = MICROSOFT_EXAMPLES
             .iter()
-            .filter_map(|(name, arguments, published)| {
+            .filter_map(|(function, arguments, published)| {
                 let decimals = published.split_once('.').map_or(0, |(_, part)| part.len());
                 let tolerance = 0.5 * 10f64.powi(-(decimals as i32));
                 let expected: f64 = published.parse().unwrap();
-                let actual = number(name, arguments);
+                let actual = number(function, arguments);
 
                 ((actual - expected).abs() > tolerance)
-                    .then(|| format!("{name}{arguments:?}: {actual} is not {published}"))
+                    .then(|| format!("{function}{arguments:?}: {actual} is not {published}"))
             })
             .collect();
 
@@ -889,11 +913,11 @@ mod tests {
             ),
         ];
 
-        for (name, arguments, error) in cases {
+        for (function, arguments, error) in cases {
             assert_eq!(
-                call(name, arguments),
+                call(function, arguments),
                 Value::Error(*error),
-                "{name}{arguments:?}"
+                "{function}{arguments:?}"
             );
         }
     }
