@@ -2205,8 +2205,7 @@ mod tests {
         for sheet in 0..SHEETS {
             let mut seed = 0x9e37_79b9 ^ (sheet + 1).wrapping_mul(0x85eb_ca6b);
             let resident_limit = 1 + next_random(&mut seed, 6);
-            let mut storage =
-                PagedStorage::new(ROWS, budget_for(resident_limit), 0).unwrap();
+            let mut storage = PagedStorage::new(ROWS, budget_for(resident_limit), 0).unwrap();
             let mut model = EvictionModel {
                 pages: vec![vec![None; PAGES]; COLS],
                 clock: 0,
