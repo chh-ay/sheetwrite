@@ -906,12 +906,15 @@ impl<'a, 'p> Context<'a, 'p> {
         let Ast::DefinedName(id) = expression else {
             return definition(expression, names).ok().cloned();
         };
-        if let Some(formula) = names.shared_formula(*id) {
-            return definition(formula, names).ok().cloned();
-        }
-        let read = names.read(*id);
-        read.formula()
-            .and_then(|formula| definition(formula, names).ok().cloned())
+        let read;
+        let formula = match names.shared_formula(*id) {
+            Some(formula) => formula,
+            None => {
+                read = names.read(*id);
+                read.formula()?
+            }
+        };
+        definition(formula, names).ok().cloned()
     }
 
     fn slot(&self, depth: u16, index: u16) -> Option<&Slot> {

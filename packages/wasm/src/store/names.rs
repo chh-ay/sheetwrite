@@ -517,8 +517,9 @@ impl NameTable {
     }
 
     /// Keep only the definitions `keep` accepts; it gets each one's scope and
-    /// folded name, and may change it.
-    pub(super) fn retain(&mut self, mut keep: impl FnMut(Option<u32>, &str, &mut DefinedName) -> bool) {
+    /// folded name, and may change it. Takes a `dyn` closure so each caller
+    /// shares one copy of the walk.
+    pub(super) fn retain(&mut self, keep: &mut dyn FnMut(Option<u32>, &str, &mut DefinedName) -> bool) {
         for entry in &mut self.entries {
             let key = &entry.key;
             entry

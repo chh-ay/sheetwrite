@@ -936,7 +936,7 @@ impl CellStore {
         }
 
         let mut changed_names = Vec::new();
-        self.names.settled().retain(|scope, key, definition| {
+        self.names.settled().retain(&mut |scope, key, definition| {
             let removed = scope == Some(sheet as u32)
                 || matches!(definition, names::DefinedName::Range(range) if range.sheet == sheet as u32);
             if removed {
@@ -4037,7 +4037,7 @@ impl CellStore {
         columns: bool,
         changed: &mut Vec<String>,
     ) {
-        self.names.settled().retain(|_, key, definition| {
+        self.names.settled().retain(&mut |_, key, definition| {
             let names::DefinedName::Range(range) = definition else {
                 return true;
             };
