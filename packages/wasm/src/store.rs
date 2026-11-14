@@ -328,9 +328,10 @@ pub struct CellStore {
     /// Live sheet handles in workbook tab order, which 3-D references span.
     /// `None` means ascending handle order: tabs that were only ever appended
     /// cost one pointer and no heap. The list exists once the host reorders.
-    // Boxed so the field stays one pointer: a bare `Vec` header would grow
-    // every store, and most workbooks never reorder tabs.
-    #[allow(clippy::box_collection)]
+    #[allow(
+        clippy::box_collection,
+        reason = "boxed so the field stays one pointer: a bare `Vec` header would grow every store, and most workbooks never reorder tabs"
+    )]
     sheet_order: Option<Box<Vec<u32>>>,
     pub(crate) sheet_lookup: FxHashMap<String, usize>,
     pub(crate) sheet_ids: FxHashMap<String, usize>,
@@ -376,9 +377,11 @@ pub struct CellStore {
     pub(crate) pivots: Option<Box<pivot_output::SavedPivots>>,
     /// Table relationships of the full engine (#229). `None` until the host
     /// sends one, so a workbook without relationships pays one pointer.
-    // Boxed so the field stays one pointer: most workbooks have no model.
     #[cfg(feature = "analysis")]
-    #[allow(clippy::box_collection)]
+    #[allow(
+        clippy::box_collection,
+        reason = "boxed so the field stays one pointer: most workbooks have no model"
+    )]
     pub(crate) relationships: Option<Box<Vec<relationships::Relationship>>>,
 }
 
