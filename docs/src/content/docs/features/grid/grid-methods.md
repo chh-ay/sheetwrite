@@ -197,7 +197,7 @@ interface Grid {
 | [`applyTransaction(transaction)`](/docs/api/core/grid/#grid-apply-transaction) | Apply arbitrary patches as one undoable grid commit. |
 | [`exportSnapshot()`](/docs/api/core/grid/#grid-export-snapshot) / [`applyRemoteOperations(operations)`](/docs/api/core/grid/#grid-apply-remote-operations) | Export the complete document, or apply already-persisted operations. See [Persistence](/docs/features/data/persistence/#serializable-documents). |
 | [`getCommandState(name)`](/docs/api/core/grid/#grid-get-command-state) | Undo/redo availability and formatting active/mixed/disabled state. See [Host-owned command state](/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state). |
-| [`getFocusCellStyle()`](/docs/api/core/grid/#grid-get-focus-cell-style) | Effective style of the focus cell: its own style over its column's `cellStyle`. |
+| [`getFocusCellStyle()`](/docs/api/core/grid/#grid-get-focus-cell-style) | Effective style of the focus cell: its own style over its column's `cellStyle`, with the column's `numberFormat` when neither sets one. |
 | [`getCellAtPoint(clientX, clientY)`](/docs/api/core/grid/#grid-get-cell-at-point) | Resolve viewport coordinates to an active-sheet cell for [host-owned menus](/docs/features/grid/context-menu/#host-owned-menu). |
 | [`setConfig(config)`](/docs/api/core/grid/#grid-set-config) / [`setReadOnly(readOnly)`](/docs/api/core/grid/#grid-set-read-only) | Reconfigure built-in chrome, or change editability, without replacing the grid. |
 

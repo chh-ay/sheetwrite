@@ -895,7 +895,8 @@ export interface Grid {
   getCommandState(command: GridCommandName): GridCommandState;
   /**
    * Effective style of the focus cell: its own style over its column's
-   * `cellStyle`. Empty when nothing is selected.
+   * `cellStyle`, with the column's `numberFormat` when neither sets one.
+   * Empty when nothing is selected.
    */
   getFocusCellStyle(): CellStyle;
   /**

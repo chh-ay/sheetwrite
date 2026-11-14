@@ -59,6 +59,9 @@ export const DIAGNOSTIC_RENDER_SCENARIOS = [
   { id: "number-format.hscroll", group: "formatting" },
   { id: "scroll-fractional.same-window", group: "view-scrolling" },
   { id: "geometry-unresized.1m", group: "geometry" },
+  { id: "wrap-unicode.paint.200", group: "formatting" },
+  { id: "wrap-unicode.paint.2000", group: "formatting" },
+  { id: "wrap-unicode.paint.20000", group: "formatting" },
   { id: WINDOW_TRANSFER_BASELINE_SCENARIO_ID, group: "view-scrolling" },
   { id: WINDOW_TRANSFER_UPPER_BOUND_SCENARIO_ID, group: "view-scrolling" },
 ] as const satisfies readonly { readonly id: string; readonly group: ScenarioGroup }[];
