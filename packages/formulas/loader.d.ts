@@ -5,7 +5,7 @@ export * from "./pkg/sheetwrite_wasm.js";
 /** Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`. */
 export type { InitInput } from "./pkg/sheetwrite_wasm.js";
 
-/** Result of module initialization: the instantiated exports plus the shared linear memory. */
+/** Raw module output of initialization, used by the loader: the generated wasm-bindgen exports and the linear memory, not API to call. */
 export type { InitOutput } from "./pkg/sheetwrite_wasm.js";
 
 /** Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`. */
