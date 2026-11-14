@@ -120,6 +120,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return pivotRebuildOutput(size);
     case "getpivotdata-many":
       return pivotDataValue(size - 1);
+    case "getpivotdata-source-edit":
+      return pivotDataValue(size - 1) + PIVOT_DATA_SOURCE_DELTA;
     case "analysis-calls":
       return analysisCallsOutput(size);
     case "history-diff":
@@ -150,6 +152,10 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
     case "sort-mixed-blanks":
       return sortMixedBlanksOutput(size);
+    case "sort-rows-labels":
+      return sortRowsOutput(size, sortRowsLabel);
+    case "sort-rows-numbers":
+      return sortRowsOutput(size, sortRowsNumber);
     case "sparse-page-write":
       return sparsePageOutput(size);
     case "map-lambda":
@@ -2281,6 +2287,10 @@ function pivotRebuildOutput(rows: number): number {
 const PIVOT_DATA_SOURCE_ROWS = 10_000;
 const PIVOT_DATA_EDIT = 1;
 const PIVOT_DATA_EDITED = 2;
+/** `getpivotdata-source-edit` adds this to the sum field of source row 99. */
+const PIVOT_DATA_SOURCE_DELTA = 1_000;
+/** The source row it edits: its items are (9, 9), as the last cell's are. */
+const PIVOT_DATA_SOURCE_ROW = 99;
 
 /** The item pair that GETPIVOTDATA cell `index` names. */
 function pivotDataItems(index: number): [number, number] {
@@ -2299,10 +2309,13 @@ function pivotDataValue(index: number): number {
 
 /**
  * A pivot on sheet `Pivot` sums field 4 by fields 0 and 1; `count` cells on
- * another sheet read it with `GETPIVOTDATA`. GETPIVOTDATA is volatile, so the
- * timed edit of an unrelated cell recalculates all of them.
+ * another sheet read it with `GETPIVOTDATA`. With `edit` "unrelated" the
+ * timed edit changes a cell nothing reads: GETPIVOTDATA depends on its
+ * pivot, so it recalculates none of them (before 0.7.0 it was volatile and
+ * recalculated all of them). With "source" the timed edit changes one source
+ * value: the pivot updates, then all of them recalculate once.
  */
-function getPivotDataManyFixture(count: number): TimedFixture {
+function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): TimedFixture {
   const store = new CellStore();
   assert(hasPivots(store), "the full engine has pivot tables");
   const source = pivotSourceSheet(store, PIVOT_DATA_SOURCE_ROWS);
@@ -2335,6 +2348,21 @@ function getPivotDataManyFixture(count: number): TimedFixture {
     );
   }
   store.recompute(calc);
+  if (edit === "source") {
+    // Sheet row 0 holds the headers.
+    const row = PIVOT_DATA_SOURCE_ROW + 1;
+    const value = PIVOT_DATA_SOURCE_ROW + PIVOT_SUM_FIELD;
+    return {
+      store,
+      run: () => {
+        store.setNumber(source, row, PIVOT_SUM_FIELD, value + PIVOT_DATA_SOURCE_DELTA, 0);
+        store.recompute(source);
+      },
+      check: () => numberAt(store, calc, count - 1, 1),
+      dispose: () => store.free(),
+      restore: restoreNumber(store, source, { row, col: PIVOT_SUM_FIELD, value }),
+    };
+  }
   return {
     store,
     run: () => {
@@ -2387,7 +2415,9 @@ function fullEngineRowFixture(id: string, size: number): TimedFixture {
     case "pivot-rebuild":
       return pivotRebuildFixture(size);
     case "getpivotdata-many":
-      return getPivotDataManyFixture(size);
+      return getPivotDataManyFixture(size, "unrelated");
+    case "getpivotdata-source-edit":
+      return getPivotDataManyFixture(size, "source");
     case "analysis-calls":
       return analysisCallsFixture(size);
     default:
@@ -2616,6 +2646,17 @@ const SORT_MIXED_LABELS = 997;
 const SORT_MIXED_TRUE_EVERY = 8;
 /** The timed edit writes this number into A1. */
 const SORT_MIXED_EDITED_FIRST = 12_345;
+/**
+ * The `sort-rows-*` rows sort one column through `sortRowsMulti`, ascending
+ * then descending. Values follow a prime step and repeat, so many rows tie.
+ */
+const SORT_ROWS_STEP = 7_919;
+const SORT_ROWS_LABELS = 5_000;
+const SORT_ROWS_LABEL_DIGITS = 5;
+const SORT_ROWS_NUMBERS = 1_000;
+const SORT_ROWS_NUMBER_SCALE = 4;
+/** The order digest is a weighted sum modulo this prime. */
+const SORT_ROWS_DIGEST_MODULUS = 1_000_000_007;
 /** `subtotal-filtered` hides every other block of this many rows. */
 const SUBTOTAL_BLOCK_ROWS = 10;
 const SUBTOTAL_EDITED_FIRST = 2;
@@ -2667,6 +2708,54 @@ function sortMixedBlanksOutput(count: number): string {
     else if (value === true) sum++;
   }
   return `${texts}:${sum}`;
+}
+
+/** A label without hyphens or case, so its collation order is its code order. */
+function sortRowsLabel(row: number): string {
+  const label = (row * SORT_ROWS_STEP) % SORT_ROWS_LABELS;
+  return `L${String(label).padStart(SORT_ROWS_LABEL_DIGITS, "0")}`;
+}
+
+function sortRowsNumber(row: number): number {
+  return ((row * SORT_ROWS_STEP) % SORT_ROWS_NUMBERS) / SORT_ROWS_NUMBER_SCALE;
+}
+
+/** First, middle and last row of a sorted order and a weighted sum of all of it. */
+function sortRowsDigest(order: ArrayLike<number>): string {
+  let sum = 0;
+  for (let position = 0; position < order.length; position++) {
+    sum = (sum + (position + 1) * (order[position] ?? 0)) % SORT_ROWS_DIGEST_MODULUS;
+  }
+  const middle = order[Math.floor(order.length / 2)];
+  return `${order[0]}:${middle}:${order[order.length - 1]}:${sum}`;
+}
+
+/** `sortRowsOutput` results, computed once per row and size. */
+const sortRowsOutputs = new Map<string, string>();
+
+/**
+ * The digests of the ascending and the descending order of `size` rows of
+ * `value`: equal values keep their row order in both directions.
+ */
+function sortRowsOutput(size: number, value: (row: number) => number | string): string {
+  const cacheKey = `${value.name}:${size}`;
+  const cached = sortRowsOutputs.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const values = Array.from({ length: size }, (_, row) => value(row));
+  const rows = Array.from({ length: size }, (_, row) => row);
+  const ascending = [...rows].sort((left, right) => {
+    const a = values[left]!;
+    const b = values[right]!;
+    return a < b ? -1 : a > b ? 1 : left - right;
+  });
+  const descending = [...rows].sort((left, right) => {
+    const a = values[left]!;
+    const b = values[right]!;
+    return a > b ? -1 : a < b ? 1 : left - right;
+  });
+  const output = `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`;
+  sortRowsOutputs.set(cacheKey, output);
+  return output;
 }
 
 function subtotalVisible(row: number): boolean {
@@ -2847,6 +2936,36 @@ function sortMixedBlanksFixture(count: number): TimedFixture {
     },
     dispose: () => store.free(),
     restore: restoreNumber(store, sheet, { row: 0, col: 0, value: first }),
+  };
+}
+
+/**
+ * Sorts the rows of one column of `value`s through `sortRowsMulti`,
+ * ascending then descending, as the sort command does. Sorting changes no
+ * cell, so every run repeats the same work.
+ */
+function sortRowsFixture(count: number, value: (row: number) => number | string): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(1, count);
+  const values = Array.from({ length: count }, (_, row) => value(row));
+  if (typeof values[0] === "string") {
+    writeStringColumn(store, sheet, 0, 0, values as string[], 0);
+  } else {
+    writeNumberColumn(store, sheet, 0, 0, Float64Array.from(values as number[]), 0);
+  }
+  const column = Uint32Array.of(0);
+  const allRows = new Uint32Array(0);
+  let ascending: Uint32Array = new Uint32Array(0);
+  let descending: Uint32Array = new Uint32Array(0);
+  return {
+    store,
+    run: () => {
+      ascending = store.sortRowsMulti(sheet, column, Uint8Array.of(1), allRows);
+      descending = store.sortRowsMulti(sheet, column, Uint8Array.of(0), allRows);
+    },
+    check: () => `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`,
+    dispose: () => store.free(),
+    restore: () => {},
   };
 }
 
@@ -3271,6 +3390,7 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "pivotby-percentof":
     case "pivot-rebuild":
     case "getpivotdata-many":
+    case "getpivotdata-source-edit":
     case "analysis-calls":
       return fullEngineRowFixture(id, size);
     case "paged-cell-reads":
@@ -3289,6 +3409,10 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
       return subtotalFilteredFixture(size);
     case "sort-mixed-blanks":
       return sortMixedBlanksFixture(size);
+    case "sort-rows-labels":
+      return sortRowsFixture(size, sortRowsLabel);
+    case "sort-rows-numbers":
+      return sortRowsFixture(size, sortRowsNumber);
     case "sparse-page-write":
       return sparsePageWriteFixture(size);
     case "index-match-many":

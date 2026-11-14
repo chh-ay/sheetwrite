@@ -220,8 +220,9 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
-    /// The formulas that name a sheet the workbook does not have or use a
-    /// table. Absent in the usual workbook, so it adds one word.
+    /// The formulas that name a sheet the workbook does not have, use a
+    /// table or call GETPIVOTDATA. Absent in the usual workbook, so it adds
+    /// one word.
     references: Option<Box<ReferenceUsers>>,
 }
 
@@ -368,6 +369,9 @@ impl TableUsers {
 struct ReferenceUsers {
     sheets: UnresolvedSheetUsers,
     tables: TableUsers,
+    /// The formulas that call GETPIVOTDATA.
+    #[cfg(feature = "analysis")]
+    pivot_readers: FormulaBits,
 }
 
 impl ReferenceUsers {
@@ -375,6 +379,16 @@ impl ReferenceUsers {
         formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
         self.sheets.add_memory_stats(formulas);
         self.tables.add_memory_stats(formulas);
+        #[cfg(feature = "analysis")]
+        self.pivot_readers.add_memory_stats(formulas);
+    }
+
+    fn is_empty(&self) -> bool {
+        #[cfg(feature = "analysis")]
+        if !self.pivot_readers.is_empty() {
+            return false;
+        }
+        self.sheets.is_empty() && self.tables.by_formula.is_empty()
     }
 }
 
@@ -473,7 +487,11 @@ impl FormulaStore {
         let table_tree = stored
             .filter(|entry| entry.uses_tables())
             .and_then(|entry| entry.ast.as_ref());
-        if !missing && table_tree.is_none() && self.references.is_none() {
+        #[cfg(feature = "analysis")]
+        let pivot_reader = stored.is_some_and(FormulaEntry::calls_pivot_data);
+        #[cfg(not(feature = "analysis"))]
+        let pivot_reader = false;
+        if !missing && table_tree.is_none() && !pivot_reader && self.references.is_none() {
             return;
         }
         let mut names = Vec::new();
@@ -489,7 +507,15 @@ impl FormulaStore {
         if let Some(ast) = table_tree {
             index.tables.record(id, ast);
         }
-        if index.sheets.is_empty() && index.tables.by_formula.is_empty() {
+        #[cfg(feature = "analysis")]
+        // A workbook without GETPIVOTDATA readers keeps an empty set, so
+        // `remove` stops at its bounds check and nothing is released.
+        if pivot_reader {
+            index.pivot_readers.insert(id);
+        } else if index.pivot_readers.remove(id) {
+            index.pivot_readers.release_if_empty();
+        }
+        if index.is_empty() {
             self.references = None;
         }
     }
@@ -698,6 +724,15 @@ impl FormulaStore {
             locations: &self.locations,
             sheet,
         }
+    }
+
+    /// The formulas that call GETPIVOTDATA, with their cells.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn pivot_readers(&self) -> impl Iterator<Item = (AbsCellKey, &FormulaEntry)> + '_ {
+        self.references
+            .iter()
+            .flat_map(|index| index.pivot_readers.ids())
+            .filter_map(|id| Some((self.location(id)?, self.get(id)?)))
     }
 
     /// Include page tables and vacant capacity in the formula owner's bytes.

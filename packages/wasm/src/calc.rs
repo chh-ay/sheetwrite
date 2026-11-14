@@ -3140,10 +3140,12 @@ fn translate_relative_refs_inner(
 ) -> bool {
     let row = |value, absolute| translated_coordinate(value, row_delta, absolute, Axis::Row, wrap);
     let col = |value, absolute| translated_coordinate(value, col_delta, absolute, Axis::Col, wrap);
-    let inner = |ast: &mut Ast| {
-        if !translate_relative_refs_inner(ast, row_delta, col_delta, wrap) {
-            *ast = Ast::InvalidRef;
+    // A child that leaves the sheet becomes `#REF!`; its parent stays.
+    let mut translate_child = |child: &mut Ast| {
+        if !translate_relative_refs_inner(child, row_delta, col_delta, wrap) {
+            *child = Ast::InvalidRef;
         }
+        false
     };
     match ast {
         Ast::Cell(r, c, flags) | Ast::AbsCell(_, r, c, flags) => {
@@ -3241,26 +3243,17 @@ fn translate_relative_refs_inner(
             }
             true
         }
-        Ast::Func(_, args) => {
-            args.iter_mut().for_each(inner);
-            true
-        }
-        Ast::UnknownFunc(call) => {
-            let args = &mut call.args;
-
-            args.iter_mut().for_each(inner);
-            true
-        }
         Ast::LetSlot { expression, .. } => {
             translate_relative_refs_inner(expression, row_delta, col_delta, wrap)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            inner(left);
-            inner(right);
-            true
-        }
-        Ast::Neg(operand) | Ast::Pos(operand) | Ast::Percent(operand) => {
-            inner(operand);
+        Ast::Func(..)
+        | Ast::UnknownFunc(_)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_) => {
+            ast.fold_children_mut(&mut translate_child);
             true
         }
         // A defined name's expansion is already placed for its formula.
@@ -3277,14 +3270,12 @@ fn translate_relative_refs_inner(
         | Ast::InvalidRef
         | Ast::Array(_) => true,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } => true,
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => true,
         #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => {
-            inner(&mut std::rc::Rc::make_mut(definition).body);
+        Ast::Lambda(_) => {
+            ast.fold_children_mut(&mut translate_child);
             true
         }
-        #[cfg(feature = "analysis")]
-        Ast::RegexPattern(_) => true,
     }
 }
 
