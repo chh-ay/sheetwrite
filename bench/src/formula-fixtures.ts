@@ -152,6 +152,10 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return subtotalOutput(size, SUBTOTAL_EDITED_FIRST);
     case "sort-mixed-blanks":
       return sortMixedBlanksOutput(size);
+    case "sort-rows-labels":
+      return sortRowsOutput(size, sortRowsLabel);
+    case "sort-rows-numbers":
+      return sortRowsOutput(size, sortRowsNumber);
     case "sparse-page-write":
       return sparsePageOutput(size);
     case "map-lambda":
@@ -2642,6 +2646,17 @@ const SORT_MIXED_LABELS = 997;
 const SORT_MIXED_TRUE_EVERY = 8;
 /** The timed edit writes this number into A1. */
 const SORT_MIXED_EDITED_FIRST = 12_345;
+/**
+ * The `sort-rows-*` rows sort one column through `sortRowsMulti`, ascending
+ * then descending. Values follow a prime step and repeat, so many rows tie.
+ */
+const SORT_ROWS_STEP = 7_919;
+const SORT_ROWS_LABELS = 5_000;
+const SORT_ROWS_LABEL_DIGITS = 5;
+const SORT_ROWS_NUMBERS = 1_000;
+const SORT_ROWS_NUMBER_SCALE = 4;
+/** The order digest is a weighted sum modulo this prime. */
+const SORT_ROWS_DIGEST_MODULUS = 1_000_000_007;
 /** `subtotal-filtered` hides every other block of this many rows. */
 const SUBTOTAL_BLOCK_ROWS = 10;
 const SUBTOTAL_EDITED_FIRST = 2;
@@ -2693,6 +2708,54 @@ function sortMixedBlanksOutput(count: number): string {
     else if (value === true) sum++;
   }
   return `${texts}:${sum}`;
+}
+
+/** A label without hyphens or case, so its collation order is its code order. */
+function sortRowsLabel(row: number): string {
+  const label = (row * SORT_ROWS_STEP) % SORT_ROWS_LABELS;
+  return `L${String(label).padStart(SORT_ROWS_LABEL_DIGITS, "0")}`;
+}
+
+function sortRowsNumber(row: number): number {
+  return ((row * SORT_ROWS_STEP) % SORT_ROWS_NUMBERS) / SORT_ROWS_NUMBER_SCALE;
+}
+
+/** First, middle and last row of a sorted order and a weighted sum of all of it. */
+function sortRowsDigest(order: ArrayLike<number>): string {
+  let sum = 0;
+  for (let position = 0; position < order.length; position++) {
+    sum = (sum + (position + 1) * (order[position] ?? 0)) % SORT_ROWS_DIGEST_MODULUS;
+  }
+  const middle = order[Math.floor(order.length / 2)];
+  return `${order[0]}:${middle}:${order[order.length - 1]}:${sum}`;
+}
+
+/** `sortRowsOutput` results, computed once per row and size. */
+const sortRowsOutputs = new Map<string, string>();
+
+/**
+ * The digests of the ascending and the descending order of `size` rows of
+ * `value`: equal values keep their row order in both directions.
+ */
+function sortRowsOutput(size: number, value: (row: number) => number | string): string {
+  const cacheKey = `${value.name}:${size}`;
+  const cached = sortRowsOutputs.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const values = Array.from({ length: size }, (_, row) => value(row));
+  const rows = Array.from({ length: size }, (_, row) => row);
+  const ascending = [...rows].sort((left, right) => {
+    const a = values[left]!;
+    const b = values[right]!;
+    return a < b ? -1 : a > b ? 1 : left - right;
+  });
+  const descending = [...rows].sort((left, right) => {
+    const a = values[left]!;
+    const b = values[right]!;
+    return a > b ? -1 : a < b ? 1 : left - right;
+  });
+  const output = `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`;
+  sortRowsOutputs.set(cacheKey, output);
+  return output;
 }
 
 function subtotalVisible(row: number): boolean {
@@ -2873,6 +2936,36 @@ function sortMixedBlanksFixture(count: number): TimedFixture {
     },
     dispose: () => store.free(),
     restore: restoreNumber(store, sheet, { row: 0, col: 0, value: first }),
+  };
+}
+
+/**
+ * Sorts the rows of one column of `value`s through `sortRowsMulti`,
+ * ascending then descending, as the sort command does. Sorting changes no
+ * cell, so every run repeats the same work.
+ */
+function sortRowsFixture(count: number, value: (row: number) => number | string): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(1, count);
+  const values = Array.from({ length: count }, (_, row) => value(row));
+  if (typeof values[0] === "string") {
+    writeStringColumn(store, sheet, 0, 0, values as string[], 0);
+  } else {
+    writeNumberColumn(store, sheet, 0, 0, Float64Array.from(values as number[]), 0);
+  }
+  const column = Uint32Array.of(0);
+  const allRows = new Uint32Array(0);
+  let ascending: Uint32Array = new Uint32Array(0);
+  let descending: Uint32Array = new Uint32Array(0);
+  return {
+    store,
+    run: () => {
+      ascending = store.sortRowsMulti(sheet, column, Uint8Array.of(1), allRows);
+      descending = store.sortRowsMulti(sheet, column, Uint8Array.of(0), allRows);
+    },
+    check: () => `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`,
+    dispose: () => store.free(),
+    restore: () => {},
   };
 }
 
@@ -3316,6 +3409,10 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
       return subtotalFilteredFixture(size);
     case "sort-mixed-blanks":
       return sortMixedBlanksFixture(size);
+    case "sort-rows-labels":
+      return sortRowsFixture(size, sortRowsLabel);
+    case "sort-rows-numbers":
+      return sortRowsFixture(size, sortRowsNumber);
     case "sparse-page-write":
       return sparsePageWriteFixture(size);
     case "index-match-many":
