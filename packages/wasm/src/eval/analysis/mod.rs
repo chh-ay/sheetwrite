@@ -112,6 +112,7 @@ mod finance;
 mod groupby;
 mod hypothesis;
 pub(crate) use groupby::grouping;
+pub(crate) use pivot_data::ast_calls_pivot_data;
 pub(crate) mod lambda;
 pub(super) mod math;
 mod matrices;
@@ -407,7 +408,8 @@ pub(crate) const SUMX2MY2_ID: u16 = known_id("SUMX2MY2");
 pub(crate) const SUMX2PY2_ID: u16 = known_id("SUMX2PY2");
 pub(crate) const SUMXMY2_ID: u16 = known_id("SUMXMY2");
 pub(crate) const LAMBDA_ID: u16 = known_id("LAMBDA");
-/// `GETPIVOTDATA` is volatile: it reads pivot output through no reference.
+/// `GETPIVOTDATA` reads pivot output through no reference; a pivot update
+/// recalculates it (see `CellStore::settle_pivots`).
 pub(crate) const GETPIVOTDATA_ID: u16 = known_id("GETPIVOTDATA");
 pub(crate) const PERCENTILE_EXC_ID: u16 = known_id("PERCENTILE.EXC");
 pub(crate) const QUARTILE_EXC_ID: u16 = known_id("QUARTILE.EXC");

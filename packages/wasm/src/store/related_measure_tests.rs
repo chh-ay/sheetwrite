@@ -411,3 +411,35 @@ fn getpivotdata_reads_measure_cells() {
         assert_eq!(settled(&fixture.store, report, 0, 0), expected, "{formula}");
     }
 }
+
+/// GETPIVOTDATA over a measure pivot follows an edit of a related table:
+/// it depends on its pivot, not on being volatile, so the source edit alone
+/// updates it.
+#[test]
+fn getpivotdata_follows_related_table_edits() {
+    let mut fixture = Fixture::new();
+    let report = fixture.store.add_sheet(2, 2);
+    fixture
+        .store
+        .set_sheet_name(fixture.output, "output", "Output");
+    let formula = "=GETPIVOTDATA(\"Credit\",Output!A1,\"region\",\"North\")";
+    fixture.store.set_formula(report, 0, 0, formula, 0);
+    fixture.store.recompute(report);
+    let north = Value::text("North");
+    let total = Value::text("Total");
+    let before = fixture.expected(CREDIT, &north, &total);
+    assert_eq!(settled(&fixture.store, report, 0, 0), before);
+
+    let customer = fixture
+        .customers
+        .iter()
+        .position(|customer| customer.region == "North")
+        .expect("a customer in the North");
+    fixture.customers[customer].credit += 1_000.0;
+    fixture.write_customer(customer);
+    fixture.store.recompute_changed();
+
+    let after = fixture.expected(CREDIT, &north, &total);
+    assert_ne!(after, before, "the edit changes the North credit");
+    assert_eq!(settled(&fixture.store, report, 0, 0), after);
+}

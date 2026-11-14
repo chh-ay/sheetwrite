@@ -32,7 +32,7 @@ use crate::pivot::{
 use crate::sheet::SheetData;
 use crate::spill::SpillRange;
 use crate::tables::{Table, TableColumn};
-use crate::types::{CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
+use crate::types::{AbsCellKey, CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
 /// Value field whose field slot names a measure ID in the string payload.
 const MEASURE_VALUE_CODE: u32 = 7;
 
@@ -1036,9 +1036,9 @@ impl CellStore {
             if changed.is_empty() {
                 return;
             }
-            // GETPIVOTDATA reads pivot output without a reference to the
-            // cell it reads, so it is volatile: changed output recomputes
-            // the volatile formulas of every sheet.
+            self.mark_pivot_data_readers_dirty(&mut changed);
+            // A volatile formula can reach changed output through OFFSET or
+            // INDIRECT, so it recalculates too.
             for (sheet, data) in self.sheets.iter().enumerate() {
                 if data.formulas.has_volatile() && !changed.contains(&sheet) {
                     changed.push(sheet);
@@ -1074,6 +1074,39 @@ impl CellStore {
                     pivot.pending.clear();
                     pivot.cache = None;
                 }
+            }
+        }
+    }
+
+    /// Marks dirty the GETPIVOTDATA formulas that read a sheet in `changed`,
+    /// whose pivot output changed, and adds their sheets to `changed`.
+    /// GETPIVOTDATA reads output cells that no reference names, but its
+    /// pivot reference is one of its reads, as in Excel, where it depends on
+    /// its pivot instead of being volatile.
+    fn mark_pivot_data_readers_dirty(&mut self, changed: &mut Vec<usize>) {
+        let reads_changed = |sheet: u32| changed.contains(&(sheet as usize));
+        let readers: Vec<AbsCellKey> = self
+            .formula_slots
+            .pivot_readers()
+            .filter(|(_, entry)| {
+                entry
+                    .reads
+                    .cells
+                    .iter()
+                    .any(|cell| reads_changed(cell.sheet))
+                    || entry
+                        .reads
+                        .ranges
+                        .iter()
+                        .any(|range| reads_changed(range.sheet))
+            })
+            .map(|(key, _)| key)
+            .collect();
+        for key in readers {
+            let sheet = key.sheet as usize;
+            self.sheets[sheet].formulas.mark_cell_dirty(key.local());
+            if !changed.contains(&sheet) {
+                changed.push(sheet);
             }
         }
     }
