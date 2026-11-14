@@ -18,7 +18,7 @@ const output = await toXlsxWorkbook(snapshot, {
 });
 ```
 
-The recorded LibreOffice 26.8 comparison in [PR #190](https://github.com/chh-ay/sheetwrite/pull/190) reports:
+Round trips through LibreOffice 26.8 on the test workbooks give:
 
 | Chain | Unexpected differences | Known producer difference |
 | --- | --- | --- |
@@ -70,7 +70,7 @@ This converts the selected file. It does not invoke LibreOffice or run the repos
 
 The evidence compares normalized workbook semantics, not ZIP/XML identity. Generated hyperlink IDs may change. Hyperlink presentation moved into cell styles compares equal only when the painted appearance remains equal.
 
-[PR #189](https://github.com/chh-ay/sheetwrite/pull/189) separates `workbook.xlsxSource` opaque bytes from semantic comparison. LibreOffice can rename parts and add its own theme or document-property graphs. Retained graphs are checked separately by **count per kind**: owner, sheet and relationship type. The result must retain at least as many graphs of each kind as the source; additions are allowed.
+The comparison leaves `workbook.xlsxSource` opaque bytes out of the semantic check. LibreOffice can rename parts and add its own theme or document-property graphs. Retained graphs are checked separately by **count per kind**: owner, sheet and relationship type. The result must retain at least as many graphs of each kind as the source; additions are allowed.
 
 That detects a lost chart, pivot or drawing count. It cannot detect one graph dropped and replaced by another of the same kind on the same owner. It does not prove opaque payload identity across different producers. A direct Sheetwrite no-edit round trip retains [eligible original compressed payloads](/docs/import-export/kept-parts-and-round-trips/).
 
@@ -78,7 +78,7 @@ That detects a lost chart, pivot or drawing count. It cannot detect one graph dr
 
 LibreOffice does not write `stopIfTrue`. The comparison records its omission in `knownProducerDifferences`, separate from unexpected `differences`; it does not pretend the conditional-format behavior survived unchanged. If later matching rules matter, inspect the file and warnings after resaving in LibreOffice.
 
-The reported pass is for the pinned fixtures and LibreOffice 26.8 in PR #190. It is not a claim that every workbook, feature or producer version round-trips without loss. The earlier #189 result still had 19 differences; #190 resolves the display/layout differences and records the known stop-rule loss.
+This holds for the test workbooks and LibreOffice 26.8. It is not a claim that every workbook, feature or producer version round-trips without loss.
 
 ## See also
 

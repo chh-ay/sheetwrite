@@ -75,8 +75,7 @@ export function sortOrders(grid: Grid) {
 ```
 
 An in-place sort is one undoable change, sent to collaborators as the new
-`permuteRows` operation with the new `"sort"` commit reason
-([#378](https://github.com/chh-ay/sheetwrite/pull/378)). A server or handler that
+`permuteRows` operation with the new `"sort"` commit reason. A server or handler that
 checks every operation or commit reason must accept them; see
 [Document operations](#document-operations).
 
@@ -84,8 +83,7 @@ checks every operation or commit reason must accept them; see
 
 `RevisionCoordinator` and its types are removed. Version history in
 `@sheetwrite/core/history` lists, reads and restores versions through a
-`HistoryStorageAdapter`
-([#390](https://github.com/chh-ay/sheetwrite/pull/390)). See
+`HistoryStorageAdapter`. See
 [Opt-in version archives](/docs/features/data/persistence/#opt-in-version-archives)
 and [Migrating from `RevisionCoordinator`](/docs/features/collaboration/#migrating-from-revisioncoordinator).
 
@@ -134,8 +132,7 @@ export async function restoreLatest(
 
 A restore is an ordinary commit, so the server no longer needs a separate
 restore endpoint. A server that records history attaches a `CommitJournal`, as
-`MemoryPersistenceAdapter.recordHistory` does
-([#386](https://github.com/chh-ay/sheetwrite/pull/386)).
+`MemoryPersistenceAdapter.recordHistory` does.
 
 ## Sync and history
 
@@ -171,9 +168,7 @@ kinds before you accept 0.7.0 clients.
 ## Add-on registration
 
 0.7.0 installs add-ons in one way: `initSheetwrite({ engine, source, addons })`,
-plus per-grid settings in `createGrid(host, { addons: { [name]: settings } })`
-([#366](https://github.com/chh-ay/sheetwrite/issues/366),
-[#466](https://github.com/chh-ay/sheetwrite/pull/466)). Each add-on package
+plus per-grid settings in `createGrid(host, { addons: { [name]: settings } })`. Each add-on package
 exports a factory named `<name>Addon`.
 
 Before:
@@ -219,7 +214,7 @@ that uses them is created, and the history panel on its first command.
 ## Errors and cancellation
 
 Core failures have one shape: a `SheetwriteError` with a stable `code` and
-`operation` ([#309](https://github.com/chh-ay/sheetwrite/pull/309)). An abort is
+`operation`. An abort is
 not a failure: it rejects with the signal's reason. See
 [Error handling](/docs/concepts/error-handling/).
 
@@ -292,7 +287,7 @@ add the new values.
 
 Synchronous sort, filter, hidden-row, row-group and view-clear methods of the
 store return the same `ApplyTransactionResult` as `applyTransaction`, so you can
-see a rejected or empty change ([#321](https://github.com/chh-ay/sheetwrite/pull/321)):
+see a rejected or empty change:
 `setColumnFilter`, `filterBy`, `hideRows`, `showRows`,
 `groupRows`, `ungroupRows`, `setGroupCollapsed` and `clearView`, and
 `grid.sortBy`. Code that implements these method types, or assigns them to a
@@ -318,8 +313,7 @@ export function hideDrafts(store: SheetwriteStore, rows: readonly number[]) {
 
 ## Cell style sanitizing
 
-`sanitizeHyperlinkStyle` is removed; use `sanitizeCellStyle` instead
-([#414](https://github.com/chh-ay/sheetwrite/pull/414)). The same check guards
+`sanitizeHyperlinkStyle` is removed; use `sanitizeCellStyle` instead. The same check guards
 hyperlinks, table styles and pasted cells, and applies Excel's font size range
 of 1 to 409 points and `#rrggbb` colors.
 
@@ -341,7 +335,7 @@ export function safeStyle(untrusted: unknown) {
 
 ## Stylesheet parts
 
-`@sheetwrite/core/styles.css` now imports the stylesheet in parts, and the command icon sheet is its own file, `styles/icons.svg`, instead of a `data:` URL ([#543](https://github.com/chh-ay/sheetwrite/pull/543)). An app that imports `styles.css` looks the same.
+`@sheetwrite/core/styles.css` now imports the stylesheet in parts, and the command icon sheet is its own file, `styles/icons.svg`, instead of a `data:` URL. An app that imports `styles.css` looks the same.
 
 | Change | What to do |
 | --- | --- |
@@ -392,21 +386,18 @@ fields.free();
 
 ### Excel sort order
 
-Every sort uses Excel's sort order
-([#377](https://github.com/chh-ay/sheetwrite/pull/377)): text compares without
+Every sort uses Excel's sort order: text compares without
 case in Excel's character order and skips apostrophes and hyphens, errors sort
 after `FALSE` and `TRUE` and are equal to each other, and blank cells are last
 in both directions. A saved view sort with mixed-case text, errors, or blank
 cells in a descending sort shows a different order after the upgrade. Sorting a
-spilled column uses the spilled values
-([#355](https://github.com/chh-ay/sheetwrite/pull/355)).
+spilled column uses the spilled values.
 
 ### Sort commands and the view sort
 
 Sort A to Z and Sort Z to A in the ribbon, the toolbar and the column menu
 move the cells. One undo restores them. To sort only the displayed rows, use
-Sort View A to Z, Sort View Z to A, or "Sort view only" in Data › Custom Sort
-([#393](https://github.com/chh-ay/sheetwrite/pull/393)). A view sort is still
+Sort View A to Z, Sort View Z to A, or "Sort view only" in Data › Custom Sort. A view sort is still
 saved with the sheet.
 
 ### Imported worksheet sort state
@@ -416,15 +407,13 @@ writes it after a sort that already moved the cells, so the rows keep the
 order Excel saved. It is kept as `Sheet.sortState` and written back on export,
 and the "sortState did not cover every data row" import warning is removed. An
 in-place sort of a table body records the table's sort state, so Excel shows
-the sort on the table's header buttons
-([#398](https://github.com/chh-ay/sheetwrite/pull/398)).
+the sort on the table's header buttons.
 
 ### INFO and other new functions
 
 `INFO` is new in both engines. It returns the sheet count for `"numfile"` and
 `"Automatic"` for `"recalc"`, and `#N/A` for `"directory"`, `"origin"`,
-`"osversion"`, `"release"` and `"system"`, which describe the desktop program
-([#399](https://github.com/chh-ay/sheetwrite/pull/399)). Workbooks that showed
+`"osversion"`, `"release"` and `"system"`, which describe the desktop program. Workbooks that showed
 `#NAME?` for an Excel function that 0.7.0 adds now show a result. See the
 [formula function contract](/docs/reference/formula-functions/).
 
