@@ -8,6 +8,7 @@ import {
   paintFrame,
   resetMergeIndexResourceStatsForTest,
 } from "../src/canvas-paint.js";
+import { contrastRatio, parseRgbColor, relativeLuminance } from "../src/color-contrast.js";
 import { dateToSerial } from "../src/date-serial.js";
 import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -545,3 +546,131 @@ describe("scroll blit and damage-band integrity", () => {
     expect(label?.y).toBe(56);
   });
 });
+
+describe("paintFrame automatic text colour on fills", () => {
+  const LIGHT = makeTheme({
+    fg: "#1f2328",
+    bg: "#ffffff",
+    headerFg: "#1f2328",
+    headerBg: "#f6f8fa",
+  });
+  const DARK = makeTheme({
+    fg: "#e6edf3",
+    bg: "#0d1117",
+    headerFg: "#e6edf3",
+    headerBg: "#161b22",
+  });
+  // Black to white, the #706 repro fill, saturated fills and a translucent fill.
+  const FILLS = [
+    "#000000",
+    "#1e293b",
+    "#475569",
+    "#7f7f7f",
+    "#94a3b8",
+    "#cbd5e1",
+    "#e6f2ec",
+    "#ffffff",
+    "#1d4ed8",
+    "#fde047",
+    "#dc2626",
+    "rgba(0, 0, 0, 0.1)",
+  ];
+
+  function paintFills(theme: Theme, styles: readonly CellStyle[]): RecordingCtx {
+    const rows = { start: 0, end: styles.length };
+    const view: VisibleWindowView = {
+      sheet: "s1",
+      stringPoolEpoch: 0,
+      rows,
+      cols: [0],
+      values: styles.map((_, row) => `r${row}`),
+      styleIds: Uint32Array.from(styles, (_, row) => row),
+      styles,
+    };
+    const layout: RenderLayout = {
+      ...makeLayout([{ key: "a", header: "A", width: 100, type: "text" }]),
+      totalRows: styles.length,
+    };
+    return render(view, layout, { ...UNIFORM_VIEWPORT, height: 1_000 }, theme);
+  }
+
+  function luminanceOf(css: string): number {
+    const color = parseRgbColor(css);
+    if (!color) throw new Error(`unparsed colour ${css}`);
+    return relativeLuminance(color);
+  }
+
+  for (const [name, theme] of [
+    ["light", LIGHT],
+    ["dark", DARK],
+  ] as const) {
+    it(`contrasts automatic text with each fill in the ${name} theme`, () => {
+      const ctx = paintFills(
+        theme,
+        FILLS.map((backgroundColor) => ({ backgroundColor })),
+      );
+      FILLS.forEach((fill, row) => {
+        const text = ctx.fillTexts.find((call) => call.text === `r${row}`);
+        if (!text) throw new Error(`row ${row} painted no text`);
+        // Judged over the theme background, as the fill is painted.
+        const fillLuminance = fill.startsWith("rgba")
+          ? luminanceOf(name === "light" ? "#e6e6e6" : "#0c0f15")
+          : luminanceOf(fill);
+        const textLuminance = luminanceOf(text.fillStyle);
+        const darkText = textLuminance < 0.2;
+        // Dark text on light fills, light text on dark fills.
+        expect({ fill, darkText }).toEqual({ fill, darkText: fillLuminance > 0.18 });
+        expect([theme.fg, invert(theme.fg)]).toContain(text.fillStyle);
+        expect(contrastRatio(textLuminance, fillLuminance)).toBeGreaterThanOrEqual(
+          contrastRatio(
+            luminanceOf(text.fillStyle === theme.fg ? invert(theme.fg) : theme.fg),
+            fillLuminance,
+          ),
+        );
+      });
+    });
+  }
+
+  it("keeps the theme foreground without a fill and an explicit text colour on a fill", () => {
+    const ctx = paintFills(DARK, [
+      {},
+      { backgroundColor: "#e6f2ec", color: "#ff00ff" },
+      { bold: true },
+    ]);
+    expect(ctx.fillTexts.find((call) => call.text === "r0")?.fillStyle).toBe(DARK.fg);
+    expect(ctx.fillTexts.find((call) => call.text === "r1")?.fillStyle).toBe("#ff00ff");
+    expect(ctx.fillTexts.find((call) => call.text === "r2")?.fillStyle).toBe(DARK.fg);
+  });
+
+  it("paints the #706 repro dark on its pale fill in the dark theme", () => {
+    const ctx = paintFills(DARK, [{ bold: true, backgroundColor: "#e6f2ec" }]);
+    const text = ctx.fillTexts.find((call) => call.text === "r0");
+    expect(text?.fillStyle).toBe(invert(DARK.fg));
+    expect(
+      contrastRatio(luminanceOf(text?.fillStyle ?? ""), luminanceOf("#e6f2ec")),
+    ).toBeGreaterThan(7);
+  });
+
+  it("contrasts a header label with its own fill", () => {
+    const layout = makeLayout([
+      {
+        key: "a",
+        header: "A",
+        width: 100,
+        type: "text",
+        headerStyle: { backgroundColor: "#fde047" },
+      },
+      { key: "b", header: "B", width: 100, type: "text" },
+    ]);
+    const ctx = render(makeView(new Uint32Array(6), [{}]), layout, UNIFORM_VIEWPORT, DARK);
+    expect(ctx.fillTexts.find((call) => call.text === "A")?.fillStyle).toBe(invert(DARK.headerFg));
+    expect(ctx.fillTexts.find((call) => call.text === "B")?.fillStyle).toBe(DARK.headerFg);
+  });
+});
+
+function invert(css: string): string {
+  const color = parseRgbColor(css);
+  if (!color) throw new Error(`unparsed colour ${css}`);
+  const byte = (value: number) => (255 - value).toString(16).padStart(2, "0");
+  return `#${byte(color.red)}${byte(color.green)}${byte(color.blue)}`;
+}

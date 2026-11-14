@@ -9,17 +9,27 @@ use super::super::matrix::EvalMatrix;
 use super::super::value::{compare_text_case_insensitive, plain_number};
 use super::super::{EvalPass, EvalResult};
 
-pub(crate) const NAMES: &[&str] = &[
-    "DAVERAGE", "DCOUNT", "DCOUNTA", "DGET", "DMAX", "DMIN", "DPRODUCT", "DSTDEV", "DSTDEVP",
-    "DSUM", "DVAR", "DVARP",
-];
+family_functions! {
+    DAVERAGE,
+    DCOUNT,
+    DCOUNTA,
+    DGET,
+    DMAX,
+    DMIN,
+    DPRODUCT,
+    DSTDEV,
+    DSTDEVP,
+    DSUM,
+    DVAR,
+    DVARP,
+}
 
 const ARGUMENT_COUNT: usize = 3;
 type CriteriaRows = Vec<Vec<(usize, Criterion)>>;
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -33,7 +43,7 @@ pub(crate) fn evaluate_ast(
         Err(error) => return Value::Error(error),
     };
     let field = store.eval_ast(&args[1], sheet, pass, depth + 1);
-    let column = if matches!(name, "DCOUNT" | "DCOUNTA")
+    let column = if matches!(function, Function::DCOUNT | Function::DCOUNTA)
         && (matches!(args[1], Ast::Missing)
             || matches!(&field, Value::Blank)
             || matches!(&field, Value::Text(text) if text.is_empty()))
@@ -53,7 +63,7 @@ pub(crate) fn evaluate_ast(
         Ok(rows) => rows,
         Err(error) => return Value::Error(error),
     };
-    aggregate(name, &database, column, &rows)
+    aggregate(function, &database, column, &rows)
 }
 
 fn field_column(headers: &[Value], field: &Value) -> Result<usize, FormulaError> {
@@ -121,7 +131,7 @@ fn database_criterion(value: &Value) -> Result<Criterion, FormulaError> {
 }
 
 fn aggregate(
-    name: &str,
+    function: Function,
     database: &EvalMatrix,
     column: Option<usize>,
     criteria: &CriteriaRows,
@@ -146,27 +156,35 @@ fn aggregate(
             continue;
         };
         let value = &record[field];
-        match name {
-            "DGET" => {
+        match function {
+            Function::DGET => {
                 if single.is_some() {
                     return Value::Error(FormulaError::Num);
                 }
                 single = Some(value.clone());
                 continue;
             }
-            "DCOUNTA" => {
+            Function::DCOUNTA => {
                 if !matches!(value, Value::Blank) {
                     count += 1;
                 }
                 continue;
             }
-            "DCOUNT" => {
+            Function::DCOUNT => {
                 if matches!(value, Value::Number(_)) {
                     count += 1;
                 }
                 continue;
             }
-            _ => {}
+            Function::DAVERAGE
+            | Function::DMAX
+            | Function::DMIN
+            | Function::DPRODUCT
+            | Function::DSTDEV
+            | Function::DSTDEVP
+            | Function::DSUM
+            | Function::DVAR
+            | Function::DVARP => {}
         }
         if let Value::Error(error) = value {
             return Value::Error(*error);
@@ -175,21 +193,26 @@ fn aggregate(
             continue;
         };
         count += 1;
-        match name {
-            "DSUM" | "DAVERAGE" => total += number,
-            "DPRODUCT" => product *= number,
-            "DMAX" => extreme = Some(extreme.map_or(*number, |previous| previous.max(*number))),
-            "DMIN" => extreme = Some(extreme.map_or(*number, |previous| previous.min(*number))),
-            "DSTDEV" | "DSTDEVP" | "DVAR" | "DVARP" => {
+        match function {
+            Function::DSUM | Function::DAVERAGE => total += number,
+            Function::DPRODUCT => product *= number,
+            Function::DMAX => {
+                extreme = Some(extreme.map_or(*number, |previous| previous.max(*number)))
+            }
+            Function::DMIN => {
+                extreme = Some(extreme.map_or(*number, |previous| previous.min(*number)))
+            }
+            Function::DSTDEV | Function::DSTDEVP | Function::DVAR | Function::DVARP => {
                 let delta = number - mean;
                 mean += delta / count as f64;
                 squared_deviations += delta * (number - mean);
             }
-            _ => return Value::Error(FormulaError::Name),
+            // Counted and returned above.
+            Function::DCOUNT | Function::DCOUNTA | Function::DGET => {}
         }
     }
-    let result = match name {
-        "DGET" => {
+    let result = match function {
+        Function::DGET => {
             return single.map_or(Value::Error(FormulaError::Value), |value| {
                 if matches!(value, Value::Blank) {
                     Value::number(0.0)
@@ -198,20 +221,20 @@ fn aggregate(
                 }
             })
         }
-        "DCOUNT" | "DCOUNTA" => count as f64,
-        "DSUM" => total,
-        "DAVERAGE" if count != 0 => total / count as f64,
-        "DAVERAGE" => return Value::Error(FormulaError::DivZero),
-        "DMAX" | "DMIN" => extreme.unwrap_or_default(),
-        "DPRODUCT" => {
+        Function::DCOUNT | Function::DCOUNTA => count as f64,
+        Function::DSUM => total,
+        Function::DAVERAGE if count != 0 => total / count as f64,
+        Function::DAVERAGE => return Value::Error(FormulaError::DivZero),
+        Function::DMAX | Function::DMIN => extreme.unwrap_or_default(),
+        Function::DPRODUCT => {
             if count == 0 {
                 0.0
             } else {
                 product
             }
         }
-        "DSTDEV" | "DSTDEVP" | "DVAR" | "DVARP" => {
-            let sample = matches!(name, "DSTDEV" | "DVAR");
+        Function::DSTDEV | Function::DSTDEVP | Function::DVAR | Function::DVARP => {
+            let sample = matches!(function, Function::DSTDEV | Function::DVAR);
             if count <= usize::from(sample) {
                 return Value::Error(FormulaError::DivZero);
             }
@@ -219,13 +242,12 @@ fn aggregate(
                 return Value::Error(FormulaError::Num);
             }
             let variance = squared_deviations.max(0.0) / (count - usize::from(sample)) as f64;
-            if matches!(name, "DSTDEV" | "DSTDEVP") {
+            if matches!(function, Function::DSTDEV | Function::DSTDEVP) {
                 variance.sqrt()
             } else {
                 variance
             }
         }
-        _ => return Value::Error(FormulaError::Name),
     };
     if result.is_finite() {
         Value::number(result)

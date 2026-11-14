@@ -12,123 +12,103 @@ use super::distributions::{
 use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "BETADIST",
-    "BETAINV",
-    "BINOMDIST",
-    "CHIDIST",
-    "CHIINV",
-    "CONFIDENCE",
-    "COVAR",
-    "CRITBINOM",
-    "EXPONDIST",
-    "FDIST",
-    "FINV",
-    "GAMMADIST",
-    "GAMMAINV",
-    "HYPGEOMDIST",
-    "LOGINV",
-    "LOGNORMDIST",
-    "MODE",
-    "NEGBINOMDIST",
-    "NORMDIST",
-    "NORMINV",
-    "NORMSDIST",
-    "NORMSINV",
-    "POISSON",
-    "STDEV",
-    "STDEVP",
-    "TDIST",
-    "TINV",
-    "VAR",
-    "VARP",
-    "WEIBULL",
-];
+family_functions! {
+    BETADIST,
+    BETAINV,
+    BINOMDIST,
+    CHIDIST,
+    CHIINV,
+    CONFIDENCE,
+    COVAR,
+    CRITBINOM,
+    EXPONDIST,
+    FDIST,
+    FINV,
+    GAMMADIST,
+    GAMMAINV,
+    HYPGEOMDIST,
+    LOGINV,
+    LOGNORMDIST,
+    MODE,
+    NEGBINOMDIST,
+    NORMDIST,
+    NORMINV,
+    NORMSDIST,
+    NORMSINV,
+    POISSON,
+    STDEV,
+    STDEVP,
+    TDIST,
+    TINV,
+    VAR,
+    VARP,
+    WEIBULL,
+}
 
 /// Functions whose arguments are number lists: a single-cell argument is a
 /// reference, so text and logical values in that cell are ignored.
-pub(crate) const REFERENCE_CELLS: &[&str] = &["MODE", "STDEV", "STDEVP", "VAR", "VARP"];
-
-/// Names that read every sheet of a 3-D reference, as `STDEV.S` does.
-pub(crate) const SHEET_SPAN_READERS: &[&str] = &["STDEV", "STDEVP", "VAR", "VARP"];
-
-/// Names that read a union as one list of values, as `MODE.SNGL` does.
-pub(crate) const UNION_READERS: &[&str] = &["MODE", "STDEV", "STDEVP", "VAR", "VARP"];
+pub(crate) const fn reads_cells_as_references(function: Function) -> bool {
+    matches!(
+        function,
+        Function::MODE | Function::STDEV | Function::STDEVP | Function::VAR | Function::VARP
+    )
+}
 
 const ONE_TAIL: f64 = 1.0;
 const TWO_TAILS: f64 = 2.0;
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    if let Some(func) = built_in_successor(name) {
-        return apply_func(func, values);
-    }
+/// A name with the contract of a default-engine function evaluates with it,
+/// and one with the arguments, errors and result of a newer distribution
+/// evaluates with that. The others keep their own rules.
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    use distributions::Function as Newer;
 
-    if let Some(successor) = distribution_successor(name) {
-        return distributions::evaluate(successor, values);
-    }
+    let built_in = |func| apply_func(func, values);
+    let newer = |successor| distributions::evaluate(successor, values);
+    let own = match function {
+        Function::COVAR => return built_in(Func::CovarianceP),
+        Function::MODE => return built_in(Func::ModeSngl),
+        Function::STDEV => return built_in(Func::StdevS),
+        Function::STDEVP => return built_in(Func::StdevP),
+        Function::VAR => return built_in(Func::VarS),
+        Function::VARP => return built_in(Func::VarP),
+        Function::BETAINV => return newer(Newer::BETA_INV),
+        Function::BINOMDIST => return newer(Newer::BINOM_DIST),
+        Function::CHIDIST => return newer(Newer::CHISQ_DIST_RT),
+        Function::CHIINV => return newer(Newer::CHISQ_INV_RT),
+        Function::CONFIDENCE => return newer(Newer::CONFIDENCE_NORM),
+        Function::EXPONDIST => return newer(Newer::EXPON_DIST),
+        Function::FDIST => return newer(Newer::F_DIST_RT),
+        Function::FINV => return newer(Newer::F_INV_RT),
+        Function::GAMMADIST => return newer(Newer::GAMMA_DIST),
+        Function::GAMMAINV => return newer(Newer::GAMMA_INV),
+        Function::LOGINV => return newer(Newer::LOGNORM_INV),
+        Function::NORMDIST => return newer(Newer::NORM_DIST),
+        Function::NORMINV => return newer(Newer::NORM_INV),
+        Function::NORMSINV => return newer(Newer::NORM_S_INV),
+        Function::POISSON => return newer(Newer::POISSON_DIST),
+        Function::TINV => return newer(Newer::T_INV_2T),
+        Function::WEIBULL => return newer(Newer::WEIBULL_DIST),
+        Function::BETADIST => beta_cumulative(values),
+        Function::CRITBINOM => critical_binomial(values),
+        Function::HYPGEOMDIST => discrete::hypergeometric(values, false),
+        Function::LOGNORMDIST => lognormal_cumulative(values),
+        Function::NEGBINOMDIST => discrete::negative_binomial(values, false),
+        Function::NORMSDIST => require_arity(values, 1, 1)
+            .and_then(|()| number_arg(values, 0, None))
+            .and_then(normal_cdf),
+        Function::TDIST => student_tails(values),
+    };
 
-    calculate(name, values).map_or_else(Value::Error, |number| {
+    own.map_or_else(Value::Error, |number| {
         if number.is_finite() {
             Value::number(number)
         } else {
             Value::Error(FormulaError::Num)
         }
     })
-}
-
-/// The default-engine function with the same contract.
-fn built_in_successor(name: &str) -> Option<Func> {
-    Some(match name {
-        "COVAR" => Func::CovarianceP,
-        "MODE" => Func::ModeSngl,
-        "STDEV" => Func::StdevS,
-        "STDEVP" => Func::StdevP,
-        "VAR" => Func::VarS,
-        "VARP" => Func::VarP,
-        _ => return None,
-    })
-}
-
-/// The newer distribution with the same arguments, errors and result.
-fn distribution_successor(name: &str) -> Option<&'static str> {
-    Some(match name {
-        "BETAINV" => "BETA.INV",
-        "BINOMDIST" => "BINOM.DIST",
-        "CHIDIST" => "CHISQ.DIST.RT",
-        "CHIINV" => "CHISQ.INV.RT",
-        "CONFIDENCE" => "CONFIDENCE.NORM",
-        "EXPONDIST" => "EXPON.DIST",
-        "FDIST" => "F.DIST.RT",
-        "FINV" => "F.INV.RT",
-        "GAMMADIST" => "GAMMA.DIST",
-        "GAMMAINV" => "GAMMA.INV",
-        "LOGINV" => "LOGNORM.INV",
-        "NORMDIST" => "NORM.DIST",
-        "NORMINV" => "NORM.INV",
-        "NORMSINV" => "NORM.S.INV",
-        "POISSON" => "POISSON.DIST",
-        "TINV" => "T.INV.2T",
-        "WEIBULL" => "WEIBULL.DIST",
-        _ => return None,
-    })
-}
-
-fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
-    match name {
-        "BETADIST" => beta_cumulative(values),
-        "CRITBINOM" => critical_binomial(values),
-        "HYPGEOMDIST" => discrete::hypergeometric(values, false),
-        "LOGNORMDIST" => lognormal_cumulative(values),
-        "NEGBINOMDIST" => discrete::negative_binomial(values, false),
-        "NORMSDIST" => {
-            require_arity(values, 1, 1)?;
-            normal_cdf(number_arg(values, 0, None)?)
-        }
-        "TDIST" => student_tails(values),
-        _ => Err(FormulaError::Name),
-    }
 }
 
 /// `BETADIST(x, alpha, beta, [A], [B])`: always the cumulative probability.
@@ -189,7 +169,7 @@ fn student_tails(values: &FuncAccumulator) -> NumberResult {
 mod tests {
     use super::*;
 
-    fn call(name: &str, arguments: &[Value]) -> Value {
+    fn call(function: Function, arguments: &[Value]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in arguments {
@@ -197,16 +177,16 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
-    fn call_numbers(name: &str, numbers: &[f64]) -> Value {
+    fn call_numbers(function: Function, numbers: &[f64]) -> Value {
         let arguments: Vec<Value> = numbers.iter().copied().map(Value::number).collect();
 
-        call(name, &arguments)
+        call(function, &arguments)
     }
 
-    fn call_list(name: &str, list: &[f64]) -> Value {
+    fn call_list(function: Function, list: &[f64]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for &number in list {
@@ -214,12 +194,12 @@ mod tests {
         }
         values.finish_arg(list.len(), 1).unwrap();
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
-    fn assert_published(name: &str, value: Value, published: &str) {
+    fn assert_published(function: Function, value: Value, published: &str) {
         let Value::Number(actual) = value else {
-            panic!("{name} returned {value:?}");
+            panic!("{function} returned {value:?}");
         };
         let decimals = published
             .split_once('.')
@@ -229,44 +209,52 @@ mod tests {
 
         assert!(
             (actual - expected).abs() <= tolerance,
-            "{name}: {actual} != {published}"
+            "{function}: {actual} != {published}"
         );
     }
 
     /// Excel results published in the "Example" table of each Microsoft
     /// Support page, `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
     /// The tolerance is one unit in the last published digit.
-    const MICROSOFT_EXAMPLES: &[(&str, &[f64], &str)] = &[
-        ("BETADIST", &[2.0, 8.0, 10.0, 1.0, 3.0], "0.6854706"),
-        ("BETAINV", &[0.685470581, 8.0, 10.0, 1.0, 3.0], "2"),
-        ("BINOMDIST", &[6.0, 10.0, 0.5, 0.0], "0.2050781"),
-        ("CHIDIST", &[18.307, 10.0], "0.0500006"),
-        ("CHIINV", &[0.050001, 10.0], "18.306973"),
-        ("CONFIDENCE", &[0.05, 2.5, 50.0], "0.692951912"),
-        ("CRITBINOM", &[6.0, 0.5, 0.75], "4"),
-        ("EXPONDIST", &[0.2, 10.0, 1.0], "0.86466472"),
-        ("EXPONDIST", &[0.2, 10.0, 0.0], "1.35335283"),
-        ("FDIST", &[15.2069, 6.0, 4.0], "0.01"),
-        ("FINV", &[0.01, 6.0, 4.0], "15.206865"),
-        ("GAMMADIST", &[10.00001131, 9.0, 2.0, 0.0], "0.032639"),
-        ("GAMMADIST", &[10.00001131, 9.0, 2.0, 1.0], "0.068094"),
-        ("GAMMAINV", &[0.068094, 9.0, 2.0], "10.0000112"),
-        ("HYPGEOMDIST", &[1.0, 4.0, 8.0, 20.0], "0.3633"),
-        ("LOGINV", &[0.039084, 3.5, 1.2], "4.0000252"),
-        ("LOGNORMDIST", &[4.0, 3.5, 1.2], "0.0390836"),
-        ("NEGBINOMDIST", &[10.0, 5.0, 0.25], "0.05504866"),
-        ("NORMDIST", &[42.0, 40.0, 1.5, 1.0], "0.9087888"),
-        ("NORMDIST", &[42.0, 40.0, 1.5, 0.0], "0.10934"),
-        ("NORMINV", &[0.908789, 40.0, 1.5], "42.000002"),
-        ("NORMSDIST", &[1.333333], "0.908788726"),
-        ("NORMSINV", &[0.908789], "1.3333347"),
-        ("POISSON", &[2.0, 5.0, 1.0], "0.124652"),
-        ("POISSON", &[2.0, 5.0, 0.0], "0.084224"),
-        ("TDIST", &[1.959999998, 60.0, 2.0], "0.054645"),
-        ("TDIST", &[1.959999998, 60.0, 1.0], "0.027322"),
-        ("TINV", &[0.054644930, 60.0], "1.96"),
-        ("WEIBULL", &[105.0, 20.0, 100.0, 1.0], "0.929581"),
-        ("WEIBULL", &[105.0, 20.0, 100.0, 0.0], "0.035589"),
+    const MICROSOFT_EXAMPLES: &[(Function, &[f64], &str)] = &[
+        (Function::BETADIST, &[2.0, 8.0, 10.0, 1.0, 3.0], "0.6854706"),
+        (Function::BETAINV, &[0.685470581, 8.0, 10.0, 1.0, 3.0], "2"),
+        (Function::BINOMDIST, &[6.0, 10.0, 0.5, 0.0], "0.2050781"),
+        (Function::CHIDIST, &[18.307, 10.0], "0.0500006"),
+        (Function::CHIINV, &[0.050001, 10.0], "18.306973"),
+        (Function::CONFIDENCE, &[0.05, 2.5, 50.0], "0.692951912"),
+        (Function::CRITBINOM, &[6.0, 0.5, 0.75], "4"),
+        (Function::EXPONDIST, &[0.2, 10.0, 1.0], "0.86466472"),
+        (Function::EXPONDIST, &[0.2, 10.0, 0.0], "1.35335283"),
+        (Function::FDIST, &[15.2069, 6.0, 4.0], "0.01"),
+        (Function::FINV, &[0.01, 6.0, 4.0], "15.206865"),
+        (
+            Function::GAMMADIST,
+            &[10.00001131, 9.0, 2.0, 0.0],
+            "0.032639",
+        ),
+        (
+            Function::GAMMADIST,
+            &[10.00001131, 9.0, 2.0, 1.0],
+            "0.068094",
+        ),
+        (Function::GAMMAINV, &[0.068094, 9.0, 2.0], "10.0000112"),
+        (Function::HYPGEOMDIST, &[1.0, 4.0, 8.0, 20.0], "0.3633"),
+        (Function::LOGINV, &[0.039084, 3.5, 1.2], "4.0000252"),
+        (Function::LOGNORMDIST, &[4.0, 3.5, 1.2], "0.0390836"),
+        (Function::NEGBINOMDIST, &[10.0, 5.0, 0.25], "0.05504866"),
+        (Function::NORMDIST, &[42.0, 40.0, 1.5, 1.0], "0.9087888"),
+        (Function::NORMDIST, &[42.0, 40.0, 1.5, 0.0], "0.10934"),
+        (Function::NORMINV, &[0.908789, 40.0, 1.5], "42.000002"),
+        (Function::NORMSDIST, &[1.333333], "0.908788726"),
+        (Function::NORMSINV, &[0.908789], "1.3333347"),
+        (Function::POISSON, &[2.0, 5.0, 1.0], "0.124652"),
+        (Function::POISSON, &[2.0, 5.0, 0.0], "0.084224"),
+        (Function::TDIST, &[1.959999998, 60.0, 2.0], "0.054645"),
+        (Function::TDIST, &[1.959999998, 60.0, 1.0], "0.027322"),
+        (Function::TINV, &[0.054644930, 60.0], "1.96"),
+        (Function::WEIBULL, &[105.0, 20.0, 100.0, 1.0], "0.929581"),
+        (Function::WEIBULL, &[105.0, 20.0, 100.0, 0.0], "0.035589"),
     ];
 
     /// Tensile strength samples from the Microsoft STDEV, STDEVP, VAR and
@@ -277,17 +265,33 @@ mod tests {
 
     #[test]
     fn microsoft_published_examples_give_the_excel_results() {
-        for (name, arguments, published) in MICROSOFT_EXAMPLES {
-            assert_published(name, call_numbers(name, arguments), published);
+        for (function, arguments, published) in MICROSOFT_EXAMPLES {
+            assert_published(*function, call_numbers(*function, arguments), published);
         }
 
-        assert_published("STDEV", call_list("STDEV", TENSILE_STRENGTH), "27.46392");
-        assert_published("STDEVP", call_list("STDEVP", TENSILE_STRENGTH), "26.05456");
-        assert_published("VAR", call_list("VAR", TENSILE_STRENGTH), "754.2667");
-        assert_published("VARP", call_list("VARP", TENSILE_STRENGTH), "678.84");
         assert_published(
-            "MODE",
-            call_list("MODE", &[5.6, 4.0, 4.0, 3.0, 2.0, 4.0]),
+            Function::STDEV,
+            call_list(Function::STDEV, TENSILE_STRENGTH),
+            "27.46392",
+        );
+        assert_published(
+            Function::STDEVP,
+            call_list(Function::STDEVP, TENSILE_STRENGTH),
+            "26.05456",
+        );
+        assert_published(
+            Function::VAR,
+            call_list(Function::VAR, TENSILE_STRENGTH),
+            "754.2667",
+        );
+        assert_published(
+            Function::VARP,
+            call_list(Function::VARP, TENSILE_STRENGTH),
+            "678.84",
+        );
+        assert_published(
+            Function::MODE,
+            call_list(Function::MODE, &[5.6, 4.0, 4.0, 3.0, 2.0, 4.0]),
             "4",
         );
     }
@@ -296,22 +300,22 @@ mod tests {
     fn discrete_distributions_use_exact_closed_forms() {
         // C(4,2) C(6,1) / C(10,3) = 36 / 120.
         assert_published(
-            "HYPGEOMDIST",
-            call_numbers("HYPGEOMDIST", &[2.0, 3.0, 4.0, 10.0]),
+            Function::HYPGEOMDIST,
+            call_numbers(Function::HYPGEOMDIST, &[2.0, 3.0, 4.0, 10.0]),
             "0.300000000000",
         );
         // One failure before the second success: C(2,1) 0.5^2 0.5^1 = 1/4.
         assert_published(
-            "NEGBINOMDIST",
-            call_numbers("NEGBINOMDIST", &[1.0, 2.0, 0.5]),
+            Function::NEGBINOMDIST,
+            call_numbers(Function::NEGBINOMDIST, &[1.0, 2.0, 0.5]),
             "0.250000000000",
         );
         assert_eq!(
-            call_numbers("NEGBINOMDIST", &[0.0, 3.0, 1.0]),
+            call_numbers(Function::NEGBINOMDIST, &[0.0, 3.0, 1.0]),
             Value::Number(1.0)
         );
         assert_eq!(
-            call_numbers("NEGBINOMDIST", &[2.0, 3.0, 0.0]),
+            call_numbers(Function::NEGBINOMDIST, &[2.0, 3.0, 0.0]),
             Value::Number(0.0)
         );
 
@@ -325,60 +329,60 @@ mod tests {
             (1.0, 4.0),
         ] {
             assert_eq!(
-                call_numbers("CRITBINOM", &[4.0, 0.5, criterion]),
+                call_numbers(Function::CRITBINOM, &[4.0, 0.5, criterion]),
                 Value::Number(expected),
                 "alpha {criterion}"
             );
         }
         assert_eq!(
-            call_numbers("CRITBINOM", &[1e9, 0.5, 0.5]),
+            call_numbers(Function::CRITBINOM, &[1e9, 0.5, 0.5]),
             Value::Number(5e8)
         );
     }
 
     #[test]
     fn domain_errors_follow_the_microsoft_remarks() {
-        for (name, arguments) in [
-            ("BETADIST", vec![0.5, 0.0, 2.0]),
-            ("BETADIST", vec![0.5, 2.0, 2.0, 1.0, 1.0]),
-            ("BETADIST", vec![3.5, 8.0, 10.0, 1.0, 3.0]),
-            ("CRITBINOM", vec![-1.0, 0.5, 0.5]),
-            ("CRITBINOM", vec![4.0, 1.5, 0.5]),
-            ("CRITBINOM", vec![4.0, 0.5, -0.5]),
-            ("HYPGEOMDIST", vec![5.0, 4.0, 8.0, 20.0]),
-            ("HYPGEOMDIST", vec![1.0, 21.0, 8.0, 20.0]),
-            ("HYPGEOMDIST", vec![1.0, 4.0, 0.0, 20.0]),
-            ("HYPGEOMDIST", vec![0.0, 15.0, 8.0, 20.0]),
-            ("LOGNORMDIST", vec![0.0, 3.5, 1.2]),
-            ("LOGNORMDIST", vec![4.0, 3.5, 0.0]),
-            ("NEGBINOMDIST", vec![-1.0, 5.0, 0.25]),
-            ("NEGBINOMDIST", vec![10.0, 0.5, 0.25]),
-            ("NEGBINOMDIST", vec![10.0, 5.0, 1.5]),
-            ("TDIST", vec![1.0, 0.5, 1.0]),
-            ("CHIDIST", vec![-1.0, 10.0]),
-            ("FINV", vec![1.5, 6.0, 4.0]),
-            ("TINV", vec![0.0, 60.0]),
+        for (function, arguments) in [
+            (Function::BETADIST, vec![0.5, 0.0, 2.0]),
+            (Function::BETADIST, vec![0.5, 2.0, 2.0, 1.0, 1.0]),
+            (Function::BETADIST, vec![3.5, 8.0, 10.0, 1.0, 3.0]),
+            (Function::CRITBINOM, vec![-1.0, 0.5, 0.5]),
+            (Function::CRITBINOM, vec![4.0, 1.5, 0.5]),
+            (Function::CRITBINOM, vec![4.0, 0.5, -0.5]),
+            (Function::HYPGEOMDIST, vec![5.0, 4.0, 8.0, 20.0]),
+            (Function::HYPGEOMDIST, vec![1.0, 21.0, 8.0, 20.0]),
+            (Function::HYPGEOMDIST, vec![1.0, 4.0, 0.0, 20.0]),
+            (Function::HYPGEOMDIST, vec![0.0, 15.0, 8.0, 20.0]),
+            (Function::LOGNORMDIST, vec![0.0, 3.5, 1.2]),
+            (Function::LOGNORMDIST, vec![4.0, 3.5, 0.0]),
+            (Function::NEGBINOMDIST, vec![-1.0, 5.0, 0.25]),
+            (Function::NEGBINOMDIST, vec![10.0, 0.5, 0.25]),
+            (Function::NEGBINOMDIST, vec![10.0, 5.0, 1.5]),
+            (Function::TDIST, vec![1.0, 0.5, 1.0]),
+            (Function::CHIDIST, vec![-1.0, 10.0]),
+            (Function::FINV, vec![1.5, 6.0, 4.0]),
+            (Function::TINV, vec![0.0, 60.0]),
         ] {
             assert_eq!(
-                call_numbers(name, &arguments),
+                call_numbers(function, &arguments),
                 Value::Error(FormulaError::Num),
-                "{name}{arguments:?}"
+                "{function}{arguments:?}"
             );
         }
 
         assert_eq!(
-            call("NORMSDIST", &[Value::text("one")]),
+            call(Function::NORMSDIST, &[Value::text("one")]),
             Value::Error(FormulaError::Value)
         );
         assert_eq!(
             call(
-                "TDIST",
+                Function::TDIST,
                 &[Value::number(1.0), Value::number(2.0), Value::Bool(true)]
             ),
-            call_numbers("TDIST", &[1.0, 2.0, 1.0])
+            call_numbers(Function::TDIST, &[1.0, 2.0, 1.0])
         );
         assert_eq!(
-            call_list("STDEV", &[1.0]),
+            call_list(Function::STDEV, &[1.0]),
             Value::Error(FormulaError::DivZero)
         );
     }
