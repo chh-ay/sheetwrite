@@ -6,7 +6,7 @@ use crate::types::{
     CellKey, FormulaError, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
-use paged::{bit, DirtyView, PagedStorage};
+use paged::{all_bits, bit, DirtyView, PagedStorage};
 
 mod paged;
 
@@ -309,6 +309,18 @@ impl CellStorage {
             paged.read(row, col).0
         } else {
             self.kind[index] & !CALCULATED
+        }
+    }
+
+    /// A cell's source kind and payload with one paged lookup.
+    #[inline]
+    pub(crate) fn source_at(&self, index: usize) -> (u8, u64) {
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, _, _) = paged.read(row, col);
+            (kind, payload)
+        } else {
+            dense_source(self.kind[index], self.payload[index])
         }
     }
 
@@ -1004,6 +1016,23 @@ impl CellRun<'_> {
             .calculated_cell(index)
             .unwrap_or((source_kind, source_payload));
         Some((kind, payload, style))
+    }
+
+    /// A paged run's clean kinds and payloads, when every cell is loaded and
+    /// no dirty or calculated block overlays the run.
+    pub(crate) fn clean_sources(&self) -> Option<(&[u8], &[u64])> {
+        if self.is_dense || self.dirty.is_some() || !self.calculated.is_empty() {
+            return None;
+        }
+        let offset = self.start - self.source_base;
+        let len = self.end - self.start;
+        if !self.loaded.is_some_and(|bits| all_bits(bits, offset, len)) {
+            return None;
+        }
+        Some((
+            &self.kinds[offset..offset + len],
+            &self.payloads[offset..offset + len],
+        ))
     }
 
     /// Visits every cell of a paged run; `None` marks an unloaded cell. Dense

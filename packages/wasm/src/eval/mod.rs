@@ -27,6 +27,8 @@ mod number_format;
 mod number_format_corpus_tests;
 mod operators;
 #[cfg(test)]
+mod paged_fold_tests;
+#[cfg(test)]
 mod pass_rule_tests;
 mod preview;
 mod preview_limits;
