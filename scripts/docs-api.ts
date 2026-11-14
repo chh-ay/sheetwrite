@@ -922,7 +922,12 @@ function fieldTypeSummary(
     : compactSummary(target.split(/\n@/)[0] ?? "", true);
 }
 
-/** A function's Parameters and Returns sections as fields. */
+/** `void` and `Promise<void>`: a return value with nothing to describe. */
+function returnsNothing(type: string): boolean {
+  return /^(?:void|Promise<void>)$/.test(type.replace(/\s+/g, ""));
+}
+
+/** A function's Parameters and Returns sections as fields; no Returns for `void`. */
 function renderFunctionFields(
   fields: FunctionFields,
   parts: DocumentationParts,
@@ -956,20 +961,23 @@ function renderFunctionFields(
       "",
     );
   }
-  blocks.push(
-    "## Returns",
-    "",
-    '<div class="api-cards">',
-    fieldHtml(
-      "returns",
-      undefined,
-      linkedTypeHtml(fields.returns, pkg, entry, item, routes),
-      undefined,
-      describe(parts.returns ?? typeSummary(fields.returns)),
-    ),
-    "</div>",
-    "",
-  );
+  // A function that returns nothing has no Returns card.
+  if (!returnsNothing(fields.returns)) {
+    blocks.push(
+      "## Returns",
+      "",
+      '<div class="api-cards">',
+      fieldHtml(
+        "returns",
+        undefined,
+        linkedTypeHtml(fields.returns, pkg, entry, item, routes),
+        undefined,
+        describe(parts.returns ?? typeSummary(fields.returns)),
+      ),
+      "</div>",
+      "",
+    );
+  }
   return blocks.join("\n");
 }
 
@@ -1484,7 +1492,10 @@ export interface UndocumentedApi {
   readonly members: readonly string[];
   /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
   readonly parameters: readonly string[];
-  /** Functions whose return value has neither `@returns` nor a documented type. */
+  /**
+   * Functions whose return value has neither `@returns` nor a documented type;
+   * `void` and `Promise<void>` return nothing to describe.
+   */
   readonly returns: readonly string[];
 }
 
@@ -1522,6 +1533,7 @@ export function undocumentedApi(
             parts.parameters.get(name) ?? fieldTypeSummary(parameter.type, pkg, routes);
           if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
         }
+        if (returnsNothing(fields.returns)) continue;
         const described = parts.returns ?? fieldTypeSummary(fields.returns, pkg, routes);
         if (described === undefined || described === "") returns.add(item.name);
       }
