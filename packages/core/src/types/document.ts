@@ -103,7 +103,9 @@ export interface Sheet {
 
 /** One key of a multi-column sort, applied in array order (first = primary). */
 export interface SortKey {
+  /** Zero-based index of the column to sort by. */
   col: number;
+  /** `true` sorts smallest first (A to Z for text); `false` the reverse. */
   ascending: boolean;
 }
 
@@ -120,8 +122,11 @@ export type ColumnFilter =
 
 /** A collapsible row group (data-row range, end-inclusive), Sheets-style. */
 export interface RowGroup {
+  /** Zero-based first row of the group. */
   start: number;
+  /** Zero-based last row of the group, included. */
   end: number;
+  /** `true` hides the group's rows behind its collapse control. */
   collapsed: boolean;
 }
 
@@ -243,25 +248,37 @@ export type DataValidationCondition =
 
 /** One stable, range-scoped data-entry rule. Blank cells are allowed unless disabled. */
 export interface DataValidationRule {
+  /** Stable ID, unique on the sheet; validation issues report it as `ruleId`. */
   id: string;
+  /** Cells the rule checks. */
   range: Range;
+  /** What a value must satisfy, such as a list of choices or a number range. */
   condition: DataValidationCondition;
+  /** `reject` refuses a failing value, `warn` accepts it with a warning, `allow` skips the check. */
   policy: ValidationPolicy;
+  /** Whether clearing a cell passes the rule; defaults to `true`. */
   allowBlank?: boolean;
+  /** Message shown when a value fails; without it, a message is built from the condition. */
   helpText?: string;
 }
 
 /** Serializable client UX policy. A host resolver decides whether a local mutation may proceed. */
 export interface ProtectedRange {
+  /** Stable ID, unique on the sheet. */
   id: string;
+  /** Cells the protection covers. */
   range: Range;
+  /** Name to show users, such as "Totals"; not used for decisions. */
   label?: string;
+  /** Your key for the permission your `ProtectionResolver` checks; Sheetwrite only passes it on. */
   permissionKey?: string;
 }
 
 /** Serializable plain-text note anchored to a cell. */
 export interface CellNote {
+  /** Cell the note is attached to. */
   addr: CellAddress;
+  /** The note's plain text. */
   text: string;
 }
 
@@ -299,8 +316,11 @@ export type CommitReason =
 
 /** Local operation and protected-range context supplied to the host policy. */
 export interface ProtectionRequest {
+  /** The protected range the operation touches. */
   protectedRange: Readonly<ProtectedRange>;
+  /** The local operation waiting for your answer. */
   operation: Readonly<DocumentOp>;
+  /** The user action or API call that produced the operation, such as `"paste"`. */
   commitReason: CommitReason;
 }
 
@@ -390,15 +410,21 @@ export type MutationIssue =
 
 /** Persistent display and grouping metadata for one document row. */
 export interface RowMetadata {
+  /** Row height in CSS pixels; absent uses the theme's row height. */
   height?: number;
+  /** `true` hides the row; it keeps its data and formulas. */
   hidden?: boolean;
 }
 
 /** Serializable cell value and optional style inside a snapshot block. */
 export interface SnapshotCell {
+  /** Row of the cell, counted from the block's first row (0 is that row). */
   rowOffset: number;
+  /** Column of the cell, counted from the block's first column. */
   colOffset: number;
+  /** The cell's content: a literal value, a formula, or a reference. */
   value: CellValue;
+  /** The cell's own style, over its column's default. */
   style?: CellStyle;
 }
 /**
@@ -407,28 +433,43 @@ export interface SnapshotCell {
  * Formula/reference tuples are sparse exceptions keyed by row-major offset.
  */
 export interface PackedCellBlock {
+  /** Number of rows in the block. */
   rowCount: number;
+  /** Number of columns in the block. */
   colCount: number;
+  /** One value per cell, row by row: cell (r, c) is at `r * colCount + c`. */
   values: CellScalar[];
+  /** Cells that hold a formula, as row-major offset and source text such as `=A1*2`. */
   formulas?: Array<[offset: number, source: string]>;
+  /** Cells that refer to another cell, as row-major offset and the cell they show. */
   refs?: Array<[offset: number, target: CellAddress]>;
+  /** The distinct styles the block uses; `styleIds` points into it. */
   styleTable?: CellStyle[];
+  /** One index into `styleTable` per cell, in the same order as `values`. */
   styleIds?: number[];
 }
 
 /** Sparse row-major cells bounded by one rectangular block. */
 export interface CellBlock {
+  /** Zero-based sheet row of the block's first row. */
   startRow: number;
+  /** Zero-based sheet column of the block's first column. */
   startCol: number;
+  /** Number of rows the block spans. */
   rowCount: number;
+  /** Number of columns the block spans. */
   colCount: number;
+  /** The block's stored cells, placed by offsets from its first row and column. */
   cells: SnapshotCell[];
 }
 
 /** Serializable complete state for one workbook sheet. */
 export interface SheetSnapshot {
+  /** Stable identifier, unique within the workbook and used by every cell address. */
   id: SheetId;
+  /** User-facing sheet name shown in tabs and workbook exports. */
   name: string;
+  /** Zero-based position of the sheet's tab. */
   order: number;
   /** A dashboard holds items and no cells; absent means a worksheet. */
   kind?: SheetKind;
@@ -436,27 +477,43 @@ export interface SheetSnapshot {
   dashboard?: Dashboard;
   /** Hidden worksheets remain in the workbook and retain formulas/references. */
   visibility?: SheetVisibility;
+  /** Number of rows the sheet has. */
   rowCount: number;
   /** Keys are stable, unique document column identities as well as datasource keys. */
   columns: Column[];
+  /** Leading rows pinned above the scrolling body; absent or 0 means none. */
   frozenRows?: number;
+  /** Leading columns pinned left of the scrolling body; absent or 0 means none. */
   frozenCols?: number;
+  /** Height and hidden state of rows that differ from the default, as `[row, metadata]` pairs. */
   rowMeta?: Array<[row: number, meta: RowMetadata]>;
+  /** Merged-cell regions; covered cells render and export from the top-left cell. */
   merges?: MergeRange[];
+  /** Conditional styles, in precedence order. */
   conditionalFormats?: ConditionalFormatRule[];
+  /** Hyperlinks attached to ranges of the sheet. */
   hyperlinks?: CellHyperlink[];
+  /** Data-entry rules checked when a value is written. */
   validationRules?: DataValidationRule[];
+  /** Ranges whose edits go through your `ProtectionResolver`. */
   protectedRanges?: ProtectedRange[];
+  /** Plain-text notes attached to cells. */
   notes?: CellNote[];
+  /** Sort keys of the sheet's view, primary first. */
   sortKeys?: SortKey[];
   /** See `Sheet.sortState`. */
   sortState?: WorkbookTableXmlElement;
+  /** Column filters of the sheet's view, as `[column index, filter]` pairs. */
   filters?: Array<[col: number, filter: ColumnFilter]>;
+  /** Collapsible row groups. */
   rowGroups?: RowGroup[];
+  /** Workbook tables anchored on this sheet. */
   tables?: WorkbookTable[];
+  /** Charts anchored on this sheet. */
   charts?: ChartDefinition[];
   /** Pivot tables anchored on this sheet. */
   pivots?: PivotDefinition[];
+  /** The sheet's non-empty cells, in rectangular blocks. */
   cells: CellBlock[];
 }
 
@@ -465,10 +522,15 @@ export interface SheetSnapshot {
  * save copies it without inflating or recompressing. Runtime copies are frozen.
  */
 export interface XlsxSourcePart {
+  /** Path of the part inside the `.xlsx` file, such as `xl/media/image1.png`. */
   readonly name: string;
+  /** The part's MIME content type from the package's `[Content_Types].xml`. */
   readonly contentType: string;
+  /** ZIP compression method of `data`: 0 for stored, 8 for deflate. */
   readonly method: 0 | 8;
+  /** CRC-32 checksum of the uncompressed part, as the ZIP entry records it. */
   readonly crc32: number;
+  /** Size of the part in bytes once uncompressed. */
   readonly uncompressedSize: number;
   /** Base64 of the compressed payload. */
   readonly data: string;
@@ -476,6 +538,7 @@ export interface XlsxSourcePart {
 
 /** What an opaque graph reads; any change to it drops the graph on save. */
 export interface XlsxSourceDependency {
+  /** Stable ID of the sheet the graph reads. */
   readonly sheetId: SheetId;
   /** Sheet name at import; OOXML formulas inside the graph refer to sheets by name. */
   readonly name: string;
@@ -487,7 +550,9 @@ export interface XlsxSourceDependency {
 
 /** One relationship from the package, workbook, or a sheet to a retained part graph. */
 export interface XlsxSourceGraph {
+  /** Which part holds the relationship: the package root, the workbook, or a sheet. */
   readonly owner: "root" | "workbook" | "sheet";
+  /** Stable ID of the owning sheet when `owner` is `"sheet"`. */
   readonly sheetId?: SheetId;
   /** OPC relationship type URI. */
   readonly type: string;
@@ -515,6 +580,7 @@ export interface XlsxSourceGraph {
   readonly unsupportedQueries?: readonly XlsxUnsupportedQuery[];
   /** Every retained part reached from `target`, including `.rels` parts. */
   readonly parts: readonly string[];
+  /** Sheets the graph reads; a change to any of them drops the graph on save. */
   readonly dependencies: readonly XlsxSourceDependency[];
 }
 
@@ -528,7 +594,9 @@ export interface XlsxUnsupportedQuery {
 
 /** Bounded, frozen record of the OOXML parts Sheetwrite does not model. */
 export interface XlsxSourceSnapshot {
+  /** The kept parts, each still compressed as in the original file. */
   readonly parts: readonly XlsxSourcePart[];
+  /** The relationships that reach the kept parts, with what each one depends on. */
   readonly graphs: readonly XlsxSourceGraph[];
   /** Targets of graphs dropped by committed edits; undo does not restore them. */
   readonly dropped?: readonly string[];
@@ -536,10 +604,15 @@ export interface XlsxSourceSnapshot {
 
 /** Schema-versioned serializable workbook document. */
 export interface WorkbookSnapshot {
+  /** Format version of the snapshot; always `1` today. */
   schemaVersion: 1;
+  /** ID of the document in your storage, kept through sync and persistence. */
   documentId?: string;
+  /** Document version the snapshot was taken at, as sync and persistence count it; absent means 0. */
   version?: number;
+  /** Workbook-wide state: the active sheet, named ranges, and kept XLSX parts. */
   workbook: {
+    /** Stable ID of the sheet shown when the workbook opens. */
     activeSheet: SheetId;
     namedRanges?: NamedRangeSnapshot[];
     /** Opaque OOXML graphs kept for the next XLSX save; never interpreted by Sheetwrite. */
@@ -553,6 +626,7 @@ export interface WorkbookSnapshot {
     /** Saved values of linked workbooks; omitted when there are none. */
     externalLinks?: ExternalLink[];
   };
+  /** Every sheet of the workbook, worksheets and dashboards alike. */
   sheets: SheetSnapshot[];
 }
 

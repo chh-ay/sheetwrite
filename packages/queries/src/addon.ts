@@ -81,6 +81,9 @@ export function createQueriesAddon(
  *   return session.refreshAll();
  * }
  * ```
+ *
+ * @param grid - A grid created after the add-on was installed.
+ * @returns The grid's query session, once the query engine has loaded.
  */
 export function querySessionOf(grid: Grid): Promise<QuerySession> {
   const pending = SESSIONS.get(grid);

@@ -57,6 +57,47 @@ it("edits boolean cells using spreadsheet text", () => {
   store.dispose();
 });
 
+it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere", () => {
+  const workbook = makeWorkbook(4);
+  workbook.sheets[0]!.validationRules = [
+    {
+      id: "status",
+      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      condition: { kind: "list", values: ["Open", "Closed"] },
+      policy: "reject",
+    },
+  ];
+  const store = new SheetwriteStore(workbook, makeColumnarData(4));
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  const altDown = () =>
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+  altDown();
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+
+  altDown();
+  const list = host.querySelector<HTMLElement>('[role="listbox"]');
+  expect(list).not.toBeNull();
+  expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  list?.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+  );
+  expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("Open");
+
+  grid.destroy();
+  store.dispose();
+});
+
 it("removes grid DOM when disposing its owned store fails", () => {
   const host = mountHost();
   const grid = new GridImpl(host, { workbook: makeWorkbook(3) });

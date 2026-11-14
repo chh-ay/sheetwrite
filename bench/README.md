@@ -272,13 +272,15 @@ Measured natively before LETs resolved function-call bindings to slots, a
 once they did. Its ratio limit is the 1.2 default until same-engine pairs
 calibrate it.
 
-Seven rows (10K and 100K formulas each) time how formulas bind to sheets,
+Eight rows (10K and 100K formulas each) time how formulas bind to sheets,
 defined names and tables, which the other rows never change after load:
 
 - `name-define`: one formula per row, `=A1*2` in nine rows of ten and
   `=A1*Scale_k` in the tenth. The timed run defines the ten names
   `Scale_0`…`Scale_9` one at a time, as an edit session or a remote change
   does; a workbook load defines its names before its formulas.
+- `name-define-unused`: the same run over `=A1*2` in every row, so no
+  formula uses a name; defining names should cost only the names.
 - `row-insert-names`: the same sheet with the names defined; the timed run
   inserts one row above everything, so every formula and name moves.
 - `table-append-row`: table `Sales` with `=[@Amount]*2` in every body row and
@@ -291,13 +293,15 @@ defined names and tables, which the other rows never change after load:
 - `memory-import`: `importMemoryState` of a released engine whose formulas
   read another sheet, every tenth also through a defined name.
 
-On develop, each name or table change resolves every formula of the workbook
-again and recalculates all of them, and a sort or a memory import parses
-every moved formula again; no other row times this. Measured natively on
-develop (Mac), per timed run at 100K: `name-define` made 5.8 M
-heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
-`sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
-the 1.2 default until same-engine pairs calibrate them.
+When these rows were added, each name or table change resolved every
+formula of the workbook again and recalculated all of them, and a sort or a
+memory import parsed every moved formula again; no other row times this.
+Measured natively then (Mac), per timed run at 100K: `name-define` made
+5.8 M heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
+`sort-formula-column` 0.9 M and `memory-import` 1.1 M. A table change now
+binds only the formulas that use the table, and a name change only the
+formulas whose text names a changed name. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
 
 Four rows time paged storage (#325, R5). Each paged sheet loads its values as
 clean pages inside a page load, the way datasource pages arrive:
@@ -350,6 +354,14 @@ A1. A blank compares equal to 0, "" and FALSE at once, so only a comparison
 sort gives this order: no sort key can. The row checks the spilled text count
 and value sum, which don't depend on the order. Its limit is the 1.2 default.
 
+`take-sort-filter` (100,000 rows) times a chain of three row steps over a
+three-column range,
+`=TAKE(SORT(FILTER(A1:C100000,C1:C100000>$E$1),2,-1),1000)`, where the timed
+run edits the threshold in E1. Each step picks rows of the range it read
+instead of copying them, so the chain copies only the 1,000 rows it spills
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
 `sort-rows-labels` (100,000 rows) and `sort-rows-numbers` (4,000 rows) sort
 one column through `sortRowsMulti`, ascending then descending, as the sort
 command does: labels like `L00042`, and numbers with many ties, below the
@@ -364,6 +376,15 @@ only its anchor changes, so the row times a recalculation that compares the
 reinstalled values with the old ones and wakes no reader of the other cells
 (#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
 calibrate it.
+
+`conditional-format-window` (10,000 and 100,000 visible cells) times one
+render-window read, 100 columns wide, under three formula rules and one value
+rule that cover the whole window: `=A1>$A$2`, `=AND(A1>B1,MOD(ROW(),2)=1)`
+and `=SUM($A1:$C1)>12`. Nothing changes between reads, so the row times only
+conditional-format evaluation and packing the window's cells. The
+check counts the matched rule bits, which the harness also counts from the
+same rules (#250). Its ratio limits are the 1.2 default until same-engine
+pairs calibrate them.
 
 Six rows time grouping, pivots, analysis functions and the version-history
 diff, which no other row reaches. The first five run on the full engine only,
@@ -801,6 +822,9 @@ bun run bench:render
 # Isolated engine smokes:
 bun run bench:render:smoke -- --engine sheetwrite
 bun run bench:render:smoke -- --engine handsontable
+
+# Only some scenarios of a set, for example the wrapped Unicode paint rows:
+bun run bench:render:diagnostic -- --scenarios wrap-unicode.paint.200,wrap-unicode.paint.20000
 
 # Fail-closed schema, completeness, and byte-stable Markdown validation:
 bun run bench:render:validate

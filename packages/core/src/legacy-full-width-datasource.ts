@@ -3,7 +3,9 @@ import type { DataSource, DataSourcePage, DataSourceRequest, RowData } from "./t
 
 /** Row-only page shape accepted by the full-width compatibility adapter. */
 export interface LegacyRowPage {
+  /** Zero-based index of the first row in the page. */
   readonly start: number;
+  /** The rows, each with a value for every column. */
   readonly rows: readonly RowData[];
 }
 

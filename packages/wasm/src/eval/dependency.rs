@@ -9,6 +9,7 @@ use rustc_hash::FxHashSet;
 use crate::graph::{offset_or_search, DirtyRect, DirtySeeds, FORMULA_INDEX_PAGE_ROWS};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
+use crate::sorting::{key96, sort_by_key96, sort_cell_formulas_column_major, sort_cells_row_major};
 use crate::types::{
     AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, FORMULA_RECURSION_LIMIT,
 };
@@ -427,9 +428,12 @@ impl DepIndex {
 
     /// Rewrites each band touched by `changes` once: `(source, reader, added)`.
     fn patch_exact(&mut self, changes: &mut [(AbsCellKey, FormulaId, bool)]) {
-        changes.sort_unstable_by_key(|&(cell, reader, added)| {
-            (cell.sheet, cell.col, cell.row, added, reader)
+        // (sheet, col, row, added, reader) order: by the last two, then
+        // stably by the cell.
+        sort_by_key96(changes, |&(_, reader, added)| {
+            u128::from(added) << 32 | u128::from(reader.raw())
         });
+        sort_by_key96(changes, |&(cell, ..)| key96(cell.sheet, cell.col, cell.row));
         let mut edges = Vec::new();
         for run in changes.chunk_by(|a, b| {
             (a.0.sheet, a.0.col, a.0.row / FORMULA_INDEX_PAGE_ROWS)
@@ -854,7 +858,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
         }
     }
 
-    exact_edges.sort_unstable_by_key(|&(cell, reader)| (cell.sheet, cell.col, cell.row, reader));
+    sort_cell_formulas_column_major(&mut exact_edges);
     let mut exact = Vec::new();
     let mut exact_sources = 0;
     let mut band_edges = Vec::new();
@@ -1373,7 +1377,7 @@ struct WalkFormulas(Vec<(AbsCellKey, FormulaId)>);
 
 impl WalkFormulas {
     fn new(mut formulas: Vec<(AbsCellKey, FormulaId)>) -> Self {
-        formulas.sort_unstable_by_key(|&(key, _)| column_major(key));
+        sort_cell_formulas_column_major(&mut formulas);
         Self(formulas)
     }
 
@@ -1831,7 +1835,7 @@ impl<'a> ComponentWalk<'a> {
         }
 
         // Row-major member order is the order Excel calculates a sheet in.
-        output.formulas[start..].sort_unstable_by_key(|key| (key.sheet, key.row, key.col));
+        sort_cells_row_major(&mut output.formulas[start..]);
         output
             .ends
             .push((output.formulas.len(), size > 1 || frame.reads_itself));

@@ -39,7 +39,14 @@ export const Route = createFileRoute("/")({
       "Sheetwrite — Spreadsheet, data grid & workbook engine · XLSX/CSV",
       "Spreadsheet and data-grid engine for multi-sheet workbooks, with XLSX/CSV exchange, Rust/WASM core, and React/Vue/Svelte framework adapters.",
     ),
-    links: [{ rel: "stylesheet", href: landingStylesheet }],
+    links: [
+      { rel: "stylesheet", href: landingStylesheet },
+      // On a slow link Chromium paints a partly parsed body, and the rest of the
+      // header or the hero's buttons and install box then arrive a frame later
+      // and push the layout (a layout shift). Hold the first paint until the
+      // hero's picture starts, which comes after both; other browsers ignore it.
+      { rel: "expect", href: "#landing-hero-app", blocking: "render" },
+    ],
   }),
   component: LandingRoute,
 });
@@ -466,6 +473,10 @@ function Landing() {
           >
             {/* Built at docs generation from committed captures; every text value is escaped. */}
             <div class="speed-story-host" id="speed-story" innerHTML={speedStory} />
+            <p class="sw-lp-note">
+              Both grids run in the same viewport with the same data and versions, and every timed
+              step repaints on both sides.
+            </p>
           </Show>
           <MoreLink class="sw-lp-more" href="/docs/performance/">
             See the full method and every result

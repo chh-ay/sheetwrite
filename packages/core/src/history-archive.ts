@@ -521,6 +521,7 @@ export class HistoryArchive {
   private manifest: HistoryManifest;
   private lock = Promise.resolve();
 
+  /** Private: use `HistoryArchive.open`. */
   private constructor(
     options: HistoryArchiveOptions,
     limits: Readonly<HistoryLimits>,

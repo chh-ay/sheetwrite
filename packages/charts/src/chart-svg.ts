@@ -11,7 +11,9 @@ import { type TickScale, tickScale } from "./ticks.js";
 
 /** Box size in CSS pixels. */
 export interface ChartSize {
+  /** Width in CSS pixels; a negative width draws as `0`. */
   width: number;
+  /** Height in CSS pixels; a negative height draws as `0`. */
   height: number;
 }
 
@@ -213,6 +215,55 @@ function valueRange(series: readonly ChartSeriesView[]): { min: number; max: num
 /** The tick count that keeps ticks at least `spacing` pixels apart. */
 function maxTickCount(length: number, spacing: number): number {
   return Math.max(1, Math.floor(length / spacing));
+}
+
+/** The tick scale of a value axis with the label of each tick. */
+interface ValueTicks {
+  scale: TickScale;
+  labels: string[];
+  /** Estimated width of the widest label. */
+  widest: number;
+}
+
+function valueTicks(scale: TickScale, label: (tick: number) => string): ValueTicks {
+  const labels = scale.ticks.map(label);
+  return { scale, labels, widest: Math.max(0, ...labels.map((text) => textWidth(text))) };
+}
+
+/**
+ * Ticks for a horizontal value axis. Its labels sit side by side, centered
+ * on their ticks, so they need as much room as the widest label, not one
+ * fixed spacing: the tick count starts at one per `HORIZONTAL_TICK_SPACING`
+ * and drops until the widest label fits between neighbouring ticks.
+ * `axisLength` is the length of the axis once the widest label is known,
+ * because an end label can need room past the plot.
+ */
+function horizontalValueTicks(
+  min: number,
+  max: number,
+  label: (tick: number) => string,
+  axisLength: (widest: number) => number,
+): ValueTicks {
+  let maxTicks = maxTickCount(axisLength(0), HORIZONTAL_TICK_SPACING);
+  for (;;) {
+    const ticks = valueTicks(tickScale(min, max, maxTicks, true), label);
+    const steps = ticks.scale.ticks.length - 1;
+    const pitch = axisLength(ticks.widest) / Math.max(1, steps);
+    if (maxTicks <= 1 || steps <= 1 || pitch >= ticks.widest + AXIS_LABEL_GAP) return ticks;
+    // Fewer steps than this scale has, so the step grows and the loop ends.
+    maxTicks = Math.min(maxTicks, steps) - 1;
+  }
+}
+
+/**
+ * Draw every n-th tick label so labels that take `extent` pixels along the
+ * axis do not overlap; 1 when all fit. Ticks are evenly spaced.
+ */
+function labelStride(axis: Axis, extent: number): number {
+  const steps = axis.scale.ticks.length - 1;
+  if (steps < 1) return 1;
+  const pitch = Math.abs(axis.end - axis.start) / steps;
+  return Math.max(1, Math.ceil(extent / pitch));
 }
 
 function chartName(view: ChartView): string {
@@ -459,51 +510,50 @@ function drawAxisTitles(context: DrawContext, box: Box): Box {
   return region;
 }
 
-/** Value labels plus a grid line at each tick; `vertical` axes run from bottom to top. */
+/**
+ * Value labels plus a grid line at each tick; `vertical` axes run from bottom
+ * to top. Each label takes `labelExtent` pixels along the axis; on an axis
+ * too short for all of them, every n-th label is drawn, as on category axes.
+ */
 function drawValueAxis(
   context: DrawContext,
   axis: Axis,
   plot: Box,
   vertical: boolean,
   labels: readonly string[],
+  labelExtent: number,
 ): void {
   const group = context.svg.element(
     "g",
     { class: "sheetwrite-chart-value-axis", "font-size": FONT_SIZE },
     context.root,
   );
+  const stride = labelStride(axis, labelExtent);
 
   axis.scale.ticks.forEach((tick, index) => {
     const pixel = axisPixel(axis, tick);
+    context.svg.element(
+      "line",
+      vertical
+        ? { x1: plot.left, x2: plot.right, y1: pixel, y2: pixel, stroke: GRID_LINE_COLOR }
+        : { x1: pixel, x2: pixel, y1: plot.top, y2: plot.bottom, stroke: GRID_LINE_COLOR },
+      group,
+    );
+    if (index % stride !== 0) return;
+
     const label = labels[index] ?? "";
-    if (vertical) {
-      context.svg.element(
-        "line",
-        { x1: plot.left, x2: plot.right, y1: pixel, y2: pixel, stroke: GRID_LINE_COLOR },
-        group,
-      );
-      context.svg.text(
-        label,
-        {
-          x: plot.left - AXIS_LABEL_GAP,
-          y: pixel,
-          "text-anchor": "end",
-          "dominant-baseline": "central",
-        },
-        group,
-      );
-    } else {
-      context.svg.element(
-        "line",
-        { x1: pixel, x2: pixel, y1: plot.top, y2: plot.bottom, stroke: GRID_LINE_COLOR },
-        group,
-      );
-      context.svg.text(
-        label,
-        { x: pixel, y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE, "text-anchor": "middle" },
-        group,
-      );
-    }
+    context.svg.text(
+      label,
+      vertical
+        ? {
+            x: plot.left - AXIS_LABEL_GAP,
+            y: pixel,
+            "text-anchor": "end",
+            "dominant-baseline": "central",
+          }
+        : { x: pixel, y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE, "text-anchor": "middle" },
+      group,
+    );
   });
 }
 
@@ -992,12 +1042,8 @@ function drawCartesian(context: DrawContext, box: Box): void {
   const fromZero = kind === "column" || kind === "bar" || kind === "area";
   const valueMin = fromZero ? Math.min(0, range.min) : range.min;
   const valueMax = fromZero ? Math.max(0, range.max) : range.max;
-  const valueLength = horizontal ? region.right - region.left : region.bottom - region.top;
-  const valueSpacing = horizontal ? HORIZONTAL_TICK_SPACING : VERTICAL_TICK_SPACING;
-  const valueScale = tickScale(valueMin, valueMax, maxTickCount(valueLength, valueSpacing), true);
   const { format, locale } = valueAxisFormat(series);
-  const valueLabels = valueScale.ticks.map((tick) => formatValue(tick, format, locale));
-  const widestValueLabel = Math.max(...valueLabels.map((label) => textWidth(label)));
+  const valueLabel = (tick: number) => formatValue(tick, format, locale);
 
   const count = pointCount(series);
   const labels = kind === "scatter" ? [] : categoryLabels(series, count);
@@ -1016,16 +1062,24 @@ function drawCartesian(context: DrawContext, box: Box): void {
       (region.right - region.left) * CATEGORY_LABEL_MAX_SHARE,
     );
     const outerWidth = (tiers?.outer.length ?? 0) * (LINE_HEIGHT + AXIS_LABEL_GAP);
+    const left = region.left + outerWidth + categoryWidth + AXIS_LABEL_GAP;
+    // The last label is centered on the plot's right edge, so half of it is past the plot.
+    const value = horizontalValueTicks(
+      valueMin,
+      valueMax,
+      valueLabel,
+      (widest) => region.right - widest / 2 - left,
+    );
     const plot = {
-      left: region.left + outerWidth + categoryWidth + AXIS_LABEL_GAP,
-      right: region.right - widestValueLabel / 2,
+      left,
+      right: region.right - value.widest / 2,
       top: region.top,
       bottom: region.bottom - LINE_HEIGHT - AXIS_LABEL_GAP,
     };
     if (plot.right - plot.left < MIN_PLOT_SIZE || plot.bottom - plot.top < MIN_PLOT_SIZE) return;
 
-    const axis = { scale: valueScale, start: plot.left, end: plot.right };
-    drawValueAxis(context, axis, plot, false, valueLabels);
+    const axis = { scale: value.scale, start: plot.left, end: plot.right };
+    drawValueAxis(context, axis, plot, false, value.labels, value.widest + AXIS_LABEL_GAP);
     drawBars(context, axis, plot, true);
     drawBaseline(context, plot, baselinePixel(axis), true);
     if (tiers) {
@@ -1037,8 +1091,12 @@ function drawCartesian(context: DrawContext, box: Box): void {
     return;
   }
 
-  const left = region.left + widestValueLabel + AXIS_LABEL_GAP;
-  const right = region.right - (kind === "scatter" ? HORIZONTAL_TICK_SPACING / 2 : 0);
+  const valueCount = maxTickCount(region.bottom - region.top, VERTICAL_TICK_SPACING);
+  const value = valueTicks(tickScale(valueMin, valueMax, valueCount, true), valueLabel);
+  const left = region.left + value.widest + AXIS_LABEL_GAP;
+  // A scatter chart's x axis is a value axis too: its last label is centered on the plot's right edge.
+  const scatter = kind === "scatter" ? scatterXTicks(series, region.right, left) : null;
+  const right = region.right - (scatter ? scatter.ticks.widest / 2 : 0);
   const maxRotated = (region.bottom - region.top) * CATEGORY_LABEL_MAX_SHARE;
   const layout = tiers ? tierLayout(tiers, (right - left) / count, false, maxRotated) : null;
   const plot = {
@@ -1049,13 +1107,13 @@ function drawCartesian(context: DrawContext, box: Box): void {
   };
   if (plot.right - plot.left < MIN_PLOT_SIZE || plot.bottom - plot.top < MIN_PLOT_SIZE) return;
 
-  const axis = { scale: valueScale, start: plot.bottom, end: plot.top };
-  drawValueAxis(context, axis, plot, true, valueLabels);
+  const axis = { scale: value.scale, start: plot.bottom, end: plot.top };
+  drawValueAxis(context, axis, plot, true, value.labels, LINE_HEIGHT);
 
   if (kind === "column") {
     drawBars(context, axis, plot, false);
-  } else if (kind === "scatter") {
-    drawScatter(context, axis, plot);
+  } else if (scatter) {
+    drawScatter(context, axis, plot, scatter);
   } else {
     const band = (plot.right - plot.left) / Math.max(1, count);
     const plotted = series.map((entry) => ({
@@ -1070,47 +1128,68 @@ function drawCartesian(context: DrawContext, box: Box): void {
   else drawCategoryLabels(context, labels, plot, false, 0);
 }
 
-function drawScatter(context: DrawContext, axis: Axis, plot: Box): void {
-  const series = context.view.series;
-  const xValues = series.map(scatterXs);
+/** The x values of a scatter chart and the ticks of its horizontal value axis. */
+interface ScatterX {
+  values: Array<Array<number | null>>;
+  ticks: ValueTicks;
+}
+
+/** Scatter x ticks for a plot that starts at `left` and leaves half the last label before `right`. */
+function scatterXTicks(series: readonly ChartSeriesView[], right: number, left: number): ScatterX {
+  const values = series.map(scatterXs);
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
-  for (const value of xValues.flat()) {
+  for (const value of values.flat()) {
     if (value === null || !Number.isFinite(value)) continue;
     min = Math.min(min, value);
     max = Math.max(max, value);
   }
 
-  const xScale = tickScale(
+  const format = scatterXFormat(series);
+  const locale = series[0]?.numberLocale ?? null;
+  const ticks = horizontalValueTicks(
     min,
     max,
-    maxTickCount(plot.right - plot.left, HORIZONTAL_TICK_SPACING),
-    true,
+    (tick) => formatValue(tick, format, locale),
+    (widest) => right - widest / 2 - left,
   );
-  const xAxis = { scale: xScale, start: plot.left, end: plot.right };
-  const xFormat = scatterXFormat(series);
-  const xLabels = xScale.ticks.map((tick) =>
-    formatValue(tick, xFormat, series[0]?.numberLocale ?? null),
-  );
+  return { values, ticks };
+}
+
+function drawScatter(context: DrawContext, axis: Axis, plot: Box, x: ScatterX): void {
+  const xAxis = { scale: x.ticks.scale, start: plot.left, end: plot.right };
+  const stride = labelStride(xAxis, x.ticks.widest + AXIS_LABEL_GAP);
   const group = context.svg.element(
     "g",
     { class: "sheetwrite-chart-category-axis", "font-size": FONT_SIZE },
     context.root,
   );
-  xScale.ticks.forEach((tick, index) => {
+  // The lowest y label ends AXIS_LABEL_GAP left of the plot at its bottom
+  // edge, so a first x label centered on that corner would run into it. As
+  // other chart libraries do, the first x label starts at the plot's left
+  // edge instead, and is left out when that would reach the next x label.
+  const ticks = xAxis.scale.ticks;
+  const nextTick = ticks[stride];
+  const nextLeft =
+    nextTick === undefined
+      ? Number.POSITIVE_INFINITY
+      : axisPixel(xAxis, nextTick) - textWidth(x.ticks.labels[stride] ?? "") / 2;
+  const firstFits = plot.left + textWidth(x.ticks.labels[0] ?? "") + AXIS_LABEL_GAP <= nextLeft;
+  ticks.forEach((tick, index) => {
+    if (index % stride !== 0 || (index === 0 && !firstFits)) return;
     context.svg.text(
-      xLabels[index] ?? "",
+      x.ticks.labels[index] ?? "",
       {
-        x: axisPixel(xAxis, tick),
+        x: index === 0 ? plot.left : axisPixel(xAxis, tick),
         y: plot.bottom + AXIS_LABEL_GAP + FONT_SIZE,
-        "text-anchor": "middle",
+        "text-anchor": index === 0 ? "start" : "middle",
       },
       group,
     );
   });
 
-  const plotted = series.map((entry, seriesIndex) => ({
-    xs: (xValues[seriesIndex] ?? []).map((value) =>
+  const plotted = context.view.series.map((entry, seriesIndex) => ({
+    xs: (x.values[seriesIndex] ?? []).map((value) =>
       value === null ? Number.NaN : axisPixel(xAxis, value),
     ),
     values: entry.values,
@@ -1244,6 +1323,9 @@ function drawPie(context: DrawContext, box: Box): void {
  *   host.replaceChildren(renderChartSvg(view, { width: 320, height: 200 }));
  * }
  * ```
+ *
+ * @returns A new `<svg>` element with a `<title>` and `<desc>` naming the chart,
+ *   not yet attached to any document.
  */
 export function renderChartSvg(
   view: ChartView,
