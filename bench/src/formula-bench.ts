@@ -89,6 +89,8 @@ const SHAPE_ROW_IDS = [
   "let-calls",
 ] as const;
 const SHAPE_ROW_SIZES = [10_000, 100_000] as const;
+/** `SORT` over numbers, text, logical values and blanks: sizes of its row. */
+const SORT_MIXED_BLANKS_SIZES = [10_000, 100_000] as const;
 /**
  * Rows for binding formulas to sheets, names and tables: defining names
  * over formulas that use them and over formulas that do not, a row insert
@@ -234,6 +236,9 @@ function formulaWorkloads(
   add("rank-many", rankManySize);
   add("sort-unique-filter", range);
   add("subtotal-filtered", range);
+  for (const size of smoke ? [1_000] : SORT_MIXED_BLANKS_SIZES) {
+    add("sort-mixed-blanks", size);
+  }
   add("sparse-page-write", range);
   add("spill-sequence-admission", large);
   add("history-diff", HISTORY_CELLS);
@@ -316,6 +321,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "rank-many",
   "sort-unique-filter",
   "subtotal-filtered",
+  "sort-mixed-blanks",
   "sparse-page-write",
   "map-lambda",
   "reduce-lambda",

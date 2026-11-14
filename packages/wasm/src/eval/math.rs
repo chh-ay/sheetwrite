@@ -388,7 +388,7 @@ fn gcd_lcm(values: &FuncAccumulator, lcm: bool) -> Value {
     Value::number(if found { result as f64 } else { 0.0 })
 }
 
-fn gcd(mut left: u64, mut right: u64) -> u64 {
+const fn gcd(mut left: u64, mut right: u64) -> u64 {
     while right != 0 {
         let remainder = left % right;
         left = right;

@@ -93,7 +93,7 @@ impl<'a> ModelSource<'a> {
         })
     }
 
-    pub(super) fn width(&self) -> usize {
+    pub(super) const fn width(&self) -> usize {
         self.fields.len()
     }
 
@@ -130,7 +130,7 @@ impl<'a> ModelSource<'a> {
     }
 }
 
-fn model_error(error: RelationshipError) -> FormulaError {
+const fn model_error(error: RelationshipError) -> FormulaError {
     match error {
         RelationshipError::MissingTable | RelationshipError::MissingColumn => FormulaError::Ref,
         RelationshipError::Keys(_) => FormulaError::Value,

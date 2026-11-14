@@ -125,11 +125,11 @@ impl FuncAccumulator {
         Ok(())
     }
 
-    pub(super) fn len(&self) -> usize {
+    pub(super) const fn len(&self) -> usize {
         self.values.len()
     }
 
-    pub(super) fn arg_count(&self) -> usize {
+    pub(super) const fn arg_count(&self) -> usize {
         self.arg_count
     }
 
@@ -469,7 +469,7 @@ impl ReductionFold {
         clippy::wildcard_enum_match_arm,
         reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
     )]
-    pub(super) fn new(func: Func) -> Option<Self> {
+    pub(super) const fn new(func: Func) -> Option<Self> {
         let kind = match func {
             Func::Sum => ReductionKind::Sum,
             Func::Avg => ReductionKind::Average,
@@ -544,7 +544,7 @@ impl ReductionFold {
 
     /// [`Self::push`] for an empty cell, which only counts toward the limit.
     #[inline]
-    pub(super) fn push_blank(&mut self) -> Result<(), FormulaError> {
+    pub(super) const fn push_blank(&mut self) -> Result<(), FormulaError> {
         if self.cells >= RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
@@ -636,7 +636,7 @@ impl ReductionFold {
 
     /// Fails like the accumulator does before it reads `cells` more values:
     /// the whole argument must fit under the cell limit.
-    pub(super) fn reserve(&self, cells: u64) -> Result<(), FormulaError> {
+    pub(super) const fn reserve(&self, cells: u64) -> Result<(), FormulaError> {
         if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }

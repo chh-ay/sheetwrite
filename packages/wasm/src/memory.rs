@@ -38,13 +38,13 @@ pub(crate) struct MemoryOwnerStats {
 }
 
 impl MemoryOwnerStats {
-    pub(crate) fn add(&mut self, other: Self) {
+    pub(crate) const fn add(&mut self, other: Self) {
         self.logical_bytes = self.logical_bytes.saturating_add(other.logical_bytes);
         self.allocated_bytes = self.allocated_bytes.saturating_add(other.allocated_bytes);
         self.entries = self.entries.saturating_add(other.entries);
     }
 
-    pub(crate) fn add_vec<T>(&mut self, len: usize, capacity: usize) {
+    pub(crate) const fn add_vec<T>(&mut self, len: usize, capacity: usize) {
         self.logical_bytes = self
             .logical_bytes
             .saturating_add(len.saturating_mul(std::mem::size_of::<T>()));
@@ -54,7 +54,7 @@ impl MemoryOwnerStats {
         self.entries = self.entries.saturating_add(len);
     }
 
-    pub(crate) fn add_hash_table<K, V>(&mut self, len: usize, capacity: usize) {
+    pub(crate) const fn add_hash_table<K, V>(&mut self, len: usize, capacity: usize) {
         let bucket_bytes = std::mem::size_of::<K>()
             .saturating_add(std::mem::size_of::<V>())
             .saturating_add(1);
@@ -68,7 +68,7 @@ impl MemoryOwnerStats {
         self.entries = self.entries.saturating_add(len);
     }
 
-    pub(crate) fn add_payload(&mut self, logical_bytes: usize, allocated_bytes: usize) {
+    pub(crate) const fn add_payload(&mut self, logical_bytes: usize, allocated_bytes: usize) {
         self.logical_bytes = self.logical_bytes.saturating_add(logical_bytes);
         self.allocated_bytes = self.allocated_bytes.saturating_add(allocated_bytes);
     }
@@ -88,7 +88,7 @@ impl Default for StoreMemoryStats {
 }
 
 impl StoreMemoryStats {
-    pub(crate) fn owner_mut(&mut self, owner: usize) -> &mut MemoryOwnerStats {
+    pub(crate) const fn owner_mut(&mut self, owner: usize) -> &mut MemoryOwnerStats {
         &mut self.owners[owner]
     }
 

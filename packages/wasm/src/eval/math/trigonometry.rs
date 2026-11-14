@@ -27,7 +27,7 @@ pub(in crate::eval) fn apply(func: Func, values: &FuncAccumulator) -> EvalResult
     }
 }
 
-fn ensure(is_valid: bool) -> Result<(), FormulaError> {
+const fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     if is_valid {
         Ok(())
     } else {

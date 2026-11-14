@@ -99,7 +99,7 @@ impl<'a> Entry<'a> {
         }
     }
 
-    fn rank(self) -> u8 {
+    const fn rank(self) -> u8 {
         match self {
             Self::Blank => 0,
             Self::Number(_) => 1,
@@ -158,7 +158,7 @@ pub(super) enum ListView<'a> {
 }
 
 impl ListView<'_> {
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         match self {
             Self::Storage { len, .. } => *len,
             Self::Values(values) => values.len(),
@@ -892,7 +892,7 @@ enum LookupArg {
 }
 
 impl LookupArg {
-    fn shape(&self) -> (usize, usize) {
+    const fn shape(&self) -> (usize, usize) {
         match self {
             Self::Storage { range, .. } => (range.rows, range.cols),
             Self::Values { rows, cols, .. } => (*rows, *cols),

@@ -39,6 +39,7 @@ struct Context<'a, 'p> {
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
 }
+
 impl Context<'_, '_> {
     fn scalar(&mut self, args: &[Ast], index: usize, default: Value) -> Value {
         optional_ast(args, index).map_or(default, |ast| {
@@ -46,6 +47,7 @@ impl Context<'_, '_> {
                 .eval_ast(ast, self.sheet, self.pass, self.depth + 1)
         })
     }
+
     fn text(&mut self, args: &[Ast], index: usize, default: &str) -> Result<String, FormulaError> {
         let text = text_from_value(&self.scalar(args, index, Value::text(default)))?.into_owned();
         if text.len() > MAX_TEXT_BYTES || text.chars().count() > MAX_TEXT_CHARS {
@@ -53,6 +55,7 @@ impl Context<'_, '_> {
         }
         Ok(text)
     }
+
     fn integer(&mut self, args: &[Ast], index: usize, default: i64) -> Result<i64, FormulaError> {
         let number = number_from_value(&self.scalar(args, index, Value::number(default as f64)))?;
         if number < i64::MIN as f64 || number >= i64::MAX as f64 {
@@ -60,9 +63,11 @@ impl Context<'_, '_> {
         }
         Ok(number.trunc() as i64)
     }
+
     fn boolean(&mut self, args: &[Ast], index: usize, default: bool) -> Result<bool, FormulaError> {
         bool_from_value(&self.scalar(args, index, Value::Bool(default)))
     }
+
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
         if range_from_ast(ast, self.sheet).is_some()
             || super::super::array::ast_produces_array(ast, self.pass.shapes())
@@ -79,6 +84,7 @@ impl Context<'_, '_> {
             ))
         }
     }
+
     fn delimiters(&mut self, args: &[Ast], index: usize) -> Result<Vec<String>, FormulaError> {
         let Some(ast) = optional_ast(args, index) else {
             return Ok(Vec::new());
@@ -102,13 +108,15 @@ impl Context<'_, '_> {
         Ok(delimiters)
     }
 }
-fn arity(args: &[Ast], minimum: usize, maximum: usize) -> Result<(), FormulaError> {
+
+const fn arity(args: &[Ast], minimum: usize, maximum: usize) -> Result<(), FormulaError> {
     if args.len() < minimum || args.len() > maximum {
         Err(FormulaError::Value)
     } else {
         Ok(())
     }
 }
+
 fn text_value(text: String) -> Result<Value, FormulaError> {
     if text.len() > MAX_TEXT_BYTES || text.chars().count() > MAX_TEXT_CHARS {
         Err(FormulaError::Value)
@@ -117,6 +125,7 @@ fn text_value(text: String) -> Result<Value, FormulaError> {
         Ok(Value::text(text))
     }
 }
+
 fn mode(context: &mut Context<'_, '_>, args: &[Ast], index: usize) -> Result<bool, FormulaError> {
     match number_from_value(&context.scalar(args, index, Value::number(0.0)))? {
         0.0 => Ok(false),
@@ -124,6 +133,7 @@ fn mode(context: &mut Context<'_, '_>, args: &[Ast], index: usize) -> Result<boo
         _ => Err(FormulaError::Value),
     }
 }
+
 // Compare original character spans so case folding cannot change byte offsets.
 fn delimiter_length(
     text: &str,
@@ -151,6 +161,7 @@ fn delimiter_length(
     }
     Ok(Some(end))
 }
+
 fn split_parts<'a>(
     text: &'a str,
     delimiters: &[String],
@@ -211,6 +222,7 @@ fn split_parts<'a>(
     }
     Ok(parts)
 }
+
 fn before_after(
     context: &mut Context<'_, '_>,
     name: &str,
@@ -341,6 +353,7 @@ fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), For
     }
     Ok(())
 }
+
 fn to_text(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
     arity(args, 1, 2)?;
     let strict = mode(context, args, 1)?;
@@ -377,6 +390,7 @@ fn to_text(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Va
     }
     text_value(output)
 }
+
 /// The compiled program for a REGEX call's pattern. A literal pattern uses
 /// the program its formulas share. A computed pattern uses the program this
 /// recalculation keeps for it, which the pass drops when it ends.
@@ -439,6 +453,7 @@ fn append_replacement(
     }
     append_text(output, replacement)
 }
+
 fn regex_scalar(
     context: &mut Context<'_, '_>,
     name: &str,
@@ -477,6 +492,7 @@ fn regex_scalar(
     append_text(&mut output, &text[offset..])?;
     text_value(output)
 }
+
 fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     arity(args, 2, 4)?;
     let text = context.text(args, 0, "")?;
@@ -519,6 +535,7 @@ fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, Fo
     };
     checked_matrix(rows, columns, values)
 }
+
 fn checked_matrix(
     rows: usize,
     columns: usize,
@@ -529,6 +546,7 @@ fn checked_matrix(
     matrix.validate_bytes()?;
     Ok(matrix)
 }
+
 fn text_split(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     arity(args, 2, 6)?;
     let text = context.text(args, 0, "")?;
@@ -564,6 +582,7 @@ fn text_split(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix,
     }
     checked_matrix(parts.len(), column_count, values)
 }
+
 fn scalar_result(
     context: &mut Context<'_, '_>,
     name: &str,
@@ -579,6 +598,7 @@ fn scalar_result(
         _ => Err(FormulaError::Name),
     }
 }
+
 pub(super) fn evaluate_ast(
     store: &CellStore,
     name: &str,
@@ -599,9 +619,11 @@ pub(super) fn evaluate_ast(
     )
     .unwrap_or_else(Value::Error)
 }
+
 pub(super) fn produces_array(name: &str, _args: &[Ast], _: Shapes<'_>) -> bool {
     matches!(name, "TEXTSPLIT" | "REGEXEXTRACT")
 }
+
 pub(super) fn evaluate_matrix(
     store: &CellStore,
     name: &str,
@@ -622,6 +644,7 @@ pub(super) fn evaluate_matrix(
         _ => Err(FormulaError::Value),
     }
 }
+
 /// The shape of `name`'s result. It evaluates in a workspace of its own, which
 /// borrows the pass's compiled regex programs so that sizing a spill and
 /// evaluating it compile each pattern once.
@@ -646,6 +669,7 @@ pub(super) fn shape(
     let matrix = evaluated?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
+
 pub(super) fn bound(
     store: &CellStore,
     name: &str,

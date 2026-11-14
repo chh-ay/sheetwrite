@@ -68,7 +68,7 @@ impl Wildcard {
 
     /// Whether the pattern uses `*`, `?` or a `~` escape. Criteria compare a
     /// pattern without them as a plain value instead.
-    pub(super) fn has_wildcards(&self) -> bool {
+    pub(super) const fn has_wildcards(&self) -> bool {
         self.has_wildcards
     }
 

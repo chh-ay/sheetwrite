@@ -281,6 +281,7 @@ describe("formula regression gate", () => {
       "rank-many",
       "sort-unique-filter",
       "subtotal-filtered",
+      "sort-mixed-blanks",
       "sparse-page-write",
       "history-diff",
       "iterative-finance",
