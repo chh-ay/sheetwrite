@@ -221,7 +221,8 @@ const SCENARIOS: &[Scenario] = &[
         ],
         edit: ("A1", 2.0),
         shown: &["B1", "B2", "B3", "D1", "D2", "D3"],
-        expected: "B1=1 B2=2 B3=3 D1=6 D2=20 D3=6 #4|B1=1 B2=2 B3= D1=3 D2=20 D3=3 #4",
+        // The spill shrinks but B2 keeps its value, so D2 does not run again.
+        expected: "B1=1 B2=2 B3=3 D1=6 D2=20 D3=6 #4|B1=1 B2=2 B3= D1=3 D2=20 D3=3 #3",
     },
     Scenario {
         name: "INDIRECT and OFFSET into formulas entered after their readers",
@@ -320,7 +321,8 @@ const SCENARIOS: &[Scenario] = &[
         ],
         edit: ("A1", 3.0),
         shown: &["B1", "C1", "D1", "D2", "D3", "D4", "E1", "E2"],
-        expected: "B1=2 C1=3 D1=1 D2=2 D3=3 D4= E1=9 E2=4 #5|B1=3 C1=4 D1=1 D2=2 D3=3 D4=4 E1=14 E2=4 #5",
+        // The spill grows but D2 keeps its value, so E2 does not run again.
+        expected: "B1=2 C1=3 D1=1 D2=2 D3=3 D4= E1=9 E2=4 #5|B1=3 C1=4 D1=1 D2=2 D3=3 D4=4 E1=14 E2=4 #4",
     },
     Scenario {
         name: "an error read through a chain and caught at its end",

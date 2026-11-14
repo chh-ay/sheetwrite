@@ -195,6 +195,7 @@ function formulaWorkloads(
     add(`${id}${LOOKUP_EDIT_SUFFIX}`, lookupFormulas);
   }
   add("spill-filter-resize", range);
+  add("spill-filter-same-range", range);
   add("sumproduct-vector-edit", range);
   add("sumproduct-matrix-edit", range);
   add("criteria-multi-range-edit", range);
@@ -305,6 +306,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "iterative-finance",
   "incremental-dependency-closure-edit",
   "spill-sequence-admission",
+  "spill-filter-same-range",
   "paged-cell-reads",
   "paged-insert-row",
   "paged-range-loaded",
