@@ -31,7 +31,7 @@
 use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;
 use crate::tables::{TableSlots, WrittenTableRef};
-use crate::types::{FormulaError, Value};
+use crate::types::{FormulaError, Value, FORMULA_RECURSION_LIMIT};
 use std::{borrow::Cow, cmp::Ordering, rc::Rc};
 
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
@@ -600,6 +600,9 @@ pub(crate) enum CmpOp {
 pub(crate) struct RefFlags(u8);
 
 impl RefFlags {
+    /// Both axes `$`-fixed.
+    pub(crate) const ABSOLUTE: Self = Self::new(true, true);
+
     pub(crate) const fn new(row_abs: bool, col_abs: bool) -> Self {
         Self((row_abs as u8) | ((col_abs as u8) << 1))
     }
@@ -653,6 +656,14 @@ pub(crate) struct UnresolvedSheetRef {
 pub(crate) struct RangeFlags {
     pub start: RefFlags,
     pub end: RefFlags,
+}
+
+impl RangeFlags {
+    /// Every axis of both ends `$`-fixed.
+    pub(crate) const ABSOLUTE: Self = Self {
+        start: RefFlags::ABSOLUTE,
+        end: RefFlags::ABSOLUTE,
+    };
 }
 
 /// The handle of a 3-D reference endpoint before ingest resolves its name.
@@ -3080,12 +3091,106 @@ where
 /// Translate relative A1 references from one formula origin to another.
 ///
 /// Conditional-format expressions store one parsed AST at the rule range's
-/// top-left. Window evaluation clones that bounded AST and applies the target
-/// cell delta here; absolute row/column markers remain fixed.
+/// top-left. A window read evaluates it in place with a reference shift; it
+/// translates a copy here only at a cell where [`relative_reach`] says the
+/// shift could not keep every reference in the sheet. Absolute row/column
+/// markers remain fixed.
 pub(crate) fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
     if !translate_relative_refs_inner(ast, row_delta, col_delta, false) {
         *ast = Ast::InvalidRef;
     }
+}
+
+/// One past the largest row and column that a relative axis of a reference
+/// in `ast` names, or 0 for an axis no reference leaves relative. Moving the
+/// references by a shift keeps them in the sheet, exactly as
+/// [`translate_relative_refs`] would, while `shift + reach` stays within the
+/// sheet's rows and columns. A defined name's expansion is placed for its
+/// formula and translation leaves it, so a relative reference inside one
+/// reports a reach past the sheet: no shift reproduces it.
+pub(crate) fn relative_reach(ast: &Ast) -> (u32, u32) {
+    let mut reach = (0, 0);
+    add_relative_reach(ast, 0, &mut reach);
+    reach
+}
+
+/// Raise `reach` to cover the references in `ast`; see [`relative_reach`].
+fn add_relative_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
+    const PAST_SHEET: (u32, u32) = (SHEET_ROWS + 1, SHEET_COLS + 1);
+    if depth > FORMULA_RECURSION_LIMIT {
+        *reach = PAST_SHEET;
+        return;
+    }
+    match ast {
+        Ast::Cell(row, col, flags) | Ast::AbsCell(_, row, col, flags) => {
+            add_end_reach(reach, (*row, *col), *flags);
+        }
+        Ast::SheetCell(reference) => {
+            add_end_reach(reach, (reference.row, reference.col), reference.flags);
+        }
+        Ast::Range(r0, c0, r1, c1, flags) | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
+            add_end_reach(reach, (*r0, *c0), flags.start);
+            add_end_reach(reach, (*r1, *c1), flags.end);
+        }
+        Ast::SheetRange(reference) => {
+            let (start, end) = (reference.flags.start, reference.flags.end);
+            add_end_reach(reach, (reference.row_start, reference.col_start), start);
+            add_end_reach(reach, (reference.row_end, reference.col_end), end);
+        }
+        Ast::SheetSpan(span) => {
+            add_end_reach(reach, (span.row_start, span.col_start), span.flags.start);
+            add_end_reach(reach, (span.row_end, span.col_end), span.flags.end);
+        }
+        Ast::NamedFormula(named) => {
+            let mut inside = (0, 0);
+            add_relative_reach(&named.expression, depth + 1, &mut inside);
+            if inside != (0, 0) {
+                *reach = PAST_SHEET;
+            }
+        }
+        // These hold no reference of their own; `any_child` visits the
+        // children of those that have some.
+        Ast::Func(..)
+        | Ast::UnknownFunc(_)
+        | Ast::LetSlot { .. }
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::LetName { .. }
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::InvalidRef
+        | Ast::Array(_) => add_children_reach(ast, depth, reach),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(_) | Ast::Parameter { .. } | Ast::RegexPattern(_) => {
+            add_children_reach(ast, depth, reach);
+        }
+    }
+}
+
+/// Raise `reach` to cover one reference end at (`row`, `col`).
+fn add_end_reach(reach: &mut (u32, u32), (row, col): (u32, u32), flags: RefFlags) {
+    if !flags.row_abs() {
+        reach.0 = reach.0.max(row + 1);
+    }
+    if !flags.col_abs() {
+        reach.1 = reach.1.max(col + 1);
+    }
+}
+
+fn add_children_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
+    ast.any_child(&mut |child| {
+        add_relative_reach(child, depth + 1, reach);
+        false
+    });
 }
 
 /// Move the relative references of a defined name's formula from cell A1,
