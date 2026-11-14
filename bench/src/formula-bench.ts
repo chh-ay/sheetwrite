@@ -94,13 +94,15 @@ const SORT_MIXED_BLANKS_SIZES = [10_000, 100_000] as const;
 /** Below the 4,096 rows where a number column switches to a radix sort. */
 const SORT_ROWS_NUMBERS_SIZE = 4_000;
 /**
- * Rows for binding formulas to sheets, names and tables: defining names, a
- * row insert in a workbook with names, a table that grows by a row, a sort
- * that moves formulas, loading formulas that name another sheet or a table
- * column, and restoring a released engine from its memory state.
+ * Rows for binding formulas to sheets, names and tables: defining names
+ * over formulas that use them and over formulas that do not, a row insert
+ * in a workbook with names, a table that grows by a row, a sort that moves
+ * formulas, loading formulas that name another sheet or a table column, and
+ * restoring a released engine from its memory state.
  */
 const BINDING_ROW_IDS = [
   "name-define",
+  "name-define-unused",
   "row-insert-names",
   "table-append-row",
   "sort-formula-column",
@@ -292,6 +294,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "indirect-many",
   "let-calls",
   "name-define",
+  "name-define-unused",
   "row-insert-names",
   "table-append-row",
   "sort-formula-column",
