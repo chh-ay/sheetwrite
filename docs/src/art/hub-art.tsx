@@ -252,7 +252,8 @@ function QueriesArt() {
           </>
         )}
       </For>
-      <path class="ink-line" d={`M162 66v22${head(162, 88, 90)}M162 114v22${head(162, 136, 90)}`} />
+      <path class="ink-line" d={`M162 66v22${head(162, 88, 90)}`} />
+      <path class="ink-line" d={`M162 114v22${head(162, 136, 90)}`} />
       <path class="hue-line" d={`M88 92c16 0 14-39 30-39${head(118, 53, 0)}`} />
       <path class="hue-line" d={`M206 149c16 0 14-35 30-35${head(236, 114, 0)}`} />
       <Sheet ch={14} cols={3} cw={20} head={12} headClass="hue-tint" rows={5} x={236} y={74} />

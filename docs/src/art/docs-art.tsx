@@ -194,7 +194,8 @@ function ConceptsArt(props: ArtProps) {
       <text class="small" text-anchor="middle" x={66} y={88}>
         WASM
       </text>
-      <path class="ink-line" d={`M106 76h22${head(128, 76, 0)}${head(106, 76, 180)}`} />
+      <path class="ink-line" d={`M106 76h22${head(128, 76, 0)}`} />
+      <path class="ink-line" d={`M128 76h-22${head(106, 76, 180)}`} />
       <rect class="panel" height={52} rx={8} width={72} x={128} y={50} />
       <text class="small strong" text-anchor="middle" x={164} y={80}>
         store

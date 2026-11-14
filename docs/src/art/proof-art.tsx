@@ -455,7 +455,7 @@ function BoundedStorageArt() {
         )}
       </For>
       <path class="rule" d="M110 64h88" />
-      <path class="hue-line" d={`M190 64c0 22-70 22-98-2${head(92, 62, -160)}`} />
+      <path class="hue-line" d={`M190 64c0 22-70 22-98 0${head(92, 64, -160)}`} />
       <text class="small" x={14} y={112}>
         records
       </text>
