@@ -2239,6 +2239,12 @@ impl CellStore {
         }
     }
 
+    /// Define `name` in `scope` (a sheet handle, or -1 for the workbook) as
+    /// the cells `row_start..=row_end`, `col_start..=col_end` of `sheet`.
+    /// It replaces a range or formula of the same name and scope, and the
+    /// formulas that use the name are bound again. Rejects a name that is
+    /// not formula-safe or that a table has, a removed sheet, and a range
+    /// outside the sheet.
     #[wasm_bindgen(js_name = setNamedRange)]
     #[expect(
         clippy::too_many_arguments,
@@ -2327,6 +2333,15 @@ impl CellStore {
         true
     }
 
+    /// Add the table `id`, or replace it, over the cells
+    /// `row_start..=row_end`, `col_start..=col_end` of `sheet`: one column
+    /// per entry of `column_ids`, named by `column_names`, with an optional
+    /// header row and totals row. The formulas that use the table, or that
+    /// waited for a table of this name, are bound again. Rejects an empty
+    /// or over-long id or name, a name that is not formula-safe or that a
+    /// defined name or another table has, a removed sheet, a range outside
+    /// the sheet or whose width differs from the column count, repeated
+    /// column ids or names, and a range that overlaps another table.
     #[wasm_bindgen(js_name = setTable)]
     #[expect(
         clippy::too_many_arguments,
@@ -2438,6 +2453,8 @@ impl CellStore {
         true
     }
 
+    /// Remove the table `id`. Its references in formulas become `#REF!`.
+    /// Returns whether the table existed.
     #[wasm_bindgen(js_name = removeTable)]
     pub fn remove_table(&mut self, id: &str) -> bool {
         let Some(slot) = self.tables.with_id(id).map(|(slot, _)| slot) else {
