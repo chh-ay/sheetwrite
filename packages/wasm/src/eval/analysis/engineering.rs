@@ -8,31 +8,31 @@ use super::super::value::text_from_value;
 use super::distributions::gamma_probability;
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "BIN2DEC",
-    "BIN2HEX",
-    "BIN2OCT",
-    "BITAND",
-    "BITLSHIFT",
-    "BITOR",
-    "BITRSHIFT",
-    "BITXOR",
-    "DEC2BIN",
-    "DEC2HEX",
-    "DEC2OCT",
-    "DELTA",
-    "ERF",
-    "ERF.PRECISE",
-    "ERFC",
-    "ERFC.PRECISE",
-    "GESTEP",
-    "HEX2BIN",
-    "HEX2DEC",
-    "HEX2OCT",
-    "OCT2BIN",
-    "OCT2DEC",
-    "OCT2HEX",
-];
+family_functions! {
+    BIN2DEC,
+    BIN2HEX,
+    BIN2OCT,
+    BITAND,
+    BITLSHIFT,
+    BITOR,
+    BITRSHIFT,
+    BITXOR,
+    DEC2BIN,
+    DEC2HEX,
+    DEC2OCT,
+    DELTA,
+    ERF,
+    ERF_PRECISE = "ERF.PRECISE",
+    ERFC,
+    ERFC_PRECISE = "ERFC.PRECISE",
+    GESTEP,
+    HEX2BIN,
+    HEX2DEC,
+    HEX2OCT,
+    OCT2BIN,
+    OCT2DEC,
+    OCT2HEX,
+}
 
 /// Binary, octal and hexadecimal numbers have at most 10 digits. A number
 /// with all 10 digits and its highest bit set is negative, in two's
@@ -62,15 +62,6 @@ const DECIMAL: Radix = Radix { base: 10, bits: 0 };
 const HEXADECIMAL: Radix = Radix { base: 16, bits: 40 };
 
 impl Radix {
-    const fn from_letter(letter: u8) -> Self {
-        match letter {
-            b'B' => BINARY,
-            b'O' => OCTAL,
-            b'H' => HEXADECIMAL,
-            _ => DECIMAL,
-        }
-    }
-
     /// 2^bits: the offset between a negative value and its two's complement.
     const fn modulus(self) -> i64 {
         1_i64 << self.bits
@@ -85,35 +76,36 @@ impl Radix {
     }
 }
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let result = match name {
-        "BITAND" | "BITOR" | "BITXOR" => bitwise(name, values),
-        "BITLSHIFT" | "BITRSHIFT" => bit_shift(name == "BITLSHIFT", values),
-        "DELTA" => compare_step(values, |number, step| number == step),
-        "GESTEP" => compare_step(values, |number, step| number >= step),
-        "ERF" => error_function_between(values),
-        "ERF.PRECISE" => single_number(values).map(error_function),
-        "ERFC" | "ERFC.PRECISE" => single_number(values).map(complementary_error_function),
-        _ => return convert_base(name, values),
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    let convert =
+        |source, target| convert_between(source, target, values).unwrap_or_else(Value::Error);
+    let result = match function {
+        Function::BIN2DEC => return convert(BINARY, DECIMAL),
+        Function::BIN2HEX => return convert(BINARY, HEXADECIMAL),
+        Function::BIN2OCT => return convert(BINARY, OCTAL),
+        Function::DEC2BIN => return convert(DECIMAL, BINARY),
+        Function::DEC2HEX => return convert(DECIMAL, HEXADECIMAL),
+        Function::DEC2OCT => return convert(DECIMAL, OCTAL),
+        Function::HEX2BIN => return convert(HEXADECIMAL, BINARY),
+        Function::HEX2DEC => return convert(HEXADECIMAL, DECIMAL),
+        Function::HEX2OCT => return convert(HEXADECIMAL, OCTAL),
+        Function::OCT2BIN => return convert(OCTAL, BINARY),
+        Function::OCT2DEC => return convert(OCTAL, DECIMAL),
+        Function::OCT2HEX => return convert(OCTAL, HEXADECIMAL),
+        Function::BITAND | Function::BITOR | Function::BITXOR => bitwise(function, values),
+        Function::BITLSHIFT | Function::BITRSHIFT => {
+            bit_shift(function == Function::BITLSHIFT, values)
+        }
+        Function::DELTA => compare_step(values, |number, step| number == step),
+        Function::GESTEP => compare_step(values, |number, step| number >= step),
+        Function::ERF => error_function_between(values),
+        Function::ERF_PRECISE => single_number(values).map(error_function),
+        Function::ERFC | Function::ERFC_PRECISE => {
+            single_number(values).map(complementary_error_function)
+        }
     };
 
     result.map_or_else(Value::Error, Value::number)
-}
-
-/// `BIN2DEC`, `DEC2HEX` and the other base conversions. The name gives the
-/// source and target bases: its first letter and the letter after the `2`.
-fn convert_base(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let bytes = name.as_bytes();
-    let (Some(&source), Some(&target)) = (bytes.first(), bytes.get(4)) else {
-        return Value::Error(FormulaError::Name);
-    };
-
-    convert_between(
-        Radix::from_letter(source),
-        Radix::from_letter(target),
-        values,
-    )
-    .unwrap_or_else(Value::Error)
 }
 
 fn convert_between(
@@ -246,15 +238,17 @@ fn bit_argument(values: &FuncAccumulator, index: usize) -> Result<u64, FormulaEr
 }
 
 /// `BITAND`, `BITOR` and `BITXOR`.
-fn bitwise(name: &str, values: &FuncAccumulator) -> NumberResult {
+fn bitwise(function: Function, values: &FuncAccumulator) -> NumberResult {
     require_arity(values, 2, 2)?;
     let left = bit_argument(values, 0)?;
     let right = bit_argument(values, 1)?;
 
-    let result = match name {
-        "BITAND" => left & right,
-        "BITOR" => left | right,
-        _ => left ^ right,
+    let result = if function == Function::BITAND {
+        left & right
+    } else if function == Function::BITOR {
+        left | right
+    } else {
+        left ^ right
     };
 
     Ok(result as f64)
@@ -338,8 +332,9 @@ fn complementary_error_function(x: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Function as F;
 
-    fn call(name: &str, arguments: &[Value]) -> Value {
+    fn call(function: Function, arguments: &[Value]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in arguments {
@@ -347,7 +342,7 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
     fn text(value: &str) -> Value {
@@ -362,153 +357,157 @@ mod tests {
     /// `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
     #[test]
     fn microsoft_published_base_examples() {
-        for (name, arguments, expected) in [
-            ("BIN2DEC", vec![number(1100100.0)], number(100.0)),
-            ("BIN2DEC", vec![number(1111111111.0)], number(-1.0)),
+        for (function, arguments, expected) in [
+            (F::BIN2DEC, vec![number(1100100.0)], number(100.0)),
+            (F::BIN2DEC, vec![number(1111111111.0)], number(-1.0)),
             (
-                "BIN2HEX",
+                F::BIN2HEX,
                 vec![number(11111011.0), number(4.0)],
                 text("00FB"),
             ),
-            ("BIN2HEX", vec![number(1110.0)], text("E")),
-            ("BIN2HEX", vec![number(1111111111.0)], text("FFFFFFFFFF")),
-            ("BIN2OCT", vec![number(1001.0), number(3.0)], text("011")),
-            ("BIN2OCT", vec![number(1100100.0)], text("144")),
-            ("BIN2OCT", vec![number(1111111111.0)], text("7777777777")),
-            ("DEC2BIN", vec![number(9.0), number(4.0)], text("1001")),
-            ("DEC2BIN", vec![number(-100.0)], text("1110011100")),
-            ("DEC2HEX", vec![number(100.0), number(4.0)], text("0064")),
-            ("DEC2HEX", vec![number(-54.0)], text("FFFFFFFFCA")),
-            ("DEC2HEX", vec![number(28.0)], text("1C")),
+            (F::BIN2HEX, vec![number(1110.0)], text("E")),
+            (F::BIN2HEX, vec![number(1111111111.0)], text("FFFFFFFFFF")),
+            (F::BIN2OCT, vec![number(1001.0), number(3.0)], text("011")),
+            (F::BIN2OCT, vec![number(1100100.0)], text("144")),
+            (F::BIN2OCT, vec![number(1111111111.0)], text("7777777777")),
+            (F::DEC2BIN, vec![number(9.0), number(4.0)], text("1001")),
+            (F::DEC2BIN, vec![number(-100.0)], text("1110011100")),
+            (F::DEC2HEX, vec![number(100.0), number(4.0)], text("0064")),
+            (F::DEC2HEX, vec![number(-54.0)], text("FFFFFFFFCA")),
+            (F::DEC2HEX, vec![number(28.0)], text("1C")),
             (
-                "DEC2HEX",
+                F::DEC2HEX,
                 vec![number(64.0), number(1.0)],
                 Value::Error(FormulaError::Num),
             ),
-            ("DEC2OCT", vec![number(58.0), number(3.0)], text("072")),
-            ("DEC2OCT", vec![number(-100.0)], text("7777777634")),
-            ("HEX2BIN", vec![text("F"), number(8.0)], text("00001111")),
-            ("HEX2BIN", vec![text("B7")], text("10110111")),
-            ("HEX2BIN", vec![text("FFFFFFFFFF")], text("1111111111")),
-            ("HEX2DEC", vec![text("A5")], number(165.0)),
-            ("HEX2DEC", vec![text("FFFFFFFF5B")], number(-165.0)),
-            ("HEX2DEC", vec![text("3DA408B9")], number(1_034_160_313.0)),
-            ("HEX2OCT", vec![text("F"), number(3.0)], text("017")),
-            ("HEX2OCT", vec![text("3B4E")], text("35516")),
-            ("HEX2OCT", vec![text("FFFFFFFF00")], text("7777777400")),
-            ("OCT2BIN", vec![number(3.0), number(3.0)], text("011")),
-            ("OCT2BIN", vec![number(7777777000.0)], text("1000000000")),
-            ("OCT2DEC", vec![number(54.0)], number(44.0)),
-            ("OCT2DEC", vec![number(7777777533.0)], number(-165.0)),
-            ("OCT2HEX", vec![number(100.0), number(4.0)], text("0040")),
-            ("OCT2HEX", vec![number(7777777533.0)], text("FFFFFFFF5B")),
+            (F::DEC2OCT, vec![number(58.0), number(3.0)], text("072")),
+            (F::DEC2OCT, vec![number(-100.0)], text("7777777634")),
+            (F::HEX2BIN, vec![text("F"), number(8.0)], text("00001111")),
+            (F::HEX2BIN, vec![text("B7")], text("10110111")),
+            (F::HEX2BIN, vec![text("FFFFFFFFFF")], text("1111111111")),
+            (F::HEX2DEC, vec![text("A5")], number(165.0)),
+            (F::HEX2DEC, vec![text("FFFFFFFF5B")], number(-165.0)),
+            (F::HEX2DEC, vec![text("3DA408B9")], number(1_034_160_313.0)),
+            (F::HEX2OCT, vec![text("F"), number(3.0)], text("017")),
+            (F::HEX2OCT, vec![text("3B4E")], text("35516")),
+            (F::HEX2OCT, vec![text("FFFFFFFF00")], text("7777777400")),
+            (F::OCT2BIN, vec![number(3.0), number(3.0)], text("011")),
+            (F::OCT2BIN, vec![number(7777777000.0)], text("1000000000")),
+            (F::OCT2DEC, vec![number(54.0)], number(44.0)),
+            (F::OCT2DEC, vec![number(7777777533.0)], number(-165.0)),
+            (F::OCT2HEX, vec![number(100.0), number(4.0)], text("0040")),
+            (F::OCT2HEX, vec![number(7777777533.0)], text("FFFFFFFF5B")),
         ] {
-            assert_eq!(call(name, &arguments), expected, "{name}{arguments:?}");
+            assert_eq!(
+                call(function, &arguments),
+                expected,
+                "{function}{arguments:?}"
+            );
         }
     }
 
     #[test]
     fn base_conversions_reject_values_outside_the_ten_digit_range() {
-        for (name, arguments) in [
-            ("BIN2DEC", vec![number(12.0)]),
-            ("BIN2DEC", vec![text("10000000000")]),
-            ("DEC2BIN", vec![number(512.0)]),
-            ("DEC2BIN", vec![number(-513.0)]),
-            ("DEC2OCT", vec![number(536_870_912.0)]),
-            ("DEC2HEX", vec![number(549_755_813_888.0)]),
-            ("DEC2BIN", vec![number(1.0), number(0.0)]),
-            ("DEC2BIN", vec![number(1.0), number(11.0)]),
-            ("HEX2BIN", vec![text("200")]),
-            ("HEX2BIN", vec![text("FFFFFFFDFF")]),
-            ("HEX2OCT", vec![text("FFDFFFFFFF")]),
-            ("OCT2BIN", vec![number(1000.0)]),
-            ("HEX2DEC", vec![text("G1")]),
-            ("BIN2DEC", vec![number(1.5)]),
+        for (function, arguments) in [
+            (F::BIN2DEC, vec![number(12.0)]),
+            (F::BIN2DEC, vec![text("10000000000")]),
+            (F::DEC2BIN, vec![number(512.0)]),
+            (F::DEC2BIN, vec![number(-513.0)]),
+            (F::DEC2OCT, vec![number(536_870_912.0)]),
+            (F::DEC2HEX, vec![number(549_755_813_888.0)]),
+            (F::DEC2BIN, vec![number(1.0), number(0.0)]),
+            (F::DEC2BIN, vec![number(1.0), number(11.0)]),
+            (F::HEX2BIN, vec![text("200")]),
+            (F::HEX2BIN, vec![text("FFFFFFFDFF")]),
+            (F::HEX2OCT, vec![text("FFDFFFFFFF")]),
+            (F::OCT2BIN, vec![number(1000.0)]),
+            (F::HEX2DEC, vec![text("G1")]),
+            (F::BIN2DEC, vec![number(1.5)]),
         ] {
             assert_eq!(
-                call(name, &arguments),
+                call(function, &arguments),
                 Value::Error(FormulaError::Num),
-                "{name}{arguments:?}"
+                "{function}{arguments:?}"
             );
         }
 
         assert_eq!(
-            call("BIN2DEC", &[Value::Bool(true)]),
+            call(F::BIN2DEC, &[Value::Bool(true)]),
             Value::Error(FormulaError::Value)
         );
         assert_eq!(
-            call("DEC2BIN", &[text("x")]),
+            call(F::DEC2BIN, &[text("x")]),
             Value::Error(FormulaError::Value)
         );
-        assert_eq!(call("HEX2DEC", &[text("ff")]), number(255.0));
-        assert_eq!(call("DEC2BIN", &[number(9.9)]), text("1001"));
+        assert_eq!(call(F::HEX2DEC, &[text("ff")]), number(255.0));
+        assert_eq!(call(F::DEC2BIN, &[number(9.9)]), text("1001"));
         assert_eq!(
-            call("DEC2BIN", &[number(-1.0), number(2.0)]),
+            call(F::DEC2BIN, &[number(-1.0), number(2.0)]),
             text("1111111111")
         );
     }
 
     #[test]
     fn microsoft_published_bit_examples() {
-        for (name, arguments, expected) in [
-            ("BITAND", [1.0, 5.0], 1.0),
-            ("BITAND", [13.0, 25.0], 9.0),
-            ("BITOR", [23.0, 10.0], 31.0),
-            ("BITXOR", [5.0, 3.0], 6.0),
-            ("BITLSHIFT", [4.0, 2.0], 16.0),
-            ("BITRSHIFT", [13.0, 2.0], 3.0),
-            ("BITLSHIFT", [16.0, -2.0], 4.0),
-            ("BITRSHIFT", [1.0, -3.0], 8.0),
+        for (function, arguments, expected) in [
+            (F::BITAND, [1.0, 5.0], 1.0),
+            (F::BITAND, [13.0, 25.0], 9.0),
+            (F::BITOR, [23.0, 10.0], 31.0),
+            (F::BITXOR, [5.0, 3.0], 6.0),
+            (F::BITLSHIFT, [4.0, 2.0], 16.0),
+            (F::BITRSHIFT, [13.0, 2.0], 3.0),
+            (F::BITLSHIFT, [16.0, -2.0], 4.0),
+            (F::BITRSHIFT, [1.0, -3.0], 8.0),
         ] {
             assert_eq!(
-                call(name, &[number(arguments[0]), number(arguments[1])]),
+                call(function, &[number(arguments[0]), number(arguments[1])]),
                 number(expected),
-                "{name}{arguments:?}"
+                "{function}{arguments:?}"
             );
         }
 
-        for (name, arguments) in [
-            ("BITAND", [-1.0, 5.0]),
-            ("BITOR", [1.5, 5.0]),
-            ("BITXOR", [BIT_LIMIT, 1.0]),
-            ("BITLSHIFT", [1.0, 54.0]),
-            ("BITLSHIFT", [BIT_LIMIT / 2.0, 1.0]),
+        for (function, arguments) in [
+            (F::BITAND, [-1.0, 5.0]),
+            (F::BITOR, [1.5, 5.0]),
+            (F::BITXOR, [BIT_LIMIT, 1.0]),
+            (F::BITLSHIFT, [1.0, 54.0]),
+            (F::BITLSHIFT, [BIT_LIMIT / 2.0, 1.0]),
         ] {
             assert_eq!(
-                call(name, &[number(arguments[0]), number(arguments[1])]),
+                call(function, &[number(arguments[0]), number(arguments[1])]),
                 Value::Error(FormulaError::Num),
-                "{name}{arguments:?}"
+                "{function}{arguments:?}"
             );
         }
     }
 
     #[test]
     fn microsoft_published_step_and_error_function_examples() {
-        assert_eq!(call("DELTA", &[number(5.0), number(4.0)]), number(0.0));
-        assert_eq!(call("DELTA", &[number(5.0), number(5.0)]), number(1.0));
-        assert_eq!(call("DELTA", &[number(0.5)]), number(0.0));
-        assert_eq!(call("GESTEP", &[number(5.0), number(4.0)]), number(1.0));
-        assert_eq!(call("GESTEP", &[number(-4.0), number(-5.0)]), number(1.0));
-        assert_eq!(call("GESTEP", &[number(-1.0)]), number(0.0));
+        assert_eq!(call(F::DELTA, &[number(5.0), number(4.0)]), number(0.0));
+        assert_eq!(call(F::DELTA, &[number(5.0), number(5.0)]), number(1.0));
+        assert_eq!(call(F::DELTA, &[number(0.5)]), number(0.0));
+        assert_eq!(call(F::GESTEP, &[number(5.0), number(4.0)]), number(1.0));
+        assert_eq!(call(F::GESTEP, &[number(-4.0), number(-5.0)]), number(1.0));
+        assert_eq!(call(F::GESTEP, &[number(-1.0)]), number(0.0));
         assert_eq!(
-            call("DELTA", &[text("a"), number(1.0)]),
+            call(F::DELTA, &[text("a"), number(1.0)]),
             Value::Error(FormulaError::Value)
         );
 
-        for (name, inputs, published) in [
-            ("ERF", vec![0.745], 0.70792892),
-            ("ERF", vec![1.0, 2.0], 0.15262147),
-            ("ERF.PRECISE", vec![0.745], 0.70792892),
-            ("ERF.PRECISE", vec![1.0], 0.84270079),
-            ("ERFC", vec![1.0], 0.15729921),
-            ("ERFC.PRECISE", vec![1.0], 0.15729921),
+        for (function, inputs, published) in [
+            (F::ERF, vec![0.745], 0.70792892),
+            (F::ERF, vec![1.0, 2.0], 0.15262147),
+            (F::ERF_PRECISE, vec![0.745], 0.70792892),
+            (F::ERF_PRECISE, vec![1.0], 0.84270079),
+            (F::ERFC, vec![1.0], 0.15729921),
+            (F::ERFC_PRECISE, vec![1.0], 0.15729921),
         ] {
             let arguments: Vec<Value> = inputs.into_iter().map(number).collect();
-            let Value::Number(actual) = call(name, &arguments) else {
-                panic!("{name} returned an error");
+            let Value::Number(actual) = call(function, &arguments) else {
+                panic!("{function} returned an error");
             };
 
-            assert!((actual - published).abs() < 1e-8, "{name}: {actual}");
+            assert!((actual - published).abs() < 1e-8, "{function}: {actual}");
         }
     }
 }

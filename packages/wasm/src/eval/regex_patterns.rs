@@ -193,11 +193,10 @@ impl PatternIndex {
     }
 }
 
-fn is_regex_function(id: u16) -> bool {
-    matches!(
-        super::analysis::name(id),
-        "REGEXTEST" | "REGEXREPLACE" | "REGEXEXTRACT"
-    )
+const fn is_regex_function(id: u16) -> bool {
+    use super::analysis::{REGEXEXTRACT_ID, REGEXREPLACE_ID, REGEXTEST_ID};
+
+    matches!(id, REGEXTEST_ID | REGEXREPLACE_ID | REGEXEXTRACT_ID)
 }
 
 /// Whether formula source text may call a REGEX function, so installing other
