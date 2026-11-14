@@ -268,25 +268,33 @@ impl SparseLiteralBlock<'_> {
         let (rows, cols) = self.dimensions;
         let cells = rows * cols;
         let words = cells.div_ceil(u64::BITS as usize);
-        let mut seen = if words <= self.offsets.len() {
-            vec![0u64; words]
-        } else {
-            Vec::new()
-        };
+        let bitset = words <= self.offsets.len();
         let mut starts = vec![0u32; cols + 1];
-        for &offset in self.offsets {
-            let offset_index = offset as usize;
-            if offset_index >= cells {
-                return None;
-            }
-            if let Some(word) = seen.get_mut(offset_index / u64::BITS as usize) {
+        // Two loops, so the bitset loop indexes a bitset of known length:
+        // one `get_mut` per offset cost a dense load ~3 instructions per cell.
+        if bitset {
+            let mut seen = vec![0u64; words];
+            for &offset in self.offsets {
+                let offset_index = offset as usize;
+                if offset_index >= cells {
+                    return None;
+                }
+                let word = &mut seen[offset_index / u64::BITS as usize];
                 let bit = 1u64 << (offset_index % u64::BITS as usize);
                 if *word & bit != 0 {
                     return None;
                 }
                 *word |= bit;
+                starts[offset_index % cols + 1] += 1;
             }
-            starts[offset_index % cols + 1] += 1;
+        } else {
+            for &offset in self.offsets {
+                let offset_index = offset as usize;
+                if offset_index >= cells {
+                    return None;
+                }
+                starts[offset_index % cols + 1] += 1;
+            }
         }
         for col in 0..cols {
             starts[col + 1] += starts[col];
@@ -300,7 +308,7 @@ impl SparseLiteralBlock<'_> {
         starts.rotate_right(1);
         starts[0] = 0;
         let columns = SparseColumns { starts, entries };
-        (!seen.is_empty() || self.columns_have_distinct_offsets(&columns)).then_some(columns)
+        (bitset || self.columns_have_distinct_offsets(&columns)).then_some(columns)
     }
 
     /// Whether no column lists an offset twice, by sorting each column's offsets.
@@ -3311,8 +3319,8 @@ impl CellStore {
             let column = &columns.entries[bounds[0] as usize..bounds[1] as usize];
             sheet_data.cells.write_column_cells(
                 block.start.1 + col,
-                column.len(),
-                |index| block.cell(column[index] as usize),
+                column,
+                |index| block.cell(index),
                 DirtyRowWrite::Keep,
             );
         }
