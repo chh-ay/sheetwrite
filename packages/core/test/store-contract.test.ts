@@ -90,9 +90,27 @@ function runFacadeContract(storage: "dense" | "paged", restoreBlock = false): vo
 
   const applied = store.applyTransaction(transaction);
   expect(applied).toMatchObject({ status: "applied", epoch: 1 });
-  expect(applied.status === "applied" ? applied.transaction.patches : []).toBe(patches);
+  const appliedPatches = applied.status === "applied" ? applied.transaction.patches : [];
   expect(events).toHaveLength(1);
-  expect(events[0]?.transaction.patches).toBe(patches);
+  expect(events[0]?.transaction.patches).toBe(appliedPatches);
+  if (restoreBlock) {
+    // Without a setBlock, the caller's operations are applied and emitted as they are.
+    expect(appliedPatches).toBe(patches);
+  } else {
+    // The setBlock's cell arrays were read once into a copy: that copy is what
+    // is stored and emitted, and the caller's array no longer reaches the store.
+    expect(appliedPatches).not.toBe(patches);
+    appliedPatches.forEach((operation, index) => {
+      if (operation.op !== "setBlock") expect(patches[index]).toBe(operation);
+    });
+    const emittedBlock = appliedPatches.find((operation) => operation.op === "setBlock");
+    if (emittedBlock?.op !== "setBlock") throw new Error("expected the copied setBlock");
+    expect(emittedBlock.block.values).toEqual([4, null, null]);
+    expect(emittedBlock.block.values).not.toBe(block.values);
+    block.values[0] = 99;
+    expect(emittedBlock.block.values[0]).toBe(4);
+    expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe(4);
+  }
   expect(listenerOrder).toEqual(["first", "second"]);
   expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).resolved).toBe(8);
   expect(store.getCell({ sheet: "s1", row: 2, col: 2 }).resolved).toBe(8);

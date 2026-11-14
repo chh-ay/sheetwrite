@@ -4,6 +4,7 @@ import {
   markAtomicBatch,
   splitOversizedBlocks,
 } from "./atomic-batch.js";
+import { readBlockArraysOnce } from "./block-ingress.js";
 import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
 import { findDashboardItem } from "./dashboard.js";
 import { cloneMeasure, cloneRelationship, findMeasure, findRelationship } from "./data-model.js";
@@ -104,7 +105,11 @@ export class DocumentController {
     const limits = atomic
       ? atomicBatchLimits(this.transactionResourceLimits)
       : this.transactionResourceLimits;
-    const resourceValidation = validateTransactionResources(operations, limits);
+    // Each setBlock's `values` and `styleIds` are read once into private
+    // copies, which the measurement, the store and the change event all use.
+    const owned =
+      (Array.isArray(operations) ? readBlockArraysOnce(operations) : undefined) ?? operations;
+    const resourceValidation = validateTransactionResources(owned, limits);
 
     if (!resourceValidation.ok) {
       return {
@@ -116,9 +121,9 @@ export class DocumentController {
 
     // The store receives a private copy of the caller's operations; the copy is
     // verified to hold the measured operations before its record is handed over.
-    const patches = operations.slice();
+    const patches = owned.slice();
     if (atomic) markAtomicBatch(patches);
-    const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
+    const admitted = admitTransactionResources(patches, limits, resourceValidation, owned);
 
     const captureReplay = takeTransactionReplayRollbackRequest(operations);
     const captured = captureReplay ? this.captureInverses(patches) : undefined;

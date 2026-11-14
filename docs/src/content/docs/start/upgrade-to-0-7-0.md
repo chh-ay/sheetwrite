@@ -443,6 +443,12 @@ the sort on the table's header buttons.
 | Typing, fill, paste or a remote edit inside a spill keeps the value and shows `#SPILL!` on the anchor. | Nothing; clearing the value restores the array. |
 | Saved hidden rows, collapsed groups and filters apply at load. | Nothing; `SUBTOTAL` no longer counts rows that a saved filter hides. |
 
+### setBlock cell arrays
+
+| Change | What to do |
+| --- | --- |
+| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change: every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation, and getters there are still rejected without running. store.applyTransaction returns and emits a copy of a transaction that contains setBlock. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
+
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
 The same workloads ran against the published 0.5.4 and 0.6.1 packages and

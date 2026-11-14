@@ -170,6 +170,27 @@ function addJsonString(walk: JsonWalk, text: string): void {
 }
 
 /**
+ * Encoded bytes of `text` as a JSON string, or a total above `budget` as soon
+ * as the count passes it, so an oversized string is never scanned to its end.
+ */
+function jsonStringBytes(text: string, budget: number): number {
+  let bytes = DELIMITER_PAIR_BYTES;
+  let index = 0;
+  while (index < text.length && bytes <= budget) {
+    if (isPlainAscii(text.charCodeAt(index))) {
+      bytes += 1;
+      index += 1;
+      continue;
+    }
+
+    const codePointBytes = encodedCodePointBytes(text, index);
+    bytes += codePointBytes;
+    index += utf8CodePointUnits(codePointBytes);
+  }
+  return bytes;
+}
+
+/**
  * Length of a finite number's JSON text. Integers, the common cell value, are
  * measured against exact powers of ten instead of allocating their text.
  */
@@ -226,6 +247,7 @@ function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
   if (Object.getPrototypeOf(array) !== Array.prototype) {
     stopInvalid(walk, "Arrays with custom prototypes are not JSON-safe");
   }
+  if (ownedArrays.has(array) && addOwnedScalarArray(walk, array)) return;
 
   for (const key in array) {
     if (!Object.hasOwn(array, key)) continue;
@@ -247,6 +269,62 @@ function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
     visitJson(walk, descriptor.value);
     walk.segments.pop();
   }
+}
+
+/** Arrays Sheetwrite built itself from values it read once; no caller holds them. */
+const ownedArrays = new WeakSet<unknown[]>();
+
+/**
+ * Record that `array` is a dense array of plain data properties that only
+ * Sheetwrite can reach, so a measurement may read its entries directly.
+ */
+export function markOwnedArray(array: unknown[]): void {
+  ownedArrays.add(array);
+}
+
+/** Whether `value` is an array recorded by `markOwnedArray`. */
+export function isOwnedArray(value: unknown): boolean {
+  return Array.isArray(value) && ownedArrays.has(value);
+}
+
+/**
+ * Measure an owned array whose entries are all JSON scalars in one pass.
+ * Returns false without counting anything at the first entry that is not a
+ * finite number, string, boolean or null, or when the array would pass the
+ * byte limit; the general walk then measures it and reports the exact issue.
+ */
+function addOwnedScalarArray(walk: JsonWalk, array: readonly unknown[]): boolean {
+  const budget = walk.limit - walk.bytes;
+  let bytes = DELIMITER_PAIR_BYTES + Math.max(0, array.length - 1);
+  // Repeated text is common in a block, so one measurement covers each run.
+  let previousText: string | undefined;
+  let previousTextBytes = 0;
+  for (let index = 0; index < array.length && bytes <= budget; index++) {
+    const value = array[index];
+    switch (typeof value) {
+      case "number":
+        if (!Number.isFinite(value)) return false;
+        bytes += jsonNumberLength(value);
+        break;
+      case "string":
+        if (value !== previousText) {
+          previousText = value;
+          previousTextBytes = jsonStringBytes(value, budget - bytes);
+        }
+        bytes += previousTextBytes;
+        break;
+      case "boolean":
+        bytes += value ? FOUR_LETTER_LITERAL_BYTES : FALSE_BYTES;
+        break;
+      default:
+        if (value !== null) return false;
+        bytes += FOUR_LETTER_LITERAL_BYTES;
+    }
+  }
+  if (bytes > budget) return false;
+
+  walk.bytes += bytes;
+  return true;
 }
 
 function visitJsonObject(walk: JsonWalk, record: object): void {
