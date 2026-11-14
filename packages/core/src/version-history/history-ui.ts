@@ -26,6 +26,9 @@ import type { HistoryAddonOptions } from "./panel-contract.js";
  *   });
  * }
  * ```
+ * @param options - Defaults for every grid, such as `archive` and `authorId`;
+ *   a grid's own settings replace them field by field.
+ * @returns The add-on to pass in `initSheetwrite({ addons })`.
  * @see /docs/features/data/persistence/
  */
 export function historyAddon(

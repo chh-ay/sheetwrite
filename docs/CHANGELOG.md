@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Functions that return `void` or `Promise<void>` have no Returns card in the API reference, and the generator no longer counts their return value as missing a description.
+- `docs:generate` reports, per package, how many public members, parameters and return values the API reference shows without a description (no doc comment, no `@param`/`@returns`, and no documented type to fall back on).
 - The landing no longer shifts while it loads on a slow link: Chromium painted a partly parsed page, and the rest of the header or the hero's buttons and install box arrived a frame later. A render-blocking `<link rel="expect">` holds the first paint until the hero's picture starts (Chromium only; other browsers ignore it).
 - Code renders in the system's own code font until JetBrains Mono is cached, instead of Courier New: SF Mono (when installed) or Menlo on macOS, Consolas on Windows, DejaVu Sans Mono or Liberation Mono on Linux, with Courier New last. Each local font has its own fallback face scaled to JetBrains Mono's advance and line metrics, so code blocks and diagram labels keep their layout when the web font is used on a later visit.
 - Code hover panels have room for one-line signatures: up to 44rem wide (still inside the viewport), with right padding kept when a long signature scrolls. A panel no longer covers its code block's tabs or title bar, and the open symbol's tint reaches a little past its glyphs without moving any text.

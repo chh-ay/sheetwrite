@@ -19,6 +19,7 @@ export {
 
 /** The result of updating one link. */
 export interface ExternalLinkUpdate {
+  /** The linked workbook's name, as the link stores it. */
   readonly book: string;
   /**
    * `updated`: the link has the new values. `unavailable`: the resolver gave
@@ -68,6 +69,7 @@ export interface ExternalLinksAddonOptions {
  *   ],
  * });
  * ```
+ * @returns The add-on to pass in `initSheetwrite({ addons })`.
  * @see /docs/features/formulas/authoring-and-references/
  */
 export function externalLinksAddon(
@@ -82,7 +84,11 @@ export function externalLinksAddon(
   };
 }
 
-/** The workbook's links; an absent list is empty. */
+/**
+ * The workbook's links; an absent list is empty.
+ *
+ * @returns One entry per linked workbook, with its saved values.
+ */
 export function listExternalLinks(grid: Grid): readonly ExternalLink[] {
   return grid.store.getWorkbook().externalLinks ?? [];
 }
@@ -123,6 +129,10 @@ function formulasNaming(
  * links when omitted), then save the new values in one undoable change that
  * recalculates the formulas that read them, as Excel's "Update Values" does.
  * Links whose resolver gives `null` or fails keep their saved values.
+ *
+ * @param books - Names of the linked workbooks to update; all links when omitted. Case is ignored.
+ * @returns One result per link asked for, in link order.
+ * @throws SheetwriteError with code `aborted` when the grid is destroyed while `resolve` runs.
  */
 export async function updateExternalLinks(
   grid: Grid,
@@ -191,6 +201,10 @@ export async function updateExternalLinks(
  * does: formulas that name `book` name `next.book`, and the link keeps its
  * saved values until the next update. One undoable change. Returns whether
  * the document applied it.
+ *
+ * @param book - Name of the linked workbook to change; case is ignored.
+ * @param next - The new workbook's name, as formulas write it, and its location.
+ * @returns `false` when no link has that name or the document refused the change.
  */
 export function changeExternalLinkSource(
   grid: Grid,
@@ -225,6 +239,9 @@ export function changeExternalLinkSource(
  * remove those links, as Excel's "Break Link" does. An error value becomes its
  * text, such as `#N/A`. One undoable change. Returns whether the document
  * applied it.
+ *
+ * @param books - Names of the linked workbooks to break; case is ignored.
+ * @returns `false` when the document refused the change.
  */
 export function breakExternalLinks(grid: Grid, books: readonly string[]): boolean {
   const patches: DocumentOp[] = formulasNaming(grid, books).map(({ addr }) => ({

@@ -304,6 +304,10 @@ function requestPivotViews(store: Store): void {
  * series, and a change event names it when it loads.
  *
  * Call it after a {@link subscribeChartChanges} event names the chart, not per frame.
+ *
+ * @param sheet - Stable ID of the sheet that holds the chart.
+ * @param id - The chart's ID.
+ * @returns The chart's resolved series, labels and settings, or `null`.
  */
 export function resolveChartView(store: Store, sheet: SheetId, id: string): ChartView | null {
   const sheets = sheetLookup(store);
@@ -798,6 +802,8 @@ const TRACKERS = new WeakMap<Store, ChartTracker>();
  * query the same index. Custom stores and report overflow refresh conservatively.
  * Returns an unsubscribe
  * function; the index is dropped with the last listener.
+ *
+ * @returns A function that removes `listener`.
  */
 export function subscribeChartChanges(store: Store, listener: ChartChangeListener): () => void {
   let tracker = TRACKERS.get(store);

@@ -1,7 +1,12 @@
 import { getEngine } from "./engine.js";
 import type { CellRef } from "./selection.js";
 
-/** Column index (0-based) → A1 column label (0 → "A", 26 → "AA"). */
+/**
+ * Column index (0-based) → A1 column label (0 → "A", 26 → "AA").
+ *
+ * @param col - Zero-based column index.
+ * @returns The column's letters, such as `"C"` for 2.
+ */
 export function colToA1(col: number): string {
   let c = col + 1;
   let out = "";
@@ -15,19 +20,36 @@ export function colToA1(col: number): string {
   return out;
 }
 
-/** A1 column label → 0-based column index (inverse of {@link colToA1}). */
+/**
+ * A1 column label → 0-based column index (inverse of {@link colToA1}).
+ *
+ * @param label - Upper-case column letters, such as `"AB"`; lower case is not accepted.
+ * @returns The zero-based column index, such as 27 for `"AB"`.
+ */
 export function labelToCol(label: string): number {
   let c = 0;
   for (let i = 0; i < label.length; i++) c = c * 26 + (label.charCodeAt(i) - 64);
   return c - 1;
 }
 
-/** 0-based (row, col) → A1 cell reference (0, 0 → "A1"). */
+/**
+ * 0-based (row, col) → A1 cell reference (0, 0 → "A1").
+ *
+ * @param row - Zero-based row index.
+ * @param col - Zero-based column index.
+ * @returns The A1 reference, such as `"B3"` for row 2, column 1.
+ */
 export function cellA1(row: number, col: number): string {
   return `${colToA1(col)}${row + 1}`;
 }
 
-/** Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal. */
+/**
+ * Two cell corners → A1 range ("A1:B3"), collapsing to a single ref when equal.
+ *
+ * @param a - One corner cell, zero-based.
+ * @param b - The opposite corner cell, zero-based; the corners can come in any order.
+ * @returns The A1 range, top-left first.
+ */
 export function rangeA1(a: CellRef, b: CellRef): string {
   if (a.row === b.row && a.col === b.col) return cellA1(a.row, a.col);
 
@@ -44,6 +66,11 @@ export function rangeA1(a: CellRef, b: CellRef): string {
  * fill from one cell to another does. Absolute parts ($A, A$1) stay fixed, and
  * a reference shifted off the sheet becomes `#REF!`. The engine owns the
  * reference rules, so this needs `initSheetwrite()` first.
+ *
+ * @param src - Formula text, such as `=A1+$B$2`.
+ * @param dRow - Rows to move the relative references by; negative moves up.
+ * @param dCol - Columns to move the relative references by; negative moves left.
+ * @returns The formula with its relative references moved.
  */
 export function shiftA1Refs(src: string, dRow: number, dCol: number): string {
   if (dRow === 0 && dCol === 0) return src;
