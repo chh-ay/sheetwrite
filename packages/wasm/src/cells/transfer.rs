@@ -5,6 +5,16 @@ use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
 
+/// Admits one transferred source kind. Dense and paged imports both call it, so
+/// a kind the store cannot hold is refused whatever width carried it.
+#[cfg(any(target_arch = "wasm32", test))]
+pub(super) fn admit_source_kind(raw: u32) -> TransferResult<u8> {
+    u8::try_from(raw)
+        .ok()
+        .filter(|kind| *kind <= KIND_FORMULA)
+        .ok_or_else(|| "invalid transferred source kind".into())
+}
+
 impl CellStorage {
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         out.usize(self.n_cols);
@@ -49,8 +59,8 @@ impl CellStorage {
                     return Err("invalid transferred dense calculated slot".into());
                 }
                 dense_calculated_cells += 1;
-            } else if kind > KIND_FORMULA {
-                return Err("invalid transferred dense source kind".into());
+            } else {
+                admit_source_kind(kind.into())?;
             }
         }
 

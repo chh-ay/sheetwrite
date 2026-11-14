@@ -17,6 +17,8 @@ use std::cell::Cell;
 
 mod rows;
 
+#[cfg(any(target_arch = "wasm32", test))]
+use super::transfer::admit_source_kind;
 use super::{StorageEntry, MAX_PAGE_CHUNK_ROWS};
 use crate::derived::{decode_cell, encode_cell, ABSENT_TAG};
 use crate::memory::{
@@ -1786,6 +1788,9 @@ impl PagedStorage {
             {
                 return Err("invalid transferred page chunk".into());
             }
+            for &kind in &clean.kind {
+                admit_source_kind(kind.into())?;
+            }
             paged.clean.push(clean);
         }
         paged.free_clean = input.ints()?;
@@ -1824,7 +1829,7 @@ impl PagedStorage {
                 block,
                 revision_index,
                 offset: u16::try_from(offset).map_err(|_| "invalid transferred dirty row")?,
-                kind: u8::try_from(kind).map_err(|_| "invalid transferred dirty kind")?,
+                kind: admit_source_kind(kind)?,
             });
         }
         paged.free_slots = input.ints()?;
@@ -1868,7 +1873,7 @@ impl PagedStorage {
 mod tests {
     use super::{Directory, PagedStorage, DIRTY_BLOCK_ROWS, NONE};
     use crate::transfer::{Reader, Writer};
-    use crate::types::{KIND_EMPTY, KIND_NUMBER};
+    use crate::types::{KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING};
 
     const ROWS: usize = 4;
     const TRANSFER_TAG: u32 = 1;
@@ -2039,5 +2044,54 @@ mod tests {
 
         restored.acknowledge_revision(9);
         assert_eq!(restored.dirty_cells(), 0);
+    }
+
+    fn transfer(storage: &PagedStorage) -> Vec<u8> {
+        let mut out = Writer::new(TRANSFER_TAG);
+        storage.write_transfer(&mut out);
+        out.0
+    }
+
+    fn read_transfer(bytes: &[u8]) -> Result<PagedStorage, String> {
+        let mut input = Reader::new(bytes, TRANSFER_TAG).unwrap();
+        PagedStorage::read_transfer(&mut input)
+    }
+
+    /// A transfer of one dirty cell with `raw` in place of its 32-bit kind.
+    fn transfer_with_dirty_kind(raw: u32) -> Vec<u8> {
+        let mut storage = PagedStorage::new(ROWS, budget_for(1), 1).unwrap();
+        assert!(storage.write(1, 0, KIND_NUMBER, 30, 0, Some(1)));
+        let number = transfer(&storage);
+        storage.slots[0].kind = KIND_STRING;
+        let string = transfer(&storage);
+
+        let kind_offset = number
+            .iter()
+            .zip(&string)
+            .position(|(left, right)| left != right)
+            .unwrap();
+        let mut bytes = number;
+        bytes[kind_offset..kind_offset + 4].copy_from_slice(&raw.to_le_bytes());
+        bytes
+    }
+
+    #[test]
+    fn transfer_refuses_dirty_kinds_the_store_cannot_hold() {
+        assert!(read_transfer(&transfer_with_dirty_kind(KIND_FORMULA.into())).is_ok());
+
+        for raw in [5, 0x105] {
+            let error = read_transfer(&transfer_with_dirty_kind(raw)).err();
+            assert_eq!(error.as_deref(), Some("invalid transferred source kind"));
+        }
+    }
+
+    #[test]
+    fn transfer_refuses_clean_page_kinds_the_store_cannot_hold() {
+        let mut storage = PagedStorage::new(ROWS, budget_for(1), 1).unwrap();
+        load(&mut storage, 0, 0, 1);
+        storage.clean[0].kind[0] = KIND_FORMULA + 1;
+
+        let error = read_transfer(&transfer(&storage)).err();
+        assert_eq!(error.as_deref(), Some("invalid transferred source kind"));
     }
 }
