@@ -6,8 +6,11 @@ const LIMIT_DIAGNOSTIC = "limit";
 
 /** Fatal source or plan failure; cell-level errors stay in the returned column lanes. */
 export class QueryError extends SheetwriteError {
+  /** Always `"QueryError"`. */
   override readonly name = "QueryError";
+  /** `resource-limit` when a {@link QueryLimits} ceiling was hit, otherwise `invalid-argument`. */
   declare readonly code: "resource-limit" | "invalid-argument";
+  /** What failed and where: the step, column and row, never source values. */
   readonly diagnostic: QueryDiagnostic;
 
   /** Diagnostic codes remain stable even when their human-readable context changes. */

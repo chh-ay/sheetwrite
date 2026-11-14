@@ -18,12 +18,25 @@ use crate::types::FormulaError;
 /// Move the relative references of a copied formula by the distance from
 /// its source cell to its target cell. Absolute parts stay; a reference
 /// moved off the sheet becomes `#REF!`.
-#[wasm_bindgen(js_name = translateFormula)]
+#[wasm_bindgen(
+    js_name = translateFormula,
+    return_description = "The formula with its relative references moved; the text unchanged when it can't be read as a formula."
+)]
 #[allow(
     unreachable_pub,
     reason = "wasm_bindgen exports need `pub`; re-exporting from the crate root instead grew these four exports by 157 B of code"
 )]
-pub fn translate_formula(source: &str, row_delta: i32, col_delta: i32) -> String {
+pub fn translate_formula(
+    #[wasm_bindgen(param_description = "Formula text of the source cell.")] source: &str,
+    #[wasm_bindgen(
+        param_description = "Rows from the source cell to the target cell; negative moves up."
+    )]
+    row_delta: i32,
+    #[wasm_bindgen(
+        param_description = "Columns from the source cell to the target cell; negative moves left."
+    )]
+    col_delta: i32,
+) -> String {
     rewrite_references(source, |reference, _| {
         translate_relative_refs(reference, i64::from(row_delta), i64::from(col_delta));
     })
@@ -44,12 +57,27 @@ pub(crate) fn sort_formula(source: &str, row_delta: i32) -> String {
 /// Follow `delta` rows or columns inserted (positive) or deleted (negative)
 /// at `at` on the formula's own sheet. A range loses its deleted rows or
 /// columns and becomes `#REF!` only when none are left.
-#[wasm_bindgen(js_name = shiftFormulaAxis)]
+#[wasm_bindgen(
+    js_name = shiftFormulaAxis,
+    return_description = "The formula with its references adjusted; the text unchanged when it can't be read as a formula."
+)]
 #[allow(
     unreachable_pub,
     reason = "wasm_bindgen exports need `pub`; re-exporting from the crate root instead grew these four exports by 157 B of code"
 )]
-pub fn shift_formula_axis(source: &str, columns: bool, at: u32, delta: i32) -> String {
+pub fn shift_formula_axis(
+    #[wasm_bindgen(param_description = "Formula text on the edited sheet.")] source: &str,
+    #[wasm_bindgen(param_description = "`true` when columns change, `false` for rows.")]
+    columns: bool,
+    #[wasm_bindgen(
+        param_description = "Zero-based index where the rows or columns are inserted or deleted."
+    )]
+    at: u32,
+    #[wasm_bindgen(
+        param_description = "Rows or columns inserted (positive) or deleted (negative)."
+    )]
+    delta: i32,
+) -> String {
     let change = AxisChange::Shift {
         at,
         delta: i64::from(delta),
@@ -59,12 +87,28 @@ pub fn shift_formula_axis(source: &str, columns: bool, at: u32, delta: i32) -> S
 
 /// Follow `count` rows or columns moved from `from` to `to` on the formula's
 /// own sheet; `to` is the first index of the moved block after the move.
-#[wasm_bindgen(js_name = moveFormulaAxis)]
+#[wasm_bindgen(
+    js_name = moveFormulaAxis,
+    return_description = "The formula with its references adjusted; the text unchanged when it can't be read as a formula."
+)]
 #[allow(
     unreachable_pub,
     reason = "wasm_bindgen exports need `pub`; re-exporting from the crate root instead grew these four exports by 157 B of code"
 )]
-pub fn move_formula_axis(source: &str, columns: bool, from: u32, count: u32, to: u32) -> String {
+pub fn move_formula_axis(
+    #[wasm_bindgen(param_description = "Formula text on the edited sheet.")] source: &str,
+    #[wasm_bindgen(param_description = "`true` when columns move, `false` for rows.")]
+    columns: bool,
+    #[wasm_bindgen(
+        param_description = "Zero-based index of the first moved row or column before the move."
+    )]
+    from: u32,
+    #[wasm_bindgen(param_description = "Number of rows or columns moved.")] count: u32,
+    #[wasm_bindgen(
+        param_description = "Zero-based index of the first moved row or column after the move."
+    )]
+    to: u32,
+) -> String {
     rewrite_own_sheet(source, columns, AxisChange::Move { from, count, to })
 }
 
@@ -84,12 +128,24 @@ fn rewrite_own_sheet(source: &str, columns: bool, change: AxisChange) -> String 
 /// An empty `column` renames table `table` to `to`; otherwise column
 /// `column` of `table` becomes `to`, where an empty `table` means
 /// references without a table name. Names match without case.
-#[wasm_bindgen(js_name = renameStructuredReference)]
+#[wasm_bindgen(
+    js_name = renameStructuredReference,
+    return_description = "The formula with the matching structured references renamed; the text unchanged when it can't be read as a formula."
+)]
 #[allow(
     unreachable_pub,
     reason = "wasm_bindgen exports need `pub`; re-exporting from the crate root instead grew these four exports by 157 B of code"
 )]
-pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: &str) -> String {
+pub fn rename_structured_reference(
+    #[wasm_bindgen(param_description = "Formula text.")] source: &str,
+    #[wasm_bindgen(
+        param_description = "Table whose references change; empty, with a `column`, means references without a table name."
+    )]
+    table: &str,
+    #[wasm_bindgen(param_description = "Column to rename; empty renames the table itself.")]
+    column: &str,
+    #[wasm_bindgen(param_description = "The new table or column name.")] to: &str,
+) -> String {
     let Some(lexemes) = lex(source) else {
         return source.to_owned();
     };
