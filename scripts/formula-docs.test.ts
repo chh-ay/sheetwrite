@@ -74,7 +74,7 @@ describe("Excel function coverage", () => {
     expect(rows).toHaveLength(520);
     for (const row of rows.filter((line) => line.includes("| Partly supported |"))) {
       const notes = row.split(" | ").at(-1) ?? "";
-      expect(notes.replace(/\[Contract\]\([^)]+\)/u, "").trim().length).toBeGreaterThan(20);
+      expect(notes.replace(/\[Reference\]\([^)]+\)/u, "").trim().length).toBeGreaterThan(20);
     }
   });
 });
