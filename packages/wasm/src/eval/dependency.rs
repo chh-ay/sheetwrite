@@ -479,10 +479,11 @@ impl DepIndex {
                 continue;
             }
 
-            // The removals of a run sort before its additions.
+            // The run is sorted by row, then removals before additions, then
+            // reader: search in that order.
             let removed = |row: u32, reader: FormulaId| {
                 run.binary_search_by(|&(cell, removed, added)| {
-                    (added, cell.row, removed).cmp(&(false, row, reader))
+                    (cell.row, added, removed).cmp(&(row, false, reader))
                 })
                 .is_ok()
             };
@@ -1973,6 +1974,46 @@ mod tests {
         assert!(patched.pending.is_empty());
         assert_eq!(index_contents(patched), index_contents(&rebuilt));
         assert!(patched.has_formula_dependencies || !rebuilt.has_formula_dependencies);
+    }
+
+    /// Sets B1 to read A10, then in one batch makes B1 read nothing and
+    /// twenty formulas in C read A1: more changes in A's first band than an
+    /// in-place patch takes, with the removal at a later row than the
+    /// additions.
+    fn store_with_rebuilt_band() -> (CellStore, usize) {
+        const ADDED_READERS: usize = 20;
+
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(3, 64);
+        store.set_number(sheet, 9, 0, 5.0, 0);
+        store.set_formula(sheet, 0, 1, "=A10", 0);
+        store.recompute(sheet);
+
+        store.set_formula(sheet, 0, 1, "=1", 0);
+        for row in 0..ADDED_READERS {
+            store.set_formula(sheet, row, 2, "=A1", 0);
+        }
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    #[test]
+    fn a_rebuilt_band_drops_a_removal_below_its_additions() {
+        let (mut store, _) = store_with_rebuilt_band();
+        assert_patch_matches_rebuild(&mut store);
+    }
+
+    #[test]
+    fn a_removed_edge_no_longer_recalculates_its_old_reader() {
+        let (mut store, sheet) = store_with_rebuilt_band();
+        store.set_number(sheet, 9, 0, 6.0, 0);
+
+        super::super::FORMULA_EVALUATIONS.with(|count| count.set(0));
+        store.recompute(sheet);
+        assert_eq!(
+            super::super::FORMULA_EVALUATIONS.with(std::cell::Cell::get),
+            0
+        );
     }
 
     #[test]
