@@ -113,6 +113,7 @@ fn text_value(text: String) -> Result<Value, FormulaError> {
     if text.len() > MAX_TEXT_BYTES || text.chars().count() > MAX_TEXT_CHARS {
         Err(FormulaError::Value)
     } else {
+        super::super::preview_limits::text(text.len())?;
         Ok(Value::text(text))
     }
 }

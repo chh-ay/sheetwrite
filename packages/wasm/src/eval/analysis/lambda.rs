@@ -923,6 +923,11 @@ impl<'a, 'p> Context<'a, 'p> {
     /// caller evaluates the body and then calls [`Context::leave_call`].
     /// `slots` is left empty, so a helper reuses it for its next element.
     fn enter_call(&mut self, callee: &Callee, slots: &mut Vec<Slot>) -> Result<(), FormulaError> {
+        // A result preview counts calls, not the nodes each call evaluates.
+        if let Err(error) = super::super::preview_limits::work(1) {
+            slots.clear();
+            return Err(error);
+        }
         let frame = self.pass.results.call_frame_mut();
         if let Err(error) = frame.charge() {
             slots.clear();
