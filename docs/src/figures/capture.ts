@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 import { chromium, type Page } from "@playwright/test";
+import type { Selection as GridSelection } from "@sheetwrite/core";
 import { createServer } from "vite";
 
 import { SHOT_SIZES, type ShotSize, shotUrl } from "../lib/content-components.ts";
@@ -63,6 +64,31 @@ async function selectRows(page: Page, rows: number) {
   for (let row = 1; row < rows; row += 1) await page.keyboard.press("ArrowDown");
   for (let col = 1; col < 5; col += 1) await page.keyboard.press("ArrowRight");
   await page.keyboard.up("Shift");
+}
+
+/** The site theme's grid geometry in CSS pixels: the column header, one row, the row numbers. */
+const HEADER_HEIGHT = 32;
+const ROW_HEIGHT = 28;
+/** The left edge of the Orders columns A to E inside the grid, then the right edge of E. */
+const ORDERS_COLUMN_EDGES = [48, 144, 248, 376, 456, 568] as const;
+
+/** A point in the grid element: the middle of a cell by its row and column from 0. */
+function cellPoint(row: number, col: number) {
+  const left = ORDERS_COLUMN_EDGES[col];
+  const right = ORDERS_COLUMN_EDGES[col + 1];
+  if (left === undefined || right === undefined) throw new Error(`Orders has no column ${col}`);
+  return { x: (left + right) / 2, y: HEADER_HEIGHT + row * ROW_HEIGHT + ROW_HEIGHT / 2 };
+}
+
+/** An inclusive block of the Orders sheet, rows and columns from 0. */
+function ordersRange(top: number, left: number, bottom: number, right: number) {
+  return { sheet: "orders", start: { row: top, col: left }, end: { row: bottom, col: right } };
+}
+
+/** Select through the grid's API, then wait for the frame that shows it. */
+async function select(page: Page, selection: GridSelection) {
+  await page.evaluate((value) => window.__sheetwriteFigureGrid?.setSelection(value), selection);
+  await settle(page);
 }
 
 const SHOTS: readonly Shot[] = [
@@ -180,6 +206,171 @@ const SHOTS: readonly Shot[] = [
     size: "app",
     query: { sheet: "orders" },
     steps: ribbon("Data", "Queries & Connections"),
+  },
+  // The Grid section: the shell around the grid, a range selected so the
+  // status line shows its totals.
+  {
+    name: "grid-overview",
+    size: "app",
+    query: { sheet: "orders" },
+    steps: (page) => select(page, { kind: "range", range: ordersRange(1, 3, 8, 4) }),
+  },
+  // The grid feature pages use the compact ribbon, so the grid gets the room.
+  {
+    name: "context-menu",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await page
+        .locator(".sheetwrite-shell-grid")
+        .click({ button: "right", position: cellPoint(1, 1) });
+      await settle(page);
+    },
+  },
+  {
+    name: "editing",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await page.locator(".sheetwrite-shell-grid").dblclick({ position: cellPoint(7, 1) });
+      await page.keyboard.press("End");
+      await page.keyboard.type(" north");
+      await settle(page);
+    },
+  },
+  {
+    name: "data-grid",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact", presentation: "data-grid" },
+  },
+  // The fill handle mid-drag: the pointer stays down, so the fill's outline shows.
+  {
+    name: "fill",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "range", range: ordersRange(1, 3, 2, 3) });
+      const grid = await page.locator(".sheetwrite-shell-grid").boundingBox();
+      if (grid === null) throw new Error("The grid is not on the stage");
+      const handle = {
+        x: grid.x + ORDERS_COLUMN_EDGES[4] - 1,
+        y: grid.y + HEADER_HEIGHT + 3 * ROW_HEIGHT - 1,
+      };
+      await page.mouse.move(handle.x, handle.y);
+      await page.mouse.down();
+      await page.mouse.move(handle.x - 5, handle.y + 3 * ROW_HEIGHT, { steps: 4 });
+      await page.mouse.move(handle.x - 5, handle.y + 5 * ROW_HEIGHT - 4, { steps: 4 });
+      await settle(page);
+    },
+  },
+  {
+    name: "search",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: async (page) => {
+      await page.locator(".sheetwrite-shell-grid").click({ position: cellPoint(1, 0) });
+      await page.keyboard.press("Control+f");
+      // Fill the Find input itself, so the search runs and the matches highlight.
+      await page.getByRole("textbox", { name: "Find in sheet" }).fill("EMEA");
+      await settle(page);
+    },
+  },
+  {
+    name: "selection",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: (page) =>
+      select(page, { kind: "multi", ranges: [ordersRange(1, 1, 3, 2), ordersRange(5, 3, 8, 4)] }),
+  },
+  {
+    name: "status-bar",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact" },
+    steps: (page) => select(page, { kind: "range", range: ordersRange(1, 4, 12, 4) }),
+  },
+  { name: "ribbon", size: "wide", query: { sheet: "orders" } },
+  // The formatting, analysis, data and formula pages, on the Report, Pivot and Formulas sheets.
+  // The compact ribbon leaves room for the whole chart under the table.
+  { name: "report", size: "app", query: { sheet: "report", ribbon: "compact" } },
+  {
+    name: "fonts",
+    size: "panel",
+    query: { sheet: "report" },
+    steps: async (page) => {
+      // The comment cell in G3, scrolled into view.
+      const comment = { sheet: "report", row: 2, col: 6 };
+      await page.evaluate((addr) => window.__sheetwriteFigureGrid?.scrollToCell(addr), comment);
+      await select(page, { kind: "cell", addr: comment });
+    },
+  },
+  {
+    name: "number-formats",
+    size: "panel",
+    query: { sheet: "report" },
+    steps: async (page) => {
+      // A manager's name: a General cell, so the format box shows what the cell has.
+      // The list covers the right of the sheet; the dollar columns stay in view.
+      await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 1 } });
+      // At this width the Number group folds into a menu; open it, then the
+      // list of its number format box.
+      await page.getByRole("button", { name: "Number", exact: true }).first().click();
+      await page.getByRole("button", { name: "Number Format list", exact: true }).click();
+      await settle(page);
+    },
+  },
+  // The app size is tall enough to show the table and the chart under it.
+  // The chart selected, so its frame and handles show it floating over the cells.
+  {
+    name: "chart",
+    size: "app",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: async (page) => {
+      await page.locator(".sheetwrite-object").first().click();
+      await settle(page);
+    },
+  },
+  {
+    name: "validation",
+    size: "panel",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: async (page) => {
+      await select(page, { kind: "cell", addr: { sheet: "report", row: 3, col: 5 } });
+      // Enter on a list cell opens its list; the grid host needs the keyboard focus first.
+      await page.locator(".sheetwrite-shell-grid").focus();
+      await page.keyboard.press("Enter");
+      await settle(page);
+    },
+  },
+  { name: "pivot-chart", size: "app", query: { sheet: "pivot" } },
+  {
+    name: "pivot",
+    size: "panel",
+    query: { sheet: "pivot", ribbon: "compact" },
+    steps: (page) => select(page, { kind: "cell", addr: { sheet: "pivot", row: 2, col: 1 } }),
+  },
+  // The data-grid presentation names the columns in their headers, so a column
+  // filter leaves the column names in view.
+  {
+    name: "filter",
+    size: "panel",
+    query: { sheet: "orders", ribbon: "compact", presentation: "data-grid" },
+    steps: async (page) => {
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.filterBy(1, "EMEA"));
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 1 } });
+      await settle(page);
+    },
+  },
+  {
+    name: "formula-bar",
+    size: "panel",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: (page) => select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 2 } }),
+  },
+  {
+    name: "groupby",
+    size: "panel",
+    query: { sheet: "formulas", ribbon: "compact" },
+    steps: (page) => select(page, { kind: "cell", addr: { sheet: "formulas", row: 0, col: 0 } }),
   },
 ];
 

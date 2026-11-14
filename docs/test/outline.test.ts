@@ -15,7 +15,7 @@ const element = (
 });
 
 describe("build-time outline", () => {
-  it("lists h2 and h3 headings without count chips, skipping member headings and search anchors", () => {
+  it("lists h2 and h3 headings without count chips, skipping member headings, group headings and search anchors", () => {
     const tree = {
       type: "root",
       children: [
@@ -25,9 +25,9 @@ describe("build-time outline", () => {
           element("span", { className: ["api-count"] }, [text("16")]),
         ]),
         element("h3", { id: "grid", className: ["api-search-anchor"] }, [text("grid")]),
-        element("details", { id: "store", className: ["api-member"] }, [
-          element("summary", {}, [element("code", {}, [text("store")])]),
-          element("h3", { id: "store-examples" }, [text("Examples")]),
+        element("h3", { id: "properties", className: ["api-member-group"] }, [text("Properties")]),
+        element("article", { id: "store", className: ["api-member"], dataMember: "store" }, [
+          element("h4", { id: "store-examples" }, [text("Examples")]),
         ]),
       ],
     };

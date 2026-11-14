@@ -24,6 +24,7 @@ use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
 };
 use crate::sheet::{formula_error_at, SheetData};
+use crate::sorting::sort_by_key96;
 use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
 use crate::tables::{Table, TableColumn, TableSlots};
 use crate::types::{
@@ -107,26 +108,35 @@ pub struct SourceSnapshot {
 
 #[wasm_bindgen]
 impl SourceSnapshot {
+    /// Row-major offset, among the captured cells, of each cell with formula
+    /// text, ascending; [`Self::formula_sources`] holds the matching text.
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         self.formula_offsets.clone()
     }
 
+    /// The formula text of each cell in [`Self::formula_offsets`], in order.
     #[wasm_bindgen(js_name = formulaSources)]
     pub fn formula_sources(&self) -> Vec<String> {
         self.formula_sources.clone()
     }
 
+    /// Row-major offset of each cell that refers to one other cell by
+    /// position instead of by formula text, ascending.
     #[wasm_bindgen(js_name = referenceOffsets)]
     pub fn reference_offsets(&self) -> Vec<u32> {
         self.reference_offsets.clone()
     }
 
+    /// The cell each of [`Self::reference_offsets`] refers to, as packed
+    /// `[sheet_handle, row, col]` triples in the same order.
     #[wasm_bindgen(js_name = referenceTargets)]
     pub fn reference_targets(&self) -> Vec<u32> {
         self.reference_targets.clone()
     }
 
+    /// One byte per captured cell, row-major: 1 where another cell's spill
+    /// fills it. Empty when no captured cell is spill-filled.
     #[wasm_bindgen(js_name = spillDerived)]
     pub fn spill_derived(&self) -> Vec<u8> {
         self.spill_derived.clone()
@@ -152,6 +162,8 @@ pub struct RangeSnapshot {
 
 #[wasm_bindgen]
 impl RangeSnapshot {
+    /// Packed `[row, col]` pairs, relative to the range's first cell, of the
+    /// cells with formula text; [`Self::formula_sources`] holds the text.
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -166,6 +178,8 @@ impl RangeSnapshot {
         offsets
     }
 
+    /// Packed `[row, col]` pairs, relative to the range's first cell, of the
+    /// cells that refer to one other cell by position instead of by formula text.
     #[wasm_bindgen(js_name = referenceOffsets)]
     pub fn reference_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -180,6 +194,8 @@ impl RangeSnapshot {
         offsets
     }
 
+    /// The cell each of [`Self::reference_offsets`] refers to, as packed
+    /// `[sheet_handle, row, col]` triples in the same order.
     #[wasm_bindgen(js_name = referenceTargets)]
     pub fn reference_targets(&self) -> Vec<u32> {
         let mut targets = Vec::new();
@@ -195,16 +211,21 @@ impl RangeSnapshot {
         targets
     }
 
+    /// The kind of each cell's stored value (`KIND_*`), one byte per cell,
+    /// column by column.
     #[wasm_bindgen(js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kind.clone()
     }
 
+    /// The style id of each cell, column by column, as in [`Self::kinds`].
     #[wasm_bindgen(js_name = styleIds)]
     pub fn style_ids(&self) -> Vec<u32> {
         self.style.clone()
     }
 
+    /// Bytes the snapshot holds: cell data, its text and formulas. History
+    /// counts it against its memory budget.
     #[wasm_bindgen(js_name = byteLength)]
     pub fn byte_length(&self) -> usize {
         self.kind.len()
@@ -226,6 +247,7 @@ impl RangeSnapshot {
                 .sum::<usize>()
     }
 
+    /// The formula text of each cell in [`Self::formula_offsets`], in order.
     #[wasm_bindgen(js_name = formulaSources)]
     pub fn formula_sources(&self) -> Vec<String> {
         self.formulas
@@ -932,19 +954,24 @@ impl CellStore {
             }
         }
 
-        let before_names = self.defined_names.len();
-        self.defined_names.retain(|(scope, _), definition| {
-            *scope != Some(sheet as u32)
-                && !matches!(definition, names::DefinedName::Range(range) if range.sheet == sheet as u32)
+        let mut changed_names = Vec::new();
+        self.defined_names.retain(|(scope, name), definition| {
+            let removed = *scope == Some(sheet as u32)
+                || matches!(definition, names::DefinedName::Range(range) if range.sheet == sheet as u32);
+            if removed {
+                changed_names.push(name.clone());
+            }
+            !removed
         });
-        let removed_names = self.remove_sheet_from_named_formulas(sheet as u32)
-            || self.defined_names.len() != before_names;
+        self.remove_sheet_from_named_formulas(sheet as u32, &mut changed_names);
 
         // The references to these tables are on the removed sheet, so the
         // walk above already made them `#REF!`.
         let tables_before = self.tables.len();
         self.tables.retain_mut(|table| table.sheet != sheet as u32);
-        let removed_tables = self.tables.len() != tables_before;
+        if self.tables.len() != tables_before {
+            self.add_names_over_tables(&mut changed_names);
+        }
 
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
@@ -966,11 +993,11 @@ impl CellStore {
         }
         self.graph.invalidate();
 
-        if removed_names || removed_tables {
-            self.refresh_named_formula_entries();
-            self.recompute_all_sheets();
-        } else {
+        if changed_names.is_empty() {
             self.recompute_with_volatile_sheets(affected);
+        } else {
+            self.rebind_name_users(changed_names);
+            self.recompute_all_sheets();
         }
 
         self.strings.request_collection();
@@ -1027,12 +1054,16 @@ impl CellStore {
             .collect()
     }
 
+    /// Rows in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = rowCount)]
     pub fn row_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.row_count())
     }
 
+    /// Columns in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = colCount)]
     pub fn col_count(&self, sheet: usize) -> usize {
@@ -1111,6 +1142,9 @@ impl CellStore {
         });
     }
 
+    /// Empties the cell at `row`, `col` of `sheet`, removing its value or
+    /// formula, and gives it style `style`.
+    ///
     /// @enginePublic Scalar clearing complements the public scalar value setters.
     #[wasm_bindgen(js_name = clearCell)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {
@@ -1571,8 +1605,8 @@ impl CellStore {
                 references.push((offset, target));
             }
         }
-        formulas.sort_unstable_by_key(|(offset, _)| *offset);
-        references.sort_unstable_by_key(|(offset, _)| *offset);
+        sort_by_key96(&mut formulas, |(offset, _)| u128::from(*offset));
+        sort_by_key96(&mut references, |(offset, _)| u128::from(*offset));
 
         let mut formula_offsets = Vec::with_capacity(formulas.len());
         let mut formula_sources = Vec::with_capacity(formulas.len());
@@ -1680,7 +1714,7 @@ impl CellStore {
                 .checked_add(col as usize)?;
             references.push((offset as u32, target));
         }
-        references.sort_unstable_by_key(|(offset, _)| *offset);
+        sort_by_key96(&mut references, |(offset, _)| u128::from(*offset));
         let mut reference_offsets = Vec::with_capacity(references.len());
         let mut reference_targets = Vec::with_capacity(references.len().saturating_mul(3));
         for (offset, target) in references {
@@ -2244,6 +2278,12 @@ impl CellStore {
         }
     }
 
+    /// Define `name` in `scope` (a sheet handle, or -1 for the workbook) as
+    /// the cells `row_start..=row_end`, `col_start..=col_end` of `sheet`.
+    /// It replaces a range or formula of the same name and scope, and the
+    /// formulas that use the name are bound again. Rejects a name that is
+    /// not formula-safe or that a table has, a removed sheet, and a range
+    /// outside the sheet.
     #[wasm_bindgen(js_name = setNamedRange)]
     #[expect(
         clippy::too_many_arguments,
@@ -2280,9 +2320,10 @@ impl CellStore {
             row_end: row_end as u32,
             col_end: col_end as u32,
         };
+        let changed = vec![key.1.clone()];
         self.defined_names
             .insert(key, names::DefinedName::Range(definition));
-        self.refresh_named_formula_entries();
+        self.rebind_name_users(changed);
         self.recompute_all_sheets();
         true
     }
@@ -2295,7 +2336,7 @@ impl CellStore {
         if self.defined_names.remove(&key).is_none() {
             return false;
         }
-        self.refresh_named_formula_entries();
+        self.rebind_name_users(vec![key.1]);
         self.recompute_all_sheets();
         true
     }
@@ -2331,6 +2372,15 @@ impl CellStore {
         true
     }
 
+    /// Add the table `id`, or replace it, over the cells
+    /// `row_start..=row_end`, `col_start..=col_end` of `sheet`: one column
+    /// per entry of `column_ids`, named by `column_names`, with an optional
+    /// header row and totals row. The formulas that use the table, or that
+    /// waited for a table of this name, are bound again. Rejects an empty
+    /// or over-long id or name, a name that is not formula-safe or that a
+    /// defined name or another table has, a removed sheet, a range outside
+    /// the sheet or whose width differs from the column count, repeated
+    /// column ids or names, and a range that overlaps another table.
     #[wasm_bindgen(js_name = setTable)]
     #[expect(
         clippy::too_many_arguments,
@@ -2442,6 +2492,8 @@ impl CellStore {
         true
     }
 
+    /// Remove the table `id`. Its references in formulas become `#REF!`.
+    /// Returns whether the table existed.
     #[wasm_bindgen(js_name = removeTable)]
     pub fn remove_table(&mut self, id: &str) -> bool {
         let Some(slot) = self.tables.with_id(id).map(|(slot, _)| slot) else {
@@ -3490,10 +3542,10 @@ impl CellStore {
         }
         self.drop_invalid_references();
         self.rebase_table_rows(edited_sheet, at, delta);
-        let ranges_changed = self.rebase_named_rows(edited_sheet, at, delta);
-        if self.shift_named_formulas(edited_sheet, at, delta, false) || ranges_changed {
-            self.refresh_named_formula_entries();
-        }
+        let mut changed = Vec::new();
+        self.rebase_named_ranges(edited_sheet, (at, delta), false, &mut changed);
+        self.shift_named_formulas(edited_sheet, (at, delta), false, &mut changed);
+        self.rebind_name_users(changed);
     }
 
     fn rewrite_formula_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
@@ -3509,10 +3561,10 @@ impl CellStore {
         }
         self.drop_invalid_references();
         self.rebase_table_cols(edited_sheet, at, delta);
-        let ranges_changed = self.rebase_named_cols(edited_sheet, at, delta);
-        if self.shift_named_formulas(edited_sheet, at, delta, true) || ranges_changed {
-            self.refresh_named_formula_entries();
-        }
+        let mut changed = Vec::new();
+        self.rebase_named_ranges(edited_sheet, (at, delta), true, &mut changed);
+        self.shift_named_formulas(edited_sheet, (at, delta), true, &mut changed);
+        self.rebind_name_users(changed);
     }
 
     /// Follow `block` (`from`, `count`, `to`) rows or, with `columns`,
@@ -3574,9 +3626,9 @@ impl CellStore {
         self.shift_pivots(edited_sheet as usize, axis, from, -i64::from(count));
         self.shift_pivots(edited_sheet as usize, axis, to, i64::from(count));
 
-        if self.move_named_references(edited_sheet, columns, block) {
-            self.refresh_named_formula_entries();
-        }
+        let mut changed = Vec::new();
+        self.move_named_references(edited_sheet, columns, block, &mut changed);
+        self.rebind_name_users(changed);
         self.graph.invalidate();
     }
 
@@ -3672,8 +3724,8 @@ impl CellStore {
     /// stable column id, and bind the formulas whose table reference waited
     /// for a table. Only those formulas change; their reads are patched in
     /// the dependency index and they recalculate. A defined name's formula
-    /// uses tables through expansions the index does not list, so while one
-    /// does, every formula is resolved again after that.
+    /// uses tables through expansions the index does not list, so the users
+    /// of such names are bound again too.
     fn after_table_edit(&mut self, slot: u16, replaced: Option<&Table>) {
         if let Some(previous) = replaced {
             let own_rows = !self
@@ -3705,9 +3757,9 @@ impl CellStore {
         self.rebind_table_users(waiting, &|entry, location, tables| {
             entry.bind_tables(location, tables)
         });
-        if self.names_use_tables() {
-            self.refresh_named_formula_entries();
-        }
+        let mut changed = Vec::new();
+        self.add_names_over_tables(&mut changed);
+        self.rebind_name_users(changed);
     }
 
     /// Give each of `formulas` the entry `rebind` makes of it, if any: the
@@ -3720,24 +3772,30 @@ impl CellStore {
                 continue;
             };
             let tables = &self.tables;
-            let Some(entry) = self
+            if let Some(entry) = self
                 .formula_slots
                 .get_mut(formula)
                 .and_then(|entry| rebind(entry, location, tables))
-            else {
-                continue;
-            };
-            let sheet = location.sheet as usize;
-            let data = &mut self.sheets[sheet];
-            self.graph.replace_entry(
-                &mut data.formulas,
-                &mut self.formula_slots,
-                sheet,
-                location.local(),
-                Some(entry),
-            );
-            data.formulas.mark_cell_dirty(location.local());
+            {
+                self.replace_bound_formula(location, entry);
+            }
         }
+    }
+
+    /// Store `entry` again for the formula at `location`, whose tree a
+    /// binding changed: the dependency index patches its reads and the
+    /// formula recalculates.
+    fn replace_bound_formula(&mut self, location: AbsCellKey, entry: FormulaEntry) {
+        let sheet = location.sheet as usize;
+        let data = &mut self.sheets[sheet];
+        self.graph.replace_entry(
+            &mut data.formulas,
+            &mut self.formula_slots,
+            sheet,
+            location.local(),
+            Some(entry),
+        );
+        data.formulas.mark_cell_dirty(location.local());
     }
 
     pub(crate) fn parse_formula_entry(
@@ -3898,14 +3956,8 @@ impl CellStore {
     /// Naming a sheet visits only formulas whose retained tree names it.
     /// Stable ids keep this index correct when formulas move between cells.
     fn bind_pending_sheet_formulas(&mut self, id: &str, name: &str) -> Vec<usize> {
-        let mut users: FxHashSet<_> = self
-            .formula_slots
-            .unresolved_sheet_users(&sheet_name_key(name))
-            .collect();
-        users.extend(
-            self.formula_slots
-                .unresolved_sheet_users(&sheet_name_key(id)),
-        );
+        let keys = [sheet_name_key(name), sheet_name_key(id)];
+        let users = self.formula_slots.unresolved_sheet_users(&keys);
         if users.is_empty() {
             return Vec::new();
         }
@@ -3979,52 +4031,40 @@ impl CellStore {
         Ok(ast)
     }
 
-    fn rebase_named_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
-        let mut removed = Vec::new();
-        let mut changed = false;
-        for (key, definition) in &mut self.defined_names {
+    /// Follow a row (or, with `columns`, column) insertion or deletion of
+    /// `delta` at `at` on `edited_sheet` in every named range, adding the
+    /// names it moved or removed to `changed`. A range the edit deletes
+    /// whole is removed.
+    fn rebase_named_ranges(
+        &mut self,
+        edited_sheet: u32,
+        (at, delta): (u32, i64),
+        columns: bool,
+        changed: &mut Vec<String>,
+    ) {
+        self.defined_names.retain(|(_, name), definition| {
             let names::DefinedName::Range(range) = definition else {
-                continue;
+                return true;
             };
             if range.sheet != edited_sheet {
-                continue;
+                return true;
             }
-            if let Some((start, end)) = shift_range(range.row_start, range.row_end, at, delta) {
-                range.row_start = start;
-                range.row_end = end;
+            let (start, end) = if columns {
+                (&mut range.col_start, &mut range.col_end)
             } else {
-                removed.push(key.clone());
-            }
-            changed = true;
-        }
-        for key in removed {
-            self.defined_names.remove(&key);
-        }
-        changed
-    }
-
-    fn rebase_named_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) -> bool {
-        let mut removed = Vec::new();
-        let mut changed = false;
-        for (key, definition) in &mut self.defined_names {
-            let names::DefinedName::Range(range) = definition else {
-                continue;
+                (&mut range.row_start, &mut range.row_end)
             };
-            if range.sheet != edited_sheet {
-                continue;
+            let shifted = shift_range(*start, *end, at, delta);
+            if shifted == Some((*start, *end)) {
+                return true;
             }
-            if let Some((start, end)) = shift_range(range.col_start, range.col_end, at, delta) {
-                range.col_start = start;
-                range.col_end = end;
-            } else {
-                removed.push(key.clone());
-            }
-            changed = true;
-        }
-        for key in removed {
-            self.defined_names.remove(&key);
-        }
-        changed
+            changed.push(name.clone());
+            let Some(span) = shifted else {
+                return false;
+            };
+            (*start, *end) = span;
+            true
+        });
     }
 
     // A table's references follow the edit in each formula tree, so moving
@@ -4144,38 +4184,6 @@ impl CellStore {
 
         affected
     }
-
-    fn refresh_named_formula_entries(&mut self) {
-        self.resolve_name_definitions();
-        for formula_sheet in 0..self.sheets.len() {
-            if self.sheet_alive.get(formula_sheet) != Some(&true) {
-                continue;
-            }
-            let sources: Vec<_> = self.sheets[formula_sheet]
-                .formulas
-                .iter(&self.formula_slots)
-                .filter(|(_, entry)| entry.is_formula())
-                .map(|(key, entry)| (key, entry.source(&self.written_names()).into_owned()))
-                .collect();
-            let refreshed: Vec<_> = sources
-                .into_iter()
-                .map(|(key, source)| {
-                    (
-                        key,
-                        self.parse_formula_entry(&source, formula_sheet as u32, key.0, key.1),
-                    )
-                })
-                .collect();
-            let sheet = &mut self.sheets[formula_sheet];
-            for (key, entry) in refreshed {
-                sheet
-                    .formulas
-                    .insert(key, entry, formula_sheet, &mut self.formula_slots);
-            }
-            sheet.formulas.mark_all_dirty();
-        }
-        self.graph.invalidate();
-    }
 }
 
 /// A resolved formula tree, and what its parse found: whether a sheet
@@ -4250,16 +4258,19 @@ pub struct CellSnapshot {
 
 #[wasm_bindgen]
 impl CellSnapshot {
+    /// The kind of each cell's value (`KIND_*`), as [`CellOut::kind`] reports it.
     #[wasm_bindgen(getter, js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kinds.clone()
     }
 
+    /// Each cell's number, for number and boolean cells.
     #[wasm_bindgen(getter, js_name = numbers)]
     pub fn numbers(&self) -> Vec<f64> {
         self.numbers.clone()
     }
 
+    /// Each cell's style id.
     #[wasm_bindgen(getter, js_name = styles)]
     pub fn styles(&self) -> Vec<u32> {
         self.styles.clone()
@@ -4271,6 +4282,8 @@ impl CellSnapshot {
         self.text_index.clone()
     }
 
+    /// The text of each cell that has one, in cell order; [`Self::text_index`]
+    /// gives a cell's entry.
     #[wasm_bindgen(getter, js_name = strings)]
     pub fn strings(&self) -> Vec<String> {
         self.strings.clone()

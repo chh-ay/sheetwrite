@@ -16,7 +16,7 @@ use crate::types::{EvalResult, FormulaError, Value};
 use super::array::static_integer;
 use super::lookup::integer_arg;
 use super::matrix::{optional_ast, range_from_ast, EvalMatrix};
-use super::range_view::{ArrayView, RangeView};
+use super::range_view::{ArrayView, RangeView, ValueRows};
 use super::EvalPass;
 
 /// The row argument is the second argument of INDEX.
@@ -85,12 +85,17 @@ impl CellStore {
             Some(range) => {
                 let view = RangeView::new(self, range, depth + 1)?;
                 if index_selects_whole_axis(args) {
-                    ArrayView::Matrix(view.materialize(pass)?)
+                    ArrayView::Rows(ValueRows::matrix(view.materialize(pass)?))
                 } else {
                     ArrayView::Range(view)
                 }
             }
-            None => ArrayView::Matrix(self.eval_matrix_arg(area, sheet, pass, depth + 1)?),
+            None => ArrayView::Rows(ValueRows::matrix(self.eval_matrix_arg(
+                area,
+                sheet,
+                pass,
+                depth + 1,
+            )?)),
         };
         let (rows, cols) = matrix.shape();
         let first = position(&self.eval_ast(&args[ROW_ARG], sheet, pass, depth + 1))?;

@@ -8,7 +8,8 @@ import { Island } from "../islands/Island.js";
 import { InteropStage } from "../showcases/interop/InteropStage.js";
 import { InteropLabs } from "../showcases/interop/labs/InteropLabs.js";
 import { SpillProof } from "../showcases/interop/SpillProof.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import {
   ADVERSARIAL_FIXTURES,
   POSITIVE_FIXTURES,

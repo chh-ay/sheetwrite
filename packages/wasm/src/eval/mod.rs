@@ -56,11 +56,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::cmp::Ordering;
 
-use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, RangeFlags, RefFlags, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
+use crate::sorting::{key96, sort_by_key96};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::CellStore;
 use crate::types::{
@@ -106,6 +107,13 @@ thread_local! {
     /// its guard restores the enclosing value, so nested evaluations keep a
     /// stack on the native stack without a heap list.
     static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
+    /// Rows and columns that relative references of the expression being
+    /// evaluated move by. A conditional-format rule's one parsed expression
+    /// is written for the rule range's top-left cell; at every other cell it
+    /// reads with that cell's distance from it. Only [`read_shifted`] sets
+    /// it, so ordinary recalculation never writes it and always reads
+    /// (0, 0).
+    static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
 }
 
 #[cfg(test)]
@@ -138,6 +146,50 @@ impl Drop for FormulaOriginGuard {
 /// The cell whose formula is being evaluated, or nothing outside a formula.
 pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGIN.with(Cell::get)
+}
+
+/// Run `read` with relative references moved by `shift`, then restore the
+/// enclosing shift. A shift of (0, 0) reads a tree this evaluation parsed
+/// itself, such as INDIRECT's text: it is placed for the target cell already,
+/// so a conditional-format shift must not move it again.
+pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
+    let enclosing = REFERENCE_SHIFT.with(|current| current.replace(shift));
+    let value = read();
+    REFERENCE_SHIFT.with(|current| current.set(enclosing));
+    value
+}
+
+/// Where a reference node's cell is read in this evaluation: its relative
+/// axes moved by the reference shift, its `$` axes as written. The caller
+/// that sets a shift keeps every shifted reference inside the sheet.
+#[inline]
+pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
+    let (row_shift, col_shift) = REFERENCE_SHIFT.with(Cell::get);
+    (
+        if flags.row_abs() {
+            row
+        } else {
+            row.wrapping_add(row_shift)
+        },
+        if flags.col_abs() {
+            col
+        } else {
+            col.wrapping_add(col_shift)
+        },
+    )
+}
+
+/// The range a reference node names in this evaluation; see [`placed_cell`].
+#[inline]
+pub(crate) fn placed_range(
+    sheet: u32,
+    (row_start, col_start): (u32, u32),
+    (row_end, col_end): (u32, u32),
+    flags: RangeFlags,
+) -> CellRange {
+    let start = placed_cell(row_start, col_start, flags.start);
+    let end = placed_cell(row_end, col_end, flags.end);
+    CellRange::new(sheet, start.0, start.1, end.0, end.1)
 }
 
 /// State shared by every evaluation in one recompute pass: the formulas the
@@ -199,19 +251,18 @@ pub(crate) fn settled_cell_value(
     if !sheet.cells.contains_cell(row, col) {
         return Value::Error(FormulaError::Ref);
     }
-    if !sheet.cells.is_loaded(row, col) {
+    let Some((source_kind, source_payload)) = sheet.cells.loaded_source_at(row, col) else {
         return Value::Error(FormulaError::Loading);
-    }
+    };
 
     let index = sheet.cells.idx(row, col);
-    let source_kind = sheet.cells.source_kind_at(index);
     let (kind, payload) = if source_kind == KIND_EMPTY {
         sheet
             .cells
             .calculated_cell_at(index)
             .unwrap_or((KIND_EMPTY, 0))
     } else {
-        (source_kind, sheet.cells.source_payload_at(index))
+        (source_kind, source_payload)
     };
     if kind != KIND_FORMULA {
         return literal_cell_value(strings, kind, payload);
@@ -681,7 +732,9 @@ impl ChangedOutputs {
                 Some((bounds, change.sequence))
             })
             .collect();
-        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+        sort_by_key96(&mut outputs, |(bounds, _)| {
+            key96(0, bounds.sheet, bounds.row_start)
+        });
 
         let leaves = outputs.len().next_power_of_two();
         let mut last_rows = vec![0; leaves * 2];
@@ -1045,7 +1098,7 @@ impl CellStore {
                 break;
             }
 
-            pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
+            sort_by_key96(&mut pending, |(key, ..)| key96(key.sheet, key.row, key.col));
 
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
@@ -1614,18 +1667,17 @@ impl CellStore {
             return Value::Error(FormulaError::Ref);
         }
 
-        if !s.cells.is_loaded(row, col) {
+        let Some((source_kind, source_payload)) = s.cells.loaded_source_at(row, col) else {
             return Value::Error(FormulaError::Loading);
-        }
+        };
 
         let i = s.cells.idx(row, col);
         // Literal sources cannot be shadowed by calculated output. Decode their
         // payload directly instead of resolving the overlay a second time.
-        let source_kind = s.cells.source_kind_at(i);
         let (kind, payload) = if source_kind == KIND_EMPTY {
             s.cells.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
         } else {
-            (source_kind, s.cells.source_payload_at(i))
+            (source_kind, source_payload)
         };
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
@@ -1750,15 +1802,19 @@ impl CellStore {
         }
     }
 
-    /// Evaluate a parsed conditional-format expression at one target cell.
-    /// Referenced formula cells use their recomputed cache; the origin guard
-    /// gives zero-argument ROW/COLUMN the target cell's coordinates.
+    /// Evaluate a conditional-format rule's parsed expression at one target
+    /// cell. `shift` is the target's distance from the cell the expression
+    /// is written for, which its relative references move by; the caller
+    /// keeps every shifted reference inside the sheet. The pass recomputes
+    /// nothing, so referenced formula cells use their recomputed cache and no
+    /// other formula evaluates under the shift. The origin guard gives
+    /// zero-argument ROW/COLUMN the target cell's coordinates.
     pub(crate) fn eval_conditional_ast(
         &self,
         ast: &Ast,
         sheet: usize,
-        row: u32,
-        col: u32,
+        target: (u32, u32),
+        shift: (u32, u32),
         results: &mut FormulaResults,
     ) -> EvalResult {
         let affected = FormulaWork::default();
@@ -1766,8 +1822,8 @@ impl CellStore {
             affected: &affected,
             results,
         };
-        let _origin = FormulaOriginGuard::push((row, col));
-        self.eval_ast(ast, sheet, &mut pass, 0)
+        let _origin = FormulaOriginGuard::push(target);
+        read_shifted(shift, || self.eval_ast(ast, sheet, &mut pass, 0))
     }
 
     pub(crate) fn eval_ast(
@@ -1797,7 +1853,7 @@ impl CellStore {
 
                 analysis::lambda::evaluate(
                     self,
-                    analysis::lambda::CALL,
+                    analysis::lambda::Invocation::Call,
                     args,
                     sheet,
                     pass,
@@ -1812,16 +1868,26 @@ impl CellStore {
                 let crate::calc::ArrayLiteral { values, .. } = &**array;
                 values.first().cloned().unwrap_or(Value::Blank)
             }
-            Ast::Cell(row, col, _) => {
-                self.eval_at(sheet, *row as usize, *col as usize, pass, depth + 1)
+            Ast::Cell(row, col, flags) => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                self.eval_at(
+                    sheet,
+                    placed_row as usize,
+                    placed_col as usize,
+                    pass,
+                    depth + 1,
+                )
             }
-            Ast::AbsCell(sheet_ref, row, col, _) => self.eval_at(
-                sheet_ref.handle as usize,
-                *row as usize,
-                *col as usize,
-                pass,
-                depth + 1,
-            ),
+            Ast::AbsCell(sheet_ref, row, col, flags) => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                self.eval_at(
+                    sheet_ref.handle as usize,
+                    placed_row as usize,
+                    placed_col as usize,
+                    pass,
+                    depth + 1,
+                )
+            }
             // A sheet reference that ingest did not resolve names another
             // workbook, which has no values here.
             Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {
@@ -2061,11 +2127,10 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
             let family = analysis::family(id);
             if let Some(hooks) = &family.array {
-                if (hooks.produces_array)(name, args, pass.shapes()) {
-                    return match (hooks.evaluate)(self, name, args, sheet, pass, depth).and_then(
+                if (hooks.produces_array)(id, args, pass.shapes()) {
+                    return match (hooks.evaluate)(self, id, args, sheet, pass, depth).and_then(
                         |matrix| {
                             matrix.validate_bytes()?;
                             Ok(matrix)
@@ -2077,7 +2142,7 @@ impl CellStore {
                 }
             }
             if let Some(evaluate) = family.evaluate_ast {
-                return evaluate(self, name, args, sheet, pass, depth);
+                return evaluate(self, id, args, sheet, pass, depth);
             }
         }
 
@@ -2247,7 +2312,6 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
             let result = match id {
                 analysis::SUMSQ_ID => {
                     analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1)
@@ -2255,7 +2319,7 @@ impl CellStore {
                 analysis::SUMX2MY2_ID | analysis::SUMX2PY2_ID | analysis::SUMXMY2_ID => {
                     analysis::math::streamed_paired_squares(
                         self,
-                        name,
+                        analysis::math::Function::of(id),
                         args,
                         sheet,
                         pass,

@@ -14,11 +14,17 @@ import type {
 
 /** Resource ceilings for canonical workbook-table metadata and identifiers. */
 export interface WorkbookTableResourceLimits {
+  /** The largest number of tables in one workbook; defaults to 1,024. */
   maxTables: number;
+  /** The largest number of columns in one table; defaults to 16,384. */
   maxColumnsPerTable: number;
+  /** The longest table or column name, in UTF-16 code units; defaults to 255. */
   maxNameLength: number;
+  /** The longest table or column ID, in UTF-16 code units; defaults to 128. */
   maxIdLength: number;
+  /** The longest table style name, in UTF-16 code units; defaults to 255. */
   maxStyleNameLength: number;
+  /** The largest number of kept Excel features that Sheetwrite does not model, on one table; defaults to 16. */
   maxUnsupportedFeaturesPerTable: number;
 }
 
@@ -61,12 +67,23 @@ const UNSUPPORTED_FEATURES: Readonly<Record<WorkbookTableUnsupportedFeature, tru
   },
 );
 
-/** Locale-independent key used for table and table-column collision checks. */
+/**
+ * Locale-independent key used for table and table-column collision checks.
+ *
+ * @param name - A table or column name.
+ * @returns The name in NFC form and upper case, so names that differ only in case match.
+ */
 export function workbookTableNameKey(name: string): string {
   return formulaNameKey(name);
 }
 
-/** Validate and NFC-normalize an ECMA-compatible structured-reference name. */
+/**
+ * Validate and NFC-normalize an ECMA-compatible structured-reference name.
+ *
+ * @param input - The name to check, such as `Sales_2024`.
+ * @param existingNames - Names already in use; a match, ignoring case, gives `duplicate`.
+ * @param maxLength - The longest allowed name, in UTF-16 code units; defaults to 255.
+ */
 export function validateWorkbookTableName(
   input: string,
   existingNames: readonly string[] = [],
@@ -168,6 +185,11 @@ const TOTALS_FUNCTIONS = new Set([
 /**
  * Validate inert table-rule trees before they enter snapshots or XML output.
  * A whitelist prevents this persistence seam from becoming arbitrary markup.
+ *
+ * @param value - The rule tree to check, from outside your code.
+ * @param expectedName - The element name the root must have, such as `autoFilter`.
+ * @param budget - Node and text counters shared across several calls; omit for one tree.
+ * @returns `true` when the tree is within the allowed elements, depth and size.
  */
 export function validWorkbookTableXmlElement(
   value: unknown,
@@ -373,7 +395,14 @@ function validStyle(
   ].every((value) => value === undefined || typeof value === "boolean");
 }
 
-/** Validate one canonical table against sheet bounds and workbook-global identities. */
+/**
+ * Validate one canonical table against sheet bounds and workbook-global identities.
+ *
+ * @param existing - Tables already accepted; the new one must not share an ID or
+ *   name with them, or overlap them.
+ * @param limits - The limits to check against; defaults to the built-in limits.
+ * @returns `true` when the table is valid.
+ */
 export function validWorkbookTable(
   table: WorkbookTable,
   sheet: Sheet,
@@ -454,7 +483,15 @@ export function validWorkbookTable(
   return !existing.some((candidate) => rangesIntersect(candidate.range, table.range));
 }
 
-/** Reject an invalid or oversized live workbook before table arrays are copied to WASM. */
+/**
+ * Reject an invalid or oversized live workbook before table arrays are copied to WASM.
+ *
+ * @param sheets - The workbook's sheets, with their tables.
+ * @param limits - The limits to check against; defaults to the built-in limits.
+ * @param reservedNames - Names tables must not use, such as the workbook's defined names.
+ * @throws SheetwriteError with code `resource-limit` when there are too many tables,
+ *   and `invalid-snapshot` when a table is invalid or its name is taken.
+ */
 export function assertWorkbookTables(
   sheets: readonly Sheet[],
   limits: Readonly<WorkbookTableResourceLimits> = DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,

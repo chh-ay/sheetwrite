@@ -33,6 +33,8 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   const HEAD_LENGTH = 6;
   /** Rects smaller than this are marks, swatches or cells, not boxes. */
   const MIN_BOX = { width: 24, height: 16 };
+  /** A bent connector whose legs sit closer than this is a jog: the boxes should line up instead. */
+  const MIN_JOG = 8;
   /** Shapes smaller than this are dots and ticks; they can't hide anything. */
   const MIN_SHAPE = 8;
   /** A frame with at least this corner radius has corners a shape can poke out of. */
@@ -259,6 +261,19 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         )
         .sort((a, b) => a.width * a.height - b.width * b.height)[0];
       if (holder === undefined) continue;
+      // Text on a filled badge drawn over the box belongs to the badge.
+      const holderIndex = drawn.findIndex((candidate) => candidate.box === holder);
+      const textIndex = drawn.findIndex((candidate) => candidate.element === element);
+      const onBadge = drawn.some(
+        (badge, badgeIndex) =>
+          badgeIndex > holderIndex &&
+          badgeIndex < textIndex &&
+          badge.element.tagName !== "text" &&
+          badge.element.tagName !== "rect" &&
+          isFilled(badge.element) &&
+          contains(badge.box, { ...centre, width: 0, height: 0 }),
+      );
+      if (onBadge) continue;
       const over = Math.max(
         holder.x + 2 - box.x,
         box.x + box.width - (holder.x + holder.width - 2),
@@ -297,7 +312,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
 
     // Shapes drawn later than a box either stay clear of it, sit inside it, or hide what is under them.
     drawn.forEach((later, laterIndex) => {
-      if (later.element.tagName === "text") return;
+      if (later.element.tagName === "text" || later.element.classList.contains("mark")) return;
       if (later.box.width < MIN_SHAPE || later.box.height < MIN_SHAPE) return;
       for (const earlier of boxes) {
         if (drawn.indexOf(earlier) >= laterIndex) continue;
@@ -311,7 +326,18 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
           report(
             `boxes at ${at(earlier.box)} and ${at(later.box)} overlap by ${round(shared.width)} × ${round(shared.height)}`,
           );
-        } else if (!isFilled(later.element)) {
+        } else if (
+          !isFilled(later.element) &&
+          // A mark on a filled badge, drawn after the box, sits on the badge, not on the box.
+          !drawn.some(
+            (badge, badgeIndex) =>
+              badgeIndex > drawn.indexOf(earlier) &&
+              badgeIndex < laterIndex &&
+              badge.element.tagName !== "text" &&
+              isFilled(badge.element) &&
+              contains(badge.box, later.box),
+          )
+        ) {
           report(
             `a ${later.element.tagName} at ${at(later.box)} is drawn over the box at ${at(earlier.box)} without hiding it`,
           );
@@ -343,11 +369,40 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
     }
 
     // Arrows: the lines that end in the art's arrowhead.
-    const paths = drawn.filter(({ element }) => element instanceof SVGPathElement);
+    // A `mark` is an arrow-shaped glyph, such as a sort or refresh icon, not a connector.
+    const paths = drawn.filter(
+      ({ element }) => element instanceof SVGPathElement && !element.classList.contains("mark"),
+    );
     const lines = paths.map(({ element }) => subpaths(element.getAttribute("d") ?? ""));
     const tips: { tip: Point; box: Box }[] = [];
+    // Arrows may also join closed, filled outlines such as a file icon.
+    const targets = [
+      ...boxes,
+      ...drawn.filter(
+        ({ element, box }) =>
+          element instanceof SVGPathElement &&
+          /z\s*$/i.test(element.getAttribute("d") ?? "") &&
+          isFilled(element) &&
+          box.width >= MIN_BOX.width &&
+          box.height >= MIN_BOX.height,
+      ),
+    ];
     const nearestBox = (point: Point) =>
-      boxes.map(({ box }) => ({ box, gap: toEdge(point, box) })).sort((a, b) => a.gap - b.gap)[0];
+      targets.map(({ box }) => ({ box, gap: toEdge(point, box) })).sort((a, b) => a.gap - b.gap)[0];
+    /** Whether a point lies on a line drawn by any other path. */
+    const touchesOtherLine = (point: Point, index: number) =>
+      lines.some(
+        (other, otherIndex) =>
+          otherIndex !== index &&
+          other.some((points) =>
+            points
+              .slice(1)
+              .some(
+                (next, pointIndex) =>
+                  toSegment(point, points[pointIndex] as Point, next) <= TOLERANCE,
+              ),
+          ),
+      );
     lines.forEach((parts, index) => {
       const head = parts.at(-1);
       const shaft = parts.slice(0, -1);
@@ -362,27 +417,26 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
       }
       const tip = head[1] as Point;
       const start = shaft[0]?.[0] as Point;
+      // A shaft that bends but stays within a narrow band is a jog between nearly aligned boxes.
+      const shaftPoints = shaft.flat();
+      const xs = shaftPoints.map((point) => point.x);
+      const ys = shaftPoints.map((point) => point.y);
+      const spread = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+      if (spread > 0.5 && spread < MIN_JOG) {
+        report(`an arrow into ${at(tip)} jogs ${round(spread)} sideways; line its boxes up`);
+      }
       const end = nearestBox(tip);
-      if (end === undefined || end.gap > TOLERANCE) {
+      // In a sequence, a message ends on another lane's lifeline.
+      const tipOnLine = touchesOtherLine(tip, index);
+      if (!tipOnLine && (end === undefined || end.gap > TOLERANCE)) {
         report(
           `an arrow ends at ${at(tip)}, ${end === undefined ? "with no box" : `${round(end.gap)} from the nearest box edge`}`,
         );
-      } else {
+      } else if (end !== undefined && end.gap <= TOLERANCE) {
         tips.push({ tip, box: end.box });
       }
-      // A branch may start on another line, such as a fan's bus.
-      const onLine = lines.some(
-        (other, otherIndex) =>
-          otherIndex !== index &&
-          other.some((points) =>
-            points
-              .slice(1)
-              .some(
-                (point, pointIndex) =>
-                  toSegment(start, points[pointIndex] as Point, point) <= TOLERANCE,
-              ),
-          ),
-      );
+      // A branch may start on another line, such as a fan's bus or a lane's lifeline.
+      const onLine = touchesOtherLine(start, index);
       const begin = nearestBox(start);
       if (!onLine && (begin === undefined || begin.gap > TOLERANCE)) {
         report(

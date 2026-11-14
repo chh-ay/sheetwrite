@@ -263,6 +263,9 @@ export type WorkerAcknowledgement =
  * Build the worker-side protocol handler. Keeping the mutable render state
  * inside the returned closure lets tests exercise the real message contract
  * without booting a browser Worker.
+ *
+ * @param postAcknowledgement - Sends a status message back to the main thread.
+ * @returns The function to call with each message the worker receives.
  */
 export function createWorkerMessageHandler(
   postAcknowledgement: (message: WorkerAcknowledgement) => void,
