@@ -166,13 +166,15 @@ describe("re-export documentation", () => {
     });
   });
 
-  it("keeps param and returns tags without their JSDoc types, and drops empty ones", async () => {
+  it("keeps param, returns and throws tags, a thrown type as code, and drops empty ones", async () => {
     const tagged = [
       "/**",
       " * Mounts a widget.",
       " * @param {object} host - Element the widget mounts into.",
       " * @param size",
       " * @returns {number} The widget's id.",
+      " * @throws {TypeError} when `host` is detached.",
+      " * @throws SheetwriteError with code `aborted` when cancelled.",
       " */",
       "export declare function mount(host: object, size: number): number;",
       "/**",
@@ -188,7 +190,7 @@ describe("re-export documentation", () => {
     const documentation = (name: string) =>
       exports.find((candidate) => candidate.name === name)?.documentation;
     expect(documentation("mount")).toBe(
-      "Mounts a widget.\n@param host - Element the widget mounts into.\n@returns The widget's id.",
+      "Mounts a widget.\n@param host - Element the widget mounts into.\n@returns The widget's id.\n@throws `TypeError` when `host` is detached.\n@throws SheetwriteError with code `aborted` when cancelled.",
     );
     expect(documentation("nothing")).toBe("Reads nothing.");
   });

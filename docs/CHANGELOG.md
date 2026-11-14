@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The API reference shows `@throws`: a function page lists each under "Throws" (the error and when it is thrown), and a member card shows its parameters, return value and throws as labelled lines instead of raw `@param` and `@returns` text. The API manifest kept no `@throws` before.
+- Code-sample hover popovers show a symbol's summary, with its parameters, return value and throws as tag lines; the doc text from the API manifest no longer shows raw `@param` and `@returns` inline.
 - The API reference shows `InitOutput` (`@sheetwrite/wasm`, `@sheetwrite/formulas`) as one card with no member list: its members are the raw module exports wasm-bindgen generates for the loader, not API to call. `docs:generate` no longer counts them as undescribed. The `free()` method wasm-bindgen adds to each engine class, which has no doc source, gets one shared description.
 - A class constructor's doc comment shows on its card in the API reference; it was read under the name `new` and lost, so `docs:generate` also counted documented constructors as undescribed.
 - The API reference shows `@param` and `@returns` text on the Parameters and Returns cards. The API manifest kept only `@example` and `@see` tags, so every described parameter and return value showed its type's summary or nothing, and `docs:generate` counted it as undescribed.

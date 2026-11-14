@@ -41,8 +41,36 @@ function entrySlug(packageName: string, subpath: string): string {
     : `${packageSlug}-${subpath.replace(/^\.\//, "").replace(/[^a-zA-Z0-9]+/g, "-")}`;
 }
 
+/** A JSDoc tag as `[name, text]`, the shape the language server's hovers use. */
+export type DocumentationTag = [name: string, text: string | undefined];
+
+/** A manifest doc comment split into its summary and its tags. */
+export interface SplitDocumentation {
+  docs?: string;
+  tags: readonly DocumentationTag[];
+}
+
+/**
+ * The manifest keeps `@param`, `@returns`, `@throws`, `@example` and `@see` in
+ * the doc text, one per line; hovers show the summary and render tags apart.
+ */
+export function splitDocumentation(documentation: string | undefined): SplitDocumentation {
+  const sections = (documentation ?? "").split(/(?:^|\n)@(\w+)\b[ \t]*\n?/);
+  const tags: DocumentationTag[] = [];
+  for (let index = 1; index < sections.length; index += 2) {
+    const name = sections[index] ?? "";
+    const raw = sections[index + 1]?.trim() ?? "";
+    // `@param name - text` reads as `name text`, as the language server's hovers give it.
+    const text = name === "param" ? raw.replace(/^([\w$.]+)\s+-\s+/, "$1 ") : raw;
+    tags.push([name, text === "" ? undefined : text]);
+  }
+  const docs = sections[0]?.trim();
+  return { docs: docs === "" ? undefined : docs, tags };
+}
+
 export interface MemberReference {
   docs: string;
+  tags: readonly DocumentationTag[];
   route: string;
 }
 
@@ -78,6 +106,7 @@ export function apiReferenceRoutes(manifest: ApiManifestShape): ReadonlyMap<stri
 export interface SymbolPreview {
   signature: string;
   docs?: string;
+  tags: readonly DocumentationTag[];
 }
 
 /**
@@ -94,7 +123,7 @@ export function apiSymbolPreviews(manifest: ApiManifestShape): ReadonlyMap<strin
         if (!item.signature || previews.has(item.name)) continue;
         previews.set(item.name, {
           signature: item.signature.replace(/^export\s+/, ""),
-          docs: item.documentation || undefined,
+          ...splitDocumentation(item.documentation),
         });
       }
     }
@@ -117,9 +146,11 @@ export function apiMemberReferences(
       const slug = entrySlug(pkg.name, entry.subpath);
       for (const item of entry.exports ?? []) {
         for (const member of item.memberDocs ?? []) {
-          if (!member.documentation || members.has(member.name)) continue;
+          const { docs, tags } = splitDocumentation(member.documentation);
+          if (docs === undefined || members.has(member.name)) continue;
           members.set(member.name, {
-            docs: member.documentation,
+            docs,
+            tags,
             route: `/docs/api/${slug}/${referenceAnchor(item.name)}/#${referenceAnchor(item.name)}-${referenceAnchor(member.name)}`,
           });
         }
