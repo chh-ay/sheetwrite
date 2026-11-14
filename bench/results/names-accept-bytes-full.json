@@ -1,0 +1,15 @@
+{
+  "candidateEngineDigest": "ad4019d9eae53195465918f7b9c6c502973e5b3ffaeb90915f4845516faeb4df",
+  "rows": [
+    {
+      "key": "workload=name-define;size=10000.allocation.retainedBytes",
+      "maximum": 2561476,
+      "reason": "Names step of #325 R2: a name change patches only its users' reads in the dependency index instead of rebuilding the index, so the index keeps its patch bitset and some spare edge capacity that a full rebuild did not. The growth comes with the first name edit and stays flat after it (named_formula_tests::name_edits_retain_bounded_index_capacity). Accepted on #325."
+    },
+    {
+      "key": "workload=name-define;size=100000.allocation.retainedBytes",
+      "maximum": 25524713,
+      "reason": "Names step of #325 R2: a name change patches only its users' reads in the dependency index instead of rebuilding the index, so the index keeps its patch bitset and some spare edge capacity that a full rebuild did not. The growth comes with the first name edit and stays flat after it (named_formula_tests::name_edits_retain_bounded_index_capacity). Accepted on #325."
+    }
+  ]
+}
