@@ -1948,6 +1948,7 @@ impl CellStore {
         {
             return false;
         }
+
         let mut sources =
             FxHashMap::with_capacity_and_hasher(snapshot.formulas.len(), FxBuildHasher);
         for (row, col, entry) in &snapshot.formulas {
@@ -1972,6 +1973,7 @@ impl CellStore {
             };
             sources.insert(key, source);
         }
+
         let revision = self.local_dirty_revision();
         if let Some(dirty_revision) = revision {
             if !self.sheets[sheet].cells.prepare_dirty_rect(
@@ -1984,12 +1986,14 @@ impl CellStore {
                 return false;
             }
         }
+
         let string_ids: Vec<u32> = (0..snapshot.strings.len())
             .map(|id| {
                 self.strings
                     .intern(snapshot.strings.get(id as u32).expect("snapshot text ID"))
             })
             .collect();
+
         self.replace_range_sources(
             sheet,
             (r0, c0),
