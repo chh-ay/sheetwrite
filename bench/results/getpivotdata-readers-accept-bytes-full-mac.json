@@ -1,5 +1,5 @@
 {
-  "candidateEngineDigest": "6124797c7af67f824dc19f7e117aefce09dc55f9bdbed43f8e81e30a4ea4717f",
+  "candidateEngineDigest": "85e933317927c35222f2ee88eb4f2cd543a8ccabb3f2606b144b21f0bdd0e73d",
   "rows": [
     {
       "key": "workload=parse-load-table;size=10000.allocation.retainedBytes",
