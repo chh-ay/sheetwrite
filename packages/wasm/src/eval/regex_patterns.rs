@@ -121,53 +121,15 @@ impl PatternIndex {
     /// Replaces the literal pattern arguments of the REGEX calls in `ast`
     /// with shared pattern nodes.
     pub(crate) fn bind(&mut self, ast: &mut Ast) {
-        match ast {
-            Ast::Func(func, args) => {
-                if let Func::Analysis(id) = func {
-                    if is_regex_function(*id) {
-                        self.bind_pattern(args);
-                    }
-                }
-                for arg in args {
-                    self.bind(arg);
-                }
+        if let Ast::Func(Func::Analysis(id), args) = ast {
+            if is_regex_function(*id) {
+                self.bind_pattern(args);
             }
-            Ast::UnknownFunc(call) => {
-                let args = &mut call.args;
-
-                for arg in args {
-                    self.bind(arg);
-                }
-            }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.bind(left);
-                self.bind(right);
-            }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => self.bind(inner),
-            Ast::LetSlot { expression, .. } => self.bind(expression),
-            Ast::Lambda(definition) => self.bind(&mut std::rc::Rc::make_mut(definition).body),
-            Ast::Num(_)
-            | Ast::Str(_)
-            | Ast::Bool(_)
-            | Ast::Missing
-            | Ast::Parameter { .. }
-            | Ast::RegexPattern(_)
-            | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
-            | Ast::UnresolvedStructured(_)
-            | Ast::Structured(_)
-            | Ast::Cell(..)
-            | Ast::SheetCell(..)
-            | Ast::AbsCell(..)
-            | Ast::Range(..)
-            | Ast::SheetRange(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_)
-            | Ast::InvalidRef
-            | Ast::LetName { .. }
-            | Ast::Array { .. } => {}
         }
+        ast.fold_children_mut(&mut |child| {
+            self.bind(child);
+            false
+        });
     }
 
     /// Counts the index and each pattern text once. Compiled programs are not
