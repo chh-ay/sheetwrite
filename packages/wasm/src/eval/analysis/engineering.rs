@@ -62,7 +62,7 @@ const DECIMAL: Radix = Radix { base: 10, bits: 0 };
 const HEXADECIMAL: Radix = Radix { base: 16, bits: 40 };
 
 impl Radix {
-    fn from_letter(letter: u8) -> Self {
+    const fn from_letter(letter: u8) -> Self {
         match letter {
             b'B' => BINARY,
             b'O' => OCTAL,
@@ -72,7 +72,7 @@ impl Radix {
     }
 
     /// 2^bits: the offset between a negative value and its two's complement.
-    fn modulus(self) -> i64 {
+    const fn modulus(self) -> i64 {
         1_i64 << self.bits
     }
 

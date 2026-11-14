@@ -289,7 +289,7 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
     }
 }
 
-fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
+const fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
     match sum {
         Ok(total) => Value::Number(total),
         Err(error) => Value::Error(error),

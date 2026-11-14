@@ -49,7 +49,7 @@ pub(super) enum RewriteScope {
 }
 
 impl RewriteScope {
-    fn child(self) -> Self {
+    const fn child(self) -> Self {
         match self {
             Self::Deferred => Self::Deferred,
             Self::Root | Self::Nested => Self::Nested,
@@ -94,7 +94,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
     }
 }
 
-fn sheet_ref(handle: u32) -> SheetRef {
+const fn sheet_ref(handle: u32) -> SheetRef {
     SheetRef { handle }
 }
 
@@ -109,7 +109,7 @@ fn range_ast(range: CellRange) -> Ast {
     )
 }
 
-fn is_single_cell(range: CellRange) -> bool {
+const fn is_single_cell(range: CellRange) -> bool {
     range.row_start == range.row_end && range.col_start == range.col_end
 }
 

@@ -111,7 +111,7 @@ impl Operand {
         }
     }
 
-    fn shape(&self) -> (usize, usize) {
+    const fn shape(&self) -> (usize, usize) {
         match self {
             Self::Scalar(_) => (1, 1),
             Self::Array(matrix) => (matrix.rows, matrix.cols),

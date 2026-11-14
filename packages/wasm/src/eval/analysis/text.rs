@@ -100,7 +100,7 @@ impl Context<'_, '_> {
         Ok(delimiters)
     }
 }
-fn arity(args: &[Ast], minimum: usize, maximum: usize) -> Result<(), FormulaError> {
+const fn arity(args: &[Ast], minimum: usize, maximum: usize) -> Result<(), FormulaError> {
     if args.len() < minimum || args.len() > maximum {
         Err(FormulaError::Value)
     } else {

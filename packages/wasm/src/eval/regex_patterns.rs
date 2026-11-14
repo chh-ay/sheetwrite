@@ -36,7 +36,7 @@ pub(crate) struct SharedPattern {
 }
 
 impl SharedPattern {
-    fn new(text: Rc<str>) -> Self {
+    const fn new(text: Rc<str>) -> Self {
         Self {
             text,
             programs: [OnceCell::new(), OnceCell::new()],

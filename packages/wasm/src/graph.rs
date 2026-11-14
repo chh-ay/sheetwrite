@@ -51,7 +51,7 @@ impl DirtyRect {
         })
     }
 
-    fn cell(cell: CellKey) -> Self {
+    const fn cell(cell: CellKey) -> Self {
         Self {
             row_start: cell.0,
             col_start: cell.1,
@@ -60,14 +60,14 @@ impl DirtyRect {
         }
     }
 
-    pub(crate) fn contains(self, cell: CellKey) -> bool {
+    pub(crate) const fn contains(self, cell: CellKey) -> bool {
         self.row_start <= cell.0
             && cell.0 <= self.row_end
             && self.col_start <= cell.1
             && cell.1 <= self.col_end
     }
 
-    pub(crate) fn intersects(self, other: Self) -> bool {
+    pub(crate) const fn intersects(self, other: Self) -> bool {
         self.row_start <= other.row_end
             && other.row_start <= self.row_end
             && self.col_start <= other.col_end
@@ -177,7 +177,7 @@ impl DirtyCells {
         self.sorted_len = self.cells.len();
     }
 
-    fn is_empty(&self) -> bool {
+    const fn is_empty(&self) -> bool {
         self.cells.is_empty()
     }
 }
@@ -346,12 +346,12 @@ pub(crate) struct SheetFormulas {
 impl SheetFormulas {
     /// Formula-free sheets can skip graph and evaluator work.
     #[inline]
-    pub(crate) fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.count == 0
     }
 
     /// Count sources without scanning sparse address pages.
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.count
     }
 
@@ -415,7 +415,7 @@ impl SheetFormulas {
 
     /// Avoid a workbook membership scan for non-volatile sheets.
     #[inline]
-    pub(crate) fn has_volatile(&self) -> bool {
+    pub(crate) const fn has_volatile(&self) -> bool {
         self.volatile_count != 0
     }
 
@@ -1052,12 +1052,12 @@ impl FormulaGraph {
 
     /// The index as of the last [`Self::ensure_index`]; `None` after an
     /// invalidation.
-    pub(crate) fn index(&self) -> Option<&DepIndex> {
+    pub(crate) const fn index(&self) -> Option<&DepIndex> {
         self.index.as_ref()
     }
 
     #[cfg(test)]
-    pub(crate) fn epoch(&self) -> u64 {
+    pub(crate) const fn epoch(&self) -> u64 {
         self.epoch
     }
 

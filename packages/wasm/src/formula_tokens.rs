@@ -149,7 +149,7 @@ struct Utf16Offsets<'a> {
 }
 
 impl<'a> Utf16Offsets<'a> {
-    fn new(src: &'a str) -> Self {
+    const fn new(src: &'a str) -> Self {
         Self {
             src,
             byte: 0,
@@ -218,14 +218,14 @@ impl FormulaSyntaxError {
     /// The UTF-16 offset where the marked text starts.
     #[wasm_bindgen(getter, js_name = from)]
     #[must_use]
-    pub fn from(&self) -> u32 {
+    pub const fn from(&self) -> u32 {
         self.from
     }
 
     /// The UTF-16 offset where the marked text ends.
     #[wasm_bindgen(getter, js_name = to)]
     #[must_use]
-    pub fn to(&self) -> u32 {
+    pub const fn to(&self) -> u32 {
         self.to
     }
 
@@ -233,7 +233,7 @@ impl FormulaSyntaxError {
     /// closing quote is missing at the end. Typing on usually completes it.
     #[wasm_bindgen(getter, js_name = incomplete)]
     #[must_use]
-    pub fn incomplete(&self) -> bool {
+    pub const fn incomplete(&self) -> bool {
         self.incomplete
     }
 

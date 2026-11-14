@@ -20,11 +20,11 @@ pub(crate) struct CustomArgument {
 // the shape; the WASM adapter reads it to build nested arrays.
 #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 impl CustomArgument {
-    pub(crate) fn rows(&self) -> usize {
+    pub(crate) const fn rows(&self) -> usize {
         self.block.rows
     }
 
-    pub(crate) fn cols(&self) -> usize {
+    pub(crate) const fn cols(&self) -> usize {
         self.block.cols
     }
 

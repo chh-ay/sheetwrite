@@ -723,7 +723,7 @@ fn is_data_column(reference: &StructuredRef) -> bool {
 }
 
 /// `op` with its operands swapped: `value < column` is `column > value`.
-fn swapped(op: CmpOp) -> CmpOp {
+const fn swapped(op: CmpOp) -> CmpOp {
     match op {
         CmpOp::Lt => CmpOp::Gt,
         CmpOp::Gt => CmpOp::Lt,

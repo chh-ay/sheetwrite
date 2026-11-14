@@ -437,7 +437,7 @@ struct Resolved {
 }
 
 impl Resolved {
-    fn group(&self) -> u8 {
+    const fn group(&self) -> u8 {
         self.kind & GROUP_MASK
     }
 }
