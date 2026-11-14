@@ -1,4 +1,5 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
+import { readBlockArraysOnce } from "./block-ingress.js";
 import { chartSourceRanges } from "./chart-definition.js";
 import { dashboardFields } from "./dashboard.js";
 import {
@@ -11,6 +12,7 @@ import {
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  isEngineBuiltTransaction,
   resolveTransactionResourceLimits,
   resolveTransactionResourceValidation,
   SnapshotResourceError,
@@ -798,9 +800,17 @@ export class SheetwriteStore implements Store {
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
     this.assertEngineRunning();
-    const preparation = new TransactionPreparation(tx.patches);
+    // Each setBlock's `values` and `styleIds` are read once into private
+    // copies. An engine-built transaction already went through its layer's
+    // ingress, and that layer matches results to its operations by identity.
+    const copied =
+      Array.isArray(tx.patches) && !isEngineBuiltTransaction(tx)
+        ? readBlockArraysOnce(tx.patches)
+        : undefined;
+    const owned = copied ? { ...tx, patches: copied } : tx;
+    const preparation = new TransactionPreparation(owned.patches);
     try {
-      return this.applyPreparedTransaction(tx, reasonOrOptions, preparation);
+      return this.applyPreparedTransaction(owned, reasonOrOptions, preparation);
     } catch (error) {
       // Change listeners run inside this call too: a trap in a listener's
       // engine read stops the engine the same way.

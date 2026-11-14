@@ -282,6 +282,11 @@ export function markOwnedArray(array: unknown[]): void {
   ownedArrays.add(array);
 }
 
+/** Whether `value` is an array recorded by `markOwnedArray`. */
+export function isOwnedArray(value: unknown): boolean {
+  return Array.isArray(value) && ownedArrays.has(value);
+}
+
 /**
  * Measure an owned array whose entries are all JSON scalars in one pass.
  * Returns false without counting anything at the first entry that is not a

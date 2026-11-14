@@ -1,5 +1,6 @@
+import { isAtomicBatch, markAtomicBatch } from "./atomic-batch.js";
 import { SheetwriteError } from "./errors.js";
-import { markOwnedArray } from "./json-bytes.js";
+import { isOwnedArray, markOwnedArray } from "./json-bytes.js";
 import type { DocumentOp } from "./types/document.js";
 
 /**
@@ -49,31 +50,60 @@ function readEntriesOnce(value: unknown): unknown[] | undefined {
   return entries;
 }
 
+/** A field read through its descriptor, so no getter runs. */
+function ownDataField(value: unknown, key: string): unknown {
+  if (value === null || typeof value !== "object") return undefined;
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  return descriptor && "value" in descriptor ? descriptor.value : undefined;
+}
+
 /**
- * The caller's operations, with the `values` and `styleIds` arrays of each
- * `setBlock` replaced by private copies read once. Validation, measurement,
- * the store, history, sync and the change event all use the copies, so an
- * entry cannot change between the check and the write, and the caller's
- * arrays are never read again. Any other operation, and a `setBlock` whose
- * fields are not plain data, is returned as it is for validation to judge.
+ * `operation` with the `values` and `styleIds` of its block replaced by
+ * private copies, or `operation` itself when it is not a `setBlock`, its
+ * arrays are already private copies, or any field it is made of is not plain
+ * data (validation then judges the original exactly as before).
  */
-export function readBlockArraysOnce(operations: readonly DocumentOp[]): DocumentOp[] {
-  return operations.map((operation) => {
-    const copy = copyDataRecord(operation);
-    if (copy?.op !== "setBlock") return operation;
-    const block = copyDataRecord(copy.block);
-    if (!block) return operation;
-    const values = readEntriesOnce(block.values);
-    if (!values) return operation;
-    block.values = values;
-    if (block.styleIds !== undefined) {
-      const styleIds = readEntriesOnce(block.styleIds);
-      if (!styleIds) return operation;
-      block.styleIds = styleIds;
-    }
-    copy.block = block;
-    // The copy has exactly the caller's fields; validation judges it as it would the original.
-    const copied = copy as unknown as DocumentOp;
-    return copied;
-  });
+function withOwnedBlockArrays(operation: DocumentOp): DocumentOp {
+  if (ownDataField(operation, "op") !== "setBlock") return operation;
+  const sourceBlock = ownDataField(operation, "block");
+  const sourceStyleIds = ownDataField(sourceBlock, "styleIds");
+  if (
+    isOwnedArray(ownDataField(sourceBlock, "values")) &&
+    (sourceStyleIds === undefined || isOwnedArray(sourceStyleIds))
+  ) {
+    return operation;
+  }
+
+  const copy = copyDataRecord(operation);
+  const block = copyDataRecord(copy?.block);
+  if (!copy || !block) return operation;
+  const values = readEntriesOnce(block.values);
+  if (!values) return operation;
+  block.values = values;
+  if (block.styleIds !== undefined) {
+    const styleIds = readEntriesOnce(block.styleIds);
+    if (!styleIds) return operation;
+    block.styleIds = styleIds;
+  }
+  copy.block = block;
+  // The copy has exactly the caller's fields; validation judges it as it would the original.
+  const copied = copy as unknown as DocumentOp;
+  return copied;
+}
+
+/**
+ * The operations with the `values` and `styleIds` arrays of each `setBlock`
+ * replaced by private copies read once by index. Every entry point that
+ * accepts operations (grid, remote, store) passes them through here first,
+ * so validation, measurement, the store, history, sync and the change event
+ * all use the copies: an entry cannot change between the check and the
+ * write, and the caller's arrays are never read again. Only those two arrays
+ * are read this way; every other operation and field keeps the full
+ * descriptor validation. Undefined when nothing was copied, so the caller
+ * keeps its operations and any measurement recorded for them.
+ */
+export function readBlockArraysOnce(operations: readonly DocumentOp[]): DocumentOp[] | undefined {
+  const owned = operations.map(withOwnedBlockArrays);
+  if (owned.every((operation, index) => operation === operations[index])) return undefined;
+  return isAtomicBatch(operations) ? markAtomicBatch(owned) : owned;
 }

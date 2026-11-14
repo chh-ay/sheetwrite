@@ -2783,7 +2783,7 @@ export class GridImpl implements Grid {
     // each setBlock's cell arrays read once. Validation, the store and the
     // change event all see the copy, so they reuse this measurement.
     const patches = Array.isArray(transaction.patches)
-      ? readBlockArraysOnce(transaction.patches)
+      ? (readBlockArraysOnce(transaction.patches) ?? transaction.patches.slice())
       : transaction.patches;
     const resourceValidation = validateTransactionResources(
       patches,
