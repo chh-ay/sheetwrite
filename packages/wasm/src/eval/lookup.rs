@@ -8,7 +8,7 @@
 
 use std::cmp::Ordering;
 
-use crate::cells::payload_num;
+use crate::cells::{payload_num, CellStorage};
 use crate::types::{
     string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER, KIND_STRING,
 };
@@ -154,13 +154,22 @@ pub(super) enum ListView<'a> {
         step: usize,
         len: usize,
     },
+    /// Entry `i` is the cell `first + i * step` of a paged sheet, read one
+    /// lookup at a time; the range is known to be loaded literal sources.
+    Paged {
+        cells: &'a CellStorage,
+        strings: &'a StringStorage,
+        first: usize,
+        step: usize,
+        len: usize,
+    },
     Values(&'a [Value]),
 }
 
 impl ListView<'_> {
     const fn len(&self) -> usize {
         match self {
-            Self::Storage { len, .. } => *len,
+            Self::Storage { len, .. } | Self::Paged { len, .. } => *len,
             Self::Values(values) => values.len(),
         }
     }
@@ -178,6 +187,16 @@ impl ListView<'_> {
             } => {
                 let index = first + position * step;
                 Entry::literal(strings, kinds[index], payloads[index])
+            }
+            Self::Paged {
+                cells,
+                strings,
+                first,
+                step,
+                ..
+            } => {
+                let (kind, payload) = cells.source_at(first + position * step);
+                Entry::literal(strings, kind, payload)
             }
             Self::Values(values) => Entry::of(&values[position]),
         }
@@ -913,14 +932,16 @@ impl LookupArg {
         }
         match self {
             Self::Storage { range, .. } => {
-                let sources = store.sheets[range.sheet].cells.dense_sources()?;
-                let (kinds, payloads) = sources.raw();
+                let cells = &store.sheets[range.sheet].cells;
                 let index = range.first + col * range.row_count + row;
-                Some(super::literal_cell_value(
-                    &store.strings,
-                    kinds[index],
-                    payloads[index],
-                ))
+                let (kind, payload) = match cells.dense_sources() {
+                    Some(sources) => {
+                        let (kinds, payloads) = sources.raw();
+                        (kinds[index], payloads[index])
+                    }
+                    None => cells.source_at(index),
+                };
+                Some(super::literal_cell_value(&store.strings, kind, payload))
             }
             Self::Values { values, .. } => values.get(row * cols + col).cloned(),
         }
@@ -1116,23 +1137,32 @@ impl CellStore {
     ) -> Result<Option<usize>, FormulaError> {
         match arg {
             LookupArg::Storage { range, shared } => {
-                let Some(sources) = self.sheets[range.sheet].cells.dense_sources() else {
-                    return Err(FormulaError::Value);
-                };
-                let (kinds, payloads) = sources.raw();
+                let cells = &self.sheets[range.sheet].cells;
                 let (step, len) = match part {
                     ListPart::FirstColumn => (1, range.rows),
                     ListPart::FirstRow => (range.row_count, range.cols),
                     ListPart::Whole if range.rows == 1 => (range.row_count, range.cols),
                     ListPart::Whole => (1, range.rows * range.cols),
                 };
-                let list = ListView::Storage {
-                    kinds,
-                    payloads,
-                    strings: &self.strings,
-                    first: range.first,
-                    step,
-                    len,
+                let list = match cells.dense_sources() {
+                    Some(sources) => {
+                        let (kinds, payloads) = sources.raw();
+                        ListView::Storage {
+                            kinds,
+                            payloads,
+                            strings: &self.strings,
+                            first: range.first,
+                            step,
+                            len,
+                        }
+                    }
+                    None => ListView::Paged {
+                        cells,
+                        strings: &self.strings,
+                        first: range.first,
+                        step,
+                        len,
+                    },
                 };
                 let state = shared.map(|(group, groups)| {
                     &mut pass.results.lookup_states().get(group, groups, part).search
@@ -1222,9 +1252,11 @@ impl CellStore {
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
         let total = EvalMatrix::validate_reference_shape(rows, cols)?;
-        let (Some(sources), true) = (data.cells.dense_sources(), depth < FORMULA_RECURSION_LIMIT)
-        else {
+        if depth >= FORMULA_RECURSION_LIMIT {
             return Ok(None);
+        }
+        let Some(sources) = data.cells.dense_sources() else {
+            return self.paged_storage_range(sheet, (row_start, col_start), (rows, cols), total);
         };
 
         let (kinds, payloads) = sources.raw();
@@ -1277,6 +1309,68 @@ impl CellStore {
             rows,
             cols,
             row_count: data.cells.row_count(),
+        }))
+    }
+}
+
+impl CellStore {
+    /// [`Self::storage_range`] for a paged sheet: every cell loaded, and a
+    /// literal source with no calculated value over it. One pass over the
+    /// range's runs, so a range several formulas read is checked once.
+    fn paged_storage_range(
+        &self,
+        sheet: usize,
+        (row_start, col_start): (usize, usize),
+        (rows, cols): (usize, usize),
+        total: usize,
+    ) -> Result<Option<StorageRange>, FormulaError> {
+        let data = &self.sheets[sheet];
+        let cells = &data.cells;
+        if !cells.range_fully_loaded(row_start, col_start, row_start + rows - 1, col_start + cols - 1)
+        {
+            return Ok(None);
+        }
+        let mut payload_bytes = total
+            .checked_mul(std::mem::size_of::<Value>())
+            .ok_or(FormulaError::Num)?;
+        for col in col_start..col_start + cols {
+            let end = cells.idx(row_start + rows - 1, col) + 1;
+            let mut start = cells.idx(row_start, col);
+            while start < end {
+                let run = cells.run(start, end);
+                for index in run.start..run.end {
+                    let (kind, payload) = run.source(index);
+                    if kind & !LITERAL_KIND_BITS != 0 || run.resolved(index) != (kind, payload) {
+                        return Ok(None);
+                    }
+                    if kind == KIND_STRING {
+                        let id = crate::cells::payload_str_id(payload);
+                        if let Some(text) = string_from_pool_ref(&self.strings, id) {
+                            payload_bytes = payload_bytes
+                                .checked_add(text.len())
+                                .ok_or(FormulaError::Num)?;
+                        }
+                    }
+                }
+                start = run.end;
+            }
+        }
+        if payload_bytes > SPILL_MAX_BYTES {
+            return Err(FormulaError::Num);
+        }
+        super::preview_limits::range(
+            data,
+            (row_start, col_start),
+            (rows, cols),
+            super::preview_limits::RangeRead::Typed,
+        )?;
+
+        Ok(Some(StorageRange {
+            sheet,
+            first: cells.idx(row_start, col_start),
+            rows,
+            cols,
+            row_count: cells.row_count(),
         }))
     }
 }

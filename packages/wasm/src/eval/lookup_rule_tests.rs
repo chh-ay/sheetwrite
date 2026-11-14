@@ -1,19 +1,46 @@
 //! Lookup results that must not drift: duplicates, text order, mixed types,
 //! errors and search directions. Each formula runs once alone and once with
 //! several copies, so both the single-reader path and the shared search of a
-//! range with many readers give the listed result.
+//! range with many readers give the listed result, on a dense sheet and on a
+//! fully loaded paged sheet.
 
 use crate::store::CellStore;
+use crate::types::KIND_EMPTY;
 
 /// Copies of a formula that make its ranges shared by several readers.
 const SHARED_COPIES: usize = 4;
 
+const COLS: usize = 12;
+const ROWS: usize = 20;
+
+/// Where the fixture's cells live.
+#[derive(Clone, Copy, Debug)]
+enum Storage {
+    Dense,
+    /// Every cell loaded, in four-row pages, so a list spans several page runs.
+    Paged,
+}
+
 /// Columns: A mixed list, B ascending numbers with duplicates, C ascending
 /// text, D a list with an error, E results, F a list with formula cells, G
 /// descending numbers, H numbers around an infinity. Rows 1-10.
-fn store() -> (CellStore, usize) {
+fn store(storage: Storage) -> (CellStore, usize) {
     let mut store = CellStore::new();
-    let sheet = store.add_sheet(12, 20);
+    let sheet = match storage {
+        Storage::Dense => store.add_sheet(COLS, ROWS),
+        Storage::Paged => {
+            let sheet = store.add_paged_sheet(COLS, ROWS, 4, 0, 0);
+            store.begin_page_load();
+            let cells = COLS * ROWS;
+            let offsets: Vec<u32> = (0..cells as u32).collect();
+            let status = store.set_sparse_block(
+                sheet, 0, 0, ROWS, COLS, &offsets, &vec![KIND_EMPTY; cells], &vec![0.0; cells],
+                &[], &[0], &vec![0; cells], &[], Vec::new(), &[], &[],
+            );
+            assert_eq!(status, crate::store::BLOCK_OK, "the blank page load must apply");
+            sheet
+        }
+    };
 
     // A: 3, "b", TRUE, blank, 0, "B", 3, "", FALSE, 2.5
     store.set_number(sheet, 0, 0, 3.0, 0);
@@ -58,12 +85,15 @@ fn store() -> (CellStore, usize) {
     store.set_number(sheet, 0, 7, 1.0, 0);
     store.set_number(sheet, 1, 7, f64::INFINITY, 0);
     store.set_number(sheet, 2, 7, 2.0, 0);
+    if let Storage::Paged = storage {
+        store.commit_sources();
+    }
     (store, sheet)
 }
 
 /// The displayed result of `source` with `copies` identical formulas.
-fn result(source: &str, copies: usize) -> String {
-    let (mut store, sheet) = store();
+fn result(storage: Storage, source: &str, copies: usize) -> String {
+    let (mut store, sheet) = store(storage);
     for copy in 0..copies {
         store.set_formula(sheet, copy, 10, source, 0);
     }
@@ -168,13 +198,15 @@ const CASES: &[(&str, &str)] = &[
 #[test]
 fn lookup_results_match_the_recorded_rules() {
     let mut failures = Vec::new();
-    for &(source, expected) in CASES {
-        for copies in [1, SHARED_COPIES] {
-            let actual = result(source, copies);
-            if actual != expected {
-                failures.push(format!(
-                    "{source} x{copies}: expected {expected}, got {actual}"
-                ));
+    for storage in [Storage::Dense, Storage::Paged] {
+        for &(source, expected) in CASES {
+            for copies in [1, SHARED_COPIES] {
+                let actual = result(storage, source, copies);
+                if actual != expected {
+                    failures.push(format!(
+                        "{storage:?} {source} x{copies}: expected {expected}, got {actual}"
+                    ));
+                }
             }
         }
     }

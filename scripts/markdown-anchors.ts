@@ -2,19 +2,20 @@ import { maskFences } from "./markdown-fences.js";
 
 /**
  * Every fragment the site gives a page. Explicit `id` attributes keep their
- * value. Headings get the slug of their text, and a repeated slug gets `-1`,
- * `-2` and so on in page order, as `rehype-slug` (github-slugger) does in
+ * value, every one on a line (a static table is one line of HTML). Headings
+ * get the slug of their text, and a repeated slug gets `-1`, `-2` and so on in
+ * page order, as `rehype-slug` (github-slugger) does in
  * `docs/src/lib/mdx-pipeline.ts`.
  */
 export function headingAnchors(content: string): Set<string> {
   const anchors = new Set<string>();
   const occurrences = new Map<string, number>();
   for (const line of maskFences(content).split("\n")) {
-    const explicit = /<[a-z][^>]*\sid=["']([^"']+)["']/i.exec(line);
-    if (explicit !== null) anchors.add(explicit[1] ?? "");
+    const ids = [...line.matchAll(/<[a-z][^>]*\sid=["']([^"']+)["']/gi)];
+    for (const [, id] of ids) anchors.add(id ?? "");
     const heading =
       /^#{1,6}\s+(.+?)\s*$/.exec(line)?.[1] ??
-      (explicit === null ? /<h[1-6](?:\s[^>]*)?>(.*?)<\/h[1-6]>/i.exec(line)?.[1] : undefined);
+      (ids.length === 0 ? /<h[1-6](?:\s[^>]*)?>(.*?)<\/h[1-6]>/i.exec(line)?.[1] : undefined);
     if (heading === undefined) continue;
 
     const base = heading

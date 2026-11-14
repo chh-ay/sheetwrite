@@ -269,7 +269,6 @@
 
 .speed-story__table {
   margin-top: var(--sw-space-3);
-  overflow-x: auto;
 }
 
 .sw-prose .speed-story__data,
@@ -279,57 +278,74 @@
   border-collapse: collapse;
 }
 
+.speed-story__data caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .sw-prose .speed-story__data :is(th, td),
 .speed-story__data :is(th, td) {
   padding: var(--sw-space-2) var(--sw-space-3);
   border-bottom: 1px solid var(--sw-border);
   background: none;
-  color: var(--sw-fg-muted);
-  font: 400 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  color: var(--sw-fg);
+  font: 400 var(--sw-text-small) / 1.4 var(--sw-font-body, inherit);
+  font-variant-numeric: tabular-nums;
   letter-spacing: normal;
-  text-align: right;
+  text-align: left;
   text-transform: none;
-  white-space: nowrap;
+  vertical-align: baseline;
 }
 
-/* Names and headings wrap, so the table fits its frame at desktop widths. */
 .sw-prose .speed-story__data :is(thead th, th[scope="row"]),
 .speed-story__data :is(thead th, th[scope="row"]) {
-  white-space: normal;
-}
-
-.speed-story__data thead small {
-  display: block;
-  font-weight: 400;
-}
-
-.sw-prose .speed-story__data :is(th[scope="row"], thead th:first-child),
-.speed-story__data :is(th[scope="row"], thead th:first-child) {
   color: var(--sw-fg-strong);
-  font-family: var(--sw-font-body, inherit);
   font-weight: 600;
-  text-align: left;
 }
 
 .sw-prose .speed-story__data thead th,
 .speed-story__data thead th {
-  font-family: var(--sw-font-body, inherit);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+/* Times keep their unit on one line; the speedup lines up on the right. */
+.speed-story__data td {
+  white-space: nowrap;
+}
+
+.sw-prose .speed-story__data :is(td:last-child, thead th:last-child),
+.speed-story__data :is(td:last-child, thead th:last-child) {
+  text-align: right;
+}
+
+.speed-story__data td:last-child {
+  color: var(--sw-fg-strong);
   font-weight: 600;
 }
 
-.speed-story__data tbody tr:hover :is(td, th) {
-  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+.speed-story__data small {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
 }
 
-.speed-story__ours b {
-  display: block;
-  color: var(--sw-fg-strong);
-  font-size: var(--sw-text-small);
-}
-
-.speed-story__ours small {
+/* Each kind opens its group of rows. */
+.sw-prose .speed-story__data .speed-story__kind th,
+.speed-story__data .speed-story__kind th {
+  padding-top: var(--sw-space-4);
   color: var(--sw-fg-muted);
   font-size: var(--sw-text-eyebrow);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.speed-story__data tbody tr:not(.speed-story__kind):hover :is(td, th) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
 }
 
 /* ---- Every number: lanes grouped by kind, or "Numbers only" ---- */
@@ -534,6 +550,49 @@
 
   .lane-group__head b {
     grid-column: 1 / -1;
+  }
+
+  /* The numbers table becomes one card per interaction: its name, then each value with its column name. */
+  .speed-story__data thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .speed-story__data :is(tbody, tr, th, td) {
+    display: block;
+  }
+
+  .speed-story__data tr:not(.speed-story__kind) {
+    padding-block: var(--sw-space-2);
+    border-bottom: 1px solid var(--sw-border);
+  }
+
+  .sw-prose .speed-story__data :is(th, td),
+  .speed-story__data :is(th, td) {
+    padding: var(--sw-space-1) 0;
+    border-bottom: 0;
+  }
+
+  .sw-prose .speed-story__data td,
+  .speed-story__data td {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--sw-space-3);
+    text-align: right;
+  }
+
+  .speed-story__data td::before {
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-text-caption);
+    font-weight: 400;
+    content: attr(data-label);
+  }
+
+  .speed-story__data td:empty {
+    display: none;
   }
 }
 

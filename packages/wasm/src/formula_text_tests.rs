@@ -67,6 +67,29 @@ fn a_sheet_rename_changes_only_the_sheet_names() {
 }
 
 #[test]
+fn naming_and_renaming_refuse_what_another_sheet_holds() {
+    let (mut store, sales, summary) = two_sheets();
+    enter(&mut store, summary, &["=Sales!A1"]);
+
+    // Names fold case, so both entry points refuse another sheet's name in any case.
+    assert!(!store.set_sheet_name(summary, "summary", "SALES"));
+    assert!(!store.rename_sheet(summary, "summary", "sales"));
+    assert!(!store.set_sheet_name(summary, "summary", ""));
+    assert!(!store.rename_sheet(summary, "summary", ""));
+    assert!(!store.set_sheet_name(summary, "sales", "Totals"));
+
+    // The refusals changed nothing: a reference entered before or after them
+    // still names Sales.
+    store.set_formula(summary, 1, 0, "=Sales!A1", 0);
+    assert!(store.rename_sheet(sales, "sales", "Revenue"));
+    assert_eq!(texts(&store, summary, 0, 2), ["=Revenue!A1", "=Revenue!A1"]);
+
+    // A sheet may take its own name again in another case.
+    assert!(store.set_sheet_name(summary, "summary", "SUMMARY"));
+    assert!(store.rename_sheet(summary, "summary", "Summary"));
+}
+
+#[test]
 fn a_row_or_column_edit_changes_only_the_moved_references() {
     let (mut store, sales, _) = two_sheets();
     let formulas = [

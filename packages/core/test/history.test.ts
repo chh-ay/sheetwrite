@@ -3,7 +3,8 @@ import { describe, expect, it } from "bun:test";
 import { measureOperationBytes } from "../src/atomic-batch.js";
 import { validateTransactionResources } from "../src/document-protocol.js";
 import { type HistoryAction, UndoManager } from "../src/history.js";
-import { TransactionPreparation } from "../src/transaction-preparation.js";
+import { encodeRestoreBlock } from "../src/restore-block.js";
+import { preparedRestore, TransactionPreparation } from "../src/transaction-preparation.js";
 import type { DocumentOp } from "../src/types/document.js";
 
 const setOperation: DocumentOp = {
@@ -144,5 +145,48 @@ describe("history restore measurement", () => {
     } finally {
       preparation.dispose();
     }
+  });
+
+  it("sizes integers of every length exactly", () => {
+    const values = [0, 7, -42, 123_456, -(2 ** 53), 2 ** 53, 1e20, 1e21, -1e21, 1e300, 0.1];
+    const operation: DocumentOp = {
+      op: "setBlock",
+      range: { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 0, col: values.length - 1 } },
+      block: { rowCount: 1, colCount: values.length, values },
+    };
+    const exact = validateTransactionResources([operation]);
+    if (!exact.ok) throw new Error("Expected a measurable operation");
+    const preparation = new TransactionPreparation();
+    try {
+      preparation.seedHistory(operation, () => true);
+      expect(preparation.measure([operation])).toBe(exact.encodedBytes);
+    } finally {
+      preparation.dispose();
+    }
+  });
+
+  it("checks the shape of a seeded history restore once, and of any other restore every time", () => {
+    const range = { sheet: "sheet", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
+    const block = { rowCount: 1, colCount: 2, values: [1, "text"] };
+    let checks = 0;
+    const countingCheck = (): readonly never[] => {
+      checks++;
+      return [];
+    };
+
+    const seeded = encodeRestoreBlock(range, block);
+    const preparation = new TransactionPreparation();
+    try {
+      preparation.seed(seeded, block);
+      expect(preparedRestore(seeded, countingCheck).errors).toEqual([]);
+      expect(checks).toBe(0);
+    } finally {
+      preparation.dispose();
+    }
+
+    expect(preparedRestore(seeded, countingCheck).errors).toEqual([]);
+    expect(checks).toBe(1);
+    expect(preparedRestore(encodeRestoreBlock(range, block), countingCheck).errors).toEqual([]);
+    expect(checks).toBe(2);
   });
 });

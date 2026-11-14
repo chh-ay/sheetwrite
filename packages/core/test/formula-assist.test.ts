@@ -82,6 +82,8 @@ function beginEdit(): {
     rect: { x: 10, y: 20, w: 80, h: 24 },
     label: "Edit A, row 1",
     theme: DEFAULT_THEME,
+    focus: true,
+    onText: () => {},
     onCommit: (value) => {
       state.committed = value;
     },

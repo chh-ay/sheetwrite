@@ -1,5 +1,20 @@
 const MAX_VISIBLE_EDITOR_LINES = 8;
 
+/**
+ * Marks a field that edits the same draft as the cell editor, such as a
+ * formula bar. Focus moving from the cell editor into one keeps the edit open.
+ */
+export const EDIT_SURFACE_ATTRIBUTE = "data-sheetwrite-edit-surface";
+
+/** Explicit lines of an editor's text, which set its height (see {@link sizeEditorTextarea}). */
+export function editorLineCount(text: string): number {
+  let lines = 1;
+  for (let index = text.indexOf("\n"); index !== -1; index = text.indexOf("\n", index + 1)) {
+    lines++;
+  }
+  return lines;
+}
+
 /** Shared newline handling for the cell editor and detached formula bar. */
 export function insertEditorLineBreak(event: KeyboardEvent, field: HTMLTextAreaElement): boolean {
   if (event.key !== "Enter" || !event.altKey || event.ctrlKey || event.metaKey) return false;

@@ -12,11 +12,16 @@ use super::super::value::number_from_value;
 use super::super::EvalPass;
 use super::super::Shapes;
 
-pub(crate) const NAMES: &[&str] = &["MDETERM", "MINVERSE", "MMULT", "MUNIT"];
+family_functions! {
+    MDETERM,
+    MINVERSE,
+    MMULT,
+    MUNIT,
+}
 
 /// MDETERM returns one number. The other functions return arrays.
-pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
-    name != "MDETERM"
+pub(crate) fn produces_array(function: Function, _: &[Ast], _: Shapes<'_>) -> bool {
+    function != Function::MDETERM
 }
 
 struct Context<'a, 'p> {
@@ -58,7 +63,7 @@ impl Context<'_, '_> {
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -84,22 +89,22 @@ pub(crate) fn evaluate_ast(
 
 pub(crate) fn shape(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let (rows, cols) = match (name, args) {
-        ("MUNIT", [dimension_ast]) => {
+    let (rows, cols) = match (function, args) {
+        (Function::MUNIT, [dimension_ast]) => {
             let dimension = literal_dimension(dimension_ast).ok_or(FormulaError::Value)??;
             (dimension, dimension)
         }
-        ("MINVERSE", [argument]) => {
+        (Function::MINVERSE, [argument]) => {
             let (rows, cols, _) = store.matrix_shape(argument, sheet, pass)?;
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension)
         }
-        ("MMULT", [left, right]) => {
+        (Function::MMULT, [left, right]) => {
             let (rows, inner, _) = store.matrix_shape(left, sheet, pass)?;
             let (right_rows, cols, _) = store.matrix_shape(right, sheet, pass)?;
             if inner != right_rows {
@@ -118,22 +123,22 @@ pub(crate) fn shape(
 /// known, like SEQUENCE.
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    if let ("MUNIT", [dimension]) = (name, args) {
+    if let (Function::MUNIT, [dimension]) = (function, args) {
         if literal_dimension(dimension).is_none() {
             return Ok(UNKNOWN_SIZE_PRECHARGE);
         }
     }
-    shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
+    shape(store, function, args, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 pub(crate) fn evaluate_matrix(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -145,8 +150,8 @@ pub(crate) fn evaluate_matrix(
         pass,
         depth,
     };
-    let (rows, cols, numbers) = match (name, args) {
-        ("MUNIT", [dimension_ast]) => {
+    let (rows, cols, numbers) = match (function, args) {
+        (Function::MUNIT, [dimension_ast]) => {
             let dimension = dimension_from_number(context.number(dimension_ast)?)?;
             EvalMatrix::validate_shape(dimension, dimension, 1, 0)?;
             let mut identity = zeros(dimension * dimension)?;
@@ -155,12 +160,12 @@ pub(crate) fn evaluate_matrix(
             }
             (dimension, dimension, identity)
         }
-        ("MINVERSE", [argument]) => {
+        (Function::MINVERSE, [argument]) => {
             let (rows, cols, numbers) = context.numbers(argument)?;
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension, inverse(dimension, numbers)?)
         }
-        ("MMULT", [left_ast, right_ast]) => {
+        (Function::MMULT, [left_ast, right_ast]) => {
             let (rows, inner, left) = context.numbers(left_ast)?;
             let (right_rows, cols, right) = context.numbers(right_ast)?;
             if inner != right_rows {

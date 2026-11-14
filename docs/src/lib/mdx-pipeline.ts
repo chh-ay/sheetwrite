@@ -29,6 +29,7 @@ import { rovingCodeFocus } from "./roving-code-focus.ts";
 import { runnableCodeBlocks } from "./runnable-code.ts";
 import { renderSectionCards } from "./section-cards.ts";
 import { sheetwriteCodeHovers } from "./sheetwrite-code-hovers.ts";
+import { isVersionCompare, renderVersionCompare } from "./version-bars.ts";
 
 interface HastNode {
   type: string;
@@ -181,27 +182,10 @@ function hydratePerfFigure() {
 }
 
 /**
- * A checked radio or checkbox in Markdown HTML starts checked but stays the
- * reader's to change: React would treat `checked` as a controlled value and
- * undo every click, so the markup's `checked` becomes `defaultChecked`.
- */
-function uncontrolledCheckedInputs() {
-  return (tree: HastNode): void => {
-    const visit = (node: HastNode): void => {
-      if (node.tagName === "input" && node.properties?.checked === true) {
-        const { checked: _checked, ...properties } = node.properties;
-        node.properties = { ...properties, defaultChecked: true };
-      }
-      node.children?.forEach(visit);
-    };
-    visit(tree);
-  };
-}
-
-/**
- * Release-note comparisons (`<perf-compare>` blocks) become the shared
- * performance bars before raw HTML is parsed, so release notes and the
- * Performance pages draw the same figure.
+ * Release-note comparisons become figures before raw HTML is parsed:
+ * `<perf-compare>` blocks the shared performance bars, so release notes and
+ * the Performance pages draw the same figure, and `<version-compare>` the
+ * release comparison drawn from the committed version-comparison reports.
  */
 function renderPerfCompares() {
   return (tree: HastNode): void => {
@@ -213,6 +197,11 @@ function renderPerfCompares() {
           child.value = renderPerfBars(
             parsePerfCompare(child.value ?? "", `perf-compare-${figures}`),
             (name) => inlineIcon(name),
+          );
+        } else if (child.type === "raw" && isVersionCompare(child.value ?? "")) {
+          figures += 1;
+          child.value = renderVersionCompare(`version-compare-${figures}`, (name) =>
+            inlineIcon(name),
           );
         } else {
           visit(child);
@@ -493,7 +482,6 @@ export const DOCS_MDX_OPTIONS = {
     renderPerfCompares,
     // Raw HTML re-parse must run after Expressive Code: it drops fence `data.meta`.
     [rehypeRaw, { passThrough: nodeTypes }],
-    uncontrolledCheckedInputs,
     renderGridResults,
     [renderSectionCards, { contentRoot: new URL("../content/docs/", import.meta.url).pathname }],
     hydrateFormulaReference,

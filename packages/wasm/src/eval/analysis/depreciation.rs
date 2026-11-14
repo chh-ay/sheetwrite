@@ -5,7 +5,11 @@ use super::super::functions::{bool_arg, number_arg, require_arity, FuncAccumulat
 use super::securities::{Basis, Date};
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &["AMORDEGRC", "AMORLINC", "VDB"];
+family_functions! {
+    AMORDEGRC,
+    AMORLINC,
+    VDB,
+}
 
 const DEFAULT_FACTOR: f64 = 2.0;
 /// VDB sums one term per period. A larger end period is `#NUM!`, so one
@@ -25,11 +29,11 @@ const LAST_SHARED_FEBRUARY_DAY: i64 = 28;
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let result = if name == "VDB" {
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    let result = if function == Function::VDB {
         variable_declining_balance(values)
     } else {
-        french_depreciation(values, name == "AMORDEGRC")
+        french_depreciation(values, function == Function::AMORDEGRC)
     };
 
     match result {

@@ -255,7 +255,7 @@ Cells inside a spilled range and host-linked reference cells hold no formula. A 
 
 Formula evaluation performs no network request and runs no custom JavaScript. `RANDARRAY`, network functions, external/live-data providers, values from external workbooks, and cube/OLAP functions are unsupported. Examples include `WEBSERVICE`, `GOOGLEFINANCE`, `IMPORT*`, `RTD`, and `CUBEVALUE`. Database functions such as `DSUM` and `LAMBDA` helpers such as `MAP` are in the full engine only.
 
-Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. The generated [unsupported-category ledger](/docs/reference/formula-functions/#unsupported-categories) is derived from the versioned inventory.
+Unsupported names evaluate to `#NAME?` while preserving source for snapshots and interchange. There is no compatibility shim or side-effecting fallback. [Unsupported functions](/docs/reference/formula-functions/#unsupported-functions) lists each group, why it is unsupported, and what its cells show.
 
 ## Performance evidence
 

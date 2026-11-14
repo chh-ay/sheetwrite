@@ -5,6 +5,7 @@ import {
   initSheetwrite,
   type Workbook,
 } from "@sheetwrite/core";
+import { createFormulaBar } from "@sheetwrite/core/shell";
 
 import "@sheetwrite/core/styles.css";
 import { COL, COLUMNS, makeColumnar, toSheetwriteColumnar } from "./dataset.js";
@@ -14,6 +15,7 @@ import {
   isForcedLayoutAction,
   stepMarkName,
   SYNCHRONOUS_ACTIONS,
+  TYPING_ACTIONS,
 } from "./forced-layout-actions.js";
 
 // The page of forced-layout-bench.ts. The driver opens it with `action`,
@@ -27,6 +29,7 @@ const START_ROW = FORCED_LAYOUT_ROWS / 2;
 const status = requiredElement("#bench-status", HTMLOutputElement);
 const runButton = requiredElement("#bench-run", HTMLButtonElement);
 const host = requiredElement("#grid-host", HTMLDivElement);
+const formulaHost = requiredElement("#formula-host", HTMLDivElement);
 
 function requiredElement<T extends Element>(selector: string, type: new () => T): T {
   const element = document.querySelector(selector);
@@ -95,6 +98,22 @@ function openEditor(): void {
   editor();
 }
 
+function formulaBar(): HTMLTextAreaElement {
+  const element = formulaHost.querySelector<HTMLTextAreaElement>("textarea");
+  if (!element) throw new Error("The formula bar is not mounted.");
+
+  return element;
+}
+
+/** One typed character at the end of `field`, as a keystroke delivers it. */
+function typeCharacter(field: HTMLTextAreaElement): void {
+  const end = field.value.length;
+  field.setRangeText("x", end, end, "end");
+  field.dispatchEvent(
+    new InputEvent("input", { bubbles: true, inputType: "insertText", data: "x" }),
+  );
+}
+
 function commitEdit(step: number): void {
   openEditor();
   const field = editor();
@@ -120,6 +139,12 @@ function performStep(grid: Grid, action: ForcedLayoutAction, step: number): void
     case "arrow-down-refresh":
       dispatchKey(host, "ArrowDown");
       grid.refresh();
+      break;
+    case "edit-type":
+      typeCharacter(editor());
+      break;
+    case "bar-type":
+      typeCharacter(formulaBar());
       break;
     case "edit-open":
       openEditor();
@@ -191,6 +216,14 @@ async function runAction(
   grid.scrollToCell({ sheet: SHEET, row: START_ROW, col: COL.customer });
   host.focus();
   await settle();
+  if (action === "edit-type") {
+    openEditor();
+    await settle();
+  }
+  if (action === "bar-type") {
+    formulaBar().focus();
+    await settle();
+  }
   if (action === "editor-scroll") {
     openEditor();
     await settle();
@@ -212,6 +245,8 @@ async function start(): Promise<void> {
     workbook: workbook(),
     data: toSheetwriteColumnar(makeColumnar(FORCED_LAYOUT_ROWS)),
   });
+  // The typing rows type with a formula bar beside the grid, as the shell shows one.
+  if (TYPING_ACTIONS[action]) createFormulaBar(formulaHost, grid);
   await settle();
   runButton.addEventListener(
     "click",
