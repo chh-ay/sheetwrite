@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
 use crate::calc::{Ast, Func, RangeFlags, SheetRef};
-use crate::sorting::{finite_number_sort_key, key_index, sort_indices_by, sort_u128};
+use crate::sorting::{key_index, number_order_bits, sort_indices_by, sort_u128};
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -843,9 +843,13 @@ impl CellStore {
             sort_u128(&mut packed);
             packed.into_iter().map(key_index).collect()
         } else {
+            // The comparison order: blanks mixed with several types, or
+            // errors. A dedicated stable sort keeps this path at its old
+            // speed; through the shared `dyn` sort it was 1.4x slower on
+            // `sort-mixed-blanks`.
             let mut indices: Vec<u32> = (0..item_count as u32).collect();
             let mut error = None;
-            sort_indices_by(&mut indices, &mut |left_item, right_item| {
+            indices.sort_by(|&left_item, &right_item| {
                 if error.is_some() {
                     return Ordering::Equal;
                 }
@@ -1423,53 +1427,50 @@ fn trimmed_span(
 /// when blanks meet keys of several classes, or a key is an error, not
 /// finite or outside the array: those orders need the comparison itself.
 fn packed_sort_keys<'a>(
-    values: impl Iterator<Item = Option<&'a Value>>,
+    values: impl Iterator<Item = Option<&'a Value>> + Clone,
     descending: bool,
 ) -> Option<Vec<u128>> {
     const CLASS_NUMBER: u128 = 0;
     const CLASS_TEXT: u128 = 1;
     const CLASS_BOOL: u128 = 2;
-    /// Above every class: marks a blank until its class is known.
-    const BLANK: u128 = (CLASS_BOOL + 1) << 64;
 
-    let mut keys = Vec::with_capacity(values.size_hint().0);
-    let mut texts: Vec<String> = Vec::new();
+    // Decide first, without allocating, whether keys can give this order.
     let mut classes = 0u8;
-    for value in values {
-        let key = match value? {
-            Value::Number(number) => {
-                CLASS_NUMBER << 64 | u128::from(finite_number_sort_key(*number)?)
+    let mut has_blank = false;
+    for value in values.clone() {
+        match value? {
+            Value::Number(number) if number.is_finite() => classes |= 1 << CLASS_NUMBER,
+            Value::Text(_) => classes |= 1 << CLASS_TEXT,
+            Value::Bool(_) => classes |= 1 << CLASS_BOOL,
+            Value::Blank => has_blank = true,
+            Value::Number(_) | Value::Error(_) => return None,
+        }
+    }
+    if has_blank && classes.count_ones() > 1 {
+        return None;
+    }
+
+    let mut texts: Vec<String> = Vec::new();
+    let mut keys: Vec<u128> = values
+        .map(|value| match value {
+            Some(Value::Number(number)) => {
+                CLASS_NUMBER << 64 | u128::from(number_order_bits(*number))
             }
-            Value::Text(text) => {
+            Some(Value::Text(text)) => {
                 texts.push(text.to_lowercase());
                 CLASS_TEXT << 64 | (texts.len() - 1) as u128
             }
-            Value::Bool(flag) => CLASS_BOOL << 64 | u128::from(*flag),
-            Value::Blank => BLANK,
-            Value::Error(_) => return None,
-        };
-        if key != BLANK {
-            classes |= 1 << (key >> 64);
-        }
-        keys.push(key);
-    }
-
-    if keys.contains(&BLANK) {
-        let blank = match classes {
-            0 | 1 => CLASS_NUMBER << 64 | u128::from(finite_number_sort_key(0.0)?),
-            2 => {
+            Some(Value::Bool(flag)) => CLASS_BOOL << 64 | u128::from(*flag),
+            // A blank among numbers is 0, among text "" and among logical
+            // values FALSE, the zero value of the one class present.
+            _ if classes == 1 << CLASS_TEXT => {
                 texts.push(String::new());
                 CLASS_TEXT << 64 | (texts.len() - 1) as u128
             }
-            4 => CLASS_BOOL << 64,
-            _ => return None,
-        };
-        for key in &mut keys {
-            if *key == BLANK {
-                *key = blank;
-            }
-        }
-    }
+            _ if classes == 1 << CLASS_BOOL => CLASS_BOOL << 64,
+            _ => CLASS_NUMBER << 64 | u128::from(number_order_bits(0.0)),
+        })
+        .collect();
 
     if !texts.is_empty() {
         // Equal texts get equal ranks.
@@ -1492,7 +1493,7 @@ fn packed_sort_keys<'a>(
         }
     }
 
-    let top = BLANK;
+    let top = (CLASS_BOOL + 1) << 64;
     Some(
         keys.into_iter()
             .enumerate()
