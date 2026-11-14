@@ -740,7 +740,7 @@ impl CellStore {
         let value = if ast_produces_array(expression, Shapes::of(results.call_frame())) {
             Value::Error(FormulaError::Value)
         } else {
-            self.eval_conditional_ast(expression, 0, 0, 0, &mut results)
+            self.eval_conditional_ast(expression, 0, (0, 0), (0, 0), &mut results)
         };
         unbind_slots(&mut results);
         value
@@ -952,8 +952,13 @@ impl CellStore {
             if !read.is_empty() {
                 return Err(FormulaError::Value);
             }
-            let result =
-                self.eval_conditional_ast(&checked, 0, 0, 0, &mut FormulaResults::default());
+            let result = self.eval_conditional_ast(
+                &checked,
+                0,
+                (0, 0),
+                (0, 0),
+                &mut FormulaResults::default(),
+            );
             if let Value::Error(error) = result {
                 return Err(error);
             }
