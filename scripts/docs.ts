@@ -495,7 +495,22 @@ async function siteDocuments(expected: readonly ExpectedFile[]): Promise<Markdow
   const generated = expected.filter(
     (file) => file.path.startsWith(`${contentRoot}${sep}`) && /\.mdx?$/.test(file.path),
   );
-  return [...authored, ...generated];
+  // The site inlines a formula table into the page that names it
+  // (docs/src/islands/content.tsx), so the table's row ids are that page's anchors.
+  const tableRoot = join(generatedDataRoot, "formula-tables");
+  const tables = new Map(
+    expected
+      .filter((file) => file.path.startsWith(`${tableRoot}${sep}`))
+      .map((file): [string, string] => [
+        relative(tableRoot, file.path).replace(/\.html$/, ""),
+        file.content,
+      ]),
+  );
+  const withTables = generated.map((file) => {
+    const table = tables.get(/<FormulaReference family="([^"]+)">/.exec(file.content)?.[1] ?? "");
+    return table === undefined ? file : { ...file, content: `${file.content}\n${table}` };
+  });
+  return [...authored, ...withTables];
 }
 
 async function checkDocs(
