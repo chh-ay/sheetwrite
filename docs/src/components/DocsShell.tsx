@@ -94,12 +94,17 @@ function DocumentPager(props: DocumentNeighbours) {
 
 /**
  * The page's eyebrow: the group it sits in (the nearest group, else its
- * section), or the package of a generated symbol page.
+ * section), or the package of a generated symbol page. A section's own
+ * overview has none: its title already names the section.
  */
-function eyebrowFor(activeHref: string | undefined, titlePackage: string | undefined): string {
+function eyebrowFor(
+  activeHref: string | undefined,
+  titlePackage: string | undefined,
+): string | undefined {
   if (titlePackage !== undefined) return titlePackage;
   const location = nearestNavigationItem(activeHref);
   if (location === undefined) return "Documentation";
+  if (location.href === location.sectionHref) return undefined;
   const group = location.ancestors.at(-1);
   // A group's own page is the group: the section names its place.
   if (group === undefined || group.href === activeHref) return location.section;
@@ -151,9 +156,13 @@ export function DocsShell(props: DocsShellProps) {
           <Show when={SECTION_MARKS[props.activeHref ?? ""]}>
             {(mark) => <SectionMark name={mark()} />}
           </Show>
-          <p class="sw-document__eyebrow" data-pagefind-ignore>
-            {eyebrowFor(props.activeHref, titlePackage)}
-          </p>
+          <Show when={eyebrowFor(props.activeHref, titlePackage)}>
+            {(eyebrow) => (
+              <p class="sw-document__eyebrow" data-pagefind-ignore>
+                {eyebrow()}
+              </p>
+            )}
+          </Show>
           <SectionArt href={props.activeHref} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
