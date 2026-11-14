@@ -211,6 +211,20 @@ function panelArea(): Box {
   };
 }
 
+/**
+ * The code block's tabs and title bar: Expressive Code's file tab and, for a
+ * block inside a tab panel (the landing's framework tabs), that tab list.
+ */
+function blockChrome(trigger: HTMLElement): Element[] {
+  const chrome: Element[] = [
+    ...(trigger.closest(".expressive-code")?.querySelectorAll("figcaption") ?? []),
+  ];
+  const tabId = trigger.closest('[role="tabpanel"]')?.getAttribute("aria-labelledby");
+  const tabList = tabId ? document.getElementById(tabId)?.closest('[role="tablist"]') : null;
+  if (tabList) chrome.push(tabList);
+  return chrome;
+}
+
 function lineOf(trigger: HTMLElement): Element {
   return trigger.closest(LINE_SELECTOR) ?? trigger;
 }
@@ -241,6 +255,7 @@ function naturalSize(panel: HTMLElement): PanelSize {
 function measure(
   trigger: HTMLElement,
   mentions: readonly HTMLElement[],
+  chrome: readonly Element[],
   panel: PanelSize,
 ): PlacementInput {
   const line = lineOf(trigger);
@@ -250,6 +265,7 @@ function measure(
     lineEnd: lineTextEnd(line),
     panel,
     mentions: mentions.map(boxOf),
+    chrome: chrome.map(boxOf),
     viewport: panelArea(),
     gap: PANEL_OFFSET_PX,
     minHeight: PANEL_MIN_HEIGHT_PX,
@@ -272,7 +288,7 @@ function followLine(): () => void {
     frame = undefined;
     if (activePopover === null) return;
     const { trigger, panel, placement, size } = activePopover;
-    positionPanel(panel, placement, measure(trigger, [], size));
+    positionPanel(panel, placement, measure(trigger, [], [], size));
   };
   const schedule = (): void => {
     frame ??= window.requestAnimationFrame(reposition);
@@ -309,7 +325,7 @@ export function openCodePopover(trigger: HTMLElement): void {
   // laid out, so these reads force no layout of its content.
   const related = relatedTriggers(trigger, panelId);
   const size = naturalSize(panel);
-  const input = measure(trigger, related, size);
+  const input = measure(trigger, related, blockChrome(trigger), size);
   const placement = choosePanelPlacement(input);
 
   closePopover();
