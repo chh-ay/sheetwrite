@@ -210,18 +210,25 @@ describe("API reference pages", () => {
     ]);
   });
 
-  it("shows InitOutput as one card, without its raw module members, and does not count them", async () => {
+  it("leaves wasm-bindgen glue off the count: InitOutput's members, and free() on generated classes", async () => {
     const output = apiExport(
       "InitOutput",
       "interface",
       "interface InitOutput {\n  readonly memory: WebAssembly.Memory;\n  readonly cellstore_new: () => number;\n}",
     );
-    const entry = entryPoint(".", [output]);
+    const generated = {
+      ...apiExport("CellOut", "class", "class CellOut {\n  free(): void;\n}"),
+      source: "pkg/sheetwrite_wasm.d.ts#L7",
+    };
+    const entry = entryPoint(".", [output, generated]);
     const pkg: ApiPackage = { name: "@sheetwrite/wasm", entryPoints: [entry] };
     const page = await renderSymbolPage(pkg, entry, output);
     expect(page).not.toContain("## Members");
     // The declaration still shows the whole type.
     expect(page).toContain("cellstore_new");
+    expect(await renderSymbolPage(pkg, entry, generated)).toContain(
+      "Releases the object's WASM memory",
+    );
     expect(undocumentedApi({ formatVersion: 2, packages: [pkg] })).toEqual([
       { packageName: "@sheetwrite/wasm", members: [], parameters: [], returns: [] },
     ]);

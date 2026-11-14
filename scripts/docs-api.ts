@@ -70,6 +70,24 @@ function renderedMembers(item: Pick<ApiExport, "name" | "signature">): Declarati
   return OPAQUE_EXPORTS.has(item.name) ? [] : declarationShape(parseableDeclaration(item)).members;
 }
 
+/**
+ * wasm-bindgen gives every class it generates a `free()` method with no doc
+ * source, so the reference describes it the same way on each of them.
+ */
+const WASM_BINDGEN_FREE =
+  "Releases the object's WASM memory now instead of at garbage collection; the object can't be used afterwards.";
+
+/** An export's member doc comments, with wasm-bindgen's `free()` described for generated classes. */
+function renderedMemberDocs(item: ApiExport): ApiExport["memberDocs"] {
+  const generated =
+    item.kind === "class" &&
+    /^pkg[^/]*\//.test(item.source) &&
+    !item.memberDocs.some((member) => member.name === "free" && member.documentation.trim() !== "");
+  return generated
+    ? [...item.memberDocs, { name: "free", documentation: WASM_BINDGEN_FREE }]
+    : item.memberDocs;
+}
+
 interface DocumentationLinkCandidate {
   readonly packageName: string;
   readonly entry: ApiEntryPoint;
@@ -1062,7 +1080,9 @@ function renderMembers(
         target.owner === item.name,
     ).map(({ term }) => term),
   );
-  const memberDocs = new Map(item.memberDocs.map((member) => [member.name, member.documentation]));
+  const memberDocs = new Map(
+    renderedMemberDocs(item).map((member) => [member.name, member.documentation]),
+  );
   const documented = new Set<string>();
   const indexLinks: string[] = [];
   const usedIds = new Set<string>();
@@ -1516,7 +1536,7 @@ export function undocumentedApi(
     for (const entry of pkg.entryPoints) {
       for (const item of entry.exports) {
         const memberDocs = new Set(
-          item.memberDocs
+          renderedMemberDocs(item)
             .filter((member) => member.documentation.trim() !== "")
             .map((member) => member.name),
         );
