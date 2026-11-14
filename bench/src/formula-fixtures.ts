@@ -1019,7 +1019,7 @@ const CONDITIONAL_WINDOW_GREATER_THAN = 4;
 const CONDITIONAL_FORMULA_KIND = 6;
 const CONDITIONAL_GREATER_KIND = 0;
 
-/** The window's cell values; the column right of the sheet reads as blank. */
+/** The window's cell values; the sheet's one column right of the window is blank. */
 function conditionalWindowValue(row: number, col: number): number {
   return col < CONDITIONAL_WINDOW_COLS ? (row * 7 + col * 3) % 10 : 0;
 }
@@ -1059,10 +1059,10 @@ function packedConditionalMatches(packed: Uint8Array): number {
 function conditionalFormatWindowFixture(size: number): TimedFixture {
   const rows = size / CONDITIONAL_WINDOW_COLS;
   const store = new CellStore();
-  const sheet = store.addSheet(CONDITIONAL_WINDOW_COLS, rows);
+  const sheet = store.addSheet(CONDITIONAL_WINDOW_COLS + 1, rows);
   for (let col = 0; col < CONDITIONAL_WINDOW_COLS; col++) {
     const values = numericColumn(rows, (row) => conditionalWindowValue(row, col));
-    store.setColumnNumbers(sheet, col, 0, values, 0);
+    writeNumberColumn(store, sheet, col, 0, values, 0);
   }
   const ruleCount = CONDITIONAL_WINDOW_FORMULAS.length + 1;
   const bounds = [0, 0, rows - 1, CONDITIONAL_WINDOW_COLS - 1];
