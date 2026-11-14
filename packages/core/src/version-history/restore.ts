@@ -31,6 +31,7 @@ export type HistoryRestoreScope =
 export interface HistoryRestoreOptions {
   /** The grid's coordinator in a shared document; the restore then needs an idle queue. */
   sync?: SyncCoordinator;
+  /** Stops the restore before it changes the grid; the call then rejects. */
   signal?: AbortSignal;
 }
 

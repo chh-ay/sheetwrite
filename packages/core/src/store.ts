@@ -1,4 +1,5 @@
 import { atomicBatchLimits, isAtomicBatch } from "./atomic-batch.js";
+import { readBlockArraysOnce } from "./block-ingress.js";
 import { chartSourceRanges } from "./chart-definition.js";
 import { dashboardFields } from "./dashboard.js";
 import {
@@ -11,6 +12,7 @@ import {
 import {
   assertWorkbookAllocationLimits,
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  isEngineBuiltTransaction,
   resolveTransactionResourceLimits,
   resolveTransactionResourceValidation,
   SnapshotResourceError,
@@ -213,6 +215,7 @@ export class SheetwriteStore implements Store {
   /** Engine generation at construction; a different current value means the instance stopped. */
   private readonly generation = engineGeneration();
 
+  /** Creates a store for `workbook`, filled from `data` when given; too large a workbook throws. */
   constructor(
     private workbook: Workbook,
     data?: ColumnarData,
@@ -259,6 +262,7 @@ export class SheetwriteStore implements Store {
     registerStoreEngine(this, this.engine, this.generation);
   }
 
+  /** Creates a store from a saved snapshot, validating it first; an invalid one throws. */
   static fromSnapshot(input: unknown, options: SheetwriteStoreOptions = {}): SheetwriteStore {
     resolveTransactionResourceLimits(options.transactionResourceLimits);
     const { snapshot, workbook } = decodeWorkbookSnapshot(input, {
@@ -466,14 +470,17 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches: [{ op: "removeDashboardItem", sheet, id }] }, "api");
   }
 
+  /** Allocation counters of range edits, for tests and benchmarks. */
   getRangeMutationAllocationStats(): RangeMutationAllocationStats {
     return this.engine.getRangeMutationAllocationStats();
   }
 
+  /** Sets the range-edit allocation counters back to zero. */
   resetRangeMutationAllocationStats(): void {
     this.engine.resetRangeMutationAllocationStats();
   }
 
+  /** Memory held by each part of the engine at this moment, for one operation phase. */
   getRuntimeResourceSnapshot(
     operation: RuntimeResourceOperation,
     phase: RuntimeResourcePhase,
@@ -482,26 +489,32 @@ export class SheetwriteStore implements Store {
     return this.engine.getRuntimeResourceSnapshot(operation, phase, runtime);
   }
 
+  /** Clears the memory figures `getRuntimeResourceSnapshot` reports. */
   resetRuntimeResourceAccounting(): void {
     this.engine.resetRuntimeResourceAccounting();
   }
 
+  /** The largest temporary formula-matrix memory seen since the last reset. */
   getFormulaMatrixResourcePeak(): TransientResourcePeak {
     return this.engine.getFormulaMatrixResourcePeak();
   }
 
+  /** Starts a new peak measurement for `getFormulaMatrixResourcePeak`. */
   resetFormulaMatrixResourcePeak(): void {
     this.engine.resetFormulaMatrixResourcePeak();
   }
 
+  /** Runs `run` with its memory use counted under `operation`. */
   withResourceOperation<T>(operation: RuntimeResourceOperation, run: () => T): T {
     return this.engine.withResourceOperation(operation, run);
   }
 
+  /** `true` when the sheet stores its cells in pages loaded from a data source. */
   isPaged(sheet: SheetId): boolean {
     return this.engine.isPaged(sheet);
   }
 
+  /** Memory and load figures of a paged data-source sheet. */
   getPagedStats(sheet: SheetId): PagedStoreStats {
     return this.engine.getPagedStats(sheet);
   }
@@ -514,6 +527,7 @@ export class SheetwriteStore implements Store {
     return this.engine.getCellLoadState(addr);
   }
 
+  /** `true` when every row from `startRow` up to `endRow` (not included) is loaded for the given columns. */
   areColumnsFullyLoaded(
     sheet: SheetId,
     startRow: number,
@@ -523,18 +537,22 @@ export class SheetwriteStore implements Store {
     return this.engine.areColumnsFullyLoaded(sheet, startRow, endRow, columns);
   }
 
+  /** `true` when every cell of `input` is loaded from the data source. */
   isRangeFullyLoaded(input: Range): boolean {
     return this.engine.isRangeFullyLoaded(input);
   }
 
+  /** Whether the operation can be applied to this store as it is now. */
   canApplyLocally(patch: DocumentOp): boolean {
     return this.engine.canApplyLocally(patch);
   }
 
+  /** Copies one range for undo; the caller must dispose the copy when it is dropped. */
   captureRangeHistory(input: Range): CompactRangeHistory | null {
     return this.engine.captureRangeHistory(input);
   }
 
+  /** The workbook model: its sheets, columns and metadata, without cell values. */
   getWorkbook(): Workbook {
     return this.engine.getWorkbook();
   }
@@ -576,10 +594,12 @@ export class SheetwriteStore implements Store {
     for (const listener of this.listeners) listener(event);
   }
 
+  /** The data row shown at a displayed row position, under the active sort and filters. */
   dataRowAt(sheet: SheetId, viewRow: number): number {
     return this.engine.dataRowAt(sheet, viewRow);
   }
 
+  /** The displayed position of a data row, or `null` when a filter hides it. */
   viewRowOf(sheet: SheetId, dataRow: number): number | null {
     return this.engine.viewRowOf(sheet, dataRow);
   }
@@ -691,6 +711,7 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches: plan.operations }, "sort");
   }
 
+  /** Sets the filter on one column, or removes it when `filter` is `null`, as one change. */
   setColumnFilter(
     sheet: SheetId,
     col: number,
@@ -703,33 +724,40 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches: [patch] }, "structure");
   }
 
+  /** Filters the column to rows whose text contains `needle`. */
   filterBy(sheet: SheetId, col: number, needle: string): ApplyTransactionResult {
     return this.setColumnFilter(sheet, col, { kind: "contains", text: needle });
   }
 
+  /** The sheet's active column filters, by zero-based column. */
   columnFilters(sheet: SheetId): ReadonlyMap<number, ColumnFilter> {
     return this.engine.columnFilters(sheet);
   }
 
+  /** The column's distinct shown values in first-seen order, at most `limit` (0 for no limit); blanks count once as `null`. */
   distinctValues(sheet: SheetId, col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
     return this.engine.distinctValues(sheet, col, limit);
   }
 
+  /** Hides the given zero-based rows as one undoable change. */
   hideRows(sheet: SheetId, rows: readonly number[]): ApplyTransactionResult {
     const patches = rowVisibilityPatches(this.engine.sheets.sheetMeta(sheet), rows, true);
     return this.applyTransaction({ patches }, "structure");
   }
 
+  /** Shows the given hidden rows again, or every hidden row when `rows` is omitted, as one change. */
   showRows(sheet: SheetId, rows?: readonly number[]): ApplyTransactionResult {
     const meta = this.engine.sheets.sheetMeta(sheet);
     const patches = rowVisibilityPatches(meta, rows ?? [...(meta.hiddenRows ?? [])], false);
     return this.applyTransaction({ patches }, "structure");
   }
 
+  /** The sheet's hidden rows, zero-based. */
   hiddenRows(sheet: SheetId): number[] {
     return this.engine.hiddenRows(sheet);
   }
 
+  /** Adds a collapsible group over rows `start` to `end`, both included, as one change. */
   groupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
     const groups = addRowGroup(this.engine.sheets.sheetMeta(sheet).rowGroups, start, end);
     return this.applyTransaction(
@@ -738,6 +766,7 @@ export class SheetwriteStore implements Store {
     );
   }
 
+  /** Removes the row group over rows `start` to `end`. */
   ungroupRows(sheet: SheetId, start: number, end: number): ApplyTransactionResult {
     const groups = removeRowGroup(this.engine.sheets.sheetMeta(sheet).rowGroups, start, end);
     return this.applyTransaction(
@@ -746,6 +775,7 @@ export class SheetwriteStore implements Store {
     );
   }
 
+  /** Collapses or expands the row group that starts at `start`. */
   setGroupCollapsed(sheet: SheetId, start: number, collapsed: boolean): ApplyTransactionResult {
     const groups = collapseRowGroup(
       this.engine.sheets.sheetMeta(sheet).rowGroups,
@@ -758,14 +788,17 @@ export class SheetwriteStore implements Store {
     );
   }
 
+  /** The sheet's collapsible row groups. */
   rowGroups(sheet: SheetId): readonly RowGroup[] {
     return this.engine.rowGroups(sheet);
   }
 
+  /** Where Ctrl+Arrow lands from a cell: the edge of the data block in the direction `dRow`, `dCol`. */
   dataEdge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number {
     return this.engine.dataEdge(sheet, row, col, dRow, dCol);
   }
 
+  /** Cells whose text matches `query`, in row order. */
   searchCells(
     sheet: SheetId,
     query: string,
@@ -774,6 +807,7 @@ export class SheetwriteStore implements Store {
     return this.engine.searchCells(sheet, query, opts);
   }
 
+  /** Like `searchCells`, as one flat `[row, col, row, col, ...]` array. */
   searchCellsFlat(
     sheet: SheetId,
     query: string,
@@ -782,6 +816,7 @@ export class SheetwriteStore implements Store {
     return this.engine.searchCellsFlat(sheet, query, opts);
   }
 
+  /** Removes the sheet's view sort and filters as one change; a no-op when there are none. */
   clearView(sheet: SheetId): ApplyTransactionResult {
     const patch = clearViewPatch(this.engine.sheets.sheetMeta(sheet));
     if (!patch) return { status: "noop", epoch: this.epoch, reason: "empty" };
@@ -793,6 +828,7 @@ export class SheetwriteStore implements Store {
     return this.engine.viewRowCount(sheet);
   }
 
+  /** `true` when the sheet has a view sort or filter. */
   hasView(sheet: SheetId): boolean {
     return this.engine.hasView(sheet);
   }
@@ -806,9 +842,17 @@ export class SheetwriteStore implements Store {
     reasonOrOptions: CommitReason | TransactionApplicationOptions = {},
   ): ApplyTransactionResult {
     this.assertEngineRunning();
-    const preparation = new TransactionPreparation(tx.patches);
+    // Each setBlock's `values` and `styleIds` are read once into private
+    // copies. An engine-built transaction already went through its layer's
+    // ingress, and that layer matches results to its operations by identity.
+    const copied =
+      Array.isArray(tx.patches) && !isEngineBuiltTransaction(tx)
+        ? readBlockArraysOnce(tx.patches)
+        : undefined;
+    const owned = copied ? { ...tx, patches: copied } : tx;
+    const preparation = new TransactionPreparation(owned.patches);
     try {
-      return this.applyPreparedTransaction(tx, reasonOrOptions, preparation);
+      return this.applyPreparedTransaction(owned, reasonOrOptions, preparation);
     } catch (error) {
       // Change listeners run inside this call too: a trap in a listener's
       // engine read stops the engine the same way.
@@ -1022,6 +1066,7 @@ export class SheetwriteStore implements Store {
     });
   }
 
+  /** Calls `fn` after each committed transaction; returns a function that removes it. */
   on(_evt: "change", fn: ChangeListener): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
@@ -1039,14 +1084,17 @@ export class SheetwriteStore implements Store {
     return this.engine.exportSnapshot(this.documentId, this.documentVersion);
   }
 
+  /** Updates formulas that name the sheet to its new name. */
   renameSheetFormulaIdentity(sheet: SheetId, name: string): boolean {
     return this.engine.renameSheetFormulaIdentity(sheet, name);
   }
 
+  /** Turns references to a deleted sheet into `#REF!` in the remaining formulas. */
   removeSheetFormulaIdentity(sheet: SheetId): boolean {
     return this.engine.removeSheetFormulaIdentity(sheet);
   }
 
+  /** Writes rows a data source returned, starting at row `start`. Cells for which `protect` returns `true` keep their value. */
   loadPage(
     sheet: SheetId,
     start: number,
@@ -1062,6 +1110,7 @@ export class SheetwriteStore implements Store {
     }
   }
 
+  /** Frees the engine memory this store holds; do not use the store afterwards. */
   dispose(): void {
     // A stopped instance can throw from any call, even `free`. Its linear
     // memory goes with the instance when the last of its stores is collected.

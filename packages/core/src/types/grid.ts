@@ -82,39 +82,64 @@ export type CellEditorNavigation = "down" | "right" | "left" | "none";
 
 /** Viewport-relative geometry of the cell currently owned by an editor. */
 export interface CellEditorRect {
+  /** Left edge of the cell in CSS pixels, from the grid's left edge. */
   readonly x: number;
+  /** Top edge of the cell in CSS pixels, from the grid's top edge. */
   readonly y: number;
+  /** Width of the cell in CSS pixels. */
   readonly width: number;
+  /** Height of the cell in CSS pixels. */
   readonly height: number;
 }
 
 /** Immutable state and guarded completion callbacks for one mounted editor. */
 export interface CellEditorContext {
+  /** The grid that opened the editor. */
   readonly grid: Grid;
+  /** Data address of the cell being edited. */
   readonly address: Readonly<CellAddress>;
+  /** Position of the cell as displayed, after sorting and filtering. */
   readonly viewAddress: Readonly<CellAddress>;
+  /** The cell's column, with its type and number format. */
   readonly column: Readonly<Column>;
+  /** The cell's current value. */
   readonly value: CellScalar;
+  /** The cell's current text as the user would edit it, such as a formula's source. */
   readonly text: string;
+  /** The character that opened the editor by typing; `undefined` for F2 or a double-click. */
   readonly initialInput: string | undefined;
+  /** Whether the editor should select its whole text when it opens. */
   readonly selectAll: boolean;
+  /** Accessible name of the cell, for the editor's `aria-label`. */
   readonly label: string;
+  /** Aborts when the edit ends, by commit, cancel or teardown. */
   readonly signal: AbortSignal;
+  /** Ends the edit and writes `value` as if typed, then moves the selection by `navigation`. */
   commit(value: string, navigation?: CellEditorNavigation): void;
+  /** Ends the edit without changing the cell. */
   cancel(): void;
 }
 
 /** Retained lifecycle returned by a custom editor's mount method. */
 export interface CellEditorInstance {
+  /** Called with a new context when the cell or grid changes while the editor is open. */
   update(context: CellEditorContext): void;
+  /** Called when the cell moves on screen, for example on scroll or resize. */
   reposition(rect: CellEditorRect): void;
+  /**
+   * Called on Enter, Tab or focus loss: return the text to write, or `undefined`
+   * to cancel; a promise keeps the editor open until it settles.
+   */
   commit(navigation: CellEditorNavigation): string | undefined | Promise<string | undefined>;
+  /** Called on Escape or when the grid ends the edit without writing. */
   cancel(): void;
+  /** Called last: remove listeners and DOM, since the host element is removed next. */
   destroy(): void;
 }
 
 /** Framework-neutral named editor definition registered through GridOptions.editors. */
 export interface CellEditor {
+  /** Builds the editor inside `host`, an element placed over the cell, and returns its lifecycle. */
   mount(host: HTMLElement, context: CellEditorContext): CellEditorInstance;
 }
 
@@ -144,15 +169,21 @@ export interface GridActions {
   saveVersion(): void;
   /** Add a dashboard sheet named `DashboardN` and show it, as Insert › New Dashboard does. */
   newDashboard(): void;
+  /** Turn bold on or off for the selection, based on the focus cell. */
   toggleBold(): void;
+  /** Turn italic on or off for the selection, based on the focus cell. */
   toggleItalic(): void;
+  /** Turn underline on or off for the selection, based on the focus cell. */
   toggleUnderline(): void;
+  /** Turn strikethrough on or off for the selection, based on the focus cell. */
   toggleStrikethrough(): void;
+  /** Set the selection's horizontal text alignment. */
   setAlign(align: CellAlign): void;
   /** Set the selection's text color; null returns it to automatic (the theme color). */
   setTextColor(color: string | null): void;
   /** Set the selection's fill; null removes it (Excel's "No Fill"). */
   setFillColor(color: string | null): void;
+  /** Add a thin border on every side of the selected cells, or remove it when the focus cell has one. */
   toggleBorder(): void;
   /**
    * Apply an Excel border preset to the selection. Edge presets (`top`,
@@ -166,7 +197,9 @@ export interface GridActions {
   setFontSize(size: number | null): void;
   /** Step the focus cell's font size to the next larger (1) or smaller (-1) standard size. */
   stepFontSize(direction: 1 | -1): void;
+  /** Set the selection's vertical text alignment. */
   setVerticalAlign(align: CellVerticalAlign): void;
+  /** Turn text wrapping on or off for the selection, based on the focus cell. */
   toggleWrap(): void;
   /** Set the selection's number format; null returns it to the column's format. */
   setNumberFormat(code: string | null): void;
@@ -191,8 +224,11 @@ export interface GridActions {
    * Does nothing without a selection; focusing A1 unfreezes both axes.
    */
   freezePanes(): void;
+  /** Remove the selection's cell formatting, keeping the contents. */
   clearFormat(): void;
+  /** Merge the selected range into one cell; does nothing unless a range is selected. */
   merge(): void;
+  /** Split merged cells in the selection back into single cells. */
   unmerge(): void;
   /** Quick sort of the cells around the focus cell by its column (`Grid.sortBy`). */
   sort(ascending: boolean): void;
@@ -200,18 +236,31 @@ export interface GridActions {
   sortView(ascending: boolean): void;
   /** Open the Sort panel: several keys, a header row, and a view-only option. */
   customSort(): void;
+  /** Insert an empty row above the focus cell. */
   insertRowAbove(): void;
+  /** Insert an empty row below the focus cell. */
   insertRowBelow(): void;
+  /** Delete the focus cell's row. */
   deleteRow(): void;
+  /** Insert an empty column left of the focus cell. */
   insertColumnLeft(): void;
+  /** Insert an empty column right of the focus cell. */
   insertColumnRight(): void;
+  /** Delete the focus cell's column. */
   deleteColumn(): void;
+  /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
+  /** Show the given zero-based rows again, or every hidden row when none are given. */
   showRows(rows?: readonly number[]): void;
+  /** Fit the focus cell's row height to its tallest content. */
   autoFitRows(): void;
+  /** Hide the given columns, or the focus cell's column; the last visible column stays shown. */
   hideColumns(cols?: readonly number[]): void;
+  /** Show the given columns again, or every hidden column when none are given. */
   showColumns(cols?: readonly number[]): void;
+  /** Fit the given columns' widths to their content, or every column when none are given. */
   autoFitColumns(cols?: readonly number[]): void;
+  /** Remove the filter on the given column, or on the focus cell's column. */
   clearFilter(col?: number): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
   copy(): Promise<ClipboardOutcome>;
@@ -221,6 +270,7 @@ export interface GridActions {
   paste(): Promise<ClipboardOutcome>;
   /** Paste keeping only resolved values — no formulas, no styles (Ctrl+Shift+V). Never rejects. */
   pasteValues(): Promise<ClipboardOutcome>;
+  /** Clear the selected cells' contents, keeping their formatting; does nothing when read-only. */
   clearContents(): void;
   /** Download the active sheet as CSV. Never throws; a failure emits `export-error`. */
   exportCsv(filename?: string): void;
@@ -248,7 +298,9 @@ export interface GridActions {
    * read-only grid.
    */
   showPivotFields(): void;
+  /** Undo the last change made through this grid. */
   undo(): void;
+  /** Redo the last undone change. */
   redo(): void;
 }
 
@@ -288,12 +340,15 @@ export type GridCommandName = Exclude<ToolbarActionName, "separator">;
 
 /** Observable availability and selection-derived activity for one command. */
 export interface GridCommandState {
+  /** `true` when the command cannot run now, for example on a read-only grid. */
   readonly disabled: boolean;
+  /** For toggles: `active` when the whole selection has it, `mixed` when part does. */
   readonly activity: "inactive" | "active" | "mixed";
 }
 
 /** Complete command-state snapshot emitted whenever availability or activity can change. */
 export interface GridCommandStateChangeEvent {
+  /** The state of every built-in command, by name. */
   readonly states: Readonly<Record<GridCommandName, GridCommandState>>;
 }
 
@@ -461,6 +516,7 @@ export type KeyboardAction =
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
+  /** Shortcut overrides by action name; actions you leave out keep their default keys. */
   bindings?: Partial<Record<KeyboardAction, KeyShortcut | readonly KeyShortcut[] | null>>;
 }
 
@@ -748,8 +804,11 @@ interface HyperlinkActivationEvent {
 
 /** Payload map for events emitted by a Grid. */
 export interface GridEvents {
+  /** A transaction committed, from a user edit, the API, undo, or a remote source. */
   change: ChangeEvent;
+  /** The selection changed; `null` when nothing is selected. */
   selection: { selection: Selection | null };
+  /** The grid scrolled; reports the scroll offsets in CSS pixels and the visible rows and columns. */
   scroll: {
     scrollTop: number;
     firstRow: number;
@@ -758,14 +817,19 @@ export interface GridEvents {
     firstVisibleColumn: number | null;
     lastVisibleColumn: number | null;
   };
+  /** A cell editor is about to open on `addr`. */
   "edit-begin": { addr: CellAddress };
+  /** An in-cell edit wrote `value` to `addr`. */
   "edit-commit": { addr: CellAddress; value: CellValue };
+  /** A search ran or moved to another match. */
   search: SearchResult;
   /** Command availability or formatting activity changed. */
   "command-state-change": GridCommandStateChangeEvent;
+  /** A local change was refused, for example by validation or protection; `issues` says why. */
   "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
+  /** The user followed a hyperlink in a cell. */
   "hyperlink-activate": HyperlinkActivationEvent;
   /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
   "theme-change": { theme: Theme };
@@ -775,6 +839,7 @@ export interface GridEvents {
    * is `spawn`, `crash`, `protocol`, `timeout` or `fatal`.
    */
   "renderer-fallback": { requested: "worker"; error: SheetwriteError };
+  /** A `DataSource.getRows` call failed; `request` is the request it was given. */
   "datasource-error": {
     request: Omit<DataSourceRequest, "signal">;
     error: SheetwriteError;

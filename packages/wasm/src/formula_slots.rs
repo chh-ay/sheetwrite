@@ -1,6 +1,6 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 use crate::calc::{for_each_table_ref, unresolved_sheet_names, Ast, TableSection};
 use crate::memory::{StoreMemoryStats, FORMULAS};
@@ -47,6 +47,11 @@ impl FormulaId {
     #[inline]
     pub(crate) fn index(self) -> usize {
         self.0 as usize
+    }
+
+    /// The id as a 32-bit integer, for packed sort keys.
+    pub(crate) const fn raw(self) -> u32 {
+        self.0
     }
 }
 
@@ -226,73 +231,6 @@ pub(crate) struct FormulaStore {
     references: Option<Box<ReferenceUsers>>,
 }
 
-/// Formulas by the missing sheet names they hold, and the reverse, so a
-/// replaced or removed formula leaves only its own names.
-#[derive(Default)]
-struct UnresolvedSheetUsers {
-    by_name: FxHashMap<String, FxHashSet<FormulaId>>,
-    by_formula: FxHashMap<FormulaId, Vec<String>>,
-}
-
-impl UnresolvedSheetUsers {
-    fn forget(&mut self, id: FormulaId) {
-        let Some(names) = self.by_formula.remove(&id) else {
-            return;
-        };
-        for name in names {
-            if let Some(users) = self.by_name.get_mut(&name) {
-                users.remove(&id);
-                if users.is_empty() {
-                    self.by_name.remove(&name);
-                }
-            }
-        }
-    }
-
-    fn record(&mut self, id: FormulaId, names: Vec<String>) {
-        if names.is_empty() {
-            return;
-        }
-        // A formula names few sheets, so a scan drops repeats; sorting
-        // strings would add a sort to the engine for this alone.
-        let mut unique: Vec<String> = Vec::with_capacity(names.len());
-        for name in names {
-            if !unique.contains(&name) {
-                unique.push(name);
-            }
-        }
-        for name in &unique {
-            self.by_name.entry(name.clone()).or_default().insert(id);
-        }
-        self.by_formula.insert(id, unique);
-    }
-
-    fn is_empty(&self) -> bool {
-        self.by_formula.is_empty()
-    }
-
-    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
-        formulas.add_hash_table::<String, FxHashSet<FormulaId>>(
-            self.by_name.len(),
-            self.by_name.capacity(),
-        );
-        for (name, users) in &self.by_name {
-            formulas.add_payload(name.len(), name.capacity());
-            formulas.add_hash_table::<FormulaId, ()>(users.len(), users.capacity());
-        }
-        formulas.add_hash_table::<FormulaId, Vec<String>>(
-            self.by_formula.len(),
-            self.by_formula.capacity(),
-        );
-        for names in self.by_formula.values() {
-            formulas.add_vec::<String>(names.len(), names.capacity());
-            for name in names {
-                formulas.add_payload(name.len(), name.capacity());
-            }
-        }
-    }
-}
-
 /// How one formula uses tables: the table slot it reads and how, or
 /// [`TableUses::SEVERAL`] when it reads more than one table.
 #[derive(Clone, Copy)]
@@ -364,10 +302,13 @@ impl TableUsers {
 }
 
 /// The formulas an edit elsewhere has to find: those that name a sheet the
-/// workbook does not have, and those that use a table.
+/// workbook does not have, and those that use a table. A sheet that
+/// appears finds its formulas by a scan, since few formulas name a missing
+/// sheet.
 #[derive(Default)]
 struct ReferenceUsers {
-    sheets: UnresolvedSheetUsers,
+    /// The missing sheet names each formula holds, each once.
+    missing_sheets: FxHashMap<FormulaId, Vec<String>>,
     tables: TableUsers,
     /// The formulas that call GETPIVOTDATA.
     #[cfg(feature = "analysis")]
@@ -377,7 +318,16 @@ struct ReferenceUsers {
 impl ReferenceUsers {
     fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
         formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
-        self.sheets.add_memory_stats(formulas);
+        formulas.add_hash_table::<FormulaId, Vec<String>>(
+            self.missing_sheets.len(),
+            self.missing_sheets.capacity(),
+        );
+        for names in self.missing_sheets.values() {
+            formulas.add_vec::<String>(names.len(), names.capacity());
+            for name in names {
+                formulas.add_payload(name.len(), name.capacity());
+            }
+        }
         self.tables.add_memory_stats(formulas);
         #[cfg(feature = "analysis")]
         self.pivot_readers.add_memory_stats(formulas);
@@ -388,7 +338,7 @@ impl ReferenceUsers {
         if !self.pivot_readers.is_empty() {
             return false;
         }
-        self.sheets.is_empty() && self.tables.by_formula.is_empty()
+        self.missing_sheets.is_empty() && self.tables.by_formula.is_empty()
     }
 }
 
@@ -501,8 +451,18 @@ impl FormulaStore {
             }
         }
         let index = self.references.get_or_insert_with(Box::default);
-        index.sheets.forget(id);
-        index.sheets.record(id, names);
+        index.missing_sheets.remove(&id);
+        if !names.is_empty() {
+            // A formula names few sheets, so a scan drops repeats; sorting
+            // strings would add a sort to the engine for this alone.
+            let mut unique: Vec<String> = Vec::with_capacity(names.len());
+            for name in names {
+                if !unique.contains(&name) {
+                    unique.push(name);
+                }
+            }
+            index.missing_sheets.insert(id, unique);
+        }
         index.tables.by_formula.remove(&id);
         if let Some(ast) = table_tree {
             index.tables.record(id, ast);
@@ -520,16 +480,17 @@ impl FormulaStore {
         }
     }
 
-    /// Stable formula users of one normalized detached sheet name.
-    pub(crate) fn unresolved_sheet_users(
-        &self,
-        name: &str,
-    ) -> impl Iterator<Item = FormulaId> + '_ {
-        self.references
-            .as_ref()
-            .and_then(|index| index.sheets.by_name.get(name))
-            .into_iter()
-            .flat_map(|users| users.iter().copied())
+    /// The formulas that name one of the missing sheets `keys` (normalized),
+    /// each once.
+    pub(crate) fn unresolved_sheet_users(&self, keys: &[String]) -> Vec<FormulaId> {
+        let Some(index) = &self.references else {
+            return Vec::new();
+        };
+        index
+            .missing_sheets
+            .iter()
+            .filter_map(|(&id, names)| names.iter().any(|held| keys.contains(held)).then_some(id))
+            .collect()
     }
 
     /// The formulas whose cells an edit of table slot `table` changes: those

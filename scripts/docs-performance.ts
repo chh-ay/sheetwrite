@@ -1973,6 +1973,8 @@ export async function renderEvidenceText(sizeHistoryOverride?: SizeHistory): Pro
       "",
       "Both engines drive identical scripted interactions in a live grid in a controlled browser. The headline numbers and the overview use 100,000-row workbooks; switch the machine to see its own capture.",
       "",
+      "Both grids run in the same viewport with the same data and the engine versions listed below, and every timed step repaints on both sides.",
+      "",
       renderSpeedStory(scaleCaptures.machines),
       "",
       "### Every size, speed and memory",

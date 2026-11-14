@@ -272,13 +272,15 @@ Measured natively before LETs resolved function-call bindings to slots, a
 once they did. Its ratio limit is the 1.2 default until same-engine pairs
 calibrate it.
 
-Seven rows (10K and 100K formulas each) time how formulas bind to sheets,
+Eight rows (10K and 100K formulas each) time how formulas bind to sheets,
 defined names and tables, which the other rows never change after load:
 
 - `name-define`: one formula per row, `=A1*2` in nine rows of ten and
   `=A1*Scale_k` in the tenth. The timed run defines the ten names
   `Scale_0`…`Scale_9` one at a time, as an edit session or a remote change
   does; a workbook load defines its names before its formulas.
+- `name-define-unused`: the same run over `=A1*2` in every row, so no
+  formula uses a name; defining names should cost only the names.
 - `row-insert-names`: the same sheet with the names defined; the timed run
   inserts one row above everything, so every formula and name moves.
 - `table-append-row`: table `Sales` with `=[@Amount]*2` in every body row and
@@ -291,13 +293,15 @@ defined names and tables, which the other rows never change after load:
 - `memory-import`: `importMemoryState` of a released engine whose formulas
   read another sheet, every tenth also through a defined name.
 
-On develop, each name or table change resolves every formula of the workbook
-again and recalculates all of them, and a sort or a memory import parses
-every moved formula again; no other row times this. Measured natively on
-develop (Mac), per timed run at 100K: `name-define` made 5.8 M
-heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
-`sort-formula-column` 0.9 M and `memory-import` 1.1 M. Their ratio limits are
-the 1.2 default until same-engine pairs calibrate them.
+When these rows were added, each name or table change resolved every
+formula of the workbook again and recalculated all of them, and a sort or a
+memory import parsed every moved formula again; no other row times this.
+Measured natively then (Mac), per timed run at 100K: `name-define` made
+5.8 M heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
+`sort-formula-column` 0.9 M and `memory-import` 1.1 M. A table change now
+binds only the formulas that use the table, and a name change only the
+formulas whose text names a changed name. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
 
 Four rows time paged storage (#325, R5). Each paged sheet loads its values as
 clean pages inside a page load, the way datasource pages arrive:
@@ -349,6 +353,14 @@ number, a text, a logical value and a blank cell in turn; the edit changes
 A1. A blank compares equal to 0, "" and FALSE at once, so only a comparison
 sort gives this order: no sort key can. The row checks the spilled text count
 and value sum, which don't depend on the order. Its limit is the 1.2 default.
+
+`take-sort-filter` (100,000 rows) times a chain of three row steps over a
+three-column range,
+`=TAKE(SORT(FILTER(A1:C100000,C1:C100000>$E$1),2,-1),1000)`, where the timed
+run edits the threshold in E1. Each step picks rows of the range it read
+instead of copying them, so the chain copies only the 1,000 rows it spills
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
 
 `sort-rows-labels` (100,000 rows) and `sort-rows-numbers` (4,000 rows) sort
 one column through `sortRowsMulti`, ascending then descending, as the sort
@@ -831,7 +843,7 @@ Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
 | `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator, and acknowledgement drain of a queue that deep, in order and pair-swapped (`src/sync-queue-depth-bench.ts`) |
 | `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
 | `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
-| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference (`src/panel-read-bench.ts`) |
+| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference; cell edits with the pivot field list closed and open (`src/panel-read-bench.ts`) |
 | `bench:view-index` | Packed view-row index against a map baseline (`src/view-index-bench.ts`) |
 | `bench:resource`, `bench:resource:smoke` | Ingest memory and string-pool resources at 1M rows (`src/resource-bench.ts`) |
 | `bench:streaming-memory` | XLSX buffered and streaming memory, baseline and candidate interleaved in fresh processes (`src/streaming-memory-bench.ts`) |
