@@ -143,9 +143,21 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
     throw new TypeError("--scenario-set must be gate or diagnostic");
   }
   const diagnostic = scenarioSet === "diagnostic";
-  const scenarios = diagnostic
+  const setScenarios: readonly ScenarioId[] = diagnostic
     ? DIAGNOSTIC_RENDER_SCENARIOS.map((scenario) => scenario.id)
     : RENDER_SCENARIOS.map((scenario) => scenario.id);
+  // `--scenarios a,b` runs only those scenarios of the chosen set, for A/B runs of one row.
+  const scenariosArg = optionValue(args, "--scenarios");
+  const scenarios =
+    scenariosArg === undefined
+      ? setScenarios
+      : scenariosArg.split(",").map((id) => {
+          const scenario = setScenarios.find((candidate) => candidate === id);
+          if (scenario === undefined) {
+            throw new TypeError(`--scenarios: ${id} is not in the ${scenarioSet} set`);
+          }
+          return scenario;
+        });
   const engineArg = optionValue(args, "--engine");
   const engines: readonly EngineId[] =
     engineArg === undefined
