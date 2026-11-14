@@ -2105,7 +2105,7 @@ impl<'a> Parser<'a, '_> {
             values.push(self.array_element()?);
             row_len += 1;
             match self.next() {
-                Some(Tok::Comma) => {}
+                Some(Tok::Comma) => continue,
                 Some(separator @ (Tok::Semicolon | Tok::RBrace)) => {
                     if cols == 0 {
                         cols = row_len;
