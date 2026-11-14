@@ -13,6 +13,7 @@ convenience. The decision behind them is on #325.
 bun run lint:rust                    # rustfmt, then Clippy against the baseline
 bun scripts/rust-lint.ts --report    # warning counts per lint and crate, as a table
 bun scripts/rust-lint.ts --update    # record lower counts after a fix
+bun scripts/check-engine-exports.ts  # after build:packages: callers of generated bindings
 ```
 
 - **One lint set.** Each crate's `Cargo.toml` ends with the same `[lints]`
@@ -33,6 +34,23 @@ bun scripts/rust-lint.ts --update    # record lower counts after a fix
   `cargo deny` for the licenses, bans and sources of every dependency
   (`deny.toml`). `bun scripts/install-rust-checks.ts` installs both at the
   versions CI uses.
+
+The existing Type Checks & Generated Docs job checks engine exports. Every
+exported Rust function and method names its JavaScript binding with an
+explicit camelCase `js_name`; constructors are the exception. The check also
+resolves the built default, full, history and query declarations against
+executable sources in `packages`, `test` and `bench`; generated output and type-only
+declarations do not count. Remove an uncalled export unless it is public API
+on purpose. In that case, add `/// @enginePublic <reason>` to its Rust docs,
+so the generated declaration carries the reason. A bare marker does not pass.
+Run with `--report` to list the callers and public reasons.
+
+Result buffers cross the boundary once. Expose a buffer through a `take*`
+method that moves it out (`std::mem::take`), not through a getter that clones
+it on every read. Review enforces this rule; a cloning getter is not reliably
+distinguishable from a small fixed result in a source check.
+
+
 
 ## Lint policy
 

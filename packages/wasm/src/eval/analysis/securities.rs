@@ -646,7 +646,7 @@ fn bisect(function: &dyn Fn(f64) -> f64, guess: f64) -> NumberResult {
 
 #[cfg(test)]
 mod tests {
-    use super::super::evaluate_scalar;
+    use super::super::{evaluate_scalar, lookup};
     use super::*;
 
     fn call(name: &str, arguments: &[f64]) -> Value {
@@ -657,7 +657,7 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate_scalar(name, &values)
+        evaluate_scalar(lookup(name).unwrap(), &values)
     }
 
     fn number(name: &str, arguments: &[f64]) -> f64 {

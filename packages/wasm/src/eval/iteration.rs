@@ -333,7 +333,11 @@ impl CellStore {
             let mut state = slot.borrow_mut();
             let edges = state.as_mut()?;
             let finished = edges.path.pop();
-            debug_assert_eq!(finished, Some(key));
+            debug_assert_eq!(
+                finished,
+                Some(key),
+                "the finished key is the last one on the path"
+            );
             if !edges.pending.contains(&key)
                 || edges
                     .path

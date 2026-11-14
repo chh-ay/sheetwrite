@@ -185,6 +185,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/normalize-sitemap.test.ts",
   "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
+  "scripts/check-engine-exports.test.ts",
   "scripts/check-local-paths.test.ts",
   "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",

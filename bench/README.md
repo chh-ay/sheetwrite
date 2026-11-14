@@ -344,6 +344,14 @@ samples with inlined frames, at the sizes the rows first had (1,000 lookups,
 
 Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
 
+`spill-filter-same-range` (100,000 rows) is the `spill-filter-resize` spill,
+`=FILTER(A1:A100000,B1:B100000)` with every row kept, where the timed run
+edits A1 instead of the filter. The spill comes back over the same range and
+only its anchor changes, so the row times a recalculation that compares the
+reinstalled values with the old ones and wakes no reader of the other cells
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
 Six rows time grouping, pivots, analysis functions and the version-history
 diff, which no other row reaches. The first five run on the full engine only,
 since the default engine has none of these functions; the default engine's
@@ -1321,6 +1329,11 @@ and retained text ownership after clearing and unique edits. That mode records
 the cold sweep and seven additional sweeps; its maximum includes the cold
 sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
 ingest and the public cached `getVisibleWindow` path.
+
+Both harnesses run `Bun.gc(true)` before each timed read, outside the timed
+span. Without it the read row timed the JS heap the write fixture left behind:
+on Linux, develop's `setSparseBlock` read 1.22× slower than 0.6.1's with
+identical engine state, and 0.989× after one collection (#651).
 
 Run each sample in a fresh process. To select a built baseline without changing
 its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for
