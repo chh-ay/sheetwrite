@@ -1054,12 +1054,16 @@ impl CellStore {
             .collect()
     }
 
+    /// Rows in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = rowCount)]
     pub fn row_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.row_count())
     }
 
+    /// Columns in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = colCount)]
     pub fn col_count(&self, sheet: usize) -> usize {
@@ -1138,6 +1142,9 @@ impl CellStore {
         });
     }
 
+    /// Empties the cell at `row`, `col` of `sheet`, removing its value or
+    /// formula, and gives it style `style`.
+    ///
     /// @enginePublic Scalar clearing complements the public scalar value setters.
     #[wasm_bindgen(js_name = clearCell)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {

@@ -76,5 +76,6 @@ export type EngineInstance = Omit<typeof WasmExports, "default" | "CellStore" | 
  *
  * @param source - Where the engine's WASM comes from, as for `load`; pass a
  *   compiled `WebAssembly.Module` to reuse it.
+ * @returns The new engine, with its own memory; `retire()` releases it.
  */
 export declare function createEngine(source?: Parameters<typeof load>[0]): Promise<EngineInstance>;
