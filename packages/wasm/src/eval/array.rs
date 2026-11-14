@@ -411,7 +411,7 @@ impl CellStore {
             Ast::Parameter { depth, index, .. } => {
                 let frame = pass.results.call_frame();
                 if let Some(super::analysis::lambda::Slot::Array { rows, cols, values }) =
-                    frame.and_then(|frame| frame.slot(*depth, *index))
+                    frame.and_then(|call_frame| call_frame.slot(*depth, *index))
                 {
                     return Some(T::shared(*rows, *cols, values));
                 }
