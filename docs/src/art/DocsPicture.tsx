@@ -4,12 +4,22 @@
 import type { JSX } from "solid-js";
 
 import { DOCS_CARD_ART, DOCS_DIAGRAMS } from "./docs-art.js";
+import { FEATURE_DIAGRAMS } from "./docs-feature-art.js";
+import { FORMULA_DIAGRAMS } from "./docs-formula-art.js";
+import { GUIDE_DIAGRAMS } from "./docs-guide-art.js";
 import { MECHANISM_DIAGRAMS } from "./docs-mechanisms.js";
+import { REFERENCE_DIAGRAMS } from "./docs-reference-art.js";
+import { RELEASE_DIAGRAMS } from "./docs-release-art.js";
 
 /** Every diagram a docs page can place, by name. */
 const DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   ...DOCS_DIAGRAMS,
   ...MECHANISM_DIAGRAMS,
+  ...FEATURE_DIAGRAMS,
+  ...FORMULA_DIAGRAMS,
+  ...GUIDE_DIAGRAMS,
+  ...REFERENCE_DIAGRAMS,
+  ...RELEASE_DIAGRAMS,
 };
 
 /**

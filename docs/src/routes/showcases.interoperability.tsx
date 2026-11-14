@@ -3,7 +3,7 @@ import { pageMeta } from "@docs/lib/seo.js";
 import { createFileRoute } from "@tanstack/solid-router";
 import { NoHydration } from "solid-js/web";
 
-import { InteropFlowDiagram } from "../art/diagrams.js";
+import { XlsxFlowFigure } from "../art/blueprint-figures.js";
 import { Island } from "../islands/Island.js";
 import { InteropStage } from "../showcases/interop/InteropStage.js";
 import { InteropLabs } from "../showcases/interop/labs/InteropLabs.js";
@@ -49,7 +49,7 @@ function InteroperabilityShowcase() {
         }}
         explain={
           <ShowcaseSection
-            figure={<InteropFlowDiagram />}
+            figure={<XlsxFlowFigure />}
             id="interoperability-flow"
             title="Where a file goes, and where it stops"
           >
