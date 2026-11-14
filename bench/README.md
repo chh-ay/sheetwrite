@@ -358,6 +358,15 @@ reinstalled values with the old ones and wakes no reader of the other cells
 (#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
 calibrate it.
 
+`conditional-format-window` (10,000 and 100,000 visible cells) times one
+render-window read, 100 columns wide, under three formula rules and one value
+rule that cover the whole window: `=A1>$A$2`, `=AND(A1>B1,MOD(ROW(),2)=1)`
+and `=SUM($A1:$C1)>12`. Nothing changes between reads, so the row times only
+conditional-format evaluation and packing the window's cells. The
+check counts the matched rule bits, which the harness also counts from the
+same rules (#250). Its ratio limits are the 1.2 default until same-engine
+pairs calibrate them.
+
 Six rows time grouping, pivots, analysis functions and the version-history
 diff, which no other row reaches. The first five run on the full engine only,
 since the default engine has none of these functions; the default engine's

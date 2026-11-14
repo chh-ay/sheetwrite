@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::formula_slots::{FormulaResults, FormulaStore};
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{translate_relative_refs, Ast};
+use crate::calc::{relative_reach, translate_relative_refs, Ast, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{payload_num, payload_str_id};
 use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
@@ -22,22 +22,73 @@ const NO_STYLE_ID: u32 = 0;
 
 /// One conditional-format predicate, mirroring the host's rule kinds. String
 /// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
-/// formula ASTs are parsed once and translated from their stored anchor per cell.
+/// formula ASTs are parsed once, written for the rule range's top-left cell,
+/// and read at every other covered cell with that cell's distance from it.
 enum CondPred {
     GtNum(f64),
     LtNum(f64),
     EqNum(f64),
     EqStr(String),
     EqEmpty,
-    Contains {
-        needle: String,
-        match_case: bool,
-    },
-    Formula {
-        ast: Ast,
-        anchor_row: u32,
-        anchor_col: u32,
-    },
+    Contains { needle: String, match_case: bool },
+    Formula(FormulaRule),
+}
+
+/// A formula rule's parsed expression, written for the rule range's top-left
+/// cell, and its [`relative_reach`]: how far its references can move before
+/// one leaves the sheet.
+struct FormulaRule {
+    ast: Ast,
+    reach: (u32, u32),
+}
+
+/// A cell a rule covers, and its distance in rows and columns from the rule
+/// range's top-left cell.
+#[derive(Clone, Copy)]
+struct CoveredCell {
+    target: (u32, u32),
+    shift: (u32, u32),
+}
+
+impl FormulaRule {
+    /// Whether the formula holds at `cell`. The expression is read in place
+    /// with the cell's shift. Where the shift would move a reference out of
+    /// the sheet, or the formula reads a defined name holding a relative
+    /// reference, a translated copy keeps the result of placing the formula
+    /// at the cell: `#REF!` for the moved reference, the name where it was.
+    fn holds(
+        &self,
+        store: &CellStore,
+        sheet: usize,
+        cell: CoveredCell,
+        results: &mut FormulaResults,
+    ) -> bool {
+        let CoveredCell { target, shift } = cell;
+        results.clear();
+        let in_sheet = shift.0.saturating_add(self.reach.0) <= SHEET_ROWS
+            && shift.1.saturating_add(self.reach.1) <= SHEET_COLS;
+        let result = if in_sheet {
+            store.eval_conditional_ast(&self.ast, sheet, target, shift, results)
+        } else {
+            let translated = translated_formula(&self.ast, shift);
+            store.eval_conditional_ast(&translated, sheet, target, (0, 0), results)
+        };
+        match result {
+            Value::Bool(holds) => holds,
+            Value::Number(number) => number != 0.0,
+            Value::Text(_) | Value::Blank | Value::Error(_) => false,
+        }
+    }
+}
+
+/// A copy of `ast` placed `shift` rows and columns further, for the rare
+/// cell [`FormulaRule::holds`] cannot read in place.
+#[cold]
+#[inline(never)]
+fn translated_formula(ast: &Ast, shift: (u32, u32)) -> Ast {
+    let mut translated = ast.clone();
+    translate_relative_refs(&mut translated, i64::from(shift.0), i64::from(shift.1));
+    translated
 }
 
 /// One conditional-format rule: a normalized cell rectangle plus a predicate.
@@ -85,7 +136,7 @@ impl ConditionalRules {
                     | CondPred::LtNum(_)
                     | CondPred::EqNum(_)
                     | CondPred::EqEmpty
-                    | CondPred::Formula { .. } => None,
+                    | CondPred::Formula(_) => None,
                 };
                 if let Some(payload) = text {
                     metadata.add_payload(payload.len(), payload.capacity());
@@ -159,14 +210,14 @@ impl CellStore {
                     },
                     match_case,
                 },
-                6 => CondPred::Formula {
-                    ast: formula_asts
+                6 => {
+                    let ast = formula_asts
                         .get(i)
                         .and_then(Clone::clone)
-                        .unwrap_or(Ast::InvalidRef),
-                    anchor_row: r0,
-                    anchor_col: c0,
-                },
+                        .unwrap_or(Ast::InvalidRef);
+                    let reach = relative_reach(&ast);
+                    CondPred::Formula(FormulaRule { ast, reach })
+                }
                 _ => continue,
             };
 
@@ -449,29 +500,12 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                     continue;
                 }
                 let hit = match &rule.pred {
-                    CondPred::Formula {
-                        ast,
-                        anchor_row,
-                        anchor_col,
-                    } => {
-                        let mut translated = ast.clone();
-                        translate_relative_refs(
-                            &mut translated,
-                            i64::from(data_row) - i64::from(*anchor_row),
-                            i64::from(col) - i64::from(*anchor_col),
-                        );
-                        results.clear();
-                        match store.eval_conditional_ast(
-                            &translated,
-                            sheet_index,
-                            data_row,
-                            col,
-                            &mut results,
-                        ) {
-                            Value::Bool(value) => value,
-                            Value::Number(value) => value != 0.0,
-                            Value::Text(_) | Value::Blank | Value::Error(_) => false,
-                        }
+                    CondPred::Formula(formula) => {
+                        let cell = CoveredCell {
+                            target: (data_row, col),
+                            shift: (data_row - rule.r0, col - rule.c0),
+                        };
+                        formula.holds(store, sheet_index, cell, &mut results)
                     }
                     predicate @ (CondPred::GtNum(_)
                     | CondPred::LtNum(_)
@@ -515,7 +549,7 @@ fn cond_pred_matches(pred: &CondPred, kind: u8, num: f64, text: Option<&str>) ->
             }
             text.is_some_and(|hay| matches_needle(hay, needle, !match_case, false))
         }
-        CondPred::Formula { .. } => false,
+        CondPred::Formula(_) => false,
     }
 }
 

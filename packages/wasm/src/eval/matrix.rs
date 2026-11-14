@@ -3,6 +3,8 @@
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::types::{CellRange, FormulaError, Value};
 
+use super::{placed_cell, placed_range};
+
 use super::preview_limits;
 use std::cell::Cell;
 use std::mem::size_of;
@@ -215,20 +217,7 @@ pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange
 /// cell is a value there, not a range.
 pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match arg {
-        Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-            formula_sheet as u32,
-            *row_start,
-            *col_start,
-            *row_end,
-            *col_end,
-        )),
-        Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-            sheet.handle,
-            *row_start,
-            *col_start,
-            *row_end,
-            *col_end,
-        )),
+        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(arg, formula_sheet),
         Ast::NamedRange(named) => Some(CellRange::new(
             named.sheet,
             named.row_start,
@@ -276,17 +265,34 @@ pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),
         Ast::NamedFormula(named) => range_from_ast(&named.expression, formula_sheet),
-        Ast::Cell(row, col, _) => {
-            Some(CellRange::new(formula_sheet as u32, *row, *col, *row, *col))
+        Ast::Cell(row, col, flags) => {
+            let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+            Some(CellRange::new(
+                formula_sheet as u32,
+                placed_row,
+                placed_col,
+                placed_row,
+                placed_col,
+            ))
         }
-        Ast::AbsCell(sheet, row, col, _) => {
-            Some(CellRange::new(sheet.handle, *row, *col, *row, *col))
+        Ast::AbsCell(sheet, row, col, flags) => {
+            let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+            Some(CellRange::new(
+                sheet.handle,
+                placed_row,
+                placed_col,
+                placed_row,
+                placed_col,
+            ))
         }
-        Ast::Range(r0, c0, r1, c1, _) => {
-            Some(CellRange::new(formula_sheet as u32, *r0, *c0, *r1, *c1))
-        }
-        Ast::AbsRange(sheet, r0, c0, r1, c1, _) => {
-            Some(CellRange::new(sheet.handle, *r0, *c0, *r1, *c1))
+        Ast::Range(r0, c0, r1, c1, flags) => Some(placed_range(
+            formula_sheet as u32,
+            (*r0, *c0),
+            (*r1, *c1),
+            *flags,
+        )),
+        Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
+            Some(placed_range(sheet.handle, (*r0, *c0), (*r1, *c1), *flags))
         }
         Ast::NamedRange(named) => Some(CellRange::new(
             named.sheet,
