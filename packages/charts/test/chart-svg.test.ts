@@ -149,6 +149,14 @@ describe("renderChartSvg", () => {
     /** The renderer's font size, and its estimate of a glyph's width as a share of it. */
     const FONT_SIZE = 11;
     const GLYPH_WIDTH_RATIO = 0.6;
+    /**
+     * A browser's text box is taller than the font size: it runs about this
+     * share of it above and below a centered label, and below the baseline of
+     * other labels. The boxes here use these generous heights so labels that
+     * merely touch count as overlapping.
+     */
+    const CENTERED_HALF_HEIGHT = 0.6;
+    const DESCENT = 0.25;
     /** Every 40 px from 200 to 2,600: tick rounding packs labels tightest at some widths only. */
     const LENGTHS = Array.from({ length: 61 }, (_, index) => 200 + index * 40);
     const MONEY = ["$#,##0", "$#,##0", "$#,##0"];
@@ -161,22 +169,42 @@ describe("renderChartSvg", () => {
       categoryFormats: MONEY,
     });
 
-    /** The extent of each label along a horizontal axis: centered on its x, as wide as estimated. */
-    function horizontalSpans(svg: Element, selector: string): Array<[number, number]> {
-      return [...svg.querySelectorAll(selector)].map((node) => {
-        const half = ((node.textContent ?? "").length * FONT_SIZE * GLYPH_WIDTH_RATIO) / 2;
-        const x = numberAttribute(node, "x");
-        return [x - half, x + half];
-      });
+    interface LabelBox {
+      text: string;
+      left: number;
+      right: number;
+      top: number;
+      bottom: number;
     }
 
-    /** The extent of each label along a vertical axis: one font size, centered on its y. */
+    /** The box of an unrotated label from its anchor, baseline and estimated width. */
+    function labelBox(node: Element): LabelBox {
+      const text = node.textContent ?? "";
+      const width = text.length * FONT_SIZE * GLYPH_WIDTH_RATIO;
+      const x = numberAttribute(node, "x");
+      const y = numberAttribute(node, "y");
+      const anchor = node.getAttribute("text-anchor");
+      const left = anchor === "start" ? x : anchor === "end" ? x - width : x - width / 2;
+      const centered = node.getAttribute("dominant-baseline") === "central";
+      return {
+        text,
+        left,
+        right: left + width,
+        top: centered ? y - FONT_SIZE * CENTERED_HALF_HEIGHT : y - FONT_SIZE,
+        bottom: centered ? y + FONT_SIZE * CENTERED_HALF_HEIGHT : y + FONT_SIZE * DESCENT,
+      };
+    }
+
+    function horizontalSpans(svg: Element, selector: string): Array<[number, number]> {
+      return [...svg.querySelectorAll(selector)]
+        .map(labelBox)
+        .map((box): [number, number] => [box.left, box.right]);
+    }
+
     function verticalSpans(svg: Element, selector: string): Array<[number, number]> {
       return [...svg.querySelectorAll(selector)]
-        .map((node): [number, number] => {
-          const y = numberAttribute(node, "y");
-          return [y - FONT_SIZE / 2, y + FONT_SIZE / 2];
-        })
+        .map(labelBox)
+        .map((box): [number, number] => [box.top, box.bottom])
         .sort(([top], [otherTop]) => top - otherTop);
     }
 
@@ -208,6 +236,34 @@ describe("renderChartSvg", () => {
       for (const height of LENGTHS) {
         const svg = renderChartSvg(chartView("column", [REVENUE]), { width: 400, height });
         expectApart(verticalSpans(svg, ".sheetwrite-chart-value-axis text"), height);
+      }
+    });
+
+    // A scatter chart is the one kind with two value axes; its lowest y label
+    // and its first x label both sit at the corner where the axes meet.
+    it("keeps the scatter chart's x and y labels apart where the axes meet, at every width", () => {
+      for (const width of LENGTHS) {
+        const svg = renderChartSvg(chartView("scatter", [SPEND]), { width, height: 300 });
+        const boxes = [
+          ...svg.querySelectorAll(
+            ".sheetwrite-chart-value-axis text, .sheetwrite-chart-category-axis text",
+          ),
+        ].map(labelBox);
+        const touching = boxes.flatMap((box, index) =>
+          boxes
+            .slice(index + 1)
+            .filter(
+              (other) =>
+                box.left < other.right &&
+                other.left < box.right &&
+                box.top < other.bottom &&
+                other.top < box.bottom,
+            )
+            .map((other) => `${box.text} / ${other.text} at ${width} px`),
+        );
+
+        expect(touching).toEqual([]);
+        expect(boxes.every((box) => box.left >= 0 && box.right <= width)).toBe(true);
       }
     });
   });
