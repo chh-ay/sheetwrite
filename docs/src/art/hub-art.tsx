@@ -96,7 +96,7 @@ function AnalysisArt() {
         d="M188 148v-40h14v40zM208 148v-64h14v64zM248 148v-80h14v80zM268 148v-30h14v30z"
       />
       <rect class="alt" height={52} width={14} x={228} y={96} />
-      <path class="alt-line dash" d={`M106 92h50${head(156, 92, 0)}`} />
+      <path class="alt-line dash" d={`M104 92h60${head(164, 92, 0)}`} />
     </CardArt>
   );
 }
@@ -156,7 +156,7 @@ function DataModelArt() {
         1
       </text>
       <rect class="alt-soft" height={22} rx={11} width={104} x={24} y={158} />
-      <text class="alt-text" x={36} y={173}>
+      <text class="strong" x={36} y={173}>
         Σ measure
       </text>
     </CardArt>
@@ -252,13 +252,11 @@ function QueriesArt() {
           </>
         )}
       </For>
-      <path class="ink-line" d={`M162 68v18${head(162, 86, 90)}M162 116v18${head(162, 134, 90)}`} />
-      <path
-        class="hue-line"
-        d={`M90 92c16 0 12-39 26-39${head(116, 53, 0)}M208 149c16 0 12-35 26-35${head(234, 114, 0)}`}
-      />
+      <path class="ink-line" d={`M162 66v22${head(162, 88, 90)}M162 114v22${head(162, 136, 90)}`} />
+      <path class="hue-line" d={`M88 92c16 0 14-39 30-39${head(118, 53, 0)}`} />
+      <path class="hue-line" d={`M206 149c16 0 14-35 30-35${head(236, 114, 0)}`} />
       <Sheet ch={14} cols={3} cw={20} head={12} headClass="hue-tint" rows={5} x={236} y={74} />
-      <path class="alt-line" d={`M276 40a10 10 0 1 1-4-8${head(272, 32, -40)}`} />
+      <path class="alt-line mark" d={`M276 40a10 10 0 1 1-4-8${head(272, 32, -40)}`} />
     </CardArt>
   );
 }
@@ -285,8 +283,8 @@ function SortArt() {
       />
       <Bar class="ink" w={26} x={66} y={37} />
       <Bar class="ink" w={22} x={194} y={37} />
-      <path class="hue-line" d={`M146 46V34${head(146, 33, -90)}`} />
-      <path class="ink-line faint" d={`M160 33v12${head(160, 46, 90)}`} />
+      <path class="hue-line mark" d={`M146 46V34${head(146, 33, -90)}`} />
+      <path class="ink-line faint mark" d={`M160 33v12${head(160, 46, 90)}`} />
       <For each={rows}>
         {(row) => (
           <>
@@ -298,7 +296,7 @@ function SortArt() {
           </>
         )}
       </For>
-      <path class="alt-line" d={`M252 166c26 0 26-89 0-89${head(252, 77, 180)}`} />
+      <path class="alt-line" d={`M248 166c30 0 30-89 0-89${head(248, 77, 180)}`} />
     </CardArt>
   );
 }
@@ -400,7 +398,7 @@ function VersionHistoryArt() {
         fill={
           <>
             <rect class="alt-tint" height={14} width={30} x={220} y={50} />
-            <rect class="hue-tint" height={14} width={30} x={250} y={78} />
+            <rect class="hue-tint" height={14} width={30} x={250} y={64} />
           </>
         }
         head={10}
@@ -408,7 +406,7 @@ function VersionHistoryArt() {
         x={190}
         y={26}
       />
-      <path class="ink-line" d={`M140 54h36${head(176, 54, 0)}M176 68h-36${head(140, 68, 180)}`} />
+      <path class="ink-line" d={`M130 54h60${head(190, 54, 0)}M190 68h-60${head(130, 68, 180)}`} />
       <path class="rule dash" d="M85 92l7 50M235 92l-11 50" />
       <path class="rule" d="M28 150h264" stroke-width={2} />
       <circle class="alt-line" cx={92} cy={150} r={10} />
@@ -416,7 +414,7 @@ function VersionHistoryArt() {
       <For each={dots}>
         {([x, alt]) => <circle class={alt ? "alt" : "hue"} cx={x} cy={150} r={6} />}
       </For>
-      <path class="hue-line" d={`M268 160c-6 26-170 26-176 4${head(92, 163, -100)}`} />
+      <path class="hue-line mark" d={`M268 160c-6 26-170 26-176 4${head(92, 163, -100)}`} />
     </CardArt>
   );
 }
@@ -520,8 +518,8 @@ function CollaborationArt() {
     <CardArt alt="blue" hue="red">
       <ClientWindow cursor={40} mine="hue" peer="alt" x={16} />
       <ClientWindow cursor={24} mine="alt" peer="hue" x={188} />
-      <path class="hue-line" d={`M60 132c0 24 30 32 64 32${head(124, 164, 0)}`} />
-      <path class="alt-line" d={`M196 164c34 0 64-8 64-32${head(260, 132, -90)}`} />
+      <path class="hue-line" d={`M60 130c0 26 30 34 68 34${head(128, 164, 0)}`} />
+      <path class="alt-line" d={`M192 164c34 0 68-8 68-34${head(260, 130, -90)}`} />
       <Panel h={32} w={64} x={128} y={148} />
       <text class="strong" text-anchor="middle" x={160} y={168}>
         v42
@@ -538,19 +536,19 @@ function DatabaseArt() {
       <ellipse class="hue-soft" cx={72} cy={44} rx={44} ry={12} />
       <path class="rule" d="M28 82a44 12 0 0 0 88 0M28 120a44 12 0 0 0 88 0" />
       <Panel class="hue-soft" h={40} w={128} x={164} y={24} />
-      <text class="hue-text" x={176} y={48}>
+      <text class="strong" x={176} y={48}>
         snapshot
       </text>
       <For each={[80, 100, 120, 140, 160]}>
         {(y, index) => (
           <>
-            <rect class="panel" height={14} rx={7} width={128} x={164} y={y} />
-            <circle class="alt" cx={175} cy={y + 7} r={3} />
-            <Bar w={44 + ((index() * 17) % 40)} x={186} y={y + 5} />
+            <rect class="panel" height={16} rx={8} width={128} x={164} y={y} />
+            <circle class="alt" cx={175} cy={y + 8} r={3} />
+            <Bar w={44 + ((index() * 17) % 40)} x={186} y={y + 6} />
           </>
         )}
       </For>
-      <path class="hue-line" d={`M158 168c-22 0-22-124 0-124${head(160, 44, 0)}`} />
+      <path class="hue-line" d={`M164 168c-24 0-24-124 0-124${head(164, 44, 0)}`} />
     </CardArt>
   );
 }
@@ -577,11 +575,11 @@ function HostRowsArt() {
       <Sheet ch={20} cols={3} cw={34} head={16} headClass="hue-tint" rows={6} x={196} y={32} />
       <path
         class="hue-line dash"
-        d={`M128 64h62${head(190, 64, 0)}M128 144h62${head(190, 144, 0)}`}
+        d={`M124 64h72${head(196, 64, 0)}M124 144h72${head(196, 144, 0)}`}
       />
       <rect class="hue" height={10} rx={5} width={22} x={140} y={59} />
       <rect class="hue" height={10} rx={5} width={22} x={156} y={139} />
-      <path class="alt-line" d={`M190 104h-60${head(130, 104, 180)}`} />
+      <path class="alt-line" d={`M196 104h-72${head(124, 104, 180)}`} />
       <text class="alt-text small" text-anchor="middle" x={160} y={97}>
         Δ id 43
       </text>
@@ -620,11 +618,11 @@ function InteropArt() {
       <Sheet ch={18} cols={3} cw={32} head={14} headClass="hue-tint" rows={6} x={200} y={38} />
       <path
         class="hue-line"
-        d={`M106 68c40 0 46 14 88 14${head(194, 82, 0)}${head(106, 68, 180)}`}
+        d={`M96 68c42 0 50 14 104 14${head(200, 82, 0)}${head(96, 68, 180)}`}
       />
       <path
         class="alt-line"
-        d={`M104 150c40 0 48-26 90-26${head(194, 124, 0)}${head(104, 150, 180)}`}
+        d={`M96 150c42 0 52-26 104-26${head(200, 124, 0)}${head(96, 150, 180)}`}
       />
     </CardArt>
   );
@@ -710,7 +708,7 @@ function DataToolsArt() {
       </For>
       <Bar class="ink" w={22} x={84} y={44} />
       <path class="hue" d="M112 41h14l-5 6.5v5.5l-4 2v-7.5z" />
-      <Panel h={96} w={104} x={88} y={60} />
+      <Panel h={96} w={100} x={88} y={60} />
       <rect class="panel" height={14} rx={4} width={88} x={96} y={68} />
       <circle class="ink-line" cx={104} cy={75} r={3} />
       <For each={[0, 1, 2, 3]}>
@@ -755,13 +753,13 @@ function VanillaArt() {
       <text class="strong small" text-anchor="middle" x={80} y={27}>
         createGrid(host)
       </text>
-      <path class="ink-line" d={`M80 36v8${head(80, 46, 90)}`} />
+      <path class="ink-line" d={`M80 34v16${head(80, 50, 90)}`} />
       <rect class="hue-line dash" height={62} rx={6} width={124} x={18} y={50} />
       <text class="hue-text small" x={26} y={64}>
         #host
       </text>
       <Sheet ch={12} cols={4} cw={24} rows={3} x={32} y={70} />
-      <path class="ink-line" d={`M80 114v8${head(80, 124, 90)}`} />
+      <path class="ink-line" d={`M80 112v16${head(80, 128, 90)}`} />
       <rect class="panel" height={22} rx={11} width={124} x={18} y={128} />
       <text class="strong small" text-anchor="middle" x={80} y={143}>
         destroy()
@@ -826,7 +824,7 @@ function ReactArt() {
         y={50}
       />
       <rect class="hue-line dash" height={36} width={72} x={156} y={68} />
-      <path class="alt-line" d={`M232 86h14${head(246, 86, 0)}`} />
+      <path class="alt-line" d={`M228 86h22${head(250, 86, 0)}`} />
       <rect class="panel" height={86} rx={6} width={52} x={250} y={52} />
       <rect class="ink" height={10} rx={3} width={24} x={264} y={47} />
       <Sheet ch={14} cols={2} cw={16} rows={2} x={260} y={72} />
@@ -859,7 +857,7 @@ function VueArt() {
       />
       <rect class="shade" height={30} rx={6} width={38} x={143} y={97} />
       <rect class="ink" height={30} rx={6} width={38} x={141} y={94} />
-      <path class="ink-line" d="M150 94v-8a10 10 0 0 1 20 0v8" stroke-width={2.5} />
+      <path class="ink-line mark" d="M150 94v-8a10 10 0 0 1 20 0v8" stroke-width={2.5} />
       <circle class="on-hue" cx={160} cy={108} r={3.5} />
       <rect class="panel" height={22} width={40} x={216} y={20} />
       <path class="alt" d="M248 20h8v8z" />
@@ -868,7 +866,7 @@ function VueArt() {
       <Bar class="alt" w={50} x={232} y={72} />
       <Bar class="alt" w={40} x={232} y={84} />
       <Bar class="alt" w={46} x={232} y={96} />
-      <path class="alt-line dash" d="M252 28c14 0 20 6 20 20" />
+      <path class="alt-line dash mark" d="M252 28c14 0 20 6 20 20" />
     </CardArt>
   );
 }
@@ -897,7 +895,7 @@ function SvelteArt() {
       <path class="ink-line dash faint" d="M112 102h42" />
       <circle class="hue-soft" cx={164} cy={102} r={9} />
       <path class="hue-line" d="M161 97v4h6l-4 7" stroke-width={1.5} />
-      <path class="hue-line" d={`M175 102h56${head(231, 102, 0)}`} />
+      <path class="hue-line mark" d={`M175 102h56${head(231, 102, 0)}`} />
       <rect class="hue" height={10} rx={5} width={20} x={184} y={86} />
       <rect class="hue" height={10} rx={5} width={20} x={208} y={86} />
       <path class="panel" d={cloudPath(240, 124)} />

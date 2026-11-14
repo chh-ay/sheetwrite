@@ -78,7 +78,7 @@ function GettingStartedArt(props: ArtProps) {
       <text class="small" x={22} y={94}>
         core
       </text>
-      <path class="ink-line" d={`M104 76h10${head(114, 76, 0)}`} />
+      <path class="ink-line" d={`M102 76h16${head(118, 76, 0)}`} />
       <rect class="panel" height={60} rx={6} width={88} x={118} y={46} />
       <text class="small" x={126} y={64}>
         createGrid(
@@ -89,10 +89,10 @@ function GettingStartedArt(props: ArtProps) {
       <text class="small" x={126} y={94}>
         )
       </text>
-      <path class="ink-line" d={`M208 76h10${head(218, 76, 0)}`} />
+      <path class="ink-line" d={`M206 76h16${head(222, 76, 0)}`} />
       <Sheet ch={14} cols={2} cw={40} head={10} rows={4} x={222} y={46} />
-      <rect class="hue" height={14} width={40} x={262} y={98} />
-      <text class="small on-hue" x={266} y={109}>
+      <rect class="hue" height={14} width={40} x={262} y={84} />
+      <text class="small on-hue" x={266} y={95}>
         =SUM
       </text>
       <text class="small" x={14} y={136}>
@@ -158,7 +158,7 @@ function TutorialsArt(props: ArtProps) {
       <rect class="soft" height={10} rx={3} width={70.5} x={110.75} y={84.75} />
       <Sheet ch={8} cols={3} cw={18} rows={3} x={119} y={100} />
       <Panel h={60} w={84} x={222} y={14} />
-      <rect class="hue-soft" height={12} rx={3} width={82} x={223} y={15} />
+      <rect class="hue-soft" height={12} rx={5} width={82} x={223} y={15} />
       <path class="hue" d="M244 18h4v5h-4zM252 18h4v5h-4zM260 18h4v5h-4z" />
       <Sheet ch={8} cols={4} cw={16} rows={3} x={232} y={34} />
       <rect class="soft" height={6} rx={2} width={64} x={232} y={62} />
@@ -194,12 +194,12 @@ function ConceptsArt(props: ArtProps) {
       <text class="small" text-anchor="middle" x={66} y={88}>
         WASM
       </text>
-      <path class="ink-line" d={`M108 76h18${head(126, 76, 0)}${head(108, 76, 180)}`} />
+      <path class="ink-line" d={`M106 76h22${head(128, 76, 0)}${head(106, 76, 180)}`} />
       <rect class="panel" height={52} rx={8} width={72} x={128} y={50} />
       <text class="small strong" text-anchor="middle" x={164} y={80}>
         store
       </text>
-      <path class="ink-line" d={`M202 76h18${head(220, 76, 0)}`} />
+      <path class="ink-line" d={`M200 76h22${head(222, 76, 0)}`} />
       <rect class="alt-soft" height={52} rx={8} width={78} x={222} y={50} />
       <text class="small strong" text-anchor="middle" x={261} y={72}>
         renderer
@@ -249,11 +249,11 @@ function ImportExportArt(props: ArtProps) {
       <Pill class="alt-soft" text="CSV" x={22} y={118} />
       <path
         class="hue-line"
-        d={`M86 44c40 0 46 20 100 20${head(186, 64, 0)}${head(86, 44, 180)}`}
+        d={`M80 44c44 0 52 20 112 20${head(192, 64, 0)}${head(80, 44, 180)}`}
       />
       <path
         class="alt-line"
-        d={`M86 116c40 0 46-20 100-20${head(186, 96, 0)}${head(86, 116, 180)}`}
+        d={`M80 116c44 0 52-20 112-20${head(192, 96, 0)}${head(80, 116, 180)}`}
       />
       <Sheet ch={18} cols={3} cw={36} head={14} headClass="hue-tint" rows={6} x={192} y={14} />
     </CardArt>

@@ -36,12 +36,12 @@ function Lanes(props: Readonly<{ lanes: readonly (readonly [x: number, name: str
 function Message(
   props: Readonly<{ from: number; to: number; y: number; label?: string; class?: string }>,
 ) {
-  const end = () => props.to + (props.to > props.from ? -4 : 4);
+  // The arrowhead's tip touches the receiving lane's lifeline.
   return (
     <>
       <path
         class={props.class ?? "ink-line"}
-        d={`M${props.from} ${props.y}H${end()}${head(end(), props.y, props.to > props.from ? 0 : 180)}`}
+        d={`M${props.from} ${props.y}H${props.to}${head(props.to, props.y, props.to > props.from ? 0 : 180)}`}
       />
       {props.label && (
         <text class="small" text-anchor="middle" x={(props.from + props.to) / 2} y={props.y - 5}>
@@ -93,7 +93,7 @@ function ConvergenceArt() {
       <Message from={160} label="v7, v8" to={280} y={98} />
       <rect class="hue-tint" height={26} rx={4} width={44} x={18} y={116} />
       <rect class="hue-tint" height={26} rx={4} width={44} x={258} y={116} />
-      <path class="hue-line" d="M30 129l6 6l12-12M270 129l6 6l12-12" />
+      <path class="hue-line mark" d="M30 129l6 6l12-12M270 129l6 6l12-12" />
       <text class="glyph strong" text-anchor="middle" x={160} y={140}>
         =
       </text>
@@ -210,7 +210,7 @@ function AtomicBatchArt() {
       <text class="small hue-text" text-anchor="middle" x={160} y={136}>
         all or none
       </text>
-      <Message class="alt-line" from={194} to={280} y={80} />
+      <Message class="alt-line" from={190} to={280} y={80} />
       <rect class="alt-soft" height={36} rx={6} width={56} x={252} y={96} />
       <text class="small strong" text-anchor="middle" x={280} y={111}>
         v10–v13
@@ -240,7 +240,7 @@ function LifecycleArt() {
         generation 1
       </text>
       <Sheet ch={10} cols={3} cw={24} rows={3} x={26} y={48} />
-      <path class="ink-line" d={`M112 56h50${head(162, 56, 0)}`} />
+      <path class="ink-line" d={`M108 56h60${head(168, 56, 0)}`} />
       <text class="small" text-anchor="middle" x={137} y={48}>
         destroy()
       </text>
@@ -248,7 +248,7 @@ function LifecycleArt() {
       <text class="small" text-anchor="middle" x={195} y={60}>
         empty
       </text>
-      <path class="ink-line" d={`M222 56h14${head(236, 56, 0)}`} />
+      <path class="ink-line" d={`M222 56h18${head(240, 56, 0)}`} />
       <rect class="hue-soft" height={64} rx={6} width={72} x={240} y={24} />
       <text class="small hue-text" x={246} y={40}>
         gen 2
@@ -278,7 +278,7 @@ function ConstructionArt() {
           </>
         )}
       </For>
-      <path class="hue-line" d={`M112 50h52${head(164, 50, 0)}`} />
+      <path class="hue-line" d={`M108 36h68${head(176, 36, 0)}`} />
       <text class="small hue-text" text-anchor="middle" x={138} y={42}>
         rebuild
       </text>
@@ -288,7 +288,7 @@ function ConstructionArt() {
       <text class="small strong" x={28} y={126}>
         read-only
       </text>
-      <path class="alt-line" d={`M112 122c30 0 44-10 60-22${head(172, 100, -40)}`} />
+      <path class="alt-line" d={`M108 122c34 0 50-12 68-22${head(176, 100, -30)}`} />
       <text class="small alt-text" x={120} y={140}>
         flips live
       </text>
@@ -300,7 +300,7 @@ function ConstructionArt() {
 function HostPagingArt() {
   return (
     <CardArt alt="blue" height={PROOF_HEIGHT} hue="amber">
-      <path class="panel" d="M20 40v72a32 9 0 0 0 64 0V40" />
+      <path class="panel" d="M20 40v72a32 9 0 0 0 64 0V40z" />
       <ellipse class="hue-soft" cx={52} cy={40} rx={32} ry={9} />
       <text class="small" text-anchor="middle" x={52} y={136}>
         your source
@@ -318,7 +318,7 @@ function HostPagingArt() {
           />
         )}
       </For>
-      <path class="hue-line dash" d={`M88 66h108${head(196, 66, 0)}`} />
+      <path class="hue-line dash" d={`M84 66h120${head(204, 66, 0)}`} />
       <circle class="ink-line" cx={142} cy={100} r={10} />
       <path class="ink-line" d="M142 100v-6M142 100l4 3" />
       <text class="small" x={158} y={104}>
@@ -342,7 +342,7 @@ function WorkerFallbackArt() {
         worker
       </text>
       <path class="error-line" d="M52 54l16 16M68 54l-16 16" />
-      <path class="ink-line" d={`M108 52h28${head(136, 52, 0)}`} />
+      <path class="ink-line" d={`M104 52h36${head(140, 52, 0)}`} />
       <rect class="alt-soft" height={22} rx={11} width={140} x={140} y={41} />
       <text class="small strong" x={152} y={56}>
         renderer-fallback
@@ -377,7 +377,7 @@ function Cylinder(props: Readonly<{ x: number; y: number; w: number; h: number }
     <>
       <path
         class="panel"
-        d={`M${props.x} ${props.y + 8}v${props.h - 16}a${rx()} 8 0 0 0 ${props.w} 0V${props.y + 8}`}
+        d={`M${props.x} ${props.y + 8}v${props.h - 16}a${rx()} 8 0 0 0 ${props.w} 0V${props.y + 8}z`}
       />
       <ellipse class="hue-soft" cx={props.x + rx()} cy={props.y + 8} rx={rx()} ry={8} />
     </>
@@ -392,7 +392,7 @@ function AtomicSequencingArt() {
       <Note class="alt-soft" text="B · base v5" x={12} y={92} />
       <path
         class="ink-line"
-        d={`M104 40c20 0 24 26 40 30${head(144, 70, 15)}M104 102c20 0 24-20 40-24${head(144, 78, -15)}`}
+        d={`M94 40c24 0 32 26 54 30${head(148, 70, 15)}M94 102c24 0 32-20 54-24${head(148, 78, -15)}`}
       />
       <rect class="panel" height={52} rx={8} width={74} x={148} y={48} />
       <text class="small strong" text-anchor="middle" x={185} y={66}>
@@ -403,9 +403,9 @@ function AtomicSequencingArt() {
           <rect class="hue-tint" height={12} rx={3} width={16} x={160 + index * 18} y={76} />
         )}
       </For>
-      <Message class="hue-line" from={222} to={246} y={60} />
+      <Message class="hue-line" from={222} to={250} y={60} />
       <Note class="hue" text="v6" x={250} y={51} />
-      <Message class="error-line" from={222} to={246} y={92} />
+      <Message class="error-line" from={222} to={250} y={92} />
       <Note class="error-soft" text="conflict" x={250} y={83} />
       <text class="small" x={12} y={146}>
         stale writers recover; nothing is lost
@@ -454,7 +454,8 @@ function BoundedStorageArt() {
           <rect class="alt-soft" height={30} rx={4} width={18} x={110 + index * 24} y={30} />
         )}
       </For>
-      <path class="hue-line" d={`M190 66c0 24-70 24-104 8${head(88, 72, -160)}`} />
+      <path class="rule" d="M110 64h88" />
+      <path class="hue-line" d={`M190 64c0 22-70 22-98-2${head(92, 62, -160)}`} />
       <text class="small" x={14} y={112}>
         records
       </text>
@@ -479,9 +480,9 @@ function ReloadRecoveryArt() {
       <text class="small" text-anchor="middle" x={51} y={142}>
         IndexedDB
       </text>
-      <path class="hue-line" d={`M96 76h56${head(152, 76, 0)}`} />
-      <path class="hue-line" d="M120 58a12 12 0 1 1 -2 -10" />
-      <path class="hue-line" d={head(116, 48, -60)} />
+      <path class="hue-line" d={`M86 76h74${head(160, 76, 0)}`} />
+      <path class="hue-line mark" d="M120 58a12 12 0 1 1 -2 -10" />
+      <path class="hue-line mark" d={head(116, 48, -60)} />
       <rect class="panel" height={96} rx={8} width={140} x={160} y={28} />
       <rect class="soft" height={14} rx={6} width={138.5} x={160.75} y={28.75} />
       <rect class="hue-soft" height={22} rx={5} width={116} x={172} y={50} />
@@ -505,7 +506,7 @@ function LargeUndoArt() {
       <text class="small" x={14} y={118}>
         100,000 cells
       </text>
-      <path class="hue-line" d={`M96 60h28${head(124, 60, 0)}`} />
+      <path class="hue-line" d={`M86 60h44${head(130, 60, 0)}`} />
       <text class="small hue-text" text-anchor="middle" x={110} y={50}>
         undo
       </text>
@@ -606,7 +607,7 @@ function ControlledQueriesArt() {
         x={12}
         y={14}
       />
-      <path class="hue-line" d={`M128 70h40${head(168, 70, 0)}`} />
+      <path class="hue-line" d={`M124 70h52${head(176, 70, 0)}`} />
       <Sheet
         ch={18}
         cols={3}
@@ -631,7 +632,7 @@ function FormulaKpisArt() {
         ch={18}
         cols={2}
         cw={40}
-        fill={<rect class="hue-tint" height={108} width={40} x={52} y={30} />}
+        fill={<rect class="hue-tint" height={90} width={40} x={52} y={30} />}
         head={12}
         rows={6}
         x={12}
@@ -669,7 +670,7 @@ function ResetReconciliationArt() {
     <CardArt alt="green" height={PROOF_HEIGHT} hue="react">
       <rect class="panel" height={56} rx={6} width={86} x={12} y={22} />
       <Sheet ch={10} cols={3} cw={22} rows={3} x={22} y={38} />
-      <path class="ink-line" d={`M102 50h44${head(146, 50, 0)}`} />
+      <path class="ink-line" d={`M98 50h54${head(152, 50, 0)}`} />
       <text class="small" text-anchor="middle" x={124} y={42}>
         rebuild
       </text>
@@ -679,7 +680,7 @@ function ResetReconciliationArt() {
         new grid
       </text>
       <Note class="alt-soft" text="React state" x={150} y={116} />
-      <path class="alt-line" d={`M195 114V84${head(195, 82, -90)}`} />
+      <path class="alt-line" d={`M195 116V78${head(195, 78, -90)}`} />
       <text class="small alt-text" x={204} y={102}>
         on ready
       </text>
@@ -702,10 +703,10 @@ function DataWorkflowsArt() {
       <text class="small hue-text" x={20} y={82}>
         CSV
       </text>
-      <path class="hue-line" d={`M72 64h36${head(108, 64, 0)}`} />
+      <path class="hue-line" d={`M68 64h46${head(114, 64, 0)}`} />
       <Sheet ch={16} cols={3} cw={28} head={10} rows={5} x={114} y={20} />
       <Note class="hue-soft" text="one undoable commit" x={92} y={122} />
-      <path class="alt-line" d={`M202 50h30${head(232, 50, 0)}M202 80h30${head(232, 80, 0)}`} />
+      <path class="alt-line" d={`M198 50h40${head(238, 50, 0)}M198 80h40${head(238, 80, 0)}`} />
       <Note text="CSV" x={238} y={41} />
       <Note text="XLSX" x={238} y={71} />
     </CardArt>
@@ -765,7 +766,7 @@ function VueAuthorityArt() {
             </text>
             <path
               class="hue-line"
-              d={`M${86 + index() * 84} 77h8${head(94 + index() * 84, 77, 0)}`}
+              d={`M${84 + index() * 84} 77H${Math.min(96 + index() * 84, 256)}${head(Math.min(96 + index() * 84, 256), 77, 0)}`}
             />
           </>
         )}
@@ -813,7 +814,7 @@ function HostAcknowledgementArt() {
   return (
     <CardArt alt="violet" height={PROOF_HEIGHT} hue="vue">
       <Note class="hue-soft" text="accepted edit" x={12} y={30} />
-      <path class="hue-line" d={`M60 52v18${head(60, 70, 90)}`} />
+      <path class="hue-line" d={`M60 48v26${head(60, 74, 90)}`} />
       <rect class="panel" height={58} rx={8} width={110} x={12} y={74} />
       <text class="small hue-text" x={22} y={92}>
         pending queue
@@ -823,12 +824,12 @@ function HostAcknowledgementArt() {
           <rect class="hue-soft" height={14} rx={7} width={24} x={22 + index * 30} y={104} />
         )}
       </For>
-      <path class="ink-line" d={`M126 103h44${head(170, 103, 0)}`} />
+      <path class="ink-line" d={`M122 103h54${head(176, 103, 0)}`} />
       <text class="small" text-anchor="middle" x={148} y={95}>
         then
       </text>
       <Note text="host v12" x={176} y={94} />
-      <path class="alt-line" d={`M260 103h14${head(274, 103, 0)}`} />
+      <path class="alt-line" d={`M240 103h38${head(278, 103, 0)}`} />
       <Note class="alt-soft" text="v13" x={278} y={94} />
     </CardArt>
   );
@@ -873,7 +874,7 @@ function DurableOutboxArt() {
       <text class="small" text-anchor="middle" x={56} y={144}>
         outbox
       </text>
-      <path class="hue-line" d={`M104 76h112${head(216, 76, 0)}`} />
+      <path class="hue-line" d={`M86 76h130${head(216, 76, 0)}`} />
       <text class="small hue-text" text-anchor="middle" x={160} y={68}>
         1, 2, 3 in order
       </text>
@@ -920,15 +921,15 @@ function ExplicitRecoveryArt() {
       </text>
       <rect class="panel" height={66} rx={8} width={92} x={190} y={20} />
       <Sheet ch={12} cols={3} cw={24} rows={3} x={200} y={36} />
-      <path class="hue-line" d="M236 104a26 26 0 1 1 18 -6" />
-      <path class="hue-line" d={head(254, 98, -40)} />
+      <path class="hue-line mark" d="M236 104a26 26 0 1 1 18 -6" />
+      <path class="hue-line mark" d={head(254, 98, -40)} />
       <text class="small hue-text" x={12} y={110}>
         remount
       </text>
       <text class="small" x={12} y={128}>
         state restored
       </text>
-      <path class="ink-line dash" d={`M130 46h54${head(184, 46, 0)}`} />
+      <path class="ink-line dash" d={`M124 31h66${head(190, 31, 0)}`} />
     </CardArt>
   );
 }
