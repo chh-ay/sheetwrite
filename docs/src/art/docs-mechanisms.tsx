@@ -1,15 +1,17 @@
 // Diagrams for the docs sections that explain how something works: one per
 // mechanism, beside the section's text. Every label comes from that section.
-import { For, type JSX, Show } from "solid-js";
+import { For, type JSX } from "solid-js";
 
 import { head, Panel, Sheet } from "./Art.js";
-import { Arrow, Box, type DiagramText, NARROW, Responsive } from "./diagram-kit.js";
+import { DocumentOpsFigure } from "./blueprint-figures.js";
+import { type FigureOutcome, type FigureStep, FlowFigure } from "./blueprint-layouts.js";
+import { Arrow, Box, type DiagramText, Responsive } from "./diagram-kit.js";
 
 /** Diagrams sit in the reading column, about 46rem wide. */
 const COLUMN = 700;
 
 /** One step of a flow: a box with a heading, caption lines and code lines. */
-interface FlowStep {
+export interface FlowStep {
   readonly title: string;
   readonly lines?: readonly string[];
   readonly code?: readonly string[];
@@ -17,37 +19,40 @@ interface FlowStep {
 }
 
 /** A side outcome of one step, drawn across the row below and reached by its own arrow. */
-interface FlowBranch {
+export interface FlowBranch {
   readonly from: number;
   readonly step: FlowStep;
   readonly arrow?: string;
 }
 
-const stepHeight = (step: FlowStep) =>
+/** A flow box's height: its heading, then 16 units per caption or code line. */
+export const stepHeight = (step: FlowStep) =>
   34 + ((step.lines?.length ?? 0) + (step.code?.length ?? 0)) * 16 + 6;
-const rowHeight = (steps: readonly FlowStep[]) => Math.max(...steps.map(stepHeight));
 
-/** Caption characters that fit across the small-screen layout. */
-const NARROW_NOTE_CHARS = 46;
+/** The blueprint tone of the older flow box classes. */
+function toneOf(tone: string | undefined): FigureStep["tone"] {
+  if (tone === "hue-soft") return "accent";
+  if (tone === "error-soft") return "danger";
+  if (tone === "alt-soft") return "muted";
+  return undefined;
+}
 
-/** Splits a caption into lines of at most `max` characters, breaking between words. */
-function wrapWords(text: string, max: number): string[] {
-  const lines: string[] = [];
-  for (const word of text.split(" ")) {
-    const last = lines.at(-1);
-    if (last !== undefined && last.length + 1 + word.length <= max)
-      lines[lines.length - 1] = `${last} ${word}`;
-    else lines.push(word);
-  }
-  return lines;
+/** A flow step as a blueprint box. */
+export function figureStep(step: FlowStep): FigureStep {
+  const tone = toneOf(step.tone);
+  return {
+    title: step.title,
+    ...(step.lines === undefined ? {} : { lines: step.lines }),
+    ...(step.code === undefined ? {} : { code: step.code }),
+    ...(tone === undefined ? {} : { tone }),
+  };
 }
 
 /**
  * A left-to-right flow of steps, with an optional outcome of one step across
- * the row below; on small screens the steps run top to bottom and the outcome
- * follows them.
+ * the row below, drawn as a blueprint flow (art/blueprint-layouts.tsx).
  */
-function FlowDiagram(
+export function FlowDiagram(
   props: Readonly<{
     text: DiagramText;
     steps: readonly FlowStep[];
@@ -55,165 +60,18 @@ function FlowDiagram(
     note?: string;
   }>,
 ) {
-  const width = () => (COLUMN - 16 - (props.steps.length - 1) * 18) / props.steps.length;
-  const mainHeight = () => rowHeight(props.steps);
-  const branchHeight = () => (props.branch === undefined ? 0 : stepHeight(props.branch.step));
-  const wideHeight = () =>
-    8 +
-    mainHeight() +
-    (props.branch === undefined ? 0 : 40 + branchHeight()) +
-    (props.note ? 36 : 12);
-  const noteLines = () =>
-    props.note === undefined ? [] : wrapWords(props.note, NARROW_NOTE_CHARS);
-  const narrowLayout = () => {
-    let y = 4;
-    const steps = props.steps.map((step) => {
-      const placed = { step, y, h: stepHeight(step) };
-      y += placed.h + 26;
-      return placed;
-    });
-    const outcome =
-      props.branch === undefined
-        ? undefined
-        : { branch: props.branch, y, h: stepHeight(props.branch.step) };
-    if (outcome !== undefined) y += outcome.h + 14;
-    // The last box's lower edge: each placement above added its box and the gap after it.
-    const bottom = y - (outcome === undefined ? 26 : 14);
-    const notes = noteLines().length;
-    return {
-      steps,
-      outcome,
-      noteBaseline: bottom + 24,
-      height: bottom + (notes === 0 ? 8 : 24 + (notes - 1) * 18 + 10),
-    };
-  };
+  const outcome = (branch: FlowBranch): FigureOutcome => ({
+    from: branch.from,
+    step: figureStep({ tone: "alt-soft", ...branch.step }),
+    kind: branch.arrow === "error-line" || branch.step.tone === "error-soft" ? "fail" : "back",
+  });
   return (
-    <Responsive
-      narrow={{
-        height: narrowLayout().height,
-        draw: () => (
-          <>
-            <For each={narrowLayout().steps}>
-              {(placed, index) => (
-                <>
-                  <Box
-                    class={placed.step.tone ?? "panel"}
-                    code={placed.step.code}
-                    h={placed.h}
-                    lines={placed.step.lines}
-                    title={placed.step.title}
-                    w={NARROW - 8}
-                    x={4}
-                    y={placed.y}
-                  />
-                  {index() < props.steps.length - 1 && (
-                    <Arrow
-                      class="hue-line"
-                      x1={180}
-                      x2={180}
-                      y1={placed.y + placed.h + 4}
-                      y2={placed.y + placed.h + 20}
-                    />
-                  )}
-                </>
-              )}
-            </For>
-            <Show when={narrowLayout().outcome}>
-              {(outcome) => <NarrowOutcome {...outcome()} />}
-            </Show>
-            <For each={noteLines()}>
-              {(line, index) => (
-                <text class="caption" x={4} y={narrowLayout().noteBaseline + index() * 18}>
-                  {line}
-                </text>
-              )}
-            </For>
-          </>
-        ),
-      }}
-      text={props.text}
-      wide={{
-        height: wideHeight(),
-        width: COLUMN,
-        draw: () => (
-          <>
-            <For each={props.steps}>
-              {(step, index) => (
-                <>
-                  <Box
-                    class={step.tone ?? "panel"}
-                    code={step.code}
-                    h={mainHeight()}
-                    lines={step.lines}
-                    title={step.title}
-                    w={width()}
-                    x={8 + index() * (width() + 18)}
-                    y={8}
-                  />
-                  {index() < props.steps.length - 1 && (
-                    <Arrow
-                      class="hue-line"
-                      x1={10 + width() + index() * (width() + 18)}
-                      x2={24 + width() + index() * (width() + 18)}
-                      y1={8 + mainHeight() / 2}
-                      y2={8 + mainHeight() / 2}
-                    />
-                  )}
-                </>
-              )}
-            </For>
-            {props.branch && (
-              <>
-                <Arrow
-                  class={props.branch.arrow ?? "alt-line"}
-                  x1={8 + props.branch.from * (width() + 18) + width() / 2}
-                  x2={8 + props.branch.from * (width() + 18) + width() / 2}
-                  y1={12 + mainHeight()}
-                  y2={44 + mainHeight()}
-                />
-                <Box
-                  class={props.branch.step.tone ?? "alt-soft"}
-                  code={props.branch.step.code}
-                  h={branchHeight()}
-                  lines={props.branch.step.lines}
-                  title={props.branch.step.title}
-                  w={COLUMN - 16}
-                  x={8}
-                  y={48 + mainHeight()}
-                />
-              </>
-            )}
-            {props.note && (
-              <text class="caption" x={8} y={wideHeight() - 12}>
-                {props.note}
-              </text>
-            )}
-          </>
-        ),
-      }}
+    <FlowFigure
+      note={props.note}
+      outcome={props.branch === undefined ? undefined : outcome(props.branch)}
+      steps={props.steps.map(figureStep)}
+      text={{ title: props.text.title, description: props.text.description }}
     />
-  );
-}
-
-/** The narrow layout's outcome: an elbow from the steps' spine into an indented box. */
-function NarrowOutcome(props: Readonly<{ branch: FlowBranch; y: number; h: number }>) {
-  return (
-    <>
-      <path
-        class={props.branch.arrow ?? "alt-line"}
-        d={`M14 ${props.y - 8}v${props.h / 2 + 8}h12${head(26, props.y + props.h / 2, 0)}`}
-      />
-      <Box
-        class={props.branch.step.tone ?? "alt-soft"}
-        code={props.branch.step.code}
-        h={props.h}
-        lines={props.branch.step.lines}
-        title={props.branch.step.title}
-        w={NARROW - 36}
-        x={30}
-        y={props.y}
-      />
-    </>
   );
 }
 
@@ -444,121 +302,6 @@ export function VolatileDiagram() {
         title: "What a transaction recalculates",
         description:
           "Each transaction that changes cell inputs recalculates the volatile functions, OFFSET, INDIRECT, RAND, RANDBETWEEN, TODAY and NOW, and their dependents. Other formulas recalculate only when a cell they read changes. A transaction without cell changes recalculates nothing.",
-      }}
-    />
-  );
-}
-
-/** Documents and operations: three ways operations reach the store, and snapshot hydration. */
-export function DocumentOpsDiagram() {
-  const sources = [
-    ["Grid edits", ["Undo history;", "SyncCoordinator sends them"], "hue-soft"],
-    ["Store.applyTransaction", ["Bypasses read-only", "and history"], "panel"],
-    ["Remote operations", ['source: "remote";', "no history, not resent"], "alt-soft"],
-  ] as const;
-  const text: DiagramText = {
-    hue: "blue",
-    alt: "violet",
-    title: "How operations and snapshots reach the document",
-    description:
-      "DocumentOp transactions reach one store reducer and one change-event shape from three places: grid edits, which enter undo history and are sent by SyncCoordinator; direct Store.applyTransaction calls, which bypass the grid's read-only and history policy; and remote operations, which carry source remote and enter neither history nor outgoing sync. A WorkbookSnapshot loads through a separate validated hydration path that recomputes once the whole graph exists and emits no event or undo entry.",
-  };
-  return (
-    <Responsive
-      narrow={{
-        height: 512,
-        draw: () => (
-          <>
-            <For each={sources}>
-              {([title, lines, tone], index) => (
-                <Box
-                  class={tone}
-                  h={66}
-                  lines={lines}
-                  title={title}
-                  w={352}
-                  x={4}
-                  y={4 + index() * 78}
-                />
-              )}
-            </For>
-            <Arrow class="hue-line" x1={180} x2={180} y1={240} y2={258} />
-            <Box
-              code={["DocumentOp[]"]}
-              h={66}
-              lines={["One reducer, one change event"]}
-              title="Store"
-              w={352}
-              x={4}
-              y={262}
-            />
-            <Box
-              class="hue-tint"
-              code={["WorkbookSnapshot"]}
-              h={98}
-              lines={[
-                "Validated hydration:",
-                "recompute once the graph",
-                "exists; no event, no undo",
-              ]}
-              title="Load a snapshot"
-              w={352}
-              x={4}
-              y={350}
-            />
-            <Arrow class="ink-line dash" x1={180} x2={180} y1={346} y2={332} />
-          </>
-        ),
-      }}
-      text={text}
-      wide={{
-        height: 252,
-        width: COLUMN,
-        draw: () => (
-          <>
-            <For each={sources}>
-              {([title, lines, tone], index) => (
-                <>
-                  <Box
-                    class={tone}
-                    h={66}
-                    lines={lines}
-                    title={title}
-                    w={232}
-                    x={8}
-                    y={6 + index() * 80}
-                  />
-                  <Arrow class="hue-line" x1={244} x2={292} y1={39 + index() * 80} y2={110} />
-                </>
-              )}
-            </For>
-            <Box
-              code={["DocumentOp[]"]}
-              h={82}
-              lines={["One reducer,", "one change event"]}
-              title="Store"
-              w={180}
-              x={296}
-              y={74}
-            />
-            <Box
-              class="hue-tint"
-              code={["WorkbookSnapshot"]}
-              h={114}
-              lines={[
-                "Validated hydration:",
-                "recompute once the",
-                "graph exists; no",
-                "event, no undo",
-              ]}
-              title="Load a snapshot"
-              w={196}
-              x={496}
-              y={58}
-            />
-            <Arrow class="ink-line dash" x1={494} x2={480} y1={115} y2={115} />
-          </>
-        ),
       }}
     />
   );
@@ -1395,7 +1138,7 @@ export const MECHANISM_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   loading: LoadingDiagram,
   "error-flow": ErrorFlowDiagram,
   volatile: VolatileDiagram,
-  "document-ops": DocumentOpsDiagram,
+  "document-ops": DocumentOpsFigure,
   recovery: RecoveryDiagram,
   "virtual-scroll": VirtualScrollDiagram,
   generations: GenerationsDiagram,

@@ -14,8 +14,9 @@ import {
   Panel,
   Sheet,
 } from "./Art.js";
+import { XlsxFlowFigure } from "./blueprint-figures.js";
 import { Arrow, Box, type DiagramText, Responsive } from "./diagram-kit.js";
-import { CollaborationRecoveryDiagram, InteropFlowDiagram, PagingDiagram } from "./diagrams.js";
+import { CollaborationRecoveryDiagram, PagingDiagram } from "./diagrams.js";
 
 /** Docs section cards are 2:1, like the framework cards. */
 const DOCS_CARD_HEIGHT = FRAMEWORK_CARD_HEIGHT;
@@ -1462,6 +1463,6 @@ export const DOCS_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "dashboard-slicers": DashboardSlicerDiagram,
   "version-archive": VersionArchiveDiagram,
   paging: PagingDiagram,
-  xlsx: InteropFlowDiagram,
+  xlsx: XlsxFlowFigure,
   "collaboration-recovery": CollaborationRecoveryDiagram,
 };
