@@ -96,9 +96,18 @@ fn define(store: &mut CellStore, name: &str, cells: &str) -> bool {
 /// for the sheet `Annual`.
 fn store_with_names() -> (CellStore, usize, usize) {
     let (mut store, report, annual) = linked_store();
-    assert!(define(&mut store, "[Budget.xlsx]!Total", "$C$10"));
-    assert!(define(&mut store, "[Budget.xlsx]!Rows", "$C$10:$C$11"));
-    assert!(define(&mut store, "'[Budget.xlsx]Annual'!Local", "$C$11"));
+    assert!(
+        define(&mut store, "[Budget.xlsx]!Total", "$C$10"),
+        "the external name is defined"
+    );
+    assert!(
+        define(&mut store, "[Budget.xlsx]!Rows", "$C$10:$C$11"),
+        "the external name is defined"
+    );
+    assert!(
+        define(&mut store, "'[Budget.xlsx]Annual'!Local", "$C$11"),
+        "the external sheet-scoped name is defined"
+    );
     (store, report, annual)
 }
 

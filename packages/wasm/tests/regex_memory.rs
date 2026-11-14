@@ -71,12 +71,18 @@ fn evaluate_and_drop(pattern: &str) {
 
     assert_eq!(
         store.get_cell(sheet, 0, 0).string().as_deref(),
-        Some("FALSE")
+        Some("FALSE"),
+        "the REGEXTEST result"
     );
-    assert_eq!(store.get_cell(sheet, 1, 0).string().as_deref(), Some("x"));
+    assert_eq!(
+        store.get_cell(sheet, 1, 0).string().as_deref(),
+        Some("x"),
+        "the REGEXREPLACE result"
+    );
     assert_eq!(
         store.get_cell(sheet, 2, 0).string().as_deref(),
-        Some("none")
+        Some("none"),
+        "the REGEXEXTRACT result"
     );
 }
 
