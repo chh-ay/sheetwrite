@@ -170,6 +170,11 @@ export interface XlsxWorkbookBackend {
   ): AsyncIterable<Uint8Array>;
   /** Reads a `Blob` directly; without it, `fromXlsxWorkbookFile` reads the whole file into memory first. */
   fromXlsxWorkbookFile?(file: Blob, options?: XlsxWorkbookOptions): Promise<WorkbookSnapshot>;
-  /** @internal Verify opaque payloads at store ingress, without retaining inflated bytes. */
+  /**
+   * Checks the kept XLSX parts of a snapshot as a store loads it, without
+   * keeping inflated bytes. Sheetwrite calls it; your code does not need to.
+   *
+   * @internal
+   */
   verifySource?(snapshot: WorkbookSnapshot): WorkbookSnapshot["workbook"]["xlsxSource"];
 }
