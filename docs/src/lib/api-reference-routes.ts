@@ -42,7 +42,7 @@ function entrySlug(packageName: string, subpath: string): string {
 }
 
 /** A JSDoc tag as `[name, text]`, the shape the language server's hovers use. */
-export type DocumentationTag = readonly [name: string, text: string | undefined];
+export type DocumentationTag = [name: string, text: string | undefined];
 
 /** A manifest doc comment split into its summary and its tags. */
 export interface SplitDocumentation {
