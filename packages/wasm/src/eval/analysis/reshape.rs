@@ -20,9 +20,16 @@ use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "EXPAND", "HSTACK", "SORTBY", "TOCOL", "TOROW", "VSTACK", "WRAPCOLS", "WRAPROWS",
-];
+family_functions! {
+    EXPAND,
+    HSTACK,
+    SORTBY,
+    TOCOL,
+    TOROW,
+    VSTACK,
+    WRAPCOLS,
+    WRAPROWS,
+}
 
 const MAX_ARGUMENTS: usize = 255;
 
@@ -34,15 +41,14 @@ const IGNORE_ERRORS: u8 = 2;
 /// An EXPAND size above every spill limit. `validate_shape` rejects it.
 const OVERSIZED: usize = SPILL_MAX_ROWS + 1;
 
-fn check_arity(name: &str, args: &[Ast]) -> Result<(), FormulaError> {
-    let is_valid = match name {
-        "HSTACK" | "VSTACK" => !args.is_empty(),
-        "TOCOL" | "TOROW" => (1..=3).contains(&args.len()),
-        "WRAPCOLS" | "WRAPROWS" => (2..=3).contains(&args.len()),
-        "EXPAND" => (2..=4).contains(&args.len()),
+fn check_arity(function: Function, args: &[Ast]) -> Result<(), FormulaError> {
+    let is_valid = match function {
+        Function::HSTACK | Function::VSTACK => !args.is_empty(),
+        Function::TOCOL | Function::TOROW => (1..=3).contains(&args.len()),
+        Function::WRAPCOLS | Function::WRAPROWS => (2..=3).contains(&args.len()),
+        Function::EXPAND => (2..=4).contains(&args.len()),
         // SORTBY(array, by_array1, [order1], by_array2, [order2], ...)
-        "SORTBY" => (2..=MAX_ARGUMENTS).contains(&args.len()),
-        _ => false,
+        Function::SORTBY => (2..=MAX_ARGUMENTS).contains(&args.len()),
     };
     if is_valid {
         Ok(())
@@ -51,8 +57,8 @@ fn check_arity(name: &str, args: &[Ast]) -> Result<(), FormulaError> {
     }
 }
 
-fn sources<'a>(name: &str, args: &'a [Ast]) -> &'a [Ast] {
-    if matches!(name, "HSTACK" | "VSTACK") {
+fn sources(function: Function, args: &[Ast]) -> &[Ast] {
+    if matches!(function, Function::HSTACK | Function::VSTACK) {
         args
     } else {
         &args[..1]
@@ -135,6 +141,14 @@ enum Estimate {
     Unknown,
 }
 
+/// The reshape function an analysis `id` names, or `None` for an id of
+/// another family.
+fn reshape_function(id: u16) -> Option<Function> {
+    const FAMILY: u16 = super::known_id(NAMES[0]) >> super::FAMILY_SHIFT;
+
+    (id >> super::FAMILY_SHIFT == FAMILY).then(|| Function::of(id))
+}
+
 /// Rows and columns of a source argument, or `None` when only evaluation can
 /// tell.
 fn source_extent(
@@ -147,9 +161,8 @@ fn source_extent(
         return Ok(Some((1, 1)));
     }
     if let Ast::Func(Func::Analysis(id), args) = ast {
-        let name = super::name(*id);
-        if NAMES.binary_search(&name).is_ok() {
-            return Ok(match estimate(store, name, args, sheet, pass)? {
+        if let Some(function) = reshape_function(*id) {
+            return Ok(match estimate(store, function, args, sheet, pass)? {
                 Estimate::Exact { rows, cols } => Some((rows, cols)),
                 Estimate::Approximate { .. } | Estimate::Unknown => None,
             });
@@ -191,10 +204,10 @@ fn wrap_extent(cells: usize, wrap_count: f64) -> (usize, usize) {
 }
 
 fn stack_extent(
-    name: &str,
+    function: Function,
     extents: impl Iterator<Item = Result<Option<(usize, usize)>, FormulaError>>,
 ) -> Result<Option<(usize, usize)>, FormulaError> {
-    let is_horizontal = name == "HSTACK";
+    let is_horizontal = function == Function::HSTACK;
     let mut joined = 0usize;
     let mut widest = 0usize;
     for extent in extents {
@@ -218,16 +231,16 @@ fn stack_extent(
 
 fn estimate(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<Estimate, FormulaError> {
-    check_arity(name, args)?;
-    if matches!(name, "HSTACK" | "VSTACK") {
+    check_arity(function, args)?;
+    if matches!(function, Function::HSTACK | Function::VSTACK) {
         return Ok(
             match stack_extent(
-                name,
+                function,
                 args.iter()
                     .map(|ast| source_extent(store, ast, sheet, pass)),
             )? {
@@ -242,41 +255,42 @@ fn estimate(
     let cells = source_rows
         .checked_mul(source_cols)
         .ok_or(FormulaError::Num)?;
-    Ok(match name {
-        "TOCOL" | "TOROW" => {
+    Ok(match function {
+        Function::TOCOL | Function::TOROW => {
             let keeps_all = match static_argument(args, 1) {
                 StaticArgument::Omitted => true,
                 StaticArgument::Literal(ignore) => ignore.trunc() == 0.0,
                 StaticArgument::Computed => false,
             };
             let scan_is_static = !matches!(static_argument(args, 2), StaticArgument::Computed);
-            match (name, keeps_all && scan_is_static) {
-                ("TOCOL", true) => Estimate::Exact {
+            let is_column = function == Function::TOCOL;
+            match (is_column, keeps_all && scan_is_static) {
+                (true, true) => Estimate::Exact {
                     rows: cells,
                     cols: 1,
                 },
-                ("TOCOL", false) => Estimate::Approximate {
+                (true, false) => Estimate::Approximate {
                     rows: cells,
                     cols: 1,
                     max_cells: cells,
                 },
-                (_, true) => Estimate::Exact {
+                (false, true) => Estimate::Exact {
                     rows: 1,
                     cols: cells,
                 },
-                (_, false) => Estimate::Approximate {
+                (false, false) => Estimate::Approximate {
                     rows: 1,
                     cols: cells.min(SPILL_MAX_COLS),
                     max_cells: cells,
                 },
             }
         }
-        "WRAPCOLS" | "WRAPROWS" => {
+        Function::WRAPCOLS | Function::WRAPROWS => {
             let is_vector = source_rows == 1 || source_cols == 1;
             match static_argument(args, 1) {
                 StaticArgument::Literal(wrap_count) if is_vector && wrap_count.trunc() >= 1.0 => {
                     let (wrap, length) = wrap_extent(cells, wrap_count.trunc());
-                    let (rows, cols) = if name == "WRAPROWS" {
+                    let (rows, cols) = if function == Function::WRAPROWS {
                         (length, wrap)
                     } else {
                         (wrap, length)
@@ -293,7 +307,7 @@ fn estimate(
                 }
             }
         }
-        "EXPAND" => match (
+        Function::EXPAND => match (
             literal_expand_size(static_argument(args, 1), source_rows),
             literal_expand_size(static_argument(args, 2), source_cols),
         ) {
@@ -301,33 +315,34 @@ fn estimate(
             // A size read from a cell is known only after evaluation.
             _ => Estimate::Unknown,
         },
-        "SORTBY" => Estimate::Exact {
+        Function::SORTBY => Estimate::Exact {
             rows: source_rows,
             cols: source_cols,
         },
-        _ => return Err(FormulaError::Value),
+        // The stacks returned above: their extent is their sources'.
+        Function::HSTACK | Function::VSTACK => return Err(FormulaError::Value),
     })
 }
 
-pub(super) const fn produces_array(_: &str, _: &[Ast], _: Shapes<'_>) -> bool {
+pub(super) const fn produces_array(_: Function, _: &[Ast], _: Shapes<'_>) -> bool {
     true
 }
 
 pub(super) fn shape(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let (rows, cols) = match estimate(store, name, args, sheet, pass)? {
+    let (rows, cols) = match estimate(store, function, args, sheet, pass)? {
         Estimate::Exact { rows, cols } => (rows, cols),
         Estimate::Approximate {
             rows,
             cols,
             max_cells,
         } => {
-            if matches!(name, "TOCOL" | "TOROW") {
+            if matches!(function, Function::TOCOL | Function::TOROW) {
                 (rows, cols)
             } else {
                 (max_cells.min(SPILL_MAX_CELLS), 1)
@@ -341,12 +356,12 @@ pub(super) fn shape(
 
 pub(super) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    match estimate(store, name, args, sheet, pass)? {
+    match estimate(store, function, args, sheet, pass)? {
         Estimate::Exact { rows, cols } => EvalMatrix::validate_shape(rows, cols, 1, 0),
         Estimate::Approximate { max_cells, .. } => Ok(max_cells.min(SPILL_MAX_CELLS)),
         Estimate::Unknown => Ok(UNKNOWN_SIZE_PRECHARGE),
@@ -396,14 +411,14 @@ struct Inputs {
 }
 
 impl Inputs {
-    fn read(evaluation: &mut Evaluation<'_, '_>, name: &str) -> Result<Self, FormulaError> {
+    fn read(evaluation: &mut Evaluation<'_, '_>, function: Function) -> Result<Self, FormulaError> {
         let args = evaluation.args;
         let mut inputs = Self {
-            matrices: Vec::with_capacity(sources(name, args).len()),
+            matrices: Vec::with_capacity(sources(function, args).len()),
             cells: 0,
             bytes: 0,
         };
-        for ast in sources(name, args) {
+        for ast in sources(function, args) {
             let matrix = evaluation.source(ast)?;
             let bytes = matrix.values.iter().try_fold(
                 matrix
@@ -480,13 +495,13 @@ impl Output {
 
 pub(super) fn evaluate(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
-    check_arity(name, args)?;
+    check_arity(function, args)?;
     let mut evaluation = Evaluation {
         store,
         args,
@@ -494,19 +509,19 @@ pub(super) fn evaluate(
         pass,
         depth,
     };
-    let inputs = Inputs::read(&mut evaluation, name)?;
-    match name {
-        "TOCOL" | "TOROW" => flatten(&mut evaluation, name, &inputs),
-        "WRAPCOLS" | "WRAPROWS" => wrap(&mut evaluation, name, &inputs),
-        "EXPAND" => expand(&mut evaluation, &inputs),
-        "SORTBY" => sort_by(&mut evaluation, &inputs),
-        _ => stack(name, &inputs),
+    let inputs = Inputs::read(&mut evaluation, function)?;
+    match function {
+        Function::TOCOL | Function::TOROW => flatten(&mut evaluation, function, &inputs),
+        Function::WRAPCOLS | Function::WRAPROWS => wrap(&mut evaluation, function, &inputs),
+        Function::EXPAND => expand(&mut evaluation, &inputs),
+        Function::SORTBY => sort_by(&mut evaluation, &inputs),
+        Function::HSTACK | Function::VSTACK => stack(function, &inputs),
     }
 }
 
 fn flatten(
     evaluation: &mut Evaluation<'_, '_>,
-    name: &str,
+    function: Function,
     inputs: &Inputs,
 ) -> Result<EvalMatrix, FormulaError> {
     let ignore_code = match evaluation.scalar(1) {
@@ -541,7 +556,7 @@ fn flatten(
     if values.values.is_empty() {
         return Err(FormulaError::Calc);
     }
-    let (rows, cols) = if name == "TOCOL" {
+    let (rows, cols) = if function == Function::TOCOL {
         (values.values.len(), 1)
     } else {
         (1, values.values.len())
@@ -640,7 +655,7 @@ fn sort_by(
 
 fn wrap(
     evaluation: &mut Evaluation<'_, '_>,
-    name: &str,
+    function: Function,
     inputs: &Inputs,
 ) -> Result<EvalMatrix, FormulaError> {
     let source = &inputs.matrices[0];
@@ -656,7 +671,7 @@ fn wrap(
     }
     let pad = evaluation.pad(2);
     let (wrap, length) = wrap_extent(source.values.len(), wrap_count);
-    let is_by_row = name == "WRAPROWS";
+    let is_by_row = function == Function::WRAPROWS;
     let (rows, cols) = if is_by_row {
         (length, wrap)
     } else {
@@ -712,9 +727,9 @@ fn expand(
     Ok(EvalMatrix::new(rows, cols, values.values))
 }
 
-fn stack(name: &str, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
+fn stack(function: Function, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
     let (rows, cols) = stack_extent(
-        name,
+        function,
         inputs
             .matrices
             .iter()
@@ -723,7 +738,7 @@ fn stack(name: &str, inputs: &Inputs) -> Result<EvalMatrix, FormulaError> {
     .ok_or(FormulaError::Value)?;
     let mut values = inputs.reserve(rows, cols)?;
     let pad = Value::Error(FormulaError::Na);
-    if name == "HSTACK" {
+    if function == Function::HSTACK {
         for row in 0..rows {
             for matrix in &inputs.matrices {
                 if row < matrix.rows {

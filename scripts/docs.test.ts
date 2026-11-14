@@ -7,9 +7,12 @@ import {
   documentationLinkRoutes,
   functionFields,
   movedPageIssues,
+  parseableDeclaration,
+  prepareDeclarationShapes,
   renderEntryPage,
   renderSymbolPage,
   symbolDescription,
+  undocumentedApi,
 } from "./docs-api.js";
 import { renderCompatibilityResults } from "./docs-compatibility.js";
 import { parseFences, trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
@@ -107,9 +110,9 @@ describe("API reference pages", () => {
     const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
     expect(new Set(anchors).size).toBe(anchors.length);
     expect(anchors).toEqual(expect.arrayContaining(["applytransaction", "rendererkind"]));
-    const members = [...symbolPage.matchAll(/<details class="api-member" id="([^"]+)"/gu)].map(
-      (match) => match[1],
-    );
+    const members = [
+      ...symbolPage.matchAll(/<article class="api-card api-member" id="([^"]+)"/gu),
+    ].map((match) => match[1]);
     expect(members.filter((id) => id?.startsWith("grid-parse"))).toHaveLength(2);
     expect(members).toContain("grid-parse");
     expect(symbolPage).toContain("Bypasses history.");
@@ -158,20 +161,91 @@ describe("API reference pages", () => {
     expect(page).toContain("```tsx compile\nconst view = <div />;\n```");
     expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
     expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
-    // Symbol sections sit under the page title (H2), member sections under Members (H3).
+    // Symbol sections sit under the page title (H2), member sections under their group (H4).
     expect(page.slice(0, page.indexOf("## Members"))).not.toMatch(/^### /m);
     expect(section(page, /<aside class="api-layout__aside"[\s\S]*?<\/aside>/)).toMatch(
       /^## Examples$/m,
     );
     const member = section(
       page,
-      /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/,
+      /<article class="api-card api-member" id="grid-apply-transaction"[\s\S]*?<\/article>/,
     );
     expect(member).toContain(
-      "### Examples\n\n```ts compile\ngrid.applyTransaction({ patches: [] });",
+      "#### Examples\n\n```ts compile\ngrid.applyTransaction({ patches: [] });",
     );
     expect(member).toContain("[Renderer](/docs/api/core/grid/#grid-renderer-kind)");
     expect(page).not.toMatch(/@(?:example|see)\b/);
+  });
+
+  it("lists members, parameters and return values the reference shows without a description", async () => {
+    const shape = apiExport(
+      "CountShape",
+      "interface",
+      "interface CountShape {\n  documented: number;\n  bare: string;\n  call(x: number): void;\n  call(x: string): void;\n}",
+      "CountShape summary.",
+      [{ name: "documented", documentation: "Has docs." }],
+    );
+    const make = apiExport(
+      "makeThing",
+      "function",
+      "(shape: CountShape, size: number, label?: string): number",
+      "Makes a thing.\n@param size - How big.",
+    );
+    const run = apiExport("runThing", "function", "(): Promise<void>", "Runs a thing.");
+    const entry = entryPoint(".", [shape, make, run]);
+    // A re-export from a second entry point counts once.
+    const adapter = entryPoint("./adapter", [make]);
+    const manifest: PublicApiManifest = {
+      formatVersion: 2,
+      packages: [{ name: "@sheetwrite/core", entryPoints: [entry, adapter] }],
+    };
+    await prepareDeclarationShapes([shape, make, run].map((item) => parseableDeclaration(item)));
+    expect(undocumentedApi(manifest)).toEqual([
+      // `call` once for both overloads; `shape` reads CountShape's summary;
+      // `runThing` returns nothing to describe.
+      {
+        packageName: "@sheetwrite/core",
+        members: ["CountShape.bare", "CountShape.call"],
+        parameters: ["makeThing(label)"],
+        returns: ["makeThing"],
+      },
+    ]);
+    const runPage = await renderSymbolPage(manifest.packages[0]!, entry, run);
+    expect(runPage).not.toContain("## Returns");
+  });
+
+  it("groups members into properties, methods and events, function-typed properties as methods", async () => {
+    const shape = apiExport(
+      "ShapeExample",
+      "interface",
+      [
+        "interface ShapeExample {",
+        "  readonly size: number;",
+        "  run: (count: number) => void;",
+        "  maybe: (() => void) | undefined;",
+        "  apply(value: string): boolean;",
+        "  onChange?: (value: string) => void;",
+        "}",
+      ].join("\n"),
+    );
+    const entry = entryPoint(".", [shape]);
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
+    const page = await renderSymbolPage(pkg, entry, shape);
+    const group = (name: string) =>
+      section(
+        page,
+        new RegExp(
+          `<h3 class="api-member-group">${name}</h3>[\\s\\S]*?(?=<h3 class="api-member-group">|$)`,
+        ),
+      );
+    expect(group("Properties")).toContain('id="shape-example-size"');
+    expect(group("Properties")).toContain('id="shape-example-maybe"');
+    expect(group("Methods")).toContain('id="shape-example-run"');
+    expect(group("Methods")).toContain('id="shape-example-apply"');
+    expect(group("Events")).toContain('id="shape-example-on-change"');
+    expect(section(page, /<article[^>]*id="shape-example-size"[\s\S]*?<\/article>/)).toContain(
+      "<span>read-only</span>",
+    );
   });
 
   it("links an expanded union member to the alias that names it", async () => {
@@ -195,7 +269,7 @@ describe("API reference pages", () => {
 
     const memberRow = section(
       page,
-      /<details class="api-member" id="storage-options-mode"[\s\S]*?<\/details>/,
+      /<article class="api-card api-member" id="storage-options-mode"[\s\S]*?<\/article>/,
     );
     // The member row names the alias of its own entry point, not the adapter's re-export.
     expect(memberRow).toContain(

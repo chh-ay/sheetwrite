@@ -229,8 +229,9 @@ function documentationParts(
 /**
  * JSDoc body, examples and related links. `headingLevel` places the Examples
  * and See also headings one level below whatever holds the text: 2 for a
- * symbol page's opening summary (under the page title), 3 for a member's
- * documentation (under Members), so heading levels never skip.
+ * symbol page's opening summary (under the page title), 4 for a member's
+ * documentation (under its group heading in Members), so heading levels never
+ * skip.
  */
 function documentationSections(
   documentation: string,
@@ -238,7 +239,7 @@ function documentationSections(
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes,
-  headingLevel: 2 | 3,
+  headingLevel: 2 | 3 | 4,
 ): string {
   const heading = "#".repeat(headingLevel);
   const { body, examples, related } = documentationParts(documentation, pkg, entry, item, routes);
@@ -272,7 +273,7 @@ function documentationMarkdown(
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
   source = item.documentation,
-  headingLevel: 2 | 3 = 3,
+  headingLevel: 2 | 3 | 4 = 3,
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
@@ -876,33 +877,57 @@ function linkedTypeHtml(
 }
 
 /**
- * One field row: name (none for a return value), type, a required or optional
- * marker, and its description.
+ * One field card: its signature line (name, type and a required or optional
+ * marker; no name for a return value) over its description.
  */
 function fieldHtml(
   id: string,
   name: string | undefined,
   typeHtml: string,
-  marker: string | undefined,
+  marker: "required" | "optional" | undefined,
   descriptionHtml: string | undefined,
 ): string {
+  const label =
+    name === undefined
+      ? ""
+      : `<span class="api-sig__name">${html(name)}</span><span class="api-sig__punct">${marker === "optional" ? "?" : ""}: </span>`;
   return [
-    `<div class="api-field" id="${id}">`,
-    '<div class="api-field__head">',
-    name === undefined ? "" : `<code class="api-field__name">${html(name)}</code>`,
-    `<code class="api-field__type">${typeHtml}</code>`,
-    marker === undefined ? "" : `<span class="api-field__marker">${marker}</span>`,
+    `<div class="api-card api-field" id="${id}">`,
+    '<div class="api-card__head">',
+    `<code class="api-sig">${label}<span class="api-sig__type">${typeHtml}</span></code>`,
+    marker === undefined ? "" : `<span class="api-card__flags"><span>${marker}</span></span>`,
     "</div>",
     descriptionHtml === undefined || descriptionHtml === ""
       ? ""
-      : `<p class="api-field__doc">${descriptionHtml}</p>`,
+      : `<p class="api-card__doc">${descriptionHtml}</p>`,
     "</div>",
   ]
     .filter((line) => line !== "")
     .join("");
 }
 
-/** A function's Parameters and Returns sections as fields. */
+/**
+ * Without its own description, a field named by one documented type reads
+ * that type's summary.
+ */
+function fieldTypeSummary(
+  type: string,
+  pkg: ApiPackage,
+  routes: DocumentationLinkRoutes,
+): string | undefined {
+  if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
+  const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
+  return target === undefined || target.trim() === ""
+    ? undefined
+    : compactSummary(target.split(/\n@/)[0] ?? "", true);
+}
+
+/** `void` and `Promise<void>`: a return value with nothing to describe. */
+function returnsNothing(type: string): boolean {
+  return /^(?:void|Promise<void>)$/.test(type.replace(/\s+/g, ""));
+}
+
+/** A function's Parameters and Returns sections as fields; no Returns for `void`. */
 function renderFunctionFields(
   fields: FunctionFields,
   parts: DocumentationParts,
@@ -913,21 +938,13 @@ function renderFunctionFields(
 ): string {
   const describe = (text: string | undefined): string | undefined =>
     text === undefined ? undefined : memberDocumentationHtml(pkg, entry, item, text, routes);
-  // Without its own description, a field named by one documented type reads
-  // that type's summary.
-  const typeSummary = (type: string): string | undefined => {
-    if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
-    const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
-    return target === undefined || target.trim() === ""
-      ? undefined
-      : compactSummary(target.split(/\n@/)[0] ?? "", true);
-  };
+  const typeSummary = (type: string): string | undefined => fieldTypeSummary(type, pkg, routes);
   const blocks: string[] = [];
   if (fields.parameters.length > 0) {
     blocks.push(
       "## Parameters",
       "",
-      '<div class="api-fields">',
+      '<div class="api-cards">',
       ...fields.parameters.map((parameter) =>
         fieldHtml(
           `parameter-${anchor(parameter.name.replace(/^\.\.\./, ""))}`,
@@ -944,20 +961,23 @@ function renderFunctionFields(
       "",
     );
   }
-  blocks.push(
-    "## Returns",
-    "",
-    '<div class="api-fields">',
-    fieldHtml(
-      "returns",
-      undefined,
-      linkedTypeHtml(fields.returns, pkg, entry, item, routes),
-      undefined,
-      describe(parts.returns ?? typeSummary(fields.returns)),
-    ),
-    "</div>",
-    "",
-  );
+  // A function that returns nothing has no Returns card.
+  if (!returnsNothing(fields.returns)) {
+    blocks.push(
+      "## Returns",
+      "",
+      '<div class="api-cards">',
+      fieldHtml(
+        "returns",
+        undefined,
+        linkedTypeHtml(fields.returns, pkg, entry, item, routes),
+        undefined,
+        describe(parts.returns ?? typeSummary(fields.returns)),
+      ),
+      "</div>",
+      "",
+    );
+  }
   return blocks.join("\n");
 }
 
@@ -988,10 +1008,41 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   ].join("\n");
 }
 
+/** The groups a symbol's members are listed in, in page order. */
+const MEMBER_GROUPS = ["Properties", "Methods", "Events"] as const;
+type MemberGroup = (typeof MEMBER_GROUPS)[number];
+
+const MEMBER_MODIFIER =
+  /^(?:readonly|static|abstract|public|protected|private|declare|get|set|async)\s+/;
+
+/** A member's declaration without its leading modifiers (`readonly`, `static`, …). */
+function memberHead(signature: string): string {
+  let head = signature.trimStart();
+  while (MEMBER_MODIFIER.test(head)) head = head.replace(MEMBER_MODIFIER, "");
+  return head;
+}
+
 /**
- * The Members section: its heading, an anchor index for long lists, then the
- * member rows. Members start collapsed; explicit fragment navigation reveals
- * its target through the docs shell.
+ * Callbacks named `on…` are events. Methods are members declared with a call
+ * signature, or as a property whose type is a function (`run: () => void`).
+ */
+function memberGroup(member: DeclarationMember): MemberGroup {
+  if (/^on[A-Z]/.test(member.name)) return "Events";
+  const head = memberHead(member.signature);
+  if (head.startsWith(member.name) && /^\??\s*[<(]/.test(head.slice(member.name.length))) {
+    return "Methods";
+  }
+  const type = memberTypeParts(head)?.type ?? "";
+  return /^(?:<[^>]*>\s*)?\([^]*\)\s*=>/.test(type) && splitTopLevel(type, "|").length === 1
+    ? "Methods"
+    : "Properties";
+}
+
+/**
+ * The Members section: an index of member names for long lists, then the
+ * members as signature cards grouped into Properties, Methods and Events. A
+ * card's header is the member's highlighted declaration; its documentation
+ * follows, always visible.
  */
 function renderMembers(
   pkg: ApiPackage,
@@ -1013,7 +1064,7 @@ function renderMembers(
   const documented = new Set<string>();
   const indexLinks: string[] = [];
   const usedIds = new Set<string>();
-  const rows = members.map((member, index) => {
+  const cards = members.map((member, index) => {
     // Overload rows repeat a member name. The first row keeps the member ID
     // that the index and other pages link to; each later row gets a suffix,
     // so no two elements share an ID.
@@ -1025,18 +1076,12 @@ function renderMembers(
     if (firstRow) indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
     const searchAnchor =
       firstRow && searchTargets.has(member.name)
-        ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
+        ? `<h4 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h4>`
         : "";
     // Overload rows repeat a member name; the merged documentation renders once,
     // on the first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
-    const summary =
-      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "", true);
-    const summaryDoc =
-      documentation === undefined
-        ? ""
-        : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, item, summary, routes)}</span>`;
     const parts = memberTypeParts(member.signature);
     const variants = parts === undefined ? undefined : stringLiteralUnionVariants(parts.type);
     const alias = variants === undefined ? undefined : aliases.get(literalUnionKey(variants));
@@ -1045,14 +1090,26 @@ function renderMembers(
       alias === undefined || parts === undefined
         ? member.signature
         : `${parts.prefix} ${alias.name}${parts.terminated ? ";" : ""}`;
-    const aliasChip =
+    const head = memberHead(member.signature);
+    const flags = [
+      /^\s*readonly\s/.test(member.signature) ? "<span>read-only</span>" : "",
+      head.startsWith(`${member.name}?`) ? "<span>optional</span>" : "",
       alias === undefined
         ? ""
-        : ` <span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`;
-    return [
+        : `<span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`,
+    ].join("");
+    const body =
+      documentation === undefined
+        ? []
+        : [
+            /(?:^|\n)@(example|see)\b/.test(documentation)
+              ? `${documentationMarkdown(pkg, entry, item, routes, documentation, 4)}\n`
+              : `<p class="api-card__doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
+          ];
+    const card = [
       searchAnchor,
-      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
-      `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
+      `<article class="api-card api-member" id="${id}" data-member="${html(member.name)}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
+      '<div class="api-card__head">',
       "",
       // A fenced block so member signatures get real syntax highlighting; the
       // member grammar reads a lone `readonly name: Type;` as a class member.
@@ -1060,41 +1117,37 @@ function renderMembers(
       signature,
       "```",
       "",
-      // Skip the body paragraph when it would only restate the summary line.
-      ...(documentation === undefined ||
-      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary.replace(/`/g, "")
-        ? []
-        : [
-            /(?:^|\n)@(example|see)\b/.test(documentation)
-              ? `${documentationMarkdown(pkg, entry, item, routes, documentation)}\n`
-              : `<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
-          ]),
-      "</details>",
+      ...(flags === "" ? [] : [`<span class="api-card__flags">${flags}</span>`, ""]),
+      "</div>",
+      "",
+      ...body,
+      "</article>",
     ].join("\n");
+    return { group: memberGroup(member), card };
   });
-  // Overloads share one entry in the index and in the count.
+  // Overloads share one entry in the index.
   const memberCount = new Set(members.map((member) => member.name)).size;
   const index =
-    members.length <= MEMBER_INDEX_MINIMUM
+    memberCount <= MEMBER_INDEX_MINIMUM
       ? []
       : [
-          // Collapsed: a hundred names would push the first member a screen down.
-          '<details class="api-member-index" data-pagefind-ignore>',
-          `<summary>Jump to a member <span class="api-count">${memberCount}</span></summary>`,
-          '<nav aria-label="Members">',
-          ...indexLinks,
-          "</nav>",
-          "</details>",
+          `<nav class="api-member-index" aria-label="Members" data-pagefind-ignore>${indexLinks.join("")}</nav>`,
           "",
         ];
-  return [
-    `## Members <span class="api-count" data-pagefind-ignore>${memberCount}</span>`,
-    "",
-    ...index,
-    '<div class="api-member-list">',
-    ...rows,
-    "</div>",
-  ].join("\n");
+  const groups = MEMBER_GROUPS.flatMap((group) => {
+    const grouped = cards.filter((card) => card.group === group);
+    return grouped.length === 0
+      ? []
+      : [
+          `<h3 class="api-member-group">${group}</h3>`,
+          "",
+          '<div class="api-cards">',
+          ...grouped.map(({ card }) => card),
+          "</div>",
+          "",
+        ];
+  });
+  return ["## Members", "", ...index, ...groups].join("\n");
 }
 
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
@@ -1430,4 +1483,66 @@ export function movedPageIssues(
     }
   }
   return failures;
+}
+
+/** What a package's reference pages show without a description. */
+export interface UndocumentedApi {
+  readonly packageName: string;
+  /** Members of interfaces and classes with no doc comment (`Owner.member`; overloads once). */
+  readonly members: readonly string[];
+  /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
+  readonly parameters: readonly string[];
+  /**
+   * Functions whose return value has neither `@returns` nor a documented type;
+   * `void` and `Promise<void>` return nothing to describe.
+   */
+  readonly returns: readonly string[];
+}
+
+/**
+ * The members, parameters and return values each package's reference shows
+ * without a description, by the rules the pages render with.
+ * A symbol re-exported from several entry points counts once. Declaration
+ * shapes must be prepared ({@link prepareDeclarationShapes}).
+ */
+export function undocumentedApi(
+  manifest: PublicApiManifest,
+  routes: DocumentationLinkRoutes = documentationLinkRoutes(manifest),
+): UndocumentedApi[] {
+  return manifest.packages.map((pkg) => {
+    const members = new Set<string>();
+    const parameters = new Set<string>();
+    const returns = new Set<string>();
+    for (const entry of pkg.entryPoints) {
+      for (const item of entry.exports) {
+        const memberDocs = new Set(
+          item.memberDocs
+            .filter((member) => member.documentation.trim() !== "")
+            .map((member) => member.name),
+        );
+        for (const member of declarationShape(parseableDeclaration(item)).members) {
+          if (!memberDocs.has(member.name)) members.add(`${item.name}.${member.name}`);
+        }
+        const fields =
+          item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
+        if (fields === undefined) continue;
+        const parts = documentationParts(item.documentation, pkg, entry, item, routes);
+        for (const parameter of fields.parameters) {
+          const name = parameter.name.replace(/^\.\.\./, "");
+          const described =
+            parts.parameters.get(name) ?? fieldTypeSummary(parameter.type, pkg, routes);
+          if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
+        }
+        if (returnsNothing(fields.returns)) continue;
+        const described = parts.returns ?? fieldTypeSummary(fields.returns, pkg, routes);
+        if (described === undefined || described === "") returns.add(item.name);
+      }
+    }
+    return {
+      packageName: pkg.name,
+      members: [...members].sort(),
+      parameters: [...parameters].sort(),
+      returns: [...returns].sort(),
+    };
+  });
 }

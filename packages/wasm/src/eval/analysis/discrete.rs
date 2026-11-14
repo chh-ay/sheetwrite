@@ -9,22 +9,21 @@ use super::distributions::{
 };
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "BINOM.DIST.RANGE",
-    "BINOM.INV",
-    "HYPGEOM.DIST",
-    "NEGBINOM.DIST",
-];
+family_functions! {
+    BINOM_DIST_RANGE = "BINOM.DIST.RANGE",
+    BINOM_INV = "BINOM.INV",
+    HYPGEOM_DIST = "HYPGEOM.DIST",
+    NEGBINOM_DIST = "NEGBINOM.DIST",
+}
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let result = match name {
-        "BINOM.DIST.RANGE" => binomial_range(values),
-        "BINOM.INV" => binomial_inverse_arguments(values),
-        "HYPGEOM.DIST" => hypergeometric(values, true),
-        "NEGBINOM.DIST" => negative_binomial(values, true),
-        _ => Err(FormulaError::Name),
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    let result = match function {
+        Function::BINOM_DIST_RANGE => binomial_range(values),
+        Function::BINOM_INV => binomial_inverse_arguments(values),
+        Function::HYPGEOM_DIST => hypergeometric(values, true),
+        Function::NEGBINOM_DIST => negative_binomial(values, true),
     };
 
     match result {
@@ -177,7 +176,7 @@ pub(super) fn negative_binomial(values: &FuncAccumulator, has_cumulative: bool) 
 mod tests {
     use super::*;
 
-    fn call(name: &str, arguments: &[Value]) -> Value {
+    fn call(function: Function, arguments: &[Value]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in arguments {
@@ -185,7 +184,7 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
     fn numbers(arguments: &[f64]) -> Vec<Value> {
@@ -199,47 +198,51 @@ mod tests {
     /// `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
     #[test]
     fn microsoft_published_examples() {
-        let cases: &[(&str, Vec<Value>, &str)] = &[
-            ("BINOM.DIST.RANGE", numbers(&[60.0, 0.75, 48.0]), "0.084"),
+        let cases: &[(Function, Vec<Value>, &str)] = &[
             (
-                "BINOM.DIST.RANGE",
+                Function::BINOM_DIST_RANGE,
+                numbers(&[60.0, 0.75, 48.0]),
+                "0.084",
+            ),
+            (
+                Function::BINOM_DIST_RANGE,
                 numbers(&[60.0, 0.75, 45.0, 50.0]),
                 "0.524",
             ),
-            ("BINOM.INV", numbers(&[6.0, 0.5, 0.75]), "4"),
+            (Function::BINOM_INV, numbers(&[6.0, 0.5, 0.75]), "4"),
             (
-                "HYPGEOM.DIST",
+                Function::HYPGEOM_DIST,
                 [numbers(&[1.0, 4.0, 8.0, 20.0]), vec![Value::Bool(true)]].concat(),
                 "0.4654",
             ),
             (
-                "HYPGEOM.DIST",
+                Function::HYPGEOM_DIST,
                 [numbers(&[1.0, 4.0, 8.0, 20.0]), vec![Value::Bool(false)]].concat(),
                 "0.3633",
             ),
             (
-                "NEGBINOM.DIST",
+                Function::NEGBINOM_DIST,
                 [numbers(&[10.0, 5.0, 0.25]), vec![Value::Bool(true)]].concat(),
                 "0.3135141",
             ),
             (
-                "NEGBINOM.DIST",
+                Function::NEGBINOM_DIST,
                 [numbers(&[10.0, 5.0, 0.25]), vec![Value::Bool(false)]].concat(),
                 "0.0550487",
             ),
         ];
 
-        for (name, arguments, published) in cases {
+        for (function, arguments, published) in cases {
             let decimals = published.split_once('.').map_or(0, |(_, part)| part.len());
             let tolerance = 0.5 * 10f64.powi(-(decimals as i32));
             let expected: f64 = published.parse().unwrap();
-            let Value::Number(actual) = call(name, arguments) else {
-                panic!("{name}{arguments:?} is not a number");
+            let Value::Number(actual) = call(*function, arguments) else {
+                panic!("{function}{arguments:?} is not a number");
             };
 
             assert!(
                 (actual - expected).abs() <= tolerance,
-                "{name}{arguments:?}: {actual} is not {published}"
+                "{function}{arguments:?}: {actual} is not {published}"
             );
         }
     }
@@ -248,61 +251,65 @@ mod tests {
     /// sixteenths for 0 to 4 heads.
     #[test]
     fn ranges_and_cumulative_sums_add_the_masses() {
-        let cases: &[(&str, Vec<Value>, f64)] = &[
+        let cases: &[(Function, Vec<Value>, f64)] = &[
             (
-                "BINOM.DIST.RANGE",
+                Function::BINOM_DIST_RANGE,
                 numbers(&[4.0, 0.5, 1.0, 3.0]),
                 14.0 / 16.0,
             ),
-            ("BINOM.DIST.RANGE", numbers(&[4.0, 0.5, 0.0, 4.0]), 1.0),
-            ("BINOM.DIST.RANGE", numbers(&[4.0, 0.0, 0.0]), 1.0),
             (
-                "NEGBINOM.DIST",
+                Function::BINOM_DIST_RANGE,
+                numbers(&[4.0, 0.5, 0.0, 4.0]),
+                1.0,
+            ),
+            (Function::BINOM_DIST_RANGE, numbers(&[4.0, 0.0, 0.0]), 1.0),
+            (
+                Function::NEGBINOM_DIST,
                 [numbers(&[1.0, 1.0, 0.5]), vec![Value::Bool(true)]].concat(),
                 0.75,
             ),
             (
-                "HYPGEOM.DIST",
+                Function::HYPGEOM_DIST,
                 [numbers(&[2.0, 2.0, 2.0, 4.0]), vec![Value::Bool(true)]].concat(),
                 1.0,
             ),
         ];
 
-        for (name, arguments, expected) in cases {
-            let Value::Number(actual) = call(name, arguments) else {
-                panic!("{name}{arguments:?} is not a number");
+        for (function, arguments, expected) in cases {
+            let Value::Number(actual) = call(*function, arguments) else {
+                panic!("{function}{arguments:?} is not a number");
             };
 
             assert!(
                 (actual - expected).abs() < 1e-12,
-                "{name}{arguments:?}: {actual}"
+                "{function}{arguments:?}: {actual}"
             );
         }
     }
 
     #[test]
     fn invalid_arguments_follow_the_microsoft_remarks() {
-        let cases: &[(&str, Vec<Value>)] = &[
-            ("BINOM.DIST.RANGE", numbers(&[4.0, 1.5, 1.0])),
-            ("BINOM.DIST.RANGE", numbers(&[4.0, 0.5, 5.0])),
-            ("BINOM.DIST.RANGE", numbers(&[4.0, 0.5, 3.0, 2.0])),
-            ("BINOM.INV", numbers(&[6.0, 0.0, 0.75])),
-            ("BINOM.INV", numbers(&[6.0, 0.5, 1.0])),
+        let cases: &[(Function, Vec<Value>)] = &[
+            (Function::BINOM_DIST_RANGE, numbers(&[4.0, 1.5, 1.0])),
+            (Function::BINOM_DIST_RANGE, numbers(&[4.0, 0.5, 5.0])),
+            (Function::BINOM_DIST_RANGE, numbers(&[4.0, 0.5, 3.0, 2.0])),
+            (Function::BINOM_INV, numbers(&[6.0, 0.0, 0.75])),
+            (Function::BINOM_INV, numbers(&[6.0, 0.5, 1.0])),
             (
-                "HYPGEOM.DIST",
+                Function::HYPGEOM_DIST,
                 [numbers(&[5.0, 4.0, 8.0, 20.0]), vec![Value::Bool(true)]].concat(),
             ),
             (
-                "NEGBINOM.DIST",
+                Function::NEGBINOM_DIST,
                 [numbers(&[1.0, 0.0, 0.5]), vec![Value::Bool(true)]].concat(),
             ),
         ];
 
-        for (name, arguments) in cases {
+        for (function, arguments) in cases {
             assert_eq!(
-                call(name, arguments),
+                call(*function, arguments),
                 Value::Error(FormulaError::Num),
-                "{name}{arguments:?}"
+                "{function}{arguments:?}"
             );
         }
     }

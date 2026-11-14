@@ -2,13 +2,12 @@
   "protocol": "sheetwrite-capture-scope-v1",
   "label": "render-scale",
   "metadata": {
-    "commit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
+    "commit": "b368152d58a0e6b1facb0878bee2951c363284e0",
     "dirty": false,
-    "engineCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
-    "harnessCommit": "ac4ab632d80abf8d0c2986685c04ebce7747e5fa",
-    "harnessPatchSha256": "350a7073f76f6dca899e1b31aacb6550dc852360914cc4afabadcd6adff6d8b7",
+    "engineCommit": "b368152d58a0e6b1facb0878bee2951c363284e0",
+    "harnessCommit": "b368152d58a0e6b1facb0878bee2951c363284e0",
     "purpose": "capture",
-    "timestamp": "2026-10-28T16:36:34.315Z",
+    "timestamp": "2026-11-14T17:07:24.497Z",
     "machine": "hypr-zephyrus",
     "cpu": "12th Gen Intel(R) Core(TM) i9-12900H",
     "bun": "1.4.4",
@@ -17,12 +16,15 @@
     "bunNodeCompat": "v26.3.0",
     "kernel": "7.3.0-4-cachyos",
     "cpuSlot": 4,
+    "effectiveCpuAffinity": "4",
+    "affinityProof": "Cpus_allowed_list:\t4",
+    "cpuSlotMeaning": "Reserved entry slot; effectiveCpuAffinity records the actual mask.",
     "memoryMax": "8G",
     "effectiveMemoryMaxBytes": 8589934592,
     "memoryMaxProof": "MemoryMax=8589934592",
-    "scope": "run-p49469-i55367.scope",
+    "scope": "run-p986990-i9391930.scope",
     "slice": "/user.slice/user-1000.slice/user@1000.service/sheetwrite.slice/sheetwrite-heavy.slice",
-    "sliceHighBefore": 201,
+    "sliceHighBefore": 2897292,
     "command": [
       "bun",
       "run",
@@ -30,15 +32,15 @@
     ]
   },
   "status": "passed",
-  "endedAt": "2026-10-28T17:15:44.341Z",
+  "endedAt": "2026-11-14T17:43:05.372Z",
   "exitCode": 0,
-  "sliceHighAfter": 201,
-  "memoryPeakBytes": 1932881920,
+  "sliceHighAfter": 2897292,
+  "memoryPeakBytes": 2581766144,
   "artifacts": [
     {
       "file": "render-scale.json",
-      "sha256": "d38f0bb680635fa88b6cffed2b26659e48b3f1e1c6f12e8b7ed1e62ca46b93db",
-      "modifiedAtMs": 1793207744329
+      "sha256": "32dc286320cfe179835f01168e5031a737850bc51b7b2a1a15dd5b18a3f9753b",
+      "modifiedAtMs": 1794678185361
     }
   ]
 }
