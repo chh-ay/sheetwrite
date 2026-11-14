@@ -1322,6 +1322,11 @@ the cold sweep and seven additional sweeps; its maximum includes the cold
 sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
 ingest and the public cached `getVisibleWindow` path.
 
+Both harnesses run `Bun.gc(true)` before each timed read, outside the timed
+span. Without it the read row timed the JS heap the write fixture left behind:
+on Linux, develop's `setSparseBlock` read 1.22× slower than 0.6.1's with
+identical engine state, and 0.989× after one collection (#651).
+
 Run each sample in a fresh process. To select a built baseline without changing
 its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for
 the first harness, and `STRING_POOL_CHECKOUT` to its checkout for the public
