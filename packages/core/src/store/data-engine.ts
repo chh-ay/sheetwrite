@@ -786,7 +786,13 @@ export class StoreDataEngine {
         (sheet.id.length + sheet.name.length) * 2,
         "scalar",
       );
-      this.wasm.setSheetName(handle, sheet.id, sheet.name);
+      if (!this.wasm.setSheetName(handle, sheet.id, sheet.name)) {
+        this.wasm.free();
+        throw storeFailure("invalid-snapshot", `invalid sheet name: ${sheet.name}`, {
+          sheet: sheet.id,
+        });
+      }
+
       this.sheets.handles.set(sheet.id, handle);
       this.sheetIdsByHandle[handle] = sheet.id;
       this.syncSpillBlockers(sheet);
@@ -4361,7 +4367,11 @@ export class StoreDataEngine {
     }
 
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
-    this.wasm.setSheetName(handle, snapshot.id, name.name);
+    if (!this.wasm.setSheetName(handle, snapshot.id, name.name)) {
+      this.wasm.removeSheet(handle);
+      return false;
+    }
+
     this.sheets.handles.set(snapshot.id, handle);
     this.sheetIdsByHandle[handle] = snapshot.id;
     for (const [row, meta] of snapshot.rowMeta ?? []) {
