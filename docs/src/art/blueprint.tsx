@@ -9,7 +9,15 @@
 // stay readable over the dots and the lines.
 import { createUniqueId, For, type JSX, Show } from "solid-js";
 
-import { anchor, arrowHead, type BoxSide, opposite, type Rect, route } from "./layout.js";
+import {
+  anchor,
+  arrowHead,
+  type BoxSide,
+  opposite,
+  type Point,
+  type Rect,
+  route,
+} from "./layout.js";
 
 /** One box: an optional mono eyebrow, a title, caption lines and code lines. */
 export interface BlueprintNode {
@@ -21,7 +29,30 @@ export interface BlueprintNode {
   readonly code?: readonly string[];
   /** `accent` marks the box the figure is about; `danger` a failure; `muted` a side result; `lane` a sequence lifeline. */
   readonly tone?: "accent" | "danger" | "muted" | "lane";
+  /** A small sheet drawn under the text: which cells a formula reads. */
+  readonly sheet?: BlueprintSheet;
 }
+
+/** A small sheet: columns from A, rows from 1, some cell values and tinted ranges. */
+export interface BlueprintSheet {
+  readonly cols: number;
+  readonly rows: number;
+  /** Column and row from 0, and the cell's text. */
+  readonly cells: readonly (readonly [col: number, row: number, text: string])[];
+  /** Inclusive blocks of cells, from and to as column and row from 0. */
+  readonly ranges: readonly {
+    readonly from: readonly [col: number, row: number];
+    readonly to: readonly [col: number, row: number];
+    readonly tone: "accent" | "muted" | "danger";
+  }[];
+}
+
+/** A small sheet's cell, its column letters' row and its row numbers' gutter. */
+const CELL = { w: 46, h: 20, head: 16, gutter: 18 } as const;
+const LETTERS = "ABCDEFGHIJ";
+
+/** The height a small sheet takes in its box, with the space above it. */
+const sheetHeight = (sheet: BlueprintSheet) => CELL.head + sheet.rows * CELL.h + 10;
 
 /** One connector, from a point on one box's side to a point on another's. */
 export interface BlueprintEdge {
@@ -60,15 +91,88 @@ const LABEL_GAP = 8;
 
 /** The height a node needs for its text: the drawings size boxes with this. */
 export function nodeHeight(
-  node: Pick<BlueprintNode, "eyebrow" | "title" | "lines" | "code">,
+  node: Pick<BlueprintNode, "eyebrow" | "title" | "lines" | "code" | "sheet">,
 ): number {
   // A box without a title (a code-only box) doesn't keep a title line.
   const title = node.title === "" ? 0 : LINE + 2;
+  const sheet = node.sheet === undefined ? 0 : sheetHeight(node.sheet);
   return (
     12 +
     title +
     (node.eyebrow ? LINE : 0) +
-    ((node.lines?.length ?? 0) + (node.code?.length ?? 0)) * LINE
+    ((node.lines?.length ?? 0) + (node.code?.length ?? 0)) * LINE +
+    sheet
+  );
+}
+
+/** A small sheet with its top-left corner at (x, y): letters, row numbers, grid lines, ranges, then values. */
+function Sheet(props: Readonly<{ sheet: BlueprintSheet; x: number; y: number; width: number }>) {
+  // Narrow boxes with many columns shrink the cells so the sheet stays inside the box.
+  const cw = Math.min(CELL.w, (props.width - CELL.gutter) / props.sheet.cols);
+  const left = props.x + CELL.gutter;
+  const top = props.y + CELL.head;
+  const right = left + props.sheet.cols * cw;
+  const bottom = top + props.sheet.rows * CELL.h;
+  const lines = [
+    ...Array.from(
+      { length: props.sheet.rows + 1 },
+      (_, row) => `M${left} ${top + row * CELL.h}H${right}`,
+    ),
+    ...Array.from(
+      { length: props.sheet.cols + 1 },
+      (_, col) => `M${left + col * cw} ${top}V${bottom}`,
+    ),
+  ].join("");
+  return (
+    <g class="bp-sheet">
+      <For each={[...LETTERS.slice(0, props.sheet.cols)]}>
+        {(letter, col) => (
+          <text
+            class="bp-sheet__head"
+            text-anchor="middle"
+            x={left + col() * cw + cw / 2}
+            y={top - 4}
+          >
+            {letter}
+          </text>
+        )}
+      </For>
+      <For each={Array.from({ length: props.sheet.rows }, (_, row) => row + 1)}>
+        {(number) => (
+          <text
+            class="bp-sheet__head"
+            text-anchor="middle"
+            x={props.x + CELL.gutter / 2}
+            y={top + number * CELL.h - 6}
+          >
+            {number}
+          </text>
+        )}
+      </For>
+      <For each={props.sheet.ranges}>
+        {(range) => (
+          // A path, not a rect: ranges overlap on purpose (an intersection), and they aren't boxes.
+          <path
+            class="bp-sheet__range"
+            d={`M${left + range.from[0] * cw} ${top + range.from[1] * CELL.h}h${(range.to[0] - range.from[0] + 1) * cw}v${(range.to[1] - range.from[1] + 1) * CELL.h}h${-(range.to[0] - range.from[0] + 1) * cw}z`}
+            data-tone={range.tone}
+          />
+        )}
+      </For>
+      <path class="bp-sheet__grid" d={lines} />
+      <For each={props.sheet.cells}>
+        {([col, row, text]) => (
+          <text
+            class="bp-sheet__cell"
+            text-anchor="middle"
+            x={left + col * cw + cw / 2}
+            y={top + row * CELL.h + 14}
+          >
+            {text}
+          </text>
+        )}
+      </For>
+    </g>
   );
 }
 
@@ -84,17 +188,34 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
       placed.push({ kind: "title", text: props.node.title, y });
       y += LINE + 2;
     }
-    for (const text of props.node.lines ?? []) {
-      placed.push({ kind: "line", text, y });
-      y += LINE;
-    }
+    // With a sheet, the code (the formula) leads into it and the lines explain it underneath.
+    const sheet = props.node.sheet;
+    const caption = (from: number) => {
+      for (const text of props.node.lines ?? []) {
+        placed.push({ kind: "line", text, y: from });
+        from += LINE;
+      }
+      return from;
+    };
+    if (sheet === undefined) y = caption(y);
     for (const text of props.node.code ?? []) {
       placed.push({ kind: "code", text, y });
       y += LINE;
     }
+    if (sheet !== undefined) caption(y + sheetHeight(sheet));
     return placed;
   };
-  const { x, y, w, h } = props.node.rect;
+  const { x, y, w } = props.node.rect;
+  // The sheet starts under the last code line.
+  const sheetTop = () =>
+    y +
+    22 -
+    LINE +
+    (props.node.eyebrow ? LINE : 0) +
+    (props.node.title === "" ? 0 : LINE + 2) +
+    (props.node.code?.length ?? 0) * LINE +
+    4;
+  const h = props.node.rect.h;
   return (
     <g class="bp-node" data-tone={props.node.tone ?? "plain"}>
       <rect class="bp-node__box" height={h} rx={6} width={w} x={x} y={y} />
@@ -106,8 +227,43 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
           </text>
         )}
       </For>
+      <Show when={props.node.sheet}>
+        {(sheet) => <Sheet sheet={sheet()} width={w - 28} x={x + 14} y={sheetTop()} />}
+      </Show>
     </g>
   );
+}
+
+/** Connector ends this close across their direction are meant to line up. */
+const SNAP = 12;
+/** A snapped end stays this far inside its box's side, clear of the rounded corner. */
+const SNAP_INSET = 6;
+
+/**
+ * A connector between two nearly aligned boxes runs straight: when its ends
+ * sit on parallel sides and are offset by less than SNAP across its
+ * direction, one end moves onto the other's line, if that line meets its side.
+ */
+function straighten(
+  fromRect: Rect,
+  start: Point,
+  toRect: Rect,
+  end: Point,
+  fromSide: BoxSide,
+  toSide: BoxSide,
+): { start: Point; end: Point } {
+  const horizontal = (side: BoxSide) => side === "left" || side === "right";
+  if (horizontal(fromSide) !== horizontal(toSide)) return { start, end };
+  const across = horizontal(fromSide) ? "y" : "x";
+  const offset = Math.abs(end[across] - start[across]);
+  if (offset < 0.5 || offset >= SNAP) return { start, end };
+  const fits = (rect: Rect, value: number) =>
+    across === "y"
+      ? value >= rect.y + SNAP_INSET && value <= rect.y + rect.h - SNAP_INSET
+      : value >= rect.x + SNAP_INSET && value <= rect.x + rect.w - SNAP_INSET;
+  if (fits(toRect, start[across])) return { start, end: { ...end, [across]: start[across] } };
+  if (fits(fromRect, end[across])) return { start: { ...start, [across]: end[across] }, end };
+  return { start, end };
 }
 
 function Edge(props: Readonly<{ edge: BlueprintEdge; nodes: ReadonlyMap<string, BlueprintNode> }>) {
@@ -119,8 +275,14 @@ function Edge(props: Readonly<{ edge: BlueprintEdge; nodes: ReadonlyMap<string, 
     );
   }
   const toSide = props.edge.toSide ?? opposite(props.edge.fromSide);
-  const start = anchor(from.rect, props.edge.fromSide, props.edge.t ?? 0.5);
-  const end = anchor(to.rect, toSide, props.edge.toT ?? props.edge.t ?? 0.5);
+  const { start, end } = straighten(
+    from.rect,
+    anchor(from.rect, props.edge.fromSide, props.edge.t ?? 0.5),
+    to.rect,
+    anchor(to.rect, toSide, props.edge.toT ?? props.edge.t ?? 0.5),
+    props.edge.fromSide,
+    toSide,
+  );
   const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
   const side = props.edge.labelSide ?? "right";
   const textAnchor: "start" | "middle" | "end" =

@@ -7,6 +7,9 @@ function isBusyStatus(status: SyncMutationStatus): status is BusyMutationStatus 
   return status === "conflicted" || status === "sending" || status === "persisting";
 }
 
+/** Acknowledged IDs kept at the front of the order array before it is compacted. */
+const COMPACT_MIN_HEAD = 64;
+
 /**
  * Pending records in queue order. Every add, removal, and status change goes
  * through here so the running totals stay exact: a local commit, state
@@ -15,12 +18,18 @@ function isBusyStatus(status: SyncMutationStatus): status is BusyMutationStatus 
 export class PendingRecordQueue {
   private readonly records = new Map<string, SyncMutationRecord>();
   /**
-   * Mutation IDs in queue order, always the keys of `records`. Kept beside the
-   * map because JavaScriptCore finds the first entry of a Map by walking the
-   * slots of entries deleted from its front, which the head lookup would hit
-   * after every acknowledgement.
+   * Mutation IDs in queue order from `start`, always the keys of `records`.
+   * Kept beside the map because JavaScriptCore finds the first entry of a Map
+   * by walking the slots of entries deleted from its front, which the head
+   * lookup would hit after every acknowledgement.
    */
   private readonly order: string[] = [];
+  /**
+   * Index of the head in `order`. Acknowledging the head only moves it, so a
+   * drain costs the same per acknowledgement at any depth; the acknowledged
+   * prefix is dropped once it is at least half of `order`.
+   */
+  private start = 0;
 
   private readonly statusCounts: Record<SyncMutationStatus, number> = {
     persisting: 0,
@@ -46,7 +55,7 @@ export class PendingRecordQueue {
   }
 
   head(): SyncMutationRecord | undefined {
-    const id = this.order[0];
+    const id = this.order[this.start];
     return id === undefined ? undefined : this.records.get(id);
   }
 
@@ -90,7 +99,19 @@ export class PendingRecordQueue {
     if (!record) return;
     this.records.delete(clientMutationId);
     // Acknowledgements arrive in queue order, so this is the head in practice.
-    this.order.splice(this.order.indexOf(clientMutationId), 1);
+    // An ID nearer the head than the tail moves the IDs before it back one
+    // place and advances the head; otherwise the IDs after it move forward.
+    const index = this.order.indexOf(clientMutationId, this.start);
+    if (index - this.start <= this.order.length - index) {
+      this.order.copyWithin(this.start + 1, this.start, index);
+      this.start += 1;
+      if (this.start >= COMPACT_MIN_HEAD && this.start * 2 >= this.order.length) {
+        this.order.splice(0, this.start);
+        this.start = 0;
+      }
+    } else {
+      this.order.splice(index, 1);
+    }
     this.statusCounts[record.status] -= 1;
     this.serverVersions -= serverVersionsOf(record);
   }
@@ -107,6 +128,7 @@ export class PendingRecordQueue {
   clear(): void {
     this.records.clear();
     this.order.length = 0;
+    this.start = 0;
     for (const status of Object.keys(this.statusCounts) as SyncMutationStatus[]) {
       this.statusCounts[status] = 0;
     }
