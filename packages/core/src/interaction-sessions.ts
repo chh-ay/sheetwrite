@@ -3,6 +3,7 @@ import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
+import type { EditDraftSink } from "./edit-draft.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
@@ -43,6 +44,8 @@ interface InteractionDependencies {
   editListeners: {
     readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
   };
+  /** Hears the cell edit's draft for the shell's formula bar (see `edit-draft.ts`). */
+  editDraft: EditDraftSink;
   /** Open the find bar; it may load first. `replace: true` focuses the replace field. */
   openFind: (options?: { replace?: boolean }) => void;
   store: Store;
@@ -262,6 +265,7 @@ export class InteractionSessions {
     this.activeEditor = null;
     this.deps.host.focus();
     this.deps.scheduleRender();
+    this.deps.editDraft.end();
   }
 
   private cancelEditor(): void {
@@ -280,12 +284,17 @@ export class InteractionSessions {
     if (this.editingAddress !== address) return;
     this.editingAddress = null;
     this.activeEditor = null;
-    if (address.sheet !== this.deps.activeSheet()) return;
-    const viewRow = this.deps.toViewRow(address.row);
-    if (viewRow === null) return;
-    const column = this.deps.sheet().columns[address.col];
-    const value = typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
-    this.commitCellEditAt(address, viewRow, value, navigate);
+    try {
+      if (address.sheet !== this.deps.activeSheet()) return;
+      const viewRow = this.deps.toViewRow(address.row);
+      if (viewRow === null) return;
+      const column = this.deps.sheet().columns[address.col];
+      const value =
+        typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
+      this.commitCellEditAt(address, viewRow, value, navigate);
+    } finally {
+      this.deps.editDraft.end();
+    }
   }
 
   private cancelPointer(): void {
@@ -295,7 +304,11 @@ export class InteractionSessions {
     else this.detachDrag();
   }
 
-  beginEdit(row: number, col: number, initial?: string, selectAll = false): void {
+  /**
+   * Open the cell editor on `row`, `col`. With `focus` false it opens as the
+   * cell's view of a draft another edit surface types (see `setEditText`).
+   */
+  beginEdit(row: number, col: number, initial?: string, selectAll = false, focus = true): void {
     if (this.deps.readOnly()) return;
 
     const editCell = this.deps.anchorCell(row, col);
@@ -341,6 +354,11 @@ export class InteractionSessions {
 
     const custom = column.editor ? this.deps.customEditors.get(column.editor) : undefined;
     if (custom) {
+      // A custom editor owns its own input; another surface cannot type its draft.
+      if (!focus) {
+        this.editingAddress = null;
+        return;
+      }
       this.activeEditor = this.customEditor;
       this.customEditor.begin({
         editor: custom,
@@ -394,7 +412,7 @@ export class InteractionSessions {
       col: editCell.col,
       type: column.type,
       initial: text,
-      selectAll: selectAll || initial === undefined,
+      selectAll: focus && (selectAll || initial === undefined),
       rect: this.deps.screenRect(
         editCell.row,
         editCell.col,
@@ -403,10 +421,41 @@ export class InteractionSessions {
       ),
       label: this.editorLabel(editCell.row, editCell.col),
       theme: this.deps.theme(),
+      focus,
       onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
       onCancel: () => this.endEditor(),
+      onText: (value) => this.deps.editDraft.text(value),
       onShortcut: (event) => this.runCustomShortcut(event, true),
     });
+    // A formula bar showing the draft starts from the opened text.
+    this.deps.editDraft.text(text);
+  }
+
+  /**
+   * Show `text`, typed in another edit surface such as a formula bar, in the
+   * cell editor, with that surface's caret. Opens the editor on the focused
+   * cell without taking focus when no edit is open. False when the cell
+   * cannot be edited as text: read-only, or a custom editor owns it.
+   */
+  setEditText(text: string, selectionStart: number, selectionEnd: number): boolean {
+    if (!this.isEditing) {
+      const focus = this.deps.selection().focusCell;
+      if (!focus) return false;
+      this.beginEdit(focus.row, focus.col, text, false, false);
+    }
+    if (this.activeEditor !== this.editor || !this.editor.isEditing) return false;
+    this.editor.setText(text, selectionStart, selectionEnd);
+    return true;
+  }
+
+  /** Commit the open cell edit in place, as Enter does in a formula bar. */
+  commitEdit(): void {
+    if (this.activeEditor === this.editor) this.editor.commit("none");
+  }
+
+  /** Cancel the open cell edit; both the editor and any formula bar show the stored value again. */
+  cancelEdit(): void {
+    if (this.isEditing) this.cancelEditor();
   }
 
   private commitCellEditAt(
@@ -524,6 +573,11 @@ export class InteractionSessions {
       };
       this.attachDrag(e, move, up, up);
       return;
+    }
+    // A draft typed in a formula bar commits when the user clicks a cell, as
+    // the focused editor's blur would.
+    if (this.activeEditor === editor && editor.isEditing && !editor.isFocused) {
+      editor.commit("none");
     }
     // A selected cell must own subsequent keyboard input across browsers.
     // Keep touch and active-editor gestures focused where they already are.
