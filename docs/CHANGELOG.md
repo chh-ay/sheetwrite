@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `docs:generate` reports, per package, how many public members, parameters and return values the API reference shows without a description (no doc comment, no `@param`/`@returns`, and no documented type to fall back on).
 - The landing no longer shifts while it loads on a slow link: Chromium painted a partly parsed page, and the rest of the header or the hero's buttons and install box arrived a frame later. A render-blocking `<link rel="expect">` holds the first paint until the hero's picture starts (Chromium only; other browsers ignore it).
 - The performance showcase loads in the dev server on macOS again. `PerformanceStage.tsx` imported both `./flight.js` and `./Flight.js`, and on a case-insensitive disk `Flight.js` resolved to `flight.ts`, so the flight controls were undefined ("Comp is not a function"). The flight component file is now `FlightPanel.tsx`, and `bun run lint` fails when two tracked paths, or two modules in one folder once their extensions are dropped, differ only by case.
 - Phones: the site header's brand and buttons, the landing's links, buttons, code tabs, footer links and number switches, the release strip's links and the content tabs take at least 44 × 44 px. Terminal blocks fit a phone's column (the 44 px tabs replace the gaps, and Copy wraps rather than overflow). The sidebar's column keeps its surface the full page height, and long inline code breaks instead of widening the page.

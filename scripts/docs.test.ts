@@ -7,9 +7,12 @@ import {
   documentationLinkRoutes,
   functionFields,
   movedPageIssues,
+  parseableDeclaration,
+  prepareDeclarationShapes,
   renderEntryPage,
   renderSymbolPage,
   symbolDescription,
+  undocumentedCounts,
 } from "./docs-api.js";
 import { renderCompatibilityResults } from "./docs-compatibility.js";
 import { parseFences, trackerReferenceIssues, unresolvedSiteLinks } from "./docs-content-checks.js";
@@ -172,6 +175,35 @@ describe("API reference pages", () => {
     );
     expect(member).toContain("[Renderer](/docs/api/core/grid/#grid-renderer-kind)");
     expect(page).not.toMatch(/@(?:example|see)\b/);
+  });
+
+  it("counts members, parameters and return values the reference shows without a description", async () => {
+    const shape = apiExport(
+      "CountShape",
+      "interface",
+      "interface CountShape {\n  documented: number;\n  bare: string;\n  call(x: number): void;\n  call(x: string): void;\n}",
+      "CountShape summary.",
+      [{ name: "documented", documentation: "Has docs." }],
+    );
+    const make = apiExport(
+      "makeThing",
+      "function",
+      "(shape: CountShape, size: number, label?: string): number",
+      "Makes a thing.\n@param size - How big.",
+    );
+    const entry = entryPoint(".", [shape, make]);
+    // A re-export from a second entry point counts once.
+    const adapter = entryPoint("./adapter", [make]);
+    const manifest: PublicApiManifest = {
+      formatVersion: 2,
+      packages: [{ name: "@sheetwrite/core", entryPoints: [entry, adapter] }],
+    };
+    await prepareDeclarationShapes([shape, make].map((item) => parseableDeclaration(item)));
+    expect(undocumentedCounts(manifest)).toEqual([
+      // `bare` and `call` (one name for both overloads); `label` (no @param, no
+      // documented type) and the number return value. `shape` reads CountShape's summary.
+      { packageName: "@sheetwrite/core", members: 2, parameters: 1, returns: 1 },
+    ]);
   });
 
   it("links an expanded union member to the alias that names it", async () => {
