@@ -449,6 +449,13 @@ the sort on the table's header buttons.
 | --- | --- |
 | An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change: every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation, and getters there are still rejected without running. store.applyTransaction returns and emits a copy of a transaction that contains setBlock. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
 
+### Dense workbooks past maxDenseCells
+
+| Change | What to do |
+| --- | --- |
+| A dense-storage workbook no longer stops at `maxDenseCells` (5,000,000 cells). In 0.6.1 a snapshot past it failed with `SnapshotResourceError("maxDenseCells")`. Now the sheets past it load in local pages, which are never evicted and always loaded, so they still behave as dense sheets (`isPaged` is false), and a row or column insert that would pass it moves the sheet into local pages instead of being refused. | Nothing. To keep the old refusal, set `maxLocalPagedCells` to 0. |
+| Local sheets share a new limit, `maxLocalPagedCells` in `SnapshotResourceLimits` (20,000,000 cells by default, also the engine's ceiling). A snapshot past it fails with `SnapshotResourceError("maxLocalPagedCells")`, and an `addRows` or `addColumns` that would pass it is rejected with a `resource-limit` issue whose resource is `local-paged-cells`. That code replaces `dense-cells`, which pre-release builds of 0.7.0 reported for an insert past `maxDenseCells`. | Match `local-paged-cells` where you matched `dense-cells`. Lower `maxLocalPagedCells` to use less memory. |
+
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
 The same workloads ran against the published 0.5.4 and 0.6.1 packages and
