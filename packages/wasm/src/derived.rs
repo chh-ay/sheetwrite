@@ -1,15 +1,19 @@
 //! The scalar tag encoding of calculated values. Dense calculated values share
 //! the source payload slot; paged ones live in calculated pages.
+
 use crate::cells::{encode_num, payload_num, STR_TAG_HI};
 use crate::types::{KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING};
+
 const ERROR_TAG_PREFIX: u64 = 0xFFFB;
 const TEXT_TAG_PREFIX: u64 = STR_TAG_HI >> 16;
 const BOOL_TAG_PREFIX: u64 = 0xFFFD;
 const BLANK_TAG_PREFIX: u64 = 0xFFFE;
+
 const ERROR_TAG: u64 = ERROR_TAG_PREFIX << 48;
 const ERROR_SLOT_MASK: u64 = u16::MAX as u64;
 const BOOL_TAG: u64 = BOOL_TAG_PREFIX << 48;
 const BLANK_TAG: u64 = BLANK_TAG_PREFIX << 48;
+
 /// A calculated-page row without a result. [`encode_cell`] never produces it.
 pub(crate) const ABSENT_TAG: u64 = 0xFFFA_0000_0000_0000;
 
