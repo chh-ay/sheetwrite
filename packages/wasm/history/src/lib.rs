@@ -158,6 +158,7 @@ impl DiffKernel {
         clippy::too_many_arguments,
         reason = "a WebAssembly export: JavaScript passes the rectangle as numbers, without building an object per call"
     )]
+    #[wasm_bindgen(js_name = touch)]
     pub fn touch(&mut self, slot: u32, r0: u32, c0: u32, r1: u32, c1: u32, author: u32) {
         if let Some(Some(sheet)) = self.sheets.get_mut(slot as usize) {
             sheet.touches.add(Touch {
@@ -219,6 +220,7 @@ impl DiffKernel {
         clippy::too_many_arguments,
         reason = "a WebAssembly export: JavaScript passes the piece as numbers, without building an object per call"
     )]
+    #[wasm_bindgen(js_name = compare)]
     pub fn compare(
         &mut self,
         slot: u32,
@@ -291,17 +293,6 @@ impl DiffKernel {
         ordinal
     }
 
-    /// Changes written since the last `clearPage`.
-    #[wasm_bindgen(js_name = pageLength)]
-    #[must_use]
-    #[allow(
-        clippy::missing_const_for_fn,
-        reason = "wasm-bindgen cannot export a const fn"
-    )]
-    pub fn page_length(&self) -> u32 {
-        self.page.len() as u32
-    }
-
     /// The sheet slot of each change. This and the other page getters hand
     /// their column over: a second read is empty, and the next `compare`
     /// starts a new page.
@@ -358,12 +349,6 @@ impl DiffKernel {
     pub fn page_authors(&mut self) -> Vec<u32> {
         self.page.read = true;
         std::mem::take(&mut self.page.author)
-    }
-
-    /// Empty the page so `compare` can fill it again.
-    #[wasm_bindgen(js_name = clearPage)]
-    pub fn clear_page(&mut self) {
-        self.page.clear();
     }
 
     /// Everyone who wrote a cell of the later version, in the order of their first write.
@@ -564,13 +549,11 @@ mod tests {
         );
         assert_eq!(kernel.page_cols(), vec![0]);
         assert!(kernel.page_cols().is_empty());
-        assert_eq!(kernel.page_length(), 1);
 
         assert_eq!(
             kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 1),
             3
         );
-        assert_eq!(kernel.page_length(), 1);
         assert_eq!(kernel.page_cols(), vec![2]);
         assert_eq!(kernel.page_authors(), vec![NONE]);
     }
@@ -593,7 +576,6 @@ mod tests {
         );
         assert_eq!(kernel.page_cols(), vec![0]);
 
-        kernel.clear_page();
         assert_eq!(
             kernel.compare(sheet, false, 0, 0, 1, 3, 0, 0, NONE, NONE, 1),
             3
