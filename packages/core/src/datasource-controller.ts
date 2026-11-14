@@ -6,6 +6,7 @@ import {
   type RowBand,
   type VisibleWaitSample,
 } from "./datasource-intervals.js";
+import { ScrollAxisMotion } from "./datasource-motion.js";
 import { datasourceFailure } from "./errors.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -26,6 +27,25 @@ export const DATASOURCE_MAX_ACTIVE_REQUESTS = 6;
 const DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT = 4_096;
 const DATASOURCE_NO_PROGRESS_RETRIES = 1;
 const ESTIMATED_CELL_BYTES = 16;
+/** Fetch time assumed until a request completes. */
+const DATASOURCE_DEFAULT_FETCH_MS = 100;
+/** Completed request durations kept for the fetch-time percentile. */
+const FETCH_TIME_SAMPLE_LIMIT = 32;
+/** Lookahead covers this percentile of measured fetch times. */
+const FETCH_TIME_PERCENTILE = 0.9;
+/** Share of lookahead rows that may sit behind a slow or resting view. */
+const BEHIND_SHARE = 0.2;
+/** Columns ahead of a view scrolling sideways: this share of its width, past the travel. */
+const COLUMN_MARGIN_SHARE = 0.25;
+/** Past a fling's predicted landing point, this share of the margin is fetched. */
+const LANDING_FAR_MARGIN_SHARE = 0.5;
+/**
+ * In-flight speculation survives an update while at least this share of its
+ * columns is still wanted: a diagonal scroll moves columns out of every
+ * request, and only one mostly out of view is cancelled.
+ */
+const KEEP_COLUMN_SHARE = 2 / 3;
+/** One display frame at 60 Hz: the interval between viewport updates while scrolling. */
 const LOGICAL_FRAME_MS = 16.7;
 const EMPTY_FORMULA_BANDS = new Uint32Array(0);
 
@@ -96,12 +116,17 @@ interface ActiveRequest extends RowBand {
   priority: RequestPriority;
   direction: -1 | 0 | 1;
   readonly attempt: number;
+  /** Controller clock time the request was sent. */
+  readonly startedAt: number;
   released: boolean;
 }
 
 export interface DatasourcePrefetchTelemetry {
   readonly direction: -1 | 0 | 1;
   readonly velocityRowsPerMs: number;
+  readonly velocityColumnsPerMs: number;
+  /** The percentile of recent fetch times that lookahead covers. */
+  readonly fetchTimeP90Ms: number;
   readonly measuredFrames: number;
   readonly residentFrames: number;
   readonly residencyRatio: number;
@@ -211,6 +236,27 @@ function columnsIntersect(a: readonly number[], b: readonly number[]): boolean {
   return false;
 }
 
+/** How many of the ascending `columns` the ascending `wanted` also holds. */
+function sharedColumns(columns: readonly number[], wanted: readonly number[]): number {
+  let shared = 0;
+  let left = 0;
+  let right = 0;
+  while (left < columns.length && right < wanted.length) {
+    const leftColumn = columns[left] ?? 0;
+    const rightColumn = wanted[right] ?? 0;
+    if (leftColumn === rightColumn) {
+      shared += 1;
+      left += 1;
+      right += 1;
+    } else if (leftColumn < rightColumn) {
+      left += 1;
+    } else {
+      right += 1;
+    }
+  }
+  return shared;
+}
+
 function columnsSubset(columns: readonly number[], superset: readonly number[]): boolean {
   let candidate = 0;
   let available = 0;
@@ -238,6 +284,72 @@ function requestWithoutSignal(request: ActiveRequest): Omit<DataSourceRequest, "
   };
 }
 
+interface ColumnRectangle extends RowBand {
+  readonly columns: readonly number[];
+}
+
+interface SpeculativePlan {
+  /** Rectangles to prefetch, nearest first. */
+  readonly fetch: ColumnRectangle[];
+  /** In-flight speculation inside one of these is still wanted. */
+  readonly keep: ColumnRectangle[];
+  /** Rows move faster than a fetch can follow: the view passes its own rows before they arrive. */
+  landing: boolean;
+}
+
+/**
+ * The span to prefetch ahead of `view` on one axis, moving `direction`, when
+ * the view travels `travel` units during one fetch.
+ *
+ * At low speed the span runs from the view's leading edge to `travel` plus
+ * `margin` past it. Above fling speed the view passes the stretch next to its
+ * edge before a fetch could return, so the span starts `margin` before the
+ * predicted landing point (`landing`) and ends half a margin past it. Ends are
+ * aligned to `align` so successive updates request whole bands; the span stays
+ * inside `[0, limit)`.
+ */
+function lookaheadSpan(
+  view: RowBand,
+  direction: -1 | 1,
+  travel: number,
+  margin: number,
+  align: number,
+  limit: number,
+): RowBand & { landing: boolean } {
+  const landingMargin = Math.ceil(margin * LANDING_FAR_MARGIN_SHARE);
+  if (direction > 0) {
+    const edge = Math.floor(view.end / align) * align;
+    const landingStart = Math.floor((view.start + travel - margin) / align) * align;
+    const landing = landingStart > edge;
+    const start = Math.min(limit, Math.max(edge, landingStart));
+    const far = view.end + travel + (landing ? landingMargin : margin);
+    const end = Math.min(limit, Math.ceil(far / align) * align);
+    return { start, end: Math.max(start, end), landing };
+  }
+  const edge = Math.min(limit, Math.ceil(view.start / align) * align);
+  const landingEnd = Math.ceil((view.end - travel + margin) / align) * align;
+  const landing = landingEnd < edge;
+  const end = Math.max(0, Math.min(edge, landingEnd));
+  const far = view.start - travel - (landing ? landingMargin : margin);
+  const start = Math.max(0, Math.floor(far / align) * align);
+  return { start: Math.min(start, end), end, landing };
+}
+
+/**
+ * The run of consecutive physical columns that ends at the view's last
+ * column: the part that scrolls sideways, after any frozen columns.
+ */
+function trailingColumnRun(columns: readonly number[]): RowBand {
+  const last = columns.at(-1) ?? 0;
+  let first = columns.length - 1;
+  while (first > 0 && columns[first - 1] === last - (columns.length - first)) first -= 1;
+  return { start: last - (columns.length - 1 - first), end: last + 1 };
+}
+
+function columnRange(start: number, end: number): readonly number[] {
+  return Object.freeze(Array.from({ length: end - start }, (_, offset) => start + offset));
+}
+
 /** Owns sparse two-dimensional datasource demand, request priority, and cancellation. */
 export class DatasourceController {
   private readonly loaded = new SparseColumnIntervals();
@@ -255,15 +367,18 @@ export class DatasourceController {
   private nextRequestId = 1;
   private generation = 0;
   private destroyed = false;
-  private direction: -1 | 0 | 1 = 0;
-  private velocityRowsPerMs = 0;
+  private readonly rowMotion = new ScrollAxisMotion();
+  private readonly columnMotion = new ScrollAxisMotion();
+  private readonly fetchTimes: number[] = [];
+  private fetchTimeCursor = 0;
+  private fetchTimeP90Ms = DATASOURCE_DEFAULT_FETCH_MS;
+  private rowsLanding = false;
   private telemetry = emptyTelemetry();
 
   private lastViewport: {
     start: number;
     end: number;
     columns: readonly number[];
-    at: number;
   } | null = null;
 
   private readonly visibleWaitDurations: VisibleWaitSample[] = [];
@@ -322,39 +437,23 @@ export class DatasourceController {
 
     const now = this.now();
     const visibleRows = bounds.end - bounds.start;
-    const previous = this.lastViewport;
-    const previousRows = previous ? previous.end - previous.start : visibleRows;
-    const delta = previous ? bounds.start - previous.start : 0;
-    const movementDirection: -1 | 0 | 1 = delta === 0 ? 0 : delta > 0 ? 1 : -1;
-    const elapsed = previous ? Math.max(0, now - previous.at) : 0;
+    const rowMove = this.rowMotion.record(now, bounds.start, visibleRows);
+    const columnRun = trailingColumnRun(columns);
+    this.columnMotion.record(now, columnRun.start, columnRun.end - columnRun.start);
+    const effectiveDirection: -1 | 1 =
+      this.rowMotion.direction === 0 ? 1 : this.rowMotion.direction;
 
-    if (elapsed > 0 && movementDirection !== 0) this.velocityRowsPerMs = delta / elapsed;
-
-    const reversal =
-      movementDirection !== 0 && this.direction !== 0 && movementDirection !== this.direction;
-    const jump = previous !== null && Math.abs(delta) > Math.max(visibleRows, previousRows) * 2;
-
-    if (movementDirection !== 0) this.direction = movementDirection;
-
-    const effectiveDirection: -1 | 1 = this.direction === 0 ? 1 : this.direction;
-
-    const speculative = this.speculativeIntervals(
-      bounds.start,
-      bounds.end,
-      effectiveDirection,
-      visibleRows,
-      columns.length,
-    );
-
-    this.lastViewport = { ...bounds, columns, at: now };
+    this.lastViewport = { ...bounds, columns };
+    const plan = this.speculativePlan(bounds, columns, columnRun, effectiveDirection);
+    this.rowsLanding = plan.landing;
     const formulaReads = this.formulaReadDemands(formulaBands);
 
     this.cancelObsoleteSpeculation(
       { ...bounds, columns },
-      speculative,
+      plan.keep,
       formulaReads,
-      jump ? "jump" : reversal ? "reversal" : "obsolete",
-      reversal || jump,
+      rowMove.jump ? "jump" : rowMove.reversal ? "reversal" : "obsolete",
+      rowMove.reversal || rowMove.jump,
     );
 
     this.refreshPagedResidency(this.options.loadable, bounds.start, bounds.end, columns);
@@ -388,7 +487,7 @@ export class DatasourceController {
         attempt: 0,
       };
       this.formulaReadDemand = formulaReads;
-      this.setSpeculativeDemand(speculative, visibleRows, effectiveDirection, columns);
+      this.setSpeculativeDemand(plan.fetch, visibleRows, effectiveDirection);
       this.drainDemand();
     } else {
       this.viewportDemand = null;
@@ -430,8 +529,10 @@ export class DatasourceController {
     const visibleWaiting = this.visibleWaitStarted.rowUnion();
 
     return {
-      direction: this.direction,
-      velocityRowsPerMs: this.velocityRowsPerMs,
+      direction: this.rowMotion.direction,
+      velocityRowsPerMs: this.rowMotion.velocity,
+      velocityColumnsPerMs: this.columnMotion.velocity,
+      fetchTimeP90Ms: this.fetchTimeP90Ms,
       measuredFrames: this.telemetry.measuredFrames,
       residentFrames: this.telemetry.residentFrames,
       residencyRatio:
@@ -573,8 +674,9 @@ export class DatasourceController {
     this.lastViewport = null;
     this.schemaCache = null;
     this.lastCanonicalColumns = null;
-    this.direction = 0;
-    this.velocityRowsPerMs = 0;
+    this.rowMotion.reset();
+    this.columnMotion.reset();
+    this.rowsLanding = false;
   }
 
   destroy(): void {
@@ -767,42 +869,25 @@ export class DatasourceController {
   }
 
   private setSpeculativeDemand(
-    intervals: readonly RowBand[],
+    rectangles: readonly ColumnRectangle[],
     bandRows: number,
     direction: -1 | 1,
-    columns: readonly number[],
   ): void {
     this.speculativeDemand.length = 0;
 
-    for (const interval of intervals) {
-      if (direction > 0) {
-        for (let cursor = interval.start; cursor < interval.end; cursor += bandRows) {
-          this.speculativeDemand.push({
-            start: cursor,
-            end: Math.min(interval.end, cursor + bandRows),
-            columns,
-            priority: "speculative",
-            direction,
-            viewportOrigin: false,
-            durableOrigin: false,
-            formulaReadOrigin: false,
-            attempt: 0,
-          });
-        }
-      } else {
-        for (let cursor = interval.end; cursor > interval.start; cursor -= bandRows) {
-          this.speculativeDemand.push({
-            start: Math.max(interval.start, cursor - bandRows),
-            end: cursor,
-            columns,
-            priority: "speculative",
-            direction,
-            viewportOrigin: false,
-            durableOrigin: false,
-            formulaReadOrigin: false,
-            attempt: 0,
-          });
-        }
+    for (const { start, end, columns } of rectangles) {
+      for (let offset = 0; offset < end - start; offset += bandRows) {
+        this.speculativeDemand.push({
+          start: direction > 0 ? start + offset : Math.max(start, end - offset - bandRows),
+          end: direction > 0 ? Math.min(end, start + offset + bandRows) : end - offset,
+          columns,
+          priority: "speculative",
+          direction,
+          viewportOrigin: false,
+          durableOrigin: false,
+          formulaReadOrigin: false,
+          attempt: 0,
+        });
       }
     }
   }
@@ -896,7 +981,12 @@ export class DatasourceController {
         }
 
         if (this.requests.size >= DATASOURCE_MAX_ACTIVE_REQUESTS) {
-          const preempted = this.preemptionCandidate(demand);
+          // While flinging, the view's own rows pass before a fetch returns: they do not
+          // displace the speculation at the landing point.
+          const preempted =
+            this.rowsLanding && demand.viewportOrigin
+              ? undefined
+              : this.preemptionCandidate(demand);
           if (preempted && demand.priority === "visible") {
             this.abortRequest(preempted, "obsolete");
             continue;
@@ -976,6 +1066,7 @@ export class DatasourceController {
       priority,
       direction,
       attempt,
+      startedAt: this.now(),
       released: false,
     };
 
@@ -1039,6 +1130,7 @@ export class DatasourceController {
           if (!this.canHydrate(activeRequest, generation)) return;
           this.loaded.add(responseColumns, page.start, loadedEnd);
           this.recordCompletedWaits(responseColumns, page.start, loadedEnd);
+          this.recordFetchTime(this.now() - activeRequest.startedAt);
           this.options.onRowsLoaded();
         }
 
@@ -1198,54 +1290,206 @@ export class DatasourceController {
     }
   }
 
-  private speculativeIntervals(
-    visibleStart: number,
-    visibleEnd: number,
-    direction: -1 | 1,
-    bandRows: number,
-    columnCount: number,
-  ): RowBand[] {
-    const horizonRows = this.speculativeRowHorizon(columnCount);
-    if (horizonRows === 0) return [];
-    const speedInWindowsPerFrame =
-      (Math.abs(this.velocityRowsPerMs) * LOGICAL_FRAME_MS) / Math.max(1, bandRows);
-    const bands = speedInWindowsPerFrame >= 0.125 || this.lastViewport === null ? 2 : 1;
-    const behindRows = Math.min(Math.floor(horizonRows / 5), Math.max(1, Math.ceil(bandRows / 2)));
-    const aheadRows = Math.min(
-      horizonRows - behindRows,
-      bandRows * Math.min(bands, DATASOURCE_PREFETCH_MAX_BANDS),
-    );
-    const intervals: RowBand[] = [];
-
-    if (direction > 0) {
-      const behindEnd = Math.floor(visibleStart / bandRows) * bandRows;
-      const behindStart = Math.max(0, behindEnd - behindRows);
-      const actualBehindRows = behindEnd - behindStart;
-      const aheadStart = Math.floor(visibleEnd / bandRows) * bandRows;
-      const desiredAheadEnd = Math.ceil((visibleEnd + aheadRows) / bandRows) * bandRows;
-      const boundedAheadEnd = aheadStart + (horizonRows - actualBehindRows);
-      const aheadEnd = Math.min(this.rowCount, desiredAheadEnd, boundedAheadEnd);
-      if (behindStart < behindEnd) intervals.push({ start: behindStart, end: behindEnd });
-      if (aheadStart < aheadEnd) intervals.push({ start: aheadStart, end: aheadEnd });
+  private recordFetchTime(durationMs: number): void {
+    if (this.fetchTimes.length < FETCH_TIME_SAMPLE_LIMIT) {
+      this.fetchTimes.push(durationMs);
     } else {
-      const aheadEnd = Math.min(this.rowCount, Math.ceil(visibleStart / bandRows) * bandRows);
-      const behindStart = Math.min(this.rowCount, Math.ceil(visibleEnd / bandRows) * bandRows);
-      const behindEnd = Math.min(this.rowCount, behindStart + behindRows);
-      const actualBehindRows = behindEnd - behindStart;
-      const desiredAheadStart =
-        Math.floor(Math.max(0, visibleStart - aheadRows) / bandRows) * bandRows;
-      const boundedAheadStart = aheadEnd - (horizonRows - actualBehindRows);
-      const aheadStart = Math.max(0, desiredAheadStart, boundedAheadStart);
-      if (aheadStart < aheadEnd) intervals.push({ start: aheadStart, end: aheadEnd });
-      if (behindStart < behindEnd) intervals.push({ start: behindStart, end: behindEnd });
+      this.fetchTimes[this.fetchTimeCursor] = durationMs;
+      this.fetchTimeCursor = (this.fetchTimeCursor + 1) % FETCH_TIME_SAMPLE_LIMIT;
     }
-    return intervals;
+    const sorted = [...this.fetchTimes].sort((a, b) => a - b);
+    const rank = Math.max(0, Math.ceil(sorted.length * FETCH_TIME_PERCENTILE) - 1);
+    this.fetchTimeP90Ms = sorted[rank] ?? DATASOURCE_DEFAULT_FETCH_MS;
   }
 
-  private speculativeRowHorizon(columnCount: number): number {
-    const rowBytes = Math.max(ESTIMATED_CELL_BYTES, columnCount * ESTIMATED_CELL_BYTES);
-    const byteBoundRows = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / rowBytes);
-    return Math.min(DATASOURCE_PREFETCH_MAX_ROWS, Math.max(0, byteBoundRows));
+  /**
+   * What to prefetch around the view, and which in-flight speculation is still
+   * wanted.
+   *
+   * Rows look ahead by the distance the view travels during one fetch (the p90
+   * of measured fetch times, bounded by where a slowing scroll comes to rest)
+   * plus one view of margin, behind a short trailing band. Columns do the same
+   * while the view moves mostly sideways. Both share the cell budget of
+   * {@link speculativeCellBudget}. In-flight speculation along the path from
+   * the trailing band to the end of the lookahead survives; a request the view
+   * has passed, or one beyond a lookahead that shrank as the scroll slowed, is
+   * cancelled.
+   */
+  private speculativePlan(
+    view: RowBand,
+    columns: readonly number[],
+    columnRun: RowBand,
+    direction: -1 | 1,
+  ): SpeculativePlan {
+    const plan: SpeculativePlan = { fetch: [], keep: [], landing: false };
+    const cellBudget = this.speculativeCellBudget();
+    const rows = this.planRows(plan, view, columns, columnRun, direction, cellBudget);
+    this.planColumns(plan, view, rows.path, columnRun, cellBudget - rows.cells);
+    return plan;
+  }
+
+  /** Adds the rows ahead of and behind the view to `plan`; returns the cells they take. */
+  private planRows(
+    plan: SpeculativePlan,
+    view: RowBand,
+    columns: readonly number[],
+    columnRun: RowBand,
+    direction: -1 | 1,
+    cellBudget: number,
+  ): { cells: number; path: RowBand } {
+    const bandRows = view.end - view.start;
+    const horizonRows = Math.min(
+      DATASOURCE_PREFETCH_MAX_ROWS,
+      Math.floor(cellBudget / Math.max(1, columns.length)),
+    );
+    if (horizonRows <= 0) return { cells: 0, path: view };
+
+    // A view that moves more than its height per frame (a scrollbar drag) shows only a
+    // sliver of the rows it crosses, so rows along the way are not worth a fetch: only the
+    // predicted resting point is, once the scroll is slowing down.
+    const rowSpeed = Math.abs(this.rowMotion.velocity);
+    const skipping = rowSpeed * LOGICAL_FRAME_MS > bandRows;
+    const travel = skipping
+      ? this.rowMotion.restDistance()
+      : this.rowMotion.travel(this.fetchTimeP90Ms);
+    // Before any motion, the first view looks two views ahead.
+    const margin = this.rowMotion.direction === 0 ? 2 * bandRows : bandRows;
+    const ahead = lookaheadSpan(
+      view,
+      direction,
+      Number.isFinite(travel) ? travel : 0,
+      margin,
+      bandRows,
+      this.rowCount,
+    );
+    if (skipping && !Number.isFinite(travel)) ahead.end = ahead.start;
+    plan.landing = skipping || ahead.landing;
+
+    const behindRows = plan.landing
+      ? 0
+      : Math.min(Math.floor(horizonRows * BEHIND_SHARE), Math.max(1, Math.ceil(bandRows / 2)));
+    let behind: RowBand;
+    if (direction > 0) {
+      const behindEnd = Math.floor(view.start / bandRows) * bandRows;
+      behind = { start: Math.max(0, behindEnd - behindRows), end: behindEnd };
+      ahead.end = Math.min(ahead.end, ahead.start + horizonRows - (behind.end - behind.start));
+    } else {
+      const behindStart = Math.min(this.rowCount, Math.ceil(view.end / bandRows) * bandRows);
+      behind = { start: behindStart, end: Math.min(this.rowCount, behindStart + behindRows) };
+      ahead.start = Math.max(ahead.start, ahead.end - horizonRows + (behind.end - behind.start));
+    }
+
+    // On a diagonal scroll, each band of rows ahead is fetched for the columns the view will
+    // show when that band comes into view.
+    for (let offset = 0; offset < ahead.end - ahead.start; offset += bandRows) {
+      const start =
+        direction > 0 ? ahead.start + offset : Math.max(ahead.start, ahead.end - offset - bandRows);
+      const end = direction > 0 ? Math.min(ahead.end, start + bandRows) : ahead.end - offset;
+      const distance = direction > 0 ? start - view.end : view.start - end;
+      const arrivesInMs = rowSpeed > 0 ? (Math.max(0, distance) + bandRows / 2) / rowSpeed : 0;
+      const bandColumns = this.columnsAfter(columns, columnRun, arrivesInMs);
+      plan.fetch.push({ start, end, columns: bandColumns });
+      if (bandColumns !== columns) plan.keep.push({ start, end, columns: bandColumns });
+    }
+    if (behind.start < behind.end) plan.fetch.push({ ...behind, columns });
+    const path = {
+      start: Math.min(view.start, behind.start, ahead.start),
+      end: Math.max(view.end, behind.end, ahead.end),
+    };
+    plan.keep.push({ ...path, columns });
+    const cells =
+      (Math.max(0, ahead.end - ahead.start) + behind.end - behind.start) * columns.length;
+    return { cells, path };
+  }
+
+  /**
+   * Adds the columns ahead of a view that scrolls mostly sideways to `plan`,
+   * for the visible rows, within `cellBudget`. During a diagonal fling the
+   * visible rows leave before those columns arrive, so none are fetched. They
+   * stay wanted while their rows are on the rows' `path`.
+   */
+  private planColumns(
+    plan: SpeculativePlan,
+    view: RowBand,
+    path: RowBand,
+    columnRun: RowBand,
+    cellBudget: number,
+  ): void {
+    const velocity = this.columnMotion.velocity;
+    const bandRows = view.end - view.start;
+    const columnExtent = columnRun.end - columnRun.start;
+    const columnCap = Math.floor(cellBudget / Math.max(1, bandRows));
+    const sideways =
+      Math.abs(velocity) / Math.max(1, columnExtent) >
+      Math.abs(this.rowMotion.velocity) / Math.max(1, bandRows);
+    if (
+      this.options.datasource?.capabilities.columns !== "windowed" ||
+      velocity === 0 ||
+      !sideways ||
+      columnCap <= 0
+    ) {
+      return;
+    }
+    const direction: -1 | 1 = velocity > 0 ? 1 : -1;
+    const ahead = lookaheadSpan(
+      columnRun,
+      direction,
+      this.columnMotion.travel(this.fetchTimeP90Ms),
+      Math.ceil(columnExtent * COLUMN_MARGIN_SHARE),
+      1,
+      this.schema().keys.length,
+    );
+    if (direction > 0) ahead.end = Math.min(ahead.end, ahead.start + columnCap);
+    else ahead.start = Math.max(ahead.start, ahead.end - columnCap);
+    if (ahead.start >= ahead.end) return;
+    plan.fetch.push({ ...view, columns: columnRange(ahead.start, ahead.end) });
+    plan.keep.push({
+      ...path,
+      columns: columnRange(
+        Math.min(columnRun.start, ahead.start),
+        Math.max(columnRun.end, ahead.end),
+      ),
+    });
+  }
+
+  /**
+   * The view's columns `durationMs` from now: the scrolling run moved by its
+   * sideways travel, frozen columns in place. The same array while the view
+   * does not move sideways.
+   */
+  private columnsAfter(
+    columns: readonly number[],
+    run: RowBand,
+    durationMs: number,
+  ): readonly number[] {
+    const velocity = this.columnMotion.velocity;
+    if (velocity === 0 || this.options.datasource?.capabilities.columns !== "windowed") {
+      return columns;
+    }
+    const extent = run.end - run.start;
+    const shift = Math.round(Math.sign(velocity) * this.columnMotion.travel(durationMs));
+    const width = this.schema().keys.length;
+    const start = Math.min(Math.max(0, run.start + shift), Math.max(0, width - extent));
+    if (start === run.start) return columns;
+    const shifted = new Set(columns.slice(0, columns.length - extent));
+    for (let column = start; column < start + extent; column++) shifted.add(column);
+    return Object.freeze([...shifted].sort((a, b) => a - b));
+  }
+
+  /**
+   * Cells speculation may hold: the prefetch byte bound, and on a paged sheet
+   * no more than the clean-chunk cache budget leaves beside the view.
+   */
+  private speculativeCellBudget(): number {
+    const byteBound = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / ESTIMATED_CELL_BYTES);
+    const loadable = this.options.loadable;
+    if (!loadable?.isPaged(this.options.activeSheet())) return byteBound;
+    const cacheBytes = storeEngine(loadable)?.pagedCacheBytes();
+    if (cacheBytes === undefined) return byteBound;
+    const view = this.lastViewport;
+    const viewCells = view ? (view.end - view.start) * view.columns.length : 0;
+    const budgetCells = Math.floor(cacheBytes / ESTIMATED_CELL_BYTES) - viewCells;
+    return Math.max(0, Math.min(byteBound, budgetCells));
   }
 
   private remainingSpeculativeRows(columnCount: number): number {
@@ -1253,7 +1497,11 @@ export class DatasourceController {
     for (const request of this.requests) {
       if (request.speculativeOrigin) active.add(request.start, request.end);
     }
-    return Math.max(0, this.speculativeRowHorizon(columnCount) - active.length);
+    const horizonRows = Math.min(
+      DATASOURCE_PREFETCH_MAX_ROWS,
+      Math.floor(this.speculativeCellBudget() / Math.max(1, columnCount)),
+    );
+    return Math.max(0, horizonRows - active.length);
   }
 
   /**
@@ -1342,7 +1590,7 @@ export class DatasourceController {
 
   private cancelObsoleteSpeculation(
     viewport: RowBand & { columns: readonly number[] },
-    intervals: readonly RowBand[],
+    keep: readonly ColumnRectangle[],
     formulaReads: readonly PendingDemand[],
     reason: "obsolete" | "reversal" | "jump",
     cancelGeneration: boolean,
@@ -1370,12 +1618,14 @@ export class DatasourceController {
         rowsIntersect(request, viewport) && columnsSubset(request.columns, viewport.columns);
       if (request.speculativeOrigin) {
         if (intersectsViewport) continue;
-        const fullyWanted =
-          columnsSubset(request.columns, viewport.columns) &&
-          intervals.some(
-            (interval) => request.start >= interval.start && request.end <= interval.end,
-          );
-        if (!cancelGeneration && fullyWanted) {
+        const stillWanted = keep.some(
+          (rectangle) =>
+            request.start >= rectangle.start &&
+            request.end <= rectangle.end &&
+            sharedColumns(request.columns, rectangle.columns) >=
+              KEEP_COLUMN_SHARE * request.columns.length,
+        );
+        if (!cancelGeneration && stillWanted) {
           request.priority = "speculative";
           continue;
         }
