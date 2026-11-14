@@ -44,7 +44,7 @@ pub(crate) const SHEET_ROWS: u32 = 1_048_576;
 pub(crate) const SHEET_COLS: u32 = 16_384;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Op {
+pub(crate) enum Op {
     Add,
     Sub,
     Mul,
@@ -54,7 +54,7 @@ pub enum Op {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Func {
+pub(crate) enum Func {
     Sum,
     Avg,
     Min,
@@ -585,7 +585,7 @@ define_function_registry! {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CmpOp {
+pub(crate) enum CmpOp {
     Eq,
     Ne,
     Lt,
@@ -630,7 +630,7 @@ impl RefFlags {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SheetRef {
+pub(crate) struct SheetRef {
     pub handle: u32,
 }
 
@@ -644,13 +644,13 @@ pub(crate) struct SheetSpanEndpoint {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnresolvedSheetRef {
+pub(crate) struct UnresolvedSheetRef {
     pub name: String,
     pub quoted: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct RangeFlags {
+pub(crate) struct RangeFlags {
     pub start: RefFlags,
     pub end: RefFlags,
 }
@@ -661,7 +661,7 @@ pub(crate) const UNRESOLVED_SHEET: u32 = u32::MAX;
 /// `Sheet1:Sheet3!A1:B2`: one range on every sheet from `first` to `last` in
 /// tab order.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SheetSpanRef {
+pub(crate) struct SheetSpanRef {
     pub first: SheetSpanEndpoint,
     pub last: SheetSpanEndpoint,
     /// The handles from `first` to `last` in tab order when the span was last
@@ -679,7 +679,7 @@ pub struct SheetSpanRef {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NamedRangeRef {
+pub(crate) struct NamedRangeRef {
     pub name: String,
     pub scope: Option<u32>,
     pub sheet: u32,
@@ -694,7 +694,7 @@ pub struct NamedRangeRef {
 /// it. Formulas share one expansion when it does not depend on where they
 /// are; see `CellStore::name_target`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct NamedFormulaRef {
+pub(crate) struct NamedFormulaRef {
     pub name: String,
     pub expression: Ast,
     /// Nodes of `expression`, counting each name in it at its own count:
@@ -704,7 +704,7 @@ pub struct NamedFormulaRef {
 
 /// What a defined name stands for in one formula.
 #[derive(Clone)]
-pub enum NameTarget {
+pub(crate) enum NameTarget {
     Range(NamedRangeRef),
     Formula(std::rc::Rc<NamedFormulaRef>),
     /// A reference with no sheet inside another name's expansion. It is
@@ -714,7 +714,7 @@ pub enum NameTarget {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TableSection {
+pub(crate) enum TableSection {
     Body,
     Headers,
     Totals,
@@ -722,7 +722,7 @@ pub enum TableSection {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnresolvedStructuredRef {
+pub(crate) struct UnresolvedStructuredRef {
     pub table_name: Option<String>,
     pub column_name: String,
     pub section: TableSection,
@@ -803,7 +803,7 @@ pub(crate) struct ArrayLiteral {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Ast {
+pub(crate) enum Ast {
     Num(f64),
     Str(Rc<str>),
     Bool(bool),
@@ -2532,7 +2532,7 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
 }
 
 /// Parse a formula source (with or without a leading `=`) into an AST.
-pub fn parse(src: &str) -> Result<Ast, String> {
+pub(crate) fn parse(src: &str) -> Result<Ast, String> {
     parse_with_features(src).map(|(ast, _)| ast)
 }
 
@@ -2832,7 +2832,7 @@ fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Opt
 
 /// Resolve workbook/sheet-scoped defined names after sheet references have
 /// stable handles. A LET or LAMBDA name shadows a defined name in its scope.
-pub fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
+pub(crate) fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
 where
     F: Fn(&str, u32) -> Option<NameTarget>,
 {
@@ -3042,7 +3042,7 @@ where
 /// Conditional-format expressions store one parsed AST at the rule range's
 /// top-left. Window evaluation clones that bounded AST and applies the target
 /// cell delta here; absolute row/column markers remain fixed.
-pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
+pub(crate) fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
     if !translate_relative_refs_inner(ast, row_delta, col_delta, false) {
         *ast = Ast::InvalidRef;
     }
@@ -3053,7 +3053,7 @@ pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
 /// formula uses the name. As in Excel, a reference that passes the last row
 /// or column wraps around to the first, so a name can refer to cells above
 /// or left of the cell that uses it.
-pub fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
+pub(crate) fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
     translate_relative_refs_inner(ast, i64::from(row), i64::from(col), true);
 }
 
@@ -3339,7 +3339,7 @@ impl AxisEdit {
 
 /// Rewrite row references affected by an edit on `edited_sheet`. Returns
 /// whether any reference changed.
-pub fn shift_rows(
+pub(crate) fn shift_rows(
     ast: &mut Ast,
     at: u32,
     delta: i64,
@@ -3359,7 +3359,7 @@ pub fn shift_rows(
 
 /// Rewrite column references affected by an edit on `edited_sheet`. Returns
 /// whether any reference changed.
-pub fn shift_cols(
+pub(crate) fn shift_cols(
     ast: &mut Ast,
     at: u32,
     delta: i64,

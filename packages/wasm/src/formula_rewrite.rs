@@ -19,7 +19,7 @@ use crate::types::FormulaError;
 /// its source cell to its target cell. Absolute parts stay; a reference
 /// moved off the sheet becomes `#REF!`.
 #[wasm_bindgen(js_name = translateFormula)]
-pub fn translate_formula(source: &str, row_delta: i32, col_delta: i32) -> String {
+pub(crate) fn translate_formula(source: &str, row_delta: i32, col_delta: i32) -> String {
     rewrite_references(source, |reference, _| {
         translate_relative_refs(reference, i64::from(row_delta), i64::from(col_delta));
     })
@@ -41,7 +41,7 @@ pub(crate) fn sort_formula(source: &str, row_delta: i32) -> String {
 /// at `at` on the formula's own sheet. A range loses its deleted rows or
 /// columns and becomes `#REF!` only when none are left.
 #[wasm_bindgen(js_name = shiftFormulaAxis)]
-pub fn shift_formula_axis(source: &str, columns: bool, at: u32, delta: i32) -> String {
+pub(crate) fn shift_formula_axis(source: &str, columns: bool, at: u32, delta: i32) -> String {
     let change = AxisChange::Shift {
         at,
         delta: i64::from(delta),
@@ -52,7 +52,13 @@ pub fn shift_formula_axis(source: &str, columns: bool, at: u32, delta: i32) -> S
 /// Follow `count` rows or columns moved from `from` to `to` on the formula's
 /// own sheet; `to` is the first index of the moved block after the move.
 #[wasm_bindgen(js_name = moveFormulaAxis)]
-pub fn move_formula_axis(source: &str, columns: bool, from: u32, count: u32, to: u32) -> String {
+pub(crate) fn move_formula_axis(
+    source: &str,
+    columns: bool,
+    from: u32,
+    count: u32,
+    to: u32,
+) -> String {
     rewrite_own_sheet(source, columns, AxisChange::Move { from, count, to })
 }
 
@@ -73,7 +79,12 @@ fn rewrite_own_sheet(source: &str, columns: bool, change: AxisChange) -> String 
 /// `column` of `table` becomes `to`, where an empty `table` means
 /// references without a table name. Names match without case.
 #[wasm_bindgen(js_name = renameStructuredReference)]
-pub fn rename_structured_reference(source: &str, table: &str, column: &str, to: &str) -> String {
+pub(crate) fn rename_structured_reference(
+    source: &str,
+    table: &str,
+    column: &str,
+    to: &str,
+) -> String {
     let Some(lexemes) = lex(source) else {
         return source.to_owned();
     };

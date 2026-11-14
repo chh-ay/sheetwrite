@@ -178,6 +178,7 @@ impl CellStore {
         QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
     }
 
+    /// Zeroes the counters that `queryResourceStats` reports.
     #[wasm_bindgen(js_name = resetQueryResourceStats)]
     pub fn reset_query_resource_stats(&self) {
         QUERY_STATS.with(|stats| stats.set([0, 0]));
@@ -569,6 +570,11 @@ impl CellStore {
 
 #[wasm_bindgen]
 impl CellStore {
+    /// The rows of `sheet` sorted by the columns `cols`, the first column
+    /// deciding first. Key `i` sorts ascending unless `ascending[i]` is 0; a
+    /// missing entry sorts ascending. When `candidates` is not empty, only
+    /// those rows take part. Equal rows keep their order. Empty when the
+    /// sheet or a column does not exist.
     #[wasm_bindgen(js_name = sortRowsMulti)]
     pub fn sort_rows_multi(
         &self,
@@ -652,6 +658,19 @@ impl CellStore {
             .collect()
     }
 
+    /// The rows of `sheet` that pass every column filter. Filter `i` reads
+    /// column `cols[i]`, and `kinds[i]` says what it keeps:
+    ///
+    /// - 0, a value list: its next `num_counts[i]` numbers in `value_nums` and
+    ///   next `text_counts[i]` texts in `value_texts` (booleans as `\0TRUE` and
+    ///   `\0FALSE`); bit 1 of `flags[i]` also keeps empty cells.
+    /// - 1, text that contains its one text in `value_texts`; `flags[i]` 1
+    ///   matches case.
+    /// - 2, numbers compared with `nums[i]`; `flags[i]` is 0 `>`, 1 `>=`, 2 `<`,
+    ///   3 `<=`, 4 `=`, anything else `<>`.
+    /// - 3, empty cells; 4, cells that are not empty.
+    ///
+    /// Empty when the sheet or a column does not exist.
     #[wasm_bindgen(js_name = filterRowsMulti)]
     #[expect(
         clippy::too_many_arguments,
@@ -950,6 +969,11 @@ impl CellStore {
         out
     }
 
+    /// `dataEdge` in a view order, where `order[i]` is the data row shown at
+    /// view position `i` and `row` is a view position. A vertical move scans
+    /// view positions and returns one; a horizontal move returns a column, as
+    /// `dataEdge` does on the data row at `row`. 0 when the sheet, the
+    /// position or the column does not exist.
     #[wasm_bindgen(js_name = dataEdgeOrdered)]
     pub fn data_edge_ordered(
         &self,
@@ -1054,7 +1078,7 @@ fn resolved_text<'a>(
 
 /// Distinct-value scan result for one column: parallel kind/number/text
 /// arrays whose buffers are surrendered once through the `take*` accessors.
-#[derive(Default)]
+#[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
     kinds: Vec<u8>,

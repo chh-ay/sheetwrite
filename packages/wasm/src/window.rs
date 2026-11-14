@@ -541,6 +541,7 @@ const WINDOW_PACKED_VERSION: u32 = 1;
 const WINDOW_PACKED_HEADER_BYTES: usize = 10 * std::mem::size_of::<u32>();
 
 /// A bulk window of resolved cells, row-major over `n_rows x n_cols`.
+#[derive(Debug)]
 #[wasm_bindgen]
 pub struct WindowView {
     string_pool_epoch: u32,
@@ -646,18 +647,22 @@ fn align_to_8(value: usize) -> Option<usize> {
 
 #[wasm_bindgen]
 impl WindowView {
+    /// The string pool epoch the window was read in. Its string ids are
+    /// valid only within that epoch (see `CellStore::string_pool_epoch`).
     #[wasm_bindgen(js_name = stringPoolEpoch)]
     #[must_use]
     pub fn string_pool_epoch(&self) -> u32 {
         self.string_pool_epoch
     }
 
+    /// Rows in the window.
     #[wasm_bindgen(getter, js_name = nRows)]
     #[must_use]
     pub fn n_rows(&self) -> u32 {
         self.n_rows
     }
 
+    /// Columns in the window.
     #[wasm_bindgen(getter, js_name = nCols)]
     #[must_use]
     pub fn n_cols(&self) -> u32 {
