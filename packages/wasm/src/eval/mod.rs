@@ -61,7 +61,7 @@ use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, Dense
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
-use crate::spill::{spill_ownership_within_budget, SpillRange};
+use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -948,6 +948,8 @@ impl CellStore {
         // evaluation of this pass. The graph does not list them, so a spill
         // change inside one makes that anchor stale. Dropped with the pass.
         let mut runtime_readers: FxHashMap<AbsCellKey, RuntimeReads> = FxHashMap::default();
+        // The spill each anchor held before it runs again, reused by every anchor.
+        let mut vacated_spill = VacatedSpill::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -995,8 +997,9 @@ impl CellStore {
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
                 let data = &mut self.sheets[output_sheet];
-                let vacated_range = data.spill.installed(local);
-                let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
+                let vacated_range = data
+                    .spill
+                    .vacate(local, &mut data.cells, &mut vacated_spill);
 
                 memo.unsettle(id);
                 let mut pass = EvalPass {
@@ -1092,7 +1095,7 @@ impl CellStore {
                     }
                 }
 
-                let mut changed = match evaluated {
+                let changed = match evaluated {
                     // A reference that resolved to one cell is a plain value,
                     // as in Excel: it owns no spill cell and spends none of
                     // the spill-owner budget.
@@ -1104,7 +1107,7 @@ impl CellStore {
                         pass.results.pull(id, matrix.into_first());
                         Vec::new()
                     }
-                    result => self.install_spill_result(key, result, pass.results),
+                    result => self.install_spill_result(key, result, &vacated_spill, pass.results),
                 };
                 if self.iteration.is_some() {
                     if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
@@ -1140,25 +1143,10 @@ impl CellStore {
                     }
                 }
 
-                // A spill that comes back over the same cells reports only the
-                // cells whose value changed. Otherwise every vacated cell
-                // changed too, before the new spill was installed.
-                let reinstalled = installed_range == vacated_range
-                    && vacated.len() == changed.len()
-                    && vacated
-                        .iter()
-                        .zip(&changed)
-                        .all(|((vacated_cell, _), cell)| vacated_cell == cell);
-                if reinstalled {
-                    let cells = &self.sheets[output_sheet].cells;
-                    let mut previous = vacated.iter().map(|&(_, value)| value);
-                    changed.retain(|&(row, col)| {
-                        let current =
-                            cells.calculated_cell_at(cells.idx(row as usize, col as usize));
-                        previous.next().flatten() != current
-                    });
-                } else if !vacated.is_empty() {
-                    let cleared: Vec<(u32, u32)> = vacated.iter().map(|&(cell, _)| cell).collect();
+                // The install reported the cells whose value changed; the
+                // vacated cells it did not write back were cleared.
+                let cleared = vacated_spill.cleared_outside(installed_range);
+                if !cleared.is_empty() {
                     spill_changes.push(SpillChange {
                         sheet: output_sheet,
                         sequence,
@@ -1307,6 +1295,7 @@ impl CellStore {
         &mut self,
         key: AbsCellKey,
         result: Result<EvalMatrix, FormulaError>,
+        vacated: &VacatedSpill,
         results: &mut FormulaResults,
     ) -> Vec<(u32, u32)> {
         let sheet = key.sheet as usize;
@@ -1357,9 +1346,13 @@ impl CellStore {
         let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
         results.pull(id, first);
         let strings = &mut self.strings;
-        data.spill.install(range, &mut data.cells, |offset| {
-            calculated_slot(strings, &matrix.values[offset])
-        })
+        let value_at = |offset: usize| calculated_slot(strings, &matrix.values[offset]);
+        if vacated.owned_cells() == 0 {
+            data.spill.install(range, &mut data.cells, value_at)
+        } else {
+            data.spill
+                .reinstall(range, &mut data.cells, vacated, value_at)
+        }
     }
 
     /// Whether no selected formula can read another one during the pass: no
