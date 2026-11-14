@@ -1756,19 +1756,19 @@ mod local_paged_tests {
             0..=2 => {
                 let payload = next(seed, 1000) as u64;
                 let style = next(seed, 3) as u32;
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     assert!(cells.write_cell(row, col, KIND_NUMBER, payload, style, revision));
                 }
             }
             3 => {
                 let style = next(seed, 3) as u32;
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     assert!(cells.write_style(row, col, style, revision));
                 }
             }
             4 => {
                 let value = next(seed, 1000) as u64;
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     assert!(cells.write_cell(row, col, KIND_FORMULA, 0, 0, None));
                     let index = cells.idx(row, col);
                     assert!(cells.set_derived(index, KIND_NUMBER, value));
@@ -1776,32 +1776,32 @@ mod local_paged_tests {
             }
             5 => {
                 let count = 1 + next(seed, 300);
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     cells.invalidate_derived();
                     cells.insert_rows(row, count).unwrap();
                 }
             }
             6 if row_count > 1 => {
                 let count = 1 + next(seed, row_count - 1);
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     cells.invalidate_derived();
                     cells.delete_rows(row, count).unwrap();
                 }
             }
             7 => {
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     cells.invalidate_derived();
                     cells.insert_cols(col, 1).unwrap();
                 }
             }
             8 if n_cols > 1 => {
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     cells.invalidate_derived();
                     cells.delete_cols(col, 1).unwrap();
                 }
             }
             _ => {
-                for cells in [&mut dense, &mut local] {
+                for cells in [&mut *dense, &mut *local] {
                     assert!(cells.write_cell(row, col, KIND_EMPTY, 0, 0, revision));
                 }
             }
