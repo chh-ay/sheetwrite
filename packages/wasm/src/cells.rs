@@ -320,7 +320,10 @@ impl CellStorage {
         } else {
             let index = self.idx(row, col);
             let kind = self.kind[index];
-            Some((kind & !CALCULATED, dense_source(kind, self.payload[index]).1))
+            Some((
+                kind & !CALCULATED,
+                dense_source(kind, self.payload[index]).1,
+            ))
         }
     }
 
