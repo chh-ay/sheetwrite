@@ -333,16 +333,23 @@ impl NameTable {
         self.entries.get(id.index())
     }
 
+    /// Whether `id` holds a formula for a formula on `sheet`, so a call of it
+    /// calls that formula's value.
+    fn holds_formula(&self, id: NameId, sheet: u32) -> bool {
+        self.entry(id).is_some_and(|entry| {
+            matches!(
+                Self::definition_for(entry, sheet),
+                Some(DefinedName::Formula(_))
+            )
+        })
+    }
+
     /// The id of the name written `name` when it holds a formula for a
     /// formula on `sheet`.
     #[cfg(feature = "analysis")]
     pub(crate) fn formula_id(&self, name: &str, sheet: u32) -> Option<NameId> {
         let id = self.id(&workbook_name_key(name))?;
-        matches!(
-            Self::definition_for(self.entry(id)?, sheet),
-            Some(DefinedName::Formula(_))
-        )
-        .then_some(id)
+        self.holds_formula(id, sheet).then_some(id)
     }
 
     /// The definition of `id` in exactly `scope`.
@@ -594,12 +601,9 @@ impl CellStore {
             let key = workbook_name_key(name);
             if call {
                 let id = table.id(&key)?;
-                let entry = table.entry(id)?;
-                return matches!(
-                    NameTable::definition_for(entry, formula_sheet),
-                    Some(DefinedName::Formula(_))
-                )
-                .then_some(Ast::DefinedName(id));
+                return table
+                    .holds_formula(id, formula_sheet)
+                    .then_some(Ast::DefinedName(id));
             }
             table.intern(key, name).map(Ast::DefinedName)
         })
@@ -663,9 +667,9 @@ impl CellStore {
     /// and flags again from their trees, which hold only the names' ids; the
     /// dependency index patches their reads and they recalculate. A formula
     /// whose tree a change does alter is parsed again from its text: one
-    /// that calls a changed name, which binds to the name's formula only
-    /// while it holds one, one with a name left unbound, and one with a LET,
-    /// whose tree is resolved in place.
+    /// that calls a changed name that no longer holds a formula, or that
+    /// holds a changed name unbound, and one with a LET, whose tree is
+    /// resolved in place.
     pub(super) fn rebind_name_users(&mut self, mut changed: Vec<String>) {
         if changed.is_empty() {
             return;
@@ -688,7 +692,8 @@ impl CellStore {
                 else {
                     continue;
                 };
-                match name_use(ast, &ids, &changed) {
+                let callable = |id: NameId| self.names.holds_formula(id, sheet as u32);
+                match name_use(ast, &ids, &changed, &callable) {
                     NameUse::None => {}
                     NameUse::Read => users.push((formula, false)),
                     NameUse::Bound => users.push((formula, true)),
@@ -1022,7 +1027,12 @@ enum NameUse {
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is walked through its children"
 )]
-fn name_use(ast: &Ast, ids: &[NameId], keys: &[String]) -> NameUse {
+fn name_use(
+    ast: &Ast,
+    ids: &[NameId],
+    keys: &[String],
+    callable: &dyn Fn(NameId) -> bool,
+) -> NameUse {
     let mut reads = false;
     let mut binds = false;
     let mut has_let = false;
@@ -1031,7 +1041,8 @@ fn name_use(ast: &Ast, ids: &[NameId], keys: &[String]) -> NameUse {
         Ast::Name(name) => binds |= keys.contains(&workbook_name_key(name)),
         Ast::UnknownFunc(call) => {
             binds |= keys.contains(&workbook_name_key(&call.name))
-                || matches!(call.args.first(), Some(Ast::DefinedName(id)) if ids.contains(id));
+                || matches!(call.args.first(), Some(Ast::DefinedName(id))
+                    if ids.contains(id) && !callable(*id));
         }
         Ast::Func(crate::calc::Func::Let, _) => has_let = true,
         _ => {}
