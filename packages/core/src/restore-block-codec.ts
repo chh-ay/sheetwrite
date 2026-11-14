@@ -58,9 +58,7 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
     !/^[A-Za-z0-9+/]*={0,2}$/.test(operation.data)
   )
     invalidRestoreBlock();
-  const binary = atob(operation.data);
-  if (btoa(binary) !== operation.data) invalidRestoreBlock();
-  const compressed = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const compressed = decodeCanonicalBase64(operation.data);
   // fflate's fixed output buffer does not report truncation. Independently walk
   // the stream first, checking its exact expansion without allocating output.
   inspectDeflate(compressed, operation.decodedBytes);
@@ -72,6 +70,33 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
   if (!block || typeof block !== "object") invalidRestoreBlock();
   assertRestoreBlockFits(operation.range, block);
   return block;
+}
+
+/** `Uint8Array.fromBase64` (ES2026); the ES2024 library this package compiles against lacks it. */
+type NativeBase64Decoder = (
+  data: string,
+  options: { readonly lastChunkHandling: "strict" },
+) => Uint8Array;
+
+/**
+ * Bytes of `data`, which the caller has checked for the base64 alphabet,
+ * padding position and length. Only the canonical spelling of those bytes is
+ * accepted, so one compressed stream has exactly one wire form.
+ */
+function decodeCanonicalBase64(data: string): Uint8Array {
+  // Native since Chromium 140, Firefox 133 and Safari 18.2; "strict" rejects
+  // nonzero padding bits, which is what makes an encoding non-canonical.
+  const fromBase64: NativeBase64Decoder | undefined = Reflect.get(Uint8Array, "fromBase64");
+  if (typeof fromBase64 === "function") {
+    try {
+      return fromBase64.call(Uint8Array, data, { lastChunkHandling: "strict" });
+    } catch (error) {
+      invalidRestoreBlock(error);
+    }
+  }
+  const binary = atob(data);
+  if (btoa(binary) !== data) invalidRestoreBlock();
+  return Uint8Array.from(binary, (char) => char.charCodeAt(0));
 }
 
 type Huffman = { codes: Map<number, number>[]; max: number };
