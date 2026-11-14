@@ -10,11 +10,12 @@ use super::super::matrix::{
 };
 use super::super::value::number_from_value;
 use super::super::EvalPass;
+use super::super::Shapes;
 
 pub(crate) const NAMES: &[&str] = &["MDETERM", "MINVERSE", "MMULT", "MUNIT"];
 
 /// MDETERM returns one number. The other functions return arrays.
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
+pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     name != "MDETERM"
 }
 
@@ -202,7 +203,8 @@ fn literal_dimension(ast: &Ast) -> Option<Result<usize, FormulaError>> {
         Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
-        | Ast::BoundMatrix { .. }
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)
@@ -236,7 +238,8 @@ const fn number_literal(ast: &Ast) -> Option<f64> {
         Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
-        | Ast::BoundMatrix { .. }
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)

@@ -257,7 +257,7 @@ impl CellStore {
         };
 
         let resolved = self.resolve_spill_refs(ast, sheet, &mut pass, 0);
-        let (status, value, shape) = if ast_produces_array(&resolved) {
+        let (status, value, shape) = if ast_produces_array(&resolved, pass.shapes()) {
             match self.eval_matrix_arg(&resolved, sheet, &mut pass, 0) {
                 // A one-cell array, such as a one-cell OFFSET, shows as its value.
                 Ok(matrix) if matrix.rows == 1 && matrix.cols == 1 => {
