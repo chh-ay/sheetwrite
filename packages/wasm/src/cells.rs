@@ -1087,11 +1087,16 @@ impl CellStorage {
                 return false;
             }
             for col_offset in 0..cols {
-                let cells = (0..rows).map(|row_offset| {
+                let column_cell = |row_offset| {
                     let (kind, payload, style) = cell(row_offset, col_offset);
                     (start.0 + row_offset, kind, payload, style)
-                });
-                paged.write_column(start.1 + col_offset, cells, DirtyRowWrite::Update);
+                };
+                paged.write_column(
+                    start.1 + col_offset,
+                    rows,
+                    &column_cell,
+                    DirtyRowWrite::Update,
+                );
             }
             return true;
         }
@@ -1118,16 +1123,19 @@ impl CellStorage {
 
     /// Writes validated rows of one column, leaving unlisted cells alone.
     /// Like `write_literal_block`, replaces sources and discards calculated slots.
-    /// Paged rows are unrevisioned writes; `dirty` decides rows with an edit.
+    /// `cell(index)` gives `(row, kind, payload, style)` for `index` in
+    /// `0..len`. Paged rows are unrevisioned writes; `dirty` decides rows with
+    /// an edit.
     pub(crate) fn write_column_cells(
         &mut self,
         col: usize,
-        cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+        len: usize,
+        cell: impl Fn(usize) -> (usize, u8, u64, u32),
         dirty: DirtyRowWrite,
     ) {
         debug_assert!(col < self.n_cols, "column writes need an in-bounds column");
         if let Some(paged) = &mut self.paged {
-            paged.write_column(col, cells, dirty);
+            paged.write_column(col, len, &cell, dirty);
             return;
         }
         let column = col * self.row_count..(col + 1) * self.row_count;
@@ -1135,7 +1143,8 @@ impl CellStorage {
         let payloads = &mut self.payload[column.clone()];
         let styles = &mut self.style[column];
         let has_calculated = self.dense_calculated_cells != 0;
-        for (row, kind, payload, style) in cells {
+        for index in 0..len {
+            let (row, kind, payload, style) = cell(index);
             if has_calculated && kinds[row] & CALCULATED != 0 {
                 self.dense_calculated_cells -= 1;
             }

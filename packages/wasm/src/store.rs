@@ -3311,7 +3311,8 @@ impl CellStore {
             let column = &columns.entries[bounds[0] as usize..bounds[1] as usize];
             sheet_data.cells.write_column_cells(
                 block.start.1 + col,
-                column.iter().map(|&index| block.cell(index as usize)),
+                column.len(),
+                |index| block.cell(column[index] as usize),
                 DirtyRowWrite::Keep,
             );
         }

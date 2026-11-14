@@ -256,6 +256,9 @@ const fn stamp(access: u64) -> u64 {
     access << 1
 }
 
+/// The `(row, kind, payload, style)` of the `index`-th cell a column write lists.
+pub(super) type ColumnCell = dyn Fn(usize) -> (usize, u8, u64, u32);
+
 /// One (column, chunk) of the page directory: its clean page, pins and
 /// eviction links. A page is on the eviction list while it is resident and
 /// unpinned.
@@ -917,17 +920,24 @@ impl PagedStorage {
     /// page, so later rows of the run record no access: the page already has
     /// the newest one. A row with an unacknowledged edit follows `dirty`.
     /// Each written row loses its calculated result.
+    ///
+    /// `cell(index)` gives `(row, kind, payload, style)` for `index` in
+    /// `0..len`. Taking it by `&dyn` keeps one copy of this loop: generic
+    /// copies were inlined into the dense block writers that call it and made
+    /// their dense paths slower.
     #[inline(never)]
     pub(super) fn write_column(
         &mut self,
         col: usize,
-        cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+        len: usize,
+        cell: &ColumnCell,
         dirty: DirtyRowWrite,
     ) {
         // (page, clean page index) of the run being written.
         let mut current: Option<(usize, usize)> = None;
 
-        for (row, kind, payload, style) in cells {
+        for index in 0..len {
+            let (row, kind, payload, style) = cell(index);
             if let Some(slot) = self.dirty_slot(row, col) {
                 if dirty == DirtyRowWrite::Update {
                     let cell = &mut self.slots[slot as usize];
@@ -2409,7 +2419,7 @@ mod tests {
                 for &row in &rows {
                     write_one_cell(&mut cells, col, value(row), dirty);
                 }
-                columns.write_column(col, rows.iter().map(|&row| value(row)), dirty);
+                columns.write_column(col, rows.len(), &|index| value(rows[index]), dirty);
 
                 for (col, page) in
                     (0..2).flat_map(|col| (0..PAGES + 4).map(move |page| (col, page)))
