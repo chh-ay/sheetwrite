@@ -1830,12 +1830,8 @@ impl PagedStorage {
         }
     }
 
-    pub(super) fn write_transfer(&self, out: &mut Writer) {
-        out.usize(self.chunk_rows);
-        out.usize(self.byte_budget);
-        out.usize(self.max_dirty_cells);
-
-        self.pages.write_transfer(out);
+    /// Writes the page records.
+    fn write_record_transfer(&self, out: &mut Writer) {
         out.usize(self.records.len());
         for record in &self.records {
             for value in [
@@ -1852,10 +1848,12 @@ impl PagedStorage {
             out.u64(record.last_access.get());
         }
         out.ints(&self.free_records);
+    }
 
-        // A free page is reset before reuse, so a transfer drops its rows:
-        // releasing memory then also returns the pages that evictions, row
-        // deletes and shrinking local sheets left free.
+    /// Writes the clean pages. A free page is reset before reuse, so a
+    /// transfer drops its rows: releasing memory then also returns the pages
+    /// that evictions, row deletes and shrinking local sheets left free.
+    fn write_clean_transfer(&self, out: &mut Writer) {
         let mut free = vec![false; self.clean.len()];
         for &id in &self.free_clean {
             free[id as usize] = true;
@@ -1870,6 +1868,17 @@ impl PagedStorage {
             out.words(&clean.loaded);
         }
         out.ints(&self.free_clean);
+    }
+
+    pub(super) fn write_transfer(&self, out: &mut Writer) {
+        out.usize(self.chunk_rows);
+        out.usize(self.byte_budget);
+        out.usize(self.max_dirty_cells);
+
+        self.pages.write_transfer(out);
+        self.write_record_transfer(out);
+
+        self.write_clean_transfer(out);
 
         self.dirty.write_transfer(out);
         out.usize(self.dirty_blocks.len());

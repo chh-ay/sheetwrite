@@ -97,11 +97,13 @@ describe("a grid over a sheet past the dense cell limit", () => {
     const host = mountHost();
     const grid = createGrid(host, { workbook: workbook() });
     try {
-      setNumber(grid.store, ROWS - 1, 3, 7);
+      const store = grid.store;
+      if (!(store instanceof SheetwriteStore)) throw new Error("expected a local store");
+      setNumber(store, ROWS - 1, 3, 7);
       grid.insertRows(0, 2);
-      expect(grid.store.getWorkbook().sheets[0]?.rowCount).toBe(ROWS + 2);
-      expect(grid.store.isPaged(SHEET)).toBe(false);
-      expect(grid.store.getCell({ sheet: SHEET, row: ROWS + 1, col: 3 }).resolved).toBe(7);
+      expect(store.getWorkbook().sheets[0]?.rowCount).toBe(ROWS + 2);
+      expect(store.isPaged(SHEET)).toBe(false);
+      expect(store.getCell({ sheet: SHEET, row: ROWS + 1, col: 3 }).resolved).toBe(7);
     } finally {
       grid.destroy();
       host.remove();
