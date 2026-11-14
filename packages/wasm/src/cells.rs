@@ -1733,6 +1733,69 @@ mod local_paged_tests {
         );
     }
 
+    /// One random cell write, style, calculated value or row or column edit,
+    /// applied to both sheets.
+    fn random_edit(seed: &mut u32, dense: &mut CellStorage, local: &mut CellStorage) {
+        let (row_count, n_cols) = (dense.row_count(), dense.n_cols());
+        let row = next(seed, row_count);
+        let col = next(seed, n_cols);
+        let revision = (next(seed, 2) == 0).then_some(7);
+        match next(seed, 9) {
+            0..=2 => {
+                let payload = next(seed, 1000) as u64;
+                let style = next(seed, 3) as u32;
+                for cells in [&mut dense, &mut local] {
+                    assert!(cells.write_cell(row, col, KIND_NUMBER, payload, style, revision));
+                }
+            }
+            3 => {
+                let style = next(seed, 3) as u32;
+                for cells in [&mut dense, &mut local] {
+                    assert!(cells.write_style(row, col, style, revision));
+                }
+            }
+            4 => {
+                let value = next(seed, 1000) as u64;
+                for cells in [&mut dense, &mut local] {
+                    assert!(cells.write_cell(row, col, KIND_FORMULA, 0, 0, None));
+                    let index = cells.idx(row, col);
+                    assert!(cells.set_derived(index, KIND_NUMBER, value));
+                }
+            }
+            5 => {
+                let count = 1 + next(seed, 300);
+                for cells in [&mut dense, &mut local] {
+                    cells.invalidate_derived();
+                    cells.insert_rows(row, count).unwrap();
+                }
+            }
+            6 if row_count > 1 => {
+                let count = 1 + next(seed, row_count - 1);
+                for cells in [&mut dense, &mut local] {
+                    cells.invalidate_derived();
+                    cells.delete_rows(row, count).unwrap();
+                }
+            }
+            7 => {
+                for cells in [&mut dense, &mut local] {
+                    cells.invalidate_derived();
+                    cells.insert_cols(col, 1).unwrap();
+                }
+            }
+            8 if n_cols > 1 => {
+                for cells in [&mut dense, &mut local] {
+                    cells.invalidate_derived();
+                    cells.delete_cols(col, 1).unwrap();
+                }
+            }
+            _ => {
+                for cells in [&mut dense, &mut local] {
+                    assert!(cells.write_cell(row, col, KIND_EMPTY, 0, 0, revision));
+                }
+            }
+        }
+    }
+
     /// 400 random sheets: the same writes, styles, calculated values and row
     /// and column edits applied to a dense sheet and to a copy that converts
     /// to local pages part of the way through leave the same cells.
@@ -1755,71 +1818,7 @@ mod local_paged_tests {
                     assert!(local.is_local_paged() && !local.is_datasource_paged());
                     assert_same(&dense, &local, &format!("sheet {sheet} after conversion"));
                 }
-                let (row_count, n_cols) = (dense.row_count(), dense.n_cols());
-                let row = next(&mut seed, row_count);
-                let col = next(&mut seed, n_cols);
-                let revision = (next(&mut seed, 2) == 0).then_some(7);
-                match next(&mut seed, 9) {
-                    0..=2 => {
-                        let payload = next(&mut seed, 1000) as u64;
-                        let style = next(&mut seed, 3) as u32;
-                        for cells in [&mut dense, &mut local] {
-                            assert!(cells.write_cell(
-                                row,
-                                col,
-                                KIND_NUMBER,
-                                payload,
-                                style,
-                                revision
-                            ));
-                        }
-                    }
-                    3 => {
-                        let style = next(&mut seed, 3) as u32;
-                        for cells in [&mut dense, &mut local] {
-                            assert!(cells.write_style(row, col, style, revision));
-                        }
-                    }
-                    4 => {
-                        let value = next(&mut seed, 1000) as u64;
-                        for cells in [&mut dense, &mut local] {
-                            assert!(cells.write_cell(row, col, KIND_FORMULA, 0, 0, None));
-                            let index = cells.idx(row, col);
-                            assert!(cells.set_derived(index, KIND_NUMBER, value));
-                        }
-                    }
-                    5 => {
-                        let count = 1 + next(&mut seed, 300);
-                        for cells in [&mut dense, &mut local] {
-                            cells.invalidate_derived();
-                            cells.insert_rows(row, count).unwrap();
-                        }
-                    }
-                    6 if row_count > 1 => {
-                        let count = 1 + next(&mut seed, row_count - 1);
-                        for cells in [&mut dense, &mut local] {
-                            cells.invalidate_derived();
-                            cells.delete_rows(row, count).unwrap();
-                        }
-                    }
-                    7 => {
-                        for cells in [&mut dense, &mut local] {
-                            cells.invalidate_derived();
-                            cells.insert_cols(col, 1).unwrap();
-                        }
-                    }
-                    8 if n_cols > 1 => {
-                        for cells in [&mut dense, &mut local] {
-                            cells.invalidate_derived();
-                            cells.delete_cols(col, 1).unwrap();
-                        }
-                    }
-                    _ => {
-                        for cells in [&mut dense, &mut local] {
-                            assert!(cells.write_cell(row, col, KIND_EMPTY, 0, 0, revision));
-                        }
-                    }
-                }
+                random_edit(&mut seed, &mut dense, &mut local);
             }
             if convert_at < STEPS {
                 assert_same(&dense, &local, &format!("sheet {sheet}"));
