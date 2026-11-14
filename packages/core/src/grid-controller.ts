@@ -101,9 +101,10 @@ export interface GridController {
  * shared object only from their commit lifecycle; mutating it during render can
  * expose callbacks from work that never commits.
  *
- * @param host     element the grid mounts into
- * @param options  grid options forwarded verbatim to {@link createGrid}
- * @param handlers mutable callback bag, read live on every event after host commit
+ * @param host - Element the grid mounts into.
+ * @param options - Grid options forwarded verbatim to {@link createGrid}.
+ * @param handlers - Event callbacks. Each event reads them again, so the host can change them in place after it commits.
+ * @param rowBridge - Turns each change into row-level changes for `handlers.onRowDelta`; omit it when you do not need them.
  */
 export function createGridController<Id extends RowBridgeId = RowBridgeId>(
   host: HTMLElement,

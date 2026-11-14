@@ -56,12 +56,18 @@ export type DelimitedTextOperation = "parse" | "import" | "encode" | "export";
 
 /** Stable resource-limit failure raised before the next oversized parse or encode allocation. */
 export class DelimitedTextResourceError extends SheetwriteError {
+  /** Always `"DelimitedTextResourceError"`. */
   override readonly name = "DelimitedTextResourceError";
+  /** Always `"delimited-text-resource-limit"`. */
   declare readonly code: "delimited-text-resource-limit";
 
+  /** Creates the error for one limit reached while reading or writing CSV or TSV. */
   constructor(
+    /** The limit that was reached. */
     readonly resource: keyof DelimitedTextResourceLimits,
+    /** The limit's value. */
     readonly limit: number,
+    /** The amount the text needed, in the limit's unit. */
     readonly actual: number,
     operation: DelimitedTextOperation,
   ) {
@@ -76,11 +82,16 @@ export class DelimitedTextResourceError extends SheetwriteError {
 
 /** Stable invalid-option failure for a delimited-text resource ceiling. */
 export class DelimitedTextOptionsError extends SheetwriteError {
+  /** Always `"DelimitedTextOptionsError"`. */
   override readonly name = "DelimitedTextOptionsError";
+  /** Always `"delimited-text-invalid-limit"`. */
   declare readonly code: "delimited-text-invalid-limit";
 
+  /** Creates the error for one limit option that is not a positive safe integer. */
   constructor(
+    /** The limit option that is wrong. */
     readonly resource: keyof DelimitedTextResourceLimits,
+    /** The value given for it. */
     readonly value: unknown,
   ) {
     super(
@@ -183,6 +194,12 @@ export interface DelimitedTextScanSink {
   readonly fieldLimit: number;
   /** Called once per materialized field, in column order within its record. */
   field(row: number, column: number, value: string): void;
+  /**
+   * Optional: offered a field whose value is one span of the input,
+   * `text.slice(start, end)`, before that string is built. Returns true when
+   * it consumed the field; false has the scanner build it and call `field`.
+   */
+  span?(row: number, column: number, text: string, start: number, end: number): boolean;
   /** Called once per completed record with its field count. */
   row(row: number, fieldCount: number): void;
 }
@@ -235,15 +252,19 @@ export function scanDelimitedText(
       failResource("maxCells", limits.maxCells, nextCells, "parse");
     }
     if (rowFields < fieldLimit) {
-      let value = "";
       if (fieldParts.length === 0) {
-        // Plain field: one slice of the input, no intermediate pieces.
-        if (end > segmentStart) value = text.slice(segmentStart, end);
+        // Plain field: one span of the input, no intermediate pieces.
+        if (sink.span?.(rowCount, rowFields, text, segmentStart, end) !== true) {
+          sink.field(rowCount, rowFields, end > segmentStart ? text.slice(segmentStart, end) : "");
+        }
       } else {
         appendSegment(end);
-        value = fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join("");
+        sink.field(
+          rowCount,
+          rowFields,
+          fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join(""),
+        );
       }
-      sink.field(rowCount, rowFields, value);
     }
     fieldParts.length = 0;
     fieldBytes = 0;
