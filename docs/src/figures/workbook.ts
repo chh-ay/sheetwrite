@@ -198,6 +198,8 @@ const REPORT_NOTES: Readonly<Record<string, readonly [status: string, comment: s
 };
 const HEADER_STYLE: CellStyle = {
   bold: true,
+  // An explicit text colour: on its light fill the header stays dark in both themes.
+  color: "#1f2937",
   backgroundColor: "#e6f2ec",
   border: { bottom: { color: "#1f7a4d", width: 2, style: "solid" } },
 };
@@ -280,7 +282,7 @@ function reportSheet(): SheetSnapshot {
         kind: "column",
         title: "Revenue by region",
         legend: "none",
-        anchor: { row: 8, col: 0, offsetX: 0, offsetY: 8, width: 520, height: 240 },
+        anchor: { row: 7, col: 0, offsetX: 0, offsetY: 4, width: 520, height: 220 },
         series: [
           {
             name: "Revenue",

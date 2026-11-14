@@ -336,6 +336,8 @@ const SHOTS: readonly Shot[] = [
         .getByRole("button", { name: /Filter/ })
         .first()
         .click();
+      // Filter Region to EMEA, so the shot shows hidden rows and an active filter button.
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.filterBy(1, "EMEA"));
       await settle(page);
     },
   },

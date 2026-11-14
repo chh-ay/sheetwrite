@@ -272,8 +272,9 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "filter",
         size: "panel",
-        alt: "The Orders sheet with filter buttons in its header row and the Region filter menu open, listing the regions with checkboxes.",
-        caption: "Filters, sorts and other data tools work on the cells.",
+        alt: "The Orders sheet with filter buttons in its header row and the Region column filtered to EMEA: only EMEA orders show, and the Region filter button is marked active.",
+        caption:
+          "Filtering the Region column to EMEA hides the other orders; the active filter is marked on its button.",
       },
     },
   ],
