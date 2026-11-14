@@ -1143,7 +1143,7 @@ export class SheetwriteStore implements Store {
     return undefined;
   }
 
-  /** Every sheet's dimensions now, and which hold dense storage, for {@link SheetGrowth}. */
+  /** Every sheet's dimensions now, and where its cells live, for {@link SheetGrowth}. */
   private sheetGrowth(): SheetGrowth {
     const sheets = new Map<SheetId, SheetDimensions>();
     for (const sheet of this.engine.getWorkbook().sheets) {
@@ -1151,7 +1151,11 @@ export class SheetwriteStore implements Store {
         name: sheet.name,
         rows: sheet.rowCount,
         columns: sheet.columns.length,
-        dense: !this.engine.isPaged(sheet.id),
+        storage: this.engine.isPaged(sheet.id)
+          ? "paged"
+          : this.engine.isLocalPaged(sheet.id)
+            ? "local"
+            : "dense",
       });
     }
     return new SheetGrowth(sheets, this.snapshotResourceLimits);

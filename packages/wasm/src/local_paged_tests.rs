@@ -126,3 +126,26 @@ fn edits_on_a_local_sheet_keep_no_dirty_overlay() {
         );
     }
 }
+
+#[test]
+fn a_local_sheet_stays_local_through_a_memory_transfer() {
+    use crate::cells::CellStorage;
+    use crate::transfer::{Reader, Writer};
+
+    let (store, dense, local) = twin_sheets(SHORT_ROWS);
+    let mut out = Writer::new(1);
+    store.sheets[local].cells.write_transfer(&mut out);
+    let mut input = Reader::new(&out.0, 1).unwrap();
+    let restored = CellStorage::read_transfer(&mut input).unwrap();
+    input.finish().unwrap();
+    assert!(restored.is_local_paged() && !restored.is_datasource_paged());
+    assert!(restored.is_fully_loaded());
+    let original = &store.sheets[dense].cells;
+    for index in 0..SHORT_ROWS * COLS {
+        assert_eq!(
+            (restored.source_kind_at(index), restored.source_payload_at(index)),
+            (original.source_kind_at(index), original.source_payload_at(index)),
+            "cell {index}"
+        );
+    }
+}

@@ -623,6 +623,15 @@ impl CellStore {
             .is_some_and(|data| data.cells.is_datasource_paged())
     }
 
+    /// Whether `sheet` keeps its cells in local pages: a dense sheet that
+    /// grew past the dense cell cap. `isPaged` is false for such a sheet.
+    #[wasm_bindgen(js_name = isLocalPaged)]
+    pub fn is_local_paged(&self, sheet: usize) -> bool {
+        self.sheets
+            .get(sheet)
+            .is_some_and(|data| data.cells.is_local_paged())
+    }
+
     /// `[chunks, loaded cells, dirty cells, clean chunk bytes, fully loaded, dirty bytes]`.
     #[wasm_bindgen(js_name = pagedStats)]
     pub fn paged_stats(&self, sheet: usize) -> Vec<f64> {

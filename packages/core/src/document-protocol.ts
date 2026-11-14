@@ -382,6 +382,12 @@ export interface SnapshotResourceLimits {
   maxLogicalCellsPerSheet: number;
   /** Aggregate cells allocated by dense storage; defaults to 5,000,000. */
   maxDenseCells: number;
+  /**
+   * Aggregate logical cells of local sheets: sheets of a dense-storage
+   * workbook past `maxDenseCells`, which the engine keeps in pages it never
+   * evicts; defaults to 20,000,000, the engine's ceiling.
+   */
+  maxLocalPagedCells: number;
 }
 
 /** Conservative defaults that retain the million-row paged-sheet contract. */
@@ -400,6 +406,8 @@ export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> 
   maxLogicalCellsPerSheet: 0xffff_ffff,
   // Bound eager dense allocation across the workbook.
   maxDenseCells: 5_000_000,
+  // Bound local pages, which a full sheet fills at about 13 bytes a cell.
+  maxLocalPagedCells: 20_000_000,
 });
 
 /** Validation and allocation policy for an untrusted workbook snapshot. */
@@ -497,6 +505,7 @@ const SNAPSHOT_RESOURCE_KEYS = [
   "maxSerializedBytes",
   "maxLogicalCellsPerSheet",
   "maxDenseCells",
+  "maxLocalPagedCells",
 ] as const satisfies readonly (keyof SnapshotResourceLimits)[];
 
 const SHEET_METADATA_ARRAY_KEYS = [
@@ -599,6 +608,29 @@ function resolveSnapshotValidationOptions(
   return { storage, limits };
 }
 
+/** Cells a dense-storage workbook holds so far, by where the engine keeps them. */
+interface DenseStorageCells {
+  dense: number;
+  local: number;
+}
+
+/**
+ * Places a sheet of `cells` cells of a dense-storage workbook as the engine
+ * does, in snapshot order: in dense storage while the dense sheets fit
+ * `maxDenseCells`, else in local pages while the local sheets fit
+ * `maxLocalPagedCells`. Returns whether it fits either.
+ */
+function placeDenseStorageSheet(
+  placed: DenseStorageCells,
+  cells: number,
+  limits: Readonly<SnapshotResourceLimits>,
+): boolean {
+  if (placed.dense + cells <= limits.maxDenseCells) placed.dense += cells;
+  else if (placed.local + cells <= limits.maxLocalPagedCells) placed.local += cells;
+  else return false;
+  return true;
+}
+
 function arrayDataValue(array: unknown[], index: number): unknown {
   const descriptor = Object.getOwnPropertyDescriptor(array, String(index));
   return descriptor?.enumerable && "value" in descriptor ? descriptor.value : undefined;
@@ -637,7 +669,7 @@ function preflightSnapshotResources(
     }
   }
 
-  let denseCells = 0;
+  const placed: DenseStorageCells = { dense: 0, local: 0 };
   let tableCount = 0;
   for (let sheetIndex = 0; sheetIndex < sheets.length; sheetIndex++) {
     const sheet = arrayDataValue(sheets, sheetIndex);
@@ -674,17 +706,16 @@ function preflightSnapshotResources(
       }
 
       if (options.storage === "dense") {
-        const remaining = limits.maxDenseCells - denseCells;
-        if (remaining < 0 || productExceeds(rowCount, columns.length, remaining)) {
+        // The logical-cell check above keeps the product exact.
+        const cells = rowCount * columns.length;
+        if (!placeDenseStorageSheet(placed, cells, limits)) {
           return resourceValidationError(
-            "maxDenseCells",
-            limits.maxDenseCells,
-            denseCells + rowCount * columns.length,
+            "maxLocalPagedCells",
+            limits.maxLocalPagedCells,
+            placed.local + cells,
             path,
           );
         }
-
-        denseCells += rowCount * columns.length;
       }
     }
 
@@ -790,7 +821,7 @@ export function assertWorkbookAllocationLimits(
     }
   }
 
-  let denseCells = 0;
+  const placed: DenseStorageCells = { dense: 0, local: 0 };
   let metadataEntries = workbook.namedRanges?.length ?? 0;
   if (metadataEntries > limits.maxMetadataEntries) {
     throw new SnapshotResourceError(
@@ -822,16 +853,14 @@ export function assertWorkbookAllocationLimits(
     }
 
     if (resolved.storage === "dense") {
-      const remaining = limits.maxDenseCells - denseCells;
-      if (remaining < 0 || productExceeds(sheet.rowCount, sheet.columns.length, remaining)) {
+      const cells = sheet.rowCount * sheet.columns.length;
+      if (!placeDenseStorageSheet(placed, cells, limits)) {
         throw new SnapshotResourceError(
-          "maxDenseCells",
-          limits.maxDenseCells,
-          denseCells + sheet.rowCount * sheet.columns.length,
+          "maxLocalPagedCells",
+          limits.maxLocalPagedCells,
+          placed.local + cells,
         );
       }
-
-      denseCells += sheet.rowCount * sheet.columns.length;
     }
 
     metadataEntries +=

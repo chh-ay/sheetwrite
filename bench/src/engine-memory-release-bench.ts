@@ -98,6 +98,38 @@ function columnar(rows: number): Core.ColumnarData {
 
 const address = (row: number, col: number): Core.CellAddress => ({ sheet: "s1", row, col });
 
+/** Columns of a sheet at the local cell budget: 20 by 1,000,000 rows. */
+const LOCAL_COLUMNS = 20;
+
+/** A sheet of `MEMORY_ROWS` rows past the dense cell limit, which loads in local pages. */
+function localWorkbook(): Core.Workbook {
+  return {
+    activeSheet: "s1",
+    sheets: [
+      {
+        id: "s1",
+        name: "Local",
+        rowCount: MEMORY_ROWS,
+        columns: Array.from({ length: LOCAL_COLUMNS }, (_, col) => ({
+          key: `n${col}`,
+          header: `N${col}`,
+          type: "number" as const,
+          width: 80,
+        })),
+      },
+    ],
+  };
+}
+
+/** Every cell of {@link localWorkbook} filled: the local cell budget's full cost. */
+function localColumnar(): Core.ColumnarData {
+  const columns: Record<string, Float64Array> = {};
+  for (let col = 0; col < LOCAL_COLUMNS; col++) {
+    columns[`n${col}`] = new Float64Array(MEMORY_ROWS).fill(col);
+  }
+  return { rowCount: MEMORY_ROWS, columns };
+}
+
 async function paths(): Promise<PathCapture> {
   const core: typeof Core = await import(
     pathToFileURL(resolve(root, "packages/core/src/index.ts")).href
@@ -327,15 +359,25 @@ async function memory() {
 
   const freshFloors = new Map<string, number>();
 
-  for (const scenario of ["empty-dense", "dense-clear", "paged-dirty", "large-clear-history"]) {
+  let localFullWasmBytes = 0;
+  for (const scenario of [
+    "empty-dense",
+    "dense-clear",
+    "paged-dirty",
+    "large-clear-history",
+    "local-clear",
+  ]) {
     await core.releaseEngineMemory();
-    const fresh = new core.SheetwriteStore(
-      workbook(MEMORY_ROWS),
-      undefined,
-      scenario === "paged-dirty"
-        ? { storage: "paged", chunkRows: 256, cacheBytes: 64 * 1024 }
-        : undefined,
-    );
+    const fresh =
+      scenario === "local-clear"
+        ? new core.SheetwriteStore(localWorkbook())
+        : new core.SheetwriteStore(
+            workbook(MEMORY_ROWS),
+            undefined,
+            scenario === "paged-dirty"
+              ? { storage: "paged", chunkRows: 256, cacheBytes: 64 * 1024 }
+              : undefined,
+          );
     let history: CompactRangeHistory | null = null;
 
     try {
@@ -365,6 +407,14 @@ async function memory() {
           sheet: "s1",
           start: { row: 0, col: 0 },
           end: { row: MEMORY_ROWS - 1, col: 2 },
+        });
+      } else if (scenario === "local-clear") {
+        fresh.applyTransaction({
+          patches: Array.from({ length: 10 }, (_, row) => ({
+            op: "setBlock" as const,
+            range: { sheet: "s1", start: { row, col: 0 }, end: { row, col: LOCAL_COLUMNS - 1 } },
+            block: { rowCount: 1, colCount: LOCAL_COLUMNS, values: Array.from({ length: LOCAL_COLUMNS }, (_, col) => col) },
+          })),
         });
       }
 
@@ -453,6 +503,36 @@ async function memory() {
       dense.dispose();
     }
 
+    // A sheet past the dense cell limit, filled to the local cell budget, then cleared.
+    const local = new core.SheetwriteStore(localWorkbook(), localColumnar());
+    try {
+      assert.equal(local.isPaged("s1"), false);
+      localFullWasmBytes = engine.getEngine().getMemory().buffer.byteLength;
+      assert.equal(
+        local.applyTransaction({
+          patches: [
+            {
+              op: "clearRange",
+              range: {
+                sheet: "s1",
+                start: { row: 10, col: 0 },
+                end: { row: MEMORY_ROWS - 1, col: LOCAL_COLUMNS - 1 },
+              },
+              contents: true,
+              style: true,
+            },
+          ],
+        }).status,
+        "applied",
+      );
+      await capture("local-clear", () => {
+        assert.equal(local.getCell(address(9, LOCAL_COLUMNS - 1)).resolved, LOCAL_COLUMNS - 1);
+        assert.equal(local.getCell(address(MEMORY_ROWS - 1, 1)).resolved, null);
+      });
+    } finally {
+      local.dispose();
+    }
+
     const paged = new core.SheetwriteStore(workbook(MEMORY_ROWS), undefined, {
       storage: "paged",
       chunkRows: 256,
@@ -539,6 +619,8 @@ async function memory() {
       engine: engineName,
       root: checkoutCommit(root),
       jsHeapMeasurement: "bun:jsc heapStats().heapSize - extraMemorySize after full GC",
+      /** Committed WASM memory with a sheet filled to the local cell budget. */
+      localFullWasmBytes,
       observations,
     };
   } finally {

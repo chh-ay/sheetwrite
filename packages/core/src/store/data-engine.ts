@@ -1383,6 +1383,11 @@ export class StoreDataEngine {
     return this.wasm.isPaged(this.sheets.handleOf(sheet));
   }
 
+  /** Whether the engine keeps a dense sheet past `maxDenseCells` in local pages. */
+  isLocalPaged(sheet: SheetId): boolean {
+    return this.wasm.isLocalPaged(this.sheets.handleOf(sheet));
+  }
+
   getPagedStats(sheet: SheetId): PagedStoreStats {
     const stats = this.wasm.pagedStats(this.sheets.handleOf(sheet));
     return {
