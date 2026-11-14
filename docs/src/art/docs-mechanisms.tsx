@@ -12,7 +12,7 @@ export function SpillDiagram() {
       pairs={[
         {
           from: { eyebrow: "The spill", title: "A1", code: ["=SEQUENCE(4)"] },
-          to: { title: "A1:A4 show 1, 2, 3, 4", lines: ["A1# is this range"], tone: "accent" },
+          to: { title: "A1:A4 hold 1 to 4", lines: ["A1# is this range"], tone: "accent" },
         },
         {
           from: {
