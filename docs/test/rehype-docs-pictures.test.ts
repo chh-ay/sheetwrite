@@ -62,7 +62,7 @@ test("a placement whose heading is gone fails the build", async () => {
 
 test("a screenshot placement adds the framed capture and links the figures stylesheet", async () => {
   const output = await compilePage("features/grid/search.md", "Lead.\n\n## Options and result");
-  expect(output).toMatch(/<p>\{"Lead\."\}<\/p><figure className="sw-frame">/);
+  expect(output).toMatch(/<p>\{"Lead\."\}<\/p><figure class="sw-frame">/);
   expect(output).toContain('src="/figures/shots/search-light-1x.avif"');
   expect(output).toContain('src="/figures/shots/search-dark-1x.avif"');
   expect(output).toMatch(/import shotStylesheet from ".*figures\.css\?url"/);
@@ -72,7 +72,7 @@ test("a screenshot placement adds the framed capture and links the figures style
 
 test("a start placement goes before the first element of the body", async () => {
   const output = await compilePage("features/grid/index.md", "Cards.");
-  expect(output).toMatch(/<figure className="sw-frame">.*<p>\{"Cards\."\}<\/p>/s);
+  expect(output).toMatch(/<figure class="sw-frame">.*<p>\{"Cards\."\}<\/p>/s);
   expect(output).toContain('src="/figures/shots/grid-overview-light-1x.avif"');
 });
 
