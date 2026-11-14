@@ -1190,6 +1190,53 @@ fn conditional_formula_rules_shift_relative_refs_stop_and_follow_dependency_edit
 }
 
 #[test]
+fn conditional_formula_rules_read_computed_references_once() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(2, 4);
+    for (row, value) in [0.0, 1.0, 2.0, 3.0].into_iter().enumerate() {
+        store.set_number(sheet, row, 0, value, 0);
+    }
+    // Each rule holds in every row only if OFFSET's and INDIRECT's results
+    // are read where they point, and each range end moves by its own `$`.
+    store.set_conditional_rules(
+        sheet,
+        &[6, 6, 6],
+        &[0, 1, 3, 1, 0, 1, 3, 1, 0, 1, 3, 1],
+        &[0.0, 0.0, 0.0],
+        vec![
+            "=OFFSET(A1,0,0)=ROW()-1".to_owned(),
+            "=INDIRECT(\"A\"&ROW())=ROW()-1".to_owned(),
+            "=SUM($A$1:A1)=(ROW()-1)*ROW()/2".to_owned(),
+        ],
+        &[0, 0, 0],
+    );
+
+    let window = decode_window(store.get_window(sheet, 0, 4, &[1]));
+    assert_eq!(window.cond_matches, vec![7, 7, 7, 7]);
+}
+
+#[test]
+fn conditional_formula_rules_give_ref_errors_past_the_last_row() {
+    let last_row = crate::calc::SHEET_ROWS - 1;
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, last_row as usize + 1);
+    store.set_conditional_rules(
+        sheet,
+        &[6],
+        &[last_row - 1, 0, last_row, 0],
+        &[0.0],
+        vec!["=ISERROR(A1048576)".to_owned()],
+        &[0],
+    );
+
+    // The second row moves A1048576 past the sheet: #REF!, as when the
+    // formula is written in that row.
+    let window =
+        decode_window(store.get_window(sheet, last_row as usize - 1, last_row as usize + 1, &[0]));
+    assert_eq!(window.cond_matches, vec![0, 1]);
+}
+
+#[test]
 fn paged_aggregate_counts_loaded_formula_before_first_recompute() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 2, 1, 0, DEFAULT_MAX_PAGED_DIRTY_CELLS);

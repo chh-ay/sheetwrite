@@ -531,11 +531,24 @@ fn changed_formula_batch(
 /// `changed_indices`, which holds at least one slot per source. Unchanged inputs keep their
 /// JavaScript strings. An empty batch has empty text and ends. An end inside a surrogate pair or
 /// outside the text fails.
-#[wasm_bindgen(js_name = convertXlsxFormulas)]
+#[wasm_bindgen(
+    js_name = convertXlsxFormulas,
+    return_description = "The text of each changed formula, in input order; throws when an end splits a surrogate pair or falls outside `joined`."
+)]
 pub fn convert_xlsx_formulas(
+    #[wasm_bindgen(
+        param_description = "Every formula's text, one after another, without separators."
+    )]
     joined: &str,
+    #[wasm_bindgen(param_description = "Where each formula ends in `joined`, as a UTF-16 offset.")]
     ends: &[u32],
+    #[wasm_bindgen(
+        param_description = "`true` to write XLSX spelling (with `_xlfn.` and `_xlpm.` prefixes), `false` to read it."
+    )]
     exporting: bool,
+    #[wasm_bindgen(
+        param_description = "Receives each changed formula's input index, from the start; needs a slot per formula."
+    )]
     changed_indices: &mut [u32],
 ) -> Result<Vec<String>, wasm_bindgen::JsError> {
     changed_formula_batch(joined, ends, exporting, changed_indices)

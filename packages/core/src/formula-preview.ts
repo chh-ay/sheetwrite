@@ -40,6 +40,7 @@ export type {
  *   return preview.status === "value" ? String(preview.value) : "";
  * }
  * ```
+ * @param text - The formula to preview, starting with `=`.
  * @see /docs/features/formulas/formula-help/
  */
 export function previewFormula(store: Store, cell: CellAddress, text: string): FormulaPreview {

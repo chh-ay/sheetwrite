@@ -9,7 +9,12 @@ function hasForbiddenSheetNameCharacter(name: string): boolean {
   return false;
 }
 
-/** Validate and canonicalize a SpreadsheetML worksheet name. */
+/**
+ * Validate and canonicalize a SpreadsheetML worksheet name.
+ *
+ * @param name - The proposed sheet name.
+ * @param existingNames - Names already in use; a match, ignoring case, is a duplicate.
+ */
 export function validateSheetName(
   name: string,
   existingNames: readonly string[] = [],

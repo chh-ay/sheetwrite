@@ -482,6 +482,8 @@ impl FormulaEntry {
     const STALE_REFERENCES: u16 = 1 << 9;
     /// The tree holds a table reference, bound or not.
     const TABLE_REFS: u16 = 1 << 10;
+    /// The tree may use a defined name: a bare name or an unknown function.
+    const NAME_REFS: u16 = 1 << 11;
     /// The tree calls GETPIVOTDATA.
     #[cfg(feature = "analysis")]
     const CALLS_PIVOT_DATA: u16 = 1 << 12;
@@ -490,6 +492,11 @@ impl FormulaEntry {
     /// among their users.
     pub(crate) const fn uses_tables(&self) -> bool {
         self.flags & Self::TABLE_REFS != 0
+    }
+
+    /// Whether the tree may use a defined name, so a name change looks at it.
+    pub(crate) const fn uses_names(&self) -> bool {
+        self.flags & Self::NAME_REFS != 0
     }
 
     /// The formula text: the text the user wrote, with each reference that
@@ -587,8 +594,9 @@ impl FormulaEntry {
     }
 
     /// `features` are the parse's: only a tree that may hold a detached
-    /// sheet reference is walked for a missing local sheet, and only one
-    /// with a table reference is listed among its tables' users.
+    /// sheet reference is walked for a missing local sheet, only one with a
+    /// table reference is listed among its tables' users, and only one that
+    /// may use a defined name is looked at when a name changes.
     pub(crate) fn parsed_source(
         mut ast: Ast,
         sheet: u32,
@@ -606,6 +614,7 @@ impl FormulaEntry {
                 ast: Some(ast),
                 source,
             };
+            entry.set_flag(Self::NAME_REFS, features.names);
             entry.set_source_error(missing_local.then_some(FormulaError::Ref));
             return entry;
         }
@@ -633,6 +642,7 @@ impl FormulaEntry {
             crate::eval::analysis::ast_calls_pivot_data(&ast),
         );
         entry.set_flag(Self::TABLE_REFS, features.table_refs);
+        entry.set_flag(Self::NAME_REFS, features.names);
         // The flags and reads above come from the tree as written; resolving
         // LET names afterwards changes how it evaluates, not what it reads.
         if contains_let && !entry.has_spill_refs() {
@@ -652,7 +662,7 @@ impl FormulaEntry {
         source: String,
         reads: ReadSet,
         is_reference: bool,
-        uses_tables: bool,
+        features: ParseFeatures,
     ) -> Self {
         if let Some(tree) = ast
             .as_mut()
@@ -667,7 +677,8 @@ impl FormulaEntry {
             flags: 0,
         };
         entry.set_flag(Self::REFERENCE, is_reference);
-        entry.set_flag(Self::TABLE_REFS, uses_tables);
+        entry.set_flag(Self::TABLE_REFS, features.table_refs);
+        entry.set_flag(Self::NAME_REFS, features.names);
         entry.set_flag(
             Self::CALLS_SUBTOTAL,
             entry
@@ -826,6 +837,7 @@ impl FormulaEntry {
         let features = ParseFeatures {
             detached_sheets: true,
             table_refs: self.uses_tables(),
+            names: self.uses_names(),
             ..ParseFeatures::default()
         };
         let mut replacement = Self::parsed_source(

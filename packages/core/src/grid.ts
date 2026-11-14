@@ -420,12 +420,23 @@ export async function initSheetwrite(options: InitSheetwriteOptions = {}): Promi
   }
 }
 
-/** Whether `initSheetwrite` has completed — the single readiness source. */
+/**
+ * Whether `initSheetwrite` has completed — the single readiness source.
+ *
+ * @returns `true` once the engine has loaded, so `createGrid` will not throw
+ *   for a missing engine; add-ons may still be installing.
+ */
 export function isSheetwriteReady(): boolean {
   return isLoaded();
 }
 
-/** Read `--sheetwrite-*` CSS custom properties into a partial theme. */
+/**
+ * Read `--sheetwrite-*` CSS custom properties into a partial theme.
+ *
+ * @param el - Element whose computed style is read. Custom properties inherit,
+ *   so any element inside the themed container works.
+ * @returns Only the theme fields whose property is set; empty outside a browser.
+ */
 export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
   if (typeof getComputedStyle !== "function") return {};
 
@@ -488,6 +499,8 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
  * // Call when the host view is removed.
  * grid.destroy();
  * ```
+ * @param host - Element the grid renders into. The grid fills it and follows its
+ *   size, so give it a height.
  * @see Grid
  * @see GridOptions
  */
@@ -2926,6 +2939,7 @@ export class GridImpl implements Grid {
     this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
     this.renderer.setTheme(this.theme);
     this.domOverlay.setTheme(this.theme);
+    this.objectLayer.setTheme(this.theme);
     this.syncTabBarTheme();
     this.rebuildIndex();
     this.rebuildColumnIndex();
