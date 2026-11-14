@@ -1,7 +1,13 @@
 import "@sheetwrite/core/styles.css";
 import "@sheetwrite/core/shell.css";
 import "../styles/tokens.css";
-import { type Grid, initSheetwrite, type Workbook, type WorkbookSnapshot } from "@sheetwrite/core";
+import {
+  type Grid,
+  type GridPresentation,
+  initSheetwrite,
+  type Workbook,
+  type WorkbookSnapshot,
+} from "@sheetwrite/core";
 import type { HistoryArchive } from "@sheetwrite/core/history";
 import { createSpreadsheetShell } from "@sheetwrite/core/shell";
 
@@ -37,11 +43,13 @@ const PLACEHOLDER_WORKBOOK: Workbook = {
 
 /**
  * Mount the shell for one screenshot. Query parameters: `theme` (light or
- * dark), `sheet` (orders,
- * regions or dashboard), `ribbon` (full or compact), `width` and `height` of
- * the stage in CSS pixels, `links=1` to give the workbook a linked
- * workbook, `layout=tablet` or `layout=phone` for a narrow dashboard layout, and `history=1` to start its version history with a named version. Marks the document `data-figure-ready`
- * once the first frame is drawn.
+ * dark), `sheet` (orders, regions, dashboard, report, pivot or formulas),
+ * `ribbon` (full or compact), `width` and `height` of the stage in CSS
+ * pixels, `links=1` to give the workbook a linked workbook, `layout=tablet`
+ * or `layout=phone` for a narrow dashboard layout, `history=1` to start its
+ * version history with a named version, and `presentation=data-grid` for
+ * column headers named by field. Marks the document `data-figure-ready` once
+ * the first frame is drawn.
  */
 async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<void> {
   document.documentElement.dataset.theme = params.get("theme") === "dark" ? "dark" : "light";
@@ -66,11 +74,14 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
   });
 
   const sheet = params.get("sheet") ?? FIGURE_SHEETS.dashboard;
+  const presentation: GridPresentation =
+    params.get("presentation") === "data-grid" ? "data-grid" : "spreadsheet";
   const shell = createSpreadsheetShell(host, {
     ribbon: { mode: params.get("ribbon") === "compact" ? "compact" : "full" },
     grid: {
       workbook: PLACEHOLDER_WORKBOOK,
       theme: siteGridTheme(),
+      presentation,
       addons: {
         queries: {
           fetchSource: async () => ({
@@ -83,7 +94,9 @@ async function mountFigure(host: HTMLElement, params: URLSearchParams): Promise<
       },
     },
   });
-  await shell.grid.importWorkbook(figureWorkbook(sheet, dashboardLayout(params.get("layout"))));
+  await shell.grid.importWorkbook(
+    figureWorkbook(sheet, dashboardLayout(params.get("layout")), presentation),
+  );
   if (params.get("links") === "1") linkBudget(shell.grid);
 
   if (params.get("history") === "1") await saveDraft(archive, figureWorkbook(sheet));

@@ -19,7 +19,12 @@ import {
   RecalculationDiagram,
 } from "../diagrams.js";
 import { DOCS_CARD_ART, DOCS_DIAGRAMS } from "../docs-art.js";
+import { FEATURE_DIAGRAMS } from "../docs-feature-art.js";
+import { FORMULA_DIAGRAMS } from "../docs-formula-art.js";
+import { GUIDE_DIAGRAMS } from "../docs-guide-art.js";
 import { MECHANISM_DIAGRAMS } from "../docs-mechanisms.js";
+import { REFERENCE_DIAGRAMS } from "../docs-reference-art.js";
+import { RELEASE_DIAGRAMS } from "../docs-release-art.js";
 import {
   ChartReadsCellsDiagram,
   DashboardDiagram,
@@ -375,6 +380,21 @@ function DocParts() {
       ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
     ),
     ...Object.entries(MECHANISM_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(FEATURE_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(FORMULA_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(GUIDE_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(REFERENCE_DIAGRAMS).map(
+      ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
+    ),
+    ...Object.entries(RELEASE_DIAGRAMS).map(
       ([name, Diagram]) => [`diagram:${name}`, Diagram] as const,
     ),
     ...marks.map((name) => [`mark:${name}`, () => <SectionMark name={name} />] as const),
