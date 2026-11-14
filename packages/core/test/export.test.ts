@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { parseCellLiteralInput } from "../src/cell-input.js";
 import { parseDateInput } from "../src/date-serial.js";
 import {
   DEFAULT_DELIMITED_TEXT_RESOURCE_LIMITS,
@@ -374,6 +375,44 @@ describe("export", () => {
     expect(store.getCell({ sheet: "types", row: 0, col: 6 }).resolved).toBe("=1+1");
     expect(store.getFormula({ sheet: "types", row: 0, col: 6 })).toBeNull();
     store.dispose();
+  });
+
+  it("reads unquoted numeric fields exactly as their text would be read", () => {
+    const types = ["number", "currency", "date", "text"] as const;
+    const columns: Column[] = types.map((type) => ({ key: type, header: type, width: 80, type }));
+    const listed = [
+      ...["0", "-0", "+5", ".5", "-.5", "5.", "007", "00.00", "0.1", "-123.456"],
+      ...["0.30000000000000004", "123456789012345", "1234567890123456", "9007199254740993"],
+      ...["1e3", "0x10", " 7 ", "1.2.3", ".", "-", "+", "", "Infinity", "TRUE", "=1"],
+      ...["0.0000000000000000000001", "0.00000000000000000000001", "1.0000000000000000000001"],
+      ...['"12"', '"-0"', '"1.5"""'],
+    ];
+    // Seeded strings of signs, digits and points, so the parse meets many shapes.
+    const alphabet = "0123456789.-+";
+    let seed = 1;
+    const random = (bound: number): number => {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      return seed % bound;
+    };
+    const fuzzed = Array.from({ length: 4_000 }, () =>
+      Array.from({ length: 1 + random(20) }, () => alphabet[random(alphabet.length)]).join(""),
+    );
+    const fields = [...listed, ...fuzzed];
+    const csv = [types.join(","), ...fields.map((field) => types.map(() => field).join(","))].join(
+      "\n",
+    );
+
+    const data = fromCsv(csv, columns);
+    const texts = parseCsv(csv).slice(1);
+    expect(data.rowCount).toBe(fields.length);
+    for (const type of types) {
+      const expected = texts.map((row) => parseCellLiteralInput(row[0] ?? "", type));
+      const actual = data.columns[type] ?? [];
+      const mismatches = actual.flatMap((value, row) =>
+        Object.is(value, expected[row]) ? [] : [{ row, field: fields[row], value }],
+      );
+      expect(mismatches).toEqual([]);
+    }
   });
 
   it("keeps non-ASCII boolean look-alikes and formula-like dates as text", () => {

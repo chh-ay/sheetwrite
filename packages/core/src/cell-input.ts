@@ -135,6 +135,61 @@ export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar
   return raw;
 }
 
+const ZERO_CODE_UNIT = 0x30;
+const NINE_CODE_UNIT = 0x39;
+const PLUS_CODE_UNIT = 0x2b;
+const MINUS_CODE_UNIT = 0x2d;
+const DOT_CODE_UNIT = 0x2e;
+/** Significant digits whose integer value is exact in a double (below 2^53). */
+const MAX_EXACT_DIGITS = 15;
+/** Powers of ten that are exact in a double, as literals so no rounding enters. */
+const EXACT_POWERS_OF_TEN: readonly number[] = [
+  1, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17,
+  1e18, 1e19, 1e20, 1e21, 1e22,
+];
+
+/**
+ * The number {@link parseCellLiteralInput} reads from `text.slice(start, end)`
+ * in a `number`, `currency` or `date` column, without building that string,
+ * when the span is a plain decimal: an optional sign, digits with at most one
+ * point, nothing else, at most 15 significant digits and 22 decimals.
+ * `undefined` for any other span, which then takes the string path.
+ *
+ * The result equals `Number()`: the digits form an exact integer below 2^53
+ * and the power of ten is exact, so one IEEE division rounds correctly.
+ */
+export function parsePlainDecimal(text: string, start: number, end: number): number | undefined {
+  let index = start;
+  const sign = text.charCodeAt(index);
+  const negative = sign === MINUS_CODE_UNIT;
+  if (negative || sign === PLUS_CODE_UNIT) index += 1;
+  let mantissa = 0;
+  let significantDigits = 0;
+  let decimals = 0;
+  let hasDigit = false;
+  let hasPoint = false;
+  for (; index < end; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code >= ZERO_CODE_UNIT && code <= NINE_CODE_UNIT) {
+      hasDigit = true;
+      if (hasPoint) decimals += 1;
+      // Leading zeros are not significant.
+      if (mantissa === 0 && code === ZERO_CODE_UNIT) continue;
+      significantDigits += 1;
+      if (significantDigits > MAX_EXACT_DIGITS) return undefined;
+      mantissa = mantissa * 10 + (code - ZERO_CODE_UNIT);
+    } else if (code === DOT_CODE_UNIT && !hasPoint) {
+      hasPoint = true;
+    } else {
+      return undefined;
+    }
+  }
+  const scale = EXACT_POWERS_OF_TEN[decimals];
+  if (!hasDigit || scale === undefined) return undefined;
+  const magnitude = mantissa / scale;
+  return negative ? -magnitude : magnitude;
+}
+
 /**
  * Parse a currency-formatted string into a plain number, or `null` when the
  * remaining text is not numeric. Strips currency symbols (`$ € £ ¥ ¤`), thousands
