@@ -24,9 +24,12 @@ export type IndexedDbPendingCommitStorageErrorCode =
 
 /** Typed IndexedDB failure raised by durable pending-commit storage. */
 export class IndexedDbPendingCommitStorageError extends SheetwriteError {
+  /** Always `"IndexedDbPendingCommitStorageError"`. */
   override readonly name = "IndexedDbPendingCommitStorageError";
+  /** What failed, such as `quota` when the browser refused more storage. */
   declare readonly code: IndexedDbPendingCommitStorageErrorCode;
 
+  /** Creates the error; `options.cause` keeps the browser's original error. */
   constructor(
     code: IndexedDbPendingCommitStorageErrorCode,
     message: string,
@@ -38,7 +41,9 @@ export class IndexedDbPendingCommitStorageError extends SheetwriteError {
 
 /** Database and store naming options for durable pending commits. */
 export interface IndexedDbPendingCommitStorageOptions {
+  /** IndexedDB database name; defaults to `sheetwrite-offline`. */
   databaseName?: string;
+  /** Object store name in that database; defaults to `pending-commits`. */
   storeName?: string;
 }
 
@@ -93,12 +98,14 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
   private readonly metaStoreName: string;
   private databaseAttempt?: DatabaseOpenAttempt;
 
+  /** Creates the storage; the database opens on first use. */
   constructor(options: IndexedDbPendingCommitStorageOptions = {}) {
     this.databaseName = options.databaseName ?? DEFAULT_DATABASE;
     this.storeName = options.storeName ?? DEFAULT_STORE;
     this.metaStoreName = `${this.storeName}-meta`;
   }
 
+  /** Reads the document's pending commits in commit order. */
   async load(
     documentId: string,
     options: PendingCommitLoadOptions,
@@ -119,6 +126,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
     return this.readOrdered(database, documentId, options);
   }
 
+  /** Adds a commit to the end of its document's queue, or replaces it when its ID is already there. */
   async put(commit: PendingCommit, signal?: AbortSignal): Promise<void> {
     throwIfAborted(signal);
     assertVersionOperationCounts(commit);
@@ -164,6 +172,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
     }
   }
 
+  /** Deletes one commit, after the server accepted it. */
   async remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Promise<void> {
     throwIfAborted(signal);
     const database = await this.open(signal);
@@ -264,6 +273,7 @@ export class IndexedDbPendingCommitStorage implements PendingCommitStorage {
     }
   }
 
+  /** Closes the database connection; a later call opens it again. */
   close(): void {
     const attempt = this.databaseAttempt;
     if (!attempt) return;

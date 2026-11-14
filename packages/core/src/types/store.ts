@@ -29,12 +29,15 @@ export type ChartRendererFactory = (store: Store) => ChartRenderer;
 
 /** Retained logical payload and allocated capacity attributed to one exclusive owner. */
 export interface ResourceOwnerBytes {
+  /** Name of the part of the engine that owns the memory, such as a cell store. */
   readonly owner: string;
   /** Bytes containing live logical payload. Never includes runtime observations. */
   readonly logicalBytes: number;
   /** Container capacity owned exclusively by this owner. */
   readonly allocatedBytes: number;
+  /** Number of items the owner holds, such as cells or strings. */
   readonly entries: number;
+  /** How the byte counts were measured, from exact capacity to an entry count only. */
   readonly measurement:
     | "exact-capacity"
     | "hash-capacity-v1"
@@ -53,6 +56,7 @@ export interface ResourceOwnerBytes {
  * Lifetime: valid until the next store mutation or window refresh.
  */
 export interface VisibleWindowView {
+  /** Stable ID of the sheet the window is read from. */
   sheet: SheetId;
   /** end-exclusive row range */
   rows: { start: number; end: number };
@@ -121,7 +125,9 @@ export interface ClipboardWindowView {
 
 /** Authoritative source value, evaluated value, style, and load state for a cell. */
 export interface ResolvedCell {
+  /** The value shown in the cell: a formula's result, or the literal itself. */
   resolved: CellScalar;
+  /** The cell's own style, without its column's default; empty when it has none. */
   style: CellStyle;
 }
 
@@ -130,12 +136,17 @@ export type CellLoadState = "unloaded" | "loaded-empty" | "loaded-value" | "loca
 
 /** Allocation and load statistics for one paged datasource sheet. */
 export interface PagedStoreStats {
+  /** Number of row chunks currently held in memory. */
   chunks: number;
+  /** Number of cells loaded from the data source. */
   loadedCells: number;
+  /** Number of cells edited locally and not yet acknowledged. */
   dirtyCells: number;
+  /** Bytes allocated for the loaded chunks. */
   allocatedBytes: number;
   /** Sparse local-edit overlay bytes, excluded from the clean chunk cache budget. */
   dirtyAllocatedBytes: number;
+  /** `true` when every row of the sheet is loaded. */
   fullyLoaded: boolean;
 }
 
@@ -146,6 +157,7 @@ export type QueryCapability =
 
 /** Columnar workbook storage, query, transaction, and subscription contract. */
 export interface Store {
+  /** The workbook model: its sheets, columns and metadata, without cell values. */
   getWorkbook(): Workbook;
   /**
    * Single-cell read for interactions, API reads, and tests.
@@ -210,6 +222,7 @@ export interface Store {
    * so every local mutation ingress shares one atomic commit barrier.
    */
   setProtectionResolver?(resolver: ProtectionResolver | undefined, mode?: MutationPolicyMode): void;
+  /** Calls `fn` after each committed transaction; returns a function that removes it. */
   on(evt: "change", fn: (event: ChangeEvent) => void): () => void;
   /** Opt in to per-cell before/after capture for packed and clear operations. */
   setDetailedChangeCapture?(enabled: boolean): void;
