@@ -3782,8 +3782,9 @@ impl CellStore {
     }
 
     /// Parses a formula, binding its sheet and table references as it goes,
-    /// then resolves its defined names when the parse found a name, so a
-    /// formula of plain cells is parsed in one pass.
+    /// then resolves its defined names when the parse found a name and
+    /// numbers its LAMBDA parameters when it found a LAMBDA, so a formula of
+    /// plain cells is parsed in one pass.
     fn resolve_unbound_formula(
         &self,
         source: &str,
@@ -3809,6 +3810,13 @@ impl CellStore {
             ast = self.resolve_defined_names(ast, formula_sheet, &placement);
         }
 
+        // A LAMBDA reads its parameters from the call frame. Numbering them
+        // before the formula is stored or previewed lets its shape checks see
+        // which ones a call binds to arrays.
+        #[cfg(feature = "analysis")]
+        if features.lambdas {
+            crate::eval::analysis::lambda::resolve_parameters(&mut ast);
+        }
         Ok((ast, features))
     }
 

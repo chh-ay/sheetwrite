@@ -90,7 +90,9 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
         | Ast::LetName { .. }
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => ast_contains_runtime_ref(&definition.body),
     }
 }
 
@@ -324,23 +326,14 @@ impl CellStore {
                     Err(_) => {}
                 }
             }
-            Ast::Func(Func::Let, args) => {
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
-                }
-            }
-            Ast::UnknownFunc(call) => {
-                let args = &mut call.args;
-
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
-                }
-            }
+            Ast::Func(Func::Let, args) => self.rewrite_deferred(args, sheet, pass, depth),
+            Ast::UnknownFunc(call) => self.rewrite_deferred(&mut call.args, sheet, pass, depth),
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(_), args) => {
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
-                }
+            Ast::Func(Func::Analysis(_), args) => self.rewrite_deferred(args, sheet, pass, depth),
+            #[cfg(feature = "analysis")]
+            Ast::Lambda(definition) => {
+                let body = &mut std::rc::Rc::make_mut(definition).body;
+                self.rewrite_deferred(std::slice::from_mut(body), sheet, pass, depth);
             }
             Ast::Func(_, args) => {
                 for arg in args {
@@ -365,6 +358,20 @@ impl CellStore {
                 *ast = expression;
             }
             _ => {}
+        }
+    }
+
+    /// Rewrites `args` as arguments whose runtime references are resolved
+    /// only when the call that holds them is evaluated.
+    fn rewrite_deferred(
+        &self,
+        args: &mut [Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) {
+        for arg in args {
+            self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
         }
     }
 
@@ -530,7 +537,7 @@ impl CellStore {
             | Ast::LetName { .. }
             | Ast::Array { .. } => None,
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
+            Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
         }
     }
 }

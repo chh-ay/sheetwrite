@@ -193,7 +193,8 @@ impl CellStore {
 
         let mut evaluated = Vec::with_capacity(arguments.len());
         for argument in arguments {
-            let block = if range_from_ast(argument, sheet).is_some() || ast_produces_array(argument)
+            let block = if range_from_ast(argument, sheet).is_some()
+                || ast_produces_array(argument, pass.shapes())
             {
                 match self.eval_matrix_arg(argument, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,
@@ -318,7 +319,9 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
         | Ast::LetName { .. }
         | Ast::Array { .. } => false,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => false,
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => calls_volatile_custom(&definition.body, functions),
     }
 }
 
