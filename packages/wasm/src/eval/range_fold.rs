@@ -185,7 +185,9 @@ impl CellStore {
         let data = &self.sheets[range.sheet as usize];
         let dense = data.cells.dense_sources();
         if cols == 1 && dense.is_none() && depth < FORMULA_RECURSION_LIMIT {
-            let start = data.cells.idx(range.row_start as usize, range.col_start as usize);
+            let start = data
+                .cells
+                .idx(range.row_start as usize, range.col_start as usize);
             if let Some(result) = fold_paged_number_column(&data.cells, start..start + rows, fold) {
                 return result.map(|()| true);
             }
@@ -265,7 +267,10 @@ fn fold_paged_number_column(
     while start < column.end {
         let run = cells.run(start, column.end);
         let (kinds, _) = run.clean_sources()?;
-        if kinds.iter().any(|&kind| kind != KIND_EMPTY && kind != KIND_NUMBER) {
+        if kinds
+            .iter()
+            .any(|&kind| kind != KIND_EMPTY && kind != KIND_NUMBER)
+        {
             return None;
         }
         start = run.end;

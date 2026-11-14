@@ -1326,8 +1326,12 @@ impl CellStore {
     ) -> Result<Option<StorageRange>, FormulaError> {
         let data = &self.sheets[sheet];
         let cells = &data.cells;
-        if !cells.range_fully_loaded(row_start, col_start, row_start + rows - 1, col_start + cols - 1)
-        {
+        if !cells.range_fully_loaded(
+            row_start,
+            col_start,
+            row_start + rows - 1,
+            col_start + cols - 1,
+        ) {
             return Ok(None);
         }
         let mut payload_bytes = total
