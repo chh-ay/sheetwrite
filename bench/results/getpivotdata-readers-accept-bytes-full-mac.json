@@ -1,0 +1,25 @@
+{
+  "candidateEngineDigest": "6124797c7af67f824dc19f7e117aefce09dc55f9bdbed43f8e81e30a4ea4717f",
+  "rows": [
+    {
+      "key": "workload=parse-load-table;size=10000.allocation.retainedBytes",
+      "maximum": 3042299,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): the formulas that call GETPIVOTDATA are kept in a bitset (16 B on wasm32) inside the formula store's optional reference index, which a workbook with table references already allocates; constant per workbook, no per-formula growth. GETPIVOTDATA stops being volatile. Accepted on #325 (comment 6872611083)."
+    },
+    {
+      "key": "workload=parse-load-table;size=100000.allocation.retainedBytes",
+      "maximum": 29752567,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): the formulas that call GETPIVOTDATA are kept in a bitset (16 B on wasm32) inside the formula store's optional reference index, which a workbook with table references already allocates; constant per workbook, no per-formula growth. GETPIVOTDATA stops being volatile. Accepted on #325 (comment 6872611083)."
+    },
+    {
+      "key": "workload=table-append-row;size=10000.allocation.retainedBytes",
+      "maximum": 3807982,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): the formulas that call GETPIVOTDATA are kept in a bitset (16 B on wasm32) inside the formula store's optional reference index, which a workbook with table references already allocates; constant per workbook, no per-formula growth. GETPIVOTDATA stops being volatile. Accepted on #325 (comment 6872611083)."
+    },
+    {
+      "key": "workload=table-append-row;size=100000.allocation.retainedBytes",
+      "maximum": 36604386,
+      "reason": "Full engine only (SHEETWRITE_BENCH_ENGINE=full): the formulas that call GETPIVOTDATA are kept in a bitset (16 B on wasm32) inside the formula store's optional reference index, which a workbook with table references already allocates; constant per workbook, no per-formula growth. GETPIVOTDATA stops being volatile. Accepted on #325 (comment 6872611083)."
+    }
+  ]
+}
