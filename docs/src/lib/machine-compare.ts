@@ -188,12 +188,14 @@ export const ALL_MACHINES = "all";
  * A Linux | Mac | All radio group. The first machine starts checked; the
  * markup's `checked` stays the reader's to change. `label` names the figure,
  * so a page with several switches reads "Machine for median recalculation time".
+ * `all: false` leaves out All, for figures whose numbers can't share an axis.
  */
 export function machineSwitch(
   options: {
     readonly id: string;
     readonly label: string;
     readonly machines: ReadonlyArray<{ readonly machine: PerfMachine; readonly name: string }>;
+    readonly all?: boolean;
   },
   icon: PerfIconMarkup,
 ): string {
@@ -204,7 +206,7 @@ export function machineSwitch(
     ...options.machines.map((entry, index) =>
       radio(entry.machine, entry.name, icon(MACHINE_ICONS[entry.machine]), index === 0),
     ),
-    radio(ALL_MACHINES, "All", icon("layers"), false),
+    ...(options.all === false ? [] : [radio(ALL_MACHINES, "All", icon("layers"), false)]),
   ].join("")}</div>`;
 }
 
