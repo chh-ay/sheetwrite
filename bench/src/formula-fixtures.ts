@@ -2704,23 +2704,32 @@ function sortRowsDigest(order: ArrayLike<number>): string {
   return `${order[0]}:${middle}:${order[order.length - 1]}:${sum}`;
 }
 
+/** `sortRowsOutput` results, computed once per row and size. */
+const sortRowsOutputs = new Map<string, string>();
+
 /**
  * The digests of the ascending and the descending order of `size` rows of
  * `value`: equal values keep their row order in both directions.
  */
 function sortRowsOutput(size: number, value: (row: number) => number | string): string {
+  const cacheKey = `${value.name}:${size}`;
+  const cached = sortRowsOutputs.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const values = Array.from({ length: size }, (_, row) => value(row));
   const rows = Array.from({ length: size }, (_, row) => row);
   const ascending = [...rows].sort((left, right) => {
-    const a = value(left);
-    const b = value(right);
+    const a = values[left]!;
+    const b = values[right]!;
     return a < b ? -1 : a > b ? 1 : left - right;
   });
   const descending = [...rows].sort((left, right) => {
-    const a = value(left);
-    const b = value(right);
+    const a = values[left]!;
+    const b = values[right]!;
     return a > b ? -1 : a < b ? 1 : left - right;
   });
-  return `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`;
+  const output = `${sortRowsDigest(ascending)}|${sortRowsDigest(descending)}`;
+  sortRowsOutputs.set(cacheKey, output);
+  return output;
 }
 
 function subtotalVisible(row: number): boolean {
@@ -2920,8 +2929,8 @@ function sortRowsFixture(count: number, value: (row: number) => number | string)
   }
   const column = Uint32Array.of(0);
   const allRows = new Uint32Array(0);
-  let ascending = new Uint32Array(0);
-  let descending = new Uint32Array(0);
+  let ascending: Uint32Array = new Uint32Array(0);
+  let descending: Uint32Array = new Uint32Array(0);
   return {
     store,
     run: () => {
