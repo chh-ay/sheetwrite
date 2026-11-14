@@ -1149,6 +1149,56 @@ describe("compressed restore operation admission", () => {
     const tinyClaim = rawRestore(new Uint8Array(1024 * 1024), 1);
     expect(validateDocumentOperationShape(tinyClaim).length).toBeGreaterThan(0);
   });
+
+  /** Runs `body` as a runtime without native base64 would. */
+  function withoutNativeBase64(body: () => void): void {
+    const toBase64 = Object.getOwnPropertyDescriptor(Uint8Array.prototype, "toBase64");
+    const fromBase64 = Object.getOwnPropertyDescriptor(Uint8Array, "fromBase64");
+    Reflect.deleteProperty(Uint8Array.prototype, "toBase64");
+    Reflect.deleteProperty(Uint8Array, "fromBase64");
+    try {
+      body();
+    } finally {
+      if (toBase64) Object.defineProperty(Uint8Array.prototype, "toBase64", toBase64);
+      if (fromBase64) Object.defineProperty(Uint8Array, "fromBase64", fromBase64);
+    }
+  }
+
+  /** A valid restore whose base64 ends in padding, so it has unused bits to set. */
+  function paddedRestore(): Extract<DocumentOp, { op: "restoreBlock" }> {
+    for (let length = 1; ; length++) {
+      const operation = encodeRestoreBlock(
+        { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
+        { rowCount: 1, colCount: 1, values: ["x".repeat(length)] },
+      );
+      if (operation.data.endsWith("=")) return operation;
+    }
+  }
+
+  it("rejects a non-canonical base64 spelling of a valid stream with and without native base64", () => {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    const valid = paddedRestore();
+    const last = valid.data.length - (valid.data.endsWith("==") ? 3 : 2);
+    const lastChar = valid.data[last] ?? "";
+    // The low bits of the last data character are padding; canonical base64 leaves them zero.
+    const spelled = `${valid.data.slice(0, last)}${alphabet[alphabet.indexOf(lastChar) | 1]}${valid.data.slice(last + 1)}`;
+    expect(atob(spelled)).toBe(atob(valid.data));
+
+    expect(validateDocumentOperationShape(valid)).toEqual([]);
+    expect(validateDocumentOperationShape({ ...valid, data: spelled }).length).toBeGreaterThan(0);
+    withoutNativeBase64(() => {
+      expect(validateDocumentOperationShape({ ...valid })).toEqual([]);
+      expect(validateDocumentOperationShape({ ...valid, data: spelled }).length).toBeGreaterThan(0);
+    });
+  });
+
+  it("encodes the same restore with and without native base64", () => {
+    const native = encodeRestoreBlock(restoreRange, restoredBlock);
+    withoutNativeBase64(() => {
+      expect(encodeRestoreBlock(restoreRange, restoredBlock)).toEqual(native);
+    });
+    expect(decodeRestoreBlock(native)).toEqual(restoredBlock);
+  });
 });
 
 describe("restore protocol store boundary", () => {
