@@ -119,7 +119,7 @@ A visible formula can read cells outside the visible window. For example, a vari
 
 The grid requests rows ahead of the scroll before they come into view. It measures how fast the view moves, averaged over the last 100 ms, and how long your `getRows` takes (the 90th percentile of recent requests).
 
-- The lookahead covers the distance the view travels during one fetch, plus one view. It grows on a slow datasource and shrinks as a fling slows down.
+- The lookahead covers the distance the view travels during one fetch, plus one view. It grows on a slow datasource and shrinks as a fling slows down. Slow wheel scrolling looks one view ahead.
 - When the view scrolls across columns of a `"windowed"` datasource, the grid also requests the columns ahead, for the visible rows.
 - During a fast fling or a scrollbar drag the view passes the rows next to it before a request could return. The grid requests the rows where the view will be when the request returns instead, and aborts requests for rows it has already passed.
 - On a paged sheet, prefetched cells stay within the `cacheBytes` budget left beside the visible cells.

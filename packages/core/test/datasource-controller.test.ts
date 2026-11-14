@@ -715,6 +715,26 @@ describe("DatasourceController scroll-speed lookahead", () => {
     expect(slow).toBeGreaterThanOrEqual(36 + VIEW_ROWS);
   });
 
+  it("keeps slow wheel scrolling to one view ahead on a slow datasource", async () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    harness.now += 300;
+    await harness.resolveAll();
+    // A row and a half a frame (0.09 rows/ms) is wheel speed: 300 ms of travel would add
+    // 27 rows, but the lookahead stays at one view past the view, as before.
+    let top = 10_000;
+    for (let frame = 1; frame <= 120; frame++) {
+      top += frame % 2 === 0 ? 2 : 1;
+      harness.frame(top);
+    }
+    const viewEnd = top + VIEW_ROWS;
+    expect(harness.controller.getTelemetry().velocityRowsPerMs).toBeLessThan(0.1);
+    expect(harness.live().some((request) => request.end > viewEnd)).toBe(true);
+    // One view past the view's end, rounded up to a whole band.
+    expect(harness.farthestLiveEnd()).toBeLessThanOrEqual(viewEnd + 2 * VIEW_ROWS);
+    harness.dispose();
+  });
+
   it("turns the lookahead around on a direction change and cancels the old one", () => {
     const harness = new ScrollHarness();
     harness.view(10_000);

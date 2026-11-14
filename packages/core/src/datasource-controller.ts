@@ -47,6 +47,8 @@ const LANDING_FAR_MARGIN_SHARE = 0.5;
 const KEEP_COLUMN_SHARE = 2 / 3;
 /** One display frame at 60 Hz: the interval between viewport updates while scrolling. */
 const LOGICAL_FRAME_MS = 16.7;
+/** Below this speed (wheel scrolling) the lookahead keeps to its margin past the view. */
+const SLOW_SCROLL_ROWS_PER_MS = 0.1;
 const EMPTY_FORMULA_BANDS = new Uint32Array(0);
 
 let datasourceClockForTest: (() => number) | undefined;
@@ -1368,6 +1370,18 @@ export class DatasourceController {
       this.rowCount,
     );
     if (skipping && !Number.isFinite(travel)) ahead.end = ahead.start;
+    // Slow, steady scrolling (a mouse wheel) reaches no further than the margin past the
+    // view, as before speed-based lookahead: the extra rows would mostly go unseen.
+    if (!skipping && rowSpeed < SLOW_SCROLL_ROWS_PER_MS) {
+      if (direction > 0) {
+        ahead.end = Math.min(ahead.end, Math.ceil((view.end + margin) / bandRows) * bandRows);
+      } else {
+        ahead.start = Math.max(
+          ahead.start,
+          Math.floor((view.start - margin) / bandRows) * bandRows,
+        );
+      }
+    }
     plan.landing = skipping || ahead.landing;
 
     const behindRows = plan.landing
