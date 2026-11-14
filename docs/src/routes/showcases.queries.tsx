@@ -12,7 +12,8 @@ import { NoHydration } from "solid-js/web";
 
 import { QueriesRefreshDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import { QueriesStage } from "../showcases/queries/QueriesStage.js";
 
 import artStylesheet from "../art/art.css?url";

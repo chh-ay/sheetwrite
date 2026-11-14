@@ -7,7 +7,8 @@ import { FormattingDiagram } from "../art/explain-diagrams.js";
 import { Island } from "../islands/Island.js";
 import { FormattingImported } from "../showcases/formatting/FormattingImported.js";
 import { FONT_FAMILIES, FormattingStage } from "../showcases/formatting/FormattingStage.js";
-import { ShowcasePage, ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcaseSection } from "../showcases/layout/ShowcaseLayout.js";
+import { ShowcasePage } from "../showcases/layout/ShowcasePage.js";
 import FormattingSnippet from "../showcases/snippets/formatting.mdx";
 import FormattingSnippetSource from "../showcases/snippets/formatting.mdx?source";
 
