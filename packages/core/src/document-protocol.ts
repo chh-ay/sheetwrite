@@ -304,6 +304,8 @@ export function resolveTransactionResourceValidation(
 }
 
 const admittedResourcesByTransaction = new WeakMap<object, AdmittedTransactionResources>();
+/** Transactions an engine layer built from operations it already took in. */
+const engineBuiltTransactions = new WeakSet<object>();
 
 /**
  * Attach one measurement to the engine-built transaction that is about to be
@@ -314,8 +316,18 @@ export function withAdmittedTransactionResources<T extends object>(
   transaction: T,
   admitted: AdmittedTransactionResources | undefined,
 ): T {
+  engineBuiltTransactions.add(transaction);
   if (admitted !== undefined) admittedResourcesByTransaction.set(transaction, admitted);
   return transaction;
+}
+
+/**
+ * Whether an engine layer built `transaction` through
+ * `withAdmittedTransactionResources`. Its operations already passed that
+ * layer's ingress, and the layer matches results to them by identity.
+ */
+export function isEngineBuiltTransaction(transaction: object): boolean {
+  return engineBuiltTransactions.has(transaction);
 }
 
 /**
