@@ -9,7 +9,7 @@
 
 use std::cmp::Ordering;
 
-use super::super::array::ast_produces_array;
+use super::super::array::{ast_produces_array, Shapes};
 use super::super::matrix::{
     optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES, SPILL_MAX_CELLS, SPILL_MAX_COLS,
     SPILL_MAX_RECOMPUTE_CELLS, SPILL_MAX_ROWS, UNKNOWN_SIZE_PRECHARGE,
@@ -59,8 +59,8 @@ fn sources<'a>(name: &str, args: &'a [Ast]) -> &'a [Ast] {
     }
 }
 
-fn is_array_argument(ast: &Ast, sheet: usize) -> bool {
-    range_from_ast(ast, sheet).is_some() || ast_produces_array(ast)
+fn is_array_argument(ast: &Ast, sheet: usize, shapes: Shapes<'_>) -> bool {
+    range_from_ast(ast, sheet).is_some() || ast_produces_array(ast, shapes)
 }
 
 /// Excel shows a blank source cell as 0 in a reshaped array.
@@ -88,7 +88,8 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Missing
-        | Ast::BoundMatrix { .. }
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
         | Ast::NamedRange(_)
@@ -142,7 +143,7 @@ fn source_extent(
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<Option<(usize, usize)>, FormulaError> {
-    if !is_array_argument(ast, sheet) {
+    if !is_array_argument(ast, sheet, pass.shapes()) {
         return Ok(Some((1, 1)));
     }
     if let Ast::Func(Func::Analysis(id), args) = ast {
@@ -308,7 +309,7 @@ fn estimate(
     })
 }
 
-pub(super) const fn produces_array(_: &str, _: &[Ast]) -> bool {
+pub(super) const fn produces_array(_: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     true
 }
 
@@ -370,7 +371,7 @@ impl Evaluation<'_, '_> {
     }
 
     fn source(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if is_array_argument(ast, self.sheet) {
+        if is_array_argument(ast, self.sheet, self.pass.shapes()) {
             self.store
                 .eval_matrix_arg(ast, self.sheet, self.pass, self.depth + 1)
         } else {

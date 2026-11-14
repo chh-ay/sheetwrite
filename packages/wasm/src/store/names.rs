@@ -666,7 +666,17 @@ fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTa
 
 /// The expansion of `name`, or a `#NUM!` in its place when it is larger than
 /// [`EXPANSION_NODE_LIMIT`].
-fn bounded_expansion(name: &str, expression: Ast) -> NamedFormulaRef {
+fn bounded_expansion(name: &str, written: Ast) -> NamedFormulaRef {
+    // A named LAMBDA reads its parameters from the call frame, like one
+    // written in a formula.
+    #[cfg(feature = "analysis")]
+    let expression = {
+        let mut resolved = written;
+        crate::eval::analysis::lambda::resolve_parameters(&mut resolved);
+        resolved
+    };
+    #[cfg(not(feature = "analysis"))]
+    let expression = written;
     let nodes = expanded_nodes(&expression);
     let bounded = if nodes > EXPANSION_NODE_LIMIT {
         Ast::Array(Box::new(crate::calc::ArrayLiteral {
@@ -705,6 +715,11 @@ fn expanded_nodes(ast: &Ast) -> usize {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => expanded_nodes(inner),
         Ast::LetSlot { expression, .. } => expanded_nodes(expression),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => definition
+            .parameters
+            .len()
+            .saturating_add(expanded_nodes(&definition.body)),
         _ => 0,
     };
     children.saturating_add(1)
@@ -765,6 +780,8 @@ fn used_names<'a>(ast: &'a Ast, names: &mut Vec<&'a str>) {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => used_names(inner, names),
         Ast::LetSlot { expression, .. } => used_names(expression, names),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => used_names(&definition.body, names),
         _ => {}
     }
 }
@@ -799,6 +816,8 @@ fn is_positional(ast: &Ast) -> bool {
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => is_positional(inner),
         Ast::LetSlot { expression, .. } => is_positional(expression),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => is_positional(&definition.body),
         _ => false,
     }
 }

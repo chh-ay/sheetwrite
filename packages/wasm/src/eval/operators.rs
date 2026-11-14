@@ -241,7 +241,7 @@ fn unary_parts(ast: &Ast) -> Option<(UnaryOp, &Ast)> {
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -287,6 +287,6 @@ fn binary_parts(ast: &Ast) -> Option<BinaryParts<'_>> {
         | Ast::LetName { .. }
         | Ast::Array { .. } => None,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => None,
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }

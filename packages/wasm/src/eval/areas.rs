@@ -161,7 +161,7 @@ impl CellStore {
                 .map(|_| 1)
                 .ok_or(FormulaError::Value),
             #[cfg(feature = "analysis")]
-            other @ (Ast::BoundMatrix { .. } | Ast::RegexPattern(_)) => {
+            other @ (Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_)) => {
                 range_from_ast(other, sheet)
                     .map(|_| 1)
                     .ok_or(FormulaError::Value)
@@ -297,7 +297,9 @@ impl CellStore {
             | Ast::LetName { .. }
             | Ast::Array { .. } => vec![Err(FormulaError::Value)],
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => vec![Err(FormulaError::Value)],
+            Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+                vec![Err(FormulaError::Value)]
+            }
         }
     }
 
@@ -346,7 +348,7 @@ impl CellStore {
             | Ast::LetName { .. }
             | Ast::Array { .. } => Err(FormulaError::Ref),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } | Ast::RegexPattern(_) => Err(FormulaError::Ref),
+            Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => Err(FormulaError::Ref),
         }
     }
 }
