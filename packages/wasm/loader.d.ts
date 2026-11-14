@@ -38,12 +38,20 @@ export type { SyncInitInput } from "./pkg/sheetwrite_wasm.js";
  * await initSheetwrite();
  * ```
  * @see /docs/start/installation/
+ *
+ * @param source - Where the WASM comes from: a URL, a `Request`,
+ *   the module's bytes or a compiled `WebAssembly.Module`. Omitted, the
+ *   package's own `pkg/sheetwrite_wasm_bg.wasm` is loaded.
  */
 export declare function load(
  source?: BufferSource | URL | string | Request | WebAssembly.Module,
 ): Promise<void>;
 
-/** Whether the WASM module has finished initializing. */
+/**
+ * Whether the WASM module has finished initializing.
+ *
+ * @returns `true` once a `load` or `createEngine` call has succeeded.
+ */
 export declare function isLoaded(): boolean;
 
 /** Engine objects and caches owned by one independently collectible WASM instance. */
@@ -63,5 +71,10 @@ export type EngineInstance = Omit<typeof WasmExports, "default" | "CellStore" | 
   functionNames?: () => string[];
 };
 
-/** Initialize a fresh engine; a compiled module can be reused without retaining its memory. */
+/**
+ * Initialize a fresh engine; a compiled module can be reused without retaining its memory.
+ *
+ * @param source - Where the engine's WASM comes from, as for `load`; pass a
+ *   compiled `WebAssembly.Module` to reuse it.
+ */
 export declare function createEngine(source?: Parameters<typeof load>[0]): Promise<EngineInstance>;
