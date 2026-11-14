@@ -5,14 +5,17 @@ use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
 
-/// Admits one transferred source kind. Dense and paged imports both call it, so
-/// a kind the store cannot hold is refused whatever width carried it.
+/// The error of a transferred kind that [`source_kind`] refuses.
 #[cfg(any(target_arch = "wasm32", test))]
-pub(super) fn admit_source_kind(raw: u32) -> TransferResult<u8> {
-    u8::try_from(raw)
-        .ok()
-        .filter(|kind| *kind <= KIND_FORMULA)
-        .ok_or_else(|| "invalid transferred source kind".into())
+pub(super) const INVALID_SOURCE_KIND: &str = "invalid transferred source kind";
+
+/// The source kind a transferred value names, or `None` for a value the store
+/// cannot hold. Dense and paged imports both admit kinds through it, so a kind
+/// is refused whatever width carried it.
+#[cfg(any(target_arch = "wasm32", test))]
+#[inline]
+pub(super) fn source_kind(raw: u32) -> Option<u8> {
+    u8::try_from(raw).ok().filter(|kind| *kind <= KIND_FORMULA)
 }
 
 impl CellStorage {
@@ -59,8 +62,8 @@ impl CellStorage {
                     return Err("invalid transferred dense calculated slot".into());
                 }
                 dense_calculated_cells += 1;
-            } else {
-                admit_source_kind(kind.into())?;
+            } else if source_kind(kind.into()).is_none() {
+                return Err(INVALID_SOURCE_KIND.into());
             }
         }
 
