@@ -283,8 +283,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "number-formats",
         size: "panel",
-        alt: "An attainment cell formatted as 0.0% selected on the Report sheet, with the ribbon's Number menu open, listing its number formats.",
-        caption: "The same numbers in dollars and percentages, and the ribbon's Number menu.",
+        alt: "The Report sheet with revenue and targets in dollars and attainment in percentages, and the ribbon's Number Format list open: General, Number, Currency, Accounting, Short Date, Long Date, Time, Percentage and Scientific.",
+        caption: "Numbers in dollars and percentages, and the ribbon's list of number formats.",
       },
     },
   ],

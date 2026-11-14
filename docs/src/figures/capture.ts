@@ -302,7 +302,9 @@ const SHOTS: readonly Shot[] = [
     size: "panel",
     query: { sheet: "report" },
     steps: async (page) => {
-      await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 4 } });
+      // A manager's name: a General cell, so the format box shows what the cell has.
+      // The list covers the right of the sheet; the dollar columns stay in view.
+      await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 1 } });
       // At this width the Number group folds into a menu; open it, then the
       // list of its number format box.
       await page.getByRole("button", { name: "Number", exact: true }).first().click();
@@ -318,8 +320,8 @@ const SHOTS: readonly Shot[] = [
     query: { sheet: "report", ribbon: "compact" },
     steps: async (page) => {
       await select(page, { kind: "cell", addr: { sheet: "report", row: 3, col: 5 } });
-      // Enter on a list cell opens its list; the grid needs the keyboard focus first.
-      await page.locator(".sheetwrite-shell-grid [tabindex='0']").first().focus();
+      // Enter on a list cell opens its list; the grid host needs the keyboard focus first.
+      await page.locator(".sheetwrite-shell-grid").focus();
       await page.keyboard.press("Enter");
       await settle(page);
     },
