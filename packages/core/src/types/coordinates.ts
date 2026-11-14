@@ -6,23 +6,33 @@ export type SheetId = string;
 
 /** Zero-based address of one cell on a stable sheet ID. */
 export interface CellAddress {
+  /** Stable ID of the sheet (not its display name). */
   sheet: SheetId;
+  /** Row index, counting from 0 at the sheet's first row. */
   row: number;
+  /** Column index, counting from 0 at the sheet's first column. */
   col: number;
 }
 
 /** Inclusive merged-cell rectangle in data-row/column coordinates. */
 export interface MergeRange {
+  /** Zero-based first row of the merged block. */
   r0: number;
+  /** Zero-based first column of the merged block. */
   c0: number;
+  /** Zero-based last row of the merged block, included. */
   r1: number;
+  /** Zero-based last column of the merged block, included. */
   c1: number;
 }
 
 /** Inclusive rectangular cell range on a stable sheet ID. */
 export interface Range {
+  /** Stable ID of the sheet the range is on. */
   sheet: SheetId;
+  /** Zero-based row and column of one corner cell, included in the range. */
   start: { row: number; col: number };
+  /** Zero-based row and column of the opposite corner cell, also included. */
   end: { row: number; col: number };
 }
 
@@ -37,10 +47,15 @@ export interface HighlightRange extends Range {
  * enters document operations, snapshots, dirty state, or undo history.
  */
 export interface PresenceOverlay {
+  /** Stable ID of the collaborator; the label shows it when `displayName` is missing. */
   actorId: string;
+  /** Name shown in the label above the collaborator's selection. */
   displayName?: string;
+  /** CSS color of the collaborator's outline and label. */
   color: string;
+  /** Sheet the collaborator is on; the overlay shows only while the grid shows that sheet. */
   activeSheet: SheetId;
+  /** The collaborator's selected ranges; the grid draws the first 8. */
   ranges: readonly Range[];
 }
 

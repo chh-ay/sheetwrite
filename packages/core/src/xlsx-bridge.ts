@@ -51,12 +51,18 @@ export const DEFAULT_XLSX_RESOURCE_LIMITS: Readonly<XlsxResourceLimits> = Object
 
 /** Stable resource-limit failure surfaced before an XLSX codec allocates unsafe data. */
 export class XlsxResourceError extends SheetwriteError {
+  /** Always `"XlsxResourceError"`. */
   override readonly name = "XlsxResourceError";
+  /** Always `"xlsx-resource-limit"`. */
   declare readonly code: "xlsx-resource-limit";
 
+  /** Creates the error for an `import` or `export` that found `actual` above `limit` for `resource`. */
   constructor(
+    /** Which limit the file went over, such as `maxCells`. */
     readonly resource: keyof XlsxResourceLimits,
+    /** The limit in force, in that resource's unit (cells, bytes, entries). */
     readonly limit: number,
+    /** The size found in the file, in the same unit; above `limit`. */
     readonly actual: number,
     operation: "import" | "export",
   ) {
@@ -129,6 +135,7 @@ function xlsxCallFailure(
  *   downloadBytes(bytes, "table.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
  * }
  * ```
+ * @returns The bytes of the `.xlsx` file.
  * @see fromXlsxTable
  */
 export async function toXlsxTable(
@@ -150,7 +157,12 @@ export async function toXlsxTable(
   }
 }
 
-/** Stream table XLSX bytes without materializing the finished archive. */
+/**
+ * Stream table XLSX bytes without materializing the finished archive.
+ *
+ * @returns The `.xlsx` file's bytes, produced as the stream is read; cancelling
+ *   the stream stops the export.
+ */
 export function toXlsxTableStream(
   workbook: Workbook,
   store: Store,
@@ -183,6 +195,8 @@ export function toXlsxTableStream(
  *   return fromXlsxTable(await file.arrayBuffer());
  * }
  * ```
+ * @param data - The bytes of an `.xlsx` file.
+ * @returns The first sheet's columns, keyed by header text.
  * @see toXlsxTable
  */
 export async function fromXlsxTable(
@@ -288,6 +302,9 @@ async function withEngineContent(
  *   downloadBytes(bytes, "workbook.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
  * }
  * ```
+ * @param input - The workbook to write: a `WorkbookSnapshot`, or a grid, whose
+ *   `exportSnapshot()` is called first.
+ * @returns The bytes of the `.xlsx` file.
  * @see fromXlsxWorkbook
  */
 export async function toXlsxWorkbook(
@@ -310,7 +327,14 @@ export async function toXlsxWorkbook(
   }
 }
 
-/** Stream formula-preserving workbook XLSX with backpressure and cancellation. */
+/**
+ * Stream formula-preserving workbook XLSX with backpressure and cancellation.
+ *
+ * @param input - The workbook to write: a `WorkbookSnapshot`, or a grid, whose
+ *   `exportSnapshot()` is called first.
+ * @returns The `.xlsx` file's bytes, produced as the stream is read; cancelling
+ *   the stream stops the export.
+ */
 export function toXlsxWorkbookStream(
   input: WorkbookSnapshot | Pick<Grid, "exportSnapshot">,
   options?: XlsxWorkbookOptions,
@@ -332,7 +356,13 @@ export function toXlsxWorkbookStream(
   );
 }
 
-/** Import a File/Blob. The built-in backend reads it without buffering the compressed workbook. */
+/**
+ * Import a File/Blob. The built-in backend reads it without buffering the compressed workbook.
+ *
+ * @param file - The `.xlsx` file, such as one picked through `<input type="file">`.
+ * @returns A workbook snapshot of every sheet, with formulas kept, ready for
+ *   `createGridFromSnapshot`.
+ */
 export async function fromXlsxWorkbookFile(
   file: Blob,
   options?: XlsxWorkbookOptions,
@@ -370,6 +400,9 @@ export async function fromXlsxWorkbookFile(
  *   return createGridFromSnapshot(host, snapshot);
  * }
  * ```
+ * @param data - The bytes of an `.xlsx` file.
+ * @returns A workbook snapshot of every sheet, with formulas kept, ready for
+ *   `createGridFromSnapshot`.
  * @see toXlsxWorkbook
  */
 export async function fromXlsxWorkbook(

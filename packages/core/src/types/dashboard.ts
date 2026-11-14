@@ -25,7 +25,9 @@ export interface DashboardBox {
 export interface DashboardPivotItem {
   /** Stable ID, unique on the dashboard. */
   id: string;
+  /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
+  /** Always `"pivot"`. */
   kind: "pivot";
   /** `PivotDefinition.id` of a pivot on the same dashboard sheet. */
   pivot: string;
@@ -39,7 +41,9 @@ export interface DashboardPivotItem {
 export interface DashboardSlicerItem {
   /** Stable ID, unique on the dashboard. */
   id: string;
+  /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
+  /** Always `"slicer"`. */
   kind: "slicer";
   /** The table column whose values the slicer lists. */
   field: TableColumnRef;
@@ -59,7 +63,9 @@ export interface DashboardSlicerItem {
 export interface DashboardChartItem {
   /** Stable ID, unique on the dashboard. */
   id: string;
+  /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
+  /** Always `"chart"`. */
   kind: "chart";
   /** `ChartDefinition.id` of a chart on the same dashboard sheet; its `pivot` names the data. */
   chart: string;
@@ -72,7 +78,9 @@ export interface DashboardChartItem {
 export interface DashboardKpiItem {
   /** Stable ID, unique on the dashboard. */
   id: string;
+  /** Where the item sits on the dashboard grid, and its size. */
   box: DashboardBox;
+  /** Always `"kpi"`. */
   kind: "kpi";
   /** `Measure.id` of a measure of the workbook's data model. */
   measure: string;
@@ -112,6 +120,8 @@ export interface DashboardItemExport {
 
 /** The static content of the items of one dashboard sheet. */
 export interface DashboardExport {
+  /** Stable ID of the dashboard sheet. */
   readonly sheet: SheetId;
+  /** The content of each item, in the dashboard's item order. */
   readonly items: readonly DashboardItemExport[];
 }

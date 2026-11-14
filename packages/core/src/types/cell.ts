@@ -13,16 +13,23 @@ export type CellVerticalAlign = "top" | "middle" | "bottom";
 export interface CellBorder {
   /** hex color, e.g. "#111111" */
   color?: string;
+  /** Line width in CSS pixels; defaults to 1. */
   width?: number;
+  /** Line pattern; defaults to `"solid"`. */
   style?: "solid" | "dashed" | "dotted";
 }
 
 /** Per-side borders; `all` applies to any side not given its own border. */
 export interface CellBorders {
+  /** Border for every side that has no border of its own. */
   all?: CellBorder;
+  /** Border along the cell's top edge. */
   top?: CellBorder;
+  /** Border along the cell's right edge. */
   right?: CellBorder;
+  /** Border along the cell's bottom edge. */
   bottom?: CellBorder;
+  /** Border along the cell's left edge. */
   left?: CellBorder;
 }
 
@@ -72,7 +79,9 @@ export type HyperlinkTarget =
 export interface CellHyperlink {
   /** Stable identity used by operations, history, and collaboration rebase. */
   id: string;
+  /** Cells the link is attached to. */
   range: Range;
+  /** Where the link goes: a URL, or a range in this workbook. */
   target: HyperlinkTarget;
   /** Optional accessible/OOXML display label; cell values remain authoritative. */
   display?: string;
@@ -91,8 +100,11 @@ export type ConditionalFormatPredicate =
 
 /** Ordered condition and style applied to a cell range. */
 export interface ConditionalFormatRule {
+  /** Cells the rule is tested on. */
   range: Range;
+  /** Test each cell's value must pass for `style` to apply. */
   when: ConditionalFormatPredicate;
+  /** Style merged over a matching cell's own style. */
   style: CellStyle;
   /** Stop evaluating lower-precedence rules for a cell when this rule matches. */
   stopIfTrue?: boolean;

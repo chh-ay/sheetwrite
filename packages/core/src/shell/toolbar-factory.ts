@@ -25,6 +25,8 @@ export interface ToolbarOptions {
  * keyboard; commands that do not fit move into a "More commands" popup. Mouse
  * clicks never steal grid focus; Left/Right/Home/End move between controls and
  * Escape returns focus to the grid. Returns the piece with an idempotent `destroy`.
+ *
+ * @param host - Element the toolbar is appended to.
  */
 export function createToolbar(
   host: HTMLElement,

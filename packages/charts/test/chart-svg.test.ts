@@ -144,6 +144,74 @@ describe("renderChartSvg", () => {
     });
   });
 
+  // #700: the value axis of a wide bar chart drew labels into each other.
+  describe("value-axis labels", () => {
+    /** The renderer's font size, and its estimate of a glyph's width as a share of it. */
+    const FONT_SIZE = 11;
+    const GLYPH_WIDTH_RATIO = 0.6;
+    /** Every 40 px from 200 to 2,600: tick rounding packs labels tightest at some widths only. */
+    const LENGTHS = Array.from({ length: 61 }, (_, index) => 200 + index * 40);
+    const MONEY = ["$#,##0", "$#,##0", "$#,##0"];
+    const REVENUE = seriesView("Revenue", [1_234_567, 2_345_678, 987_654], {
+      categories: ["Americas", "APAC", "EMEA"],
+      numberFormats: MONEY,
+    });
+    const SPEND = seriesView("Revenue", [3, 5, 2], {
+      categories: [1_250_000, 2_500_000, 4_750_000],
+      categoryFormats: MONEY,
+    });
+
+    /** The extent of each label along a horizontal axis: centered on its x, as wide as estimated. */
+    function horizontalSpans(svg: Element, selector: string): Array<[number, number]> {
+      return [...svg.querySelectorAll(selector)].map((node) => {
+        const half = ((node.textContent ?? "").length * FONT_SIZE * GLYPH_WIDTH_RATIO) / 2;
+        const x = numberAttribute(node, "x");
+        return [x - half, x + half];
+      });
+    }
+
+    /** The extent of each label along a vertical axis: one font size, centered on its y. */
+    function verticalSpans(svg: Element, selector: string): Array<[number, number]> {
+      return [...svg.querySelectorAll(selector)]
+        .map((node): [number, number] => {
+          const y = numberAttribute(node, "y");
+          return [y - FONT_SIZE / 2, y + FONT_SIZE / 2];
+        })
+        .sort(([top], [otherTop]) => top - otherTop);
+    }
+
+    function expectApart(spans: Array<[number, number]>, end: number): void {
+      expect(spans.length).toBeGreaterThan(0);
+      spans.slice(1).forEach(([start], index) => {
+        expect(start).toBeGreaterThanOrEqual(spans[index]?.[1] ?? Number.POSITIVE_INFINITY);
+      });
+      expect(spans[0]?.[0]).toBeGreaterThanOrEqual(0);
+      expect(spans.at(-1)?.[1]).toBeLessThanOrEqual(end);
+    }
+
+    it.each<[ChartKind, ChartView, string]>([
+      ["bar", chartView("bar", [REVENUE]), ".sheetwrite-chart-value-axis text"],
+      ["scatter", chartView("scatter", [SPEND]), ".sheetwrite-chart-category-axis text"],
+    ])("keeps the %s chart's horizontal value labels apart at every width", (_, view, selector) => {
+      const counts = LENGTHS.map((width) => {
+        const spans = horizontalSpans(renderChartSvg(view, { width, height: 300 }), selector);
+        expectApart(spans, width);
+        return spans.length;
+      });
+
+      // Wider charts still get more labels, not just the two ends.
+      expect(counts.at(-1)).toBeGreaterThan(counts[0] ?? 0);
+      expect(counts.at(-1)).toBeGreaterThan(2);
+    });
+
+    it("keeps the column chart's vertical value labels apart at every height", () => {
+      for (const height of LENGTHS) {
+        const svg = renderChartSvg(chartView("column", [REVENUE]), { width: 400, height });
+        expectApart(verticalSpans(svg, ".sheetwrite-chart-value-axis text"), height);
+      }
+    });
+  });
+
   it("leaves a gap for each null value and notes a truncated series", () => {
     const sales = seriesView("Sales", [1, null, 3, 4, null], { truncated: true });
     const svg = render(chartView("line", [sales]));

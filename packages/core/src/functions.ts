@@ -53,7 +53,9 @@ function registryOf(engine: StoreDataEngine): HostFunctionRegistry | undefined {
 
 /** One host function: its metadata and the JavaScript that computes it. */
 export interface FormulaFunctionDefinition {
+  /** Name, arguments and help text of the function. */
   readonly metadata: FormulaFunctionMetadata;
+  /** The function itself, called with the argument values on each evaluation. */
   readonly implementation: FormulaFunction;
 }
 
@@ -120,6 +122,8 @@ function registerFunctions(store: Store, functions: readonly FormulaFunctionDefi
  *   ],
  * });
  * ```
+ * @param functions - The functions to add to every grid created after `initSheetwrite`.
+ * @returns The add-on to pass in `initSheetwrite({ addons })`.
  * @see /docs/features/formulas/custom-functions/
  */
 export function functionsAddon(
@@ -138,6 +142,8 @@ export function functionsAddon(
  * functions of the active engine, then the host functions of `store` in
  * registration order. Formula help reads this one list. The built-in table
  * loads on the first call, so the result is a promise.
+ *
+ * @returns The metadata, built-in functions first.
  */
 export async function listFunctions(store: Store): Promise<readonly FormulaFunctionMetadata[]> {
   // Only a SheetwriteStore has an engine; for any other store this throws.
