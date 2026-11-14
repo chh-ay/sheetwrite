@@ -142,6 +142,9 @@ fn compare(left_entry: Entry<'_>, right_entry: Entry<'_>) -> Result<Ordering, Fo
     }
 }
 
+/// A search's answer: the matching position, or none.
+type SearchResult = Result<Option<usize>, FormulaError>;
+
 /// What every search reads: a list's length and its entries by position.
 /// Each list type gets its own copy of the searches, so the dense loops
 /// stay as tight as they are without paged sheets.
@@ -152,11 +155,7 @@ pub(super) trait SearchList {
 
     /// [`exact_match`]'s plain scan for a finite number key, when the list
     /// has a faster one than an entry per position.
-    fn number_scan(
-        &self,
-        _key: f64,
-        _search_reverse: bool,
-    ) -> Option<Result<Option<usize>, FormulaError>> {
+    fn number_scan(&self, _key: f64, _search_reverse: bool) -> Option<SearchResult> {
         None
     }
 }
@@ -202,11 +201,7 @@ impl SearchList for ListView<'_> {
         }
     }
 
-    fn number_scan(
-        &self,
-        key: f64,
-        search_reverse: bool,
-    ) -> Option<Result<Option<usize>, FormulaError>> {
+    fn number_scan(&self, key: f64, search_reverse: bool) -> Option<SearchResult> {
         match self {
             Self::Storage { .. } => Some(storage_number_scan(self, key, search_reverse)),
             Self::Values(_) => None,
