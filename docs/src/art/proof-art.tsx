@@ -36,12 +36,12 @@ function Lanes(props: Readonly<{ lanes: readonly (readonly [x: number, name: str
 function Message(
   props: Readonly<{ from: number; to: number; y: number; label?: string; class?: string }>,
 ) {
-  const end = () => props.to + (props.to > props.from ? -4 : 4);
+  // The arrowhead's tip touches the receiving lane's lifeline.
   return (
     <>
       <path
         class={props.class ?? "ink-line"}
-        d={`M${props.from} ${props.y}H${end()}${head(end(), props.y, props.to > props.from ? 0 : 180)}`}
+        d={`M${props.from} ${props.y}H${props.to}${head(props.to, props.y, props.to > props.from ? 0 : 180)}`}
       />
       {props.label && (
         <text class="small" text-anchor="middle" x={(props.from + props.to) / 2} y={props.y - 5}>
