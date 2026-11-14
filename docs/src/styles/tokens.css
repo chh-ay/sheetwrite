@@ -213,16 +213,100 @@
   line-gap-override: 0%;
 }
 
-/* Code: a monospace fallback scaled to JetBrains Mono's 0.6 em advance and
-   line metrics, so a code line that fits in the web font also fits before it
-   loads, and wrapped lines keep their count. Courier New and Liberation Mono
-   advance 0.6001 em; the scale keeps the fallback a hair narrower. */
+/* Code: one fallback per system code font, so a first visit shows the
+   system's own code font rather than Courier New: SF Mono (when installed)
+   or Menlo on macOS, Consolas on Windows, DejaVu Sans Mono or Liberation
+   Mono on Linux, then Courier New. Each is scaled to JetBrains Mono's 0.6 em
+   advance, with JetBrains Mono's line metrics (ascent 1.02, descent 0.3)
+   divided by the scale, so a code line that fits in the web font also fits
+   before it loads and wrapped lines keep their count. Advances: SF Mono
+   0.6182 em, Menlo and DejaVu Sans Mono 0.6021, Consolas 0.5498, Liberation
+   Mono and Courier New 0.6001. Scales round down, keeping each fallback a
+   hair narrower. */
 @font-face {
-  font-family: "JetBrains Mono Fallback";
+  font-family: "JetBrains Mono Fallback SF Mono";
   font-weight: 100 549;
-  src:
-    local("Courier New"), local("CourierNewPSMT"), local("Liberation Mono"),
-    local("LiberationMono"), local("Cousine");
+  src: local("SF Mono"), local("SFMono-Regular");
+  size-adjust: 97.06%;
+  ascent-override: 105.09%;
+  descent-override: 30.91%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback SF Mono";
+  font-weight: 550 900;
+  src: local("SF Mono Bold"), local("SFMono-Bold");
+  size-adjust: 97.06%;
+  ascent-override: 105.09%;
+  descent-override: 30.91%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Menlo";
+  font-weight: 100 549;
+  src: local("Menlo Regular"), local("Menlo-Regular");
+  size-adjust: 99.65%;
+  ascent-override: 102.36%;
+  descent-override: 30.11%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Menlo";
+  font-weight: 550 900;
+  src: local("Menlo Bold"), local("Menlo-Bold");
+  size-adjust: 99.65%;
+  ascent-override: 102.36%;
+  descent-override: 30.11%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Consolas";
+  font-weight: 100 549;
+  src: local("Consolas");
+  size-adjust: 109.12%;
+  ascent-override: 93.48%;
+  descent-override: 27.49%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Consolas";
+  font-weight: 550 900;
+  src: local("Consolas Bold"), local("Consolas-Bold");
+  size-adjust: 109.12%;
+  ascent-override: 93.48%;
+  descent-override: 27.49%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback DejaVu Sans Mono";
+  font-weight: 100 549;
+  src: local("DejaVu Sans Mono"), local("DejaVuSansMono");
+  size-adjust: 99.65%;
+  ascent-override: 102.36%;
+  descent-override: 30.11%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback DejaVu Sans Mono";
+  font-weight: 550 900;
+  src: local("DejaVu Sans Mono Bold"), local("DejaVuSansMono-Bold");
+  size-adjust: 99.65%;
+  ascent-override: 102.36%;
+  descent-override: 30.11%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Liberation Mono";
+  font-weight: 100 549;
+  src: local("Liberation Mono"), local("LiberationMono"), local("Cousine");
   size-adjust: 99.98%;
   ascent-override: 102.02%;
   descent-override: 30.01%;
@@ -230,11 +314,29 @@
 }
 
 @font-face {
-  font-family: "JetBrains Mono Fallback";
+  font-family: "JetBrains Mono Fallback Liberation Mono";
   font-weight: 550 900;
-  src:
-    local("Courier New Bold"), local("CourierNewPS-BoldMT"), local("Liberation Mono Bold"),
-    local("LiberationMono-Bold"), local("Cousine Bold");
+  src: local("Liberation Mono Bold"), local("LiberationMono-Bold"), local("Cousine Bold");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Courier New";
+  font-weight: 100 549;
+  src: local("Courier New"), local("CourierNewPSMT");
+  size-adjust: 99.98%;
+  ascent-override: 102.02%;
+  descent-override: 30.01%;
+  line-gap-override: 0%;
+}
+
+@font-face {
+  font-family: "JetBrains Mono Fallback Courier New";
+  font-weight: 550 900;
+  src: local("Courier New Bold"), local("CourierNewPS-BoldMT");
   size-adjust: 99.98%;
   ascent-override: 102.02%;
   descent-override: 30.01%;
@@ -252,7 +354,11 @@
   --sw-font-display:
     "Bricolage Grotesque Variable", "Bricolage Grotesque", "Bricolage Grotesque Fallback",
     system-ui, sans-serif;
-  --sw-font-mono: "JetBrains Mono", "JetBrains Mono Fallback", ui-monospace, monospace;
+  --sw-font-mono:
+    "JetBrains Mono", "JetBrains Mono Fallback SF Mono", "JetBrains Mono Fallback Menlo",
+    "JetBrains Mono Fallback Consolas", "JetBrains Mono Fallback DejaVu Sans Mono",
+    "JetBrains Mono Fallback Liberation Mono", "JetBrains Mono Fallback Courier New", ui-monospace,
+    monospace;
   --font-sans: var(--sw-font-body);
   --font-display: var(--sw-font-display);
   --font-mono: var(--sw-font-mono);
