@@ -257,7 +257,7 @@ const fn stamp(access: u64) -> u64 {
 }
 
 /// The `(row, kind, payload, style)` of the `index`-th cell a column write lists.
-pub(super) type ColumnCell = dyn Fn(usize) -> (usize, u8, u64, u32);
+pub(super) type ColumnCell<'a> = dyn Fn(usize) -> (usize, u8, u64, u32) + 'a;
 
 /// One (column, chunk) of the page directory: its clean page, pins and
 /// eviction links. A page is on the eviction list while it is resident and
@@ -930,7 +930,7 @@ impl PagedStorage {
         &mut self,
         col: usize,
         len: usize,
-        cell: &ColumnCell,
+        cell: &ColumnCell<'_>,
         dirty: DirtyRowWrite,
     ) {
         // (page, clean page index) of the run being written.
