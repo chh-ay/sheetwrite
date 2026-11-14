@@ -745,6 +745,7 @@ export class SheetwriteStore implements Store {
     return this.applyTransaction({ patches }, "structure");
   }
 
+  /** Shows the given hidden rows again, or every hidden row when `rows` is omitted, as one change. */
   showRows(sheet: SheetId, rows?: readonly number[]): ApplyTransactionResult {
     const meta = this.engine.sheets.sheetMeta(sheet);
     const patches = rowVisibilityPatches(meta, rows ?? [...(meta.hiddenRows ?? [])], false);

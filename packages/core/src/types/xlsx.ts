@@ -82,6 +82,7 @@ export interface XlsxTableImportBackend {
 
 /** Structured fidelity warning emitted during XLSX conversion. */
 export interface XlsxWorkbookWarning {
+  /** What was lost or changed, such as `rich-text` when formatted runs became plain text. */
   code:
     | "boolean-literal"
     | "rich-text"

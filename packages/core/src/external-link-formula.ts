@@ -122,6 +122,7 @@ export function formulaContainsExternalReference(formula: string): boolean {
  * Whether the formula calls a function that reads live external data, such as `RTD` or `DDE`.
  *
  * @param formula - Formula text, with or without the leading `=`.
+ * @returns `true` when such a call appears outside quoted text.
  */
 export function formulaCallsExternalData(formula: string): boolean {
   return (
