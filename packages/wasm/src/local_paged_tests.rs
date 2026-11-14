@@ -27,16 +27,17 @@ fn twin_sheets(rows: usize) -> (CellStore, usize, usize) {
         store.recompute(sheet);
     }
     store.convert_sheet_to_local_paged(local);
-    assert!(store.sheets[local].cells.is_local_paged());
+    assert!(
+        store.sheets[local].cells.is_local_paged(),
+        "the copy converts"
+    );
     (store, dense, local)
 }
 
-fn column(
-    store: &CellStore,
-    sheet: usize,
-    rows: usize,
-    col: usize,
-) -> Vec<(u8, f64, Option<String>)> {
+/// Each cell's kind, number and text.
+type ColumnCells = Vec<(u8, f64, Option<String>)>;
+
+fn column(store: &CellStore, sheet: usize, rows: usize, col: usize) -> ColumnCells {
     (0..rows)
         .map(|row| {
             let cell = store.get_cell(sheet, row, col);
@@ -106,7 +107,7 @@ fn edits_on_a_local_sheet_keep_no_dirty_overlay() {
             &offsets,
             &[KIND_NUMBER, KIND_STRING, KIND_NUMBER],
             &[1.5, 0.0, 2.5],
-            "x".as_bytes(),
+            b"x",
             &[0, 1],
             &[0; 3],
             &[],

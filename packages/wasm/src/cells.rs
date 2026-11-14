@@ -1043,6 +1043,9 @@ pub(crate) fn source_kind(raw: u8) -> u8 {
     raw & !CALCULATED
 }
 
+/// A run's source kinds and payloads, one entry per cell.
+pub(crate) type SourceSlices<'a> = (&'a [u8], &'a [u64]);
+
 /// A borrowed column segment bounded by its source page or column, and for
 /// paged storage also by its dirty and calculated blocks. Indices are absolute
 /// and valid only inside `start..end`. Creating a run allocates nothing and
@@ -1139,7 +1142,7 @@ impl CellRun<'_> {
     /// A paged run's clean kinds and payloads, when every cell is loaded and
     /// no dirty or calculated block overlays the run. A local sheet's run
     /// without a page is all empty cells: `Some` with empty slices.
-    pub(crate) fn clean_sources(&self) -> Option<(&[u8], &[u64])> {
+    pub(crate) fn clean_sources(&self) -> Option<SourceSlices<'_>> {
         if self.is_dense || self.dirty.is_some() || !self.calculated.is_empty() {
             return None;
         }
