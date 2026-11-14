@@ -22,7 +22,7 @@ use super::super::matrix::{
     range_from_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
 };
 use super::super::value::number_from_value;
-use super::super::EvalPass;
+use super::super::{settled_cell_value, EvalPass};
 use crate::calc::{Ast, Func, LambdaDefinition};
 use crate::memory::MemoryOwnerStats;
 use crate::store::CellStore;
@@ -61,6 +61,17 @@ pub(crate) enum Slot {
         rows: usize,
         cols: usize,
         values: Rc<[Value]>,
+    },
+    /// One table column at a list of its rows, read in place: a measure's
+    /// column in one pivot cell. No rows read as one blank, as a range with
+    /// no cells does.
+    Rows {
+        sheet: u32,
+        col: u32,
+        /// The sheet row of the table's first data row.
+        first_row: u32,
+        /// Data rows, ascending.
+        rows: Rc<[u32]>,
     },
     /// A LAMBDA and the call record it was created in. The definition is
     /// shared with the tree that wrote it, so a closure costs one handle.
@@ -248,9 +259,10 @@ impl<'a> Shapes<'a> {
             | Slot::Shaped {
                 is_array: false, ..
             } => Kind::Scalar,
-            Slot::Shaped { is_array: true, .. } | Slot::OneCell(_) | Slot::Array { .. } => {
-                Kind::Array
-            }
+            Slot::Shaped { is_array: true, .. }
+            | Slot::OneCell(_)
+            | Slot::Array { .. }
+            | Slot::Rows { .. } => Kind::Array,
             Slot::Closure { definition, link } => Kind::Closure(
                 definition,
                 Shapes {
@@ -498,10 +510,22 @@ pub(crate) fn parameter_count(expression: &Ast) -> Result<usize, FormulaError> {
 }
 
 /// The value a parameter use reads.
-pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16) -> Value {
+pub(crate) fn parameter_value(
+    store: &CellStore,
+    frame: Option<&CallFrame>,
+    depth: u16,
+    index: u16,
+) -> Value {
     match frame.and_then(|active| active.slot(depth, index)) {
         Some(Slot::Value(value) | Slot::OneCell(value)) => value.clone(),
         Some(Slot::Array { values, .. }) => values.first().cloned().unwrap_or(Value::Blank),
+        Some(
+            rows @ Slot::Rows {
+                rows: positions, ..
+            },
+        ) => positions
+            .first()
+            .map_or(Value::Blank, |&row| row_value(store, rows, row)),
         Some(Slot::Missing) => Value::Blank,
         // Shape analysis binds shapes only; it never reads a value.
         Some(Slot::Shaped { .. }) => Value::Error(FormulaError::Value),
@@ -511,14 +535,104 @@ pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16)
     }
 }
 
-/// The shape of an array or one-cell parameter.
+/// The settled value of data row `row` of a [`Slot::Rows`] column.
+fn row_value(store: &CellStore, slot: &Slot, row: u32) -> Value {
+    let Slot::Rows {
+        sheet,
+        col,
+        first_row,
+        ..
+    } = slot
+    else {
+        return Value::Error(FormulaError::Value);
+    };
+    store
+        .sheets
+        .get(*sheet as usize)
+        .map_or(Value::Error(FormulaError::Ref), |data| {
+            settled_cell_value(
+                data,
+                &store.strings,
+                *first_row as usize + row as usize,
+                *col as usize,
+                &store.formula_slots,
+            )
+        })
+}
+
+/// Takes one value of an array argument; an error stops the reading.
+pub(in crate::eval) type ReadValue<'a> = dyn FnMut(Value) -> Result<(), FormulaError> + 'a;
+/// Rows and columns of an array.
+pub(in crate::eval) type ArrayShape = (usize, usize);
+
+/// Calls `read` with each value of an array, one-cell or row-list
+/// parameter in row-major order, without copying the array, and returns
+/// its shape. `None` when `argument` is not such a parameter.
+pub(in crate::eval) fn read_parameter_values(
+    store: &CellStore,
+    frame: Option<&CallFrame>,
+    argument: &Ast,
+    read: &mut ReadValue<'_>,
+) -> Option<Result<ArrayShape, FormulaError>> {
+    let Ast::Parameter { depth, index, .. } = argument else {
+        return None;
+    };
+    let slot = frame?.slot(*depth, *index)?;
+    let shape = parameter_slot_shape(slot)?;
+    Some(read_slot_values(store, slot, read).map(|()| shape))
+}
+
+/// Calls `read` with each value of an array-like slot in row-major order.
+/// A slot with no values to read is `#VALUE!`.
+fn read_slot_values(
+    store: &CellStore,
+    slot: &Slot,
+    read: &mut ReadValue<'_>,
+) -> Result<(), FormulaError> {
+    match slot {
+        Slot::OneCell(value) => read(value.clone()),
+        Slot::Array { values, .. } => values.iter().try_for_each(|value| read(value.clone())),
+        Slot::Rows { rows, .. } if rows.is_empty() => read(Value::Blank),
+        Slot::Rows { rows, .. } => rows
+            .iter()
+            .try_for_each(|&row| read(row_value(store, slot, row))),
+        Slot::Value(_) | Slot::Missing | Slot::Closure { .. } | Slot::Shaped { .. } => {
+            Err(FormulaError::Value)
+        }
+    }
+}
+
+/// The values of an array, one-cell or row-list parameter.
+pub(in crate::eval) fn parameter_matrix(
+    store: &CellStore,
+    frame: Option<&CallFrame>,
+    depth: u16,
+    index: u16,
+) -> Option<EvalMatrix> {
+    let slot = frame?.slot(depth, index)?;
+    let (rows, cols) = parameter_slot_shape(slot)?;
+    let mut values = Vec::with_capacity(rows * cols);
+    read_slot_values(store, slot, &mut |value| {
+        values.push(value);
+        Ok(())
+    })
+    .ok()?;
+    Some(EvalMatrix::new(rows, cols, values))
+}
+
+/// The shape of an array, one-cell or row-list parameter.
 pub(crate) fn parameter_shape(
     frame: Option<&CallFrame>,
     depth: u16,
     index: u16,
 ) -> Option<(usize, usize)> {
-    match frame?.slot(depth, index)? {
+    parameter_slot_shape(frame?.slot(depth, index)?)
+}
+
+fn parameter_slot_shape(slot: &Slot) -> Option<(usize, usize)> {
+    match slot {
         Slot::OneCell(_) => Some((1, 1)),
+        Slot::Rows { rows, .. } => Some((rows.len().max(1), 1)),
         Slot::Array { rows, cols, .. }
         | Slot::Shaped {
             rows,

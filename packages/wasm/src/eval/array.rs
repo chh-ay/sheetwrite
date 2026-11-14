@@ -409,17 +409,15 @@ impl CellStore {
             // row step over it copies none.
             #[cfg(feature = "analysis")]
             Ast::Parameter { depth, index, .. } => {
-                use super::analysis::lambda::Slot;
-                let slot = pass.results.call_frame()?.slot(*depth, *index)?;
-                return match slot {
-                    Slot::Array { rows, cols, values } => Some(T::shared(*rows, *cols, values)),
-                    Slot::OneCell(value) => {
-                        Some(T::computed(EvalMatrix::new(1, 1, vec![value.clone()])))
-                    }
-                    Slot::Value(_) | Slot::Missing | Slot::Closure { .. } | Slot::Shaped { .. } => {
-                        None
-                    }
-                };
+                let frame = pass.results.call_frame();
+                if let Some(super::analysis::lambda::Slot::Array { rows, cols, values }) =
+                    frame.and_then(|frame| frame.slot(*depth, *index))
+                {
+                    return Some(T::shared(*rows, *cols, values));
+                }
+                Ok(super::analysis::lambda::parameter_matrix(
+                    self, frame, *depth, *index,
+                )?)
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
