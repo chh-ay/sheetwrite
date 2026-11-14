@@ -10,7 +10,7 @@ import {
   PairsFigure,
   TileFigure,
 } from "./blueprint-layouts.js";
-import type { DiagramText } from "./diagram-kit.js";
+import type { BlueprintText } from "./blueprint.js";
 
 /** One step of a flow: a box with a heading, caption lines and code lines. */
 export interface FlowStep {
@@ -56,7 +56,7 @@ export function figureStep(step: FlowStep): FigureStep {
  */
 export function FlowDiagram(
   props: Readonly<{
-    text: DiagramText;
+    text: BlueprintText;
     steps: readonly FlowStep[];
     branch?: FlowBranch;
     note?: string;
@@ -72,7 +72,7 @@ export function FlowDiagram(
       note={props.note}
       outcome={props.branch === undefined ? undefined : outcome(props.branch)}
       steps={props.steps.map(figureStep)}
-      text={{ title: props.text.title, description: props.text.description }}
+      text={props.text}
     />
   );
 }
@@ -149,8 +149,6 @@ export function ErrorFlowDiagram() {
         { title: "C1 replaces it", code: ["=IFERROR(B1,0)", "→ 0"], tone: "hue-soft" },
       ]}
       text={{
-        hue: "green",
-        alt: "red",
         title: "Errors are values that flow to dependents",
         description:
           "A formula error is a result, not an exception. A1 =1/0 shows #DIV/0!; B1 =A1*2, which reads it, shows #DIV/0! too; C1 =IFERROR(B1,0) replaces the error with 0. An unknown function shows #NAME? and its source stays in the document.",
@@ -175,8 +173,6 @@ export function VolatileDiagram() {
         { title: "Other formulas", lines: ["Only when a cell", "they read changed"] },
       ]}
       text={{
-        hue: "violet",
-        alt: "amber",
         title: "What a transaction recalculates",
         description:
           "Each transaction that changes cell inputs recalculates the volatile functions, OFFSET, INDIRECT, RAND, RANDBETWEEN, TODAY and NOW, and their dependents. Other formulas recalculate only when a cell they read changes. A transaction without cell changes recalculates nothing.",
@@ -243,8 +239,6 @@ export function VirtualScrollDiagram() {
         },
       ]}
       text={{
-        hue: "teal",
-        alt: "amber",
         title: "Painting only the rows in view, past the browser's height cap",
         description:
           "Only the rows that intersect the viewport are painted: computeWindow turns the scroll offset and viewport height into a row range, padded by overscan rows on each side. Browsers cap an element's height, so the grid measures the real cap, pins its scroll sizer to it, and ScaledScroll maps the capped scrollbar position linearly onto every row.",
@@ -270,8 +264,6 @@ export function GenerationsDiagram() {
         tone: index === 0 ? "hue-soft" : "panel",
       }))}
       text={{
-        hue: "green",
-        alt: "violet",
         title: "Each grid generation gets its own onReady",
         description:
           "onReady receives the grid, a one-based generation that increases whenever the adapter replaces its Grid, and a reason: initial after mount and WASM initialization, input-reset when a reset-classified input changed identity, or renderer-reset when renderer, workerUrl or renderers changed. The exposed handle is set before onReady and cleared when its generation is destroyed.",
@@ -362,8 +354,6 @@ export function StreamingImportDiagram() {
         { title: "Snapshot cells", lines: ["Built as rows", "stream in"] },
       ]}
       text={{
-        hue: "blue",
-        alt: "red",
         title: "How a large XLSX file imports",
         description:
           "fromXlsxWorkbookFile reads a seekable File or Blob without buffering it first. Import keeps the ZIP directory and parses each worksheet incrementally from bounded inflated chunks, building snapshot cells as rows stream; the snapshot still holds every imported cell. If the signal aborts, the call rejects with signal.reason and keeps no partial snapshot.",
@@ -396,8 +386,6 @@ export function KeptPartsDiagram() {
         },
       ]}
       text={{
-        hue: "teal",
-        alt: "amber",
         title: "Which parts Sheetwrite keeps on save",
         description:
           "Import stores each opaque part with its original compressed ZIP bytes in snapshot.workbook.xlsxSource, and export writes it back byte for byte. VBA projects, customXml, XML maps, data connections, theme and document properties are always kept. Images, drawings without charts and single-cell XML tables are kept if their sheet's rows and columns didn't change. Charts the chart model can't hold, pivot tables and their caches are kept if no cell, sheet name or defined name changed.",
@@ -440,8 +428,6 @@ export function WorkerRenderingDiagram() {
         },
       ]}
       text={{
-        hue: "violet",
-        alt: "green",
         title: "How worker rendering paints, and when it falls back",
         description:
           "The renderer constructs the Worker first, then transfers control of a canvas to it with transferControlToOffscreen. Layout, theme, viewport and each painted window, a typed-array-backed VisibleWindowView, are posted to the worker, which paints into the OffscreenCanvas off the main thread. If constructing the worker throws, the grid switches to the main-thread CanvasRenderer and emits one renderer-fallback event.",
@@ -502,8 +488,6 @@ export function FormulaReadsDiagram() {
         },
       ]}
       text={{
-        hue: "amber",
-        alt: "blue",
         title: "Loading the cells that visible formulas read",
         description:
           "For the formulas it paints, including frozen bands and overscan, the grid asks the engine which same-sheet cells they read, also through other formulas, and requests those cells with the window, within one shared 32,768-cell budget. The painted cells and their dependency closure stay protected from clean-cache eviction while visible. Reads from other sheets are not loaded this way.",
@@ -537,8 +521,6 @@ export function IterationDiagram() {
         },
       ]}
       text={{
-        hue: "violet",
-        alt: "green",
         title: "How a cycle calculates with iteration on",
         description:
           "Each recalculation starts from the values the cells show now; a cell that showed #CYCLE! starts at 0. The engine calculates the cycle's cells in row order, each reading the newest values, and stops after maxIterations passes or after the first pass in which no value changes by more than maxChange. Formulas that read the cycle calculate once, after it settles.",
@@ -598,8 +580,6 @@ export function PendingCommitsDiagram() {
         { title: "4 · Remove", lines: ["Only after applied", "or duplicate"], tone: "alt-soft" },
       ]}
       text={{
-        hue: "blue",
-        alt: "green",
         title: "What durable pending commits do",
         description:
           "With a PendingCommitStorage adapter, SyncCoordinator persists each immutable commit before it can be sent, restores pending commits on startup and reapplies them as remote-source operations so they are not echoed, retries with the original clientMutationId after reconnect or reload, removes durable work only after an applied or duplicate acknowledgement, and keeps conflicts and storage failures for explicit host recovery.",
@@ -660,8 +640,6 @@ export function ViewPipelineDiagram() {
         { title: "Sorted", lines: ["By the active", "multi-key sort"], tone: "alt-soft" },
       ]}
       text={{
-        hue: "pink",
-        alt: "blue",
         title: "How a view picks and orders the displayed rows",
         description:
           "All active column filters are ANDed together, hidden rows and collapsed groups are subtracted, and the remaining rows are sorted by the active multi-key sort. No cell moves: a view sort is saved with the sheet and exports to XLSX as sortState.",

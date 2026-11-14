@@ -547,3 +547,134 @@ export function ExchangeFigure(
     />
   );
 }
+
+/** The fraction along `target`'s side that lines up with the middle of `source`, on the given axis. */
+function facing(target: BlueprintNode, source: BlueprintNode, axis: "x" | "y"): number {
+  const middle =
+    axis === "x" ? source.rect.x + source.rect.w / 2 : source.rect.y + source.rect.h / 2;
+  const start = axis === "x" ? target.rect.x : target.rect.y;
+  const length = axis === "x" ? target.rect.w : target.rect.h;
+  return Math.min(0.85, Math.max(0.15, (middle - start) / length));
+}
+
+function mergeWide(sources: readonly FigureStep[], steps: readonly FigureStep[]): BlueprintLayout {
+  const columns = steps.length + 1;
+  const gap = ROW_GAP + 24;
+  const w = (WIDE - 2 * MARGIN - (columns - 1) * gap) / columns;
+  const h = Math.max(...sources.map(nodeHeight));
+  const left: BlueprintNode[] = sources.map((source, index) =>
+    box(`in${index}`, source, MARGIN, MARGIN + index * (h + ROW_GAP / 2), w, h),
+  );
+  const height = sources.length * h + (sources.length - 1) * (ROW_GAP / 2);
+  const stepHeight = Math.max(...steps.map(nodeHeight));
+  const y = MARGIN + (height - stepHeight) / 2;
+  const right = steps.map((step, index) =>
+    box(`s${index}`, step, MARGIN + (index + 1) * (w + gap), y, w, stepHeight),
+  );
+  const first = right[0];
+  if (first === undefined) throw new Error("A merge needs at least one step after its sources");
+  return {
+    width: WIDE,
+    height: MARGIN + Math.max(height, stepHeight) + MARGIN,
+    nodes: [...left, ...right],
+    edges: [
+      ...left.map((source) => ({
+        from: source.id,
+        fromSide: "right" as const,
+        to: first.id,
+        toSide: "left" as const,
+        toT: facing(first, source, "y"),
+        kind: "main" as const,
+      })),
+      ...right.slice(1).map((step, index) => ({
+        from: `s${index}`,
+        fromSide: "right" as const,
+        to: step.id,
+        kind: "main" as const,
+      })),
+    ],
+  };
+}
+
+function mergeNarrow(
+  sources: readonly FigureStep[],
+  steps: readonly FigureStep[],
+): BlueprintLayout {
+  // Two sources sit side by side; more stack, each on its own row.
+  const across = sources.length === 2 ? 2 : 1;
+  // Stacked sources are indented, so their connectors can drop down on the left.
+  const inset = across === 1 ? INDENT : 0;
+  const w = (NARROW - 2 * MARGIN - inset - (across - 1) * (ROW_GAP / 2)) / across;
+  const h = Math.max(...sources.map((source) => nodeHeight(source)));
+  const nodes: BlueprintNode[] = sources.map((source, index) =>
+    box(
+      `in${index}`,
+      source,
+      MARGIN + inset + (index % across) * (w + ROW_GAP / 2),
+      MARGIN + Math.floor(index / across) * (h + ROW_GAP / 2),
+      w,
+      h,
+    ),
+  );
+  const rows = Math.ceil(sources.length / across);
+  let y = MARGIN + rows * h + (rows - 1) * (ROW_GAP / 2) + ROW_SPACE;
+  const right = steps.map((step, index) => {
+    const placed = box(`s${index}`, step, MARGIN, y, NARROW - 2 * MARGIN);
+    y += placed.rect.h + ROW_SPACE;
+    return placed;
+  });
+  const first = right[0];
+  if (first === undefined) throw new Error("A merge needs at least one step after its sources");
+  // Stacked sources drop down on their left, the upper ones farther out, so no two cross.
+  const sourceEdges: BlueprintEdge[] =
+    across === 2
+      ? nodes.map((source) => ({
+          from: source.id,
+          fromSide: "bottom",
+          to: first.id,
+          toSide: "top",
+          toT: facing(first, source, "x"),
+          kind: "main",
+        }))
+      : nodes.map((source, index) => ({
+          from: source.id,
+          fromSide: "left",
+          to: first.id,
+          toSide: "top",
+          toT: (8 + index * ((INDENT - 16) / Math.max(1, nodes.length - 1))) / first.rect.w,
+          kind: "main",
+        }));
+  return {
+    width: NARROW,
+    height: y - ROW_SPACE + MARGIN,
+    nodes: [...nodes, ...right],
+    edges: [
+      ...sourceEdges,
+      ...right.slice(1).map((step, index) => ({
+        from: `s${index}`,
+        fromSide: "bottom" as const,
+        to: step.id,
+        kind: "main" as const,
+      })),
+    ],
+  };
+}
+
+/** A merge: several sources that feed one step, then a short flow on from it. */
+export function MergeFigure(
+  props: Readonly<{
+    text: BlueprintText;
+    sources: readonly FigureStep[];
+    steps: readonly FigureStep[];
+    note?: string;
+  }>,
+): JSX.Element {
+  return (
+    <BlueprintDiagram
+      narrow={mergeNarrow(props.sources, props.steps)}
+      note={props.note}
+      text={props.text}
+      wide={mergeWide(props.sources, props.steps)}
+    />
+  );
+}

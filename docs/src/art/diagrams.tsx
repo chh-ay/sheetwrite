@@ -4,7 +4,7 @@
 import type { JSX } from "solid-js";
 
 import { along, NARROW, node, WIDE, XlsxFlowFigure } from "./blueprint-figures.js";
-import { FlowFigure, PairsFigure, SequenceFigure } from "./blueprint-layouts.js";
+import { FlowFigure, MergeFigure, PairsFigure, SequenceFigure } from "./blueprint-layouts.js";
 import { BlueprintDiagram, type BlueprintLayout } from "./blueprint.js";
 
 /** Live recalculation showcase: which formulas each edit recalculates. */
@@ -134,172 +134,24 @@ export function DataModelDiagram(): JSX.Element {
   );
 }
 
-function commandLayout(width: number, narrow: boolean): BlueprintLayout {
-  if (narrow) {
-    const half = (width - 16 - 16) / 2;
-    const ribbon = node({
-      id: "ribbon",
-      x: 8,
-      y: 8,
-      w: half,
-      title: "Ribbon command",
-      lines: ["Home › Editing", "› AutoSum"],
-    });
-    const toolbar = node({
-      id: "toolbar",
-      x: 8 + half + 16,
-      y: 8,
-      w: half,
-      title: "Your toolbar",
-      lines: ["Your own", "buttons"],
-    });
-    const h = Math.max(ribbon.rect.h, toolbar.rect.h);
-    const actions = node({
-      id: "actions",
-      x: 8,
-      y: 8 + h + 48,
-      w: width - 16,
-      title: "grid.actions",
-      lines: ["The same methods"],
-      tone: "accent",
-    });
-    const grid = node({
-      id: "grid",
-      x: 8,
-      y: actions.rect.y + actions.rect.h + 48,
-      w: width - 16,
-      title: "Grid",
-      lines: ["Applies the command"],
-    });
-    const refresh = node({
-      id: "refresh",
-      x: 8,
-      y: grid.rect.y + grid.rect.h + 32,
-      w: half,
-      title: "Refresh All",
-      lines: ["Data › Refresh All"],
-      tone: "muted",
-    });
-    const query = node({
-      id: "query",
-      x: 8 + half + 16,
-      y: refresh.rect.y,
-      w: half,
-      h: refresh.rect.h,
-      title: "Saved query",
-      lines: ["Reloads Targets"],
-    });
-    return {
-      width,
-      height: query.rect.y + query.rect.h + 8,
-      nodes: [
-        { ...ribbon, rect: { ...ribbon.rect, h } },
-        { ...toolbar, rect: { ...toolbar.rect, h } },
-        actions,
-        grid,
-        refresh,
-        query,
-      ],
-      edges: [
-        {
-          from: "ribbon",
-          fromSide: "bottom",
-          to: "actions",
-          toT: along(actions, 8 + half / 2),
-          kind: "main",
-        },
-        {
-          from: "toolbar",
-          fromSide: "bottom",
-          to: "actions",
-          toT: along(actions, 8 + half + 16 + half / 2),
-          kind: "main",
-        },
-        { from: "actions", fromSide: "bottom", to: "grid", kind: "main" },
-        { from: "refresh", fromSide: "right", to: "query", kind: "side" },
-      ],
-    };
-  }
-  const ribbon = node({
-    id: "ribbon",
-    x: 8,
-    y: 8,
-    w: 200,
-    title: "Ribbon command",
-    lines: ["Home › Editing › AutoSum"],
-  });
-  const toolbar = node({
-    id: "toolbar",
-    x: 8,
-    y: 8 + ribbon.rect.h + 24,
-    w: 200,
-    h: ribbon.rect.h,
-    title: "Your toolbar",
-    lines: ["Your own buttons"],
-  });
-  const middle = (toolbar.rect.y + toolbar.rect.h + 8) / 2;
-  const actions = node({
-    id: "actions",
-    x: 276,
-    y: 0,
-    w: 180,
-    title: "grid.actions",
-    lines: ["The same methods"],
-    tone: "accent",
-  });
-  const placedActions = { ...actions, rect: { ...actions.rect, y: middle - actions.rect.h / 2 } };
-  const grid = node({
-    id: "grid",
-    x: 524,
-    y: placedActions.rect.y,
-    w: 188,
-    h: actions.rect.h,
-    title: "Grid",
-    lines: ["Applies the command"],
-  });
-  const refresh = node({
-    id: "refresh",
-    x: 8,
-    y: toolbar.rect.y + toolbar.rect.h + 40,
-    w: 200,
-    title: "Refresh All",
-    lines: ["Data › Refresh All"],
-    tone: "muted",
-  });
-  const query = node({
-    id: "query",
-    x: 276,
-    y: refresh.rect.y,
-    w: 180,
-    h: refresh.rect.h,
-    title: "Saved query",
-    lines: ["Reloads the Targets sheet"],
-  });
-  return {
-    width,
-    height: query.rect.y + query.rect.h + 8,
-    nodes: [ribbon, toolbar, placedActions, grid, refresh, query],
-    edges: [
-      { from: "ribbon", fromSide: "right", to: "actions", toSide: "left", toT: 0.3, kind: "main" },
-      { from: "toolbar", fromSide: "right", to: "actions", toSide: "left", toT: 0.7, kind: "main" },
-      { from: "actions", fromSide: "right", to: "grid", kind: "main" },
-      { from: "refresh", fromSide: "right", to: "query", kind: "side" },
-    ],
-  };
-}
-
 /** Spreadsheet showcase: the ribbon and your toolbar call the same grid actions. */
 export function CommandModelDiagram(): JSX.Element {
   return (
-    <BlueprintDiagram
-      narrow={commandLayout(NARROW, true)}
-      note="The Targets sheet is a saved query that Refresh All reloads."
+    <MergeFigure
+      note="The Targets sheet is a saved query that Data › Refresh All reloads."
+      sources={[
+        { title: "Ribbon command", lines: ["Home › Editing", "› AutoSum"] },
+        { title: "Your toolbar", lines: ["Your own", "buttons"] },
+      ]}
+      steps={[
+        { title: "grid.actions", lines: ["The same methods"], tone: "accent" },
+        { title: "Grid", lines: ["Applies the command"] },
+      ]}
       text={{
         title: "One command model: the ribbon and your toolbar call the same grid actions",
         description:
           "A ribbon command and a button in your own toolbar both call grid.actions, which applies the command to the grid. Data › Refresh All reloads the saved query behind the Targets sheet.",
       }}
-      wide={commandLayout(WIDE, false)}
     />
   );
 }
