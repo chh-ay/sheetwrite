@@ -2,6 +2,7 @@ import { type Component, For, type JSX, Show } from "solid-js";
 
 import { Icon } from "../../components/Icon.js";
 import { SiteTopbar } from "../../components/SiteTopbar.js";
+import { type ShowcaseCall, showcaseCalls } from "./showcase-calls.js";
 
 /*
  * The one layout every showcase uses: a short task statement, the live demo as
@@ -34,6 +35,11 @@ export interface ShowcaseCode {
   readonly source: string;
   /** A picture beside the code, in place of the list of calls (an architecture diagram). */
   readonly figure?: JSX.Element;
+  /**
+   * What a call does in this example, by the call as written (`grid.setPivot`),
+   * where its API summary says less.
+   */
+  readonly notes?: Readonly<Record<string, string>>;
 }
 
 /** A link from the showcase to the guide that explains it. */
@@ -135,12 +141,6 @@ function CodeFactValue(props: { readonly value: string }) {
  * whole rather than hide a few lines behind the control.
  */
 const FOLDED_LINES = 34;
-/** At most this many calls are listed beside the code. */
-const LISTED_CALLS = 8;
-/** A call the snippet makes: a Grid method, a factory, an init, a constructed class, or a subscription. */
-const CALL =
-  /\b(?:grid\.[a-zA-Z.]+|create[A-Z][A-Za-z]+|init[A-Z][A-Za-z]+|new [A-Z][A-Za-z]+|[a-z]+\.(?:subscribe|on|ready))(?=\()/g;
-const BUILT_IN = /^new (?:Promise|Map|Set|Error|URL|Date|Uint8Array)$/;
 
 /** The fenced code of a snippet file, without the fences. */
 function fencedCode(source: string): string {
@@ -155,10 +155,7 @@ function ShowcaseCodeBlock(props: {
   const Snippet = props.code.Snippet;
   const code = fencedCode(props.code.source);
   const lines = code.trimEnd().split("\n").length;
-  const calls = [...new Set(code.match(CALL) ?? [])]
-    .filter((call) => !BUILT_IN.test(call))
-    .map((call) => call.replace(/^new /, ""))
-    .slice(0, LISTED_CALLS);
+  const calls = showcaseCalls(code, props.code.notes);
   const hasFigure = "figure" in props.code;
   return (
     <div class="sw-showcase__code-row" data-figure={hasFigure ? "" : undefined}>
@@ -186,16 +183,12 @@ function ShowcaseCodeBlock(props: {
         <Show
           fallback={
             <>
-              <h3 class="sw-showcase__aside-title">In this code</h3>
+              <h3 class="sw-showcase__aside-title">APIs in this example</h3>
               <ul class="sw-showcase__calls">
-                <For each={calls}>
-                  {(call) => (
-                    <li>
-                      <code>{call}</code>
-                    </li>
-                  )}
-                </For>
+                <For each={calls}>{(call) => <ShowcaseCallRow call={call} />}</For>
               </ul>
+              {/* Pointing at or focusing a call tints the code lines that use it. */}
+              <style>{callHighlightRules(calls)}</style>
             </>
           }
           when={hasFigure}
@@ -214,6 +207,42 @@ function ShowcaseCodeBlock(props: {
       </aside>
     </div>
   );
+}
+
+/** A call beside the code: its name, linked to its reference, and what it does. */
+function ShowcaseCallRow(props: { readonly call: ShowcaseCall }) {
+  const name = <code>{props.call.label}</code>;
+  return (
+    <li class="sw-showcase__call" data-symbol={props.call.symbol}>
+      <Show fallback={<span class="sw-showcase__call-name">{name}</span>} when={props.call.href}>
+        {(href) => (
+          <a class="sw-showcase__call-name" href={href()}>
+            {name}
+          </a>
+        )}
+      </Show>
+      <Show when={props.call.summary}>
+        {(summary) => (
+          <p class="sw-showcase__call-summary">
+            <For each={summary().split("`")}>
+              {(part, index) => (index() % 2 === 1 ? <code>{part}</code> : part)}
+            </For>
+          </p>
+        )}
+      </Show>
+    </li>
+  );
+}
+
+/** One rule per listed call: its row, pointed at or focused, tints the code lines naming it. */
+function callHighlightRules(calls: readonly ShowcaseCall[]): string {
+  const selectors = calls.map(
+    ({ symbol }) =>
+      `.sw-showcase__code-row:has([data-symbol="${symbol}"]:is(:hover, :focus-within)) .ec-line:has([data-sw-symbol="${symbol}"])`,
+  );
+  return selectors.length === 0
+    ? ""
+    : `${selectors.join(",\n")} { background: var(--sw-code-symbol-highlight); }`;
 }
 
 /** Props of {@link ShowcaseStage}. */
