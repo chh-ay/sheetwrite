@@ -378,7 +378,7 @@ impl CellStore {
             Ast::Parameter { depth, index, .. } => {
                 let frame = pass.results.call_frame();
                 Ok(super::analysis::lambda::parameter_matrix(
-                    frame, *depth, *index,
+                    self, frame, *depth, *index,
                 )?)
             }
             #[cfg(feature = "analysis")]
