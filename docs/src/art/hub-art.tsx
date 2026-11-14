@@ -156,7 +156,7 @@ function DataModelArt() {
         1
       </text>
       <rect class="alt-soft" height={22} rx={11} width={104} x={24} y={158} />
-      <text class="alt-text" x={36} y={173}>
+      <text class="strong" x={36} y={173}>
         Σ measure
       </text>
     </CardArt>
@@ -538,7 +538,7 @@ function DatabaseArt() {
       <ellipse class="hue-soft" cx={72} cy={44} rx={44} ry={12} />
       <path class="rule" d="M28 82a44 12 0 0 0 88 0M28 120a44 12 0 0 0 88 0" />
       <Panel class="hue-soft" h={40} w={128} x={164} y={24} />
-      <text class="hue-text" x={176} y={48}>
+      <text class="strong" x={176} y={48}>
         snapshot
       </text>
       <For each={[80, 100, 120, 140, 160]}>
