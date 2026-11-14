@@ -339,7 +339,9 @@ export interface SheetwriteStoreOptions {
   dirtyCellLimit?: number;
   /** Maximum clean references retained for exact multi-operation remove-sheet simulation. */
   referenceSimulationLimit?: number;
+  /** Decides which protected cells a local edit may change; servers must still check every edit. */
   protectionResolver?: ProtectionResolver;
+  /** What happens to a transaction with denied operations: `atomic` (default) rejects it, `partial` skips them. */
   mutationPolicy?: MutationPolicyMode;
 }
 
