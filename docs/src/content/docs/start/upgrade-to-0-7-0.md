@@ -445,30 +445,30 @@ the sort on the table's header buttons.
 
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
-Preliminary: 0.7.0 here is develop before the release; the final numbers come
-from a rerun on the release commit. One script ran the same workloads against
-the published 0.5.4 and 0.6.1 packages and the 0.7.0 packages on each machine,
-8 interleaved rounds, medians shown. Every cell was measured for this
-comparison; none is reused from earlier captures. Lower is better; compare
-within a machine, not across machines. Linux noise between rounds reaches 8%
-for times and 15% for retained memory, so smaller Linux differences are noise.
-The workloads, per-row times, raw samples and noise are in
+These numbers come from 0.7.0 before its release; they will be replaced with
+numbers from the release build. The same workloads ran against the published
+0.5.4 and 0.6.1 packages and against 0.7.0 on two machines, and each cell is the
+median of 8 runs. Lower is better. Compare versions on the same machine, not one
+machine with the other. On Linux, results vary between runs by up to 8% for
+times and 15% for retained memory, so smaller Linux differences are not
+meaningful. Formula recalculation is the typical time (geometric mean) across
+the benchmark formulas. The workloads and every run are in
 [the comparison results](https://github.com/chh-ay/sheetwrite/blob/develop/bench/results/version-comparison/version-comparison.md).
 
 | Measure | Engine | Linux 0.5.4 | Linux 0.6.1 | Linux 0.7.0 | Mac 0.5.4 | Mac 0.6.1 | Mac 0.7.0 |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Formula recalculation, geomean time of the shared benchmark rows | default | 0.264 ms (measured) | 0.153 ms (measured) | 0.073 ms (measured) | 0.158 ms (measured) | 0.082 ms (measured) | 0.038 ms (measured) |
-| Formula recalculation, geomean time of the shared benchmark rows | full | 0.268 ms (measured) | 0.149 ms (measured) | 0.071 ms (measured) | 0.159 ms (measured) | 0.082 ms (measured) | 0.038 ms (measured) |
-| Retained memory, 100k formulas | default | 66.6 MiB (measured) | 71.5 MiB (measured) | 50.3 MiB (measured) | 71.4 MiB (measured) | 85.5 MiB (measured) | 52.3 MiB (measured) |
-| Retained memory, 100k formulas | full | 64.9 MiB (measured) | 65.9 MiB (measured) | 46.7 MiB (measured) | 70.7 MiB (measured) | 84.1 MiB (measured) | 46.5 MiB (measured) |
-| Peak memory, 100k formulas | default | 131.9 MiB (measured) | 148.4 MiB (measured) | 128.0 MiB (measured) | 143.7 MiB (measured) | 186.2 MiB (measured) | 152.9 MiB (measured) |
-| Peak memory, 100k formulas | full | 122.1 MiB (measured) | 145.1 MiB (measured) | 114.3 MiB (measured) | 135.3 MiB (measured) | 169.8 MiB (measured) | 144.4 MiB (measured) |
-| Engine download, Brotli | default | 263 KiB (measured) | 304 KiB (measured) | 363 KiB (measured) | 263 KiB (measured) | 304 KiB (measured) | 363 KiB (measured) |
-| Engine download, Brotli | full | 349 KiB (measured) | 423 KiB (measured) | 531 KiB (measured) | 349 KiB (measured) | 423 KiB (measured) | 531 KiB (measured) |
-| XLSX import | default | 2,054 ms (measured) | 2,036 ms (measured) | 1,975 ms (measured) | 1,127 ms (measured) | 1,051 ms (measured) | 1,025 ms (measured) |
-| XLSX import | full | 2,108 ms (measured) | 1,947 ms (measured) | 1,900 ms (measured) | 1,142 ms (measured) | 1,044 ms (measured) | 1,037 ms (measured) |
-| XLSX export | default | 1,144 ms (measured) | 937 ms (measured) | 972 ms (measured) | 564 ms (measured) | 482 ms (measured) | 511 ms (measured) |
-| XLSX export | full | 1,152 ms (measured) | 942 ms (measured) | 1,031 ms (measured) | 570 ms (measured) | 476 ms (measured) | 515 ms (measured) |
+| Formula recalculation | default | 0.264 ms | 0.153 ms | 0.073 ms | 0.158 ms | 0.082 ms | 0.038 ms |
+| Formula recalculation | full | 0.268 ms | 0.149 ms | 0.071 ms | 0.159 ms | 0.082 ms | 0.038 ms |
+| Retained memory, 100k formulas | default | 66.6 MiB | 71.5 MiB | 50.3 MiB | 71.4 MiB | 85.5 MiB | 52.3 MiB |
+| Retained memory, 100k formulas | full | 64.9 MiB | 65.9 MiB | 46.7 MiB | 70.7 MiB | 84.1 MiB | 46.5 MiB |
+| Peak memory, 100k formulas | default | 131.9 MiB | 148.4 MiB | 128.0 MiB | 143.7 MiB | 186.2 MiB | 152.9 MiB |
+| Peak memory, 100k formulas | full | 122.1 MiB | 145.1 MiB | 114.3 MiB | 135.3 MiB | 169.8 MiB | 144.4 MiB |
+| Engine download, Brotli | default | 263 KiB | 304 KiB | 363 KiB | 263 KiB | 304 KiB | 363 KiB |
+| Engine download, Brotli | full | 349 KiB | 423 KiB | 531 KiB | 349 KiB | 423 KiB | 531 KiB |
+| XLSX import | default | 2,054 ms | 2,036 ms | 1,975 ms | 1,127 ms | 1,051 ms | 1,025 ms |
+| XLSX import | full | 2,108 ms | 1,947 ms | 1,900 ms | 1,142 ms | 1,044 ms | 1,037 ms |
+| XLSX export | default | 1,144 ms | 937 ms | 972 ms | 564 ms | 482 ms | 511 ms |
+| XLSX export | full | 1,152 ms | 942 ms | 1,031 ms | 570 ms | 476 ms | 515 ms |
 
 ## Upgrade from earlier versions
 
