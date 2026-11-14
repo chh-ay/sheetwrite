@@ -25,7 +25,7 @@
     "clippy::shadow_reuse": 34,
     "clippy::shadow_same": 3,
     "clippy::single_match_else": 5,
-    "clippy::str_to_string": 18,
+    "clippy::str_to_string": 1,
     "clippy::suspicious_operation_groupings": 3,
     "clippy::too_many_arguments": 103,
     "clippy::too_many_lines": 56,
@@ -39,7 +39,7 @@
     "E0133": 6,
     "missing_debug_implementations": 10,
     "missing_docs": 38,
-    "redundant_imports": 14,
+    "redundant_imports": 12,
     "unnameable_types": 6,
     "unreachable_pub": 23
   },
