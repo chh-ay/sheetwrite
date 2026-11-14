@@ -1,17 +1,9 @@
-//! Criteria functions over ranges of dense literal cells, read in place.
-//!
-//! The cell-by-cell walk (`RangeReader::next_allow_errors`) builds a `Value`
-//! for every cell, with a fresh string for every text cell. When every range
-//! of a `COUNTIF`, `COUNTIFS`, `SUMIF(S)`, `AVERAGEIF(S)`, `MAXIFS` or
-//! `MINIFS` call holds only literals on dense storage, this kernel reads each
-//! cell's kind byte and payload instead. It gives the walk's results: cells
-//! are matched with [`Criterion::matches_number`] and
-//! [`Criterion::matches_text`], other kinds with [`Criterion::matches`] once
-//! per call, and rows are visited in the same row-major order, so sums add in
-//! the same order.
+//! Criteria folds over shared range views, with typed literal-column scans.
 
 use super::criteria::{Criterion, IfExtreme, IfSum};
-use super::range_reader::LiteralColumns;
+use super::range_reader::RangeReader;
+use super::range_view::LiteralColumns;
+use super::EvalPass;
 
 use crate::calc::CmpOp;
 use crate::cells::{payload_num, payload_str_id};
@@ -25,6 +17,101 @@ use crate::types::{
 thread_local! {
     /// Calls of the kernel, so tests can tell it ran.
     static KERNEL_CALLS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// A criteria fold and its equally shaped ranges. Every cell is read even
+/// when a prior criterion rejects its row, preserving loading and error order.
+pub(super) struct CriteriaRead<'a, 'c, 'r> {
+    pub(super) fold: CriteriaFold,
+    pub(super) values: Option<&'r mut RangeReader<'a>>,
+    pub(super) criteria: &'r mut [(RangeReader<'a>, &'c Criterion)],
+    /// IFS reads its value range first; IF reads its criterion range first.
+    pub(super) value_first: bool,
+}
+
+impl CriteriaRead<'_, '_, '_> {
+    /// Folds in row-major order. Single-column ranges of dense literals are
+    /// matched as whole columns; any other shape reads through each view's
+    /// page cursor.
+    pub(super) fn finish(mut self, store: &CellStore, pass: &mut EvalPass<'_>) -> EvalResult {
+        let Some((first, _)) = self.criteria.first() else {
+            return Value::Error(FormulaError::Value);
+        };
+        let (rows, cols) = first.shape();
+
+        if cols == 1 {
+            let columns: Option<Vec<_>> = self
+                .criteria
+                .iter()
+                .map(|(range, criterion)| Some((range.literal_columns()?, *criterion)))
+                .collect();
+            let value_columns = self.values.as_ref().map(|range| range.literal_columns());
+            if let (Some(criteria), None | Some(Some(_))) = (columns, &value_columns) {
+                let values = value_columns.as_ref().and_then(Option::as_ref);
+                if let Some(result) = store.criteria_literals_family(self.fold, values, &criteria) {
+                    return result;
+                }
+            }
+        }
+
+        let mut count = 0.0;
+        let mut sums = IfSum::new();
+        let mut extremes =
+            IfExtreme::new(matches!(self.fold, CriteriaFold::Extreme { maximum: true }));
+        for _ in 0..rows * cols {
+            let mut value = None;
+            if self.value_first {
+                match self.read_value(pass) {
+                    Ok(cell) => value = cell,
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            let mut matched = true;
+            for (reader, criterion) in self.criteria.iter_mut() {
+                match reader.next_allow_errors(pass) {
+                    Ok(Some(candidate)) => matched &= criterion.matches(&candidate),
+                    Ok(None) => return Value::Error(FormulaError::Value),
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            if !self.value_first {
+                match self.read_value(pass) {
+                    Ok(cell) => value = cell,
+                    Err(error) => return Value::Error(error),
+                }
+            }
+            if !matched {
+                continue;
+            }
+            let result = match (self.fold, value) {
+                (CriteriaFold::Count, _) => {
+                    count += 1.0;
+                    Ok(())
+                }
+                (CriteriaFold::Sum { .. }, Some(cell)) => sums.add(&cell),
+                (CriteriaFold::Extreme { .. }, Some(cell)) => extremes.add(&cell),
+                (_, None) => Err(FormulaError::Value),
+            };
+            if let Err(error) = result {
+                return Value::Error(error);
+            }
+        }
+        match self.fold {
+            CriteriaFold::Count => Value::number(count),
+            CriteriaFold::Sum { average } => sums.finish(average),
+            CriteriaFold::Extreme { .. } => extremes.finish(),
+        }
+    }
+
+    /// Reads the value range at the position required by the function family.
+    fn read_value(&mut self, pass: &mut EvalPass<'_>) -> Result<Option<Value>, FormulaError> {
+        self.values.as_mut().map_or(Ok(None), |range| {
+            range
+                .next_allow_errors(pass)?
+                .map(Some)
+                .ok_or(FormulaError::Value)
+        })
+    }
 }
 
 /// What a criteria call computes from the cells whose criteria all match.
@@ -202,105 +289,47 @@ fn folded_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
 }
 
 impl CellStore {
-    /// Folds the cells of `values` (or counts the rows, for `Count`) where
-    /// every criteria range's cell matches its criterion. All ranges have the
-    /// shape the caller checked.
+    /// Folds single-column literal ranges: each criterion masks its whole
+    /// column, and the fold reads only the matched rows, lowest first, so sums
+    /// add in row order. `None` when a column is shorter than the first range.
     ///
     /// Out of line, and named `*_family`, so its loops stay out of `eval_ast`.
     #[inline(never)]
-    pub(super) fn literal_criteria_family(
+    pub(super) fn criteria_literals_family(
         &self,
         fold: CriteriaFold,
         values: Option<&LiteralColumns<'_>>,
         criteria: &[(LiteralColumns<'_>, &Criterion)],
-    ) -> EvalResult {
-        let Some((first, _)) = criteria.first() else {
-            return Value::Error(FormulaError::Value);
-        };
-        let rows = first.rows;
-        let cols = first.columns.len();
-        #[cfg(test)]
-        KERNEL_CALLS.with(|calls| calls.set(calls.get() + 1));
-
-        let strings = &self.strings;
-
+    ) -> Option<EvalResult> {
+        let rows = criteria.first()?.0.rows;
         let mut tests = Vec::new();
-        if tests.try_reserve_exact(criteria.len()).is_err() {
-            return Value::Error(FormulaError::Num);
-        }
+        tests.try_reserve_exact(criteria.len()).ok()?;
         tests.extend(
             criteria
                 .iter()
                 .map(|(range, criterion)| (range, CellTest::new(criterion))),
         );
 
-        // One column per range is the common shape: match whole columns into
-        // a row mask, then fold the matched rows in row order, as below.
-        if cols == 1 {
-            let column_tests: Option<Vec<_>> = tests
-                .iter()
-                .map(|(range, test)| Some((column_rows(range, rows)?, test)))
-                .collect();
-            let column_values = values.map(|source| column_rows(source, rows));
-            if let (Some(columns), None | Some(Some(_))) = (column_tests, column_values) {
-                return self.literal_criteria_column_family(
-                    fold,
-                    column_values.flatten(),
-                    &columns,
-                    rows,
-                );
-            }
-        }
+        let columns: Vec<_> = tests
+            .iter()
+            .map(|(range, test)| Some((column_rows(range, rows)?, test)))
+            .collect::<Option<_>>()?;
+        let column_values = match values {
+            Some(source) => Some(column_rows(source, rows)?),
+            None => None,
+        };
 
-        let mut count = 0.0;
-        let mut sums = IfSum::new();
-        let mut extremes = IfExtreme::new(matches!(fold, CriteriaFold::Extreme { maximum: true }));
+        #[cfg(test)]
+        KERNEL_CALLS.with(|calls| calls.set(calls.get() + 1));
 
-        for row in 0..rows {
-            for col in 0..cols {
-                let matched = tests.iter().all(|(range, test)| {
-                    let (kinds, payloads) = range.columns[col];
-                    test.matches(strings, kinds[row], payloads[row])
-                });
-
-                if !matched {
-                    continue;
-                }
-
-                let folded = match (fold, values) {
-                    (CriteriaFold::Count, _) => {
-                        count += 1.0;
-                        Ok(())
-                    }
-                    (_, None) => Err(FormulaError::Value),
-                    (CriteriaFold::Sum { .. }, Some(value_range)) => {
-                        let (kinds, payloads) = value_range.columns[col];
-                        sums.add(&folded_value(strings, kinds[row], payloads[row]))
-                    }
-                    (CriteriaFold::Extreme { .. }, Some(value_range)) => {
-                        let (kinds, payloads) = value_range.columns[col];
-                        extremes.add(&folded_value(strings, kinds[row], payloads[row]))
-                    }
-                };
-
-                if let Err(error) = folded {
-                    return Value::Error(error);
-                }
-            }
-        }
-
-        match fold {
-            CriteriaFold::Count => Value::number(count),
-            CriteriaFold::Sum { average } => sums.finish(average),
-            CriteriaFold::Extreme { .. } => extremes.finish(),
-        }
+        Some(self.fold_matched_rows(fold, column_values, &columns, rows))
     }
 
-    /// [`Self::literal_criteria_family`] for single-column ranges: each
-    /// criterion masks its whole column, and the fold reads only the matched
-    /// rows, lowest first, so sums add in the same order.
-    #[inline(never)]
-    fn literal_criteria_column_family(
+    /// [`Self::criteria_literals_family`]'s mask and fold over matched rows.
+    /// Always inlined: as a separate wasm function, JavaScriptCore's
+    /// optimizing tier ran `criteria-multi-range-edit` about 15% slower.
+    #[inline(always)]
+    fn fold_matched_rows(
         &self,
         fold: CriteriaFold,
         values: Option<LiteralColumn<'_>>,
@@ -438,9 +467,7 @@ mod tests {
 
         for criterion in CRITERIA {
             sources.push(format!("=COUNTIF(A1:A{last},{criterion})"));
-            sources.push(format!("=COUNTIF(A1:C{last},{criterion})"));
             sources.push(format!("=SUMIF(A1:A{last},{criterion},C1:C{last})"));
-            sources.push(format!("=SUMIF(A1:B{last},{criterion},C1)"));
             sources.push(format!("=AVERAGEIF(B1:B{last},{criterion},C1:C{last})"));
             sources.push(format!(
                 "=COUNTIFS(A1:A{last},{criterion},D1:D{last},\"<>b\")"
@@ -449,7 +476,6 @@ mod tests {
                 "=SUMIFS(C1:C{last},A1:A{last},{criterion},E1:E{last},\">0\")"
             ));
             sources.push(format!("=SUMIFS(B1:B{last},A1:A{last},{criterion})"));
-            sources.push(format!("=AVERAGEIFS(C1:D{last},A1:B{last},{criterion})"));
             sources.push(format!("=MAXIFS(E1:E{last},D1:D{last},{criterion})"));
             sources.push(format!(
                 "=MINIFS(B1:B{last},A1:A{last},{criterion},C1:C{last},\"<>\")"
