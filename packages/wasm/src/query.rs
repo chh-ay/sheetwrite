@@ -173,11 +173,13 @@ impl NumericAccumulator {
 #[wasm_bindgen]
 impl CellStore {
     /// `[contains cache constructions, owned distinct strings]`.
+    /// @enginePublic Benchmarks check contains-cache construction and owned distinct strings.
     #[wasm_bindgen(js_name = queryResourceStats)]
     pub fn query_resource_stats(&self) -> Vec<f64> {
         QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
     }
 
+    /// @enginePublic Reset the resource counters before each benchmark probe.
     #[wasm_bindgen(js_name = resetQueryResourceStats)]
     pub fn reset_query_resource_stats(&self) {
         QUERY_STATS.with(|stats| stats.set([0, 0]));
