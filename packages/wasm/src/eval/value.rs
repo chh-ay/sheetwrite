@@ -39,7 +39,7 @@ pub(super) fn cached_formula_value(
     }
 }
 
-fn bool_text(value: bool) -> &'static str {
+const fn bool_text(value: bool) -> &'static str {
     if value {
         "TRUE"
     } else {
@@ -165,7 +165,7 @@ pub(super) fn compare_values(
     }
 }
 
-fn value_rank(value: &Value) -> u8 {
+const fn value_rank(value: &Value) -> u8 {
     match value {
         Value::Blank => 0,
         Value::Number(_) => 1,

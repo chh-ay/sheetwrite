@@ -57,7 +57,7 @@ const NAUTICAL_MILE: f64 = 1_852.0;
 const PICA_POINT: f64 = INCH / 72.0;
 const LIGHT_YEAR: f64 = 9_460_730_472_580_800.0;
 /// 648000 / pi astronomical units of 149,597,870,700 m.
-const PARSEC: f64 = 30_856_775_814_913_673.0;
+const PARSEC: f64 = 3.085_677_581_491_367e16;
 /// 1200 / 3937 m.
 const SURVEY_FOOT: f64 = 1_200.0 / 3_937.0;
 const POUND_GRAMS: f64 = 453.592_37;
@@ -409,15 +409,26 @@ const DECIMAL_PREFIXES: &[(&str, f64)] = &[
     ("y", 1e-24),
 ];
 
+// Powers of 1024, multiplied at compile time: written out, the largest have
+// more digits than an `f64` keeps, although each is exact.
+const KIBI: f64 = 1_024.0;
+const MEBI: f64 = KIBI * KIBI;
+const GIBI: f64 = MEBI * KIBI;
+const TEBI: f64 = GIBI * KIBI;
+const PEBI: f64 = TEBI * KIBI;
+const EXBI: f64 = PEBI * KIBI;
+const ZEBI: f64 = EXBI * KIBI;
+const YOBI: f64 = ZEBI * KIBI;
+
 const BINARY_PREFIXES: &[(&str, f64)] = &[
-    ("Yi", 1_208_925_819_614_629_174_706_176.0),
-    ("Zi", 1_180_591_620_717_411_303_424.0),
-    ("Ei", 1_152_921_504_606_846_976.0),
-    ("Pi", 1_125_899_906_842_624.0),
-    ("Ti", 1_099_511_627_776.0),
-    ("Gi", 1_073_741_824.0),
-    ("Mi", 1_048_576.0),
-    ("ki", 1_024.0),
+    ("Yi", YOBI),
+    ("Zi", ZEBI),
+    ("Ei", EXBI),
+    ("Pi", PEBI),
+    ("Ti", TEBI),
+    ("Gi", GIBI),
+    ("Mi", MEBI),
+    ("ki", KIBI),
 ];
 
 /// Kelvins at 0 degrees Celsius.
@@ -437,7 +448,7 @@ struct Resolved {
 }
 
 impl Resolved {
-    fn group(&self) -> u8 {
+    const fn group(&self) -> u8 {
         self.kind & GROUP_MASK
     }
 }

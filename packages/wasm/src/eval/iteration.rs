@@ -49,11 +49,11 @@ impl IterationLimits {
         })
     }
 
-    pub(crate) fn max_iterations(self) -> u32 {
+    pub(crate) const fn max_iterations(self) -> u32 {
         self.max_iterations
     }
 
-    pub(crate) fn max_change(self) -> f64 {
+    pub(crate) const fn max_change(self) -> f64 {
         self.max_change
     }
 

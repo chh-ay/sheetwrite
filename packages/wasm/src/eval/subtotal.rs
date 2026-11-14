@@ -26,6 +26,8 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast) -> bool {
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(super::analysis::AGGREGATE_ID), _) => true,
         Ast::Func(_, args) => args.iter().any(ast_calls_subtotal),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => ast_calls_subtotal(&definition.body),
         Ast::UnknownFunc(call) => {
             let args = &call.args;
             args.iter().any(ast_calls_subtotal)
@@ -279,7 +281,7 @@ impl SubtotalReader<'_> {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        if ast_produces_array(arg) {
+        if ast_produces_array(arg, pass.shapes()) {
             if let Some(result) = self
                 .store
                 .eval_dynamic_array(arg, self.sheet, pass, depth + 1)

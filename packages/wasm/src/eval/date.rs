@@ -279,7 +279,7 @@ fn days_in_month(year: i64, month: i64) -> i64 {
     days_from_civil(next_year, next_month, 1) - days_from_civil(year, month, 1)
 }
 
-fn is_leap_year(year: i64) -> bool {
+const fn is_leap_year(year: i64) -> bool {
     year == 1900 || (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))
 }
 

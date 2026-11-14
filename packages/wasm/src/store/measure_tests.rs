@@ -87,7 +87,7 @@ struct LabeledCell {
 struct Lcg(u64);
 
 impl Lcg {
-    fn next(&mut self, bound: usize) -> usize {
+    const fn next(&mut self, bound: usize) -> usize {
         self.0 = self
             .0
             .wrapping_mul(6_364_136_223_846_793_005)

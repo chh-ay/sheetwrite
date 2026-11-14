@@ -149,7 +149,7 @@ struct Utf16Offsets<'a> {
 }
 
 impl<'a> Utf16Offsets<'a> {
-    fn new(src: &'a str) -> Self {
+    const fn new(src: &'a str) -> Self {
         Self {
             src,
             byte: 0,
@@ -204,6 +204,7 @@ pub fn formula_tokens(src: &str) -> Vec<u32> {
 }
 
 /// The first syntax error of a formula, as the engine's parser finds it.
+#[derive(Debug)]
 #[wasm_bindgen]
 pub struct FormulaSyntaxError {
     from: u32,

@@ -109,6 +109,9 @@ impl CellStore {
 
 #[wasm_bindgen]
 impl CellStore {
+    /// Rebuilds a range snapshot from the bytes `exportMemoryState` wrote, for
+    /// the range that starts at row `row_start`, column `col_start` of `sheet`.
+    /// Throws when the bytes are not a valid range transfer.
     #[cfg(target_arch = "wasm32")]
     #[wasm_bindgen(js_name = importRangeMemoryState)]
     pub fn import_range_memory_state(
@@ -126,7 +129,6 @@ impl CellStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cells::encode_str_id;
 
     /// A one-cell range transfer with no formulas.
     fn one_cell_range(kind: u8, payload: u64) -> Vec<u8> {
