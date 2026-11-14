@@ -19,7 +19,9 @@ import { commitCellInput } from "./grid-binding.js";
 
 /** A mounted shell piece: its root element plus an idempotent teardown. */
 export interface ShellPiece {
+  /** The piece's root element, already appended to its host. */
   readonly element: HTMLElement;
+  /** Removes the piece and its listeners; calling it twice is safe. */
   destroy(): void;
 }
 
@@ -39,6 +41,8 @@ const A1_CELL_OR_RANGE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\
  * on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
  * accepted. Invalid or out-of-bounds references set `aria-invalid` and make
  * no grid calls; Escape restores the displayed reference.
+ *
+ * @param host - Element the name box is appended to.
  */
 export function createNameBox(
   host: HTMLElement,
@@ -144,6 +148,7 @@ export interface FormulaBarOptions {
 
 /** A formula bar piece; `setReadOnly` blocks commits without unmounting. */
 export interface FormulaBarPiece extends ShellPiece {
+  /** Turns committing from the bar off or on. */
   setReadOnly(readOnly: boolean): void;
 }
 
@@ -159,6 +164,8 @@ export interface FormulaBarPiece extends ShellPiece {
  * focus. Escape in either restores the stored text in both. A focused draft
  * is never overwritten by selection/change events. While focused, the bar
  * shows formula help as the cell editor does.
+ *
+ * @param host - Element the formula bar is appended to.
  */
 export function createFormulaBar(
   host: HTMLElement,

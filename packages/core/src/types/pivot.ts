@@ -48,14 +48,19 @@ export type PivotValueField =
 
 /** Keep-list filter: only source rows whose `field` value is in `values` contribute. */
 export interface PivotFilter {
+  /** Zero-based index of the source field to filter on. */
   field: number;
+  /** The values to keep; source rows with any other value are left out. */
   values: CellScalar[];
 }
 
 /** Sort of one axis field by its labels. Fields without a sort key sort ascending. */
 export interface PivotSort {
+  /** Whether the field is on the row or the column axis. */
   axis: "rows" | "columns";
+  /** Zero-based index of the source field whose labels are sorted. */
   field: number;
+  /** `true` sorts Z to A; `false` sorts A to Z. */
   descending: boolean;
 }
 
@@ -150,12 +155,20 @@ export interface PivotSourceField {
  *   `cells` holds those values and `headerRows`/`labelCols` are 0.
  */
 export interface PivotResultView {
+  /** Whether the output was computed, failed, cannot be computed, or comes from the file. */
   status: "ok" | "error" | "unavailable" | "saved";
+  /** The error the anchor shows, such as `#SPILL!`; only when `status` is `error`. */
   error?: string;
+  /** Top-left cell of the output. */
   anchor: CellAddress;
+  /** Number of rows the output takes. */
   rows: number;
+  /** Number of columns the output takes. */
   cols: number;
+  /** Number of rows at the top that hold column labels. */
   headerRows: number;
+  /** Number of columns at the left that hold row labels. */
   labelCols: number;
+  /** The output values, row by row. */
   cells: CellScalar[];
 }

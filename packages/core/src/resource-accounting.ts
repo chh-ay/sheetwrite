@@ -73,54 +73,83 @@ export type BoundaryTransferKind = "bulk" | "scalar";
 
 /** Decoded, fail-closed retained-memory ownership report from the WASM store. */
 export interface StoreMemoryBreakdown {
+  /** Version of the report format the engine sent. */
   readonly protocolVersion: typeof STORE_MEMORY_PROTOCOL_VERSION;
+  /** Version of the rule used to estimate hash-table sizes. */
   readonly hashTableEstimateVersion: typeof STORE_MEMORY_HASH_ESTIMATE_VERSION;
+  /** Bytes held by each part of the engine, in a fixed order. */
   readonly owners: readonly ResourceOwnerBytes[];
+  /** Sum of the owners' live data bytes. */
   readonly logicalLiveBytes: number;
+  /** Sum of the owners' allocated bytes. */
   readonly allocatedCapacityBytes: number;
   /** Linear-memory pages are a runtime observation and are never summed into live payload. */
   readonly wasmCommittedBytes: number | null;
   /** Allocator internals are intentionally not fabricated from `size_of_val`. */
   readonly allocatorMarginBytes: number | null;
+  /** Bytes no owner accounts for; always 0 in a valid report. */
   readonly unaccountedBytes: number;
 }
 
 /** Fixed-cardinality boundary crossing counters for one operation. */
 export interface BoundaryOperationStats {
+  /** The operation the counts belong to. */
   readonly operation: RuntimeResourceOperation;
+  /** Calls from JavaScript into WASM. */
   readonly ffiCalls: number;
+  /** Bytes copied from JavaScript into WASM. */
   readonly jsToWasmBytes: number;
+  /** Bytes copied from WASM to JavaScript. */
   readonly wasmToJsBytes: number;
+  /** Size of the largest single copy, in bytes. */
   readonly largestTransferBytes: number;
+  /** Calls that moved a packed batch of values. */
   readonly bulkCalls: number;
+  /** Calls that moved one value. */
   readonly scalarCalls: number;
 }
 
 /** Available runtime-level memory observations, kept separate from retained owner totals. */
 export interface RuntimeMemoryObservation {
+  /** JavaScript heap in use, from `performance.memory`; `null` where the browser does not report it. */
   readonly usedJSHeapSize: number | null;
+  /** Bytes in ArrayBuffers, from Node or Bun's `process.memoryUsage()`; `null` in browsers. */
   readonly arrayBufferBytes: number | null;
+  /** Memory outside the JavaScript heap, from `process.memoryUsage()`; `null` in browsers. */
   readonly externalBytes: number | null;
+  /** Browser canvas and image memory; always `null` here, as only browser tooling can read it. */
   readonly browserBackingStoreBytes: number | null;
 }
 
 /** Operation-scoped transient peak, excluded from retained owner totals. */
 export interface TransientResourcePeak {
+  /** Name of the part of the engine that made the temporary allocations. */
   readonly owner: string;
+  /** Largest number of temporary bytes held at once. */
   readonly peakBytes: number;
+  /** Number of temporary allocations made. */
   readonly allocations: number;
+  /** How the peak was measured; always counted by the engine itself. */
   readonly measurement: "instrumented-operation-peak";
 }
 
 /** Complete retained-resource and boundary snapshot for one operation phase. */
 export interface RuntimeResourceSnapshot {
+  /** Version of the snapshot format. */
   readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
+  /** The operation being measured. */
   readonly operation: RuntimeResourceOperation;
+  /** When in the operation the snapshot was taken. */
   readonly phase: RuntimeResourcePhase;
+  /** Memory the WASM engine holds, by owner. */
   readonly wasm: StoreMemoryBreakdown;
+  /** Memory JavaScript objects hold, by owner. */
   readonly jsOwners: readonly ResourceOwnerBytes[];
+  /** JavaScript-to-WASM call and copy counts, per operation. */
   readonly boundary: readonly BoundaryOperationStats[];
+  /** Memory figures the JavaScript runtime reports. */
   readonly runtime: RuntimeMemoryObservation;
+  /** Sums over all WASM and JavaScript owners. */
   readonly totals: {
     /** Sum of owner logical bytes only. Boundary and runtime observations are excluded. */
     readonly logicalLiveBytes: number;
@@ -138,11 +167,17 @@ interface ResourceOwnerDelta {
 
 /** Owner and runtime deltas between two phases of the same operation. */
 export interface RuntimeResourcePhaseDelta {
+  /** Version of the snapshot format. */
   readonly schemaVersion: typeof RUNTIME_RESOURCE_SCHEMA_VERSION;
+  /** The operation both snapshots measured. */
   readonly operation: RuntimeResourceOperation;
+  /** Phase of the earlier snapshot. */
   readonly from: RuntimeResourcePhase;
+  /** Phase of the later snapshot. */
   readonly to: RuntimeResourcePhase;
+  /** Change of each owner's bytes and entries, sorted by owner name. */
   readonly owners: readonly ResourceOwnerDelta[];
+  /** Change of each runtime figure; `null` when either snapshot lacks it. */
   readonly runtime: {
     readonly usedJSHeapSize: number | null;
     readonly arrayBufferBytes: number | null;
@@ -199,6 +234,12 @@ export class BoundaryResourceAccounting {
     scalarCalls: 0,
   }));
 
+  /**
+   * Counts `calls` boundary crossings that moved `bytes` in total.
+   *
+   * @throws SheetwriteError with code `invalid-argument` when a count is negative,
+   *   not a whole number, or would overflow.
+   */
   record(
     operation: RuntimeResourceOperation,
     direction: BoundaryDirection,
@@ -236,6 +277,7 @@ export class BoundaryResourceAccounting {
     counter.scalarCalls = nextScalarCalls;
   }
 
+  /** Sets every counter back to zero. */
   reset(): void {
     for (const counter of this.counters) {
       counter.ffiCalls = 0;
@@ -247,6 +289,7 @@ export class BoundaryResourceAccounting {
     }
   }
 
+  /** A copy of the counters, one entry per operation. */
   snapshot(): BoundaryOperationStats[] {
     return RESOURCE_OPERATIONS.map((operation, index) => ({
       operation,
@@ -255,7 +298,13 @@ export class BoundaryResourceAccounting {
   }
 }
 
-/** Decode the flat Rust protocol and fail closed on version/order/total drift. */
+/**
+ * Decode the flat Rust protocol and fail closed on version/order/total drift.
+ *
+ * @param encoded - The numbers the engine's memory report returned.
+ * @param wasmCommittedBytes - Size of the WASM linear memory, or `null` when unknown.
+ * @throws SheetwriteError with code `invalid-argument` when the report does not match this version.
+ */
 export function decodeStoreMemoryStats(
   encoded: ArrayLike<number>,
   wasmCommittedBytes: number | null,
@@ -321,7 +370,11 @@ export function decodeStoreMemoryStats(
   };
 }
 
-/** Construct a zero-owner store report when no WASM store is available. */
+/**
+ * Construct a zero-owner store report when no WASM store is available.
+ *
+ * @param wasmCommittedBytes - Size of the WASM linear memory, or `null` when unknown.
+ */
 export function emptyStoreMemoryStats(wasmCommittedBytes: number | null): StoreMemoryBreakdown {
   const encoded = new Float64Array(5 + WASM_MEMORY_OWNERS.length * 3);
   encoded[0] = STORE_MEMORY_PROTOCOL_VERSION;
@@ -330,7 +383,13 @@ export function emptyStoreMemoryStats(wasmCommittedBytes: number | null): StoreM
   return decodeStoreMemoryStats(encoded, wasmCommittedBytes);
 }
 
-/** Build and validate one operation-phase snapshot without double-counting runtime observations. */
+/**
+ * Build and validate one operation-phase snapshot without double-counting runtime observations.
+ *
+ * @param input - The operation and phase, the WASM report, and optional JavaScript owners,
+ *   boundary counts and runtime figures.
+ * @throws SheetwriteError with code `invalid-argument` when an owner repeats or a total does not add up.
+ */
 export function createRuntimeResourceSnapshot(input: {
   operation: RuntimeResourceOperation;
   phase: RuntimeResourcePhase;
@@ -391,7 +450,13 @@ export function assertRuntimeResourceSnapshot(snapshot: RuntimeResourceSnapshot)
   }
 }
 
-/** Diff two validated phases of the same operation by exclusive resource owner. */
+/**
+ * Diff two validated phases of the same operation by exclusive resource owner.
+ *
+ * @param before - The earlier snapshot.
+ * @param after - The later snapshot, of the same operation.
+ * @throws SheetwriteError with code `invalid-argument` when the snapshots measure different operations or are invalid.
+ */
 export function diffRuntimeResourcePhases(
   before: RuntimeResourceSnapshot,
   after: RuntimeResourceSnapshot,

@@ -473,6 +473,10 @@ function Landing() {
           >
             {/* Built at docs generation from committed captures; every text value is escaped. */}
             <div class="speed-story-host" id="speed-story" innerHTML={speedStory} />
+            <p class="sw-lp-note">
+              Both grids run in the same viewport with the same data and versions, and every timed
+              step repaints on both sides.
+            </p>
           </Show>
           <MoreLink class="sw-lp-more" href="/docs/performance/">
             See the full method and every result

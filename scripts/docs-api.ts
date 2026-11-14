@@ -906,7 +906,28 @@ function fieldHtml(
     .join("");
 }
 
-/** A function's Parameters and Returns sections as fields. */
+/**
+ * Without its own description, a field named by one documented type reads
+ * that type's summary.
+ */
+function fieldTypeSummary(
+  type: string,
+  pkg: ApiPackage,
+  routes: DocumentationLinkRoutes,
+): string | undefined {
+  if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
+  const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
+  return target === undefined || target.trim() === ""
+    ? undefined
+    : compactSummary(target.split(/\n@/)[0] ?? "", true);
+}
+
+/** `void` and `Promise<void>`: a return value with nothing to describe. */
+function returnsNothing(type: string): boolean {
+  return /^(?:void|Promise<void>)$/.test(type.replace(/\s+/g, ""));
+}
+
+/** A function's Parameters and Returns sections as fields; no Returns for `void`. */
 function renderFunctionFields(
   fields: FunctionFields,
   parts: DocumentationParts,
@@ -917,15 +938,7 @@ function renderFunctionFields(
 ): string {
   const describe = (text: string | undefined): string | undefined =>
     text === undefined ? undefined : memberDocumentationHtml(pkg, entry, item, text, routes);
-  // Without its own description, a field named by one documented type reads
-  // that type's summary.
-  const typeSummary = (type: string): string | undefined => {
-    if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
-    const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
-    return target === undefined || target.trim() === ""
-      ? undefined
-      : compactSummary(target.split(/\n@/)[0] ?? "", true);
-  };
+  const typeSummary = (type: string): string | undefined => fieldTypeSummary(type, pkg, routes);
   const blocks: string[] = [];
   if (fields.parameters.length > 0) {
     blocks.push(
@@ -948,20 +961,23 @@ function renderFunctionFields(
       "",
     );
   }
-  blocks.push(
-    "## Returns",
-    "",
-    '<div class="api-cards">',
-    fieldHtml(
-      "returns",
-      undefined,
-      linkedTypeHtml(fields.returns, pkg, entry, item, routes),
-      undefined,
-      describe(parts.returns ?? typeSummary(fields.returns)),
-    ),
-    "</div>",
-    "",
-  );
+  // A function that returns nothing has no Returns card.
+  if (!returnsNothing(fields.returns)) {
+    blocks.push(
+      "## Returns",
+      "",
+      '<div class="api-cards">',
+      fieldHtml(
+        "returns",
+        undefined,
+        linkedTypeHtml(fields.returns, pkg, entry, item, routes),
+        undefined,
+        describe(parts.returns ?? typeSummary(fields.returns)),
+      ),
+      "</div>",
+      "",
+    );
+  }
   return blocks.join("\n");
 }
 
@@ -1467,4 +1483,66 @@ export function movedPageIssues(
     }
   }
   return failures;
+}
+
+/** What a package's reference pages show without a description. */
+export interface UndocumentedApi {
+  readonly packageName: string;
+  /** Members of interfaces and classes with no doc comment (`Owner.member`; overloads once). */
+  readonly members: readonly string[];
+  /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
+  readonly parameters: readonly string[];
+  /**
+   * Functions whose return value has neither `@returns` nor a documented type;
+   * `void` and `Promise<void>` return nothing to describe.
+   */
+  readonly returns: readonly string[];
+}
+
+/**
+ * The members, parameters and return values each package's reference shows
+ * without a description, by the rules the pages render with.
+ * A symbol re-exported from several entry points counts once. Declaration
+ * shapes must be prepared ({@link prepareDeclarationShapes}).
+ */
+export function undocumentedApi(
+  manifest: PublicApiManifest,
+  routes: DocumentationLinkRoutes = documentationLinkRoutes(manifest),
+): UndocumentedApi[] {
+  return manifest.packages.map((pkg) => {
+    const members = new Set<string>();
+    const parameters = new Set<string>();
+    const returns = new Set<string>();
+    for (const entry of pkg.entryPoints) {
+      for (const item of entry.exports) {
+        const memberDocs = new Set(
+          item.memberDocs
+            .filter((member) => member.documentation.trim() !== "")
+            .map((member) => member.name),
+        );
+        for (const member of declarationShape(parseableDeclaration(item)).members) {
+          if (!memberDocs.has(member.name)) members.add(`${item.name}.${member.name}`);
+        }
+        const fields =
+          item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
+        if (fields === undefined) continue;
+        const parts = documentationParts(item.documentation, pkg, entry, item, routes);
+        for (const parameter of fields.parameters) {
+          const name = parameter.name.replace(/^\.\.\./, "");
+          const described =
+            parts.parameters.get(name) ?? fieldTypeSummary(parameter.type, pkg, routes);
+          if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
+        }
+        if (returnsNothing(fields.returns)) continue;
+        const described = parts.returns ?? fieldTypeSummary(fields.returns, pkg, routes);
+        if (described === undefined || described === "") returns.add(item.name);
+      }
+    }
+    return {
+      packageName: pkg.name,
+      members: [...members].sort(),
+      parameters: [...parameters].sort(),
+      returns: [...returns].sort(),
+    };
+  });
 }

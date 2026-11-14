@@ -2,7 +2,12 @@ import { parseDateInput } from "./date-serial.js";
 import { formatNumber } from "./number-format.js";
 import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 
-/** Spreadsheet display text for a resolved scalar. */
+/**
+ * Spreadsheet display text for a resolved scalar.
+ *
+ * @returns `""` for an empty cell, `TRUE` or `FALSE` for a boolean, and the
+ *   unformatted text of anything else.
+ */
 export function cellScalarToText(value: CellScalar): string {
   if (value === null) return "";
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
@@ -57,8 +62,10 @@ export function cellEditText(value: CellScalar, type: CellFormat): string {
  *
  * Shared by the grid's inline editor and any host-built formula bar, so input
  * parsing is identical everywhere instead of re-derived per consumer.
+ *
+ * @param raw - The text the user typed.
+ * @param type - The column's format, which decides how dates and currency are read.
  */
-
 export function parseCellInput(raw: string, type: CellFormat): CellValue {
   const trimmed = raw.trim();
 
@@ -107,6 +114,9 @@ const EQUALS_CODE_UNIT = 0x3d;
  * currency rules as {@link parseCellInput}. Unlike interactive entry, a leading
  * `=` remains inert text. Declared date columns also accept an existing finite
  * date serial so delimited export/import preserves numeric dates.
+ *
+ * @param raw - One field of imported text.
+ * @param type - The column's format, which decides how dates and currency are read.
  */
 export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar {
   // Imports call this once per field, so the rules are applied directly here
@@ -141,6 +151,9 @@ export function parseCellLiteralInput(raw: string, type: CellFormat): CellScalar
  * grouping (`,`), and whitespace, and reads accounting-style parentheses
  * (`(1,234.50)`) as a negative amount. Grouping/decimals follow the US locale the
  * renderer uses.
+ *
+ * @param raw - Text such as `$1,234.50` or `(1,234.50)`.
+ * @returns The amount, such as `1234.5` or `-1234.5`, or `null`.
  */
 export function parseCurrencyInput(raw: string): number | null {
   let body = raw.replace(/[$€£¥¤,\s]/g, "");

@@ -9,7 +9,11 @@ import type { Selection } from "../types/coordinates.js";
 import type { Grid, SelectionSummary } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
 
-/** Human phrase for a selection's geometry; blank for null/single-cell. */
+/**
+ * Human phrase for a selection's geometry; blank for null/single-cell.
+ *
+ * @returns Text such as `3 × 2 cells` or `Row 4`, or an empty string.
+ */
 export function describeSelection(selection: Selection | null): string {
   if (!selection || selection.kind === "cell") return "";
 
@@ -45,6 +49,8 @@ const STATUS_SEPARATOR = " · ";
  * `<output role="status">` that follows the grid's selection and its values.
  * Text nodes only; polite live region so screen readers announce changes
  * without interrupting.
+ *
+ * @param host - Element the status is appended to.
  */
 export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece {
   const output = document.createElement("output");

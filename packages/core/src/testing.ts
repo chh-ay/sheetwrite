@@ -10,12 +10,19 @@ export { installDatasourceClockForTest } from "./datasource-controller.js";
 export interface RecordingContext2D {
   /** Per-method invocation counts, keyed by the 2D-context method name. */
   readonly calls: Record<string, number>;
+  /** The last fill style set; starts as `""`. */
   fillStyle: string;
+  /** The last stroke style set; starts as `""`. */
   strokeStyle: string;
+  /** The last font set; starts as `""`. */
   font: string;
+  /** The last text alignment set; starts as `""`. */
   textAlign: string;
+  /** The last text baseline set; starts as `""`. */
   textBaseline: string;
+  /** The last line width set; starts as 1. */
   lineWidth: number;
+  /** Any other context method: it does nothing and counts the call in `calls`. */
   [method: string]: unknown;
 }
 
@@ -70,6 +77,8 @@ function makeRecordingContext(canvas: HTMLCanvasElement): RecordingContext2D {
  * {@link RecordingContext2D}; re-request it from a mounted canvas to assert
  * paint activity. Nothing is painted — assert grid STATE, not pixels.
  * Test-only: never import from production code.
+ *
+ * @returns A function that removes the stubs and restores the originals.
  */
 export function installCanvasTestStubs(options: CanvasTestStubOptions = {}): () => void {
   const width = options.width ?? 800;
