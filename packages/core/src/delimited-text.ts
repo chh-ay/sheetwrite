@@ -56,12 +56,18 @@ export type DelimitedTextOperation = "parse" | "import" | "encode" | "export";
 
 /** Stable resource-limit failure raised before the next oversized parse or encode allocation. */
 export class DelimitedTextResourceError extends SheetwriteError {
+  /** Always `"DelimitedTextResourceError"`. */
   override readonly name = "DelimitedTextResourceError";
+  /** Always `"delimited-text-resource-limit"`. */
   declare readonly code: "delimited-text-resource-limit";
 
+  /** Creates the error for one limit reached while reading or writing CSV or TSV. */
   constructor(
+    /** The limit that was reached. */
     readonly resource: keyof DelimitedTextResourceLimits,
+    /** The limit's value. */
     readonly limit: number,
+    /** The amount the text needed, in the limit's unit. */
     readonly actual: number,
     operation: DelimitedTextOperation,
   ) {
@@ -76,11 +82,16 @@ export class DelimitedTextResourceError extends SheetwriteError {
 
 /** Stable invalid-option failure for a delimited-text resource ceiling. */
 export class DelimitedTextOptionsError extends SheetwriteError {
+  /** Always `"DelimitedTextOptionsError"`. */
   override readonly name = "DelimitedTextOptionsError";
+  /** Always `"delimited-text-invalid-limit"`. */
   declare readonly code: "delimited-text-invalid-limit";
 
+  /** Creates the error for one limit option that is not a positive safe integer. */
   constructor(
+    /** The limit option that is wrong. */
     readonly resource: keyof DelimitedTextResourceLimits,
+    /** The value given for it. */
     readonly value: unknown,
   ) {
     super(
