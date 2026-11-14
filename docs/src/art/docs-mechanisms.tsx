@@ -3,79 +3,7 @@
 import type { JSX } from "solid-js";
 
 import { DocumentOpsFigure } from "./blueprint-figures.js";
-import {
-  type FigureOutcome,
-  type FigureStep,
-  FlowFigure,
-  PairsFigure,
-  TileFigure,
-} from "./blueprint-layouts.js";
-import type { BlueprintText } from "./blueprint.js";
-
-/** One step of a flow: a box with a heading, caption lines and code lines. */
-export interface FlowStep {
-  readonly title: string;
-  readonly lines?: readonly string[];
-  readonly code?: readonly string[];
-  readonly tone?: string;
-}
-
-/** A side outcome of one step, drawn across the row below and reached by its own arrow. */
-export interface FlowBranch {
-  readonly from: number;
-  readonly step: FlowStep;
-  readonly arrow?: string;
-}
-
-/** A flow box's height: its heading, then 16 units per caption or code line. */
-export const stepHeight = (step: FlowStep) =>
-  34 + ((step.lines?.length ?? 0) + (step.code?.length ?? 0)) * 16 + 6;
-
-/** The blueprint tone of the older flow box classes. */
-function toneOf(tone: string | undefined): FigureStep["tone"] {
-  if (tone === "hue-soft") return "accent";
-  if (tone === "error-soft") return "danger";
-  if (tone === "alt-soft") return "muted";
-  return undefined;
-}
-
-/** A flow step as a blueprint box. */
-export function figureStep(step: FlowStep): FigureStep {
-  const tone = toneOf(step.tone);
-  return {
-    title: step.title,
-    ...(step.lines === undefined ? {} : { lines: step.lines }),
-    ...(step.code === undefined ? {} : { code: step.code }),
-    ...(tone === undefined ? {} : { tone }),
-  };
-}
-
-/**
- * A left-to-right flow of steps, with an optional outcome of one step across
- * the row below, drawn as a blueprint flow (art/blueprint-layouts.tsx).
- */
-export function FlowDiagram(
-  props: Readonly<{
-    text: BlueprintText;
-    steps: readonly FlowStep[];
-    branch?: FlowBranch;
-    note?: string;
-  }>,
-) {
-  const outcome = (branch: FlowBranch): FigureOutcome => ({
-    from: branch.from,
-    step: figureStep({ tone: "alt-soft", ...branch.step }),
-    kind: branch.arrow === "error-line" || branch.step.tone === "error-soft" ? "fail" : "back",
-  });
-  return (
-    <FlowFigure
-      note={props.note}
-      outcome={props.branch === undefined ? undefined : outcome(props.branch)}
-      steps={props.steps.map(figureStep)}
-      text={props.text}
-    />
-  );
-}
+import { type FigureStep, FlowFigure, PairsFigure, TileFigure } from "./blueprint-layouts.js";
 
 /** Calculation engine › Spills. */
 export function SpillDiagram() {
@@ -141,12 +69,12 @@ export function LoadingDiagram() {
 /** Calculation engine › Errors are values. */
 export function ErrorFlowDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       note="An unknown function shows #NAME? and keeps its source."
       steps={[
-        { title: "A1", code: ["=1/0", "→ #DIV/0!"], tone: "error-soft" },
-        { title: "B1 reads A1", code: ["=A1*2", "→ #DIV/0!"], tone: "error-soft" },
-        { title: "C1 replaces it", code: ["=IFERROR(B1,0)", "→ 0"], tone: "hue-soft" },
+        { title: "A1", code: ["=1/0", "→ #DIV/0!"], tone: "danger" },
+        { title: "B1 reads A1", code: ["=A1*2", "→ #DIV/0!"], tone: "danger" },
+        { title: "C1 replaces it", code: ["=IFERROR(B1,0)", "→ 0"], tone: "accent" },
       ]}
       text={{
         title: "Errors are values that flow to dependents",
@@ -160,15 +88,15 @@ export function ErrorFlowDiagram() {
 /** Calculation engine › Volatile functions. */
 export function VolatileDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       note="A transaction without cell changes recalculates nothing."
       steps={[
-        { title: "A transaction", lines: ["that changes cells"], tone: "hue-soft" },
+        { title: "A transaction", lines: ["that changes cells"], tone: "accent" },
         {
           title: "Volatile formulas",
           code: ["NOW · TODAY · RAND", "OFFSET · INDIRECT"],
           lines: ["and their dependents"],
-          tone: "alt-soft",
+          tone: "muted",
         },
         { title: "Other formulas", lines: ["Only when a cell", "they read changed"] },
       ]}
@@ -181,28 +109,26 @@ export function VolatileDiagram() {
   );
 }
 
-const RECOVERY_GROUPS = [
-  [
-    "Fix the input",
-    ["SnapshotValidationError", "DelimitedTextOptionsError", "SyncProtocolError"],
-    "error-soft",
-  ],
-  [
-    "Reduce it, or raise the limit",
-    ["SnapshotResourceError", "DelimitedTextResourceError", "XlsxResourceError"],
-    "alt-soft",
-  ],
-  ["Load the pages", ["IncompleteDataError"], "hue-soft"],
-  ["Drain pending work", ["SyncPendingCapacityError"], "hue-soft"],
-  [
-    "Read the cause or code",
-    ["PersistenceError", "IndexedDbPending", "  CommitStorageError"],
-    "panel",
-  ],
-  ["The grid keeps working", ["renderer-fallback", "worker → canvas"], "panel"],
-] as const;
-
-/** Where each group's box starts on small screens, and (last) where the stack ends. */
+/** What each error asks you to do, with the errors that ask it. */
+const RECOVERY_GROUPS: readonly FigureStep[] = [
+  {
+    title: "Fix the input",
+    code: ["SnapshotValidationError", "DelimitedTextOptionsError", "SyncProtocolError"],
+    tone: "danger",
+  },
+  {
+    title: "Reduce it, or raise the limit",
+    code: ["SnapshotResourceError", "DelimitedTextResourceError", "XlsxResourceError"],
+    tone: "muted",
+  },
+  { title: "Load the pages", code: ["IncompleteDataError"], tone: "accent" },
+  { title: "Drain pending work", code: ["SyncPendingCapacityError"], tone: "accent" },
+  {
+    title: "Read the cause or code",
+    code: ["PersistenceError", "IndexedDbPendingCommitStorageError"],
+  },
+  { title: "The grid keeps working", code: ["renderer-fallback", "worker → canvas"] },
+];
 
 /** Error handling › Recovery by boundary. */
 export function RecoveryDiagram() {
@@ -214,7 +140,7 @@ export function RecoveryDiagram() {
         description:
           "Fix the input for SnapshotValidationError, DelimitedTextOptionsError and SyncProtocolError. Reduce the input or raise the named limit for SnapshotResourceError, DelimitedTextResourceError and XlsxResourceError. Load the pages an IncompleteDataError names. Drain pending work after SyncPendingCapacityError. Read the cause or code of PersistenceError and IndexedDbPendingCommitStorageError. A worker failure switches to the canvas renderer and emits renderer-fallback.",
       }}
-      tiles={RECOVERY_GROUPS.map(([title, code, tone]) => figureStep({ title, code, tone }))}
+      tiles={RECOVERY_GROUPS}
     />
   );
 }
@@ -222,7 +148,7 @@ export function RecoveryDiagram() {
 /** Runtime ownership › Virtualization & scaled scroll. */
 export function VirtualScrollDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       note="OffsetIndex maps a row to its offset and back in O(log n)."
       steps={[
         { title: "Every row", lines: ["Taller than the", "browser's height cap"] },
@@ -230,7 +156,7 @@ export function VirtualScrollDiagram() {
         {
           title: "ScaledScroll",
           lines: ["Maps the capped position", "onto every row"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         {
           title: "The painted window",
@@ -255,13 +181,13 @@ export function GenerationsDiagram() {
     ["Generation 3", 'reason: "renderer-reset"', "renderer or workerUrl changed"],
   ] as const;
   return (
-    <FlowDiagram
+    <FlowFigure
       note="Reattach subscriptions in onReady; never keep a Grid from an earlier generation."
       steps={generations.map(([title, code, line], index) => ({
         title,
         code: ["onReady", code],
         lines: [line],
-        tone: index === 0 ? "hue-soft" : "panel",
+        ...(index === 0 ? { tone: "accent" as const } : {}),
       }))}
       text={{
         title: "Each grid generation gets its own onReady",
@@ -329,14 +255,14 @@ export function CsvInjectionDiagram() {
 /** Large files and streaming: a seekable file streams into a snapshot; an abort leaves nothing. */
 export function StreamingImportDiagram() {
   return (
-    <FlowDiagram
-      branch={{
+    <FlowFigure
+      outcome={{
         from: 1,
-        arrow: "error-line dash",
+        kind: "fail",
         step: {
           title: "signal aborts",
           lines: ["Rejects with signal.reason; nothing partial"],
-          tone: "error-soft",
+          tone: "danger",
         },
       }}
       note="The snapshot holds every imported cell: streaming bounds parsing, not the document."
@@ -349,7 +275,7 @@ export function StreamingImportDiagram() {
         {
           title: "Each worksheet",
           lines: ["Parsed from bounded", "inflated chunks"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         { title: "Snapshot cells", lines: ["Built as rows", "stream in"] },
       ]}
@@ -365,14 +291,14 @@ export function StreamingImportDiagram() {
 /** Kept parts and round trips: opaque parts travel as their original bytes, under three conditions. */
 export function KeptPartsDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       note="A shared graph, such as a pivot and its cache, is kept or dropped together."
       steps={[
         {
           title: "Import",
           lines: ["Opaque parts keep their", "compressed ZIP bytes"],
           code: ["workbook.xlsxSource"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         { title: "Always kept", lines: ["VBA, customXml, theme,", "connections, properties"] },
         {
@@ -382,7 +308,7 @@ export function KeptPartsDiagram() {
         {
           title: "If no cell changed",
           lines: ["Unmodelled charts,", "pivots and caches"],
-          tone: "alt-soft",
+          tone: "muted",
         },
       ]}
       text={{
@@ -397,15 +323,15 @@ export function KeptPartsDiagram() {
 /** Worker rendering › How it works, and Automatic fallback. */
 export function WorkerRenderingDiagram() {
   return (
-    <FlowDiagram
-      branch={{
+    <FlowFigure
+      outcome={{
         from: 0,
-        arrow: "error-line dash",
+        kind: "fail",
         step: {
           title: "Construction throws",
           lines: ["CanvasRenderer paints on the main thread"],
           code: ["renderer-fallback, once"],
-          tone: "error-soft",
+          tone: "danger",
         },
       }}
       note="The canvas moves with transferControlToOffscreen."
@@ -413,7 +339,7 @@ export function WorkerRenderingDiagram() {
         {
           title: "Construct the Worker",
           lines: ["First, before the", "canvas is transferred"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         { title: "Transfer the canvas", lines: ["Its control moves", "to the worker"] },
         {
@@ -424,7 +350,7 @@ export function WorkerRenderingDiagram() {
         {
           title: "Worker paints",
           lines: ["OffscreenCanvas, off", "the main thread"],
-          tone: "alt-soft",
+          tone: "muted",
         },
       ]}
       text={{
@@ -468,13 +394,13 @@ export function AriaMirrorDiagram() {
 /** Datasources › Cells that visible formulas read. */
 export function FormulaReadsDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       note="Reads from other sheets aren't loaded this way: return them from the datasource."
       steps={[
         {
           title: "Painted formulas",
           lines: ["In the window, frozen", "bands and overscan"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         {
           title: "Ask the engine",
@@ -484,7 +410,7 @@ export function FormulaReadsDiagram() {
         {
           title: "Kept while visible",
           lines: ["Protected from", "clean-cache eviction"],
-          tone: "alt-soft",
+          tone: "muted",
         },
       ]}
       text={{
@@ -499,12 +425,12 @@ export function FormulaReadsDiagram() {
 /** Iterative calculation › How a cycle calculates. */
 export function IterationDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       steps={[
         {
           title: "Start",
           lines: ["From the values", "shown; #CYCLE!", "starts at 0"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         {
           title: "One pass",
@@ -513,7 +439,7 @@ export function IterationDiagram() {
         {
           title: "Stop",
           lines: ["Nothing moved more", "than maxChange, or", "maxIterations ran"],
-          tone: "alt-soft",
+          tone: "muted",
         },
         {
           title: "Then its readers",
@@ -559,25 +485,25 @@ export function RulePrecedenceDiagram() {
 /** Collaboration › Durable pending commits. */
 export function PendingCommitsDiagram() {
   return (
-    <FlowDiagram
-      branch={{
+    <FlowFigure
+      outcome={{
         from: 3,
         step: {
           title: "Conflicts and failures",
           lines: ["Kept for explicit host recovery"],
-          tone: "error-soft",
+          tone: "danger",
         },
-        arrow: "error-line dash",
+        kind: "fail",
       }}
       steps={[
         {
           title: "1 · Persist",
           lines: ["Each commit, before", "it can be sent"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         { title: "2 · Restore", lines: ["On startup, reapplied", "as remote, not echoed"] },
         { title: "3 · Retry", lines: ["After reconnect or", "reload, same mutation id"] },
-        { title: "4 · Remove", lines: ["Only after applied", "or duplicate"], tone: "alt-soft" },
+        { title: "4 · Remove", lines: ["Only after applied", "or duplicate"], tone: "muted" },
       ]}
       text={{
         title: "What durable pending commits do",
@@ -627,17 +553,17 @@ export function ImportContractsDiagram() {
 /** Data operations › Display views: how the displayed rows are chosen and ordered. */
 export function ViewPipelineDiagram() {
   return (
-    <FlowDiagram
+    <FlowFigure
       note="No cell moves. A view sort is saved with the sheet and exports as sortState."
       steps={[
         { title: "Every row", lines: ["In data order"] },
         {
           title: "Column filters",
           lines: ["All active filters,", "ANDed together"],
-          tone: "hue-soft",
+          tone: "accent",
         },
         { title: "Minus hidden", lines: ["Hidden rows and", "collapsed groups"] },
-        { title: "Sorted", lines: ["By the active", "multi-key sort"], tone: "alt-soft" },
+        { title: "Sorted", lines: ["By the active", "multi-key sort"], tone: "muted" },
       ]}
       text={{
         title: "How a view picks and orders the displayed rows",
