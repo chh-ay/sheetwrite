@@ -790,7 +790,8 @@ pub(crate) struct UnknownCall {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ArrayLiteral {
     pub(crate) cols: u32,
-    pub(crate) values: Vec<Value>,
+    /// Shared with the arrays that read the constant, so a read copies none.
+    pub(crate) values: Rc<[Value]>,
 }
 
 /// A well-formed LAMBDA after its parameters are numbered
@@ -1121,11 +1122,9 @@ impl Ast {
                 let payload = std::mem::size_of::<ArrayLiteral>();
                 out.add_payload(payload, payload);
                 let bytes = std::mem::size_of::<Value>();
-                out.add_payload(
-                    values.len().saturating_mul(bytes),
-                    values.capacity().saturating_mul(bytes),
-                );
-                for value in values {
+                let values_bytes = values.len().saturating_mul(bytes);
+                out.add_payload(values_bytes, values_bytes);
+                for value in &**values {
                     if let Value::Text(text) = value {
                         out.add_payload(text.len(), text.len());
                     }
@@ -2157,7 +2156,7 @@ impl<'a> Parser<'a, '_> {
             u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_owned())?;
         Ok(Ast::Array(Box::new(ArrayLiteral {
             cols: width,
-            values,
+            values: values.into(),
         })))
     }
 
@@ -4307,7 +4306,8 @@ mod tests {
                     Value::text("x"),
                     Value::Bool(false),
                     Value::Error(FormulaError::Name),
-                ],
+                ]
+                .into(),
             })))
         );
         assert_eq!(

@@ -681,7 +681,7 @@ fn bounded_expansion(name: &str, written: Ast) -> NamedFormulaRef {
     let bounded = if nodes > EXPANSION_NODE_LIMIT {
         Ast::Array(Box::new(crate::calc::ArrayLiteral {
             cols: 1,
-            values: vec![Value::Error(FormulaError::Num)],
+            values: Rc::from([Value::Error(FormulaError::Num)]),
         }))
     } else {
         expression

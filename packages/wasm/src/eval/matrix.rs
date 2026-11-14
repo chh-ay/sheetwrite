@@ -129,6 +129,9 @@ impl EvalMatrix {
         }
         Ok(cells)
     }
+    /// One copy's [`Self::validate_copies`]: what the full engine's array
+    /// functions check before returning a matrix.
+    #[cfg(feature = "analysis")]
     pub(super) fn validate_bytes(&self) -> Result<(), crate::types::FormulaError> {
         self.validate_copies(1)
     }

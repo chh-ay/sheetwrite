@@ -511,19 +511,6 @@ pub(crate) fn parameter_value(frame: Option<&CallFrame>, depth: u16, index: u16)
     }
 }
 
-/// The values of an array or one-cell parameter.
-pub(in crate::eval) fn parameter_matrix(
-    frame: Option<&CallFrame>,
-    depth: u16,
-    index: u16,
-) -> Option<EvalMatrix> {
-    match frame?.slot(depth, index)? {
-        Slot::OneCell(value) => Some(EvalMatrix::new(1, 1, vec![value.clone()])),
-        Slot::Array { rows, cols, values } => Some(EvalMatrix::new(*rows, *cols, values.to_vec())),
-        Slot::Value(_) | Slot::Missing | Slot::Closure { .. } | Slot::Shaped { .. } => None,
-    }
-}
-
 /// The shape of an array or one-cell parameter.
 pub(crate) fn parameter_shape(
     frame: Option<&CallFrame>,
