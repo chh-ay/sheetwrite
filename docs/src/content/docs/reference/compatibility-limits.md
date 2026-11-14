@@ -75,17 +75,17 @@ If the restore exceeds the batch ceilings, cannot be split, or needs an unsuppor
 
 [`DEFAULT_SNAPSHOT_RESOURCE_LIMITS`](/docs/api/core/default-snapshot-resource-limits/) owns validation and allocation defaults. Exceeding one produces a path-qualified validation error or `SnapshotResourceError` before store allocation; an allocation failure within a configured ceiling still surfaces as a resource failure.
 
-`maxRowsPerSheet` bounds snapshot admission and direct workbook construction, not the lifetime row count of an admitted grid. Ordinary row insertion may grow a million-row sheet beyond that default, and layout refresh does not reapply the snapshot row ceiling. Importing or restoring a snapshot of the enlarged sheet still requires an explicit higher snapshot limit.
+The store also holds row and column inserts to these limits, so a sheet never grows past what its own snapshot can load. A transaction whose `addRows` or `addColumns` would pass `maxRowsPerSheet`, `maxColumnsPerSheet`, `maxLogicalCellsPerSheet` or, for dense sheets, `maxDenseCells` is rejected atomically with a `resource-limit` issue (`sheet-rows`, `sheet-columns`, `sheet-cells` or `dense-cells`) that names the limit, and nothing changes. Insert Row and Insert Column in the grid show that message in the grid's alert and emit `mutation-rejected`. A sheet exactly at a limit still saves and loads.
 
 | Owner / resource | Default and unit | Why / evidence class | Behavior above the ceiling | Supported override |
 | --- | --- | --- | --- | --- |
 | `maxSheets` | 256 sheets per workbook | Resource defense: bound sheet-indexed schema/store state | Snapshot or direct workbook construction is rejected | `SnapshotValidationOptions.resourceLimits`, `SheetwriteStoreOptions.snapshotResourceLimits`, or `SnapshotGridOptions.snapshotResourceLimits` |
-| `maxRowsPerSheet` | 1,000,000 rows per sheet | Compatibility: million-row allocation-lazy sheet contract | Rejected before allocation | Same snapshot resource-limit paths |
-| `maxColumnsPerSheet` | 16,384 columns per sheet | Compatibility: worksheet width shared with XLSX | Rejected before allocation | Same snapshot resource-limit paths |
+| `maxRowsPerSheet` | 1,000,000 rows per sheet | Compatibility: million-row allocation-lazy sheet contract | Rejected before allocation; a row insert past it is rejected with `sheet-rows` | Same snapshot resource-limit paths |
+| `maxColumnsPerSheet` | 16,384 columns per sheet | Compatibility: worksheet width shared with XLSX | Rejected before allocation; a column insert past it is rejected with `sheet-columns` | Same snapshot resource-limit paths |
 | `maxMetadataEntries` | 1,000,000 aggregate entries | Resource defense: bound names and sheet metadata collections | Rejected during resource preflight | Same snapshot resource-limit paths |
 | `maxSerializedBytes` | 64 MiB of UTF-8 JSON | Resource defense: bound snapshot JSON-safety inspection | Validation returns a resource-limit error | Same snapshot resource-limit paths |
-| `maxLogicalCellsPerSheet` | 4,294,967,295 row-by-column cells per sheet | Resource defense: cap logical area even when paged storage defers allocation | Rejected before dense or paged allocation | Same snapshot resource-limit paths |
-| `maxDenseCells` | 5,000,000 aggregate cells per dense workbook | Resource defense: bound eager allocation | Dense construction is rejected; paged storage does not consume this budget | Same snapshot resource-limit paths; choose `storage: "paged"` for allocation-lazy data |
+| `maxLogicalCellsPerSheet` | 4,294,967,295 row-by-column cells per sheet | Resource defense: cap logical area even when paged storage defers allocation | Rejected before dense or paged allocation; an insert past it is rejected with `sheet-cells` | Same snapshot resource-limit paths |
+| `maxDenseCells` | 5,000,000 aggregate cells per dense workbook | Resource defense: bound eager allocation | Dense construction is rejected, and so is a row or column insert into a dense sheet past it (`dense-cells`); paged storage does not consume this budget | Same snapshot resource-limit paths; choose `storage: "paged"` for allocation-lazy data |
 
 See [persistence and recovery](/docs/features/data/persistence/) and [document operations](/docs/reference/document-operations/).
 
