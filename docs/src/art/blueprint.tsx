@@ -21,7 +21,30 @@ export interface BlueprintNode {
   readonly code?: readonly string[];
   /** `accent` marks the box the figure is about; `danger` a failure; `muted` a side result; `lane` a sequence lifeline. */
   readonly tone?: "accent" | "danger" | "muted" | "lane";
+  /** A small sheet drawn under the text: which cells a formula reads. */
+  readonly sheet?: BlueprintSheet;
 }
+
+/** A small sheet: columns from A, rows from 1, some cell values and tinted ranges. */
+export interface BlueprintSheet {
+  readonly cols: number;
+  readonly rows: number;
+  /** Column and row from 0, and the cell's text. */
+  readonly cells: readonly (readonly [col: number, row: number, text: string])[];
+  /** Inclusive blocks of cells, from and to as column and row from 0. */
+  readonly ranges: readonly {
+    readonly from: readonly [col: number, row: number];
+    readonly to: readonly [col: number, row: number];
+    readonly tone: "accent" | "muted" | "danger";
+  }[];
+}
+
+/** A small sheet's cell, its column letters' row and its row numbers' gutter. */
+const CELL = { w: 46, h: 20, head: 16, gutter: 18 } as const;
+const LETTERS = "ABCDEFGHIJ";
+
+/** The height a small sheet takes in its box, with the space above it. */
+const sheetHeight = (sheet: BlueprintSheet) => CELL.head + sheet.rows * CELL.h + 10;
 
 /** One connector, from a point on one box's side to a point on another's. */
 export interface BlueprintEdge {
@@ -60,15 +83,90 @@ const LABEL_GAP = 8;
 
 /** The height a node needs for its text: the drawings size boxes with this. */
 export function nodeHeight(
-  node: Pick<BlueprintNode, "eyebrow" | "title" | "lines" | "code">,
+  node: Pick<BlueprintNode, "eyebrow" | "title" | "lines" | "code" | "sheet">,
 ): number {
   // A box without a title (a code-only box) doesn't keep a title line.
   const title = node.title === "" ? 0 : LINE + 2;
+  const sheet = node.sheet === undefined ? 0 : sheetHeight(node.sheet);
   return (
     12 +
     title +
     (node.eyebrow ? LINE : 0) +
-    ((node.lines?.length ?? 0) + (node.code?.length ?? 0)) * LINE
+    ((node.lines?.length ?? 0) + (node.code?.length ?? 0)) * LINE +
+    sheet
+  );
+}
+
+/** A small sheet with its top-left corner at (x, y): letters, row numbers, grid lines, ranges, then values. */
+function Sheet(props: Readonly<{ sheet: BlueprintSheet; x: number; y: number; width: number }>) {
+  // Narrow boxes with many columns shrink the cells so the sheet stays inside the box.
+  const cw = Math.min(CELL.w, (props.width - CELL.gutter) / props.sheet.cols);
+  const left = props.x + CELL.gutter;
+  const top = props.y + CELL.head;
+  const right = left + props.sheet.cols * cw;
+  const bottom = top + props.sheet.rows * CELL.h;
+  const lines = [
+    ...Array.from(
+      { length: props.sheet.rows + 1 },
+      (_, row) => `M${left} ${top + row * CELL.h}H${right}`,
+    ),
+    ...Array.from(
+      { length: props.sheet.cols + 1 },
+      (_, col) => `M${left + col * cw} ${top}V${bottom}`,
+    ),
+  ].join("");
+  return (
+    <g class="bp-sheet">
+      <For each={[...LETTERS.slice(0, props.sheet.cols)]}>
+        {(letter, col) => (
+          <text
+            class="bp-sheet__head"
+            text-anchor="middle"
+            x={left + col() * cw + cw / 2}
+            y={top - 4}
+          >
+            {letter}
+          </text>
+        )}
+      </For>
+      <For each={Array.from({ length: props.sheet.rows }, (_, row) => row + 1)}>
+        {(number) => (
+          <text
+            class="bp-sheet__head"
+            text-anchor="middle"
+            x={props.x + CELL.gutter / 2}
+            y={top + number * CELL.h - 6}
+          >
+            {number}
+          </text>
+        )}
+      </For>
+      <For each={props.sheet.ranges}>
+        {(range) => (
+          <rect
+            class="bp-sheet__range"
+            data-tone={range.tone}
+            height={(range.to[1] - range.from[1] + 1) * CELL.h}
+            width={(range.to[0] - range.from[0] + 1) * cw}
+            x={left + range.from[0] * cw}
+            y={top + range.from[1] * CELL.h}
+          />
+        )}
+      </For>
+      <path class="bp-sheet__grid" d={lines} />
+      <For each={props.sheet.cells}>
+        {([col, row, text]) => (
+          <text
+            class="bp-sheet__cell"
+            text-anchor="middle"
+            x={left + col * cw + cw / 2}
+            y={top + row * CELL.h + 14}
+          >
+            {text}
+          </text>
+        )}
+      </For>
+    </g>
   );
 }
 
@@ -84,17 +182,34 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
       placed.push({ kind: "title", text: props.node.title, y });
       y += LINE + 2;
     }
-    for (const text of props.node.lines ?? []) {
-      placed.push({ kind: "line", text, y });
-      y += LINE;
-    }
+    // With a sheet, the code (the formula) leads into it and the lines explain it underneath.
+    const sheet = props.node.sheet;
+    const caption = (from: number) => {
+      for (const text of props.node.lines ?? []) {
+        placed.push({ kind: "line", text, y: from });
+        from += LINE;
+      }
+      return from;
+    };
+    if (sheet === undefined) y = caption(y);
     for (const text of props.node.code ?? []) {
       placed.push({ kind: "code", text, y });
       y += LINE;
     }
+    if (sheet !== undefined) caption(y + sheetHeight(sheet));
     return placed;
   };
-  const { x, y, w, h } = props.node.rect;
+  const { x, y, w } = props.node.rect;
+  // The sheet starts under the last code line.
+  const sheetTop = () =>
+    y +
+    22 -
+    LINE +
+    (props.node.eyebrow ? LINE : 0) +
+    (props.node.title === "" ? 0 : LINE + 2) +
+    (props.node.code?.length ?? 0) * LINE +
+    4;
+  const h = props.node.rect.h;
   return (
     <g class="bp-node" data-tone={props.node.tone ?? "plain"}>
       <rect class="bp-node__box" height={h} rx={6} width={w} x={x} y={y} />
@@ -106,6 +221,9 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
           </text>
         )}
       </For>
+      <Show when={props.node.sheet}>
+        {(sheet) => <Sheet sheet={sheet()} width={w - 28} x={x + 14} y={sheetTop()} />}
+      </Show>
     </g>
   );
 }
