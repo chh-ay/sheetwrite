@@ -565,57 +565,6 @@ a {
   padding: var(--sw-space-1) var(--sw-space-4) var(--sw-space-2);
 }
 
-.sw-architecture {
-  margin: var(--sw-space-6) 0 var(--sw-space-10);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-lg);
-  padding: var(--sw-space-4);
-  background: var(--sw-surface-1);
-}
-
-.sw-architecture__flow {
-  display: grid;
-  gap: var(--sw-space-1-5);
-}
-
-.sw-architecture__step > div {
-  display: grid;
-  grid-template-columns: 2rem 10rem minmax(0, 1fr);
-  align-items: baseline;
-  gap: var(--sw-space-3);
-  border: 1px solid var(--sw-border);
-  border-radius: var(--sw-radius-md);
-  padding: var(--sw-space-3);
-  background: var(--sw-surface-2);
-}
-
-.sw-architecture__step > span {
-  display: block;
-  color: var(--sw-fg-muted);
-  text-align: center;
-}
-
-.sw-architecture__step div > span {
-  color: var(--sw-accent-strong);
-  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) var(--sw-font-mono);
-}
-
-.sw-architecture__step strong {
-  font-family: var(--sw-font-display);
-}
-
-.sw-architecture__step p {
-  margin: 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-caption);
-}
-
-.sw-architecture figcaption {
-  margin: var(--sw-space-3) var(--sw-space-1) 0;
-  color: var(--sw-fg-muted);
-  font-size: var(--sw-text-eyebrow);
-}
-
 /* Reading order first, colophon last: the footer closes the page with where
    to go next rather than with licence small print. */
 .sw-document__footer {
