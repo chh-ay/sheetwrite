@@ -65,3 +65,18 @@ fn paged_column_folds_read_an_unacknowledged_edit() {
     assert!(store.sheets[paged].cells.is_cell_dirty(5, 0));
     assert_eq!(results(&mut store, paged), results(&mut store, dense));
 }
+
+#[test]
+fn paged_column_folds_read_beside_a_formula_in_the_column() {
+    let (mut store, dense, paged) = twin_sheets();
+    let sums: Vec<f64> = [dense, paged]
+        .into_iter()
+        .map(|sheet| {
+            // The result sits in the folded column's last page, below the range.
+            store.set_formula(sheet, ROWS - 1, 0, "=SUM(A1:A12)", 0);
+            store.recompute(sheet);
+            store.get_cell(sheet, ROWS - 1, 0).num()
+        })
+        .collect();
+    assert_eq!(sums[1], sums[0]);
+}

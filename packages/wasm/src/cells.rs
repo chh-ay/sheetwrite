@@ -1140,10 +1140,19 @@ impl CellRun<'_> {
     }
 
     /// A paged run's clean kinds and payloads, when every cell is loaded and
-    /// no dirty or calculated block overlays the run. A local sheet's run
-    /// without a page is all empty cells: `Some` with empty slices.
+    /// none holds an edit or a calculated value. A local sheet's run without
+    /// a page is all empty cells: `Some` with empty slices.
     pub(crate) fn clean_sources(&self) -> Option<SourceSlices<'_>> {
-        if self.is_dense || self.dirty.is_some() || !self.calculated.is_empty() {
+        if self.is_dense {
+            return None;
+        }
+        // A formula cell's result or one edit only overlays its own row.
+        let mut cells = self.start..self.end;
+        if self.dirty.is_some() && cells.any(|index| self.dirty_cell(index).is_some()) {
+            return None;
+        }
+        let mut cells = self.start..self.end;
+        if !self.calculated.is_empty() && cells.any(|index| self.calculated_cell(index).is_some()) {
             return None;
         }
         if self.kinds.is_empty() {
