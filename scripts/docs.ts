@@ -45,6 +45,7 @@ import {
   markdownDocuments,
   readReadmes,
   siteLinkIssues,
+  trackerReferenceIssues,
   unresolvedCssTokens,
   validateMarkdown,
 } from "./docs-content-checks.js";
@@ -518,6 +519,7 @@ async function checkDocs(
   }
   failures.push(...movedPageIssues(MOVED_PAGES, documents, MOVED_HEADINGS));
   failures.push(...(await siteLinkIssues(documents)));
+  failures.push(...trackerReferenceIssues(documents));
   const publicRoot = join(repositoryRoot, "docs/public");
   const generatedPublicFiles = new Set(
     expected
