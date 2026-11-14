@@ -237,7 +237,7 @@ describe("snapshot persistence boundary", () => {
     expect(gridError.cause).toBeInstanceOf(SnapshotValidationError);
     expect(host.childElementCount).toBe(0);
   });
-  it("hydrates a million-row snapshot only through paged allocation", () => {
+  it("hydrates a million-row snapshot without allocating its rectangle", () => {
     const snapshot: WorkbookSnapshot = {
       schemaVersion: 1,
       workbook: { activeSheet: "large" },
@@ -258,7 +258,11 @@ describe("snapshot persistence boundary", () => {
       ],
     };
 
-    expect(() => SheetwriteStore.fromSnapshot(snapshot)).toThrow(SnapshotValidationError);
+    // Past the dense cell limit, dense storage continues in local pages.
+    const localStore = SheetwriteStore.fromSnapshot(snapshot);
+    expect(localStore.isPaged("large")).toBe(false);
+    expect(localStore.getPagedStats("large").allocatedBytes).toBe(0);
+    localStore.dispose();
     const pagedStore = SheetwriteStore.fromSnapshot(snapshot, { storage: "paged" });
     expect(pagedStore.isPaged("large")).toBe(true);
     expect(pagedStore.getPagedStats("large").allocatedBytes).toBe(0);
@@ -273,7 +277,9 @@ describe("snapshot persistence boundary", () => {
 
     let error: unknown;
     try {
-      createGridFromSnapshot(document.createElement("div"), snapshot);
+      createGridFromSnapshot(document.createElement("div"), snapshot, {
+        snapshotResourceLimits: { maxLocalPagedCells: 5_999_999 },
+      });
     } catch (cause) {
       error = cause;
     }
