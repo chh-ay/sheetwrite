@@ -259,6 +259,19 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
         )
         .sort((a, b) => a.width * a.height - b.width * b.height)[0];
       if (holder === undefined) continue;
+      // Text on a filled badge drawn over the box belongs to the badge.
+      const holderIndex = drawn.findIndex((candidate) => candidate.box === holder);
+      const textIndex = drawn.findIndex((candidate) => candidate.element === element);
+      const onBadge = drawn.some(
+        (badge, badgeIndex) =>
+          badgeIndex > holderIndex &&
+          badgeIndex < textIndex &&
+          badge.element.tagName !== "text" &&
+          badge.element.tagName !== "rect" &&
+          isFilled(badge.element) &&
+          contains(badge.box, { ...centre, width: 0, height: 0 }),
+      );
+      if (onBadge) continue;
       const over = Math.max(
         holder.x + 2 - box.x,
         box.x + box.width - (holder.x + holder.width - 2),
