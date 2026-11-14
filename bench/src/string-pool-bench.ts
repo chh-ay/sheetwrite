@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type * as WasmModule from "@sheetwrite/wasm";
 import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
 
+import { writeStringColumn } from "./packed-fixture.js";
 import { median } from "./stats.js";
 
 const wasmRoot =
@@ -25,7 +26,8 @@ function measure(operation: () => void): number {
 
 function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
   for (let start = 0; start < ROWS; start += BATCH) {
-    store.setColumnStrings(
+    writeStringColumn(
+      store,
       sheet,
       0,
       start,

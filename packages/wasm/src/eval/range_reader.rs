@@ -263,7 +263,7 @@ mod tests {
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(COLUMNS + 1, ROWS, ROWS, 0, ROWS * COLUMNS);
         for col in 0..COLUMNS {
-            store.set_column_numbers(sheet, col, 0, &[0.0; ROWS], 0);
+            crate::tests::write_number_column(&mut store, sheet, col, 0, &[0.0; ROWS]);
         }
         store.set_number(sheet, 0, 0, 7.0, 0);
         store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
@@ -379,7 +379,7 @@ mod tests {
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(2, 8, 4, 0, 0);
         store.begin_page_load();
-        store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+        crate::tests::write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
         store.commit_sources();
         let loaded = range(sheet, 0, 0, 3, 0);
         assert_eq!(

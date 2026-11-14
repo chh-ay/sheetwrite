@@ -5,6 +5,36 @@ use crate::cells::{
 };
 use crate::memory::{StoreMemoryStats, SPILL_OWNERS};
 
+/// Load numeric fixture data through the retained packed column writer.
+pub(crate) fn write_number_column(
+    store: &mut CellStore,
+    sheet: usize,
+    col: usize,
+    row: usize,
+    values: &[f64],
+) {
+    assert_eq!(
+        store.set_column_block_packed(
+            sheet,
+            row,
+            col,
+            values.len(),
+            1,
+            &vec![KIND_NUMBER; values.len()],
+            values,
+            &[],
+            &[0],
+            &vec![0; values.len()],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        ),
+        crate::store::BLOCK_OK,
+        "numeric fixture column must load",
+    );
+}
+
 fn assert_close(actual: f64, expected: f64) {
     assert!(
         (actual - expected).abs() < 1e-9,
@@ -775,8 +805,6 @@ fn public_api_bounds_checks_do_not_panic() {
         store.set_string(sheet, 0, 9, "x", 0);
         store.clear_cell(sheet, 9, 9, 0);
         store.set_formula(sheet, 9, 0, "=A1", 0);
-        store.set_column_numbers(sheet, 9, 0, &[1.0, 2.0], 0);
-        store.set_column_strings(sheet, 9, 0, vec!["x".to_string()], 0);
         store.add_rows(99, 0, 1);
         store.remove_rows(99, 0, 1);
 
@@ -1017,25 +1045,35 @@ fn structural_edits_rewrite_cross_sheet_targets_and_preserve_qualifiers() {
     assert_close(number(&store, summary, 1, 0), 7.0);
 }
 
+/// Joined text, its UTF-16 lengths and the cells it must produce.
+#[cfg(not(feature = "analysis"))]
+type SavedTextCase<'a> = (&'a str, &'a [u32], &'a [&'a str]);
+
+#[cfg(not(feature = "analysis"))]
 #[test]
-fn packed_string_loader_survives_hostile_utf16_lengths() {
-    let mut store = CellStore::new();
-    let sheet = store.add_sheet(4, 6);
-    store.set_column_strings_packed(sheet, 0, 0, "abc".to_string(), &[2, 5, 3], 0);
-    assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("ab"));
-    assert_eq!(string(&store, sheet, 1, 0).as_deref(), Some("c"));
-    assert_eq!(string(&store, sheet, 2, 0).as_deref(), Some(""));
-    store.set_column_strings_packed(sheet, 1, 0, "abcdef".to_string(), &[2, 1], 0);
-    assert_eq!(string(&store, sheet, 0, 1).as_deref(), Some("ab"));
-    assert_eq!(string(&store, sheet, 1, 1).as_deref(), Some("c"));
-    assert_eq!(string(&store, sheet, 2, 1), None);
-    store.set_column_strings_packed(sheet, 2, 0, "𝄞x".to_string(), &[1, 1], 0);
-    assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("𝄞"));
-    assert_eq!(string(&store, sheet, 1, 2).as_deref(), Some("x"));
-    store.set_column_strings_packed(sheet, 3, 0, "é漢z".to_string(), &[1, 1, 1], 0);
-    assert_eq!(string(&store, sheet, 0, 3).as_deref(), Some("é"));
-    assert_eq!(string(&store, sheet, 1, 3).as_deref(), Some("漢"));
-    assert_eq!(string(&store, sheet, 2, 3).as_deref(), Some("z"));
+fn saved_pivot_text_survives_hostile_utf16_lengths() {
+    let cases: &[SavedTextCase<'_>] = &[
+        ("abc", &[2, 5, 3], &["ab", "c", ""]),
+        ("abcdef", &[2, 1], &["ab", "c"]),
+        ("𝄞x", &[1, 1], &["𝄞", "x"]),
+        ("é漢z", &[1, 1, 1], &["é", "漢", "z"]),
+    ];
+    for &(text, lengths, expected) in cases {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, expected.len());
+        assert!(store.set_saved_pivots(
+            sheet,
+            &[0, 0, expected.len() as u32, 1],
+            &vec![KIND_STRING; expected.len()],
+            &vec![0.0; expected.len()],
+            text.into(),
+            lengths,
+        ));
+        store.recompute(sheet);
+        for (row, value) in expected.iter().enumerate() {
+            assert_eq!(string(&store, sheet, row, 0).as_deref(), Some(*value));
+        }
+    }
 }
 
 #[test]
@@ -1331,7 +1369,7 @@ fn many_scalar_writes_before_a_bulk_write_recompute_every_reader() {
 
     // A scalar written into the formula column is a dirty formula reader too.
     store.set_formula(sheet, 3, FORMULA_COL, "=C10+1", 0);
-    store.set_column_numbers(sheet, BULK_COL, 0, &[BULK_VALUE; BULK_ROWS], 0);
+    crate::tests::write_number_column(&mut store, sheet, BULK_COL, 0, &[BULK_VALUE; BULK_ROWS]);
     store.commit_sources();
 
     assert_close(number(&store, sheet, 0, FORMULA_COL), WRITTEN_VALUE * 2.0);
@@ -1473,13 +1511,13 @@ fn paged_text_collection_preserves_dirty_overlays_after_clean_eviction() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(1, 1_000_000, 4096, 110_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
-    store.set_column_strings(sheet, 0, 0, vec!["clean old".into()], 0);
-    store.set_column_strings(sheet, 0, 4096, vec!["evicted".into()], 0);
+    store.set_string(sheet, 0, 0, "clean old", 0);
+    store.set_string(sheet, 4096, 0, "evicted", 0);
     store.commit_sources();
     store.set_string(sheet, 0, 0, "dirty survivor", 0);
     store.begin_page_load();
-    store.set_column_strings(sheet, 0, 8192, vec!["clean survivor".into()], 0);
-    store.set_column_strings(sheet, 0, 12288, vec!["last survivor".into()], 0);
+    store.set_string(sheet, 8192, 0, "clean survivor", 0);
+    store.set_string(sheet, 12288, 0, "last survivor", 0);
     for edit in 0..4_000 {
         store.set_string(
             sheet,
@@ -1527,8 +1565,8 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     assert_eq!(string(&store, sheet, 0, 0).as_deref(), Some("#LOADING!"));
 
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 0, &[1.0], 0);
-    store.set_column_numbers(sheet, 0, 4096, &[2.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &[1.0]);
+    crate::tests::write_number_column(&mut store, sheet, 0, 4096, &[2.0]);
     store.commit_sources();
     let loaded = store.paged_stats(sheet);
     assert_eq!(loaded[0], 2.0);
@@ -1539,8 +1577,8 @@ fn paged_sheet_allocates_lazily_and_evicts_only_clean_chunks() {
     // evicts the older clean chunk without affecting the local edit.
     store.set_number(sheet, 0, 0, 10.0, 0);
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 8192, &[3.0], 0);
-    store.set_column_numbers(sheet, 0, 12288, &[4.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 8192, &[3.0]);
+    crate::tests::write_number_column(&mut store, sheet, 0, 12288, &[4.0]);
     store.commit_sources();
     let evicted = store.paged_stats(sheet);
     assert_eq!(evicted[0], 2.0);
@@ -1560,20 +1598,20 @@ fn viewport_and_mapped_read_pins_have_independent_lifetimes() {
     store.pin_read_window(sheet, 0, 1, &[8], &[0]);
     store.begin_page_load();
     for row in [4, 8] {
-        store.set_column_numbers(sheet, 0, row, &[row as f64 + 1.0], 0);
+        crate::tests::write_number_column(&mut store, sheet, 0, row, &[row as f64 + 1.0]);
     }
     store.commit_sources();
 
     store.pin_read_window(sheet, 0, 0, &[], &[]);
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 12, &[13.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 12, &[13.0]);
     store.commit_sources();
     assert_close(number(&store, sheet, 4, 0), 5.0);
     assert_eq!(store.cell_state(sheet, 8, 0), 0);
 
     store.pin_viewport_bands(sheet, &[]);
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 16, &[17.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 16, &[17.0]);
     store.commit_sources();
     assert_eq!(store.cell_state(sheet, 4, 0), 0);
 }
@@ -1584,8 +1622,8 @@ fn columns_fully_loaded_tracks_disjoint_columns_holes_bounds_and_sparse_accounti
     let sheet = store.add_paged_sheet(3, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
 
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
-    store.set_column_numbers(sheet, 2, 0, &[5.0, 6.0, 7.0, 8.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
+    crate::tests::write_number_column(&mut store, sheet, 2, 0, &[5.0, 6.0, 7.0, 8.0]);
     store.commit_sources();
 
     assert!(store.columns_fully_loaded(sheet, 0, 4, &[0]));
@@ -1626,7 +1664,7 @@ fn scalar_index_only_waits_for_its_selected_paged_cell() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(3, 6000, 4096, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 0, &[17.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &[17.0]);
     store.commit_sources();
     store.set_formula(sheet, 0, 1, "=INDEX(A1:A6000,1)", 0);
     store.set_formula(sheet, 0, 2, "=INDEX(A1:A6000,5001)", 0);
@@ -1635,7 +1673,7 @@ fn scalar_index_only_waits_for_its_selected_paged_cell() {
     assert_eq!(string(&store, sheet, 0, 2).as_deref(), Some("#LOADING!"));
 
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 5000, &[41.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 5000, &[41.0]);
     store.commit_sources();
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 1), 17.0);
@@ -1655,7 +1693,7 @@ fn paged_formulas_propagate_loading_until_dependencies_arrive() {
     assert_eq!(loading_view.strings[loading_index as usize], "#LOADING!");
 
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 5000, &[41.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 5000, &[41.0]);
     store.commit_sources();
     store.recompute(sheet);
     assert_close(number(&store, sheet, 0, 1), 42.0);
@@ -2680,8 +2718,8 @@ fn loaded_spans_match_per_row_loaded_probes() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(3, 8, 4, 1_000_000, DEFAULT_MAX_PAGED_DIRTY_CELLS);
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
-    store.set_column_numbers(sheet, 1, 2, &[1.0, 2.0, 3.0, 4.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
+    crate::tests::write_number_column(&mut store, sheet, 1, 2, &[1.0, 2.0, 3.0, 4.0]);
     store.commit_sources();
     // A local edit is loaded but dirty; both states belong in a run.
     store.set_number(sheet, 7, 0, 9.0, 0);
