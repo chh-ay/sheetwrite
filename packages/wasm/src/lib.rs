@@ -101,6 +101,8 @@ pub use formula_tokens::{check_formula_syntax, formula_tokens, FormulaSyntaxErro
 #[cfg(feature = "formula-engine")]
 pub use formula_xlsx::convert_xlsx_formulas;
 #[cfg(feature = "formula-engine")]
+pub use query::DistinctColumn;
+#[cfg(feature = "formula-engine")]
 pub use store::{CellOut, CellStore};
 #[cfg(feature = "formula-engine")]
 pub use window::WindowView;
