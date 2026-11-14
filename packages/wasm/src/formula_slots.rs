@@ -220,6 +220,9 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
+    /// The formulas that call GETPIVOTDATA.
+    #[cfg(feature = "analysis")]
+    pivot_readers: FormulaBits,
     /// The formulas that name a sheet the workbook does not have or use a
     /// table. Absent in the usual workbook, so it adds one word.
     references: Option<Box<ReferenceUsers>>,
@@ -457,6 +460,18 @@ impl FormulaStore {
             self.subtotals.remove(id);
             self.subtotals.release_if_empty();
         }
+        #[cfg(feature = "analysis")]
+        self.track_pivot_reader(id);
+    }
+
+    #[cfg(feature = "analysis")]
+    fn track_pivot_reader(&mut self, id: FormulaId) {
+        if self.get(id).is_some_and(FormulaEntry::calls_pivot_data) {
+            self.pivot_readers.insert(id);
+        } else {
+            self.pivot_readers.remove(id);
+            self.pivot_readers.release_if_empty();
+        }
     }
 
     fn track_references(&mut self, id: FormulaId) {
@@ -552,6 +567,8 @@ impl FormulaStore {
                 self.subtotals.insert(id);
             }
         }
+        #[cfg(feature = "analysis")]
+        self.track_pivot_reader(id);
         self.track_references(id);
         Some(id)
     }
@@ -700,6 +717,14 @@ impl FormulaStore {
         }
     }
 
+    /// The formulas that call GETPIVOTDATA, with their cells.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn pivot_readers(&self) -> impl Iterator<Item = (AbsCellKey, &FormulaEntry)> + '_ {
+        self.pivot_readers
+            .ids()
+            .filter_map(|id| Some((self.location(id)?, self.get(id)?)))
+    }
+
     /// Include page tables and vacant capacity in the formula owner's bytes.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
@@ -707,6 +732,8 @@ impl FormulaStore {
         formulas.add_vec::<Vec<FormulaSlot>>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
+        #[cfg(feature = "analysis")]
+        self.pivot_readers.add_memory_stats(formulas);
         if let Some(index) = &self.references {
             index.add_memory_stats(formulas);
         }

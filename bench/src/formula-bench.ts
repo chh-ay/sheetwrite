@@ -131,6 +131,7 @@ const FULL_ENGINE_ROWS = [
   { id: "pivotby-percentof", size: 50_000, smokeSize: 1_000 },
   { id: "pivot-rebuild", size: 100_000, smokeSize: 1_000 },
   { id: "getpivotdata-many", size: 1_000, smokeSize: 100 },
+  { id: "getpivotdata-source-edit", size: 1_000, smokeSize: 100 },
   // 100,000 formulas took 0.19 s per edit natively on the Mac; 10,000 make 40,000 calls.
   { id: "analysis-calls", size: 10_000, smokeSize: 1_000 },
 ] as const;
@@ -292,6 +293,7 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "pivotby-percentof",
   "pivot-rebuild",
   "getpivotdata-many",
+  "getpivotdata-source-edit",
   "analysis-calls",
   "spill-filter-resize",
   "sumproduct-vector-edit",

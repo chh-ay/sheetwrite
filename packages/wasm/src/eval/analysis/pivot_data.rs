@@ -3,7 +3,7 @@
 
 use std::borrow::Cow;
 
-use crate::calc::Ast;
+use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -12,6 +12,19 @@ use super::super::value::text_from_value;
 use super::super::{EvalPass, EvalResult};
 
 pub(crate) const NAMES: &[&str] = &["GETPIVOTDATA"];
+
+/// Whether `ast` calls GETPIVOTDATA anywhere.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
+pub(crate) fn ast_calls_pivot_data(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
+        Ast::NamedFormula(named) => ast_calls_pivot_data(&named.expression),
+        _ => ast.any_child(&mut ast_calls_pivot_data),
+    }
+}
 
 /// The data field and the pivot reference come before the pairs.
 const FIXED_ARGUMENTS: usize = 2;

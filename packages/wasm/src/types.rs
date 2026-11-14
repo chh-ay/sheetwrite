@@ -393,8 +393,6 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             | Func::Info,
             _,
         ) => true,
-        #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(crate::eval::analysis::GETPIVOTDATA_ID), _) => true,
         Ast::NamedFormula(named) => ast_is_volatile(&named.expression),
         _ => ast.any_child(&mut ast_is_volatile),
     }
@@ -477,6 +475,9 @@ impl FormulaEntry {
     const STALE_REFERENCES: u16 = 1 << 9;
     /// The tree holds a table reference, bound or not.
     const TABLE_REFS: u16 = 1 << 10;
+    /// The tree calls GETPIVOTDATA.
+    #[cfg(feature = "analysis")]
+    const CALLS_PIVOT_DATA: u16 = 1 << 12;
 
     /// Whether the tree holds a table reference, so its tables list it
     /// among their users.
@@ -567,6 +568,13 @@ impl FormulaEntry {
         self.flags & Self::CALLS_SUBTOTAL != 0
     }
 
+    /// Whether the formula calls GETPIVOTDATA. It reads pivot output that
+    /// no reference names, so a pivot update recalculates it.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn calls_pivot_data(&self) -> bool {
+        self.flags & Self::CALLS_PIVOT_DATA != 0
+    }
+
     fn set_flag(&mut self, flag: u16, enabled: bool) {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
@@ -609,6 +617,11 @@ impl FormulaEntry {
         entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
         entry.set_produces_array(crate::eval::ast_produces_array(&ast));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
+        #[cfg(feature = "analysis")]
+        entry.set_flag(
+            Self::CALLS_PIVOT_DATA,
+            crate::eval::analysis::ast_calls_pivot_data(&ast),
+        );
         entry.set_flag(Self::TABLE_REFS, features.table_refs);
         // The flags and reads above come from the tree as written; resolving
         // LET names afterwards changes how it evaluates, not what it reads.
@@ -651,6 +664,14 @@ impl FormulaEntry {
                 .ast
                 .as_ref()
                 .is_some_and(crate::eval::ast_calls_subtotal),
+        );
+        #[cfg(feature = "analysis")]
+        entry.set_flag(
+            Self::CALLS_PIVOT_DATA,
+            entry
+                .ast
+                .as_ref()
+                .is_some_and(crate::eval::analysis::ast_calls_pivot_data),
         );
         entry
     }

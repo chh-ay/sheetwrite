@@ -122,6 +122,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=pivotby-percentof;size=50000": 1.2,
   "workload=pivot-rebuild;size=100000": 1.2,
   "workload=getpivotdata-many;size=1000": 1.2,
+  // Not yet resampled: the 1.2 default until same-engine pairs calibrate it.
+  "workload=getpivotdata-source-edit;size=1000": 1.2,
   "workload=analysis-calls;size=10000": 1.2,
   "workload=iterative-finance;size=1000": 1.15,
   "workload=incremental-dependency-closure-edit;size=100000": 1.15,

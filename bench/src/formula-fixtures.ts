@@ -119,6 +119,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return pivotRebuildOutput(size);
     case "getpivotdata-many":
       return pivotDataValue(size - 1);
+    case "getpivotdata-source-edit":
+      return pivotDataValue(size - 1) + PIVOT_DATA_SOURCE_DELTA;
     case "analysis-calls":
       return analysisCallsOutput(size);
     case "history-diff":
@@ -2197,6 +2199,10 @@ function pivotRebuildOutput(rows: number): number {
 const PIVOT_DATA_SOURCE_ROWS = 10_000;
 const PIVOT_DATA_EDIT = 1;
 const PIVOT_DATA_EDITED = 2;
+/** `getpivotdata-source-edit` adds this to the sum field of source row 99. */
+const PIVOT_DATA_SOURCE_DELTA = 1_000;
+/** The source row it edits: its items are (9, 9), as the last cell's are. */
+const PIVOT_DATA_SOURCE_ROW = 99;
 
 /** The item pair that GETPIVOTDATA cell `index` names. */
 function pivotDataItems(index: number): [number, number] {
@@ -2215,10 +2221,13 @@ function pivotDataValue(index: number): number {
 
 /**
  * A pivot on sheet `Pivot` sums field 4 by fields 0 and 1; `count` cells on
- * another sheet read it with `GETPIVOTDATA`. GETPIVOTDATA is volatile, so the
- * timed edit of an unrelated cell recalculates all of them.
+ * another sheet read it with `GETPIVOTDATA`. With `edit` "unrelated" the
+ * timed edit changes a cell nothing reads: GETPIVOTDATA depends on its
+ * pivot, so it recalculates none of them (before 0.7.0 it was volatile and
+ * recalculated all of them). With "source" the timed edit changes one source
+ * value: the pivot updates, then all of them recalculate once.
  */
-function getPivotDataManyFixture(count: number): TimedFixture {
+function getPivotDataManyFixture(count: number, edit: "unrelated" | "source"): TimedFixture {
   const store = new CellStore();
   assert(hasPivots(store), "the full engine has pivot tables");
   const source = pivotSourceSheet(store, PIVOT_DATA_SOURCE_ROWS);
@@ -2251,6 +2260,21 @@ function getPivotDataManyFixture(count: number): TimedFixture {
     );
   }
   store.recompute(calc);
+  if (edit === "source") {
+    // Sheet row 0 holds the headers.
+    const row = PIVOT_DATA_SOURCE_ROW + 1;
+    const value = PIVOT_DATA_SOURCE_ROW + PIVOT_SUM_FIELD;
+    return {
+      store,
+      run: () => {
+        store.setNumber(source, row, PIVOT_SUM_FIELD, value + PIVOT_DATA_SOURCE_DELTA, 0);
+        store.recompute(source);
+      },
+      check: () => numberAt(store, calc, count - 1, 1),
+      dispose: () => store.free(),
+      restore: restoreNumber(store, source, { row, col: PIVOT_SUM_FIELD, value }),
+    };
+  }
   return {
     store,
     run: () => {
@@ -2303,7 +2327,9 @@ function fullEngineRowFixture(id: string, size: number): TimedFixture {
     case "pivot-rebuild":
       return pivotRebuildFixture(size);
     case "getpivotdata-many":
-      return getPivotDataManyFixture(size);
+      return getPivotDataManyFixture(size, "unrelated");
+    case "getpivotdata-source-edit":
+      return getPivotDataManyFixture(size, "source");
     case "analysis-calls":
       return analysisCallsFixture(size);
     default:
@@ -3091,6 +3117,7 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "pivotby-percentof":
     case "pivot-rebuild":
     case "getpivotdata-many":
+    case "getpivotdata-source-edit":
     case "analysis-calls":
       return fullEngineRowFixture(id, size);
     case "paged-cell-reads":
