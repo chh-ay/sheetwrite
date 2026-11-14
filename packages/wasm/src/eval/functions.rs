@@ -762,7 +762,7 @@ pub(super) fn numeric_entries<'a>(
     Ok(numbers)
 }
 
-pub(super) const fn treats_cell_as_reference(func: Func) -> bool {
+pub(super) fn treats_cell_as_reference(func: Func) -> bool {
     match func {
         Func::Sum
         | Func::Avg

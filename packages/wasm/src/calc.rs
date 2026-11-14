@@ -337,7 +337,7 @@ macro_rules! define_function_registry {
                 .map(|index| FUNCTION_ALIASES[index].1)
         }
 
-        const fn func_name(func: Func) -> &'static str {
+        fn func_name(func: Func) -> &'static str {
             match func {
                 $(Func::$variant => $canonical,)+
                 Func::AnchorArray => "ANCHORARRAY",

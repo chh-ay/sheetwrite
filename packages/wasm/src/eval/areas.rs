@@ -21,7 +21,7 @@ use super::EvalPass;
 pub(super) type AreaRange = Result<(CellRange, usize), FormulaError>;
 
 /// The functions that Excel lets read a 3-D reference.
-const fn accepts_sheet_span(func: Func) -> bool {
+fn accepts_sheet_span(func: Func) -> bool {
     match func {
         Func::Sum
         | Func::Avg
