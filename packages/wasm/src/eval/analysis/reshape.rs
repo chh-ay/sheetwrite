@@ -608,7 +608,7 @@ fn sort_by(
     let order = super::sorted_positions(item_count, &mut |left, right| {
         for key in &keys {
             match compare_values(&key.values.values[left], &key.values.values[right]) {
-                Ok(Ordering::Equal) => continue,
+                Ok(Ordering::Equal) => {}
                 Ok(ordering) if key.is_descending => return ordering.reverse(),
                 Ok(ordering) => return ordering,
                 Err(found) => {

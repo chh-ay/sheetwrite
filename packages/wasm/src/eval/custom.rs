@@ -18,7 +18,13 @@ pub(crate) struct CustomArgument {
 
 // The native build has no JavaScript adapter, so only the engine tests read
 // the shape; the WASM adapter reads it to build nested arrays.
-#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+#[cfg_attr(
+    not(target_arch = "wasm32"),
+    allow(
+        dead_code,
+        reason = "only the WASM adapter calls this outside the engine tests"
+    )
+)]
 impl CustomArgument {
     pub(crate) const fn rows(&self) -> usize {
         self.block.rows
@@ -47,7 +53,13 @@ pub(crate) type CustomFunctions = FxHashMap<String, CustomFunction>;
 impl CellStore {
     /// Adds or replaces a host function and recalculates the workbook.
     // Only the WASM adapter calls this outside the engine tests.
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        allow(
+            dead_code,
+            reason = "only the WASM adapter calls this outside the engine tests"
+        )
+    )]
     pub(crate) fn install_custom_function(&mut self, name: &str, function: CustomFunction) -> bool {
         let installed = self.insert_custom_function(name, function);
         if installed {
@@ -66,7 +78,13 @@ impl CellStore {
     /// function. A name that is also a cell reference (`A1`, `R1C1`) is refused
     /// as in Excel, because a sheet with more columns would read it as a
     /// reference.
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        allow(
+            dead_code,
+            reason = "only the WASM adapter calls this outside the engine tests"
+        )
+    )]
     pub(crate) fn insert_custom_function(
         &mut self,
         raw_name: &str,
@@ -88,7 +106,13 @@ impl CellStore {
     }
 
     /// Removes a host function. Its callers then show `#NAME?`.
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        allow(
+            dead_code,
+            reason = "only the WASM adapter calls this outside the engine tests"
+        )
+    )]
     pub(crate) fn remove_custom_function(&mut self, name: &str) -> bool {
         let removed = self
             .custom_functions
