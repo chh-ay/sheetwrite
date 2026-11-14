@@ -180,6 +180,7 @@ impl PagedStorage {
         let clean = existing.unwrap_or_else(|| {
             let id = self.record_or_insert(col, page);
             let allocated = if let Some(reused) = self.free_clean.pop() {
+                self.clean[reused as usize].restore(self.chunk_rows);
                 reused
             } else {
                 self.clean.push(CleanPage::new(self.chunk_rows));

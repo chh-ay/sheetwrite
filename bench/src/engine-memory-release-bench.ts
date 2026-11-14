@@ -365,11 +365,11 @@ async function memory() {
     "dense-clear",
     "paged-dirty",
     "large-clear-history",
-    "local-clear",
+    "local-shrink",
   ]) {
     await core.releaseEngineMemory();
     const fresh =
-      scenario === "local-clear"
+      scenario === "local-shrink"
         ? new core.SheetwriteStore(localWorkbook())
         : new core.SheetwriteStore(
             workbook(MEMORY_ROWS),
@@ -408,7 +408,7 @@ async function memory() {
           start: { row: 0, col: 0 },
           end: { row: MEMORY_ROWS - 1, col: 2 },
         });
-      } else if (scenario === "local-clear") {
+      } else if (scenario === "local-shrink") {
         fresh.applyTransaction({
           patches: Array.from({ length: 10 }, (_, row) => ({
             op: "setBlock" as const,
@@ -507,31 +507,20 @@ async function memory() {
       dense.dispose();
     }
 
-    // A sheet past the dense cell limit, filled to the local cell budget, then cleared.
+    // A sheet past the dense cell limit, filled to the local cell budget, then shrunk.
     const local = new core.SheetwriteStore(localWorkbook(), localColumnar());
     try {
       assert.equal(local.isPaged("s1"), false);
       localFullWasmBytes = engine.getEngine().getMemory().buffer.byteLength;
       assert.equal(
         local.applyTransaction({
-          patches: [
-            {
-              op: "clearRange",
-              range: {
-                sheet: "s1",
-                start: { row: 10, col: 0 },
-                end: { row: MEMORY_ROWS - 1, col: LOCAL_COLUMNS - 1 },
-              },
-              contents: true,
-              style: true,
-            },
-          ],
+          patches: [{ op: "removeRows", sheet: "s1", at: 10, count: MEMORY_ROWS - 10 }],
         }).status,
         "applied",
       );
-      await capture("local-clear", () => {
+      await capture("local-shrink", () => {
         assert.equal(local.getCell(address(9, LOCAL_COLUMNS - 1)).resolved, LOCAL_COLUMNS - 1);
-        assert.equal(local.getCell(address(MEMORY_ROWS - 1, 1)).resolved, null);
+        assert.equal(local.getWorkbook().sheets[0]?.rowCount, 10);
       });
     } finally {
       local.dispose();

@@ -221,3 +221,41 @@ fn column_folds_over_absent_local_pages_match_the_dense_sheet() {
         );
     }
 }
+
+#[test]
+fn a_memory_transfer_drops_the_rows_of_free_local_pages() {
+    use crate::cells::CellStorage;
+    use crate::transfer::{Reader, Writer};
+
+    // Two pages of 4,096 rows; deleting the second frees its page.
+    let mut cells = CellStorage::try_new_local(1, 8_192).unwrap();
+    for row in [0, 5_000] {
+        assert!(cells.write_cell(row, 0, KIND_NUMBER, 7, 0, None), "write");
+    }
+    cells.delete_rows(4_096, 4_096).unwrap();
+    let transfer = |cells: &CellStorage| {
+        let mut out = Writer::new(1);
+        cells.write_transfer(&mut out);
+        out.0
+    };
+    let before = transfer(&cells);
+    let mut input = Reader::new(&before, 1).unwrap();
+    let mut restored = CellStorage::read_transfer(&mut input).unwrap();
+    input.finish().unwrap();
+    assert!(
+        // One page holds 13 bytes a row; the other page is free.
+        before.len() < 2 * 4_096 * 13,
+        "the free page's rows stay behind: {} bytes",
+        before.len()
+    );
+
+    // Growing again reuses the free page with whole, empty arrays.
+    restored.insert_rows(4_096, 4_096).unwrap();
+    assert!(
+        restored.write_cell(6_000, 0, KIND_NUMBER, 9, 0, None),
+        "write"
+    );
+    assert_eq!(restored.source_payload_at(0), 7);
+    assert_eq!(restored.source_payload_at(6_000), 9);
+    assert_eq!(restored.source_kind_at(5_000), crate::types::KIND_EMPTY);
+}

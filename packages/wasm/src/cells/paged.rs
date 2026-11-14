@@ -204,7 +204,9 @@ impl Directory {
 }
 
 /// Clean, reloadable source values of one page. Eviction frees the entry and
-/// the next loaded page reuses its arrays.
+/// the next loaded page reuses its arrays. A free page that came through a
+/// transfer has empty arrays until reuse allocates them.
+#[derive(Default)]
 pub(super) struct CleanPage {
     pub(super) kind: Vec<u8>,
     pub(super) payload: Vec<u64>,
@@ -223,6 +225,13 @@ impl CleanPage {
             payload: vec![0; rows],
             style: vec![0; rows],
             loaded: vec![0; rows.div_ceil(BITS_PER_WORD)],
+        }
+    }
+
+    /// Allocates the arrays of a free page whose rows a transfer dropped.
+    fn restore(&mut self, rows: usize) {
+        if self.kind.is_empty() {
+            *self = Self::new(rows);
         }
     }
 
@@ -825,6 +834,7 @@ impl PagedStorage {
         self.evict_for_chunk();
 
         let clean = if let Some(reused) = self.free_clean.pop() {
+            self.clean[reused as usize].restore(self.chunk_rows);
             self.clean[reused as usize].reset();
             reused
         } else {
@@ -1843,8 +1853,17 @@ impl PagedStorage {
         }
         out.ints(&self.free_records);
 
+        // A free page is reset before reuse, so a transfer drops its rows:
+        // releasing memory then also returns the pages that evictions, row
+        // deletes and shrinking local sheets left free.
+        let mut free = vec![false; self.clean.len()];
+        for &id in &self.free_clean {
+            free[id as usize] = true;
+        }
         out.usize(self.clean.len());
-        for clean in &self.clean {
+        for (clean, free) in self.clean.iter().zip(free) {
+            let empty = CleanPage::default();
+            let clean = if free { &empty } else { clean };
             out.bytes(&clean.kind);
             out.words(&clean.payload);
             out.ints(&clean.style);
@@ -1937,11 +1956,15 @@ impl PagedStorage {
                 style: input.ints()?,
                 loaded: input.words()?,
             };
-            if clean.kind.len() != rows
-                || clean.payload.len() != rows
-                || clean.style.len() != rows
-                || clean.loaded.len() != rows.div_ceil(BITS_PER_WORD)
-            {
+            let empty = clean.kind.is_empty()
+                && clean.payload.is_empty()
+                && clean.style.is_empty()
+                && clean.loaded.is_empty();
+            let full = clean.kind.len() == rows
+                && clean.payload.len() == rows
+                && clean.style.len() == rows
+                && clean.loaded.len() == rows.div_ceil(BITS_PER_WORD);
+            if !empty && !full {
                 return Err("invalid transferred page chunk".into());
             }
             if !all_source_kinds(&clean.kind) {
@@ -1950,6 +1973,21 @@ impl PagedStorage {
             paged.clean.push(clean);
         }
         paged.free_clean = input.ints()?;
+        let mut free = vec![false; paged.clean.len()];
+        for &id in &paged.free_clean {
+            *free
+                .get_mut(id as usize)
+                .ok_or("invalid transferred free page")? = true;
+        }
+        // Only a free page may arrive without its rows.
+        if paged
+            .clean
+            .iter()
+            .zip(&free)
+            .any(|(clean, &free)| clean.kind.is_empty() && !free)
+        {
+            return Err("invalid transferred page chunk".into());
+        }
 
         paged.dirty = Directory::read_transfer(input)?;
         for _ in 0..input.count()? {
