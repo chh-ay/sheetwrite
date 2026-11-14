@@ -11,7 +11,9 @@ use super::super::matrix::range_from_ast;
 use super::super::value::text_from_value;
 use super::super::{EvalPass, EvalResult};
 
-pub(crate) const NAMES: &[&str] = &["GETPIVOTDATA"];
+family_functions! {
+    GETPIVOTDATA,
+}
 
 /// Whether `ast` calls GETPIVOTDATA anywhere.
 #[allow(
@@ -33,7 +35,7 @@ const MAX_PAIRS: usize = 126;
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,

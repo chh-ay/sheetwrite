@@ -12,7 +12,9 @@ use super::super::subtotal::SkippedCells;
 use super::super::value::number_from_value;
 use super::super::EvalPass;
 
-pub(crate) const NAMES: &[&str] = &["AGGREGATE"];
+family_functions! {
+    AGGREGATE,
+}
 
 const FUNCTION_ARGUMENT: usize = 0;
 const OPTIONS_ARGUMENT: usize = 1;
@@ -70,7 +72,7 @@ const fn operation(function_number: i64) -> Option<Func> {
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,

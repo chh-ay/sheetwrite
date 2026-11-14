@@ -5,7 +5,12 @@ use super::super::functions::{integer_arg, require_arity, text_arg, FuncAccumula
 use super::super::value::{number_from_text, number_from_value};
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &["DATEDIF", "ISOWEEKNUM", "NETWORKDAYS.INTL", "WORKDAY.INTL"];
+family_functions! {
+    DATEDIF,
+    ISOWEEKNUM,
+    NETWORKDAYS_INTL = "NETWORKDAYS.INTL",
+    WORKDAY_INTL = "WORKDAY.INTL",
+}
 const MAX_SERIAL: i64 = 2_958_465;
 const DAYS_PER_WEEK: i64 = 7;
 const MONTHS_PER_YEAR: i64 = 12;
@@ -13,8 +18,8 @@ const MONTHS_PER_YEAR: i64 = 12;
 const DAYS_COMMON_YEAR: i64 = 365;
 type DateResult = Result<i64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).map_or_else(Value::Error, |result| Value::number(result as f64))
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).map_or_else(Value::Error, |result| Value::number(result as f64))
 }
 
 fn serial_value(value: &Value) -> DateResult {
@@ -49,9 +54,9 @@ fn serial_arg(values: &FuncAccumulator, index: usize) -> DateResult {
     serial_value(values.arg_value(index).ok_or(FormulaError::Value)?)
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> DateResult {
-    match name {
-        "DATEDIF" => {
+fn calculate(function: Function, values: &FuncAccumulator) -> DateResult {
+    match function {
+        Function::DATEDIF => {
             require_arity(values, 3, 3)?;
             datedif(
                 serial_arg(values, 0)?,
@@ -59,16 +64,16 @@ fn calculate(name: &str, values: &FuncAccumulator) -> DateResult {
                 &text_arg(values, 2, None)?,
             )
         }
-        "ISOWEEKNUM" => {
+        Function::ISOWEEKNUM => {
             require_arity(values, 1, 1)?;
             iso_week(serial_arg(values, 0)?)
         }
-        "NETWORKDAYS.INTL" | "WORKDAY.INTL" => {
+        Function::NETWORKDAYS_INTL | Function::WORKDAY_INTL => {
             require_arity(values, 2, 4)?;
             let start = serial_arg(values, 0)?;
             let weekend = weekend_mask(values)?;
             let holidays = holidays(values, &weekend)?;
-            if name == "NETWORKDAYS.INTL" {
+            if function == Function::NETWORKDAYS_INTL {
                 let end = serial_arg(values, 1)?;
                 if start <= end {
                     Ok(workday_count(start, end, &weekend, &holidays))
@@ -80,7 +85,6 @@ fn calculate(name: &str, values: &FuncAccumulator) -> DateResult {
                 workday_offset(start, offset, &weekend, &holidays)
             }
         }
-        _ => Err(FormulaError::Name),
     }
 }
 

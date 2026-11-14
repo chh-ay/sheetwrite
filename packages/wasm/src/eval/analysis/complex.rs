@@ -9,34 +9,34 @@ use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulat
 use super::super::number_format::general_text;
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "COMPLEX",
-    "IMABS",
-    "IMAGINARY",
-    "IMARGUMENT",
-    "IMCONJUGATE",
-    "IMCOS",
-    "IMCOSH",
-    "IMCOT",
-    "IMCSC",
-    "IMCSCH",
-    "IMDIV",
-    "IMEXP",
-    "IMLN",
-    "IMLOG10",
-    "IMLOG2",
-    "IMPOWER",
-    "IMPRODUCT",
-    "IMREAL",
-    "IMSEC",
-    "IMSECH",
-    "IMSIN",
-    "IMSINH",
-    "IMSQRT",
-    "IMSUB",
-    "IMSUM",
-    "IMTAN",
-];
+family_functions! {
+    COMPLEX,
+    IMABS,
+    IMAGINARY,
+    IMARGUMENT,
+    IMCONJUGATE,
+    IMCOS,
+    IMCOSH,
+    IMCOT,
+    IMCSC,
+    IMCSCH,
+    IMDIV,
+    IMEXP,
+    IMLN,
+    IMLOG10,
+    IMLOG2,
+    IMPOWER,
+    IMPRODUCT,
+    IMREAL,
+    IMSEC,
+    IMSECH,
+    IMSIN,
+    IMSINH,
+    IMSQRT,
+    IMSUB,
+    IMSUM,
+    IMTAN,
+}
 
 /// Excel accepts at most 255 arguments.
 const MAX_ARGUMENTS: usize = 255;
@@ -196,33 +196,48 @@ impl Suffix {
     }
 }
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).unwrap_or_else(Value::Error)
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).unwrap_or_else(Value::Error)
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> Result<Value, FormulaError> {
-    match name {
-        "COMPLEX" => complex(values),
-        "IMSUM" | "IMPRODUCT" => fold(name == "IMSUM", values),
-        "IMSUB" | "IMDIV" => binary(name == "IMSUB", values),
-        "IMPOWER" => {
+fn calculate(function: Function, values: &FuncAccumulator) -> Result<Value, FormulaError> {
+    match function {
+        Function::COMPLEX => complex(values),
+        Function::IMSUM | Function::IMPRODUCT => fold(function == Function::IMSUM, values),
+        Function::IMSUB | Function::IMDIV => binary(function == Function::IMSUB, values),
+        Function::IMPOWER => {
             require_arity(values, 2, 2)?;
             let (base, suffix) = argument(values, 0)?;
             let exponent = number_arg(values, 1, None)?;
 
             complex_result(base.power(exponent)?, &suffix)
         }
-        "IMABS" | "IMAGINARY" | "IMARGUMENT" | "IMREAL" => {
+        Function::IMABS | Function::IMAGINARY | Function::IMARGUMENT | Function::IMREAL => {
             require_arity(values, 1, 1)?;
             let (number, _) = argument(values, 0)?;
 
-            real_part(name, number)
+            real_part(function, number)
         }
-        _ => {
+        Function::IMCONJUGATE
+        | Function::IMCOS
+        | Function::IMCOSH
+        | Function::IMCOT
+        | Function::IMCSC
+        | Function::IMCSCH
+        | Function::IMEXP
+        | Function::IMLN
+        | Function::IMLOG10
+        | Function::IMLOG2
+        | Function::IMSEC
+        | Function::IMSECH
+        | Function::IMSIN
+        | Function::IMSINH
+        | Function::IMSQRT
+        | Function::IMTAN => {
             require_arity(values, 1, 1)?;
             let (number, suffix) = argument(values, 0)?;
 
-            complex_result(unary(name, number)?, &suffix)
+            complex_result(unary(function, number)?, &suffix)
         }
     }
 }
@@ -282,38 +297,51 @@ fn binary(is_subtract: bool, values: &FuncAccumulator) -> Result<Value, FormulaE
 }
 
 /// The functions that return one real number.
-fn real_part(name: &str, number: Complex) -> Result<Value, FormulaError> {
-    let result = match name {
-        "IMABS" => number.modulus(),
-        "IMAGINARY" => number.im,
-        "IMREAL" => number.re,
-        _ if number.is_zero() => return Err(FormulaError::DivZero),
-        _ => number.argument(),
+fn real_part(function: Function, number: Complex) -> Result<Value, FormulaError> {
+    let result = if function == Function::IMABS {
+        number.modulus()
+    } else if function == Function::IMAGINARY {
+        number.im
+    } else if function == Function::IMREAL {
+        number.re
+    } else if number.is_zero() {
+        return Err(FormulaError::DivZero);
+    } else {
+        number.argument()
     };
 
     Ok(Value::number(result))
 }
 
 /// The functions of one complex number that return a complex number.
-fn unary(name: &str, number: Complex) -> Result<Complex, FormulaError> {
-    Ok(match name {
-        "IMCONJUGATE" => Complex::new(number.re, -number.im),
-        "IMCOS" => number.cos(),
-        "IMCOSH" => number.cosh(),
-        "IMCOT" => number.cos().divide(number.sin())?,
-        "IMCSC" => number.sin().reciprocal()?,
-        "IMCSCH" => number.sinh().reciprocal()?,
-        "IMEXP" => number.exp(),
-        "IMLN" => number.ln()?,
-        "IMLOG10" => scale(number.ln()?, std::f64::consts::LOG10_E),
-        "IMLOG2" => scale(number.ln()?, std::f64::consts::LOG2_E),
-        "IMSEC" => number.cos().reciprocal()?,
-        "IMSECH" => number.cosh().reciprocal()?,
-        "IMSIN" => number.sin(),
-        "IMSINH" => number.sinh(),
-        "IMSQRT" => number.power(0.5)?,
-        "IMTAN" => number.sin().divide(number.cos())?,
-        _ => return Err(FormulaError::Name),
+fn unary(function: Function, number: Complex) -> Result<Complex, FormulaError> {
+    Ok(match function {
+        Function::IMCONJUGATE => Complex::new(number.re, -number.im),
+        Function::IMCOS => number.cos(),
+        Function::IMCOSH => number.cosh(),
+        Function::IMCOT => number.cos().divide(number.sin())?,
+        Function::IMCSC => number.sin().reciprocal()?,
+        Function::IMCSCH => number.sinh().reciprocal()?,
+        Function::IMEXP => number.exp(),
+        Function::IMLN => number.ln()?,
+        Function::IMLOG10 => scale(number.ln()?, std::f64::consts::LOG10_E),
+        Function::IMLOG2 => scale(number.ln()?, std::f64::consts::LOG2_E),
+        Function::IMSEC => number.cos().reciprocal()?,
+        Function::IMSECH => number.cosh().reciprocal()?,
+        Function::IMSIN => number.sin(),
+        Function::IMSINH => number.sinh(),
+        Function::IMSQRT => number.power(0.5)?,
+        Function::IMTAN => number.sin().divide(number.cos())?,
+        Function::COMPLEX
+        | Function::IMABS
+        | Function::IMAGINARY
+        | Function::IMARGUMENT
+        | Function::IMDIV
+        | Function::IMPOWER
+        | Function::IMPRODUCT
+        | Function::IMREAL
+        | Function::IMSUB
+        | Function::IMSUM => return Err(FormulaError::Name),
     })
 }
 
@@ -436,7 +464,7 @@ fn format_complex(number: Complex, suffix: char) -> String {
 mod tests {
     use super::*;
 
-    fn call(name: &str, arguments: &[Value]) -> Value {
+    fn call(function: Function, arguments: &[Value]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in arguments {
@@ -444,7 +472,7 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
     fn text(value: &str) -> Value {
@@ -459,40 +487,56 @@ mod tests {
     /// `https://support.microsoft.com/en-us/excel/functions/<name>-function`.
     #[test]
     fn microsoft_published_exact_examples() {
-        for (name, arguments, expected) in [
-            ("COMPLEX", vec![number(3.0), number(4.0)], text("3+4i")),
+        for (function, arguments, expected) in [
             (
-                "COMPLEX",
+                Function::COMPLEX,
+                vec![number(3.0), number(4.0)],
+                text("3+4i"),
+            ),
+            (
+                Function::COMPLEX,
                 vec![number(3.0), number(4.0), text("j")],
                 text("3+4j"),
             ),
-            ("COMPLEX", vec![number(0.0), number(1.0)], text("i")),
-            ("COMPLEX", vec![number(1.0), number(0.0)], text("1")),
-            ("IMABS", vec![text("5+12i")], number(13.0)),
-            ("IMAGINARY", vec![text("3+4i")], number(4.0)),
-            ("IMAGINARY", vec![text("0-j")], number(-1.0)),
-            ("IMAGINARY", vec![number(4.0)], number(0.0)),
-            ("IMCONJUGATE", vec![text("3+4i")], text("3-4i")),
+            (Function::COMPLEX, vec![number(0.0), number(1.0)], text("i")),
+            (Function::COMPLEX, vec![number(1.0), number(0.0)], text("1")),
+            (Function::IMABS, vec![text("5+12i")], number(13.0)),
+            (Function::IMAGINARY, vec![text("3+4i")], number(4.0)),
+            (Function::IMAGINARY, vec![text("0-j")], number(-1.0)),
+            (Function::IMAGINARY, vec![number(4.0)], number(0.0)),
+            (Function::IMCONJUGATE, vec![text("3+4i")], text("3-4i")),
             (
-                "IMDIV",
+                Function::IMDIV,
                 vec![text("-238+240i"), text("10+24i")],
                 text("5+12i"),
             ),
             (
-                "IMPRODUCT",
+                Function::IMPRODUCT,
                 vec![text("3+4i"), text("5-3i")],
                 text("27+11i"),
             ),
             (
-                "IMPRODUCT",
+                Function::IMPRODUCT,
                 vec![text("1+2i"), number(30.0)],
                 text("30+60i"),
             ),
-            ("IMREAL", vec![text("6-9i")], number(6.0)),
-            ("IMSUB", vec![text("13+4i"), text("5+3i")], text("8+i")),
-            ("IMSUM", vec![text("3+4i"), text("5-3i")], text("8+i")),
+            (Function::IMREAL, vec![text("6-9i")], number(6.0)),
+            (
+                Function::IMSUB,
+                vec![text("13+4i"), text("5+3i")],
+                text("8+i"),
+            ),
+            (
+                Function::IMSUM,
+                vec![text("3+4i"), text("5-3i")],
+                text("8+i"),
+            ),
         ] {
-            assert_eq!(call(name, &arguments), expected, "{name}{arguments:?}");
+            assert_eq!(
+                call(function, &arguments),
+                expected,
+                "{function}{arguments:?}"
+            );
         }
     }
 
@@ -510,85 +554,85 @@ mod tests {
     /// compared to 14 significant digits.
     #[test]
     fn microsoft_published_rounded_examples() {
-        for (name, arguments, published) in [
+        for (function, arguments, published) in [
             (
-                "IMCOS",
+                Function::IMCOS,
                 vec![text("1+i")],
                 "0.833730025131149-0.988897705762865i",
             ),
             (
-                "IMCOSH",
+                Function::IMCOSH,
                 vec![text("4+3i")],
                 "-27.0349456030742+3.85115333481178i",
             ),
             (
-                "IMCOT",
+                Function::IMCOT,
                 vec![text("4+3i")],
                 "0.0049011823943045-0.999266927805902i",
             ),
             (
-                "IMCSC",
+                Function::IMCSC,
                 vec![text("4+3i")],
                 "-0.0754898329158637+0.0648774713706355i",
             ),
             (
-                "IMEXP",
+                Function::IMEXP,
                 vec![text("1+i")],
                 "1.46869393991589+2.28735528717884i",
             ),
             (
-                "IMLN",
+                Function::IMLN,
                 vec![text("3+4i")],
                 "1.6094379124341+0.927295218001612i",
             ),
             (
-                "IMLOG10",
+                Function::IMLOG10,
                 vec![text("3+4i")],
                 "0.698970004336019+0.402719196273373i",
             ),
             (
-                "IMLOG2",
+                Function::IMLOG2,
                 vec![text("3+4i")],
                 "2.32192809488736+1.33780421245098i",
             ),
             (
-                "IMPOWER",
+                Function::IMPOWER,
                 vec![text("2+3i"), number(3.0)],
                 "-46+9.00000000000001i",
             ),
             (
-                "IMSEC",
+                Function::IMSEC,
                 vec![text("4+3i")],
                 "-0.0652940278579471-0.0752249603027732i",
             ),
             (
-                "IMSIN",
+                Function::IMSIN,
                 vec![text("4+3i")],
                 "-7.61923172032141-6.548120040911i",
             ),
             (
-                "IMSINH",
+                Function::IMSINH,
                 vec![text("4+3i")],
                 "-27.0168132580039+3.85373803791938i",
             ),
             (
-                "IMSQRT",
+                Function::IMSQRT,
                 vec![text("1+i")],
                 "1.09868411346781+0.455089860562227i",
             ),
             (
-                "IMTAN",
+                Function::IMTAN,
                 vec![text("4+3i")],
                 "0.00490825806749606+1.00070953606723i",
             ),
         ] {
-            let actual = parts(&call(name, &arguments));
+            let actual = parts(&call(function, &arguments));
             let expected = parse(published).unwrap().0;
 
             for (actual, expected) in [(actual.re, expected.re), (actual.im, expected.im)] {
                 assert!(
                     (actual - expected).abs() <= 1e-13 * expected.abs(),
-                    "{name}{arguments:?}: {actual} != {expected}"
+                    "{function}{arguments:?}: {actual} != {expected}"
                 );
             }
         }
@@ -597,21 +641,21 @@ mod tests {
         // imaginary part: IMCSCH has the right imaginary part and IMSECH the
         // right real part. The reciprocals of the published IMSINH and IMCOSH
         // examples give the other parts.
-        for (name, published_part, reciprocal_of, is_real_published) in [
+        for (function, published_part, reciprocal_of, is_real_published) in [
             (
-                "IMCSCH",
+                Function::IMCSCH,
                 -0.0051744731840194,
                 "-27.0168132580039+3.85373803791938i",
                 false,
             ),
             (
-                "IMSECH",
+                Function::IMSECH,
                 -0.0362534969158689,
                 "-27.0349456030742+3.85115333481178i",
                 true,
             ),
         ] {
-            let actual = parts(&call(name, &[text("4+3i")]));
+            let actual = parts(&call(function, &[text("4+3i")]));
             let reciprocal = parse(reciprocal_of).unwrap().0.reciprocal().unwrap();
             let (published, other, expected_other) = if is_real_published {
                 (actual.re, actual.im, reciprocal.im)
@@ -619,14 +663,14 @@ mod tests {
                 (actual.im, actual.re, reciprocal.re)
             };
 
-            assert!((published - published_part).abs() <= 1e-15, "{name}");
+            assert!((published - published_part).abs() <= 1e-15, "{function}");
             assert!(
                 (other - expected_other).abs() <= 1e-13 * expected_other.abs(),
-                "{name}"
+                "{function}"
             );
         }
 
-        let Value::Number(angle) = call("IMARGUMENT", &[text("3+4i")]) else {
+        let Value::Number(angle) = call(Function::IMARGUMENT, &[text("3+4i")]) else {
             panic!("IMARGUMENT returned an error");
         };
         assert!((angle - 0.92729522).abs() < 1e-8);
@@ -650,27 +694,36 @@ mod tests {
         }
 
         assert_eq!(
-            call("IMSUM", &[text("1+i"), text("1+j")]),
-            Value::Error(FormulaError::Value)
-        );
-        assert_eq!(call("IMSUM", &[text("1+j"), number(2.0)]), text("3+j"));
-        assert_eq!(
-            call("COMPLEX", &[number(1.0), number(1.0), text("k")]),
+            call(Function::IMSUM, &[text("1+i"), text("1+j")]),
             Value::Error(FormulaError::Value)
         );
         assert_eq!(
-            call("IMABS", &[Value::Bool(true)]),
+            call(Function::IMSUM, &[text("1+j"), number(2.0)]),
+            text("3+j")
+        );
+        assert_eq!(
+            call(Function::COMPLEX, &[number(1.0), number(1.0), text("k")]),
             Value::Error(FormulaError::Value)
         );
         assert_eq!(
-            call("IMDIV", &[text("1"), text("0")]),
+            call(Function::IMABS, &[Value::Bool(true)]),
+            Value::Error(FormulaError::Value)
+        );
+        assert_eq!(
+            call(Function::IMDIV, &[text("1"), text("0")]),
             Value::Error(FormulaError::Num)
         );
-        assert_eq!(call("IMLN", &[text("0")]), Value::Error(FormulaError::Num));
         assert_eq!(
-            call("IMARGUMENT", &[text("0")]),
+            call(Function::IMLN, &[text("0")]),
+            Value::Error(FormulaError::Num)
+        );
+        assert_eq!(
+            call(Function::IMARGUMENT, &[text("0")]),
             Value::Error(FormulaError::DivZero)
         );
-        assert_eq!(call("IMSUB", &[text("1+2i"), text("1+2i")]), text("0"));
+        assert_eq!(
+            call(Function::IMSUB, &[text("1+2i"), text("1+2i")]),
+            text("0")
+        );
     }
 }
