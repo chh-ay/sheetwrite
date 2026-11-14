@@ -194,13 +194,18 @@ impl ListView<'_> {
                 first,
                 step,
                 ..
-            } => {
-                let (kind, payload) = cells.source_at(first + position * step);
-                Entry::literal(strings, kind, payload)
-            }
+            } => paged_entry(cells, strings, first + position * step),
             Self::Values(values) => Entry::of(&values[position]),
         }
     }
+}
+
+/// One entry of a paged list, out of line: searches inline `ListView::entry`
+/// into their loops, and the paged read would make it too large for that.
+#[inline(never)]
+fn paged_entry<'s>(cells: &CellStorage, strings: &'s StringStorage, index: usize) -> Entry<'s> {
+    let (kind, payload) = cells.source_at(index);
+    Entry::literal(strings, kind, payload)
 }
 
 /// The value domain a list lives in. A list whose entries all fall in one
@@ -1317,6 +1322,7 @@ impl CellStore {
     /// [`Self::storage_range`] for a paged sheet: every cell loaded, and a
     /// literal source with no calculated value over it. One pass over the
     /// range's runs, so a range several formulas read is checked once.
+    #[inline(never)]
     fn paged_storage_range(
         &self,
         sheet: usize,
