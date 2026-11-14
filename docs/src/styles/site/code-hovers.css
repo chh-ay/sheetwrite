@@ -13,7 +13,11 @@
   --sw-code-symbol-highlight: color-mix(in srgb, var(--sw-accent-soft) 70%, var(--sw-code-bg));
 }
 
+/* The tint reaches a little past the glyphs; the negative margin gives the
+   padding back, so no text moves. */
 .expressive-code .sw-code-popover__trigger {
+  margin-inline: calc(-1 * var(--sw-space-0-5));
+  padding-inline: var(--sw-space-0-5);
   border-radius: var(--sw-radius-xs);
   color: inherit;
   text-decoration: underline dotted transparent;
@@ -80,7 +84,9 @@
   /* Size to content: a short signature gets a small panel. Floating UI sets
      the viewport clamp inline as the panel opens. */
   width: max-content;
-  max-width: min(34rem, calc(100vw - var(--sw-space-6)));
+  /* Wide enough for a one-line signature such as
+     `interface SimpleColumn<Row extends Record<string, CellScalar>>`. */
+  max-width: min(44rem, calc(100vw - var(--sw-space-6)));
   max-height: 30rem;
   overflow: auto;
   visibility: hidden;
@@ -106,7 +112,7 @@
    classes from components.css, which read the theme's colour tokens. */
 .sw-code-popover__signature {
   display: block;
-  padding: var(--sw-space-3) var(--sw-space-4);
+  padding: var(--sw-space-3) 0 var(--sw-space-3) var(--sw-space-4);
   overflow-x: auto;
   border-bottom: var(--sw-border-width) solid var(--sw-border);
   background: var(--sw-code-bg);
@@ -118,6 +124,15 @@
 
 .sw-code-popover__signature--narrow {
   display: none;
+}
+
+/* The end padding sits on the text, not on the scrolling signature: some
+   browsers drop a scroller's own end padding, so a scrolled signature would
+   run into the panel's edge. */
+.sw-code-popover__signature-text {
+  display: block;
+  width: max-content;
+  padding-inline-end: var(--sw-space-4);
 }
 
 .sw-code-popover__docs,
