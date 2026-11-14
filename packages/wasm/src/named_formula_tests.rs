@@ -477,3 +477,48 @@ fn a_name_over_a_table_follows_the_table() {
     store.recompute(sheet);
     assert_eq!(number(&store, sheet, 0, 3), 12.0, "Sum of A1:A3");
 }
+
+/// The bytes the store retains, as the formula gate reads them.
+fn retained_bytes(store: &CellStore) -> f64 {
+    store.memory_stats().last().copied().unwrap_or_default()
+}
+
+/// A name edit patches its users' reads in the dependency index, which keeps
+/// some spare capacity that a rebuild would not. That growth comes with the
+/// first edit and stays flat after it: 200 edits that move `Rate` back and
+/// forth over 100,000 formulas that use it retain what the first one did.
+#[test]
+fn name_edits_retain_bounded_index_capacity() {
+    const FORMULAS: usize = 100_000;
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, FORMULAS);
+    for row in 0..FORMULAS {
+        store.set_number(sheet, row, 0, 1.0, 0);
+        store.set_formula(sheet, row, 1, &format!("=A{}*Rate", row + 1), 0);
+    }
+    store.set_number(sheet, 0, 2, 2.0, 0);
+    store.set_number(sheet, 1, 2, 3.0, 0);
+    store.recompute(sheet);
+
+    let mut retained = Vec::new();
+    for edit in 1..=200 {
+        let row = edit % 2;
+        assert!(
+            store.set_named_range("Rate", -1, sheet, row, 2, row, 2),
+            "Rate moves"
+        );
+        store.recompute(sheet);
+        if [1, 10, 100, 200].contains(&edit) {
+            retained.push(retained_bytes(&store));
+        }
+    }
+    assert_eq!(
+        number(&store, sheet, FORMULAS - 1, 1),
+        2.0,
+        "the last edit put Rate on C1"
+    );
+    assert!(
+        retained.iter().all(|&bytes| bytes == retained[0]),
+        "retained bytes after edits 1, 10, 100 and 200: {retained:?}"
+    );
+}
