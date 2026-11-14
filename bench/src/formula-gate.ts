@@ -116,6 +116,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=rank-many;size=4000": 1.2,
   "workload=sort-unique-filter;size=100000": 1.2,
   "workload=subtotal-filtered;size=100000": 1.2,
+  "workload=sort-mixed-blanks;size=10000": 1.2,
+  "workload=sort-mixed-blanks;size=100000": 1.2,
   "workload=sparse-page-write;size=100000": 1.2,
   "workload=history-diff;size=100000": 1.2,
   "workload=groupby-sum;size=100000": 1.2,
