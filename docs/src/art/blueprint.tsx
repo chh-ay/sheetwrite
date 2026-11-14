@@ -9,7 +9,15 @@
 // stay readable over the dots and the lines.
 import { createUniqueId, For, type JSX, Show } from "solid-js";
 
-import { anchor, arrowHead, type BoxSide, opposite, type Rect, route } from "./layout.js";
+import {
+  anchor,
+  arrowHead,
+  type BoxSide,
+  opposite,
+  type Point,
+  type Rect,
+  route,
+} from "./layout.js";
 
 /** One box: an optional mono eyebrow, a title, caption lines and code lines. */
 export interface BlueprintNode {
@@ -228,6 +236,38 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
   );
 }
 
+/** Connector ends this close across their direction are meant to line up. */
+const SNAP = 12;
+/** A snapped end stays this far inside its box's side, clear of the rounded corner. */
+const SNAP_INSET = 6;
+
+/**
+ * A connector between two nearly aligned boxes runs straight: when its ends
+ * sit on parallel sides and are offset by less than SNAP across its
+ * direction, one end moves onto the other's line, if that line meets its side.
+ */
+function straighten(
+  fromRect: Rect,
+  start: Point,
+  toRect: Rect,
+  end: Point,
+  fromSide: BoxSide,
+  toSide: BoxSide,
+): { start: Point; end: Point } {
+  const horizontal = (side: BoxSide) => side === "left" || side === "right";
+  if (horizontal(fromSide) !== horizontal(toSide)) return { start, end };
+  const across = horizontal(fromSide) ? "y" : "x";
+  const offset = Math.abs(end[across] - start[across]);
+  if (offset < 0.5 || offset >= SNAP) return { start, end };
+  const fits = (rect: Rect, value: number) =>
+    across === "y"
+      ? value >= rect.y + SNAP_INSET && value <= rect.y + rect.h - SNAP_INSET
+      : value >= rect.x + SNAP_INSET && value <= rect.x + rect.w - SNAP_INSET;
+  if (fits(toRect, start[across])) return { start, end: { ...end, [across]: start[across] } };
+  if (fits(fromRect, end[across])) return { start: { ...start, [across]: end[across] }, end };
+  return { start, end };
+}
+
 function Edge(props: Readonly<{ edge: BlueprintEdge; nodes: ReadonlyMap<string, BlueprintNode> }>) {
   const from = props.nodes.get(props.edge.from);
   const to = props.nodes.get(props.edge.to);
@@ -237,8 +277,14 @@ function Edge(props: Readonly<{ edge: BlueprintEdge; nodes: ReadonlyMap<string, 
     );
   }
   const toSide = props.edge.toSide ?? opposite(props.edge.fromSide);
-  const start = anchor(from.rect, props.edge.fromSide, props.edge.t ?? 0.5);
-  const end = anchor(to.rect, toSide, props.edge.toT ?? props.edge.t ?? 0.5);
+  const { start, end } = straighten(
+    from.rect,
+    anchor(from.rect, props.edge.fromSide, props.edge.t ?? 0.5),
+    to.rect,
+    anchor(to.rect, toSide, props.edge.toT ?? props.edge.t ?? 0.5),
+    props.edge.fromSide,
+    toSide,
+  );
   const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
   const side = props.edge.labelSide ?? "right";
   const textAnchor: "start" | "middle" | "end" =
