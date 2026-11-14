@@ -338,11 +338,11 @@ impl DepIndex {
     }
 
     /// Whether any formula reads another formula through its static reads.
-    pub(super) fn has_formula_dependencies(&self) -> bool {
+    pub(super) const fn has_formula_dependencies(&self) -> bool {
         self.has_formula_dependencies
     }
 
-    pub(super) fn has_dynamic_arrays(&self) -> bool {
+    pub(super) const fn has_dynamic_arrays(&self) -> bool {
         self.dynamic_array_formulas > 0
     }
 
@@ -808,7 +808,7 @@ struct RangeInterval {
 }
 
 impl RangeInterval {
-    fn new(start: u32, end: u32, group: usize) -> Self {
+    const fn new(start: u32, end: u32, group: usize) -> Self {
         Self {
             start,
             end,
@@ -1376,7 +1376,7 @@ impl WalkFormulas {
         Self(formulas)
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.0.len()
     }
 
@@ -1526,7 +1526,7 @@ impl DependencyFrame<'_> {
     }
 }
 
-fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
+const fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
     (key.sheet, key.col, key.row)
 }
 

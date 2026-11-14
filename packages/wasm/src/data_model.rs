@@ -90,7 +90,7 @@ fn fold_into(text: &str, buffer: &mut Vec<u8>) {
 
 /// Merges the kind of one more key into the column's kind. Returns `None`
 /// when the key does not fit the kind.
-fn merge_kind(kind: KeyKind, key: &Key<'_>) -> Option<KeyKind> {
+const fn merge_kind(kind: KeyKind, key: &Key<'_>) -> Option<KeyKind> {
     match (kind, key) {
         (_, Key::Blank) => Some(kind),
         (KeyKind::Empty | KeyKind::Number, Key::Number(_)) => Some(KeyKind::Number),
@@ -337,7 +337,7 @@ impl KeyIndex {
 
     /// Heap bytes the index holds.
     #[cfg(test)]
-    fn heap_bytes(&self) -> usize {
+    const fn heap_bytes(&self) -> usize {
         (self.numbers.capacity() * size_of::<f64>())
             + self.text.capacity()
             + (self.text_ends.capacity() + self.rows.capacity() + self.dense.capacity())

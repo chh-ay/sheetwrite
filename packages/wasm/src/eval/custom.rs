@@ -26,11 +26,11 @@ pub(crate) struct CustomArgument {
     )
 )]
 impl CustomArgument {
-    pub(crate) fn rows(&self) -> usize {
+    pub(crate) const fn rows(&self) -> usize {
         self.block.rows
     }
 
-    pub(crate) fn cols(&self) -> usize {
+    pub(crate) const fn cols(&self) -> usize {
         self.block.cols
     }
 

@@ -1305,12 +1305,12 @@ pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, 
 }
 
 /// Whether a range spans every row of the sheet: a whole-column range.
-fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
+const fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
     row_start == 0 && row_end == SHEET_ROWS - 1
 }
 
 /// Whether a range spans every column of the sheet: a whole-row range.
-fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
+const fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
     col_start == 0 && col_end == SHEET_COLS - 1
 }
 
@@ -1455,7 +1455,7 @@ pub(crate) enum ReferenceEdge {
 impl ReferenceEdge {
     /// `#REF!` is a reference operand too: a deleted operand serializes as
     /// it, and the formula must parse back to the same intersection.
-    pub(crate) fn after(previous: Option<&Tok<'_>>) -> Self {
+    pub(crate) const fn after(previous: Option<&Tok<'_>>) -> Self {
         match previous {
             Some(Tok::Ident(..)) => Self::Name,
             Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => {
@@ -1527,7 +1527,7 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
 }
 
 /// The token of one ASCII punctuation byte, or `None` for any other byte.
-fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
+const fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
     Some(match byte {
         b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => Tok::Op(byte as char),
         b'(' => Tok::LParen,
@@ -1759,7 +1759,7 @@ struct Cursor<'a> {
 }
 
 impl<'a> Cursor<'a> {
-    fn over_text(src: &'a str) -> Self {
+    const fn over_text(src: &'a str) -> Self {
         Self {
             src,
             index: 0,
@@ -1901,7 +1901,7 @@ enum BinaryOperator {
 
 /// The level and operator of a binary operator token.
 #[inline]
-fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
+const fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
     Some(match tok {
         Tok::Cmp(op) => (COMPARISON, BinaryOperator::Cmp(*op)),
         Tok::Op('&') => (CONCATENATION, BinaryOperator::Op(Op::Concat)),
@@ -3121,7 +3121,7 @@ fn translated_coordinate(
 
 /// Put one axis of a range back in order after a wrapping translation moved
 /// one edge past the other; each edge keeps its `$` marker.
-fn order_wrapped_edges(start: &mut u32, end: &mut u32, flags: &mut RangeFlags, row: bool) {
+const fn order_wrapped_edges(start: &mut u32, end: &mut u32, flags: &mut RangeFlags, row: bool) {
     if *start > *end {
         std::mem::swap(start, end);
         let axis_mask = if row { 1 } else { 2 };
@@ -3295,14 +3295,14 @@ pub(crate) enum Axis {
 
 impl Axis {
     /// The rows or columns of a sheet.
-    fn len(self) -> u32 {
+    const fn len(self) -> u32 {
         match self {
             Self::Row => SHEET_ROWS,
             Self::Col => SHEET_COLS,
         }
     }
 
-    fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
+    const fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
         match self {
             Self::Row => row,
             Self::Col => col,

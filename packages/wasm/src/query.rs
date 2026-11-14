@@ -39,7 +39,7 @@ struct PoolIdStamps {
 }
 
 impl PoolIdStamps {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self { words: Vec::new() }
     }
 
@@ -150,7 +150,7 @@ struct NumericAccumulator {
 }
 
 impl NumericAccumulator {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             sum: 0.0,
             count: 0,
@@ -1038,7 +1038,7 @@ fn resolved_kind(sheet: &SheetData, index: usize, slots: &FormulaStore) -> u8 {
     }
 }
 
-fn boolean_text(value: bool) -> &'static str {
+const fn boolean_text(value: bool) -> &'static str {
     if value {
         "TRUE"
     } else {
@@ -1223,7 +1223,7 @@ pub(crate) fn number_matches_text(
     )
 }
 
-fn is_number_text_byte(byte: u8) -> bool {
+const fn is_number_text_byte(byte: u8) -> bool {
     byte.is_ascii_digit() || byte == b'-' || byte == b'.'
 }
 
@@ -1244,7 +1244,7 @@ pub(crate) struct MatchCache {
 }
 
 impl MatchCache {
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         // `NO_STRING` (u32::MAX) is the empty sentinel: a real pool id never
         // reaches it, so an untouched slot never spuriously reports a hit.
         Self {

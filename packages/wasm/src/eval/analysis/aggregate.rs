@@ -43,7 +43,7 @@ impl Options {
     }
 }
 
-fn operation(function_number: i64) -> Option<Func> {
+const fn operation(function_number: i64) -> Option<Func> {
     Some(match function_number {
         1 => Func::Avg,
         2 => Func::Count,

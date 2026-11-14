@@ -417,7 +417,7 @@ impl LetFrame {
     /// first binding zero; it opens slots above any in use. A nested LET's
     /// slots follow its enclosing LET's, so it shares the open ones. Returns
     /// what [`LetFrame::close_resolved`] restores.
-    pub(crate) fn open_resolved(&mut self, first_slot: u32) -> ResolvedScope {
+    pub(crate) const fn open_resolved(&mut self, first_slot: u32) -> ResolvedScope {
         if first_slot != 0 {
             return ResolvedScope::Nested;
         }

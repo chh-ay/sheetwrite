@@ -149,7 +149,7 @@ struct Utf16Offsets<'a> {
 }
 
 impl<'a> Utf16Offsets<'a> {
-    fn new(src: &'a str) -> Self {
+    const fn new(src: &'a str) -> Self {
         Self {
             src,
             byte: 0,
