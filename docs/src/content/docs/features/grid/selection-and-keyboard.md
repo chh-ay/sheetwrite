@@ -105,6 +105,7 @@ When the grid has focus and is not editing:
 | Ctrl/Cmd + Home / End | Move to the sheet's first / last cell. |
 | Shift + any of the above | Extend the selection instead of moving. |
 | Enter or F2 | Edit the focused cell (F2 selects the existing text). |
+| Alt + Down | Open the list of a cell with a list validation rule, as Enter does. |
 | Delete / Backspace | Clear the selected cells. |
 | A printable character | Start editing, replacing the cell's content. |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
