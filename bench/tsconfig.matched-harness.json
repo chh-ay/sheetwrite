@@ -1,0 +1,9 @@
+{
+  // matched-formula-harness.ts runs against the pinned 77c4198 and 27be344
+  // engines, and bench/results/formula-regression-raw.json pins its bytes by
+  // hash. Its own project adds those engines' setColumnNumbers to its types,
+  // so the setter stays out of every other benchmark's types.
+  "extends": "./tsconfig.json",
+  "include": [],
+  "files": ["src/matched-formula-harness.ts", "src/matched-formula-harness-engines.d.ts"]
+}

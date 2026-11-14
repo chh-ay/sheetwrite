@@ -173,11 +173,13 @@ impl NumericAccumulator {
 #[wasm_bindgen]
 impl CellStore {
     /// `[contains cache constructions, owned distinct strings]`.
+    /// @enginePublic Benchmarks check contains-cache construction and owned distinct strings.
     #[wasm_bindgen(js_name = queryResourceStats)]
     pub fn query_resource_stats(&self) -> Vec<f64> {
         QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
     }
 
+    /// @enginePublic Reset the resource counters before each benchmark probe.
     #[wasm_bindgen(js_name = resetQueryResourceStats)]
     pub fn reset_query_resource_stats(&self) {
         QUERY_STATS.with(|stats| stats.set([0, 0]));
@@ -1323,7 +1325,8 @@ fn sort_finite_number_column_comparison(
     base: usize,
     ascending: bool,
 ) -> Option<Vec<u32>> {
-    let mut order = Vec::with_capacity(sheet.cells.row_count());
+    // Each row keeps its value beside it, so the comparator reads no cells.
+    let mut keyed: Vec<(f64, u32)> = Vec::with_capacity(sheet.cells.row_count());
     let end = base + sheet.cells.row_count();
     let mut start = base;
     while start < end {
@@ -1333,29 +1336,12 @@ fn sort_finite_number_column_comparison(
             if !value.is_finite() {
                 return None;
             }
-            order.push((index - base) as u32);
+            keyed.push((value, (index - base) as u32));
         }
         start = run.end;
     }
 
-    order.sort_unstable_by(|&a, &b| {
-        #[allow(unsafe_code, reason = "calls `payload_unchecked`; see its reason")]
-        let (left, right) = if sheet.cells.is_paged() {
-            (
-                sheet.cells.num_at(base + a as usize),
-                sheet.cells.num_at(base + b as usize),
-            )
-        } else {
-            // SAFETY: This is dense storage. Every row in `order` is below
-            // row_count, so base + row stays within this column's payload
-            // buffer, whose range is base..base + row_count.
-            unsafe {
-                (
-                    f64::from_bits(sheet.cells.payload_unchecked(base + a as usize)),
-                    f64::from_bits(sheet.cells.payload_unchecked(base + b as usize)),
-                )
-            }
-        };
+    keyed.sort_unstable_by(|&(left, a), &(right, b)| {
         let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
         let directed = if ascending { ord } else { ord.reverse() };
         if directed == Ordering::Equal {
@@ -1364,7 +1350,7 @@ fn sort_finite_number_column_comparison(
             directed
         }
     });
-    Some(order)
+    Some(keyed.into_iter().map(|(_, row)| row).collect())
 }
 
 fn sort_finite_number_column_radix(
