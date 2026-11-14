@@ -27,8 +27,8 @@ describe("structural edits the engine cannot hold", () => {
       patches: [{ op: "addRows", sheet: "s1", at: 0, count: ROWS_PAST_LIMIT }],
     });
 
-    // The store drops a patch the engine refuses, as it drops an out-of-range one.
-    expect(result.status).toBe("noop");
+    // The store refuses an insert past the document limits before the engine sees it.
+    expect(result).toMatchObject({ status: "rejected", issues: [{ kind: "resource-limit" }] });
     expect(store.getWorkbook().sheets[0]?.rowCount).toBe(ROWS);
     expect(store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe(30.5);
     expect(store.getCell(formula).resolved).toBe(30.5);

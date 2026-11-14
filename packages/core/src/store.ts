@@ -54,6 +54,7 @@ import {
 } from "./store/engine-registry.js";
 import { StoreMutationPolicy } from "./store/mutation-policy.js";
 import { addRowGroup, collapseRowGroup, patchSheetId, removeRowGroup } from "./store/ranges.js";
+import { type SheetDimensions, SheetGrowth } from "./store/sheet-growth.js";
 import { decodeWorkbookSnapshot, freezeXlsxSource } from "./store/snapshot-codec.js";
 import {
   clearViewPatch,
@@ -207,6 +208,8 @@ export class SheetwriteStore implements Store {
   private mutationPolicy: MutationPolicyMode;
   private policy: StoreMutationPolicy;
   private readonly transactionResourceLimits: Readonly<TransactionResourceLimits>;
+  /** Document limits a snapshot of this store must meet; row and column inserts are held to them. */
+  private readonly snapshotResourceLimits: Readonly<SnapshotResourceLimits>;
   private documentId?: string;
   private documentVersion?: number;
   /** Engine generation at construction; a different current value means the instance stopped. */
@@ -227,6 +230,11 @@ export class SheetwriteStore implements Store {
       storage,
       resourceLimits: options.snapshotResourceLimits,
     });
+    // The assertion above has validated every override.
+    this.snapshotResourceLimits = {
+      ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+      ...options.snapshotResourceLimits,
+    };
 
     try {
       this.dataEngine = new StoreDataEngine(workbook, data, options);
@@ -1081,9 +1089,13 @@ export class SheetwriteStore implements Store {
     return isEngineTrap(error) ? stopEngine(error, this.generation) : error;
   }
 
-  /** The first operation that is malformed, breaks sheet lifecycle, or names a missing sheet. */
+  /**
+   * The first operation that is malformed, breaks sheet lifecycle, names a
+   * missing sheet, or grows a sheet past a document limit.
+   */
   private transactionOperationIssue(tx: Transaction): MutationIssue | undefined {
     const sheetLifecycle = createSheetLifecycleState(this.engine.getWorkbook().sheets);
+    let growth: SheetGrowth | undefined;
     for (let operationIndex = 0; operationIndex < tx.patches.length; operationIndex++) {
       const operationPath = `transaction.patches[${operationIndex}]`;
       const operation = tx.patches[operationIndex];
@@ -1126,9 +1138,33 @@ export class SheetwriteStore implements Store {
           message: `Sheet ${missingSheet} does not exist`,
         };
       }
+
+      if (operation.op === "addRows" || operation.op === "addColumns") {
+        growth ??= this.sheetGrowth();
+        const issue = growth.grow(
+          operation.sheet,
+          operation.op === "addRows" ? operation.count : 0,
+          operation.op === "addColumns" ? operation.columns.length : 0,
+        );
+        if (issue) return issue;
+      }
     }
 
     return undefined;
+  }
+
+  /** Every sheet's dimensions now, and which hold dense storage, for {@link SheetGrowth}. */
+  private sheetGrowth(): SheetGrowth {
+    const sheets = new Map<SheetId, SheetDimensions>();
+    for (const sheet of this.engine.getWorkbook().sheets) {
+      sheets.set(sheet.id, {
+        name: sheet.name,
+        rows: sheet.rowCount,
+        columns: sheet.columns.length,
+        dense: !this.engine.isPaged(sheet.id),
+      });
+    }
+    return new SheetGrowth(sheets, this.snapshotResourceLimits);
   }
 }
 

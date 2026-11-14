@@ -25,6 +25,7 @@ import {
   validateTransactionResources,
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
+import { type EditDraftSink, registerEditDraft } from "./edit-draft.js";
 import {
   ENGINE_LOAD_HINT,
   engineFailedError,
@@ -570,6 +571,9 @@ export class GridImpl implements Grid {
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly customEditors = new Map<string, CellEditor>();
 
+  /** The shell's formula bar hearing the cell edit's draft (internal, see `edit-draft.ts`). */
+  private readonly editDraftListeners = new Set<EditDraftSink>();
+
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
     selection: new Set(),
@@ -756,6 +760,15 @@ export class GridImpl implements Grid {
       trustedResourceCallbacks: true,
     });
     registerGridDocument(this, this.document);
+    registerEditDraft(this, {
+      subscribe: (listener) => {
+        this.editDraftListeners.add(listener);
+        return () => this.editDraftListeners.delete(listener);
+      },
+      setText: (text, start, end) => this.interactions.setEditText(text, start, end),
+      commit: () => this.interactions.commitEdit(),
+      cancel: () => this.interactions.cancelEdit(),
+    });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
     // construction; the input controller consults this on every keydown.
@@ -937,6 +950,14 @@ export class GridImpl implements Grid {
       columnHeader: (col) => this.columnHeader(col),
       toViewRow: (row) => this.toViewRow(row),
       editListeners: this.listeners,
+      editDraft: {
+        text: (value) => {
+          for (const listener of this.editDraftListeners) listener.text(value);
+        },
+        end: () => {
+          for (const listener of this.editDraftListeners) listener.end();
+        },
+      },
       openFind: (options) => this.openFindBar(options),
       store: this.store,
       loadable: this.loadable,
@@ -2938,10 +2959,22 @@ export class GridImpl implements Grid {
 
   insertRows(at: number, count = 1): void {
     if (count <= 0) return;
-    this.document.commit(
-      [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
-      "structure",
+    this.reportRejectedInsert(
+      this.document.commit(
+        [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
+        "structure",
+      ),
     );
+  }
+
+  /**
+   * A row or column insert past a document limit is refused; the user reads
+   * which limit in the grid's alert, beside the `mutation-rejected` event.
+   */
+  private reportRejectedInsert(outcome: ApplyTransactionResult): void {
+    if (outcome.status !== "rejected") return;
+    const issue = outcome.issues.find((candidate) => candidate.kind === "resource-limit");
+    if (issue) this.actionFeedback.show(issue.message);
   }
 
   removeRows(at: number, count = 1): void {
@@ -2963,16 +2996,18 @@ export class GridImpl implements Grid {
   insertColumns(at: number, count = 1): void {
     if (count <= 0) return;
     const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
-    this.document.commit(
-      [
-        {
-          op: "addColumns",
-          sheet: this.activeSheet,
-          at: insertAt,
-          columns: this.makeBlankColumns(insertAt, count),
-        },
-      ],
-      "structure",
+    this.reportRejectedInsert(
+      this.document.commit(
+        [
+          {
+            op: "addColumns",
+            sheet: this.activeSheet,
+            at: insertAt,
+            columns: this.makeBlankColumns(insertAt, count),
+          },
+        ],
+        "structure",
+      ),
     );
   }
 

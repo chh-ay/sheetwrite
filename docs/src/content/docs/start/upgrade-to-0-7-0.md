@@ -23,13 +23,13 @@ of 0.6 is called a view sort and has its own methods. See
 [Sort cells in place](/docs/features/data/data-operations/#sort-cells-in-place)
 and [Display views](/docs/features/data/data-operations/#display-views).
 
-| 0.6 API | 0.7.0 | Pull request |
-| --- | --- | --- |
-| `grid.sortBy(col, ascending)` sorted the view | Changed: sorts the cells in place, as Excel's quick sort does. For the view sort, use `grid.setViewSort([{ col, ascending }])` | [#393](https://github.com/chh-ay/sheetwrite/pull/393) |
-| `grid.setSort(keys)` | Removed: use `grid.setViewSort(keys)` | [#393](https://github.com/chh-ay/sheetwrite/pull/393) |
-| `grid.sortByMulti(keys)` | Removed: use `grid.setViewSort(keys)` | [#393](https://github.com/chh-ay/sheetwrite/pull/393) |
-| `store.sortBy(sheet, col, ascending)` | Removed: use `store.setViewSort(sheet, [{ col, ascending }])` | [#393](https://github.com/chh-ay/sheetwrite/pull/393) |
-| `store.sortByMulti(sheet, keys)` | Removed: use `store.setViewSort(sheet, keys)` | [#393](https://github.com/chh-ay/sheetwrite/pull/393) |
+| 0.6 API | 0.7.0 |
+| --- | --- |
+| `grid.sortBy(col, ascending)` sorted the view | Changed: sorts the cells in place, as Excel's quick sort does. For the view sort, use `grid.setViewSort([{ col, ascending }])` |
+| `grid.setSort(keys)` | Removed: use `grid.setViewSort(keys)` |
+| `grid.sortByMulti(keys)` | Removed: use `grid.setViewSort(keys)` |
+| `store.sortBy(sheet, col, ascending)` | Removed: use `store.setViewSort(sheet, [{ col, ascending }])` |
+| `store.sortByMulti(sheet, keys)` | Removed: use `store.setViewSort(sheet, keys)` |
 
 Before:
 
@@ -75,8 +75,7 @@ export function sortOrders(grid: Grid) {
 ```
 
 An in-place sort is one undoable change, sent to collaborators as the new
-`permuteRows` operation with the new `"sort"` commit reason
-([#378](https://github.com/chh-ay/sheetwrite/pull/378)). A server or handler that
+`permuteRows` operation with the new `"sort"` commit reason. A server or handler that
 checks every operation or commit reason must accept them; see
 [Document operations](#document-operations).
 
@@ -84,8 +83,7 @@ checks every operation or commit reason must accept them; see
 
 `RevisionCoordinator` and its types are removed. Version history in
 `@sheetwrite/core/history` lists, reads and restores versions through a
-`HistoryStorageAdapter`
-([#390](https://github.com/chh-ay/sheetwrite/pull/390)). See
+`HistoryStorageAdapter`. See
 [Opt-in version archives](/docs/features/data/persistence/#opt-in-version-archives)
 and [Migrating from `RevisionCoordinator`](/docs/features/collaboration/#migrating-from-revisioncoordinator).
 
@@ -134,17 +132,16 @@ export async function restoreLatest(
 
 A restore is an ordinary commit, so the server no longer needs a separate
 restore endpoint. A server that records history attaches a `CommitJournal`, as
-`MemoryPersistenceAdapter.recordHistory` does
-([#386](https://github.com/chh-ay/sheetwrite/pull/386)).
+`MemoryPersistenceAdapter.recordHistory` does.
 
 ## Sync and history
 
-| Change | What to do | Pull request |
-| --- | --- | --- |
-| New `SyncCoordinatorOptions.authorId` stamps each pending commit. `VersionedOperation` has `authorId` and `committedAt`. | Pass the signed-in user's ID to record who made each change. While a history journal is attached, a commit without `authorId` is rejected with `commit-rejected`. | [#386](https://github.com/chh-ay/sheetwrite/pull/386) |
-| Comment calls (`load`, `create`, `reply`, `resolve`, `mutate`) accept a final `AbortSignal`. An abort or `destroy()` rejects with the signal's reason and emits no `error` event. A sync send aborted by `setOnline(false)` or `destroy()` rejects with an `AbortError` instead of `sync-failed`, and the commit stays pending. | Treat these `AbortError` rejections as cancellation. Do not compare them with the old string messages. | [#320](https://github.com/chh-ay/sheetwrite/pull/320) |
-| Coordinator teardown and sync disconnection pass an `AbortError` reason to transport adapters. | Check `signal.aborted` in your adapter instead of matching a string reason. | [#320](https://github.com/chh-ay/sheetwrite/pull/320) |
-| Unmounting a React, Vue or Svelte grid destroys it and aborts its pending work. | Destroy host-created sync and collaboration coordinators yourself when the view is removed. | [#320](https://github.com/chh-ay/sheetwrite/pull/320) |
+| Change | What to do |
+| --- | --- |
+| New `SyncCoordinatorOptions.authorId` stamps each pending commit. `VersionedOperation` has `authorId` and `committedAt`. | Pass the signed-in user's ID to record who made each change. While a history journal is attached, a commit without `authorId` is rejected with `commit-rejected`. |
+| Comment calls (`load`, `create`, `reply`, `resolve`, `mutate`) accept a final `AbortSignal`. An abort or `destroy()` rejects with the signal's reason and emits no `error` event. A sync send aborted by `setOnline(false)` or `destroy()` rejects with an `AbortError` instead of `sync-failed`, and the commit stays pending. | Treat these `AbortError` rejections as cancellation. Do not compare them with the old string messages. |
+| Coordinator teardown and sync disconnection pass an `AbortError` reason to transport adapters. | Check `signal.aborted` in your adapter instead of matching a string reason. |
+| Unmounting a React, Vue or Svelte grid destroys it and aborts its pending work. | Destroy host-created sync and collaboration coordinators yourself when the view is removed. |
 
 ```ts compile title="Record the author of each change"
 import { SyncCoordinator, type Grid, type PersistenceAdapter } from "@sheetwrite/core";
@@ -171,9 +168,7 @@ kinds before you accept 0.7.0 clients.
 ## Add-on registration
 
 0.7.0 installs add-ons in one way: `initSheetwrite({ engine, source, addons })`,
-plus per-grid settings in `createGrid(host, { addons: { [name]: settings } })`
-([#366](https://github.com/chh-ay/sheetwrite/issues/366),
-[#466](https://github.com/chh-ay/sheetwrite/pull/466)). Each add-on package
+plus per-grid settings in `createGrid(host, { addons: { [name]: settings } })`. Each add-on package
 exports a factory named `<name>Addon`.
 
 Before:
@@ -219,24 +214,24 @@ that uses them is created, and the history panel on its first command.
 ## Errors and cancellation
 
 Core failures have one shape: a `SheetwriteError` with a stable `code` and
-`operation` ([#309](https://github.com/chh-ay/sheetwrite/pull/309)). An abort is
+`operation`. An abort is
 not a failure: it rejects with the signal's reason. See
 [Error handling](/docs/concepts/error-handling/).
 
-| 0.6 behavior | 0.7.0 | Pull request |
-| --- | --- | --- |
-| Bad host input threw `RangeError`, `TypeError` or `Error` from `resolveTransactionResourceLimits`, `validateTransactionResources`, `createRowBridge`, `createSimpleGridInput`, `legacyFullWidthDataSource`, `decodeStoreMemoryStats`, `assertRuntimeResourceSnapshot` and custom `CellRenderer` results | A `SheetwriteError` with code `invalid-argument`; operations `store`, `transaction`, `render`, `row-bridge` and `resource-diagnostics` are new | [#309](https://github.com/chh-ay/sheetwrite/pull/309) |
-| An unknown sheet ID threw a plain error | `not-found`, operation `store`, with `context.sheet` | [#309](https://github.com/chh-ay/sheetwrite/pull/309) |
-| A bad limit override threw `limit` or `TypeError` | `invalid-limits` everywhere | [#309](https://github.com/chh-ay/sheetwrite/pull/309) |
-| Operations `comments` and `export-xlsx` | Renamed to `comment` and `xlsx-export` | [#309](https://github.com/chh-ay/sheetwrite/pull/309) |
-| `datasource-error` context copied column keys | Holds `columnBandCount` and the first 64 bands; read the keys from `event.request` | [#309](https://github.com/chh-ay/sheetwrite/pull/309) |
-| A WASM trap threw an untyped `RuntimeError` | `engine-failed` (operation `engine`); the grid emits `engine-failed` and becomes read-only | [#296](https://github.com/chh-ay/sheetwrite/pull/296) |
-| `renderer-fallback` errors told the cause in the message | `error.context.failure`: `spawn`, `crash`, `protocol`, `timeout` or `fatal` | [#296](https://github.com/chh-ay/sheetwrite/pull/296) |
-| An aborted XLSX or CSV/TSV call rejected with `code: "aborted"` | Rejects with `signal.reason`; persistence and IndexedDB storage keep `aborted` | [#294](https://github.com/chh-ay/sheetwrite/pull/294) |
-| `grid.summarizeSelection()` kept reading after `destroy()` | Rejects with an `AbortError` | [#315](https://github.com/chh-ay/sheetwrite/pull/315) |
-| `<Sheetwrite>` in Vue and Svelte threw a plain `Error` for a bad `height`/`fill` | `invalid-argument`, operation `create-grid` | [#320](https://github.com/chh-ay/sheetwrite/pull/320) |
-| `<Sheetwrite>` in React accepted both or neither of `height` and `fill`, and Svelte checked them after the grid mounted. Vue typed `fill` as `boolean` | React, Vue and Svelte throw `invalid-argument` (operation `create-grid`) while rendering, before a grid mounts. Vue types `fill` as `fill?: true` | [#622](https://github.com/chh-ay/sheetwrite/pull/622) |
-| `revision-failed`, `revision` | Removed with `RevisionCoordinator`; see [Revisions move to version history](#revisions-move-to-version-history) | [#390](https://github.com/chh-ay/sheetwrite/pull/390) |
+| 0.6 behavior | 0.7.0 |
+| --- | --- |
+| Bad host input threw `RangeError`, `TypeError` or `Error` from `resolveTransactionResourceLimits`, `validateTransactionResources`, `createRowBridge`, `createSimpleGridInput`, `legacyFullWidthDataSource`, `decodeStoreMemoryStats`, `assertRuntimeResourceSnapshot` and custom `CellRenderer` results | A `SheetwriteError` with code `invalid-argument`; operations `store`, `transaction`, `render`, `row-bridge` and `resource-diagnostics` are new |
+| An unknown sheet ID threw a plain error | `not-found`, operation `store`, with `context.sheet` |
+| A bad limit override threw `limit` or `TypeError` | `invalid-limits` everywhere |
+| Operations `comments` and `export-xlsx` | Renamed to `comment` and `xlsx-export` |
+| `datasource-error` context copied column keys | Holds `columnBandCount` and the first 64 bands; read the keys from `event.request` |
+| A WASM trap threw an untyped `RuntimeError` | `engine-failed` (operation `engine`); the grid emits `engine-failed` and becomes read-only |
+| `renderer-fallback` errors told the cause in the message | `error.context.failure`: `spawn`, `crash`, `protocol`, `timeout` or `fatal` |
+| An aborted XLSX or CSV/TSV call rejected with `code: "aborted"` | Rejects with `signal.reason`; persistence and IndexedDB storage keep `aborted` |
+| `grid.summarizeSelection()` kept reading after `destroy()` | Rejects with an `AbortError` |
+| `<Sheetwrite>` in Vue and Svelte threw a plain `Error` for a bad `height`/`fill` | `invalid-argument`, operation `create-grid` |
+| `<Sheetwrite>` in React accepted both or neither of `height` and `fill`, and Svelte checked them after the grid mounted. Vue typed `fill` as `boolean` | React, Vue and Svelte throw `invalid-argument` (operation `create-grid`) while rendering, before a grid mounts. Vue types `fill` as `fill?: true` |
+| `revision-failed`, `revision` | Removed with `RevisionCoordinator`; see [Revisions move to version history](#revisions-move-to-version-history) |
 
 Before:
 
@@ -292,7 +287,7 @@ add the new values.
 
 Synchronous sort, filter, hidden-row, row-group and view-clear methods of the
 store return the same `ApplyTransactionResult` as `applyTransaction`, so you can
-see a rejected or empty change ([#321](https://github.com/chh-ay/sheetwrite/pull/321)):
+see a rejected or empty change:
 `setColumnFilter`, `filterBy`, `hideRows`, `showRows`,
 `groupRows`, `ungroupRows`, `setGroupCollapsed` and `clearView`, and
 `grid.sortBy`. Code that implements these method types, or assigns them to a
@@ -318,8 +313,7 @@ export function hideDrafts(store: SheetwriteStore, rows: readonly number[]) {
 
 ## Cell style sanitizing
 
-`sanitizeHyperlinkStyle` is removed; use `sanitizeCellStyle` instead
-([#414](https://github.com/chh-ay/sheetwrite/pull/414)). The same check guards
+`sanitizeHyperlinkStyle` is removed; use `sanitizeCellStyle` instead. The same check guards
 hyperlinks, table styles and pasted cells, and applies Excel's font size range
 of 1 to 409 points and `#rrggbb` colors.
 
@@ -341,7 +335,7 @@ export function safeStyle(untrusted: unknown) {
 
 ## Stylesheet parts
 
-`@sheetwrite/core/styles.css` now imports the stylesheet in parts, and the command icon sheet is its own file, `styles/icons.svg`, instead of a `data:` URL ([#543](https://github.com/chh-ay/sheetwrite/pull/543)). An app that imports `styles.css` looks the same.
+`@sheetwrite/core/styles.css` now imports the stylesheet in parts, and the command icon sheet is its own file, `styles/icons.svg`, instead of a `data:` URL. An app that imports `styles.css` looks the same.
 
 | Change | What to do |
 | --- | --- |
@@ -354,11 +348,11 @@ export function safeStyle(untrusted: unknown) {
 Most apps never call the engine directly. If you call `CellStore` from
 `@sheetwrite/wasm` or `@sheetwrite/formulas` yourself, these methods change.
 
-| 0.6 | 0.7.0 | Pull request |
-| --- | --- | --- |
-| `setSparseBlock(..., numbers, texts, styles, ...)` with one string per entry | `setSparseBlock(..., numbers, textBuf, textOffsets, styles, ...)`: the UTF-8 bytes of the string entries only, in entry order. The n-th string entry owns bytes `textOffsets[n]` to `textOffsets[n + 1]`; a block without text passes an empty buffer and `[0]`. | [#571](https://github.com/chh-ay/sheetwrite/pull/571) |
-| `convertXlsxFormulas(sources, exporting)`; scalar `formulaToXlsx` / `formulaFromXlsx` | `convertXlsxFormulas(sources.join(""), ends, exporting, changedIndices)`: `ends` are cumulative UTF-16 lengths (JavaScript `length`), `changedIndices` is a `Uint32Array` with one slot per source. It returns only the changed formulas and writes their input positions to the front of `changedIndices`; keep every other source. For one source use one end, `source.length`. Core's `XlsxFormulaEngine.convert` is unchanged. | #624 |
-| `PivotFields.names()`, `PivotFields.types()` | `takeNames()`, `takeTypes()`. Each hands the buffer over once and leaves it empty. | [#565](https://github.com/chh-ay/sheetwrite/pull/565) |
+| 0.6 | 0.7.0 |
+| --- | --- |
+| `setSparseBlock(..., numbers, texts, styles, ...)` with one string per entry | `setSparseBlock(..., numbers, textBuf, textOffsets, styles, ...)`: the UTF-8 bytes of the string entries only, in entry order. The n-th string entry owns bytes `textOffsets[n]` to `textOffsets[n + 1]`; a block without text passes an empty buffer and `[0]`. |
+| `convertXlsxFormulas(sources, exporting)`; scalar `formulaToXlsx` / `formulaFromXlsx` | `convertXlsxFormulas(sources.join(""), ends, exporting, changedIndices)`: `ends` are cumulative UTF-16 lengths (JavaScript `length`), `changedIndices` is a `Uint32Array` with one slot per source. It returns only the changed formulas and writes their input positions to the front of `changedIndices`; keep every other source. For one source use one end, `source.length`. Core's `XlsxFormulaEngine.convert` is unchanged. |
+| `PivotFields.names()`, `PivotFields.types()` | `takeNames()`, `takeTypes()`. Each hands the buffer over once and leaves it empty. |
 
 Before:
 
@@ -392,21 +386,18 @@ fields.free();
 
 ### Excel sort order
 
-Every sort uses Excel's sort order
-([#377](https://github.com/chh-ay/sheetwrite/pull/377)): text compares without
+Every sort uses Excel's sort order: text compares without
 case in Excel's character order and skips apostrophes and hyphens, errors sort
 after `FALSE` and `TRUE` and are equal to each other, and blank cells are last
 in both directions. A saved view sort with mixed-case text, errors, or blank
 cells in a descending sort shows a different order after the upgrade. Sorting a
-spilled column uses the spilled values
-([#355](https://github.com/chh-ay/sheetwrite/pull/355)).
+spilled column uses the spilled values.
 
 ### Sort commands and the view sort
 
 Sort A to Z and Sort Z to A in the ribbon, the toolbar and the column menu
 move the cells. One undo restores them. To sort only the displayed rows, use
-Sort View A to Z, Sort View Z to A, or "Sort view only" in Data › Custom Sort
-([#393](https://github.com/chh-ay/sheetwrite/pull/393)). A view sort is still
+Sort View A to Z, Sort View Z to A, or "Sort view only" in Data › Custom Sort. A view sort is still
 saved with the sheet.
 
 ### Imported worksheet sort state
@@ -416,43 +407,41 @@ writes it after a sort that already moved the cells, so the rows keep the
 order Excel saved. It is kept as `Sheet.sortState` and written back on export,
 and the "sortState did not cover every data row" import warning is removed. An
 in-place sort of a table body records the table's sort state, so Excel shows
-the sort on the table's header buttons
-([#398](https://github.com/chh-ay/sheetwrite/pull/398)).
+the sort on the table's header buttons.
 
 ### INFO and other new functions
 
 `INFO` is new in both engines. It returns the sheet count for `"numfile"` and
 `"Automatic"` for `"recalc"`, and `#N/A` for `"directory"`, `"origin"`,
-`"osversion"`, `"release"` and `"system"`, which describe the desktop program
-([#399](https://github.com/chh-ay/sheetwrite/pull/399)). Workbooks that showed
+`"osversion"`, `"release"` and `"system"`, which describe the desktop program. Workbooks that showed
 `#NAME?` for an Excel function that 0.7.0 adds now show a result. See the
 [formula function contract](/docs/reference/formula-functions/).
 
 ### Formula results that match Excel
 
-| Change | Pull request |
-| --- | --- |
-| Operators read number text as `VALUE` does: `="1,000"+0` is 1000 and `="2024-01-31"+0` is 45322. A space inside a number is text (`=VALUE("1 234")` is `#VALUE!`), date text with trailing words is `#VALUE!`, and the criterion `"inf"` is text. | [#335](https://github.com/chh-ay/sheetwrite/pull/335) |
-| `ROUND`, `TEXT`, `CHOOSE`, `INDEX`, `SUMIF`, `FLOOR`, `CEILING`, `TRIM` and other functions give Excel's result; numbers become text with 15 significant digits. | [#300](https://github.com/chh-ay/sheetwrite/pull/300) |
-| `SUBTOTAL` accepts codes 101 to 111 and skips hidden rows; `AGGREGATE` options 1, 3, 5 and 7 skip hidden rows; a subtotal does not count another subtotal. | [#306](https://github.com/chh-ay/sheetwrite/pull/306) |
-| Paste, fill and conditional-format rules rewrite references with the engine's rules: `=SUM(A:A)` pasted one column right is `=SUM(B:B)`, and a reference that leaves the sheet becomes `#REF!`. `shiftA1Refs` needs `initSheetwrite()` first. | [#307](https://github.com/chh-ay/sheetwrite/pull/307), [#283](https://github.com/chh-ay/sheetwrite/pull/283) |
-| XLSX import expands shared formulas with the same rule, so a shared whole-column reference moves with each cell. | [#322](https://github.com/chh-ay/sheetwrite/pull/322) |
-| A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. | [#300](https://github.com/chh-ay/sheetwrite/pull/300) |
-| A reference to another workbook, such as `[Budget.xlsx]Annual!C10`, keeps its text and shows `#REF!` until the workbook has values for the link. Before, the unquoted form was a syntax error and a quoted form made the whole formula `#REF!`. | [#430](https://github.com/chh-ay/sheetwrite/pull/430) |
-| A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references: renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. | [#497](https://github.com/chh-ay/sheetwrite/pull/497) |
-| Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does: references follow the moved cells instead of becoming `#REF!`, a range loses a moved row at its edge and grows by one that lands inside it, and a move that would split a table is refused. | [#499](https://github.com/chh-ay/sheetwrite/pull/499) |
-| Array formulas whose size comes from a cell, such as `=SEQUENCE($C$1)`, spill in every formula of a recalculation; the third and later ones no longer show `#NUM!`. | [#574](https://github.com/chh-ay/sheetwrite/pull/574) |
-| On paged data, `INDEX` that returns one cell shows `#LOADING!` only until that cell loads, and a short text result no longer shows `#NUM!` when other cells of its area hold a lot of text. | [#594](https://github.com/chh-ay/sheetwrite/pull/594) |
+| Change |
+| --- |
+| Operators read number text as `VALUE` does: `="1,000"+0` is 1000 and `="2024-01-31"+0` is 45322. A space inside a number is text (`=VALUE("1 234")` is `#VALUE!`), date text with trailing words is `#VALUE!`, and the criterion `"inf"` is text. |
+| `ROUND`, `TEXT`, `CHOOSE`, `INDEX`, `SUMIF`, `FLOOR`, `CEILING`, `TRIM` and other functions give Excel's result; numbers become text with 15 significant digits. |
+| `SUBTOTAL` accepts codes 101 to 111 and skips hidden rows; `AGGREGATE` options 1, 3, 5 and 7 skip hidden rows; a subtotal does not count another subtotal. |
+| Paste, fill and conditional-format rules rewrite references with the engine's rules: `=SUM(A:A)` pasted one column right is `=SUM(B:B)`, and a reference that leaves the sheet becomes `#REF!`. `shiftA1Refs` needs `initSheetwrite()` first. |
+| XLSX import expands shared formulas with the same rule, so a shared whole-column reference moves with each cell. |
+| A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. |
+| A reference to another workbook, such as `[Budget.xlsx]Annual!C10`, keeps its text and shows `#REF!` until the workbook has values for the link. Before, the unquoted form was a syntax error and a quoted form made the whole formula `#REF!`. |
+| A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references: renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. |
+| Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does: references follow the moved cells instead of becoming `#REF!`, a range loses a moved row at its edge and grows by one that lands inside it, and a move that would split a table is refused. |
+| Array formulas whose size comes from a cell, such as `=SEQUENCE($C$1)`, spill in every formula of a recalculation; the third and later ones no longer show `#NUM!`. |
+| On paged data, `INDEX` that returns one cell shows `#LOADING!` only until that cell loads, and a short text result no longer shows `#NUM!` when other cells of its area hold a lot of text. |
 
 ### Grid markup and loading
 
-| Change | What to do | Pull request |
-| --- | --- | --- |
-| The toolbar, the ribbon and the compact ribbon render one command model. The `.sheetwrite-tb-*` classes are gone; each command element has a `data-command` attribute. The built-in toolbar loads with the ribbon's chunk. | Select commands by `data-command` in styles and tests, and wait for the toolbar after the grid mounts. | [#287](https://github.com/chh-ay/sheetwrite/pull/287) |
-| `GridConfig` command flags (`CommandFlags`) choose ribbon commands too. | Check the ribbon after changing a flag such as `export`. | [#287](https://github.com/chh-ay/sheetwrite/pull/287) |
-| The find bar loads on first open. | Open it with `grid.actions.find()` or Ctrl+F before looking for `.sheetwrite-find`. Expect one more lazy chunk. | [#313](https://github.com/chh-ay/sheetwrite/pull/313) |
-| Typing, fill, paste or a remote edit inside a spill keeps the value and shows `#SPILL!` on the anchor. | Nothing; clearing the value restores the array. | [#352](https://github.com/chh-ay/sheetwrite/pull/352) |
-| Saved hidden rows, collapsed groups and filters apply at load. | Nothing; `SUBTOTAL` no longer counts rows that a saved filter hides. | [#330](https://github.com/chh-ay/sheetwrite/pull/330) |
+| Change | What to do |
+| --- | --- |
+| The toolbar, the ribbon and the compact ribbon render one command model. The `.sheetwrite-tb-*` classes are gone; each command element has a `data-command` attribute. The built-in toolbar loads with the ribbon's chunk. | Select commands by `data-command` in styles and tests, and wait for the toolbar after the grid mounts. |
+| `GridConfig` command flags (`CommandFlags`) choose ribbon commands too. | Check the ribbon after changing a flag such as `export`. |
+| The find bar loads on first open. | Open it with `grid.actions.find()` or Ctrl+F before looking for `.sheetwrite-find`. Expect one more lazy chunk. |
+| Typing, fill, paste or a remote edit inside a spill keeps the value and shows `#SPILL!` on the anchor. | Nothing; clearing the value restores the array. |
+| Saved hidden rows, collapsed groups and filters apply at load. | Nothing; `SUBTOTAL` no longer counts rows that a saved filter hides. |
 
 ### setBlock cell arrays
 
@@ -462,30 +451,14 @@ the sort on the table's header buttons
 
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
-Preliminary: 0.7.0 here is develop before the release; the final numbers come
-from a rerun on the release commit. One script ran the same workloads against
-the published 0.5.4 and 0.6.1 packages and the 0.7.0 packages on each machine,
-8 interleaved rounds, medians shown. Every cell was measured for this
-comparison; none is reused from earlier captures. Lower is better; compare
-within a machine, not across machines. Linux noise between rounds reaches 8%
-for times and 15% for retained memory, so smaller Linux differences are noise.
-The workloads, per-row times, raw samples and noise are in
+The same workloads ran against the published 0.5.4 and 0.6.1 packages and
+against 0.7.0 on two machines. The 0.7.0 numbers come from develop before the
+release and are measured again on the release commit. Recalculation is about
+twice as fast as in 0.6.1 and uses less memory; the engine download grows. The
+workloads, raw samples and noise are in
 [the comparison results](https://github.com/chh-ay/sheetwrite/blob/develop/bench/results/version-comparison/version-comparison.md).
 
-| Measure | Engine | Linux 0.5.4 | Linux 0.6.1 | Linux 0.7.0 | Mac 0.5.4 | Mac 0.6.1 | Mac 0.7.0 |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Formula recalculation, geomean time of the shared benchmark rows | default | 0.264 ms (measured) | 0.153 ms (measured) | 0.073 ms (measured) | 0.158 ms (measured) | 0.082 ms (measured) | 0.038 ms (measured) |
-| Formula recalculation, geomean time of the shared benchmark rows | full | 0.268 ms (measured) | 0.149 ms (measured) | 0.071 ms (measured) | 0.159 ms (measured) | 0.082 ms (measured) | 0.038 ms (measured) |
-| Retained memory, 100k formulas | default | 66.6 MiB (measured) | 71.5 MiB (measured) | 50.3 MiB (measured) | 71.4 MiB (measured) | 85.5 MiB (measured) | 52.3 MiB (measured) |
-| Retained memory, 100k formulas | full | 64.9 MiB (measured) | 65.9 MiB (measured) | 46.7 MiB (measured) | 70.7 MiB (measured) | 84.1 MiB (measured) | 46.5 MiB (measured) |
-| Peak memory, 100k formulas | default | 131.9 MiB (measured) | 148.4 MiB (measured) | 128.0 MiB (measured) | 143.7 MiB (measured) | 186.2 MiB (measured) | 152.9 MiB (measured) |
-| Peak memory, 100k formulas | full | 122.1 MiB (measured) | 145.1 MiB (measured) | 114.3 MiB (measured) | 135.3 MiB (measured) | 169.8 MiB (measured) | 144.4 MiB (measured) |
-| Engine download, Brotli | default | 263 KiB (measured) | 304 KiB (measured) | 363 KiB (measured) | 263 KiB (measured) | 304 KiB (measured) | 363 KiB (measured) |
-| Engine download, Brotli | full | 349 KiB (measured) | 423 KiB (measured) | 531 KiB (measured) | 349 KiB (measured) | 423 KiB (measured) | 531 KiB (measured) |
-| XLSX import | default | 2,054 ms (measured) | 2,036 ms (measured) | 1,975 ms (measured) | 1,127 ms (measured) | 1,051 ms (measured) | 1,025 ms (measured) |
-| XLSX import | full | 2,108 ms (measured) | 1,947 ms (measured) | 1,900 ms (measured) | 1,142 ms (measured) | 1,044 ms (measured) | 1,037 ms (measured) |
-| XLSX export | default | 1,144 ms (measured) | 937 ms (measured) | 972 ms (measured) | 564 ms (measured) | 482 ms (measured) | 511 ms (measured) |
-| XLSX export | full | 1,152 ms (measured) | 942 ms (measured) | 1,031 ms (measured) | 570 ms (measured) | 476 ms (measured) | 515 ms (measured) |
+<version-compare></version-compare>
 
 ## Upgrade from earlier versions
 
