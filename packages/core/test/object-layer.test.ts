@@ -313,6 +313,19 @@ describe("object layer mounting", () => {
     grid.setReadOnly(true);
     expect(grid.setChart(chart("blocked"))).toMatchObject({ status: "noop", reason: "read-only" });
   });
+
+  it("paints charts with the grid's theme and follows setTheme", () => {
+    const grid = mountGrid({ theme: { bg: "#101828", fg: "#e5e7eb", gridLine: "#344054" } });
+    grid.setChart(chart("themed"));
+    const layer = frameOf(grid, "themed").closest<HTMLElement>(".sheetwrite-object-layer");
+    if (!layer) throw new Error("expected the object layer");
+    const color = (name: string) => layer.style.getPropertyValue(name);
+    expect([color("--sheetwrite-bg"), color("--sheetwrite-fg")]).toEqual(["#101828", "#e5e7eb"]);
+    expect(color("--sheetwrite-grid-line")).toBe("#344054");
+
+    grid.setTheme({ bg: "#f8fafc", fg: "#101828" });
+    expect([color("--sheetwrite-bg"), color("--sheetwrite-fg")]).toEqual(["#f8fafc", "#101828"]);
+  });
 });
 
 describe("object layer shortcuts", () => {

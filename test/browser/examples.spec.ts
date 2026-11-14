@@ -114,3 +114,48 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     )
     .toBe(true);
 });
+
+// #726: Alt+Down opens a list rule's list, as in Excel.
+test("Alt+Down opens a list rule's list and moves down elsewhere", async ({ page }) => {
+  await page.goto("/vue/");
+  await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
+  await expect
+    .poll(() => page.evaluate(() => Boolean(window.__sheetwriteVueWorkbench?.grid)))
+    .toBe(true);
+
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteVueWorkbench?.grid;
+    if (!grid) throw new Error("Vue grid is unavailable");
+    grid.setValidationRule({
+      id: "browser-alt-down",
+      range: { sheet: "orders", start: { row: 1, col: 0 }, end: { row: 1, col: 0 } },
+      condition: { kind: "list", values: [1, 2, 3] },
+      policy: "reject",
+      helpText: "Choose an order ID",
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 0 } });
+  });
+  const grid = page.locator(".sw-demo-grid .sheetwrite");
+  const list = page.getByRole("listbox", { name: "Choose an order ID" });
+  const selection = () => page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection());
+
+  // A1 has no rule: Alt+Down moves to A2, which has one.
+  await grid.press("Alt+ArrowDown");
+  await expect(list).toBeHidden();
+  await expect.poll(selection).toEqual({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
+
+  await grid.press("Alt+ArrowDown");
+  await expect(list).toBeVisible();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(list).toBeHidden();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          window.__sheetwriteVueWorkbench?.grid.store.getCell({ sheet: "orders", row: 1, col: 0 })
+            .resolved,
+      ),
+    )
+    .toBe(2);
+});

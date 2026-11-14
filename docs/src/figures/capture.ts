@@ -270,7 +270,8 @@ const SHOTS: readonly Shot[] = [
     steps: async (page) => {
       await page.locator(".sheetwrite-shell-grid").click({ position: cellPoint(1, 0) });
       await page.keyboard.press("Control+f");
-      await page.keyboard.type("EMEA");
+      // Fill the Find input itself, so the search runs and the matches highlight.
+      await page.getByRole("textbox", { name: "Find in sheet" }).fill("EMEA");
       await settle(page);
     },
   },
@@ -289,32 +290,54 @@ const SHOTS: readonly Shot[] = [
   },
   { name: "ribbon", size: "wide", query: { sheet: "orders" } },
   // The formatting, analysis, data and formula pages, on the Report, Pivot and Formulas sheets.
-  { name: "report", size: "app", query: { sheet: "report" } },
+  // The compact ribbon leaves room for the whole chart under the table.
+  { name: "report", size: "app", query: { sheet: "report", ribbon: "compact" } },
   {
     name: "fonts",
     size: "panel",
     query: { sheet: "report" },
-    steps: (page) => select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 6 } }),
+    steps: async (page) => {
+      // The comment cell in G3, scrolled into view.
+      const comment = { sheet: "report", row: 2, col: 6 };
+      await page.evaluate((addr) => window.__sheetwriteFigureGrid?.scrollToCell(addr), comment);
+      await select(page, { kind: "cell", addr: comment });
+    },
   },
   {
     name: "number-formats",
     size: "panel",
     query: { sheet: "report" },
     steps: async (page) => {
-      await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 4 } });
+      // A manager's name: a General cell, so the format box shows what the cell has.
+      // The list covers the right of the sheet; the dollar columns stay in view.
+      await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 1 } });
+      // At this width the Number group folds into a menu; open it, then the
+      // list of its number format box.
       await page.getByRole("button", { name: "Number", exact: true }).first().click();
+      await page.getByRole("button", { name: "Number Format list", exact: true }).click();
       await settle(page);
     },
   },
   // The app size is tall enough to show the table and the chart under it.
-  { name: "chart", size: "app", query: { sheet: "report", ribbon: "compact" } },
+  // The chart selected, so its frame and handles show it floating over the cells.
+  {
+    name: "chart",
+    size: "app",
+    query: { sheet: "report", ribbon: "compact" },
+    steps: async (page) => {
+      await page.locator(".sheetwrite-object").first().click();
+      await settle(page);
+    },
+  },
   {
     name: "validation",
     size: "panel",
     query: { sheet: "report", ribbon: "compact" },
     steps: async (page) => {
       await select(page, { kind: "cell", addr: { sheet: "report", row: 3, col: 5 } });
-      await page.keyboard.press("Alt+ArrowDown");
+      // Enter on a list cell opens its list; the grid host needs the keyboard focus first.
+      await page.locator(".sheetwrite-shell-grid").focus();
+      await page.keyboard.press("Enter");
       await settle(page);
     },
   },
@@ -325,17 +348,15 @@ const SHOTS: readonly Shot[] = [
     query: { sheet: "pivot", ribbon: "compact" },
     steps: (page) => select(page, { kind: "cell", addr: { sheet: "pivot", row: 2, col: 1 } }),
   },
+  // The data-grid presentation names the columns in their headers, so a column
+  // filter leaves the column names in view.
   {
     name: "filter",
     size: "panel",
-    query: { sheet: "orders", ribbon: "compact" },
+    query: { sheet: "orders", ribbon: "compact", presentation: "data-grid" },
     steps: async (page) => {
+      await page.evaluate(() => window.__sheetwriteFigureGrid?.filterBy(1, "EMEA"));
       await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 1 } });
-      await page.getByRole("tab", { name: "Data", exact: true }).click();
-      await page
-        .getByRole("button", { name: /Filter/ })
-        .first()
-        .click();
       await settle(page);
     },
   },

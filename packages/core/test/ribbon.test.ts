@@ -193,6 +193,39 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   expect(document.activeElement).toBe(host);
 });
 
+// #731: a cell that takes its format from its column showed "General".
+it("shows the format a cell displays, its column's when it has none of its own", async () => {
+  const { grid, host, select, cell, press } = await setup();
+  grid.applyTransaction({
+    patches: [{ op: "setColumn", sheet: "s1", col: 1, patch: { numberFormat: "0.00%" } }],
+  });
+  grid.styleRange(
+    { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
+    { numberFormat: "$#,##0.00" },
+  );
+  const box = () => {
+    const input = host.querySelector<HTMLInputElement>('[aria-label="Number Format"]');
+    if (input === null) throw new Error("no Number Format box");
+    return input.value;
+  };
+
+  select(0, 0);
+  expect(box()).toBe("General");
+  select(0, 1);
+  expect(box()).toBe("Percentage");
+  select(1, 1);
+  expect(box()).toBe("Currency");
+
+  // Increase Decimal starts from the column's format too.
+  select(0, 1);
+  const increase = host.querySelector<HTMLButtonElement>('[aria-label="Increase Decimal"]');
+  if (increase === null) throw new Error("no Increase Decimal button");
+  press(increase);
+  for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+  expect(cell(0, 1).style.numberFormat).toBe("0.000%");
+  expect(box()).toBe("Custom");
+});
+
 it.each(["full", "compact"] as const)(
   "%s ribbon keeps a keyboard menu open across a pending layout frame and returns focus",
   async (mode) => {

@@ -22,7 +22,7 @@ use super::matrix::{
 use super::range_view::{RowReader, ValueRows};
 use super::reference::RewriteScope;
 use super::value::{bool_from_value, compare_values, number_from_value};
-use super::EvalPass;
+use super::{placed_cell, EvalPass};
 
 pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     match ast? {
@@ -173,8 +173,14 @@ impl CellStore {
     /// the anchor holds no spill.
     pub(super) fn spill_reference(&self, args: &[Ast], formula_sheet: usize) -> Ast {
         let (sheet, row, col) = match args {
-            [Ast::Cell(row, col, _)] => (formula_sheet, *row, *col),
-            [Ast::AbsCell(sheet, row, col, _)] => (sheet.handle as usize, *row, *col),
+            [Ast::Cell(row, col, flags)] => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                (formula_sheet, placed_row, placed_col)
+            }
+            [Ast::AbsCell(sheet, row, col, flags)] => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                (sheet.handle as usize, placed_row, placed_col)
+            }
             _ => return Ast::InvalidRef,
         };
         let Some(range) = self
@@ -193,7 +199,7 @@ impl CellStore {
             col,
             range.row_end,
             range.col_end,
-            RangeFlags::default(),
+            RangeFlags::ABSOLUTE,
         )
     }
 
