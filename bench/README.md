@@ -344,6 +344,12 @@ samples with inlined frames, at the sizes the rows first had (1,000 lookups,
 
 Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
 
+`sort-mixed-blanks` (10,000 and 100,000 rows) is `=SORT(A1:An)` over a
+number, a text, a logical value and a blank cell in turn; the edit changes
+A1. A blank compares equal to 0, "" and FALSE at once, so only a comparison
+sort gives this order: no sort key can. The row checks the spilled text count
+and value sum, which don't depend on the order. Its limit is the 1.2 default.
+
 `spill-filter-same-range` (100,000 rows) is the `spill-filter-resize` spill,
 `=FILTER(A1:A100000,B1:B100000)` with every row kept, where the timed run
 edits A1 instead of the filter. The spill comes back over the same range and
