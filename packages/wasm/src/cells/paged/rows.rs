@@ -168,14 +168,12 @@ impl PagedStorage {
         let loaded = source.loaded.iter().any(|&word| word != 0);
         let existing = self.clean_index(col, page);
         if !loaded {
-            if let Some(clean) = existing {
+            if existing.is_some() {
                 let id = self.page_id(col, page);
                 if self.records[id as usize].is_evictable() {
                     self.lru_unlink(id);
                 }
-                self.records[id as usize].clean = NONE;
-                self.free_clean.push(clean as u32);
-                self.release_if_empty(id);
+                self.drop_clean(id);
             }
             return;
         }
@@ -187,13 +185,7 @@ impl PagedStorage {
                 self.clean.push(CleanPage::new(self.chunk_rows));
                 (self.clean.len() - 1) as u32
             };
-            let access = self.next_access();
-            let record = &mut self.records[id as usize];
-            record.clean = allocated;
-            record.last_access.set(access);
-            if record.is_evictable() {
-                self.lru_link_after(id, self.lru_tail.get());
-            }
+            self.attach_clean(id, allocated);
             allocated as usize
         });
         self.clean[clean].copy_rows(source, 0, 0, self.chunk_rows);
