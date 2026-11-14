@@ -20,6 +20,8 @@ export interface FigureStep {
   readonly lines?: readonly string[];
   readonly code?: readonly string[];
   readonly tone?: BlueprintNode["tone"];
+  /** In a fan, a tile the source doesn't reach: drawn without a connector, to show what is left out. */
+  readonly unreached?: boolean;
 }
 
 /** A side outcome of one step: a failure exit or a result that flows back. */
@@ -47,7 +49,8 @@ function box(
   w: number,
   h?: number,
 ): BlueprintNode {
-  return { id, ...step, rect: { x, y, w, h: h ?? nodeHeight(step) } };
+  const { unreached: _unreached, ...node } = step;
+  return { id, ...node, rect: { x, y, w, h: h ?? nodeHeight(step) } };
 }
 
 function flowWide(
@@ -162,13 +165,15 @@ function fanWide(source: FigureStep, tiles: readonly FigureStep[]): BlueprintLay
     width: WIDE,
     height: y + h + MARGIN,
     nodes: [top, ...nodes],
-    edges: nodes.map((node) => ({
-      from: "source",
-      fromSide: "bottom" as const,
-      t: (node.rect.x + node.rect.w / 2 - top.rect.x) / top.rect.w,
-      to: node.id,
-      kind: "main" as const,
-    })),
+    edges: nodes
+      .filter((_, index) => tiles[index]?.unreached !== true)
+      .map((node) => ({
+        from: "source",
+        fromSide: "bottom" as const,
+        t: (node.rect.x + node.rect.w / 2 - top.rect.x) / top.rect.w,
+        to: node.id,
+        kind: "main" as const,
+      })),
   };
 }
 
@@ -186,14 +191,16 @@ function fanNarrow(source: FigureStep, tiles: readonly FigureStep[]): BlueprintL
     width: NARROW,
     height: y - ROW_SPACE / 2 + MARGIN,
     nodes: [top, ...nodes],
-    edges: nodes.map((node) => ({
-      from: "source",
-      fromSide: "bottom" as const,
-      t: spineT,
-      to: node.id,
-      toSide: "left" as const,
-      kind: "main" as const,
-    })),
+    edges: nodes
+      .filter((_, index) => tiles[index]?.unreached !== true)
+      .map((node) => ({
+        from: "source",
+        fromSide: "bottom" as const,
+        t: spineT,
+        to: node.id,
+        toSide: "left" as const,
+        kind: "main" as const,
+      })),
   };
 }
 

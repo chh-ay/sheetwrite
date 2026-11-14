@@ -2,6 +2,7 @@
 // come from their text (nodeHeight); connector ends come from the boxes.
 import type { JSX } from "solid-js";
 
+import { FanFigure, FlowFigure } from "./blueprint-layouts.js";
 import {
   BlueprintDiagram,
   type BlueprintLayout,
@@ -540,6 +541,418 @@ export function DocumentOpsFigure(): JSX.Element {
       narrow={documentOpsNarrow()}
       text={DOCUMENT_OPS_TEXT}
       wide={documentOpsWide()}
+    />
+  );
+}
+
+// ---- Getting started and concepts ---------------------------------------------------
+
+/** First grid: install, create, add a formula, save and open. */
+export function FirstGridFigure(): JSX.Element {
+  return (
+    <FlowFigure
+      steps={[
+        { title: "1 · Install", code: ["npm install", "@sheetwrite/core"] },
+        { title: "2 · Create", code: ["createGrid(host,", "  { workbook })"] },
+        {
+          title: "3 · Formula",
+          code: ["=SUM(B2:B4)"],
+          lines: ["A total that updates"],
+          tone: "accent",
+        },
+        { title: "4 · Save, open", code: ["exportSnapshot()", "createGridFromSnapshot"] },
+      ]}
+      text={{
+        title: "The four steps of a first grid",
+        description:
+          "Install the packages, create the grid in a host element with createGrid, add a formula that totals a column, then save the document with exportSnapshot and open it again with createGridFromSnapshot.",
+      }}
+    />
+  );
+}
+
+/** Choose an engine: one source, two builds. */
+export function EngineBuildsFigure(): JSX.Element {
+  return (
+    <FanFigure
+      note="In the default build, full-only functions return #NAME?."
+      source={{
+        title: "One engine source, two builds",
+        lines: ["Same API, storage and limits"],
+      }}
+      text={{
+        title: "The default and full engine builds",
+        description:
+          "The default build, @sheetwrite/wasm, has math, lookup, text, logic, dates, dynamic arrays and LET. The full build, @sheetwrite/formulas, has every default function plus statistics and distributions, regression, finance, regex, database, matrix and reshaping functions, the LAMBDA helpers, GROUPBY and PIVOTBY. Both compile from the same source with the same API, storage and limits. In the default build, full-only functions return #NAME?.",
+      }}
+      tiles={[
+        {
+          eyebrow: "@sheetwrite/wasm",
+          title: "Default",
+          lines: ["Math, lookup, text, logic,", "dates, dynamic arrays, LET"],
+        },
+        {
+          eyebrow: "@sheetwrite/formulas",
+          title: "Full",
+          lines: [
+            "Every default function, plus",
+            "statistics, finance, regex,",
+            "LAMBDA, GROUPBY, PIVOTBY",
+          ],
+          tone: "accent",
+        },
+      ]}
+    />
+  );
+}
+
+/** Installation: what loads when. */
+export function LoadOrderFigure(): JSX.Element {
+  return (
+    <FlowFigure
+      note="Worker rendering and XLSX stay explicit: the worker entry is @sheetwrite/core/worker, and XLSX is the xlsxAddon() passed to initSheetwrite."
+      steps={[
+        {
+          title: "Install",
+          code: ["@sheetwrite/core"],
+          lines: ["Add @sheetwrite/formulas", "for the full engine"],
+        },
+        {
+          title: "initSheetwrite()",
+          lines: ["Loads the engine once,", "before the first grid;", "adapters call it on mount"],
+          tone: "accent",
+        },
+        {
+          title: "createGrid",
+          code: ["createGrid(host,", "  options)"],
+          lines: ["Mounts the grid"],
+        },
+      ]}
+      text={{
+        title: "What loads when",
+        description:
+          "Install @sheetwrite/core, which uses the default engine, @sheetwrite/wasm; add @sheetwrite/formulas for the full engine. initSheetwrite() loads the engine once, before the first grid or store; framework adapters call it on mount, and an engine passed to it is selected for good. Then createGrid mounts the grid. Worker rendering and XLSX stay explicit: the worker entry comes from @sheetwrite/core/worker, and XLSX needs @sheetwrite/xlsx registered with initSheetwrite({ addons: [xlsxAddon()] }).",
+      }}
+    />
+  );
+}
+
+/** Calculation engine: what happens on an edit. */
+export function RecalculationFigure(): JSX.Element {
+  return (
+    <FlowFigure
+      note="The transaction returns after the calculation: getCell(…).resolved, the change event and the next paint show the new results."
+      steps={[
+        { title: "Transaction", code: ["set A2"] },
+        { title: "Store", lines: ["Keeps the value,", "marks A2 dirty"] },
+        { title: "Dependency index", lines: ["B2 reads A2,", "D5 reads B2"], tone: "accent" },
+        { title: "Recalculate", lines: ["B2, then D5;", "C3 keeps its result"] },
+      ]}
+      text={{
+        title: "What happens on an edit",
+        description:
+          "An edit is a transaction, such as set A2. The engine stores the value and marks A2 dirty. Its dependency index finds every formula that A2 affects, also through other formulas: B2 reads A2, and D5 reads B2. Only those formulas calculate again, in dependency order; a formula no change reaches, such as C3, keeps its result. The transaction returns after the calculation, so getCell(…).resolved has the new result, and the change event and the next paint show it.",
+      }}
+    />
+  );
+}
+
+// ---- Data -----------------------------------------------------------------------------
+
+const ROW_BRIDGE_TEXT = {
+  title: "Keeping app rows in your store",
+  description:
+    "Your store keeps the row objects. createRowBridge maps each row to a stable ID with getRowId, and createRowId names new rows. Sheetwrite owns editing, history, sorting and filtering in the grid, and reports each edit as a row delta that names the row by its ID, which your app applies to its store.",
+};
+
+function rowBridgeWide(): BlueprintLayout {
+  const store = node({
+    id: "store",
+    x: 8,
+    y: 8,
+    w: 176,
+    eyebrow: "Your app",
+    title: "Your store",
+    lines: ["The row objects"],
+  });
+  const bridge = node({
+    id: "bridge",
+    x: 272,
+    y: 8,
+    w: 176,
+    title: "createRowBridge",
+    code: ["getRowId(row)", "createRowId()"],
+    tone: "accent",
+  });
+  const grid = node({
+    id: "grid",
+    x: 536,
+    y: 8,
+    w: 176,
+    eyebrow: "Sheetwrite",
+    title: "Grid",
+    lines: ["Editing, history,", "sorting, filtering"],
+  });
+  const h = Math.max(store.rect.h, bridge.rect.h, grid.rect.h);
+  const nodes = [store, bridge, grid].map((each) => ({ ...each, rect: { ...each.rect, h } }));
+  return {
+    width: WIDE,
+    height: 8 + h + 8,
+    nodes,
+    edges: [
+      {
+        from: "store",
+        fromSide: "right",
+        to: "bridge",
+        t: 0.3,
+        kind: "main",
+        label: "rows",
+        labelSide: "above",
+      },
+      {
+        from: "bridge",
+        fromSide: "left",
+        to: "store",
+        t: 0.7,
+        kind: "back",
+        label: "apply by ID",
+        labelSide: "below",
+      },
+      {
+        from: "bridge",
+        fromSide: "right",
+        to: "grid",
+        t: 0.3,
+        kind: "main",
+        label: "stable IDs",
+        labelSide: "above",
+      },
+      {
+        from: "grid",
+        fromSide: "left",
+        to: "bridge",
+        t: 0.7,
+        kind: "back",
+        label: "row deltas",
+        labelSide: "below",
+      },
+    ],
+  };
+}
+
+function rowBridgeNarrow(): BlueprintLayout {
+  const store = node({
+    id: "store",
+    x: 8,
+    y: 8,
+    w: 344,
+    eyebrow: "Your app",
+    title: "Your store",
+    lines: ["The row objects"],
+  });
+  const bridge = node({
+    id: "bridge",
+    x: 8,
+    y: store.rect.h + 72,
+    w: 344,
+    title: "createRowBridge",
+    code: ["getRowId(row) · createRowId()"],
+    tone: "accent",
+  });
+  const grid = node({
+    id: "grid",
+    x: 8,
+    y: bridge.rect.y + bridge.rect.h + 64,
+    w: 344,
+    eyebrow: "Sheetwrite",
+    title: "Grid",
+    lines: ["Editing, history, sorting, filtering"],
+  });
+  return {
+    width: NARROW,
+    height: grid.rect.y + grid.rect.h + 8,
+    nodes: [store, bridge, grid],
+    edges: [
+      {
+        from: "store",
+        fromSide: "bottom",
+        to: "bridge",
+        t: 0.3,
+        kind: "main",
+        label: "rows",
+        labelSide: "right",
+      },
+      {
+        from: "bridge",
+        fromSide: "top",
+        to: "store",
+        t: 0.7,
+        kind: "back",
+        label: "apply by ID",
+        labelSide: "right",
+      },
+      {
+        from: "bridge",
+        fromSide: "bottom",
+        to: "grid",
+        t: 0.3,
+        kind: "main",
+        label: "stable IDs",
+        labelSide: "right",
+      },
+      {
+        from: "grid",
+        fromSide: "top",
+        to: "bridge",
+        t: 0.7,
+        kind: "back",
+        label: "row deltas",
+        labelSide: "right",
+      },
+    ],
+  };
+}
+
+/** Host-owned rows: rows in your store, edits back as deltas by row ID. */
+export function RowBridgeFigure(): JSX.Element {
+  return (
+    <BlueprintDiagram narrow={rowBridgeNarrow()} text={ROW_BRIDGE_TEXT} wide={rowBridgeWide()} />
+  );
+}
+
+// ---- Analysis ---------------------------------------------------------------------
+
+const RELATIONSHIP_TEXT = {
+  title: "A relationship and a pivot across it",
+  description:
+    "A relationship links two tables by one key column each. The from side, Orders[Customer], is the many side: many orders share a key. The to side, Customers[Customer], is the one side: each non-blank key is unique. A pivot over the model groups Orders by Customers › Region. A matching key reads that row's cell; no match or a blank key reads blank; a duplicate one-side key shows #VALUE! at the pivot's anchor.",
+};
+
+function relationshipLayout(width: number, narrow: boolean): BlueprintLayout {
+  const half = (width - 16 - (narrow ? 24 : 96)) / 2;
+  const orders = node({
+    id: "orders",
+    x: 8,
+    y: 8,
+    w: half,
+    eyebrow: "Many side",
+    title: "Orders",
+    code: ["Orders[Customer]"],
+    lines: ["Keys repeat"],
+  });
+  const customers = node({
+    id: "customers",
+    x: width - 8 - half,
+    y: 8,
+    w: half,
+    eyebrow: "One side",
+    title: "Customers",
+    code: ["Customers[Customer]"],
+    lines: ["Each key once"],
+  });
+  const top = Math.max(orders.rect.h, customers.rect.h);
+  const pivot = node({
+    id: "pivot",
+    x: 8,
+    y: 8 + top + 56,
+    w: width - 16,
+    title: "Pivot over the model",
+    lines: ["Orders grouped by Customers › Region"],
+    tone: "accent",
+  });
+  const sized = [orders, customers].map((each) => ({ ...each, rect: { ...each.rect, h: top } }));
+  return {
+    width,
+    height: pivot.rect.y + pivot.rect.h + 8,
+    nodes: [...sized, pivot],
+    edges: [
+      {
+        from: "orders",
+        fromSide: "right",
+        to: "customers",
+        kind: "side",
+        label: narrow ? "" : "many → one",
+        labelSide: "above",
+      },
+      {
+        from: "orders",
+        fromSide: "bottom",
+        to: "pivot",
+        toT: along(pivot, 8 + half / 2),
+        kind: "main",
+      },
+      {
+        from: "customers",
+        fromSide: "bottom",
+        to: "pivot",
+        toT: along(pivot, width - 8 - half / 2),
+        kind: "main",
+      },
+    ],
+  };
+}
+
+/** Data model: a many-to-one relationship and a pivot that reads across it. */
+export function RelationshipFigure(): JSX.Element {
+  return (
+    <BlueprintDiagram
+      narrow={relationshipLayout(NARROW, true)}
+      note="No match or a blank key reads blank; a duplicate key on the one side shows #VALUE! at the pivot."
+      text={RELATIONSHIP_TEXT}
+      wide={relationshipLayout(WIDE, false)}
+    />
+  );
+}
+
+/** Dashboards: which items a slicer filters. */
+export function DashboardSlicerFigure(): JSX.Element {
+  return (
+    <FanFigure
+      note="A slicer filters from the one side to the many side, never back."
+      source={{ title: "Slicer on Regions[Region]", lines: ["Orders → Regions is many to one"] }}
+      text={{
+        title: "Which items a slicer filters",
+        description:
+          "A slicer on a column of a table filters every pivot whose table is that table or reaches it through many-to-one relationships; the filter goes from the one side to the many side, never back. Here a Region slicer on Regions filters the pivot over Orders, which reaches Regions, the PivotChart over that pivot, and a KPI card whose measure's home table is Orders. A pivot over Targets, which doesn't reach Regions, is not filtered.",
+      }}
+      tiles={[
+        { title: "Pivot", lines: ["Over Orders, which", "reaches Regions"], tone: "accent" },
+        { title: "PivotChart", lines: ["Follows its pivot"], tone: "accent" },
+        { title: "KPI card", lines: ["Measure on Orders"], tone: "accent" },
+        {
+          title: "Pivot",
+          lines: ["Over Targets:", "not filtered"],
+          tone: "muted",
+          unreached: true,
+        },
+      ]}
+    />
+  );
+}
+
+/** Persistence: how the version archive records a document. */
+export function VersionArchiveFigure(): JSX.Element {
+  return (
+    <FlowFigure
+      note="A marker is made after five active minutes with committed edits, and saveVersion names one; readVersion and diffVersions read versions back."
+      steps={[
+        {
+          title: "Committed",
+          lines: ["Confirmed with revision", "and author; optimistic", "edits aren't recorded"],
+        },
+        { title: "Log", lines: ["Each transaction", "appended"] },
+        {
+          title: "Checkpoint",
+          lines: ["After 30 active minutes,", "1,000 transactions", "or 2 MiB of log"],
+          tone: "accent",
+        },
+        { title: "Pages", lines: ["16 rows × 4 columns;", "unchanged pages", "are shared"] },
+      ]}
+      text={{
+        title: "How the version archive records a document",
+        description:
+          "Only committed transactions, confirmed by the document authority with their revision and author, go to record; optimistic grid change events don't. The archive appends each one to its log and makes a checkpoint when one is due: after 30 active minutes, 1,000 transactions or 2 MiB of log. Checkpoints reference fixed 16-row by 4-column cell pages, and unchanged pages are shared between checkpoints. An automatic marker is made after five active minutes with committed edits; saveVersion names one. readVersion and diffVersions read versions back.",
+      }}
     />
   );
 }
