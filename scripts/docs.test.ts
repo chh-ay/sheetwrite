@@ -174,6 +174,40 @@ describe("API reference pages", () => {
     expect(page).not.toMatch(/@(?:example|see)\b/);
   });
 
+  it("groups members into properties, methods and events, function-typed properties as methods", async () => {
+    const shape = apiExport(
+      "ShapeExample",
+      "interface",
+      [
+        "interface ShapeExample {",
+        "  readonly size: number;",
+        "  run: (count: number) => void;",
+        "  maybe: (() => void) | undefined;",
+        "  apply(value: string): boolean;",
+        "  onChange?: (value: string) => void;",
+        "}",
+      ].join("\n"),
+    );
+    const entry = entryPoint(".", [shape]);
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
+    const page = await renderSymbolPage(pkg, entry, shape);
+    const group = (name: string) =>
+      section(
+        page,
+        new RegExp(
+          `<h3 class="api-member-group">${name}</h3>[\\s\\S]*?(?=<h3 class="api-member-group">|$)`,
+        ),
+      );
+    expect(group("Properties")).toContain('id="shape-example-size"');
+    expect(group("Properties")).toContain('id="shape-example-maybe"');
+    expect(group("Methods")).toContain('id="shape-example-run"');
+    expect(group("Methods")).toContain('id="shape-example-apply"');
+    expect(group("Events")).toContain('id="shape-example-on-change"');
+    expect(section(page, /<article[^>]*id="shape-example-size"[\s\S]*?<\/article>/)).toContain(
+      "<span>read-only</span>",
+    );
+  });
+
   it("links an expanded union member to the alias that names it", async () => {
     const aliasExports = () => [
       apiExport("STORAGE_MODES", "variable", 'readonly ["memory", "session"]'),

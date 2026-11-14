@@ -1006,11 +1006,18 @@ function memberHead(signature: string): string {
   return head;
 }
 
-/** Callbacks named `on…` are events; members called with arguments are methods. */
+/**
+ * Callbacks named `on…` are events. Methods are members declared with a call
+ * signature, or as a property whose type is a function (`run: () => void`).
+ */
 function memberGroup(member: DeclarationMember): MemberGroup {
   if (/^on[A-Z]/.test(member.name)) return "Events";
   const head = memberHead(member.signature);
-  return head.startsWith(member.name) && /^\??\s*[<(]/.test(head.slice(member.name.length))
+  if (head.startsWith(member.name) && /^\??\s*[<(]/.test(head.slice(member.name.length))) {
+    return "Methods";
+  }
+  const type = memberTypeParts(head)?.type ?? "";
+  return /^(?:<[^>]*>\s*)?\([^]*\)\s*=>/.test(type) && splitTopLevel(type, "|").length === 1
     ? "Methods"
     : "Properties";
 }
