@@ -5,7 +5,7 @@
     "clippy::cognitive_complexity": 28,
     "clippy::default_trait_access": 1,
     "clippy::disallowed_methods": 16,
-    "clippy::expect_used": 28,
+    "clippy::expect_used": 27,
     "clippy::fn_params_excessive_bools": 1,
     "clippy::if_then_some_else_none": 2,
     "clippy::iter_with_drain": 1,
