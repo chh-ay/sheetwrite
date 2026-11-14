@@ -428,6 +428,31 @@ function themedShots(
   );
 }
 
+/** A screenshot placed in a Markdown page: its capture, alt text, caption and size. */
+export interface FramedShot {
+  readonly name: string;
+  readonly alt: string;
+  readonly caption: string;
+  readonly size?: ShotSize;
+}
+
+/**
+ * The markup of `<Frame caption><Screenshot name alt size /></Frame>`, for the
+ * placement table (art/docs-pictures.ts), which puts screenshots into Markdown pages.
+ */
+export function framedShot(shot: FramedShot): HastNode {
+  return element(
+    "figure",
+    [
+      element("div", [themedShots(shot.name, shot.alt, shot.size ?? "app", PAGE_SHOT_SIZES)], {
+        className: ["sw-frame__media"],
+      }),
+      element("figcaption", [text(shot.caption)], {}),
+    ],
+    { className: ["sw-frame"] },
+  );
+}
+
 /**
  * A screenshot from the committed capture script, in the light and the dark
  * theme. The hidden theme's image is `display: none` and lazy, so it never
@@ -745,6 +770,9 @@ function runtimeImport({ module, names }: (typeof RUNTIME_MODULES)[RuntimeCompon
   };
 }
 
+/** The figure kit's stylesheet: frames, screenshots, diagrams and comparisons. */
+export const FIGURES_STYLESHEET = "/src/styles/content/figures.css";
+
 /**
  * Components whose styles most pages never need, each with its stylesheet
  * (from the docs root). A page that uses one exports the stylesheet's URL in
@@ -753,11 +781,11 @@ function runtimeImport({ module, names }: (typeof RUNTIME_MODULES)[RuntimeCompon
 const PAGE_STYLESHEETS: Partial<Record<ComponentName, string>> = {
   Accordion: "/src/styles/content/accordion.css",
   AccordionGroup: "/src/styles/content/accordion.css",
-  Frame: "/src/styles/content/figures.css",
-  Screenshot: "/src/styles/content/figures.css",
-  Diagram: "/src/styles/content/figures.css",
-  Annotated: "/src/styles/content/figures.css",
-  Compare: "/src/styles/content/figures.css",
+  Frame: FIGURES_STYLESHEET,
+  Screenshot: FIGURES_STYLESHEET,
+  Diagram: FIGURES_STYLESHEET,
+  Annotated: FIGURES_STYLESHEET,
+  Compare: FIGURES_STYLESHEET,
   Update: "/src/styles/content/update.css",
   LiveGrid: "/src/styles/content/live-grid.css",
 };
@@ -896,7 +924,7 @@ export function contentComponents() {
       if (sheet !== undefined) sheets.add(sheet);
       // A card's screenshot swaps with the theme, as figure screenshots do.
       if (node.name === "Card" && attribute(node, "screenshot") !== undefined) {
-        sheets.add("/src/styles/content/figures.css");
+        sheets.add(FIGURES_STYLESHEET);
       }
       if (node.name === "Tabs" || node.name === "Tab") {
         used.add("Tabs");

@@ -33,6 +33,8 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
   const HEAD_LENGTH = 6;
   /** Rects smaller than this are marks, swatches or cells, not boxes. */
   const MIN_BOX = { width: 24, height: 16 };
+  /** A bent connector whose legs sit closer than this is a jog: the boxes should line up instead. */
+  const MIN_JOG = 8;
   /** Shapes smaller than this are dots and ticks; they can't hide anything. */
   const MIN_SHAPE = 8;
   /** A frame with at least this corner radius has corners a shape can poke out of. */
@@ -362,6 +364,14 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
       }
       const tip = head[1] as Point;
       const start = shaft[0]?.[0] as Point;
+      // A shaft that bends but stays within a narrow band is a jog between nearly aligned boxes.
+      const shaftPoints = shaft.flat();
+      const xs = shaftPoints.map((point) => point.x);
+      const ys = shaftPoints.map((point) => point.y);
+      const spread = Math.min(Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+      if (spread > 0.5 && spread < MIN_JOG) {
+        report(`an arrow into ${at(tip)} jogs ${round(spread)} sideways; line its boxes up`);
+      }
       const end = nearestBox(tip);
       if (end === undefined || end.gap > TOLERANCE) {
         report(
