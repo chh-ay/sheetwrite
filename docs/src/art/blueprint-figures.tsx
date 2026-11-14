@@ -2,7 +2,7 @@
 // come from their text (nodeHeight); connector ends come from the boxes.
 import type { JSX } from "solid-js";
 
-import { FanFigure, FlowFigure } from "./blueprint-layouts.js";
+import { ExchangeFigure, FanFigure, FlowFigure } from "./blueprint-layouts.js";
 import {
   BlueprintDiagram,
   type BlueprintLayout,
@@ -659,164 +659,29 @@ export function RecalculationFigure(): JSX.Element {
 
 // ---- Data -----------------------------------------------------------------------------
 
-const ROW_BRIDGE_TEXT = {
-  title: "Keeping app rows in your store",
-  description:
-    "Your store keeps the row objects. createRowBridge maps each row to a stable ID with getRowId, and createRowId names new rows. Sheetwrite owns editing, history, sorting and filtering in the grid, and reports each edit as a row delta that names the row by its ID, which your app applies to its store.",
-};
-
-function rowBridgeWide(): BlueprintLayout {
-  const store = node({
-    id: "store",
-    x: 8,
-    y: 8,
-    w: 176,
-    eyebrow: "Your app",
-    title: "Your store",
-    lines: ["The row objects"],
-  });
-  const bridge = node({
-    id: "bridge",
-    x: 272,
-    y: 8,
-    w: 176,
-    title: "createRowBridge",
-    code: ["getRowId(row)", "createRowId()"],
-    tone: "accent",
-  });
-  const grid = node({
-    id: "grid",
-    x: 536,
-    y: 8,
-    w: 176,
-    eyebrow: "Sheetwrite",
-    title: "Grid",
-    lines: ["Editing, history,", "sorting, filtering"],
-  });
-  const h = Math.max(store.rect.h, bridge.rect.h, grid.rect.h);
-  const nodes = [store, bridge, grid].map((each) => ({ ...each, rect: { ...each.rect, h } }));
-  return {
-    width: WIDE,
-    height: 8 + h + 8,
-    nodes,
-    edges: [
-      {
-        from: "store",
-        fromSide: "right",
-        to: "bridge",
-        t: 0.3,
-        kind: "main",
-        label: "rows",
-        labelSide: "above",
-      },
-      {
-        from: "bridge",
-        fromSide: "left",
-        to: "store",
-        t: 0.7,
-        kind: "back",
-        label: "apply by ID",
-        labelSide: "below",
-      },
-      {
-        from: "bridge",
-        fromSide: "right",
-        to: "grid",
-        t: 0.3,
-        kind: "main",
-        label: "stable IDs",
-        labelSide: "above",
-      },
-      {
-        from: "grid",
-        fromSide: "left",
-        to: "bridge",
-        t: 0.7,
-        kind: "back",
-        label: "row deltas",
-        labelSide: "below",
-      },
-    ],
-  };
-}
-
-function rowBridgeNarrow(): BlueprintLayout {
-  const store = node({
-    id: "store",
-    x: 8,
-    y: 8,
-    w: 344,
-    eyebrow: "Your app",
-    title: "Your store",
-    lines: ["The row objects"],
-  });
-  const bridge = node({
-    id: "bridge",
-    x: 8,
-    y: store.rect.h + 72,
-    w: 344,
-    title: "createRowBridge",
-    code: ["getRowId(row) · createRowId()"],
-    tone: "accent",
-  });
-  const grid = node({
-    id: "grid",
-    x: 8,
-    y: bridge.rect.y + bridge.rect.h + 64,
-    w: 344,
-    eyebrow: "Sheetwrite",
-    title: "Grid",
-    lines: ["Editing, history, sorting, filtering"],
-  });
-  return {
-    width: NARROW,
-    height: grid.rect.y + grid.rect.h + 8,
-    nodes: [store, bridge, grid],
-    edges: [
-      {
-        from: "store",
-        fromSide: "bottom",
-        to: "bridge",
-        t: 0.3,
-        kind: "main",
-        label: "rows",
-        labelSide: "right",
-      },
-      {
-        from: "bridge",
-        fromSide: "top",
-        to: "store",
-        t: 0.7,
-        kind: "back",
-        label: "apply by ID",
-        labelSide: "right",
-      },
-      {
-        from: "bridge",
-        fromSide: "bottom",
-        to: "grid",
-        t: 0.3,
-        kind: "main",
-        label: "stable IDs",
-        labelSide: "right",
-      },
-      {
-        from: "grid",
-        fromSide: "top",
-        to: "bridge",
-        t: 0.7,
-        kind: "back",
-        label: "row deltas",
-        labelSide: "right",
-      },
-    ],
-  };
-}
-
 /** Host-owned rows: rows in your store, edits back as deltas by row ID. */
 export function RowBridgeFigure(): JSX.Element {
   return (
-    <BlueprintDiagram narrow={rowBridgeNarrow()} text={ROW_BRIDGE_TEXT} wide={rowBridgeWide()} />
+    <ExchangeFigure
+      links={[
+        { forward: "rows", back: "apply by ID" },
+        { forward: "stable IDs", back: "row deltas" },
+      ]}
+      steps={[
+        { eyebrow: "Your app", title: "Your store", lines: ["The row objects"] },
+        { title: "createRowBridge", code: ["getRowId(row)", "createRowId()"], tone: "accent" },
+        {
+          eyebrow: "Sheetwrite",
+          title: "Grid",
+          lines: ["Editing, history,", "sorting, filtering"],
+        },
+      ]}
+      text={{
+        title: "Keeping app rows in your store",
+        description:
+          "Your store keeps the row objects. createRowBridge maps each row to a stable ID with getRowId, and createRowId names new rows. Sheetwrite owns editing, history, sorting and filtering in the grid, and reports each edit as a row delta that names the row by its ID, which your app applies to its store.",
+      }}
+    />
   );
 }
 

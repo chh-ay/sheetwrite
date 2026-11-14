@@ -59,9 +59,16 @@ const LINE = 16;
 const LABEL_GAP = 8;
 
 /** The height a node needs for its text: the drawings size boxes with this. */
-export function nodeHeight(node: Pick<BlueprintNode, "eyebrow" | "lines" | "code">): number {
+export function nodeHeight(
+  node: Pick<BlueprintNode, "eyebrow" | "title" | "lines" | "code">,
+): number {
+  // A box without a title (a code-only box) doesn't keep a title line.
+  const title = node.title === "" ? 0 : LINE + 2;
   return (
-    30 + (node.eyebrow ? LINE : 0) + ((node.lines?.length ?? 0) + (node.code?.length ?? 0)) * LINE
+    12 +
+    title +
+    (node.eyebrow ? LINE : 0) +
+    ((node.lines?.length ?? 0) + (node.code?.length ?? 0)) * LINE
   );
 }
 
@@ -73,8 +80,10 @@ function Node(props: Readonly<{ node: BlueprintNode }>) {
       placed.push({ kind: "eyebrow", text: props.node.eyebrow, y: y - 2 });
       y += LINE;
     }
-    placed.push({ kind: "title", text: props.node.title, y });
-    y += LINE + 2;
+    if (props.node.title !== "") {
+      placed.push({ kind: "title", text: props.node.title, y });
+      y += LINE + 2;
+    }
     for (const text of props.node.lines ?? []) {
       placed.push({ kind: "line", text, y });
       y += LINE;

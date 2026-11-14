@@ -367,7 +367,7 @@ function sequenceLayout(
   const pending: { step: Extract<SequenceStep, { message: string }>; y: number }[] = [];
   steps.forEach((step, index) => {
     if ("note" in step) {
-      const h = nodeHeight({ lines: [step.note] }) - 18;
+      const h = nodeHeight({ title: step.note });
       closeLane(step.lane, y - 8);
       const x = (centre.get(step.lane) ?? 0) - noteWidth / 2;
       const note = box(
@@ -442,6 +442,107 @@ export function SequenceFigure(
       note={props.note}
       text={props.text}
       wide={sequenceLayout(props.lanes, props.steps, WIDE, 168)}
+    />
+  );
+}
+
+/** Between two neighbouring boxes of an exchange: what goes forward, and what comes back. */
+export interface FigureLink {
+  readonly forward: string;
+  readonly back?: string;
+}
+
+function exchangeWide(steps: readonly FigureStep[], links: readonly FigureLink[]): BlueprintLayout {
+  // The gaps hold the labels, so they share the width with the boxes.
+  const gap = 120;
+  const w = (WIDE - 2 * MARGIN - (steps.length - 1) * gap) / steps.length;
+  const h = Math.max(...steps.map(nodeHeight), 72);
+  const nodes = steps.map((step, index) =>
+    box(`s${index}`, step, MARGIN + index * (w + gap), MARGIN, w, h),
+  );
+  const edges: BlueprintEdge[] = links.flatMap((link, index) => [
+    {
+      from: `s${index}`,
+      fromSide: "right" as const,
+      to: `s${index + 1}`,
+      t: link.back ? 0.3 : 0.5,
+      kind: "main" as const,
+      label: link.forward,
+      labelSide: "above" as const,
+    },
+    ...(link.back
+      ? [
+          {
+            from: `s${index + 1}`,
+            fromSide: "left" as const,
+            to: `s${index}`,
+            t: 0.7,
+            kind: "back" as const,
+            label: link.back,
+            labelSide: "below" as const,
+          },
+        ]
+      : []),
+  ]);
+  return { width: WIDE, height: MARGIN + h + MARGIN, nodes, edges };
+}
+
+function exchangeNarrow(
+  steps: readonly FigureStep[],
+  links: readonly FigureLink[],
+): BlueprintLayout {
+  const nodes: BlueprintNode[] = [];
+  let y = MARGIN;
+  steps.forEach((step, index) => {
+    const placed = box(`s${index}`, step, MARGIN, y, NARROW - 2 * MARGIN);
+    nodes.push(placed);
+    y += placed.rect.h + 64;
+  });
+  const edges: BlueprintEdge[] = links.flatMap((link, index) => [
+    {
+      from: `s${index}`,
+      fromSide: "bottom" as const,
+      to: `s${index + 1}`,
+      t: 0.25,
+      kind: "main" as const,
+      label: link.forward,
+      labelSide: "right" as const,
+    },
+    ...(link.back
+      ? [
+          {
+            from: `s${index + 1}`,
+            fromSide: "top" as const,
+            to: `s${index}`,
+            t: 0.7,
+            kind: "back" as const,
+            label: link.back,
+            labelSide: "right" as const,
+          },
+        ]
+      : []),
+  ]);
+  return { width: NARROW, height: y - 64 + MARGIN, nodes, edges };
+}
+
+/** An exchange: boxes in a row, with what each passes to the next and what comes back. */
+export function ExchangeFigure(
+  props: Readonly<{
+    text: BlueprintText;
+    steps: readonly FigureStep[];
+    links: readonly FigureLink[];
+    note?: string;
+  }>,
+): JSX.Element {
+  if (props.links.length !== props.steps.length - 1) {
+    throw new Error("An exchange needs one link between each pair of neighbouring boxes");
+  }
+  return (
+    <BlueprintDiagram
+      narrow={exchangeNarrow(props.steps, props.links)}
+      note={props.note}
+      text={props.text}
+      wide={exchangeWide(props.steps, props.links)}
     />
   );
 }
