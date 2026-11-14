@@ -222,3 +222,226 @@ export function FanFigure(
     />
   );
 }
+
+function tilesLayout(
+  tiles: readonly FigureStep[],
+  width: number,
+  columns: number,
+): BlueprintLayout {
+  const w = (width - 2 * MARGIN - ((columns - 1) * ROW_GAP) / 2) / columns;
+  const rows: FigureStep[][] = [];
+  tiles.forEach((tile, index) => {
+    const row = Math.floor(index / columns);
+    (rows[row] ??= []).push(tile);
+  });
+  const nodes: BlueprintNode[] = [];
+  let y = MARGIN;
+  rows.forEach((row, rowIndex) => {
+    const h = Math.max(...row.map(nodeHeight));
+    row.forEach((tile, column) =>
+      nodes.push(
+        box(`t${rowIndex * columns + column}`, tile, MARGIN + column * (w + ROW_GAP / 2), y, w, h),
+      ),
+    );
+    y += h + ROW_GAP / 2;
+  });
+  return { width, height: y - ROW_GAP / 2 + MARGIN, nodes, edges: [] };
+}
+
+/** Tiles: groups side by side, `columns` across wide and `narrowColumns` on phones, with no connectors. */
+export function TileFigure(
+  props: Readonly<{
+    text: BlueprintText;
+    tiles: readonly FigureStep[];
+    columns: number;
+    narrowColumns?: number;
+    note?: string;
+  }>,
+): JSX.Element {
+  return (
+    <BlueprintDiagram
+      narrow={tilesLayout(props.tiles, NARROW, props.narrowColumns ?? 1)}
+      note={props.note}
+      text={props.text}
+      wide={tilesLayout(props.tiles, WIDE, props.columns)}
+    />
+  );
+}
+
+/** One row of a pairs figure: what goes in, and what comes out. */
+export interface FigurePair {
+  readonly from: FigureStep;
+  readonly to: FigureStep;
+}
+
+function pairsLayout(pairs: readonly FigurePair[], width: number, share: number): BlueprintLayout {
+  const gap = ROW_GAP + 16;
+  const left = (width - 2 * MARGIN - gap) * share;
+  const right = width - 2 * MARGIN - gap - left;
+  const nodes: BlueprintNode[] = [];
+  const edges: BlueprintEdge[] = [];
+  let y = MARGIN;
+  pairs.forEach((pair, index) => {
+    const h = Math.max(nodeHeight(pair.from), nodeHeight(pair.to));
+    nodes.push(box(`a${index}`, pair.from, MARGIN, y, left, h));
+    nodes.push(box(`b${index}`, pair.to, MARGIN + left + gap, y, right, h));
+    edges.push({ from: `a${index}`, fromSide: "right", to: `b${index}`, kind: "main" });
+    y += h + ROW_GAP / 2;
+  });
+  return { width, height: y - ROW_GAP / 2 + MARGIN, nodes, edges };
+}
+
+/** Pairs: what goes in on the left and what comes out on the right, one row each. */
+export function PairsFigure(
+  props: Readonly<{ text: BlueprintText; pairs: readonly FigurePair[]; note?: string }>,
+): JSX.Element {
+  return (
+    <BlueprintDiagram
+      narrow={pairsLayout(props.pairs, NARROW, 0.55)}
+      note={props.note}
+      text={props.text}
+      wide={pairsLayout(props.pairs, WIDE, 0.55)}
+    />
+  );
+}
+
+/** One participant of a sequence: a lane with a name at its head. */
+export interface SequenceLane {
+  readonly id: string;
+  readonly name: string;
+}
+
+/** One step of a sequence, top to bottom: a message between two lanes, or a note on one lane. */
+export type SequenceStep =
+  | {
+      readonly message: string;
+      readonly from: string;
+      readonly to: string;
+      readonly kind?: BlueprintEdge["kind"];
+      /** A message that never arrives ends in a "lost" mark halfway. */
+      readonly lost?: boolean;
+    }
+  | { readonly note: string; readonly lane: string; readonly tone?: BlueprintNode["tone"] };
+
+/** The vertical space one message takes, room for its label above the line. */
+const MESSAGE_STEP = 36;
+/** A lane's lifeline is a bar this wide: messages start and end on its edges. */
+const LIFELINE = 24;
+
+function sequenceLayout(
+  lanes: readonly SequenceLane[],
+  steps: readonly SequenceStep[],
+  width: number,
+  noteWidth: number,
+): BlueprintLayout {
+  const span = (width - 2 * MARGIN - noteWidth) / Math.max(1, lanes.length - 1);
+  const centre = new Map(
+    lanes.map((lane, index) => [lane.id, MARGIN + noteWidth / 2 + index * span]),
+  );
+  const heads = lanes.map((lane) => {
+    const x = (centre.get(lane.id) ?? 0) - noteWidth / 2;
+    return box(`head-${lane.id}`, { title: lane.name }, x, MARGIN, noteWidth, 32);
+  });
+  const top = MARGIN + 32;
+  // Each lane is a column of segments: lifeline bars, broken where a note sits.
+  const segments = new Map<string, BlueprintNode[]>(lanes.map((lane) => [lane.id, []]));
+  const open = new Map<string, number>(lanes.map((lane) => [lane.id, top]));
+  const nodes: BlueprintNode[] = [...heads];
+  const edges: BlueprintEdge[] = [];
+  const closeLane = (lane: string, y: number) => {
+    const start = open.get(lane) ?? top;
+    if (y - start < 4) return;
+    const x = (centre.get(lane) ?? 0) - LIFELINE / 2;
+    const bar = box(
+      `bar-${lane}-${segments.get(lane)?.length ?? 0}`,
+      { title: "" },
+      x,
+      start,
+      LIFELINE,
+      y - start,
+    );
+    segments.get(lane)?.push(bar);
+    nodes.push({ ...bar, tone: "lane" });
+  };
+  let y = top + MESSAGE_STEP;
+  const pending: { step: Extract<SequenceStep, { message: string }>; y: number }[] = [];
+  steps.forEach((step, index) => {
+    if ("note" in step) {
+      const h = nodeHeight({ lines: [step.note] }) - 18;
+      closeLane(step.lane, y - 8);
+      const x = (centre.get(step.lane) ?? 0) - noteWidth / 2;
+      const note = box(
+        `note-${index}`,
+        { title: step.note, ...(step.tone ? { tone: step.tone } : {}) },
+        x,
+        y - 8,
+        noteWidth,
+        h,
+      );
+      nodes.push(note);
+      segments.get(step.lane)?.push(note);
+      open.set(step.lane, y - 8 + h);
+      y += h + 12;
+    } else {
+      pending.push({ step, y });
+      y += MESSAGE_STEP;
+    }
+  });
+  const bottom = y - MESSAGE_STEP + 16;
+  for (const lane of lanes) closeLane(lane.id, bottom);
+  const at = (lane: string, level: number) =>
+    segments.get(lane)?.find((node) => level >= node.rect.y && level <= node.rect.y + node.rect.h);
+  pending.forEach(({ step, y: level }, index) => {
+    const from = at(step.from, level);
+    const to = at(step.to, level);
+    if (from === undefined || to === undefined)
+      throw new Error(`No lane under the "${step.message}" message`);
+    const rightward = to.rect.x > from.rect.x;
+    const fromSide = rightward ? "right" : "left";
+    if (step.lost) {
+      const mid = (from.rect.x + to.rect.x) / 2;
+      const mark = box(`lost-${index}`, { title: "✕ lost" }, mid - 30, level - 12, 60, 24);
+      nodes.push({ ...mark, tone: "danger" });
+      edges.push({
+        from: from.id,
+        fromSide,
+        t: (level - from.rect.y) / from.rect.h,
+        to: mark.id,
+        kind: "fail",
+        label: step.message,
+        labelSide: "above",
+      });
+      return;
+    }
+    edges.push({
+      from: from.id,
+      fromSide,
+      t: (level - from.rect.y) / from.rect.h,
+      to: to.id,
+      toT: (level - to.rect.y) / to.rect.h,
+      kind: step.kind ?? "main",
+      label: step.message,
+      labelSide: "above",
+    });
+  });
+  return { width, height: bottom + MARGIN, nodes, edges };
+}
+
+/** A sequence: lanes side by side, messages between them top to bottom, and notes on a lane. */
+export function SequenceFigure(
+  props: Readonly<{
+    text: BlueprintText;
+    lanes: readonly SequenceLane[];
+    steps: readonly SequenceStep[];
+    note?: string;
+  }>,
+): JSX.Element {
+  return (
+    <BlueprintDiagram
+      narrow={sequenceLayout(props.lanes, props.steps, NARROW, 104)}
+      note={props.note}
+      text={props.text}
+      wide={sequenceLayout(props.lanes, props.steps, WIDE, 168)}
+    />
+  );
+}

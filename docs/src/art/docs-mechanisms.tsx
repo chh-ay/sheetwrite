@@ -4,7 +4,13 @@ import { For, type JSX } from "solid-js";
 
 import { head, Panel, Sheet } from "./Art.js";
 import { DocumentOpsFigure } from "./blueprint-figures.js";
-import { type FigureOutcome, type FigureStep, FlowFigure } from "./blueprint-layouts.js";
+import {
+  type FigureOutcome,
+  type FigureStep,
+  FlowFigure,
+  PairsFigure,
+  TileFigure,
+} from "./blueprint-layouts.js";
 import { Arrow, Box, type DiagramText, Responsive } from "./diagram-kit.js";
 
 /** Diagrams sit in the reading column, about 46rem wide. */
@@ -329,62 +335,18 @@ const RECOVERY_GROUPS = [
 ] as const;
 
 /** Where each group's box starts on small screens, and (last) where the stack ends. */
-const RECOVERY_NARROW_TOPS = RECOVERY_GROUPS.reduce<number[]>(
-  (tops, [, code]) => [...tops, (tops.at(-1) ?? 0) + 34 + code.length * 16 + 6 + 10],
-  [0],
-);
 
 /** Error handling › Recovery by boundary. */
 export function RecoveryDiagram() {
-  const text: DiagramText = {
-    hue: "blue",
-    alt: "amber",
-    title: "What each error asks you to do",
-    description:
-      "Fix the input for SnapshotValidationError, DelimitedTextOptionsError and SyncProtocolError. Reduce the input or raise the named limit for SnapshotResourceError, DelimitedTextResourceError and XlsxResourceError. Load the pages an IncompleteDataError names. Drain pending work after SyncPendingCapacityError. Read the cause or code of PersistenceError and IndexedDbPendingCommitStorageError. A worker failure switches to the canvas renderer and emits renderer-fallback.",
-  };
   return (
-    <Responsive
-      narrow={{
-        height: 8 + (RECOVERY_NARROW_TOPS.at(-1) ?? 0),
-        draw: () => (
-          <For each={RECOVERY_GROUPS}>
-            {([title, code, tone], index) => (
-              <Box
-                class={tone}
-                code={code}
-                h={34 + code.length * 16 + 6}
-                lines={[]}
-                title={title}
-                w={352}
-                x={4}
-                y={4 + (RECOVERY_NARROW_TOPS[index()] ?? 0)}
-              />
-            )}
-          </For>
-        ),
+    <TileFigure
+      columns={3}
+      text={{
+        title: "What each error asks you to do",
+        description:
+          "Fix the input for SnapshotValidationError, DelimitedTextOptionsError and SyncProtocolError. Reduce the input or raise the named limit for SnapshotResourceError, DelimitedTextResourceError and XlsxResourceError. Load the pages an IncompleteDataError names. Drain pending work after SyncPendingCapacityError. Read the cause or code of PersistenceError and IndexedDbPendingCommitStorageError. A worker failure switches to the canvas renderer and emits renderer-fallback.",
       }}
-      text={text}
-      wide={{
-        height: 206,
-        width: COLUMN,
-        draw: () => (
-          <For each={RECOVERY_GROUPS}>
-            {([title, code, tone], index) => (
-              <Box
-                class={tone}
-                code={code}
-                h={88}
-                lines={[]}
-                title={title}
-                w={220}
-                x={8 + (index() % 3) * 234}
-                y={6 + Math.floor(index() / 3) * 104}
-              />
-            )}
-          </For>
-        ),
-      }}
+      tiles={RECOVERY_GROUPS.map(([title, code, tone]) => figureStep({ title, code, tone }))}
     />
   );
 }
@@ -514,132 +476,54 @@ export function GenerationsDiagram() {
 
 /** Adapter lifecycle › Controlled values do not reset the document. */
 export function LiveOrResetDiagram() {
-  const text: DiagramText = {
-    hue: "green",
-    alt: "amber",
-    title: "Which props update in place, and which make a new generation",
-    description:
-      "theme, readOnly, config, overscan and minColumns update the current grid in place, as do callbacks and sizing. Changing the identity of workbook, data, datasource, datasourceStorage, presentation, editors, protectionResolver, mutationPolicy or transactionResourceLimits makes a new generation with reason input-reset; renderer, workerUrl or renderers make one with reason renderer-reset.",
-  };
-  const columns = [
-    ["Updated in place", ["theme", "readOnly", "config", "overscan", "minColumns"], "hue-soft"],
-    [
-      "New one: input-reset",
-      ["workbook", "data", "datasource", "presentation", "editors …"],
-      "alt-soft",
-    ],
-    ["New one: renderer-reset", ["renderer", "workerUrl", "renderers"], "alt-soft"],
-  ] as const;
   return (
-    <Responsive
-      narrow={{
-        height: 468,
-        draw: () => (
-          <For each={columns}>
-            {([title, code, tone], index) => (
-              <Box
-                class={tone}
-                code={code}
-                h={34 + code.length * 16 + 6}
-                lines={[]}
-                title={title}
-                w={352}
-                x={4}
-                y={4 + index() * 132}
-              />
-            )}
-          </For>
-        ),
+    <TileFigure
+      columns={3}
+      text={{
+        title: "Which props update in place, and which make a new generation",
+        description:
+          "theme, readOnly, config, overscan and minColumns update the current grid in place, as do callbacks and sizing. Changing the identity of workbook, data, datasource, datasourceStorage, presentation, editors, protectionResolver, mutationPolicy or transactionResourceLimits makes a new generation with reason input-reset; renderer, workerUrl or renderers make one with reason renderer-reset.",
       }}
-      text={text}
-      wide={{
-        height: 136,
-        width: COLUMN,
-        draw: () => (
-          <For each={columns}>
-            {([title, code, tone], index) => (
-              <Box
-                class={tone}
-                code={code}
-                h={120}
-                lines={[]}
-                title={title}
-                w={220}
-                x={8 + index() * 234}
-                y={6}
-              />
-            )}
-          </For>
-        ),
-      }}
+      tiles={[
+        {
+          title: "Updated in place",
+          code: ["theme", "readOnly", "config", "overscan", "minColumns"],
+          tone: "accent",
+        },
+        {
+          title: "New one: input-reset",
+          code: ["workbook", "data", "datasource", "presentation", "editors …"],
+        },
+        { title: "New one: renderer-reset", code: ["renderer", "workerUrl", "renderers"] },
+      ]}
     />
   );
 }
 
 /** CSV and TSV › Output and injection safety. */
 export function CsvInjectionDiagram() {
-  const rows = [
-    ["Text  =1+1", "'=1+1", "error-soft"],
-    ["Text  @SUM(A1)", "'@SUM(A1)", "error-soft"],
-    ["Formula  =1+1", "2", "hue-soft"],
-  ] as const;
-  const text: DiagramText = {
-    hue: "blue",
-    alt: "red",
-    title: "How CSV export keeps text from running as a formula",
-    description:
-      "For text values, a leading =, +, -, @, tab or carriage return is prefixed with a single quote, so the text =1+1 exports as '=1+1 and cannot reopen as a formula. A real formula cell exports its resolved value, so =1+1 exports as 2. CSV is UTF-8 with a byte-order mark and CRLF line endings.",
-  };
-  const draw = (x: number, y: number, w: number) => (
-    <>
-      <text class="caption strong" x={x} y={y + 12}>
-        Cell
-      </text>
-      <text class="caption strong" x={x + w - 150} y={y + 12}>
-        In the CSV
-      </text>
-      <For each={rows}>
-        {([cell, out, tone], index) => (
-          <>
-            <rect
-              class="panel"
-              height={30}
-              rx={5}
-              width={w - 196}
-              x={x}
-              y={y + 24 + index() * 40}
-            />
-            <text class="small strong" x={x + 10} y={y + 43 + index() * 40}>
-              {cell}
-            </text>
-            <path
-              class="hue-line"
-              d={`M${x + w - 190} ${y + 39 + index() * 40}h28${head(x + w - 162, y + 39 + index() * 40, 0)}`}
-            />
-            <rect
-              class={tone}
-              height={30}
-              rx={5}
-              width={150}
-              x={x + w - 150}
-              y={y + 24 + index() * 40}
-            />
-            <text class="small strong" x={x + w - 140} y={y + 43 + index() * 40}>
-              {out}
-            </text>
-          </>
-        )}
-      </For>
-      <text class="caption" x={x} y={y + 160}>
-        Prefixed: a leading = + - @ tab or CR. UTF-8, BOM, CRLF.
-      </text>
-    </>
-  );
   return (
-    <Responsive
-      narrow={{ height: 180, draw: () => draw(4, 4, 352) }}
-      text={text}
-      wide={{ height: 176, width: COLUMN, draw: () => draw(8, 4, 684) }}
+    <PairsFigure
+      note="A text value that starts with =, +, -, @, a tab or a carriage return gets a leading quote. CSV is UTF-8 with a byte-order mark and CRLF line endings."
+      pairs={[
+        {
+          from: { eyebrow: "Cell, text", title: "=1+1" },
+          to: { eyebrow: "In the CSV", title: "'=1+1" },
+        },
+        {
+          from: { eyebrow: "Cell, text", title: "@SUM(A1)" },
+          to: { eyebrow: "In the CSV", title: "'@SUM(A1)" },
+        },
+        {
+          from: { eyebrow: "Cell, formula", title: "=1+1" },
+          to: { eyebrow: "In the CSV", title: "2" },
+        },
+      ]}
+      text={{
+        title: "How CSV export keeps text from running as a formula",
+        description:
+          "For text values, a leading =, +, -, @, tab or carriage return is prefixed with a single quote, so the text =1+1 exports as '=1+1 and cannot reopen as a formula. A real formula cell exports its resolved value, so =1+1 exports as 2. CSV is UTF-8 with a byte-order mark and CRLF line endings.",
+      }}
     />
   );
 }
@@ -1033,75 +917,36 @@ export function PendingCommitsDiagram() {
 
 /** XLSX import › Choose an import contract. */
 export function ImportContractsDiagram() {
-  const contracts = [
-    [
-      "fromXlsxWorkbook",
-      "ArrayBuffer or Uint8Array",
-      ["WorkbookSnapshot", "Formulas as source"],
-      "hue-soft",
-    ],
-    [
-      "fromXlsxWorkbookFile",
-      "File or Blob, not buffered",
-      ["WorkbookSnapshot", "Same contract"],
-      "hue-soft",
-    ],
-    [
-      "fromXlsxTable",
-      "ArrayBuffer or Uint8Array",
-      ["ColumnarData", "One table, resolved values"],
-      "alt-soft",
-    ],
-  ] as const;
-  const text: DiagramText = {
-    hue: "blue",
-    alt: "amber",
-    title: "The three XLSX import contracts",
-    description:
-      "fromXlsxWorkbook takes an ArrayBuffer or Uint8Array and returns a WorkbookSnapshot that keeps supported workbook state, with formulas imported as source. fromXlsxWorkbookFile returns the same snapshot from a File or Blob without buffering the compressed file first. fromXlsxTable returns ColumnarData: one rectangular table with first-row headers and resolved values; it is not a workbook round-trip API.",
-  };
   return (
-    <Responsive
-      narrow={{
-        height: 408,
-        draw: () => (
-          <For each={contracts}>
-            {([name, input, result, tone], index) => (
-              <Box
-                class={tone}
-                code={[name, ...result]}
-                h={98}
-                lines={[input]}
-                title={index() === 2 ? "Table" : "Workbook"}
-                w={352}
-                x={4}
-                y={4 + index() * 134}
-              />
-            )}
-          </For>
-        ),
+    <TileFigure
+      columns={3}
+      text={{
+        title: "The three XLSX import contracts",
+        description:
+          "fromXlsxWorkbook takes an ArrayBuffer or Uint8Array and returns a WorkbookSnapshot that keeps supported workbook state, with formulas imported as source. fromXlsxWorkbookFile returns the same snapshot from a File or Blob without buffering the compressed file first. fromXlsxTable returns ColumnarData: one rectangular table with first-row headers and resolved values; it is not a workbook round-trip API.",
       }}
-      text={text}
-      wide={{
-        height: 130,
-        width: COLUMN,
-        draw: () => (
-          <For each={contracts}>
-            {([name, input, result, tone], index) => (
-              <Box
-                class={tone}
-                code={[name, ...result]}
-                h={114}
-                lines={[input]}
-                title={index() === 2 ? "Table" : "Workbook"}
-                w={220}
-                x={8 + index() * 234}
-                y={6}
-              />
-            )}
-          </For>
-        ),
-      }}
+      tiles={[
+        {
+          eyebrow: "Workbook",
+          title: "fromXlsxWorkbook",
+          lines: ["ArrayBuffer or Uint8Array"],
+          code: ["→ WorkbookSnapshot"],
+          tone: "accent",
+        },
+        {
+          eyebrow: "Workbook",
+          title: "fromXlsxWorkbookFile",
+          lines: ["File or Blob, not buffered"],
+          code: ["→ WorkbookSnapshot"],
+          tone: "accent",
+        },
+        {
+          eyebrow: "Table",
+          title: "fromXlsxTable",
+          lines: ["One table, resolved values"],
+          code: ["→ ColumnarData"],
+        },
+      ]}
     />
   );
 }

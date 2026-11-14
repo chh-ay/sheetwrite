@@ -404,3 +404,10 @@
   font-size: var(--sw-text-caption);
   line-height: 1.5;
 }
+.sw-blueprint [data-tone="lane"] .bp-node__box {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+.sw-blueprint [data-tone="lane"] .bp-node__edge {
+  display: none;
+}

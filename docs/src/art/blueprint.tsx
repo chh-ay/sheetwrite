@@ -19,8 +19,8 @@ export interface BlueprintNode {
   readonly title: string;
   readonly lines?: readonly string[];
   readonly code?: readonly string[];
-  /** `accent` marks the box the figure is about; `danger` a failure; `muted` a side result. */
-  readonly tone?: "accent" | "danger" | "muted";
+  /** `accent` marks the box the figure is about; `danger` a failure; `muted` a side result; `lane` a sequence lifeline. */
+  readonly tone?: "accent" | "danger" | "muted" | "lane";
 }
 
 /** One connector, from a point on one box's side to a point on another's. */
@@ -114,6 +114,8 @@ function Edge(props: Readonly<{ edge: BlueprintEdge; nodes: ReadonlyMap<string, 
   const end = anchor(to.rect, toSide, props.edge.toT ?? props.edge.t ?? 0.5);
   const middle = { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 };
   const side = props.edge.labelSide ?? "right";
+  const textAnchor: "start" | "middle" | "end" =
+    side === "left" ? "end" : side === "right" ? "start" : "middle";
   const label = {
     x: side === "left" ? middle.x - LABEL_GAP : side === "right" ? middle.x + LABEL_GAP : middle.x,
     y:
@@ -122,7 +124,7 @@ function Edge(props: Readonly<{ edge: BlueprintEdge; nodes: ReadonlyMap<string, 
         : side === "below"
           ? middle.y + LABEL_GAP + 9
           : middle.y + 4,
-    anchor: side === "left" ? "end" : side === "right" ? "start" : "middle",
+    anchor: textAnchor,
   };
   return (
     <>

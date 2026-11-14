@@ -5,6 +5,7 @@
 import { For, type JSX } from "solid-js";
 
 import { DiagramArt, head } from "./Art.js";
+import { SequenceFigure } from "./blueprint-layouts.js";
 import { Arrow, Box, type DiagramText, Responsive } from "./diagram-kit.js";
 
 const INTEROP_STEPS = [
@@ -498,20 +499,6 @@ export function DataModelDiagram() {
   );
 }
 
-/** A note on a sequence diagram's lane. */
-function LaneNote(
-  props: Readonly<{ x: number; y: number; w: number; text: string; class: string }>,
-) {
-  return (
-    <>
-      <rect class={props.class} height={26} rx={6} width={props.w} x={props.x} y={props.y} />
-      <text class="caption" x={props.x + 8} y={props.y + 17}>
-        {props.text}
-      </text>
-    </>
-  );
-}
-
 const COLLABORATION_TEXT: DiagramText = {
   hue: "red",
   alt: "blue",
@@ -520,148 +507,30 @@ const COLLABORATION_TEXT: DiagramText = {
     "Client A sends an edit based on version 5; the server assigns version 6, acknowledges it to A and sends it to B. Version 7 never reaches B. When version 8 arrives, B sees the gap, requests versions 7 to 8, and the server replays them so B applies them in order. Later A goes offline with two edits queued; on reconnect it sends them and the server acknowledges them as versions 9 and 10.",
 };
 
-/** The sequence for one layout: lanes at `a`, `s` and `b`, notes placed per layout. */
-function CollaborationSequence(
-  props: Readonly<{
-    a: number;
-    s: number;
-    b: number;
-    laneWidth: number;
-    gapNote: number;
-    noteWidth: number;
-  }>,
-) {
-  const lanes = () =>
-    [
-      [props.a, "Client A"],
-      [props.s, "Server"],
-      [props.b, "Client B"],
-    ] as const;
-  return (
-    <>
-      <For each={lanes()}>
-        {([x, name]) => (
-          <>
-            <path class="rule dash" d={`M${x} 52V364`} />
-            <rect
-              class="shade"
-              height={32}
-              rx={8}
-              width={props.laneWidth}
-              x={x - props.laneWidth / 2 + 2}
-              y={15}
-            />
-            <rect
-              class="panel"
-              height={32}
-              rx={8}
-              width={props.laneWidth}
-              x={x - props.laneWidth / 2}
-              y={12}
-            />
-            <text class="heading" text-anchor="middle" x={x} y={33}>
-              {name}
-            </text>
-          </>
-        )}
-      </For>
-      <Arrow
-        class="hue-line"
-        label="edit, based on v5"
-        x1={props.a}
-        x2={props.s - 6}
-        y1={80}
-        y2={80}
-      />
-      <Arrow label="ack v6" x1={props.s} x2={props.a + 6} y1={112} y2={112} />
-      <Arrow class="alt-line" label="v6" x1={props.s} x2={props.b - 6} y1={112} y2={112} />
-      <path class="error-line dash" d={`M${props.s} 150H${props.b - 50}`} />
-      <path class="error-line" d={`M${props.b - 46} 144l12 12M${props.b - 34} 144l-12 12`} />
-      <text class="caption" text-anchor="middle" x={(props.s + props.b) / 2 - 20} y={143}>
-        v7, lost
-      </text>
-      <Arrow class="alt-line" label="v8" x1={props.s} x2={props.b - 6} y1={184} y2={184} />
-      <LaneNote
-        class="alt-soft"
-        text="Gap: v7 missing"
-        w={props.noteWidth}
-        x={props.gapNote}
-        y={194}
-      />
-      <Arrow
-        class="alt-line"
-        label="request v7–v8"
-        x1={props.b}
-        x2={props.s + 6}
-        y1={244}
-        y2={244}
-      />
-      <Arrow
-        class="alt-line"
-        label="replay v7, v8"
-        x1={props.s}
-        x2={props.b - 6}
-        y1={276}
-        y2={276}
-      />
-      <LaneNote
-        class="alt-soft"
-        text="Applied in order"
-        w={props.noteWidth}
-        x={props.gapNote}
-        y={286}
-      />
-      <LaneNote
-        class="hue-soft"
-        text="Offline: 2 edits queued"
-        w={164}
-        x={props.a - 44 < 8 ? 8 : props.a - 44}
-        y={300}
-      />
-      <Arrow
-        class="hue-line"
-        label="send 2 queued edits"
-        x1={props.a}
-        x2={props.s - 6}
-        y1={344}
-        y2={344}
-      />
-      <Arrow below label="ack v9, v10" x1={props.s} x2={props.a + 6} y1={356} y2={356} />
-    </>
-  );
-}
-
 /** Collaboration: how a client recovers a missed version, and how offline edits drain on reconnect. */
 export function CollaborationRecoveryDiagram() {
   return (
-    <Responsive
-      narrow={{
-        height: 386,
-        draw: () => (
-          <CollaborationSequence
-            a={52}
-            b={308}
-            gapNote={194}
-            laneWidth={96}
-            noteWidth={110}
-            s={180}
-          />
-        ),
-      }}
+    <SequenceFigure
+      lanes={[
+        { id: "a", name: "Client A" },
+        { id: "server", name: "Server" },
+        { id: "b", name: "Client B" },
+      ]}
+      steps={[
+        { message: "edit on v5", from: "a", to: "server" },
+        { message: "ack v6", from: "server", to: "a", kind: "back" },
+        { message: "v6", from: "server", to: "b", kind: "back" },
+        { message: "v7", from: "server", to: "b", lost: true },
+        { message: "v8", from: "server", to: "b", kind: "back" },
+        { note: "Gap: v7 missing", lane: "b", tone: "danger" },
+        { message: "ask v7–v8", from: "b", to: "server" },
+        { message: "replay v7, v8", from: "server", to: "b", kind: "back" },
+        { note: "Applied in order", lane: "b", tone: "accent" },
+        { note: "Offline: 2 queued", lane: "a", tone: "muted" },
+        { message: "send 2 edits", from: "a", to: "server" },
+        { message: "ack v9, v10", from: "server", to: "a", kind: "back" },
+      ]}
       text={COLLABORATION_TEXT}
-      wide={{
-        height: 386,
-        draw: () => (
-          <CollaborationSequence
-            a={120}
-            b={700}
-            gapNote={548}
-            laneWidth={150}
-            noteWidth={140}
-            s={410}
-          />
-        ),
-      }}
     />
   );
 }
