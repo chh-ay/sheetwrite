@@ -1,4 +1,4 @@
-import { boundedJsonByteLength } from "./json-bytes.js";
+import { boundedJsonByteLength, jsonNumberLength } from "./json-bytes.js";
 import { decodeRestoreBlockPayload } from "./restore-block-codec.js";
 import { normalizedRange } from "./store/ranges.js";
 import type { Range } from "./types/coordinates.js";
@@ -48,7 +48,7 @@ function scalarArrayBytes(
   for (const value of values) {
     if (typeof value === "number") {
       if (!Number.isFinite(value)) return undefined;
-      bytes += String(value).length;
+      bytes += jsonNumberLength(value);
     } else if (typeof value === "string") {
       if (value !== previousText) {
         previousText = value;
@@ -159,9 +159,16 @@ export class TransactionPreparation {
     }
   }
 
+  /**
+   * The engine built `block` from validated store state for a history restore,
+   * so its shape is not checked again when the store applies `operation`.
+   */
   seed(operation: Restore, block: PackedCellBlock): void {
     this.bind([operation]);
-    this.entries.set(operation, prepare(operation, stamp(operation), block));
+    const prepared = prepare(operation, stamp(operation), block);
+    prepared.errors = [];
+    recordBlockFacts(prepared);
+    this.entries.set(operation, prepared);
   }
 
   restore(operation: Restore): PreparedRestore {
@@ -187,6 +194,14 @@ export class TransactionPreparation {
   }
 }
 
+function recordBlockFacts(prepared: PreparedRestore): void {
+  prepared.requiredSheets = [
+    ...new Set((prepared.block.refs ?? []).map(([, target]) => target.sheet)),
+  ];
+  prepared.containsFormula = (prepared.block.formulas?.length ?? 0) > 0;
+  prepared.containsReference = (prepared.block.refs?.length ?? 0) > 0;
+}
+
 export function preparedRestore<E>(
   operation: Restore,
   validate: (value: unknown) => readonly E[],
@@ -194,13 +209,7 @@ export function preparedRestore<E>(
   const prepared = owners.get(operation)?.restore(operation) ?? prepare(operation);
   if (!prepared.errors) {
     prepared.errors = validate({ op: "setBlock", range: operation.range, block: prepared.block });
-    if (prepared.errors.length === 0) {
-      prepared.requiredSheets = [
-        ...new Set((prepared.block.refs ?? []).map(([, target]) => target.sheet)),
-      ];
-      prepared.containsFormula = (prepared.block.formulas?.length ?? 0) > 0;
-      prepared.containsReference = (prepared.block.refs?.length ?? 0) > 0;
-    }
+    if (prepared.errors.length === 0) recordBlockFacts(prepared);
   }
   return prepared as Omit<PreparedRestore, "errors"> & { errors: readonly E[] };
 }

@@ -56,17 +56,26 @@ export function encodeMeasuredRestoreBlock(
   // The fastest level: undo data is mostly numbers and text that higher levels
   // shrink by under 5 percent at two to three times the cost.
   const compressed = deflateSync(bytes, { level: 1 });
-  let binary = "";
-  for (let at = 0; at < compressed.length; at += 8192) {
-    binary += String.fromCharCode(...compressed.subarray(at, at + 8192));
-  }
   return {
     op: "restoreBlock",
     range: { ...range, start: { ...range.start }, end: { ...range.end } },
     encoding: "deflate-json-v1",
     decodedBytes: bytes.length,
-    data: btoa(binary),
+    data: base64(compressed),
   };
+}
+
+/** Bytes per `String.fromCharCode` call when the runtime has no native encoder. */
+const BINARY_STRING_CHUNK = 8192;
+
+function base64(bytes: Uint8Array): string {
+  // Native since Chromium 140, Firefox 133 and Safari 18.2; older hosts build a binary string.
+  if (typeof bytes.toBase64 === "function") return bytes.toBase64();
+  let binary = "";
+  for (let at = 0; at < bytes.length; at += BINARY_STRING_CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(at, at + BINARY_STRING_CHUNK));
+  }
+  return btoa(binary);
 }
 
 /** Cells compressed to estimate how well a whole block compresses. */
