@@ -107,9 +107,9 @@ describe("API reference pages", () => {
     const anchors = [...symbolPage.matchAll(/\sid="([^"]+)"/gu)].map((match) => match[1]);
     expect(new Set(anchors).size).toBe(anchors.length);
     expect(anchors).toEqual(expect.arrayContaining(["applytransaction", "rendererkind"]));
-    const members = [...symbolPage.matchAll(/<details class="api-member" id="([^"]+)"/gu)].map(
-      (match) => match[1],
-    );
+    const members = [
+      ...symbolPage.matchAll(/<article class="api-card api-member" id="([^"]+)"/gu),
+    ].map((match) => match[1]);
     expect(members.filter((id) => id?.startsWith("grid-parse"))).toHaveLength(2);
     expect(members).toContain("grid-parse");
     expect(symbolPage).toContain("Bypasses history.");
@@ -158,17 +158,17 @@ describe("API reference pages", () => {
     expect(page).toContain("```tsx compile\nconst view = <div />;\n```");
     expect(page).toContain("[Commit reasons](/docs/api/core/commit-reason/)");
     expect(page).toContain("[https://example.com/guide](https://example.com/guide)");
-    // Symbol sections sit under the page title (H2), member sections under Members (H3).
+    // Symbol sections sit under the page title (H2), member sections under their group (H4).
     expect(page.slice(0, page.indexOf("## Members"))).not.toMatch(/^### /m);
     expect(section(page, /<aside class="api-layout__aside"[\s\S]*?<\/aside>/)).toMatch(
       /^## Examples$/m,
     );
     const member = section(
       page,
-      /<details class="api-member" id="grid-apply-transaction"[\s\S]*?<\/details>/,
+      /<article class="api-card api-member" id="grid-apply-transaction"[\s\S]*?<\/article>/,
     );
     expect(member).toContain(
-      "### Examples\n\n```ts compile\ngrid.applyTransaction({ patches: [] });",
+      "#### Examples\n\n```ts compile\ngrid.applyTransaction({ patches: [] });",
     );
     expect(member).toContain("[Renderer](/docs/api/core/grid/#grid-renderer-kind)");
     expect(page).not.toMatch(/@(?:example|see)\b/);
@@ -195,7 +195,7 @@ describe("API reference pages", () => {
 
     const memberRow = section(
       page,
-      /<details class="api-member" id="storage-options-mode"[\s\S]*?<\/details>/,
+      /<article class="api-card api-member" id="storage-options-mode"[\s\S]*?<\/article>/,
     );
     // The member row names the alias of its own entry point, not the adapter's re-export.
     expect(memberRow).toContain(

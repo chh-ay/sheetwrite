@@ -229,8 +229,9 @@ function documentationParts(
 /**
  * JSDoc body, examples and related links. `headingLevel` places the Examples
  * and See also headings one level below whatever holds the text: 2 for a
- * symbol page's opening summary (under the page title), 3 for a member's
- * documentation (under Members), so heading levels never skip.
+ * symbol page's opening summary (under the page title), 4 for a member's
+ * documentation (under its group heading in Members), so heading levels never
+ * skip.
  */
 function documentationSections(
   documentation: string,
@@ -238,7 +239,7 @@ function documentationSections(
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes,
-  headingLevel: 2 | 3,
+  headingLevel: 2 | 3 | 4,
 ): string {
   const heading = "#".repeat(headingLevel);
   const { body, examples, related } = documentationParts(documentation, pkg, entry, item, routes);
@@ -272,7 +273,7 @@ function documentationMarkdown(
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
   source = item.documentation,
-  headingLevel: 2 | 3 = 3,
+  headingLevel: 2 | 3 | 4 = 3,
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
@@ -876,26 +877,29 @@ function linkedTypeHtml(
 }
 
 /**
- * One field row: name (none for a return value), type, a required or optional
- * marker, and its description.
+ * One field card: its signature line (name, type and a required or optional
+ * marker; no name for a return value) over its description.
  */
 function fieldHtml(
   id: string,
   name: string | undefined,
   typeHtml: string,
-  marker: string | undefined,
+  marker: "required" | "optional" | undefined,
   descriptionHtml: string | undefined,
 ): string {
+  const label =
+    name === undefined
+      ? ""
+      : `<span class="api-sig__name">${html(name)}</span><span class="api-sig__punct">${marker === "optional" ? "?" : ""}: </span>`;
   return [
-    `<div class="api-field" id="${id}">`,
-    '<div class="api-field__head">',
-    name === undefined ? "" : `<code class="api-field__name">${html(name)}</code>`,
-    `<code class="api-field__type">${typeHtml}</code>`,
-    marker === undefined ? "" : `<span class="api-field__marker">${marker}</span>`,
+    `<div class="api-card api-field" id="${id}">`,
+    '<div class="api-card__head">',
+    `<code class="api-sig">${label}<span class="api-sig__type">${typeHtml}</span></code>`,
+    marker === undefined ? "" : `<span class="api-card__flags"><span>${marker}</span></span>`,
     "</div>",
     descriptionHtml === undefined || descriptionHtml === ""
       ? ""
-      : `<p class="api-field__doc">${descriptionHtml}</p>`,
+      : `<p class="api-card__doc">${descriptionHtml}</p>`,
     "</div>",
   ]
     .filter((line) => line !== "")
@@ -927,7 +931,7 @@ function renderFunctionFields(
     blocks.push(
       "## Parameters",
       "",
-      '<div class="api-fields">',
+      '<div class="api-cards">',
       ...fields.parameters.map((parameter) =>
         fieldHtml(
           `parameter-${anchor(parameter.name.replace(/^\.\.\./, ""))}`,
@@ -947,7 +951,7 @@ function renderFunctionFields(
   blocks.push(
     "## Returns",
     "",
-    '<div class="api-fields">',
+    '<div class="api-cards">',
     fieldHtml(
       "returns",
       undefined,
@@ -988,10 +992,34 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   ].join("\n");
 }
 
+/** The groups a symbol's members are listed in, in page order. */
+const MEMBER_GROUPS = ["Properties", "Methods", "Events"] as const;
+type MemberGroup = (typeof MEMBER_GROUPS)[number];
+
+const MEMBER_MODIFIER =
+  /^(?:readonly|static|abstract|public|protected|private|declare|get|set|async)\s+/;
+
+/** A member's declaration without its leading modifiers (`readonly`, `static`, …). */
+function memberHead(signature: string): string {
+  let head = signature.trimStart();
+  while (MEMBER_MODIFIER.test(head)) head = head.replace(MEMBER_MODIFIER, "");
+  return head;
+}
+
+/** Callbacks named `on…` are events; members called with arguments are methods. */
+function memberGroup(member: DeclarationMember): MemberGroup {
+  if (/^on[A-Z]/.test(member.name)) return "Events";
+  const head = memberHead(member.signature);
+  return head.startsWith(member.name) && /^\??\s*[<(]/.test(head.slice(member.name.length))
+    ? "Methods"
+    : "Properties";
+}
+
 /**
- * The Members section: its heading, an anchor index for long lists, then the
- * member rows. Members start collapsed; explicit fragment navigation reveals
- * its target through the docs shell.
+ * The Members section: an index of member names for long lists, then the
+ * members as signature cards grouped into Properties, Methods and Events. A
+ * card's header is the member's highlighted declaration; its documentation
+ * follows, always visible.
  */
 function renderMembers(
   pkg: ApiPackage,
@@ -1013,7 +1041,7 @@ function renderMembers(
   const documented = new Set<string>();
   const indexLinks: string[] = [];
   const usedIds = new Set<string>();
-  const rows = members.map((member, index) => {
+  const cards = members.map((member, index) => {
     // Overload rows repeat a member name. The first row keeps the member ID
     // that the index and other pages link to; each later row gets a suffix,
     // so no two elements share an ID.
@@ -1025,18 +1053,12 @@ function renderMembers(
     if (firstRow) indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
     const searchAnchor =
       firstRow && searchTargets.has(member.name)
-        ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
+        ? `<h4 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h4>`
         : "";
     // Overload rows repeat a member name; the merged documentation renders once,
     // on the first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
-    const summary =
-      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "", true);
-    const summaryDoc =
-      documentation === undefined
-        ? ""
-        : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, item, summary, routes)}</span>`;
     const parts = memberTypeParts(member.signature);
     const variants = parts === undefined ? undefined : stringLiteralUnionVariants(parts.type);
     const alias = variants === undefined ? undefined : aliases.get(literalUnionKey(variants));
@@ -1045,14 +1067,26 @@ function renderMembers(
       alias === undefined || parts === undefined
         ? member.signature
         : `${parts.prefix} ${alias.name}${parts.terminated ? ";" : ""}`;
-    const aliasChip =
+    const head = memberHead(member.signature);
+    const flags = [
+      /^\s*readonly\s/.test(member.signature) ? "<span>read-only</span>" : "",
+      head.startsWith(`${member.name}?`) ? "<span>optional</span>" : "",
       alias === undefined
         ? ""
-        : ` <span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`;
-    return [
+        : `<span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`,
+    ].join("");
+    const body =
+      documentation === undefined
+        ? []
+        : [
+            /(?:^|\n)@(example|see)\b/.test(documentation)
+              ? `${documentationMarkdown(pkg, entry, item, routes, documentation, 4)}\n`
+              : `<p class="api-card__doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
+          ];
+    const card = [
       searchAnchor,
-      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
-      `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
+      `<article class="api-card api-member" id="${id}" data-member="${html(member.name)}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
+      '<div class="api-card__head">',
       "",
       // A fenced block so member signatures get real syntax highlighting; the
       // member grammar reads a lone `readonly name: Type;` as a class member.
@@ -1060,41 +1094,37 @@ function renderMembers(
       signature,
       "```",
       "",
-      // Skip the body paragraph when it would only restate the summary line.
-      ...(documentation === undefined ||
-      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary.replace(/`/g, "")
-        ? []
-        : [
-            /(?:^|\n)@(example|see)\b/.test(documentation)
-              ? `${documentationMarkdown(pkg, entry, item, routes, documentation)}\n`
-              : `<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
-          ]),
-      "</details>",
+      ...(flags === "" ? [] : [`<span class="api-card__flags">${flags}</span>`, ""]),
+      "</div>",
+      "",
+      ...body,
+      "</article>",
     ].join("\n");
+    return { group: memberGroup(member), card };
   });
-  // Overloads share one entry in the index and in the count.
+  // Overloads share one entry in the index.
   const memberCount = new Set(members.map((member) => member.name)).size;
   const index =
-    members.length <= MEMBER_INDEX_MINIMUM
+    memberCount <= MEMBER_INDEX_MINIMUM
       ? []
       : [
-          // Collapsed: a hundred names would push the first member a screen down.
-          '<details class="api-member-index" data-pagefind-ignore>',
-          `<summary>Jump to a member <span class="api-count">${memberCount}</span></summary>`,
-          '<nav aria-label="Members">',
-          ...indexLinks,
-          "</nav>",
-          "</details>",
+          `<nav class="api-member-index" aria-label="Members" data-pagefind-ignore>${indexLinks.join("")}</nav>`,
           "",
         ];
-  return [
-    `## Members <span class="api-count" data-pagefind-ignore>${memberCount}</span>`,
-    "",
-    ...index,
-    '<div class="api-member-list">',
-    ...rows,
-    "</div>",
-  ].join("\n");
+  const groups = MEMBER_GROUPS.flatMap((group) => {
+    const grouped = cards.filter((card) => card.group === group);
+    return grouped.length === 0
+      ? []
+      : [
+          `<h3 class="api-member-group">${group}</h3>`,
+          "",
+          '<div class="api-cards">',
+          ...grouped.map(({ card }) => card),
+          "</div>",
+          "",
+        ];
+  });
+  return ["## Members", "", ...index, ...groups].join("\n");
 }
 
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
