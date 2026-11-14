@@ -1745,66 +1745,85 @@ mod local_paged_tests {
         );
     }
 
+    /// One random edit to apply to both sheets.
+    #[derive(Clone, Copy)]
+    enum Edit {
+        Number(u64, u32),
+        Style(u32),
+        Calculated(u64),
+        InsertRows(usize),
+        DeleteRows(usize),
+        InsertCol,
+        DeleteCol,
+        Clear,
+    }
+
     /// One random cell write, style, calculated value or row or column edit,
     /// applied to both sheets.
     fn random_edit(seed: &mut u32, dense: &mut CellStorage, local: &mut CellStorage) {
         let (row_count, n_cols) = (dense.row_count(), dense.n_cols());
-        let row = next(seed, row_count);
-        let col = next(seed, n_cols);
+        let at = (next(seed, row_count), next(seed, n_cols));
         let revision = (next(seed, 2) == 0).then_some(7);
-        match next(seed, 9) {
-            0..=2 => {
-                let payload = next(seed, 1000) as u64;
-                let style = next(seed, 3) as u32;
-                for cells in [&mut *dense, &mut *local] {
-                    assert!(cells.write_cell(row, col, KIND_NUMBER, payload, style, revision));
-                }
+        let edit = match next(seed, 9) {
+            0..=2 => Edit::Number(next(seed, 1000) as u64, next(seed, 3) as u32),
+            3 => Edit::Style(next(seed, 3) as u32),
+            4 => Edit::Calculated(next(seed, 1000) as u64),
+            5 => Edit::InsertRows(1 + next(seed, 300)),
+            6 if row_count > 1 => Edit::DeleteRows(1 + next(seed, row_count - 1)),
+            7 => Edit::InsertCol,
+            8 if n_cols > 1 => Edit::DeleteCol,
+            _ => Edit::Clear,
+        };
+        for cells in [dense, local] {
+            apply_edit(cells, at, revision, edit);
+        }
+    }
+
+    fn apply_edit(
+        cells: &mut CellStorage,
+        (row, col): (usize, usize),
+        revision: Option<u64>,
+        edit: Edit,
+    ) {
+        match edit {
+            Edit::Number(payload, style) => {
+                let written = cells.write_cell(row, col, KIND_NUMBER, payload, style, revision);
+                assert!(written, "number write");
             }
-            3 => {
-                let style = next(seed, 3) as u32;
-                for cells in [&mut *dense, &mut *local] {
-                    assert!(cells.write_style(row, col, style, revision));
-                }
+            Edit::Style(style) => {
+                assert!(cells.write_style(row, col, style, revision), "style write")
             }
-            4 => {
-                let value = next(seed, 1000) as u64;
-                for cells in [&mut *dense, &mut *local] {
-                    assert!(cells.write_cell(row, col, KIND_FORMULA, 0, 0, None));
-                    let index = cells.idx(row, col);
-                    assert!(cells.set_derived(index, KIND_NUMBER, value));
-                }
+            Edit::Calculated(value) => {
+                assert!(
+                    cells.write_cell(row, col, KIND_FORMULA, 0, 0, None),
+                    "formula write"
+                );
+                let index = cells.idx(row, col);
+                assert!(
+                    cells.set_derived(index, KIND_NUMBER, value),
+                    "calculated value"
+                );
             }
-            5 => {
-                let count = 1 + next(seed, 300);
-                for cells in [&mut *dense, &mut *local] {
-                    cells.invalidate_derived();
-                    cells.insert_rows(row, count).unwrap();
-                }
+            Edit::InsertRows(count) => {
+                cells.invalidate_derived();
+                cells.insert_rows(row, count).unwrap();
             }
-            6 if row_count > 1 => {
-                let count = 1 + next(seed, row_count - 1);
-                for cells in [&mut *dense, &mut *local] {
-                    cells.invalidate_derived();
-                    cells.delete_rows(row, count).unwrap();
-                }
+            Edit::DeleteRows(count) => {
+                cells.invalidate_derived();
+                cells.delete_rows(row, count).unwrap();
             }
-            7 => {
-                for cells in [&mut *dense, &mut *local] {
-                    cells.invalidate_derived();
-                    cells.insert_cols(col, 1).unwrap();
-                }
+            Edit::InsertCol => {
+                cells.invalidate_derived();
+                cells.insert_cols(col, 1).unwrap();
             }
-            8 if n_cols > 1 => {
-                for cells in [&mut *dense, &mut *local] {
-                    cells.invalidate_derived();
-                    cells.delete_cols(col, 1).unwrap();
-                }
+            Edit::DeleteCol => {
+                cells.invalidate_derived();
+                cells.delete_cols(col, 1).unwrap();
             }
-            _ => {
-                for cells in [&mut *dense, &mut *local] {
-                    assert!(cells.write_cell(row, col, KIND_EMPTY, 0, 0, revision));
-                }
-            }
+            Edit::Clear => assert!(
+                cells.write_cell(row, col, KIND_EMPTY, 0, 0, revision),
+                "clear"
+            ),
         }
     }
 
