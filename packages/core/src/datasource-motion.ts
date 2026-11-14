@@ -1,5 +1,5 @@
 /** Scroll speed is measured over this much recent motion. */
-export const SCROLL_VELOCITY_WINDOW_MS = 100;
+const SCROLL_VELOCITY_WINDOW_MS = 100;
 /** A move longer than this many view extents in one update is a jump unless the speed predicted it. */
 const JUMP_EXTENTS = 2;
 
