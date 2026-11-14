@@ -380,8 +380,12 @@ matrix leaves them out.
   fields, one column field, SUM and AVERAGE) installed with `setPivots` and
   recalculated; restoring removes it.
 - `getpivotdata-many` (1K cells): `GETPIVOTDATA` cells that each name one of
-  the 100 groups of a pivot over 10K rows. GETPIVOTDATA is volatile, so the
-  timed edit of an unrelated cell recalculates all of them.
+  the 100 groups of a pivot over 10K rows. The timed edit changes a cell
+  nothing reads. GETPIVOTDATA depends on its pivot, so none of them
+  recalculates; before 0.7.0 it was volatile and all of them did.
+- `getpivotdata-source-edit` (1K cells): the same cells, but the timed edit
+  changes one source value. The pivot updates its output, then every
+  `GETPIVOTDATA` cell recalculates once.
 - `analysis-calls` (10K formulas): SUMSQ, AGGREGATE, FORECAST.LINEAR and
   TEXTBEFORE in one formula per row, all reading the edited `$C$1`.
 - `history-diff` (100K cells, both engines): the version-history diff kernel
@@ -818,7 +822,7 @@ Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
 | `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator, and acknowledgement drain of a queue that deep, in order and pair-swapped (`src/sync-queue-depth-bench.ts`) |
 | `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
 | `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
-| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference (`src/panel-read-bench.ts`) |
+| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference; cell edits with the pivot field list closed and open (`src/panel-read-bench.ts`) |
 | `bench:view-index` | Packed view-row index against a map baseline (`src/view-index-bench.ts`) |
 | `bench:resource`, `bench:resource:smoke` | Ingest memory and string-pool resources at 1M rows (`src/resource-bench.ts`) |
 | `bench:streaming-memory` | XLSX buffered and streaming memory, baseline and candidate interleaved in fresh processes (`src/streaming-memory-bench.ts`) |
