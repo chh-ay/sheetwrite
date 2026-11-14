@@ -584,7 +584,7 @@ const GENERAL_CODE_RE = /^general$/i;
  *
  * @param value - The number to format; a string is placed into the code's text section.
  * @param format - Excel number-format code, such as `#,##0.00` or `yyyy-mm-dd`;
- *   omitted formats like `General`.
+ *   when it is omitted, the value is formatted as with `General`.
  * @param locale - BCP 47 locale for the decimal and group separators; defaults to `en-US`.
  * @returns The value as Excel would show it with that code.
  */

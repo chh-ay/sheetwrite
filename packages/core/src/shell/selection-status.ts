@@ -12,6 +12,7 @@ import type { ShellPiece } from "./formula-controls.js";
 /**
  * Human phrase for a selection's geometry; blank for null/single-cell.
  *
+ * @param selection - The grid's selection, or `null` when nothing is selected.
  * @returns Text such as `3 × 2 cells` or `Row 4`, or an empty string.
  */
 export function describeSelection(selection: Selection | null): string {

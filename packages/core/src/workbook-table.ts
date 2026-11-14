@@ -14,17 +14,17 @@ import type {
 
 /** Resource ceilings for canonical workbook-table metadata and identifiers. */
 export interface WorkbookTableResourceLimits {
-  /** Most tables in one workbook; defaults to 1,024. */
+  /** The largest number of tables in one workbook; defaults to 1,024. */
   maxTables: number;
-  /** Most columns in one table; defaults to 16,384. */
+  /** The largest number of columns in one table; defaults to 16,384. */
   maxColumnsPerTable: number;
-  /** Longest table or column name, in UTF-16 code units; defaults to 255. */
+  /** The longest table or column name, in UTF-16 code units; defaults to 255. */
   maxNameLength: number;
-  /** Longest table or column ID, in UTF-16 code units; defaults to 128. */
+  /** The longest table or column ID, in UTF-16 code units; defaults to 128. */
   maxIdLength: number;
-  /** Longest table style name, in UTF-16 code units; defaults to 255. */
+  /** The longest table style name, in UTF-16 code units; defaults to 255. */
   maxStyleNameLength: number;
-  /** Most kept-but-unmodelled Excel features on one table; defaults to 16. */
+  /** The largest number of kept Excel features that Sheetwrite does not model, on one table; defaults to 16. */
   maxUnsupportedFeaturesPerTable: number;
 }
 
@@ -82,7 +82,7 @@ export function workbookTableNameKey(name: string): string {
  *
  * @param input - The name to check, such as `Sales_2024`.
  * @param existingNames - Names already in use; a match, ignoring case, gives `duplicate`.
- * @param maxLength - Longest allowed name, in UTF-16 code units; defaults to 255.
+ * @param maxLength - The longest allowed name, in UTF-16 code units; defaults to 255.
  */
 export function validateWorkbookTableName(
   input: string,

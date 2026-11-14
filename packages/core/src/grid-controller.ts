@@ -103,7 +103,7 @@ export interface GridController {
  *
  * @param host - Element the grid mounts into.
  * @param options - Grid options forwarded verbatim to {@link createGrid}.
- * @param handlers - Mutable callback bag, read live on every event after host commit.
+ * @param handlers - Event callbacks. Each event reads them again, so the host can change them in place after it commits.
  * @param rowBridge - Turns each change into row-level changes for `handlers.onRowDelta`; omit it when you do not need them.
  */
 export function createGridController<Id extends RowBridgeId = RowBridgeId>(
