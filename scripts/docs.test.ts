@@ -210,6 +210,23 @@ describe("API reference pages", () => {
     ]);
   });
 
+  it("shows InitOutput as one card, without its raw module members, and does not count them", async () => {
+    const output = apiExport(
+      "InitOutput",
+      "interface",
+      "interface InitOutput {\n  readonly memory: WebAssembly.Memory;\n  readonly cellstore_new: () => number;\n}",
+    );
+    const entry = entryPoint(".", [output]);
+    const pkg: ApiPackage = { name: "@sheetwrite/wasm", entryPoints: [entry] };
+    const page = await renderSymbolPage(pkg, entry, output);
+    expect(page).not.toContain("## Members");
+    // The declaration still shows the whole type.
+    expect(page).toContain("cellstore_new");
+    expect(undocumentedApi({ formatVersion: 2, packages: [pkg] })).toEqual([
+      { packageName: "@sheetwrite/wasm", members: [], parameters: [], returns: [] },
+    ]);
+  });
+
   it("groups members into properties, methods and events, function-typed properties as methods", async () => {
     const shape = apiExport(
       "ShapeExample",

@@ -58,6 +58,18 @@ interface DeclarationShape {
   variants: string[];
 }
 
+/**
+ * Exports shown as one card with no member list. `InitOutput` is the raw module
+ * output wasm-bindgen generates for the loader: its members are ABI glue with no
+ * doc source, not API to call (#504).
+ */
+const OPAQUE_EXPORTS: ReadonlySet<string> = new Set(["InitOutput"]);
+
+/** The members an export's reference page lists. */
+function renderedMembers(item: Pick<ApiExport, "name" | "signature">): DeclarationMember[] {
+  return OPAQUE_EXPORTS.has(item.name) ? [] : declarationShape(parseableDeclaration(item)).members;
+}
+
 interface DocumentationLinkCandidate {
   readonly packageName: string;
   readonly entry: ApiEntryPoint;
@@ -112,9 +124,7 @@ function closestCandidate<
 }
 
 function hasRenderedMember(item: ApiExport, memberName: string): boolean {
-  return declarationShape(parseableDeclaration(item)).members.some(
-    (member) => member.name === memberName,
-  );
+  return renderedMembers(item).some((member) => member.name === memberName);
 }
 
 function documentationLinkRoute(
@@ -1213,8 +1223,9 @@ export async function renderSymbolPage(
       "",
     );
   }
-  if (shape.members.length > 0) {
-    body.push(renderMembers(pkg, entry, item, shape.members, routes, aliases), "");
+  const members = renderedMembers(item);
+  if (members.length > 0) {
+    body.push(renderMembers(pkg, entry, item, members, routes, aliases), "");
   }
 
   // A variants section earns its space only for structured unions; scalar
@@ -1509,7 +1520,7 @@ export function undocumentedApi(
             .filter((member) => member.documentation.trim() !== "")
             .map((member) => member.name),
         );
-        for (const member of declarationShape(parseableDeclaration(item)).members) {
+        for (const member of renderedMembers(item)) {
           if (!memberDocs.has(member.name)) members.add(`${item.name}.${member.name}`);
         }
         const fields =
