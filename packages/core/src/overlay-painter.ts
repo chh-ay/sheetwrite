@@ -1,4 +1,5 @@
 import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
+import { contrastRatio, relativeLuminance } from "./color-contrast.js";
 import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
@@ -212,15 +213,8 @@ function presenceColor(value: string, resolver?: CanvasRenderingContext2D | null
 }
 
 function readablePresenceForeground(color: PresenceColor): "#000000" | "#ffffff" {
-  const channel = (value: number): number => {
-    const normalized = value / 255;
-    return normalized <= 0.04045 ? normalized / 12.92 : ((normalized + 0.055) / 1.055) ** 2.4;
-  };
-  const luminance =
-    0.2126 * channel(color.red) + 0.7152 * channel(color.green) + 0.0722 * channel(color.blue);
-  const blackContrast = (luminance + 0.05) / 0.05;
-  const whiteContrast = 1.05 / (luminance + 0.05);
-  return blackContrast >= whiteContrast ? "#000000" : "#ffffff";
+  const luminance = relativeLuminance({ ...color, alpha: 1 });
+  return contrastRatio(luminance, 0) >= contrastRatio(luminance, 1) ? "#000000" : "#ffffff";
 }
 
 export interface OverlayPainterDeps {

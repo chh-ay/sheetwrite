@@ -59,6 +59,8 @@ mod sheet;
 #[cfg(feature = "formula-engine")]
 mod sort_text;
 #[cfg(feature = "formula-engine")]
+mod sorting;
+#[cfg(feature = "formula-engine")]
 mod spill;
 #[cfg(feature = "formula-engine")]
 mod store;

@@ -3,45 +3,45 @@
 use super::super::functions::{bool_arg, number_arg, require_arity, FuncAccumulator};
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "BETA.DIST",
-    "BETA.INV",
-    "BINOM.DIST",
-    "CHISQ.DIST",
-    "CHISQ.DIST.RT",
-    "CHISQ.INV",
-    "CHISQ.INV.RT",
-    "CONFIDENCE.NORM",
-    "CONFIDENCE.T",
-    "EXPON.DIST",
-    "F.DIST",
-    "F.DIST.RT",
-    "F.INV",
-    "F.INV.RT",
-    "FISHER",
-    "FISHERINV",
-    "GAMMA",
-    "GAMMA.DIST",
-    "GAMMA.INV",
-    "GAMMALN",
-    "GAMMALN.PRECISE",
-    "GAUSS",
-    "LOGNORM.DIST",
-    "LOGNORM.INV",
-    "NORM.DIST",
-    "NORM.INV",
-    "NORM.S.DIST",
-    "NORM.S.INV",
-    "PHI",
-    "POISSON.DIST",
-    "STANDARDIZE",
-    "T.DIST",
-    "T.DIST.2T",
-    "T.DIST.RT",
-    "T.INV",
-    "T.INV.2T",
-    "WEIBULL.DIST",
-];
+family_functions! {
+    BETA_DIST = "BETA.DIST",
+    BETA_INV = "BETA.INV",
+    BINOM_DIST = "BINOM.DIST",
+    CHISQ_DIST = "CHISQ.DIST",
+    CHISQ_DIST_RT = "CHISQ.DIST.RT",
+    CHISQ_INV = "CHISQ.INV",
+    CHISQ_INV_RT = "CHISQ.INV.RT",
+    CONFIDENCE_NORM = "CONFIDENCE.NORM",
+    CONFIDENCE_T = "CONFIDENCE.T",
+    EXPON_DIST = "EXPON.DIST",
+    F_DIST = "F.DIST",
+    F_DIST_RT = "F.DIST.RT",
+    F_INV = "F.INV",
+    F_INV_RT = "F.INV.RT",
+    FISHER,
+    FISHERINV,
+    GAMMA,
+    GAMMA_DIST = "GAMMA.DIST",
+    GAMMA_INV = "GAMMA.INV",
+    GAMMALN,
+    GAMMALN_PRECISE = "GAMMALN.PRECISE",
+    GAUSS,
+    LOGNORM_DIST = "LOGNORM.DIST",
+    LOGNORM_INV = "LOGNORM.INV",
+    NORM_DIST = "NORM.DIST",
+    NORM_INV = "NORM.INV",
+    NORM_S_DIST = "NORM.S.DIST",
+    NORM_S_INV = "NORM.S.INV",
+    PHI,
+    POISSON_DIST = "POISSON.DIST",
+    STANDARDIZE,
+    T_DIST = "T.DIST",
+    T_DIST_2T = "T.DIST.2T",
+    T_DIST_RT = "T.DIST.RT",
+    T_INV = "T.INV",
+    T_INV_2T = "T.INV.2T",
+    WEIBULL_DIST = "WEIBULL.DIST",
+}
 
 const MAX_ITERATIONS: usize = 10_000;
 const MAX_INVERSE_ITERATIONS: usize = 1_100;
@@ -56,8 +56,8 @@ const CUMULATIVE_TOLERANCE: f64 = 64.0 * f64::EPSILON;
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).map_or_else(Value::Error, |number| {
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).map_or_else(Value::Error, |number| {
         if number.is_finite() {
             Value::number(number)
         } else {
@@ -66,115 +66,147 @@ pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
     })
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
-    let (minimum, maximum) = match name {
-        "BETA.DIST" => (4, 6),
-        "BETA.INV" => (3, 5),
-        "NORM.DIST" | "BINOM.DIST" | "GAMMA.DIST" | "WEIBULL.DIST" | "F.DIST" => (4, 4),
-        "NORM.INV" | "T.DIST" | "CHISQ.DIST" | "F.DIST.RT" | "F.INV" | "F.INV.RT"
-        | "POISSON.DIST" | "EXPON.DIST" | "GAMMA.INV" | "LOGNORM.INV" | "CONFIDENCE.NORM"
-        | "CONFIDENCE.T" | "STANDARDIZE" => (3, 3),
-        "LOGNORM.DIST" => (4, 4),
-        "NORM.S.DIST" | "T.DIST.2T" | "T.DIST.RT" | "T.INV" | "T.INV.2T" | "CHISQ.DIST.RT"
-        | "CHISQ.INV" | "CHISQ.INV.RT" => (2, 2),
-        "NORM.S.INV" | "GAMMA" | "GAMMALN" | "GAMMALN.PRECISE" | "FISHER" | "FISHERINV" | "PHI"
-        | "GAUSS" => (1, 1),
-        _ => return Err(FormulaError::Name),
+fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
+    let (minimum, maximum) = match function {
+        Function::BETA_DIST => (4, 6),
+        Function::BETA_INV => (3, 5),
+        Function::NORM_DIST
+        | Function::BINOM_DIST
+        | Function::GAMMA_DIST
+        | Function::WEIBULL_DIST
+        | Function::F_DIST => (4, 4),
+        Function::NORM_INV
+        | Function::T_DIST
+        | Function::CHISQ_DIST
+        | Function::F_DIST_RT
+        | Function::F_INV
+        | Function::F_INV_RT
+        | Function::POISSON_DIST
+        | Function::EXPON_DIST
+        | Function::GAMMA_INV
+        | Function::LOGNORM_INV
+        | Function::CONFIDENCE_NORM
+        | Function::CONFIDENCE_T
+        | Function::STANDARDIZE => (3, 3),
+        Function::LOGNORM_DIST => (4, 4),
+        Function::NORM_S_DIST
+        | Function::T_DIST_2T
+        | Function::T_DIST_RT
+        | Function::T_INV
+        | Function::T_INV_2T
+        | Function::CHISQ_DIST_RT
+        | Function::CHISQ_INV
+        | Function::CHISQ_INV_RT => (2, 2),
+        Function::NORM_S_INV
+        | Function::GAMMA
+        | Function::GAMMALN
+        | Function::GAMMALN_PRECISE
+        | Function::FISHER
+        | Function::FISHERINV
+        | Function::PHI
+        | Function::GAUSS => (1, 1),
     };
     require_arity(values, minimum, maximum)?;
     let x = number_arg(values, 0, None)?;
-    match name {
-        "PHI" => Ok(normal_density(x)),
-        "GAUSS" => {
+    match function {
+        Function::PHI => Ok(normal_density(x)),
+        Function::GAUSS => {
             let probability = gamma_probability(HALF, x * x * HALF, false)?;
             Ok(x.signum() * HALF * probability)
         }
-        "FISHER" => {
+        Function::FISHER => {
             ensure(x.abs() < 1.0)?;
             Ok(HALF * (x.ln_1p() - (-x).ln_1p()))
         }
-        "FISHERINV" => Ok(x.tanh()),
-        "GAMMA" => gamma(x),
-        "GAMMALN" | "GAMMALN.PRECISE" => {
+        Function::FISHERINV => Ok(x.tanh()),
+        Function::GAMMA => gamma(x),
+        Function::GAMMALN | Function::GAMMALN_PRECISE => {
             ensure(x > 0.0)?;
             Ok(log_gamma(x))
         }
-        "NORM.S.DIST" => {
+        Function::NORM_S_DIST => {
             if bool_arg(values, 1, None)? {
                 normal_cdf(x)
             } else {
                 Ok(normal_density(x))
             }
         }
-        "NORM.S.INV" => normal_inverse(x),
-        "NORM.DIST" | "NORM.INV" | "LOGNORM.DIST" | "LOGNORM.INV" | "STANDARDIZE" => {
+        Function::NORM_S_INV => normal_inverse(x),
+        Function::NORM_DIST
+        | Function::NORM_INV
+        | Function::LOGNORM_DIST
+        | Function::LOGNORM_INV
+        | Function::STANDARDIZE => {
             let mean = number_arg(values, 1, None)?;
             let deviation = number_arg(values, 2, None)?;
             ensure(deviation > 0.0)?;
-            match name {
-                "STANDARDIZE" => Ok((x - mean) / deviation),
-                "NORM.INV" => Ok(mean + deviation * normal_inverse(x)?),
-                "LOGNORM.INV" => Ok((mean + deviation * normal_inverse(x)?).exp()),
-                _ => {
-                    let is_log = name == "LOGNORM.DIST";
-                    ensure(!is_log || x > 0.0)?;
-                    let standardized = ((if is_log { x.ln() } else { x }) - mean) / deviation;
-                    if bool_arg(values, 3, None)? {
-                        normal_cdf(standardized)
-                    } else {
-                        Ok(normal_density(standardized) / deviation / if is_log { x } else { 1.0 })
-                    }
+            if function == Function::STANDARDIZE {
+                Ok((x - mean) / deviation)
+            } else if function == Function::NORM_INV {
+                Ok(mean + deviation * normal_inverse(x)?)
+            } else if function == Function::LOGNORM_INV {
+                Ok((mean + deviation * normal_inverse(x)?).exp())
+            } else {
+                let is_log = function == Function::LOGNORM_DIST;
+                ensure(!is_log || x > 0.0)?;
+                let standardized = ((if is_log { x.ln() } else { x }) - mean) / deviation;
+                if bool_arg(values, 3, None)? {
+                    normal_cdf(standardized)
+                } else {
+                    Ok(normal_density(standardized) / deviation / if is_log { x } else { 1.0 })
                 }
             }
         }
-        "T.DIST" | "T.DIST.2T" | "T.DIST.RT" | "T.INV" | "T.INV.2T" => {
+        Function::T_DIST
+        | Function::T_DIST_2T
+        | Function::T_DIST_RT
+        | Function::T_INV
+        | Function::T_INV_2T => {
             let degrees = degrees_arg(values, 1)?;
-            match name {
-                "T.INV" => student_inverse(x, degrees),
-                "T.INV.2T" => {
-                    ensure(x > 0.0 && x <= 1.0)?;
-                    positive_inverse(x * HALF, |point| student_tail(point, degrees), true)
-                }
-                "T.DIST.2T" => {
-                    ensure(x >= 0.0)?;
-                    Ok(2.0 * student_tail(x, degrees)?)
-                }
-                "T.DIST.RT" => {
-                    let tail = student_tail(x.abs(), degrees)?;
-                    Ok(if x < 0.0 { 1.0 - tail } else { tail })
-                }
-                _ => {
-                    if bool_arg(values, 2, None)? {
-                        let tail = student_tail(x.abs(), degrees)?;
-                        Ok(if x < 0.0 { tail } else { 1.0 - tail })
-                    } else {
-                        Ok((log_gamma((degrees + 1.0) * HALF)
-                            - log_gamma(degrees * HALF)
-                            - HALF * (degrees.ln() + std::f64::consts::PI.ln())
-                            - (degrees + 1.0) * HALF * (x * x / degrees).ln_1p())
-                        .exp())
-                    }
-                }
+            if function == Function::T_INV {
+                student_inverse(x, degrees)
+            } else if function == Function::T_INV_2T {
+                ensure(x > 0.0 && x <= 1.0)?;
+                positive_inverse(x * HALF, |point| student_tail(point, degrees), true)
+            } else if function == Function::T_DIST_2T {
+                ensure(x >= 0.0)?;
+                Ok(2.0 * student_tail(x, degrees)?)
+            } else if function == Function::T_DIST_RT {
+                let tail = student_tail(x.abs(), degrees)?;
+                Ok(if x < 0.0 { 1.0 - tail } else { tail })
+            } else if bool_arg(values, 2, None)? {
+                let tail = student_tail(x.abs(), degrees)?;
+                Ok(if x < 0.0 { tail } else { 1.0 - tail })
+            } else {
+                Ok((log_gamma((degrees + 1.0) * HALF)
+                    - log_gamma(degrees * HALF)
+                    - HALF * (degrees.ln() + std::f64::consts::PI.ln())
+                    - (degrees + 1.0) * HALF * (x * x / degrees).ln_1p())
+                .exp())
             }
         }
-        "CHISQ.DIST" | "CHISQ.DIST.RT" | "CHISQ.INV" | "CHISQ.INV.RT" => {
+        Function::CHISQ_DIST
+        | Function::CHISQ_DIST_RT
+        | Function::CHISQ_INV
+        | Function::CHISQ_INV_RT => {
             let shape = degrees_arg(values, 1)? * HALF;
-            if name.starts_with("CHISQ.INV") {
-                gamma_inverse(x, shape, 2.0, name.ends_with(".RT"))
+            let is_right = matches!(function, Function::CHISQ_DIST_RT | Function::CHISQ_INV_RT);
+            if matches!(function, Function::CHISQ_INV | Function::CHISQ_INV_RT) {
+                gamma_inverse(x, shape, 2.0, is_right)
             } else {
                 ensure(x >= 0.0)?;
-                if name.ends_with(".RT") || bool_arg(values, 2, None)? {
-                    gamma_probability(shape, x * HALF, name.ends_with(".RT"))
+                if is_right || bool_arg(values, 2, None)? {
+                    gamma_probability(shape, x * HALF, is_right)
                 } else {
                     gamma_density(x, shape, 2.0)
                 }
             }
         }
-        "F.DIST" | "F.DIST.RT" | "F.INV" | "F.INV.RT" => {
+        Function::F_DIST | Function::F_DIST_RT | Function::F_INV | Function::F_INV_RT => {
             let numerator = degrees_arg(values, 1)?;
             let denominator = degrees_arg(values, 2)?;
-            let is_right = name.ends_with(".RT");
-            if name.starts_with("F.INV") {
+            let is_right = matches!(function, Function::F_DIST_RT | Function::F_INV_RT);
+            if matches!(function, Function::F_INV | Function::F_INV_RT) {
                 f_inverse(x, numerator, denominator, is_right)
             } else {
                 ensure(x >= 0.0)?;
@@ -197,11 +229,11 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 }
             }
         }
-        "GAMMA.DIST" | "GAMMA.INV" => {
+        Function::GAMMA_DIST | Function::GAMMA_INV => {
             let shape = number_arg(values, 1, None)?;
             let scale = number_arg(values, 2, None)?;
             ensure(shape > 0.0 && scale > 0.0)?;
-            if name == "GAMMA.INV" {
+            if function == Function::GAMMA_INV {
                 gamma_inverse(x, shape, scale, false)
             } else {
                 ensure(x >= 0.0)?;
@@ -212,10 +244,10 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 }
             }
         }
-        "BETA.DIST" | "BETA.INV" => {
+        Function::BETA_DIST | Function::BETA_INV => {
             let alpha = number_arg(values, 1, None)?;
             let beta = number_arg(values, 2, None)?;
-            let is_inverse = name == "BETA.INV";
+            let is_inverse = function == Function::BETA_INV;
             let bound_index = if is_inverse { 3 } else { 4 };
             let lower = number_arg(values, bound_index, Some(0.0))?;
             let upper = number_arg(values, bound_index + 1, Some(1.0))?;
@@ -233,7 +265,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 }
             }
         }
-        "BINOM.DIST" => {
+        Function::BINOM_DIST => {
             let successes = x.trunc();
             let trials = number_arg(values, 1, None)?.trunc();
             let probability = number_arg(values, 2, None)?;
@@ -264,7 +296,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 .exp())
             }
         }
-        "POISSON.DIST" => {
+        Function::POISSON_DIST => {
             let occurrences = x.trunc();
             let mean = number_arg(values, 1, None)?;
             ensure(x >= 0.0 && mean >= 0.0)?;
@@ -276,7 +308,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 Ok((occurrences * mean.ln() - mean - log_gamma(occurrences + 1.0)).exp())
             }
         }
-        "EXPON.DIST" => {
+        Function::EXPON_DIST => {
             let rate = number_arg(values, 1, None)?;
             ensure(x >= 0.0 && rate > 0.0)?;
             if bool_arg(values, 2, None)? {
@@ -285,7 +317,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 Ok(rate * (-rate * x).exp())
             }
         }
-        "WEIBULL.DIST" => {
+        Function::WEIBULL_DIST => {
             let shape = number_arg(values, 1, None)?;
             let scale = number_arg(values, 2, None)?;
             ensure(x >= 0.0 && shape > 0.0 && scale > 0.0)?;
@@ -299,11 +331,11 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 Ok((shape.ln() - scale.ln() + (shape - 1.0) * (x / scale).ln() - power).exp())
             }
         }
-        "CONFIDENCE.NORM" | "CONFIDENCE.T" => {
+        Function::CONFIDENCE_NORM | Function::CONFIDENCE_T => {
             let deviation = number_arg(values, 1, None)?;
             let size = number_arg(values, 2, None)?.trunc();
             ensure(x > 0.0 && x < 1.0 && deviation > 0.0 && size >= 1.0)?;
-            let critical = if name == "CONFIDENCE.NORM" {
+            let critical = if function == Function::CONFIDENCE_NORM {
                 -normal_inverse(x * HALF)?
             } else {
                 if size == 1.0 {
@@ -313,7 +345,6 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             };
             Ok(critical * deviation / size.sqrt())
         }
-        _ => Err(FormulaError::Name),
     }
 }
 
@@ -799,24 +830,25 @@ pub(super) fn negative_binomial_mass(failures: f64, successes: f64, probability:
 #[cfg(test)]
 mod tests {
     use super::*;
+    use Function as F;
 
-    fn call(name: &str, arguments: &[Value]) -> Value {
+    fn call(function: Function, arguments: &[Value]) -> Value {
         let mut values = FuncAccumulator::default();
         for argument in arguments {
             values.push_scalar(argument.clone()).unwrap();
             values.finish_arg(1, 1).unwrap();
         }
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
-    fn assert_number(name: &str, numbers: &[f64], expected: f64, tolerance: f64) {
+    fn assert_number(function: Function, numbers: &[f64], expected: f64, tolerance: f64) {
         let arguments: Vec<Value> = numbers.iter().copied().map(Value::number).collect();
-        let Value::Number(actual) = call(name, &arguments) else {
-            panic!("{name} returned an error");
+        let Value::Number(actual) = call(function, &arguments) else {
+            panic!("{function} returned an error");
         };
         assert!(
             (actual - expected).abs() <= tolerance,
-            "{name}: {actual} != {expected}"
+            "{function}: {actual} != {expected}"
         );
     }
 
@@ -824,154 +856,169 @@ mod tests {
     /// `https://support.microsoft.com/en-us/excel/functions/<slug>-function`.
     /// Some pages truncate and others round, so the tolerance is one unit in the last
     /// published digit.
-    const MICROSOFT_EXAMPLES: &[(&str, &str, &[f64], &str)] = &[
+    const MICROSOFT_EXAMPLES: &[(&str, Function, &[f64], &str)] = &[
         (
             "beta-dist",
-            "BETA.DIST",
+            F::BETA_DIST,
             &[2.0, 8.0, 10.0, 1.0, 1.0, 3.0],
             "0.6854706",
         ),
         (
             "beta-dist",
-            "BETA.DIST",
+            F::BETA_DIST,
             &[2.0, 8.0, 10.0, 0.0, 1.0, 3.0],
             "1.4837646",
         ),
         (
             "beta-inv",
-            "BETA.INV",
+            F::BETA_INV,
             &[0.685470581, 8.0, 10.0, 1.0, 3.0],
             "2",
         ),
         (
             "binom-dist",
-            "BINOM.DIST",
+            F::BINOM_DIST,
             &[6.0, 10.0, 0.5, 0.0],
             "0.2050781",
         ),
-        ("chisq-dist", "CHISQ.DIST", &[0.5, 1.0, 1.0], "0.52049988"),
-        ("chisq-dist", "CHISQ.DIST", &[2.0, 3.0, 0.0], "0.20755375"),
+        ("chisq-dist", F::CHISQ_DIST, &[0.5, 1.0, 1.0], "0.52049988"),
+        ("chisq-dist", F::CHISQ_DIST, &[2.0, 3.0, 0.0], "0.20755375"),
         (
             "chisq-dist-rt",
-            "CHISQ.DIST.RT",
+            F::CHISQ_DIST_RT,
             &[18.307, 10.0],
             "0.0500006",
         ),
-        ("chisq-inv", "CHISQ.INV", &[0.93, 1.0], "3.283020286"),
-        ("chisq-inv", "CHISQ.INV", &[0.6, 2.0], "1.832581464"),
+        ("chisq-inv", F::CHISQ_INV, &[0.93, 1.0], "3.283020286"),
+        ("chisq-inv", F::CHISQ_INV, &[0.6, 2.0], "1.832581464"),
         (
             "chisq-inv-rt",
-            "CHISQ.INV.RT",
+            F::CHISQ_INV_RT,
             &[0.050001, 10.0],
             "18.306973",
         ),
         (
             "confidence-norm",
-            "CONFIDENCE.NORM",
+            F::CONFIDENCE_NORM,
             &[0.05, 2.5, 50.0],
             "0.692952",
         ),
         (
             "confidence-t",
-            "CONFIDENCE.T",
+            F::CONFIDENCE_T,
             &[0.05, 1.0, 50.0],
             "0.284196855",
         ),
-        ("expon-dist", "EXPON.DIST", &[0.2, 10.0, 1.0], "0.86466472"),
-        ("expon-dist", "EXPON.DIST", &[0.2, 10.0, 0.0], "1.35335283"),
-        ("f-dist", "F.DIST", &[15.2069, 6.0, 4.0, 1.0], "0.99"),
-        ("f-dist", "F.DIST", &[15.2069, 6.0, 4.0, 0.0], "0.0012238"),
-        ("f-dist-rt", "F.DIST.RT", &[15.2068649, 6.0, 4.0], "0.01"),
-        ("f-inv", "F.INV", &[0.01, 6.0, 4.0], "0.10930991"),
-        ("f-inv-rt", "F.INV.RT", &[0.01, 6.0, 4.0], "15.20686"),
-        ("fisher", "FISHER", &[0.75], "0.9729551"),
-        ("fisherinv", "FISHERINV", &[0.972955], "0.75"),
-        ("gamma", "GAMMA", &[2.5], "1.329"),
-        ("gamma", "GAMMA", &[-3.75], "0.268"),
+        ("expon-dist", F::EXPON_DIST, &[0.2, 10.0, 1.0], "0.86466472"),
+        ("expon-dist", F::EXPON_DIST, &[0.2, 10.0, 0.0], "1.35335283"),
+        ("f-dist", F::F_DIST, &[15.2069, 6.0, 4.0, 1.0], "0.99"),
+        ("f-dist", F::F_DIST, &[15.2069, 6.0, 4.0, 0.0], "0.0012238"),
+        ("f-dist-rt", F::F_DIST_RT, &[15.2068649, 6.0, 4.0], "0.01"),
+        ("f-inv", F::F_INV, &[0.01, 6.0, 4.0], "0.10930991"),
+        ("f-inv-rt", F::F_INV_RT, &[0.01, 6.0, 4.0], "15.20686"),
+        ("fisher", F::FISHER, &[0.75], "0.9729551"),
+        ("fisherinv", F::FISHERINV, &[0.972955], "0.75"),
+        ("gamma", F::GAMMA, &[2.5], "1.329"),
+        ("gamma", F::GAMMA, &[-3.75], "0.268"),
         (
             "gamma-dist",
-            "GAMMA.DIST",
+            F::GAMMA_DIST,
             &[10.00001131, 9.0, 2.0, 0.0],
             "0.032639",
         ),
         (
             "gamma-dist",
-            "GAMMA.DIST",
+            F::GAMMA_DIST,
             &[10.00001131, 9.0, 2.0, 1.0],
             "0.068094",
         ),
         (
             "gamma-inv",
-            "GAMMA.INV",
+            F::GAMMA_INV,
             &[0.068094, 9.0, 2.0],
             "10.0000112",
         ),
-        ("gammaln", "GAMMALN", &[4.0], "1.7917595"),
-        ("gammaln-precise", "GAMMALN.PRECISE", &[4.0], "1.7917595"),
-        ("gauss", "GAUSS", &[2.0], "0.47725"),
+        ("gammaln", F::GAMMALN, &[4.0], "1.7917595"),
+        ("gammaln-precise", F::GAMMALN_PRECISE, &[4.0], "1.7917595"),
+        ("gauss", F::GAUSS, &[2.0], "0.47725"),
         (
             "lognorm-dist",
-            "LOGNORM.DIST",
+            F::LOGNORM_DIST,
             &[4.0, 3.5, 1.2, 1.0],
             "0.0390836",
         ),
         (
             "lognorm-dist",
-            "LOGNORM.DIST",
+            F::LOGNORM_DIST,
             &[4.0, 3.5, 1.2, 0.0],
             "0.0176176",
         ),
         (
             "lognorm-inv",
-            "LOGNORM.INV",
+            F::LOGNORM_INV,
             &[0.039084, 3.5, 1.2],
             "4.0000252",
         ),
         (
             "norm-dist",
-            "NORM.DIST",
+            F::NORM_DIST,
             &[42.0, 40.0, 1.5, 1.0],
             "0.9087888",
         ),
-        ("norm-dist", "NORM.DIST", &[42.0, 40.0, 1.5, 0.0], "0.10934"),
-        ("norm-inv", "NORM.INV", &[0.908789, 40.0, 1.5], "42.000002"),
+        (
+            "norm-dist",
+            F::NORM_DIST,
+            &[42.0, 40.0, 1.5, 0.0],
+            "0.10934",
+        ),
+        ("norm-inv", F::NORM_INV, &[0.908789, 40.0, 1.5], "42.000002"),
         (
             "norm-s-dist",
-            "NORM.S.DIST",
+            F::NORM_S_DIST,
             &[1.333333, 1.0],
             "0.908788726",
         ),
         (
             "norm-s-dist",
-            "NORM.S.DIST",
+            F::NORM_S_DIST,
             &[1.333333, 0.0],
             "0.164010148",
         ),
-        ("norm-s-inv", "NORM.S.INV", &[0.908789], "1.3333347"),
-        ("phi", "PHI", &[0.75], "0.301137432"),
-        ("poisson-dist", "POISSON.DIST", &[2.0, 5.0, 1.0], "0.124652"),
-        ("poisson-dist", "POISSON.DIST", &[2.0, 5.0, 0.0], "0.084224"),
+        ("norm-s-inv", F::NORM_S_INV, &[0.908789], "1.3333347"),
+        ("phi", F::PHI, &[0.75], "0.301137432"),
+        (
+            "poisson-dist",
+            F::POISSON_DIST,
+            &[2.0, 5.0, 1.0],
+            "0.124652",
+        ),
+        (
+            "poisson-dist",
+            F::POISSON_DIST,
+            &[2.0, 5.0, 0.0],
+            "0.084224",
+        ),
         (
             "standardize",
-            "STANDARDIZE",
+            F::STANDARDIZE,
             &[42.0, 40.0, 1.5],
             "1.33333333",
         ),
-        ("t-dist", "T.DIST", &[60.0, 1.0, 1.0], "0.99469533"),
-        ("t-dist", "T.DIST", &[8.0, 3.0, 0.0], "0.00073691"),
-        ("t-dist-2t", "T.DIST.2T", &[1.959999998, 60.0], "0.054645"),
-        ("t-dist-rt", "T.DIST.RT", &[1.959999998, 60.0], "0.027322"),
-        ("t-inv", "T.INV", &[0.75, 2.0], "0.8164966"),
-        ("t-inv-2t", "T.INV.2T", &[0.546449, 60.0], "0.606533076"),
+        ("t-dist", F::T_DIST, &[60.0, 1.0, 1.0], "0.99469533"),
+        ("t-dist", F::T_DIST, &[8.0, 3.0, 0.0], "0.00073691"),
+        ("t-dist-2t", F::T_DIST_2T, &[1.959999998, 60.0], "0.054645"),
+        ("t-dist-rt", F::T_DIST_RT, &[1.959999998, 60.0], "0.027322"),
+        ("t-inv", F::T_INV, &[0.75, 2.0], "0.8164966"),
+        ("t-inv-2t", F::T_INV_2T, &[0.546449, 60.0], "0.606533076"),
         (
             "weibull-dist",
-            "WEIBULL.DIST",
+            F::WEIBULL_DIST,
             &[105.0, 20.0, 100.0, 1.0],
             "0.929581",
         ),
         (
             "weibull-dist",
-            "WEIBULL.DIST",
+            F::WEIBULL_DIST,
             &[105.0, 20.0, 100.0, 0.0],
             "0.035589",
         ),
@@ -979,19 +1026,22 @@ mod tests {
 
     #[test]
     fn microsoft_published_examples_cover_every_function() {
-        for (slug, name, arguments, published) in MICROSOFT_EXAMPLES {
+        for (slug, function, arguments, published) in MICROSOFT_EXAMPLES {
             let decimals = published
                 .split_once('.')
                 .map_or(0, |(_, fraction)| fraction.len());
             let tolerance = 10f64.powi(-(decimals as i32));
             let expected: f64 = published.parse().unwrap();
-            assert_number(name, arguments, expected, tolerance);
+            assert_number(*function, arguments, expected, tolerance);
             assert!(
-                slug.replace('-', ".").eq_ignore_ascii_case(name),
-                "{slug} documents {name}"
+                slug.replace('-', ".").eq_ignore_ascii_case(function.name()),
+                "{slug} documents {function}"
             );
         }
-        let mut covered: Vec<&str> = MICROSOFT_EXAMPLES.iter().map(|example| example.1).collect();
+        let mut covered: Vec<&str> = MICROSOFT_EXAMPLES
+            .iter()
+            .map(|example| example.1.name())
+            .collect();
         covered.dedup();
         assert_eq!(covered, NAMES);
     }
@@ -1000,78 +1050,92 @@ mod tests {
     fn distribution_tails_and_inverse_endpoints() {
         // Independent closed forms: df=2 chi-square and shape=1 gamma are exponential;
         // df=1 Student is Cauchy, and equal unit beta parameters are uniform.
-        assert_number("CHISQ.DIST.RT", &[100.0, 2.0], (-50.0f64).exp(), 1e-35);
-        assert_number("CHISQ.INV.RT", &[1e-20, 2.0], -2.0 * (1e-20f64).ln(), 1e-11);
-        assert_number("GAMMA.INV", &[0.25, 1.0, 3.0], -3.0 * (0.75f64).ln(), 1e-12);
-        assert_number("T.INV", &[0.75, 1.0], 1.0, 1e-13);
-        assert_number("T.INV.2T", &[1.0, 3.0], 0.0, 0.0);
-        assert_number("BETA.INV", &[1e-20, 1.0, 1.0], 1e-20, 1e-32);
-        assert_number("NORM.S.INV", &[0.5], 0.0, 0.0);
-        assert_number("BETA.INV", &[1.0, 2.0, 4.0, 3.0, 8.0], 8.0, 0.0);
-        assert_number("GAMMA", &[-0.5], -2.0 * std::f64::consts::PI.sqrt(), 1e-13);
-        assert_number("BINOM.DIST", &[2.9, 4.8, 0.5, 0.0], 0.375, 1e-14);
-        assert_number("POISSON.DIST", &[0.0, 0.0, 1.0], 1.0, 0.0);
-        assert_number("WEIBULL.DIST", &[0.0, 1.0, 2.0, 0.0], 0.5, 0.0);
-        assert_number("T.DIST.RT", &[-1.0, 1.0], 0.75, 1e-15);
+        assert_number(F::CHISQ_DIST_RT, &[100.0, 2.0], (-50.0f64).exp(), 1e-35);
+        assert_number(
+            F::CHISQ_INV_RT,
+            &[1e-20, 2.0],
+            -2.0 * (1e-20f64).ln(),
+            1e-11,
+        );
+        assert_number(
+            F::GAMMA_INV,
+            &[0.25, 1.0, 3.0],
+            -3.0 * (0.75f64).ln(),
+            1e-12,
+        );
+        assert_number(F::T_INV, &[0.75, 1.0], 1.0, 1e-13);
+        assert_number(F::T_INV_2T, &[1.0, 3.0], 0.0, 0.0);
+        assert_number(F::BETA_INV, &[1e-20, 1.0, 1.0], 1e-20, 1e-32);
+        assert_number(F::NORM_S_INV, &[0.5], 0.0, 0.0);
+        assert_number(F::BETA_INV, &[1.0, 2.0, 4.0, 3.0, 8.0], 8.0, 0.0);
+        assert_number(F::GAMMA, &[-0.5], -2.0 * std::f64::consts::PI.sqrt(), 1e-13);
+        assert_number(F::BINOM_DIST, &[2.9, 4.8, 0.5, 0.0], 0.375, 1e-14);
+        assert_number(F::POISSON_DIST, &[0.0, 0.0, 1.0], 1.0, 0.0);
+        assert_number(F::WEIBULL_DIST, &[0.0, 1.0, 2.0, 0.0], 0.5, 0.0);
+        assert_number(F::T_DIST_RT, &[-1.0, 1.0], 0.75, 1e-15);
     }
 
     #[test]
     fn scalar_coercion_arity_and_domain_errors() {
         assert_eq!(
-            call("NORM.S.DIST", &[Value::text("0"), Value::text("TRUE")]),
+            call(F::NORM_S_DIST, &[Value::text("0"), Value::text("TRUE")]),
             Value::Number(0.5)
         );
         assert_eq!(
-            call("PHI", &[Value::Error(FormulaError::Ref)]),
+            call(F::PHI, &[Value::Error(FormulaError::Ref)]),
             Value::Error(FormulaError::Ref)
         );
         assert_eq!(
-            call("NORM.S.DIST", &[Value::text("one"), Value::Bool(true)]),
+            call(F::NORM_S_DIST, &[Value::text("one"), Value::Bool(true)]),
             Value::Error(FormulaError::Value)
         );
         // Domain rules from the "Remarks" section of each Microsoft Support page.
-        for (name, inputs, error) in [
-            ("NORM.DIST", vec![0.0, 0.0, 0.0, 1.0], FormulaError::Num),
-            ("NORM.INV", vec![1.0, 0.0, 1.0], FormulaError::Num),
-            ("T.DIST", vec![1.0, 0.5, 1.0], FormulaError::Num),
-            ("T.DIST.2T", vec![-1.0, 3.0], FormulaError::Num),
-            ("T.INV", vec![0.0, 2.0], FormulaError::Num),
-            ("T.INV.2T", vec![0.0, 2.0], FormulaError::Num),
-            ("CHISQ.DIST", vec![-1.0, 2.0, 1.0], FormulaError::Num),
-            ("CHISQ.DIST.RT", vec![1.0, 1e11], FormulaError::Num),
-            ("CHISQ.INV", vec![1.5, 2.0], FormulaError::Num),
-            ("CHISQ.INV.RT", vec![-0.5, 2.0], FormulaError::Num),
-            ("F.DIST", vec![1.0, 0.9, 2.0, 1.0], FormulaError::Num),
-            ("F.DIST.RT", vec![-1.0, 2.0, 2.0], FormulaError::Num),
-            ("F.INV", vec![1.5, 2.0, 2.0], FormulaError::Num),
-            ("F.INV.RT", vec![0.5, 2.0, 0.0], FormulaError::Num),
-            ("BINOM.DIST", vec![5.0, 4.0, 0.5, 1.0], FormulaError::Num),
-            ("BINOM.DIST", vec![1.0, 4.0, 1.5, 1.0], FormulaError::Num),
-            ("POISSON.DIST", vec![1.0, -1.0, 1.0], FormulaError::Num),
-            ("EXPON.DIST", vec![1.0, 0.0, 1.0], FormulaError::Num),
-            ("GAMMA.DIST", vec![-1.0, 1.0, 1.0, 1.0], FormulaError::Num),
-            ("GAMMA.INV", vec![0.5, 1.0, 0.0], FormulaError::Num),
-            ("BETA.DIST", vec![0.5, 2.0, 2.0], FormulaError::Value),
+        for (function, inputs, error) in [
+            (F::NORM_DIST, vec![0.0, 0.0, 0.0, 1.0], FormulaError::Num),
+            (F::NORM_INV, vec![1.0, 0.0, 1.0], FormulaError::Num),
+            (F::T_DIST, vec![1.0, 0.5, 1.0], FormulaError::Num),
+            (F::T_DIST_2T, vec![-1.0, 3.0], FormulaError::Num),
+            (F::T_INV, vec![0.0, 2.0], FormulaError::Num),
+            (F::T_INV_2T, vec![0.0, 2.0], FormulaError::Num),
+            (F::CHISQ_DIST, vec![-1.0, 2.0, 1.0], FormulaError::Num),
+            (F::CHISQ_DIST_RT, vec![1.0, 1e11], FormulaError::Num),
+            (F::CHISQ_INV, vec![1.5, 2.0], FormulaError::Num),
+            (F::CHISQ_INV_RT, vec![-0.5, 2.0], FormulaError::Num),
+            (F::F_DIST, vec![1.0, 0.9, 2.0, 1.0], FormulaError::Num),
+            (F::F_DIST_RT, vec![-1.0, 2.0, 2.0], FormulaError::Num),
+            (F::F_INV, vec![1.5, 2.0, 2.0], FormulaError::Num),
+            (F::F_INV_RT, vec![0.5, 2.0, 0.0], FormulaError::Num),
+            (F::BINOM_DIST, vec![5.0, 4.0, 0.5, 1.0], FormulaError::Num),
+            (F::BINOM_DIST, vec![1.0, 4.0, 1.5, 1.0], FormulaError::Num),
+            (F::POISSON_DIST, vec![1.0, -1.0, 1.0], FormulaError::Num),
+            (F::EXPON_DIST, vec![1.0, 0.0, 1.0], FormulaError::Num),
+            (F::GAMMA_DIST, vec![-1.0, 1.0, 1.0, 1.0], FormulaError::Num),
+            (F::GAMMA_INV, vec![0.5, 1.0, 0.0], FormulaError::Num),
+            (F::BETA_DIST, vec![0.5, 2.0, 2.0], FormulaError::Value),
             (
-                "BETA.DIST",
+                F::BETA_DIST,
                 vec![0.5, 2.0, 2.0, 1.0, 1.0, 1.0],
                 FormulaError::Num,
             ),
-            ("BETA.INV", vec![0.0, 2.0, 2.0], FormulaError::Num),
-            ("LOGNORM.DIST", vec![0.0, 0.0, 1.0, 1.0], FormulaError::Num),
-            ("LOGNORM.INV", vec![1.0, 0.0, 1.0], FormulaError::Num),
-            ("WEIBULL.DIST", vec![1.0, 0.0, 1.0, 1.0], FormulaError::Num),
-            ("CONFIDENCE.NORM", vec![1.0, 1.0, 10.0], FormulaError::Num),
-            ("CONFIDENCE.T", vec![0.05, 1.0, 1.0], FormulaError::DivZero),
-            ("STANDARDIZE", vec![1.0, 0.0, 0.0], FormulaError::Num),
-            ("FISHER", vec![1.0], FormulaError::Num),
-            ("GAMMA", vec![0.0], FormulaError::Num),
-            ("GAMMA", vec![-2.0], FormulaError::Num),
-            ("GAMMALN", vec![0.0], FormulaError::Num),
-            ("NORM.S.INV", vec![0.0], FormulaError::Num),
+            (F::BETA_INV, vec![0.0, 2.0, 2.0], FormulaError::Num),
+            (F::LOGNORM_DIST, vec![0.0, 0.0, 1.0, 1.0], FormulaError::Num),
+            (F::LOGNORM_INV, vec![1.0, 0.0, 1.0], FormulaError::Num),
+            (F::WEIBULL_DIST, vec![1.0, 0.0, 1.0, 1.0], FormulaError::Num),
+            (F::CONFIDENCE_NORM, vec![1.0, 1.0, 10.0], FormulaError::Num),
+            (F::CONFIDENCE_T, vec![0.05, 1.0, 1.0], FormulaError::DivZero),
+            (F::STANDARDIZE, vec![1.0, 0.0, 0.0], FormulaError::Num),
+            (F::FISHER, vec![1.0], FormulaError::Num),
+            (F::GAMMA, vec![0.0], FormulaError::Num),
+            (F::GAMMA, vec![-2.0], FormulaError::Num),
+            (F::GAMMALN, vec![0.0], FormulaError::Num),
+            (F::NORM_S_INV, vec![0.0], FormulaError::Num),
         ] {
             let arguments: Vec<Value> = inputs.into_iter().map(Value::number).collect();
-            assert_eq!(call(name, &arguments), Value::Error(error), "{name}");
+            assert_eq!(
+                call(function, &arguments),
+                Value::Error(error),
+                "{function}"
+            );
         }
     }
 }

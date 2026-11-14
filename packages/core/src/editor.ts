@@ -1,5 +1,7 @@
 import {
+  EDIT_SURFACE_ATTRIBUTE,
   type EditorFieldMetrics,
+  editorLineCount as lineCount,
   insertEditorLineBreak,
   readEditorFieldMetrics,
   sizeEditorTextarea,
@@ -31,8 +33,16 @@ export interface BeginEditOptions {
   /** Accessible name derived from the semantic or positional column header. */
   label: string;
   theme: Theme;
+  /**
+   * Focus the editor. False opens it as the cell's view of a draft that
+   * another edit surface, such as a formula bar, is typing; it takes focus
+   * only when the user moves into it.
+   */
+  focus: boolean;
   onCommit: (value: string, navigate: EditNavigate) => void;
   onCancel: () => void;
+  /** Every change the user makes to the text: typing, paste, IME, undo, a picked reference. */
+  onText: (value: string) => void;
   /** Runs a host command bound to this key combination; true when one ran. */
   onShortcut?: (event: KeyboardEvent) => boolean;
 }
@@ -41,7 +51,13 @@ export interface BeginEditOptions {
 interface EditorSizing {
   readonly width: string;
   readonly minimumHeight: number;
-  readonly value: string;
+  /** Explicit lines of the text when it was sized. */
+  readonly lines: number;
+}
+
+/** Whether focus moving to `target` keeps the edit open in another surface. */
+function isEditSurface(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(`[${EDIT_SURFACE_ATTRIBUTE}]`) !== null;
 }
 
 /**
@@ -57,6 +73,7 @@ export class EditController {
   private refStart = -1;
   private refEnd = -1;
   private readonly assist: FormulaAssist | null;
+  private assistAttached = false;
   // Read once per open and again only when the editor's line height changes,
   // so sizing reads only the textarea's own box, never its computed style.
   private metrics: EditorFieldMetrics | null = null;
@@ -70,6 +87,11 @@ export class EditController {
 
   get isEditing(): boolean {
     return this.textarea !== null;
+  }
+
+  /** Whether the user is typing in this editor, not in another edit surface. */
+  get isFocused(): boolean {
+    return this.textarea !== null && document.activeElement === this.textarea;
   }
 
   begin(opts: BeginEditOptions): void {
@@ -101,17 +123,35 @@ export class EditController {
     ta.addEventListener("compositionstart", this.onCompositionStart);
     ta.addEventListener("compositionend", this.onCompositionEnd);
     ta.addEventListener("keydown", this.onKeyDown);
+    ta.addEventListener("focus", this.onFocus);
     ta.addEventListener("blur", this.onBlur);
     ta.addEventListener("input", this.onInput);
 
-    ta.focus();
+    if (opts.focus) ta.focus();
     if (opts.selectAll) {
       ta.select();
     } else {
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
     }
-    this.assist?.attach(ta, opts.theme);
+    if (opts.focus) this.attachAssist();
+  }
+
+  /**
+   * Show `value`, typed in another edit surface, with that surface's caret.
+   * Changes nothing while the editor itself has focus: its own text wins.
+   */
+  setText(value: string, selectionStart: number, selectionEnd: number): void {
+    const ta = this.textarea;
+    if (!ta || this.isFocused) return;
+    if (ta.value !== value) {
+      ta.value = value;
+      this.refStart = -1;
+      // Mirrored text resizes only when it gains or loses a line, so typing
+      // in the other surface lays this one out only at a line break.
+      if (this.sizing?.lines !== lineCount(value)) this.resize();
+    }
+    ta.setSelectionRange(selectionStart, selectionEnd);
   }
 
   /** Follow the cell. A move that keeps the cell's size only writes the position. */
@@ -126,7 +166,7 @@ export class EditController {
       sizing === null ||
       sizing.width !== width ||
       sizing.minimumHeight !== rect.h ||
-      sizing.value !== ta.value
+      sizing.lines !== lineCount(ta.value)
     ) {
       ta.style.width = width;
       const lineHeight = `${Math.max(1, rect.h - 4)}px`;
@@ -146,7 +186,8 @@ export class EditController {
 
   /**
    * Insert (or, while dragging, replace) an A1 reference at the caret — the
-   * "point mode" a spreadsheet enters after you type `=`.
+   * "point mode" a spreadsheet enters after you type `=`. A formula bar that
+   * holds the draft keeps focus; it hears the new text through `onText`.
    */
   setReference(ref: string): void {
     const ta = this.textarea;
@@ -157,9 +198,10 @@ export class EditController {
     this.refStart = start;
     this.refEnd = start + ref.length;
     ta.setSelectionRange(this.refEnd, this.refEnd);
-    ta.focus();
+    if (!isEditSurface(document.activeElement)) ta.focus();
     this.resize();
-    this.assist?.update();
+    if (this.assistAttached) this.assist?.update();
+    this.opts?.onText(ta.value);
   }
 
   /** Finish a reference pick; the next pick inserts fresh at the caret. */
@@ -169,10 +211,30 @@ export class EditController {
   }
 
   private readonly onInput = (): void => {
+    const ta = this.textarea;
+    if (!ta) return;
     this.refStart = -1;
     this.resize();
-    this.assist?.update();
+    if (this.assistAttached) this.assist?.update();
+    this.opts?.onText(ta.value);
   };
+
+  /** The user moved into the cell editor: formula help follows the caret here. */
+  private readonly onFocus = (): void => {
+    this.attachAssist();
+  };
+
+  private attachAssist(): void {
+    if (!this.assist || !this.textarea || !this.opts || this.assistAttached) return;
+    this.assist.attach(this.textarea, this.opts.theme);
+    this.assistAttached = true;
+  }
+
+  private detachAssist(): void {
+    if (!this.assistAttached) return;
+    this.assist?.detach();
+    this.assistAttached = false;
+  }
 
   private resize(): void {
     if (this.textarea && this.opts) this.size(this.opts.rect.h);
@@ -182,7 +244,7 @@ export class EditController {
     const ta = this.textarea;
     if (!ta) return;
     sizeEditorTextarea(ta, minimumHeight, this.metrics);
-    this.sizing = { width: ta.style.width, minimumHeight, value: ta.value };
+    this.sizing = { width: ta.style.width, minimumHeight, lines: lineCount(ta.value) };
   }
 
   commit(navigate: EditNavigate): void {
@@ -223,7 +285,7 @@ export class EditController {
       e.stopPropagation();
       return;
     }
-    if (this.assist?.handleKeyDown(e)) {
+    if (this.assistAttached && this.assist?.handleKeyDown(e)) {
       e.stopPropagation();
       return;
     }
@@ -245,18 +307,25 @@ export class EditController {
     e.stopPropagation();
   };
 
-  private readonly onBlur = (): void => {
-    if (this.textarea && !this.tearingDown) this.commit("none");
+  private readonly onBlur = (event: FocusEvent): void => {
+    if (!this.textarea || this.tearingDown) return;
+    // Moving into a formula bar keeps the edit open there, as in Excel.
+    if (isEditSurface(event.relatedTarget)) {
+      this.detachAssist();
+      return;
+    }
+    this.commit("none");
   };
 
   private teardown(): void {
     const ta = this.textarea;
     if (!ta) return;
     this.tearingDown = true;
-    this.assist?.detach();
+    this.detachAssist();
     ta.removeEventListener("compositionstart", this.onCompositionStart);
     ta.removeEventListener("compositionend", this.onCompositionEnd);
     ta.removeEventListener("keydown", this.onKeyDown);
+    ta.removeEventListener("focus", this.onFocus);
     ta.removeEventListener("blur", this.onBlur);
     ta.removeEventListener("input", this.onInput);
     ta.remove();
