@@ -1135,12 +1135,12 @@ fn same_name(left: &str, right: &str) -> bool {
 
 /// [`field_name`], borrowing a text header instead of copying it.
 fn field_name_ref(header: &Value, field: usize) -> Cow<'_, str> {
-    match header {
-        Value::Text(text) if !text.is_empty() => Cow::Borrowed(text),
-        Value::Text(_) | Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
-            Cow::Owned(field_name(header, field))
+    if let Value::Text(text) = header {
+        if !text.is_empty() {
+            return Cow::Borrowed(text);
         }
     }
+    Cow::Owned(field_name(header, field))
 }
 
 /// The name of a source field: its header, or `ColumnN` for a blank header.
