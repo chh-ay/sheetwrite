@@ -214,10 +214,12 @@ interface DocumentationParts {
   /** `@param` descriptions by parameter name. */
   readonly parameters: ReadonlyMap<string, string>;
   readonly returns?: string;
+  /** `@throws` texts: the error, then when it is thrown. */
+  readonly throws: readonly string[];
 }
 
 /** The tags a doc comment is split on; everything else stays in the body. */
-const DOCUMENTATION_TAG = /(?:^|\n)@(example|see|param|returns?)\b\s*/;
+const DOCUMENTATION_TAG = /(?:^|\n)@(example|see|param|returns?|throws)\b\s*/;
 
 function documentationParts(
   documentation: string,
@@ -230,6 +232,7 @@ function documentationParts(
   const examples: string[] = [];
   const related: string[] = [];
   const parameters = new Map<string, string>();
+  const throws: string[] = [];
   let returns: string | undefined;
   for (let index = 1; index < sections.length; index += 2) {
     const tag = sections[index];
@@ -247,11 +250,13 @@ function documentationParts(
       if (parameter?.[1] !== undefined) {
         parameters.set(parameter[1], (parameter[2] ?? "").replace(/\s+/g, " ").trim());
       }
+    } else if (tag === "throws") {
+      throws.push(value.replace(/\s+/g, " ").trim());
     } else {
       returns = value.replace(/\s+/g, " ").trim();
     }
   }
-  return { body: sections[0]?.trim() ?? "", examples, related, parameters, returns };
+  return { body: sections[0]?.trim() ?? "", examples, related, parameters, returns, throws };
 }
 
 /**
@@ -333,6 +338,37 @@ function memberDocumentationHtml(
           : `<a href="${route}"><code>${text}</code></a>`;
       },
     );
+}
+
+/**
+ * A member card's `@param`, `@returns` and `@throws` as labelled lines, so they
+ * read as a compact list instead of raw tags inside the description.
+ */
+function memberTagsHtml(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  parts: DocumentationParts,
+  routes: DocumentationLinkRoutes,
+): string | undefined {
+  const describe = (text: string): string =>
+    memberDocumentationHtml(pkg, entry, item, text, routes);
+  const rows = [
+    ...[...parts.parameters].map(
+      ([name, text]) =>
+        `<div><dt>Parameter</dt><dd><code>${html(name)}</code> ${describe(text)}</dd></div>`,
+    ),
+    ...(parts.returns === undefined
+      ? []
+      : [`<div><dt>Returns</dt><dd>${describe(parts.returns)}</dd></div>`]),
+    ...parts.throws.map((text) => `<div><dt>Throws</dt><dd>${describe(text)}</dd></div>`),
+  ];
+  return rows.length === 0 ? undefined : `<dl class="api-card__tags">${rows.join("")}</dl>`;
+}
+
+/** One card per `@throws`: the error, then when it is thrown. */
+function throwsCardHtml(descriptionHtml: string): string {
+  return `<div class="api-card api-field"><p class="api-card__doc">${descriptionHtml}</p></div>`;
 }
 
 /**
@@ -1006,6 +1042,16 @@ function renderFunctionFields(
       "",
     );
   }
+  if (parts.throws.length > 0) {
+    blocks.push(
+      "## Throws",
+      "",
+      '<div class="api-cards">',
+      ...parts.throws.map((text) => throwsCardHtml(describe(text) ?? "")),
+      "</div>",
+      "",
+    );
+  }
   return blocks.join("\n");
 }
 
@@ -1128,14 +1174,23 @@ function renderMembers(
         ? ""
         : `<span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`,
     ].join("");
-    const body =
+    const docParts =
       documentation === undefined
+        ? undefined
+        : documentationParts(documentation, pkg, entry, item, routes);
+    const tags =
+      docParts === undefined ? undefined : memberTagsHtml(pkg, entry, item, docParts, routes);
+    const body =
+      documentation === undefined || docParts === undefined
         ? []
         : [
             /(?:^|\n)@(example|see)\b/.test(documentation)
               ? `${documentationMarkdown(pkg, entry, item, routes, documentation, 4)}\n`
-              : `<p class="api-card__doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
-          ];
+              : docParts.body === ""
+                ? ""
+                : `<p class="api-card__doc">${memberDocumentationHtml(pkg, entry, item, docParts.body, routes)}</p>`,
+            ...(tags === undefined ? [] : [tags]),
+          ].filter((block) => block !== "");
     const card = [
       searchAnchor,
       `<article class="api-card api-member" id="${id}" data-member="${html(member.name)}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,

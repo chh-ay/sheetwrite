@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { selectAll } from "@expressive-code/core/hast";
 import { ExpressiveCode } from "expressive-code";
 
+import { splitDocumentation } from "../src/lib/api-reference-routes.js";
 import { sheetwriteCodeHovers } from "../src/lib/sheetwrite-code-hovers.js";
 
 /** The one public export the hover below links to, as docs generation lists it. */
@@ -40,4 +41,23 @@ test("hover see-also tags link guide paths and API names", async () => {
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("manifest docs split into the hover summary and its tags", () => {
+  expect(
+    splitDocumentation(
+      "Export a workbook.\n@param workbook The workbook.\n@returns The file's bytes.\n@throws `TypeError` when it is closed.\n@example\nawait toXlsxWorkbook(workbook);",
+    ),
+  ).toEqual({
+    docs: "Export a workbook.",
+    tags: [
+      ["param", "workbook The workbook."],
+      ["returns", "The file's bytes."],
+      ["throws", "`TypeError` when it is closed."],
+      ["example", "await toXlsxWorkbook(workbook);"],
+    ],
+  });
+  expect(splitDocumentation("@returns Only a tag.")).toEqual({
+    tags: [["returns", "Only a tag."]],
+  });
 });

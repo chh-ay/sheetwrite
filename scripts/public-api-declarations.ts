@@ -12,6 +12,7 @@ import {
   isJSDocParameterTag,
   isJSDocReturnTag,
   isJSDocSeeTag,
+  isJSDocThrowsTag,
   isTypeAliasDeclaration,
   isVariableStatement,
   type ModifiersBase,
@@ -135,6 +136,15 @@ function jsDocCommentTexts(node: Node): string[] {
         if (comment.trim() !== "") comments.push(`@returns ${comment.trim()}`);
         continue;
       }
+      // `@throws {TypeError} when …` keeps its type as code: it may not be a linkable export.
+      if (isJSDocThrowsTag(tag)) {
+        const type = tag.typeExpression?.type.getText();
+        const text = [type === undefined ? undefined : `\`${type}\``, comment.trim()]
+          .filter(Boolean)
+          .join(" ");
+        if (text !== "") comments.push(`@throws ${text}`);
+        continue;
+      }
       if (!["example", "see"].includes(tag.tagName.text)) continue;
       const reference = isJSDocSeeTag(tag) ? tag.nameExpression?.getText() : undefined;
       const text = [reference, comment].filter(Boolean).join(" ");
@@ -153,7 +163,7 @@ export function mergeDocumentation(sources: readonly string[]): string {
   const summaries: string[] = [];
   const tags: string[] = [];
   for (const source of sources) {
-    for (const block of source.split(/(?=^@(?:example|see|param|returns)\b)/m)) {
+    for (const block of source.split(/(?=^@(?:example|see|param|returns|throws)\b)/m)) {
       const text = block.trim();
       if (text.length === 0) continue;
       (text.startsWith("@") ? tags : summaries).push(text);

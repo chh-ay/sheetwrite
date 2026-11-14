@@ -864,7 +864,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                   wideSignature: structuredClone(parts.wide),
                   narrowSignature: structuredClone(parts.narrow),
                   docs: preview.docs,
-                  tags: [],
+                  tags: preview.tags,
                   referenceRoute: link.route,
                   navigable: true,
                   isApiName: true,
@@ -904,8 +904,10 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
           const memberReference = isLibrarySymbol
             ? undefined
             : memberDocsFor(hover.target, accessibleSignature, members);
-          const hasDetails =
-            Boolean(hover.docs ?? memberReference?.docs) || (hover.tags?.length ?? 0) > 0;
+          // Without its own docs the hover shows the manifest member's summary and tags.
+          const docsFromMember = hover.docs === undefined ? memberReference : undefined;
+          const tags = docsFromMember?.tags ?? hover.tags ?? [];
+          const hasDetails = Boolean(hover.docs ?? docsFromMember?.docs) || tags.length > 0;
           if (!hasDetails) {
             const restated = accessibleSignature.replace(/[;,]\s*$/, "").replace(/\s+/g, " ");
             if (line.text.replace(/\s+/g, " ").includes(restated)) continue;
@@ -931,7 +933,7 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
             }),
           ]);
           const seeRoutes = new Map<string, string>();
-          for (const [name, value] of hover.tags ?? []) {
+          for (const [name, value] of tags) {
             if (name !== "see" || !value) continue;
             const label = cleanDocumentation(value);
             const route = referenceRouteForHover(label, label, routes);
@@ -945,8 +947,8 @@ export function sheetwriteCodeHovers(options: SheetwriteCodeHoverOptions) {
                 accessibleSignature,
                 wideSignature: codeLineContents(renderedWideSignature.renderedGroupAst),
                 narrowSignature: codeLineContents(renderedNarrowSignature.renderedGroupAst),
-                docs: hover.docs ?? memberReference?.docs,
-                tags: hover.tags ?? [],
+                docs: hover.docs ?? docsFromMember?.docs,
+                tags,
                 seeRoutes,
                 referenceRoute,
                 navigable: referenceRoute !== undefined,
