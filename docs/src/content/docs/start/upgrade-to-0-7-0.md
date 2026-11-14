@@ -454,6 +454,12 @@ the sort on the table's header buttons
 | Typing, fill, paste or a remote edit inside a spill keeps the value and shows `#SPILL!` on the anchor. | Nothing; clearing the value restores the array. | [#352](https://github.com/chh-ay/sheetwrite/pull/352) |
 | Saved hidden rows, collapsed groups and filters apply at load. | Nothing; `SUBTOTAL` no longer counts rows that a saved filter hides. | [#330](https://github.com/chh-ay/sheetwrite/pull/330) |
 
+### setBlock arrays at the Grid
+
+| Change | What to do | Pull request |
+| --- | --- | --- |
+| An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction` reads each entry of a `setBlock`'s `values` and `styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Holes, non-finite numbers, byte limits and every other check are unchanged. | Nothing, unless you relied on the rejection. The `change` event carries the copied operation, not your object. | [#PR](https://github.com/chh-ay/sheetwrite/pull/PR) |
+
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
 Preliminary: 0.7.0 here is develop before the release; the final numbers come

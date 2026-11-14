@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { validateTransactionResources } from "../src/document-protocol.js";
+import { SheetwriteError } from "../src/errors.js";
 import {
   AUTO_FIT_CHUNK_CELLS,
   createGrid,
@@ -12,6 +13,7 @@ import {
 import { releaseEngineMemory } from "../src/index.js";
 import { IncompleteDataError, SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { registerGridTransactionAdmission } from "../src/transaction-admission.js";
 import type {
   CellScalar,
   ChangeEvent,
@@ -622,6 +624,155 @@ describe("Grid transaction resource ingress", () => {
       grid.destroy();
     }
   }, 30_000);
+});
+
+describe("setBlock arrays at Grid ingress", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } };
+  const setBlock = (values: CellScalar[], styleIds?: number[]): DocumentOp => ({
+    op: "setBlock",
+    range,
+    block: {
+      rowCount: 1,
+      colCount: 2,
+      values,
+      ...(styleIds ? { styleTable: [{}, { bold: true }], styleIds } : {}),
+    },
+  });
+  const cellAt = (grid: GridImpl, col: number) =>
+    grid.store.getCell({ sheet: "s1", row: 0, col }).resolved;
+
+  it("reads an accessor entry once and stores, emits, sends and undoes that value", () => {
+    const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+    const sent: DocumentOp[] = [];
+    const disposeAdmission = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        sent.push(...operations);
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+    const emitted: DocumentOp[] = [];
+    grid.on("change", (event) => emitted.push(...event.transaction.patches));
+    const before = cellAt(grid, 1);
+
+    // Each read returns a new number, so any second read would store a different value.
+    let valueReads = 0;
+    const values: CellScalar[] = ["kept", 0];
+    Object.defineProperty(values, 1, {
+      enumerable: true,
+      get() {
+        valueReads++;
+        return valueReads * 10;
+      },
+    });
+    let styleReads = 0;
+    const styleIds = [0, 0];
+    Object.defineProperty(styleIds, 1, {
+      enumerable: true,
+      get() {
+        styleReads++;
+        return styleReads;
+      },
+    });
+
+    expect(grid.applyTransaction({ patches: [setBlock(values, styleIds)] }).status).toBe("applied");
+    expect(valueReads).toBe(1);
+    expect(styleReads).toBe(1);
+    expect(cellAt(grid, 1)).toBe(10);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 1 }).style).toMatchObject({
+      bold: true,
+    });
+    for (const operation of [emitted[0], sent[0]]) {
+      if (operation?.op !== "setBlock") throw new Error("expected the copied setBlock");
+      expect(operation.block.values).toEqual(["kept", 10]);
+      expect(operation.block.values).not.toBe(values);
+      expect(operation.block.styleIds).toEqual([0, 1]);
+    }
+
+    grid.undo();
+    expect(cellAt(grid, 1)).toBe(before);
+    grid.redo();
+    expect(cellAt(grid, 1)).toBe(10);
+    expect(valueReads).toBe(1);
+    disposeAdmission();
+    grid.destroy();
+  });
+
+  it("throws invalid-argument for an entry whose getter throws, and changes nothing", () => {
+    const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+    let changes = 0;
+    grid.on("change", () => {
+      changes++;
+    });
+    const values: CellScalar[] = ["kept", 0];
+    const cause = new Error("entry unavailable");
+    Object.defineProperty(values, 1, {
+      enumerable: true,
+      get() {
+        throw cause;
+      },
+    });
+
+    let failure: unknown;
+    try {
+      grid.applyTransaction({ patches: [setBlock(values)] });
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(SheetwriteError);
+    expect(failure).toMatchObject({ code: "invalid-argument", operation: "transaction", cause });
+    expect(cellAt(grid, 0)).toBeNull();
+    expect(changes).toBe(0);
+    grid.destroy();
+  });
+
+  it("still rejects holes, non-finite numbers, envelope accessors and oversized blocks", () => {
+    const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+    const holey: CellScalar[] = ["kept"];
+    holey.length = 2;
+    let envelopeReads = 0;
+    const envelopeAccessor = Object.defineProperty({ rowCount: 1, colCount: 2 }, "values", {
+      enumerable: true,
+      get() {
+        envelopeReads++;
+        return ["a", "b"];
+      },
+    });
+    const invalid: DocumentOp[] = [
+      setBlock(holey),
+      setBlock(["kept", Number.NaN]),
+      setBlock(["kept", Number.POSITIVE_INFINITY]),
+      { op: "setBlock", range, block: envelopeAccessor } as unknown as DocumentOp,
+    ];
+    for (const operation of invalid) {
+      expect(grid.applyTransaction({ patches: [operation] }).status).toBe("rejected");
+    }
+    expect(envelopeReads).toBe(0);
+    expect(cellAt(grid, 0)).toBeNull();
+    grid.destroy();
+
+    const exact = validateTransactionResources([setBlock(["kept", "text"])]);
+    if (!exact.ok) throw new Error("expected a measurable block");
+    const limited = (maxEncodedBytes: number) =>
+      new GridImpl(mountHost(), {
+        workbook: makeWorkbook(4),
+        transactionResourceLimits: { maxEncodedBytes },
+      });
+    const atLimit = limited(exact.encodedBytes);
+    expect(atLimit.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
+      "applied",
+    );
+    atLimit.destroy();
+    const belowLimit = limited(exact.encodedBytes - 1);
+    expect(belowLimit.applyTransaction({ patches: [setBlock(["kept", "text"])] })).toMatchObject({
+      status: "rejected",
+      issues: [{ kind: "resource-limit", resource: "encoded-bytes" }],
+    });
+    belowLimit.destroy();
+  });
 });
 
 describe("Grid theme contract: setTheme merges, replaceTheme replaces", () => {
