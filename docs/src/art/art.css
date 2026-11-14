@@ -288,3 +288,128 @@
     aspect-ratio: 2 / 1;
   }
 }
+
+/* ---- Blueprint figures (art/blueprint.tsx) ----------------------------------- */
+/* A dotted canvas inside the figure frame, on docs pages and showcases; boxes
+   on the surface colour with a coloured inline-start edge; connectors by kind.
+   Names and labels use the body face, which every page preloads; only code
+   lines use the mono face. Every label carries a halo in the canvas colour,
+   so it reads over the dots and the lines. */
+:is(.sw-art-figure, .sw-showcase__figure):has(.sw-blueprint) {
+  --bp-canvas: var(--sw-surface-0);
+  border-radius: var(--sw-radius-md);
+  background:
+    radial-gradient(circle at 1px 1px, var(--sw-border) 1px, transparent 1.5px) 0 0 / 16px 16px,
+    var(--bp-canvas);
+}
+.sw-blueprint {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.sw-blueprint text {
+  font: 400 12px var(--sw-font-body);
+  fill: var(--sw-fg);
+}
+.sw-blueprint .bp-node__box {
+  fill: var(--sw-surface-1);
+  stroke: var(--sw-border-strong);
+  stroke-width: 1;
+}
+.sw-blueprint .bp-node__edge {
+  fill: var(--sw-border-strong);
+  stroke: none;
+}
+.sw-blueprint [data-tone="accent"] .bp-node__box {
+  fill: var(--sw-accent-soft);
+  stroke: var(--sw-accent);
+}
+.sw-blueprint [data-tone="accent"] .bp-node__edge {
+  fill: var(--sw-accent);
+}
+.sw-blueprint [data-tone="danger"] .bp-node__edge {
+  fill: var(--sw-danger);
+}
+.sw-blueprint [data-tone="danger"] .bp-node__box {
+  stroke: var(--sw-danger);
+}
+.sw-blueprint [data-tone="muted"] .bp-node__box {
+  fill: var(--sw-surface-2);
+  stroke-dasharray: 3 3;
+}
+.sw-blueprint .bp-node__eyebrow {
+  font: 600 10.5px var(--sw-font-body);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  fill: var(--sw-accent-strong);
+}
+.sw-blueprint .bp-node__title {
+  font: 600 13px var(--sw-font-body);
+  fill: var(--sw-fg-strong);
+}
+.sw-blueprint .bp-node__line {
+  fill: var(--sw-fg-muted);
+}
+.sw-blueprint .bp-node__code {
+  font: 500 11px var(--sw-font-mono);
+  fill: var(--sw-fg);
+}
+.sw-blueprint .bp-edge {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sw-blueprint .bp-edge[data-kind="main"] {
+  stroke: var(--sw-accent);
+  stroke-width: 2;
+}
+.sw-blueprint .bp-edge[data-kind="back"] {
+  stroke: var(--sw-violet);
+  stroke-dasharray: 5 3;
+}
+.sw-blueprint .bp-edge[data-kind="fail"] {
+  stroke: var(--sw-danger);
+  stroke-dasharray: 2 3;
+}
+.sw-blueprint .bp-edge[data-kind="side"] {
+  stroke: var(--sw-fg-muted);
+}
+/* Labels: strong ink on a halo in the canvas colour, never dim text on the dots. */
+.sw-blueprint .bp-edge__label {
+  font: 600 11.5px var(--sw-font-body);
+  fill: var(--sw-fg-strong);
+  paint-order: stroke;
+  stroke: var(--bp-canvas, var(--sw-surface-0));
+  stroke-width: 5px;
+  stroke-linejoin: round;
+}
+.sw-blueprint .bp-edge__label[data-kind="main"] {
+  fill: var(--sw-accent-strong);
+}
+.sw-blueprint .bp-edge__label[data-kind="back"] {
+  fill: var(--sw-violet);
+}
+.sw-blueprint .bp-edge__label[data-kind="fail"] {
+  fill: var(--sw-danger);
+}
+.sw-art-figure > figcaption {
+  margin-top: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+.sw-art-note {
+  margin: var(--sw-space-3) 0 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+.sw-blueprint [data-tone="lane"] .bp-node__box {
+  fill: var(--sw-surface-2);
+  stroke: var(--sw-border-strong);
+}
+.sw-blueprint [data-tone="lane"] .bp-node__edge {
+  display: none;
+}
