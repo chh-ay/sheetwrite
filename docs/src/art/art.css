@@ -413,3 +413,24 @@
 .sw-blueprint [data-tone="lane"] .bp-node__edge {
   display: none;
 }
+.sw-blueprint .bp-sheet__grid {
+  fill: none;
+  stroke: var(--sw-border-strong);
+  stroke-width: 1;
+}
+.sw-blueprint .bp-sheet__head {
+  font: 500 10.5px var(--sw-font-body);
+  fill: var(--sw-fg-muted);
+}
+.sw-blueprint .bp-sheet__cell {
+  font: 500 11px var(--sw-font-mono);
+}
+.sw-blueprint .bp-sheet__range[data-tone="accent"] {
+  fill: var(--sw-accent-soft);
+}
+.sw-blueprint .bp-sheet__range[data-tone="muted"] {
+  fill: var(--sw-surface-2);
+}
+.sw-blueprint .bp-sheet__range[data-tone="danger"] {
+  fill: var(--sw-danger-soft);
+}
