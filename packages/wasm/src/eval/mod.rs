@@ -17,8 +17,6 @@ mod index;
 mod info;
 mod iteration;
 mod let_slots;
-mod literal_criteria;
-mod literal_products;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
@@ -35,7 +33,9 @@ mod preview_limits;
 #[cfg(test)]
 mod preview_tests;
 mod random;
+mod range_criteria;
 mod range_fold;
+mod range_products;
 mod range_reader;
 mod range_view;
 mod reference;
@@ -72,7 +72,7 @@ use crate::types::{
 use array::dynamic_recompute_within_limit;
 pub(crate) use array::{ast_produces_array, Shapes};
 pub(crate) use criteria::sum_range_extent;
-use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
+use criteria::{aggregate_if, extreme_if, Criterion};
 use date::host_clock_serial;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{
@@ -83,7 +83,6 @@ use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, Reduction
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
 pub(crate) use let_slots::{resolve_let_names, LetFrame};
-use literal_criteria::CriteriaFold;
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
@@ -92,6 +91,7 @@ pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_
 #[cfg(feature = "analysis")]
 pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
+use range_criteria::{CriteriaFold, CriteriaRead};
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
 use statistic_args::StatisticCall;
@@ -871,12 +871,20 @@ impl CellStore {
     where
         I: IntoIterator<Item = usize> + Clone,
     {
+        if let (Some(changes), Some(work)) = (self.recalculation.as_deref_mut(), affected) {
+            for key in work.keys(&self.formula_slots) {
+                changes.cell(key.sheet, key.row, key.col);
+            }
+        }
         if self.pivots.is_some() {
             self.capture_pivot_changes(sheets.clone(), affected);
         }
 
         for sheet in sheets {
             if let Some(data) = self.sheets.get_mut(sheet) {
+                if let Some(changes) = self.recalculation.as_deref_mut() {
+                    changes.dirty_seeds(sheet, data);
+                }
                 data.finish_recompute();
             }
         }
@@ -1221,6 +1229,7 @@ impl CellStore {
                         output_cells: cleared.len(),
                         cells: cleared.clone(),
                     });
+                    self.record_recalculated_cells(output_sheet, &cleared);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1238,6 +1247,7 @@ impl CellStore {
                 }
 
                 if !changed.is_empty() {
+                    self.record_recalculated_cells(output_sheet, &changed);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -2212,7 +2222,7 @@ impl CellStore {
         }
 
         if func == Func::SumProduct {
-            if let Some(result) = self.literal_sum_product_family(args, sheet, depth + 1) {
+            if let Some(result) = self.sum_product_range_family(args, sheet, depth + 1) {
                 return result;
             }
         }
@@ -2771,7 +2781,7 @@ impl CellStore {
         }
         let range = range_from_ast(&args[0], sheet)?;
         let reader_depth = depth + 1;
-        let mut reader = match RangeReader::new(self, range, reader_depth) {
+        let reader = match RangeReader::new(self, range, reader_depth) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2782,26 +2792,15 @@ impl CellStore {
         if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
             return Some(Value::number(count as f64));
         }
-        if let Some(cells) = reader.literal_columns() {
-            return Some(self.literal_criteria_family(
-                CriteriaFold::Count,
-                None,
-                &[(cells, &criterion)],
-            ));
-        }
-        let mut matches = 0.0;
-        loop {
-            match reader.next_allow_errors(pass) {
-                Ok(Some(value)) => {
-                    if criterion.matches(&value) {
-                        matches += 1.0;
-                    }
-                }
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut [(reader, &criterion)],
+                value_first: false,
             }
-        }
-        Some(Value::number(matches))
+            .finish(self, pass),
+        )
     }
 
     /// COUNTIF with a numeric criterion over dense columns that hold only
@@ -2879,39 +2878,16 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
-        if let Some(ranges) = readers
-            .iter()
-            .map(RangeReader::literal_columns)
-            .collect::<Option<Vec<_>>>()
-        {
-            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
-            return Some(self.literal_criteria_family(CriteriaFold::Count, None, &pairs));
-        }
-        let mut matches = 0.0;
-        loop {
-            let first = match readers[0].next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let mut row_matches = criteria[0].matches(&first);
-            for index in 1..readers.len() {
-                let candidate = match readers[index].next_allow_errors(pass) {
-                    Ok(Some(value)) => value,
-                    // The shapes are checked equal, so every reader ends on
-                    // the same row.
-                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                    Err(error) => return Some(Value::Error(error)),
-                };
-                if !criteria[index].matches(&candidate) {
-                    row_matches = false;
-                }
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut pairs,
+                value_first: false,
             }
-            if row_matches {
-                matches += 1.0;
-            }
-        }
-        Some(Value::number(matches))
+            .finish(self, pass),
+        )
     }
 
     fn streamed_sum_if(
@@ -2926,7 +2902,7 @@ impl CellStore {
             return None;
         }
         let criteria_range = range_from_ast(&args[0], sheet)?;
-        let mut criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
+        let criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2949,35 +2925,17 @@ impl CellStore {
         if criteria_reader.shape() != value_reader.shape() {
             return Some(Value::Error(FormulaError::Value));
         }
-        if let (Some(cells), Some(values)) = (
-            criteria_reader.literal_columns(),
-            value_reader.literal_columns(),
-        ) {
-            let fold = CriteriaFold::Sum {
-                average: func == Func::AverageIf,
-            };
-            return Some(self.literal_criteria_family(fold, Some(&values), &[(cells, &criterion)]));
-        }
-        let mut fold = IfSum::new();
-        loop {
-            let candidate = match criteria_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let value = match value_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                // The shapes are checked equal, so both readers end together.
-                Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                Err(error) => return Some(Value::Error(error)),
-            };
-            if criterion.matches(&candidate) {
-                if let Err(error) = fold.add(&value) {
-                    return Some(Value::Error(error));
-                }
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Sum {
+                    average: func == Func::AverageIf,
+                },
+                values: Some(&mut value_reader),
+                criteria: &mut [(criteria_reader, &criterion)],
+                value_first: false,
             }
-        }
-        Some(fold.finish(func == Func::AverageIf))
+            .finish(self, pass),
+        )
     }
 
     fn streamed_sum_ifs_or_extreme(
@@ -3014,63 +2972,25 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
-        let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
-        if let (Some(values), Some(ranges)) = (
-            value_reader.literal_columns(),
-            readers
-                .iter()
-                .map(RangeReader::literal_columns)
-                .collect::<Option<Vec<_>>>(),
-        ) {
-            let fold = if extreme {
-                CriteriaFold::Extreme {
-                    maximum: func == Func::MaxIfs,
-                }
-            } else {
-                CriteriaFold::Sum {
-                    average: func == Func::AverageIfs,
-                }
-            };
-            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
-            return Some(self.literal_criteria_family(fold, Some(&values), &pairs));
-        }
-        let mut sums = IfSum::new();
-        let mut extremes = IfExtreme::new(func == Func::MaxIfs);
-        loop {
-            let value = match value_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let mut row_matches = true;
-            for index in 0..readers.len() {
-                let candidate = match readers[index].next_allow_errors(pass) {
-                    Ok(Some(value)) => value,
-                    // The shapes are checked equal, so every reader ends on
-                    // the same row.
-                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                    Err(error) => return Some(Value::Error(error)),
-                };
-                if !criteria[index].matches(&candidate) {
-                    row_matches = false;
-                }
+        let fold = if matches!(func, Func::MaxIfs | Func::MinIfs) {
+            CriteriaFold::Extreme {
+                maximum: func == Func::MaxIfs,
             }
-            if row_matches {
-                let folded = if extreme {
-                    extremes.add(&value)
-                } else {
-                    sums.add(&value)
-                };
-                if let Err(error) = folded {
-                    return Some(Value::Error(error));
-                }
-            }
-        }
-        Some(if extreme {
-            extremes.finish()
         } else {
-            sums.finish(func == Func::AverageIfs)
-        })
+            CriteriaFold::Sum {
+                average: func == Func::AverageIfs,
+            }
+        };
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold,
+                values: Some(&mut value_reader),
+                criteria: &mut pairs,
+                value_first: true,
+            }
+            .finish(self, pass),
+        )
     }
 
     #[inline(never)]

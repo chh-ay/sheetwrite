@@ -374,6 +374,11 @@ class SheetSources {
     const c0 = Math.min(range.start.col, range.end.col);
     const c1 = Math.max(range.start.col, range.end.col);
 
+    this.queryBounds(r0, r1, c0, c1, hit);
+  }
+
+  /** Inclusive primitive bounds avoid building a Range per engine rectangle. */
+  queryBounds(r0: number, r1: number, c0: number, c1: number, hit: (chart: number) => void): void {
     // First entry whose start row is past the edit; nothing from there on can overlap.
     let low = 0;
     let high = this.entries.length;
@@ -406,14 +411,13 @@ class ChartIndex {
   readonly charts: ChartRef[] = [];
   readonly sources = new Map<SheetId, SheetSources>();
   readonly owned = new Map<SheetId, number[]>();
-  /** Charts that read a formula, reference, spill or pivot output; any value change may move them. */
-  readonly computed: number[] = [];
+  /** Charts over pivots have no cell-source rectangle to query. */
+  readonly pivotIndices: number[] = [];
   /** Charts over pivots; they also change when the pivot views are computed again. */
   readonly pivots: ChartRef[] = [];
 
   constructor(store: Store) {
     const sheets = sheetLookup(store);
-    const engine = storeEngine(store);
     const entries = new Map<SheetId, SourceEntry[]>();
 
     for (const sheet of store.getWorkbook().sheets) {
@@ -429,9 +433,9 @@ class ChartIndex {
         if (definition.pivot !== undefined) {
           // A chart over a pivot reads the pivot's result.
           this.pivots.push(ref);
-          this.computed.push(chart);
-        } else if (this.addSources(definition, chart, sheets, entries, engine)) {
-          this.computed.push(chart);
+          this.pivotIndices.push(chart);
+        } else {
+          this.addSources(definition, chart, sheets, entries);
         }
       }
     }
@@ -444,16 +448,13 @@ class ChartIndex {
     return this.owned.get(ref.sheet)?.find((chart) => this.charts[chart]?.id === ref.id);
   }
 
-  /** Returns whether the chart reads a computed cell. Custom stores cannot tell, so they always do. */
+  /** Index each source rectangle once, independent of the cells it currently holds. */
   private addSources(
     definition: ChartDefinition,
     chart: number,
     sheets: SheetLookup,
     entries: Map<SheetId, SourceEntry[]>,
-    engine: StoreDataEngine | null,
-  ): boolean {
-    let computed = false;
-
+  ): void {
     for (const series of definition.series) {
       // Category levels in rows are read with every row, so the index covers the same cells.
       const levelRows = categoryLevelLayout(definition.kind, series) === "rows";
@@ -465,41 +466,18 @@ class ChartIndex {
         const list = entries.get(rect.sheet.id);
         if (list) list.push({ rect, chart });
         else entries.set(rect.sheet.id, [{ rect, chart }]);
-
-        // One bulk source capture per range, only while no earlier range answered.
-        computed ||=
-          engine === null ||
-          engine.chartSourcesComputed({
-            sheet: rect.sheet.id,
-            start: { row: rect.r0, col: rect.c0 },
-            end: { row: rect.r1, col: rect.c1 },
-          });
       }
     }
-
-    return computed;
   }
 }
+
+/** Values per engine recalculation rectangle: sheet handle, row start/end, column start/end. */
+const RECALCULATION_RECT_WIDTH = 5;
+/** A handle no sheet has; `sheetIdOfHandle` returns undefined for it. */
+const NO_SHEET_HANDLE = -1;
 
 /** Upper bound for open-ended index queries; larger than any row or column index. */
 const UNBOUNDED = Number.MAX_SAFE_INTEGER;
-
-/** Whether a direct cell edit may add a formula, reference or spill to its rectangle. */
-function mayAddComputedSource(patch: DocumentOp): boolean {
-  switch (patch.op) {
-    case "set":
-      return patch.value.kind !== "literal";
-    case "setRange":
-      return patch.cells.some((cell) => cell.value.kind !== "literal");
-    case "setBlock":
-      return (patch.block.formulas?.length ?? 0) > 0 || (patch.block.refs?.length ?? 0) > 0;
-    case "restoreBlock":
-    case "permuteRows":
-      return true;
-    default:
-      return false;
-  }
-}
 
 /**
  * The indexed charts one commit names, each once, in the order first named.
@@ -561,22 +539,6 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       const sources = index.sources.get(range.sheet);
       sources?.query(range, hit);
       context.valuesChanged = true;
-
-      // Spills grow down and right and can reach a source outside the edited rectangle.
-      if (mayAddComputedSource(patch)) {
-        const start = {
-          row: Math.min(range.start.row, range.end.row),
-          col: Math.min(range.start.col, range.end.col),
-        };
-
-        sources?.query(
-          { sheet: range.sheet, start, end: { row: UNBOUNDED, col: UNBOUNDED } },
-          (chart) => {
-            hits.add(chart);
-            context.rebuild = true;
-          },
-        );
-      }
 
       return;
     }
@@ -712,15 +674,21 @@ class ChartTracker {
   readonly listeners = new Set<ChartChangeListener>();
   private index: ChartIndex;
   private readonly hits = new ChartHits();
+  /** One bound callback for every index query, so a commit allocates none. */
+  private readonly addHit = (chart: number): void => this.hits.add(chart);
+  private readonly engine: StoreDataEngine | null;
   private readonly detach: () => void;
 
   constructor(private readonly store: Store) {
     this.index = new ChartIndex(store);
+    this.engine = storeEngine(store);
+    this.engine?.trackChartRecalculation(true);
     this.detach = store.on("change", (event) => this.onChange(event));
   }
 
   dispose(): void {
     this.detach();
+    this.engine?.trackChartRecalculation(false);
   }
 
   /**
@@ -733,6 +701,33 @@ class ChartTracker {
 
     const event: ChartChangeEvent = { epoch: undefined, charts: [...charts] };
     for (const listener of this.listeners) listener(event);
+  }
+
+  /**
+   * Name the indexed charts whose sources meet a rectangle the engine
+   * recalculated in commit `epoch`. False when the engine cannot tell, so
+   * the caller names every chart.
+   */
+  private queryRecalculated(epoch: number | undefined, index: ChartIndex): boolean {
+    const engine = this.engine;
+    const rects = engine?.recalculatedRects(epoch);
+    if (!engine || !rects) return false;
+    for (
+      let offset = 0;
+      offset + RECALCULATION_RECT_WIDTH <= rects.length;
+      offset += RECALCULATION_RECT_WIDTH
+    ) {
+      const sheet = engine.sheetIdOfHandle(rects[offset] ?? NO_SHEET_HANDLE);
+      const sources = sheet === undefined ? undefined : index.sources.get(sheet);
+      sources?.queryBounds(
+        rects[offset + 1] ?? 0,
+        (rects[offset + 2] ?? 0) - 1,
+        rects[offset + 3] ?? 0,
+        (rects[offset + 4] ?? 0) - 1,
+        this.addHit,
+      );
+    }
+    return true;
   }
 
   private onChange(event: ChangeEvent): void {
@@ -750,7 +745,17 @@ class ChartTracker {
     for (const patch of event.transaction.patches) classifyPatch(patch, context);
 
     const { direct, valuesChanged, rebuild } = context;
-    if (valuesChanged) for (const chart of index.computed) hits.add(chart);
+    const precise = this.queryRecalculated(event.epoch, index);
+    if (valuesChanged) {
+      if (precise) {
+        // Pivot views have no worksheet source rectangle; their asynchronous
+        // refresh also names them through pivotViewsChanged().
+        for (const chart of index.pivotIndices) hits.add(chart);
+      } else {
+        // Custom stores and bounded-report overflow keep the conservative contract.
+        for (let chart = 0; chart < index.charts.length; chart++) hits.add(chart);
+      }
+    }
 
     if (rebuild) this.index = new ChartIndex(this.store);
 
@@ -789,8 +794,9 @@ const TRACKERS = new WeakMap<Store, ChartTracker>();
 /**
  * Listen for commits that change any chart's `ChartView`. Edited rectangles are
  * matched against an index of series ranges, so edits outside every series
- * range cost no chart work. Charts that read formulas, references or spills
- * also change on any commit that changes cell values. Returns an unsubscribe
+ * range cost no chart work. Recomputed formulas and changed spill/pivot cells
+ * query the same index. Custom stores and report overflow refresh conservatively.
+ * Returns an unsubscribe
  * function; the index is dropped with the last listener.
  */
 export function subscribeChartChanges(store: Store, listener: ChartChangeListener): () => void {
