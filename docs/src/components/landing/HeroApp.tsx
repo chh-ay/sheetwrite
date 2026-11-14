@@ -554,6 +554,8 @@ export function HeroApp() {
   return (
     <figure
       class="sw-hero-app"
+      // The landing's render-blocking `expect` link waits for this id (routes/index.tsx).
+      id="landing-hero-app"
       data-chart-selected={String(STILL.chartSelected)}
       data-editing="false"
       data-landing-running="false"
