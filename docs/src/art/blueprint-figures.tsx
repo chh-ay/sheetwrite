@@ -42,7 +42,7 @@ const ARCHITECTURE_TEXT = {
 function architectureWide(): BlueprintLayout {
   const host = node({
     id: "host",
-    x: 190,
+    x: 120,
     y: 8,
     w: 320,
     eyebrow: "Your app",
@@ -51,7 +51,7 @@ function architectureWide(): BlueprintLayout {
   });
   const core = node({
     id: "core",
-    x: 190,
+    x: 120,
     y: 152,
     w: 320,
     eyebrow: "@sheetwrite/core",
@@ -61,16 +61,16 @@ function architectureWide(): BlueprintLayout {
   });
   const renderer = node({
     id: "renderer",
-    x: 584,
+    x: 580,
     y: 152,
-    w: 128,
+    w: 132,
     eyebrow: "Canvas",
     title: "Renderer",
     lines: ["Main thread", "or worker"],
   });
   const wasm = node({
     id: "wasm",
-    x: 190,
+    x: 120,
     y: 296,
     w: 320,
     eyebrow: "@sheetwrite/wasm",
@@ -435,9 +435,9 @@ function documentOpsWide(): BlueprintLayout {
   const height = last.rect.y + last.rect.h;
   const store = node({
     id: "store",
-    x: 296,
+    x: 290,
     y: 0,
-    w: 168,
+    w: 160,
     title: "Store",
     lines: ["One reducer,", "one change event"],
     code: ["DocumentOp[]"],
@@ -446,9 +446,9 @@ function documentOpsWide(): BlueprintLayout {
   const storeAt = { ...store, rect: { ...store.rect, y: (8 + height - store.rect.h) / 2 } };
   const snapshot = node({
     id: "snapshot",
-    x: 520,
+    x: 540,
     y: 0,
-    w: 192,
+    w: 172,
     title: "Load a snapshot",
     lines: ["Validated, recalculated", "once; no event or undo"],
     code: ["WorkbookSnapshot"],

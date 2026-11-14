@@ -407,6 +407,7 @@ function sequenceLayout(
         fromSide,
         t: (level - from.rect.y) / from.rect.h,
         to: mark.id,
+        toT: 0.5,
         kind: "fail",
         label: step.message,
         labelSide: "above",

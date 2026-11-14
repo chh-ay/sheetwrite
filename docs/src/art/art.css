@@ -291,7 +291,8 @@
 
 /* ---- Blueprint figures (art/blueprint.tsx) ----------------------------------- */
 /* A dotted canvas inside the figure frame; boxes on the surface colour with a
-   coloured inline-start edge; connectors by kind. Every label carries a halo in
+   coloured inline-start edge; connectors by kind. Names and labels use the
+   body face, which every page preloads; only code lines use the mono face. Every label carries a halo in
    the canvas colour, so it reads over the dots and the lines. */
 .sw-art-figure:has(.sw-blueprint) {
   --bp-canvas: var(--sw-surface-0);
@@ -337,13 +338,13 @@
   stroke-dasharray: 3 3;
 }
 .sw-blueprint .bp-node__eyebrow {
-  font: 600 10.5px var(--sw-font-mono);
+  font: 600 10.5px var(--sw-font-body);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   fill: var(--sw-accent-strong);
 }
 .sw-blueprint .bp-node__title {
-  font: 600 12.5px var(--sw-font-mono);
+  font: 600 13px var(--sw-font-body);
   fill: var(--sw-fg-strong);
 }
 .sw-blueprint .bp-node__line {
@@ -376,7 +377,7 @@
 }
 /* Labels: strong ink on a halo in the canvas colour, never dim text on the dots. */
 .sw-blueprint .bp-edge__label {
-  font: 600 11px var(--sw-font-mono);
+  font: 600 11.5px var(--sw-font-body);
   fill: var(--sw-fg-strong);
   paint-order: stroke;
   stroke: var(--bp-canvas, var(--sw-surface-0));
