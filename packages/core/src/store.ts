@@ -564,6 +564,7 @@ export class SheetwriteStore implements Store {
       source: "local",
       epoch: this.epoch,
     };
+    this.engine.captureChartRecalculation(event.epoch);
     for (const listener of this.listeners) listener(event);
   }
 
@@ -898,6 +899,7 @@ export class SheetwriteStore implements Store {
         epoch: this.epoch,
       };
 
+      this.engine.captureChartRecalculation(event.epoch);
       for (const listener of this.listeners) listener(event);
     }
 

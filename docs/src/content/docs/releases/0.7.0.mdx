@@ -315,6 +315,20 @@ export async function restoreLatest(
 
 </Compare>
 
+### Removed engine bindings
+
+Direct `@sheetwrite/wasm` and `@sheetwrite/formulas` users must replace these bindings
+([#609](https://github.com/chh-ay/sheetwrite/pull/609)):
+
+| Removed | Replacement |
+| --- | --- |
+| `CellStore.setColumnNumbers`, `setColumnStrings`, `setColumnStringsPacked` | `setColumnBlockPacked`, `setBlockPacked` or `setSparseBlock` |
+| `DiffKernel.clearPage` | Consume the page arrays; the next `compare` starts a new page |
+| `DiffKernel.pageLength` | Read the length of a returned page array |
+
+The scalar setters and `clearCell`, `CellStore.rowCount` / `colCount`, and
+`WindowView.nRows` / `nCols` remain public APIs.
+
 ### Errors and cancellation
 
 - Bad input and passed limits throw a `SheetwriteError` (`invalid-argument`, `not-found`,
