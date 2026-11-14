@@ -5,6 +5,8 @@ export const FORCED_LAYOUT_ACTIONS = [
   "edit-open",
   "edit-commit",
   "editor-scroll",
+  "edit-type",
+  "bar-type",
   "scroll-refresh",
   "arrow-down-refresh",
   "edit-commit-refresh",
@@ -21,9 +23,28 @@ export const SYNCHRONOUS_ACTIONS: Readonly<Record<ForcedLayoutAction, boolean>> 
   "edit-open": false,
   "edit-commit": false,
   "editor-scroll": false,
+  "edit-type": false,
+  "bar-type": false,
   "scroll-refresh": true,
   "arrow-down-refresh": true,
   "edit-commit-refresh": true,
+};
+
+/**
+ * Actions that type one character per step with a formula bar beside the
+ * grid: into the open cell editor, or into the formula bar.
+ */
+export const TYPING_ACTIONS: Readonly<Record<ForcedLayoutAction, boolean>> = {
+  scroll: false,
+  "arrow-down": false,
+  "edit-open": false,
+  "edit-commit": false,
+  "editor-scroll": false,
+  "edit-type": true,
+  "bar-type": true,
+  "scroll-refresh": false,
+  "arrow-down-refresh": false,
+  "edit-commit-refresh": false,
 };
 
 export const FORCED_LAYOUT_ROWS = 100_000;

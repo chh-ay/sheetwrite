@@ -173,7 +173,7 @@ function addJsonString(walk: JsonWalk, text: string): void {
  * Length of a finite number's JSON text. Integers, the common cell value, are
  * measured against exact powers of ten instead of allocating their text.
  */
-function jsonNumberLength(value: number): number {
+export function jsonNumberLength(value: number): number {
   const magnitude = Math.abs(value);
   if (!Number.isInteger(value) || magnitude >= (POWERS_OF_TEN[PLAIN_INTEGER_DIGITS] ?? 0)) {
     return String(value).length;

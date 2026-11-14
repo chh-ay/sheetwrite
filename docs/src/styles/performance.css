@@ -1,9 +1,10 @@
 /* The performance pages' sheets, one request: evidence tables, figures, perf
-   bars, machine comparisons, the speed story and change notes appear
+   bars, the release comparison, machine comparisons, the speed story and change notes appear
    together, in site.css's cascade order. */
 @import "@docs/styles/site/evidence.css";
 @import "@docs/styles/site/figures.css";
 @import "@docs/styles/site/perf-bars.css";
+@import "@docs/styles/site/version-bars.css";
 @import "@docs/styles/site/machine-compare.css";
 @import "@docs/styles/site/speed-story.css";
 @import "@docs/styles/site/release-change.css";

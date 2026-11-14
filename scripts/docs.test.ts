@@ -267,6 +267,9 @@ describe("documentation content", () => {
       "example-1",
       "example-2",
     ]);
+    expect([
+      ...headingAnchors('<table><tr id="fn-sum"><td>SUM</td></tr><tr id="fn-abs"></tr></table>'),
+    ]).toEqual(["fn-sum", "fn-abs"]);
   });
 
   it("keeps published package README links valid outside the monorepo", async () => {

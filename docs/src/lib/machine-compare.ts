@@ -9,7 +9,7 @@
  */
 import { type FigureShape, type FigureTone, scalePosition } from "../components/figures/scale.js";
 import { laneHtml, legendMark } from "../components/figures/static.js";
-import { escapeHtml, formatTimes, type PerfIconMarkup, type PerfMachine } from "./perf-bars.js";
+import { escapeHtml, type PerfIconMarkup, type PerfMachine } from "./perf-bars.js";
 
 /** One machine's result for one row: a ratio above 1 is faster, or pending. */
 export type MachineResult =
@@ -163,24 +163,18 @@ function row(entry: MachineRow, comparison: MachineComparison, axis: RatioAxis):
 }
 
 function table(comparison: MachineComparison): string {
-  const head = [
-    comparison.rowHeader,
-    ...comparison.machines.map((key) => `${key.name}: ${comparison.measure.toLowerCase()}`),
-  ]
+  // The caption and the axis title above name the measure, so each column is its machine.
+  const head = [comparison.rowHeader, ...comparison.machines.map((key) => key.name)]
     .map((column) => `<th scope="col">${escapeHtml(column)}</th>`)
     .join("");
   const body = [...comparison.rows, ...(comparison.quiet?.rows ?? [])]
     .map(
       (entry) =>
         `<tr><th scope="row">${escapeHtml(entry.label)}</th>${comparison.machines
-          .map((key) => {
-            const result = entry.results[key.machine];
-            const text = resultText(
-              result,
-              (value) => `${formatTimes(value.ratio)} · ${value.text}`,
-            );
-            return `<td>${escapeHtml(text)}</td>`;
-          })
+          .map(
+            (key) =>
+              `<td>${escapeHtml(resultText(entry.results[key.machine], (value) => value.text))}</td>`,
+          )
           .join("")}</tr>`,
     )
     .join("");
@@ -194,12 +188,14 @@ export const ALL_MACHINES = "all";
  * A Linux | Mac | All radio group. The first machine starts checked; the
  * markup's `checked` stays the reader's to change. `label` names the figure,
  * so a page with several switches reads "Machine for median recalculation time".
+ * `all: false` leaves out All, for figures whose numbers can't share an axis.
  */
 export function machineSwitch(
   options: {
     readonly id: string;
     readonly label: string;
     readonly machines: ReadonlyArray<{ readonly machine: PerfMachine; readonly name: string }>;
+    readonly all?: boolean;
   },
   icon: PerfIconMarkup,
 ): string {
@@ -210,7 +206,7 @@ export function machineSwitch(
     ...options.machines.map((entry, index) =>
       radio(entry.machine, entry.name, icon(MACHINE_ICONS[entry.machine]), index === 0),
     ),
-    radio(ALL_MACHINES, "All", icon("layers"), false),
+    ...(options.all === false ? [] : [radio(ALL_MACHINES, "All", icon("layers"), false)]),
   ].join("")}</div>`;
 }
 

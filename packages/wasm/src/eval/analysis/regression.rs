@@ -6,24 +6,26 @@ use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
 use super::super::value::{aggregate_number, bool_from_value};
 use super::super::EvalPass;
+use super::descriptive;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use std::cmp::Ordering;
 
-pub(crate) const NAMES: &[&str] = &[
-    "FREQUENCY",
-    "GROWTH",
-    "LINEST",
-    "LOGEST",
-    "MODE.MULT",
-    "PERCENTILE",
-    "PERCENTRANK",
-    "PROB",
-    "QUARTILE",
-    "RANK",
-    "TREND",
-];
+family_functions! {
+    FREQUENCY,
+    GROWTH,
+    LINEST,
+    LOGEST,
+    MODE_MULT = "MODE.MULT",
+    PERCENTILE,
+    PERCENTRANK,
+    PROB,
+    QUARTILE,
+    RANK,
+    TREND,
+}
+
 const STATS_ROWS: usize = 5;
 const PROBABILITY_TOLERANCE: f64 = 1e-12;
 const QR_DEPENDENCE_FACTOR: f64 = 64.0;
@@ -32,15 +34,23 @@ const LINEST_MAX_ARGS: usize = 4;
 const FREQUENCY_ARGS: usize = 2;
 const MODE_MAX_ARGS: usize = 255;
 
-/// The legacy names use the same rules as their current names.
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let current = match name {
-        "PERCENTILE" => Func::PercentileInc,
-        "QUARTILE" => Func::QuartileInc,
-        "RANK" => Func::RankEq,
-        "PERCENTRANK" => return super::descriptive::evaluate("PERCENTRANK.INC", values),
-        "PROB" => return probability(values).map_or_else(Value::Error, Value::number),
-        _ => return Value::Error(FormulaError::Name),
+/// The legacy names use the same rules as their current names. The array
+/// functions evaluate through the array hooks only.
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    let current = match function {
+        Function::PERCENTILE => Func::PercentileInc,
+        Function::QUARTILE => Func::QuartileInc,
+        Function::RANK => Func::RankEq,
+        Function::PERCENTRANK => {
+            return descriptive::evaluate(descriptive::Function::PERCENTRANK_INC, values)
+        }
+        Function::PROB => return probability(values).map_or_else(Value::Error, Value::number),
+        Function::FREQUENCY
+        | Function::GROWTH
+        | Function::LINEST
+        | Function::LOGEST
+        | Function::MODE_MULT
+        | Function::TREND => return Value::Error(FormulaError::Name),
     };
     statistics::apply(current, values).unwrap_or(Value::Error(FormulaError::Name))
 }
@@ -70,10 +80,15 @@ fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         .sum())
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
+pub(crate) const fn produces_array(function: Function, _: &[Ast], _: Shapes<'_>) -> bool {
     matches!(
-        name,
-        "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND"
+        function,
+        Function::FREQUENCY
+            | Function::GROWTH
+            | Function::LINEST
+            | Function::LOGEST
+            | Function::MODE_MULT
+            | Function::TREND
     )
 }
 
@@ -123,12 +138,12 @@ fn argument_shape(
 /// can be a formula, so the evaluated result can be smaller.
 pub(crate) fn shape(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let (rows, cols) = if name == "FREQUENCY" {
+    let (rows, cols) = if function == Function::FREQUENCY {
         if args.len() != FREQUENCY_ARGS {
             return Err(FormulaError::Value);
         }
@@ -136,7 +151,7 @@ pub(crate) fn shape(
         let (_, _, bin_cells) = argument_shape(store, &args[1], sheet, pass)?;
         validate_frequency_resources(data_cells, bin_cells)?;
         (bin_cells + 1, 1)
-    } else if name == "MODE.MULT" {
+    } else if function == Function::MODE_MULT {
         if args.is_empty() || args.len() > MODE_MAX_ARGS {
             return Err(FormulaError::Value);
         }
@@ -159,7 +174,7 @@ pub(crate) fn shape(
             })?;
         let predictors = predictor_count(y_rows, y_cols, x_rows, x_cols)?;
         validate_fit_resources(y_cells, predictors)?;
-        if name == "LINEST" || name == "LOGEST" {
+        if function == Function::LINEST || function == Function::LOGEST {
             (statistics_rows_bound(args), predictors + 1)
         } else if let Some(ast) = optional_ast(args, 2) {
             let (new_rows, new_cols, new_cells) = argument_shape(store, ast, sheet, pass)?;
@@ -175,12 +190,12 @@ pub(crate) fn shape(
 
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
+    shape(store, function, args, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 fn statistics_rows_bound(args: &[Ast]) -> usize {
@@ -294,23 +309,24 @@ impl Evaluation<'_, '_> {
 
 pub(crate) fn evaluate_array(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
-    shape(store, name, args, sheet, pass)?;
+    shape(store, function, args, sheet, pass)?;
     let mut evaluation = Evaluation {
         store,
         sheet,
         pass,
         depth,
     };
-    match name {
-        "FREQUENCY" => return frequency(&mut evaluation, args),
-        "MODE.MULT" => return modes(&mut evaluation, args),
-        _ => {}
+    if function == Function::FREQUENCY {
+        return frequency(&mut evaluation, args);
+    }
+    if function == Function::MODE_MULT {
+        return modes(&mut evaluation, args);
     }
     let y_matrix = evaluation.matrix(&args[0])?;
     let x_matrix = if let Some(ast) = optional_ast(args, 1) {
@@ -325,8 +341,8 @@ pub(crate) fn evaluate_array(
         )
     };
     let is_vertical = y_matrix.cols == 1;
-    let is_exponential = name == "LOGEST" || name == "GROWTH";
-    let is_prediction = name == "TREND" || name == "GROWTH";
+    let is_exponential = function == Function::LOGEST || function == Function::GROWTH;
+    let is_prediction = function == Function::TREND || function == Function::GROWTH;
     let has_intercept = evaluation.boolean(args, if is_prediction { 3 } else { 2 }, true)?;
     if !is_prediction {
         let has_statistics = evaluation.boolean(args, 3, false)?;

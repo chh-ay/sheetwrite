@@ -324,6 +324,22 @@ impl CellStorage {
         }
     }
 
+    /// The source kind and payload with one paged lookup; `None` while unloaded.
+    #[inline]
+    pub(crate) fn loaded_source_at(&self, row: usize, col: usize) -> Option<(u8, u64)> {
+        if let Some(paged) = &self.paged {
+            let (kind, payload, _, loaded, _) = paged.read(row, col);
+            loaded.then_some((kind, payload))
+        } else {
+            let index = self.idx(row, col);
+            let kind = self.kind[index];
+            Some((
+                kind & !CALCULATED,
+                dense_source(kind, self.payload[index]).1,
+            ))
+        }
+    }
+
     #[inline]
     pub(crate) fn source_payload_at(&self, index: usize) -> u64 {
         if let Some(paged) = &self.paged {
@@ -1152,19 +1168,27 @@ impl CellStorage {
 
     /// Writes validated rows of one column, leaving unlisted cells alone.
     /// Like `write_literal_block`, replaces sources and discards calculated slots.
-    /// `cell(index)` gives `(row, kind, payload, style)` for `index` in
-    /// `0..len`. Paged rows are unrevisioned writes; `dirty` decides rows with
-    /// an edit.
+    /// `cell(entry)` gives `(row, kind, payload, style)` for each of
+    /// `entries`. Paged rows are unrevisioned writes; `dirty` decides rows
+    /// with an edit.
+    ///
+    /// The dense loop walks `entries` directly: indexing them through the
+    /// paged writer's per-index callback cost ~14 instructions per cell.
     pub(crate) fn write_column_cells(
         &mut self,
         col: usize,
-        len: usize,
+        entries: &[u32],
         cell: impl Fn(usize) -> (usize, u8, u64, u32),
         dirty: DirtyRowWrite,
     ) {
         debug_assert!(col < self.n_cols, "column writes need an in-bounds column");
         if let Some(paged) = &mut self.paged {
-            paged.write_column(col, len, &cell, dirty);
+            paged.write_column(
+                col,
+                entries.len(),
+                &|index| cell(entries[index] as usize),
+                dirty,
+            );
             return;
         }
         let column = col * self.row_count..(col + 1) * self.row_count;
@@ -1172,8 +1196,8 @@ impl CellStorage {
         let payloads = &mut self.payload[column.clone()];
         let styles = &mut self.style[column];
         let has_calculated = self.dense_calculated_cells != 0;
-        for index in 0..len {
-            let (row, kind, payload, style) = cell(index);
+        for &entry in entries {
+            let (row, kind, payload, style) = cell(entry as usize);
             if has_calculated && kinds[row] & CALCULATED != 0 {
                 self.dense_calculated_cells -= 1;
             }
