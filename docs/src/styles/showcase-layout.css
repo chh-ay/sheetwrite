@@ -11,6 +11,10 @@
   --sw-frame-max: 120rem;
 
   min-height: 100vh;
+  /* Clip, not hide: the demo-card rule that shares this class sets
+     overflow: hidden, which makes the page a scroll container and stops the
+     site header and the code aside from sticking. */
+  overflow: clip;
   background: var(--sw-surface-0);
   color: var(--sw-fg);
 }
@@ -369,30 +373,36 @@ a.sw-showcase__call-name:hover {
 }
 
 @media (min-width: 72rem) {
+  /* Two rows, the code's heading and its body; the code section lays its
+     own heading and body on them (subgrid), so the aside starts level with
+     the code's top edge. */
   .sw-showcase__code-row {
+    grid-template-rows: auto 1fr;
     grid-template-columns: repeat(12, minmax(0, 1fr));
-    column-gap: var(--sw-space-8);
+    gap: var(--sw-space-4) var(--sw-space-8);
   }
 
   .sw-showcase__code-row > .sw-showcase__code {
-    grid-column: span 8;
+    grid-template-rows: subgrid;
+    grid-row: span 2;
+    grid-column: 1 / span 8;
   }
 
-  /* The aside starts level with the code, under the code's heading. */
+  /* Beside long code the aside stays in view, below the sticky site header. */
   .sw-showcase__code-row > .sw-showcase__code-aside {
     position: sticky;
-    top: var(--sw-space-8);
-    grid-column: span 4;
-    margin-top: var(--sw-space-12);
+    top: calc(var(--sw-header-height) + var(--sw-space-4));
+    grid-row: 2;
+    grid-column: 9 / -1;
   }
 
   /* An architecture picture beside the code gets more of the row. */
   .sw-showcase__code-row[data-figure] > .sw-showcase__code {
-    grid-column: span 7;
+    grid-column: 1 / span 7;
   }
 
   .sw-showcase__code-row[data-figure] > .sw-showcase__code-aside {
-    grid-column: span 5;
+    grid-column: 8 / -1;
   }
 }
 
