@@ -1,7 +1,8 @@
 // Panel reads of a large source range: the pivot field list (distinct values
 // of a filter field), dashboard slicer values, a dashboard pivot's output and
-// Insert › Chart (category and header inference). The output records each
-// result so two runs can be compared for equality.
+// Insert › Chart (category and header inference), and single cell edits with
+// the pivot field list closed and open. The output records each result so two
+// runs can be compared for equality.
 
 import "./dom-setup.js";
 import { createHash } from "node:crypto";
@@ -15,6 +16,7 @@ import {
   slicerValuesOf,
 } from "../../packages/core/src/dashboard/dashboard-engine.js";
 import {
+  type CellAddress,
   createGrid,
   initSheetwrite,
   type Column,
@@ -33,6 +35,8 @@ const WARMUPS = 5;
 const SAMPLES = 30;
 const REPORT_SHEET = "report";
 const SHEET = "source";
+/** A sheet the pivot does not read, for edits that cannot change its field list. */
+const OTHER_SHEET = "other";
 const HOST_WIDTH_PX = 900;
 const HOST_HEIGHT_PX = 500;
 const COLUMN_WIDTH_PX = 100;
@@ -59,6 +63,7 @@ const columns: Column[] = [
   { key: "amount", header: "Amount", width: COLUMN_WIDTH_PX, type: "number" },
   { key: "output", header: "Output", width: COLUMN_WIDTH_PX, type: "text" },
 ];
+const otherColumn: Column = { key: "note", header: "Note", width: COLUMN_WIDTH_PX, type: "number" };
 const range = {
   sheet: SHEET,
   start: { row: 0, col: 0 },
@@ -107,6 +112,7 @@ const grid = createGrid(host, {
     sheets: [
       { id: SHEET, name: "Source", rowCount: ROW_COUNT, columns, tables: [table] },
       { id: REPORT_SHEET, name: "Report", kind: "dashboard", rowCount: 0, columns: [] },
+      { id: OTHER_SHEET, name: "Other", rowCount: 1, columns: [otherColumn] },
     ],
   },
   data: { rowCount: ROW_COUNT, columns: { region: labels, amount: amounts } },
@@ -127,6 +133,55 @@ function measure(run: () => () => void): number[] {
   return samples;
 }
 
+/**
+ * One cell write per sample to `addr`, each a new number, so no write is a
+ * no-op. The source cell holds numbers already, so its field type stays.
+ */
+function editEach(addr: CellAddress): () => () => void {
+  let value = 0;
+  return () => {
+    value += 1;
+    const result = grid.applyTransaction({
+      patches: [{ op: "set", addr, value: { kind: "literal", value } }],
+    });
+    if (result.status !== "applied") throw new Error(`edit of ${addr.sheet} was ${result.status}`);
+    return () => {};
+  };
+}
+
+/**
+ * Cell edits with the pivot field list closed and open: on another sheet,
+ * which cannot change the list, and in the source, which re-reads it. The
+ * open list must stay the same elements throughout.
+ */
+function measureOpenPanelEdits(body: HTMLElement): Record<string, number[]> {
+  const other = { sheet: OTHER_SHEET, row: 0, col: 0 };
+  const source = { sheet: SHEET, row: 1, col: 1 };
+  const otherSheetEditMs = measure(editEach(other));
+  const sourceEditMs = measure(editEach(source));
+  const cleanup = pivotPanel(grid, SHEET, pivot.id, false).render(body);
+  try {
+    const list = body.querySelector(".sheetwrite-panel-fields");
+    if (list === null) throw new Error("the pivot field list is missing");
+    const openPanelOtherSheetEditMs = measure(editEach(other));
+    const openPanelSourceEditMs = measure(editEach(source));
+    if (body.querySelector(".sheetwrite-panel-fields") !== list) {
+      throw new Error("a cell edit rebuilt the open pivot field list");
+    }
+    return { otherSheetEditMs, sourceEditMs, openPanelOtherSheetEditMs, openPanelSourceEditMs };
+  } finally {
+    cleanup?.();
+    body.replaceChildren();
+    const restored = grid.applyTransaction({
+      patches: [
+        { op: "set", addr: source, value: { kind: "literal", value: amounts[1] ?? null } },
+        { op: "set", addr: other, value: { kind: "literal", value: null } },
+      ],
+    });
+    if (restored.status !== "applied") throw new Error("edited cells were not restored");
+  }
+}
+
 try {
   if (grid.setPivot(pivot, SHEET).status !== "applied") throw new Error("pivot was not applied");
   if (grid.setPivot(outputPivot, REPORT_SHEET).status !== "applied") {
@@ -143,6 +198,7 @@ try {
       body.replaceChildren();
     };
   });
+  const openPanelEdits = measureOpenPanelEdits(body);
 
   let slicerValues = "";
   const slicerMs = measure(() => {
@@ -194,6 +250,9 @@ try {
         slicerValuesMs: summarize(slicerMs),
         pivotOutputMs: summarize(pivotOutputMs),
         insertChartMs: summarize(chartMs),
+        cellEditMs: Object.fromEntries(
+          Object.entries(openPanelEdits).map(([row, samples]) => [row, summarize(samples)]),
+        ),
       },
       null,
       2,
