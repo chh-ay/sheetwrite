@@ -380,8 +380,12 @@ matrix leaves them out.
   fields, one column field, SUM and AVERAGE) installed with `setPivots` and
   recalculated; restoring removes it.
 - `getpivotdata-many` (1K cells): `GETPIVOTDATA` cells that each name one of
-  the 100 groups of a pivot over 10K rows. GETPIVOTDATA is volatile, so the
-  timed edit of an unrelated cell recalculates all of them.
+  the 100 groups of a pivot over 10K rows. The timed edit changes a cell
+  nothing reads. GETPIVOTDATA depends on its pivot, so none of them
+  recalculates; before 0.7.0 it was volatile and all of them did.
+- `getpivotdata-source-edit` (1K cells): the same cells, but the timed edit
+  changes one source value. The pivot updates its output, then every
+  `GETPIVOTDATA` cell recalculates once.
 - `analysis-calls` (10K formulas): SUMSQ, AGGREGATE, FORECAST.LINEAR and
   TEXTBEFORE in one formula per row, all reading the edited `$C$1`.
 - `history-diff` (100K cells, both engines): the version-history diff kernel

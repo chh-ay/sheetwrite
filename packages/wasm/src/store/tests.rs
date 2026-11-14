@@ -1625,3 +1625,83 @@ fn getpivotdata_follows_source_edits() {
 
     assert_eq!(store.get_cell(report, 0, 0).num(), 136.0);
 }
+
+/// The fixture's pivot at A1 of `Output`, and a `Report` sheet for
+/// GETPIVOTDATA formulas: `(store, source, output, report)`.
+fn pivot_reader_fixture() -> (CellStore, usize, usize, usize) {
+    let (mut store, source, output) = fixture(12);
+    let report = store.add_sheet(4, 20);
+    store.set_sheet_name(output, "output", "Output");
+    store.set_sheet_name(report, "report", "Report");
+    install(&mut store, source, output, 12, &[SUM]);
+    (store, source, output, report)
+}
+
+/// GETPIVOTDATA depends on its pivot, as in Excel; it is not volatile. An
+/// edit that changes no pivot output does not recalculate it, so it reads
+/// no output cell.
+#[test]
+fn getpivotdata_skips_edits_that_leave_its_pivot_unchanged() {
+    let (mut store, _, output, report) = pivot_reader_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
+    assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
+    let entry = store.sheets[report]
+        .formulas
+        .get((0, 0), &store.formula_slots)
+        .expect("the formula is stored");
+    assert!(!entry.volatile(), "GETPIVOTDATA is not volatile");
+    let reads = store.pivot_output_reads(output, 0);
+
+    store.set_number(report, 5, 3, 1.0, 0);
+    store.recompute(report);
+
+    assert_eq!(store.pivot_output_reads(output, 0), reads);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 36.0);
+}
+
+/// A new definition of its pivot recalculates GETPIVOTDATA: another
+/// aggregation, then no pivot at the reference (`#REF!`), then the pivot
+/// installed again after the formula.
+#[test]
+fn getpivotdata_follows_pivot_definition_changes() {
+    let (mut store, source, output, report) = pivot_reader_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
+    assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
+
+    // Six odd rows.
+    let count = fixture_pivot(source, 12, &[COUNT]).numbers();
+    assert!(store.set_pivots(output, &count, vec!["pivot".into()]));
+    store.recompute(output);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 6.0);
+
+    assert!(store.set_pivots(output, &[], Vec::new()));
+    store.recompute(output);
+    assert_eq!(
+        store.get_cell(report, 0, 0).string().as_deref(),
+        Some("#REF!")
+    );
+
+    install(&mut store, source, output, 12, &[SUM]);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 36.0);
+}
+
+/// A source edit recalculates GETPIVOTDATA once, after its pivot updates,
+/// and a reader on the pivot's own sheet follows it too.
+#[test]
+fn getpivotdata_follows_source_edits_on_any_sheet() {
+    let (mut store, source, output, report) = pivot_reader_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",$A$1,\"Region\",0)";
+    store.set_formula(output, 0, 20, formula, 0);
+    let across = "=GETPIVOTDATA(\"Sales\",Output!B2)";
+    assert_eq!(report_cell(&mut store, report, across).num(), 78.0);
+    store.recompute(output);
+    // Even rows: 2 + 4 + ... + 12.
+    assert_eq!(store.get_cell(output, 0, 20).num(), 42.0);
+
+    // Row 2 (region 0) sells 102 instead of 2.
+    store.set_number(source, 2, SALES, 102.0, 0);
+    store.recompute(source);
+
+    assert_eq!(store.get_cell(output, 0, 20).num(), 142.0);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 178.0);
+}

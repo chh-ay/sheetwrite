@@ -1795,7 +1795,7 @@ impl CellStore {
 
                 analysis::lambda::evaluate(
                     self,
-                    analysis::lambda::CALL,
+                    analysis::lambda::Invocation::Call,
                     args,
                     sheet,
                     pass,
@@ -2059,11 +2059,10 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
             let family = analysis::family(id);
             if let Some(hooks) = &family.array {
-                if (hooks.produces_array)(name, args, pass.shapes()) {
-                    return match (hooks.evaluate)(self, name, args, sheet, pass, depth).and_then(
+                if (hooks.produces_array)(id, args, pass.shapes()) {
+                    return match (hooks.evaluate)(self, id, args, sheet, pass, depth).and_then(
                         |matrix| {
                             matrix.validate_bytes()?;
                             Ok(matrix)
@@ -2075,7 +2074,7 @@ impl CellStore {
                 }
             }
             if let Some(evaluate) = family.evaluate_ast {
-                return evaluate(self, name, args, sheet, pass, depth);
+                return evaluate(self, id, args, sheet, pass, depth);
             }
         }
 
@@ -2245,7 +2244,6 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
             let result = match id {
                 analysis::SUMSQ_ID => {
                     analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1)
@@ -2253,7 +2251,7 @@ impl CellStore {
                 analysis::SUMX2MY2_ID | analysis::SUMX2PY2_ID | analysis::SUMXMY2_ID => {
                     analysis::math::streamed_paired_squares(
                         self,
-                        name,
+                        analysis::math::Function::of(id),
                         args,
                         sheet,
                         pass,
