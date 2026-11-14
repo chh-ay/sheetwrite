@@ -735,12 +735,12 @@ function popoverPanel(rendered: RenderedHover, popoverId: string): Element {
       h(
         "span.sw-code-popover__signature.sw-code-popover__signature--wide",
         { ariaHidden: "true" },
-        rendered.wideSignature,
+        h("span.sw-code-popover__signature-text", rendered.wideSignature),
       ),
       h(
         "span.sw-code-popover__signature.sw-code-popover__signature--narrow",
         { ariaHidden: "true" },
-        rendered.narrowSignature,
+        h("span.sw-code-popover__signature-text", rendered.narrowSignature),
       ),
       rendered.docs ? h("span.sw-code-popover__docs", cleanDocumentation(rendered.docs)) : [],
       tags.length > 0 ? h("span.sw-code-popover__tags", tags) : [],
