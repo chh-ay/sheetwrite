@@ -310,7 +310,7 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
 
     // Shapes drawn later than a box either stay clear of it, sit inside it, or hide what is under them.
     drawn.forEach((later, laterIndex) => {
-      if (later.element.tagName === "text") return;
+      if (later.element.tagName === "text" || later.element.classList.contains("mark")) return;
       if (later.box.width < MIN_SHAPE || later.box.height < MIN_SHAPE) return;
       for (const earlier of boxes) {
         if (drawn.indexOf(earlier) >= laterIndex) continue;
@@ -367,7 +367,10 @@ export async function findArtDefects(): Promise<ArtDefect[]> {
     }
 
     // Arrows: the lines that end in the art's arrowhead.
-    const paths = drawn.filter(({ element }) => element instanceof SVGPathElement);
+    // A `mark` is an arrow-shaped glyph, such as a sort or refresh icon, not a connector.
+    const paths = drawn.filter(
+      ({ element }) => element instanceof SVGPathElement && !element.classList.contains("mark"),
+    );
     const lines = paths.map(({ element }) => subpaths(element.getAttribute("d") ?? ""));
     const tips: { tip: Point; box: Box }[] = [];
     // Arrows may also join closed, filled outlines such as a file icon.
