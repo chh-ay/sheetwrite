@@ -242,8 +242,8 @@ const XLSX_TEXT = {
 };
 
 function xlsxWide(): BlueprintLayout {
-  const w = 124;
-  const gap = 25;
+  const w = 120;
+  const gap = 26;
   const x = (index: number) => 8 + index * (w + gap);
   const row = (y: number, h: number) => ({ y, h });
   const top = row(8, 62);

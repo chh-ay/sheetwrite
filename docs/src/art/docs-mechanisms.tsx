@@ -340,7 +340,7 @@ const RECOVERY_GROUPS = [
 export function RecoveryDiagram() {
   return (
     <TileFigure
-      columns={3}
+      columns={2}
       text={{
         title: "What each error asks you to do",
         description:
