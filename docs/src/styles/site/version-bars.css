@@ -1,0 +1,218 @@
+/* The release comparison (docs/src/lib/version-bars.ts), in the blueprint
+   style of the docs figures: a framed panel, measure names in mono, slim bars
+   ending in a dot, and the change against the previous release as a chip. The
+   newest version is the accent colour; older ones are muted greys that differ
+   by tone, and each bar is also labelled with its version. */
+
+.version-bars {
+  --version-old: color-mix(in srgb, var(--sw-fg-muted) 45%, var(--sw-surface-1));
+  --version-previous: var(--sw-fg-muted);
+  --version-new: var(--sw-accent);
+
+  margin: var(--sw-space-8) 0;
+  padding: var(--sw-space-5) var(--sw-space-6) var(--sw-space-4);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .version-bars p {
+  margin: 0;
+}
+
+.version-bars__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sw-space-2) var(--sw-space-6);
+  margin-bottom: var(--sw-space-4);
+}
+
+.version-bars__title {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.35 var(--sw-font-body);
+}
+
+.version-bars__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.version-bars__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+}
+
+.version-bars__key i {
+  display: inline-block;
+  width: 1.125rem;
+  height: 0.5rem;
+  border-radius: 2px;
+  background: var(--version-old);
+}
+
+.version-bars__key:nth-child(2) i {
+  background: var(--version-previous);
+}
+
+.version-bars__key[data-newest] {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.version-bars__key[data-newest] i {
+  background: var(--version-new);
+}
+
+.version-bars .machine-switch {
+  margin-bottom: var(--sw-space-3);
+}
+
+/* One machine at a time, in the switch's place. */
+.version-bars:has(input[value="linux"]:checked) .version-bars__machine:not([data-machine="linux"]),
+.version-bars:has(input[value="mac"]:checked) .version-bars__machine:not([data-machine="mac"]) {
+  display: none;
+}
+
+.version-bars__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version-bars__row {
+  display: grid;
+  grid-template-columns: 10rem minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--sw-space-2) var(--sw-space-6);
+  margin: 0;
+  padding: var(--sw-space-4) 0;
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}
+
+.version-bars__measure strong {
+  display: block;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.4 var(--sw-font-mono);
+}
+
+.version-bars__measure span {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.version-bars__engine-name {
+  margin-bottom: var(--sw-space-1) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.version-bars__bar {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr) 4.75rem;
+  align-items: center;
+  gap: var(--sw-space-2);
+  min-height: 1.25rem;
+}
+
+.version-bars__version {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.version-bars__track {
+  position: relative;
+  height: 3px;
+}
+
+/* The bar, and a dot where it ends: its value. */
+.version-bars__track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 2px;
+  background: var(--version-old);
+}
+
+.version-bars__track i::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.version-bars__bar:nth-of-type(3) .version-bars__track i {
+  background: var(--version-previous);
+}
+
+.version-bars__bar[data-newest] .version-bars__track i {
+  background: var(--version-new);
+}
+
+.version-bars__value {
+  color: var(--sw-fg);
+  font-size: var(--sw-text-caption);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.version-bars__bar[data-newest] :is(.version-bars__version, .version-bars__value) {
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+/* The change against the previous release: words and an arrow, never colour alone. */
+.version-bars__change {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  margin-top: var(--sw-space-2) !important;
+  padding: 0.0625rem var(--sw-space-2);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.version-bars__change strong {
+  font-weight: var(--sw-weight-semibold);
+}
+
+.version-bars__change[data-change="better"] {
+  background: var(--sw-success-soft);
+  color: var(--sw-success);
+}
+
+.version-bars__change[data-change="worse"] {
+  background: var(--sw-danger-soft);
+  color: var(--sw-danger);
+}
+
+.version-bars__caption {
+  margin-top: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+
+/* Phones: each measure stacks its engines under its name. */
+@media (max-width: 40rem) {
+  .version-bars {
+    padding: var(--sw-space-4);
+  }
+
+  .version-bars__row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
