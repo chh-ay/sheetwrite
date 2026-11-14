@@ -130,6 +130,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return `12:${size + 1}`;
     case "spill-sequence-admission":
       return `1:${size}:0`;
+    case "spill-filter-same-range":
+      return `${SAME_RANGE_EDITED_FIRST}:0`;
     case "paged-cell-reads":
       return pagedCellReadsOutput(size);
     case "paged-insert-row":
@@ -961,6 +963,40 @@ function spillFilterResizeFixture(count: number): TimedFixture {
       store.setBool(sheet, count - 1, 1, false, 0);
       store.recompute(sheet);
     },
+  };
+}
+
+/** The `spill-filter-same-range` edit writes this into A1, the spill's first value. */
+const SAME_RANGE_EDITED_FIRST = -1;
+
+/**
+ * The spill of `spill-filter-resize`, but the edit changes one source value
+ * instead of the filter, so the spill comes back over the same range with one
+ * changed cell: the anchor.
+ */
+function spillFilterSameRangeFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(3, count);
+  writeNumberColumn(
+    store,
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row),
+    0,
+  );
+  for (let row = 0; row < count; row++) store.setBool(sheet, row, 1, true, 0);
+  store.setFormula(sheet, 0, 2, `=FILTER(A1:A${count},B1:B${count})`, 0);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      store.setNumber(sheet, 0, 0, SAME_RANGE_EDITED_FIRST, 0);
+      store.recompute(sheet);
+    },
+    check: () => `${numberAt(store, sheet, 0, 2)}:${store.spillAnchorRow(sheet, count - 1, 2)}`,
+    dispose: () => store.free(),
+    restore: restoreNumber(store, sheet, { row: 0, col: 0, value: 0 }),
   };
 }
 
@@ -3239,6 +3275,8 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
       return incrementalDependencyClosureFixture(size);
     case "spill-sequence-admission":
       return spillSequenceAdmissionFixture(size);
+    case "spill-filter-same-range":
+      return spillFilterSameRangeFixture(size);
     case "scalar-edit-affects-0":
       return fanOutEditFixture(size, true);
     default:
