@@ -90,6 +90,7 @@ function csvRows(
  *
  * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
  * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
+ * @returns The whole CSV file as one string, starting with the BOM.
  */
 export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions = {}): string {
   return encodeDelimitedText(csvRows(sheet, store, options), ",", options, {
@@ -98,7 +99,12 @@ export function toCsv(sheet: Sheet, store: Store, options: DelimitedTextOptions 
   });
 }
 
-/** Export UTF-8 CSV on demand, retaining only one store window and one byte chunk. */
+/**
+ * Export UTF-8 CSV on demand, retaining only one store window and one byte chunk.
+ *
+ * @returns The CSV file's bytes, produced as the stream is read; cancelling the
+ *   stream stops the export.
+ */
 export function toCsvStream(
   sheet: Sheet,
   store: Store,
@@ -169,6 +175,7 @@ function tsvRows(
  *
  * @throws {@link IncompleteDataError} before serialization when a paged sheet is incomplete.
  * @throws {@link DelimitedTextResourceError} when a configured resource ceiling is exceeded.
+ * @returns The range as TSV text, ready for the clipboard.
  */
 export function toTsv(range: Range, store: Store, options: DelimitedTextOptions = {}): string {
   return encodeDelimitedText(tsvRows(range, store, options), "\t", options, {
@@ -176,7 +183,12 @@ export function toTsv(range: Range, store: Store, options: DelimitedTextOptions 
   });
 }
 
-/** Export canonical data-space TSV with pull-driven store reads and cancellation. */
+/**
+ * Export canonical data-space TSV with pull-driven store reads and cancellation.
+ *
+ * @returns The TSV text's UTF-8 bytes, produced as the stream is read;
+ *   cancelling the stream stops the export.
+ */
 export function toTsvStream(
   range: Range,
   store: Store,
@@ -197,6 +209,10 @@ export function toTsvStream(
  * leading UTF-8 BOM. The synchronous API consumes an existing in-memory string
  * and returns an in-memory grid; it does not claim streaming. Scanning enforces
  * resource ceilings before materializing the next oversized field or record.
+ *
+ * @param text - The CSV file's text.
+ * @returns One array of field strings per record, in file order; values are
+ *   not converted to numbers.
  */
 export function parseCsv(text: string, options: DelimitedTextOptions = {}): string[][] {
   return parseDelimitedText(text, ",", options);
@@ -208,6 +224,11 @@ export function parseCsv(text: string, options: DelimitedTextOptions = {}): stri
  * columns are initialized to `null`, matching the visible-column CSV export.
  * Extra fields are ignored and missing fields become `null`. The returned
  * columnar table is fully materialized in memory.
+ *
+ * @param text - The CSV file's text; its first record is the header row.
+ * @param columns - The sheet's columns. Visible ones take the fields left to
+ *   right. `TRUE` and `FALSE` become booleans, and number, currency and date
+ *   columns turn number text (and dates or amounts) into numbers.
  */
 export function fromCsv(
   text: string,
@@ -288,6 +309,10 @@ export function fromCsv(
  * Trigger a browser download from in-memory bytes. The temporary anchor is
  * removed and its object URL is scheduled for revocation even when DOM append or
  * click throws.
+ *
+ * @param bytes - File contents; a string is saved as its text.
+ * @param filename - Name the browser offers for the saved file, such as `report.xlsx`.
+ * @param mime - MIME type of the file, such as `text/csv`.
  */
 export function downloadBytes(bytes: Uint8Array | string, filename: string, mime: string): void {
   startDownload(bytes, filename, mime, (revoke) => setTimeout(revoke, 0));
