@@ -18,7 +18,7 @@ use std::cell::Cell;
 mod rows;
 
 #[cfg(any(target_arch = "wasm32", test))]
-use super::transfer::{source_kind, INVALID_SOURCE_KIND};
+use super::transfer::{all_source_kinds, source_kind, INVALID_SOURCE_KIND};
 use super::{StorageEntry, MAX_PAGE_CHUNK_ROWS};
 use crate::derived::{decode_cell, encode_cell, ABSENT_TAG};
 use crate::memory::{
@@ -1788,11 +1788,7 @@ impl PagedStorage {
             {
                 return Err("invalid transferred page chunk".into());
             }
-            if !clean
-                .kind
-                .iter()
-                .all(|&kind| source_kind(kind.into()).is_some())
-            {
+            if !all_source_kinds(&clean.kind) {
                 return Err(INVALID_SOURCE_KIND.into());
             }
             paged.clean.push(clean);

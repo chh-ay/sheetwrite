@@ -18,6 +18,14 @@ pub(super) fn source_kind(raw: u32) -> Option<u8> {
     u8::try_from(raw).ok().filter(|kind| *kind <= KIND_FORMULA)
 }
 
+/// Whether every kind of a byte-wide slice passes [`source_kind`]. The same rule
+/// as a fold over the slice, so the check of a clean page vectorizes.
+#[cfg(any(target_arch = "wasm32", test))]
+#[inline]
+pub(super) fn all_source_kinds(kinds: &[u8]) -> bool {
+    kinds.iter().fold(KIND_EMPTY, |max, &kind| max.max(kind)) <= KIND_FORMULA
+}
+
 impl CellStorage {
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         out.usize(self.n_cols);
