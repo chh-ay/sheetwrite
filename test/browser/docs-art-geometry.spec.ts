@@ -34,14 +34,12 @@ function pagesWithArt(directory = SITE): string[] {
  */
 const KNOWN_DEFECTS: ReadonlySet<string> = new Set([
   "/figures/illustrations/accessibility.svg",
-  "/figures/illustrations/data.svg",
   "/figures/illustrations/excel-in-javascript.svg",
   "/figures/illustrations/excel-in-nodejs.svg",
   "/figures/illustrations/excel-in-react.svg",
   "/figures/illustrations/excel-in-svelte.svg",
   "/figures/illustrations/excel-in-vue.svg",
   "/figures/illustrations/formatting.svg",
-  "/figures/illustrations/formula-references.svg",
   "/figures/illustrations/lifecycle.svg",
   "A formula that reads cells not loaded yet",
   "Each grid generation gets its own onReady",
