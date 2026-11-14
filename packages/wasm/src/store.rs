@@ -831,42 +831,45 @@ impl CellStore {
     }
 
     /// Gives the live `sheet` its stable `id` and display `name`, replacing
-    /// earlier ones. A missing or removed sheet is ignored.
+    /// earlier ones. Returns false, changing nothing, when another sheet holds
+    /// `id` or the name is refused (see `admitted_sheet_name_key`).
     #[wasm_bindgen(js_name = setSheetName)]
-    pub fn set_sheet_name(&mut self, sheet: usize, id: &str, name: &str) {
-        if sheet >= self.sheets.len() {
-            return;
+    pub fn set_sheet_name(&mut self, sheet: usize, id: &str, name: &str) -> bool {
+        if self
+            .sheet_ids
+            .get(id)
+            .is_some_and(|holder| *holder != sheet)
+        {
+            return false;
         }
-        if !self.sheet_alive[sheet] {
-            return;
-        }
+        let Some(name_key) = self.admitted_sheet_name_key(sheet, name) else {
+            return false;
+        };
 
         self.sheet_ids.retain(|_, handle| *handle != sheet);
         self.sheet_lookup.retain(|_, handle| *handle != sheet);
         self.sheet_names[sheet] = name.to_owned();
         self.sheet_ids.insert(id.to_owned(), sheet);
-        self.sheet_lookup.insert(sheet_name_key(name), sheet);
+        self.sheet_lookup.insert(name_key, sheet);
         let affected = self.bind_pending_sheet_formulas(id, name);
         if !affected.is_empty() {
             self.recompute_seed_sheets(&affected);
         }
+
+        true
     }
 
-    /// Rename a live stable sheet handle and rewrite every resolved formula AST reference.
+    /// Rename a live stable sheet handle and rewrite every resolved formula AST
+    /// reference. Returns false, changing nothing, when `id` is not the sheet's
+    /// or the name is refused (see `admitted_sheet_name_key`).
     #[wasm_bindgen(js_name = renameSheet)]
     pub fn rename_sheet(&mut self, sheet: usize, id: &str, name: &str) -> bool {
-        let name_key = sheet_name_key(name);
-
-        if name.is_empty()
-            || self.sheet_alive.get(sheet) != Some(&true)
-            || self.sheet_ids.get(id) != Some(&sheet)
-            || self
-                .sheet_lookup
-                .get(&name_key)
-                .is_some_and(|existing| *existing != sheet)
-        {
+        if self.sheet_ids.get(id) != Some(&sheet) {
             return false;
         }
+        let Some(name_key) = self.admitted_sheet_name_key(sheet, name) else {
+            return false;
+        };
 
         let mut affected = Vec::new();
 
@@ -3870,6 +3873,22 @@ impl CellStore {
             self.regex_patterns.set(Some(patterns));
         }
         ast
+    }
+
+    /// The one rule for naming a sheet: the sheet is live and the name is
+    /// nonempty and held by no other sheet, case-insensitively. Returns the
+    /// name's lookup key when admitted.
+    fn admitted_sheet_name_key(&self, sheet: usize, name: &str) -> Option<String> {
+        if name.is_empty() || self.sheet_alive.get(sheet) != Some(&true) {
+            return None;
+        }
+
+        let name_key = sheet_name_key(name);
+        let held_by_other = self
+            .sheet_lookup
+            .get(&name_key)
+            .is_some_and(|holder| *holder != sheet);
+        (!held_by_other).then_some(name_key)
     }
 
     /// Naming a sheet visits only formulas whose retained tree names it.
