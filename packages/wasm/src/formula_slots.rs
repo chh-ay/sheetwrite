@@ -508,10 +508,11 @@ impl FormulaStore {
             index.tables.record(id, ast);
         }
         #[cfg(feature = "analysis")]
+        // A workbook without GETPIVOTDATA readers keeps an empty set, so
+        // `remove` stops at its bounds check and nothing is released.
         if pivot_reader {
             index.pivot_readers.insert(id);
-        } else {
-            index.pivot_readers.remove(id);
+        } else if index.pivot_readers.remove(id) {
             index.pivot_readers.release_if_empty();
         }
         if index.is_empty() {
