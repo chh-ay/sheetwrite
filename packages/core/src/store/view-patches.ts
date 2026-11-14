@@ -4,7 +4,7 @@
  * and a request that changes nothing builds no patch.
  */
 import { cloneJsonValue } from "../plain-data.js";
-import type { SheetId } from "../types/coordinates.js";
+import type { Range, SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, DocumentOp, Sheet, SortKey } from "../types/document.js";
 
 /** The patch that sets the view sort of `sheet`; empty `keys` clear it. */
@@ -63,4 +63,29 @@ export function clearViewPatch(meta: Sheet): DocumentOp | null {
   if ((meta.sortKeys?.length ?? 0) === 0 && (meta.filters?.length ?? 0) === 0) return null;
 
   return { op: "setSheetMeta", sheet: meta.id, patch: { sortKeys: [], filters: [] } };
+}
+
+/**
+ * The patch that turns the AutoFilter of `meta` on for `range` or, with
+ * null, off. Either way it clears the column filters, as Excel's Data › Filter
+ * does. Null when there is nothing to turn off.
+ */
+export function autoFilterPatch(meta: Sheet, range: Range | null): DocumentOp | null {
+  if (range === null && !meta.autoFilter && (meta.filters?.length ?? 0) === 0) return null;
+
+  return {
+    op: "setSheetMeta",
+    sheet: meta.id,
+    patch: { autoFilter: range === null ? null : { range: cloneJsonValue(range) }, filters: [] },
+  };
+}
+
+/**
+ * The patch that sets the filters of `meta` to what they are, so the view
+ * filters again: Excel's Reapply, after edits changed which rows match.
+ */
+export function reapplyFilterPatch(meta: Sheet): DocumentOp | null {
+  if ((meta.filters?.length ?? 0) === 0) return null;
+
+  return { op: "setSheetMeta", sheet: meta.id, patch: { filters: cloneJsonValue(meta.filters) } };
 }

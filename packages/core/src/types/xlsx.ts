@@ -145,6 +145,8 @@ export interface XlsxWorkbookExportContext {
   readonly pivotOutputs?: readonly DashboardExport[];
   /** The resolved view of each worksheet chart over a pivot, by sheet and chart ID. */
   readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
+  /** The rows each worksheet AutoFilter hides, by sheet; Excel stores them hidden. */
+  readonly filteredRows?: ReadonlyMap<SheetId, readonly number[]>;
 }
 
 /** Optional backend contract for complete workbook XLSX interchange. */

@@ -253,6 +253,7 @@ export {
 export type {
   AggregateOp,
   ApplyTransactionResult,
+  AutoFilter,
   CalculationSettings,
   CellAddress,
   CellAlign,
@@ -305,6 +306,7 @@ export type {
   ContextMenuContext,
   ContextMenuItem,
   ContextMenuItems,
+  CustomColumnFilter,
   Dashboard,
   DashboardBox,
   DashboardChartItem,
@@ -331,6 +333,7 @@ export type {
   ExternalLinkName,
   ExternalLinkSheet,
   ExternalLinkValue,
+  FilterCondition,
   Grid,
   GridActions,
   GridCommandName,

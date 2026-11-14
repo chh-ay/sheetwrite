@@ -549,11 +549,13 @@ export class DocumentController {
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
               compact,
               ...charts,
+              ...this.autoFilterRestore(patch.sheet),
             ]
           : [
               { op: "addRows", sheet: patch.sheet, at: patch.at, count: patch.count },
               ...this.snapshotRows(patch.sheet, patch.at, patch.count),
               ...charts,
+              ...this.autoFilterRestore(patch.sheet),
             ];
       }
 
@@ -608,6 +610,7 @@ export class DocumentController {
               },
               compact,
               ...charts,
+              ...this.autoFilterRestore(patch.sheet),
             ]
           : [
               {
@@ -618,6 +621,7 @@ export class DocumentController {
               },
               ...this.snapshotColumnCells(patch.sheet, patch.at, patch.count),
               ...charts,
+              ...this.autoFilterRestore(patch.sheet),
             ];
       }
 
@@ -813,6 +817,12 @@ export class DocumentController {
                 patch.patch.filters === undefined
                   ? undefined
                   : (sheet.filters?.map(([col, filter]) => [col, structuredClone(filter)]) ?? []),
+              autoFilter:
+                patch.patch.autoFilter === undefined
+                  ? undefined
+                  : sheet.autoFilter
+                    ? structuredClone(sheet.autoFilter)
+                    : null,
             },
           },
         ];
@@ -1230,6 +1240,26 @@ export class DocumentController {
    * set back after the structure is restored so undo returns them exactly.
    * `includeOwned` false skips charts anchored on `sheet`, which its snapshot carries.
    */
+  /**
+   * The sheet's AutoFilter and column filters as they are, for the inverse of
+   * an edit that can shrink or drop them, such as deleting its header row.
+   */
+  private autoFilterRestore(sheetId: SheetId): DocumentOp[] {
+    const sheet = this.sheetById(sheetId);
+    if (!sheet?.autoFilter) return [];
+
+    return [
+      {
+        op: "setSheetMeta",
+        sheet: sheetId,
+        patch: {
+          autoFilter: structuredClone(sheet.autoFilter),
+          filters: sheet.filters?.map(([col, filter]) => [col, structuredClone(filter)]) ?? [],
+        },
+      },
+    ];
+  }
+
   private chartRestores(
     sheet: SheetId,
     { includeOwned }: { includeOwned: boolean },
@@ -1300,6 +1330,7 @@ export class DocumentController {
       sortKeys: structuredClone(sheet.sortKeys),
       sortState: structuredClone(sheet.sortState),
       filters: structuredClone(sheet.filters),
+      autoFilter: structuredClone(sheet.autoFilter),
       rowGroups: sheet.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(sheet.tables),
       charts: sheet.charts?.map(cloneChartDefinition),

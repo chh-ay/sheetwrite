@@ -25,6 +25,7 @@ import {
   type XlsxCodecContext,
 } from "./resources.js";
 import { StylesRegistry } from "./styles.js";
+import { autoFilterXml } from "./writer-autofilter.js";
 import { quotedSheet, cellXml, hyperlinkStyledRows } from "./writer-cells.js";
 import { appendTableRule, sortStateFits, tableXml } from "./writer-tables.js";
 import type { AbsoluteCell, WorkbookWriteHook, ExtraRelationship } from "./writer.js";
@@ -303,6 +304,8 @@ function* writeSheetRows(
   byRow: ReadonlyMap<number, AbsoluteCell[]>,
   rowMetadata: ReadonlyMap<number, NonNullable<SheetSnapshot["rowMeta"]>[number][1]>,
   outlines: WorksheetOutlines,
+  /** Rows the AutoFilter hides, which Excel stores hidden. */
+  filtered: ReadonlySet<number>,
   hook: WorkbookWriteHook | undefined,
 ): Generator<Uint8Array> {
   const { collapsedOutlineRows, outlineLevels, collapsedSummaries } = outlines;
@@ -319,7 +322,7 @@ function* writeSheetRows(
   const styledRows = sheet.hyperlinks?.length ? hyperlinkStyledRows(sheet, sourceRows) : sourceRows;
   for (const { row, cells } of styledRows) {
     const meta = rowMetadata.get(row);
-    const hidden = meta?.hidden || collapsedOutlineRows.has(row);
+    const hidden = meta?.hidden || collapsedOutlineRows.has(row) || filtered.has(row);
     const outlineLevel = outlineLevels.get(row);
     xml.append(
       `<row r="${row + 1}"${meta?.height !== undefined ? ` ht="${(meta.height * 72) / 96}" customHeight="1"` : ""}${hidden ? ' hidden="1"' : ""}${outlineLevel ? ` outlineLevel="${outlineLevel}"` : ""}${collapsedSummaries.has(row) ? ' collapsed="1"' : ""}>`,
@@ -346,6 +349,7 @@ function appendSheetFormats(
 ): void {
   const maxRow = Math.max(1, sheet.rowCount);
   const maxCol = Math.max(0, sheet.columns.length - 1);
+  if (sheet.autoFilter) xml.append(autoFilterXml(sheet, sheet.autoFilter));
   if (sheet.sortKeys?.length && sheet.rowCount > 0) {
     const reference = `A1:${cellA1(maxRow - 1, maxCol)}`;
     xml.append(`<sortState ref="${reference}">`);
@@ -416,11 +420,11 @@ function appendSheetFormats(
       sheet: sheet.name,
     });
   }
-  if (sheet.filters?.length) {
+  if (sheet.filters?.length && !sheet.autoFilter) {
     emitWarning(context, {
       code: "unsupported-feature",
       message:
-        "Excel autoFilter always excludes a header row, but Sheetwrite filters every data row; native emission would change which row is filtered, so filters remain in Sheetwrite metadata",
+        "View filters without an AutoFilter filter every row, and an Excel autoFilter always keeps a header row; native emission would change which rows are filtered, so the filters remain in Sheetwrite metadata",
       sheet: sheet.name,
     });
   }
@@ -590,6 +594,7 @@ export function* writeSheet(
   hook?: WorkbookWriteHook,
   pivotRelationships: readonly ExtraRelationship[] = [],
   pivotCharts?: ReadonlyMap<string, PivotChartData>,
+  filteredRows: readonly number[] = [],
 ): Generator<Uint8Array, SheetWriteResult> {
   const byRow = indexSheetRows(sheet);
   const rowMetadata = new Map(sheet.rowMeta ?? []);
@@ -600,6 +605,7 @@ export function* writeSheet(
     ...rowMetadata.keys(),
     ...outlines.outlineLevels.keys(),
     ...outlines.collapsedSummaries,
+    ...filteredRows,
   ]);
 
   const xml = new XmlBuffer(context);
@@ -615,6 +621,7 @@ export function* writeSheet(
     byRow,
     rowMetadata,
     outlines,
+    new Set(filteredRows),
     hook,
   );
 

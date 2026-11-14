@@ -10,7 +10,7 @@ use super::value::{compare_text_case_insensitive, plain_number};
 use super::wildcard::Wildcard;
 
 #[derive(Debug)]
-pub(super) struct Criterion {
+pub(crate) struct Criterion {
     op: CmpOp,
     operand: Value,
     wildcard: Option<Wildcard>,
@@ -19,7 +19,7 @@ pub(super) struct Criterion {
 impl Criterion {
     /// Parses a criterion, or fails with `#NUM!` when its wildcard pattern
     /// cannot be allocated.
-    pub(super) fn parse(value: Value) -> Result<Self, FormulaError> {
+    pub(crate) fn parse(value: Value) -> Result<Self, FormulaError> {
         let Value::Text(text) = value else {
             return Ok(Self {
                 op: CmpOp::Eq,
@@ -65,7 +65,7 @@ impl Criterion {
         })
     }
 
-    pub(super) fn matches(&self, candidate: &Value) -> bool {
+    pub(crate) fn matches(&self, candidate: &Value) -> bool {
         let ordering = if let Some(pattern) = &self.wildcard {
             let matched = criterion_text(candidate).is_some_and(|text| pattern.matches(text));
             return if self.op == CmpOp::Ne {
@@ -97,7 +97,7 @@ impl Criterion {
     }
 
     /// [`Self::matches`] for a finite number cell, without building a `Value`.
-    pub(super) fn matches_number(&self, number: f64) -> bool {
+    pub(crate) fn matches_number(&self, number: f64) -> bool {
         // A pattern never matches a number.
         if self.wildcard.is_some() {
             return self.op == CmpOp::Ne;
@@ -116,7 +116,7 @@ impl Criterion {
     }
 
     /// [`Self::matches`] for a text cell, read in place from the string pool.
-    pub(super) fn matches_text(&self, text: &str) -> bool {
+    pub(crate) fn matches_text(&self, text: &str) -> bool {
         if let Some(pattern) = &self.wildcard {
             return pattern.matches(text) != (self.op == CmpOp::Ne);
         }

@@ -326,9 +326,9 @@ function workbookXml(
   if (externalReferences.length > 0) {
     xml.append(`<externalReferences>${externalReferences.join("")}</externalReferences>`);
   }
-  if (snapshot.workbook.namedRanges?.length) {
+  if (snapshot.workbook.namedRanges?.length || ordered.some((sheet) => sheet.autoFilter)) {
     xml.append("<definedNames>");
-    for (const named of snapshot.workbook.namedRanges) {
+    for (const named of snapshot.workbook.namedRanges ?? []) {
       const scopeIndex =
         named.scope === undefined
           ? undefined
@@ -347,6 +347,15 @@ function workbookXml(
       }
       xml.append(
         `<definedName name="${escapeXml(encodeXstring(named.name))}"${scopeIndex !== undefined && scopeIndex >= 0 ? ` localSheetId="${scopeIndex}"` : ""}>${escapeXml(encodeXstring(source))}</definedName>`,
+      );
+    }
+    // Excel names each worksheet AutoFilter's range `_xlnm._FilterDatabase`.
+    for (const [index, sheet] of ordered.entries()) {
+      const range = sheet.autoFilter?.range;
+      if (!range) continue;
+      const source = `${quotedSheet(sheet.name)}!$${colToA1(range.start.col)}$${range.start.row + 1}:$${colToA1(range.end.col)}$${range.end.row + 1}`;
+      xml.append(
+        `<definedName name="_xlnm._FilterDatabase" localSheetId="${index}" hidden="1">${escapeXml(encodeXstring(source))}</definedName>`,
       );
     }
     xml.append("</definedNames>");
@@ -384,6 +393,8 @@ export interface EngineContent {
   readonly pivotOutputs?: readonly DashboardExport[];
   /** The resolved view of each worksheet chart over a pivot, by sheet and chart ID. */
   readonly pivotCharts?: ReadonlyMap<SheetId, ReadonlyMap<string, ChartView>>;
+  /** The rows each worksheet AutoFilter hides, by sheet; Excel stores them hidden. */
+  readonly filteredRows?: ReadonlyMap<SheetId, readonly number[]>;
 }
 
 /**
@@ -484,6 +495,7 @@ function* writeWorkbookParts(
         hook,
         pivots?.sheetRelationships(exportSheet.id),
         dashboard?.charts ?? worksheetPivotCharts(sheet, content, pivots?.nativeIds),
+        content.filteredRows?.get(sheet.id),
       );
     }
     const exportSheet = dashboard?.sheet ?? (pivots ? pivots.withSavedOutput(sheet) : sheet);

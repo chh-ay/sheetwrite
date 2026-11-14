@@ -541,6 +541,7 @@ function planSheetInPlace(
       rowGroups: historical.rowGroups ?? [],
       sortKeys: historical.sortKeys ?? [],
       filters: historical.filters ?? [],
+      autoFilter: historical.autoFilter ?? null,
     },
   });
 

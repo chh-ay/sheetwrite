@@ -125,6 +125,15 @@ grid.setViewSort([
 grid.setColumnFilter(3, { kind: "contains", text: "Tokyo" });
 grid.setColumnFilter(2, { kind: "values", values: ["Retail", "Partner"] });
 grid.setColumnFilter(5, { kind: "compare", op: "gte", value: 1000 });
+// Excel's custom filter: COUNTIF-style conditions, joined by AND or OR.
+grid.setColumnFilter(1, {
+  kind: "custom",
+  join: "or",
+  conditions: [
+    { op: "beginsWith", value: "North" },
+    { op: "contains", value: "coast" },
+  ],
+});
 
 const cities = grid.distinctValues(3, 100); // data source for a filter menu
 
@@ -141,6 +150,8 @@ grid.setGroupCollapsed(10, true);
 | `filterBy` | `filterBy(col: number, needle: string): void` | Shorthand for a case-insensitive `contains` column filter. |
 | `setColumnFilter` | `setColumnFilter(col: number, filter: ColumnFilter \| null): void` | Set or clear one column filter. |
 | `getColumnFilters` | `getColumnFilters(): ReadonlyMap<number, ColumnFilter>` | Current active column filters. |
+| `setAutoFilter` | `setAutoFilter(range: Range \| null): ApplyTransactionResult` | Excel's AutoFilter: the range's first row is its header, and column filters hide only the rows below it. `null` turns it off and clears the filters. |
+| `reapplyFilter` | `reapplyFilter(): ApplyTransactionResult` | Filter again after edits; edits do not re-filter on their own, as in Excel. |
 | `distinctValues` | `distinctValues(col: number, limit = 1000): CellScalar[]` | First-seen distinct resolved values for a column. |
 | `hideRows` / `showRows` | `hideRows(rows)` / `showRows(rows?)` | Hide/show data rows independent of sort/filter state. |
 | `hiddenRows` | `hiddenRows(): readonly number[]` | Currently hidden data rows. |
