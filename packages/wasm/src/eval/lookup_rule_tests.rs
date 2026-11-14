@@ -5,7 +5,6 @@
 //! fully loaded paged sheet.
 
 use crate::store::CellStore;
-use crate::types::KIND_EMPTY;
 
 /// Copies of a formula that make its ranges shared by several readers.
 const SHARED_COPIES: usize = 4;
@@ -31,13 +30,7 @@ fn store(storage: Storage) -> (CellStore, usize) {
         Storage::Paged => {
             let sheet = store.add_paged_sheet(COLS, ROWS, 4, 0, 0);
             store.begin_page_load();
-            let cells = COLS * ROWS;
-            let offsets: Vec<u32> = (0..cells as u32).collect();
-            let status = store.set_sparse_block(
-                sheet, 0, 0, ROWS, COLS, &offsets, &vec![KIND_EMPTY; cells], &vec![0.0; cells],
-                &[], &[0], &vec![0; cells], &[], Vec::new(), &[], &[],
-            );
-            assert_eq!(status, crate::store::BLOCK_OK, "the blank page load must apply");
+            crate::tests::load_blank_cells(&mut store, sheet, ROWS, COLS);
             sheet
         }
     };

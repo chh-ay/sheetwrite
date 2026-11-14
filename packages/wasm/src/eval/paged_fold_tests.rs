@@ -2,7 +2,6 @@
 //! they read clean page slices or fall back to reading cell by cell.
 
 use crate::store::CellStore;
-use crate::types::KIND_EMPTY;
 
 const ROWS: usize = 14;
 const COLS: usize = 3;
@@ -14,13 +13,7 @@ fn twin_sheets() -> (CellStore, usize, usize) {
     let dense = store.add_sheet(COLS, ROWS);
     let paged = store.add_paged_sheet(COLS, ROWS, 4, 0, 0);
     store.begin_page_load();
-    let cells = ROWS * COLS;
-    let offsets: Vec<u32> = (0..cells as u32).collect();
-    let status = store.set_sparse_block(
-        paged, 0, 0, ROWS, COLS, &offsets, &vec![KIND_EMPTY; cells], &vec![0.0; cells], &[],
-        &[0], &vec![0; cells], &[], Vec::new(), &[], &[],
-    );
-    assert_eq!(status, crate::store::BLOCK_OK, "the blank page load must apply");
+    crate::tests::load_blank_cells(&mut store, paged, ROWS, COLS);
     for sheet in [dense, paged] {
         for row in (0..ROWS).filter(|row| row % 3 != 1) {
             store.set_number(sheet, row, 0, row as f64 * 1.5 - 4.0, 0);
