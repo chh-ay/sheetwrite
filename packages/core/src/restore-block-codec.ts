@@ -72,6 +72,12 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
   return block;
 }
 
+/** `Uint8Array.fromBase64` (ES2026); the ES2024 library this package compiles against lacks it. */
+type NativeBase64Decoder = (
+  data: string,
+  options: { readonly lastChunkHandling: "strict" },
+) => Uint8Array;
+
 /**
  * Bytes of `data`, which the caller has checked for the base64 alphabet,
  * padding position and length. Only the canonical spelling of those bytes is
@@ -80,9 +86,10 @@ export function decodeRestoreBlockPayload(operation: RestoreBlock): PackedCellBl
 function decodeCanonicalBase64(data: string): Uint8Array {
   // Native since Chromium 140, Firefox 133 and Safari 18.2; "strict" rejects
   // nonzero padding bits, which is what makes an encoding non-canonical.
-  if (typeof Uint8Array.fromBase64 === "function") {
+  const fromBase64: NativeBase64Decoder | undefined = Reflect.get(Uint8Array, "fromBase64");
+  if (typeof fromBase64 === "function") {
     try {
-      return Uint8Array.fromBase64(data, { lastChunkHandling: "strict" });
+      return fromBase64.call(Uint8Array, data, { lastChunkHandling: "strict" });
     } catch (error) {
       invalidRestoreBlock(error);
     }

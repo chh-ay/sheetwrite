@@ -68,9 +68,13 @@ export function encodeMeasuredRestoreBlock(
 /** Bytes per `String.fromCharCode` call when the runtime has no native encoder. */
 const BINARY_STRING_CHUNK = 8192;
 
+/** `Uint8Array.prototype.toBase64` (ES2026); the ES2024 library this package compiles against lacks it. */
+type NativeBase64Encoder = (this: Uint8Array) => string;
+
 function base64(bytes: Uint8Array): string {
   // Native since Chromium 140, Firefox 133 and Safari 18.2; older hosts build a binary string.
-  if (typeof bytes.toBase64 === "function") return bytes.toBase64();
+  const toBase64: NativeBase64Encoder | undefined = Reflect.get(Uint8Array.prototype, "toBase64");
+  if (typeof toBase64 === "function") return toBase64.call(bytes);
   let binary = "";
   for (let at = 0; at < bytes.length; at += BINARY_STRING_CHUNK) {
     binary += String.fromCharCode(...bytes.subarray(at, at + BINARY_STRING_CHUNK));
