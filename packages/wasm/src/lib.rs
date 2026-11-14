@@ -97,10 +97,6 @@ mod structural_edit_tests;
 mod tests;
 
 #[cfg(feature = "formula-engine")]
-pub use formula_rewrite::{
-    move_formula_axis, rename_structured_reference, shift_formula_axis, translate_formula,
-};
-#[cfg(feature = "formula-engine")]
 pub use formula_tokens::{check_formula_syntax, formula_tokens, FormulaSyntaxError};
 #[cfg(feature = "formula-engine")]
 pub use formula_xlsx::convert_xlsx_formulas;
