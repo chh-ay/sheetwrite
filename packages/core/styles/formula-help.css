@@ -25,6 +25,7 @@
 }
 
 .sheetwrite-formula-guide:not(:empty),
+.sheetwrite-formula-preview:not(:empty),
 .sheetwrite-assist {
   box-sizing: border-box;
   margin: 0;
@@ -35,8 +36,14 @@
   pointer-events: auto;
 }
 
-.sheetwrite-formula-guide:not(:empty) {
+.sheetwrite-formula-guide:not(:empty),
+.sheetwrite-formula-preview:not(:empty) {
   padding: 4px 8px;
+}
+
+.sheetwrite-formula-preview {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 
 .sheetwrite-formula-description {

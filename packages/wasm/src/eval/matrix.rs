@@ -2,6 +2,8 @@
 
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::types::{CellRange, FormulaError, Value};
+
+use super::preview_limits;
 use std::cell::Cell;
 use std::mem::size_of;
 
@@ -41,6 +43,9 @@ pub(super) struct EvalMatrix {
 
 impl EvalMatrix {
     pub(super) fn new(rows: usize, cols: usize, values: Vec<Value>) -> Self {
+        // A path that skipped the shape check still cannot hand an oversized
+        // array to a preview: the refusal is sticky, so the preview fails.
+        let _refused = preview_limits::array(values.len());
         let bytes = values.capacity().saturating_mul(size_of::<Value>()) as u64;
         MATRIX_RESOURCE_STATS.with(|stats| {
             let [live, peak, allocations] = stats.get();
@@ -77,7 +82,31 @@ impl Drop for EvalMatrix {
 }
 
 impl EvalMatrix {
+    /// The cell count of an array of `rows` × `cols` that is about to be
+    /// built, checked against the array shape, cell and byte limits and,
+    /// during a result preview, its smaller array limit.
     pub(super) fn validate_shape(
+        rows: usize,
+        cols: usize,
+        value_buffers: usize,
+        extra_bytes: usize,
+    ) -> Result<usize, crate::types::FormulaError> {
+        let cells = Self::validate_buffers(rows, cols, value_buffers, extra_bytes)?;
+        preview_limits::array(cells)?;
+        Ok(cells)
+    }
+
+    /// The cell count of a reference read in place, checked against the
+    /// array shape limit. Nothing is allocated, so a preview's smaller array
+    /// limit does not apply.
+    pub(super) fn validate_reference_shape(
+        rows: usize,
+        cols: usize,
+    ) -> Result<usize, crate::types::FormulaError> {
+        Self::validate_buffers(rows, cols, 1, 0)
+    }
+
+    fn validate_buffers(
         rows: usize,
         cols: usize,
         value_buffers: usize,

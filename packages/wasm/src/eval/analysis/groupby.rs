@@ -2,7 +2,7 @@
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
 
-use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
+use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_BYTES, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::value::{bool_from_value, compare_values, number_from_value};
 use super::super::EvalPass;
 use super::super::Shapes;
@@ -10,9 +10,7 @@ use super::lambda::Slot;
 use crate::calc::{parse, Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
-use grouping::{
-    compare_fields, compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL,
-};
+use grouping::{compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL};
 
 /// Key and aggregate rules that `PIVOTBY` shares with pivot tables. It lives
 /// below this family so the function registry does not list it.
@@ -36,6 +34,13 @@ const AGGREGATORS: &[&str] = &[
     "VAR.P",
     "VAR.S",
 ];
+/// Source values that one grouping may place in groups, subtotals and totals,
+/// counted once per value column: 64 MiB of 4-byte row numbers. Every
+/// placement is one stored row number and, for `SUM` and `PERCENTOF`, one
+/// value read per value column. These passes over the source do not count
+/// against [`SPILL_MAX_RECOMPUTE_CELLS`]; the groups, sorting, output and other
+/// aggregators do.
+const GROUPING_MAX_PLACEMENTS: usize = SPILL_MAX_BYTES / 4;
 
 struct Context<'a, 'p> {
     store: &'a CellStore,
@@ -43,6 +48,9 @@ struct Context<'a, 'p> {
     pass: &'a mut EvalPass<'p>,
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
+    /// Work charged against [`SPILL_MAX_RECOMPUTE_CELLS`]. Reading the
+    /// arguments and passing over the source rows are not charged: the matrix
+    /// byte limit and [`GROUPING_MAX_PLACEMENTS`] bound them.
     work: usize,
     sums: FxHashMap<(usize, usize, usize), Value>,
 }
@@ -53,14 +61,10 @@ impl Context<'_, '_> {
     }
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
         if !super::super::array::ast_produces_array(expression, self.pass.shapes()) {
-            self.charge(1)?;
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
         }
-        let matrix =
-            self.store
-                .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)?;
-        self.charge(matrix.values.len())?;
-        Ok(matrix)
+        self.store
+            .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)
     }
     fn charge(&mut self, work: usize) -> Result<(), FormulaError> {
         self.work = self.work.checked_add(work).ok_or(FormulaError::Num)?;
@@ -80,7 +84,6 @@ impl Context<'_, '_> {
         if let Some(sum) = self.sums.get(&key) {
             return Ok(sum.clone());
         }
-        self.charge(rows.len())?;
         let mut total = 0.0;
         for &row in rows {
             match range_number(&values.values[row * values.cols + column]) {
@@ -141,7 +144,9 @@ impl Axis {
             rows: Vec::new(),
             parent: None,
         }];
-        let mut buckets: FxHashMap<Vec<KeyPart>, Vec<usize>> = FxHashMap::default();
+        // A group is found by its parent and its own key at each level, so a
+        // row costs one lookup per level whatever the width of the key.
+        let mut buckets: FxHashMap<(usize, KeyPart), Vec<usize>> = FxHashMap::default();
         // Every included row belongs to the root and one group per prefix.
         let membership_width = fields.cols + 1;
         let mut memberships = vec![
@@ -151,44 +156,30 @@ impl Axis {
                 .checked_mul(membership_width)
                 .ok_or(FormulaError::Num)?
         ];
-        // Reuse the lookup key; only a new bucket needs an owned copy.
-        let mut key = Vec::with_capacity(fields.cols);
         for &row in included {
             groups[0].rows.push(row);
-            key.clear();
             let mut parent = 0;
             for width in 1..=fields.cols {
                 let values = &fields.values[row * fields.cols..row * fields.cols + width];
-                let text_work = values.iter().try_fold(0usize, |work, value| {
-                    work.checked_add(if let Value::Text(text) = value {
-                        text.len()
-                    } else {
-                        0
-                    })
-                    .ok_or(FormulaError::Num)
-                })?;
-                context.charge(width.checked_add(text_work).ok_or(FormulaError::Num)?)?;
-                key.push(key_part(&values[width - 1])?);
-                let mut found = None;
-                if let Some(bucket) = buckets.get(&key) {
-                    for &group in bucket {
-                        context.charge(width)?;
-                        if compare_fields(&groups[group].fields, values) == Ordering::Equal {
-                            found = Some(group);
-                            break;
-                        }
-                    }
-                }
-                let group = found.unwrap_or_else(|| {
+                let value = &values[width - 1];
+                let bucket = buckets.entry((parent, key_part(value)?)).or_default();
+                let found = bucket.iter().copied().find(|&group| {
+                    compare_group_values(&groups[group].fields[width - 1], value) == Ordering::Equal
+                });
+                let group = if let Some(group) = found {
+                    group
+                } else {
+                    // A new group stores its key: work per group, not per row.
+                    context.charge(width)?;
                     let index = groups.len();
                     groups.push(Group {
                         fields: values.to_vec(),
                         rows: Vec::new(),
                         parent: Some(parent),
                     });
-                    buckets.entry(key.clone()).or_default().push(index);
+                    bucket.push(index);
                     index
-                });
+                };
                 groups[group].rows.push(row);
                 memberships[row * membership_width + width] = group;
                 parent = group;
@@ -523,6 +514,30 @@ pub(crate) fn evaluate_ast(
     }
 }
 
+/// Refuses a grouping that would place more than [`GROUPING_MAX_PLACEMENTS`]
+/// source values: each included row goes into its group at every row level
+/// and the root, the same for the column levels, and every pair of the two.
+fn check_placements(
+    rows: usize,
+    row_width: usize,
+    col_width: Option<usize>,
+    value_cols: usize,
+) -> Result<(), FormulaError> {
+    let row_levels = row_width + 1;
+    let per_row = match col_width {
+        Some(width) => (width + 1)
+            .checked_mul(row_levels)
+            .and_then(|pairs| pairs.checked_add(width + 1 + row_levels)),
+        None => Some(row_levels),
+    };
+    per_row
+        .and_then(|count| count.checked_mul(rows))
+        .and_then(|placements| placements.checked_mul(value_cols))
+        .filter(|placements| *placements <= GROUPING_MAX_PLACEMENTS)
+        .map(|_| ())
+        .ok_or(FormulaError::Num)
+}
+
 fn sort_codes(
     context: &mut Context<'_, '_>,
     arguments: &[Ast],
@@ -675,6 +690,12 @@ pub(crate) fn evaluate_matrix(
     if included.is_empty() {
         return Err(FormulaError::Calc);
     }
+    check_placements(
+        included.len(),
+        row_fields.cols,
+        col_fields.as_ref().map(|fields| fields.cols),
+        values.cols,
+    )?;
     let mut rows = Axis::build(&mut context, &row_fields, &included, row_total)?;
     let mut column_axis = if let Some(fields) = &col_fields {
         Some(Axis::build(&mut context, fields, &included, col_total)?)
@@ -748,7 +769,6 @@ pub(crate) fn evaluate_matrix(
         for &row in &included {
             for &row_group in rows.memberships(row) {
                 for &col_group in columns.memberships(row) {
-                    context.charge(1)?;
                     intersections
                         .entry((row_group, col_group))
                         .or_default()
@@ -976,6 +996,80 @@ mod tests {
                 assert!((store.get_cell(sheet, 9, 9).num() - expected).abs() < 1e-10);
             }
         }
+    }
+
+    /// Sales rows as in #605: 10 regions, 100 products (each in one region),
+    /// an amount of 1 and one of 4 quarters. Each product has the same number
+    /// of rows in every quarter.
+    fn sales(rows: usize, formula: &str) -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(16, rows);
+        for row in 0..rows {
+            let product = row % 100;
+            store.set_string(sheet, row, 0, &format!("Region {}", product % 10), 0);
+            store.set_string(sheet, row, 1, &format!("Product {product}"), 0);
+            store.set_number(sheet, row, 2, 1.0, 0);
+            store.set_string(sheet, row, 3, &format!("Q{}", row / 100 % 4 + 1), 0);
+        }
+        store.set_formula(sheet, 0, 5, formula, 0);
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    #[test]
+    fn source_rows_do_not_count_against_the_operation_cap() {
+        // Develop charged about 38 operations per source row here and gave
+        // #NUM! above about 52,600 rows.
+        let (store, sheet) = sales(
+            70_000,
+            "=PIVOTBY(A1:B70000,D1:D70000,C1:C70000,PERCENTOF,0,2,,1,,,2)",
+        );
+        // The corner above the row labels is blank, not #NUM!.
+        assert_eq!(store.get_cell(sheet, 0, 5).string(), None);
+        assert_eq!(store.get_cell(sheet, 0, 7).string().as_deref(), Some("Q1"));
+        assert_eq!(
+            store.get_cell(sheet, 0, 11).string().as_deref(),
+            Some("Total")
+        );
+        // Region 0, Product 0: 175 rows in each quarter.
+        assert_eq!(
+            store.get_cell(sheet, 1, 5).string().as_deref(),
+            Some("Region 0")
+        );
+        assert_eq!(
+            store.get_cell(sheet, 1, 6).string().as_deref(),
+            Some("Product 0")
+        );
+        for column in 7..11 {
+            assert_eq!(store.get_cell(sheet, 1, column).num(), 175.0 / 70_000.0);
+        }
+        assert_eq!(store.get_cell(sheet, 1, 11).num(), 700.0 / 70_000.0);
+        // After the header: 100 products, 10 region subtotals, then the total.
+        assert_eq!(
+            store.get_cell(sheet, 111, 5).string().as_deref(),
+            Some("Total")
+        );
+        assert_eq!(store.get_cell(sheet, 111, 11).num(), 1.0);
+        // Develop charged about 19 per row and gave #NUM! above 100,000 rows.
+        let (store, sheet) = sales(120_000, "=GROUPBY(A1:B120000,C1:C120000,SUM,0,2)");
+        assert_eq!(store.get_cell(sheet, 0, 7).num(), 1_200.0);
+        assert_eq!(store.get_cell(sheet, 110, 7).num(), 120_000.0);
+    }
+
+    #[test]
+    fn oversized_groupings_are_still_refused() {
+        // 600,001 rows of two columns is above the 1,000,000-cell output limit.
+        let (store, sheet) = calculate("=GROUPBY(SEQUENCE(600000),SEQUENCE(600000),SUM)");
+        assert_eq!(
+            store.get_cell(sheet, 8, 8).string().as_deref(),
+            Some("#NUM!")
+        );
+        // A full sheet in the #605 shape fits; a second value column does not.
+        assert!(check_placements(1_048_575, 2, Some(1), 1).is_ok());
+        assert_eq!(
+            check_placements(1_048_575, 2, Some(1), 2),
+            Err(FormulaError::Num)
+        );
     }
 
     #[test]
