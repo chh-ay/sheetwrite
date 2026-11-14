@@ -11,7 +11,9 @@ import { type TickScale, tickScale } from "./ticks.js";
 
 /** Box size in CSS pixels. */
 export interface ChartSize {
+  /** Width in CSS pixels; a negative width draws as `0`. */
   width: number;
+  /** Height in CSS pixels; a negative height draws as `0`. */
   height: number;
 }
 
@@ -1244,6 +1246,9 @@ function drawPie(context: DrawContext, box: Box): void {
  *   host.replaceChildren(renderChartSvg(view, { width: 320, height: 200 }));
  * }
  * ```
+ *
+ * @returns A new `<svg>` element with a `<title>` and `<desc>` naming the chart,
+ *   not yet attached to any document.
  */
 export function renderChartSvg(
   view: ChartView,
