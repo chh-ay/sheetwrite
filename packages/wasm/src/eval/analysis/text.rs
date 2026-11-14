@@ -15,18 +15,18 @@ use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "ARRAYTOTEXT",
-    "DOLLAR",
-    "FIXED",
-    "REGEXEXTRACT",
-    "REGEXREPLACE",
-    "REGEXTEST",
-    "TEXTAFTER",
-    "TEXTBEFORE",
-    "TEXTSPLIT",
-    "VALUETOTEXT",
-];
+family_functions! {
+    ARRAYTOTEXT,
+    DOLLAR,
+    FIXED,
+    REGEXEXTRACT,
+    REGEXREPLACE,
+    REGEXTEST,
+    TEXTAFTER,
+    TEXTBEFORE,
+    TEXTSPLIT,
+    VALUETOTEXT,
+}
 const MAX_TEXT_CHARS: usize = 32_767;
 const MAX_TEXT_BYTES: usize = MAX_TEXT_CHARS * 4;
 const MAX_MATCH_WORK: usize = 2_000_000;
@@ -39,6 +39,7 @@ struct Context<'a, 'p> {
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
 }
+
 impl Context<'_, '_> {
     fn scalar(&mut self, args: &[Ast], index: usize, default: Value) -> Value {
         optional_ast(args, index).map_or(default, |ast| {
@@ -46,6 +47,7 @@ impl Context<'_, '_> {
                 .eval_ast(ast, self.sheet, self.pass, self.depth + 1)
         })
     }
+
     fn text(&mut self, args: &[Ast], index: usize, default: &str) -> Result<String, FormulaError> {
         let text = text_from_value(&self.scalar(args, index, Value::text(default)))?.into_owned();
         if text.len() > MAX_TEXT_BYTES || text.chars().count() > MAX_TEXT_CHARS {
@@ -53,6 +55,7 @@ impl Context<'_, '_> {
         }
         Ok(text)
     }
+
     fn integer(&mut self, args: &[Ast], index: usize, default: i64) -> Result<i64, FormulaError> {
         let number = number_from_value(&self.scalar(args, index, Value::number(default as f64)))?;
         if number < i64::MIN as f64 || number >= i64::MAX as f64 {
@@ -60,9 +63,11 @@ impl Context<'_, '_> {
         }
         Ok(number.trunc() as i64)
     }
+
     fn boolean(&mut self, args: &[Ast], index: usize, default: bool) -> Result<bool, FormulaError> {
         bool_from_value(&self.scalar(args, index, Value::Bool(default)))
     }
+
     fn matrix(&mut self, ast: &Ast) -> Result<EvalMatrix, FormulaError> {
         if range_from_ast(ast, self.sheet).is_some()
             || super::super::array::ast_produces_array(ast, self.pass.shapes())
@@ -79,6 +84,7 @@ impl Context<'_, '_> {
             ))
         }
     }
+
     fn delimiters(&mut self, args: &[Ast], index: usize) -> Result<Vec<String>, FormulaError> {
         let Some(ast) = optional_ast(args, index) else {
             return Ok(Vec::new());
@@ -102,6 +108,7 @@ impl Context<'_, '_> {
         Ok(delimiters)
     }
 }
+
 const fn arity(args: &[Ast], minimum: usize, maximum: usize) -> Result<(), FormulaError> {
     if args.len() < minimum || args.len() > maximum {
         Err(FormulaError::Value)
@@ -109,6 +116,7 @@ const fn arity(args: &[Ast], minimum: usize, maximum: usize) -> Result<(), Formu
         Ok(())
     }
 }
+
 fn text_value(text: String) -> Result<Value, FormulaError> {
     if text.len() > MAX_TEXT_BYTES || text.chars().count() > MAX_TEXT_CHARS {
         Err(FormulaError::Value)
@@ -117,6 +125,7 @@ fn text_value(text: String) -> Result<Value, FormulaError> {
         Ok(Value::text(text))
     }
 }
+
 fn mode(context: &mut Context<'_, '_>, args: &[Ast], index: usize) -> Result<bool, FormulaError> {
     match number_from_value(&context.scalar(args, index, Value::number(0.0)))? {
         0.0 => Ok(false),
@@ -124,6 +133,7 @@ fn mode(context: &mut Context<'_, '_>, args: &[Ast], index: usize) -> Result<boo
         _ => Err(FormulaError::Value),
     }
 }
+
 // Compare original character spans so case folding cannot change byte offsets.
 fn delimiter_length(
     text: &str,
@@ -151,6 +161,7 @@ fn delimiter_length(
     }
     Ok(Some(end))
 }
+
 fn split_parts<'a>(
     text: &'a str,
     delimiters: &[String],
@@ -211,9 +222,10 @@ fn split_parts<'a>(
     }
     Ok(parts)
 }
+
 fn before_after(
     context: &mut Context<'_, '_>,
-    name: &str,
+    function: Function,
     args: &[Ast],
 ) -> Result<Value, FormulaError> {
     arity(args, 2, 6)?;
@@ -229,7 +241,7 @@ fn before_after(
     if text.is_empty() {
         return Ok(Value::text(""));
     }
-    let is_before = name == "TEXTBEFORE";
+    let is_before = function == Function::TEXTBEFORE;
     if delimiter.is_empty() {
         return text_value(if is_before == (instance > 0) {
             String::new()
@@ -288,14 +300,18 @@ fn before_after(
     }
 }
 
-fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
-    arity(args, 1, if name == "FIXED" { 3 } else { 2 })?;
+fn fixed(
+    context: &mut Context<'_, '_>,
+    function: Function,
+    args: &[Ast],
+) -> Result<Value, FormulaError> {
+    arity(args, 1, if function == Function::FIXED { 3 } else { 2 })?;
     let number = number_from_value(&context.scalar(args, 0, Value::Blank))?;
     let decimals = context.integer(args, 1, 2)?;
     if !(-MAX_DECIMALS..=MAX_DECIMALS).contains(&decimals) {
         return Err(FormulaError::Value);
     }
-    let no_commas = name == "FIXED" && context.boolean(args, 2, false)?;
+    let no_commas = function == Function::FIXED && context.boolean(args, 2, false)?;
     let rounded = round_decimal(number, decimals as i32, Rounding::Nearest);
     if !rounded.is_finite() {
         return Err(FormulaError::Num);
@@ -306,7 +322,7 @@ fn fixed(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Valu
     } else {
         format!("0.{}", "0".repeat(places))
     };
-    let code = if name == "DOLLAR" {
+    let code = if function == Function::DOLLAR {
         format!("$#,##{digits};($#,##{digits})")
     } else if no_commas {
         digits
@@ -341,10 +357,15 @@ fn serialize(output: &mut String, value: &Value, strict: bool) -> Result<(), For
     }
     Ok(())
 }
-fn to_text(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Value, FormulaError> {
+
+fn to_text(
+    context: &mut Context<'_, '_>,
+    function: Function,
+    args: &[Ast],
+) -> Result<Value, FormulaError> {
     arity(args, 1, 2)?;
     let strict = mode(context, args, 1)?;
-    if name == "VALUETOTEXT" {
+    if function == Function::VALUETOTEXT {
         let mut output = String::new();
         serialize(&mut output, &context.scalar(args, 0, Value::Blank), strict)?;
         return text_value(output);
@@ -377,6 +398,7 @@ fn to_text(context: &mut Context<'_, '_>, name: &str, args: &[Ast]) -> Result<Va
     }
     text_value(output)
 }
+
 /// The compiled program for a REGEX call's pattern. A literal pattern uses
 /// the program its formulas share. A computed pattern uses the program this
 /// recalculation keeps for it, which the pass drops when it ends.
@@ -439,21 +461,38 @@ fn append_replacement(
     }
     append_text(output, replacement)
 }
+
 fn regex_scalar(
     context: &mut Context<'_, '_>,
-    name: &str,
+    function: Function,
     args: &[Ast],
 ) -> Result<Value, FormulaError> {
     arity(
         args,
-        if name == "REGEXREPLACE" { 3 } else { 2 },
-        if name == "REGEXREPLACE" { 5 } else { 3 },
+        if function == Function::REGEXREPLACE {
+            3
+        } else {
+            2
+        },
+        if function == Function::REGEXREPLACE {
+            5
+        } else {
+            3
+        },
     )?;
     let text = context.text(args, 0, "")?;
     let pattern = context.text(args, 1, "")?;
-    let insensitive = mode(context, args, if name == "REGEXREPLACE" { 4 } else { 2 })?;
+    let insensitive = mode(
+        context,
+        args,
+        if function == Function::REGEXREPLACE {
+            4
+        } else {
+            2
+        },
+    )?;
     let regex = compile_regex(context.pass.results, args, &pattern, insensitive)?;
-    if name == "REGEXTEST" {
+    if function == Function::REGEXTEST {
         return Ok(Value::Bool(regex.is_match(&text)));
     }
     let replacement = context.text(args, 2, "")?;
@@ -477,6 +516,7 @@ fn regex_scalar(
     append_text(&mut output, &text[offset..])?;
     text_value(output)
 }
+
 fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     arity(args, 2, 4)?;
     let text = context.text(args, 0, "")?;
@@ -519,6 +559,7 @@ fn extract(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, Fo
     };
     checked_matrix(rows, columns, values)
 }
+
 fn checked_matrix(
     rows: usize,
     columns: usize,
@@ -529,6 +570,7 @@ fn checked_matrix(
     matrix.validate_bytes()?;
     Ok(matrix)
 }
+
 fn text_split(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     arity(args, 2, 6)?;
     let text = context.text(args, 0, "")?;
@@ -564,24 +606,25 @@ fn text_split(context: &mut Context<'_, '_>, args: &[Ast]) -> Result<EvalMatrix,
     }
     checked_matrix(parts.len(), column_count, values)
 }
+
 fn scalar_result(
     context: &mut Context<'_, '_>,
-    name: &str,
+    function: Function,
     args: &[Ast],
 ) -> Result<Value, FormulaError> {
-    match name {
-        "TEXTBEFORE" | "TEXTAFTER" => before_after(context, name, args),
-        "FIXED" | "DOLLAR" => fixed(context, name, args),
-        "VALUETOTEXT" | "ARRAYTOTEXT" => to_text(context, name, args),
-        "REGEXTEST" | "REGEXREPLACE" => regex_scalar(context, name, args),
-        "REGEXEXTRACT" => extract(context, args).map(EvalMatrix::into_first),
-        "TEXTSPLIT" => text_split(context, args).map(EvalMatrix::into_first),
-        _ => Err(FormulaError::Name),
+    match function {
+        Function::TEXTBEFORE | Function::TEXTAFTER => before_after(context, function, args),
+        Function::FIXED | Function::DOLLAR => fixed(context, function, args),
+        Function::VALUETOTEXT | Function::ARRAYTOTEXT => to_text(context, function, args),
+        Function::REGEXTEST | Function::REGEXREPLACE => regex_scalar(context, function, args),
+        Function::REGEXEXTRACT => extract(context, args).map(EvalMatrix::into_first),
+        Function::TEXTSPLIT => text_split(context, args).map(EvalMatrix::into_first),
     }
 }
+
 pub(super) fn evaluate_ast(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -594,17 +637,19 @@ pub(super) fn evaluate_ast(
             pass,
             depth,
         },
-        name,
+        function,
         args,
     )
     .unwrap_or_else(Value::Error)
 }
-pub(super) fn produces_array(name: &str, _args: &[Ast], _: Shapes<'_>) -> bool {
-    matches!(name, "TEXTSPLIT" | "REGEXEXTRACT")
+
+pub(super) const fn produces_array(function: Function, _args: &[Ast], _: Shapes<'_>) -> bool {
+    matches!(function, Function::TEXTSPLIT | Function::REGEXEXTRACT)
 }
+
 pub(super) fn evaluate_matrix(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -616,18 +661,26 @@ pub(super) fn evaluate_matrix(
         pass,
         depth,
     };
-    match name {
-        "TEXTSPLIT" => text_split(&mut context, args),
-        "REGEXEXTRACT" => extract(&mut context, args),
-        _ => Err(FormulaError::Value),
+    match function {
+        Function::TEXTSPLIT => text_split(&mut context, args),
+        Function::REGEXEXTRACT => extract(&mut context, args),
+        Function::ARRAYTOTEXT
+        | Function::DOLLAR
+        | Function::FIXED
+        | Function::REGEXREPLACE
+        | Function::REGEXTEST
+        | Function::TEXTAFTER
+        | Function::TEXTBEFORE
+        | Function::VALUETOTEXT => Err(FormulaError::Value),
     }
 }
-/// The shape of `name`'s result. It evaluates in a workspace of its own, which
+
+/// The shape of `function`'s result. It evaluates in a workspace of its own, which
 /// borrows the pass's compiled regex programs so that sizing a spill and
 /// evaluating it compile each pattern once.
 pub(super) fn shape(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     outer: &mut EvalPass<'_>,
@@ -640,20 +693,21 @@ pub(super) fn shape(
         affected: &affected,
         results: &mut results,
     };
-    let evaluated = evaluate_matrix(store, name, args, sheet, &mut pass, 0);
+    let evaluated = evaluate_matrix(store, function, args, sheet, &mut pass, 0);
 
     results.swap_scratch(outer.results);
     let matrix = evaluated?;
     Ok((matrix.rows, matrix.cols, matrix.values.len()))
 }
+
 pub(super) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, args, sheet, pass).map(|shape| shape.2)
+    shape(store, function, args, sheet, pass).map(|shape| shape.2)
 }
 
 #[cfg(test)]

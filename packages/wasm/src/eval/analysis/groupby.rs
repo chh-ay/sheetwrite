@@ -16,7 +16,11 @@ use grouping::{compare_group_values, key_part, range_number, KeyPart, TOTAL_LABE
 /// below this family so the function registry does not list it.
 pub(crate) mod grouping;
 
-pub(crate) const NAMES: &[&str] = &["GROUPBY", "PERCENTOF", "PIVOTBY"];
+family_functions! {
+    GROUPBY,
+    PERCENTOF,
+    PIVOTBY,
+}
 const AGGREGATORS: &[&str] = &[
     "ARRAYTOTEXT",
     "AVERAGE",
@@ -26,7 +30,7 @@ const AGGREGATORS: &[&str] = &[
     "MAX",
     "MEDIAN",
     "MIN",
-    "PERCENTOF",
+    Function::PERCENTOF.name(),
     "PRODUCT",
     "STDEV.P",
     "STDEV.S",
@@ -54,11 +58,13 @@ struct Context<'a, 'p> {
     work: usize,
     sums: FxHashMap<(usize, usize, usize), Value>,
 }
+
 impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
         self.store
             .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
         if !super::super::array::ast_produces_array(expression, self.pass.shapes()) {
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
@@ -66,6 +72,7 @@ impl Context<'_, '_> {
         self.store
             .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn charge(&mut self, work: usize) -> Result<(), FormulaError> {
         self.work = self.work.checked_add(work).ok_or(FormulaError::Num)?;
         if self.work > SPILL_MAX_RECOMPUTE_CELLS {
@@ -73,6 +80,7 @@ impl Context<'_, '_> {
         }
         Ok(())
     }
+
     fn sum_rows(
         &mut self,
         values: &EvalMatrix,
@@ -100,6 +108,7 @@ impl Context<'_, '_> {
         self.sums.insert(key, sum.clone());
         Ok(sum)
     }
+
     fn option(
         &mut self,
         arguments: &[Ast],
@@ -122,6 +131,7 @@ struct Group {
     rows: Vec<usize>,
     parent: Option<usize>,
 }
+
 struct Axis {
     groups: Vec<Group>,
     memberships: Vec<usize>,
@@ -129,6 +139,7 @@ struct Axis {
     grand: usize,
     width: usize,
 }
+
 impl Axis {
     fn build(
         context: &mut Context<'_, '_>,
@@ -202,10 +213,12 @@ impl Axis {
             width: fields.cols,
         })
     }
+
     fn memberships(&self, row: usize) -> &[usize] {
         let width = self.width + 1;
         &self.memberships[row * width..(row + 1) * width]
     }
+
     fn ancestor(&self, mut group: usize, width: usize) -> usize {
         while self.groups[group].fields.len() > width {
             group = self.groups[group]
@@ -214,6 +227,7 @@ impl Axis {
         }
         group
     }
+
     fn sort(
         &mut self,
         context: &mut Context<'_, '_>,
@@ -324,6 +338,7 @@ struct Aggregator {
     arity: usize,
     label: String,
 }
+
 impl Aggregator {
     fn resolve(written: &Ast) -> Result<Self, FormulaError> {
         let expression = written.bound_value();
@@ -332,7 +347,11 @@ impl Aggregator {
             if !AGGREGATORS.contains(&label.as_str()) {
                 return Err(FormulaError::Value);
             }
-            let arity = if label == "PERCENTOF" { 2 } else { 1 };
+            let arity = if label == Function::PERCENTOF.name() {
+                2
+            } else {
+                1
+            };
             let Ast::Func(function, _) =
                 parse(&format!("={label}(0)")).map_err(|_| FormulaError::Value)?
             else {
@@ -366,6 +385,7 @@ impl Aggregator {
         }
         Err(FormulaError::Value)
     }
+
     fn aggregate(
         &self,
         context: &mut Context<'_, '_>,
@@ -377,7 +397,7 @@ impl Aggregator {
         if self.label == "SUM" {
             return context.sum_rows(values, rows, column);
         }
-        if self.label == "PERCENTOF" {
+        if self.label == Function::PERCENTOF.name() {
             let subset = context.sum_rows(values, rows, column)?;
             let total = context.sum_rows(values, total_rows, column)?;
             return Ok(
@@ -420,26 +440,28 @@ impl Aggregator {
     }
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
-    name != "PERCENTOF"
+pub(crate) fn produces_array(function: Function, _: &[Ast], _: Shapes<'_>) -> bool {
+    function != Function::PERCENTOF
 }
+
 pub(crate) fn shape(
     _: &CellStore,
-    _: &str,
+    _: Function,
     _: &[Ast],
     _: usize,
     _: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     Ok((1, 1, 1))
 }
+
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    let is_pivot = name == "PIVOTBY";
+    let is_pivot = function == Function::PIVOTBY;
     let required = if is_pivot { 4 } else { 3 };
     if arguments.len() < required {
         return Err(FormulaError::Value);
@@ -482,13 +504,13 @@ pub(crate) fn bound(
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    name: &str,
+    function: Function,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
-    if name != "PERCENTOF" || arguments.len() != 2 {
+    if function != Function::PERCENTOF || arguments.len() != 2 {
         return Value::Error(FormulaError::Value);
     }
     let sum = |expression: &Ast, pass: &mut EvalPass<'_>| {
@@ -568,13 +590,13 @@ fn sort_codes(
 
 pub(crate) fn evaluate_matrix(
     store: &CellStore,
-    name: &str,
+    function: Function,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
-    let is_pivot = name == "PIVOTBY";
+    let is_pivot = function == Function::PIVOTBY;
     let required = if is_pivot { 4 } else { 3 };
     let maximum = if is_pivot { 11 } else { 8 };
     if arguments.len() < required || arguments.len() > maximum {

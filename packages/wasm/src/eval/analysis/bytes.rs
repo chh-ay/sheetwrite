@@ -13,27 +13,35 @@ use super::super::functions::{apply_func, require_arity, text_arg, FuncAccumulat
 use crate::calc::Func;
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "ASC", "BAHTTEXT", "DBCS", "FINDB", "LEFTB", "LENB", "MIDB", "REPLACEB", "RIGHTB", "SEARCHB",
-];
+family_functions! {
+    ASC,
+    BAHTTEXT,
+    DBCS,
+    FINDB,
+    LEFTB,
+    LENB,
+    MIDB,
+    REPLACEB,
+    RIGHTB,
+    SEARCHB,
+}
 
 /// The longest text a width conversion may return, as for other text
 /// functions.
 const MAX_TEXT_OUTPUT_BYTES: usize = 16 * 1024 * 1024;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let character_function = match name {
-        "LENB" => Func::Len,
-        "LEFTB" => Func::Left,
-        "RIGHTB" => Func::Right,
-        "MIDB" => Func::Mid,
-        "REPLACEB" => Func::Replace,
-        "FINDB" => Func::Find,
-        "SEARCHB" => Func::Search,
-        "ASC" => return convert_width(values, width::half_width),
-        "DBCS" => return convert_width(values, width::full_width),
-        "BAHTTEXT" => return baht::baht_text(values),
-        _ => return Value::Error(FormulaError::Name),
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    let character_function = match function {
+        Function::LENB => Func::Len,
+        Function::LEFTB => Func::Left,
+        Function::RIGHTB => Func::Right,
+        Function::MIDB => Func::Mid,
+        Function::REPLACEB => Func::Replace,
+        Function::FINDB => Func::Find,
+        Function::SEARCHB => Func::Search,
+        Function::ASC => return convert_width(values, width::half_width),
+        Function::DBCS => return convert_width(values, width::full_width),
+        Function::BAHTTEXT => return baht::baht_text(values),
     };
 
     apply_func(character_function, values)
