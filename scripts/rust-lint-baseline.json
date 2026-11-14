@@ -38,8 +38,8 @@
     "clippy::wildcard_enum_match_arm": 11,
     "E0133": 6,
     "missing_debug_implementations": 10,
-    "missing_docs": 38,
-    "redundant_imports": 12,
+    "missing_docs": 8,
+    "redundant_imports": 11,
     "unnameable_types": 6,
     "unreachable_pub": 23
   },
