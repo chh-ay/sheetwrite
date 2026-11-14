@@ -12,6 +12,7 @@ use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
 use crate::sort_text::push_collation_key;
+use crate::sorting::{key_index, sort_indices_by, sort_u128, sort_u64};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -558,17 +559,117 @@ impl CellStore {
         }
         let ranked = keys.rank();
 
-        let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
-        order.sort_unstable_by(|&a, &b| {
-            let ord = ranked.compare(a as usize, b as usize, ascending);
-            if ord == Ordering::Equal {
-                a.cmp(&b)
-            } else {
-                ord
-            }
-        });
-        order
+        // The row in the low bits breaks ties, so equal rows keep their order.
+        let mut packed: Vec<u128> = (0..s.cells.row_count())
+            .map(|row| ranked.packed(row, ascending) | row as u128)
+            .collect();
+        sort_u128(&mut packed);
+        packed.into_iter().map(key_index).collect()
     }
+
+    /// The ranked sort keys of `rows` in `cols`, key-major: key `k` of the
+    /// row at position `p` is `k * rows.len() + p`.
+    fn ranked_row_keys(&self, data: &SheetData, cols: &[u32], rows: &[u32]) -> SortKeys {
+        let row_count = rows.len();
+        // Decorate-sort-undecorate per key, the same way the one-key path does:
+        // a comparison sort that rebuilt both operands would reconstruct each
+        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
+        // every time. Keys are stored key-major so the first key — the one that
+        // decides nearly every comparison — stays contiguous.
+        let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
+        for &col in cols {
+            let base = col as usize * data.cells.row_count();
+
+            let mut cached_run: Option<CellRun<'_>> = None;
+            for &row in rows {
+                let index = base + row as usize;
+                let run = cached_run
+                    .get_or_insert_with(|| data.cells.run(index, base + data.cells.row_count()));
+                if index < run.start || index >= run.end {
+                    *run = data.cells.run(index, base + data.cells.row_count());
+                }
+                keys.push(ComparableCell::from_run(
+                    data,
+                    &self.strings,
+                    run,
+                    index,
+                    &self.formula_slots,
+                ));
+            }
+        }
+        keys.rank()
+    }
+}
+
+/// Positions `0..rows.len()` sorted by `key_count` keys, then by row.
+///
+/// Starts in row order and sorts by the first key; then each run of
+/// positions that tie on every key so far is sorted by the next key, with
+/// the position's place in its run as the tie-break. That is the order of a
+/// stable sort by all keys, and most rows never compare a second key.
+fn sort_positions_by_keys(
+    ranked: &SortKeys,
+    rows: &[u32],
+    key_count: usize,
+    ascending: &[u8],
+) -> Vec<u32> {
+    let row_count = rows.len();
+    let mut positions: Vec<u32> = if rows.is_sorted() {
+        (0..row_count as u32).collect()
+    } else {
+        let mut by_row: Vec<u64> = rows
+            .iter()
+            .enumerate()
+            .map(|(position, &row)| u64::from(row) << 32 | position as u64)
+            .collect();
+        sort_u64(&mut by_row);
+        by_row.into_iter().map(|key| key as u32).collect()
+    };
+
+    let mut runs = vec![(0, row_count)];
+    let mut next_runs = Vec::new();
+    let mut packed = Vec::new();
+    let mut sorted = Vec::new();
+    for key in 0..key_count {
+        let key_ascending = ascending.get(key).copied().unwrap_or(1) != 0;
+        let last_key = key + 1 == key_count;
+        next_runs.clear();
+        for &(start, end) in &runs {
+            packed.clear();
+            packed.extend(
+                positions[start..end]
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, &position)| {
+                        ranked.packed(key * row_count + position as usize, key_ascending)
+                            | slot as u128
+                    }),
+            );
+            sort_u128(&mut packed);
+            sorted.clear();
+            sorted.extend(
+                packed
+                    .iter()
+                    .map(|&packed_key| positions[start + key_index(packed_key) as usize]),
+            );
+            positions[start..end].copy_from_slice(&sorted);
+            if last_key {
+                continue;
+            }
+            // Runs of equal keys: the packed keys differ only in the slot.
+            let mut run_start = 0;
+            for slot in 1..=packed.len() {
+                if slot == packed.len() || packed[slot] >> 32 != packed[run_start] >> 32 {
+                    if slot - run_start > 1 {
+                        next_runs.push((start + run_start, start + slot));
+                    }
+                    run_start = slot;
+                }
+            }
+        }
+        std::mem::swap(&mut runs, &mut next_runs);
+    }
+    positions
 }
 
 #[wasm_bindgen]
@@ -611,51 +712,9 @@ impl CellStore {
                 .filter(|&row| (row as usize) < data.cells.row_count())
                 .collect()
         };
-        let row_count = rows.len();
-        // Decorate-sort-undecorate per key, the same way the one-key path does:
-        // a comparison sort that rebuilt both operands would reconstruct each
-        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
-        // every time. Keys are stored key-major so the first key — the one that
-        // decides nearly every comparison — stays contiguous.
-        let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
-        for &col in cols {
-            let base = col as usize * data.cells.row_count();
+        let ranked = self.ranked_row_keys(data, cols, &rows);
 
-            let mut cached_run: Option<CellRun<'_>> = None;
-            for &row in &rows {
-                let index = base + row as usize;
-                let run = cached_run
-                    .get_or_insert_with(|| data.cells.run(index, base + data.cells.row_count()));
-                if index < run.start || index >= run.end {
-                    *run = data.cells.run(index, base + data.cells.row_count());
-                }
-                keys.push(ComparableCell::from_run(
-                    data,
-                    &self.strings,
-                    run,
-                    index,
-                    &self.formula_slots,
-                ));
-            }
-        }
-        let ranked = keys.rank();
-
-        let mut positions: Vec<u32> = (0..row_count as u32).collect();
-        // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
-        positions.sort_by(|&left, &right| {
-            for key in 0..cols.len() {
-                let order = ranked.compare(
-                    key * row_count + left as usize,
-                    key * row_count + right as usize,
-                    ascending.get(key).copied().unwrap_or(1) != 0,
-                );
-                if order != Ordering::Equal {
-                    return order;
-                }
-            }
-            rows[left as usize].cmp(&rows[right as usize])
-        });
-        positions
+        sort_positions_by_keys(&ranked, &rows, cols.len(), ascending)
             .into_iter()
             .map(|position| rows[position as usize])
             .collect()
@@ -1350,32 +1409,23 @@ fn sort_finite_number_column_comparison(
     base: usize,
     ascending: bool,
 ) -> Option<Vec<u32>> {
-    // Each row keeps its value beside it, so the comparator reads no cells.
-    let mut keyed: Vec<(f64, u32)> = Vec::with_capacity(sheet.cells.row_count());
+    // Each row's key holds its value's order above the row, so the sort reads
+    // no cells and equal values keep their row order in both directions.
+    let mut packed: Vec<u128> = Vec::with_capacity(sheet.cells.row_count());
     let end = base + sheet.cells.row_count();
     let mut start = base;
     while start < end {
         let run = sheet.cells.run(start, end);
         for index in run.start..run.end {
             let value = source_number_in_run(&run, index, sheet.cells.is_paged())?;
-            if !value.is_finite() {
-                return None;
-            }
-            keyed.push((value, (index - base) as u32));
+            let key = finite_number_sort_key(value)?;
+            let directed = if ascending { key } else { !key };
+            packed.push(u128::from(directed) << 32 | (index - base) as u128);
         }
         start = run.end;
     }
-
-    keyed.sort_unstable_by(|&(left, a), &(right, b)| {
-        let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
-        let directed = if ascending { ord } else { ord.reverse() };
-        if directed == Ordering::Equal {
-            a.cmp(&b)
-        } else {
-            directed
-        }
-    });
-    Some(keyed.into_iter().map(|(_, row)| row).collect())
+    sort_u128(&mut packed);
+    Some(packed.into_iter().map(key_index).collect())
 }
 
 fn sort_finite_number_column_radix(
@@ -1421,14 +1471,19 @@ fn sort_finite_number_column_radix(
 }
 
 fn finite_number_sort_key(value: f64) -> Option<u64> {
-    if !value.is_finite() {
-        return None;
-    }
+    value.is_finite().then(|| number_order_bits(value))
+}
 
+/// Bits whose unsigned order is the order of `value`s, with -0 equal to 0.
+fn number_order_bits(value: f64) -> u64 {
+    const SIGN: u64 = 1 << 63;
     let normalized = if value == 0.0 { 0.0 } else { value };
     let bits = normalized.to_bits();
-    const SIGN: u64 = 1 << 63;
-    Some(if bits & SIGN == 0 { bits ^ SIGN } else { !bits })
+    if bits & SIGN == 0 {
+        bits ^ SIGN
+    } else {
+        !bits
+    }
 }
 
 fn radix_sort_numeric_pairs(pairs: &mut [NumericSortPair]) {
@@ -1701,7 +1756,7 @@ impl SortKeyBuilder {
     /// the row sort makes no byte comparison. The arena is dropped here.
     pub(crate) fn rank(mut self) -> SortKeys {
         let mut order: Vec<u32> = (0..self.texts.len() as u32).collect();
-        order.sort_unstable_by(|&a, &b| self.collation_cmp(a, b));
+        sort_indices_by(&mut order, &mut |a, b| self.collation_cmp(a, b));
 
         let mut ranks = vec![0u32; self.texts.len()];
         let mut rank = 0u32;
@@ -1744,9 +1799,33 @@ pub(crate) struct SortKeys {
 }
 
 impl SortKeys {
+    /// Key `key` as an integer whose unsigned order is [`Self::compare`]'s
+    /// order, shifted left 32 bits to leave room for a tie-break: the class
+    /// above a value (a number's order-preserving bits, a text rank, 0 or 1
+    /// for a logical value, 0 for an error). Descending flips both, except
+    /// for blank cells, which stay last. A NaN number (only `setNumber` can
+    /// store one) sorts after every other number, where `compare` calls it
+    /// equal to all of them.
+    pub(crate) fn packed(&self, key: usize, ascending: bool) -> u128 {
+        let class = self.classes[key];
+        let value = match class {
+            CLASS_NUMBER => number_order_bits(f64::from_bits(self.values[key])),
+            CLASS_ERROR | CLASS_EMPTY => 0,
+            _ => self.values[key],
+        };
+        let (class, value) = if ascending || class == CLASS_EMPTY {
+            (class, value)
+        } else {
+            (CLASS_ERROR - class, !value)
+        };
+        (u128::from(class) << 64 | u128::from(value)) << 32
+    }
+
     /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
     /// before `TRUE`, then errors, which are all equal. A descending sort
     /// reverses this order, but blank cells are last in both directions.
+    /// The sorts use [`Self::packed`]; tests check it against this.
+    #[cfg(test)]
     pub(crate) fn compare(&self, left: usize, right: usize, ascending: bool) -> Ordering {
         let class_left = self.classes[left];
         let class_right = self.classes[right];
@@ -1786,5 +1865,152 @@ impl Ord for OrderedNumber {
 impl PartialOrd for OrderedNumber {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+mod packed_order_tests {
+    use super::*;
+
+    const ROWS: usize = 600;
+    const COLUMNS: usize = 3;
+    const CASES: usize = 40;
+    const TEXTS: [&str; 9] = ["a", "A", "b", "co-op", "coop", "Co-op", "", "ß", "item-2"];
+    const NUMBERS: [f64; 8] = [0.0, -0.0, 1.5, -1.5, 1e300, -1e-300, 2.0, 1.5];
+    const FORMULAS: [&str; 4] = ["=1/0", "=NA()", "=-0", "=\"A\""];
+    const KINDS: usize = 6;
+    const SEED: u64 = 0x5eed;
+    const LCG_MULTIPLIER: u64 = 6_364_136_223_846_793_005;
+
+    struct Random(u64);
+
+    impl Random {
+        fn below(&mut self, bound: usize) -> usize {
+            self.0 = self.0.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
+            ((self.0 >> 33) as usize) % bound
+        }
+    }
+
+    /// Numbers, text, logical values, formula results (errors among them)
+    /// and blanks, from few distinct values, so many rows tie on a key.
+    fn mixed_store(random: &mut Random) -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(COLUMNS, ROWS);
+        for col in 0..COLUMNS {
+            for row in 0..ROWS {
+                match random.below(KINDS) {
+                    0 | 1 => {
+                        let number = NUMBERS[random.below(NUMBERS.len())];
+                        store.set_number(sheet, row, col, number, 0);
+                    }
+                    2 => store.set_string(sheet, row, col, TEXTS[random.below(TEXTS.len())], 0),
+                    3 => store.set_bool(sheet, row, col, random.below(2) == 0, 0),
+                    4 => {
+                        let formula = FORMULAS[random.below(FORMULAS.len())];
+                        store.set_formula(sheet, row, col, formula, 0);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    /// A stable sort by [`SortKeys::compare`], key by key, then by row: the
+    /// order the row sorts gave before they packed their keys.
+    fn compared_order(
+        store: &CellStore,
+        sheet: usize,
+        cols: &[u32],
+        ascending: &[u8],
+        rows: &[u32],
+    ) -> Vec<u32> {
+        let ranked = store.ranked_row_keys(&store.sheets[sheet], cols, rows);
+        let mut positions: Vec<usize> = (0..rows.len()).collect();
+        positions.sort_by(|&left, &right| {
+            (0..cols.len())
+                .map(|key| {
+                    ranked.compare(
+                        key * rows.len() + left,
+                        key * rows.len() + right,
+                        ascending[key] != 0,
+                    )
+                })
+                .find(|order| order.is_ne())
+                .unwrap_or_else(|| rows[left].cmp(&rows[right]))
+        });
+        positions
+            .into_iter()
+            .map(|position| rows[position])
+            .collect()
+    }
+
+    #[test]
+    fn packed_keys_sort_rows_in_the_compared_order() {
+        let mut random = Random(SEED);
+        for _ in 0..CASES {
+            let (store, sheet) = mixed_store(&mut random);
+            let key_count = 1 + random.below(COLUMNS);
+            let cols: Vec<u32> = (0..key_count)
+                .map(|_| random.below(COLUMNS) as u32)
+                .collect();
+            let ascending: Vec<u8> = (0..key_count).map(|_| random.below(2) as u8).collect();
+            let all_rows: Vec<u32> = (0..ROWS as u32).collect();
+            let mut candidates: Vec<u32> = all_rows
+                .iter()
+                .copied()
+                .filter(|_| random.below(3) > 0)
+                .collect();
+            for index in (1..candidates.len()).rev() {
+                candidates.swap(index, random.below(index + 1));
+            }
+
+            assert_eq!(
+                store.sort_rows_multi(sheet, &cols, &ascending, &candidates),
+                compared_order(&store, sheet, &cols, &ascending, &candidates),
+                "keys {cols:?}, ascending {ascending:?}, shuffled candidates"
+            );
+            assert_eq!(
+                store.sort_rows_multi(sheet, &cols, &ascending, &[]),
+                compared_order(&store, sheet, &cols, &ascending, &all_rows),
+                "keys {cols:?}, ascending {ascending:?}, all rows"
+            );
+            assert_eq!(
+                store.sort_rows(sheet, cols[0] as usize, ascending[0] != 0),
+                compared_order(&store, sheet, &cols[..1], &ascending[..1], &all_rows),
+                "one key {}, ascending {}",
+                cols[0],
+                ascending[0]
+            );
+        }
+    }
+
+    #[test]
+    fn a_stored_nan_sorts_after_every_other_number() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 4);
+        for (row, value) in [f64::NAN, f64::INFINITY, 1.0, f64::NEG_INFINITY]
+            .into_iter()
+            .enumerate()
+        {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        store.set_string(sheet, 3, 0, "text", 0);
+        assert_eq!(store.sort_rows(sheet, 0, true), vec![2, 1, 0, 3]);
+        assert_eq!(store.sort_rows(sheet, 0, false), vec![3, 0, 1, 2]);
+    }
+
+    #[test]
+    fn number_columns_sort_by_value_then_row_in_both_directions() {
+        // Below the radix threshold, so the comparison path sorts.
+        let values = [2.0, -0.0, 0.0, -3.5, 2.0, 1e-300];
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, values.len());
+        for (row, &value) in values.iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        assert_eq!(store.sort_rows(sheet, 0, true), vec![3, 1, 2, 5, 0, 4]);
+        assert_eq!(store.sort_rows(sheet, 0, false), vec![0, 4, 5, 1, 2, 3]);
     }
 }
