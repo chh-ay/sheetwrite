@@ -21,7 +21,6 @@
     "clippy::option_option": 4,
     "clippy::or_fun_call": 5,
     "clippy::panic": 5,
-    "clippy::rc_buffer": 1,
     "clippy::shadow_reuse": 33,
     "clippy::shadow_same": 3,
     "clippy::single_match_else": 5,
