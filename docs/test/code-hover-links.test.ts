@@ -46,7 +46,7 @@ test("hover see-also tags link guide paths and API names", async () => {
 test("manifest docs split into the hover summary and its tags", () => {
   expect(
     splitDocumentation(
-      "Export a workbook.\n@param workbook The workbook.\n@returns The file's bytes.\n@throws `TypeError` when it is closed.\n@example\nawait toXlsxWorkbook(workbook);",
+      "Export a workbook.\n@param workbook - The workbook.\n@returns The file's bytes.\n@throws `TypeError` when it is closed.\n@example\nawait toXlsxWorkbook(workbook);",
     ),
   ).toEqual({
     docs: "Export a workbook.",

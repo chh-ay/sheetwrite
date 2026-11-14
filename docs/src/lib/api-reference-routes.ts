@@ -58,8 +58,11 @@ export function splitDocumentation(documentation: string | undefined): SplitDocu
   const sections = (documentation ?? "").split(/(?:^|\n)@(\w+)\b[ \t]*\n?/);
   const tags: DocumentationTag[] = [];
   for (let index = 1; index < sections.length; index += 2) {
-    const text = sections[index + 1]?.trim();
-    tags.push([sections[index] ?? "", text === "" ? undefined : text]);
+    const name = sections[index] ?? "";
+    const raw = sections[index + 1]?.trim() ?? "";
+    // `@param name - text` reads as `name text`, as the language server's hovers give it.
+    const text = name === "param" ? raw.replace(/^([\w$.]+)\s+-\s+/, "$1 ") : raw;
+    tags.push([name, text === "" ? undefined : text]);
   }
   const docs = sections[0]?.trim();
   return { docs: docs === "" ? undefined : docs, tags };
