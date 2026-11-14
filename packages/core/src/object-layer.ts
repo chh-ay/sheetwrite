@@ -162,6 +162,7 @@ export class ObjectLayer {
     };
     for (const name of PANE_NAMES) root.appendChild(this.panes[name]);
     this.root = root;
+    this.setTheme(options.theme());
     root.addEventListener("wheel", this.onWheel, { passive: false });
     options.viewport.appendChild(root);
 
@@ -226,6 +227,21 @@ export class ObjectLayer {
     }
     // Placement follows the grid's scroll, so focus must not scroll the pane.
     if (focus && entry) entry.frame.focus({ preventScroll: true });
+  }
+
+  /**
+   * Copy the grid's theme into the custom properties charts paint with, so a
+   * `theme` option or `setTheme` reaches the charts as it does the cells. They
+   * are set on the layer, an ancestor of every chart, so a host rule on
+   * `.sheetwrite-object` still overrides them.
+   */
+  setTheme(theme: Theme): void {
+    const style = this.root.style;
+    style.setProperty("--sheetwrite-bg", theme.bg);
+    style.setProperty("--sheetwrite-fg", theme.fg);
+    style.setProperty("--sheetwrite-grid-line", theme.gridLine);
+    style.setProperty("--sheetwrite-selection-border", theme.selectionBorder);
+    style.setProperty("--sheetwrite-font", theme.font);
   }
 
   destroy(): void {

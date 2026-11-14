@@ -171,3 +171,53 @@ test("a chart's right-click menu deletes it, and undo brings it back", async ({ 
   await page.keyboard.press("ControlOrMeta+z");
   await expect(chartObjects(page)).toHaveCount(1);
 });
+
+// #727: a chart over the cells painted the stylesheet's background, not the grid's theme.
+for (const scheme of ["light", "dark"] as const) {
+  test(`a chart and a PivotChart sit on the grid's themed background (${scheme})`, async ({
+    page,
+  }) => {
+    await open(page);
+    const theme =
+      scheme === "dark"
+        ? { bg: "#101828", fg: "#e5e7eb", gridLine: "#344054" }
+        : { bg: "#fdf6e3", fg: "#1f2937", gridLine: "#d6cfb8" };
+    await page.evaluate(
+      ([colorScheme, sheet, id, pivot, colors]) => {
+        const grid = window.__sheetwriteAnalysisGrid;
+        const current = grid?.getCharts(sheet).find((entry) => entry.id === id);
+        if (!grid || !current) throw new Error(`Chart ${id} is missing`);
+        document.documentElement.dataset.theme = colorScheme;
+        grid.setTheme(colors);
+        const anchor = { ...current.anchor, row: current.anchor.row + 20 };
+        grid.setChart(
+          { ...current, id: "pivot-chart", kind: "column", pivot, series: [], anchor },
+          sheet,
+        );
+      },
+      [scheme, SUMMARY, CHART, PIVOT, theme] as const,
+    );
+    await expect(chartObjects(page)).toHaveCount(2);
+
+    const expected = await page.evaluate(() => {
+      const probe = document.createElement("span");
+      document.body.append(probe);
+      const resolve = (color: string | undefined) => {
+        probe.style.color = color ?? "";
+        return getComputedStyle(probe).color;
+      };
+      const effective = window.__sheetwriteAnalysisGrid?.getEffectiveTheme();
+      const colors = { bg: resolve(effective?.bg), fg: resolve(effective?.fg) };
+      probe.remove();
+      return colors;
+    });
+    expect(expected.bg).toBe(scheme === "dark" ? "rgb(16, 24, 40)" : "rgb(253, 246, 227)");
+    const painted = await chartObjects(page).evaluateAll((frames) =>
+      frames.map((frame) => {
+        const style = getComputedStyle(frame);
+        return { bg: style.backgroundColor, fg: style.color };
+      }),
+    );
+    expect(painted).toEqual([expected, expected]);
+  });
+}
