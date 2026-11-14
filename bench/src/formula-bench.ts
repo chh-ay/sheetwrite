@@ -91,6 +91,8 @@ const SHAPE_ROW_IDS = [
 const SHAPE_ROW_SIZES = [10_000, 100_000] as const;
 /** `SORT` over numbers, text, logical values and blanks: sizes of its row. */
 const SORT_MIXED_BLANKS_SIZES = [10_000, 100_000] as const;
+/** Below the 4,096 rows where a number column switches to a radix sort. */
+const SORT_ROWS_NUMBERS_SIZE = 4_000;
 /**
  * Rows for binding formulas to sheets, names and tables: defining names
  * over formulas that use them and over formulas that do not, a row insert
@@ -239,6 +241,8 @@ function formulaWorkloads(
   for (const size of smoke ? [1_000] : SORT_MIXED_BLANKS_SIZES) {
     add("sort-mixed-blanks", size);
   }
+  add("sort-rows-labels", range);
+  add("sort-rows-numbers", smoke ? 1_000 : SORT_ROWS_NUMBERS_SIZE);
   add("sparse-page-write", range);
   add("spill-sequence-admission", large);
   add("history-diff", HISTORY_CELLS);
@@ -322,6 +326,8 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "sort-unique-filter",
   "subtotal-filtered",
   "sort-mixed-blanks",
+  "sort-rows-labels",
+  "sort-rows-numbers",
   "sparse-page-write",
   "map-lambda",
   "reduce-lambda",

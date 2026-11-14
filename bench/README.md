@@ -354,6 +354,13 @@ A1. A blank compares equal to 0, "" and FALSE at once, so only a comparison
 sort gives this order: no sort key can. The row checks the spilled text count
 and value sum, which don't depend on the order. Its limit is the 1.2 default.
 
+`sort-rows-labels` (100,000 rows) and `sort-rows-numbers` (4,000 rows) sort
+one column through `sortRowsMulti`, ascending then descending, as the sort
+command does: labels like `L00042`, and numbers with many ties, below the
+4,096 rows where a number column switches to a radix sort. Each run sorts the
+same column again. The rows check a digest of both orders. Their limits are
+the 1.2 default.
+
 `spill-filter-same-range` (100,000 rows) is the `spill-filter-resize` spill,
 `=FILTER(A1:A100000,B1:B100000)` with every row kept, where the timed run
 edits A1 instead of the filter. The spill comes back over the same range and
@@ -812,7 +819,7 @@ Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
 | `bench:paged-storage` | Paged storage: local edits, their acknowledgement, clean-page eviction and range reads through formulas (`src/paged-storage-bench.ts`) |
 | `bench:windows` | Window ownership: scroll and off-screen edits against the painted window (`src/window-ownership-bench.ts`) |
 | `bench:epochs` | Edit-to-paint cost for changes that may or may not reach the painted window (`src/epoch-split-bench.ts`) |
-| `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator (`src/sync-queue-depth-bench.ts`) |
+| `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator, and acknowledgement drain of a queue that deep, in order and pair-swapped (`src/sync-queue-depth-bench.ts`) |
 | `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
 | `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
 | `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference (`src/panel-read-bench.ts`) |

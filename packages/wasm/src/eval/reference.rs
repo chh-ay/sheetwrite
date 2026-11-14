@@ -55,6 +55,32 @@ impl RewriteScope {
             Self::Root | Self::Nested => Self::Nested,
         }
     }
+
+    /// What replaces an OFFSET or INDIRECT call at this position whose range
+    /// resolved to `resolved`; `None` keeps the call. A #REF! becomes the node
+    /// consumers already know. Other errors keep the call below the root, so
+    /// evaluation reports them where they occur. At the root the error is the
+    /// result; keeping the call there would charge the spill budget for an
+    /// unknown shape on every recalculation.
+    fn resolved_node(self, resolved: Result<CellRange, FormulaError>) -> Option<Ast> {
+        match resolved {
+            Ok(range) if self == Self::Nested && is_single_cell(range) => Some(Ast::AbsCell(
+                sheet_ref(range.sheet),
+                range.row_start,
+                range.col_start,
+                RefFlags::default(),
+            )),
+            Ok(range) => Some(range_ast(range)),
+            Err(FormulaError::Ref) => Some(Ast::InvalidRef),
+            Err(error) if self == Self::Root => {
+                Some(Ast::Array(Box::new(crate::calc::ArrayLiteral {
+                    cols: 1,
+                    values: vec![Value::Error(error)],
+                })))
+            }
+            Err(_) => None,
+        }
+    }
 }
 
 pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
@@ -301,29 +327,10 @@ impl CellStore {
                     return;
                 }
 
-                // A #REF! becomes the node consumers already know. Other
-                // errors keep the call below the root, so evaluation reports
-                // them where they occur. At the root the error is the result;
-                // keeping the call there would charge the spill budget for an
-                // unknown shape on every recalculation.
-                match self.runtime_range(*func, args, sheet, pass, depth + 1) {
-                    Ok(range) if scope == RewriteScope::Nested && is_single_cell(range) => {
-                        *ast = Ast::AbsCell(
-                            sheet_ref(range.sheet),
-                            range.row_start,
-                            range.col_start,
-                            RefFlags::default(),
-                        );
-                    }
-                    Ok(range) => *ast = range_ast(range),
-                    Err(FormulaError::Ref) => *ast = Ast::InvalidRef,
-                    Err(error) if scope == RewriteScope::Root => {
-                        *ast = Ast::Array(Box::new(crate::calc::ArrayLiteral {
-                            cols: 1,
-                            values: vec![Value::Error(error)],
-                        }));
-                    }
-                    Err(_) => {}
+                if let Some(node) =
+                    scope.resolved_node(self.runtime_range(*func, args, sheet, pass, depth + 1))
+                {
+                    *ast = node;
                 }
             }
             Ast::Func(Func::Let, args) => self.rewrite_deferred(args, sheet, pass, depth),
@@ -335,21 +342,6 @@ impl CellStore {
                 let body = &mut std::rc::Rc::make_mut(definition).body;
                 self.rewrite_deferred(std::slice::from_mut(body), sheet, pass, depth);
             }
-            Ast::Func(_, args) => {
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, child);
-                }
-            }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.rewrite_references(left, sheet, pass, depth + 1, child);
-                self.rewrite_references(right, sheet, pass, depth + 1, child);
-            }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.rewrite_references(inner, sheet, pass, depth + 1, child);
-            }
-            Ast::LetSlot { expression, .. } => {
-                self.rewrite_references(expression, sheet, pass, depth + 1, child);
-            }
             // The copy is only evaluated, never written back, so the name's
             // expansion takes the node's place.
             Ast::NamedFormula(named) => {
@@ -357,7 +349,38 @@ impl CellStore {
                 self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
                 *ast = expression;
             }
-            _ => {}
+            Ast::Func(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetName { .. }
+            | Ast::Array(_) => {
+                ast.fold_children_mut(&mut |node| {
+                    self.rewrite_references(node, sheet, pass, depth + 1, child);
+                    false
+                });
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
         }
     }
 
