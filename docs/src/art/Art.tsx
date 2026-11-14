@@ -72,35 +72,6 @@ export function CardArt(
   );
 }
 
-/** A meaningful diagram: an image with a title and a description for assistive technology. */
-export function DiagramArt(
-  props: Readonly<{
-    hue: ArtHue;
-    alt?: ArtAlt;
-    width: number;
-    height: number;
-    title: string;
-    description: string;
-    children: JSX.Element;
-  }>,
-) {
-  const id = createUniqueId();
-  return (
-    <svg
-      aria-labelledby={`${id}-title ${id}-desc`}
-      class="sw-art sw-art--diagram"
-      data-alt={props.alt}
-      data-hue={props.hue}
-      role="img"
-      viewBox={`0 0 ${props.width} ${props.height}`}
-    >
-      <title id={`${id}-title`}>{props.title}</title>
-      <desc id={`${id}-desc`}>{props.description}</desc>
-      {props.children}
-    </svg>
-  );
-}
-
 /** An arrowhead ending at (x, y), pointing along `angle` degrees (0 is right, 90 is down). */
 export function head(x: number, y: number, angle: number): string {
   const radians = (angle * Math.PI) / 180;
