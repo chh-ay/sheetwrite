@@ -12,27 +12,29 @@ use super::super::value::aggregate_number;
 use super::super::EvalPass;
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &[
-    "CEILING.MATH",
-    "COMBIN",
-    "COMBINA",
-    "FACT",
-    "FACTDOUBLE",
-    "FLOOR.MATH",
-    "MULTINOMIAL",
-    "PERMUT",
-    "PERMUTATIONA",
-    "SERIESSUM",
-    "SQRTPI",
-    "SUMSQ",
-    "SUMX2MY2",
-    "SUMX2PY2",
-    "SUMXMY2",
-];
+family_functions! {
+    CEILING_MATH = "CEILING.MATH",
+    COMBIN,
+    COMBINA,
+    FACT,
+    FACTDOUBLE,
+    FLOOR_MATH = "FLOOR.MATH",
+    MULTINOMIAL,
+    PERMUT,
+    PERMUTATIONA,
+    SERIESSUM,
+    SQRTPI,
+    SUMSQ,
+    SUMX2MY2,
+    SUMX2PY2,
+    SUMXMY2,
+}
 
 /// Functions whose arguments are number lists: a single-cell argument is a
 /// reference, so text and logical values in that cell are ignored.
-pub(crate) const REFERENCE_CELLS: &[&str] = &["MULTINOMIAL", "SUMSQ"];
+pub(crate) const fn reads_cells_as_references(function: Function) -> bool {
+    matches!(function, Function::MULTINOMIAL | Function::SUMSQ)
+}
 
 /// The largest arguments whose results are finite IEEE doubles.
 const MAX_FACTORIAL_ARGUMENT: f64 = 170.0;
@@ -40,8 +42,8 @@ const MAX_DOUBLE_FACTORIAL_ARGUMENT: f64 = 300.0;
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).map_or_else(Value::Error, Value::number)
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).map_or_else(Value::Error, Value::number)
 }
 
 /// Fold a reference directly; literal numbers need no evaluation or value list.
@@ -158,7 +160,7 @@ impl<'a> NumberCursor<'a> {
 /// Read both references directly, preserving left-before-right error precedence.
 pub(in crate::eval) fn streamed_paired_squares(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -217,11 +219,7 @@ pub(in crate::eval) fn streamed_paired_squares(
                 None
             };
             if let (Some(x), Some(y)) = (left_number, right_number) {
-                sum += match name {
-                    "SUMX2MY2" => x * x - y * y,
-                    "SUMX2PY2" => x * x + y * y,
-                    _ => (x - y) * (x - y),
-                };
+                sum += paired_term(function, x, y);
             }
         }
         if let Some(error) = right_error {
@@ -241,13 +239,16 @@ pub(in crate::eval) fn streamed_paired_squares(
     Some(result.map_or_else(Value::Error, Value::number))
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
-    match name {
-        "FACT" | "FACTDOUBLE" => {
+fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
+    match function {
+        Function::FACT | Function::FACTDOUBLE => {
             require_arity(values, 1, 1)?;
-            factorial(number_arg(values, 0, None)?, name == "FACTDOUBLE")
+            factorial(
+                number_arg(values, 0, None)?,
+                function == Function::FACTDOUBLE,
+            )
         }
-        "SQRTPI" => {
+        Function::SQRTPI => {
             require_arity(values, 1, 1)?;
             let number = number_arg(values, 0, None)?;
             if number < 0.0 {
@@ -255,7 +256,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             }
             Ok((number * std::f64::consts::PI).sqrt())
         }
-        "CEILING.MATH" | "FLOOR.MATH" => {
+        Function::CEILING_MATH | Function::FLOOR_MATH => {
             require_arity(values, 1, 3)?;
             let number = number_arg(values, 0, None)?;
             let significance = number_arg(values, 1, Some(1.0))?.abs();
@@ -263,7 +264,8 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             if significance == 0.0 {
                 return Ok(0.0);
             }
-            let rounds_up = (name == "CEILING.MATH") != (number < 0.0 && reverses_negative);
+            let rounds_up =
+                (function == Function::CEILING_MATH) != (number < 0.0 && reverses_negative);
             let multiples = number / significance;
             Ok(if rounds_up {
                 multiples.ceil()
@@ -271,36 +273,38 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 multiples.floor()
             } * significance)
         }
-        "COMBIN" | "COMBINA" | "PERMUT" | "PERMUTATIONA" => {
-            require_arity(values, 2, 2)?;
-            let total = number_arg(values, 0, None)?.trunc();
-            let chosen = number_arg(values, 1, None)?.trunc();
-            if total < 0.0 || chosen < 0.0 {
-                return Err(FormulaError::Num);
-            }
-            match name {
-                "COMBIN" => combinations(total, chosen),
-                "COMBINA" if total == 0.0 => {
-                    if chosen == 0.0 {
-                        Ok(1.0)
-                    } else {
-                        Err(FormulaError::Num)
-                    }
-                }
-                "COMBINA" => combinations(total + chosen - 1.0, chosen),
-                "PERMUT" => permutations(total, chosen),
-                _ => Ok(total.powf(chosen)),
+        Function::COMBIN => {
+            let (total, chosen) = choice_counts(values)?;
+            combinations(total, chosen)
+        }
+        Function::COMBINA => {
+            let (total, chosen) = choice_counts(values)?;
+            if total != 0.0 {
+                combinations(total + chosen - 1.0, chosen)
+            } else if chosen == 0.0 {
+                Ok(1.0)
+            } else {
+                Err(FormulaError::Num)
             }
         }
-        "SUMSQ" | "MULTINOMIAL" => {
+        Function::PERMUT => {
+            let (total, chosen) = choice_counts(values)?;
+            permutations(total, chosen)
+        }
+        Function::PERMUTATIONA => choice_counts(values).map(|(total, chosen)| total.powf(chosen)),
+        Function::SUMSQ | Function::MULTINOMIAL => {
             if values.arg_count() == 0 {
                 return Err(FormulaError::Value);
             }
             let mut total = 0.0;
-            let mut result = if name == "SUMSQ" { 0.0 } else { 1.0 };
+            let mut result = if function == Function::SUMSQ {
+                0.0
+            } else {
+                1.0
+            };
             for entry in values.entries() {
                 if let Some(number) = aggregate_number(&entry.value, entry.from_range)? {
-                    if name == "SUMSQ" {
+                    if function == Function::SUMSQ {
                         result += number * number;
                     } else {
                         if number < 0.0 {
@@ -314,7 +318,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             }
             Ok(result)
         }
-        "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => {
+        Function::SUMX2MY2 | Function::SUMX2PY2 | Function::SUMXMY2 => {
             require_arity(values, 2, 2)?;
             let left = values.arg(0).ok_or(FormulaError::Value)?;
             let right = values.arg(1).ok_or(FormulaError::Value)?;
@@ -330,15 +334,11 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 ) else {
                     continue;
                 };
-                sum += match name {
-                    "SUMX2MY2" => x * x - y * y,
-                    "SUMX2PY2" => x * x + y * y,
-                    _ => (x - y) * (x - y),
-                };
+                sum += paired_term(function, x, y);
             }
             Ok(sum)
         }
-        "SERIESSUM" => {
+        Function::SERIESSUM => {
             require_arity(values, 4, 4)?;
             let x = number_arg(values, 0, None)?;
             let first_power = number_arg(values, 1, None)?;
@@ -357,7 +357,33 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             }
             Ok(sum)
         }
-        _ => Err(FormulaError::Name),
+    }
+}
+
+/// The whole, nonnegative item count and chosen count of COMBIN, COMBINA,
+/// PERMUT and PERMUTATIONA.
+type Choice = (f64, f64);
+
+/// The [`Choice`] arguments of COMBIN, COMBINA, PERMUT and PERMUTATIONA.
+/// Each is whole and nonnegative.
+fn choice_counts(values: &FuncAccumulator) -> Result<Choice, FormulaError> {
+    require_arity(values, 2, 2)?;
+    let total = number_arg(values, 0, None)?.trunc();
+    let chosen = number_arg(values, 1, None)?.trunc();
+    if total < 0.0 || chosen < 0.0 {
+        return Err(FormulaError::Num);
+    }
+    Ok((total, chosen))
+}
+
+/// One pair's term of SUMX2MY2, SUMX2PY2 or SUMXMY2.
+fn paired_term(function: Function, x: f64, y: f64) -> f64 {
+    if function == Function::SUMX2MY2 {
+        x * x - y * y
+    } else if function == Function::SUMX2PY2 {
+        x * x + y * y
+    } else {
+        (x - y) * (x - y)
     }
 }
 
@@ -415,16 +441,16 @@ fn permutations(total: f64, chosen: f64) -> NumberResult {
 mod tests {
     use super::*;
 
-    fn scalar(name: &str, arguments: &[f64]) -> Value {
+    fn scalar(function: Function, arguments: &[f64]) -> Value {
         let mut values = FuncAccumulator::default();
         for &argument in arguments {
             values.push_scalar(Value::number(argument)).unwrap();
             values.finish_arg(1, 1).unwrap();
         }
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
-    fn paired(name: &str, left: &[Value], right: &[Value]) -> Value {
+    fn paired(function: Function, left: &[Value], right: &[Value]) -> Value {
         let mut values = FuncAccumulator::default();
         for column in [left, right] {
             for value in column {
@@ -432,7 +458,7 @@ mod tests {
             }
             values.finish_arg(column.len(), 1).unwrap();
         }
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
     fn assert_close(actual: Value, expected: f64, tolerance: f64) {
@@ -450,99 +476,119 @@ mod tests {
     #[test]
     fn microsoft_rounding_examples() {
         // https://support.microsoft.com/en-us/excel/functions/ceiling-math-function
-        assert_close(scalar("CEILING.MATH", &[24.3, 5.0]), 25.0, 0.0);
-        assert_close(scalar("CEILING.MATH", &[6.7]), 7.0, 0.0);
-        assert_close(scalar("CEILING.MATH", &[-8.1, 2.0]), -8.0, 0.0);
-        assert_close(scalar("CEILING.MATH", &[-5.5, 2.0, -1.0]), -6.0, 0.0);
+        assert_close(scalar(Function::CEILING_MATH, &[24.3, 5.0]), 25.0, 0.0);
+        assert_close(scalar(Function::CEILING_MATH, &[6.7]), 7.0, 0.0);
+        assert_close(scalar(Function::CEILING_MATH, &[-8.1, 2.0]), -8.0, 0.0);
+        assert_close(
+            scalar(Function::CEILING_MATH, &[-5.5, 2.0, -1.0]),
+            -6.0,
+            0.0,
+        );
         // https://support.microsoft.com/en-us/excel/functions/floor-math-function
-        assert_close(scalar("FLOOR.MATH", &[24.3, 5.0]), 20.0, 0.0);
-        assert_close(scalar("FLOOR.MATH", &[6.7]), 6.0, 0.0);
-        assert_close(scalar("FLOOR.MATH", &[-8.1, 2.0]), -10.0, 0.0);
-        assert_close(scalar("FLOOR.MATH", &[-5.5, 2.0, -1.0]), -4.0, 0.0);
-        assert_close(scalar("FLOOR.MATH", &[7.0, 0.0]), 0.0, 0.0);
+        assert_close(scalar(Function::FLOOR_MATH, &[24.3, 5.0]), 20.0, 0.0);
+        assert_close(scalar(Function::FLOOR_MATH, &[6.7]), 6.0, 0.0);
+        assert_close(scalar(Function::FLOOR_MATH, &[-8.1, 2.0]), -10.0, 0.0);
+        assert_close(scalar(Function::FLOOR_MATH, &[-5.5, 2.0, -1.0]), -4.0, 0.0);
+        assert_close(scalar(Function::FLOOR_MATH, &[7.0, 0.0]), 0.0, 0.0);
         // https://support.microsoft.com/en-us/excel/functions/sqrtpi-function
-        assert_close(scalar("SQRTPI", &[1.0]), 1.772454, 1e-6);
-        assert_close(scalar("SQRTPI", &[2.0]), 2.506628, 1e-6);
-        assert_eq!(scalar("SQRTPI", &[-1.0]), Value::Error(FormulaError::Num));
+        assert_close(scalar(Function::SQRTPI, &[1.0]), 1.772454, 1e-6);
+        assert_close(scalar(Function::SQRTPI, &[2.0]), 2.506628, 1e-6);
+        assert_eq!(
+            scalar(Function::SQRTPI, &[-1.0]),
+            Value::Error(FormulaError::Num)
+        );
     }
 
     #[test]
     fn microsoft_factorial_and_combinatorics_examples() {
         // https://support.microsoft.com/en-us/excel/functions/fact-function
         for (argument, expected) in [(5.0, 120.0), (1.9, 1.0), (0.0, 1.0), (1.0, 1.0)] {
-            assert_close(scalar("FACT", &[argument]), expected, 0.0);
+            assert_close(scalar(Function::FACT, &[argument]), expected, 0.0);
         }
-        assert_eq!(scalar("FACT", &[-1.0]), Value::Error(FormulaError::Num));
-        // https://support.microsoft.com/en-us/excel/functions/factdouble-function
-        assert_close(scalar("FACTDOUBLE", &[6.0]), 48.0, 0.0);
-        assert_close(scalar("FACTDOUBLE", &[7.0]), 105.0, 0.0);
-        // https://support.microsoft.com/en-us/excel/functions/combin-function
-        assert_close(scalar("COMBIN", &[8.0, 2.0]), 28.0, 0.0);
         assert_eq!(
-            scalar("COMBIN", &[2.0, 3.0]),
+            scalar(Function::FACT, &[-1.0]),
+            Value::Error(FormulaError::Num)
+        );
+        // https://support.microsoft.com/en-us/excel/functions/factdouble-function
+        assert_close(scalar(Function::FACTDOUBLE, &[6.0]), 48.0, 0.0);
+        assert_close(scalar(Function::FACTDOUBLE, &[7.0]), 105.0, 0.0);
+        // https://support.microsoft.com/en-us/excel/functions/combin-function
+        assert_close(scalar(Function::COMBIN, &[8.0, 2.0]), 28.0, 0.0);
+        assert_eq!(
+            scalar(Function::COMBIN, &[2.0, 3.0]),
             Value::Error(FormulaError::Num)
         );
         // https://support.microsoft.com/en-us/excel/functions/combina-function
-        assert_close(scalar("COMBINA", &[4.0, 3.0]), 20.0, 0.0);
-        assert_close(scalar("COMBINA", &[10.0, 3.0]), 220.0, 0.0);
+        assert_close(scalar(Function::COMBINA, &[4.0, 3.0]), 20.0, 0.0);
+        assert_close(scalar(Function::COMBINA, &[10.0, 3.0]), 220.0, 0.0);
         // https://support.microsoft.com/en-us/excel/functions/permut-function
-        assert_close(scalar("PERMUT", &[100.0, 3.0]), 970_200.0, 0.0);
-        assert_close(scalar("PERMUT", &[3.0, 2.0]), 6.0, 0.0);
+        assert_close(scalar(Function::PERMUT, &[100.0, 3.0]), 970_200.0, 0.0);
+        assert_close(scalar(Function::PERMUT, &[3.0, 2.0]), 6.0, 0.0);
         assert_eq!(
-            scalar("PERMUT", &[2.0, 3.0]),
+            scalar(Function::PERMUT, &[2.0, 3.0]),
             Value::Error(FormulaError::Num)
         );
         // https://support.microsoft.com/en-us/excel/functions/permutationa-function
-        assert_close(scalar("PERMUTATIONA", &[3.0, 2.0]), 9.0, 0.0);
-        assert_close(scalar("PERMUTATIONA", &[2.0, 2.0]), 4.0, 0.0);
+        assert_close(scalar(Function::PERMUTATIONA, &[3.0, 2.0]), 9.0, 0.0);
+        assert_close(scalar(Function::PERMUTATIONA, &[2.0, 2.0]), 4.0, 0.0);
         // https://support.microsoft.com/en-us/excel/functions/multinomial-function
-        assert_close(scalar("MULTINOMIAL", &[2.0, 3.0, 4.0]), 1260.0, 0.0);
+        assert_close(scalar(Function::MULTINOMIAL, &[2.0, 3.0, 4.0]), 1260.0, 0.0);
         assert_eq!(
-            scalar("MULTINOMIAL", &[-1.0]),
+            scalar(Function::MULTINOMIAL, &[-1.0]),
             Value::Error(FormulaError::Num)
         );
     }
 
     #[test]
     fn results_beyond_double_range_are_num_errors() {
-        assert_close(scalar("FACT", &[170.0]), 7.257_415_615_307_999e306, 1e293);
-        assert_eq!(scalar("FACT", &[171.0]), Value::Error(FormulaError::Num));
+        assert_close(
+            scalar(Function::FACT, &[170.0]),
+            7.257_415_615_307_999e306,
+            1e293,
+        );
         assert_eq!(
-            scalar("FACTDOUBLE", &[301.0]),
+            scalar(Function::FACT, &[171.0]),
             Value::Error(FormulaError::Num)
         );
         assert_eq!(
-            scalar("COMBIN", &[1e9, 5e8]),
+            scalar(Function::FACTDOUBLE, &[301.0]),
             Value::Error(FormulaError::Num)
         );
         assert_eq!(
-            scalar("PERMUT", &[1e9, 1e6]),
+            scalar(Function::COMBIN, &[1e9, 5e8]),
             Value::Error(FormulaError::Num)
         );
         assert_eq!(
-            scalar("PERMUTATIONA", &[10.0, 400.0]),
+            scalar(Function::PERMUT, &[1e9, 1e6]),
             Value::Error(FormulaError::Num)
         );
-        assert_eq!(scalar("FACT", &[]), Value::Error(FormulaError::Value));
+        assert_eq!(
+            scalar(Function::PERMUTATIONA, &[10.0, 400.0]),
+            Value::Error(FormulaError::Num)
+        );
+        assert_eq!(
+            scalar(Function::FACT, &[]),
+            Value::Error(FormulaError::Value)
+        );
     }
 
     #[test]
     fn microsoft_sum_of_squares_examples() {
         // https://support.microsoft.com/en-us/excel/functions/sumsq-function
-        assert_close(scalar("SUMSQ", &[3.0, 4.0]), 25.0, 0.0);
+        assert_close(scalar(Function::SUMSQ, &[3.0, 4.0]), 25.0, 0.0);
         // https://support.microsoft.com/en-us/excel/functions/sumx2my2-function
         // https://support.microsoft.com/en-us/excel/functions/sumx2py2-function
         // https://support.microsoft.com/en-us/excel/functions/sumxmy2-function
         let left = [2.0, 3.0, 9.0, 1.0, 8.0, 7.0, 5.0].map(Value::number);
         let right = [6.0, 5.0, 11.0, 7.0, 5.0, 4.0, 4.0].map(Value::number);
-        assert_close(paired("SUMX2MY2", &left, &right), -55.0, 0.0);
-        assert_close(paired("SUMX2PY2", &left, &right), 521.0, 0.0);
-        assert_close(paired("SUMXMY2", &left, &right), 79.0, 0.0);
+        assert_close(paired(Function::SUMX2MY2, &left, &right), -55.0, 0.0);
+        assert_close(paired(Function::SUMX2PY2, &left, &right), 521.0, 0.0);
+        assert_close(paired(Function::SUMXMY2, &left, &right), 79.0, 0.0);
         let with_text = [Value::number(2.0), Value::text("skip")];
         let numbers = [Value::number(6.0), Value::number(5.0)];
-        assert_close(paired("SUMXMY2", &with_text, &numbers), 16.0, 0.0);
+        assert_close(paired(Function::SUMXMY2, &with_text, &numbers), 16.0, 0.0);
         assert_eq!(
-            paired("SUMXMY2", &left, &right[..6]),
+            paired(Function::SUMXMY2, &left, &right[..6]),
             Value::Error(FormulaError::Na)
         );
     }
@@ -559,6 +605,6 @@ mod tests {
             values.push_range(Value::number(coefficient)).unwrap();
         }
         values.finish_arg(4, 1).unwrap();
-        assert_close(evaluate("SERIESSUM", &values), 0.707103, 1e-6);
+        assert_close(evaluate(Function::SERIESSUM, &values), 0.707103, 1e-6);
     }
 }

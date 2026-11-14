@@ -1,5 +1,101 @@
 //! Optional function families for the complete analysis engine.
 
+/// Declares a family's functions once, in ASCII order of their names: the
+/// `NAMES` the registry looks names up in, and the `Function` enum the
+/// family's evaluators match. A name defaults to its variant's spelling; a
+/// name with dots gives it after `=`. A function's registry index is its
+/// position in both lists, so an id always names the same variant.
+macro_rules! family_functions {
+    ($($function:ident $(= $name:literal)?,)+) => {
+        pub(crate) const NAMES: &[&str] = &[
+            $(family_functions!(@name $function $(= $name)?)),+
+        ];
+
+        /// The functions of this family, in the order of [`NAMES`].
+        #[allow(
+            non_camel_case_types,
+            clippy::upper_case_acronyms,
+            reason = "variants spell the Excel names, with `_` for `.`"
+        )]
+        #[derive(Clone, Copy, PartialEq, Eq, Debug)]
+        pub(crate) enum Function {
+            $($function),+
+        }
+
+        impl Function {
+            const ALL: &'static [Self] = &[$(Self::$function),+];
+
+            /// The function a registry id of this family names. Every such
+            /// id indexes this family's `NAMES`, so it indexes `ALL` too.
+            pub(crate) fn of(id: u16) -> Self {
+                Self::ALL[usize::from(id & super::NAME_MASK)]
+            }
+
+            /// The registered name: `NAMES` at this function's index.
+            pub(crate) const fn name(self) -> &'static str {
+                NAMES[self as usize]
+            }
+        }
+
+        impl std::fmt::Display for Function {
+            fn fmt(&self, out: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                out.write_str(self.name())
+            }
+        }
+    };
+    (@name $function:ident = $name:literal) => {
+        $name
+    };
+    (@name $function:ident) => {
+        stringify!($function)
+    };
+}
+
+/// A scalar hook that passes `family`'s typed function to `evaluate`.
+macro_rules! scalar_hook {
+    ($family:ident::$evaluate:ident) => {
+        |id, values| $family::$evaluate($family::Function::of(id), values)
+    };
+}
+
+/// An AST hook that passes `family`'s typed function to `evaluate`. A family
+/// whose hooks also take other input names that type (see
+/// `lambda::Invocation`); it has an `of(id)` as `Function` does.
+macro_rules! ast_hook {
+    ($family:ident::$evaluate:ident) => {
+        ast_hook!($family::$evaluate, $family::Function)
+    };
+    ($family:ident::$evaluate:ident, $input:ty) => {
+        |store, id, args, sheet, pass, depth| {
+            $family::$evaluate(store, <$input>::of(id), args, sheet, pass, depth)
+        }
+    };
+}
+
+/// The array hooks of `family`: its `produces_array`, `shape` and `bound`,
+/// and `evaluate`, each given the typed function as `ast_hook!` gives it.
+macro_rules! array_hooks {
+    ($family:ident::$evaluate:ident) => {
+        array_hooks!($family::$evaluate, $family::Function)
+    };
+    ($family:ident::$evaluate:ident, $input:ty) => {
+        ArrayHooks {
+            produces_array: |id, args, shapes| {
+                $family::produces_array(<$input>::of(id), args, shapes)
+            },
+            shape: |store, id, args, sheet, pass| {
+                $family::shape(store, <$input>::of(id), args, sheet, pass)
+            },
+            bound: |store, id, args, sheet, pass| {
+                $family::bound(store, <$input>::of(id), args, sheet, pass)
+            },
+            evaluate: |store, id, args, sheet, pass, depth| {
+                $family::$evaluate(store, <$input>::of(id), args, sheet, pass, depth)
+            },
+        }
+    };
+}
+
 mod aggregate;
 mod bessel;
 mod bytes;
@@ -16,6 +112,7 @@ mod finance;
 mod groupby;
 mod hypothesis;
 pub(crate) use groupby::grouping;
+pub(crate) use pivot_data::ast_calls_pivot_data;
 pub(crate) mod lambda;
 pub(super) mod math;
 mod matrices;
@@ -34,12 +131,12 @@ use super::functions::FuncAccumulator;
 use super::matrix::EvalMatrix;
 use super::EvalPass;
 
-pub(super) type ScalarEvaluator = fn(&str, &FuncAccumulator) -> EvalResult;
+pub(super) type ScalarEvaluator = fn(u16, &FuncAccumulator) -> EvalResult;
 pub(super) type AstEvaluator =
-    fn(&CellStore, &str, &[Ast], usize, &mut EvalPass<'_>, usize) -> EvalResult;
+    fn(&CellStore, u16, &[Ast], usize, &mut EvalPass<'_>, usize) -> EvalResult;
 pub(super) type MatrixEvaluator = fn(
     &CellStore,
-    &str,
+    u16,
     &[Ast],
     usize,
     &mut EvalPass<'_>,
@@ -50,17 +147,17 @@ pub(super) type MatrixEvaluator = fn(
 /// the evaluation that follows, such as compiled regex programs, is done once.
 pub(super) type ShapeEvaluator = fn(
     &CellStore,
-    &str,
+    u16,
     &[Ast],
     usize,
     &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError>;
 pub(super) type BoundEvaluator =
-    fn(&CellStore, &str, &[Ast], usize, &mut EvalPass<'_>) -> Result<usize, FormulaError>;
+    fn(&CellStore, u16, &[Ast], usize, &mut EvalPass<'_>) -> Result<usize, FormulaError>;
 
 /// Array hooks must use the same shape, byte and work limits as built-in arrays.
 pub(super) struct ArrayHooks {
-    pub(super) produces_array: for<'a> fn(&str, &[Ast], super::array::Shapes<'a>) -> bool,
+    pub(super) produces_array: for<'a> fn(u16, &[Ast], super::array::Shapes<'a>) -> bool,
     pub(super) shape: ShapeEvaluator,
     pub(super) bound: BoundEvaluator,
     pub(super) evaluate: MatrixEvaluator,
@@ -69,213 +166,189 @@ pub(super) struct ArrayHooks {
 pub(super) struct Family {
     /// ASCII uppercase spellings in alphabetical order, including any aliases.
     pub(super) names: &'static [&'static str],
-    /// Names whose single-cell arguments are references, like `SUM(A1)`: text
-    /// and logical values in the cell are ignored instead of converted.
-    pub(super) reference_cells: &'static [&'static str],
+    /// Whether a function's single-cell arguments are references, like
+    /// `SUM(A1)`: text and logical values in the cell are ignored instead of
+    /// converted.
+    pub(super) reference_cells: fn(u16) -> bool,
     pub(super) evaluate: Option<ScalarEvaluator>,
     /// Runs before accumulator coercion and retains the original arguments.
     pub(super) evaluate_ast: Option<AstEvaluator>,
     pub(super) array: Option<ArrayHooks>,
 }
 
+/// Whether no function of a family reads single-cell arguments as references.
+const NO_REFERENCE_CELLS: fn(u16) -> bool = |_| false;
+
 const FAMILIES: &[Family] = &[
     Family {
         names: groupby::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(groupby::evaluate_ast),
-        array: Some(ArrayHooks {
-            produces_array: groupby::produces_array,
-            shape: groupby::shape,
-            bound: groupby::bound,
-            evaluate: groupby::evaluate_matrix,
-        }),
+        evaluate_ast: Some(ast_hook!(groupby::evaluate_ast)),
+        array: Some(array_hooks!(groupby::evaluate_matrix)),
     },
     Family {
         names: aggregate::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(aggregate::evaluate_ast),
+        evaluate_ast: Some(ast_hook!(aggregate::evaluate_ast)),
         array: None,
     },
     Family {
         names: database::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(database::evaluate_ast),
+        evaluate_ast: Some(ast_hook!(database::evaluate_ast)),
         array: None,
     },
     Family {
         names: dates::NAMES,
-        reference_cells: &[],
-        evaluate: Some(dates::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(dates::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: descriptive::NAMES,
-        reference_cells: descriptive::REFERENCE_CELLS,
-        evaluate: Some(descriptive::evaluate),
+        reference_cells: |id| descriptive::reads_cells_as_references(descriptive::Function::of(id)),
+        evaluate: Some(scalar_hook!(descriptive::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: distributions::NAMES,
-        reference_cells: &[],
-        evaluate: Some(distributions::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(distributions::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: compatibility::NAMES,
-        reference_cells: compatibility::REFERENCE_CELLS,
-        evaluate: Some(compatibility::evaluate),
+        reference_cells: |id| {
+            compatibility::reads_cells_as_references(compatibility::Function::of(id))
+        },
+        evaluate: Some(scalar_hook!(compatibility::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: discrete::NAMES,
-        reference_cells: &[],
-        evaluate: Some(discrete::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(discrete::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: hypothesis::NAMES,
-        reference_cells: &[],
-        evaluate: Some(hypothesis::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(hypothesis::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: engineering::NAMES,
-        reference_cells: &[],
-        evaluate: Some(engineering::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(engineering::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: complex::NAMES,
-        reference_cells: &[],
-        evaluate: Some(complex::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(complex::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: bessel::NAMES,
-        reference_cells: &[],
-        evaluate: Some(bessel::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(bessel::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: units::NAMES,
-        reference_cells: &[],
-        evaluate: Some(units::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(units::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: bytes::NAMES,
-        reference_cells: &[],
-        evaluate: Some(bytes::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(bytes::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: finance::NAMES,
-        reference_cells: &[],
-        evaluate: Some(finance::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(finance::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: depreciation::NAMES,
-        reference_cells: &[],
-        evaluate: Some(depreciation::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(depreciation::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: securities::NAMES,
-        reference_cells: &[],
-        evaluate: Some(securities::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(securities::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: math::NAMES,
-        reference_cells: math::REFERENCE_CELLS,
-        evaluate: Some(math::evaluate),
+        reference_cells: |id| math::reads_cells_as_references(math::Function::of(id)),
+        evaluate: Some(scalar_hook!(math::evaluate)),
         evaluate_ast: None,
         array: None,
     },
     Family {
         names: matrices::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(matrices::evaluate_ast),
-        array: Some(ArrayHooks {
-            produces_array: matrices::produces_array,
-            shape: matrices::shape,
-            bound: matrices::bound,
-            evaluate: matrices::evaluate_matrix,
-        }),
+        evaluate_ast: Some(ast_hook!(matrices::evaluate_ast)),
+        array: Some(array_hooks!(matrices::evaluate_matrix)),
     },
     Family {
         names: regression::NAMES,
-        reference_cells: &[],
-        evaluate: Some(regression::evaluate),
+        reference_cells: NO_REFERENCE_CELLS,
+        evaluate: Some(scalar_hook!(regression::evaluate)),
         evaluate_ast: None,
-        array: Some(ArrayHooks {
-            produces_array: regression::produces_array,
-            shape: regression::shape,
-            bound: regression::bound,
-            evaluate: regression::evaluate_array,
-        }),
+        array: Some(array_hooks!(regression::evaluate_array)),
     },
     Family {
         names: text::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(text::evaluate_ast),
-        array: Some(ArrayHooks {
-            produces_array: text::produces_array,
-            shape: text::shape,
-            bound: text::bound,
-            evaluate: text::evaluate_matrix,
-        }),
+        evaluate_ast: Some(ast_hook!(text::evaluate_ast)),
+        array: Some(array_hooks!(text::evaluate_matrix)),
     },
     Family {
         names: reshape::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
         evaluate_ast: None,
-        array: Some(ArrayHooks {
-            produces_array: reshape::produces_array,
-            shape: reshape::shape,
-            bound: reshape::bound,
-            evaluate: reshape::evaluate,
-        }),
+        array: Some(array_hooks!(reshape::evaluate)),
     },
     Family {
         names: pivot_data::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(pivot_data::evaluate_ast),
+        evaluate_ast: Some(ast_hook!(pivot_data::evaluate_ast)),
         array: None,
     },
     Family {
         names: lambda::NAMES,
-        reference_cells: &[],
+        reference_cells: NO_REFERENCE_CELLS,
         evaluate: None,
-        evaluate_ast: Some(lambda::evaluate),
-        array: Some(ArrayHooks {
-            produces_array: lambda::produces_array,
-            shape: lambda::shape,
-            bound: lambda::bound,
-            evaluate: lambda::evaluate_matrix,
-        }),
+        evaluate_ast: Some(ast_hook!(lambda::evaluate, lambda::Invocation)),
+        array: Some(array_hooks!(lambda::evaluate_matrix, lambda::Invocation)),
     },
 ];
 
@@ -335,10 +408,19 @@ pub(crate) const SUMX2MY2_ID: u16 = known_id("SUMX2MY2");
 pub(crate) const SUMX2PY2_ID: u16 = known_id("SUMX2PY2");
 pub(crate) const SUMXMY2_ID: u16 = known_id("SUMXMY2");
 pub(crate) const LAMBDA_ID: u16 = known_id("LAMBDA");
-/// `GETPIVOTDATA` is volatile: it reads pivot output through no reference.
+/// `GETPIVOTDATA` reads pivot output through no reference; a pivot update
+/// recalculates it (see `CellStore::settle_pivots`).
 pub(crate) const GETPIVOTDATA_ID: u16 = known_id("GETPIVOTDATA");
 pub(crate) const PERCENTILE_EXC_ID: u16 = known_id("PERCENTILE.EXC");
 pub(crate) const QUARTILE_EXC_ID: u16 = known_id("QUARTILE.EXC");
+pub(crate) const REGEXEXTRACT_ID: u16 = known_id("REGEXEXTRACT");
+pub(crate) const REGEXREPLACE_ID: u16 = known_id("REGEXREPLACE");
+pub(crate) const REGEXTEST_ID: u16 = known_id("REGEXTEST");
+const MODE_ID: u16 = known_id("MODE");
+const STDEV_ID: u16 = known_id("STDEV");
+const STDEVP_ID: u16 = known_id("STDEVP");
+const VAR_ID: u16 = known_id("VAR");
+const VARP_ID: u16 = known_id("VARP");
 
 pub(crate) fn name(id: u16) -> &'static str {
     FAMILIES[usize::from(id >> FAMILY_SHIFT)].names[usize::from(id & NAME_MASK)]
@@ -375,22 +457,24 @@ pub(super) fn evaluate_scalar(id: u16, values: &FuncAccumulator) -> EvalResult {
     family(id)
         .evaluate
         .map_or(Value::Error(FormulaError::Name), |evaluate| {
-            evaluate(name(id), values)
+            evaluate(id, values)
         })
 }
 
 pub(super) fn treats_cell_as_reference(id: u16) -> bool {
-    family(id).reference_cells.contains(&name(id))
+    (family(id).reference_cells)(id)
 }
 
-/// Whether the function reads every sheet of a 3-D reference.
-pub(crate) fn accepts_sheet_span(id: u16) -> bool {
-    compatibility::SHEET_SPAN_READERS.contains(&name(id))
+/// Whether the function reads every sheet of a 3-D reference, as `STDEV.S`
+/// does.
+pub(crate) const fn accepts_sheet_span(id: u16) -> bool {
+    matches!(id, STDEV_ID | STDEVP_ID | VAR_ID | VARP_ID)
 }
 
-/// Whether the function reads a union as one list of values.
-pub(crate) fn accepts_union(id: u16) -> bool {
-    compatibility::UNION_READERS.contains(&name(id))
+/// Whether the function reads a union as one list of values, as `MODE.SNGL`
+/// does.
+pub(crate) const fn accepts_union(id: u16) -> bool {
+    matches!(id, MODE_ID | STDEV_ID | STDEVP_ID | VAR_ID | VARP_ID)
 }
 
 /// Returns the positions `0..count` in stable sorted order.

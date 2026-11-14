@@ -504,7 +504,7 @@ async function readAnalysisSources(root: string): Promise<AnalysisSources> {
   return { registry, families };
 }
 
-/** Each `analysis/<family>.rs` must own one `NAMES` table and be registered in `mod.rs`. */
+/** Each `analysis/<family>.rs` must declare its functions once and be registered in `mod.rs`. */
 function extractAnalysisSpellings(sources: AnalysisSources, issues: string[]): string[] {
   const spellings: string[] = [];
   if (sources.families.size === 0) issues.push("analysis family registry not found");
@@ -515,11 +515,13 @@ function extractAnalysisSpellings(sources: AnalysisSources, issues: string[]): s
     if (!declared || !sources.registry.includes(`names: ${family}::NAMES,`)) {
       issues.push(`analysis family ${family} is not registered in ${ANALYSIS_PATH}/mod.rs`);
     }
-    const block = source.match(
-      /(?:pub(?:\([^)]*\))?\s+)?(?:const|static)\s+NAMES\s*:[^=]+=\s*&?\[([\s\S]*?)\];/,
-    );
-    const names = block?.[1]?.match(/"[A-Z][A-Z0-9.]*"/g)?.map((name) => name.slice(1, -1)) ?? [];
-    if (names.length === 0) issues.push(`analysis family ${family} has no NAMES table`);
+    // `family_functions! { BESSELJ, CHISQ_DIST = "CHISQ.DIST", ... }`: a
+    // variant spells its own name unless a dotted name follows `=`.
+    const block = source.match(/^family_functions!\s*\{([\s\S]*?)^\}/m);
+    const names = [
+      ...(block?.[1] ?? "").matchAll(/^\s*([A-Z][A-Z0-9_]*)(?:\s*=\s*"([A-Z][A-Z0-9.]*)")?,/gm),
+    ].flatMap(([, variant, dotted]) => dotted ?? variant ?? []);
+    if (names.length === 0) issues.push(`analysis family ${family} has no family_functions table`);
     spellings.push(...names);
   }
   if (new Set(spellings).size !== spellings.length) {

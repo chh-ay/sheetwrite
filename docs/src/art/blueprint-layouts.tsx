@@ -20,6 +20,7 @@ export interface FigureStep {
   readonly lines?: readonly string[];
   readonly code?: readonly string[];
   readonly tone?: BlueprintNode["tone"];
+  readonly sheet?: BlueprintNode["sheet"];
   /** In a fan, a tile the source doesn't reach: drawn without a connector, to show what is left out. */
   readonly unreached?: boolean;
 }
