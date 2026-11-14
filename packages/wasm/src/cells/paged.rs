@@ -1859,9 +1859,9 @@ impl PagedStorage {
             free[id as usize] = true;
         }
         out.usize(self.clean.len());
-        for (clean, free) in self.clean.iter().zip(free) {
+        for (page, is_free) in self.clean.iter().zip(free) {
             let empty = CleanPage::default();
-            let clean = if free { &empty } else { clean };
+            let clean = if is_free { &empty } else { page };
             out.bytes(&clean.kind);
             out.words(&clean.payload);
             out.ints(&clean.style);
@@ -1993,7 +1993,7 @@ impl PagedStorage {
             .clean
             .iter()
             .zip(&free)
-            .any(|(clean, &free)| clean.kind.is_empty() && !free)
+            .any(|(clean, &is_free)| clean.kind.is_empty() && !is_free)
         {
             return Err("invalid transferred page chunk".into());
         }

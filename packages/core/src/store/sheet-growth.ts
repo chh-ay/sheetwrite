@@ -6,7 +6,7 @@ import type { MutationIssue } from "../types/document.js";
  * Where a sheet's cells live: dense storage, local pages (a dense sheet that
  * grew past `maxDenseCells`), or datasource-backed pages.
  */
-export type SheetStorage = "dense" | "local" | "paged";
+type SheetStorage = "dense" | "local" | "paged";
 
 /** One sheet's dimensions as a transaction's row and column inserts grow it. */
 export interface SheetDimensions {
