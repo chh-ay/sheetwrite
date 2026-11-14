@@ -1,17 +1,20 @@
 import { fragmentId } from "./fragment.js";
 
 /**
- * Fragment navigation must actually show the target. Generated API members
- * are collapsed `<details>` rows, and two anchor forms point at them: the
- * details id itself (`#grid-apply-transaction`) and the search-anchor h3
- * that precedes it (`#applytransaction`). Browsers scroll to closed rows
- * without opening them, so deep links land on nothing visible.
+ * Fragment navigation to a generated API member marks its card. Two anchor
+ * forms point at a member: the card's id (`#grid-apply-transaction`) and the
+ * hidden search anchor just before it (`#applytransaction`), which CSS
+ * `:target` cannot carry to the card, so a data flag marks it either way.
  */
-function memberFor(target: Element): HTMLDetailsElement | null {
-  if (target instanceof HTMLDetailsElement) return target;
+function memberFor(target: Element): HTMLElement | null {
   const following = target.nextElementSibling;
-  if (following instanceof HTMLDetailsElement) return following;
-  return target.closest("details");
+  if (
+    target.classList.contains("api-search-anchor") &&
+    following?.classList.contains("api-member")
+  ) {
+    return following as HTMLElement;
+  }
+  return target.closest<HTMLElement>(".api-member");
 }
 
 export function revealAnchoredMember(): void {
@@ -26,15 +29,10 @@ export function revealAnchoredMember(): void {
       return;
     }
     const member = memberFor(target);
-    if (member !== null) {
-      if (!member.open) member.open = true;
-      // Search links target the hidden h3 anchor, so CSS :target misses the
-      // row; a data flag carries the emphasis either way.
-      for (const previous of document.querySelectorAll<HTMLElement>(".api-member[data-revealed]")) {
-        delete previous.dataset.revealed;
-      }
-      member.dataset.revealed = "";
+    for (const previous of document.querySelectorAll<HTMLElement>(".api-member[data-revealed]")) {
+      delete previous.dataset.revealed;
     }
+    if (member !== null) member.dataset.revealed = "";
     requestAnimationFrame(() => {
       (member ?? target).scrollIntoView({ block: "start" });
     });

@@ -587,40 +587,6 @@ details[open] > summary > .sw-disclosure-icon {
   margin: var(--sw-space-4) 0 var(--sw-space-6);
   font-size: var(--sw-text-caption);
 }
-.sw-docs .api-member-list {
-  border: 0;
-  border-bottom: 1px solid var(--sw-border);
-  margin: var(--sw-space-4) 0 var(--sw-space-8);
-}
-/* Members are a flat list split by hairlines; an open member gets a faint
-   tint so its body reads as part of that row. */
-.sw-docs .api-member {
-  border: 0;
-  border-top: 1px solid var(--sw-border);
-  border-radius: 0;
-  margin: 0;
-  background: var(--sw-surface-1);
-}
-.sw-docs .api-member summary {
-  padding: var(--sw-space-3) var(--sw-space-2);
-  border-radius: var(--sw-radius-sm);
-}
-.sw-docs .api-member[open] {
-  background: color-mix(in srgb, var(--sw-fg) 2.5%, var(--sw-surface-1));
-}
-.sw-docs .api-member[open] > summary {
-  border-radius: 0;
-}
-.sw-docs .api-member summary > code {
-  font-size: var(--sw-text-small);
-}
-.sw-docs .api-member .expressive-code {
-  margin: var(--sw-space-3);
-}
-.sw-docs .api-member .api-member-doc {
-  padding: 0 var(--sw-space-3);
-  margin: var(--sw-space-3) 0;
-}
 .sw-docs .api-symbol-grid {
   gap: var(--sw-space-3);
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -938,15 +904,11 @@ html:has(.sw-nav-dialog[open]) {
   .sw-toc-inline > summary {
     min-height: 44px;
   }
-  /* A symbol's member index and the figures' rows grow to 44 px rows. The
-     index's names stay one line with their ellipsis, centred by the line
-     height. */
+  /* A symbol's member index: 44 px pill links. */
   .sw-prose .api-member-index a {
-    padding-block: 0;
-    line-height: 44px;
-  }
-  .sw-prose .api-member-index > summary {
+    display: inline-flex;
     min-height: 44px;
+    align-items: center;
   }
   /* A link that is a whole list item or paragraph ("See also", next steps,
      "Read the notes", from markLinkRows in vite.config.ts), and a release's
@@ -966,16 +928,16 @@ html:has(.sw-nav-dialog[open]) {
     min-height: 44px;
     align-items: center;
   }
-  /* A field's type link sits in its code token: the head row is 44 px tall
-     and the link's target fills it, without growing the token. */
-  .sw-prose .api-field__head {
+  /* A field's type link sits in its signature: the card header is 44 px
+     tall and the link's target fills it, without growing the text. */
+  .sw-prose .api-field .api-card__head {
     min-height: 44px;
     align-items: center;
   }
-  .sw-prose .api-field__type a {
+  .sw-prose .api-sig__type a {
     position: relative;
   }
-  .sw-prose .api-field__type a::after {
+  .sw-prose .api-sig__type a::after {
     position: absolute;
     inset: -13px -6px;
     content: "";
