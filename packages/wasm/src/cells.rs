@@ -311,6 +311,19 @@ impl CellStorage {
         }
     }
 
+    /// The source kind and payload with one paged lookup; `None` while unloaded.
+    #[inline]
+    pub(crate) fn loaded_source_at(&self, row: usize, col: usize) -> Option<(u8, u64)> {
+        if let Some(paged) = &self.paged {
+            let (kind, payload, _, loaded, _) = paged.read(row, col);
+            loaded.then_some((kind, payload))
+        } else {
+            let index = self.idx(row, col);
+            let kind = self.kind[index];
+            Some((kind & !CALCULATED, dense_source(kind, self.payload[index]).1))
+        }
+    }
+
     #[inline]
     pub(crate) fn source_payload_at(&self, index: usize) -> u64 {
         if let Some(paged) = &self.paged {
