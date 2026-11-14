@@ -382,6 +382,10 @@ fn ast_is_plain(ast: &Ast) -> bool {
     }
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
 fn ast_is_volatile(ast: &Ast) -> bool {
     match ast {
         Ast::Func(
@@ -396,8 +400,6 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             | Func::Info,
             _,
         ) => true,
-        #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(crate::eval::analysis::GETPIVOTDATA_ID), _) => true,
         Ast::NamedFormula(named) => ast_is_volatile(&named.expression),
         _ => ast.any_child(&mut ast_is_volatile),
     }
@@ -482,6 +484,9 @@ impl FormulaEntry {
     const TABLE_REFS: u16 = 1 << 10;
     /// The tree may use a defined name: a bare name or an unknown function.
     const NAME_REFS: u16 = 1 << 11;
+    /// The tree calls GETPIVOTDATA.
+    #[cfg(feature = "analysis")]
+    const CALLS_PIVOT_DATA: u16 = 1 << 12;
 
     /// Whether the tree holds a table reference, so its tables list it
     /// among their users.
@@ -577,6 +582,13 @@ impl FormulaEntry {
         self.flags & Self::CALLS_SUBTOTAL != 0
     }
 
+    /// Whether the formula calls GETPIVOTDATA. It reads pivot output that
+    /// no reference names, so a pivot update recalculates it.
+    #[cfg(feature = "analysis")]
+    pub(crate) const fn calls_pivot_data(&self) -> bool {
+        self.flags & Self::CALLS_PIVOT_DATA != 0
+    }
+
     const fn set_flag(&mut self, flag: u16, enabled: bool) {
         self.flags = (self.flags & !flag) | if enabled { flag } else { 0 };
     }
@@ -624,6 +636,11 @@ impl FormulaEntry {
             crate::eval::Shapes::NONE,
         ));
         entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
+        #[cfg(feature = "analysis")]
+        entry.set_flag(
+            Self::CALLS_PIVOT_DATA,
+            crate::eval::analysis::ast_calls_pivot_data(&ast),
+        );
         entry.set_flag(Self::TABLE_REFS, features.table_refs);
         entry.set_flag(Self::NAME_REFS, features.names);
         // The flags and reads above come from the tree as written; resolving
@@ -668,6 +685,14 @@ impl FormulaEntry {
                 .ast
                 .as_ref()
                 .is_some_and(crate::eval::ast_calls_subtotal),
+        );
+        #[cfg(feature = "analysis")]
+        entry.set_flag(
+            Self::CALLS_PIVOT_DATA,
+            entry
+                .ast
+                .as_ref()
+                .is_some_and(crate::eval::analysis::ast_calls_pivot_data),
         );
         entry
     }
