@@ -808,7 +808,7 @@ Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
 | `bench:paged-storage` | Paged storage: local edits, their acknowledgement, clean-page eviction and range reads through formulas (`src/paged-storage-bench.ts`) |
 | `bench:windows` | Window ownership: scroll and off-screen edits against the painted window (`src/window-ownership-bench.ts`) |
 | `bench:epochs` | Edit-to-paint cost for changes that may or may not reach the painted window (`src/epoch-split-bench.ts`) |
-| `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator (`src/sync-queue-depth-bench.ts`) |
+| `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator, and acknowledgement drain of a queue that deep, in order and pair-swapped (`src/sync-queue-depth-bench.ts`) |
 | `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
 | `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
 | `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference (`src/panel-read-bench.ts`) |
