@@ -12,23 +12,33 @@ export interface ChartAnchor {
   row: number;
   /** 0-based column of the cell that holds the top-left corner. */
   col: number;
+  /** Distance from that cell's left edge to the chart's left edge, in CSS pixels; 0 or more. */
   offsetX: number;
+  /** Distance from that cell's top edge to the chart's top edge, in CSS pixels; 0 or more. */
   offsetY: number;
+  /** Width of the chart in CSS pixels; more than 0. */
   width: number;
+  /** Height of the chart in CSS pixels; more than 0. */
   height: number;
 }
 
 /** Sources are read in row-major order. */
 export interface ChartSeries {
+  /** Name shown in the legend; it wins over `nameRange`. */
   name?: string;
+  /** Cell that holds the name; only its top-left cell is read. */
   nameRange?: ChartRange;
+  /** Cells that hold the values to plot. */
   values: ChartRange;
+  /** Cells that hold the category labels; several columns or rows give levels of labels. */
   categories?: ChartRange;
 }
 
 /** Persisted chart definition; IDs are unique within the owning sheet. */
 export interface ChartDefinition {
+  /** Stable ID, unique on the sheet. */
   id: string;
+  /** The chart type, such as `column` or `line`. */
   kind: ChartKind;
   /** Text above the chart; `undefined` shows no title. */
   title?: string;
@@ -49,7 +59,9 @@ export interface ChartDefinition {
   };
   /** Legend position; `undefined` lets the renderer use its default position. */
   legend?: "none" | "top" | "right" | "bottom" | "left";
+  /** Where the chart sits on the sheet, and its size. */
   anchor: ChartAnchor;
+  /** The data series, in drawing order; empty when `pivot` is set. */
   series: ChartSeries[];
   /**
    * The ID of a pivot on the same sheet whose result the chart shows, as an
@@ -84,6 +96,7 @@ export interface ChartCategoryLevel {
 
 /** Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order. */
 export interface ChartSeriesView {
+  /** The series name: `name`, else the text of `nameRange`, else `Series 1` and so on. */
   name: string;
   /** Numeric cells; text, booleans, errors and empty cells are `null` (a gap). */
   values: Array<number | null>;
@@ -124,12 +137,15 @@ export interface ChartView {
    * write throws; copy it (for example with `structuredClone`) to edit it.
    */
   chart: ReadonlyChartDefinition;
+  /** The resolved data of each series, in drawing order. */
   series: ChartSeriesView[];
 }
 
 /** Stable identity of one chart: the sheet that owns it and its ID on that sheet. */
 export interface ChartRef {
+  /** Stable ID of the sheet that holds the chart. */
   readonly sheet: SheetId;
+  /** The chart's ID on that sheet. */
   readonly id: string;
 }
 
@@ -166,6 +182,7 @@ export interface ChartViewProvider {
 export interface MountedChart {
   /** Core calls this after it changes the box size in CSS pixels. */
   resize(width: number, height: number): void;
+  /** Core calls this before it removes the chart's box; free what the chart holds. */
   dispose(): void;
 }
 
@@ -173,5 +190,6 @@ export interface MountedChart {
 export interface ChartRenderer {
   /** `host` is an empty element that core owns, positions and clips. */
   mount(host: HTMLElement, chart: ChartRef, size: { width: number; height: number }): MountedChart;
+  /** Core calls this when the grid is destroyed, after every chart is disposed. */
   dispose(): void;
 }

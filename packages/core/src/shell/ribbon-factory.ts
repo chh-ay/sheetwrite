@@ -23,6 +23,8 @@ export interface RibbonOptions extends RibbonConfig {
  * the toolbar, in a full or a compact layout. Groups shrink, then collapse into
  * dropdowns, as the host narrows. Returns the piece with an idempotent
  * `destroy`.
+ *
+ * @param host - Element the ribbon is appended to.
  */
 export function createRibbon(
   host: HTMLElement,

@@ -114,9 +114,12 @@ export type SyncProtocolErrorCode =
 
 /** Typed rejection of malformed or resource-exhausting synchronization input. */
 export class SyncProtocolError extends SheetwriteError {
+  /** Always `"SyncProtocolError"`. */
   override readonly name = "SyncProtocolError";
+  /** What was wrong with the server's data. */
   declare readonly code: SyncProtocolErrorCode;
 
+  /** Creates the error; `options.cause` keeps the underlying error. */
   constructor(code: SyncProtocolErrorCode, message: string, options?: ErrorOptions) {
     super(code, "synchronize", message, { cause: options?.cause });
   }
