@@ -948,6 +948,9 @@ pub(crate) fn source_kind(raw: u8) -> u8 {
     raw & !CALCULATED
 }
 
+/// A run's source kinds and payloads, one entry per cell.
+pub(crate) type SourceSlices<'a> = (&'a [u8], &'a [u64]);
+
 /// A borrowed column segment bounded by its source page or column, and for
 /// paged storage also by its dirty and calculated blocks. Indices are absolute
 /// and valid only inside `start..end`. Creating a run allocates nothing and
