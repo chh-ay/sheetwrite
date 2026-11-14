@@ -5,37 +5,46 @@ use super::super::functions::{
 };
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
-pub(crate) const NAMES: &[&str] = &[
-    "AVEDEV",
-    "DEVSQ",
-    "FORECAST",
-    "FORECAST.LINEAR",
-    "HARMEAN",
-    "INTERCEPT",
-    "KURT",
-    "PEARSON",
-    "PERCENTILE.EXC",
-    "PERCENTRANK.EXC",
-    "PERCENTRANK.INC",
-    "QUARTILE.EXC",
-    "RANK.AVG",
-    "RSQ",
-    "SKEW",
-    "SKEW.P",
-    "SLOPE",
-    "STEYX",
-    "TRIMMEAN",
-];
+family_functions! {
+    AVEDEV,
+    DEVSQ,
+    FORECAST,
+    FORECAST_LINEAR = "FORECAST.LINEAR",
+    HARMEAN,
+    INTERCEPT,
+    KURT,
+    PEARSON,
+    PERCENTILE_EXC = "PERCENTILE.EXC",
+    PERCENTRANK_EXC = "PERCENTRANK.EXC",
+    PERCENTRANK_INC = "PERCENTRANK.INC",
+    QUARTILE_EXC = "QUARTILE.EXC",
+    RANK_AVG = "RANK.AVG",
+    RSQ,
+    SKEW,
+    SKEW_P = "SKEW.P",
+    SLOPE,
+    STEYX,
+    TRIMMEAN,
+}
 
 /// Functions whose arguments are number lists: a single-cell argument is a
 /// reference, so text and logical values in that cell are ignored.
-pub(crate) const REFERENCE_CELLS: &[&str] =
-    &["AVEDEV", "DEVSQ", "HARMEAN", "KURT", "SKEW", "SKEW.P"];
+pub(crate) const fn reads_cells_as_references(function: Function) -> bool {
+    matches!(
+        function,
+        Function::AVEDEV
+            | Function::DEVSQ
+            | Function::HARMEAN
+            | Function::KURT
+            | Function::SKEW
+            | Function::SKEW_P
+    )
+}
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).map_or_else(Value::Error, |number| {
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).map_or_else(Value::Error, |number| {
         if number.is_finite() {
             Value::number(number)
         } else {
@@ -44,35 +53,29 @@ pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
     })
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
-    match name {
-        "AVEDEV" | "DEVSQ" | "HARMEAN" | "KURT" | "SKEW" | "SKEW.P" => {
-            require_arity(values, 1, 255)?;
-            let numbers = numbers(values.entries())?;
-            match name {
-                "AVEDEV" => average_deviation(&numbers),
-                "DEVSQ" => Ok(moments(&numbers)?.m2),
-                "HARMEAN" => harmonic_mean(&numbers),
-                "KURT" => kurtosis(&numbers),
-                "SKEW" => skewness(&numbers, true),
-                _ => skewness(&numbers, false),
-            }
-        }
-        "TRIMMEAN" => {
+fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
+    match function {
+        Function::AVEDEV => average_deviation(&number_list(values)?),
+        Function::DEVSQ => Ok(moments(&number_list(values)?)?.m2),
+        Function::HARMEAN => harmonic_mean(&number_list(values)?),
+        Function::KURT => kurtosis(&number_list(values)?),
+        Function::SKEW => skewness(&number_list(values)?, true),
+        Function::SKEW_P => skewness(&number_list(values)?, false),
+        Function::TRIMMEAN => {
             require_arity(values, 2, 2)?;
             trimmed_mean(
                 numbers(values.arg(0).unwrap_or_default())?,
                 number_arg(values, 1, None)?,
             )
         }
-        "PERCENTILE.EXC" => {
+        Function::PERCENTILE_EXC => {
             require_arity(values, 2, 2)?;
             percentile_exclusive(
                 numbers(values.arg(0).unwrap_or_default())?,
                 number_arg(values, 1, None)?,
             )
         }
-        "QUARTILE.EXC" => {
+        Function::QUARTILE_EXC => {
             require_arity(values, 2, 2)?;
             let quartile = integer_arg(values, 1, None)?;
             if !(1..=3).contains(&quartile) {
@@ -83,7 +86,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
                 quartile as f64 * 0.25,
             )
         }
-        "PERCENTRANK.INC" | "PERCENTRANK.EXC" => {
+        Function::PERCENTRANK_INC | Function::PERCENTRANK_EXC => {
             require_arity(values, 2, 3)?;
             let numbers = numbers(values.arg(0).unwrap_or_default())?;
             let target = number_arg(values, 1, None)?;
@@ -91,31 +94,26 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             if significance < 1 {
                 return Err(FormulaError::Num);
             }
-            percent_rank(numbers, target, name == "PERCENTRANK.EXC", significance)
+            percent_rank(
+                numbers,
+                target,
+                function == Function::PERCENTRANK_EXC,
+                significance,
+            )
         }
-        "RANK.AVG" => {
+        Function::RANK_AVG => {
             require_arity(values, 2, 3)?;
             let target = number_arg(values, 0, None)?;
             let numbers = numbers(values.arg(1).unwrap_or_default())?;
             let ascending = number_arg(values, 2, Some(0.0))? != 0.0;
             rank_average(&numbers, target, ascending)
         }
-        "PEARSON" | "RSQ" | "SLOPE" | "INTERCEPT" | "STEYX" => {
-            require_arity(values, 2, 2)?;
-            // PEARSON takes (array1, array2); the others take (known_y, known_x).
-            let fit = Fit::from_pairs(
-                values.arg(1).unwrap_or_default(),
-                values.arg(0).unwrap_or_default(),
-            )?;
-            match name {
-                "PEARSON" => fit.correlation(),
-                "RSQ" => fit.correlation().map(|r| r * r),
-                "SLOPE" => fit.slope(),
-                "INTERCEPT" => fit.intercept(),
-                _ => fit.standard_error(),
-            }
-        }
-        "FORECAST" | "FORECAST.LINEAR" => {
+        Function::PEARSON => paired_fit(values)?.correlation(),
+        Function::RSQ => paired_fit(values)?.correlation().map(|r| r * r),
+        Function::SLOPE => paired_fit(values)?.slope(),
+        Function::INTERCEPT => paired_fit(values)?.intercept(),
+        Function::STEYX => paired_fit(values)?.standard_error(),
+        Function::FORECAST | Function::FORECAST_LINEAR => {
             require_arity(values, 3, 3)?;
             let x = number_arg(values, 0, None)?;
             let fit = Fit::from_pairs(
@@ -124,8 +122,23 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
             )?;
             Ok(fit.intercept()? + fit.slope()? * x)
         }
-        _ => Err(FormulaError::Name),
     }
+}
+
+/// The numbers of a function that takes one list of numbers.
+fn number_list(values: &FuncAccumulator) -> Result<Vec<f64>, FormulaError> {
+    require_arity(values, 1, 255)?;
+    numbers(values.entries())
+}
+
+/// The fit of a function of two paired arrays. PEARSON takes (`array1`,
+/// `array2`); the others take (`known_y`, `known_x`).
+fn paired_fit(values: &FuncAccumulator) -> Result<Fit, FormulaError> {
+    require_arity(values, 2, 2)?;
+    Fit::from_pairs(
+        values.arg(1).unwrap_or_default(),
+        values.arg(0).unwrap_or_default(),
+    )
 }
 
 fn numbers(entries: &[FuncValue]) -> Result<Vec<f64>, FormulaError> {
@@ -416,20 +429,20 @@ mod tests {
         values
     }
 
-    fn number(name: &str, args: Vec<Arg>) -> Value {
-        evaluate(name, &accumulator(args))
+    fn number(function: Function, args: Vec<Arg>) -> Value {
+        evaluate(function, &accumulator(args))
     }
 
-    fn assert_close(name: &str, args: Vec<Arg>, expected: f64, tolerance: f64) {
-        match number(name, args) {
+    fn assert_close(function: Function, args: Vec<Arg>, expected: f64, tolerance: f64) {
+        match number(function, args) {
             Value::Number(actual) => {
                 assert!(
                     (actual - expected).abs() <= tolerance,
-                    "{name}: {actual} vs {expected}"
+                    "{function}: {actual} vs {expected}"
                 );
             }
             other @ (Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_)) => {
-                panic!("{name}: expected {expected}, got {other:?}")
+                panic!("{function}: expected {expected}, got {other:?}")
             }
         }
     }
@@ -441,21 +454,31 @@ mod tests {
     #[test]
     fn microsoft_published_examples() {
         let skew_data = [3.0, 4.0, 5.0, 2.0, 3.0, 4.0, 5.0, 6.0, 4.0, 7.0];
-        assert_close("SKEW", vec![array_arg(&skew_data)], 0.359543, 1e-6);
-        assert_close("SKEW.P", vec![array_arg(&skew_data)], 0.303193, 1e-6);
-        assert_close("KURT", vec![array_arg(&skew_data)], -0.151799637, 1e-9);
+        assert_close(Function::SKEW, vec![array_arg(&skew_data)], 0.359543, 1e-6);
         assert_close(
-            "AVEDEV",
+            Function::SKEW_P,
+            vec![array_arg(&skew_data)],
+            0.303193,
+            1e-6,
+        );
+        assert_close(
+            Function::KURT,
+            vec![array_arg(&skew_data)],
+            -0.151799637,
+            1e-9,
+        );
+        assert_close(
+            Function::AVEDEV,
             vec![array_arg(&[4.0, 5.0, 6.0, 7.0, 5.0, 4.0, 3.0])],
             1.020408163,
             1e-9,
         );
         let devsq = [4.0, 5.0, 8.0, 7.0, 11.0, 4.0, 3.0];
-        assert_close("DEVSQ", vec![array_arg(&devsq)], 48.0, 0.0);
-        assert_close("HARMEAN", vec![array_arg(&devsq)], 5.028376, 1e-6);
+        assert_close(Function::DEVSQ, vec![array_arg(&devsq)], 48.0, 0.0);
+        assert_close(Function::HARMEAN, vec![array_arg(&devsq)], 5.028376, 1e-6);
         let trim = [4.0, 5.0, 6.0, 7.0, 2.0, 3.0, 4.0, 5.0, 1.0, 2.0, 3.0];
         assert_close(
-            "TRIMMEAN",
+            Function::TRIMMEAN,
             vec![array_arg(&trim), scalar_arg(0.2)],
             3.777777778,
             1e-9,
@@ -464,20 +487,25 @@ mod tests {
         let ys = [2.0, 3.0, 9.0, 1.0, 8.0, 7.0, 5.0];
         let xs = [6.0, 5.0, 11.0, 7.0, 5.0, 4.0, 4.0];
         assert_close(
-            "SLOPE",
+            Function::SLOPE,
             vec![array_arg(&ys), array_arg(&xs)],
             0.305556,
             1e-6,
         );
-        assert_close("RSQ", vec![array_arg(&ys), array_arg(&xs)], 0.05795, 1e-5);
         assert_close(
-            "STEYX",
+            Function::RSQ,
+            vec![array_arg(&ys), array_arg(&xs)],
+            0.05795,
+            1e-5,
+        );
+        assert_close(
+            Function::STEYX,
             vec![array_arg(&ys), array_arg(&xs)],
             3.305719,
             1e-6,
         );
         assert_close(
-            "INTERCEPT",
+            Function::INTERCEPT,
             vec![
                 array_arg(&[2.0, 3.0, 9.0, 1.0, 8.0]),
                 array_arg(&[6.0, 5.0, 11.0, 7.0, 5.0]),
@@ -486,7 +514,7 @@ mod tests {
             1e-7,
         );
         assert_close(
-            "PEARSON",
+            Function::PEARSON,
             vec![
                 array_arg(&[9.0, 7.0, 5.0, 3.0, 1.0]),
                 array_arg(&[10.0, 6.0, 1.0, 5.0, 3.0]),
@@ -499,11 +527,11 @@ mod tests {
             array_arg(&[6.0, 7.0, 9.0, 15.0, 21.0]),
             array_arg(&[20.0, 28.0, 31.0, 38.0, 40.0]),
         ];
-        assert_close("FORECAST.LINEAR", forecast, 10.607253, 1e-6);
+        assert_close(Function::FORECAST_LINEAR, forecast, 10.607253, 1e-6);
 
         let exc = [1.0, 2.0, 3.0, 6.0, 6.0, 6.0, 7.0, 8.0, 9.0];
         assert_close(
-            "PERCENTILE.EXC",
+            Function::PERCENTILE_EXC,
             vec![array_arg(&exc), scalar_arg(0.25)],
             2.5,
             0.0,
@@ -512,13 +540,13 @@ mod tests {
             6.0, 7.0, 15.0, 36.0, 39.0, 40.0, 41.0, 42.0, 43.0, 47.0, 49.0,
         ];
         assert_close(
-            "QUARTILE.EXC",
+            Function::QUARTILE_EXC,
             vec![array_arg(&quartiles), scalar_arg(1.0)],
             15.0,
             0.0,
         );
         assert_close(
-            "QUARTILE.EXC",
+            Function::QUARTILE_EXC,
             vec![array_arg(&quartiles), scalar_arg(3.0)],
             43.0,
             0.0,
@@ -527,33 +555,33 @@ mod tests {
         let inc = [13.0, 12.0, 11.0, 8.0, 4.0, 3.0, 2.0, 1.0, 1.0, 1.0];
         for (target, expected) in [(2.0, 0.333), (4.0, 0.555), (8.0, 0.666), (5.0, 0.583)] {
             assert_close(
-                "PERCENTRANK.INC",
+                Function::PERCENTRANK_INC,
                 vec![array_arg(&inc), scalar_arg(target)],
                 expected,
                 0.0,
             );
         }
         assert_close(
-            "PERCENTRANK.EXC",
+            Function::PERCENTRANK_EXC,
             vec![array_arg(&exc), scalar_arg(7.0)],
             0.7,
             0.0,
         );
         assert_close(
-            "PERCENTRANK.EXC",
+            Function::PERCENTRANK_EXC,
             vec![array_arg(&exc), scalar_arg(5.43)],
             0.381,
             0.0,
         );
         assert_close(
-            "PERCENTRANK.EXC",
+            Function::PERCENTRANK_EXC,
             vec![array_arg(&exc), scalar_arg(5.43), scalar_arg(1.0)],
             0.3,
             0.0,
         );
         let temperatures = [89.0, 88.0, 92.0, 101.0, 94.0, 97.0, 95.0];
         assert_close(
-            "RANK.AVG",
+            Function::RANK_AVG,
             vec![scalar_arg(94.0), array_arg(&temperatures)],
             4.0,
             0.0,
@@ -563,67 +591,75 @@ mod tests {
     #[test]
     fn domain_and_shape_errors() {
         let short = [1.0, 2.0];
-        let cases: Vec<(&str, Vec<Arg>, FormulaError)> = vec![
-            ("SKEW", vec![array_arg(&short)], FormulaError::DivZero),
+        let cases: Vec<(Function, Vec<Arg>, FormulaError)> = vec![
             (
-                "KURT",
+                Function::SKEW,
+                vec![array_arg(&short)],
+                FormulaError::DivZero,
+            ),
+            (
+                Function::KURT,
                 vec![array_arg(&[1.0, 2.0, 3.0])],
                 FormulaError::DivZero,
             ),
             (
-                "SKEW.P",
+                Function::SKEW_P,
                 vec![array_arg(&[4.0, 4.0, 4.0])],
                 FormulaError::DivZero,
             ),
-            ("HARMEAN", vec![array_arg(&[1.0, 0.0])], FormulaError::Num),
             (
-                "TRIMMEAN",
+                Function::HARMEAN,
+                vec![array_arg(&[1.0, 0.0])],
+                FormulaError::Num,
+            ),
+            (
+                Function::TRIMMEAN,
                 vec![array_arg(&short), scalar_arg(1.0)],
                 FormulaError::Num,
             ),
             (
-                "PERCENTILE.EXC",
+                Function::PERCENTILE_EXC,
                 vec![array_arg(&[1.0, 2.0, 3.0]), scalar_arg(0.1)],
                 FormulaError::Num,
             ),
             (
-                "QUARTILE.EXC",
+                Function::QUARTILE_EXC,
                 vec![array_arg(&[1.0, 2.0, 3.0]), scalar_arg(4.0)],
                 FormulaError::Num,
             ),
             (
-                "PERCENTRANK.INC",
+                Function::PERCENTRANK_INC,
                 vec![array_arg(&short), scalar_arg(9.0)],
                 FormulaError::Na,
             ),
             (
-                "PERCENTRANK.INC",
+                Function::PERCENTRANK_INC,
                 vec![array_arg(&short), scalar_arg(1.0), scalar_arg(0.0)],
                 FormulaError::Num,
             ),
             (
-                "RANK.AVG",
+                Function::RANK_AVG,
                 vec![scalar_arg(9.0), array_arg(&short)],
                 FormulaError::Na,
             ),
             (
-                "SLOPE",
+                Function::SLOPE,
                 vec![array_arg(&short), array_arg(&[1.0])],
                 FormulaError::Na,
             ),
             (
-                "SLOPE",
+                Function::SLOPE,
                 vec![array_arg(&short), array_arg(&[3.0, 3.0])],
                 FormulaError::DivZero,
             ),
             (
-                "STEYX",
+                Function::STEYX,
                 vec![array_arg(&short), array_arg(&[1.0, 2.0])],
                 FormulaError::DivZero,
             ),
         ];
-        for (name, args, error) in cases {
-            assert_eq!(number(name, args), Value::Error(error), "{name}");
+        for (function, args, error) in cases {
+            assert_eq!(number(function, args), Value::Error(error), "{function}");
         }
     }
 
@@ -635,7 +671,7 @@ mod tests {
         );
         let xs = array_arg(&[1.0, 2.0, 3.0]);
         // Only (1, 2) and (3, 6) remain: slope 2, intercept 0.
-        assert_close("SLOPE", vec![ys.clone(), xs.clone()], 2.0, 1e-12);
-        assert_close("INTERCEPT", vec![ys, xs], 0.0, 1e-12);
+        assert_close(Function::SLOPE, vec![ys.clone(), xs.clone()], 2.0, 1e-12);
+        assert_close(Function::INTERCEPT, vec![ys, xs], 0.0, 1e-12);
     }
 }

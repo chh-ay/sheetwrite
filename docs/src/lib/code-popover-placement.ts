@@ -27,6 +27,8 @@ export interface PlacementInput {
   readonly panel: { readonly width: number; readonly height: number };
   /** The other mentions of the symbol in the same code block. */
   readonly mentions: readonly Box[];
+  /** The code block's tabs and title bar: a panel keeps clear of them, as of mentions. */
+  readonly chrome: readonly Box[];
   /** The area a panel may cover: the viewport below the sticky header, less padding. */
   readonly viewport: Box;
   /** Space between the panel and the line. */
@@ -86,6 +88,11 @@ function overlaps(a: Box, b: Box): boolean {
   return a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom;
 }
 
+/** What a panel should not cover: the mentions and the block's tabs. */
+function keepClear(input: PlacementInput): readonly Box[] {
+  return [...input.mentions, ...input.chrome];
+}
+
 /** Sides to try, best first: the side with fewer mentions, beside when both have some. */
 function sidesInOrder(input: PlacementInput): PanelSide[] {
   const above = input.mentions.filter((mention) => mention.top < input.line.top).length;
@@ -102,12 +109,13 @@ function sidesInOrder(input: PlacementInput): PanelSide[] {
  */
 function pastMentions(side: PanelSide, input: PlacementInput): PanelPlacement | undefined {
   if (side === "beside") return undefined;
+  const clear = keepClear(input);
   let shift = 0;
-  // Each step clears at least one more mention, so one step per mention plus
-  // the final check suffices.
-  for (let step = 0; step <= input.mentions.length; step += 1) {
+  // Each step clears at least one more box, so one step per box plus the
+  // final check suffices.
+  for (let step = 0; step <= clear.length; step += 1) {
     const box = panelBox({ side, shift }, input);
-    const covered = input.mentions.filter((mention) => overlaps(box, mention));
+    const covered = clear.filter((mention) => overlaps(box, mention));
     if (covered.length === 0) return shift === 0 ? undefined : { side, shift };
     shift =
       side === "below"
@@ -119,11 +127,12 @@ function pastMentions(side: PanelSide, input: PlacementInput): PanelPlacement | 
 
 /**
  * The first placement, in preference order, whose panel fits the viewport and
- * covers no mention: the sides at the usual gap, then the vertical sides moved
+ * covers no mention and none of the block's tabs: the sides at the usual gap, then the vertical sides moved
  * past the mentions; else the fitting side that covers the fewest; else below.
  */
 export function choosePanelPlacement(input: PlacementInput): PanelPlacement {
   const sides = sidesInOrder(input);
+  const clear = keepClear(input);
   const candidates: PanelPlacement[] = [
     ...sides.map((side) => ({ side, shift: 0 })),
     ...sides.flatMap((side) => pastMentions(side, input) ?? []),
@@ -132,7 +141,7 @@ export function choosePanelPlacement(input: PlacementInput): PanelPlacement {
   for (const placement of candidates) {
     const box = panelBox(placement, input);
     if (!fitsViewport(box, input)) continue;
-    const covered = input.mentions.filter((mention) => overlaps(box, mention)).length;
+    const covered = clear.filter((mention) => overlaps(box, mention)).length;
     if (covered === 0) return placement;
     if (best === undefined || covered < best.covered) best = { placement, covered };
   }

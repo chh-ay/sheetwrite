@@ -7,16 +7,16 @@ use super::super::functions::{
 use super::distributions::{ensure, f_probability, gamma_probability, normal_cdf, student_tail};
 use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
 
-pub(crate) const NAMES: &[&str] = &[
-    "CHISQ.TEST",
-    "CHITEST",
-    "F.TEST",
-    "FTEST",
-    "T.TEST",
-    "TTEST",
-    "Z.TEST",
-    "ZTEST",
-];
+family_functions! {
+    CHISQ_TEST = "CHISQ.TEST",
+    CHITEST,
+    F_TEST = "F.TEST",
+    FTEST,
+    T_TEST = "T.TEST",
+    TTEST,
+    Z_TEST = "Z.TEST",
+    ZTEST,
+}
 
 const ONE_TAIL: f64 = 1.0;
 const TWO_TAILS: f64 = 2.0;
@@ -27,8 +27,8 @@ const HALF: f64 = 0.5;
 
 type NumberResult = Result<f64, FormulaError>;
 
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    calculate(name, values).map_or_else(Value::Error, |number| {
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    calculate(function, values).map_or_else(Value::Error, |number| {
         if number.is_finite() {
             Value::number(number)
         } else {
@@ -37,13 +37,12 @@ pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
     })
 }
 
-fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
-    match name {
-        "CHITEST" | "CHISQ.TEST" => chi_squared_test(values),
-        "FTEST" | "F.TEST" => f_test(values),
-        "TTEST" | "T.TEST" => t_test(values),
-        "ZTEST" | "Z.TEST" => z_test(values),
-        _ => Err(FormulaError::Name),
+fn calculate(function: Function, values: &FuncAccumulator) -> NumberResult {
+    match function {
+        Function::CHITEST | Function::CHISQ_TEST => chi_squared_test(values),
+        Function::FTEST | Function::F_TEST => f_test(values),
+        Function::TTEST | Function::T_TEST => t_test(values),
+        Function::ZTEST | Function::Z_TEST => z_test(values),
     }
 }
 
@@ -293,7 +292,7 @@ mod tests {
         Number(f64),
     }
 
-    fn call(name: &str, arguments: &[Argument<'_>]) -> Value {
+    fn call(function: Function, arguments: &[Argument<'_>]) -> Value {
         let mut values = FuncAccumulator::default();
 
         for argument in arguments {
@@ -317,12 +316,12 @@ mod tests {
             }
         }
 
-        evaluate(name, &values)
+        evaluate(function, &values)
     }
 
-    fn assert_published(name: &str, value: Value, published: &str) {
+    fn assert_published(function: Function, value: Value, published: &str) {
         let Value::Number(actual) = value else {
-            panic!("{name} returned {value:?}");
+            panic!("{function} returned {value:?}");
         };
         let decimals = published
             .split_once('.')
@@ -332,7 +331,7 @@ mod tests {
 
         assert!(
             (actual - expected).abs() <= tolerance,
-            "{name}: {actual} != {published}"
+            "{function}: {actual} != {published}"
         );
     }
 
@@ -350,9 +349,9 @@ mod tests {
     #[test]
     fn microsoft_published_examples_give_the_excel_results() {
         assert_published(
-            "CHITEST",
+            Function::CHITEST,
             call(
-                "CHITEST",
+                Function::CHITEST,
                 &[
                     Argument::Table(ACTUAL, 3, 2),
                     Argument::Table(EXPECTED, 3, 2),
@@ -361,17 +360,17 @@ mod tests {
             "0.0003082",
         );
         assert_published(
-            "FTEST",
+            Function::FTEST,
             call(
-                "FTEST",
+                Function::FTEST,
                 &[Argument::List(FTEST_FIRST), Argument::List(FTEST_SECOND)],
             ),
             "0.64831785",
         );
         assert_published(
-            "TTEST",
+            Function::TTEST,
             call(
-                "TTEST",
+                Function::TTEST,
                 &[
                     Argument::List(TTEST_FIRST),
                     Argument::List(TTEST_SECOND),
@@ -382,17 +381,17 @@ mod tests {
             "0.196016",
         );
         assert_published(
-            "ZTEST",
+            Function::ZTEST,
             call(
-                "ZTEST",
+                Function::ZTEST,
                 &[Argument::List(ZTEST_DATA), Argument::Number(4.0)],
             ),
             "0.090574",
         );
         assert_published(
-            "ZTEST",
+            Function::ZTEST,
             call(
-                "ZTEST",
+                Function::ZTEST,
                 &[Argument::List(ZTEST_DATA), Argument::Number(6.0)],
             ),
             "0.863043",
@@ -416,10 +415,26 @@ mod tests {
         ];
         let sample = [Argument::List(ZTEST_DATA), Argument::Number(6.0)];
 
-        assert_published("CHISQ.TEST", call("CHISQ.TEST", &tables), "0.0003082");
-        assert_published("F.TEST", call("F.TEST", &pairs), "0.64831785");
-        assert_published("T.TEST", call("T.TEST", &paired), "0.196016");
-        assert_published("Z.TEST", call("Z.TEST", &sample), "0.863043");
+        assert_published(
+            Function::CHISQ_TEST,
+            call(Function::CHISQ_TEST, &tables),
+            "0.0003082",
+        );
+        assert_published(
+            Function::F_TEST,
+            call(Function::F_TEST, &pairs),
+            "0.64831785",
+        );
+        assert_published(
+            Function::T_TEST,
+            call(Function::T_TEST, &paired),
+            "0.196016",
+        );
+        assert_published(
+            Function::Z_TEST,
+            call(Function::Z_TEST, &sample),
+            "0.863043",
+        );
     }
 
     #[test]
@@ -435,7 +450,7 @@ mod tests {
 
         for (kind, degrees) in [(2.0, 4.0), (3.0, welch_degrees)] {
             let Value::Number(actual) = call(
-                "TTEST",
+                Function::TTEST,
                 &[
                     Argument::List(&first),
                     Argument::List(&second),
@@ -454,7 +469,7 @@ mod tests {
     #[test]
     fn errors_follow_the_microsoft_remarks() {
         let different_lengths = call(
-            "TTEST",
+            Function::TTEST,
             &[
                 Argument::List(&[1.0, 2.0, 3.0]),
                 Argument::List(&[1.0, 2.0]),
@@ -467,7 +482,7 @@ mod tests {
         for (tails, kind) in [(3.0, 1.0), (2.0, 4.0), (0.0, 2.0)] {
             assert_eq!(
                 call(
-                    "TTEST",
+                    Function::TTEST,
                     &[
                         Argument::List(TTEST_FIRST),
                         Argument::List(TTEST_SECOND),
@@ -482,7 +497,7 @@ mod tests {
 
         assert_eq!(
             call(
-                "CHITEST",
+                Function::CHITEST,
                 &[
                     Argument::Table(ACTUAL, 3, 2),
                     Argument::Table(EXPECTED, 2, 3)
@@ -492,14 +507,14 @@ mod tests {
         );
         assert_eq!(
             call(
-                "FTEST",
+                Function::FTEST,
                 &[Argument::List(&[1.0]), Argument::List(FTEST_SECOND)]
             ),
             Value::Error(FormulaError::DivZero)
         );
         assert_eq!(
             call(
-                "FTEST",
+                Function::FTEST,
                 &[Argument::List(&[2.0, 2.0]), Argument::List(FTEST_SECOND)]
             ),
             Value::Error(FormulaError::DivZero)

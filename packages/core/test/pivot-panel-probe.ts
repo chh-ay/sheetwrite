@@ -236,6 +236,103 @@ try {
   grid.undo();
   assert.ok(byLabel("Region in Rows actions"), "undo puts Region back in Rows");
 
+  // While the list is open, a commit rebuilds it only when what it shows
+  // changed, and reads the source fields only when they can have changed.
+  let fieldReads = 0;
+  const getPivotFields = grid.getPivotFields.bind(grid);
+  grid.getPivotFields = (sheet: string, id: string) => {
+    fieldReads += 1;
+    return getPivotFields(sheet, id);
+  };
+  const write = (
+    sheet: string,
+    row: number,
+    col: number,
+    value: string | number | { formula: string },
+  ): void => {
+    const patch: DocumentOp = {
+      op: "set",
+      addr: { sheet, row, col },
+      value:
+        typeof value === "object"
+          ? { kind: "formula", src: value.formula }
+          : { kind: "literal", value },
+    };
+    assert.equal(grid.applyTransaction({ patches: [patch] }).status, "applied");
+  };
+  /** Field reads of one write. */
+  const readsOf = (run: () => void): number => {
+    const before = fieldReads;
+    run();
+    return fieldReads - before;
+  };
+  const fieldList = (): Element => find(".sheetwrite-panel-fields");
+  const badges = (): (string | null)[] =>
+    [...host.querySelectorAll(".sheetwrite-panel-fields .sheetwrite-panel-badge")].map(
+      (badge) => badge.textContent,
+    );
+  const shown = fieldList();
+  write("data", 20, 9, "elsewhere");
+  assert.equal(fieldList(), shown, "a cell edit outside the source keeps the list");
+  const widened = grid.applyTransaction({
+    patches: [{ op: "setColumn", sheet: "data", col: 9, patch: { width: 120 } }],
+  });
+  assert.equal(widened.status, "applied");
+  assert.equal(fieldList(), shown, "a column width change keeps the list");
+
+  const notesAdded = grid.applyTransaction({
+    patches: [
+      {
+        op: "addSheet",
+        sheet: { id: "notes", name: "Notes", order: 1, rowCount: 5, columns, cells: [] },
+      },
+    ],
+  });
+  assert.equal(notesAdded.status, "applied");
+  assert.equal(fieldList(), shown, "a new sheet keeps the list");
+  assert.equal(
+    readsOf(() => write("notes", 0, 0, 1)),
+    0,
+    "literal sources ignore other sheets",
+  );
+  assert.equal(
+    readsOf(() => write("data", 21, 9, { formula: "=1+1" })),
+    1,
+  );
+  assert.equal(
+    readsOf(() => write("notes", 0, 0, 2)),
+    1,
+    "a formula on the source sheet counts",
+  );
+  const cleared = grid.applyTransaction({
+    patches: [
+      {
+        op: "clearRange",
+        range: { sheet: "data", start: { row: 21, col: 9 }, end: { row: 21, col: 9 } },
+      },
+    ],
+  });
+  assert.equal(cleared.status, "applied");
+  assert.equal(
+    readsOf(() => write("notes", 0, 0, 3)),
+    0,
+    "a cleared formula stops counting",
+  );
+  const removed = grid.applyTransaction({ patches: [{ op: "removeSheet", sheet: "notes" }] });
+  assert.equal(removed.status, "applied");
+  assert.equal(fieldList(), shown, "other sheets' edits never rebuilt the list");
+
+  write("data", 1, 2, "ten");
+  assert.notEqual(fieldList(), shown, "a source edit that changes a field type rebuilds the list");
+  assert.deepEqual(badges(), ["Text", "Text", "Mixed"]);
+  write("data", 1, 2, 10);
+  assert.deepEqual(badges(), ["Text", "Text", "Number"]);
+  write("data", 0, 0, "Area");
+  assert.ok(byLabel("Area field actions"), "a header edit renames the field");
+  write("data", 0, 0, "Region");
+  assert.ok(byLabel("Region in Rows actions"), "the renamed field keeps its area");
+  grid.getPivotFields = getPivotFields;
+
   // Selecting a cell of the output opens the field list without taking focus.
   grid.openPanel(null);
   assert.equal(host.querySelector(".sheetwrite-panel"), null);

@@ -113,6 +113,9 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/grid/custom-editors/": [
+    { after: "editor-contract", picture: "editor-lifecycle" },
+  ],
   "/docs/features/grid/editing-and-clipboard/": [
     {
       after: AFTER_LEAD,
@@ -124,6 +127,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/grid/grid-methods/": [{ after: AFTER_LEAD, picture: "grid-handle" }],
   "/docs/features/grid/options-and-presentation/": [
     {
       after: "spreadsheet-and-data-grid-presentation",
@@ -190,6 +194,13 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/grid/touch/": [{ after: "touch-gestures", picture: "touch-gestures" }],
+  "/docs/features/formulas/authoring-and-references/": [
+    { after: "point-mode-and-reference-rewriting", picture: "reference-rewrite" },
+  ],
+  "/docs/features/formulas/custom-functions/": [
+    { after: "registration", picture: "custom-functions" },
+  ],
   "/docs/features/formulas/formula-help/": [
     {
       after: AFTER_LEAD,
@@ -201,6 +212,49 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/formulas/lookup-criteria-and-financial/": [
+    { after: "criteria-semantics-and-shapes", picture: "criteria-rows" },
+  ],
+  "/docs/features/formulas/offset-and-indirect/": [
+    { after: "dynamic-references", picture: "dynamic-references" },
+  ],
+  "/docs/features/formulas/operators/": [{ after: "intersection", picture: "reference-operators" }],
+  "/docs/features/formulas/volatile-functions/": [
+    { after: "recalculation-and-clock", picture: "volatile-clock" },
+  ],
+  "/docs/frameworks/react/": [{ after: "listen-to-changes", picture: "react-adapter" }],
+  "/docs/frameworks/vue/": [{ after: "listen-to-changes", picture: "vue-adapter" }],
+  "/docs/frameworks/svelte/": [{ after: "listen-to-changes", picture: "svelte-adapter" }],
+  "/docs/frameworks/vanilla/": [{ after: "listen-to-changes", picture: "vanilla-lifecycle" }],
+  "/docs/tutorials/excel-in-javascript/": [{ after: AFTER_LEAD, picture: "tutorial-javascript" }],
+  "/docs/tutorials/excel-in-react/": [{ after: AFTER_LEAD, picture: "tutorial-react" }],
+  "/docs/tutorials/excel-in-vue/": [{ after: AFTER_LEAD, picture: "tutorial-vue" }],
+  "/docs/tutorials/excel-in-svelte/": [{ after: AFTER_LEAD, picture: "tutorial-svelte" }],
+  "/docs/tutorials/excel-in-nodejs/": [{ after: AFTER_LEAD, picture: "tutorial-nodejs" }],
+  "/docs/tutorials/spreadsheet-app-with-ribbon/": [
+    { after: "shell-ownership", picture: "tutorial-shell" },
+  ],
+  "/docs/start/upgrade-to-0-6-0/": [
+    { after: "update-packages-together", picture: "upgrade-0-6-0" },
+  ],
+  "/docs/start/upgrade-to-0-7-0/": [
+    { after: "update-packages-together", picture: "upgrade-0-7-0" },
+  ],
+  "/docs/import-export/libreoffice-compatibility/": [
+    { after: "what-the-comparison-proves", picture: "libreoffice-round-trip" },
+  ],
+  "/docs/import-export/xlsx-export/": [{ after: "table-interchange", picture: "xlsx-exports" }],
+  "/docs/reference/api-contract/": [{ after: AFTER_LEAD, picture: "api-gate" }],
+  "/docs/reference/compatibility-limits/": [{ after: AT_START, picture: "limits" }],
+  "/docs/reference/document-operations/": [{ after: "snapshots-and-rebase", picture: "rebase" }],
+  "/docs/reference/events/": [{ after: "event-direction", picture: "event-direction" }],
+  "/docs/releases/0.5.0/": [{ after: AFTER_LEAD, picture: "release-0.5.0" }],
+  "/docs/releases/0.5.1/": [{ after: AFTER_LEAD, picture: "release-0.5.1" }],
+  "/docs/releases/0.5.2/": [{ after: AFTER_LEAD, picture: "release-0.5.2" }],
+  "/docs/releases/0.5.3/": [{ after: AFTER_LEAD, picture: "release-0.5.3" }],
+  "/docs/releases/0.5.4/": [{ after: AFTER_LEAD, picture: "release-0.5.4" }],
+  "/docs/releases/0.6.0/": [{ after: AFTER_LEAD, picture: "release-0.6.0" }],
+  "/docs/releases/0.6.1/": [{ after: AFTER_LEAD, picture: "release-0.6.1" }],
   "/docs/features/formatting/": [
     {
       after: AT_START,
@@ -234,6 +288,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/formatting/styles/": [{ after: "resolution-order", picture: "theme-layers" }],
   "/docs/features/analysis/": [
     {
       after: AT_START,
@@ -272,9 +327,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "filter",
         size: "panel",
-        alt: "The Orders sheet with filter buttons in its header row and the Region column filtered to EMEA: only EMEA orders show, and the Region filter button is marked active.",
-        caption:
-          "Filtering the Region column to EMEA hides the other orders; the active filter is marked on its button.",
+        alt: "The Orders sheet with its columns named Month, Region, Product, Units and Revenue, and the Region column filtered to EMEA: only the EMEA orders show.",
+        caption: "Filtering the Region column to EMEA hides the other orders.",
       },
     },
   ],
