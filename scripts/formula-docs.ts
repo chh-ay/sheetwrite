@@ -655,7 +655,12 @@ function functionIndexHtml(
     readonly summaryOf: (formula: FormulaRecord) => string;
   },
 ): string {
-  const letters = Map.groupBy(sorted, (formula) => formula.canonical.charAt(0));
+  // The docs app type-checks this file against ES2022, which has no Map.groupBy.
+  const letters = new Map<string, FormulaRecord[]>();
+  for (const formula of sorted) {
+    const letter = formula.canonical.charAt(0);
+    letters.set(letter, [...(letters.get(letter) ?? []), formula]);
+  }
   return [...letters]
     .map(
       ([letter, group]) =>
