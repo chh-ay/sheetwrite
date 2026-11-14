@@ -132,6 +132,8 @@ describe("re-export documentation", () => {
       " * @see DataSource",
       " */",
       "export declare class Service {",
+      "  /** Make a service for `name`. */",
+      "  constructor(name: string);",
       "  /** Run the service.",
       "   * @example",
       "   * ```ts",
@@ -157,6 +159,10 @@ describe("re-export documentation", () => {
       name: "run",
       documentation:
         "Run the service.\n@example\n```ts\nservice.run();\n```\n@see\nhttps://example.com/run",
+    });
+    expect(service?.memberDocs).toContainEqual({
+      name: "constructor",
+      documentation: "Make a service for `name`.",
     });
   });
 });

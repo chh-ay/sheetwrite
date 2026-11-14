@@ -284,14 +284,15 @@ export async function memberDocumentation(
   const record = (name: string, documentation: string): void => {
     if (documentation.length > 0 && !docs.has(name)) docs.set(name, documentation);
   };
-  const collectFromType = async (type: Type): Promise<void> => {
+  // A class's construct signatures are its `constructor` members; an interface's are `new`.
+  const collectFromType = async (type: Type, constructName = "new"): Promise<void> => {
     for (const property of await checker.getPropertiesOfType(type)) {
       if ((await isPrivateSymbol(property, project)) || property.name === "prototype") continue;
       record(property.name, (await symbolDocumentation(property, project)).trim());
     }
     const signatureKinds = [
       [SignatureKind.Call, "call"],
-      [SignatureKind.Construct, "new"],
+      [SignatureKind.Construct, constructName],
     ] as const;
     for (const [kind, name] of signatureKinds) {
       for (const signature of await checker.getSignaturesOfType(type, kind)) {
@@ -310,7 +311,10 @@ export async function memberDocumentation(
   }
   const classDeclaration = declarations.find(isClassDeclaration);
   if (classDeclaration !== undefined) {
-    await collectFromType(await checker.getTypeOfSymbolAtLocation(symbol, classDeclaration));
+    await collectFromType(
+      await checker.getTypeOfSymbolAtLocation(symbol, classDeclaration),
+      "constructor",
+    );
   }
   const aliasDeclaration = declarations.find(isTypeAliasDeclaration);
   if (aliasDeclaration !== undefined) {
