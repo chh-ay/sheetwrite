@@ -15,9 +15,10 @@
 
 use std::cell::Cell;
 
+mod cols;
 mod rows;
 
-use super::{StorageEntry, MAX_PAGE_CHUNK_ROWS};
+use super::{DirtyRowWrite, MAX_PAGE_CHUNK_ROWS};
 use crate::derived::{decode_cell, encode_cell, ABSENT_TAG};
 use crate::memory::{
     MemoryOwnerStats, StoreMemoryStats, FORMULAS, PAGED_DIRTY_BITMAPS, PAGED_INDEXES, PAGED_KINDS,
@@ -775,6 +776,9 @@ impl PagedStorage {
     }
 
     /// The clean page of (`col`, `page`), loading an empty one when absent.
+    // Single cell writes and column writes both load pages here. Inline in
+    // each, as with the helpers `CleanPage::new` names.
+    #[inline(always)]
     fn ensure_clean(&mut self, col: usize, page: usize) -> &mut CleanPage {
         let id = self.record_or_insert(col, page);
         let existing = self.records[id as usize].clean;
@@ -817,7 +821,7 @@ impl PagedStorage {
         self.dirty_blocks[block as usize].slot(row & (DIRTY_BLOCK_ROWS - 1))
     }
 
-    fn is_dirty(&self, row: usize, col: usize) -> bool {
+    pub(super) fn is_dirty(&self, row: usize, col: usize) -> bool {
         self.dirty_slot(row, col).is_some()
     }
 
@@ -906,6 +910,56 @@ impl PagedStorage {
         clean.payload[offset] = payload;
         clean.style[offset] = style;
         set_bit(&mut clean.loaded, offset);
+    }
+
+    /// Writes unrevisioned cells of one column, in any row order. A clean row
+    /// lands in its clean page, found or loaded once per run of rows on that
+    /// page, so later rows of the run record no access: the page already has
+    /// the newest one. A row with an unacknowledged edit follows `dirty`.
+    /// Each written row loses its calculated result.
+    #[inline(never)]
+    pub(super) fn write_column(
+        &mut self,
+        col: usize,
+        cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+        dirty: DirtyRowWrite,
+    ) {
+        // (page, clean page index) of the run being written.
+        let mut current: Option<(usize, usize)> = None;
+
+        for (row, kind, payload, style) in cells {
+            if let Some(slot) = self.dirty_slot(row, col) {
+                if dirty == DirtyRowWrite::Update {
+                    let cell = &mut self.slots[slot as usize];
+                    cell.kind = kind;
+                    cell.payload = payload;
+                    cell.style = style;
+                    self.remove_calculated(row, col);
+                }
+                continue;
+            }
+
+            let (page, offset) = self.split(row);
+            let clean = match current {
+                Some((current_page, clean)) if current_page == page => clean,
+                _ => {
+                    self.ensure_clean(col, page);
+                    let clean = self.records[self.page_id(col, page) as usize].clean as usize;
+                    current = Some((page, clean));
+                    clean
+                }
+            };
+
+            let target = &mut self.clean[clean];
+            target.kind[offset] = kind;
+            target.payload[offset] = payload;
+            target.style[offset] = style;
+            set_bit(&mut target.loaded, offset);
+
+            if self.has_calculated() {
+                self.remove_calculated(row, col);
+            }
+        }
     }
 
     pub(super) fn dirty_cells(&self) -> usize {
@@ -1578,35 +1632,6 @@ impl PagedStorage {
         coordinates
     }
 
-    pub(super) fn entries(&self) -> Vec<StorageEntry> {
-        let mut entries = Vec::with_capacity(self.loaded_cells());
-
-        entries.extend(
-            self.visible_clean_cells()
-                .map(|(row, col, clean, offset)| StorageEntry {
-                    row,
-                    col,
-                    kind: clean.kind[offset],
-                    payload: clean.payload[offset],
-                    style: clean.style[offset],
-                    dirty_revision: None,
-                }),
-        );
-        entries.extend(self.live_slots().map(|slot| {
-            let (row, col) = self.slot_cell(slot);
-            StorageEntry {
-                row,
-                col,
-                kind: slot.kind,
-                payload: slot.payload,
-                style: slot.style,
-                dirty_revision: Some(slot.revision),
-            }
-        }));
-        entries.sort_unstable_by_key(|entry| (entry.col, entry.row));
-        entries
-    }
-
     pub(super) fn dirty_coordinates(&self) -> Vec<f64> {
         let mut keys: Vec<(usize, usize)> =
             self.live_slots().map(|slot| self.slot_cell(slot)).collect();
@@ -1944,7 +1969,7 @@ impl PagedStorage {
 
 #[cfg(test)]
 mod tests {
-    use super::{Directory, PagedStorage, DIRTY_BLOCK_ROWS, NONE};
+    use super::{Directory, DirtyRowWrite, PagedStorage, DIRTY_BLOCK_ROWS, NONE};
     use crate::transfer::{Reader, Writer};
     use crate::types::{KIND_EMPTY, KIND_NUMBER};
 
@@ -2304,6 +2329,100 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    /// What [`PagedStorage::write_column`] does for one cell, through the
+    /// single-cell writes.
+    fn write_one_cell(
+        storage: &mut PagedStorage,
+        col: usize,
+        (row, kind, payload, style): (usize, u8, u64, u32),
+        dirty: DirtyRowWrite,
+    ) {
+        if dirty == DirtyRowWrite::Update {
+            storage.remove_calculated(row, col);
+            assert!(
+                storage.write(row, col, kind, payload, style, None),
+                "an unrevisioned write is accepted"
+            );
+        } else if storage.hydrate(row, col, kind, payload, style) {
+            storage.remove_calculated(row, col);
+        }
+    }
+
+    fn assert_same_cells(actual: &PagedStorage, expected: &PagedStorage, rows: usize) {
+        for (row, col) in (0..2).flat_map(|col| (0..rows).map(move |row| (row, col))) {
+            assert_eq!(actual.read(row, col), expected.read(row, col));
+            assert_eq!(
+                actual.calculated_at(row, col),
+                expected.calculated_at(row, col)
+            );
+        }
+        assert_eq!(actual.dirty_coordinates(), expected.dirty_coordinates());
+    }
+
+    /// Column writes of 400 random page loads leave the cells, dirty edits and
+    /// resident pages that one cell write at a time leaves.
+    #[test]
+    fn column_writes_match_cell_writes() {
+        const SHEETS: u32 = 400;
+        const PAGES: usize = 16;
+
+        for sheet in 0..SHEETS {
+            let mut seed = 0x2545_f491 ^ (sheet + 1).wrapping_mul(0x9e37_79b9);
+            let mut random = |bound: usize| {
+                seed ^= seed << 13;
+                seed ^= seed >> 17;
+                seed ^= seed << 5;
+                seed as usize % bound
+            };
+            let budget = budget_for(1 + random(PAGES));
+            let mut cells = PagedStorage::new(ROWS, budget, 64).unwrap();
+            let mut columns = PagedStorage::new(ROWS, budget, 64).unwrap();
+            for _ in 0..random(12) {
+                let (row, col) = (random(PAGES * ROWS), random(2));
+                let payload = random(100) as u64;
+                let calculated_row = random(PAGES * ROWS);
+                for storage in [&mut cells, &mut columns] {
+                    assert!(storage.write(row, col, KIND_NUMBER, payload, 1, Some(7)));
+                    assert!(storage.set_calculated(calculated_row, col, KIND_NUMBER, 3));
+                }
+            }
+
+            for load in 0..8 {
+                let col = random(2);
+                let start = random(PAGES * ROWS);
+                let len = 1 + random(3 * ROWS);
+                let dirty = if random(2) == 0 {
+                    DirtyRowWrite::Keep
+                } else {
+                    DirtyRowWrite::Update
+                };
+                let rows: Vec<usize> = if random(4) == 0 {
+                    (start..start + len).rev().collect()
+                } else {
+                    (start..start + len).collect()
+                };
+                let value = |row: usize| (row, KIND_NUMBER, (load * 1000 + row) as u64, 2);
+
+                for &row in &rows {
+                    write_one_cell(&mut cells, col, value(row), dirty);
+                }
+                columns.write_column(col, rows.iter().map(|&row| value(row)), dirty);
+
+                for (col, page) in
+                    (0..2).flat_map(|col| (0..PAGES + 4).map(move |page| (col, page)))
+                {
+                    assert_eq!(
+                        is_resident(&columns, page, col),
+                        is_resident(&cells, page, col),
+                        "sheet {sheet}, load {load}, page {page}, col {col}"
+                    );
+                }
+            }
+
+            assert_same_cells(&columns, &cells, (PAGES + 4) * ROWS);
         }
     }
 }

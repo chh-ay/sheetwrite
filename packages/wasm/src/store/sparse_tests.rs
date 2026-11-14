@@ -190,3 +190,96 @@ fn sparse_page_load_skips_dirty_sources_and_keeps_mixed_entry_sources() {
     assert_eq!(store.get_cell(sheet, 1, 1).num(), 12.0);
     assert_eq!(store.get_cell(sheet, 2, 0).string().as_deref(), Some("雪"));
 }
+
+#[test]
+fn sparse_literal_page_load_writes_paged_columns_and_keeps_edited_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 1_000_000, 4, 1_000_000, 16);
+    store.set_formula(sheet, 0, 0, "=17", 5);
+    store.set_number(sheet, 5, 1, 7.0, 3);
+    store.begin_page_load();
+    store.set_formula(sheet, 2, 0, "=1+1", 0);
+    store.commit_sources();
+
+    // A 999,999 x 2 block of five entries: the edited cells keep their values,
+    // and the loaded formula at row 2 is replaced.
+    let load = |store: &mut CellStore, offsets: &[u32]| {
+        store.begin_page_load();
+        let status = store.set_sparse_block(
+            sheet,
+            0,
+            0,
+            999_999,
+            2,
+            offsets,
+            &vec![KIND_NUMBER; offsets.len()],
+            &(1..=offsets.len())
+                .map(|value| value as f64)
+                .collect::<Vec<_>>(),
+            &[],
+            &[0],
+            &vec![9; offsets.len()],
+            &[],
+            Vec::new(),
+            &[],
+            &[],
+        );
+        store.commit_sources();
+        status
+    };
+    assert_eq!(load(&mut store, &[0, 1, 4, 11, 1_999_997]), BLOCK_OK);
+    assert_eq!(store.formula_source(sheet, 0, 0).as_deref(), Some("=17"));
+    assert_eq!(store.get_cell(sheet, 0, 0).num(), 17.0);
+    assert_eq!(store.get_cell(sheet, 0, 1).num(), 2.0);
+    assert_eq!(store.formula_source(sheet, 2, 0), None);
+    assert_eq!(store.get_cell(sheet, 2, 0).num(), 3.0);
+    assert_eq!(store.get_cell(sheet, 5, 1).num(), 7.0);
+    assert_eq!(store.get_cell(sheet, 5, 1).style(), 3);
+    assert_eq!(store.get_cell(sheet, 999_998, 1).num(), 5.0);
+    assert_eq!(store.get_cell(sheet, 999_998, 1).style(), 9);
+
+    // Repeats are found without a bitset over the block's two million cells.
+    assert_eq!(load(&mut store, &[3, 1_999_997, 3]), BLOCK_INVALID);
+    assert_eq!(store.cell_state(sheet, 1, 1), 0);
+    assert_eq!(store.get_cell(sheet, 999_998, 1).num(), 5.0);
+}
+
+#[test]
+fn packed_page_load_writes_paged_columns_and_updates_edited_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_paged_sheet(2, 12, 4, 1_000_000, 16);
+    store.set_number(sheet, 1, 0, 7.0, 3);
+    store.set_formula(sheet, 2, 1, "=1+1", 0);
+    let rows = 10;
+    let cells = rows * 2;
+    let numbers: Vec<f64> = (0..cells).map(|offset| offset as f64).collect();
+    store.begin_page_load();
+    let status = store.set_column_block_packed(
+        sheet,
+        0,
+        0,
+        rows,
+        2,
+        &vec![KIND_NUMBER; cells],
+        &numbers,
+        &[],
+        &[0],
+        &vec![9; cells],
+        &[],
+        Vec::new(),
+        &[],
+        &[],
+    );
+    store.commit_sources();
+    assert_eq!(status, BLOCK_OK);
+
+    // A page load replaces an edit's value as one unrevisioned write does,
+    // and the cell stays an unacknowledged edit.
+    assert_eq!(store.get_cell(sheet, 1, 0).num(), 1.0);
+    assert_eq!(store.get_cell(sheet, 1, 0).style(), 9);
+    assert_eq!(store.cell_state(sheet, 1, 0), 3);
+    assert_eq!(store.formula_source(sheet, 2, 1), None);
+    assert_eq!(store.get_cell(sheet, 2, 1).num(), 12.0);
+    assert_eq!(store.get_cell(sheet, 9, 1).num(), 19.0);
+    assert_eq!(store.cell_state(sheet, 10, 0), 0);
+}

@@ -89,13 +89,14 @@ pub(crate) fn dense_resolved(kind: u8, payload: u64) -> (u8, u64) {
     }
 }
 
-struct StorageEntry {
-    row: usize,
-    col: usize,
-    kind: u8,
-    payload: u64,
-    style: u32,
-    dirty_revision: Option<u64>,
+/// How an unrevisioned column write treats a paged row that holds an
+/// unacknowledged edit.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DirtyRowWrite {
+    /// A page load leaves the edit alone.
+    Keep,
+    /// Any other write replaces the edit's value in place, as one cell write does.
+    Update,
 }
 
 pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
@@ -529,10 +530,12 @@ impl CellStorage {
             .is_none_or(|paged| paged.read(row, col).3)
     }
 
+    /// Whether a paged cell holds an unacknowledged edit. A check, not a read:
+    /// it records no page access.
     pub(crate) fn is_cell_dirty(&self, row: usize, col: usize) -> bool {
         self.paged
             .as_ref()
-            .is_some_and(|paged| paged.read(row, col).4)
+            .is_some_and(|paged| paged.is_dirty(row, col))
     }
 
     pub(crate) fn dirty_coordinates(&self) -> Vec<f64> {
@@ -619,44 +622,6 @@ impl CellStorage {
     #[inline]
     pub(crate) fn idx(&self, row: usize, col: usize) -> usize {
         col * self.row_count + row
-    }
-
-    fn remap_paged<F>(&mut self, new_rows: usize, new_cols: usize, mut remap: F)
-    where
-        F: FnMut(usize, usize) -> Option<(usize, usize)>,
-    {
-        let Some(current) = self.paged.take() else {
-            return;
-        };
-
-        let entries = current.entries();
-        let mut next = PagedStorage::new(
-            current.chunk_rows,
-            current.byte_budget,
-            current.max_dirty_cells,
-        )
-        .expect("a live paged sheet already has a valid chunk size");
-
-        for entry in entries {
-            let Some((new_row, new_col)) = remap(entry.row, entry.col) else {
-                continue;
-            };
-
-            if new_row < new_rows && new_col < new_cols {
-                let _ = next.write(
-                    new_row,
-                    new_col,
-                    entry.kind,
-                    entry.payload,
-                    entry.style,
-                    entry.dirty_revision,
-                );
-            }
-        }
-
-        self.row_count = new_rows;
-        self.n_cols = new_cols;
-        self.paged = Some(Box::new(next));
     }
 
     /// Whether the grid can take `rows` rows of `cols` columns. A dense grid
@@ -814,9 +779,10 @@ impl CellStorage {
             .ok_or_else(|| format!("{old_cols} columns plus {count} columns overflow"))?;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(self.row_count, new_cols, |row, col| {
-                Some((row, if col >= clamped_at { col + count } else { col }))
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.insert_cols(clamped_at, count);
+            }
+            self.n_cols = new_cols;
             return Ok(());
         }
 
@@ -840,20 +806,10 @@ impl CellStorage {
         let new_cols = self.n_cols - clamped_count;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(self.row_count, new_cols, |row, col| {
-                if col >= at && col < at + clamped_count {
-                    None
-                } else {
-                    Some((
-                        row,
-                        if col >= at + clamped_count {
-                            col - clamped_count
-                        } else {
-                            col
-                        },
-                    ))
-                }
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.delete_cols(at, clamped_count);
+            }
+            self.n_cols = new_cols;
             return Ok(());
         }
 
@@ -1108,24 +1064,38 @@ impl CellStorage {
         }
     }
 
-    /// Writes a `rows x cols` block of dense sources at `start`, dropping any
-    /// calculated value each cell held. Returns `false` without writing for
-    /// paged storage, whose writes need per-cell residency and dirty overlays.
+    /// Writes a `rows x cols` block of literal sources at `start`, dropping any
+    /// calculated value each cell held. A paged sheet takes it only without a
+    /// `revision` (a page load): each column goes through the paged column
+    /// writer, and a row with an unacknowledged edit has the edit's value
+    /// replaced, as one unrevisioned cell write does. Returns `false` without
+    /// writing for a revisioned paged write, which needs dirty slots per cell.
     ///
     /// Bulk ingest runs here once per column: one bounds check per column
     /// instead of per-cell sheet lookups, and the calculated-count update is
     /// skipped entirely while the sheet holds no calculated values.
-    pub(crate) fn write_dense_block(
+    pub(crate) fn write_literal_block(
         &mut self,
         start: (usize, usize),
         dimensions: (usize, usize),
+        revision: Option<u64>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
-        if self.paged.is_some() {
-            return false;
+        let (rows, cols) = dimensions;
+        if let Some(paged) = &mut self.paged {
+            if revision.is_some() {
+                return false;
+            }
+            for col_offset in 0..cols {
+                let cells = (0..rows).map(|row_offset| {
+                    let (kind, payload, style) = cell(row_offset, col_offset);
+                    (start.0 + row_offset, kind, payload, style)
+                });
+                paged.write_column(start.1 + col_offset, cells, DirtyRowWrite::Update);
+            }
+            return true;
         }
 
-        let (rows, cols) = dimensions;
         let has_calculated = self.dense_calculated_cells != 0;
         for col_offset in 0..cols {
             let base = self.idx(start.0, start.1 + col_offset);
@@ -1146,17 +1116,20 @@ impl CellStorage {
         true
     }
 
-    /// Writes validated rows of one dense column, leaving unlisted cells alone.
-    /// Like `write_dense_block`, replaces sources and discards calculated slots.
-    pub(crate) fn write_dense_column_cells(
+    /// Writes validated rows of one column, leaving unlisted cells alone.
+    /// Like `write_literal_block`, replaces sources and discards calculated slots.
+    /// Paged rows are unrevisioned writes; `dirty` decides rows with an edit.
+    pub(crate) fn write_column_cells(
         &mut self,
         col: usize,
         cells: impl Iterator<Item = (usize, u8, u64, u32)>,
+        dirty: DirtyRowWrite,
     ) {
-        debug_assert!(
-            self.paged.is_none() && col < self.n_cols,
-            "dense column writes need an in-bounds dense column"
-        );
+        debug_assert!(col < self.n_cols, "column writes need an in-bounds column");
+        if let Some(paged) = &mut self.paged {
+            paged.write_column(col, cells, dirty);
+            return;
+        }
         let column = col * self.row_count..(col + 1) * self.row_count;
         let kinds = &mut self.kind[column.clone()];
         let payloads = &mut self.payload[column.clone()];

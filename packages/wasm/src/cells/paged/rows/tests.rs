@@ -11,6 +11,8 @@ struct ModelCell {
 }
 
 type ModelColumns = [Vec<Option<ModelCell>>];
+/// The model's columns, which column edits insert and remove.
+type ModelGrid = Vec<Vec<Option<ModelCell>>>;
 
 fn next(seed: &mut u32, bound: usize) -> usize {
     *seed ^= *seed << 13;
@@ -49,6 +51,29 @@ fn check(storage: &PagedStorage, columns: &ModelColumns) {
             );
         }
     }
+    let rows = columns.first().map_or(0, Vec::len);
+    for row in 0..rows {
+        assert!(
+            !storage.read(row, columns.len()).3,
+            "row {row} past the last column"
+        );
+    }
+    let mut dirty: Vec<(usize, usize)> = columns
+        .iter()
+        .enumerate()
+        .flat_map(|(col, cells)| {
+            cells.iter().enumerate().filter_map(move |(row, cell)| {
+                cell.is_some_and(|value| value.revision.is_some())
+                    .then_some((row, col))
+            })
+        })
+        .collect();
+    dirty.sort_unstable();
+    let coordinates: Vec<f64> = dirty
+        .into_iter()
+        .flat_map(|(row, col)| [row as f64, col as f64])
+        .collect();
+    assert_eq!(storage.dirty_coordinates(), coordinates);
     assert_eq!(
         storage.loaded_cells(),
         columns
@@ -59,12 +84,46 @@ fn check(storage: &PagedStorage, columns: &ModelColumns) {
     );
 }
 
+/// A random column insert or delete on both the storage and the model.
+fn edit_columns(storage: &mut PagedStorage, columns: &mut ModelGrid, seed: &mut u32) {
+    let rows = columns[0].len();
+    let at = next(seed, columns.len() + 1);
+    let count = 1 + next(seed, 2);
+    if next(seed, 2) == 0 {
+        storage.insert_cols(at, count);
+        columns.splice(at..at, vec![vec![None; rows]; count]);
+    } else if at < columns.len() {
+        let removed = count.min(columns.len() - at).min(columns.len() - 1);
+        storage.delete_cols(at, removed);
+        columns.drain(at..at + removed);
+    }
+}
+
+/// A random row insert or delete of up to two chunks plus three rows.
+fn edit_rows(storage: &mut PagedStorage, columns: &mut ModelColumns, seed: &mut u32, chunk: usize) {
+    let rows = columns[0].len();
+    let at = next(seed, rows);
+    let count = 1 + next(seed, chunk * 2 + 3);
+    if next(seed, 2) == 0 {
+        storage.move_rows(at, at + count, rows);
+        for cells in columns {
+            cells.splice(at..at, vec![None; count]);
+        }
+    } else {
+        let removed = count.min(rows - at).min(rows - 1);
+        storage.move_rows(at + removed, at, rows);
+        for cells in columns {
+            cells.drain(at..at + removed);
+        }
+    }
+}
+
 #[test]
-fn insert_delete_keep_loaded_cells_styles_and_revision_ownership() {
+fn row_and_column_edits_keep_loaded_cells_styles_and_revision_ownership() {
     let mut seed = 0x9E37_79B9;
     for chunk in [1, 4, 64, 128, 4096] {
-        for _ in 0..32 {
-            let mut rows = 129 + next(&mut seed, 200);
+        for _ in 0..80 {
+            let rows = 129 + next(&mut seed, 200);
             let mut columns = vec![vec![None; rows]; 3];
             let mut storage = PagedStorage::new(chunk, 0, rows * columns.len()).unwrap();
             for (col, cells) in columns.iter_mut().enumerate() {
@@ -90,21 +149,10 @@ fn insert_delete_keep_loaded_cells_styles_and_revision_ownership() {
                 }
             }
             for _ in 0..8 {
-                let at = next(&mut seed, rows);
-                let count = 1 + next(&mut seed, chunk * 2 + 3);
-                if next(&mut seed, 2) == 0 {
-                    storage.move_rows(at, at + count, rows);
-                    for cells in &mut columns {
-                        cells.splice(at..at, vec![None; count]);
-                    }
-                    rows += count;
+                if next(&mut seed, 3) == 0 {
+                    edit_columns(&mut storage, &mut columns, &mut seed);
                 } else {
-                    let removed = count.min(rows - at).min(rows - 1);
-                    storage.move_rows(at + removed, at, rows);
-                    for cells in &mut columns {
-                        cells.drain(at..at + removed);
-                    }
-                    rows -= removed;
+                    edit_rows(&mut storage, &mut columns, &mut seed, chunk);
                 }
                 check(&storage, &columns);
             }
