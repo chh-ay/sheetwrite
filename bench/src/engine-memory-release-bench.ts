@@ -450,9 +450,13 @@ async function memory() {
     }
 
     if (scenario !== "paged-dirty") {
+      // A local sheet that shrank from 20,000,000 cells keeps one page record
+      // and directory entry per page it once held (under 1 MiB), not their rows.
+      const slack = scenario === "local-shrink" ? 1024 * 1024 : 0;
       assert.ok(
-        after.wasmBytes <= freshWasmBytesFloor * 1.1,
-        `${scenario}: import exceeded the fresh floor by over 10%`,
+        after.wasmBytes <= freshWasmBytesFloor * 1.1 + slack,
+        `${scenario}: import exceeded the fresh floor by over 10%: ${after.wasmBytes} B ` +
+          `after, ${freshWasmBytesFloor} B fresh`,
       );
     }
 
