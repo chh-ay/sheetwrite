@@ -807,12 +807,20 @@ impl CellStore {
     where
         I: IntoIterator<Item = usize> + Clone,
     {
+        if let (Some(changes), Some(work)) = (self.recalculation.as_deref_mut(), affected) {
+            for key in work.keys(&self.formula_slots) {
+                changes.cell(key.sheet, key.row, key.col);
+            }
+        }
         if self.pivots.is_some() {
             self.capture_pivot_changes(sheets.clone(), affected);
         }
 
         for sheet in sheets {
             if let Some(data) = self.sheets.get_mut(sheet) {
+                if let Some(changes) = self.recalculation.as_deref_mut() {
+                    changes.dirty_seeds(sheet, data);
+                }
                 data.finish_recompute();
             }
         }
@@ -1157,6 +1165,7 @@ impl CellStore {
                         output_cells: cleared.len(),
                         cells: cleared.clone(),
                     });
+                    self.record_recalculated_cells(output_sheet, &cleared);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1174,6 +1183,7 @@ impl CellStore {
                 }
 
                 if !changed.is_empty() {
+                    self.record_recalculated_cells(output_sheet, &changed);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
