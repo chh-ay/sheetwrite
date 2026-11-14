@@ -174,7 +174,7 @@ struct Reference {
 
 impl Reference {
     /// A table reference or `#REF!` from lexeme `first` to lexeme `last`.
-    fn whole(lexemes: &[Lexeme<'_>], first: usize, last: usize) -> Self {
+    const fn whole(lexemes: &[Lexeme<'_>], first: usize, last: usize) -> Self {
         Self {
             ast: None,
             qualified: false,
@@ -185,7 +185,7 @@ impl Reference {
     }
 
     /// Whether the text ends with the spill suffix `#`.
-    fn spills(&self) -> bool {
+    const fn spills(&self) -> bool {
         matches!(self.ast, Some(Ast::Func(Func::AnchorArray, _)))
     }
 }

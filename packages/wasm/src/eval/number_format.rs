@@ -62,7 +62,7 @@ impl Decimal {
         }
     }
 
-    fn is_zero(&self) -> bool {
+    const fn is_zero(&self) -> bool {
         self.digits.is_empty()
     }
 
@@ -274,7 +274,7 @@ fn sections(code: &str) -> Vec<&str> {
 
 /// Letters that make a code a date or time format, which this formatter does
 /// not read.
-fn is_date_letter(ch: char) -> bool {
+const fn is_date_letter(ch: char) -> bool {
     matches!(ch.to_ascii_lowercase(), 'd' | 'm' | 'y' | 'h' | 's')
 }
 
@@ -456,7 +456,7 @@ fn render(section: &Section<'_>, value: f64) -> Result<String, FormulaError> {
     Ok(text)
 }
 
-fn literal_text<'a>(token: &Token<'a>) -> &'a str {
+const fn literal_text<'a>(token: &Token<'a>) -> &'a str {
     match token {
         Token::Literal(text) => text,
         Token::Percent => "%",

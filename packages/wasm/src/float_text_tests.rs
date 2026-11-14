@@ -18,7 +18,7 @@ const FIXED_PLACES_CHECKED: u32 = MAX_FIXED_PLACES;
 struct Numbers(u64);
 
 impl Numbers {
-    fn next(&mut self) -> u64 {
+    const fn next(&mut self) -> u64 {
         self.0 ^= self.0 << 13;
         self.0 ^= self.0 >> 7;
         self.0 ^= self.0 << 17;

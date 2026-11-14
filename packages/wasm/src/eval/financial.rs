@@ -277,7 +277,7 @@ fn cashflow_number(entry: &FuncValue) -> Result<Option<f64>, FormulaError> {
     }
 }
 
-fn finite(value: f64) -> Result<f64, FormulaError> {
+const fn finite(value: f64) -> Result<f64, FormulaError> {
     if value.is_finite() {
         Ok(value)
     } else {
@@ -292,7 +292,7 @@ struct RootSample {
 }
 
 impl RootSample {
-    fn new(value: f64, scale: f64) -> Result<Self, FormulaError> {
+    const fn new(value: f64, scale: f64) -> Result<Self, FormulaError> {
         if value.is_nan() || scale.is_nan() {
             Err(FormulaError::Num)
         } else {
@@ -523,7 +523,7 @@ fn secant_candidate(bracket: RootBracket) -> Option<f64> {
     candidate.is_finite().then_some(candidate)
 }
 
-fn opposite_signs(left: RootSample, right: RootSample) -> bool {
+const fn opposite_signs(left: RootSample, right: RootSample) -> bool {
     left.value.is_sign_positive() != right.value.is_sign_positive()
 }
 

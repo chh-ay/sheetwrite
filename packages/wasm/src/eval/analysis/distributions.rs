@@ -317,7 +317,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> NumberResult {
     }
 }
 
-pub(super) fn ensure(is_valid: bool) -> Result<(), FormulaError> {
+pub(super) const fn ensure(is_valid: bool) -> Result<(), FormulaError> {
     if is_valid {
         Ok(())
     } else {

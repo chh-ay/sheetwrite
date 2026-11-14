@@ -317,7 +317,7 @@ fn modified_return(arguments: &FuncAccumulator) -> NumberResult {
     Ok((-positive_future / negative_present).powf(1.0 / last_period) - 1.0)
 }
 
-fn list_number(entry: &FuncValue) -> NumberResult {
+const fn list_number(entry: &FuncValue) -> NumberResult {
     match &entry.value {
         Value::Number(number) if number.is_finite() => Ok(*number),
         Value::Blank => Ok(0.0),

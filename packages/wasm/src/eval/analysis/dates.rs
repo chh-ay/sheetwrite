@@ -85,7 +85,7 @@ fn calculate(name: &str, values: &FuncAccumulator) -> DateResult {
 }
 
 // Masks start on Monday. The serial calendar retains Excel's false leap day.
-fn weekday(serial: i64) -> usize {
+const fn weekday(serial: i64) -> usize {
     (serial + 5).rem_euclid(DAYS_PER_WEEK) as usize
 }
 
