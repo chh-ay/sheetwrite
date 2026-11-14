@@ -338,7 +338,7 @@ impl Reader<'_> {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<Value, FormulaError> {
-        if ast_produces_array(arg, pass.shapes()) {
+        if ast_produces_array(arg, pass.shapes(self.store.name_scope(self.sheet))) {
             if let Some(result) = self
                 .store
                 .eval_dynamic_array(arg, self.sheet, pass, depth + 1)
@@ -376,7 +376,7 @@ impl Reader<'_> {
     ) -> Result<StatisticArgs, FormulaError> {
         for arg in args {
             self.values.start_arg();
-            let first = if let Some(area) = argument_range(arg, self.sheet) {
+            let first = if let Some(area) = argument_range(arg, self.store.name_scope(self.sheet)) {
                 self.range(area, pass, depth + 1)?
             } else if matches!(arg, Ast::Func(Func::Union, _) | Ast::SheetSpan(_)) {
                 self.areas(arg, pass, depth + 1)?
@@ -418,8 +418,9 @@ impl CellStore {
         if depth > FORMULA_RECURSION_LIMIT {
             return None;
         }
-        let left = RangeView::clipped(self, argument_range(left_arg, call.sheet)?, depth).ok()?;
-        let right = RangeView::clipped(self, argument_range(right_arg, call.sheet)?, depth).ok()?;
+        let names = self.name_scope(call.sheet);
+        let left = RangeView::clipped(self, argument_range(left_arg, names)?, depth).ok()?;
+        let right = RangeView::clipped(self, argument_range(right_arg, names)?, depth).ok()?;
         let (left_rows, left_cols) = left.shape();
         let cells = left_rows.checked_mul(left_cols)?;
         if cells.checked_mul(2)? > RANGE_CELL_LIMIT as usize {

@@ -6,7 +6,7 @@ use crate::store::CellStore;
 use crate::types::{CellRange, FORMULA_RECURSION_LIMIT, KIND_EMPTY, KIND_NUMBER};
 
 use super::super::functions::{number_arg, require_arity, FuncAccumulator};
-use super::super::matrix::range_from_ast;
+use super::super::matrix::{is_range_argument, range_from_ast};
 use super::super::range_reader::RangeReader;
 use super::super::value::aggregate_number;
 use super::super::EvalPass;
@@ -58,13 +58,11 @@ pub(in crate::eval) fn streamed_sum_squares(
         return None;
     };
     // Scalar cells and let slots keep the accumulator's coercion rules.
-    if !matches!(
-        argument,
-        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..)
-    ) {
+    let names = store.name_scope(sheet);
+    if !is_range_argument(argument, names) {
         return None;
     }
-    let range = range_from_ast(argument, sheet)?;
+    let range = range_from_ast(argument, names)?;
     let result = (|| {
         if depth > FORMULA_RECURSION_LIMIT {
             return Err(FormulaError::Num);
@@ -169,16 +167,15 @@ pub(in crate::eval) fn streamed_paired_squares(
     let [left, right] = args else {
         return None;
     };
-    if !args.iter().all(|argument| {
-        matches!(
-            argument,
-            Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..)
-        )
-    }) {
+    let names = store.name_scope(sheet);
+    if !args
+        .iter()
+        .all(|argument| is_range_argument(argument, names))
+    {
         return None;
     }
-    let left_range = range_from_ast(left, sheet)?;
-    let right_range = range_from_ast(right, sheet)?;
+    let left_range = range_from_ast(left, names)?;
+    let right_range = range_from_ast(right, names)?;
     if depth > FORMULA_RECURSION_LIMIT {
         return Some(Value::Error(FormulaError::Num));
     }

@@ -5,6 +5,7 @@
 use super::matrix::EvalMatrix;
 use super::{ast_produces_array, range_from_ast, CellStore, EvalPass};
 use crate::calc::{parse, Ast};
+use crate::store::names::{NameScope, NameView};
 use crate::types::{FormulaError, Value};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -149,6 +150,11 @@ impl CellStore {
         }
 
         for (index, sheet) in self.sheets.iter_mut().enumerate() {
+            let names = NameScope {
+                table: &self.names,
+                tables: &self.tables,
+                sheet: index as u32,
+            };
             let keys: Vec<_> = sheet
                 .formulas
                 .iter(&self.formula_slots)
@@ -156,7 +162,7 @@ impl CellStore {
                     entry
                         .ast
                         .as_ref()
-                        .is_some_and(|ast| calls_volatile_custom(ast, functions))
+                        .is_some_and(|ast| calls_volatile_custom(ast, functions, names))
                         .then_some(key)
                 })
                 .collect();
@@ -193,8 +199,9 @@ impl CellStore {
 
         let mut evaluated = Vec::with_capacity(arguments.len());
         for argument in arguments {
-            let block = if range_from_ast(argument, sheet).is_some()
-                || ast_produces_array(argument, pass.shapes())
+            let names = self.name_scope(sheet);
+            let block = if range_from_ast(argument, names).is_some()
+                || ast_produces_array(argument, pass.shapes(names))
             {
                 match self.eval_matrix_arg(argument, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,
@@ -217,8 +224,8 @@ impl CellStore {
         (function.implementation)(&evaluated)
     }
 
-    /// A call of a defined name's LAMBDA that was left unresolved in the
-    /// formula: one inside that LAMBDA's own definition, which calls itself.
+    /// A call of a defined name's LAMBDA that was left unbound in the
+    /// formula, because the name held no formula when the formula was bound.
     #[cfg(feature = "analysis")]
     fn eval_named_lambda_call(
         &self,
@@ -228,11 +235,11 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Value {
-        let Some(lambda) = self.named_lambda(name, sheet) else {
+        let Some(id) = self.names.formula_id(name, sheet as u32) else {
             return Value::Error(FormulaError::Name);
         };
         let mut call = Vec::with_capacity(arguments.len() + 1);
-        call.push(Ast::NamedFormula(lambda));
+        call.push(Ast::DefinedName(id));
         call.extend_from_slice(arguments);
         let invocation = super::analysis::lambda::Invocation::Call;
         super::analysis::lambda::evaluate(self, invocation, &call, sheet, pass, depth)
@@ -273,11 +280,11 @@ fn is_reference_like(name: &str) -> bool {
     a1 || r1c1
 }
 
-fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
+fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions, names: NameScope<'_>) -> bool {
     let any = |arguments: &[Ast]| {
         arguments
             .iter()
-            .any(|argument| calls_volatile_custom(argument, functions))
+            .any(|argument| calls_volatile_custom(argument, functions, names))
     };
     match ast {
         Ast::UnknownFunc(call) => {
@@ -293,19 +300,23 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
         }
         Ast::Func(_, arguments) => any(arguments),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            calls_volatile_custom(left, functions) || calls_volatile_custom(right, functions)
+            calls_volatile_custom(left, functions, names)
+                || calls_volatile_custom(right, functions, names)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            calls_volatile_custom(inner, functions)
+            calls_volatile_custom(inner, functions, names)
         }
-        Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions),
-        Ast::NamedFormula(named) => calls_volatile_custom(&named.expression, functions),
+        Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions, names),
+        Ast::DefinedName(id) => names.read(*id, |view| match view {
+            NameView::Formula(expression) => calls_volatile_custom(expression, functions, names),
+            NameView::Placed(expression) => calls_volatile_custom(&expression, functions, names),
+            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
+        }),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -321,7 +332,7 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
         #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => calls_volatile_custom(&definition.body, functions),
+        Ast::Lambda(definition) => calls_volatile_custom(&definition.body, functions, names),
     }
 }
 

@@ -584,8 +584,7 @@ impl CellStore {
             | Ast::Lambda(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(_)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -737,7 +736,10 @@ impl CellStore {
         };
         let mut results = FormulaResults::default();
         bind_slots(&mut results, slots);
-        let value = if ast_produces_array(expression, Shapes::of(results.call_frame())) {
+        let value = if ast_produces_array(
+            expression,
+            Shapes::of(results.call_frame(), self.name_scope(0)),
+        ) {
             Value::Error(FormulaError::Value)
         } else {
             self.eval_conditional_ast(expression, 0, 0, 0, &mut results)
@@ -855,8 +857,7 @@ impl CellStore {
             | Ast::Lambda(_)
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(_)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -918,8 +919,7 @@ impl CellStore {
                 | Ast::Lambda(_)
                 | Ast::RegexPattern(_)
                 | Ast::Name(_)
-                | Ast::NamedRange(_)
-                | Ast::NamedFormula(_)
+                | Ast::DefinedName(_)
                 | Ast::UnresolvedStructured(_)
                 | Ast::Structured(_)
                 | Ast::Cell(..)

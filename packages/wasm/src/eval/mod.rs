@@ -56,12 +56,13 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::cmp::Ordering;
 
-use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, NameId, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
+use crate::store::names::{NameScope, NameView};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -140,6 +141,14 @@ pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGIN.with(Cell::get)
 }
 
+/// Run `bind` as the formula at `origin`, for work on a formula outside
+/// evaluation that reads its defined names: a name whose formula is
+/// relative to the cell that uses it is placed for `origin`.
+pub(crate) fn with_formula_origin<R>(origin: (u32, u32), bind: impl FnOnce() -> R) -> R {
+    let _origin = FormulaOriginGuard::push(origin);
+    bind()
+}
+
 /// State shared by every evaluation in one recompute pass: the formulas the
 /// pass recomputes, the results computed so far, and the formulas on the
 /// current evaluation path, which detect cycles.
@@ -152,15 +161,15 @@ pub(crate) struct EvalPass<'a> {
 
 impl EvalPass<'_> {
     /// What shape checks know about the LAMBDA parameters of the calls in
-    /// progress.
+    /// progress, for a formula whose defined names `names` reads.
     #[cfg(feature = "analysis")]
-    pub(crate) fn shapes(&self) -> Shapes<'_> {
-        Shapes::of(self.results.call_frame())
+    pub(crate) fn shapes<'a>(&'a self, names: NameScope<'a>) -> Shapes<'a> {
+        Shapes::of(self.results.call_frame(), names)
     }
 
     #[cfg(not(feature = "analysis"))]
-    pub(crate) const fn shapes(&self) -> Shapes<'static> {
-        Shapes::NONE
+    pub(crate) const fn shapes<'a>(&self, names: NameScope<'a>) -> Shapes<'a> {
+        Shapes::top(names)
     }
 }
 
@@ -353,8 +362,7 @@ fn expand_let_node<'a>(
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -491,8 +499,7 @@ fn shift_parameters(ast: &mut Ast, by: u16) {
             | Ast::Parameter { .. }
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
+            | Ast::DefinedName(_)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -1731,7 +1738,7 @@ impl CellStore {
                     let _origin = FormulaOriginGuard::push(local);
                     if entry.has_spill_refs() {
                         let resolved = self.resolve_spill_refs(ast, sheet, pass, depth + 1);
-                        if range_from_ast(&resolved, sheet).is_some() {
+                        if range_from_ast(&resolved, self.name_scope(sheet)).is_some() {
                             self.eval_matrix_arg(&resolved, sheet, pass, depth + 1)
                                 .map(EvalMatrix::into_first)
                                 .unwrap_or_else(Value::Error)
@@ -1841,7 +1848,7 @@ impl CellStore {
                 }
             }
             Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
-            Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
+            Ast::DefinedName(id) => self.eval_defined_name_family(*id, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
             Ast::UnknownFunc(call) => {
                 let crate::calc::UnknownCall {
@@ -1858,17 +1865,6 @@ impl CellStore {
             Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(_) => {
                 Value::Error(FormulaError::Name)
             }
-            Ast::NamedRange(named)
-                if named.row_start == named.row_end && named.col_start == named.col_end =>
-            {
-                self.eval_at(
-                    named.sheet as usize,
-                    named.row_start as usize,
-                    named.col_start as usize,
-                    pass,
-                    depth + 1,
-                )
-            }
             Ast::Structured(reference) if reference.row_start == reference.row_end => self.eval_at(
                 reference.sheet as usize,
                 reference.row_start as usize,
@@ -1877,7 +1873,6 @@ impl CellStore {
                 depth + 1,
             ),
             Ast::Structured(_)
-            | Ast::NamedRange(_)
             | Ast::Range(..)
             | Ast::AbsRange(..)
             | Ast::SheetSpan(_) => Value::Error(FormulaError::Value),
@@ -1890,8 +1885,7 @@ impl CellStore {
                     | Ast::Bool(_)
                     | Ast::Missing
                     | Ast::Name(_)
-                    | Ast::NamedRange(_)
-                    | Ast::NamedFormula(_)
+                    | Ast::DefinedName(_)
                     | Ast::UnresolvedStructured(_)
                     | Ast::Structured(_)
                     | Ast::Cell(..)
@@ -2013,19 +2007,39 @@ impl CellStore {
         value
     }
 
-    /// The value of a defined name's formula. Out of line, so the name adds
-    /// one call to `eval_ast`, which must stay under the size above which
-    /// JavaScriptCore does not optimize a function; the `_family` suffix
-    /// keeps wasm-opt from inlining it back.
+    /// The value of a defined name for a formula on `sheet`: its cell, its
+    /// formula's value, or `#NAME?` while undefined (`#REF!` for a linked
+    /// workbook's name the link does not hold). A range of more than one
+    /// cell is `#VALUE!` as a value, as a range written there is. Out of
+    /// line, so the name adds one call to `eval_ast`, which must stay under
+    /// the size above which JavaScriptCore does not optimize a function; the
+    /// `_family` suffix keeps wasm-opt from inlining it back.
     #[inline(never)]
-    fn eval_named_formula_family(
+    fn eval_defined_name_family(
         &self,
-        named: &crate::calc::NamedFormulaRef,
+        id: NameId,
         sheet: usize,
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        self.eval_ast(&named.expression, sheet, pass, depth + 1)
+        self.name_scope(sheet).read(id, |view| match view {
+            NameView::Range(range)
+                if range.row_start == range.row_end && range.col_start == range.col_end =>
+            {
+                self.eval_at(
+                    range.sheet as usize,
+                    range.row_start as usize,
+                    range.col_start as usize,
+                    pass,
+                    depth + 1,
+                )
+            }
+            NameView::Range(_) => Value::Error(FormulaError::Value),
+            NameView::Formula(expression) => self.eval_ast(expression, sheet, pass, depth + 1),
+            NameView::Placed(expression) => self.eval_ast(&expression, sheet, pass, depth + 1),
+            NameView::Undefined => Value::Error(FormulaError::Name),
+            NameView::Linked => Value::Error(FormulaError::Ref),
+        })
     }
 
     /// Routes a function call. Only the hottest calls run here: `LET`, `IF`,
@@ -2061,7 +2075,7 @@ impl CellStore {
         if let Func::Analysis(id) = func {
             let family = analysis::family(id);
             if let Some(hooks) = &family.array {
-                if (hooks.produces_array)(id, args, pass.shapes()) {
+                if (hooks.produces_array)(id, args, pass.shapes(self.name_scope(sheet))) {
                     return match (hooks.evaluate)(self, id, args, sheet, pass, depth).and_then(
                         |matrix| {
                             matrix.validate_bytes()?;
@@ -2287,7 +2301,7 @@ impl CellStore {
                 }
                 continue;
             }
-            let shape = if let Some(area) = argument_range(arg, sheet) {
+            let shape = if let Some(area) = argument_range(arg, self.name_scope(sheet)) {
                 match self.eval_range_values(area, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
@@ -2297,7 +2311,7 @@ impl CellStore {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
-            } else if ast_produces_array(arg, pass.shapes()) {
+            } else if ast_produces_array(arg, pass.shapes(self.name_scope(sheet))) {
                 match self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
                     Some(Ok(matrix)) => {
                         if let Err(error) = matrix.validate_copies(2) {
@@ -2399,7 +2413,7 @@ impl CellStore {
                 Err(error) => return Value::Error(error),
             };
             let selected = &args[index];
-            if range_from_ast(selected, sheet).is_some() {
+            if range_from_ast(selected, self.name_scope(sheet)).is_some() {
                 return match self.eval_matrix_arg(selected, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix.into_first(),
                     Err(error) => Value::Error(error),
@@ -2416,7 +2430,7 @@ impl CellStore {
                 return Value::Error(FormulaError::Value);
             }
             let coordinate = if let Some(reference) = args.first() {
-                let range = match (range_from_ast(reference, sheet), reference) {
+                let range = match (range_from_ast(reference, self.name_scope(sheet)), reference) {
                     (Some(range), _) => range,
                     (None, Ast::Func(func @ (Func::Offset | Func::Indirect), args)) => {
                         match self.runtime_range(*func, args, sheet, pass, depth + 1) {
@@ -2451,7 +2465,7 @@ impl CellStore {
             }
             // A written reference has its shape without its cells, which
             // keeps `ROWS(A:A)` at 1048576 instead of the used rows.
-            if let Some(range) = range_from_ast(&args[0], sheet) {
+            if let Some(range) = range_from_ast(&args[0], self.name_scope(sheet)) {
                 if self.sheets.get(range.sheet as usize).is_none() {
                     return Value::Error(FormulaError::Ref);
                 }
@@ -2676,7 +2690,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let Some(range) = range_from_ast(ast, formula_sheet) else {
+        let Some(range) = range_from_ast(ast, self.name_scope(formula_sheet)) else {
             let Some(result) = self.eval_dynamic_array(ast, formula_sheet, pass, depth + 1) else {
                 return Err(FormulaError::Value);
             };
@@ -2726,7 +2740,7 @@ impl CellStore {
         let mut fold = ReductionFold::new(func)?;
         let mut ranges = Vec::with_capacity(args.len());
         for arg in args {
-            ranges.push(range_from_ast(arg, sheet)?);
+            ranges.push(range_from_ast(arg, self.name_scope(sheet))?);
         }
         for range in ranges {
             if let Err(error) = self.fold_range(range, &mut fold, false, pass, depth) {
@@ -2772,7 +2786,7 @@ impl CellStore {
         if args.len() != 2 {
             return None;
         }
-        let range = range_from_ast(&args[0], sheet)?;
+        let range = range_from_ast(&args[0], self.name_scope(sheet))?;
         let reader_depth = depth + 1;
         let reader = match RangeReader::new(self, range, reader_depth) {
             Ok(reader) => reader,
@@ -2853,7 +2867,7 @@ impl CellStore {
         let mut readers = Vec::with_capacity(args.len() / 2);
         let mut criteria = Vec::with_capacity(args.len() / 2);
         for pair in args.as_chunks::<2>().0 {
-            let range = range_from_ast(&pair[0], sheet)?;
+            let range = range_from_ast(&pair[0], self.name_scope(sheet))?;
             let reader = match RangeReader::new(self, range, depth + 1) {
                 Ok(reader) => reader,
                 Err(error) => return Some(Value::Error(error)),
@@ -2894,7 +2908,7 @@ impl CellStore {
         if !(2..=3).contains(&args.len()) {
             return None;
         }
-        let criteria_range = range_from_ast(&args[0], sheet)?;
+        let criteria_range = range_from_ast(&args[0], self.name_scope(sheet))?;
         let criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
@@ -2905,7 +2919,7 @@ impl CellStore {
         };
         let value_range = match args.get(2) {
             Some(ast) => sum_range_extent(
-                range_from_ast(ast, sheet)?,
+                range_from_ast(ast, self.name_scope(sheet))?,
                 criteria_range.row_end - criteria_range.row_start + 1,
                 criteria_range.col_end - criteria_range.col_start + 1,
             ),
@@ -2942,7 +2956,7 @@ impl CellStore {
         if args.len() < 3 || args.len().is_multiple_of(2) {
             return None;
         }
-        let value_range = range_from_ast(&args[0], sheet)?;
+        let value_range = range_from_ast(&args[0], self.name_scope(sheet))?;
         let mut value_reader = match RangeReader::new(self, value_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
@@ -2950,7 +2964,7 @@ impl CellStore {
         let mut readers = Vec::with_capacity((args.len() - 1) / 2);
         let mut criteria = Vec::with_capacity((args.len() - 1) / 2);
         for pair in args[1..].as_chunks::<2>().0 {
-            let range = range_from_ast(&pair[0], sheet)?;
+            let range = range_from_ast(&pair[0], self.name_scope(sheet))?;
             let reader = match RangeReader::new(self, range, depth + 1) {
                 Ok(reader) => reader,
                 Err(error) => return Some(Value::Error(error)),
@@ -3070,9 +3084,9 @@ impl CellStore {
                     Err(error) => return Value::Error(error),
                 };
                 let value_range = if let Some(ast) = args.get(2) {
-                    let matrix = match range_from_ast(ast, sheet) {
+                    let matrix = match range_from_ast(ast, self.name_scope(sheet)) {
                         Some(range) => {
-                            let (rows, cols) = match range_from_ast(&args[0], sheet) {
+                            let (rows, cols) = match range_from_ast(&args[0], self.name_scope(sheet)) {
                                 Some(criteria) => (
                                     criteria.row_end - criteria.row_start + 1,
                                     criteria.col_end - criteria.col_start + 1,

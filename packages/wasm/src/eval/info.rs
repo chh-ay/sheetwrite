@@ -76,7 +76,7 @@ impl CellStore {
             Ast::InvalidRef | Ast::SheetCell(..) | Ast::SheetRange(..) => {
                 return Err(FormulaError::Ref)
             }
-            expression => match range_from_ast(expression, sheet) {
+            expression => match range_from_ast(expression, self.name_scope(sheet)) {
                 Some(range) => range,
                 None => {
                     return match self.eval_ast(reference, sheet, pass, depth + 1) {
@@ -260,7 +260,7 @@ impl CellStore {
             [] => sheet,
             [Ast::InvalidRef] => return Err(FormulaError::Ref),
             [Ast::SheetSpan(span)] => *span.sheets.first().ok_or(FormulaError::Ref)? as usize,
-            [value] => match range_from_ast(value, sheet) {
+            [value] => match range_from_ast(value, self.name_scope(sheet)) {
                 Some(range) => range.sheet as usize,
                 None => match self.eval_ast(value, sheet, pass, depth + 1) {
                     Value::Error(error) => return Err(error),

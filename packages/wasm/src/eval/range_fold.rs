@@ -8,6 +8,7 @@ use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
 
 use crate::calc::{Ast, Func};
 use crate::cells::payload_num;
+use crate::store::names::NameView;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
@@ -33,14 +34,12 @@ impl CellStore {
         depth: usize,
     ) -> Option<EvalResult> {
         if let [arg] = args {
-            let range = super::matrix::range_from_ast(arg, sheet)?;
+            let names = self.name_scope(sheet);
+            let range = super::matrix::range_from_ast(arg, names)?;
 
             // A direct range argument stops at the recursion limit before it
             // reads a cell; other one-range forms check depth per cell.
-            let direct = matches!(
-                arg,
-                Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(_) | Ast::Structured(_)
-            );
+            let direct = super::matrix::is_range_argument(arg, names);
             if direct && depth > FORMULA_RECURSION_LIMIT {
                 return Some(Value::Error(FormulaError::Num));
             }
@@ -60,14 +59,15 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Option<EvalResult> {
+        let names = self.name_scope(sheet);
         if args.is_empty()
             || args.len() > MAX_FUNCTION_ARGS
             || args
                 .iter()
-                .all(|arg| super::matrix::range_from_ast(arg, sheet).is_some())
+                .all(|arg| super::matrix::range_from_ast(arg, names).is_some())
             || !args
                 .iter()
-                .all(|arg| sum_scalar_or_range(arg, sheet, pass.shapes()).is_some())
+                .all(|arg| sum_scalar_or_range(arg, pass.shapes(names)).is_some())
         {
             return None;
         }
@@ -75,7 +75,7 @@ impl CellStore {
         let mut fold = ReductionFold::new(Func::Sum)?;
         let mut deferred = None;
         for arg in args {
-            let result = match sum_scalar_or_range(arg, sheet, pass.shapes())? {
+            let result = match sum_scalar_or_range(arg, pass.shapes(names))? {
                 SumArg::Range(range) => self
                     .fold_range(range, &mut fold, true, pass, depth)
                     .map(|_| ()),
@@ -255,11 +255,22 @@ enum SumArg {
 /// The accumulator's reading of `arg`, or `None` for arguments the mixed
 /// path leaves to it: arrays, unions, sheet spans, intersections and
 /// missing arguments.
-fn sum_scalar_or_range(arg: &Ast, sheet: usize, shapes: Shapes<'_>) -> Option<SumArg> {
+fn sum_scalar_or_range(arg: &Ast, shapes: Shapes<'_>) -> Option<SumArg> {
+    let names = shapes.names();
     match arg {
-        Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(_) | Ast::Structured(_) => {
-            super::matrix::range_from_ast(arg, sheet).map(SumArg::Range)
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(_) => {
+            super::matrix::range_from_ast(arg, names).map(SumArg::Range)
         }
+        Ast::DefinedName(id) => match names.read(*id, |view| match view {
+            NameView::Range(range) => Some(range),
+            NameView::Formula(_) | NameView::Placed(_) | NameView::Undefined | NameView::Linked => {
+                None
+            }
+        }) {
+            Some(range) => Some(SumArg::Range(range)),
+            None if ast_produces_array(arg, shapes) => None,
+            None => Some(SumArg::Scalar { reference: false }),
+        },
         Ast::Cell(..) | Ast::AbsCell(..) => Some(SumArg::Scalar {
             reference: treats_cell_as_reference(Func::Sum),
         }),
@@ -269,7 +280,6 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize, shapes: Shapes<'_>) -> Option<Su
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Name(_)
-        | Ast::NamedFormula(_)
         | Ast::UnresolvedStructured(_)
         | Ast::SheetCell(..)
         | Ast::SheetRange(..)

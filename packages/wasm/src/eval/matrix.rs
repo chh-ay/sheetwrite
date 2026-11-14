@@ -1,6 +1,7 @@
 //! Matrix values and AST-to-range conversion helpers.
 
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::store::names::{NameScope, NameView};
 use crate::types::{CellRange, FormulaError, Value};
 
 use super::preview_limits;
@@ -177,16 +178,15 @@ pub(super) fn optional_ast(args: &[Ast], index: usize) -> Option<&Ast> {
 /// `Sheet2!$A$1:$A$9`. A single-cell reference, a defined name or a LET value
 /// returns `None`: functions that read a lone cell as a scalar value coerce it
 /// differently from a range.
-pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
+pub(super) fn written_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     match ast {
-        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(ast, formula_sheet),
+        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(ast, names),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
+        | Ast::DefinedName(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -210,13 +210,27 @@ pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange
     }
 }
 
+/// Whether `argument` is written as a range: a range, a table column or a
+/// defined name of a range. A lone cell, a LET value or a formula is not.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not a written range"
+)]
+pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
+    match argument {
+        Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(..) => true,
+        Ast::DefinedName(id) => names.read(*id, |view| matches!(view, NameView::Range(_))),
+        _ => false,
+    }
+}
+
 /// The range an argument of an aggregate or statistic names: a written
 /// range, a defined name of one, a table column or an intersection. A lone
 /// cell is a value there, not a range.
-pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRange> {
+pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     match arg {
         Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-            formula_sheet as u32,
+            names.sheet,
             *row_start,
             *col_start,
             *row_end,
@@ -229,13 +243,12 @@ pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRang
             *row_end,
             *col_end,
         )),
-        Ast::NamedRange(named) => Some(CellRange::new(
-            named.sheet,
-            named.row_start,
-            named.col_start,
-            named.row_end,
-            named.col_end,
-        )),
+        Ast::DefinedName(id) => names.read(*id, |view| match view {
+            NameView::Range(range) => Some(range),
+            NameView::Formula(_) | NameView::Placed(_) | NameView::Undefined | NameView::Linked => {
+                None
+            }
+        }),
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,
             reference.row_start,
@@ -243,13 +256,12 @@ pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRang
             reference.row_end,
             reference.col,
         )),
-        Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
+        Ast::Func(Func::Intersect, operands) => intersection_range(operands, names).ok(),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::NamedFormula(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Cell(..)
         | Ast::SheetCell(..)
@@ -272,29 +284,26 @@ pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRang
     }
 }
 
-pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
+/// The cells a reference argument covers, reading defined names through
+/// `names`; `None` when `ast` is not one reference.
+pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
+    let formula_sheet = names.sheet;
     match ast {
-        Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),
-        Ast::NamedFormula(named) => range_from_ast(&named.expression, formula_sheet),
-        Ast::Cell(row, col, _) => {
-            Some(CellRange::new(formula_sheet as u32, *row, *col, *row, *col))
-        }
+        Ast::LetSlot { expression, .. } => range_from_ast(expression, names),
+        Ast::DefinedName(id) => names.read(*id, |view| match view {
+            NameView::Range(range) => Some(range),
+            NameView::Formula(expression) => range_from_ast(expression, names),
+            NameView::Placed(expression) => range_from_ast(&expression, names),
+            NameView::Undefined | NameView::Linked => None,
+        }),
+        Ast::Cell(row, col, _) => Some(CellRange::new(formula_sheet, *row, *col, *row, *col)),
         Ast::AbsCell(sheet, row, col, _) => {
             Some(CellRange::new(sheet.handle, *row, *col, *row, *col))
         }
-        Ast::Range(r0, c0, r1, c1, _) => {
-            Some(CellRange::new(formula_sheet as u32, *r0, *c0, *r1, *c1))
-        }
+        Ast::Range(r0, c0, r1, c1, _) => Some(CellRange::new(formula_sheet, *r0, *c0, *r1, *c1)),
         Ast::AbsRange(sheet, r0, c0, r1, c1, _) => {
             Some(CellRange::new(sheet.handle, *r0, *c0, *r1, *c1))
         }
-        Ast::NamedRange(named) => Some(CellRange::new(
-            named.sheet,
-            named.row_start,
-            named.col_start,
-            named.row_end,
-            named.col_end,
-        )),
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,
             reference.row_start,
@@ -302,7 +311,7 @@ pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
             reference.row_end,
             reference.col,
         )),
-        Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
+        Ast::Func(Func::Intersect, operands) => intersection_range(operands, names).ok(),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -333,7 +342,7 @@ pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
 /// are `#NULL!`.
 pub(crate) fn intersection_range(
     operands: &[Ast],
-    formula_sheet: usize,
+    names: NameScope<'_>,
 ) -> Result<CellRange, FormulaError> {
     let mut common: Option<CellRange> = None;
     let mut empty = false;
@@ -341,7 +350,7 @@ pub(crate) fn intersection_range(
     // Every operand is checked before an empty result is reported, so a
     // non-reference operand stays #VALUE! wherever it sits.
     for operand in operands {
-        let Some(range) = range_from_ast(operand, formula_sheet) else {
+        let Some(range) = range_from_ast(operand, names) else {
             return Err(match operand {
                 Ast::InvalidRef => FormulaError::Ref,
                 Ast::Num(_)
@@ -349,8 +358,7 @@ pub(crate) fn intersection_range(
                 | Ast::Bool(_)
                 | Ast::Missing
                 | Ast::Name(_)
-                | Ast::NamedRange(_)
-                | Ast::NamedFormula(_)
+                | Ast::DefinedName(_)
                 | Ast::UnresolvedStructured(_)
                 | Ast::Structured(_)
                 | Ast::Cell(..)

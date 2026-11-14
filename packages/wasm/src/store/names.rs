@@ -1,53 +1,88 @@
-//! Defined names that hold a formula, such as `Tax = 0.2`,
+//! Defined names: named ranges such as `Scale = Data!$C$1`, and names that
+//! hold a formula, such as `Tax = 0.2`,
 //! `Recent = OFFSET(Data!$A$1,COUNT(Data!$A:$A)-5,0,5)` or
 //! `MYFN = LAMBDA(x,x+1)`.
 //!
-//! A formula that uses such a name gets the name's formula expanded in its
-//! tree as an [`Ast::NamedFormula`] node, which writes back as the name.
-//! Expansion happens when the formula is parsed, like the expansion of named
-//! ranges, so evaluation reads no name table. A change that alters an
-//! expansion (a definition, a sheet, a table, a row or column edit) parses
-//! again only the formulas that may use a changed name: those flagged as
-//! using names whose text holds one (`rebind_name_users`). Bound sheet
-//! references retain only handles; rewritten source uses the registry.
+//! The store keeps one [`NameTable`] entry per name without case, holding the
+//! name's definition in each scope. A formula holds the entry's id
+//! ([`Ast::DefinedName`]) for each name it uses, defined yet or not, and
+//! reads the definition through the table whenever it is evaluated or
+//! walked: the sheet's own definition first, then the workbook's. A
+//! definition change therefore rewrites no formula tree: the formulas that
+//! use a changed name get their reads and flags again and recalculate
+//! (`rebind_name_users`).
 //!
 //! As in Excel, relative references in a name's formula are relative to cell
 //! A1, and a formula at C5 that uses the name reads them two columns right
-//! and four rows down.
-//!
-//! A name whose expansion is the same for every cell and every sheet is
-//! resolved once, when names change, and every formula that uses it
-//! shares that one resolved definition. A single unqualified reference takes
-//! the sheet of the formula when the formula binds to the name. Any other
-//! name is expanded for the cell that binds to it.
+//! and four rows down. Such a formula, or one with a table reference, is
+//! placed for the cell that reads it each time it is read
+//! ([`NameView::Placed`]); every other definition is read as it is stored, by
+//! every formula that uses it.
 
 use std::cell::{Cell, RefCell};
-use std::rc::Rc;
 
+use rustc_hash::FxHashMap;
 use wasm_bindgen::prelude::*;
 
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
-    for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse, rename_sheet_refs,
-    resolve_named_ranges, resolve_structured_refs, shift_cols, shift_rows, translate_name_refs,
-    Ast, NameTarget, NamedFormulaRef, NamedRangeRef, RangeFlags, RefFlags, WrittenNames,
+    bind_defined_names, for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse,
+    rename_sheet_refs, resolve_structured_refs, shift_cols, shift_rows, translate_name_refs,
+    ArrayLiteral, Ast, NameId, NamedRangeRef, ParseFeatures, WrittenNames,
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::types::{AbsCellKey, FormulaError, Value};
+use crate::tables::TableSlots;
+use crate::types::{
+    AbsCellKey, CellRange, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
+};
 
 /// The formula sheet a name's definition is shifted as: no sheet, so a
 /// row or column edit moves only the references that name their sheet. An
 /// unqualified reference reads the sheet of the formula that uses the name.
 const NO_SHEET: u32 = u32::MAX;
 
-type NameKey = (Option<u32>, String);
-
-/// Most nodes one name's expansion may have, counting the names in it at
-/// their own expanded size. Past it the name returns `#NUM!`, as a LET does
-/// past its expansion limit, so a chain of names that each use the next
-/// twice cannot grow without bound.
+/// Most nodes one name's formula may have, counting the names in it at
+/// their own size. Past it the name returns `#NUM!`, as a LET does past its
+/// expansion limit, so a chain of names that each use the next twice cannot
+/// grow the time to read it without bound.
 const EXPANSION_NODE_LIMIT: usize = 65_536;
+
+/// The store's defined names, one entry per name without case, by
+/// [`NameId`]. An entry is made the first time a definition or a formula
+/// names it and is kept for the store's life, so an id in a formula tree
+/// always finds its entry.
+#[derive(Default)]
+pub(crate) struct NameTable {
+    /// Ids by folded name ([`workbook_name_key`]).
+    ids: FxHashMap<Box<str>, NameId>,
+    entries: Vec<NameEntry>,
+    /// Names that formulas used first while the store was only read, so no
+    /// entry could be added: ids past `entries`, with no definition.
+    /// [`NameTable::settle`] adds their entries.
+    unsettled: RefCell<UnsettledNames>,
+}
+
+#[derive(Default)]
+struct UnsettledNames {
+    ids: FxHashMap<Box<str>, NameId>,
+    /// Folded name and first spelling, in id order.
+    names: Vec<(Box<str>, Box<str>)>,
+}
+
+struct NameEntry {
+    key: Box<str>,
+    /// What a use writes back while no scope defines the name: the
+    /// spelling of the first formula that used it.
+    spelling: Box<str>,
+    /// The name's definitions, the workbook's and sheets' own. Most names
+    /// have one.
+    definitions: Vec<(Option<u32>, DefinedName)>,
+    /// The formula cell `(sheet, row, col)` whose walk is inside this name's
+    /// formula. A name met again inside its own formula, for the same cell,
+    /// reads as undefined.
+    followed_by: Cell<Option<(u32, u32, u32)>>,
+}
 
 pub(super) enum DefinedName {
     Range(NamedRangeRef),
@@ -58,28 +93,425 @@ pub(super) struct Definition {
     name: String,
     /// The formula with its leading `=`, as the host reads it back.
     source: String,
-    /// `source` parsed, with its sheet references resolved. Defined names in
-    /// it resolve in each formula that uses the name.
+    /// `source` parsed, with its sheet references bound. Its names stay as
+    /// written; row, column and sheet edits rewrite it.
     ast: Ast,
-    /// Whether the expansion depends on the cell that uses the name: a
-    /// relative reference or a table reference makes it so.
+    /// `ast` with its names bound to the table, its LAMBDA parameters
+    /// numbered, and `#NUM!` in its place past [`EXPANSION_NODE_LIMIT`]:
+    /// what reads of the name walk and evaluate. Bound again after every
+    /// name change, since a call binds only to a name that holds a formula.
+    expression: Ast,
+    /// Whether the formula reads differently from different cells: it has a
+    /// relative reference or a table reference.
     positional: bool,
-    /// The one resolved definition that every formula binds to, when the
-    /// expansion is the same for every cell and sheet. A reference target
-    /// whose sheet is [`NO_SHEET`] takes the formula's sheet at bind.
-    /// `resolve_name_definitions` sets it whenever formulas are refreshed.
-    resolved: Option<NameTarget>,
-    /// Where `resolve_name_definitions` is with this definition while it
-    /// orders definitions so that each one's names are resolved first.
-    visit: Cell<Visit>,
 }
 
-/// The state of a definition while `resolve_name_definitions` orders them.
-#[derive(Clone, Copy, PartialEq)]
-enum Visit {
-    Unvisited,
-    Visiting,
-    Done,
+/// What a defined name stands for in the formula being read.
+pub(crate) enum NameView<'a> {
+    /// No definition for the formula's sheet: `#NAME?`. A name met again
+    /// inside its own formula reads as undefined too.
+    Undefined,
+    /// A name of a linked workbook that the link does not hold: `#REF!`, as
+    /// in Excel.
+    Linked,
+    /// A range. A name whose formula is one cell or range reference reads as
+    /// one, so functions that take a reference accept it.
+    Range(CellRange),
+    /// The name's formula, the same for every cell that reads it. It reads
+    /// unqualified references on the sheet of the formula that uses it.
+    Formula(&'a Ast),
+    /// The name's formula placed for the cell that reads it.
+    Placed(Ast),
+}
+
+/// The formula a walk is in, for reading the defined names of its tree: the
+/// store's name table and table slots, which place a name's table
+/// references, and the formula's sheet, which picks each name's scope. It
+/// borrows only those two parts of the store, so an edit can walk the
+/// formulas of its sheets while it holds them.
+#[derive(Clone, Copy)]
+pub(crate) struct NameScope<'a> {
+    pub(crate) table: &'a NameTable,
+    pub(crate) tables: &'a TableSlots,
+    pub(crate) sheet: u32,
+}
+
+impl<'a> NameScope<'a> {
+    /// The names of a formula on `sheet`, read from `table` and placed with
+    /// `tables`.
+    pub(crate) const fn new(table: &'a NameTable, tables: &'a TableSlots, sheet: u32) -> Self {
+        Self {
+            table,
+            tables,
+            sheet,
+        }
+    }
+
+    /// Read the name `id` for the formula on [`Self::sheet`] at the cell that
+    /// is being evaluated or bound (`current_formula_origin`), and give
+    /// `read` what it stands for there. While `read` runs inside the name's
+    /// formula, a use of `id` in that formula, for the same cell, reads as
+    /// [`NameView::Undefined`].
+    pub(crate) fn read<R>(self, id: NameId, read: impl FnOnce(NameView<'a>) -> R) -> R {
+        let Some(entry) = self.table.entry(id) else {
+            return read(if self.table.unsettled_is_linked(id) {
+                NameView::Linked
+            } else {
+                NameView::Undefined
+            });
+        };
+        let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
+        let cell = (self.sheet, row, col);
+        if entry.followed_by.get() == Some(cell) {
+            return read(NameView::Undefined);
+        }
+        let view = self.view(entry, row, col);
+        if !matches!(view, NameView::Formula(_) | NameView::Placed(_)) {
+            return read(view);
+        }
+        let previous = entry.followed_by.replace(Some(cell));
+        let result = read(view);
+        entry.followed_by.set(previous);
+        result
+    }
+
+    /// What the name of `entry` stands for in the formula at (`row`, `col`).
+    fn view(self, entry: &'a NameEntry, row: u32, col: u32) -> NameView<'a> {
+        let sheet = self.sheet;
+        match NameTable::definition_for(entry, sheet) {
+            None if entry.key.contains('!') => NameView::Linked,
+            None => NameView::Undefined,
+            Some(DefinedName::Range(range)) => NameView::Range(CellRange::new(
+                range.sheet,
+                range.row_start,
+                range.col_start,
+                range.row_end,
+                range.col_end,
+            )),
+            Some(DefinedName::Formula(formula)) if formula.positional => {
+                let mut placed = formula.expression.clone();
+                translate_name_refs(&mut placed, row, col);
+                let tables = self.tables;
+                resolve_structured_refs(&mut placed, sheet, row, col, &|reference, at, row, col| {
+                    tables.bind(reference.written(), AbsCellKey { sheet: at, row, col })
+                });
+                reference_target(&placed, sheet).map_or(NameView::Placed(placed), NameView::Range)
+            }
+            Some(DefinedName::Formula(formula)) => reference_target(&formula.expression, sheet)
+                .map_or(NameView::Formula(&formula.expression), NameView::Range),
+        }
+    }
+
+    /// What a use of `id` writes, as [`NameTable::write_spelling`] does.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn spelling(self, id: NameId) -> String {
+        let mut out = String::new();
+        self.table.write_spelling(id, &mut out);
+        out
+    }
+
+    /// The formula the name `id` holds for this sheet, as it is defined.
+    #[cfg(feature = "analysis")]
+    fn formula(self, id: NameId) -> Option<&'a Ast> {
+        let entry = self.table.entry(id)?;
+        match NameTable::definition_for(entry, self.sheet)? {
+            DefinedName::Formula(formula) => Some(&formula.expression),
+            DefinedName::Range(_) => None,
+        }
+    }
+
+    /// The expression that a LET binding's use or a defined name stands
+    /// for, through any number of them: what a function argument such as
+    /// `MAP(A1:A3,MYFN)` passes. A name's formula is read as it is defined:
+    /// placing it for a cell moves its references, not its shape.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn bound_value<'t>(self, ast: &'t Ast) -> &'t Ast
+    where
+        'a: 't,
+    {
+        let mut expression = ast;
+        for _ in 0..FORMULA_RECURSION_LIMIT {
+            expression = match expression {
+                Ast::LetSlot {
+                    expression: bound, ..
+                } => bound,
+                Ast::DefinedName(id) => match self.formula(*id) {
+                    Some(formula) => formula,
+                    None => return expression,
+                },
+                Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::Parameter { .. }
+                | Ast::Lambda(_)
+                | Ast::RegexPattern(_)
+                | Ast::Name(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(..)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::InvalidRef
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Cmp(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetName { .. }
+                | Ast::Array { .. } => return expression,
+            };
+        }
+        expression
+    }
+}
+
+impl NameTable {
+    /// The id of `key`, a folded name, making its entry with `spelling` when
+    /// the table has none.
+    fn intern(&self, key: String, spelling: &str) -> Option<NameId> {
+        if let Some(&id) = self.ids.get(key.as_str()) {
+            return Some(id);
+        }
+        let mut unsettled = self.unsettled.try_borrow_mut().ok()?;
+        if let Some(&id) = unsettled.ids.get(key.as_str()) {
+            return Some(id);
+        }
+        let id = NameId::at(self.entries.len() + unsettled.names.len())?;
+        let key: Box<str> = key.into_boxed_str();
+        unsettled.names.push((key.clone(), spelling.into()));
+        unsettled.ids.insert(key, id);
+        Some(id)
+    }
+
+    /// Add the entries of the names formulas used first while the store
+    /// was only read. Every change to the table settles first, so an
+    /// unsettled id is always the next entry's.
+    fn settle(&mut self) {
+        let unsettled = std::mem::take(self.unsettled.get_mut());
+        for ((key, spelling), id) in unsettled.names.into_iter().zip(self.entries.len()..) {
+            let Some(id) = NameId::at(id) else {
+                return;
+            };
+            self.entries.push(NameEntry {
+                key: key.clone(),
+                spelling,
+                definitions: Vec::new(),
+                followed_by: Cell::new(None),
+            });
+            self.ids.insert(key, id);
+        }
+    }
+
+    /// The table with every used name settled, for a change.
+    pub(super) fn settled(&mut self) -> &mut Self {
+        self.settle();
+        self
+    }
+
+    /// Whether the unsettled name `id` is a linked workbook's.
+    fn unsettled_is_linked(&self, id: NameId) -> bool {
+        self.unsettled.try_borrow().is_ok_and(|unsettled| {
+            id.index()
+                .checked_sub(self.entries.len())
+                .and_then(|index| unsettled.names.get(index))
+                .is_some_and(|(key, _)| key.contains('!'))
+        })
+    }
+
+    fn id(&self, key: &str) -> Option<NameId> {
+        self.ids.get(key).copied()
+    }
+
+    fn entry(&self, id: NameId) -> Option<&NameEntry> {
+        self.entries.get(id.index())
+    }
+
+    /// The id of the name written `name` when it holds a formula for a
+    /// formula on `sheet`.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn formula_id(&self, name: &str, sheet: u32) -> Option<NameId> {
+        let id = self.id(&workbook_name_key(name))?;
+        matches!(
+            Self::definition_for(self.entry(id)?, sheet),
+            Some(DefinedName::Formula(_))
+        )
+        .then_some(id)
+    }
+
+    /// The definition of `id` in exactly `scope`.
+    fn defined_at(&self, scope: Option<u32>, id: NameId) -> Option<&DefinedName> {
+        self.entry(id)?
+            .definitions
+            .iter()
+            .find_map(|(defined, definition)| (*defined == scope).then_some(definition))
+    }
+
+    /// The formula `id` holds in exactly `scope`, to bind it again.
+    fn formula_at_mut(&mut self, scope: Option<u32>, id: NameId) -> Option<&mut Definition> {
+        self.entries
+            .get_mut(id.index())?
+            .definitions
+            .iter_mut()
+            .find_map(|(defined, definition)| match definition {
+                DefinedName::Formula(formula) if *defined == scope => Some(&mut **formula),
+                DefinedName::Formula(_) | DefinedName::Range(_) => None,
+            })
+    }
+
+    /// The formula the folded name `key` holds in exactly `scope`.
+    fn formula_mut(&mut self, scope: Option<u32>, key: &str) -> Option<&mut Definition> {
+        let id = self.id(key)?;
+        self.formula_at_mut(scope, id)
+    }
+
+    /// The definition of `key` in exactly `scope`.
+    pub(super) fn get(&self, scope: Option<u32>, key: &str) -> Option<&DefinedName> {
+        self.defined_at(scope, self.id(key)?)
+    }
+
+    /// Define `key` in `scope` as `definition`, replacing the one there.
+    pub(super) fn insert(
+        &mut self,
+        scope: Option<u32>,
+        key: String,
+        spelling: &str,
+        definition: DefinedName,
+    ) {
+        self.settle();
+        let id = self.intern(key, spelling);
+        self.settle();
+        let Some(entry) = id.and_then(|id| self.entries.get_mut(id.index())) else {
+            return;
+        };
+        if let Some(slot) = entry
+            .definitions
+            .iter_mut()
+            .find(|(defined, _)| *defined == scope)
+        {
+            slot.1 = definition;
+        } else {
+            entry.definitions.push((scope, definition));
+        }
+    }
+
+    /// Remove the definition of `key` in `scope`; whether there was one.
+    pub(super) fn remove(&mut self, scope: Option<u32>, key: &str) -> bool {
+        let Some(entry) = self
+            .id(key)
+            .and_then(|id| self.entries.get_mut(id.index()))
+        else {
+            return false;
+        };
+        let before = entry.definitions.len();
+        entry.definitions.retain(|(defined, _)| *defined != scope);
+        entry.definitions.len() != before
+    }
+
+    /// Whether any scope defines `key`.
+    pub(super) fn defines(&self, key: &str) -> bool {
+        self.id(key)
+            .and_then(|id| self.entry(id))
+            .is_some_and(|entry| !entry.definitions.is_empty())
+    }
+
+    /// Every definition with its scope and folded name.
+    pub(super) fn definitions(
+        &self,
+    ) -> impl Iterator<Item = (Option<u32>, &str, &DefinedName)> + '_ {
+        self.entries.iter().flat_map(|entry| {
+            entry
+                .definitions
+                .iter()
+                .map(move |(scope, definition)| (*scope, &*entry.key, definition))
+        })
+    }
+
+    /// Keep only the definitions `keep` accepts; it gets each one's scope and
+    /// folded name, and may change it.
+    pub(super) fn retain(&mut self, mut keep: impl FnMut(Option<u32>, &str, &mut DefinedName) -> bool) {
+        for entry in &mut self.entries {
+            let key = &entry.key;
+            entry
+                .definitions
+                .retain_mut(|(scope, definition)| keep(*scope, key, definition));
+        }
+    }
+
+    /// The definition a formula on `sheet` reads: the sheet's own, then the
+    /// workbook's.
+    fn definition_for(entry: &NameEntry, sheet: u32) -> Option<&DefinedName> {
+        let mut workbook = None;
+        for (scope, definition) in &entry.definitions {
+            match scope {
+                Some(own) if *own == sheet => return Some(definition),
+                Some(_) => {}
+                None => workbook = Some(definition),
+            }
+        }
+        workbook
+    }
+
+    /// Write what a formula writes for a use of `id`: the spelling of the
+    /// workbook's definition, else of any definition, else of the first use.
+    pub(crate) fn write_spelling(&self, id: NameId, out: &mut String) {
+        let Some(entry) = self.entry(id) else {
+            if let Ok(unsettled) = self.unsettled.try_borrow() {
+                let index = id.index().saturating_sub(self.entries.len());
+                if let Some((_, spelling)) = unsettled.names.get(index) {
+                    out.push_str(spelling);
+                }
+            }
+            return;
+        };
+        let defined = entry
+            .definitions
+            .iter()
+            .min_by_key(|(scope, _)| scope.is_some())
+            .map(|(_, definition)| match definition {
+                DefinedName::Range(range) => range.name.as_str(),
+                DefinedName::Formula(formula) => formula.name.as_str(),
+            });
+        out.push_str(defined.unwrap_or(&entry.spelling));
+    }
+
+    fn add_memory(&self, metadata: &mut MemoryOwnerStats) {
+        metadata.add_hash_table::<Box<str>, NameId>(self.ids.len(), self.ids.capacity());
+        let bytes = self.entries.capacity() * std::mem::size_of::<NameEntry>();
+        metadata.add_payload(
+            self.entries.len() * std::mem::size_of::<NameEntry>(),
+            bytes,
+        );
+        for entry in &self.entries {
+            // The key is held twice: by the entry and by the id lookup.
+            metadata.add_payload(2 * entry.key.len(), 2 * entry.key.len());
+            metadata.add_payload(entry.spelling.len(), entry.spelling.len());
+            let bytes = entry.definitions.capacity()
+                * std::mem::size_of::<(Option<u32>, DefinedName)>();
+            metadata.add_payload(bytes, bytes);
+            for (_, definition) in &entry.definitions {
+                match definition {
+                    DefinedName::Range(range) => {
+                        metadata.add_payload(range.name.len(), range.name.capacity());
+                    }
+                    DefinedName::Formula(formula) => {
+                        let bytes = std::mem::size_of::<Definition>();
+                        metadata.add_payload(bytes, bytes);
+                        metadata.add_payload(formula.name.len(), formula.name.capacity());
+                        metadata.add_payload(formula.source.len(), formula.source.capacity());
+                        formula.ast.heap_memory_stats(metadata);
+                        formula.expression.heap_memory_stats(metadata);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Definition {
@@ -93,68 +525,10 @@ impl Definition {
         let names = WrittenNames {
             sheets,
             tables: None,
+            names: None,
         };
         self.source = write_references(&self.source, &self.ast, &names);
         true
-    }
-}
-
-/// The cell whose formula is being resolved, and the state of the defined
-/// names being expanded for it.
-pub(crate) struct NamePlacement {
-    row: u32,
-    col: u32,
-    /// Name keys being expanded. A name met again inside its own expansion
-    /// stays unresolved: a plain formula then returns `#NAME?`, and a LAMBDA
-    /// that calls itself finds itself when the call is evaluated.
-    expanding: RefCell<Vec<String>>,
-    /// Whether the expansion in progress depends on `row` and `col`.
-    positional: Cell<bool>,
-    /// The lowest index in `expanding` that the expansion in progress left
-    /// unresolved, or `usize::MAX`. An expansion that left a name outside
-    /// itself unresolved differs where that name is not being expanded, so
-    /// it is not reused.
-    lowest_cut: Cell<usize>,
-    /// Whether the expansion in progress reads a name that some sheet
-    /// defines in its own scope, so it reads differently on that sheet. Only
-    /// set while definitions are resolved for every sheet.
-    sheet_bound: Cell<bool>,
-    /// The names already expanded for this one formula, so a name used many
-    /// times, directly or through other names, is expanded once. It lives
-    /// only as long as this placement, which serves one formula. A formula
-    /// uses few names, so a list is searched.
-    placed: RefCell<Vec<Placed>>,
-}
-
-/// One name expanded for the formula of a [`NamePlacement`].
-struct Placed {
-    key: String,
-    target: NameTarget,
-    /// Whether the expansion depends on the formula's cell.
-    positional: bool,
-    /// Whether the expansion depends on the formula's sheet.
-    sheet_bound: bool,
-}
-
-impl NamePlacement {
-    pub(crate) fn new(row: u32, col: u32) -> Self {
-        Self {
-            row,
-            col,
-            expanding: RefCell::new(Vec::new()),
-            positional: Cell::new(false),
-            lowest_cut: Cell::new(usize::MAX),
-            sheet_bound: Cell::new(false),
-            placed: RefCell::new(Vec::new()),
-        }
-    }
-
-    /// Start one definition: forget what the previous one found.
-    fn restart(&self) {
-        self.positional.set(false);
-        self.lowest_cut.set(usize::MAX);
-        self.sheet_bound.set(false);
-        self.placed.borrow_mut().clear();
     }
 }
 
@@ -178,18 +552,21 @@ impl CellStore {
             return false;
         };
 
-        let key = (name_scope, workbook_name_key(name));
+        let key = workbook_name_key(name);
         let definition = Definition {
             name: name.to_owned(),
             source: source.to_owned(),
             positional: is_positional(&ast),
             ast,
-            resolved: None,
-            visit: Cell::new(Visit::Unvisited),
+            expression: Ast::Missing,
         };
-        self.defined_names
-            .insert(key, DefinedName::Formula(Box::new(definition)));
-        self.rebind_name_users(vec![workbook_name_key(name)]);
+        self.names.insert(
+            name_scope,
+            key.clone(),
+            name,
+            DefinedName::Formula(Box::new(definition)),
+        );
+        self.rebind_name_users(vec![key]);
         self.recompute_all_sheets();
         true
     }
@@ -200,10 +577,7 @@ impl CellStore {
     #[wasm_bindgen(js_name = namedFormulaSource)]
     pub fn named_formula_source(&self, name: &str, scope: i32) -> Option<String> {
         let name_scope = u32::try_from(scope).ok();
-        match self
-            .defined_names
-            .get(&(name_scope, workbook_name_key(name)))?
-        {
+        match self.names.get(name_scope, &workbook_name_key(name))? {
             DefinedName::Formula(definition) => Some(definition.source.clone()),
             DefinedName::Range(_) => None,
         }
@@ -211,159 +585,47 @@ impl CellStore {
 }
 
 impl CellStore {
-    /// What `name` stands for in a formula on `formula_sheet` at the cell of
-    /// `placement`: a sheet-scoped name first, then the workbook's.
-    pub(crate) fn name_target(
-        &self,
-        name: &str,
-        formula_sheet: u32,
-        placement: &NamePlacement,
-    ) -> Option<NameTarget> {
-        let mut key = workbook_name_key(name);
-        if formula_sheet == NO_SHEET {
-            key = self.note_sheet_scoped(key, placement);
-        }
-        for scope in [Some(formula_sheet), None] {
-            let scoped = (scope, key);
-            match self.defined_names.get(&scoped) {
-                Some(DefinedName::Range(range)) => return Some(NameTarget::Range(range.clone())),
-                Some(DefinedName::Formula(definition)) => {
-                    return self.expand(definition, scoped, formula_sheet, placement);
-                }
-                None => {}
+    /// Bind the defined names of a formula on `formula_sheet`: each name
+    /// becomes its table id, and a call of a name that holds a formula
+    /// becomes a call of that formula's value. LET and LAMBDA names stay.
+    pub(super) fn bind_formula_names(&self, ast: Ast, formula_sheet: u32) -> Ast {
+        let table = &self.names;
+        bind_defined_names(ast, &mut |name, call| {
+            let key = workbook_name_key(name);
+            if call {
+                let id = table.id(&key)?;
+                let entry = table.entry(id)?;
+                return matches!(
+                    NameTable::definition_for(entry, formula_sheet),
+                    Some(DefinedName::Formula(_))
+                )
+                .then_some(Ast::DefinedName(id));
             }
-            key = scoped.1;
-        }
-
-        // A name of a linked workbook that the link does not hold is
-        // `#REF!`, as in Excel.
-        name.contains('!').then(|| {
-            NameTarget::Formula(Rc::new(NamedFormulaRef {
-                name: name.to_owned(),
-                expression: Ast::InvalidRef,
-                nodes: 1,
-            }))
+            table.intern(key, name).map(Ast::DefinedName)
         })
     }
 
-    /// Mark the definition being resolved for every sheet as depending on
-    /// the sheet when some sheet defines `key` in its own scope. Returns `key`.
-    fn note_sheet_scoped(&self, key: String, placement: &NamePlacement) -> String {
-        let mut scoped = (None, key);
-        for (sheet, _) in (0u32..).zip(&self.sheet_names) {
-            scoped.0 = Some(sheet);
-            if self.defined_names.contains_key(&scoped) {
-                placement.sheet_bound.set(true);
-                break;
-            }
+    /// The defined names of a formula on `sheet`, for its walks and its
+    /// evaluation.
+    pub(crate) fn name_scope(&self, sheet: usize) -> NameScope<'_> {
+        NameScope {
+            table: &self.names,
+            tables: &self.tables,
+            sheet: sheet as u32,
         }
-        scoped.1
-    }
-
-    /// Cell formulas and expanded name definitions use one resolver closure
-    /// type, so the recursive traversal has one compiled specialization.
-    #[inline(never)]
-    pub(super) fn resolve_defined_names(
-        &self,
-        ast: Ast,
-        formula_sheet: u32,
-        placement: &NamePlacement,
-    ) -> Ast {
-        resolve_named_ranges(ast, formula_sheet, &|name, sheet| {
-            self.name_target(name, sheet, placement)
-        })
-    }
-
-    fn expand(
-        &self,
-        definition: &Definition,
-        (scope, key): NameKey,
-        formula_sheet: u32,
-        placement: &NamePlacement,
-    ) -> Option<NameTarget> {
-        let depth = {
-            let expanding = placement.expanding.borrow();
-            if let Some(index) = expanding.iter().position(|open| *open == key) {
-                placement
-                    .lowest_cut
-                    .set(placement.lowest_cut.get().min(index));
-                return None;
-            }
-            expanding.len()
-        };
-        if let Some(placed) = placement
-            .placed
-            .borrow()
-            .iter()
-            .find(|placed| placed.key == key)
-        {
-            placement
-                .positional
-                .set(placement.positional.get() || placed.positional);
-            placement
-                .sheet_bound
-                .set(placement.sheet_bound.get() || placed.sheet_bound);
-            return Some(placed.target.clone());
-        }
-        if let Some(target) = &definition.resolved {
-            return Some(match target {
-                NameTarget::Range(range) => place_range(range.clone(), formula_sheet, depth),
-                NameTarget::Formula(_) | NameTarget::Reference(_) => target.clone(),
-            });
-        }
-
-        let outer_positional = placement.positional.replace(definition.positional);
-        let outer_sheet_bound = placement.sheet_bound.replace(false);
-        let outer_cut = placement.lowest_cut.replace(usize::MAX);
-        placement.expanding.borrow_mut().push(key.clone());
-        let mut ast = definition.ast.clone();
-        if definition.positional {
-            translate_name_refs(&mut ast, placement.row, placement.col);
-        }
-        let mut resolved = self.resolve_defined_names(ast, formula_sheet, placement);
-        resolve_structured_refs(
-            &mut resolved,
-            formula_sheet,
-            placement.row,
-            placement.col,
-            &|reference, sheet, row, col| {
-                self.resolve_structured_reference(reference, sheet, row, col)
-            },
-        );
-        placement.expanding.borrow_mut().pop();
-        let positional = placement.positional.get();
-        let sheet_bound = placement.sheet_bound.get();
-        let cut = placement.lowest_cut.get();
-        placement.positional.set(outer_positional || positional);
-        placement.sheet_bound.set(outer_sheet_bound || sheet_bound);
-        placement.lowest_cut.set(outer_cut.min(cut));
-
-        let target = match reference_target(&resolved, &definition.name, scope, formula_sheet) {
-            Some(range) => place_range(range, formula_sheet, depth),
-            None => NameTarget::Formula(Rc::new(bounded_expansion(&definition.name, resolved))),
-        };
-        if cut >= depth {
-            placement.placed.borrow_mut().push(Placed {
-                key,
-                target: target.clone(),
-                positional,
-                sheet_bound,
-            });
-        }
-        Some(target)
     }
 
     /// Add to `changed` the names whose formula has a table reference: a
-    /// table edit changes their expansions in the formulas that use them.
+    /// table edit changes how the formulas that use them read.
     pub(super) fn add_names_over_tables(&self, changed: &mut Vec<String>) {
-        for ((_, key), definition) in &self.defined_names {
+        for (_, key, definition) in self.names.definitions() {
             let DefinedName::Formula(formula) = definition else {
                 continue;
             };
             let mut uses_table = false;
             for_each_table_ref(&formula.ast, &mut |_| uses_table = true);
             if uses_table {
-                changed.push(key.clone());
+                changed.push(key.to_owned());
             }
         }
     }
@@ -371,13 +633,14 @@ impl CellStore {
     /// Add to `changed` every name whose formula uses a name in it, directly
     /// or through other names.
     fn add_names_using(&self, changed: &mut Vec<String>) {
+        let table = &self.names;
         loop {
             let before = changed.len();
-            for ((_, key), definition) in &self.defined_names {
+            for (_, key, definition) in table.definitions() {
                 let DefinedName::Formula(formula) = definition else {
                     continue;
                 };
-                if changed.contains(key) {
+                if changed.iter().any(|name| name == key) {
                     continue;
                 }
                 let mut used = Vec::new();
@@ -386,7 +649,7 @@ impl CellStore {
                     .iter()
                     .any(|name| changed.contains(&workbook_name_key(name)))
                 {
-                    changed.push(key.clone());
+                    changed.push(key.to_owned());
                 }
             }
             if changed.len() == before {
@@ -395,149 +658,140 @@ impl CellStore {
         }
     }
 
-    /// Bind again the formulas that use a name in `changed` (folded names),
-    /// or a name whose formula uses one, after those names changed. Only
-    /// these formulas are parsed again, from their text, which a name
-    /// change leaves as it is; the dependency index patches their reads and
-    /// they recalculate.
+    /// After the names in `changed` (folded names) changed, give the
+    /// formulas that use one, or a name whose formula uses one, their reads
+    /// and flags again from their trees, which hold only the names' ids; the
+    /// dependency index patches their reads and they recalculate. A formula
+    /// whose tree a change does alter is parsed again from its text: one
+    /// that calls a changed name, which binds to the name's formula only
+    /// while it holds one, one with a name left unbound, and one with a LET,
+    /// whose tree is resolved in place.
     pub(super) fn rebind_name_users(&mut self, mut changed: Vec<String>) {
         if changed.is_empty() {
             return;
         }
-        self.resolve_name_definitions();
+        self.bind_name_definitions();
         self.add_names_using(&mut changed);
-        let names = self.written_names();
-        let mut rebound = Vec::new();
-        for (sheet, data) in (0u32..).zip(&self.sheets) {
-            if self.sheet_alive.get(sheet as usize) != Some(&true) {
+        let table = self.names.settled();
+        let ids: Vec<NameId> = changed.iter().filter_map(|key| table.id(key)).collect();
+        let mut users = Vec::new();
+        for (sheet, data) in self.sheets.iter().enumerate() {
+            if self.sheet_alive.get(sheet) != Some(&true) {
                 continue;
             }
-            for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
-                if !entry.uses_names() {
-                    continue;
-                }
-                let source = entry.source(&names);
-                if changed.iter().any(|name| mentions_name(&source, name)) {
-                    let at = AbsCellKey { sheet, row, col };
-                    rebound.push((at, self.parse_formula_entry(&source, sheet, row, col)));
-                }
-            }
-        }
-        for (at, entry) in rebound {
-            self.replace_bound_formula(at, entry);
-        }
-    }
-
-    /// Resolve every name definition once, for every formula that uses it.
-    /// A definition whose expansion depends on the cell or the sheet that
-    /// uses it is left unresolved and is expanded where it is used. Names
-    /// that a definition uses are resolved before it, so it reads their
-    /// resolved form.
-    pub(super) fn resolve_name_definitions(&mut self) {
-        let mut keys = Vec::new();
-        for (key, definition) in &mut self.defined_names {
-            if let DefinedName::Formula(formula) = definition {
-                formula.resolved = None;
-                formula.visit.set(Visit::Unvisited);
-                keys.push(key.clone());
-            }
-        }
-
-        let placement = NamePlacement::new(0, 0);
-        for key in self.dependency_order(keys) {
-            let resolved = self.resolve_definition(&key, &placement);
-            if let Some(DefinedName::Formula(definition)) = self.defined_names.get_mut(&key) {
-                definition.resolved = resolved;
-            }
-        }
-    }
-
-    /// `keys` ordered so that each definition comes after the definitions it
-    /// uses. Definitions in a cycle come in the order the walk meets them.
-    fn dependency_order(&self, keys: Vec<NameKey>) -> Vec<NameKey> {
-        let mut order = Vec::with_capacity(keys.len());
-        let mut stack: Vec<(NameKey, bool)> = Vec::new();
-        for root in keys {
-            stack.push((root, false));
-            while let Some((key, used_names_done)) = stack.pop() {
-                let Some(DefinedName::Formula(definition)) = self.defined_names.get(&key) else {
+            for formula in data.formulas.ids() {
+                let Some(ast) = self
+                    .formula_slots
+                    .get(formula)
+                    .filter(|entry| entry.uses_names())
+                    .and_then(|entry| entry.ast.as_ref())
+                else {
                     continue;
                 };
-                if used_names_done {
-                    definition.visit.set(Visit::Done);
-                    order.push(key);
-                    continue;
-                }
-                if definition.visit.get() != Visit::Unvisited {
-                    continue;
-                }
-
-                definition.visit.set(Visit::Visiting);
-                let scope = key.0;
-                stack.push((key, true));
-                let mut names = Vec::new();
-                used_names(&definition.ast, &mut names);
-                for name in names {
-                    stack.push((self.used_name_key(scope, name), false));
+                match name_use(ast, &ids, &changed) {
+                    NameUse::None => {}
+                    NameUse::Read => users.push((formula, false)),
+                    NameUse::Bound => users.push((formula, true)),
                 }
             }
         }
-        order
-    }
-
-    /// The key that `name`, used in a definition in `scope`, resolves to
-    /// while definitions are resolved: the scope's own name first.
-    fn used_name_key(&self, scope: Option<u32>, name: &str) -> NameKey {
-        let key = workbook_name_key(name);
-        if scope.is_some() {
-            let scoped = (scope, key);
-            if self.defined_names.contains_key(&scoped) {
-                return scoped;
+        for (formula, parse_again) in users {
+            let Some(at) = self.formula_slots.location(formula) else {
+                continue;
+            };
+            let replacement = if parse_again {
+                let Some(source) = self
+                    .formula_slots
+                    .get(formula)
+                    .map(|entry| entry.source(&self.written_names()).into_owned())
+                else {
+                    continue;
+                };
+                Some(self.parse_formula_entry(&source, at.sheet, at.row, at.col))
+            } else {
+                let names = NameScope::new(&self.names, &self.tables, at.sheet);
+                self.formula_slots.get_mut(formula).and_then(|entry| {
+                    crate::eval::with_formula_origin((at.row, at.col), || entry.rebound(names))
+                })
+            };
+            if let Some(entry) = replacement {
+                self.replace_bound_formula(at, entry);
             }
-            return (None, scoped.1);
         }
-        (None, key)
     }
 
-    /// The expansion of one definition for every sheet, or nothing when it
-    /// depends on the cell or the sheet that uses it. A sheet's own name is
-    /// only used on that sheet, so it resolves as that sheet's.
-    fn resolve_definition(&self, key: &NameKey, placement: &NamePlacement) -> Option<NameTarget> {
-        let Some(DefinedName::Formula(definition)) = self.defined_names.get(key) else {
-            return None;
-        };
-        if definition.positional {
-            return None;
+    /// Bind every name definition's formula again: its names to their ids
+    /// and its calls to the names that hold a formula now. A formula whose
+    /// reads would pass [`EXPANSION_NODE_LIMIT`] nodes, counting each name
+    /// it uses at that name's size, becomes `#NUM!`.
+    pub(super) fn bind_name_definitions(&mut self) {
+        let written: Vec<(Option<u32>, String, Ast)> = self
+            .names
+            .settled()
+            .definitions()
+            .filter_map(|(scope, key, definition)| match definition {
+                DefinedName::Formula(formula) => {
+                    Some((scope, key.to_owned(), formula.ast.clone()))
+                }
+                DefinedName::Range(_) => None,
+            })
+            .collect();
+        let mut bound = Vec::with_capacity(written.len());
+        for (scope, key, ast) in written {
+            #[cfg_attr(not(feature = "analysis"), allow(unused_mut))]
+            let mut expression = self.bind_formula_names(ast, scope.unwrap_or(NO_SHEET));
+            // A named LAMBDA reads its parameters from the call frame, like
+            // one written in a formula.
+            #[cfg(feature = "analysis")]
+            crate::eval::analysis::lambda::resolve_parameters(&mut expression);
+            bound.push((scope, key, expression));
         }
-
-        placement.restart();
-        let formula_sheet = key.0.unwrap_or(NO_SHEET);
-        let target = self.expand(definition, key.clone(), formula_sheet, placement)?;
-        let shared = !placement.positional.get()
-            && !placement.sheet_bound.get()
-            && placement.lowest_cut.get() == usize::MAX;
-        shared.then_some(target)
+        let table = self.names.settled();
+        for (scope, key, expression) in bound {
+            if let Some(formula) = table.formula_mut(scope, &key) {
+                formula.expression = expression;
+            }
+        }
+        self.bound_expression_sizes();
     }
 
-    /// The LAMBDA that `name` holds, expanded for the formula being
-    /// evaluated. A LAMBDA that calls itself leaves that call unresolved in
-    /// its expansion; evaluation finds it here when the call runs.
-    #[cfg(feature = "analysis")]
-    pub(crate) fn named_lambda(&self, name: &str, sheet: usize) -> Option<Rc<NamedFormulaRef>> {
-        if self.defined_names.is_empty() {
-            return None;
-        }
-        let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
-        match self.name_target(name, sheet as u32, &NamePlacement::new(row, col))? {
-            NameTarget::Formula(formula) => Some(formula),
-            NameTarget::Range(_) | NameTarget::Reference(_) => None,
+    /// Replace each definition's formula with `#NUM!` when reading it walks
+    /// more than [`EXPANSION_NODE_LIMIT`] nodes, counting the names it uses
+    /// at their own sizes as defined in its scope, then the workbook's.
+    fn bound_expression_sizes(&mut self) {
+        let table = &mut self.names;
+        let keys: Vec<(Option<u32>, NameId)> = table
+            .entries
+            .iter()
+            .enumerate()
+            .filter_map(|(index, entry)| Some((NameId::at(index)?, entry)))
+            .flat_map(|(id, entry)| {
+                entry
+                    .definitions
+                    .iter()
+                    .filter(|(_, definition)| matches!(definition, DefinedName::Formula(_)))
+                    .map(move |(scope, _)| (*scope, id))
+            })
+            .collect();
+        let mut sizes = FxHashMap::default();
+        let oversized: Vec<(Option<u32>, NameId)> = keys
+            .into_iter()
+            .filter(|&key| definition_size(&*table, key, &mut sizes, 0) > EXPANSION_NODE_LIMIT)
+            .collect();
+        for (scope, id) in oversized {
+            if let Some(formula) = table.formula_at_mut(scope, id) {
+                formula.expression = Ast::Array(Box::new(ArrayLiteral {
+                    cols: 1,
+                    values: vec![Value::Error(FormulaError::Num)],
+                }));
+            }
         }
     }
 
     /// Follow a row (or, with `columns`, column) insertion or deletion on
     /// `edited_sheet` in every name's formula. Adds to `changed` the names
-    /// whose expansions change: a name whose formula changed, and a name
-    /// placed by the cell that uses it, since formulas moved.
+    /// that read differently: a name whose formula changed, and a name
+    /// placed by the cell that reads it, since formulas moved.
     pub(super) fn shift_named_formulas(
         &mut self,
         edited_sheet: u32,
@@ -545,27 +799,32 @@ impl CellStore {
         columns: bool,
         changed: &mut Vec<String>,
     ) {
-        for ((_, key), definition) in &mut self.defined_names {
-            let DefinedName::Formula(formula) = definition else {
-                continue;
-            };
-            let shifted = formula.rewrite(&self.sheet_names, |ast| {
-                if columns {
-                    shift_cols(ast, at, delta, NO_SHEET, edited_sheet)
-                } else {
-                    shift_rows(ast, at, delta, NO_SHEET, edited_sheet)
-                }
-            });
-            if formula.positional || shifted {
-                changed.push(key.clone());
+        let sheets = &self.sheet_names;
+        for entry in &mut self.names.entries {
+            let mut moved = false;
+            for (_, definition) in &mut entry.definitions {
+                let DefinedName::Formula(formula) = definition else {
+                    continue;
+                };
+                let shifted = formula.rewrite(sheets, |ast| {
+                    if columns {
+                        shift_cols(ast, at, delta, NO_SHEET, edited_sheet)
+                    } else {
+                        shift_rows(ast, at, delta, NO_SHEET, edited_sheet)
+                    }
+                });
+                moved |= formula.positional || shifted;
+            }
+            if moved {
+                changed.push(entry.key.to_string());
             }
         }
     }
 
     /// Follow `count` rows (or, with `columns`, columns) of `edited_sheet`
     /// moved from `from` to `to` in every name: a named range's span and the
-    /// references of a name's formula. Adds to `changed` the names whose
-    /// expansions change.
+    /// references of a name's formula. Adds to `changed` the names that read
+    /// differently.
     pub(super) fn move_named_references(
         &mut self,
         edited_sheet: u32,
@@ -573,109 +832,94 @@ impl CellStore {
         (from, count, to): (u32, u32, u32),
         changed: &mut Vec<String>,
     ) {
-        for ((_, key), definition) in &mut self.defined_names {
-            let moved = match definition {
-                DefinedName::Formula(formula) => {
-                    formula.positional
-                        | formula.rewrite(&self.sheet_names, |ast| {
-                            move_refs(ast, edited_sheet, NO_SHEET, columns, (from, count, to))
-                        })
-                }
-                DefinedName::Range(range) if range.sheet == edited_sheet => {
-                    let (start, end) = if columns {
-                        (&mut range.col_start, &mut range.col_end)
-                    } else {
-                        (&mut range.row_start, &mut range.row_end)
-                    };
-                    let moved = moved_span(*start, *end, from, count, to);
-                    let changed = moved.is_some_and(|span| span != (*start, *end));
-                    if let Some(span) = moved {
-                        (*start, *end) = span;
+        let sheets = &self.sheet_names;
+        for entry in &mut self.names.entries {
+            let mut moved = false;
+            for (_, definition) in &mut entry.definitions {
+                moved |= match definition {
+                    DefinedName::Formula(formula) => {
+                        formula.positional
+                            | formula.rewrite(sheets, |ast| {
+                                move_refs(ast, edited_sheet, NO_SHEET, columns, (from, count, to))
+                            })
                     }
-                    changed
-                }
-                DefinedName::Range(_) => false,
-            };
+                    DefinedName::Range(range) if range.sheet == edited_sheet => {
+                        let (start, end) = if columns {
+                            (&mut range.col_start, &mut range.col_end)
+                        } else {
+                            (&mut range.row_start, &mut range.row_end)
+                        };
+                        let span = moved_span(*start, *end, from, count, to);
+                        let differs = span.is_some_and(|span| span != (*start, *end));
+                        if let Some(span) = span {
+                            (*start, *end) = span;
+                        }
+                        differs
+                    }
+                    DefinedName::Range(_) => false,
+                };
+            }
             if moved {
-                changed.push(key.clone());
+                changed.push(entry.key.to_string());
             }
         }
     }
 
     /// Follow a sheet rename in every name's formula.
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
-        for definition in self.defined_names.values_mut() {
-            if let DefinedName::Formula(formula) = definition {
-                formula.rewrite(&self.sheet_names, |ast| {
-                    rename_sheet_refs(ast, handle, name)
-                });
+        let sheets = &self.sheet_names;
+        for entry in &mut self.names.entries {
+            for (_, definition) in &mut entry.definitions {
+                if let DefinedName::Formula(formula) = definition {
+                    formula.rewrite(sheets, |ast| rename_sheet_refs(ast, handle, name));
+                }
             }
         }
     }
 
     /// Turn a removed sheet's references into `#REF!`, adding the names
-    /// whose formula changed to `changed`. The table owner has already
-    /// removed definitions scoped to that sheet.
+    /// whose formula changed to `changed`. The definitions scoped to that
+    /// sheet are already removed.
     pub(super) fn remove_sheet_from_named_formulas(
         &mut self,
         handle: u32,
         changed: &mut Vec<String>,
     ) {
-        for ((_, key), definition) in &mut self.defined_names {
-            if let DefinedName::Formula(formula) = definition {
-                if formula.rewrite(&self.sheet_names, |ast| invalidate_sheet_refs(ast, handle)) {
-                    changed.push(key.clone());
+        let sheets = &self.sheet_names;
+        for entry in &mut self.names.entries {
+            let mut invalidated = false;
+            for (_, definition) in &mut entry.definitions {
+                if let DefinedName::Formula(formula) = definition {
+                    invalidated |=
+                        formula.rewrite(sheets, |ast| invalidate_sheet_refs(ast, handle));
                 }
+            }
+            if invalidated {
+                changed.push(entry.key.to_string());
             }
         }
     }
 
     pub(super) fn add_defined_name_memory(&self, metadata: &mut MemoryOwnerStats) {
-        metadata.add_hash_table::<NameKey, DefinedName>(
-            self.defined_names.len(),
-            self.defined_names.capacity(),
-        );
-        for ((_, key), definition) in &self.defined_names {
-            metadata.add_payload(key.len(), key.capacity());
-            let DefinedName::Formula(formula) = definition else {
-                if let DefinedName::Range(range) = definition {
-                    metadata.add_payload(range.name.len(), range.name.capacity());
-                }
-                continue;
-            };
-            let bytes = std::mem::size_of::<Definition>();
-            metadata.add_payload(bytes, bytes);
-            metadata.add_payload(formula.name.len(), formula.name.capacity());
-            metadata.add_payload(formula.source.len(), formula.source.capacity());
-            formula.ast.heap_memory_stats(metadata);
-            match &formula.resolved {
-                Some(NameTarget::Range(range)) => {
-                    metadata.add_payload(range.name.len(), range.name.capacity());
-                }
-                Some(NameTarget::Formula(expansion)) => {
-                    let bytes = std::mem::size_of::<NamedFormulaRef>();
-                    metadata.add_payload(bytes, bytes);
-                    metadata.add_payload(expansion.name.len(), expansion.name.capacity());
-                    expansion.expression.heap_memory_stats(metadata);
-                }
-                Some(NameTarget::Reference(_)) | None => {}
-            }
-        }
+        self.names.add_memory(metadata);
     }
 
-    /// Every name's scope, name and formula, for a same-build transfer.
-    pub(super) fn named_formula_sources(&self) -> impl Iterator<Item = (Option<u32>, &str, &str)> {
-        self.defined_names
-            .iter()
-            .filter_map(|((scope, _), definition)| match definition {
+    /// Every named formula's scope, name and formula, for a same-build
+    /// transfer.
+    pub(super) fn named_formula_sources(
+        &self,
+    ) -> impl Iterator<Item = (Option<u32>, &str, &str)> + '_ {
+        self.names
+            .definitions()
+            .filter_map(|(scope, _, definition)| match definition {
                 DefinedName::Formula(formula) => {
-                    Some((*scope, formula.name.as_str(), formula.source.as_str()))
+                    Some((scope, formula.name.as_str(), formula.source.as_str()))
                 }
                 DefinedName::Range(_) => None,
             })
     }
 
-    /// Define a transferred name without resolving formulas, which the
+    /// Define a transferred name without binding formulas, which the
     /// transfer has not read yet.
     #[cfg(any(target_arch = "wasm32", test))]
     pub(super) fn insert_transferred_named_formula(
@@ -688,123 +932,136 @@ impl CellStore {
             .ok()
             .and_then(|ast| self.resolve_sheets(ast).ok())
             .ok_or("invalid transferred defined name")?;
-        let key = (scope, workbook_name_key(&name));
+        let key = workbook_name_key(&name);
         let definition = Definition {
-            name,
-            source,
             positional: is_positional(&ast),
+            name: name.clone(),
+            source,
             ast,
-            resolved: None,
-            visit: Cell::new(Visit::Unvisited),
+            expression: Ast::Missing,
         };
-        self.defined_names
-            .insert(key, DefinedName::Formula(Box::new(definition)));
+        self.names.insert(
+            scope,
+            key,
+            &name,
+            DefinedName::Formula(Box::new(definition)),
+        );
         Ok(())
     }
 }
 
-/// A name's single reference for a formula on `formula_sheet`. A reference
-/// with no sheet takes the formula's sheet. While a definition is resolved for
-/// every sheet, it keeps no sheet at the top of that definition, which takes
-/// the sheet at bind, and stays a plain reference inside it, which reads the
-/// sheet of the formula that evaluates it.
-fn place_range(range: NamedRangeRef, formula_sheet: u32, depth: usize) -> NameTarget {
-    if range.sheet != NO_SHEET {
-        return NameTarget::Range(range);
+/// The nodes a read of the definition `(scope, id)` walks, counting each name
+/// in it at its own size, saturating. A name met again inside its own
+/// formula counts as one node, as it reads as undefined.
+fn definition_size(
+    table: &NameTable,
+    (scope, id): (Option<u32>, NameId),
+    sizes: &mut FxHashMap<(Option<u32>, NameId), usize>,
+    depth: usize,
+) -> usize {
+    if let Some(&size) = sizes.get(&(scope, id)) {
+        return size;
     }
-    if formula_sheet == NO_SHEET && depth > 0 {
-        let absolute = RefFlags::new(true, true);
-        return NameTarget::Reference(Ast::Range(
-            range.row_start,
-            range.col_start,
-            range.row_end,
-            range.col_end,
-            RangeFlags {
-                start: absolute,
-                end: absolute,
-            },
-        ));
-    }
-
-    NameTarget::Range(NamedRangeRef {
-        sheet: formula_sheet,
-        ..range
-    })
-}
-
-/// The expansion of `name`, or a `#NUM!` in its place when it is larger than
-/// [`EXPANSION_NODE_LIMIT`].
-fn bounded_expansion(name: &str, written: Ast) -> NamedFormulaRef {
-    // A named LAMBDA reads its parameters from the call frame, like one
-    // written in a formula.
-    #[cfg(feature = "analysis")]
-    let expression = {
-        let mut resolved = written;
-        crate::eval::analysis::lambda::resolve_parameters(&mut resolved);
-        resolved
+    let Some(DefinedName::Formula(formula)) = table.defined_at(scope, id) else {
+        return 1;
     };
-    #[cfg(not(feature = "analysis"))]
-    let expression = written;
-    let nodes = expanded_nodes(&expression);
-    let bounded = if nodes > EXPANSION_NODE_LIMIT {
-        Ast::Array(Box::new(crate::calc::ArrayLiteral {
-            cols: 1,
-            values: vec![Value::Error(FormulaError::Num)],
-        }))
+    // A cycle reads as undefined where it closes.
+    sizes.insert((scope, id), 1);
+    let size = if depth > FORMULA_RECURSION_LIMIT {
+        usize::MAX
     } else {
-        expression
+        expression_size(table, &formula.expression, scope, sizes, depth)
     };
-    NamedFormulaRef {
-        name: name.to_owned(),
-        expression: bounded,
-        nodes,
-    }
+    sizes.insert((scope, id), size);
+    size
 }
 
-/// The nodes a walk over `ast` visits, where a name counts as its expansion.
+/// The nodes of `ast`, counting each name in it at the size of its
+/// definition in `scope`, else the workbook's.
 #[allow(
     clippy::wildcard_enum_match_arm,
-    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node counts as one"
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node counts as one plus its children"
 )]
-fn expanded_nodes(ast: &Ast) -> usize {
-    let children = match ast {
-        Ast::NamedFormula(named) => return named.nodes,
-        Ast::Func(_, args) => args
-            .iter()
-            .map(expanded_nodes)
-            .fold(0, usize::saturating_add),
-        Ast::UnknownFunc(call) => call
-            .args
-            .iter()
-            .map(expanded_nodes)
-            .fold(0, usize::saturating_add),
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            expanded_nodes(left).saturating_add(expanded_nodes(right))
-        }
-        Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => expanded_nodes(inner),
-        Ast::LetSlot { expression, .. } => expanded_nodes(expression),
-        #[cfg(feature = "analysis")]
-        Ast::Lambda(definition) => definition
-            .parameters
-            .len()
-            .saturating_add(expanded_nodes(&definition.body)),
-        _ => 0,
-    };
-    children.saturating_add(1)
+fn expression_size(
+    table: &NameTable,
+    ast: &Ast,
+    scope: Option<u32>,
+    sizes: &mut FxHashMap<(Option<u32>, NameId), usize>,
+    depth: usize,
+) -> usize {
+    if let Ast::DefinedName(id) = ast {
+        let own = scope.filter(|_| table.defined_at(scope, *id).is_some());
+        return definition_size(table, (own, *id), sizes, depth + 1);
+    }
+    let mut size: usize = 1;
+    #[cfg(feature = "analysis")]
+    if let Ast::Lambda(definition) = ast {
+        size = size.saturating_add(definition.parameters.len());
+    }
+    ast.any_child(&mut |child| {
+        size = size.saturating_add(expression_size(table, child, scope, sizes, depth));
+        false
+    });
+    size
 }
 
-/// A name whose formula is one cell or range reference is a named range in
-/// the formula that uses it, so functions that take a reference accept it.
+/// How a formula uses the changed names.
+enum NameUse {
+    None,
+    /// It reads a changed name through its id: its reads and flags change.
+    Read,
+    /// Its tree binds differently: it calls a changed name or holds one
+    /// unbound; or it reads one and has a LET, whose tree is resolved in
+    /// place.
+    Bound,
+}
+
+/// How `ast` uses the names `ids` (or the folded names `keys`, for names it
+/// holds unbound).
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is walked through its children"
+)]
+fn name_use(ast: &Ast, ids: &[NameId], keys: &[String]) -> NameUse {
+    let mut reads = false;
+    let mut binds = false;
+    let mut has_let = false;
+    let mut visit = |node: &Ast| match node {
+        Ast::DefinedName(id) => reads |= ids.contains(id),
+        Ast::Name(name) => binds |= keys.contains(&workbook_name_key(name)),
+        Ast::UnknownFunc(call) => {
+            binds |= keys.contains(&workbook_name_key(&call.name))
+                || matches!(call.args.first(), Some(Ast::DefinedName(id)) if ids.contains(id));
+        }
+        Ast::Func(crate::calc::Func::Let, _) => has_let = true,
+        _ => {}
+    };
+    walk(ast, &mut visit);
+    if binds || (reads && has_let) {
+        NameUse::Bound
+    } else if reads {
+        NameUse::Read
+    } else {
+        NameUse::None
+    }
+}
+
+/// Visit `ast` and every node below it.
+fn walk(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
+    visit(ast);
+    ast.any_child(&mut |child| {
+        walk(child, visit);
+        false
+    });
+}
+
+/// A name's formula that is one cell or range reference, read as a range
+/// on `formula_sheet`: an unqualified reference reads that sheet.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not a single cell or range"
 )]
-fn reference_target(
-    ast: &Ast,
-    name: &str,
-    scope: Option<u32>,
-    formula_sheet: u32,
-) -> Option<NamedRangeRef> {
+fn reference_target(ast: &Ast, formula_sheet: u32) -> Option<CellRange> {
     let (sheet, row_start, col_start, row_end, col_end) = match ast {
         Ast::Cell(row, col, _) => (formula_sheet, *row, *col, *row, *col),
         Ast::AbsCell(sheet, row, col, _) => (sheet.handle, *row, *col, *row, *col),
@@ -812,15 +1069,7 @@ fn reference_target(
         Ast::AbsRange(sheet, r0, c0, r1, c1, _) => (sheet.handle, *r0, *c0, *r1, *c1),
         _ => return None,
     };
-    Some(NamedRangeRef {
-        name: name.to_owned(),
-        scope,
-        sheet,
-        row_start,
-        col_start,
-        row_end,
-        col_end,
-    })
+    Some(CellRange::new(sheet, row_start, col_start, row_end, col_end))
 }
 
 /// The names that `ast` uses, as a name or as a function it calls.
@@ -888,21 +1137,4 @@ fn is_positional(ast: &Ast) -> bool {
         Ast::Lambda(definition) => is_positional(&definition.body),
         _ => false,
     }
-}
-
-/// Whether `source` may use the name whose folded key is `key`: it holds
-/// the name, without case. A linked workbook's name is matched by its part
-/// after `!`. A false match only binds a formula again that did not need it.
-fn mentions_name(source: &str, key: &str) -> bool {
-    let name = key.rsplit('!').next().unwrap_or(key);
-    if name.is_empty() {
-        return true;
-    }
-    if source.is_ascii() {
-        return source
-            .as_bytes()
-            .windows(name.len())
-            .any(|window| window.eq_ignore_ascii_case(name.as_bytes()));
-    }
-    source.to_uppercase().contains(name)
 }

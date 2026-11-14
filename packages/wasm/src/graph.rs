@@ -10,6 +10,7 @@ use crate::memory::{
     StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, FORMULAS, SHEET_INDEXES_METADATA,
 };
 use crate::sheet::SheetData;
+use crate::store::names::NameScope;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
@@ -604,7 +605,9 @@ impl SheetFormulas {
         slots.retire(id)
     }
 
-    /// Refresh source metadata without replacing surviving ids.
+    /// Refresh source metadata without replacing surviving ids. Each entry
+    /// is rewritten as the formula at its cell, so a defined name placed by
+    /// the cell that reads it is read there.
     pub(crate) fn rewrite_entries(
         &mut self,
         slots: &mut FormulaStore,
@@ -613,10 +616,11 @@ impl SheetFormulas {
         let mut volatile_count = 0;
         let mut subtotal_count = 0;
         for id in self.ids() {
+            let origin = slots.location(id).map(|at| (at.row, at.col));
             let Some(entry) = slots.get_mut(id) else {
                 continue;
             };
-            rewrite(entry);
+            crate::eval::with_formula_origin(origin.unwrap_or_default(), || rewrite(entry));
             slots.refresh_flags(id);
             volatile_count += usize::from(slots.is_volatile(id));
             subtotal_count += usize::from(slots.is_subtotal(id));
@@ -625,22 +629,25 @@ impl SheetFormulas {
         self.subtotal_count = subtotal_count;
     }
 
-    /// Moves entries at or below `at` down by `count` rows on this sheet,
-    /// rewriting their same-sheet references, and dirties the whole sheet.
+    /// Moves entries at or below `at` down by `count` rows on this sheet
+    /// (`names.sheet`), rewriting their same-sheet references, and dirties
+    /// the whole sheet.
     pub(crate) fn insert_rows(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: u32,
         count: u32,
         slots: &mut FormulaStore,
     ) {
         self.move_entries(slots, |(row, col), entry| {
-            entry.shift_rows(at, i64::from(count), sheet, sheet);
             let moved_row = if row >= at {
                 row.saturating_add(count)
             } else {
                 row
             };
+            crate::eval::with_formula_origin((moved_row, col), || {
+                entry.shift_rows(at, i64::from(count), names, names.sheet)
+            });
             Some((moved_row, col))
         });
     }
@@ -649,7 +656,7 @@ impl SheetFormulas {
     /// same-sheet references, and dirties the whole sheet.
     pub(crate) fn delete_rows(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: u32,
         count: u32,
         slots: &mut FormulaStore,
@@ -659,26 +666,31 @@ impl SheetFormulas {
             if row >= at && row < end {
                 return None;
             }
-            entry.shift_rows(at, -i64::from(count), sheet, sheet);
-            Some((if row >= end { row - count } else { row }, col))
+            let moved_row = if row >= end { row - count } else { row };
+            crate::eval::with_formula_origin((moved_row, col), || {
+                entry.shift_rows(at, -i64::from(count), names, names.sheet)
+            });
+            Some((moved_row, col))
         });
     }
 
     /// Column counterpart of [`Self::insert_rows`].
     pub(crate) fn insert_cols(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: u32,
         count: u32,
         slots: &mut FormulaStore,
     ) {
         self.move_entries(slots, |(row, col), entry| {
-            entry.shift_cols(at, i64::from(count), sheet, sheet);
             let moved_col = if col >= at {
                 col.saturating_add(count)
             } else {
                 col
             };
+            crate::eval::with_formula_origin((row, moved_col), || {
+                entry.shift_cols(at, i64::from(count), names, names.sheet)
+            });
             Some((row, moved_col))
         });
     }
@@ -686,7 +698,7 @@ impl SheetFormulas {
     /// Column counterpart of [`Self::delete_rows`].
     pub(crate) fn delete_cols(
         &mut self,
-        sheet: u32,
+        names: NameScope<'_>,
         at: u32,
         count: u32,
         slots: &mut FormulaStore,
@@ -696,8 +708,11 @@ impl SheetFormulas {
             if col >= at && col < end {
                 return None;
             }
-            entry.shift_cols(at, -i64::from(count), sheet, sheet);
-            Some((row, if col >= end { col - count } else { col }))
+            let moved_col = if col >= end { col - count } else { col };
+            crate::eval::with_formula_origin((row, moved_col), || {
+                entry.shift_cols(at, -i64::from(count), names, names.sheet)
+            });
+            Some((row, moved_col))
         });
     }
 

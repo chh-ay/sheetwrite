@@ -9,7 +9,7 @@ use crate::calc::{
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::tables::TableSlots;
+use crate::store::names::{NameScope, NameView};
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -217,16 +217,24 @@ pub(crate) struct ReadSet {
 }
 
 impl ReadSet {
-    pub(crate) fn from_ast(ast: &Ast, formula_sheet: u32) -> Self {
+    /// The reads of the formula `ast` on `names.sheet`; its defined names are
+    /// read through `names` for the cell being bound.
+    pub(crate) fn from_ast(ast: &Ast, names: NameScope<'_>) -> Self {
         let mut out = Self::default();
-        out.collect(ast, formula_sheet);
+        out.collect(ast, names);
         out
     }
 
-    pub(crate) fn collect(&mut self, ast: &Ast, formula_sheet: u32) {
+    pub(crate) fn collect(&mut self, ast: &Ast, names: NameScope<'_>) {
+        let formula_sheet = names.sheet;
         match ast {
-            Ast::LetSlot { expression, .. } => self.collect(expression, formula_sheet),
-            Ast::NamedFormula(named) => self.collect(&named.expression, formula_sheet),
+            Ast::LetSlot { expression, .. } => self.collect(expression, names),
+            Ast::DefinedName(id) => names.read(*id, |view| match view {
+                NameView::Range(range) => self.push_range(range),
+                NameView::Formula(expression) => self.collect(expression, names),
+                NameView::Placed(expression) => self.collect(&expression, names),
+                NameView::Undefined | NameView::Linked => {}
+            }),
             Ast::Cell(row, col, _) => self.push_cell(AbsCellKey {
                 sheet: formula_sheet,
                 row: *row,
@@ -243,13 +251,6 @@ impl ReadSet {
             Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => self.push_range(
                 CellRange::new(sheet.handle, *row_start, *col_start, *row_end, *col_end),
             ),
-            Ast::NamedRange(named) => self.push_range(CellRange::new(
-                named.sheet,
-                named.row_start,
-                named.col_start,
-                named.row_end,
-                named.col_end,
-            )),
             Ast::Structured(reference) => self.push_range(CellRange::new(
                 reference.sheet,
                 reference.row_start,
@@ -276,11 +277,11 @@ impl ReadSet {
             // range has, whatever size the sum range is written with.
             Ast::Func(Func::SumIf | Func::AverageIf, args) if args.len() == 3 => {
                 for arg in args {
-                    self.collect(arg, formula_sheet);
+                    self.collect(arg, names);
                 }
                 if let (Some(criteria), Some(sum)) = (
-                    crate::eval::static_range(&args[0], formula_sheet as usize),
-                    crate::eval::static_range(&args[2], formula_sheet as usize),
+                    crate::eval::static_range(&args[0], names),
+                    crate::eval::static_range(&args[2], names),
                 ) {
                     self.push_range(crate::eval::sum_range_extent(
                         sum,
@@ -291,33 +292,31 @@ impl ReadSet {
             }
             // Static operands read only the shared cells; an empty
             // intersection is a constant #NULL! and reads nothing.
-            Ast::Func(Func::Intersect, operands) => {
-                match intersection_range(operands, formula_sheet as usize) {
-                    Ok(range) => self.push_range(range),
-                    Err(FormulaError::Null) => {}
-                    Err(_) => {
-                        for operand in operands {
-                            self.collect(operand, formula_sheet);
-                        }
+            Ast::Func(Func::Intersect, operands) => match intersection_range(operands, names) {
+                Ok(range) => self.push_range(range),
+                Err(FormulaError::Null) => {}
+                Err(_) => {
+                    for operand in operands {
+                        self.collect(operand, names);
                     }
                 }
-            }
+            },
             Ast::Func(_, args) => {
                 for arg in args {
-                    self.collect(arg, formula_sheet);
+                    self.collect(arg, names);
                 }
             }
             Ast::UnknownFunc(call) => {
                 for arg in &call.args {
-                    self.collect(arg, formula_sheet);
+                    self.collect(arg, names);
                 }
             }
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.collect(left, formula_sheet);
-                self.collect(right, formula_sheet);
+                self.collect(left, names);
+                self.collect(right, names);
             }
             Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.collect(inner, formula_sheet);
+                self.collect(inner, names);
             }
             Ast::SheetCell(..)
             | Ast::SheetRange(..)
@@ -333,7 +332,7 @@ impl ReadSet {
             #[cfg(feature = "analysis")]
             Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
             #[cfg(feature = "analysis")]
-            Ast::Lambda(definition) => self.collect(&definition.body, formula_sheet),
+            Ast::Lambda(definition) => self.collect(&definition.body, names),
         }
     }
 
@@ -386,7 +385,7 @@ fn ast_is_plain(ast: &Ast) -> bool {
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
 )]
-fn ast_is_volatile(ast: &Ast) -> bool {
+fn ast_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(
             Func::Today
@@ -400,11 +399,17 @@ fn ast_is_volatile(ast: &Ast) -> bool {
             | Func::Info,
             _,
         ) => true,
-        Ast::NamedFormula(named) => ast_is_volatile(&named.expression),
-        _ => ast.any_child(&mut ast_is_volatile),
+        Ast::DefinedName(id) => names.read(*id, |view| match view {
+            NameView::Formula(expression) => ast_is_volatile(expression, names),
+            NameView::Placed(expression) => ast_is_volatile(&expression, names),
+            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
+        }),
+        _ => ast.any_child(&mut |child| ast_is_volatile(child, names)),
     }
 }
 
+/// Whether the formula's own tree has a LET. A defined name's LET is in the
+/// name's formula, which evaluates it there.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
@@ -412,7 +417,6 @@ fn ast_is_volatile(ast: &Ast) -> bool {
 fn ast_contains_let(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, _) => true,
-        Ast::NamedFormula(named) => ast_contains_let(&named.expression),
         _ => ast.any_child(&mut ast_contains_let),
     }
 }
@@ -421,25 +425,29 @@ fn ast_contains_let(ast: &Ast) -> bool {
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
 )]
-fn ast_contains_spill_ref(ast: &Ast) -> bool {
+fn ast_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
-        Ast::NamedFormula(named) => ast_contains_spill_ref(&named.expression),
-        _ => ast.any_child(&mut ast_contains_spill_ref),
+        Ast::DefinedName(id) => names.read(*id, |view| match view {
+            NameView::Formula(expression) => ast_contains_spill_ref(expression, names),
+            NameView::Placed(expression) => ast_contains_spill_ref(&expression, names),
+            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
+        }),
+        _ => ast.any_child(&mut |child| ast_contains_spill_ref(child, names)),
     }
 }
 
 /// The reads and volatility of `ast`; `contains_let` is
 /// [`ast_contains_let`] of it, which the caller may need too.
-fn formula_metadata(ast: &Ast, formula_sheet: u32, contains_let: bool) -> (ReadSet, bool) {
+fn formula_metadata(ast: &Ast, names: NameScope<'_>, contains_let: bool) -> (ReadSet, bool) {
     if !contains_let {
-        return (ReadSet::from_ast(ast, formula_sheet), ast_is_volatile(ast));
+        return (ReadSet::from_ast(ast, names), ast_is_volatile(ast, names));
     }
     let expanded = expand_let_reachable_ast(ast).ok();
     let metadata = expanded.as_ref().unwrap_or(ast);
     (
-        ReadSet::from_ast(metadata, formula_sheet),
-        ast_is_volatile(metadata),
+        ReadSet::from_ast(metadata, names),
+        ast_is_volatile(metadata, names),
     )
 }
 
@@ -596,10 +604,11 @@ impl FormulaEntry {
     /// `features` are the parse's: only a tree that may hold a detached
     /// sheet reference is walked for a missing local sheet, only one with a
     /// table reference is listed among its tables' users, and only one that
-    /// may use a defined name is looked at when a name changes.
+    /// may use a defined name is looked at when a name changes. The formula
+    /// is on `names.sheet`, and its defined names are read through `names`.
     pub(crate) fn parsed_source(
         mut ast: Ast,
-        sheet: u32,
+        names: NameScope<'_>,
         source: String,
         features: ParseFeatures,
     ) -> Self {
@@ -610,7 +619,7 @@ impl FormulaEntry {
         if ast_is_plain(&ast) {
             let mut entry = Self {
                 flags: 0,
-                reads: ReadSet::from_ast(&ast, sheet),
+                reads: ReadSet::from_ast(&ast, names),
                 ast: Some(ast),
                 source,
             };
@@ -620,7 +629,7 @@ impl FormulaEntry {
         }
 
         let contains_let = ast_contains_let(&ast);
-        let (reads, volatile) = formula_metadata(&ast, sheet, contains_let);
+        let (reads, volatile) = formula_metadata(&ast, names, contains_let);
 
         let mut entry = Self {
             flags: 0,
@@ -630,23 +639,26 @@ impl FormulaEntry {
         };
 
         entry.set_volatile(volatile);
-        entry.set_has_spill_refs(ast_contains_spill_ref(&ast));
+        entry.set_has_spill_refs(ast_contains_spill_ref(&ast, names));
         entry.set_produces_array(crate::eval::ast_produces_array(
             &ast,
-            crate::eval::Shapes::NONE,
+            crate::eval::Shapes::top(names),
         ));
-        entry.set_flag(Self::CALLS_SUBTOTAL, crate::eval::ast_calls_subtotal(&ast));
+        entry.set_flag(
+            Self::CALLS_SUBTOTAL,
+            crate::eval::ast_calls_subtotal(&ast, names),
+        );
         #[cfg(feature = "analysis")]
         entry.set_flag(
             Self::CALLS_PIVOT_DATA,
-            crate::eval::analysis::ast_calls_pivot_data(&ast),
+            crate::eval::analysis::ast_calls_pivot_data(&ast, names),
         );
         entry.set_flag(Self::TABLE_REFS, features.table_refs);
         entry.set_flag(Self::NAME_REFS, features.names);
         // The flags and reads above come from the tree as written; resolving
         // LET names afterwards changes how it evaluates, not what it reads.
         if contains_let && !entry.has_spill_refs() {
-            crate::eval::resolve_let_names(&mut ast);
+            crate::eval::resolve_let_names(&mut ast, names);
         }
         entry.set_source_error(missing_local.then_some(FormulaError::Ref));
         entry.ast = Some(ast);
@@ -663,12 +675,12 @@ impl FormulaEntry {
         reads: ReadSet,
         is_reference: bool,
         features: ParseFeatures,
+        names: NameScope<'_>,
     ) -> Self {
-        if let Some(tree) = ast
-            .as_mut()
-            .filter(|candidate| ast_contains_let(candidate) && !ast_contains_spill_ref(candidate))
-        {
-            crate::eval::resolve_let_names(tree);
+        if let Some(tree) = ast.as_mut().filter(|candidate| {
+            ast_contains_let(candidate) && !ast_contains_spill_ref(candidate, names)
+        }) {
+            crate::eval::resolve_let_names(tree, names);
         }
         let mut entry = Self {
             ast,
@@ -684,7 +696,7 @@ impl FormulaEntry {
             entry
                 .ast
                 .as_ref()
-                .is_some_and(crate::eval::ast_calls_subtotal),
+                .is_some_and(|tree| crate::eval::ast_calls_subtotal(tree, names)),
         );
         #[cfg(feature = "analysis")]
         entry.set_flag(
@@ -692,12 +704,13 @@ impl FormulaEntry {
             entry
                 .ast
                 .as_ref()
-                .is_some_and(crate::eval::analysis::ast_calls_pivot_data),
+                .is_some_and(|tree| crate::eval::analysis::ast_calls_pivot_data(tree, names)),
         );
         entry
     }
 
-    pub(crate) fn reference(target: AbsCellKey, formula_sheet: u32) -> Self {
+    /// A cell that only refers to `target`, as a sort or a move leaves it.
+    pub(crate) fn reference(target: AbsCellKey) -> Self {
         let ast = Ast::AbsCell(
             SheetRef {
                 handle: target.sheet,
@@ -707,7 +720,10 @@ impl FormulaEntry {
             RefFlags::default(),
         );
         Self {
-            reads: ReadSet::from_ast(&ast, formula_sheet),
+            reads: ReadSet {
+                cells: vec![target],
+                ranges: Vec::new(),
+            },
             ast: Some(ast),
             source: String::new(),
             flags: Self::REFERENCE,
@@ -763,7 +779,7 @@ impl FormulaEntry {
     /// rest stays as the user wrote it, as in Excel. Returns whether anything
     /// changed. Out of line, so the edits that call it share one copy.
     #[inline(never)]
-    fn rewrite_ast(&mut self, formula_sheet: u32, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
+    fn rewrite_ast(&mut self, names: NameScope<'_>, rewrite: impl FnOnce(&mut Ast) -> bool) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
         };
@@ -771,7 +787,7 @@ impl FormulaEntry {
             return false;
         }
 
-        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
+        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast));
         self.reads = reads;
 
         // A plain reference has no source text: its tree is the target.
@@ -785,7 +801,7 @@ impl FormulaEntry {
     /// into its replacement, leaving the old read set for the graph edit.
     pub(crate) fn bind_sheets(
         &mut self,
-        formula_sheet: u32,
+        names: NameScope<'_>,
         resolve: &SheetResolver<'_>,
         place: &SpanPlacer<'_>,
     ) -> Option<Self> {
@@ -793,21 +809,22 @@ impl FormulaEntry {
         if !bind_sheet_refs(ast, resolve, place) {
             return None;
         }
-        self.rebound(formula_sheet)
+        self.rebound(names)
     }
 
     /// Bind the table references that no table bound when the formula in
-    /// cell `at` was written. Like [`Self::bind_sheets`], the text stays as
-    /// typed.
-    pub(crate) fn bind_tables(&mut self, at: AbsCellKey, tables: &TableSlots) -> Option<Self> {
+    /// cell `at` was written, to the tables of `names`. Like
+    /// [`Self::bind_sheets`], the text stays as typed.
+    pub(crate) fn bind_tables(&mut self, at: AbsCellKey, names: NameScope<'_>) -> Option<Self> {
         let ast = self.ast.as_mut()?;
+        let tables = names.tables;
         let bind = |reference: &UnresolvedStructuredRef, sheet: u32, row: u32, col: u32| {
             tables.bind(reference.written(), AbsCellKey { sheet, row, col })
         };
         if !resolve_structured_refs(ast, at.sheet, at.row, at.col, &bind) {
             return None;
         }
-        self.rebound(at.sheet)
+        self.rebound(names)
     }
 
     /// Refresh the entry's references to table slot `table` after an edit of
@@ -816,23 +833,24 @@ impl FormulaEntry {
     pub(crate) fn refresh_table(
         &mut self,
         table: u16,
-        formula_sheet: u32,
+        names: NameScope<'_>,
         refresh: &TableRefresh<'_>,
     ) -> Option<Self> {
         let ast = self.ast.as_mut()?;
         if !refresh_table_refs(ast, table, refresh) {
             return None;
         }
-        let mut replacement = self.rebound(formula_sheet)?;
+        let mut replacement = self.rebound(names)?;
         let has_text = replacement.flags & Self::REFERENCE == 0;
         replacement.set_flag(Self::STALE_REFERENCES, has_text);
         Some(replacement)
     }
 
     /// The entry rebuilt around its edited tree, with its text and its
-    /// reference and stale-text bits. Moves the tree and source into the
+    /// reference and stale-text bits; also what a defined name change gives
+    /// a formula that reads the name. Moves the tree and source into the
     /// replacement, leaving the old read set for the graph edit.
-    fn rebound(&mut self, formula_sheet: u32) -> Option<Self> {
+    pub(crate) fn rebound(&mut self, names: NameScope<'_>) -> Option<Self> {
         let ast = self.ast.take()?;
         let features = ParseFeatures {
             detached_sheets: true,
@@ -840,12 +858,8 @@ impl FormulaEntry {
             names: self.uses_names(),
             ..ParseFeatures::default()
         };
-        let mut replacement = Self::parsed_source(
-            ast,
-            formula_sheet,
-            std::mem::take(&mut self.source),
-            features,
-        );
+        let mut replacement =
+            Self::parsed_source(ast, names, std::mem::take(&mut self.source), features);
         replacement.flags |= self.flags & (Self::REFERENCE | Self::STALE_REFERENCES);
         Some(replacement)
     }
@@ -854,11 +868,11 @@ impl FormulaEntry {
         &mut self,
         at: u32,
         delta: i64,
-        formula_sheet: u32,
+        names: NameScope<'_>,
         edited_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| {
-            shift_rows(ast, at, delta, formula_sheet, edited_sheet)
+        self.rewrite_ast(names, |ast| {
+            shift_rows(ast, at, delta, names.sheet, edited_sheet)
         })
     }
 
@@ -866,20 +880,20 @@ impl FormulaEntry {
         &mut self,
         at: u32,
         delta: i64,
-        formula_sheet: u32,
+        names: NameScope<'_>,
         edited_sheet: u32,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| {
-            shift_cols(ast, at, delta, formula_sheet, edited_sheet)
+        self.rewrite_ast(names, |ast| {
+            shift_cols(ast, at, delta, names.sheet, edited_sheet)
         })
     }
 
-    pub(crate) fn rename_sheet(&mut self, handle: u32, name: &str, formula_sheet: u32) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| rename_sheet_refs(ast, handle, name))
+    pub(crate) fn rename_sheet(&mut self, handle: u32, name: &str, names: NameScope<'_>) -> bool {
+        self.rewrite_ast(names, |ast| rename_sheet_refs(ast, handle, name))
     }
 
-    pub(crate) fn invalidate_sheet(&mut self, handle: u32, formula_sheet: u32) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| invalidate_sheet_refs(ast, handle))
+    pub(crate) fn invalidate_sheet(&mut self, handle: u32, names: NameScope<'_>) -> bool {
+        self.rewrite_ast(names, |ast| invalidate_sheet_refs(ast, handle))
     }
 
     /// Follow `block` (`from`, `count`, `to`) rows or, with `columns`,
@@ -887,12 +901,12 @@ impl FormulaEntry {
     pub(crate) fn move_axis(
         &mut self,
         edited_sheet: u32,
-        formula_sheet: u32,
+        names: NameScope<'_>,
         columns: bool,
         block: (u32, u32, u32),
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| {
-            move_refs(ast, edited_sheet, formula_sheet, columns, block)
+        self.rewrite_ast(names, |ast| {
+            move_refs(ast, edited_sheet, names.sheet, columns, block)
         })
     }
 
@@ -903,33 +917,34 @@ impl FormulaEntry {
         &mut self,
         key: &str,
         handle: Option<u32>,
-        formula_sheet: u32,
-        names: &[String],
+        names: NameScope<'_>,
+        sheet_names: &[String],
     ) -> bool {
         let Some(ast) = &mut self.ast else {
             return false;
         };
-        if !relink_sheet_refs(ast, key, handle, names) {
+        if !relink_sheet_refs(ast, key, handle, sheet_names) {
             return false;
         }
 
         // A relinked reference writes the same text, so the source stays as
         // the user wrote it instead of being written again from the tree.
-        let (reads, volatile) = formula_metadata(ast, formula_sheet, ast_contains_let(ast));
+        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast));
         self.reads = reads;
         self.set_volatile(volatile);
         true
     }
 
-    /// Re-places the entry's 3-D references in the tab `order`; `names` holds
-    /// the sheet name of each handle. Returns whether anything changed.
+    /// Re-places the entry's 3-D references in the tab `order`;
+    /// `sheet_names` holds the sheet name of each handle. Returns whether
+    /// anything changed.
     pub(crate) fn refresh_sheet_spans(
         &mut self,
         order: &[u32],
-        names: &[String],
-        formula_sheet: u32,
+        sheet_names: &[String],
+        names: NameScope<'_>,
     ) -> bool {
-        self.rewrite_ast(formula_sheet, |ast| refresh_sheet_spans(ast, order, names))
+        self.rewrite_ast(names, |ast| refresh_sheet_spans(ast, order, sheet_names))
     }
 
     /// Heap allocations owned by this formula entry. The inline entry is
@@ -974,20 +989,18 @@ mod formula_entry_tests {
 
     #[test]
     fn formula_entry_flags_preserve_independent_metadata() {
+        let store = crate::store::CellStore::new();
         for reference in [false, true] {
             let mut entry = if reference {
-                FormulaEntry::reference(
-                    AbsCellKey {
-                        sheet: 0,
-                        row: 1,
-                        col: 2,
-                    },
-                    0,
-                )
+                FormulaEntry::reference(AbsCellKey {
+                    sheet: 0,
+                    row: 1,
+                    col: 2,
+                })
             } else {
                 FormulaEntry::parsed_source(
                     Ast::Num(1.0),
-                    0,
+                    store.name_scope(0),
                     "=1".to_owned(),
                     ParseFeatures::default(),
                 )

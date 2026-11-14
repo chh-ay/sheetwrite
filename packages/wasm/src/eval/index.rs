@@ -81,7 +81,7 @@ impl CellStore {
             return Err(FormulaError::Value);
         }
         let area = self.index_area(&args[0], args.get(AREA_ARG), sheet, pass, depth + 1)?;
-        let matrix = match range_from_ast(area, sheet) {
+        let matrix = match range_from_ast(area, self.name_scope(sheet)) {
             Some(range) => {
                 let view = RangeView::new(self, range, depth + 1)?;
                 if index_selects_whole_axis(args) {
