@@ -1,4 +1,4 @@
-import { cellScalarToText, parseCellLiteralInput } from "./cell-input.js";
+import { cellScalarToText, parseCellLiteralInput, parsePlainDecimal } from "./cell-input.js";
 import { neutralizeInjection } from "./clipboard.js";
 import {
   assertDelimitedTextDimensions,
@@ -216,25 +216,40 @@ export function fromCsv(
 ): ColumnarData {
   const limits = resolveDelimitedTextResourceLimits(options);
   const projected = columns.filter((column) => column.visible !== false);
+  const numeric = projected.map(
+    ({ type }) => type === "number" || type === "currency" || type === "date",
+  );
   const values: CellScalar[][] = Array.from({ length: projected.length }, () => []);
   let scannedRows = 0;
   let cursor = 0;
+  const append = (column: number, value: CellScalar): void => {
+    while (cursor < column) {
+      values[cursor]?.push(null);
+      cursor += 1;
+    }
+    values[column]?.push(value);
+    cursor = column + 1;
+  };
   scanDelimitedText(
     text,
     ",",
     limits,
     {
       fieldLimit: projected.length,
+      // A plain decimal in a numeric column becomes its number without a string.
+      span: (row, column, source, start, end) => {
+        if (row === 0) return true;
+        if (numeric[column] !== true) return false;
+        const number = parsePlainDecimal(source, start, end);
+        if (number === undefined) return false;
+        append(column, number);
+        return true;
+      },
       field: (row, column, value) => {
         if (row === 0) return;
         const target = projected[column];
         if (target === undefined) return;
-        while (cursor < column) {
-          values[cursor]?.push(null);
-          cursor += 1;
-        }
-        values[column]?.push(parseCellLiteralInput(value, target.type));
-        cursor = column + 1;
+        append(column, parseCellLiteralInput(value, target.type));
       },
       row: (row) => {
         if (row > 0) {

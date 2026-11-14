@@ -183,6 +183,12 @@ export interface DelimitedTextScanSink {
   readonly fieldLimit: number;
   /** Called once per materialized field, in column order within its record. */
   field(row: number, column: number, value: string): void;
+  /**
+   * Optional: offered a field whose value is one span of the input,
+   * `text.slice(start, end)`, before that string is built. Returns true when
+   * it consumed the field; false has the scanner build it and call `field`.
+   */
+  span?(row: number, column: number, text: string, start: number, end: number): boolean;
   /** Called once per completed record with its field count. */
   row(row: number, fieldCount: number): void;
 }
@@ -235,15 +241,19 @@ export function scanDelimitedText(
       failResource("maxCells", limits.maxCells, nextCells, "parse");
     }
     if (rowFields < fieldLimit) {
-      let value = "";
       if (fieldParts.length === 0) {
-        // Plain field: one slice of the input, no intermediate pieces.
-        if (end > segmentStart) value = text.slice(segmentStart, end);
+        // Plain field: one span of the input, no intermediate pieces.
+        if (sink.span?.(rowCount, rowFields, text, segmentStart, end) !== true) {
+          sink.field(rowCount, rowFields, end > segmentStart ? text.slice(segmentStart, end) : "");
+        }
       } else {
         appendSegment(end);
-        value = fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join("");
+        sink.field(
+          rowCount,
+          rowFields,
+          fieldParts.length === 1 ? (fieldParts[0] ?? "") : fieldParts.join(""),
+        );
       }
-      sink.field(rowCount, rowFields, value);
     }
     fieldParts.length = 0;
     fieldBytes = 0;
