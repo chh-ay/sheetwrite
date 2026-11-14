@@ -51,7 +51,12 @@ const EMPTY_FORMULA_BANDS = new Uint32Array(0);
 
 let datasourceClockForTest: (() => number) | undefined;
 
-/** Installs a deterministic monotonic clock through the public testing entrypoint. */
+/**
+ * Installs a deterministic monotonic clock through the public testing entrypoint.
+ *
+ * @param now - Returns the current time in milliseconds; it must never go back.
+ * @returns A function that puts the previous clock back.
+ */
 export function installDatasourceClockForTest(now: () => number): () => void {
   const previous = datasourceClockForTest;
   datasourceClockForTest = now;

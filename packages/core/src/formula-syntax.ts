@@ -11,8 +11,11 @@ import type { FormulaArgumentMetadata, FormulaFunctionMetadata } from "./functio
 
 /** A problem in a formula, with the span of text it marks. */
 export interface FormulaDiagnostic {
+  /** UTF-16 offset in the formula text where the marked span starts. */
   readonly from: number;
+  /** UTF-16 offset where the marked span ends, not included. */
   readonly to: number;
+  /** A readable explanation of the problem. */
   readonly message: string;
   /**
    * The formula ends before it is complete (a missing `)` or value at the end).

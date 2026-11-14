@@ -47,6 +47,7 @@ let pendingRelease: Promise<EngineMemoryReleaseReport> | undefined;
  * const report = await releaseEngineMemory();
  * document.body.dataset.engineBytes = String(report.wasmBytesAfter);
  * ```
+ * @returns How many stores moved, the memory before and after, and the pause.
  * @see EngineMemoryReleaseReport
  */
 export function releaseEngineMemory(): Promise<EngineMemoryReleaseReport> {

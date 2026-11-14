@@ -339,7 +339,9 @@ export interface SheetwriteStoreOptions {
   dirtyCellLimit?: number;
   /** Maximum clean references retained for exact multi-operation remove-sheet simulation. */
   referenceSimulationLimit?: number;
+  /** Decides which protected cells a local edit may change; servers must still check every edit. */
   protectionResolver?: ProtectionResolver;
+  /** What happens to a transaction with denied operations: `atomic` (default) rejects it, `partial` skips them. */
   mutationPolicy?: MutationPolicyMode;
 }
 
@@ -566,10 +568,14 @@ function storeFailure(
 
 /** Error thrown when an operation requires datasource cells that are not loaded. */
 export class IncompleteDataError extends SheetwriteError {
+  /** Always `"IncompleteDataError"`. */
   override readonly name = "IncompleteDataError";
+  /** Always `"incomplete-data"`. */
   declare readonly code: "incomplete-data";
+  /** How many of the sheet's cells are loaded, out of the total. */
   readonly capability: Extract<QueryCapability, { status: "incomplete" }>;
 
+  /** Creates the error for a query on `sheet`, which has unloaded cells. */
   constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete" }>) {
     super("incomplete-data", "query", `Sheetwrite: ${sheet} has unloaded datasource cells`, {
       context: {

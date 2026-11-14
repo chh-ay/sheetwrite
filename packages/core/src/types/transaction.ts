@@ -80,6 +80,7 @@ export interface TransactionApplicationOptions {
 
 /** Classification metadata for host-supplied remote operations. */
 export interface RemoteOperationOptions {
+  /** How the `change` event classifies the commit; defaults to `"api"`. */
   commitReason?: CommitReason;
   /** Reapply a durable local mutation as dirty pending state rather than authoritative remote data. */
   localReplay?: boolean;
@@ -94,9 +95,13 @@ export interface RestoreProvenance {
 
 /** Immutable local operation batch awaiting a host acknowledgement. */
 export interface PendingCommit {
+  /** ID of the document the operations change. */
   documentId: string;
+  /** Server version the operations were made against; the commit lands at `baseVersion + 1`. */
   baseVersion: number;
+  /** Unique ID of this local change; a resend with the same ID must not apply twice. */
   clientMutationId: string;
+  /** The document operations, in the order they were applied locally. */
   readonly operations: readonly DocumentOp[];
   /**
    * Present only when the operations are too large for one server version.
@@ -128,6 +133,7 @@ export type SyncMutationStatus =
 
 /** Pending commit paired with its current synchronization status. */
 export interface SyncMutationRecord extends PendingCommit {
+  /** Where the change is in the queue, such as `"sending"` or `"conflicted"`. */
   status: SyncMutationStatus;
 }
 
@@ -141,8 +147,11 @@ export interface VersionBatchMember {
 
 /** Remote document operations paired with a contiguous server version. */
 export interface VersionedOperation {
+  /** Server version these operations produce; versions arrive one after another. */
   version: number;
+  /** The document operations of this version, in order. */
   readonly operations: readonly DocumentOp[];
+  /** ID of the local change that produced the version, so its author can recognise it. */
   clientMutationId?: string;
   /**
    * Present when this version is one member of an atomic batch. Every member
@@ -158,6 +167,7 @@ export interface VersionedOperation {
 
 /** Cancellable pending commit submitted to a persistence adapter. */
 export interface PersistenceCommitRequest extends PendingCommit {
+  /** Aborts when the coordinator stops waiting, for example when it is destroyed. */
   signal?: AbortSignal;
 }
 
@@ -190,6 +200,7 @@ export interface CommittedTransaction {
  * `@sheetwrite/core/history` implements this interface.
  */
 export interface CommitJournal {
+  /** Stores one committed transaction; call `capture` only when a checkpoint is due. */
   record(commit: CommittedTransaction, capture: () => WorkbookSnapshot): Promise<void>;
 }
 
@@ -229,7 +240,9 @@ export type PersistenceCommitResponse =
  * @see SyncCoordinator
  */
 export interface PersistenceAdapter {
+  /** Returns the current snapshot of the document, with its `version` set. */
   load(documentId: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
+  /** Applies one pending commit at `baseVersion + 1`, or reports a duplicate or a conflict. */
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse>;
   /**
    * Commit an atomic batch at versions `baseVersion + 1` through
@@ -246,6 +259,10 @@ export interface PersistenceAdapter {
  * can pause intake should await the listener promise to preserve backpressure.
  */
 export interface RemoteOperationSource {
+  /**
+   * Calls `listener` for each new version, in order; returns a function that
+   * stops the subscription (or `undefined` when `signal` does that).
+   */
   subscribe(
     listener: (operation: VersionedOperation) => void | Promise<void>,
     signal?: AbortSignal,
@@ -260,15 +277,21 @@ export interface RemoteOperationSource {
  * that participate in read-only policy and undo/redo history.
  */
 export interface GridTransaction {
+  /** Document operations, applied in order as one undo step. */
   patches: DocumentOp[];
 }
 
 /** One committed cell edit, carrying enough to roll back. */
 export interface CellChange {
+  /** The cell that changed. */
   addr: CellAddress;
+  /** The cell's content before the commit. */
   oldValue: CellValue;
+  /** The cell's content after the commit. */
   newValue: CellValue;
+  /** The cell's own style before the commit, when it had one. */
   oldStyle?: CellStyle;
+  /** The cell's own style after the commit, when it has one. */
   newStyle?: CellStyle;
 }
 

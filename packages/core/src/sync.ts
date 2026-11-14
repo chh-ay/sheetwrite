@@ -55,6 +55,7 @@ import { utf8ByteLength } from "./utf8.js";
 
 /** Mandatory bounds for one durable pending-commit restore. */
 export interface PendingCommitLoadOptions {
+  /** Aborts when the coordinator is destroyed before the queue has loaded. */
   signal?: AbortSignal;
   /** Maximum records returned for one document queue. */
   maxRecords: number;
@@ -66,8 +67,11 @@ export interface PendingCommitLoadOptions {
 
 /** Host-owned durable queue. Browser storage lives in the optional `./browser` entrypoint. */
 export interface PendingCommitStorage {
+  /** Returns the document's saved pending commits, oldest first, within the given bounds. */
   load(documentId: string, options: PendingCommitLoadOptions): Promise<readonly PendingCommit[]>;
+  /** Saves one pending commit durably; it must survive a page reload. */
   put(commit: PendingCommit, signal?: AbortSignal): Promise<void>;
+  /** Deletes one pending commit once the server has acknowledged it. */
   remove(documentId: string, clientMutationId: string, signal?: AbortSignal): Promise<void>;
   /**
    * Atomically replaces one document queue only if its ordered IDs still match
@@ -103,7 +107,9 @@ export type SyncPendingCapacityState =
 
 /** Immutable observable synchronization state. */
 export interface SyncStateSnapshot {
+  /** Whether the coordinator is online, connecting, offline, failed or destroyed. */
   connection: SyncConnectionState;
+  /** What the coordinator is doing now, such as `"sending"` or `"idle"`. */
   activity: SyncActivityState;
   /** Pending local commits, including synchronous pre-commit reservations. */
   pendingCount: number;
@@ -119,18 +125,28 @@ export interface SyncStateSnapshot {
 
 /** Contiguous-version recovery request produced when remote input skips ahead. */
 export interface SyncVersionGapRequest {
+  /** ID of the document with the gap. */
   documentId: string;
+  /** The next version the coordinator needs. */
   expectedVersion: number;
+  /** The later version that arrived first. */
   receivedVersion: number;
+  /** Aborts when the coordinator stops waiting for your recovery. */
   signal: AbortSignal;
 }
 
 /** Typed local transaction rejection produced when the durable queue cannot reserve capacity. */
 export class SyncPendingCapacityError extends SheetwriteError {
+  /** Always `"SyncPendingCapacityError"`. */
   override readonly name = "SyncPendingCapacityError";
+  /** Always `"pending-capacity"`. */
   declare readonly code: "pending-capacity";
 
-  constructor(readonly issue: Extract<MutationIssue, { kind: "resource-limit" }>) {
+  /** Creates the error from the queue limit that refused the transaction. */
+  constructor(
+    /** The limit the queue hit, with its maximum and the size asked for. */
+    readonly issue: Extract<MutationIssue, { kind: "resource-limit" }>,
+  ) {
     super("pending-capacity", "synchronize", issue.message, {
       context: { resource: issue.resource, limit: issue.max, actual: issue.actual },
     });
@@ -139,10 +155,15 @@ export class SyncPendingCapacityError extends SheetwriteError {
 
 /** Document, version, durability, and online options for synchronization. */
 export interface SyncCoordinatorOptions {
+  /** ID of the document to sync; every pending commit carries it. */
   documentId: string;
+  /** Server version of the snapshot the grid was created from. */
   serverVersion: number;
+  /** Makes the ID of each new local change; defaults to `sheetwrite-` and random hex. */
   createMutationId?: () => string;
+  /** Durable queue for unsent changes, so they survive a reload; without it they live in memory. */
   pendingStorage?: PendingCommitStorage;
+  /** Connection state at start; defaults to `"online"`. */
   initialConnection?: "offline" | "online";
   /**
    * Authenticated ID of the person editing through this grid. Each new pending
@@ -305,6 +326,10 @@ export class SyncCoordinator {
   private pendingOperationTotal = 0;
   private pendingEncodedByteTotal = 0;
 
+  /**
+   * Starts syncing `grid` through `adapter`: from now on, each local change is
+   * queued and sent in order. With `pendingStorage`, saved changes load first.
+   */
   constructor(
     private readonly grid: Grid,
     private readonly adapter: PersistenceAdapter,
@@ -345,14 +370,17 @@ export class SyncCoordinator {
     }
   }
 
+  /** The last server version applied, from acknowledgements and remote operations. */
   get serverVersion(): number {
     return this.version;
   }
 
+  /** Number of local changes not yet acknowledged by the server. */
   get pendingCount(): number {
     return this.pendingCommitTotal;
   }
 
+  /** The current state, as a new object on each read. */
   get state(): SyncStateSnapshot {
     return {
       connection: this.destroyed ? "destroyed" : this.connection,
@@ -365,10 +393,12 @@ export class SyncCoordinator {
     };
   }
 
+  /** Copies of the unacknowledged local changes, oldest first, with their status. */
   pendingCommits(): readonly SyncMutationRecord[] {
     return this.queue.toArray().map(cloneRecord);
   }
 
+  /** Calls `listener` for every sync event; returns a function that removes it. */
   on(listener: SyncListener): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -402,6 +432,10 @@ export class SyncCoordinator {
     if (online) void this.flush().catch(() => {});
   }
 
+  /**
+   * Applies remote versions from `source` as they arrive, replacing any earlier
+   * source; returns a function that stops it.
+   */
   subscribe(source: RemoteOperationSource | AsyncIterable<VersionedOperation>): () => void {
     this.disposeRemote?.();
     const controller = new AbortController();
@@ -454,6 +488,10 @@ export class SyncCoordinator {
     }
   }
 
+  /**
+   * Sends queued changes one by one while online, stopping at a conflict;
+   * resolves to the responses received.
+   */
   async flush(): Promise<readonly PersistenceCommitResponse[]> {
     if (this.flushPromise) return this.flushPromise;
     const run = async (): Promise<readonly PersistenceCommitResponse[]> => {
@@ -474,6 +512,7 @@ export class SyncCoordinator {
     return promise;
   }
 
+  /** Sends the oldest queued change; resolves to `null` when there is nothing to send. */
   async sendNext(): Promise<PersistenceCommitResponse | null> {
     if (this.hydrating) await this.readyPromise;
     if (this.hydrationError !== undefined) throw this.hydrationError;
@@ -493,6 +532,10 @@ export class SyncCoordinator {
     return this.send(clientMutationId);
   }
 
+  /**
+   * Saves a change again after `pendingStorage` failed to save it; resolves to
+   * `true` once it is saved.
+   */
   async retryPersistence(clientMutationId: string): Promise<boolean> {
     await this.readyPromise;
     const record = this.queue.get(clientMutationId);
@@ -501,6 +544,10 @@ export class SyncCoordinator {
     return !this.storageErrors.has(clientMutationId);
   }
 
+  /**
+   * Sends one queued change, only when it is the oldest; resolves to `null`
+   * when offline or when it cannot be sent now.
+   */
   async send(clientMutationId: string): Promise<PersistenceCommitResponse | null> {
     if (this.destroyed || this.connection !== "online") return null;
     if (this.hydrating) await this.readyPromise;
@@ -721,6 +768,10 @@ export class SyncCoordinator {
     });
   }
 
+  /**
+   * Applies one remote version to the grid. Versions must arrive in order; a
+   * gap starts recovery through `recoverVersionGap`, or asks for a reload.
+   */
   applyVersionedOperation(operation: VersionedOperation): Promise<void> {
     if (this.destroyed) return Promise.resolve();
     let inspected: InspectedVersionedOperation;
@@ -979,6 +1030,7 @@ export class SyncCoordinator {
     }
   }
 
+  /** Stops syncing: aborts requests in flight, stops the remote source and drops the in-memory queue. */
   destroy(): void {
     if (this.destroyed) return;
     this.destroyed = true;

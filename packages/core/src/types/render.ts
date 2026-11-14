@@ -38,17 +38,25 @@ export interface Theme {
 
 /** Read-only cell value and screen geometry supplied to a custom renderer. */
 export interface CellPaintContext {
+  /** The value the cell shows. */
   value: CellScalar;
+  /** Left edge of the cell on the canvas, in CSS pixels. */
   x: number;
+  /** Top edge of the cell on the canvas, in CSS pixels. */
   y: number;
+  /** Width of the cell in CSS pixels. */
   w: number;
+  /** Height of the cell in CSS pixels. */
   h: number;
+  /** The grid's current theme. */
   theme: Theme;
+  /** The cell's style, with its column's style merged under it. */
   style: CellStyle;
 }
 
 /** Custom cell renderer hooks for the main-thread canvas or retained DOM overlay. */
 export interface CellRenderer {
+  /** Paints the cell on the grid's canvas; drawing is clipped to the cell. */
   canvas?(ctx: CanvasRenderingContext2D, c: CellPaintContext): void;
   /** Creates a fresh, detached element uniquely owned by one retained DOM cell. */
   dom?(c: CellPaintContext): HTMLElement;
