@@ -140,7 +140,7 @@ fn a_cell_that_is_not_loaded_makes_the_preview_wait() {
     let mut store = CellStore::new();
     let sheet = store.add_paged_sheet(2, 8, 4, 0, 0);
     store.begin_page_load();
-    store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
     store.commit_sources();
 
     assert_eq!(number(&preview(&store, sheet, "=SUM(A1:A4)")), 10.0);
@@ -154,7 +154,7 @@ fn a_cell_that_is_not_loaded_makes_the_preview_wait() {
 fn typed_range_reads_reach_a_million_cells_and_no_further() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 1_000_001);
-    store.set_column_numbers(sheet, 0, 0, &vec![1.0; 1_000_001], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &vec![1.0; 1_000_001]);
     store.commit_sources();
 
     assert_eq!(
@@ -179,7 +179,7 @@ fn typed_range_reads_reach_a_million_cells_and_no_further() {
 fn cell_by_cell_reads_and_arrays_have_smaller_limits() {
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, 60_001);
-    store.set_column_numbers(sheet, 0, 0, &vec![1.0; 60_001], 0);
+    crate::tests::write_number_column(&mut store, sheet, 0, 0, &vec![1.0; 60_001]);
     store.commit_sources();
 
     // Copying a range into an array reads each cell; 50,000 at most.

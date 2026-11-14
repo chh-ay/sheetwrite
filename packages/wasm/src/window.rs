@@ -636,7 +636,11 @@ fn pack_window(cells: &WindowCells, cond_matches: &[u32]) -> Option<Vec<u8>> {
     for value in cond_matches {
         packed.extend_from_slice(&value.to_le_bytes());
     }
-    debug_assert_eq!(packed.len(), total_bytes);
+    debug_assert_eq!(
+        packed.len(),
+        total_bytes,
+        "the packed buffer has the length computed before packing"
+    );
     Some(packed)
 }
 
@@ -652,12 +656,14 @@ impl WindowView {
         self.string_pool_epoch
     }
 
+    /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nRows)]
     #[must_use]
     pub fn n_rows(&self) -> u32 {
         self.n_rows
     }
 
+    /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nCols)]
     #[must_use]
     pub fn n_cols(&self) -> u32 {

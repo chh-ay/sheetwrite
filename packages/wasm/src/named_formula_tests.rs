@@ -1,7 +1,7 @@
 //! Defined names that hold a formula, in both engines, and named LAMBDAs in
 //! the full engine. Excel is the reference:
-//! https://support.microsoft.com/en-us/office/define-and-use-names-in-formulas-4d0f13ac-53b7-422e-afd2-abd7ff379c64
-//! https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67
+//! <https://support.microsoft.com/en-us/office/define-and-use-names-in-formulas-4d0f13ac-53b7-422e-afd2-abd7ff379c64>
+//! <https://support.microsoft.com/en-us/office/lambda-function-bd212d27-1cd1-4321-a34a-ccbf254b8b67>
 
 use std::time::{Duration, Instant};
 
