@@ -86,8 +86,12 @@ pub(crate) fn ast_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
         Ast::Parameter { depth, index, .. } => _shapes.parameter_is_array(*depth, *index),
         #[cfg(feature = "analysis")]
         Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
-            let crate::calc::UnknownCall { name, args } = &**call;
-            super::analysis::lambda::produces_array(name, args, _shapes)
+            let args = &call.args;
+            super::analysis::lambda::produces_array(
+                super::analysis::lambda::Invocation::Call,
+                args,
+                _shapes,
+            )
         }
         Ast::NamedRange(named) => {
             named.row_start != named.row_end || named.col_start != named.col_end
@@ -103,13 +107,10 @@ pub(crate) fn ast_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
             ast_produces_array(inner, _shapes)
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(id), args) => {
-            let name = super::analysis::name(*id);
-            super::analysis::family(*id)
-                .array
-                .as_ref()
-                .is_some_and(|hooks| (hooks.produces_array)(name, args, _shapes))
-        }
+        Ast::Func(Func::Analysis(id), args) => super::analysis::family(*id)
+            .array
+            .as_ref()
+            .is_some_and(|hooks| (hooks.produces_array)(*id, args, _shapes)),
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -239,24 +240,29 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
-                let crate::calc::UnknownCall { name, args } = &**call;
+                let args = &call.args;
                 ast_produces_array(ast, pass.shapes()).then(|| {
                     runtime_reference_bound(
                         ast,
-                        super::analysis::lambda::bound(self, name, args, formula_sheet, pass),
+                        super::analysis::lambda::bound(
+                            self,
+                            super::analysis::lambda::Invocation::Call,
+                            args,
+                            formula_sheet,
+                            pass,
+                        ),
                     )
                 })
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
-                let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(*id).array.as_ref()?;
-                if !(hooks.produces_array)(name, args, pass.shapes()) {
+                if !(hooks.produces_array)(*id, args, pass.shapes()) {
                     return None;
                 }
                 Some(runtime_reference_bound(
                     ast,
-                    (hooks.bound)(self, name, args, formula_sheet, pass),
+                    (hooks.bound)(self, *id, args, formula_sheet, pass),
                 ))
             }
             Ast::Range(..)
@@ -421,20 +427,26 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
-                let crate::calc::UnknownCall { name, args } = &**call;
+                let args = &call.args;
                 if !ast_produces_array(ast, pass.shapes()) {
                     return None;
                 }
-                super::analysis::lambda::evaluate_matrix(self, name, args, sheet, pass, depth + 1)
+                super::analysis::lambda::evaluate_matrix(
+                    self,
+                    super::analysis::lambda::Invocation::Call,
+                    args,
+                    sheet,
+                    pass,
+                    depth + 1,
+                )
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
-                let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(*id).array.as_ref()?;
-                if !(hooks.produces_array)(name, args, pass.shapes()) {
+                if !(hooks.produces_array)(*id, args, pass.shapes()) {
                     return None;
                 }
-                (hooks.evaluate)(self, name, args, sheet, pass, depth + 1)
+                (hooks.evaluate)(self, *id, args, sheet, pass, depth + 1)
             }
             Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(..) | Ast::Structured(..) => {
                 self.eval_matrix_arg(ast, sheet, pass, depth + 1)
@@ -607,21 +619,26 @@ impl CellStore {
             }
             #[cfg(feature = "analysis")]
             Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
-                let crate::calc::UnknownCall { name, args } = &**call;
+                let args = &call.args;
 
-                return super::analysis::lambda::shape(self, name, args, formula_sheet, pass);
+                return super::analysis::lambda::shape(
+                    self,
+                    super::analysis::lambda::Invocation::Call,
+                    args,
+                    formula_sheet,
+                    pass,
+                );
             }
             #[cfg(feature = "analysis")]
             Ast::Func(Func::Analysis(id), args) => {
-                let name = super::analysis::name(*id);
                 let hooks = super::analysis::family(*id)
                     .array
                     .as_ref()
                     .ok_or(FormulaError::Value)?;
-                if !(hooks.produces_array)(name, args, pass.shapes()) {
+                if !(hooks.produces_array)(*id, args, pass.shapes()) {
                     return Err(FormulaError::Value);
                 }
-                let (rows, cols, cells) = (hooks.shape)(self, name, args, formula_sheet, pass)?;
+                let (rows, cols, cells) = (hooks.shape)(self, *id, args, formula_sheet, pass)?;
                 let validated = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
                 if cells != validated {
                     return Err(FormulaError::Value);

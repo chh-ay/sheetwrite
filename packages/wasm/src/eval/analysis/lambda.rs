@@ -28,17 +28,35 @@ use crate::memory::MemoryOwnerStats;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
-pub(crate) const NAMES: &[&str] = &[
-    "BYCOL",
-    "BYROW",
-    "ISOMITTED",
-    "LAMBDA",
-    "MAKEARRAY",
-    "MAP",
-    "REDUCE",
-    "SCAN",
-];
+family_functions! {
+    BYCOL,
+    BYROW,
+    ISOMITTED,
+    LAMBDA,
+    MAKEARRAY,
+    MAP,
+    REDUCE,
+    SCAN,
+}
+
+/// The name of the call that runs a LAMBDA value, `f(2)` or `LAMBDA(x,x)(2)`.
 pub(crate) const CALL: &str = "$LAMBDA_CALL";
+
+/// What a hook of this family evaluates: one of its helper functions, or a
+/// call of a LAMBDA value.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Invocation {
+    Helper(Function),
+    Call,
+}
+
+impl Invocation {
+    /// The helper a registry id of this family names.
+    pub(crate) fn of(id: u16) -> Self {
+        Self::Helper(Function::of(id))
+    }
+}
+
 const PARAMETER_LIMIT: usize = 253;
 /// Helper and call evaluations nested inside one another.
 const CALL_DEPTH_LIMIT: usize = 64;
@@ -643,11 +661,21 @@ fn parameter_slot_shape(slot: &Slot) -> Option<(usize, usize)> {
     }
 }
 
-pub(crate) fn produces_array(name: &str, arguments: &[Ast], shapes: Shapes<'_>) -> bool {
-    match name {
-        "MAP" | "SCAN" | "BYROW" | "BYCOL" | "MAKEARRAY" => true,
-        CALL => call_produces_array(arguments, shapes),
-        _ => false,
+pub(crate) fn produces_array(
+    invocation: Invocation,
+    arguments: &[Ast],
+    shapes: Shapes<'_>,
+) -> bool {
+    match invocation {
+        Invocation::Helper(
+            Function::MAP
+            | Function::SCAN
+            | Function::BYROW
+            | Function::BYCOL
+            | Function::MAKEARRAY,
+        ) => true,
+        Invocation::Call => call_produces_array(arguments, shapes),
+        Invocation::Helper(Function::ISOMITTED | Function::LAMBDA | Function::REDUCE) => false,
     }
 }
 
@@ -704,7 +732,7 @@ fn source_shape(context: &mut Context<'_, '_>, expression: &Ast) -> Result<Shape
 
 pub(crate) fn shape(
     store: &CellStore,
-    name: &str,
+    invocation: Invocation,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -716,22 +744,22 @@ pub(crate) fn shape(
         pass,
         depth: 0,
     };
-    let result = helper_shape(&mut context, name, arguments);
+    let result = helper_shape(&mut context, invocation, arguments);
     context.pass.results.call_frame_mut().exit();
     result
 }
 
 fn helper_shape(
     context: &mut Context<'_, '_>,
-    name: &str,
+    invocation: Invocation,
     arguments: &[Ast],
 ) -> Result<Shape, FormulaError> {
-    let (rows, cols) = match name {
+    let (rows, cols) = match invocation {
         // The body's shape with each parameter's shape and no values. A
         // shape that needs a value, such as `SEQUENCE(x)`, comes from the
         // evaluation instead: this is the only place that evaluates a call
         // to size it, for an operator that needs both shapes first.
-        CALL => {
+        Invocation::Call => {
             if let Some(shape) = context.static_call_shape(arguments)? {
                 return Ok(shape);
             }
@@ -739,7 +767,7 @@ fn helper_shape(
             let cells = EvalMatrix::validate_shape(matrix.rows, matrix.cols, 1, 0)?;
             return Ok((matrix.rows, matrix.cols, cells));
         }
-        "MAKEARRAY" => {
+        Invocation::Helper(Function::MAKEARRAY) => {
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
             }
@@ -760,44 +788,46 @@ fn helper_shape(
                 sizes.dimension(&arguments[1])?,
             )
         }
-        "MAP" => {
+        Invocation::Helper(Function::MAP) => {
             if arguments.len() < 2 {
                 return Err(FormulaError::Value);
             }
             let (rows, cols, _) = source_shape(context, &arguments[0])?;
             (rows, cols)
         }
-        "SCAN" => {
+        Invocation::Helper(Function::SCAN) => {
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
             }
             let (rows, cols, _) = source_shape(context, &arguments[1])?;
             (rows, cols)
         }
-        "BYROW" | "BYCOL" => {
+        Invocation::Helper(helper @ (Function::BYROW | Function::BYCOL)) => {
             if arguments.len() != 2 {
                 return Err(FormulaError::Value);
             }
             let (rows, cols, _) = source_shape(context, &arguments[0])?;
-            if name == "BYROW" {
+            if helper == Function::BYROW {
                 (rows, 1)
             } else {
                 (1, cols)
             }
         }
-        _ => return Err(FormulaError::Value),
+        Invocation::Helper(Function::ISOMITTED | Function::LAMBDA | Function::REDUCE) => {
+            return Err(FormulaError::Value)
+        }
     };
     Ok((rows, cols, EvalMatrix::validate_shape(rows, cols, 2, 0)?))
 }
 
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    invocation: Invocation,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    if name == CALL {
+    if invocation == Invocation::Call {
         // A call is sized from its parameters' shapes when that is enough;
         // otherwise the spill is charged for what the call's own evaluation
         // produces, so the body runs once.
@@ -812,7 +842,7 @@ pub(crate) fn bound(
         context.pass.results.call_frame_mut().exit();
         return Ok(shape?.map_or(UNKNOWN_SIZE_PRECHARGE, |(_, _, cells)| cells));
     }
-    shape(store, name, arguments, sheet, pass).map(|(_, _, cells)| cells)
+    shape(store, invocation, arguments, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 /// The LAMBDA a call runs and the call record it was created in.
@@ -1017,7 +1047,7 @@ impl<'a, 'p> Context<'a, 'p> {
 
 pub(crate) fn evaluate(
     store: &CellStore,
-    name: &str,
+    invocation: Invocation,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -1032,16 +1062,26 @@ pub(crate) fn evaluate(
         pass,
         depth,
     };
-    let result = match name {
-        "LAMBDA" => match arguments.split_last() {
+    let result = match invocation {
+        Invocation::Helper(Function::LAMBDA) => match arguments.split_last() {
             Some((_, parameters)) if valid_parameters(parameters) => Err(FormulaError::Calc),
             _ => Err(FormulaError::Value),
         },
-        "ISOMITTED" if arguments.len() == 1 => Ok(Value::Bool(context.is_omitted(&arguments[0]))),
-        "ISOMITTED" => Err(FormulaError::Value),
-        CALL => context.call_value(arguments),
-        "REDUCE" => reduce(&mut context, arguments, false).map(EvalMatrix::into_first),
-        _ => evaluate_with_context(&mut context, name, arguments).map(EvalMatrix::into_first),
+        Invocation::Helper(Function::ISOMITTED) if arguments.len() == 1 => {
+            Ok(Value::Bool(context.is_omitted(&arguments[0])))
+        }
+        Invocation::Helper(Function::ISOMITTED) => Err(FormulaError::Value),
+        Invocation::Call => context.call_value(arguments),
+        Invocation::Helper(Function::REDUCE) => {
+            reduce(&mut context, arguments, false).map(EvalMatrix::into_first)
+        }
+        Invocation::Helper(
+            Function::BYCOL
+            | Function::BYROW
+            | Function::MAKEARRAY
+            | Function::MAP
+            | Function::SCAN,
+        ) => evaluate_with_context(&mut context, invocation, arguments).map(EvalMatrix::into_first),
     };
     context.pass.results.call_frame_mut().exit();
     result.unwrap_or_else(Value::Error)
@@ -1049,7 +1089,7 @@ pub(crate) fn evaluate(
 
 pub(in crate::eval) fn evaluate_matrix(
     store: &CellStore,
-    name: &str,
+    invocation: Invocation,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -1065,7 +1105,7 @@ pub(in crate::eval) fn evaluate_matrix(
         pass,
         depth,
     };
-    let result = evaluate_with_context(&mut context, name, arguments);
+    let result = evaluate_with_context(&mut context, invocation, arguments);
     context.pass.results.call_frame_mut().exit();
     result
 }
@@ -1100,13 +1140,13 @@ fn reduce(
 
 fn evaluate_with_context(
     context: &mut Context<'_, '_>,
-    name: &str,
+    invocation: Invocation,
     arguments: &[Ast],
 ) -> Result<EvalMatrix, FormulaError> {
-    match name {
-        CALL => context.call_matrix(arguments),
-        "SCAN" => reduce(context, arguments, true),
-        "MAKEARRAY" => {
+    match invocation {
+        Invocation::Call => context.call_matrix(arguments),
+        Invocation::Helper(Function::SCAN) => reduce(context, arguments, true),
+        Invocation::Helper(Function::MAKEARRAY) => {
             if arguments.len() != 3 {
                 return Err(FormulaError::Value);
             }
@@ -1125,7 +1165,7 @@ fn evaluate_with_context(
             }
             Ok(EvalMatrix::new(rows, cols, values))
         }
-        "MAP" => {
+        Invocation::Helper(Function::MAP) => {
             if arguments.len() < 2 {
                 return Err(FormulaError::Value);
             }
@@ -1160,12 +1200,12 @@ fn evaluate_with_context(
             }
             Ok(EvalMatrix::new(first.rows, first.cols, values))
         }
-        "BYROW" | "BYCOL" => {
+        Invocation::Helper(helper @ (Function::BYROW | Function::BYCOL)) => {
             if arguments.len() != 2 {
                 return Err(FormulaError::Value);
             }
             let array = context.matrix(&arguments[0])?;
-            let by_row = name == "BYROW";
+            let by_row = helper == Function::BYROW;
             let count = if by_row { array.rows } else { array.cols };
             let callee = context.callee(&arguments[1])?;
             let mut values = Vec::with_capacity(count);
@@ -1191,7 +1231,9 @@ fn evaluate_with_context(
                 values,
             ))
         }
-        _ => Err(FormulaError::Value),
+        Invocation::Helper(Function::ISOMITTED | Function::LAMBDA | Function::REDUCE) => {
+            Err(FormulaError::Value)
+        }
     }
 }
 

@@ -11,7 +11,9 @@ use super::super::matrix::range_from_ast;
 use super::super::value::text_from_value;
 use super::super::{EvalPass, EvalResult};
 
-pub(crate) const NAMES: &[&str] = &["GETPIVOTDATA"];
+family_functions! {
+    GETPIVOTDATA,
+}
 
 /// The data field and the pivot reference come before the pairs.
 const FIXED_ARGUMENTS: usize = 2;
@@ -20,7 +22,7 @@ const MAX_PAIRS: usize = 126;
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,

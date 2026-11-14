@@ -234,8 +234,8 @@ impl CellStore {
         let mut call = Vec::with_capacity(arguments.len() + 1);
         call.push(Ast::NamedFormula(lambda));
         call.extend_from_slice(arguments);
-        let call_name = super::analysis::lambda::CALL;
-        super::analysis::lambda::evaluate(self, call_name, &call, sheet, pass, depth)
+        let invocation = super::analysis::lambda::Invocation::Call;
+        super::analysis::lambda::evaluate(self, invocation, &call, sheet, pass, depth)
     }
 
     #[cfg(not(feature = "analysis"))]
