@@ -286,6 +286,7 @@ describe("formula regression gate", () => {
       "iterative-finance",
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
+      "spill-filter-same-range",
     ]);
     const baseline = formulaFixture("full");
     baseline.workloads = baseline.workloads.filter((workload) => !expanded.has(workload.id));

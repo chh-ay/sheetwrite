@@ -204,6 +204,7 @@ pub fn formula_tokens(src: &str) -> Vec<u32> {
 }
 
 /// The first syntax error of a formula, as the engine's parser finds it.
+#[derive(Debug)]
 #[wasm_bindgen]
 pub struct FormulaSyntaxError {
     from: u32,

@@ -541,6 +541,7 @@ const WINDOW_PACKED_VERSION: u32 = 1;
 const WINDOW_PACKED_HEADER_BYTES: usize = 10 * std::mem::size_of::<u32>();
 
 /// A bulk window of resolved cells, row-major over `n_rows x n_cols`.
+#[derive(Debug)]
 #[wasm_bindgen]
 pub struct WindowView {
     string_pool_epoch: u32,
@@ -636,7 +637,11 @@ fn pack_window(cells: &WindowCells, cond_matches: &[u32]) -> Option<Vec<u8>> {
     for value in cond_matches {
         packed.extend_from_slice(&value.to_le_bytes());
     }
-    debug_assert_eq!(packed.len(), total_bytes);
+    debug_assert_eq!(
+        packed.len(),
+        total_bytes,
+        "the packed buffer has the length computed before packing"
+    );
     Some(packed)
 }
 
@@ -646,12 +651,16 @@ fn align_to_8(value: usize) -> Option<usize> {
 
 #[wasm_bindgen]
 impl WindowView {
+    /// The string pool epoch the window was read in. Its string ids are
+    /// valid only within that epoch (see `CellStore::string_pool_epoch`).
     #[wasm_bindgen(js_name = stringPoolEpoch)]
     #[must_use]
     pub fn string_pool_epoch(&self) -> u32 {
         self.string_pool_epoch
     }
 
+    /// Rows in the window.
+    ///
     /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nRows)]
     #[must_use]
@@ -659,6 +668,8 @@ impl WindowView {
         self.n_rows
     }
 
+    /// Columns in the window.
+    ///
     /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nCols)]
     #[must_use]

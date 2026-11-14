@@ -8,7 +8,6 @@
 //! `bound` gives an upper bound of cells.
 
 use std::cmp::Ordering;
-use std::mem::size_of;
 
 use super::super::array::ast_produces_array;
 use super::super::matrix::{

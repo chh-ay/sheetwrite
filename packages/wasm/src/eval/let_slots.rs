@@ -252,7 +252,10 @@ fn resolve_scope(args: &mut [Ast], bindings: &mut Vec<Binding>, next: &mut u32) 
         let Ast::Name(text) = name else {
             continue;
         };
-        debug_assert!(valid_let_name(text));
+        debug_assert!(
+            valid_let_name(text),
+            "LET names reach slot assignment only after validation"
+        );
         let slot = *next;
         *next += 1;
         bindings.push((text.to_string(), slot));

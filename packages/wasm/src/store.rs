@@ -3,7 +3,6 @@
 //! identity, so naming a sheet binds only its waiting users without reparsing.
 
 use std::borrow::Cow;
-use std::mem::size_of;
 
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use wasm_bindgen::prelude::*;
@@ -436,6 +435,7 @@ impl BlockInputOrder {
 
 #[wasm_bindgen]
 impl CellStore {
+    /// An empty workbook with no sheets.
     #[wasm_bindgen(constructor)]
     #[must_use]
     pub fn new() -> Self {
@@ -490,11 +490,15 @@ impl CellStore {
         )
     }
 
+    /// Each cell payload of `snapshot` read as a number, row-major. Only
+    /// number and boolean cells give meaningful values.
     #[wasm_bindgen(js_name = snapshotNumbers)]
     pub fn snapshot_numbers(&self, snapshot: &RangeSnapshot) -> Vec<f64> {
         snapshot.payload.iter().copied().map(payload_num).collect()
     }
 
+    /// The text of each cell of `snapshot`, row-major; an empty string for a
+    /// cell without text.
     #[wasm_bindgen(js_name = snapshotTexts)]
     pub fn snapshot_texts(&self, snapshot: &RangeSnapshot) -> Vec<String> {
         snapshot
@@ -581,6 +585,8 @@ impl CellStore {
         Ok(index)
     }
 
+    /// Whether `sheet` keeps its cells in paged storage, loaded from the host
+    /// on demand.
     #[wasm_bindgen(js_name = isPaged)]
     pub fn is_paged(&self, sheet: usize) -> bool {
         self.sheets
@@ -614,6 +620,9 @@ impl CellStore {
         ]
     }
 
+    /// Bytes held by each part of the store, in the flat layout that
+    /// `packages/core/src/resource-accounting.ts` reads: `[schema, owner count,
+    /// hash estimate version, (logical, allocated, entries) per owner, totals]`.
     #[wasm_bindgen(js_name = memoryStats)]
     pub fn memory_stats(&self) -> Vec<f64> {
         self.store_memory_stats().encode()
@@ -628,6 +637,7 @@ impl CellStore {
             .collect()
     }
 
+    /// Zeroes the counters that `formulaMatrixResourceStats` reports.
     #[wasm_bindgen(js_name = resetFormulaMatrixResourceStats)]
     pub fn reset_formula_matrix_resource_stats(&self) {
         crate::eval::reset_matrix_resource_stats();
@@ -648,6 +658,7 @@ impl CellStore {
         self.strings.epoch
     }
 
+    /// Bytes of WebAssembly memory committed so far; 0 in a native build.
     #[wasm_bindgen(js_name = wasmCommittedBytes)]
     pub fn wasm_committed_bytes(&self) -> usize {
         #[cfg(target_arch = "wasm32")]
@@ -681,6 +692,9 @@ impl CellStore {
         }
     }
 
+    /// The cells of a paged `sheet` that changed locally and are not clean yet,
+    /// as flattened `[row, col]` pairs sorted by row, then column. Empty for a
+    /// sheet that is not paged.
     #[wasm_bindgen(js_name = pagedDirtyCoordinates)]
     pub fn paged_dirty_coordinates(&self, sheet: usize) -> Vec<f64> {
         self.sheets
@@ -688,6 +702,8 @@ impl CellStore {
             .map_or_else(Vec::new, |data| data.cells.dirty_coordinates())
     }
 
+    /// Whether every cell of `sheet` is loaded. True for a sheet that is not
+    /// paged; false when the sheet does not exist.
     #[wasm_bindgen(js_name = isFullyLoaded)]
     pub fn is_fully_loaded(&self, sheet: usize) -> bool {
         self.sheets
@@ -695,6 +711,9 @@ impl CellStore {
             .is_some_and(|data| data.cells.is_fully_loaded())
     }
 
+    /// Whether every cell from (`r0`, `c0`) to (`r1`, `c1`), both inclusive, of
+    /// `sheet` is loaded. True for a sheet that is not paged; false when the
+    /// sheet does not exist.
     #[wasm_bindgen(js_name = rangeFullyLoaded)]
     pub fn range_fully_loaded(
         &self,
@@ -709,6 +728,8 @@ impl CellStore {
             .is_some_and(|data| data.cells.range_fully_loaded(r0, c0, r1, c1))
     }
 
+    /// Whether rows `start_row..end_row` of each column in `cols` lie inside
+    /// `sheet` and are loaded. True for an empty row range or no columns.
     #[wasm_bindgen(js_name = columnsFullyLoaded)]
     pub fn columns_fully_loaded(
         &self,
@@ -734,6 +755,8 @@ impl CellStore {
         })
     }
 
+    /// Marks the cells in rows `start_row..end_row` and columns
+    /// `start_col..end_col` of a paged `sheet` clean, keeping their values.
     #[wasm_bindgen(js_name = markRangeClean)]
     pub fn mark_range_clean(
         &mut self,
@@ -749,6 +772,8 @@ impl CellStore {
         }
     }
 
+    /// Marks every cell that `revision` still owns clean, once the host has
+    /// stored that revision. Revision 0 does nothing.
     #[wasm_bindgen(js_name = acknowledgeRevision)]
     pub fn acknowledge_revision(&mut self, revision: u64) {
         if revision == 0 {
@@ -784,6 +809,9 @@ impl CellStore {
         }
     }
 
+    /// Starts a local edit and returns its revision. Cells it changes stay
+    /// dirty under that revision until `acknowledgeRevision`; `commitSources`
+    /// ends the edit.
     #[wasm_bindgen(js_name = beginMutation)]
     pub fn begin_mutation(&mut self) -> u64 {
         self.reset_recalculation();
@@ -792,11 +820,15 @@ impl CellStore {
         revision
     }
 
+    /// Starts loading a page from the host. Until `commitSources`, writes are
+    /// stored values, not local edits, so they don't become dirty.
     #[wasm_bindgen(js_name = beginPageLoad)]
     pub fn begin_page_load(&mut self) {
         self.loading_page = self.loading_page.saturating_add(1);
     }
 
+    /// Gives the live `sheet` its stable `id` and display `name`, replacing
+    /// earlier ones. A missing or removed sheet is ignored.
     #[wasm_bindgen(js_name = setSheetName)]
     pub fn set_sheet_name(&mut self, sheet: usize, id: &str, name: &str) {
         if sheet >= self.sheets.len() {
@@ -1006,6 +1038,8 @@ impl CellStore {
         self.sheets.get(sheet).map_or(0, |s| s.cells.n_cols())
     }
 
+    /// Writes the number `value` with style `style` to the cell at `row`,
+    /// `col` of `sheet`.
     #[wasm_bindgen(js_name = setNumber)]
     pub fn set_number(&mut self, sheet: usize, row: usize, col: usize, value: f64, style: u32) {
         let revision = self.local_dirty_revision();
@@ -1023,6 +1057,8 @@ impl CellStore {
         });
     }
 
+    /// Writes the boolean `value` with style `style` to the cell at `row`,
+    /// `col` of `sheet`.
     #[wasm_bindgen(js_name = setBool)]
     pub fn set_bool(&mut self, sheet: usize, row: usize, col: usize, value: bool, style: u32) {
         let revision = self.local_dirty_revision();
@@ -1040,6 +1076,8 @@ impl CellStore {
         });
     }
 
+    /// Writes the text `value` with style `style` to the cell at `row`, `col`
+    /// of `sheet`.
     #[wasm_bindgen(js_name = setString)]
     pub fn set_string(&mut self, sheet: usize, row: usize, col: usize, value: &str, style: u32) {
         if cell_key(row, col).is_none() {
@@ -2008,6 +2046,9 @@ impl CellStore {
         true
     }
 
+    /// Remove `count` rows from `at`, as many as the sheet has. Returns
+    /// `false` and changes nothing when the sheet is missing or the edit is
+    /// refused.
     #[wasm_bindgen(js_name = removeRows)]
     pub fn remove_rows(&mut self, sheet: usize, at: usize, count: usize) -> bool {
         let Some(data) = self.sheets.get(sheet) else {
@@ -2036,6 +2077,8 @@ impl CellStore {
         true
     }
 
+    /// Insert `count` columns at `at`. Returns `false` and changes nothing
+    /// when the sheet is missing or cannot hold the columns.
     #[wasm_bindgen(js_name = insertCols)]
     pub fn insert_cols(&mut self, sheet: usize, at: usize, count: usize) -> bool {
         let Some(data) = self.sheets.get(sheet) else {
@@ -2067,6 +2110,9 @@ impl CellStore {
         true
     }
 
+    /// Remove `count` columns from `at`, as many as the sheet has. Returns
+    /// `false` and changes nothing when the sheet is missing or the edit is
+    /// refused.
     #[wasm_bindgen(js_name = removeCols)]
     pub fn remove_cols(&mut self, sheet: usize, at: usize, count: usize) -> bool {
         let Some(data) = self.sheets.get(sheet) else {
@@ -2478,6 +2524,8 @@ impl CellStore {
         }
     }
 
+    /// The formula of the cell at `row`, `col` of `sheet` as written, with its
+    /// leading `=`; `None` when the cell holds no formula.
     #[wasm_bindgen(js_name = formulaSource)]
     pub fn formula_source(&self, sheet: usize, row: usize, col: usize) -> Option<String> {
         let key = cell_key(row, col)?;
@@ -2491,6 +2539,9 @@ impl CellStore {
             .then(|| entry.source(&self.written_names()).into_owned())
     }
 
+    /// `[sheet, row, col]` of the cell that the formula at `row`, `col` of
+    /// `sheet` refers to, when the formula is only a reference to one cell;
+    /// `None` otherwise.
     #[wasm_bindgen(js_name = referenceTarget)]
     pub fn reference_target(&self, sheet: usize, row: usize, col: usize) -> Option<Vec<u32>> {
         let key = cell_key(row, col)?;
@@ -2547,6 +2598,8 @@ impl CellStore {
             .map_or(u32::MAX, |anchor| anchor.0)
     }
 
+    /// Stable spill owner column, or `u32::MAX` when the cell is not part of
+    /// a materialized spill; the row comes from `spillAnchorRow`.
     #[wasm_bindgen(js_name = spillAnchorCol)]
     pub fn spill_anchor_col(&self, sheet: usize, row: usize, col: usize) -> u32 {
         cell_key(row, col)
@@ -2590,6 +2643,8 @@ impl CellStore {
         mask
     }
 
+    /// The pool strings for `ids`, in order; an empty string for `NO_STRING`
+    /// or an id the pool no longer holds.
     #[wasm_bindgen(js_name = poolStrings)]
     pub fn pool_strings(&self, ids: &[u32]) -> Vec<String> {
         ids.iter()
@@ -4077,24 +4132,29 @@ impl CellOut {
 
 #[wasm_bindgen]
 impl CellOut {
+    /// The kind of the value (`KIND_*`). Errors and cells still loading are
+    /// text, with their sentinel in `string`.
     #[wasm_bindgen(getter, js_name = kind)]
     #[must_use]
     pub fn kind(&self) -> u8 {
         self.kind
     }
 
+    /// The number, for number and boolean cells.
     #[wasm_bindgen(getter, js_name = num)]
     #[must_use]
     pub fn num(&self) -> f64 {
         self.num
     }
 
+    /// The text, for text cells, errors and cells still loading.
     #[wasm_bindgen(getter, js_name = string)]
     #[must_use]
     pub fn string(&self) -> Option<String> {
         self.string.clone()
     }
 
+    /// The cell's style id.
     #[wasm_bindgen(getter, js_name = style)]
     #[must_use]
     pub fn style(&self) -> u32 {
