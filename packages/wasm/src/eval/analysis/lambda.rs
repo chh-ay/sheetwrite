@@ -25,7 +25,7 @@ use super::super::value::number_from_value;
 use super::super::{settled_cell_value, EvalPass};
 use crate::calc::{Ast, Func, LambdaDefinition};
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
@@ -906,11 +906,9 @@ impl<'a, 'p> Context<'a, 'p> {
         let Ast::DefinedName(id) = expression else {
             return definition(expression, names).ok().cloned();
         };
-        names.read(*id, |view| match view {
-            NameView::Formula(formula) => definition(formula, names).ok().cloned(),
-            NameView::Placed(placed) => definition(&placed, names).ok().cloned(),
-            NameView::Range(_) | NameView::Undefined | NameView::Linked => None,
-        })
+        let read = names.read(*id);
+        read.formula()
+            .and_then(|formula| definition(formula, names).ok().cloned())
     }
 
     fn slot(&self, depth: u16, index: u16) -> Option<&Slot> {
@@ -1361,11 +1359,10 @@ impl Context<'_, '_> {
             return self.written_shape(bound, depth + 1);
         }
         if let Ast::DefinedName(id) = expression {
-            return self.names().read(*id, |view| match view {
-                NameView::Formula(formula) => self.written_shape(formula, depth + 1),
-                NameView::Placed(placed) => self.written_shape(&placed, depth + 1),
-                NameView::Range(_) | NameView::Undefined | NameView::Linked => None,
-            });
+            let read = self.names().read(*id);
+            return read
+                .formula()
+                .and_then(|formula| self.written_shape(formula, depth + 1));
         }
         if let Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) = expression {
             return self.written_shape(inner, depth + 1);

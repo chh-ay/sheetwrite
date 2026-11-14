@@ -8,7 +8,6 @@ use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
 
 use crate::calc::{Ast, Func};
 use crate::cells::payload_num;
-use crate::store::names::NameView;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
@@ -261,12 +260,7 @@ fn sum_scalar_or_range(arg: &Ast, shapes: Shapes<'_>) -> Option<SumArg> {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(_) => {
             super::matrix::range_from_ast(arg, names).map(SumArg::Range)
         }
-        Ast::DefinedName(id) => match names.read(*id, |view| match view {
-            NameView::Range(range) => Some(range),
-            NameView::Formula(_) | NameView::Placed(_) | NameView::Undefined | NameView::Linked => {
-                None
-            }
-        }) {
+        Ast::DefinedName(id) => match names.read(*id).range() {
             Some(range) => Some(SumArg::Range(range)),
             None if ast_produces_array(arg, shapes) => None,
             None => Some(SumArg::Scalar { reference: false }),

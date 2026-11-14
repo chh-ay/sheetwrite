@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 
 use crate::calc::{Ast, Func};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -25,11 +25,10 @@ family_functions! {
 pub(crate) fn ast_calls_pivot_data(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Formula(expression) => ast_calls_pivot_data(expression, names),
-            NameView::Placed(expression) => ast_calls_pivot_data(&expression, names),
-            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
-        }),
+        Ast::DefinedName(id) => names
+            .read(*id)
+            .formula()
+            .is_some_and(|expression| ast_calls_pivot_data(expression, names)),
         _ => ast.any_child(&mut |child| ast_calls_pivot_data(child, names)),
     }
 }

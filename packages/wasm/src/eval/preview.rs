@@ -14,7 +14,6 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{Ast, Func, NameId};
 use crate::formula_slots::{FormulaResults, FormulaWork};
-use crate::store::names::NameView;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -310,11 +309,10 @@ impl SafetyWalk<'_> {
             if !self.named.contains(id) {
                 self.named.push(*id);
                 let names = self.store.name_scope(self.sheet);
-                let refused = names.read(*id, |view| match view {
-                    NameView::Formula(expression) => self.visit(expression, depth + 1),
-                    NameView::Placed(expression) => self.visit(&expression, depth + 1),
-                    NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
-                });
+                let read = names.read(*id);
+                let refused = read
+                    .formula()
+                    .is_some_and(|expression| self.visit(expression, depth + 1));
                 if refused {
                     return true;
                 }

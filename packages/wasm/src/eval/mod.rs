@@ -62,7 +62,7 @@ use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork}
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -2022,10 +2022,12 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        self.name_scope(sheet).read(id, |view| match view {
-            NameView::Range(range)
-                if range.row_start == range.row_end && range.col_start == range.col_end =>
-            {
+        let read = self.name_scope(sheet).read(id);
+        if let Some(expression) = read.formula() {
+            return self.eval_ast(expression, sheet, pass, depth + 1);
+        }
+        match read.range() {
+            Some(range) if range.row_start == range.row_end && range.col_start == range.col_end => {
                 self.eval_at(
                     range.sheet as usize,
                     range.row_start as usize,
@@ -2034,12 +2036,9 @@ impl CellStore {
                     depth + 1,
                 )
             }
-            NameView::Range(_) => Value::Error(FormulaError::Value),
-            NameView::Formula(expression) => self.eval_ast(expression, sheet, pass, depth + 1),
-            NameView::Placed(expression) => self.eval_ast(&expression, sheet, pass, depth + 1),
-            NameView::Undefined => Value::Error(FormulaError::Name),
-            NameView::Linked => Value::Error(FormulaError::Ref),
-        })
+            Some(_) => Value::Error(FormulaError::Value),
+            None => Value::Error(read.error().unwrap_or(FormulaError::Name)),
+        }
     }
 
     /// Routes a function call. Only the hottest calls run here: `LET`, `IF`,

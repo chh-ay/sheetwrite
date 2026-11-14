@@ -1,7 +1,7 @@
 //! Matrix values and AST-to-range conversion helpers.
 
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::types::{CellRange, FormulaError, Value};
 
 use super::preview_limits;
@@ -219,7 +219,7 @@ pub(super) fn written_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange
 pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
     match argument {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(..) => true,
-        Ast::DefinedName(id) => names.read(*id, |view| matches!(view, NameView::Range(_))),
+        Ast::DefinedName(id) => names.read(*id).range().is_some(),
         _ => false,
     }
 }
@@ -243,12 +243,7 @@ pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRang
             *row_end,
             *col_end,
         )),
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Range(range) => Some(range),
-            NameView::Formula(_) | NameView::Placed(_) | NameView::Undefined | NameView::Linked => {
-                None
-            }
-        }),
+        Ast::DefinedName(id) => names.read(*id).range(),
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,
             reference.row_start,
@@ -290,12 +285,13 @@ pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRang
     let formula_sheet = names.sheet;
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, names),
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Range(range) => Some(range),
-            NameView::Formula(expression) => range_from_ast(expression, names),
-            NameView::Placed(expression) => range_from_ast(&expression, names),
-            NameView::Undefined | NameView::Linked => None,
-        }),
+        Ast::DefinedName(id) => {
+            let read = names.read(*id);
+            read.range().or_else(|| {
+                read.formula()
+                    .and_then(|expression| range_from_ast(expression, names))
+            })
+        }
         Ast::Cell(row, col, _) => Some(CellRange::new(formula_sheet, *row, *col, *row, *col)),
         Ast::AbsCell(sheet, row, col, _) => {
             Some(CellRange::new(sheet.handle, *row, *col, *row, *col))

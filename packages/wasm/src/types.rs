@@ -9,7 +9,7 @@ use crate::calc::{
 use crate::eval::{expand_let_reachable_ast, intersection_range};
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -229,12 +229,14 @@ impl ReadSet {
         let formula_sheet = names.sheet;
         match ast {
             Ast::LetSlot { expression, .. } => self.collect(expression, names),
-            Ast::DefinedName(id) => names.read(*id, |view| match view {
-                NameView::Range(range) => self.push_range(range),
-                NameView::Formula(expression) => self.collect(expression, names),
-                NameView::Placed(expression) => self.collect(&expression, names),
-                NameView::Undefined | NameView::Linked => {}
-            }),
+            Ast::DefinedName(id) => {
+                let read = names.read(*id);
+                if let Some(range) = read.range() {
+                    self.push_range(range);
+                } else if let Some(expression) = read.formula() {
+                    self.collect(expression, names);
+                }
+            }
             Ast::Cell(row, col, _) => self.push_cell(AbsCellKey {
                 sheet: formula_sheet,
                 row: *row,
@@ -399,11 +401,10 @@ fn ast_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
             | Func::Info,
             _,
         ) => true,
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Formula(expression) => ast_is_volatile(expression, names),
-            NameView::Placed(expression) => ast_is_volatile(&expression, names),
-            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
-        }),
+        Ast::DefinedName(id) => names
+            .read(*id)
+            .formula()
+            .is_some_and(|expression| ast_is_volatile(expression, names)),
         _ => ast.any_child(&mut |child| ast_is_volatile(child, names)),
     }
 }
@@ -428,11 +429,10 @@ fn ast_contains_let(ast: &Ast) -> bool {
 fn ast_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Formula(expression) => ast_contains_spill_ref(expression, names),
-            NameView::Placed(expression) => ast_contains_spill_ref(&expression, names),
-            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
-        }),
+        Ast::DefinedName(id) => names
+            .read(*id)
+            .formula()
+            .is_some_and(|expression| ast_contains_spill_ref(expression, names)),
         _ => ast.any_child(&mut |child| ast_contains_spill_ref(child, names)),
     }
 }

@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
 use crate::calc::{Ast, Func, RangeFlags, SheetRef};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -102,14 +102,15 @@ pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
                 shapes,
             )
         }
-        Ast::DefinedName(id) => shapes.names().read(*id, |view| match view {
-            NameView::Range(range) => {
-                range.row_start != range.row_end || range.col_start != range.col_end
+        Ast::DefinedName(id) => {
+            let read = shapes.names().read(*id);
+            match read.range() {
+                Some(range) => range.row_start != range.row_end || range.col_start != range.col_end,
+                None => read
+                    .formula()
+                    .is_some_and(|expression| ast_produces_array(expression, shapes)),
             }
-            NameView::Formula(expression) => ast_produces_array(expression, shapes),
-            NameView::Placed(expression) => ast_produces_array(&expression, shapes),
-            NameView::Undefined | NameView::Linked => false,
-        }),
+        }
         Ast::Structured(reference) => reference.row_start != reference.row_end,
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Array(_) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression, shapes),
@@ -291,19 +292,19 @@ impl CellStore {
             Ast::LetSlot { expression, .. } => {
                 self.dynamic_array_bound(expression, formula_sheet, pass)
             }
-            Ast::DefinedName(id) => self.name_scope(formula_sheet).read(*id, |view| match view {
-                NameView::Range(_) => Some(
-                    self.matrix_shape(ast, formula_sheet, pass)
-                        .map(|(_, _, cells)| cells),
-                ),
-                NameView::Formula(expression) => {
-                    self.dynamic_array_bound(expression, formula_sheet, pass)
+            Ast::DefinedName(id) => {
+                let read = self.name_scope(formula_sheet).read(*id);
+                if read.range().is_some() {
+                    Some(
+                        self.matrix_shape(ast, formula_sheet, pass)
+                            .map(|(_, _, cells)| cells),
+                    )
+                } else {
+                    read.formula().and_then(|expression| {
+                        self.dynamic_array_bound(expression, formula_sheet, pass)
+                    })
                 }
-                NameView::Placed(expression) => {
-                    self.dynamic_array_bound(&expression, formula_sheet, pass)
-                }
-                NameView::Undefined | NameView::Linked => None,
-            }),
+            }
             // The selection is at most the whole area; an area that has no
             // shape before evaluation is charged after it.
             Ast::Func(Func::Index, args) if index_selects_whole_axis(args) => Some(Ok(self
@@ -453,22 +454,13 @@ impl CellStore {
                 return self.eval_dynamic_array(expression, sheet, pass, depth)
             }
             Ast::DefinedName(id) => {
-                return self.name_scope(sheet).read(*id, |view| match view {
-                    NameView::Range(_) => Some(
-                        self.eval_matrix_arg(ast, sheet, pass, depth + 1)
-                            .and_then(|matrix| {
-                                matrix.validate_bytes()?;
-                                Ok(matrix)
-                            }),
-                    ),
-                    NameView::Formula(expression) => {
+                let read = self.name_scope(sheet).read(*id);
+                if read.range().is_none() {
+                    return read.formula().and_then(|expression| {
                         self.eval_dynamic_array(expression, sheet, pass, depth)
-                    }
-                    NameView::Placed(expression) => {
-                        self.eval_dynamic_array(&expression, sheet, pass, depth)
-                    }
-                    NameView::Undefined | NameView::Linked => None,
-                })
+                    });
+                }
+                self.eval_matrix_arg(ast, sheet, pass, depth + 1)
             }
             Ast::Func(Func::Let, args) => {
                 let (expanded_ast, slots) = match expand_let_ast(args) {
@@ -635,17 +627,9 @@ impl CellStore {
                 }
             }
             Ast::DefinedName(id) => {
-                let shape = self.name_scope(formula_sheet).read(*id, |view| match view {
-                    NameView::Formula(expression) => {
-                        Some(self.matrix_shape(expression, formula_sheet, pass))
-                    }
-                    NameView::Placed(expression) => {
-                        Some(self.matrix_shape(&expression, formula_sheet, pass))
-                    }
-                    NameView::Range(_) | NameView::Undefined | NameView::Linked => None,
-                });
-                if let Some(shape) = shape {
-                    return shape;
+                let read = self.name_scope(formula_sheet).read(*id);
+                if let Some(expression) = read.formula() {
+                    return self.matrix_shape(expression, formula_sheet, pass);
                 }
             }
             Ast::Array(array) => {

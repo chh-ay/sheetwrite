@@ -5,7 +5,7 @@
 use super::matrix::EvalMatrix;
 use super::{ast_produces_array, range_from_ast, CellStore, EvalPass};
 use crate::calc::{parse, Ast};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::types::{FormulaError, Value};
 use rustc_hash::FxHashMap;
 use std::rc::Rc;
@@ -307,11 +307,10 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions, names: NameScop
             calls_volatile_custom(inner, functions, names)
         }
         Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions, names),
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Formula(expression) => calls_volatile_custom(expression, functions, names),
-            NameView::Placed(expression) => calls_volatile_custom(&expression, functions, names),
-            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
-        }),
+        Ast::DefinedName(id) => names
+            .read(*id)
+            .formula()
+            .is_some_and(|expression| calls_volatile_custom(expression, functions, names)),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)

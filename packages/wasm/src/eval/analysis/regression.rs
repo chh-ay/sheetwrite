@@ -8,7 +8,7 @@ use super::super::value::{aggregate_number, bool_from_value};
 use super::super::EvalPass;
 use super::descriptive;
 use crate::calc::{Ast, Func};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use std::cmp::Ordering;
@@ -519,12 +519,13 @@ fn is_reference(ast: &Ast, names: NameScope<'_>) -> bool {
         | Ast::AbsRange(..)
         | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => is_reference(expression, names),
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Range(_) => true,
-            NameView::Formula(expression) => is_reference(expression, names),
-            NameView::Placed(expression) => is_reference(&expression, names),
-            NameView::Undefined | NameView::Linked => false,
-        }),
+        Ast::DefinedName(id) => {
+            let read = names.read(*id);
+            read.range().is_some()
+                || read
+                    .formula()
+                    .is_some_and(|expression| is_reference(expression, names))
+        }
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)

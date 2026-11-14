@@ -24,7 +24,7 @@
 use std::cell::RefCell;
 
 use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
-use crate::store::names::{NameScope, NameView};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{CellRange, FormulaError, Value};
 
@@ -98,11 +98,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool 
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => contains(left) || contains(right),
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => contains(inner),
         Ast::LetSlot { expression, .. } => contains(expression),
-        Ast::DefinedName(id) => names.read(*id, |view| match view {
-            NameView::Formula(expression) => contains(expression),
-            NameView::Placed(expression) => contains(&expression),
-            NameView::Range(_) | NameView::Undefined | NameView::Linked => false,
-        }),
+        Ast::DefinedName(id) => names.read(*id).formula().is_some_and(contains),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -353,11 +349,7 @@ impl CellStore {
             // The copy is only evaluated, never written back, so the name's
             // formula takes the node's place.
             Ast::DefinedName(id) => {
-                let formula = self.name_scope(sheet).read(*id, |view| match view {
-                    NameView::Formula(expression) => Some(expression.clone()),
-                    NameView::Placed(expression) => Some(expression),
-                    NameView::Range(_) | NameView::Undefined | NameView::Linked => None,
-                });
+                let formula = self.name_scope(sheet).read(*id).formula().cloned();
                 if let Some(mut expression) = formula {
                     self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
                     *ast = expression;
@@ -547,12 +539,7 @@ impl CellStore {
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             Ast::Structured(_) => range_from_ast(entry.ast.as_ref()?, self.name_scope(sheet)),
-            Ast::DefinedName(id) => self.name_scope(sheet).read(*id, |view| match view {
-                NameView::Range(range) => Some(range),
-                NameView::Formula(_) | NameView::Placed(_) | NameView::Undefined | NameView::Linked => {
-                    None
-                }
-            }),
+            Ast::DefinedName(id) => self.name_scope(sheet).read(*id).range(),
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)

@@ -10,8 +10,7 @@ use wasm_bindgen::prelude::*;
 use crate::calc::{
     ast_contains_sheet_span, bind_sheet_refs, external_name_key, has_unresolved_local_sheets,
     moved_index, moved_span, parse, parse_bound_with_features, place_span, sheet_name_key,
-    shift_range, Ast, NamedRangeRef, ParseFeatures, StructuredRef, UnresolvedStructuredRef,
-    WrittenNames,
+    shift_range, Ast, NamedRangeRef, ParseFeatures, StructuredRef, WrittenNames,
 };
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
@@ -3690,7 +3689,7 @@ impl CellStore {
     #[cfg(feature = "analysis")]
     pub(super) fn resolve_structured_reference(
         &self,
-        reference: &UnresolvedStructuredRef,
+        reference: &crate::calc::UnresolvedStructuredRef,
         formula_sheet: u32,
         formula_row: u32,
         formula_col: u32,

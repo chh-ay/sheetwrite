@@ -28,14 +28,12 @@ use super::{workbook_name_key, CellStore};
 use crate::calc::{
     bind_defined_names, for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse,
     rename_sheet_refs, resolve_structured_refs, shift_cols, shift_rows, translate_name_refs,
-    ArrayLiteral, Ast, NameId, NamedRangeRef, ParseFeatures, WrittenNames,
+    ArrayLiteral, Ast, NameId, NamedRangeRef, WrittenNames,
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::tables::TableSlots;
-use crate::types::{
-    AbsCellKey, CellRange, FormulaEntry, FormulaError, Value, FORMULA_RECURSION_LIMIT,
-};
+use crate::types::{AbsCellKey, CellRange, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
 /// The formula sheet a name's definition is shifted as: no sheet, so a
 /// row or column edit moves only the references that name their sheet. An
@@ -84,6 +82,10 @@ struct NameEntry {
     followed_by: Cell<Option<(u32, u32, u32)>>,
 }
 
+/// A name whose formula a cell is reading, and the cell that read it
+/// before, to put back when the read ends.
+type FollowedName<'a> = (&'a NameEntry, Option<(u32, u32, u32)>);
+
 pub(super) enum DefinedName {
     Range(NamedRangeRef),
     Formula(Box<Definition>),
@@ -104,10 +106,13 @@ pub(super) struct Definition {
     /// Whether the formula reads differently from different cells: it has a
     /// relative reference or a table reference.
     positional: bool,
+    /// The nodes a read of `expression` walks, counting the names in it at
+    /// their own sizes; worked out when the formulas are bound.
+    nodes: Cell<Option<usize>>,
 }
 
 /// What a defined name stands for in the formula being read.
-pub(crate) enum NameView<'a> {
+enum NameView<'a> {
     /// No definition for the formula's sheet: `#NAME?`. A name met again
     /// inside its own formula reads as undefined too.
     Undefined,
@@ -122,6 +127,55 @@ pub(crate) enum NameView<'a> {
     Formula(&'a Ast),
     /// The name's formula placed for the cell that reads it.
     Placed(Ast),
+}
+
+/// One read of a defined name by a formula ([`NameScope::read`]). While it
+/// lives, a use of the name inside the name's own formula, for the same
+/// cell, reads as undefined; dropping it ends that.
+pub(crate) struct NameRead<'a> {
+    view: NameView<'a>,
+    followed: Option<FollowedName<'a>>,
+}
+
+impl NameRead<'_> {
+    /// The name's formula, as defined or placed for the reading cell; `None`
+    /// for a range or an undefined name.
+    pub(crate) fn formula(&self) -> Option<&Ast> {
+        match &self.view {
+            NameView::Formula(expression) => Some(expression),
+            NameView::Placed(expression) => Some(expression),
+            NameView::Undefined | NameView::Linked | NameView::Range(_) => None,
+        }
+    }
+
+    /// The range the name stands for, also when its formula is one
+    /// reference.
+    pub(crate) const fn range(&self) -> Option<CellRange> {
+        match &self.view {
+            NameView::Range(range) => Some(*range),
+            NameView::Undefined | NameView::Linked | NameView::Formula(_) | NameView::Placed(_) => {
+                None
+            }
+        }
+    }
+
+    /// The error an undefined name is: `#NAME?`, or `#REF!` for a linked
+    /// workbook's name the link does not hold.
+    pub(crate) const fn error(&self) -> Option<FormulaError> {
+        match &self.view {
+            NameView::Undefined => Some(FormulaError::Name),
+            NameView::Linked => Some(FormulaError::Ref),
+            NameView::Range(_) | NameView::Formula(_) | NameView::Placed(_) => None,
+        }
+    }
+}
+
+impl Drop for NameRead<'_> {
+    fn drop(&mut self) {
+        if let Some((entry, previous)) = self.followed {
+            entry.followed_by.set(previous);
+        }
+    }
 }
 
 /// The formula a walk is in, for reading the defined names of its tree: the
@@ -148,31 +202,33 @@ impl<'a> NameScope<'a> {
     }
 
     /// Read the name `id` for the formula on [`Self::sheet`] at the cell that
-    /// is being evaluated or bound (`current_formula_origin`), and give
-    /// `read` what it stands for there. While `read` runs inside the name's
-    /// formula, a use of `id` in that formula, for the same cell, reads as
-    /// [`NameView::Undefined`].
-    pub(crate) fn read<R>(self, id: NameId, read: impl FnOnce(NameView<'a>) -> R) -> R {
+    /// is being evaluated or bound (`current_formula_origin`). Out of line:
+    /// every walk that meets a name calls it.
+    #[inline(never)]
+    pub(crate) fn read(self, id: NameId) -> NameRead<'a> {
         let Some(entry) = self.table.entry(id) else {
-            return read(if self.table.unsettled_is_linked(id) {
+            let view = if self.table.unsettled_is_linked(id) {
                 NameView::Linked
             } else {
                 NameView::Undefined
-            });
+            };
+            return NameRead {
+                view,
+                followed: None,
+            };
         };
         let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
         let cell = (self.sheet, row, col);
         if entry.followed_by.get() == Some(cell) {
-            return read(NameView::Undefined);
+            return NameRead {
+                view: NameView::Undefined,
+                followed: None,
+            };
         }
         let view = self.view(entry, row, col);
-        if !matches!(view, NameView::Formula(_) | NameView::Placed(_)) {
-            return read(view);
-        }
-        let previous = entry.followed_by.replace(Some(cell));
-        let result = read(view);
-        entry.followed_by.set(previous);
-        result
+        let followed = matches!(view, NameView::Formula(_) | NameView::Placed(_))
+            .then(|| (entry, entry.followed_by.replace(Some(cell))));
+        NameRead { view, followed }
     }
 
     /// What the name of `entry` stands for in the formula at (`row`, `col`).
@@ -360,22 +416,13 @@ impl NameTable {
             .find_map(|(defined, definition)| (*defined == scope).then_some(definition))
     }
 
-    /// The formula `id` holds in exactly `scope`, to bind it again.
-    fn formula_at_mut(&mut self, scope: Option<u32>, id: NameId) -> Option<&mut Definition> {
-        self.entries
-            .get_mut(id.index())?
-            .definitions
-            .iter_mut()
-            .find_map(|(defined, definition)| match definition {
-                DefinedName::Formula(formula) if *defined == scope => Some(&mut **formula),
-                DefinedName::Formula(_) | DefinedName::Range(_) => None,
-            })
-    }
-
-    /// The formula the folded name `key` holds in exactly `scope`.
-    fn formula_mut(&mut self, scope: Option<u32>, key: &str) -> Option<&mut Definition> {
-        let id = self.id(key)?;
-        self.formula_at_mut(scope, id)
+    /// The formula at `(entry, definition)` positions of the table, to bind
+    /// it again.
+    fn formula_at_position(&mut self, (entry, definition): (usize, usize)) -> Option<&mut Definition> {
+        match self.entries.get_mut(entry)?.definitions.get_mut(definition)? {
+            (_, DefinedName::Formula(formula)) => Some(formula),
+            (_, DefinedName::Range(_)) => None,
+        }
     }
 
     /// The definition of `key` in exactly `scope`.
@@ -566,6 +613,7 @@ impl CellStore {
             positional: is_positional(&ast),
             ast,
             expression: Ast::Missing,
+            nodes: Cell::new(None),
         };
         self.names.insert(
             name_scope,
@@ -730,61 +778,42 @@ impl CellStore {
     /// reads would pass [`EXPANSION_NODE_LIMIT`] nodes, counting each name
     /// it uses at that name's size, becomes `#NUM!`.
     pub(super) fn bind_name_definitions(&mut self) {
-        let written: Vec<(Option<u32>, String, Ast)> = self
-            .names
-            .settled()
-            .definitions()
-            .filter_map(|(scope, key, definition)| match definition {
-                DefinedName::Formula(formula) => {
-                    Some((scope, key.to_owned(), formula.ast.clone()))
+        let table = self.names.settled();
+        let mut written = Vec::new();
+        for (entry_index, entry) in table.entries.iter().enumerate() {
+            for (definition_index, (scope, definition)) in entry.definitions.iter().enumerate() {
+                if let DefinedName::Formula(formula) = definition {
+                    let sheet = scope.unwrap_or(NO_SHEET);
+                    written.push(((entry_index, definition_index), sheet, formula.ast.clone()));
                 }
-                DefinedName::Range(_) => None,
-            })
-            .collect();
+            }
+        }
         let mut bound = Vec::with_capacity(written.len());
-        for (scope, key, ast) in written {
+        for (at, sheet, ast) in written {
             #[cfg_attr(not(feature = "analysis"), allow(unused_mut))]
-            let mut expression = self.bind_formula_names(ast, scope.unwrap_or(NO_SHEET));
+            let mut expression = self.bind_formula_names(ast, sheet);
             // A named LAMBDA reads its parameters from the call frame, like
             // one written in a formula.
             #[cfg(feature = "analysis")]
             crate::eval::analysis::lambda::resolve_parameters(&mut expression);
-            bound.push((scope, key, expression));
+            bound.push((at, expression));
         }
-        let table = self.names.settled();
-        for (scope, key, expression) in bound {
-            if let Some(formula) = table.formula_mut(scope, &key) {
-                formula.expression = expression;
+        let table = &mut self.names;
+        for (at, expression) in &mut bound {
+            if let Some(formula) = table.formula_at_position(*at) {
+                formula.expression = std::mem::replace(expression, Ast::Missing);
+                formula.nodes.set(None);
             }
         }
-        self.bound_expression_sizes();
-    }
-
-    /// Replace each definition's formula with `#NUM!` when reading it walks
-    /// more than [`EXPANSION_NODE_LIMIT`] nodes, counting the names it uses
-    /// at their own sizes as defined in its scope, then the workbook's.
-    fn bound_expression_sizes(&mut self) {
-        let table = &mut self.names;
-        let keys: Vec<(Option<u32>, NameId)> = table
-            .entries
-            .iter()
-            .enumerate()
-            .filter_map(|(index, entry)| Some((NameId::at(index)?, entry)))
-            .flat_map(|(id, entry)| {
-                entry
-                    .definitions
-                    .iter()
-                    .filter(|(_, definition)| matches!(definition, DefinedName::Formula(_)))
-                    .map(move |(scope, _)| (*scope, id))
-            })
-            .collect();
-        let mut sizes = FxHashMap::default();
-        let oversized: Vec<(Option<u32>, NameId)> = keys
-            .into_iter()
-            .filter(|&key| definition_size(&*table, key, &mut sizes, 0) > EXPANSION_NODE_LIMIT)
-            .collect();
-        for (scope, id) in oversized {
-            if let Some(formula) = table.formula_at_mut(scope, id) {
+        // Past the limit, a formula reads as `#NUM!`, as a LET does past
+        // its expansion limit.
+        for (at, _) in bound {
+            let oversized = table.entries.get(at.0).is_some_and(|entry| {
+                let scope = entry.definitions.get(at.1).and_then(|(scope, _)| *scope);
+                NameId::at(at.0)
+                    .is_some_and(|id| definition_size(table, (scope, id), 0) > EXPANSION_NODE_LIMIT)
+            });
+            if let Some(formula) = oversized.then(|| table.formula_at_position(at)).flatten() {
                 formula.expression = Ast::Array(Box::new(ArrayLiteral {
                     cols: 1,
                     values: vec![Value::Error(FormulaError::Num)],
@@ -944,6 +973,7 @@ impl CellStore {
             source,
             ast,
             expression: Ast::Missing,
+            nodes: Cell::new(None),
         };
         self.names.insert(
             scope,
@@ -956,47 +986,33 @@ impl CellStore {
 }
 
 /// The nodes a read of the definition `(scope, id)` walks, counting each name
-/// in it at its own size, saturating. A name met again inside its own
-/// formula counts as one node, as it reads as undefined.
-fn definition_size(
-    table: &NameTable,
-    (scope, id): (Option<u32>, NameId),
-    sizes: &mut FxHashMap<(Option<u32>, NameId), usize>,
-    depth: usize,
-) -> usize {
-    if let Some(&size) = sizes.get(&(scope, id)) {
-        return size;
-    }
+/// in it at its own size, saturating, and kept in the definition. A name
+/// met again inside its own formula counts as one node, as it reads as
+/// undefined.
+fn definition_size(table: &NameTable, (scope, id): (Option<u32>, NameId), depth: usize) -> usize {
     let Some(DefinedName::Formula(formula)) = table.defined_at(scope, id) else {
         return 1;
     };
+    if let Some(size) = formula.nodes.get() {
+        return size;
+    }
     // A cycle reads as undefined where it closes.
-    sizes.insert((scope, id), 1);
+    formula.nodes.set(Some(1));
     let size = if depth > FORMULA_RECURSION_LIMIT {
         usize::MAX
     } else {
-        expression_size(table, &formula.expression, scope, sizes, depth)
+        expression_size(table, &formula.expression, scope, depth)
     };
-    sizes.insert((scope, id), size);
+    formula.nodes.set(Some(size));
     size
 }
 
 /// The nodes of `ast`, counting each name in it at the size of its
 /// definition in `scope`, else the workbook's.
-#[allow(
-    clippy::wildcard_enum_match_arm,
-    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node counts as one plus its children"
-)]
-fn expression_size(
-    table: &NameTable,
-    ast: &Ast,
-    scope: Option<u32>,
-    sizes: &mut FxHashMap<(Option<u32>, NameId), usize>,
-    depth: usize,
-) -> usize {
+fn expression_size(table: &NameTable, ast: &Ast, scope: Option<u32>, depth: usize) -> usize {
     if let Ast::DefinedName(id) = ast {
         let own = scope.filter(|_| table.defined_at(scope, *id).is_some());
-        return definition_size(table, (own, *id), sizes, depth + 1);
+        return definition_size(table, (own, *id), depth + 1);
     }
     let mut size: usize = 1;
     #[cfg(feature = "analysis")]
@@ -1004,7 +1020,7 @@ fn expression_size(
         size = size.saturating_add(definition.parameters.len());
     }
     ast.any_child(&mut |child| {
-        size = size.saturating_add(expression_size(table, child, scope, sizes, depth));
+        size = size.saturating_add(expression_size(table, child, scope, depth));
         false
     });
     size
