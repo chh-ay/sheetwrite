@@ -29,6 +29,23 @@ pub(crate) fn sort_indices_by(indices: &mut [u32], compare: &mut dyn FnMut(u32, 
     indices.sort_by(|&left, &right| compare(left, right));
 }
 
+/// [`number_order_bits`] of a finite `value`; `None` for NaN and infinities.
+pub(crate) fn finite_number_sort_key(value: f64) -> Option<u64> {
+    value.is_finite().then(|| number_order_bits(value))
+}
+
+/// Bits whose unsigned order is the order of `value`s, with -0 equal to 0.
+pub(crate) fn number_order_bits(value: f64) -> u64 {
+    const SIGN: u64 = 1 << 63;
+    let normalized = if value == 0.0 { 0.0 } else { value };
+    let bits = normalized.to_bits();
+    if bits & SIGN == 0 {
+        bits ^ SIGN
+    } else {
+        !bits
+    }
+}
+
 /// The index a packed key carries in its low 32 bits.
 pub(crate) const fn key_index(key: u128) -> u32 {
     key as u32

@@ -395,14 +395,19 @@ pub(crate) fn accepts_union(id: u16) -> bool {
 
 /// Returns the positions `0..count` in stable sorted order.
 ///
-/// Family position sorts use one shared implementation. The comparison is a
-/// trait object, so the binary holds one copy of the stable sort. Plain f64
-/// sorts can reuse the default engine's smaller unstable sort instead.
+/// Family position sorts go through the engine's shared stable index sort,
+/// [`crate::sorting::sort_indices_by`], so they add no sort of their own.
+/// Plain f64 sorts can reuse the default engine's unstable f64 sort instead.
 pub(super) fn sorted_positions(
     count: usize,
     compare: &mut dyn FnMut(usize, usize) -> std::cmp::Ordering,
 ) -> Vec<usize> {
-    let mut positions: Vec<usize> = (0..count).collect();
-    positions.sort_by(|&left, &right| compare(left, right));
+    let mut positions: Vec<u32> = (0..count as u32).collect();
+    crate::sorting::sort_indices_by(&mut positions, &mut |left, right| {
+        compare(left as usize, right as usize)
+    });
     positions
+        .into_iter()
+        .map(|position| position as usize)
+        .collect()
 }

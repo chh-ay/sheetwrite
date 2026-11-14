@@ -12,7 +12,9 @@ use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
 use crate::sort_text::push_collation_key;
-use crate::sorting::{key_index, sort_indices_by, sort_u128, sort_u64};
+use crate::sorting::{
+    finite_number_sort_key, key_index, number_order_bits, sort_indices_by, sort_u128, sort_u64,
+};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -1468,22 +1470,6 @@ fn sort_finite_number_column_radix(
 
     radix_sort_numeric_pairs(&mut pairs);
     Some(pairs.into_iter().map(|(_, row)| row).collect())
-}
-
-fn finite_number_sort_key(value: f64) -> Option<u64> {
-    value.is_finite().then(|| number_order_bits(value))
-}
-
-/// Bits whose unsigned order is the order of `value`s, with -0 equal to 0.
-fn number_order_bits(value: f64) -> u64 {
-    const SIGN: u64 = 1 << 63;
-    let normalized = if value == 0.0 { 0.0 } else { value };
-    let bits = normalized.to_bits();
-    if bits & SIGN == 0 {
-        bits ^ SIGN
-    } else {
-        !bits
-    }
 }
 
 fn radix_sort_numeric_pairs(pairs: &mut [NumericSortPair]) {

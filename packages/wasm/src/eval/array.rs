@@ -8,6 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 
 use crate::calc::{Ast, Func, RangeFlags, SheetRef};
+use crate::sorting::{finite_number_sort_key, key_index, sort_indices_by, sort_u128};
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -830,49 +831,56 @@ impl CellStore {
 
         let item_count = if by_col { array.cols } else { array.rows };
         let key = sort_index as usize - 1;
-        let mut indices: Vec<usize> = (0..item_count).collect();
-        let mut error = None;
-        indices.sort_by(|left, right| {
-            if error.is_some() {
-                return Ordering::Equal;
+        let key_value = |item: usize| {
+            if by_col {
+                array.get(key, item)
+            } else {
+                array.get(item, key)
             }
-            let left_value = if by_col {
-                array.get(key, *left)
-            } else {
-                array.get(*left, key)
-            };
-            let right_value = if by_col {
-                array.get(key, *right)
-            } else {
-                array.get(*right, key)
-            };
-            let compared = match (left_value, right_value) {
-                (Some(left), Some(right)) => compare_values(left, right),
-                _ => Err(FormulaError::Ref),
-            };
-            match compared {
-                Ok(value) if order == -1 => value.reverse(),
-                Ok(value) => value,
-                Err(found) => {
-                    error = Some(found);
-                    Ordering::Equal
+        };
+        let indices: Vec<u32> = match packed_sort_keys((0..item_count).map(key_value), order == -1)
+        {
+            Some(mut packed) => {
+                sort_u128(&mut packed);
+                packed.into_iter().map(key_index).collect()
+            }
+            None => {
+                let mut indices: Vec<u32> = (0..item_count as u32).collect();
+                let mut error = None;
+                sort_indices_by(&mut indices, &mut |left, right| {
+                    if error.is_some() {
+                        return Ordering::Equal;
+                    }
+                    let compared = match (key_value(left as usize), key_value(right as usize)) {
+                        (Some(left), Some(right)) => compare_values(left, right),
+                        _ => Err(FormulaError::Ref),
+                    };
+                    match compared {
+                        Ok(value) if order == -1 => value.reverse(),
+                        Ok(value) => value,
+                        Err(found) => {
+                            error = Some(found);
+                            Ordering::Equal
+                        }
+                    }
+                });
+                if let Some(first_error) = error {
+                    return Err(first_error);
                 }
+                indices
             }
-        });
-        if let Some(first_error) = error {
-            return Err(first_error);
-        }
+        };
 
         let mut values = Vec::with_capacity(array.values.len());
         if by_col {
             for row in 0..array.rows {
                 for &col in &indices {
-                    values.push(array.values[row * array.cols + col].clone());
+                    values.push(array.values[row * array.cols + col as usize].clone());
                 }
             }
         } else {
             for row in indices {
-                let start = row * array.cols;
+                let start = row as usize * array.cols;
                 values.extend_from_slice(&array.values[start..start + array.cols]);
             }
         }
@@ -1402,6 +1410,197 @@ fn trimmed_span(
     };
 
     start..end
+}
+
+/// Packed keys of `values` in SORT's stable [`compare_values`] order: the
+/// class (numbers, then text, then logical values) and the value above the
+/// position, so [`sort_u128`] gives the order a stable comparison sort gives.
+/// Text compares by its lowercase form, so each text is lowered once here
+/// instead of on every comparison.
+///
+/// A blank compares equal to 0, "" and FALSE at once, so it gets a key only
+/// when the other keys are all of one class: that class's zero value. `None`
+/// when blanks meet keys of several classes, or a key is an error, not
+/// finite or outside the array: those orders need the comparison itself.
+fn packed_sort_keys<'a>(
+    values: impl Iterator<Item = Option<&'a Value>>,
+    descending: bool,
+) -> Option<Vec<u128>> {
+    const CLASS_NUMBER: u128 = 0;
+    const CLASS_TEXT: u128 = 1;
+    const CLASS_BOOL: u128 = 2;
+    /// Above every class: marks a blank until its class is known.
+    const BLANK: u128 = (CLASS_BOOL + 1) << 64;
+
+    let mut keys = Vec::with_capacity(values.size_hint().0);
+    let mut texts: Vec<String> = Vec::new();
+    let mut classes = 0u8;
+    for value in values {
+        let key = match value? {
+            Value::Number(number) => {
+                CLASS_NUMBER << 64 | u128::from(finite_number_sort_key(*number)?)
+            }
+            Value::Text(text) => {
+                texts.push(text.to_lowercase());
+                CLASS_TEXT << 64 | (texts.len() - 1) as u128
+            }
+            Value::Bool(flag) => CLASS_BOOL << 64 | u128::from(*flag),
+            Value::Blank => BLANK,
+            Value::Error(_) => return None,
+        };
+        if key != BLANK {
+            classes |= 1 << (key >> 64);
+        }
+        keys.push(key);
+    }
+
+    if keys.contains(&BLANK) {
+        let blank = match classes {
+            0 | 1 => CLASS_NUMBER << 64 | u128::from(finite_number_sort_key(0.0)?),
+            2 => {
+                texts.push(String::new());
+                CLASS_TEXT << 64 | (texts.len() - 1) as u128
+            }
+            4 => CLASS_BOOL << 64,
+            _ => return None,
+        };
+        for key in &mut keys {
+            if *key == BLANK {
+                *key = blank;
+            }
+        }
+    }
+
+    if !texts.is_empty() {
+        // Equal texts get equal ranks.
+        let mut order: Vec<u32> = (0..texts.len() as u32).collect();
+        sort_indices_by(&mut order, &mut |left, right| {
+            texts[left as usize].cmp(&texts[right as usize])
+        });
+        let mut ranks = vec![0u64; texts.len()];
+        let mut rank = 0;
+        for (position, &text) in order.iter().enumerate() {
+            if position > 0 && texts[order[position - 1] as usize] != texts[text as usize] {
+                rank += 1;
+            }
+            ranks[text as usize] = rank;
+        }
+        for key in &mut keys {
+            if *key >> 64 == CLASS_TEXT {
+                *key = CLASS_TEXT << 64 | u128::from(ranks[*key as u64 as usize]);
+            }
+        }
+    }
+
+    let top = BLANK;
+    Some(
+        keys.into_iter()
+            .enumerate()
+            .map(|(position, key)| {
+                let directed = if descending { top - 1 - key } else { key };
+                directed << 32 | position as u128
+            })
+            .collect(),
+    )
+}
+
+#[cfg(test)]
+mod packed_sort_key_tests {
+    use super::*;
+
+    const ITEMS: usize = 400;
+    const CASES: usize = 50;
+    const TEXTS: [&str; 8] = ["a", "A", "b", "Ä", "ä", "co-op", "Straße", "STRASSE"];
+    const NUMBERS: [f64; 6] = [0.0, -0.0, 1.5, -1.5, 1e300, 2.0];
+    const SEED: u64 = 0x5eed;
+    const LCG_MULTIPLIER: u64 = 6_364_136_223_846_793_005;
+    const CLASSES: usize = 3;
+
+    struct Random(u64);
+
+    impl Random {
+        fn below(&mut self, bound: usize) -> usize {
+            self.0 = self.0.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
+            ((self.0 >> 33) as usize) % bound
+        }
+    }
+
+    /// The order SORT gave before packed keys: a stable sort by
+    /// [`compare_values`].
+    fn compared_order(values: &[Value], descending: bool) -> Vec<u32> {
+        let mut indices: Vec<u32> = (0..values.len() as u32).collect();
+        indices.sort_by(|&left, &right| {
+            let order = compare_values(&values[left as usize], &values[right as usize])
+                .expect("no errors among the test values");
+            if descending {
+                order.reverse()
+            } else {
+                order
+            }
+        });
+        indices
+    }
+
+    fn packed_order(values: &[Value], descending: bool) -> Vec<u32> {
+        let mut packed =
+            packed_sort_keys(values.iter().map(Some), descending).expect("packable values");
+        sort_u128(&mut packed);
+        packed.into_iter().map(key_index).collect()
+    }
+
+    #[test]
+    fn packed_keys_sort_mixed_classes_in_the_compared_order() {
+        let mut random = Random(SEED);
+        for case in 0..CASES {
+            let values: Vec<Value> = (0..ITEMS)
+                .map(|_| match random.below(CLASSES) {
+                    0 => Value::Number(NUMBERS[random.below(NUMBERS.len())]),
+                    1 => Value::text(TEXTS[random.below(TEXTS.len())]),
+                    _ => Value::Bool(random.below(2) == 0),
+                })
+                .collect();
+            let descending = case % 2 == 1;
+            assert_eq!(
+                packed_order(&values, descending),
+                compared_order(&values, descending),
+                "descending {descending}"
+            );
+        }
+    }
+
+    #[test]
+    fn blanks_sort_as_the_zero_value_of_a_single_class() {
+        let mut random = Random(SEED);
+        for case in 0..CASES {
+            // 0 numbers, 1 text, 2 logical values, 3 blanks only.
+            let class = case % (CLASSES + 1);
+            let values: Vec<Value> = (0..ITEMS)
+                .map(|_| match (random.below(3), class) {
+                    (0, _) | (_, 3) => Value::Blank,
+                    (_, 0) => Value::Number(NUMBERS[random.below(NUMBERS.len())]),
+                    (_, 1) => Value::text(["", "a", "B", "b"][random.below(4)]),
+                    _ => Value::Bool(random.below(2) == 0),
+                })
+                .collect();
+            let descending = case % 8 >= 4;
+            assert_eq!(
+                packed_order(&values, descending),
+                compared_order(&values, descending),
+                "class {class}, descending {descending}"
+            );
+        }
+    }
+
+    #[test]
+    fn mixed_blanks_errors_and_infinities_need_the_comparison() {
+        let mixed = [Value::Number(1.0), Value::Blank, Value::Bool(true)];
+        assert!(packed_sort_keys(mixed.iter().map(Some), false).is_none());
+        for value in [Value::Error(FormulaError::Na), Value::Number(f64::INFINITY)] {
+            let values = [Value::Number(1.0), value];
+            assert!(packed_sort_keys(values.iter().map(Some), false).is_none());
+        }
+        assert!(packed_sort_keys([Some(&Value::Number(1.0)), None].into_iter(), false).is_none());
+    }
 }
 
 #[cfg(test)]
