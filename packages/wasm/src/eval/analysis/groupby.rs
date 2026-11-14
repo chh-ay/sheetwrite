@@ -54,11 +54,13 @@ struct Context<'a, 'p> {
     work: usize,
     sums: FxHashMap<(usize, usize, usize), Value>,
 }
+
 impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
         self.store
             .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
         if !super::super::array::ast_produces_array(expression, self.pass.shapes()) {
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
@@ -66,6 +68,7 @@ impl Context<'_, '_> {
         self.store
             .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn charge(&mut self, work: usize) -> Result<(), FormulaError> {
         self.work = self.work.checked_add(work).ok_or(FormulaError::Num)?;
         if self.work > SPILL_MAX_RECOMPUTE_CELLS {
@@ -73,6 +76,7 @@ impl Context<'_, '_> {
         }
         Ok(())
     }
+
     fn sum_rows(
         &mut self,
         values: &EvalMatrix,
@@ -100,6 +104,7 @@ impl Context<'_, '_> {
         self.sums.insert(key, sum.clone());
         Ok(sum)
     }
+
     fn option(
         &mut self,
         arguments: &[Ast],
@@ -122,6 +127,7 @@ struct Group {
     rows: Vec<usize>,
     parent: Option<usize>,
 }
+
 struct Axis {
     groups: Vec<Group>,
     memberships: Vec<usize>,
@@ -129,6 +135,7 @@ struct Axis {
     grand: usize,
     width: usize,
 }
+
 impl Axis {
     fn build(
         context: &mut Context<'_, '_>,
@@ -202,10 +209,12 @@ impl Axis {
             width: fields.cols,
         })
     }
+
     fn memberships(&self, row: usize) -> &[usize] {
         let width = self.width + 1;
         &self.memberships[row * width..(row + 1) * width]
     }
+
     fn ancestor(&self, mut group: usize, width: usize) -> usize {
         while self.groups[group].fields.len() > width {
             group = self.groups[group]
@@ -214,6 +223,7 @@ impl Axis {
         }
         group
     }
+
     fn sort(
         &mut self,
         context: &mut Context<'_, '_>,
@@ -324,6 +334,7 @@ struct Aggregator {
     arity: usize,
     label: String,
 }
+
 impl Aggregator {
     fn resolve(written: &Ast) -> Result<Self, FormulaError> {
         let expression = written.bound_value();
@@ -366,6 +377,7 @@ impl Aggregator {
         }
         Err(FormulaError::Value)
     }
+
     fn aggregate(
         &self,
         context: &mut Context<'_, '_>,
@@ -423,6 +435,7 @@ impl Aggregator {
 pub(crate) fn produces_array(name: &str, _: &[Ast], _: Shapes<'_>) -> bool {
     name != "PERCENTOF"
 }
+
 pub(crate) fn shape(
     _: &CellStore,
     _: &str,
@@ -432,6 +445,7 @@ pub(crate) fn shape(
 ) -> Result<(usize, usize, usize), FormulaError> {
     Ok((1, 1, 1))
 }
+
 pub(crate) fn bound(
     store: &CellStore,
     name: &str,
