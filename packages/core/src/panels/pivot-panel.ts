@@ -6,11 +6,18 @@
 import { scanColumnValues } from "../data-window-reads.js";
 import { Scope } from "../scope.js";
 import { storeEngine } from "../store/engine-registry.js";
+import { patchSheetId } from "../store/ranges.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { TableColumnRef } from "../types/data-model.js";
+import type { DocumentOp } from "../types/document.js";
 import type { Grid, GridPanel } from "../types/grid.js";
-import type { PivotDefinition, PivotFieldType, PivotSourceField } from "../types/pivot.js";
+import type {
+  PivotDefinition,
+  PivotFieldType,
+  PivotSource,
+  PivotSourceField,
+} from "../types/pivot.js";
 import { panelSection, rebuildPanel, rejectionMessage, selectOf } from "./panel-dom.js";
 import { menuButton, type PanelMenuItem } from "./panel-menu.js";
 import {
@@ -87,7 +94,16 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   let message: string | null = null;
   // The value field whose number format form is open.
   let formatting: number | null = null;
-  let rendered = "";
+  /** Definition, data model and message the panel was built from, as JSON. */
+  let renderedStructure = "";
+  let renderedFields: readonly PivotSourceField[] = [];
+  /** Sheets the pivot reads cells from, as of the last definition read; empty without a pivot. */
+  let sourceSheets: ReadonlySet<SheetId> = new Set();
+  /**
+   * Whether the source sheets hold literal cells only, so that only writes to
+   * them change the fields. Undefined until checked; a write to one clears it.
+   */
+  let sourcesAreLiteral: boolean | undefined;
 
   /**
    * Distinct values of one source field, at most one more than a filter may
@@ -398,20 +414,130 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   /** Rebuild when the definition, its fields, the relationships or the message changed. */
   const refresh = (force = false): void => {
     const pivot = read();
-    const signature = JSON.stringify([
-      pivot,
-      pivot === null ? [] : grid.getPivotFields(sheet, id),
-      grid.store.getWorkbook().dataModel,
-      message,
-    ]);
-    if (!force && signature === rendered) return;
-    rendered = signature;
+    const fields = pivot === null ? [] : grid.getPivotFields(sheet, id);
+    const structure = JSON.stringify([pivot, grid.store.getWorkbook().dataModel, message]);
+    sourceSheets = pivot === null ? new Set() : pivotSourceSheets(grid, pivot.source);
+    sourcesAreLiteral = undefined;
+    if (!force && structure === renderedStructure && sameFields(fields, renderedFields)) return;
+    renderedStructure = structure;
+    renderedFields = fields;
+    rebuildPanel(body, build);
+  };
+
+  /**
+   * After a commit that only wrote cells. The definition, tables and data
+   * model are as they were, so only the fields' names and types can change,
+   * and only when a written cell or a formula is on a source sheet.
+   */
+  const refreshFields = (patches: readonly DocumentOp[]): void => {
+    if (sourceSheets.size === 0) return;
+    const writesSource = patches.some((patch) => {
+      const written = patchSheetId(patch);
+      return written === null || sourceSheets.has(written);
+    });
+    if (writesSource) {
+      sourcesAreLiteral = undefined;
+    } else {
+      sourcesAreLiteral ??= holdsLiteralsOnly(grid, sourceSheets, { sheet, id });
+      if (sourcesAreLiteral) return;
+    }
+    const fields = grid.getPivotFields(sheet, id);
+    if (sameFields(fields, renderedFields)) return;
+    renderedFields = fields;
     rebuildPanel(body, build);
   };
 
   refresh(true);
-  lifetime.add(grid.on("change", () => refresh()));
+  lifetime.add(
+    grid.on("change", (event) => {
+      const { patches } = event.transaction;
+      if (patches.every(writesCellsOnly)) refreshFields(patches);
+      else refresh();
+    }),
+  );
   return () => lifetime.close();
+}
+
+/**
+ * Sheets whose cells `source` reads. A table or model source reads its base
+ * table and, through relationships, other tables, so it counts every sheet
+ * that holds a table.
+ */
+function pivotSourceSheets(grid: Grid, source: PivotSource): Set<SheetId> {
+  if ("range" in source) return new Set([source.range.sheet]);
+  const sheets = grid.store.getWorkbook().sheets;
+  return new Set(
+    sheets.filter((candidate) => (candidate.tables?.length ?? 0) > 0).map(({ id }) => id),
+  );
+}
+
+/**
+ * Whether `sheets` hold literal cells only: fully loaded, with no formula,
+ * reference or other pivot's output. Their values then change only through
+ * writes to them. `own` is the panel's pivot, whose output follows its source.
+ */
+function holdsLiteralsOnly(
+  grid: Grid,
+  sheets: ReadonlySet<SheetId>,
+  own: { readonly sheet: SheetId; readonly id: string },
+): boolean {
+  const engine = storeEngine(grid.store);
+  if (!engine) return false;
+  for (const sheet of sheets) {
+    if (engine.isPaged(sheet)) return false;
+    const otherPivot = grid
+      .getPivots(sheet)
+      .some((pivot) => sheet !== own.sheet || pivot.id !== own.id);
+    if (otherPivot) return false;
+    const sources = engine.captureSheetSources(sheet);
+    if (
+      sources === null ||
+      sources.formulaOffsets.length > 0 ||
+      sources.referenceOffsets.length > 0
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Whether `patch` changes only cell content or formatting. Such a commit
+ * leaves pivot definitions, tables and the data model as they were.
+ */
+function writesCellsOnly(patch: DocumentOp): boolean {
+  switch (patch.op) {
+    case "set":
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+    case "clearRange":
+    case "setRangeStyle":
+    case "setNote":
+    case "setHyperlink":
+    case "removeHyperlink":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function sameFields(
+  left: readonly PivotSourceField[],
+  right: readonly PivotSourceField[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((field, index) => {
+      const other = right[index];
+      return (
+        other !== undefined &&
+        field.index === other.index &&
+        field.header === other.header &&
+        field.type === other.type
+      );
+    })
+  );
 }
 
 function note(text: string, alert = false): HTMLElement {

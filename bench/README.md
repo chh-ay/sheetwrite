@@ -811,7 +811,7 @@ Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
 | `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator (`src/sync-queue-depth-bench.ts`) |
 | `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
 | `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
-| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference (`src/panel-read-bench.ts`) |
+| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference; cell edits with the pivot field list closed and open (`src/panel-read-bench.ts`) |
 | `bench:view-index` | Packed view-row index against a map baseline (`src/view-index-bench.ts`) |
 | `bench:resource`, `bench:resource:smoke` | Ingest memory and string-pool resources at 1M rows (`src/resource-bench.ts`) |
 | `bench:streaming-memory` | XLSX buffered and streaming memory, baseline and candidate interleaved in fresh processes (`src/streaming-memory-bench.ts`) |
