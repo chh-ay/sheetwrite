@@ -130,18 +130,18 @@ try {
 
 An XLSX error message keeps at most 8 KiB of text from the file, so a hostile part name or attribute cannot make a large error.
 
-## Memory evidence and limits
+## Memory use
 
-[PR #186](https://github.com/chh-ay/sheetwrite/pull/186) measured seven interleaved fresh-process rounds per side with one CPU slot:
+Importing an XLSX workbook holds the whole result in memory. On a Linux machine with an Intel Core i9-12900H, generated workbooks of 8 columns peak at about this much process memory (median of seven runs, with the largest run in brackets):
 
-| Generated workbook | Import path | Peak RSS median before → after | Candidate maximum |
-| --- | --- | --- | --- |
-| 200,000 × 8 | Buffered | 1,095 → 800 MiB | 814 MiB |
-| 200,000 × 8 | Blob | 1,112 → 779 MiB | 791 MiB |
-| 1,000,000 × 8 | Buffered | 5,061 → 3,352 MiB | 3,512 MiB |
-| 1,000,000 × 8 | Blob | 4,475 → 3,336 MiB | 3,504 MiB |
+| Generated workbook | Import path | Peak memory |
+| --- | --- | --- |
+| 200,000 × 8 | Buffered | 800 MiB (814 MiB) |
+| 200,000 × 8 | Blob | 779 MiB (791 MiB) |
+| 1,000,000 × 8 | Buffered | 3,352 MiB (3,512 MiB) |
+| 1,000,000 × 8 | Blob | 3,336 MiB (3,504 MiB) |
 
-These are measured workloads with adjusted budgets, not default-limit promises. The later results supersede the earlier #179 import peak-risk observation; they do not establish a universal memory ceiling.
+These runs raised the resource budgets above their defaults. Other workbooks use more or less memory, so these numbers are not a memory ceiling.
 
 ## See also
 
