@@ -270,7 +270,8 @@ const SHOTS: readonly Shot[] = [
     steps: async (page) => {
       await page.locator(".sheetwrite-shell-grid").click({ position: cellPoint(1, 0) });
       await page.keyboard.press("Control+f");
-      await page.keyboard.type("EMEA");
+      // Fill the Find input itself, so the search runs and the matches highlight.
+      await page.getByRole("textbox", { name: "Find in sheet" }).fill("EMEA");
       await settle(page);
     },
   },
@@ -302,7 +303,10 @@ const SHOTS: readonly Shot[] = [
     query: { sheet: "report" },
     steps: async (page) => {
       await select(page, { kind: "cell", addr: { sheet: "report", row: 2, col: 4 } });
+      // At this width the Number group folds into a menu; open it, then the
+      // list of its number format box.
       await page.getByRole("button", { name: "Number", exact: true }).first().click();
+      await page.getByRole("button", { name: "Number Format list", exact: true }).click();
       await settle(page);
     },
   },
@@ -314,7 +318,9 @@ const SHOTS: readonly Shot[] = [
     query: { sheet: "report", ribbon: "compact" },
     steps: async (page) => {
       await select(page, { kind: "cell", addr: { sheet: "report", row: 3, col: 5 } });
-      await page.keyboard.press("Alt+ArrowDown");
+      // Enter on a list cell opens its list; the grid needs the keyboard focus first.
+      await page.locator(".sheetwrite-shell-grid [tabindex='0']").first().focus();
+      await page.keyboard.press("Enter");
       await settle(page);
     },
   },
@@ -325,19 +331,15 @@ const SHOTS: readonly Shot[] = [
     query: { sheet: "pivot", ribbon: "compact" },
     steps: (page) => select(page, { kind: "cell", addr: { sheet: "pivot", row: 2, col: 1 } }),
   },
+  // The data-grid presentation names the columns in their headers, so a column
+  // filter leaves the column names in view.
   {
     name: "filter",
     size: "panel",
-    query: { sheet: "orders", ribbon: "compact" },
+    query: { sheet: "orders", ribbon: "compact", presentation: "data-grid" },
     steps: async (page) => {
-      await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 1 } });
-      await page.getByRole("tab", { name: "Data", exact: true }).click();
-      await page
-        .getByRole("button", { name: /Filter/ })
-        .first()
-        .click();
-      // Filter Region to EMEA, so the shot shows hidden rows and an active filter button.
       await page.evaluate(() => window.__sheetwriteFigureGrid?.filterBy(1, "EMEA"));
+      await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 1 } });
       await settle(page);
     },
   },
