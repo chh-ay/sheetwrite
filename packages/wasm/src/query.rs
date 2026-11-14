@@ -1813,12 +1813,12 @@ impl SortKeys {
             CLASS_ERROR | CLASS_EMPTY => 0,
             _ => self.values[key],
         };
-        let (class, value) = if ascending || class == CLASS_EMPTY {
+        let (directed_class, directed_value) = if ascending || class == CLASS_EMPTY {
             (class, value)
         } else {
             (CLASS_ERROR - class, !value)
         };
-        (u128::from(class) << 64 | u128::from(value)) << 32
+        (u128::from(directed_class) << 64 | u128::from(directed_value)) << 32
     }
 
     /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
