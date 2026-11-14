@@ -37,12 +37,8 @@ const NONE: u32 = u32::MAX;
 const READ_PIN: u8 = 1 << 0;
 /// A rendered viewport band pins the page.
 const VIEWPORT_PIN: u8 = 1 << 1;
-const PINNED: u8 = READ_PIN | VIEWPORT_PIN;
-/// Set-membership bit used while a pin replacement runs. Every operation that
-/// sets it clears it before returning.
-const MARK: u8 = 1 << 2;
 
-/// The column of a free slab entry.
+/// The column of a free dirty or calculated block.
 const FREE_ENTRY: u32 = u32::MAX;
 /// The revision of a slot on the free list. Live writes never use revision 0.
 const FREE_SLOT: u64 = 0;
@@ -226,40 +222,94 @@ impl CleanPage {
     }
 }
 
+/// What a page record holds. A record without a clean page lives only for its
+/// pins; one with neither is freed.
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum PageState {
+    /// On the free list.
+    Free,
+    /// Holds pins and no clean page.
+    Pinned,
+    /// Holds a clean page, pinned or not.
+    Resident,
+}
+
+impl PageState {
+    #[cfg(any(target_arch = "wasm32", test))]
+    fn from_transfer(value: u32) -> Option<Self> {
+        [Self::Free, Self::Pinned, Self::Resident]
+            .into_iter()
+            .find(|&state| state as u32 == value)
+    }
+}
+
+/// The low bit of an access stamp: set while the page sits on the eviction
+/// list at that stamp. A read writes a new stamp with the bit clear, so the
+/// bit also says the list position is still current.
+const QUEUED: u64 = 1;
+
+/// The access stamp for a clock value, not yet queued.
+#[inline]
+const fn stamp(access: u64) -> u64 {
+    access << 1
+}
+
 /// One (column, chunk) of the page directory: its clean page, pins and
-/// eviction links. A page is on the eviction list while it is clean-resident
-/// and unpinned.
+/// eviction links. A page is on the eviction list while it is resident and
+/// unpinned.
 struct PageRecord {
     col: u32,
     page: u32,
     clean: u32,
-    prev: Cell<u32>,
-    next: Cell<u32>,
+    prev: u32,
+    next: u32,
+    /// The access stamp: the clock value of the last access, shifted left
+    /// once, and [`QUEUED`]. Reads move it through `&self`; the eviction list
+    /// changes only under `&mut self`.
     last_access: Cell<u64>,
-    flags: u8,
+    state: PageState,
+    pins: u8,
 }
 
+// One per page record of a paged sheet; the queued bit keeps the stamp in place
+// of a second one.
+const _: () = assert!(
+    std::mem::size_of::<PageRecord>() == 32,
+    "PageRecord changed size: measure, then update this number"
+);
+
 impl PageRecord {
+    /// A new record starts as [`PageState::Pinned`] with no pins: its caller
+    /// attaches a clean page or a pin before anything can free it.
     fn new(col: u32, page: u32) -> Self {
         Self {
             col,
             page,
             clean: NONE,
-            prev: Cell::new(NONE),
-            next: Cell::new(NONE),
+            prev: NONE,
+            next: NONE,
             last_access: Cell::new(0),
-            flags: 0,
+            state: PageState::Pinned,
+            pins: 0,
         }
     }
 
     #[inline]
     fn is_evictable(&self) -> bool {
-        self.clean != NONE && self.flags & PINNED == 0
+        self.state == PageState::Resident && self.pins == 0
+    }
+
+    /// The clock value of the last access.
+    #[inline]
+    fn access(&self) -> u64 {
+        self.last_access.get() >> 1
     }
 
     /// Eviction order: oldest access first, then directory position.
+    #[inline]
     fn eviction_key(&self) -> (u64, u32, u32) {
-        (self.last_access.get(), self.col, self.page)
+        (self.access(), self.col, self.page)
     }
 }
 
@@ -448,12 +498,17 @@ pub(super) struct PagedStorage {
     calculated: Directory,
     calculated_blocks: Vec<CalculatedBlock>,
     free_calculated_blocks: Vec<u32>,
+    /// Sorted, deduplicated record ids.
     read_pins: Vec<u32>,
+    /// Sorted, deduplicated record ids.
     viewport_pins: Vec<u32>,
     /// Pin replacement and acknowledgement scratch, empty between calls.
     scratch: Vec<u32>,
-    lru_head: Cell<u32>,
-    lru_tail: Cell<u32>,
+    /// The eviction list: evictable pages in order of the access each was
+    /// queued at. A queued access is a lower bound of the page's own, so the
+    /// first page whose stamp still has [`QUEUED`] is the least recent one.
+    lru_head: u32,
+    lru_tail: u32,
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
     evictions: u64,
@@ -500,8 +555,8 @@ impl PagedStorage {
             read_pins: Vec::new(),
             viewport_pins: Vec::new(),
             scratch: Vec::new(),
-            lru_head: Cell::new(NONE),
-            lru_tail: Cell::new(NONE),
+            lru_head: NONE,
+            lru_tail: NONE,
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
             evictions: 0,
@@ -547,19 +602,46 @@ impl PagedStorage {
     /// Frees a record that holds no clean page and no pins.
     fn release_if_empty(&mut self, id: u32) {
         let record = &mut self.records[id as usize];
-        if record.clean != NONE || record.flags != 0 {
+        if record.state == PageState::Resident || record.pins != 0 {
             return;
         }
 
         self.pages.clear(record.col as usize, record.page as usize);
-        record.col = FREE_ENTRY;
+        record.state = PageState::Free;
         self.free_records.push(id);
+    }
+
+    /// Returns a resident record's clean page to the free list. The record
+    /// stays for its pins or is freed. The caller has unlinked it.
+    #[inline(always)]
+    fn drop_clean(&mut self, id: u32) {
+        let record = &mut self.records[id as usize];
+        self.free_clean.push(record.clean);
+        record.clean = NONE;
+        record.state = PageState::Pinned;
+        self.release_if_empty(id);
+    }
+
+    /// Attaches a clean page to a record at a new access. The access is the
+    /// newest, so an evictable page goes last on the eviction list.
+    #[inline(always)]
+    fn attach_clean(&mut self, id: u32, clean: u32) {
+        let access = self.next_access();
+        let record = &mut self.records[id as usize];
+        record.clean = clean;
+        record.state = PageState::Resident;
+        record.last_access.set(stamp(access));
+
+        if record.is_evictable() {
+            record.last_access.set(stamp(access) | QUEUED);
+            self.lru_link_after(id, self.lru_tail);
+        }
     }
 
     fn live_records(&self) -> impl Iterator<Item = &PageRecord> {
         self.records
             .iter()
-            .filter(|record| record.col != FREE_ENTRY)
+            .filter(|record| record.state != PageState::Free)
     }
 
     fn live_slots(&self) -> impl Iterator<Item = &DirtySlot> {
@@ -586,80 +668,78 @@ impl PagedStorage {
         next
     }
 
-    fn lru_unlink(&self, id: u32) {
-        let record = &self.records[id as usize];
-        let (prev, next) = (record.prev.get(), record.next.get());
+    fn lru_unlink(&mut self, id: u32) {
+        let record = &mut self.records[id as usize];
+        let (prev, next) = (record.prev, record.next);
+        record.prev = NONE;
+        record.next = NONE;
 
         if prev == NONE {
-            self.lru_head.set(next);
+            self.lru_head = next;
         } else {
-            self.records[prev as usize].next.set(next);
+            self.records[prev as usize].next = next;
         }
 
         if next == NONE {
-            self.lru_tail.set(prev);
+            self.lru_tail = prev;
         } else {
-            self.records[next as usize].prev.set(prev);
+            self.records[next as usize].prev = prev;
         }
-
-        record.prev.set(NONE);
-        record.next.set(NONE);
     }
 
     /// Links `id` after `prev`, or at the head when `prev` is [`NONE`].
-    fn lru_link_after(&self, id: u32, prev: u32) {
+    fn lru_link_after(&mut self, id: u32, prev: u32) {
         let next = if prev == NONE {
-            self.lru_head.get()
+            self.lru_head
         } else {
-            self.records[prev as usize].next.get()
+            self.records[prev as usize].next
         };
-        let record = &self.records[id as usize];
-        record.prev.set(prev);
-        record.next.set(next);
+        let record = &mut self.records[id as usize];
+        record.prev = prev;
+        record.next = next;
 
         if prev == NONE {
-            self.lru_head.set(id);
+            self.lru_head = id;
         } else {
-            self.records[prev as usize].next.set(id);
+            self.records[prev as usize].next = id;
         }
 
         if next == NONE {
-            self.lru_tail.set(id);
+            self.lru_tail = id;
         } else {
-            self.records[next as usize].prev.set(id);
+            self.records[next as usize].prev = id;
         }
     }
 
-    /// Links a page that became evictable at its eviction-order position.
-    /// Pinned pages keep recent access stamps, so the walk from the tail is short.
-    fn lru_insert_ordered(&self, id: u32) {
-        let key = self.records[id as usize].eviction_key();
-        let mut prev = self.lru_tail.get();
+    /// Queues an evictable page at its current access. The walk from the tail
+    /// compares current accesses: a page it passes was read after `id`'s
+    /// access, and every page before the stop was queued no later than it.
+    /// Recently read or unpinned pages sort last, so the walk is short.
+    fn lru_queue(&mut self, id: u32) {
+        let record = &self.records[id as usize];
+        record.last_access.set(record.last_access.get() | QUEUED);
+        let key = record.eviction_key();
+        let mut prev = self.lru_tail;
 
         while prev != NONE && self.records[prev as usize].eviction_key() > key {
-            prev = self.records[prev as usize].prev.get();
+            prev = self.records[prev as usize].prev;
         }
 
         self.lru_link_after(id, prev);
     }
 
-    /// Records an access to a clean-resident page and moves it to the newest
-    /// eviction position.
+    /// Records an access to a resident page: a new stamp, unless the page
+    /// already holds the newest one. The eviction list does not change; it
+    /// finds the moved stamp when the page reaches its head.
+    #[inline]
     pub(super) fn touch(&self, id: u32) {
         if id == NONE {
             return;
         }
 
         let record = &self.records[id as usize];
-        if record.clean == NONE {
-            return;
-        }
-
-        record.last_access.set(self.next_access());
-
-        if record.is_evictable() && self.lru_tail.get() != id {
-            self.lru_unlink(id);
-            self.lru_link_after(id, self.lru_tail.get());
+        if record.state == PageState::Resident && record.access() != self.clock.get() {
+            record.last_access.set(stamp(self.next_access()));
         }
     }
 
@@ -675,7 +755,7 @@ impl PagedStorage {
         let chunk_bytes = self.chunk_bytes();
 
         while (self.resident_chunks() + 1) * chunk_bytes > self.byte_budget {
-            let candidate = self.lru_head.get();
+            let candidate = self.lru_head;
             if candidate == NONE {
                 break;
             }
@@ -683,10 +763,13 @@ impl PagedStorage {
             self.eviction_candidate_checks = self.eviction_candidate_checks.saturating_add(1);
             self.lru_unlink(candidate);
 
-            let record = &mut self.records[candidate as usize];
-            self.free_clean.push(record.clean);
-            record.clean = NONE;
-            self.release_if_empty(candidate);
+            if self.records[candidate as usize].last_access.get() & QUEUED == 0 {
+                // Read since it was queued: it goes back at its new access.
+                self.lru_queue(candidate);
+                continue;
+            }
+
+            self.drop_clean(candidate);
             self.evictions = self.evictions.saturating_add(1);
         }
     }
@@ -710,15 +793,7 @@ impl PagedStorage {
             self.clean.push(CleanPage::new(self.chunk_rows));
             (self.clean.len() - 1) as u32
         };
-        let access = self.next_access();
-        let record = &mut self.records[id as usize];
-        record.clean = clean;
-        record.last_access.set(access);
-
-        if record.is_evictable() {
-            self.lru_link_after(id, self.lru_tail.get());
-        }
-
+        self.attach_clean(id, clean);
         &mut self.clean[clean as usize]
     }
 
@@ -1148,16 +1223,10 @@ impl PagedStorage {
         self.scratch = touched;
     }
 
-    /// Marks the page record of (`col`, `page`) once, appending a newly marked
-    /// id to `next`.
+    /// Appends the page record of (`col`, `page`) to `next`. The pin
+    /// replacement removes duplicates.
     fn collect_pin(&mut self, col: usize, page: usize, next: &mut Vec<u32>) {
-        let id = self.record_or_insert(col, page);
-        let record = &mut self.records[id as usize];
-
-        if record.flags & MARK == 0 {
-            record.flags |= MARK;
-            next.push(id);
-        }
+        next.push(self.record_or_insert(col, page));
     }
 
     pub(super) fn pin_read_window(&mut self, start: usize, end: usize, rows: &[u32], cols: &[u32]) {
@@ -1183,10 +1252,15 @@ impl PagedStorage {
 
         for &id in &self.read_pins {
             let record = &self.records[id as usize];
-            if record.clean != NONE {
-                record.last_access.set(access);
+            if record.state == PageState::Resident {
+                record.last_access.set(stamp(access));
             }
         }
+
+        // These pages share one access. Moving the clock on makes a later read
+        // of any of them a newer access, as it is for a page that has the
+        // newest access alone.
+        self.next_access();
     }
 
     pub(super) fn pin_viewport_bands(&mut self, bands: &[u32]) {
@@ -1210,35 +1284,37 @@ impl PagedStorage {
         self.replace_pins(previous, VIEWPORT_PIN);
     }
 
-    /// Moves `pin` from `previous` to the marked pages of the current list for
-    /// `pin`. Unpinned resident pages return to eviction order; newly pinned
-    /// ones leave it.
+    /// Moves `pin` from `previous` to the pages of the current list for `pin`,
+    /// which it sorts and deduplicates. Unpinned resident pages return to
+    /// eviction order; newly pinned ones leave it.
     fn replace_pins(&mut self, mut previous: Vec<u32>, pin: u8) {
+        let mut current = if pin == READ_PIN {
+            std::mem::take(&mut self.read_pins)
+        } else {
+            std::mem::take(&mut self.viewport_pins)
+        };
+        current.sort_unstable();
+        current.dedup();
+
         for &id in &previous {
-            let record = &mut self.records[id as usize];
-            if record.flags & MARK != 0 {
+            if current.binary_search(&id).is_ok() {
                 continue;
             }
 
-            record.flags &= !pin;
+            let record = &mut self.records[id as usize];
+            record.pins &= !pin;
 
             if record.is_evictable() {
-                self.lru_insert_ordered(id);
+                self.lru_queue(id);
             }
 
             self.release_if_empty(id);
         }
 
-        let current = if pin == READ_PIN {
-            std::mem::take(&mut self.read_pins)
-        } else {
-            std::mem::take(&mut self.viewport_pins)
-        };
-
         for &id in &current {
-            let was_evictable = self.records[id as usize].is_evictable();
             let record = &mut self.records[id as usize];
-            record.flags = (record.flags & !MARK) | pin;
+            let was_evictable = record.is_evictable();
+            record.pins |= pin;
 
             if was_evictable {
                 self.lru_unlink(id);
@@ -1438,7 +1514,7 @@ impl PagedStorage {
         for record in self
             .records
             .iter()
-            .filter(|record| record.col != FREE_ENTRY && record.clean != NONE)
+            .filter(|record| record.state == PageState::Resident)
         {
             for payload in &mut self.clean[record.clean as usize].payload {
                 remap(payload);
@@ -1677,9 +1753,10 @@ impl PagedStorage {
                 record.col,
                 record.page,
                 record.clean,
-                record.prev.get(),
-                record.next.get(),
-                u32::from(record.flags),
+                record.prev,
+                record.next,
+                record.state as u32,
+                u32::from(record.pins),
             ] {
                 out.u32(value);
             }
@@ -1741,8 +1818,8 @@ impl PagedStorage {
 
         out.ints(&self.read_pins);
         out.ints(&self.viewport_pins);
-        out.u32(self.lru_head.get());
-        out.u32(self.lru_tail.get());
+        out.u32(self.lru_head);
+        out.u32(self.lru_tail);
         out.u64(self.clock.get());
         out.u64(self.eviction_candidate_checks);
         out.u64(self.evictions);
@@ -1755,19 +1832,20 @@ impl PagedStorage {
 
         paged.pages = Directory::read_transfer(input)?;
         for _ in 0..input.count()? {
-            let mut fields = [0u32; 6];
+            let mut fields = [0u32; 7];
             for field in &mut fields {
                 *field = input.u32()?;
             }
-            let [col, page, clean, prev, next, flags] = fields;
+            let [col, page, clean, prev, next, state, pins] = fields;
             paged.records.push(PageRecord {
                 col,
                 page,
                 clean,
-                prev: Cell::new(prev),
-                next: Cell::new(next),
+                prev,
+                next,
                 last_access: Cell::new(input.u64()?),
-                flags: u8::try_from(flags).map_err(|_| "invalid transferred page flags")?,
+                state: PageState::from_transfer(state).ok_or("invalid transferred page state")?,
+                pins: u8::try_from(pins).map_err(|_| "invalid transferred page pins")?,
             });
         }
         paged.free_records = input.ints()?;
@@ -1854,8 +1932,8 @@ impl PagedStorage {
 
         paged.read_pins = input.ints()?;
         paged.viewport_pins = input.ints()?;
-        paged.lru_head.set(input.u32()?);
-        paged.lru_tail.set(input.u32()?);
+        paged.lru_head = input.u32()?;
+        paged.lru_tail = input.u32()?;
         paged.clock.set(input.u64()?);
         paged.eviction_candidate_checks = input.u64()?;
         paged.evictions = input.u64()?;
@@ -1994,6 +2072,21 @@ mod tests {
     }
 
     #[test]
+    fn a_read_after_a_read_window_makes_its_page_newer_than_the_window() {
+        let mut storage = PagedStorage::new(ROWS, budget_for(2), 1).unwrap();
+        load(&mut storage, 0, 0, 1);
+        load(&mut storage, 1, 0, 2);
+
+        // Both pages share the window's access until page 0 is read.
+        storage.pin_read_window(0, 2 * ROWS, &[], &[0]);
+        storage.read(0, 0);
+        storage.pin_read_window(0, 0, &[], &[]);
+        load(&mut storage, 2, 0, 3);
+        assert!(is_resident(&storage, 0, 0));
+        assert!(!is_resident(&storage, 1, 0));
+    }
+
+    #[test]
     fn dirty_cells_and_calculated_blocks_survive_eviction_and_release_when_empty() {
         let mut storage = PagedStorage::new(ROWS, budget_for(1), 4).unwrap();
         assert!(storage.write(1, 0, KIND_NUMBER, 10, 0, Some(5)));
@@ -2039,5 +2132,178 @@ mod tests {
 
         restored.acknowledge_revision(9);
         assert_eq!(restored.dirty_cells(), 0);
+    }
+
+    /// One page of the eviction model.
+    #[derive(Clone, Copy, Default)]
+    struct ModelPage {
+        resident: bool,
+        access: u64,
+        read_pinned: bool,
+        viewport_pinned: bool,
+    }
+
+    impl ModelPage {
+        const fn is_evictable(self) -> bool {
+            self.resident && !self.read_pinned && !self.viewport_pinned
+        }
+    }
+
+    /// The eviction order before access stamps: every access moves the page
+    /// to the newest place, and eviction takes the oldest unpinned page.
+    struct EvictionModel {
+        /// Pages by column, then page.
+        columns: Vec<Vec<ModelPage>>,
+        clock: u64,
+        resident_limit: usize,
+    }
+
+    impl EvictionModel {
+        fn access(&mut self) -> u64 {
+            self.clock += 1;
+            self.clock
+        }
+
+        fn pages(&mut self) -> impl Iterator<Item = (usize, usize, &mut ModelPage)> {
+            self.columns
+                .iter_mut()
+                .enumerate()
+                .flat_map(|(col, pages)| {
+                    pages
+                        .iter_mut()
+                        .enumerate()
+                        .map(move |(page, state)| (col, page, state))
+                })
+        }
+
+        fn load(&mut self, page: usize, col: usize) {
+            if self.columns[col][page].resident {
+                self.read(page, col);
+                return;
+            }
+
+            // Evicts until the new page fits or no unpinned page is left.
+            while self
+                .columns
+                .iter()
+                .flatten()
+                .filter(|page| page.resident)
+                .count()
+                >= self.resident_limit
+            {
+                let oldest = self
+                    .pages()
+                    .filter(|(_, _, page)| page.is_evictable())
+                    .min_by_key(|&(col, page, ref state)| (state.access, col, page))
+                    .map(|(col, page, _)| (col, page));
+                let Some((col, page)) = oldest else {
+                    break;
+                };
+                self.columns[col][page].resident = false;
+            }
+
+            let access = self.access();
+            let loaded = &mut self.columns[col][page];
+            loaded.resident = true;
+            loaded.access = access;
+        }
+
+        fn read(&mut self, page: usize, col: usize) {
+            let access = self.access();
+            let read = &mut self.columns[col][page];
+            if read.resident {
+                read.access = access;
+            }
+        }
+
+        /// Read pins replace the previous ones and share one access.
+        fn pin_read_window(&mut self, col: usize, pages: std::ops::Range<usize>) {
+            let access = self.access();
+            for (pinned_col, page, state) in self.pages() {
+                state.read_pinned = pinned_col == col && pages.contains(&page);
+                if state.read_pinned && state.resident {
+                    state.access = access;
+                }
+            }
+        }
+
+        fn pin_viewport(&mut self, col: usize, pages: std::ops::Range<usize>) {
+            for (pinned_col, page, state) in self.pages() {
+                state.viewport_pinned = pinned_col == col && pages.contains(&page);
+            }
+        }
+    }
+
+    fn next_random(seed: &mut u32, bound: usize) -> usize {
+        *seed ^= *seed << 13;
+        *seed ^= *seed >> 17;
+        *seed ^= *seed << 5;
+        *seed as usize % bound
+    }
+
+    fn transferred(storage: &PagedStorage) -> PagedStorage {
+        let mut out = Writer::new(TRANSFER_TAG);
+        storage.write_transfer(&mut out);
+        let mut input = Reader::new(&out.0, TRANSFER_TAG).unwrap();
+        let restored = PagedStorage::read_transfer(&mut input).unwrap();
+        input.finish().unwrap();
+        restored
+    }
+
+    /// Random loads, reads, pins and transfers on 400 paged sheets keep the
+    /// resident pages of the eviction model above after every operation.
+    #[test]
+    fn access_stamps_evict_the_pages_the_moved_list_evicted() {
+        const SHEETS: u32 = 400;
+        const STEPS: usize = 200;
+        const COLS: usize = 3;
+        const PAGES: usize = 12;
+
+        for sheet in 0..SHEETS {
+            let mut seed = 0x9e37_79b9 ^ (sheet + 1).wrapping_mul(0x85eb_ca6b);
+            let resident_limit = 1 + next_random(&mut seed, 6);
+            let mut storage = PagedStorage::new(ROWS, budget_for(resident_limit), 0).unwrap();
+            let mut model = EvictionModel {
+                columns: vec![vec![ModelPage::default(); PAGES]; COLS],
+                clock: 0,
+                resident_limit,
+            };
+
+            for step in 0..STEPS {
+                let col = next_random(&mut seed, COLS);
+                let page = next_random(&mut seed, PAGES);
+                let pages = page..(page + next_random(&mut seed, 3)).min(PAGES);
+                match next_random(&mut seed, 10) {
+                    0..=3 => {
+                        load(&mut storage, page, col, step as u64);
+                        model.load(page, col);
+                    }
+                    4..=6 => {
+                        storage.read(page * ROWS + next_random(&mut seed, ROWS), col);
+                        model.read(page, col);
+                    }
+                    7 => {
+                        let rows = pages.start * ROWS..pages.end * ROWS;
+                        storage.pin_read_window(rows.start, rows.end, &[], &[col as u32]);
+                        model.pin_read_window(col, pages);
+                    }
+                    8 => {
+                        let [first, end] =
+                            [pages.start, pages.end].map(|page| (page * ROWS) as u32);
+                        storage.pin_viewport_bands(&[first, end, col as u32, col as u32 + 1]);
+                        model.pin_viewport(col, pages);
+                    }
+                    _ => storage = transferred(&storage),
+                }
+
+                for (col, page, state) in model.pages() {
+                    assert_eq!(
+                        is_resident(&storage, page, col),
+                        state.resident,
+                        "sheet {sheet}, step {step}, page {page}, col {col}"
+                    );
+                }
+            }
+        }
     }
 }
