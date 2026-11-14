@@ -4,6 +4,7 @@
 // the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
+import { editDraftFor } from "../edit-draft.js";
 import {
   EDIT_SURFACE_ATTRIBUTE,
   editorLineCount,
@@ -186,6 +187,8 @@ export function createFormulaBar(
   let dirty = false;
   let readOnly = false;
   let composing = false;
+  /** The built-in grid's draft channel; another `Grid` implementation has none. */
+  const draft = editDraftFor(grid);
   /** A cell edit is open and the bar shows its draft. */
   let editing = false;
   /** Lines the bar was last sized for. */
@@ -210,8 +213,8 @@ export function createFormulaBar(
   const restore = (): void => {
     dirty = false;
     if (editing) {
-      // The grid reports the cancel through `edit-end`, which restores the bar.
-      grid.cancelEdit();
+      // The cancel reaches the bar through the draft's `end`, which restores it.
+      draft?.cancel();
       return;
     }
     input.value = committed;
@@ -221,7 +224,7 @@ export function createFormulaBar(
 
   const commit = (): void => {
     if (readOnly || !snapshot) return;
-    if (editing) grid.commitEdit();
+    if (editing) draft?.commit();
     else commitCellInput(grid, snapshot, input.value);
     dirty = false;
     options.focusGrid?.();
@@ -254,7 +257,7 @@ export function createFormulaBar(
     size();
     assist.update();
     if (readOnly) return;
-    editing = grid.setEditText(input.value, input.selectionStart, input.selectionEnd);
+    editing = draft?.setText(input.value, input.selectionStart, input.selectionEnd) ?? false;
   };
   const onFocus = (): void => {
     size();
@@ -263,7 +266,7 @@ export function createFormulaBar(
   const onBlur = (): void => assist.detach();
 
   /** The cell editor's draft: shown here unless the user is typing in the bar. */
-  const onEditInput = ({ text }: { text: string }): void => {
+  const onEditInput = (text: string): void => {
     editing = true;
     if (document.activeElement === input || input.value === text) return;
     input.value = text;
@@ -300,8 +303,7 @@ export function createFormulaBar(
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("change", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
-  lifetime.add(grid.on("edit-input", onEditInput));
-  lifetime.add(grid.on("edit-end", onEditEnd));
+  if (draft) lifetime.add(draft.subscribe({ text: onEditInput, end: onEditEnd }));
   host.appendChild(input);
   refresh();
   lifetime.add(() => input.remove());

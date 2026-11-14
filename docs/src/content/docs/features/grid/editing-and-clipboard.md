@@ -91,9 +91,7 @@ Successful completion emits `change`, then `edit-commit`, then the navigation's 
 
 ### Formula bar
 
-During an edit the cell editor and a formula bar share one draft, as in Excel. Every keystroke, paste, IME step, undo or picked reference in the cell editor shows in the bar, and typing in the bar shows in the cell, which opens its editor without taking focus. Escape in either cancels the edit and both show the stored value again; Enter in either commits. Moving focus between the two keeps the edit open.
-
-The shell's [`createFormulaBar`](/docs/api/core-shell/create-formula-bar/) does this already. A host formula bar does it with the grid's API: it listens to `edit-input` (show the cell's draft) and `edit-end` (show the stored value again), calls `grid.setEditText(text, selectionStart, selectionEnd)` on its own input, and `grid.commitEdit()` or `grid.cancelEdit()` on Enter or Escape. Mark its field with the `data-sheetwrite-edit-surface` attribute so that moving focus into it from the cell editor does not commit.
+During an edit the cell editor and the shell's formula bar ([`createFormulaBar`](/docs/api/core-shell/create-formula-bar/)) share one draft, as in Excel. Every keystroke, paste, IME step, undo or picked reference in the cell editor shows in the bar, and typing in the bar shows in the cell, which opens its editor without taking focus. Escape in either cancels the edit and both show the stored value again; Enter in either commits. Moving focus between the two keeps the edit open.
 
 To supply your own editor, see [Host-supplied editors](/docs/features/grid/custom-editors/).
 

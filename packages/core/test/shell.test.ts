@@ -371,7 +371,6 @@ describe("createFormulaBar", () => {
     it("does not open the cell editor from the bar in read-only mode", () => {
       const { grid, bar, cellEditor, type, done } = setup();
       grid.setReadOnly(true);
-      expect(grid.setEditText("x", 1, 1)).toBe(false);
       bar.focus();
       type(bar, "x");
       expect(cellEditor()).toBeNull();

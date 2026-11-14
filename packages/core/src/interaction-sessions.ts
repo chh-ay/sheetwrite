@@ -3,6 +3,7 @@ import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
+import type { EditDraftSink } from "./edit-draft.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
@@ -41,10 +42,10 @@ interface InteractionDependencies {
   columnHeader: (col: number) => string;
   toViewRow: (dataRow: number) => number | null;
   editListeners: {
-    readonly [K in "edit-begin" | "edit-commit" | "edit-input" | "edit-end"]: ReadonlySet<
-      (payload: GridEvents[K]) => void
-    >;
+    readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
   };
+  /** Hears the cell edit's draft for the shell's formula bar (see `edit-draft.ts`). */
+  editDraft: EditDraftSink;
   /** Open the find bar; it may load first. `replace: true` focuses the replace field. */
   openFind: (options?: { replace?: boolean }) => void;
   store: Store;
@@ -259,18 +260,12 @@ export class InteractionSessions {
     return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
   }
 
-  private endEditor(viewAddress: Readonly<CellAddress>): void {
+  private endEditor(): void {
     this.editingAddress = null;
     this.activeEditor = null;
     this.deps.host.focus();
     this.deps.scheduleRender();
-    this.emitEditEnd(viewAddress, "cancel");
-  }
-
-  private emitEditEnd(viewAddress: Readonly<CellAddress>, reason: "commit" | "cancel"): void {
-    for (const listener of this.deps.editListeners["edit-end"]) {
-      listener({ addr: { ...viewAddress }, reason });
-    }
+    this.deps.editDraft.end();
   }
 
   private cancelEditor(): void {
@@ -283,7 +278,6 @@ export class InteractionSessions {
 
   private finishEdit(
     address: Readonly<CellAddress>,
-    viewAddress: Readonly<CellAddress>,
     input: string | CellValue,
     navigate: EditNavigate,
   ): void {
@@ -299,7 +293,7 @@ export class InteractionSessions {
         typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
       this.commitCellEditAt(address, viewRow, value, navigate);
     } finally {
-      this.emitEditEnd(viewAddress, "commit");
+      this.deps.editDraft.end();
     }
   }
 
@@ -344,9 +338,8 @@ export class InteractionSessions {
     this.deps.scheduleRender();
     if (selectionChanged) this.deps.emitSelection();
     if (generation !== this.generation || this.deps.readOnly()) return;
-    const viewAddress = { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col };
     for (const listener of this.deps.editListeners["edit-begin"]) {
-      listener({ addr: { ...viewAddress } });
+      listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
     }
 
     // edit-begin remains a before-open notification. Reentrant callbacks can
@@ -384,8 +377,8 @@ export class InteractionSessions {
           contentTop,
           this.deps.scroller.scrollLeft,
         ),
-        onCommit: (value, navigate) => this.finishEdit(dataAddr, viewAddress, value, navigate),
-        onCancel: () => this.endEditor(viewAddress),
+        onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
+        onCancel: () => this.endEditor(),
       });
 
       return;
@@ -406,19 +399,14 @@ export class InteractionSessions {
         ),
         theme: this.deps.theme(),
         onCommit: (value, navigate) =>
-          this.finishEdit(dataAddr, viewAddress, { kind: "literal", value }, navigate),
-        onCancel: () => this.endEditor(viewAddress),
+          this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
+        onCancel: () => this.endEditor(),
       });
 
       return;
     }
 
     this.activeEditor = this.editor;
-    const emitText = (value: string): void => {
-      for (const listener of this.deps.editListeners["edit-input"]) {
-        listener({ addr: { ...viewAddress }, text: value });
-      }
-    };
     this.editor.begin({
       row: editCell.row,
       col: editCell.col,
@@ -434,13 +422,13 @@ export class InteractionSessions {
       label: this.editorLabel(editCell.row, editCell.col),
       theme: this.deps.theme(),
       focus,
-      onCommit: (value, navigate) => this.finishEdit(dataAddr, viewAddress, value, navigate),
-      onCancel: () => this.endEditor(viewAddress),
-      onText: emitText,
+      onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
+      onCancel: () => this.endEditor(),
+      onText: (value) => this.deps.editDraft.text(value),
       onShortcut: (event) => this.runCustomShortcut(event, true),
     });
-    // Surfaces that show the draft, such as a formula bar, start from the opened text.
-    emitText(text);
+    // A formula bar showing the draft starts from the opened text.
+    this.deps.editDraft.text(text);
   }
 
   /**
