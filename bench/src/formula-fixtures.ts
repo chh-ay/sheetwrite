@@ -103,6 +103,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
     case "name-define":
     case "row-insert-names":
       return (size - NAMED_FORMULA_STRIDE + 1) * NAME_SCALE;
+    case "name-define-unused":
+      return size * NAME_SCALE;
     case "table-append-row":
       return ((size + 1) * (size + 2)) / 2;
     case "sort-formula-column":
@@ -1518,8 +1520,11 @@ function defineBindingNames(store: CellStore, sheet: number): void {
   }
 }
 
-/** Column A holds 1…count, column B a formula per row, and C1:C10 the values the names point at. */
-function namedFormulasSheet(store: CellStore, count: number): number {
+/**
+ * Column A holds 1…count, column B a formula per row, and C1:C10 the values
+ * the names point at. Without `usesNames`, every formula is `=A1*2`.
+ */
+function namedFormulasSheet(store: CellStore, count: number, usesNames = true): number {
   const sheet = store.addSheet(3, count);
   writeNumberColumn(
     store,
@@ -1538,7 +1543,9 @@ function namedFormulasSheet(store: CellStore, count: number): number {
     0,
   );
   for (let row = 0; row < count; row++) {
-    store.setFormula(sheet, row, 1, namedRowFormula(row, `A${row + 1}`), 0);
+    const cell = `A${row + 1}`;
+    const formula = usesNames ? namedRowFormula(row, cell) : `=${cell}*${NAME_SCALE}`;
+    store.setFormula(sheet, row, 1, formula, 0);
   }
   return sheet;
 }
@@ -1563,6 +1570,31 @@ function nameDefineFixture(count: number): TimedFixture {
       store.recompute(sheet);
     },
     check: () => lastNamedFormula(store, sheet, count),
+    dispose: () => store.free(),
+    restore: () => {
+      for (let index = 0; index < BINDING_NAMES; index++) {
+        store.removeNamedRange(bindingName(index), -1);
+      }
+      store.recompute(sheet);
+    },
+  };
+}
+
+/**
+ * `name-define` over a sheet whose formulas use no name: defining names
+ * must cost no more than the names themselves.
+ */
+function nameDefineUnusedFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = namedFormulasSheet(store, count, false);
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      defineBindingNames(store, sheet);
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
       for (let index = 0; index < BINDING_NAMES; index++) {
@@ -1820,6 +1852,8 @@ function bindingRowFixture(id: string, count: number): TimedFixture {
   switch (id) {
     case "name-define":
       return nameDefineFixture(count);
+    case "name-define-unused":
+      return nameDefineUnusedFixture(count);
     case "row-insert-names":
       return rowInsertNamesFixture(count);
     case "table-append-row":
@@ -3372,6 +3406,7 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "let-calls":
       return shapeRowFixture(id, size);
     case "name-define":
+    case "name-define-unused":
     case "row-insert-names":
     case "table-append-row":
     case "sort-formula-column":
