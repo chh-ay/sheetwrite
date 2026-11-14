@@ -107,6 +107,15 @@ pub(crate) const MAX_PAGE_CHUNK_ROWS: usize = crate::calc::SHEET_ROWS as usize;
 /// Aggregate eager-allocation ceiling mirrored by `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`.
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
 
+/// The logical cells (rows times columns) that local sheets may hold across a
+/// workbook. A full local sheet costs about as much as a dense one, 13 bytes a
+/// cell, so this bounds them at about 260 MB.
+pub(crate) const MAX_LOCAL_PAGED_CELLS: usize = 20_000_000;
+
+/// Rows per page of a local sheet: a dense sheet that grew past
+/// [`MAX_DENSE_CELLS`].
+const LOCAL_PAGE_CHUNK_ROWS: usize = DEFAULT_PAGE_CHUNK_ROWS;
+
 pub(crate) fn checked_dense_cell_count(n_cols: usize, row_count: usize) -> Option<usize> {
     n_cols
         .checked_mul(row_count)
@@ -200,7 +209,12 @@ impl CellStorage {
         }
     }
 
+    /// A dense sheet, or a local paged one when the grid passes
+    /// [`MAX_DENSE_CELLS`].
     pub(crate) fn try_new(n_cols: usize, row_count: usize) -> Result<Self, String> {
+        if checked_dense_cell_count(n_cols, row_count).is_none() {
+            return Self::try_new_local(n_cols, row_count);
+        }
         let (kind, payload, style) = try_dense_buffers(n_cols, row_count)?;
 
         Ok(Self {
@@ -210,6 +224,19 @@ impl CellStorage {
             payload,
             style,
             paged: None,
+            dense_calculated_cells: 0,
+        })
+    }
+
+    /// A sheet whose cells live in local pages: no datasource, every cell loaded.
+    pub(crate) fn try_new_local(n_cols: usize, row_count: usize) -> Result<Self, String> {
+        Ok(Self {
+            n_cols,
+            row_count,
+            kind: Vec::new(),
+            payload: Vec::new(),
+            style: Vec::new(),
+            paged: Some(Box::new(PagedStorage::new_local(LOCAL_PAGE_CHUNK_ROWS)?)),
             dense_calculated_cells: 0,
         })
     }
@@ -238,6 +265,63 @@ impl CellStorage {
 
     pub(crate) fn is_paged(&self) -> bool {
         self.paged.is_some()
+    }
+
+    /// Whether the sheet loads its cells from a datasource. A local sheet is
+    /// paged but owns every cell, like a dense one.
+    pub(crate) fn is_datasource_paged(&self) -> bool {
+        self.paged.as_ref().is_some_and(|paged| !paged.local)
+    }
+
+    /// Whether the sheet grew past the dense cap and keeps its cells in local
+    /// pages.
+    pub(crate) fn is_local_paged(&self) -> bool {
+        self.paged.as_ref().is_some_and(|paged| paged.local)
+    }
+
+    /// Moves a dense sheet's cells into local pages, one column at a time:
+    /// empty unstyled cells allocate nothing, and calculated values move to
+    /// calculated blocks. On error the dense cells stay as they were.
+    pub(crate) fn convert_to_local_paged(&mut self) -> Result<(), String> {
+        if self.paged.is_some() {
+            return Ok(());
+        }
+
+        let mut paged = PagedStorage::new_local(LOCAL_PAGE_CHUNK_ROWS)?;
+        let rows = self.row_count;
+        let mut live = Vec::new();
+        for col in 0..self.n_cols {
+            let base = col * rows;
+            live.clear();
+            live.extend(
+                (0..rows).filter(|&row| {
+                    self.kind[base + row] != KIND_EMPTY || self.style[base + row] != 0
+                }),
+            );
+            let cell = |index: usize| {
+                let row = live[index];
+                let (kind, payload) = dense_source(self.kind[base + row], self.payload[base + row]);
+                (row, kind, payload, self.style[base + row])
+            };
+            paged.write_column(col, live.len(), &cell, DirtyRowWrite::Update);
+            for &row in &live {
+                let raw = self.kind[base + row];
+                if raw & CALCULATED == 0 {
+                    continue;
+                }
+                let (kind, payload) = decode_cell(self.payload[base + row]);
+                if !paged.set_calculated(row, col, kind, payload) {
+                    return Err("local sheet allocation failed for calculated values".to_owned());
+                }
+            }
+        }
+
+        self.kind = Vec::new();
+        self.payload = Vec::new();
+        self.style = Vec::new();
+        self.dense_calculated_cells = 0;
+        self.paged = Some(Box::new(paged));
+        Ok(())
     }
 
     fn coordinates(&self, index: usize) -> (usize, usize) {
@@ -592,9 +676,11 @@ impl CellStorage {
 
     pub(crate) fn is_fully_loaded(&self) -> bool {
         self.paged.as_ref().is_none_or(|paged| {
-            self.row_count
-                .checked_mul(self.n_cols)
-                .is_some_and(|cells| paged.loaded_cells() >= cells)
+            paged.local
+                || self
+                    .row_count
+                    .checked_mul(self.n_cols)
+                    .is_some_and(|cells| paged.loaded_cells() >= cells)
         })
     }
 
@@ -624,16 +710,19 @@ impl CellStorage {
         col * self.row_count + row
     }
 
-    /// Whether the grid can take `rows` rows of `cols` columns. A dense grid
-    /// must stay within [`MAX_DENSE_CELLS`]; a paged grid allocates per chunk
-    /// and has no such bound.
-    pub(crate) fn check_dimensions(&self, rows: usize, cols: usize) -> Result<(), String> {
-        if self.is_paged() || checked_dense_cell_count(cols, rows).is_some() {
-            Ok(())
+    /// Whether a dense grid of `rows` by `cols` passes [`MAX_DENSE_CELLS`], so
+    /// growing to it moves the sheet to local pages.
+    pub(crate) fn grows_past_dense_cap(&self, rows: usize, cols: usize) -> bool {
+        self.paged.is_none() && checked_dense_cell_count(cols, rows).is_none()
+    }
+
+    /// The logical cells this sheet counts toward [`MAX_LOCAL_PAGED_CELLS`]:
+    /// all of them for a local sheet, none otherwise.
+    pub(crate) fn local_paged_cells(&self) -> usize {
+        if self.is_local_paged() {
+            self.row_count.saturating_mul(self.n_cols)
         } else {
-            Err(format!(
-                "dense sheet resource limit exceeded: {cols} columns by {rows} rows exceeds {MAX_DENSE_CELLS} cells"
-            ))
+            0
         }
     }
 
@@ -704,6 +793,9 @@ impl CellStorage {
         let new_count = old
             .checked_add(count)
             .ok_or_else(|| format!("{old} rows plus {count} rows overflow the row count"))?;
+        if self.grows_past_dense_cap(new_count, self.n_cols) {
+            self.convert_to_local_paged()?;
+        }
         if self.is_paged() {
             self.invalidate_derived();
             if let Some(paged) = &mut self.paged {
@@ -777,6 +869,9 @@ impl CellStorage {
         let new_cols = old_cols
             .checked_add(count)
             .ok_or_else(|| format!("{old_cols} columns plus {count} columns overflow"))?;
+        if self.grows_past_dense_cap(self.row_count, new_cols) {
+            self.convert_to_local_paged()?;
+        }
         if self.is_paged() {
             self.invalidate_derived();
             if let Some(paged) = &mut self.paged {
@@ -938,6 +1033,8 @@ pub(crate) struct CellRun<'a> {
     /// Paged load bits; `None` with empty slices is a page without clean values.
     loaded: Option<&'a [u64]>,
     is_dense: bool,
+    /// A local sheet's run: every cell is loaded, absent pages read empty.
+    is_local: bool,
     dirty: Option<DirtyView<'a>>,
     /// The page's calculated values; empty when it has none.
     calculated: &'a [u64],
@@ -965,6 +1062,7 @@ impl CellRun<'_> {
     #[inline]
     fn clean_loaded(&self, index: usize) -> bool {
         self.is_dense
+            || self.is_local
             || self
                 .loaded
                 .is_some_and(|bits| bit(bits, index - self.source_base))
@@ -986,6 +1084,10 @@ impl CellRun<'_> {
 
         if !self.clean_loaded(index) {
             return None;
+        }
+
+        if self.kinds.is_empty() {
+            return Some((KIND_EMPTY, 0, 0));
         }
 
         let offset = index - self.source_base;
@@ -1083,7 +1185,7 @@ impl CellStorage {
     ) -> bool {
         let (rows, cols) = dimensions;
         if let Some(paged) = &mut self.paged {
-            if revision.is_some() {
+            if revision.is_some() && !paged.local {
                 return false;
             }
             for col_offset in 0..cols {
@@ -1262,6 +1364,7 @@ impl CellStorage {
                 styles: &self.style,
                 loaded: None,
                 is_dense: true,
+                is_local: false,
                 dirty: None,
                 calculated: &[],
             };
@@ -1280,6 +1383,7 @@ impl CellStorage {
             styles: view.clean.map_or(&[], |clean| clean.style.as_slice()),
             loaded: view.clean.map(|clean| clean.loaded.as_slice()),
             is_dense: false,
+            is_local: paged.local,
             dirty: view.dirty,
             calculated: view.calculated,
         }
@@ -1519,6 +1623,155 @@ mod lifecycle_tests {
             assert_eq!(
                 store.get_cell(sheet, row, 0).string().as_deref(),
                 Some("retained text")
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod local_paged_tests {
+    use super::{CellStorage, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER};
+    use crate::types::CellKey;
+
+    fn next(seed: &mut u32, bound: usize) -> usize {
+        *seed ^= *seed << 13;
+        *seed ^= *seed >> 17;
+        *seed ^= *seed << 5;
+        *seed as usize % bound
+    }
+
+    fn assert_same(dense: &CellStorage, local: &CellStorage, context: &str) {
+        assert_eq!(
+            (dense.row_count(), dense.n_cols()),
+            (local.row_count(), local.n_cols()),
+            "{context}"
+        );
+        for col in 0..dense.n_cols() {
+            for row in 0..dense.row_count() {
+                let index = dense.idx(row, col);
+                let at = |cells: &CellStorage| {
+                    (
+                        cells.is_loaded(row, col),
+                        cells.kind_at(index),
+                        cells.source_kind_at(index),
+                        cells.source_payload_at(index),
+                        cells.resolved_payload_at(index),
+                        cells.style_at(index),
+                        cells.calculated_cell_at(index),
+                    )
+                };
+                assert_eq!(at(dense), at(local), "{context}: row {row}, col {col}");
+            }
+        }
+        let sorted = |cells: &CellStorage| {
+            let mut keys: Vec<CellKey> = cells.persisted_coordinates();
+            keys.sort_unstable();
+            keys
+        };
+        assert_eq!(sorted(dense), sorted(local), "{context}");
+        assert!(local.is_fully_loaded(), "{context}");
+        assert!(
+            local.range_fully_loaded(0, 0, local.row_count() - 1, local.n_cols() - 1),
+            "{context}"
+        );
+    }
+
+    /// 400 random sheets: the same writes, styles, calculated values and row
+    /// and column edits applied to a dense sheet and to a copy that converts
+    /// to local pages part of the way through leave the same cells.
+    #[test]
+    fn local_sheets_hold_the_cells_of_the_dense_sheets_they_replace() {
+        const SHEETS: u32 = 400;
+        const STEPS: usize = 60;
+
+        for sheet in 0..SHEETS {
+            let mut seed = 0x51ed_270b ^ (sheet + 1).wrapping_mul(0x9e37_79b9);
+            let cols = 1 + next(&mut seed, 4);
+            let rows = 1 + next(&mut seed, 2 * 4096 + 10);
+            let mut dense = CellStorage::try_new(cols, rows).unwrap();
+            let mut local = CellStorage::try_new(cols, rows).unwrap();
+            let convert_at = next(&mut seed, STEPS);
+
+            for step in 0..STEPS {
+                if step == convert_at {
+                    local.convert_to_local_paged().unwrap();
+                    assert!(local.is_local_paged() && !local.is_datasource_paged());
+                    assert_same(&dense, &local, &format!("sheet {sheet} after conversion"));
+                }
+                let (row_count, n_cols) = (dense.row_count(), dense.n_cols());
+                let row = next(&mut seed, row_count);
+                let col = next(&mut seed, n_cols);
+                let revision = (next(&mut seed, 2) == 0).then_some(7);
+                match next(&mut seed, 9) {
+                    0..=2 => {
+                        let payload = next(&mut seed, 1000) as u64;
+                        let style = next(&mut seed, 3) as u32;
+                        for cells in [&mut dense, &mut local] {
+                            assert!(cells.write_cell(
+                                row,
+                                col,
+                                KIND_NUMBER,
+                                payload,
+                                style,
+                                revision
+                            ));
+                        }
+                    }
+                    3 => {
+                        let style = next(&mut seed, 3) as u32;
+                        for cells in [&mut dense, &mut local] {
+                            assert!(cells.write_style(row, col, style, revision));
+                        }
+                    }
+                    4 => {
+                        let value = next(&mut seed, 1000) as u64;
+                        for cells in [&mut dense, &mut local] {
+                            assert!(cells.write_cell(row, col, KIND_FORMULA, 0, 0, None));
+                            let index = cells.idx(row, col);
+                            assert!(cells.set_derived(index, KIND_NUMBER, value));
+                        }
+                    }
+                    5 => {
+                        let count = 1 + next(&mut seed, 300);
+                        for cells in [&mut dense, &mut local] {
+                            cells.invalidate_derived();
+                            cells.insert_rows(row, count).unwrap();
+                        }
+                    }
+                    6 if row_count > 1 => {
+                        let count = 1 + next(&mut seed, row_count - 1);
+                        for cells in [&mut dense, &mut local] {
+                            cells.invalidate_derived();
+                            cells.delete_rows(row, count).unwrap();
+                        }
+                    }
+                    7 => {
+                        for cells in [&mut dense, &mut local] {
+                            cells.invalidate_derived();
+                            cells.insert_cols(col, 1).unwrap();
+                        }
+                    }
+                    8 if n_cols > 1 => {
+                        for cells in [&mut dense, &mut local] {
+                            cells.invalidate_derived();
+                            cells.delete_cols(col, 1).unwrap();
+                        }
+                    }
+                    _ => {
+                        for cells in [&mut dense, &mut local] {
+                            assert!(cells.write_cell(row, col, KIND_EMPTY, 0, 0, revision));
+                        }
+                    }
+                }
+            }
+            if convert_at < STEPS {
+                assert_same(&dense, &local, &format!("sheet {sheet}"));
+            }
+            local.acknowledge_revision(7);
+            assert_same(
+                &dense,
+                &local,
+                &format!("sheet {sheet} after acknowledgement"),
             );
         }
     }

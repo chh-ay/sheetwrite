@@ -154,7 +154,8 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     );
     assert_eq!(checked_dense_cell_count(1, MAX_DENSE_CELLS + 1), None);
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
-    assert!(SheetData::try_new(usize::MAX, 2).is_err());
+    assert!(SheetData::try_new(usize::MAX, 2)
+        .is_ok_and(|past_the_cap| past_the_cap.cells.is_local_paged()));
     let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
     assert_eq!(
         at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),
@@ -163,7 +164,9 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     drop(at_limit);
 
     let mut bounded_store = CellStore::new();
-    assert!(bounded_store.try_add_sheet(1, MAX_DENSE_CELLS + 1).is_err());
+    assert!(bounded_store
+        .try_add_sheet(1, crate::cells::MAX_LOCAL_PAGED_CELLS + 1)
+        .is_err());
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);

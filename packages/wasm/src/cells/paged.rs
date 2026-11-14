@@ -516,6 +516,10 @@ pub(super) struct PagedStorage {
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
     evictions: u64,
+    /// A local sheet: a dense sheet that grew past the dense cap. It has no
+    /// datasource, so it never evicts, keeps no dirty overlay and counts
+    /// every cell as loaded.
+    pub(super) local: bool,
 }
 
 impl PagedStorage {
@@ -564,7 +568,16 @@ impl PagedStorage {
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
             evictions: 0,
+            local: false,
         })
+    }
+
+    /// Local storage for a sheet without a datasource: chunks of
+    /// `chunk_rows`, no eviction and no dirty overlay.
+    pub(super) fn new_local(chunk_rows: usize) -> Result<Self, String> {
+        let mut storage = Self::new(chunk_rows, 0, 0)?;
+        storage.local = true;
+        Ok(storage)
     }
 
     /// The page index and the row offset inside it.
@@ -806,7 +819,7 @@ impl PagedStorage {
 
     pub(super) fn clean_loaded(&self, row: usize, col: usize) -> bool {
         let (clean, offset) = self.clean_page(row, col);
-        clean.is_some_and(|page| bit(&page.loaded, offset))
+        self.local || clean.is_some_and(|page| bit(&page.loaded, offset))
     }
 
     #[inline]
@@ -840,19 +853,19 @@ impl PagedStorage {
         let (page, offset) = self.split(row);
         let id = self.page_id(col, page);
         if id == NONE {
-            return (KIND_EMPTY, 0, 0, false, false);
+            return (KIND_EMPTY, 0, 0, self.local, false);
         }
 
         let clean = self.records[id as usize].clean;
         if clean == NONE {
-            return (KIND_EMPTY, 0, 0, false, false);
+            return (KIND_EMPTY, 0, 0, self.local, false);
         }
 
         self.touch(id);
         let clean_page = &self.clean[clean as usize];
 
         if !bit(&clean_page.loaded, offset) {
-            return (KIND_EMPTY, 0, 0, false, false);
+            return (KIND_EMPTY, 0, 0, self.local, false);
         }
 
         (
@@ -977,10 +990,14 @@ impl PagedStorage {
     }
 
     pub(super) fn can_dirty_cell(&self, row: usize, col: usize) -> bool {
-        self.is_dirty(row, col) || self.dirty_cells() < self.max_dirty_cells
+        self.local || self.is_dirty(row, col) || self.dirty_cells() < self.max_dirty_cells
     }
 
     pub(super) fn can_dirty_rect(&self, r0: usize, c0: usize, rows: usize, cols: usize) -> bool {
+        if self.local {
+            return true;
+        }
+
         let mut additional = 0usize;
 
         for col in c0..c0 + cols {
@@ -1024,6 +1041,10 @@ impl PagedStorage {
         cols: usize,
         revision: u64,
     ) -> bool {
+        if self.local {
+            return true;
+        }
+
         let additional = (c0..c0 + cols)
             .flat_map(|col| (r0..r0 + rows).map(move |row| (row, col)))
             .filter(|&(row, col)| !self.is_dirty(row, col))
@@ -1032,6 +1053,10 @@ impl PagedStorage {
     }
 
     pub(super) fn prepare_dirty_cells(&mut self, cells: &[(usize, usize)], revision: u64) -> bool {
+        if self.local {
+            return true;
+        }
+
         let additional = cells
             .iter()
             .filter(|&&(row, col)| !self.is_dirty(row, col))
@@ -1196,7 +1221,8 @@ impl PagedStorage {
         style: u32,
         dirty_revision: Option<u64>,
     ) -> bool {
-        if let Some(revision) = dirty_revision {
+        // A local sheet has no datasource to acknowledge an edit against.
+        if let Some(revision) = dirty_revision.filter(|_| !self.local) {
             return self.write_dirty(row, col, kind, payload, style, revision);
         }
 
@@ -1858,6 +1884,7 @@ impl PagedStorage {
         out.u64(self.clock.get());
         out.u64(self.eviction_candidate_checks);
         out.u64(self.evictions);
+        out.u32(u32::from(self.local));
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
@@ -1972,6 +1999,11 @@ impl PagedStorage {
         paged.clock.set(input.u64()?);
         paged.eviction_candidate_checks = input.u64()?;
         paged.evictions = input.u64()?;
+        paged.local = match input.u32()? {
+            0 => false,
+            1 => true,
+            _ => return Err("invalid transferred page storage mode".into()),
+        };
 
         Ok(paged)
     }
