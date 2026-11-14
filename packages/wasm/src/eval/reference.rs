@@ -29,7 +29,7 @@ use crate::types::{CellRange, FormulaError, Value};
 
 use super::matrix::{range_from_ast, EvalMatrix, SPILL_MAX_COLS, SPILL_MAX_ROWS};
 use super::value::{bool_from_value, number_from_value, text_from_value};
-use super::{current_formula_origin, read_unshifted, sheet_envelopes, EvalPass};
+use super::{current_formula_origin, read_shifted, sheet_envelopes, EvalPass};
 
 const OFFSET_MIN_ARGS: usize = 3;
 const OFFSET_MAX_ARGS: usize = 5;
@@ -489,7 +489,7 @@ impl CellStore {
         entry
             .ast
             .as_ref()
-            .and_then(|ast| read_unshifted(|| range_from_ast(ast, sheet)))
+            .and_then(|ast| read_shifted((0, 0), || range_from_ast(ast, sheet)))
             .or_else(|| self.indirect_named_reference(source, sheet))
             .ok_or(FormulaError::Ref)
     }

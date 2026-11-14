@@ -109,8 +109,9 @@ thread_local! {
     /// Rows and columns that relative references of the expression being
     /// evaluated move by. A conditional-format rule's one parsed expression
     /// is written for the rule range's top-left cell; at every other cell it
-    /// reads with that cell's distance from it. Every formula cell evaluates
-    /// with no shift, also when a conditional format reads it.
+    /// reads with that cell's distance from it. Only [`read_shifted`] sets
+    /// it, so ordinary recalculation never writes it and always reads
+    /// (0, 0).
     static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
 }
 
@@ -121,25 +122,16 @@ thread_local! {
     pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Sets the formula origin and reference shift for one evaluation and
-/// restores the enclosing ones when dropped.
+/// Sets the formula origin for one evaluation and restores the enclosing
+/// origin when dropped.
 struct FormulaOriginGuard {
     enclosing: Option<(u32, u32)>,
-    enclosing_shift: (u32, u32),
 }
 
 impl FormulaOriginGuard {
     fn push(origin: (u32, u32)) -> Self {
-        Self::push_shifted(origin, (0, 0))
-    }
-
-    fn push_shifted(origin: (u32, u32), shift: (u32, u32)) -> Self {
         let enclosing = FORMULA_ORIGIN.with(|current| current.replace(Some(origin)));
-        let enclosing_shift = REFERENCE_SHIFT.with(|current| current.replace(shift));
-        Self {
-            enclosing,
-            enclosing_shift,
-        }
+        Self { enclosing }
     }
 }
 
@@ -147,7 +139,6 @@ impl Drop for FormulaOriginGuard {
     fn drop(&mut self) {
         let enclosing = self.enclosing;
         FORMULA_ORIGIN.with(|current| current.set(enclosing));
-        REFERENCE_SHIFT.with(|current| current.set(self.enclosing_shift));
     }
 }
 
@@ -156,11 +147,12 @@ pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
     FORMULA_ORIGIN.with(Cell::get)
 }
 
-/// Run `read` with no reference shift. For a tree this evaluation parsed
+/// Run `read` with relative references moved by `shift`, then restore the
+/// enclosing shift. A shift of (0, 0) reads a tree this evaluation parsed
 /// itself, such as INDIRECT's text: it is placed for the target cell already,
 /// so a conditional-format shift must not move it again.
-pub(crate) fn read_unshifted<T>(read: impl FnOnce() -> T) -> T {
-    let enclosing = REFERENCE_SHIFT.with(|current| current.replace((0, 0)));
+pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
+    let enclosing = REFERENCE_SHIFT.with(|current| current.replace(shift));
     let value = read();
     REFERENCE_SHIFT.with(|current| current.set(enclosing));
     value
@@ -1812,9 +1804,10 @@ impl CellStore {
     /// Evaluate a conditional-format rule's parsed expression at one target
     /// cell. `shift` is the target's distance from the cell the expression
     /// is written for, which its relative references move by; the caller
-    /// keeps every shifted reference inside the sheet. Referenced formula
-    /// cells use their recomputed cache; the origin guard gives zero-argument
-    /// ROW/COLUMN the target cell's coordinates.
+    /// keeps every shifted reference inside the sheet. The pass recomputes
+    /// nothing, so referenced formula cells use their recomputed cache and no
+    /// other formula evaluates under the shift. The origin guard gives
+    /// zero-argument ROW/COLUMN the target cell's coordinates.
     pub(crate) fn eval_conditional_ast(
         &self,
         ast: &Ast,
@@ -1828,8 +1821,8 @@ impl CellStore {
             affected: &affected,
             results,
         };
-        let _origin = FormulaOriginGuard::push_shifted(target, shift);
-        self.eval_ast(ast, sheet, &mut pass, 0)
+        let _origin = FormulaOriginGuard::push(target);
+        read_shifted(shift, || self.eval_ast(ast, sheet, &mut pass, 0))
     }
 
     pub(crate) fn eval_ast(
