@@ -14,8 +14,8 @@ use crate::calc::{
     WrittenNames,
 };
 use crate::cells::{
-    encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
-    DEFAULT_PAGE_CHUNK_ROWS,
+    encode_num, encode_str_id, payload_num, payload_str_id, DirtyRowWrite,
+    DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::eval::{IterationLimits, RandomSource};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore};
@@ -282,23 +282,41 @@ struct SparseLiteralBlock<'a> {
 }
 
 impl SparseLiteralBlock<'_> {
-    /// Counting-sort entry indexes by column while rejecting invalid offsets.
+    /// Counting-sort entry indexes by column while rejecting invalid or
+    /// repeated offsets. Repeats are found with an offset bitset while it is no
+    /// larger than the entries, else by sorting each column's offsets, so a
+    /// sparse paged block never allocates by its rectangle.
     fn column_entries(&self) -> Option<SparseColumns> {
         let (rows, cols) = self.dimensions;
-        let mut seen = vec![0u64; (rows * cols).div_ceil(u64::BITS as usize)];
+        let cells = rows * cols;
+        let words = cells.div_ceil(u64::BITS as usize);
+        let bitset = words <= self.offsets.len();
         let mut starts = vec![0u32; cols + 1];
-        for &offset in self.offsets {
-            let offset_index = offset as usize;
-            if offset_index >= rows * cols {
-                return None;
+        // Two loops, so the bitset loop indexes a bitset of known length:
+        // one `get_mut` per offset cost a dense load ~3 instructions per cell.
+        if bitset {
+            let mut seen = vec![0u64; words];
+            for &offset in self.offsets {
+                let offset_index = offset as usize;
+                if offset_index >= cells {
+                    return None;
+                }
+                let word = &mut seen[offset_index / u64::BITS as usize];
+                let bit = 1u64 << (offset_index % u64::BITS as usize);
+                if *word & bit != 0 {
+                    return None;
+                }
+                *word |= bit;
+                starts[offset_index % cols + 1] += 1;
             }
-            let word = &mut seen[offset_index / u64::BITS as usize];
-            let bit = 1u64 << (offset_index % u64::BITS as usize);
-            if *word & bit != 0 {
-                return None;
+        } else {
+            for &offset in self.offsets {
+                let offset_index = offset as usize;
+                if offset_index >= cells {
+                    return None;
+                }
+                starts[offset_index % cols + 1] += 1;
             }
-            *word |= bit;
-            starts[offset_index % cols + 1] += 1;
         }
         for col in 0..cols {
             starts[col + 1] += starts[col];
@@ -311,7 +329,23 @@ impl SparseLiteralBlock<'_> {
         }
         starts.rotate_right(1);
         starts[0] = 0;
-        Some(SparseColumns { starts, entries })
+        let columns = SparseColumns { starts, entries };
+        (bitset || self.columns_have_distinct_offsets(&columns)).then_some(columns)
+    }
+
+    /// Whether no column lists an offset twice, by sorting each column's offsets.
+    fn columns_have_distinct_offsets(&self, columns: &SparseColumns) -> bool {
+        let mut column_offsets = Vec::new();
+        columns.starts.windows(2).all(|bounds| {
+            column_offsets.clear();
+            column_offsets.extend(
+                columns.entries[bounds[0] as usize..bounds[1] as usize]
+                    .iter()
+                    .map(|&index| self.offsets[index as usize]),
+            );
+            column_offsets.sort_unstable();
+            column_offsets.windows(2).all(|pair| pair[0] != pair[1])
+        })
     }
 
     fn cell(&self, index: usize) -> (usize, u8, u64, u32) {
@@ -1249,12 +1283,12 @@ impl CellStore {
             return BLOCK_SOURCE_INVALID;
         }
 
-        // Paged cells need dirty-overlay preflight and residency checks; spills
-        // need per-cell detachment. Neither can use the dense column writer.
+        // Paged edits need dirty-overlay preflight; a page load does not, and
+        // keeps every edited cell. Spills need per-cell detachment.
         if !offsets.is_empty()
             && formula_offsets.is_empty()
             && reference_offsets.is_empty()
-            && !existing.cells.is_paged()
+            && (hydrating || !existing.cells.is_paged())
             && existing.spill.is_empty()
         {
             let mut block = SparseLiteralBlock {
@@ -3107,7 +3141,10 @@ impl CellStore {
         // Dense sheets are capped below u32 coordinates, so keys always exist.
         if !HAS_SOURCES {
             let sheet_data = &mut self.sheets[sheet];
-            if sheet_data.cells.write_dense_block(start, dimensions, &cell) {
+            if sheet_data
+                .cells
+                .write_literal_block(start, dimensions, revision, &cell)
+            {
                 if !sheet_data.formulas.is_empty() {
                     for col in start.1..start.1 + dimensions.1 {
                         for row in start.0..start.0 + dimensions.0 {
@@ -3320,8 +3357,10 @@ impl CellStore {
         self.replace_cell_source_inner(write, false)
     }
 
-    /// Writes a validated, spill-free dense literal block column by column.
-    /// Formula retirement and dirty seeds still describe only listed cells.
+    /// Writes a validated, spill-free literal block column by column: a dense
+    /// block, or a page load into a paged sheet. Formula retirement and dirty
+    /// seeds still describe only listed cells, and a page load leaves cells
+    /// with an unacknowledged edit, and their formulas, alone.
     #[inline(never)]
     fn write_sparse_columns(
         &mut self,
@@ -3333,9 +3372,11 @@ impl CellStore {
         let sheet_data = &mut self.sheets[sheet];
         for (col, bounds) in columns.starts.windows(2).enumerate() {
             let column = &columns.entries[bounds[0] as usize..bounds[1] as usize];
-            sheet_data.cells.write_dense_column_cells(
+            sheet_data.cells.write_column_cells(
                 block.start.1 + col,
-                column.iter().map(|&index| block.cell(index as usize)),
+                column,
+                |index| block.cell(index),
+                DirtyRowWrite::Keep,
             );
         }
         let keys = || {
@@ -3348,7 +3389,9 @@ impl CellStore {
             })
         };
         if !sheet_data.formulas.is_empty() {
-            for key in keys() {
+            let cells = &sheet_data.cells;
+            for key in keys().filter(|&(row, col)| !cells.is_cell_dirty(row as usize, col as usize))
+            {
                 self.graph.replace_entry(
                     &mut sheet_data.formulas,
                     &mut self.formula_slots,
