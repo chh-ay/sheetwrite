@@ -979,7 +979,8 @@ const SAME_RANGE_EDITED_FIRST = -1;
 function spillFilterSameRangeFixture(count: number): TimedFixture {
   const store = new CellStore();
   const sheet = store.addSheet(3, count);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,

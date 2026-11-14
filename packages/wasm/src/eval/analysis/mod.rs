@@ -284,10 +284,16 @@ const FAMILY_SHIFT: u32 = 8;
 const NAME_MASK: u16 = 0xff;
 
 const _: () = {
-    assert!(FAMILIES.len() <= 256);
+    assert!(
+        FAMILIES.len() <= 256,
+        "a family index fits in the 8 bits above FAMILY_SHIFT"
+    );
     let mut family = 0;
     while family < FAMILIES.len() {
-        assert!(FAMILIES[family].names.len() <= 256);
+        assert!(
+            FAMILIES[family].names.len() <= 256,
+            "a name index fits in NAME_MASK"
+        );
         family += 1;
     }
 };

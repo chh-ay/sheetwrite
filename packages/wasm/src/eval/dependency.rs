@@ -1127,10 +1127,13 @@ impl DirtyWalk<'_> {
         let mut offset = 0;
         while let Some(&group) = self.range_matches.get(offset) {
             offset += 1;
-            debug_assert!(index
-                .range_groups
-                .get(group)
-                .is_some_and(|stored| stored.range.contains(cell)));
+            debug_assert!(
+                index
+                    .range_groups
+                    .get(group)
+                    .is_some_and(|stored| stored.range.contains(cell)),
+                "each range match is a stored range group that contains the cell"
+            );
             self.fire_group(group);
         }
     }
