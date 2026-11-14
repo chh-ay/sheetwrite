@@ -61,6 +61,7 @@ use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, Dense
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
+use crate::sorting::{key96, sort_by_key96};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::CellStore;
 use crate::types::{
@@ -681,7 +682,9 @@ impl ChangedOutputs {
                 Some((bounds, change.sequence))
             })
             .collect();
-        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+        sort_by_key96(&mut outputs, |(bounds, _)| {
+            key96(0, bounds.sheet, bounds.row_start)
+        });
 
         let leaves = outputs.len().next_power_of_two();
         let mut last_rows = vec![0; leaves * 2];
@@ -1045,7 +1048,7 @@ impl CellStore {
                 break;
             }
 
-            pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
+            sort_by_key96(&mut pending, |(key, ..)| key96(key.sheet, key.row, key.col));
 
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();

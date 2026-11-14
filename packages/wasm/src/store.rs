@@ -24,6 +24,7 @@ use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
 };
 use crate::sheet::{formula_error_at, SheetData};
+use crate::sorting::sort_by_key96;
 use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
 use crate::tables::{Table, TableColumn, TableSlots};
 use crate::types::{
@@ -1568,8 +1569,8 @@ impl CellStore {
                 references.push((offset, target));
             }
         }
-        formulas.sort_unstable_by_key(|(offset, _)| *offset);
-        references.sort_unstable_by_key(|(offset, _)| *offset);
+        sort_by_key96(&mut formulas, |(offset, _)| u128::from(*offset));
+        sort_by_key96(&mut references, |(offset, _)| u128::from(*offset));
 
         let mut formula_offsets = Vec::with_capacity(formulas.len());
         let mut formula_sources = Vec::with_capacity(formulas.len());
@@ -1677,7 +1678,7 @@ impl CellStore {
                 .checked_add(col as usize)?;
             references.push((offset as u32, target));
         }
-        references.sort_unstable_by_key(|(offset, _)| *offset);
+        sort_by_key96(&mut references, |(offset, _)| u128::from(*offset));
         let mut reference_offsets = Vec::with_capacity(references.len());
         let mut reference_targets = Vec::with_capacity(references.len().saturating_mul(3));
         for (offset, target) in references {

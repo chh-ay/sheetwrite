@@ -12,7 +12,7 @@ use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
 use crate::sort_text::push_collation_key;
-use crate::sorting::{key_index, sort_indices_by, sort_u128, sort_u64};
+use crate::sorting::{key_index, sort_indices_by, sort_u128, sort_u32_pairs, sort_u64};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -504,7 +504,7 @@ impl CellStore {
             }
         }
 
-        pairs.sort_unstable();
+        sort_u32_pairs(&mut pairs);
 
         let mut out = Vec::with_capacity(pairs.len() * 2);
         for (row, col) in pairs {

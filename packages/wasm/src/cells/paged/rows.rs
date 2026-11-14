@@ -3,6 +3,8 @@
 #[cfg(test)]
 mod tests;
 
+use crate::sorting::{key96, sort_by_key96, sort_usize_pairs};
+
 use super::{CleanPage, Directory, PagedStorage, BITS_PER_WORD, FREE_SLOT, NONE};
 
 /// An edit maps the retained suffix `from..old_rows` to `to..new_rows`.
@@ -126,7 +128,7 @@ impl PagedStorage {
                 pages.push((col, last / self.chunk_rows));
             }
         }
-        pages.sort_unstable();
+        sort_usize_pairs(&mut pages);
         pages.dedup();
         if movement.to > movement.from {
             pages.reverse();
@@ -212,7 +214,9 @@ impl PagedStorage {
                 (col, row, id as u32)
             })
             .collect();
-        positions.sort_unstable();
+        sort_by_key96(&mut positions, |&(col, row, id)| {
+            key96(col as u32, row as u32, id)
+        });
         self.dirty = Directory::default();
         self.dirty_blocks.clear();
         self.free_dirty_blocks.clear();

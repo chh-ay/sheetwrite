@@ -9,6 +9,10 @@ use rustc_hash::FxHashSet;
 use crate::graph::{offset_or_search, DirtyRect, DirtySeeds, FORMULA_INDEX_PAGE_ROWS};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
+use crate::sorting::{
+    key96, sort_by_key96, sort_cell_formulas_column_major, sort_cells_row_major,
+    sort_range_formulas, sort_row_formulas, sort_u128,
+};
 use crate::types::{
     AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, FORMULA_RECURSION_LIMIT,
 };
@@ -427,9 +431,12 @@ impl DepIndex {
 
     /// Rewrites each band touched by `changes` once: `(source, reader, added)`.
     fn patch_exact(&mut self, changes: &mut [(AbsCellKey, FormulaId, bool)]) {
-        changes.sort_unstable_by_key(|&(cell, reader, added)| {
-            (cell.sheet, cell.col, cell.row, added, reader)
+        // (sheet, col, row, added, reader) order: by the last two, then
+        // stably by the cell.
+        sort_by_key96(changes, |&(_, reader, added)| {
+            u128::from(added) << 32 | u128::from(reader.raw())
         });
+        sort_by_key96(changes, |&(cell, ..)| key96(cell.sheet, cell.col, cell.row));
         let mut edges = Vec::new();
         for run in changes.chunk_by(|a, b| {
             (a.0.sheet, a.0.col, a.0.row / FORMULA_INDEX_PAGE_ROWS)
@@ -504,7 +511,7 @@ impl DepIndex {
                     .filter(|change| change.2)
                     .map(|&(cell, reader, _)| (cell.row, reader)),
             );
-            edges.sort_unstable();
+            sort_row_formulas(&mut edges);
 
             match (search, edges.is_empty()) {
                 (Ok(position), true) => {
@@ -539,8 +546,8 @@ impl DepIndex {
         if removals.is_empty() && additions.is_empty() {
             return;
         }
-        removals.sort_unstable();
-        additions.sort_unstable();
+        sort_range_formulas(removals);
+        sort_range_formulas(additions);
         if removals.len() + additions.len() <= IN_PLACE_EDGES {
             let mut regrouped = false;
             for &(range, reader) in removals.iter() {
@@ -854,7 +861,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
         }
     }
 
-    exact_edges.sort_unstable_by_key(|&(cell, reader)| (cell.sheet, cell.col, cell.row, reader));
+    sort_cell_formulas_column_major(&mut exact_edges);
     let mut exact = Vec::new();
     let mut exact_sources = 0;
     let mut band_edges = Vec::new();
@@ -878,7 +885,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
     }
     drop(exact_edges);
 
-    range_edges.sort_unstable();
+    sort_range_formulas(&mut range_edges);
     let mut range_groups = Vec::with_capacity(range_edges.chunk_by(|a, b| a.0 == b.0).count());
     let range_readers: Vec<FormulaId> = range_edges.iter().map(|&(_, reader)| reader).collect();
     let mut end = 0;
@@ -924,8 +931,21 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
 }
 
 fn prepare_interval_index(intervals: &mut [RangeInterval]) {
-    intervals.sort_unstable_by(interval_order);
+    sort_intervals(intervals);
     accumulate_max_end(intervals);
+}
+
+/// Sorts intervals by [`interval_order`]. Each comes back with `max_end` =
+/// `end`, for [`accumulate_max_end`] to fill in.
+fn sort_intervals(intervals: &mut [RangeInterval]) {
+    let mut keys: Vec<u128> = intervals
+        .iter()
+        .map(|interval| key96(interval.start, interval.end, interval.group as u32))
+        .collect();
+    sort_u128(&mut keys);
+    for (interval, key) in intervals.iter_mut().zip(keys) {
+        *interval = RangeInterval::new((key >> 64) as u32, (key >> 32) as u32, key as u32 as usize);
+    }
 }
 
 fn interval_order(a: &RangeInterval, b: &RangeInterval) -> Ordering {
@@ -948,7 +968,7 @@ fn merge_intervals(intervals: &mut Vec<RangeInterval>, mut added: Vec<RangeInter
         return;
     };
 
-    added.sort_unstable_by(interval_order);
+    sort_intervals(&mut added);
     let mut kept = intervals.len();
     intervals.resize(kept + added.len(), filler);
     for write in (0..intervals.len()).rev() {
@@ -1373,7 +1393,7 @@ struct WalkFormulas(Vec<(AbsCellKey, FormulaId)>);
 
 impl WalkFormulas {
     fn new(mut formulas: Vec<(AbsCellKey, FormulaId)>) -> Self {
-        formulas.sort_unstable_by_key(|&(key, _)| column_major(key));
+        sort_cell_formulas_column_major(&mut formulas);
         Self(formulas)
     }
 
@@ -1831,7 +1851,7 @@ impl<'a> ComponentWalk<'a> {
         }
 
         // Row-major member order is the order Excel calculates a sheet in.
-        output.formulas[start..].sort_unstable_by_key(|key| (key.sheet, key.row, key.col));
+        sort_cells_row_major(&mut output.formulas[start..]);
         output
             .ends
             .push((output.formulas.len(), size > 1 || frame.reads_itself));

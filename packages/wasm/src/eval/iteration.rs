@@ -19,6 +19,7 @@ use std::cell::RefCell;
 use rustc_hash::FxHashSet;
 
 use crate::sheet::formula_error_with_entry;
+use crate::sorting::sort_cells_row_major;
 use crate::store::CellStore;
 use crate::types::{AbsCellKey, EvalResult, FormulaError, Value};
 
@@ -349,7 +350,7 @@ impl CellStore {
             Some(std::mem::take(&mut edges.pending))
         })?;
         let mut members: Vec<_> = pending.into_iter().collect();
-        members.sort_unstable_by_key(|member| (member.sheet, member.row, member.col));
+        sort_cells_row_major(&mut members);
         let limits = self.iteration.as_deref().copied()?;
         for _ in 1..limits.max_iterations {
             let mut converged = true;

@@ -10,6 +10,7 @@ use crate::memory::{
     StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, FORMULAS, SHEET_INDEXES_METADATA,
 };
 use crate::sheet::SheetData;
+use crate::sorting::sort_u32_pairs;
 use crate::transfer::Writer;
 #[cfg(any(target_arch = "wasm32", test))]
 use crate::transfer::{Reader, TransferResult};
@@ -127,7 +128,7 @@ impl DirtyCells {
         // Fold before growing. Room for as many cells again as survive the
         // fold keeps each fold amortized.
         if len == self.cells.capacity() {
-            self.cells.sort_unstable();
+            sort_u32_pairs(&mut self.cells);
             self.cells.dedup();
             self.sorted_len = self.cells.len();
             if self.cells.binary_search(&key).is_ok() {
@@ -171,7 +172,7 @@ impl DirtyCells {
         if sorted && ascending && !continues {
             self.cells = merge_unique(old, new);
         } else if !(sorted && ascending) {
-            self.cells.sort_unstable();
+            sort_u32_pairs(&mut self.cells);
             self.cells.dedup();
         }
         self.sorted_len = self.cells.len();
