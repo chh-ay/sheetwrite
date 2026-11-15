@@ -290,6 +290,14 @@
   --sheetwrite-icon-x: -7.5;
   --sheetwrite-icon-y: -9;
 }
+.sheetwrite-icon[data-icon="filter"] {
+  --sheetwrite-icon-x: -9;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="reapplyFilter"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -9;
+}
 .sheetwrite-icon[data-icon="chart"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -10.5;

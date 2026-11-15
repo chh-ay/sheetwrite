@@ -188,7 +188,9 @@ const SORT_ITEMS: readonly RibbonMenuItem[] = [
   item("Custom Sort…", (grid) => grid.actions.customSort(), "sortCustom"),
   item("Sort View A to Z", (grid) => grid.actions.sortView(true), "sortView"),
   item("Sort View Z to A", (grid) => grid.actions.sortView(false), "sortView"),
-  item("Clear Filter", (grid) => grid.actions.clearFilter(), "clearFilter"),
+  item("Filter", (grid) => grid.actions.toggleAutoFilter(), "filter"),
+  item("Clear", (grid) => grid.actions.clearFilters(), "clearFilter"),
+  item("Reapply", (grid) => grid.actions.reapplyFilter(), "reapplyFilter"),
 ];
 
 /** Sort the view only; the two orders share the glyph, so each names its own ID. */
@@ -889,7 +891,15 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
           }),
           viewSortButton("Sort View A to Z", "sortViewAsc", true),
           viewSortButton("Sort View Z to A", "sortViewDesc", false),
-          button("Clear Filter", "clearFilter", (grid) => grid.actions.clearFilter()),
+          {
+            ...button("Filter", "filter", (grid) => grid.actions.toggleAutoFilter(), "filter", {
+              toggle: true,
+              large: true,
+            }),
+            description: "Filter (Ctrl+Shift+L): filter buttons on the header row",
+          },
+          button("Clear", "clearFilter", (grid) => grid.actions.clearFilters()),
+          button("Reapply", "reapplyFilter", (grid) => grid.actions.reapplyFilter()),
         ],
       },
       {

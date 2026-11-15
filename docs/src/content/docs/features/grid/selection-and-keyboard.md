@@ -105,13 +105,14 @@ When the grid has focus and is not editing:
 | Ctrl/Cmd + Home / End | Move to the sheet's first / last cell. |
 | Shift + any of the above | Extend the selection instead of moving. |
 | Enter or F2 | Edit the focused cell (F2 selects the existing text). |
-| Alt + Down | Open the list of a cell with a list validation rule, as Enter does. |
+| Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule, as Enter does. |
 | Delete / Backspace | Clear the selected cells. |
 | A printable character | Start editing, replacing the cell's content. |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
+| Ctrl/Cmd + Shift + L | Turn the AutoFilter on for the current range, or off. |
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 

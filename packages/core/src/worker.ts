@@ -37,6 +37,7 @@ interface WorkerPane {
   scrollLeft: number;
   rowTops?: Float64Array;
   rowHeights?: Float64Array;
+  rowNumbers?: Uint32Array;
 }
 
 interface PanesMessage {
@@ -235,6 +236,7 @@ function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean 
       height: state.viewport.height,
       rowTops: pane.rowTops,
       rowHeights: pane.rowHeights,
+      rowNumbers: pane.rowNumbers,
     };
     paintFrame(
       state.ctx,

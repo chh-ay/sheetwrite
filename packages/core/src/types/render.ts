@@ -95,6 +95,12 @@ export interface Viewport {
    */
   rowTops?: Float64Array;
   rowHeights?: Float64Array;
+  /**
+   * Row header labels for the painted rows, window-aligned like `rowTops`.
+   * Present while a filter or hidden rows hide rows: the headers then show
+   * each row's sheet number, as Excel does, not its view position.
+   */
+  rowNumbers?: Uint32Array;
 }
 
 /** One frozen-pane paint: a window plus the clip rect and scroll offsets it paints with. */
@@ -109,6 +115,8 @@ export interface PanePaint {
   /** Per-pane row geometry (window-aligned), like Viewport.rowTops/rowHeights. */
   rowTops?: Float64Array;
   rowHeights?: Float64Array;
+  /** Per-pane row header labels, like `Viewport.rowNumbers`. */
+  rowNumbers?: Uint32Array;
 }
 
 export interface Renderer {

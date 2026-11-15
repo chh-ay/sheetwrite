@@ -329,6 +329,7 @@ export class WorkerRenderer implements Renderer {
         scrollLeft: pane.scrollLeft,
         rowTops: pane.rowTops,
         rowHeights: pane.rowHeights,
+        rowNumbers: pane.rowNumbers,
       };
     });
 

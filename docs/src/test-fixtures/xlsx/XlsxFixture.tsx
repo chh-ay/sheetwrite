@@ -1,6 +1,7 @@
 import {
   fromXlsxWorkbook,
   initSheetwrite,
+  SheetwriteStore,
   toXlsxWorkbook,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
@@ -46,6 +47,77 @@ const snapshot: WorkbookSnapshot = {
   ],
 };
 
+/** A1:B5: a header and four items; the AutoFilter keeps the Qty values above 5. */
+const autoFilterSnapshot: WorkbookSnapshot = {
+  schemaVersion: 1,
+  workbook: { activeSheet: "items" },
+  sheets: [
+    {
+      id: "items",
+      name: "Items",
+      order: 0,
+      rowCount: 5,
+      columns: [
+        { key: "item", header: "Item", width: 80, type: "text" },
+        { key: "qty", header: "Qty", width: 80, type: "number" },
+      ],
+      autoFilter: {
+        range: { sheet: "items", start: { row: 0, col: 0 }, end: { row: 4, col: 1 } },
+      },
+      filters: [[1, { kind: "custom", join: "and", conditions: [{ op: "gt", value: 5 }] }]],
+      cells: [
+        {
+          startRow: 0,
+          startCol: 0,
+          rowCount: 5,
+          colCount: 2,
+          cells: (
+            [
+              ["Item", "Qty"],
+              ["apple", 3],
+              ["fig", 7],
+              ["kiwi", 1],
+              ["pear", 12],
+            ] as const
+          ).flatMap((row, rowOffset) =>
+            row.map((value, colOffset) => ({
+              rowOffset,
+              colOffset,
+              value: { kind: "literal" as const, value },
+            })),
+          ),
+        },
+      ],
+    },
+  ],
+};
+
+/**
+ * Write a filtered store to XLSX and read it back: the AutoFilter and its
+ * condition must survive, and the read store must show the same rows.
+ */
+async function autoFilterRoundTrip(): Promise<number> {
+  const store = SheetwriteStore.fromSnapshot(autoFilterSnapshot);
+  try {
+    const imported = await fromXlsxWorkbook(await toXlsxWorkbook(store));
+    const sheet = imported.sheets[0];
+    if (
+      JSON.stringify(sheet?.autoFilter) !== JSON.stringify(autoFilterSnapshot.sheets[0]?.autoFilter) ||
+      JSON.stringify(sheet?.filters) !== JSON.stringify(autoFilterSnapshot.sheets[0]?.filters)
+    ) {
+      throw new Error("The AutoFilter changed in an XLSX round trip");
+    }
+    const reloaded = SheetwriteStore.fromSnapshot(imported);
+    try {
+      return reloaded.viewRowCount("items");
+    } finally {
+      reloaded.dispose();
+    }
+  } finally {
+    store.dispose();
+  }
+}
+
 export function XlsxFixture() {
   const [result, setResult] = createSignal<{
     status: "running" | "ready" | "error";
@@ -71,10 +143,11 @@ export function XlsxFixture() {
         ) {
           throw new Error("Workbook XLSX round-trip changed browser-visible semantics");
         }
+        const shownRows = await autoFilterRoundTrip();
         if (!isCancelled) {
           setResult({
             status: "ready",
-            text: JSON.stringify({ bytes: bytes.byteLength, formula: formula.src }),
+            text: JSON.stringify({ bytes: bytes.byteLength, formula: formula.src, shownRows }),
           });
         }
       } catch (error) {

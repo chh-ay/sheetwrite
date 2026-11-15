@@ -2144,6 +2144,16 @@ export class StoreDataEngine {
     return this.view.distinctValues(sheet, col, limit, rows);
   }
 
+  /** What an AutoFilter dropdown lists for `col`; see `StoreViewState.autoFilterValues`. */
+  autoFilterValues(
+    sheet: SheetId,
+    col: number,
+    limit: number,
+  ): { values: CellScalar[]; kept: CellScalar[] | null } {
+    this.requireCompleteQuery(sheet);
+    return this.view.autoFilterValues(sheet, col, limit);
+  }
+
   /** The sheet's explicitly hidden data rows, ascending. */
   hiddenRows(sheet: SheetId): number[] {
     return [...(this.sheets.sheetMeta(sheet).hiddenRows ?? [])].sort((a, b) => a - b);

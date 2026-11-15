@@ -982,7 +982,7 @@ impl CellStore {
         end_row: usize,
         limit: usize,
     ) -> DistinctColumn {
-        let mut out = DistinctColumn::default();
+        let out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
             return out;
         };
@@ -991,78 +991,32 @@ impl CellStore {
         }
         let row_count = data.cells.row_count();
         let rows = start_row.min(row_count)..end_row.min(row_count);
-        let text_at = |index: usize| {
-            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or_default()
+        distinct_over(self, data, col, rows, limit)
+    }
+
+    /// Distinct resolved values of one column over `rows`, canonical data rows
+    /// in the order given, such as the rows the other column filters keep.
+    /// Rows past the sheet are skipped; `limit` as in `distinctValuesInRows`.
+    #[wasm_bindgen(js_name = distinctValuesOfRows)]
+    pub fn distinct_values_of_rows(
+        &self,
+        sheet: usize,
+        col: usize,
+        rows: &[u32],
+        limit: usize,
+    ) -> DistinctColumn {
+        let Some(data) = self.sheets.get(sheet) else {
+            return DistinctColumn::default();
         };
-        // Stored text carries a pool id that stands for its value, so the scan
-        // dedupes it through one bit per id instead of hashing the characters.
-        // Text without an id — the sentinel a formula error reports reads back as
-        // plain text — still has to meet pooled text by content, so the first
-        // such cell restarts the scan on content hashing. The restart is rare and
-        // keeps equal text a single entry, in first-seen order, either way.
-        let mut pooled = true;
-        loop {
-            out = DistinctColumn::default();
-            let mut stamps = PoolIdStamps::new();
-            let mut seen: FxHashSet<DistinctKey<'_>> = FxHashSet::default();
-            let mut needs_content = false;
-            for row in rows.clone() {
-                let index = col * data.cells.row_count() + row;
-                let kind = resolved_kind(data, index, &self.formula_slots);
-                let fresh = match kind {
-                    1 => seen.insert(DistinctKey::Number(
-                        numeric_cell_value(data, index, &self.formula_slots)
-                            .unwrap_or_default()
-                            .to_bits(),
-                    )),
-                    2 if pooled => match data.cells.str_id_at(index) {
-                        NO_STRING => {
-                            needs_content = true;
-                            break;
-                        }
-                        id => stamps.insert(id),
-                    },
-                    2 => seen.insert(DistinctKey::Text(text_at(index))),
-                    3 => seen.insert(DistinctKey::Bool(
-                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
-                    )),
-                    _ => seen.insert(DistinctKey::Blank),
-                };
-                if !fresh {
-                    continue;
-                }
-                out.kinds.push(kind);
-                if kind == 1 {
-                    out.numbers.push(
-                        numeric_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
-                    );
-                } else if kind == 3 {
-                    out.numbers.push(
-                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default()
-                        {
-                            1.0
-                        } else {
-                            0.0
-                        },
-                    );
-                } else if kind == 2 {
-                    out.texts.push(text_at(index).to_owned());
-                }
-                if limit != 0 && out.kinds.len() >= limit {
-                    break;
-                }
-            }
-            if !needs_content {
-                break;
-            }
-            pooled = false;
+        if col >= data.cells.n_cols() {
+            return DistinctColumn::default();
         }
-        QUERY_STATS.with(|stats| {
-            let mut current = stats.get();
-            current[1] = current[1].saturating_add(out.texts.len() as u64);
-            stats.set(current);
-        });
-        out
+        let row_count = data.cells.row_count();
+        let rows = rows
+            .iter()
+            .map(|&row| row as usize)
+            .filter(move |&row| row < row_count);
+        distinct_over(self, data, col, rows, limit)
     }
 
     /// `dataEdge` in a view order, where `order[i]` is the data row shown at
@@ -1106,6 +1060,90 @@ impl CellStore {
         };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32
     }
+}
+
+/// The distinct resolved values of `col` over `rows`, in first-seen order;
+/// a zero `limit` keeps every value.
+fn distinct_over(
+    store: &CellStore,
+    data: &SheetData,
+    col: usize,
+    rows: impl Iterator<Item = usize> + Clone,
+    limit: usize,
+) -> DistinctColumn {
+    let mut out;
+    let text_at = |index: usize| {
+        resolved_text(data, &store.strings, index, &store.formula_slots).unwrap_or_default()
+    };
+    // Stored text carries a pool id that stands for its value, so the scan
+    // dedupes it through one bit per id instead of hashing the characters.
+    // Text without an id — the sentinel a formula error reports reads back as
+    // plain text — still has to meet pooled text by content, so the first
+    // such cell restarts the scan on content hashing. The restart is rare and
+    // keeps equal text a single entry, in first-seen order, either way.
+    let mut pooled = true;
+    loop {
+        out = DistinctColumn::default();
+        let mut stamps = PoolIdStamps::new();
+        let mut seen: FxHashSet<DistinctKey<'_>> = FxHashSet::default();
+        let mut needs_content = false;
+        for row in rows.clone() {
+            let index = col * data.cells.row_count() + row;
+            let kind = resolved_kind(data, index, &store.formula_slots);
+            let fresh = match kind {
+                1 => seen.insert(DistinctKey::Number(
+                    numeric_cell_value(data, index, &store.formula_slots)
+                        .unwrap_or_default()
+                        .to_bits(),
+                )),
+                2 if pooled => match data.cells.str_id_at(index) {
+                    NO_STRING => {
+                        needs_content = true;
+                        break;
+                    }
+                    id => stamps.insert(id),
+                },
+                2 => seen.insert(DistinctKey::Text(text_at(index))),
+                3 => seen.insert(DistinctKey::Bool(
+                    boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default(),
+                )),
+                _ => seen.insert(DistinctKey::Blank),
+            };
+            if !fresh {
+                continue;
+            }
+            out.kinds.push(kind);
+            if kind == 1 {
+                out.numbers.push(
+                    numeric_cell_value(data, index, &store.formula_slots).unwrap_or_default(),
+                );
+            } else if kind == 3 {
+                out.numbers.push(
+                    if boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default()
+                    {
+                        1.0
+                    } else {
+                        0.0
+                    },
+                );
+            } else if kind == 2 {
+                out.texts.push(text_at(index).to_owned());
+            }
+            if limit != 0 && out.kinds.len() >= limit {
+                break;
+            }
+        }
+        if !needs_content {
+            break;
+        }
+        pooled = false;
+    }
+    QUERY_STATS.with(|stats| {
+        let mut current = stats.get();
+        current[1] = current[1].saturating_add(out.texts.len() as u64);
+        stats.set(current);
+    });
+    out
 }
 
 /// Whether the cell at `index`, of resolved `kind`, meets a COUNTIF criterion.
