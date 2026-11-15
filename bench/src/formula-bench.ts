@@ -120,6 +120,8 @@ const LOOKUP_ROW_IDS = [
   "xlookup-many-sorted",
   "text-lookup-many",
   "text-lookup-many-sorted",
+  "paged-vlookup-many",
+  "paged-xlookup-many",
 ] as const;
 
 const CLOSURE_ROW_IDS = [
@@ -289,6 +291,10 @@ const EXPANDED_FORMULA_WORKLOAD_IDS = new Set([
   "text-lookup-many-edit",
   "text-lookup-many-sorted",
   "text-lookup-many-sorted-edit",
+  "paged-vlookup-many",
+  "paged-vlookup-many-edit",
+  "paged-xlookup-many",
+  "paged-xlookup-many-edit",
   "sum-multi-range",
   "sumifs-3-criteria",
   "countif-100k",
