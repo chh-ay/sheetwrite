@@ -36,6 +36,7 @@ import {
   summarizeCompleteness,
   WINDOW_TRANSFER_ORDER_SEED,
   WINDOW_TRANSFER_SCENARIO_IDS,
+  type WindowTransferScenarioId,
 } from "./render-protocol.js";
 import { counterbalancedOrder } from "./stats.js";
 
@@ -52,6 +53,8 @@ interface DriverConfiguration {
   readonly rows: readonly number[];
   readonly scenarios: readonly ScenarioId[];
   readonly diagnostic: boolean;
+  /** The diagnostic window-transfer pair is among the scenarios. */
+  readonly windowTransfer: boolean;
   readonly rounds: number;
   readonly measuredSamples: number;
   readonly warmupSamples: number;
@@ -136,7 +139,17 @@ function nonNegativeIntegerArgument(
   return parsed;
 }
 
-function parseConfiguration(args: readonly string[]): DriverConfiguration {
+/** The Markdown view written beside a JSON artifact: `x.json` → `x.md`, any other name gains `.md`. */
+export function markdownPathFor(jsonPath: string): string {
+  return jsonPath.endsWith(".json") ? `${jsonPath.slice(0, -".json".length)}.md` : `${jsonPath}.md`;
+}
+
+function isWindowTransferScenario(scenario: ScenarioId): boolean {
+  return WINDOW_TRANSFER_SCENARIO_IDS.includes(scenario as WindowTransferScenarioId);
+}
+
+/** Driver options from the command line; throws on an invalid combination. */
+export function parseConfiguration(args: readonly string[]): DriverConfiguration {
   const smoke = args.includes("--smoke");
   const scenarioSet = optionValue(args, "--scenario-set") ?? "gate";
   if (scenarioSet !== "gate" && scenarioSet !== "diagnostic") {
@@ -158,6 +171,13 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
           }
           return scenario;
         });
+  // The window-transfer pair is measured against itself, so a run takes both rows or neither.
+  const windowTransferCount = scenarios.filter(isWindowTransferScenario).length;
+  if (windowTransferCount !== 0 && windowTransferCount !== WINDOW_TRANSFER_SCENARIO_IDS.length) {
+    throw new TypeError(
+      `--scenarios: ${WINDOW_TRANSFER_SCENARIO_IDS.join(" and ")} run together or not at all`,
+    );
+  }
   const engineArg = optionValue(args, "--engine");
   const engines: readonly EngineId[] =
     engineArg === undefined
@@ -199,13 +219,14 @@ function parseConfiguration(args: readonly string[]): DriverConfiguration {
         ? diagnostic
           ? DIAGNOSTIC_MARKDOWN_PATH
           : DEFAULT_MARKDOWN_PATH
-        : outputPath.replace(/\.json$/u, ".md"));
+        : markdownPathFor(outputPath));
   return {
     smoke,
     engines,
     rows,
     scenarios,
     diagnostic,
+    windowTransfer: diagnostic && windowTransferCount > 0,
     rounds: positiveIntegerArgument(args, "--rounds", smoke ? 1 : 2),
     measuredSamples: positiveIntegerArgument(args, "--samples", smoke ? 1 : 3),
     warmupSamples: nonNegativeIntegerArgument(args, "--warmups", 1),
@@ -601,7 +622,7 @@ async function validateExistingArtifact(
   const artifact = gateMode
     ? validateRenderGateArtifact(value, gateMode)
     : parseRenderArtifactJson(json);
-  const markdownPath = path.replace(/\.json$/u, ".md");
+  const markdownPath = markdownPathFor(path);
   const expectedMarkdown = renderBenchmarkMarkdown(artifact);
   const observedMarkdown = await Bun.file(markdownPath).text();
   if (observedMarkdown !== expectedMarkdown) {
@@ -635,7 +656,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
     configuration.rounds,
     RENDER_ORDER_SEED,
   );
-  const windowTransferScenarioOrder = configuration.diagnostic
+  const windowTransferScenarioOrder = configuration.windowTransfer
     ? counterbalancedOrder(
         WINDOW_TRANSFER_SCENARIO_IDS,
         configuration.rounds,
@@ -672,12 +693,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
         windowTransferScenarioOrder === undefined
           ? configuration.scenarios
           : [
-              ...configuration.scenarios.filter(
-                (scenario) =>
-                  !WINDOW_TRANSFER_SCENARIO_IDS.includes(
-                    scenario as (typeof WINDOW_TRANSFER_SCENARIO_IDS)[number],
-                  ),
-              ),
+              ...configuration.scenarios.filter((scenario) => !isWindowTransferScenario(scenario)),
               ...windowTransferScenarioOrder[roundIndex]!,
             ];
       for (const engine of engineOrder[roundIndex]!) {
@@ -697,7 +713,7 @@ async function runDriver(args: readonly string[]): Promise<void> {
             timeoutMs: configuration.timeoutMs,
             datasetHash: datasetHashes[String(rows)]!,
             browserExecutable: configuration.browserExecutable,
-            windowTransferDiagnostic: configuration.diagnostic,
+            windowTransferDiagnostic: configuration.windowTransfer,
           });
           results.push(...output.results);
           launchAttempts.push(...output.launchAttempts);
