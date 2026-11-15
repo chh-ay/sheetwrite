@@ -178,24 +178,71 @@ before you upgrade.
 
 ## Performance
 
-Recalculation takes 0.837–0.861 of the time on average across the 53 formula workloads with dense
-formula IDs, and 0.835–0.912 of that with
-flat dependency arrays, on Linux and Mac
-with both engines. Selected workloads:
+Each group starts with its largest gain. "0.25 of the time" means four times faster. Mac is an
+M5 Pro, Linux an i9-12900H, and "both engines" means the default and the full engine.
 
-| Workload | Faster by |
-| --- | --- |
-| 200 `INDEX`/`MATCH` lookups over 100,000 rows | 85–132× |
-| `COUNTIF` with a number criterion, 100k cells | 11.5–18× |
-| `SUM` over two 100k ranges | 2.15–6.62× |
-| Row edit in a 100,000-formula workbook | 3.80× |
-| Range formulas over loaded pages | 3.01–3.10× |
-| One-formula range edit, 100k workbook | 2.53–3.26× |
-| Lookup edits and repeated lookups | 1.2–3.0× |
-| First recalculation of 100k formulas | 1.55–1.87× |
-| Loading formulas | 1.21–1.46× |
+### Formulas and recalculation
 
-The dependency index for 100k formulas shrinks from 7.67 MB to 1.21 MB.
+`INDEX`/`MATCH` lookups read only the cell they return: 200 lookups over 100,000 rows take
+0.008 of the time on the Mac and 0.011 on Linux.
+
+- Recalculation takes 0.837–0.861 of the time on average across the 53 formula workloads with
+  dense formula IDs, and 0.835–0.912 of that with flat dependency arrays, on Linux and Mac with
+  both engines. The dependency index for 100k formulas shrinks from 7.67 MB to 1.21 MB.
+- Redefining a name that 100,000 formulas use takes 19 ms instead of 491 ms on Linux, and
+  appending a table row is about 60 times faster.
+- `COUNTIF` with a number criterion over 100k cells is 11.5–18× faster, and `SUM` over two 100k
+  ranges 2.15–6.62×.
+- A `LET` in every row recalculates in 0.17–0.22 of the time, and `MAP`, `REDUCE`, `BYROW` and
+  named `LAMBDA` calls in 0.41–0.64.
+
+### Charts and pivots
+
+With 20,000 formula-backed charts, an unrelated edit and the chart refresh take 0.006 ms instead
+of 20.2 ms on the Mac and 0.016 ms instead of 47.3 ms on Linux.
+
+- `GETPIVOTDATA` recalculates only when its pivot changes, as in Excel.
+- A pivot of measures over 100,000 rows recalculates in 0.66–0.71 of the time.
+- With the PivotTable field list open, an edit on another sheet takes 12.95 µs instead of
+  1.629 ms on the Mac.
+
+### Paged and large data
+
+A row insert in a 1,000,000-row paged sheet takes 0.0136–0.0221 of the time.
+
+- A 1,000,000-cell `setBlock` is admitted in 17 ms instead of 212 ms on the Mac and 65 ms
+  instead of 617 ms on Linux.
+- Range formulas over loaded pages are 3.0–3.1× faster, and after a fast fling cells show
+  "loading" up to 74% less.
+- Draining 10,000 acknowledged edits takes 0.246 ms instead of 4.004 ms on the Mac.
+
+### Grid and editing
+
+Setting 100,000 row heights one at a time takes 0.49 s instead of 151.8 s on the Mac and
+2.05 s instead of 340.8 s on Linux.
+
+- A wrapped cell of 20,000 characters paints in 0.175 ms instead of 0.887 ms on the Mac.
+- Scrolling with the cell editor open forces no style or layout work.
+- The sort command on 1,000–4,000 numbers does 0.329–0.509 of the work.
+
+### Import and export
+
+XLSX export of 100,000 formulas takes 481 ms on the Mac (0.6.1: 491 ms) and 1,030 ms on Linux
+(0.6.1: 1,053 ms).
+
+- CSV import takes 7.3% less time on the Mac and 11.0% less on Linux.
+- Formulas load 1.21–1.46× faster.
+
+### Download size
+
+`grid.css`, the one stylesheet part every grid needs, is 4,666 B, where the old stylesheet was
+89,452 B.
+
+- Shared sorts make the engines 13,307 B (default) and 16,248 B (full) Brotli smaller, and
+  writing number text without Rust's float formatting saves 6,784–7,113 B (default) and
+  5,561–5,563 B (full).
+- The query engine (85,351 B gzip) and the version comparison kernel (16,646 B gzip) load only
+  when they are used.
 
 ## Breaking changes
 
@@ -286,6 +333,13 @@ export async function restoreLatest(
 
 </Compare>
 
+### Chart views are read-only
+
+`ChartView.chart` is now the store's own definition, typed `ReadonlyChartDefinition`, and
+development builds freeze it. Edit a copy from `grid.getCharts(sheet)` and commit it with
+`grid.setChart`. The result of `rebaseDocumentOperations` can hold your own operations, so treat
+it as read-only too. See [Chart views are read-only](/docs/start/upgrade-to-0-7-0/#chart-views-are-read-only).
+
 ### Removed engine bindings
 
 Direct `@sheetwrite/wasm` and `@sheetwrite/formulas` users must replace these bindings:
@@ -298,6 +352,9 @@ Direct `@sheetwrite/wasm` and `@sheetwrite/formulas` users must replace these bi
 
 The scalar setters and `clearCell`, `CellStore.rowCount` / `colCount`, and
 `WindowView.nRows` / `nCols` remain public APIs.
+
+`setSheetName` now returns whether it named the sheet. Like `renameSheet`, it refuses an empty
+name, a name another sheet holds in any case, and another sheet's id.
 
 ### Errors and cancellation
 
