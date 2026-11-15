@@ -1124,11 +1124,11 @@ fn criterion_matches_cell(
         3 => boolean_cell_value(sheet, index, slots)
             .is_some_and(|value| criterion.matches(&Value::Bool(value))),
         2 => {
-            let error = (sheet.cells.kind_at(index) == KIND_FORMULA)
+            let formula_error = (sheet.cells.kind_at(index) == KIND_FORMULA)
                 .then(|| key_for_index(sheet, index))
                 .flatten()
                 .and_then(|key| formula_error_at(sheet, key, slots));
-            match error {
+            match formula_error {
                 Some(error) => criterion.matches(&Value::Error(error)),
                 None => resolved_text(sheet, &store.strings, index, slots)
                     .is_some_and(|text| criterion.matches_text(text)),
