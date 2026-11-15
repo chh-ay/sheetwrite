@@ -24,8 +24,9 @@ function copyDataRecord(value: unknown): Record<string, unknown> | undefined {
 /**
  * Entries of a plain array, each read once by index into a new dense array.
  * A getter on an entry runs here, once. Undefined when `value` is not a plain
- * array or an entry reads as `undefined` (a hole); validation then reports it
- * on the original.
+ * array, an index is not an own property (a hole, even one a polluted
+ * prototype would fill) or an entry reads as `undefined`; validation then
+ * reports it on the original.
  */
 function readEntriesOnce(value: unknown): unknown[] | undefined {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
@@ -34,6 +35,7 @@ function readEntriesOnce(value: unknown): unknown[] | undefined {
   let index = 0;
   try {
     for (; index < length; index++) {
+      if (!Object.hasOwn(value, index)) return undefined;
       const entry: unknown = value[index];
       if (entry === undefined) return undefined;
       entries.push(entry);
@@ -60,8 +62,9 @@ function ownDataField(value: unknown, key: string): unknown {
 /**
  * `operation` with the `values` and `styleIds` of its block replaced by
  * private copies, or `operation` itself when it is not a `setBlock`, its
- * arrays are already private copies, or any field it is made of is not plain
- * data (validation then judges the original exactly as before).
+ * arrays are already the frozen copies made here (a caller sending back an
+ * operation from a change event or result), or any field it is made of is not
+ * plain data (validation then judges the original exactly as before).
  */
 function withOwnedBlockArrays(operation: DocumentOp): DocumentOp {
   if (ownDataField(operation, "op") !== "setBlock") return operation;

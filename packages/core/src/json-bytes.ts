@@ -271,14 +271,17 @@ function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
   }
 }
 
-/** Arrays Sheetwrite built itself from values it read once; no caller holds them. */
+/** Frozen arrays Sheetwrite built itself from values it read once. */
 const ownedArrays = new WeakSet<unknown[]>();
 
 /**
- * Record that `array` is a dense array of plain data properties that only
- * Sheetwrite can reach, so a measurement may read its entries directly.
+ * Freeze `array`, a dense array of plain data properties Sheetwrite built,
+ * and record it so a measurement may read its entries directly. Callers
+ * receive these arrays in change events and results; freezing keeps every
+ * entry a plain data property when one is sent back.
  */
 export function markOwnedArray(array: unknown[]): void {
+  Object.freeze(array);
   ownedArrays.add(array);
 }
 

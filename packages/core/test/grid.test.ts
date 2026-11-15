@@ -775,6 +775,61 @@ describe("setBlock arrays at every entry point", () => {
       });
       belowLimit.destroy();
     });
+
+    it(`${name} stores the measured values when an operation from a change event is sent again`, () => {
+      const first = validateTransactionResources([setBlock(["kept", "text"])]);
+      if (!first.ok) throw new Error("expected a measurable block");
+      const grid = new GridImpl(mountHost(), {
+        workbook: makeWorkbook(4),
+        transactionResourceLimits: { maxEncodedBytes: first.encodedBytes },
+      });
+      const emitted: DocumentOp[] = [];
+      grid.on("change", (event) => emitted.push(...event.transaction.patches));
+      expect(apply(grid, [setBlock(["kept", "text"])]).status).toBe("applied");
+      const kept = emitted[0];
+      if (kept?.op !== "setBlock") throw new Error("expected the copied setBlock");
+
+      // A getter that measures small and then writes text over the byte limit.
+      const overLimit = "kept, now longer than the byte limit allows";
+      let reads = 0;
+      Reflect.defineProperty(kept.block.values, 0, {
+        enumerable: true,
+        configurable: true,
+        get() {
+          reads++;
+          return reads === 1 ? 1 : overLimit;
+        },
+      });
+      expect(grid.store.applyTransaction({ patches: [setBlock([null, null])] }).status).toBe(
+        "applied",
+      );
+
+      expect(apply(grid, [kept]).status).toBe("applied");
+      expect(reads).toBe(0);
+      expect(cellAt(grid, 0)).toBe("kept");
+      grid.destroy();
+    });
+
+    it(`${name} rejects a hole that Array.prototype would fill`, () => {
+      const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+      const holey: CellScalar[] = ["kept"];
+      holey.length = 2;
+      Object.defineProperty(Array.prototype, 1, {
+        value: "inherited",
+        configurable: true,
+        writable: true,
+      });
+      const result = (() => {
+        try {
+          return apply(grid, [setBlock(holey)]);
+        } finally {
+          delete (Array.prototype as unknown as Record<number, unknown>)[1];
+        }
+      })();
+      expect(result.status).toBe("rejected");
+      expect(cellAt(grid, 1)).toBeNull();
+      grid.destroy();
+    });
   }
 
   it("grid.applyTransaction sends, undoes and redoes the value an entry getter returned once", () => {
