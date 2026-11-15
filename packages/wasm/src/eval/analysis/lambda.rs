@@ -909,8 +909,10 @@ impl<'a, 'p> Context<'a, 'p> {
         let Ast::DefinedName(id) = expression else {
             return definition(expression, names).ok().cloned();
         };
+        // A formula read in place holds no LAMBDA when it is shifted: a
+        // name's LAMBDA is always placed in a copy.
         let read;
-        let formula = if let Some(formula) = names.shared_formula(*id) {
+        let formula = if let Some((formula, _)) = names.in_place(*id) {
             formula
         } else {
             read = names.read(*id);
@@ -984,7 +986,12 @@ impl<'a, 'p> Context<'a, 'p> {
                 return Ok(closure.clone());
             }
         }
-        if let Some(shared) = self.lambda(argument) {
+        // Only a LAMBDA, a LET binding or a defined name can stand for one.
+        let may_be_lambda = matches!(
+            argument,
+            Ast::Lambda(_) | Ast::LetSlot { .. } | Ast::DefinedName(_)
+        );
+        if let Some(shared) = may_be_lambda.then(|| self.lambda(argument)).flatten() {
             return Ok(Slot::Closure {
                 definition: shared,
                 link: self.top(),

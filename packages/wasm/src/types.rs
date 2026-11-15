@@ -3,10 +3,13 @@
 use crate::calc::{
     bind_sheet_refs, has_unresolved_local_sheets, invalidate_sheet_refs, move_refs,
     refresh_sheet_spans, refresh_table_refs, relink_sheet_refs, rename_sheet_refs,
-    resolve_structured_refs, shift_cols, shift_rows, Ast, Func, ParseFeatures, RefFlags, SheetRef,
-    SheetResolver, SpanPlacer, TableRefresh, UnresolvedStructuredRef, WrittenNames,
+    resolve_structured_refs, shift_cols, shift_rows, Ast, Func, NameId, ParseFeatures, RefFlags,
+    SheetRef, SheetResolver, SpanPlacer, TableRefresh, UnresolvedStructuredRef, WrittenNames,
 };
-use crate::eval::{expand_let_reachable_ast, intersection_range};
+use crate::eval::{
+    expand_let_reachable_ast, intersection_range, read_shifted, reference_shift, shifted_cell,
+    shifted_range,
+};
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::store::names::NameScope;
@@ -221,38 +224,54 @@ impl ReadSet {
     /// read through `names` for the cell being bound.
     pub(crate) fn from_ast(ast: &Ast, names: NameScope<'_>) -> Self {
         let mut out = Self::default();
-        out.collect(ast, names);
+        out.collect(ast, names, reference_shift());
         out
     }
 
-    pub(crate) fn collect(&mut self, ast: &Ast, names: NameScope<'_>) {
+    /// Add the reads of `ast`, its relative references moved by `shift`: the
+    /// enclosing reference shift, or a defined name's while its formula is
+    /// read in place. The shift travels as an argument, not a thread-local
+    /// read per reference.
+    fn collect(&mut self, ast: &Ast, names: NameScope<'_>, shift: (u32, u32)) {
         let formula_sheet = names.sheet;
+        let collect = |reads: &mut Self, child: &Ast| reads.collect(child, names, shift);
         match ast {
-            Ast::LetSlot { expression, .. } => self.collect(expression, names),
-            Ast::DefinedName(id) => {
-                let read = names.read(*id);
-                if let Some(range) = read.range() {
-                    self.push_range(range);
-                } else if let Some(expression) = read.formula() {
-                    self.collect(expression, names);
-                }
+            Ast::LetSlot { expression, .. } => collect(self, expression),
+            Ast::DefinedName(id) => self.collect_name(*id, names, shift),
+            Ast::Cell(row, col, flags) => {
+                let (placed_row, placed_col) = shifted_cell(shift, *row, *col, *flags);
+                self.push_cell(AbsCellKey {
+                    sheet: formula_sheet,
+                    row: placed_row,
+                    col: placed_col,
+                });
             }
-            Ast::Cell(row, col, _) => self.push_cell(AbsCellKey {
-                sheet: formula_sheet,
-                row: *row,
-                col: *col,
-            }),
-            Ast::AbsCell(sheet, row, col, _) => self.push_cell(AbsCellKey {
-                sheet: sheet.handle,
-                row: *row,
-                col: *col,
-            }),
-            Ast::Range(row_start, col_start, row_end, col_end, _) => self.push_range(
-                CellRange::new(formula_sheet, *row_start, *col_start, *row_end, *col_end),
-            ),
-            Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => self.push_range(
-                CellRange::new(sheet.handle, *row_start, *col_start, *row_end, *col_end),
-            ),
+            Ast::AbsCell(sheet, row, col, flags) => {
+                let (placed_row, placed_col) = shifted_cell(shift, *row, *col, *flags);
+                self.push_cell(AbsCellKey {
+                    sheet: sheet.handle,
+                    row: placed_row,
+                    col: placed_col,
+                });
+            }
+            Ast::Range(row_start, col_start, row_end, col_end, flags) => {
+                self.push_range(shifted_range(
+                    shift,
+                    formula_sheet,
+                    (*row_start, *col_start),
+                    (*row_end, *col_end),
+                    *flags,
+                ));
+            }
+            Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, flags) => {
+                self.push_range(shifted_range(
+                    shift,
+                    sheet.handle,
+                    (*row_start, *col_start),
+                    (*row_end, *col_end),
+                    *flags,
+                ));
+            }
             Ast::Structured(reference) => self.push_range(CellRange::new(
                 reference.sheet,
                 reference.row_start,
@@ -262,12 +281,12 @@ impl ReadSet {
             )),
             Ast::SheetSpan(span) => {
                 for &sheet in &span.sheets {
-                    self.push_range(CellRange::new(
+                    self.push_range(shifted_range(
+                        shift,
                         sheet,
-                        span.row_start,
-                        span.col_start,
-                        span.row_end,
-                        span.col_end,
+                        (span.row_start, span.col_start),
+                        (span.row_end, span.col_end),
+                        span.flags,
                     ));
                 }
             }
@@ -279,7 +298,7 @@ impl ReadSet {
             // range has, whatever size the sum range is written with.
             Ast::Func(Func::SumIf | Func::AverageIf, args) if args.len() == 3 => {
                 for arg in args {
-                    self.collect(arg, names);
+                    collect(self, arg);
                 }
                 if let (Some(criteria), Some(sum)) = (
                     crate::eval::static_range(&args[0], names),
@@ -299,27 +318,25 @@ impl ReadSet {
                 Err(FormulaError::Null) => {}
                 Err(_) => {
                     for operand in operands {
-                        self.collect(operand, names);
+                        collect(self, operand);
                     }
                 }
             },
             Ast::Func(_, args) => {
                 for arg in args {
-                    self.collect(arg, names);
+                    collect(self, arg);
                 }
             }
             Ast::UnknownFunc(call) => {
                 for arg in &call.args {
-                    self.collect(arg, names);
+                    collect(self, arg);
                 }
             }
             Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.collect(left, names);
-                self.collect(right, names);
+                collect(self, left);
+                collect(self, right);
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.collect(inner, names);
-            }
+            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => collect(self, inner),
             Ast::SheetCell(..)
             | Ast::SheetRange(..)
             | Ast::InvalidRef
@@ -334,7 +351,26 @@ impl ReadSet {
             #[cfg(feature = "analysis")]
             Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
             #[cfg(feature = "analysis")]
-            Ast::Lambda(definition) => self.collect(&definition.body, names),
+            Ast::Lambda(definition) => collect(self, &definition.body),
+        }
+    }
+
+    /// Add the reads of the defined name `id`. A formula read in place
+    /// moves its references by its own shift, which the walks of
+    /// [`crate::eval::static_range`] read from the reference shift.
+    fn collect_name(&mut self, id: NameId, names: NameScope<'_>, shift: (u32, u32)) {
+        if let Some((expression, own)) = names.in_place(id) {
+            match own {
+                None => self.collect(expression, names, shift),
+                Some(own) => read_shifted(own, || self.collect(expression, names, own)),
+            }
+            return;
+        }
+        let read = names.read(id);
+        if let Some(range) = read.range() {
+            self.push_range(range);
+        } else {
+            read.with_formula(|expression| self.collect(expression, names, reference_shift()));
         }
     }
 
@@ -401,10 +437,13 @@ fn ast_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
             | Func::Info,
             _,
         ) => true,
-        Ast::DefinedName(id) => names
-            .read(*id)
-            .formula()
-            .is_some_and(|expression| ast_is_volatile(expression, names)),
+        Ast::DefinedName(id) => match names.in_place(*id) {
+            Some((expression, _)) => ast_is_volatile(expression, names),
+            None => names
+                .read(*id)
+                .formula()
+                .is_some_and(|expression| ast_is_volatile(expression, names)),
+        },
         _ => ast.any_child(&mut |child| ast_is_volatile(child, names)),
     }
 }

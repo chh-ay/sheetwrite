@@ -308,9 +308,10 @@ impl CellStore {
                             .map(|(_, _, cells)| cells),
                     )
                 } else {
-                    read.formula().and_then(|expression| {
+                    read.with_formula(|expression| {
                         self.dynamic_array_bound(expression, formula_sheet, pass)
                     })
+                    .flatten()
                 }
             }
             // The selection is at most the whole area; an area that has no
@@ -503,8 +504,8 @@ impl CellStore {
                 let read = self.name_scope(sheet).read(*id);
                 if read.range().is_none() {
                     return read
-                        .formula()
-                        .and_then(|expression| self.eval_array(expression, sheet, pass, depth));
+                        .with_formula(|expression| self.eval_array(expression, sheet, pass, depth))
+                        .flatten();
                 }
                 self.eval_matrix_arg(ast, sheet, pass, depth + 1)
             }
@@ -714,8 +715,10 @@ impl CellStore {
             }
             Ast::DefinedName(id) => {
                 let read = self.name_scope(formula_sheet).read(*id);
-                if let Some(expression) = read.formula() {
-                    return self.matrix_shape(expression, formula_sheet, pass);
+                if let Some(shape) = read
+                    .with_formula(|expression| self.matrix_shape(expression, formula_sheet, pass))
+                {
+                    return shape;
                 }
             }
             Ast::Array(array) => {

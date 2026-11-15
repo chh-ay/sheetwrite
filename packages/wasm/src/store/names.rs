@@ -14,10 +14,12 @@
 //!
 //! As in Excel, relative references in a name's formula are relative to cell
 //! A1, and a formula at C5 that uses the name reads them two columns right
-//! and four rows down. Such a formula, or one with a table reference, is
-//! placed for the cell that reads it each time it is read
-//! ([`NameView::Placed`]); every other definition is read as it is stored, by
-//! every formula that uses it.
+//! and four rows down. Such a formula is read in place, its relative
+//! references moved by the reading cell's row and column
+//! ([`NameView::Shifted`]), while every moved reference stays in the sheet;
+//! one that reads a table, holds a LAMBDA or would leave the sheet is placed
+//! in a copy for that cell ([`NameView::Placed`]). Every other definition is
+//! read as it is stored, by every formula that uses it.
 
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
@@ -28,9 +30,11 @@ use wasm_bindgen::prelude::*;
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
     bind_defined_names, for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse,
-    rename_sheet_refs, resolve_structured_refs, shift_cols, shift_rows, translate_name_refs,
-    ArrayLiteral, Ast, NameId, NamedRangeRef, WrittenNames,
+    relative_reach, rename_sheet_refs, resolve_structured_refs, shift_cols, shift_rows,
+    translate_name_refs, ArrayLiteral, Ast, NameId, NamedRangeRef, RefFlags, WrittenNames,
+    SHEET_COLS, SHEET_ROWS,
 };
+use crate::eval::{current_formula_origin, read_shifted, shifted_cell, shifted_range};
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::tables::TableSlots;
@@ -46,6 +50,11 @@ const NO_SHEET: u32 = u32::MAX;
 /// expansion limit, so a chain of names that each use the next twice cannot
 /// grow the time to read it without bound.
 const EXPANSION_NODE_LIMIT: usize = 65_536;
+
+/// The reach of a formula that is never read in place: a table reference is
+/// bound for the reading cell, and a LAMBDA's body runs where it is called,
+/// outside the read.
+const NEVER_IN_PLACE: (u32, u32) = (u32::MAX, u32::MAX);
 
 /// The store's defined names, one entry per name without case, by
 /// [`NameId`]. An entry is made the first time a definition or a formula
@@ -104,9 +113,6 @@ struct NameEntry {
 /// before, to put back when the read ends.
 type FollowedName<'a> = (&'a NameEntry, Option<FormulaCell>);
 
-/// A positional formula placed for each cell `(row, col)` that read it.
-type Placements = RefCell<FxHashMap<(u32, u32), Rc<Ast>>>;
-
 /// A definition's scope, its name's spelling, and the definition.
 pub(super) type DefinitionRow<'a> = (Option<u32>, &'a str, &'a DefinedName);
 
@@ -117,9 +123,16 @@ pub(super) type KeepDefinition<'k> = dyn FnMut(Option<u32>, &str, &mut DefinedNa
 /// A named formula's scope, name and formula text.
 pub(super) type FormulaSource<'a> = (Option<u32>, &'a str, &'a str);
 
+/// A name's definition in one scope. A formula is held in place, not boxed:
+/// evaluation reads it for every use of the name, and a name has one or two
+/// definitions.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "a boxed Definition cost one more load per name read; target-edit rows measured"
+)]
 pub(super) enum DefinedName {
     Range(NamedRangeRef),
-    Formula(Box<Definition>),
+    Formula(Definition),
 }
 
 pub(super) struct Definition {
@@ -142,19 +155,17 @@ pub(super) struct Definition {
     nodes: Cell<Option<usize>>,
     /// Whether `expression` uses a name or calls a function that may be one,
     /// so a read of it can come back to this name; a read of any other
-    /// formula that is not positional needs no cycle guard.
+    /// formula needs no cycle guard.
     follows_names: bool,
-    /// Whether every read of `expression` is the formula as it is: not
-    /// positional, not following names, and not one reference.
-    shared: bool,
-    /// Whether `expression` has a table reference: its placement follows
-    /// table edits, so it is not kept in `placements`.
-    reads_tables: bool,
-    /// `expression` placed for each cell `(row, col)` that read it, so a
-    /// recalculation does not place it again. Emptied whenever the
-    /// definitions are bound, after any change to a name or a structural
-    /// edit.
-    placements: Placements,
+    /// Whether every read of `expression` evaluates it as it is: it follows
+    /// no names and is not one reference.
+    plain: bool,
+    /// One past the largest row and column a relative reference of
+    /// `expression` names ([`relative_reach`], past the sheet when it uses
+    /// another name): a cell whose row and column added to it stay in the
+    /// sheet reads the formula in place. [`NEVER_IN_PLACE`] for a formula
+    /// that reads a table or holds a LAMBDA.
+    reach: (u32, u32),
 }
 
 /// What a defined name stands for in the formula being read.
@@ -171,8 +182,11 @@ enum NameView<'a> {
     /// The name's formula, the same for every cell that reads it. It reads
     /// unqualified references on the sheet of the formula that uses it.
     Formula(&'a Ast),
-    /// The name's formula placed for the cell that reads it.
-    Placed(Rc<Ast>),
+    /// The name's formula, read with its relative references moved by the
+    /// reading cell's row and column.
+    Shifted(&'a Ast, (u32, u32)),
+    /// The name's formula placed in a copy for the cell that reads it.
+    Placed(Box<Ast>),
 }
 
 /// One read of a defined name by a formula ([`NameScope::read`]). While it
@@ -183,13 +197,52 @@ pub(crate) struct NameRead<'a> {
     followed: Option<FollowedName<'a>>,
 }
 
-impl NameRead<'_> {
-    /// The name's formula, as defined or placed for the reading cell; `None`
-    /// for a range or an undefined name.
+impl<'a> NameRead<'a> {
+    /// A read that guards no name.
+    const fn unguarded(view: NameView<'a>) -> Self {
+        Self {
+            view,
+            followed: None,
+        }
+    }
+
+    /// The name's formula: as defined, or placed in a copy for the reading
+    /// cell; `None` for a range or an undefined name. A shifted formula comes
+    /// as defined, so this serves walks of its shape and of the functions it
+    /// calls; what reads its references goes through [`Self::with_formula`].
     pub(crate) fn formula(&self) -> Option<&Ast> {
         match &self.view {
-            NameView::Formula(expression) => Some(expression),
+            NameView::Formula(expression) | NameView::Shifted(expression, _) => Some(expression),
             NameView::Placed(expression) => Some(expression),
+            NameView::Undefined | NameView::Linked | NameView::Range(_) => None,
+        }
+    }
+
+    /// `read` of the name's formula with its references where the reading
+    /// cell reads them: a shifted formula under its shift, a placed copy
+    /// under none (it is placed already), and a formula every cell reads
+    /// alike under the enclosing shift, which moves none of its references.
+    /// `None` for a range or an undefined name.
+    pub(crate) fn with_formula<T>(&self, read: impl FnOnce(&Ast) -> T) -> Option<T> {
+        match &self.view {
+            NameView::Formula(expression) => Some(read(expression)),
+            NameView::Shifted(expression, shift) => Some(read_shifted(*shift, || read(expression))),
+            NameView::Placed(expression) => Some(read_shifted((0, 0), || read(expression))),
+            NameView::Undefined | NameView::Linked | NameView::Range(_) => None,
+        }
+    }
+
+    /// The name's formula in a copy placed for the reading cell, for a
+    /// rewrite that evaluates the copy in the name's place.
+    pub(crate) fn placed_formula(&self) -> Option<Ast> {
+        match &self.view {
+            NameView::Formula(expression) => Some((*expression).clone()),
+            NameView::Shifted(expression, (row, col)) => {
+                let mut placed = (*expression).clone();
+                translate_name_refs(&mut placed, *row, *col);
+                Some(placed)
+            }
+            NameView::Placed(expression) => Some((**expression).clone()),
             NameView::Undefined | NameView::Linked | NameView::Range(_) => None,
         }
     }
@@ -199,9 +252,11 @@ impl NameRead<'_> {
     pub(crate) const fn range(&self) -> Option<CellRange> {
         match &self.view {
             NameView::Range(range) => Some(*range),
-            NameView::Undefined | NameView::Linked | NameView::Formula(_) | NameView::Placed(_) => {
-                None
-            }
+            NameView::Undefined
+            | NameView::Linked
+            | NameView::Formula(_)
+            | NameView::Shifted(..)
+            | NameView::Placed(_) => None,
         }
     }
 
@@ -211,7 +266,10 @@ impl NameRead<'_> {
         match &self.view {
             NameView::Undefined => Some(FormulaError::Name),
             NameView::Linked => Some(FormulaError::Ref),
-            NameView::Range(_) | NameView::Formula(_) | NameView::Placed(_) => None,
+            NameView::Range(_)
+            | NameView::Formula(_)
+            | NameView::Shifted(..)
+            | NameView::Placed(_) => None,
         }
     }
 }
@@ -247,62 +305,43 @@ impl<'a> NameScope<'a> {
         }
     }
 
-    /// The formula `id` holds for this sheet when every cell reads it the
-    /// same way, it is not one reference, and reading it needs no cycle
-    /// guard: what evaluation reads without [`Self::read`]. Inline, since
-    /// evaluation calls it for every use of a name.
+    /// The formula `id` holds for this sheet when it can be read in place
+    /// with no cycle guard: it follows no names, is not one reference, and is
+    /// either read alike by every cell (no shift) or moved by the cell being
+    /// read's row and column without leaving the sheet (that shift). What
+    /// evaluation and the walks that bind a formula read without
+    /// [`Self::read`]; inline, since they meet it at every use of a name.
     #[inline]
-    pub(crate) fn shared_formula(self, id: NameId) -> Option<&'a Ast> {
+    pub(crate) fn in_place(self, id: NameId) -> Option<(&'a Ast, Option<(u32, u32)>)> {
         match NameTable::definition_for(self.table.entry(id)?, self.sheet)? {
-            DefinedName::Formula(formula) if formula.shared => Some(&formula.expression),
+            DefinedName::Formula(formula) if formula.plain => {
+                if !formula.positional {
+                    return Some((&formula.expression, None));
+                }
+                let origin = current_formula_origin().unwrap_or_default();
+                formula
+                    .fits_at(origin)
+                    .then_some((&formula.expression, Some(origin)))
+            }
             DefinedName::Formula(_) | DefinedName::Range(_) => None,
         }
     }
 
     /// Read the name `id` for the formula on [`Self::sheet`] at the cell that
     /// is being evaluated or bound (`current_formula_origin`). Out of line:
-    /// every walk that meets a name calls it.
+    /// every walk that meets a name calls it. A formula that can come back
+    /// to its name, or that must be placed in a copy, takes the cold
+    /// [`Self::guarded_read`].
     #[inline(never)]
     pub(crate) fn read(self, id: NameId) -> NameRead<'a> {
         let Some(entry) = self.table.entry(id) else {
-            let view = if self.table.unsettled_is_linked(id) {
+            return NameRead::unguarded(if self.table.unsettled_is_linked(id) {
                 NameView::Linked
             } else {
                 NameView::Undefined
-            };
-            return NameRead {
-                view,
-                followed: None,
-            };
+            });
         };
-        if let Some(DefinedName::Formula(formula)) = NameTable::definition_for(entry, self.sheet) {
-            if !formula.positional && !formula.follows_names {
-                let view = reference_target(&formula.expression, self.sheet)
-                    .map_or(NameView::Formula(&formula.expression), NameView::Range);
-                return NameRead {
-                    view,
-                    followed: None,
-                };
-            }
-        }
-        let (row, col) = crate::eval::current_formula_origin().unwrap_or_default();
-        let cell = (self.sheet, row, col);
-        if entry.followed_by.get() == Some(cell) {
-            return NameRead {
-                view: NameView::Undefined,
-                followed: None,
-            };
-        }
-        let view = self.view(entry, row, col);
-        let followed = matches!(view, NameView::Formula(_) | NameView::Placed(_))
-            .then(|| (entry, entry.followed_by.replace(Some(cell))));
-        NameRead { view, followed }
-    }
-
-    /// What the name of `entry` stands for in the formula at (`row`, `col`).
-    fn view(self, entry: &'a NameEntry, row: u32, col: u32) -> NameView<'a> {
-        let sheet = self.sheet;
-        match NameTable::definition_for(entry, sheet) {
+        let view = match NameTable::definition_for(entry, self.sheet) {
             None if entry.spelling.contains('!') => NameView::Linked,
             None => NameView::Undefined,
             Some(DefinedName::Range(range)) => NameView::Range(CellRange::new(
@@ -312,13 +351,58 @@ impl<'a> NameScope<'a> {
                 range.row_end,
                 range.col_end,
             )),
-            Some(DefinedName::Formula(formula)) if formula.positional => {
-                let placed = formula.placed(sheet, row, col, self.tables);
-                reference_target(&placed, sheet).map_or(NameView::Placed(placed), NameView::Range)
+            Some(DefinedName::Formula(formula)) if formula.follows_names => {
+                return self.guarded_read(entry, formula)
             }
-            Some(DefinedName::Formula(formula)) => reference_target(&formula.expression, sheet)
-                .map_or(NameView::Formula(&formula.expression), NameView::Range),
+            Some(DefinedName::Formula(formula)) => match self.view_in_place(formula) {
+                Some(view) => view,
+                None => return self.guarded_read(entry, formula),
+            },
+        };
+        NameRead::unguarded(view)
+    }
+
+    /// What `formula` stands for at the cell being read when it needs no
+    /// copy: a range when it is one reference, else the formula, shifted
+    /// when it is positional. `None` when it must be placed in a copy.
+    fn view_in_place(self, formula: &'a Definition) -> Option<NameView<'a>> {
+        let shift = if formula.positional {
+            let origin = current_formula_origin().unwrap_or_default();
+            if !formula.fits_at(origin) {
+                return None;
+            }
+            origin
+        } else {
+            (0, 0)
+        };
+        Some(
+            match reference_target(&formula.expression, self.sheet, shift) {
+                Some(range) => NameView::Range(range),
+                None if formula.positional => NameView::Shifted(&formula.expression, shift),
+                None => NameView::Formula(&formula.expression),
+            },
+        )
+    }
+
+    /// The read of a formula that follows names, guarded so that a use of
+    /// the name inside its own formula, for the same cell, reads as
+    /// undefined, or of one placed in a copy for the cell being read.
+    #[cold]
+    #[inline(never)]
+    fn guarded_read(self, entry: &'a NameEntry, formula: &'a Definition) -> NameRead<'a> {
+        let (row, col) = current_formula_origin().unwrap_or_default();
+        let cell = (self.sheet, row, col);
+        if formula.follows_names && entry.followed_by.get() == Some(cell) {
+            return NameRead::unguarded(NameView::Undefined);
         }
+        let view = self.view_in_place(formula).unwrap_or_else(|| {
+            let placed = formula.placed(self.sheet, row, col, self.tables);
+            reference_target(&placed, self.sheet, (0, 0))
+                .map_or(NameView::Placed(placed), NameView::Range)
+        });
+        let followed = (formula.follows_names && !matches!(view, NameView::Range(_)))
+            .then(|| (entry, entry.followed_by.replace(Some(cell))));
+        NameRead { view, followed }
     }
 
     /// What a use of `id` writes, as [`NameTable::write_spelling`] does.
@@ -515,7 +599,7 @@ impl NameTable {
             .definitions
             .get_mut(definition)?
         {
-            (_, DefinedName::Formula(formula)) => Some(&mut **formula),
+            (_, DefinedName::Formula(formula)) => Some(formula),
             (_, DefinedName::Range(_)) => None,
         }
     }
@@ -601,9 +685,12 @@ impl NameTable {
     }
 
     /// The definition a formula on `sheet` reads: the sheet's own, then the
-    /// workbook's.
+    /// workbook's. Most names have one definition, checked without a loop.
     #[inline]
     fn definition_for(entry: &NameEntry, sheet: u32) -> Option<&DefinedName> {
+        if let [(scope, definition)] = entry.definitions.as_slice() {
+            return scope.is_none_or(|own| own == sheet).then_some(definition);
+        }
         let mut workbook = None;
         for (scope, definition) in &entry.definitions {
             match scope {
@@ -669,8 +756,6 @@ impl NameTable {
                         metadata.add_payload(range.name.len(), range.name.capacity());
                     }
                     DefinedName::Formula(formula) => {
-                        let bytes = std::mem::size_of::<Definition>();
-                        metadata.add_payload(bytes, bytes);
                         metadata.add_payload(formula.name.len(), formula.name.capacity());
                         metadata.add_payload(formula.source.len(), formula.source.capacity());
                         formula.ast.heap_memory_stats(metadata);
@@ -683,21 +768,18 @@ impl NameTable {
 }
 
 impl Definition {
+    /// Whether a cell at `(row, col)` reads the formula in place: moved by
+    /// that row and column, every relative reference stays in the sheet.
+    #[inline]
+    const fn fits_at(&self, (row, col): (u32, u32)) -> bool {
+        row.saturating_add(self.reach.0) <= SHEET_ROWS
+            && col.saturating_add(self.reach.1) <= SHEET_COLS
+    }
+
     /// `expression` placed for the cell at (`row`, `col`) on `sheet`: its
     /// relative references moved there and its table references bound.
-    /// Kept per cell unless it reads tables.
-    fn placed(&self, sheet: u32, row: u32, col: u32, tables: &TableSlots) -> Rc<Ast> {
-        if !self.reads_tables {
-            if let Some(placed) = self
-                .placements
-                .try_borrow()
-                .ok()
-                .and_then(|placements| placements.get(&(row, col)).cloned())
-            {
-                return placed;
-            }
-        }
-        let mut tree = self.expression.clone();
+    fn placed(&self, sheet: u32, row: u32, col: u32, tables: &TableSlots) -> Box<Ast> {
+        let mut tree = Box::new(self.expression.clone());
         translate_name_refs(&mut tree, row, col);
         resolve_structured_refs(
             &mut tree,
@@ -715,13 +797,7 @@ impl Definition {
                 )
             },
         );
-        let placed = Rc::new(tree);
-        if !self.reads_tables {
-            if let Ok(mut placements) = self.placements.try_borrow_mut() {
-                placements.insert((row, col), Rc::clone(&placed));
-            }
-        }
-        placed
+        tree
     }
 
     /// Rewrite the tree with `rewrite`; the source follows a changed tree in
@@ -770,15 +846,14 @@ impl CellStore {
             expression: Ast::Missing,
             nodes: Cell::new(None),
             follows_names: true,
-            shared: false,
-            reads_tables: true,
-            placements: RefCell::default(),
+            plain: false,
+            reach: NEVER_IN_PLACE,
         };
         self.names.insert(
             name_scope,
             key.clone(),
             name,
-            DefinedName::Formula(Box::new(definition)),
+            DefinedName::Formula(definition),
         );
         self.rebind_name_users(vec![key]);
         self.recompute_all_sheets();
@@ -970,12 +1045,14 @@ impl CellStore {
                 formula.expression = std::mem::replace(expression, Ast::Missing);
                 let mut reads_tables = false;
                 for_each_table_ref(&formula.expression, &mut |_| reads_tables = true);
-                formula.reads_tables = reads_tables;
-                formula.placements = RefCell::default();
                 formula.follows_names = follows_names(&formula.expression);
-                formula.shared = !formula.positional
-                    && !formula.follows_names
-                    && reference_target(&formula.expression, NO_SHEET).is_none();
+                formula.plain = !formula.follows_names
+                    && reference_target(&formula.expression, NO_SHEET, (0, 0)).is_none();
+                formula.reach = if reads_tables || holds_lambda(&formula.expression) {
+                    NEVER_IN_PLACE
+                } else {
+                    relative_reach(&formula.expression)
+                };
                 formula.nodes.set(None);
             }
         }
@@ -1147,15 +1224,14 @@ impl CellStore {
             expression: Ast::Missing,
             nodes: Cell::new(None),
             follows_names: true,
-            shared: false,
-            reads_tables: true,
-            placements: RefCell::default(),
+            plain: false,
+            reach: NEVER_IN_PLACE,
         };
         self.names.insert(
             scope,
             key,
             &name,
-            DefinedName::Formula(Box::new(definition)),
+            DefinedName::Formula(definition),
         );
         Ok(())
     }
@@ -1264,23 +1340,42 @@ fn follows_names(ast: &Ast) -> bool {
         || ast.any_child(&mut |child| follows_names(child))
 }
 
+/// Whether `ast` holds a LAMBDA, whose body runs where it is called.
+#[cfg(feature = "analysis")]
+fn holds_lambda(ast: &Ast) -> bool {
+    matches!(ast, Ast::Lambda(_)) || ast.any_child(&mut |child| holds_lambda(child))
+}
+
+/// Whether `ast` holds a LAMBDA; only the analysis build has them.
+#[cfg(not(feature = "analysis"))]
+const fn holds_lambda(_: &Ast) -> bool {
+    false
+}
+
 /// A name's formula that is one cell or range reference, read as a range
-/// on `formula_sheet`: an unqualified reference reads that sheet.
+/// on `formula_sheet` with its relative axes moved by `shift`: an
+/// unqualified reference reads that sheet. The caller keeps every moved
+/// axis in the sheet.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is not a single cell or range"
 )]
-const fn reference_target(ast: &Ast, formula_sheet: u32) -> Option<CellRange> {
-    let (sheet, row_start, col_start, row_end, col_end) = match ast {
-        Ast::Cell(row, col, _) => (formula_sheet, *row, *col, *row, *col),
-        Ast::AbsCell(sheet, row, col, _) => (sheet.handle, *row, *col, *row, *col),
-        Ast::Range(r0, c0, r1, c1, _) => (formula_sheet, *r0, *c0, *r1, *c1),
-        Ast::AbsRange(sheet, r0, c0, r1, c1, _) => (sheet.handle, *r0, *c0, *r1, *c1),
-        _ => return None,
+fn reference_target(ast: &Ast, formula_sheet: u32, shift: (u32, u32)) -> Option<CellRange> {
+    let cell = |sheet: u32, row: u32, col: u32, flags: RefFlags| {
+        let (placed_row, placed_col) = shifted_cell(shift, row, col, flags);
+        CellRange::new(sheet, placed_row, placed_col, placed_row, placed_col)
     };
-    Some(CellRange::new(
-        sheet, row_start, col_start, row_end, col_end,
-    ))
+    Some(match ast {
+        Ast::Cell(row, col, flags) => cell(formula_sheet, *row, *col, *flags),
+        Ast::AbsCell(sheet, row, col, flags) => cell(sheet.handle, *row, *col, *flags),
+        Ast::Range(r0, c0, r1, c1, flags) => {
+            shifted_range(shift, formula_sheet, (*r0, *c0), (*r1, *c1), *flags)
+        }
+        Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
+            shifted_range(shift, sheet.handle, (*r0, *c0), (*r1, *c1), *flags)
+        }
+        _ => return None,
+    })
 }
 
 /// The names that `ast` uses, as a name or as a function it calls.

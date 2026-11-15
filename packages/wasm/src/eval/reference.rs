@@ -350,9 +350,9 @@ impl CellStore {
                 self.rewrite_deferred(std::slice::from_mut(body), sheet, pass, depth);
             }
             // The copy is only evaluated, never written back, so the name's
-            // formula takes the node's place.
+            // formula, placed for the formula's cell, takes the node's place.
             Ast::DefinedName(id) => {
-                let formula = self.name_scope(sheet).read(*id).formula().cloned();
+                let formula = self.name_scope(sheet).read(*id).placed_formula();
                 if let Some(mut expression) = formula {
                     self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
                     *ast = expression;

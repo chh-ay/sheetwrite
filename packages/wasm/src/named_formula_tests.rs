@@ -59,6 +59,28 @@ fn relative_references_in_a_name_follow_the_cell_that_uses_it() {
     assert_eq!(number(&store, sheet, 2, 2), 31.0);
 }
 
+/// A relative name is read in place, its references moved by the reading
+/// cell's row and column. A spilling formula is evaluated before the plain
+/// formulas of the pass, so a formula cell the name reads is evaluated
+/// inside that read: it reads its own references where they are written.
+#[test]
+fn a_formula_a_relative_name_reads_first_reads_its_own_cells() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(4, 4);
+    assert!(store.set_named_formula("Right", -1, "=B1+0"));
+    store.set_number(sheet, 1, 2, 10.0, 0);
+    store.set_number(sheet, 2, 2, 100.0, 0);
+    store.set_formula(sheet, 1, 0, "=Right*{1;2}", 0);
+    store.set_formula(sheet, 1, 1, "=C2+1", 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 2, 0), 22.0, "A3 spills B2*2, and B2 reads C2");
+
+    store.set_number(sheet, 1, 2, 20.0, 0);
+    store.recompute(sheet);
+    assert_eq!(number(&store, sheet, 1, 1), 21.0, "B2 reads C2");
+    assert_eq!(number(&store, sheet, 2, 0), 42.0, "A3 spills B2*2");
+}
+
 /// `$A1048575:$A1`, relative to A1, is the two rows above a cell and the
 /// cell itself in column A; used in row 3 it wraps to A1:A3.
 #[test]

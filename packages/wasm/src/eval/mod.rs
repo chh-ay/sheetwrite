@@ -111,9 +111,10 @@ thread_local! {
     /// Rows and columns that relative references of the expression being
     /// evaluated move by. A conditional-format rule's one parsed expression
     /// is written for the rule range's top-left cell; at every other cell it
-    /// reads with that cell's distance from it. Only [`read_shifted`] sets
-    /// it, so ordinary recalculation never writes it and always reads
-    /// (0, 0).
+    /// reads with that cell's distance from it. A defined name's formula is
+    /// written for A1 and reads with the reading cell's row and column. Only
+    /// [`read_shifted`] sets it, and the evaluation of a formula cell reads
+    /// (0, 0) under any enclosing shift.
     static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
 }
 
@@ -162,18 +163,32 @@ pub(crate) fn with_formula_origin<R>(origin: (u32, u32), bind: impl FnOnce() -> 
 /// itself, such as INDIRECT's text: it is placed for the target cell already,
 /// so a conditional-format shift must not move it again.
 pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
-    let enclosing = REFERENCE_SHIFT.with(|current| current.replace(shift));
-    let value = read();
-    REFERENCE_SHIFT.with(|current| current.set(enclosing));
-    value
+    // One thread-local lookup for both writes: on some targets each lookup
+    // is a call.
+    REFERENCE_SHIFT.with(|current| {
+        let enclosing = current.replace(shift);
+        let value = read();
+        current.set(enclosing);
+        value
+    })
 }
 
-/// Where a reference node's cell is read in this evaluation: its relative
-/// axes moved by the reference shift, its `$` axes as written. The caller
-/// that sets a shift keeps every shifted reference inside the sheet.
+/// The rows and columns relative references move by in this evaluation;
+/// see `REFERENCE_SHIFT`.
 #[inline]
-pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
-    let (row_shift, col_shift) = REFERENCE_SHIFT.with(Cell::get);
+pub(crate) fn reference_shift() -> (u32, u32) {
+    REFERENCE_SHIFT.with(Cell::get)
+}
+
+/// The cell at (`row`, `col`) with its relative axes moved by `shift` and
+/// its `$` axes as written. The caller keeps every moved axis in the sheet.
+#[inline]
+pub(crate) fn shifted_cell(
+    (row_shift, col_shift): (u32, u32),
+    row: u32,
+    col: u32,
+    flags: RefFlags,
+) -> (u32, u32) {
     (
         if flags.row_abs() {
             row
@@ -188,17 +203,38 @@ pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
     )
 }
 
-/// The range a reference node names in this evaluation; see [`placed_cell`].
+/// The range from `start` to `end` on `sheet` with its relative axes moved
+/// by `shift`; see [`shifted_cell`].
 #[inline]
-pub(crate) fn placed_range(
+pub(crate) fn shifted_range(
+    shift: (u32, u32),
     sheet: u32,
     (row_start, col_start): (u32, u32),
     (row_end, col_end): (u32, u32),
     flags: RangeFlags,
 ) -> CellRange {
-    let start = placed_cell(row_start, col_start, flags.start);
-    let end = placed_cell(row_end, col_end, flags.end);
+    let start = shifted_cell(shift, row_start, col_start, flags.start);
+    let end = shifted_cell(shift, row_end, col_end, flags.end);
     CellRange::new(sheet, start.0, start.1, end.0, end.1)
+}
+
+/// Where a reference node's cell is read in this evaluation: its relative
+/// axes moved by the reference shift, its `$` axes as written. The caller
+/// that sets a shift keeps every shifted reference inside the sheet.
+#[inline]
+pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
+    shifted_cell(reference_shift(), row, col, flags)
+}
+
+/// The range a reference node names in this evaluation; see [`placed_cell`].
+#[inline]
+pub(crate) fn placed_range(
+    sheet: u32,
+    start: (u32, u32),
+    end: (u32, u32),
+    flags: RangeFlags,
+) -> CellRange {
+    shifted_range(reference_shift(), sheet, start, end, flags)
 }
 
 /// State shared by every evaluation in one recompute pass: the formulas the
@@ -1699,7 +1735,14 @@ impl CellStore {
                 // a clean formula is; iteration still records the read.
                 if pass.affected.contains(id) {
                     if !pass.results.is_settled(id) {
-                        return self.eval_formula_id(id, pass, depth + 1);
+                        // A formula evaluated inside a shifted read, such as
+                        // a dependency a defined name reads before the pass
+                        // has computed it, reads its own references where
+                        // they are written. Top-level evaluations start
+                        // unshifted.
+                        return read_shifted((0, 0), || {
+                            self.eval_formula_id(id, pass, depth + 1)
+                        });
                     }
                     if self.iteration.is_some() {
                         iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
@@ -1813,9 +1856,9 @@ impl CellStore {
     /// cell. `shift` is the target's distance from the cell the expression
     /// is written for, which its relative references move by; the caller
     /// keeps every shifted reference inside the sheet. The pass recomputes
-    /// nothing, so referenced formula cells use their recomputed cache and no
-    /// other formula evaluates under the shift. The origin guard gives
-    /// zero-argument ROW/COLUMN the target cell's coordinates.
+    /// nothing, so referenced formula cells use their recomputed cache. The
+    /// origin guard gives zero-argument ROW/COLUMN the target cell's
+    /// coordinates.
     pub(crate) fn eval_conditional_ast(
         &self,
         ast: &Ast,
@@ -2074,13 +2117,14 @@ impl CellStore {
         value
     }
 
-    /// The value of a defined name for a formula on `sheet`: its cell, its
-    /// formula's value, or `#NAME?` while undefined (`#REF!` for a linked
-    /// workbook's name the link does not hold). A range of more than one
-    /// cell is `#VALUE!` as a value, as a range written there is. Out of
-    /// line, so the name adds one call to `eval_ast`, which must stay under
-    /// the size above which JavaScriptCore does not optimize a function; the
-    /// `_family` suffix keeps wasm-opt from inlining it back.
+    /// The value of a defined name for a formula on `sheet`. A formula read
+    /// in place is evaluated here; every other name takes
+    /// [`Self::eval_defined_name_read_family`]. Out of line, so the name adds
+    /// one call to `eval_ast`, which must stay under the size above which
+    /// JavaScriptCore does not optimize a function; the `_family` suffix
+    /// keeps wasm-opt from inlining it back. The read path has its own
+    /// function, so this one keeps a small frame and its calls stay tail
+    /// calls.
     #[inline(never)]
     fn eval_defined_name_family(
         &self,
@@ -2089,13 +2133,32 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        let names = self.name_scope(sheet);
-        if let Some(expression) = names.shared_formula(id) {
-            return self.eval_ast(expression, sheet, pass, depth + 1);
+        match self.name_scope(sheet).in_place(id) {
+            Some((expression, None)) => self.eval_ast(expression, sheet, pass, depth + 1),
+            Some((expression, Some(shift))) => {
+                read_shifted(shift, || self.eval_ast(expression, sheet, pass, depth + 1))
+            }
+            None => self.eval_defined_name_read_family(id, sheet, pass, depth),
         }
-        let read = names.read(id);
-        if let Some(expression) = read.formula() {
-            return self.eval_ast(expression, sheet, pass, depth + 1);
+    }
+
+    /// The value of a defined name read through [`NameScope::read`]: its
+    /// cell, its formula's value, or `#NAME?` while undefined (`#REF!` for a
+    /// linked workbook's name the link does not hold). A range of more than
+    /// one cell is `#VALUE!` as a value, as a range written there is.
+    #[inline(never)]
+    fn eval_defined_name_read_family(
+        &self,
+        id: NameId,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let read = self.name_scope(sheet).read(id);
+        if let Some(value) =
+            read.with_formula(|expression| self.eval_ast(expression, sheet, pass, depth + 1))
+        {
+            return value;
         }
         match read.range() {
             Some(range) if range.row_start == range.row_end && range.col_start == range.col_end => {

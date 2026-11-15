@@ -280,8 +280,8 @@ pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRang
         Ast::DefinedName(id) => {
             let read = names.read(*id);
             read.range().or_else(|| {
-                read.formula()
-                    .and_then(|expression| range_from_ast(expression, names))
+                read.with_formula(|expression| range_from_ast(expression, names))
+                    .flatten()
             })
         }
         Ast::Cell(row, col, flags) => {
