@@ -13,7 +13,7 @@ import type {
 import { formatNumber } from "@sheetwrite/core";
 
 import { type CellRect, parseCellRect } from "./cell-reference.js";
-import { emitWarning, type XlsxCodecContext } from "./resources.js";
+import { checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";
 import { type XmlElement, xmlAttribute, xmlChild, xmlChildren, xmlLocalName } from "./xml.js";
 
 /**
@@ -58,7 +58,8 @@ function conditionValue(text: string): number | string {
  * `notEqual *ab*`; those read back as the named conditions.
  */
 export function customFilterCondition(operator: string, val: string): FilterCondition | null {
-  const op = OPERATORS[operator];
+  // An own key only: "constructor" and the like are not operators.
+  const op = Object.hasOwn(OPERATORS, operator) ? OPERATORS[operator] : undefined;
   if (op === undefined) return null;
 
   if (op === "eq" || op === "neq") {
@@ -139,12 +140,24 @@ export function parseAutoFilter(
   if (!element || !range) return undefined;
 
   const columns: ParsedFilterColumn[] = [];
+  const seen = new Set<number>();
   for (const filterColumn of xmlChildren(element, "filterColumn")) {
     const colId = Number(xmlAttribute(filterColumn, "colId"));
     const col = range.c0 + colId;
     if (!Number.isInteger(colId) || colId < 0 || col > range.c1) continue;
     const kinds = filterColumn.children.map((child) => xmlLocalName(child.name));
     if (kinds.length === 0) continue;
+    // One filter per column, as Excel writes: a repeated column is dropped, so
+    // the filters stay bounded by the range's width.
+    if (seen.has(col)) {
+      emitWarning(context, {
+        code: "unsupported-feature",
+        message: `A second AutoFilter filter for column ${colId + 1} of the range was dropped`,
+        sheet: sheetName,
+      });
+      continue;
+    }
+    seen.add(col);
 
     const parsed = parseFilterColumn(filterColumn, col);
     if (parsed) {
@@ -191,6 +204,30 @@ function displayText(cell: SnapshotCell, column: Column | undefined): string | n
 }
 
 /**
+ * The body cells of each column that has a value list, read in one pass over
+ * the sheet's cells however many filtered columns there are; a long pass
+ * stops when the import is aborted.
+ */
+function bodyCellsByColumn(
+  parsed: ParsedAutoFilter,
+  body: { start: number; end: number },
+  cells: readonly SnapshotCell[],
+  context: XlsxCodecContext,
+): Map<number, SnapshotCell[]> {
+  const byColumn = new Map<number, SnapshotCell[]>();
+  for (const column of parsed.columns) if (column.kind === "values") byColumn.set(column.col, []);
+  if (byColumn.size === 0) return byColumn;
+
+  for (let index = 0; index < cells.length; index++) {
+    if ((index & 4_095) === 0) checkAbort(context);
+    const cell = cells[index]!;
+    if (cell.rowOffset < body.start || cell.rowOffset > body.end) continue;
+    byColumn.get(cell.colOffset)?.push(cell);
+  }
+  return byColumn;
+}
+
+/**
  * The values a value list keeps. Excel names each value by the text its cells
  * show, so the list keeps the value of every body cell of the column whose
  * text is on it, compared without case as Excel does. Text that names no
@@ -199,8 +236,6 @@ function displayText(cell: SnapshotCell, column: Column | undefined): string | n
 function valuesShowing(
   texts: readonly string[],
   blanks: boolean,
-  col: number,
-  body: { start: number; end: number },
   cells: readonly SnapshotCell[],
   column: Column | undefined,
 ): CellScalar[] {
@@ -208,8 +243,6 @@ function valuesShowing(
   const named = new Set<string>();
   const values = new Map<string, CellScalar>();
   for (const cell of cells) {
-    if (cell.colOffset !== col || cell.rowOffset < body.start || cell.rowOffset > body.end)
-      continue;
     const text = displayText(cell, column)?.toLowerCase();
     if (text === undefined || !wanted.has(text) || cell.value.kind !== "literal") continue;
     named.add(text);
@@ -241,6 +274,7 @@ export function snapshotAutoFilter(
   cells: readonly SnapshotCell[],
   columns: readonly Column[],
   rowCount: number,
+  context: XlsxCodecContext,
 ): Pick<SheetSnapshot, "autoFilter" | "filters"> {
   if (!parsed) {
     return !meta?.autoFilter && meta?.filters ? { filters: structuredClone(meta.filters) } : {};
@@ -273,6 +307,7 @@ export function snapshotAutoFilter(
   }
 
   const body = { start: range.start.row + 1, end: range.end.row };
+  const cellsByColumn = bodyCellsByColumn(parsed, body, cells, context);
   const filters: [number, ColumnFilter][] = parsed.columns
     .filter((column) => column.col <= c1)
     .map((column) => [
@@ -284,9 +319,7 @@ export function snapshotAutoFilter(
             values: valuesShowing(
               column.texts,
               column.blanks,
-              column.col,
-              body,
-              cells,
+              cellsByColumn.get(column.col) ?? [],
               columns[column.col],
             ),
           },

@@ -3355,14 +3355,18 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       filterColumns.add(column);
     }
 
+    const autoFilterRange = sheet.autoFilter?.range;
     if (
-      sheet.autoFilter &&
-      (sheet.autoFilter.range.sheet !== sheet.id || !rangeInSheet(sheet.autoFilter.range, sheet))
+      autoFilterRange &&
+      (autoFilterRange.sheet !== sheet.id ||
+        autoFilterRange.start.row > autoFilterRange.end.row ||
+        autoFilterRange.start.col > autoFilterRange.end.col ||
+        !rangeInSheet(autoFilterRange, sheet))
     ) {
       invalid(
         errors,
         `${path}.autoFilter.range`,
-        "AutoFilter range lies outside its sheet",
+        "AutoFilter range must start at its top-left cell and lie inside its sheet",
         "out-of-bounds",
       );
     }

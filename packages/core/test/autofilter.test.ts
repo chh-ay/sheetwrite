@@ -204,6 +204,12 @@ describe("AutoFilter", () => {
     const outside = structuredClone(saved);
     outside.sheets[0]!.autoFilter = { range: { ...RANGE, end: { row: 99, col: 1 } } };
     expect(validateWorkbookSnapshot(outside).ok).toBe(false);
+    // A range given bottom-up would repeat rows in the view; it is refused.
+    const reversed = structuredClone(saved);
+    reversed.sheets[0]!.autoFilter = {
+      range: { sheet: "s1", start: { row: 6, col: 1 }, end: { row: 1, col: 0 } },
+    };
+    expect(validateWorkbookSnapshot(reversed).ok).toBe(false);
     const badCondition = structuredClone(saved);
     badCondition.sheets[0]!.filters = [
       [0, { kind: "custom", join: "and", conditions: [{ op: "contains", value: 3 }] }],
