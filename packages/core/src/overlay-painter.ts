@@ -1343,6 +1343,9 @@ export class OverlayPainter {
     for (let i = this.cursor; i < this.pool.length; i++) {
       const el = this.pool[i]!;
       el.removeAttribute("data-sheetwrite-presence");
+      // A hidden filter button must not stay one, for queries and styles alike.
+      if (el.className) el.className = "";
+      el.removeAttribute("data-filtered");
       el.removeAttribute("data-sheetwrite-presence-range");
       el.removeAttribute("aria-hidden");
       el.removeAttribute("title");

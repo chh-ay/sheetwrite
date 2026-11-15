@@ -106,7 +106,12 @@ async function autoFilterRoundTrip(): Promise<number> {
         JSON.stringify(autoFilterSnapshot.sheets[0]?.autoFilter) ||
       JSON.stringify(sheet?.filters) !== JSON.stringify(autoFilterSnapshot.sheets[0]?.filters)
     ) {
-      throw new Error("The AutoFilter changed in an XLSX round trip");
+      throw new Error(
+        `The AutoFilter changed in an XLSX round trip: ${JSON.stringify({
+          autoFilter: sheet?.autoFilter,
+          filters: sheet?.filters,
+        })}`,
+      );
     }
     const reloaded = SheetwriteStore.fromSnapshot(imported);
     try {
