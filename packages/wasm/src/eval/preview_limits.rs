@@ -37,6 +37,13 @@ thread_local! {
     static ACTIVE: Cell<Option<Budget>> = const { Cell::new(None) };
 }
 
+#[cfg(test)]
+thread_local! {
+    /// Kind entries the typed range scans read on this thread. Tests read it
+    /// to show that a refused read scans nothing, which no value can show.
+    pub(super) static KINDS_SCANNED: Cell<usize> = const { Cell::new(0) };
+}
+
 /// The budget of one preview request. Dropping it restores the enclosing
 /// state, so an early return or a nested preview leaves nothing behind.
 pub(super) struct PreviewScope {
@@ -141,9 +148,11 @@ fn charge_range(
     let Some(sources) = dense.filter(|_| read != RangeRead::Cells) else {
         return charge(|budget| add(&mut budget.cells, cells, PREVIEW_CELL_READS));
     };
-    if cells > PREVIEW_TYPED_CELLS {
-        return charge(|_| false);
-    }
+    // The typed cells are charged before the scan, so a read past the budget,
+    // or any read after a refusal, scans no kinds.
+    charge(|budget| add(&mut budget.typed, cells, PREVIEW_TYPED_CELLS))?;
+    #[cfg(test)]
+    KINDS_SCANNED.with(|scanned| scanned.set(scanned.get() + cells));
 
     // Formula and spill cells are read one by one even in a typed scan.
     let (kinds, _) = sources.raw();
@@ -161,10 +170,7 @@ fn charge_range(
             })
             .count();
     }
-    charge(|budget| {
-        add(&mut budget.typed, cells, PREVIEW_TYPED_CELLS)
-            && add(&mut budget.cells, computed, PREVIEW_CELL_READS)
-    })
+    charge(|budget| add(&mut budget.cells, computed, PREVIEW_CELL_READS))
 }
 
 /// Charges one cell read one by one, such as the cell scalar INDEX selects.
