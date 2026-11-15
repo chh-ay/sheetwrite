@@ -489,11 +489,12 @@ describe("documentation content", () => {
           "Sorting changed ([#393](https://github.com/chh-ay/sheetwrite/pull/393)).",
           "PR #186 measured memory.",
           "See [the issues](https://github.com/chh-ay/sheetwrite/issues/12) and (#624).",
+          "Default limits (decision recorded in #228).",
         ].join("\n"),
       ),
       document(
         "b.md",
-        "Sorting changed. See [the guide](#sorting), `#REF!`, color #123456 and &#91;1&#93;.",
+        "Sorting changed. See [the guide](#sorting), [step 1](#10-steps), `#REF!`, color #123456 and &#91;1&#93;.",
       ),
     ];
     expect(trackerReferenceIssues(documents)).toEqual([
@@ -502,6 +503,7 @@ describe("documentation content", () => {
       "docs/src/content/docs/a.md:2 cites the tracker (PR #186); describe the change instead",
       "docs/src/content/docs/a.md:3 cites the tracker (github.com/chh-ay/sheetwrite/issues); describe the change instead",
       "docs/src/content/docs/a.md:3 cites the tracker ((#624)); describe the change instead",
+      "docs/src/content/docs/a.md:4 cites the tracker (#228); describe the change instead",
     ]);
   });
 });

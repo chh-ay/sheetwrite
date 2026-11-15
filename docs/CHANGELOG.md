@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The API index says in one line what each package is for, and drops the build-system words. The performance overview says what its pages show, and its results heading names 0.7.0.
+- `docs:check` also rejects a bare issue number such as "#228" in a docs page or a doc comment, not only tracker links and "PR #N".
 - The API reference shows `@throws`: a function page lists each under "Throws" (the error and when it is thrown), and a member card shows its parameters, return value and throws as labelled lines instead of raw `@param` and `@returns` text. The API manifest kept no `@throws` before.
 - Code-sample hover popovers show a symbol's summary, with its parameters, return value and throws as tag lines; the doc text from the API manifest no longer shows raw `@param` and `@returns` inline.
 - The API reference shows `InitOutput` (`@sheetwrite/wasm`, `@sheetwrite/formulas`) as one card with no member list: its members are the raw module exports wasm-bindgen generates for the loader, not API to call. `docs:generate` no longer counts them as undescribed. The `free()` method wasm-bindgen adds to each engine class, which has no doc source, gets one shared description.

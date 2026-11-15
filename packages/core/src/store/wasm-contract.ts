@@ -19,7 +19,7 @@ export type RecomputingCellStore = Omit<CellStore, "setSavedPivots" | "setHostFu
       recalculate: boolean,
     ): boolean;
 
-    /** Full engine only: replace every pivot anchored on `sheet` (issue #194 wire format). */
+    /** Full engine only: replace every pivot anchored on `sheet`, encoded by `encodePivotPayload`. */
     setPivots?(sheet: number, numbers: Float64Array, strings: string[]): boolean;
 
     /** Full engine only: 7 values per pivot, in the order sent to `setPivots`. */

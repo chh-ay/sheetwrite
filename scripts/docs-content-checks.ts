@@ -102,8 +102,10 @@ export async function siteLinkIssues(documents: readonly MarkdownDocument[]): Pr
   return unresolvedSiteLinks(links, documents);
 }
 
+// The last form is a bare issue number such as "decision recorded in #228"; it
+// skips hex colours, HTML entities and heading anchors such as `#1-intro`.
 const TRACKER_REFERENCE =
-  /github\.com\/chh-ay\/sheetwrite\/(?:pull|issues)\b|\bPR #\d+|\[#\d+\](?=\()|(?<![\w&])\(#\d+\)/g;
+  /github\.com\/chh-ay\/sheetwrite\/(?:pull|issues)\b|\bPR #\d+|\[#\d+\](?=\()|(?<![\w&])\(#\d+\)|(?<![\w&#"'/-])#\d{2,5}(?![\w-])/g;
 
 /**
  * Readers need what a page says, not which pull request or issue changed it,
