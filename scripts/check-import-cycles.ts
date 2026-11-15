@@ -14,6 +14,7 @@ export interface ImportGraphIssue {
 }
 
 const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
+  "autofilter.ts": ["../types/document.ts"],
   "engine-hidden-rows.ts": ["../types/coordinates.ts", "../types/document.ts", "wasm-contract.ts"],
   "mutation-policy.ts": [
     "../restore-block.ts",
@@ -23,7 +24,12 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/pivot.ts",
     "ranges.ts",
   ],
-  "ranges.ts": ["../types/cell.ts", "../types/coordinates.ts", "../types/document.ts"],
+  "ranges.ts": [
+    "../types/cell.ts",
+    "../types/coordinates.ts",
+    "../types/document.ts",
+    "autofilter.ts",
+  ],
   "sheet-registry.ts": ["../errors.ts", "../types/coordinates.ts", "../types/document.ts"],
   "snapshot-codec.ts": [
     "../dashboard.ts",
@@ -42,6 +48,7 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/cell.ts",
     "../types/coordinates.ts",
     "../types/document.ts",
+    "autofilter.ts",
     "engine-hidden-rows.ts",
     "sheet-registry.ts",
     "wasm-contract.ts",
