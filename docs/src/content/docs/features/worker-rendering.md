@@ -1,40 +1,32 @@
 ---
 title: Worker rendering
-description: Configure OffscreenCanvas worker painting and understand capability-based main-thread fallback.
+description: Paint the grid in a Web Worker with OffscreenCanvas, and fall back to the main thread when the browser can't.
 ---
 
-By default Sheetwrite paints on the main thread (`renderer: "canvas"`). For sheets
-where a busy main thread could stall scrolling, you can move painting onto a Web
-Worker with an OffscreenCanvas — same `Renderer` contract, drop-in.
+Sheetwrite paints on the main thread by default (`renderer: "canvas"`). When a
+busy main thread could stall scrolling, paint in a Web Worker instead. The
+worker draws into an OffscreenCanvas, and the rest of the grid works as before.
 
 ## Enabling it
 
-Set `renderer: "worker"`. With a bundler that understands module workers, that
-is all: Sheetwrite creates its worker as
-`new Worker(new URL("./worker.js", import.meta.url), { type: "module" })`, the
-pattern bundlers look for, so the bundler builds the worker with its imports.
-Vite does this, verified by the fixture build in `test/bundler-fixtures/vite`
-(`bun run verify:bundlers`). webpack 5 and Parcel recognize the same pattern;
-check with the steps under [Verify it actually started](#verify-it-actually-started).
+Set `renderer: "worker"`. Vite, webpack 5 and Parcel build the worker for you,
+so nothing else is needed with them. To confirm that the worker started, see
+[Verify it actually started](#verify-it-actually-started).
 
 ```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
 const grid = createGrid(host, { workbook, datasource, renderer: "worker" });
 ```
 
-Pass `workerUrl` when the default cannot work: no bundler, or a bundler that
-copies the file instead of building it. It must be the worker module's URL
-**as the browser will fetch it**. The worker entry ships at
-`@sheetwrite/core/dist/worker.js` (export subpath `@sheetwrite/core/worker`),
-but the platform `Worker`/`URL` constructors do not consult package exports —
-`new URL("@sheetwrite/core/worker", import.meta.url)` treats the bare
-specifier as a relative path and produces a 404 URL unless your bundler
-happens to rewrite that exact form. Two reliable recipes:
+Pass `workerUrl` when no bundler builds the worker: you use no bundler, or
+yours copies the file without building it. The URL must be the one the browser
+fetches. The worker ships as `@sheetwrite/core/dist/worker.js`, exported as
+`@sheetwrite/core/worker`. The browser's `Worker` and `URL` don't read package
+exports, so `new URL("@sheetwrite/core/worker", import.meta.url)` gives a URL
+that returns 404. Use one of these two recipes.
 
-**Universal (any bundler, no bundler):** the worker entry is an ES module with
-relative imports (`./canvas-paint.js`, …), so a single-file copy breaks — copy
-the package's whole `dist/` directory into your public/static assets and pass
-the served `worker.js` URL (a module worker fetches its sibling imports over
-HTTP):
+**Any setup:** the worker is an ES module that imports its sibling files, so
+copying `worker.js` alone breaks it. Copy the package's whole `dist/` folder
+into your static files, and pass the URL of the copied `worker.js`:
 
 ```sh verify title="Verified command"
 cp -r node_modules/@sheetwrite/core/dist public/sheetwrite
@@ -53,10 +45,8 @@ const grid = createGrid(host, {
 });
 ```
 
-**Vite dependency-worker import (machine-verified):** Vite bundles the whole
-worker graph into one chunk and returns its URL via the `?worker&url` query —
-verified by the fixture build in `test/bundler-fixtures/vite`
-(`bun run verify:bundlers`):
+**Vite:** import the worker with the `?worker&url` query. Vite bundles the
+worker and its imports into one file and gives you its URL:
 
 ```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
 import workerUrl from "@sheetwrite/core/worker?worker&url";
@@ -66,8 +56,8 @@ import workerUrl from "@sheetwrite/core/worker?worker&url";
 
 ## Verify it actually started
 
-A worker that fails to construct falls back to the main-thread canvas renderer
-(see below) — verify instead of assuming:
+When the worker can't start, the grid paints on the main thread instead (see
+[Automatic fallback](#automatic-fallback)). Check which one runs:
 
 ```ts prelude="wasm" partial="requires surrounding host state" title="Partial example"
 grid.on("renderer-fallback", ({ error }) => {
@@ -112,19 +102,18 @@ has changed, discard the raw projection and read it again.
 
 ## Automatic fallback
 
-The worker is constructed **first**, before the canvas is transferred. If
-construction throws — no `OffscreenCanvas` support, or a bundler/security
-restriction on the worker URL — the grid switches to the main-thread
-`CanvasRenderer` and emits one `renderer-fallback` event with a
-`SheetwriteError`. You still get a working grid; worker rendering is an
-enhancement, never a hard requirement.
+The grid creates the worker **before** it hands over the canvas. If that
+fails, because the browser has no `OffscreenCanvas` or blocks the worker URL,
+the grid paints on the main thread with `CanvasRenderer`. It emits one
+`renderer-fallback` event with a `SheetwriteError`. The grid keeps working:
+worker rendering is an improvement, never a requirement.
 
 ## Limitation: no custom renderers
 
-Custom cell renderers are functions, and functions can not cross the worker
-boundary. Under `renderer: "worker"` the `renderers` option (and
-`defineCellRenderer`) have no effect — the worker's renderer registry is always
-empty. If you rely on custom [`CellRenderer`](/docs/features/grid/options-and-presentation/#gridoptions)s,
+Custom cell renderers are functions, and functions can't be sent to a worker.
+With `renderer: "worker"`, the `renderers` option and `defineCellRenderer`
+have no effect, because the worker has no renderers of its own. If you use a
+custom [`CellRenderer`](/docs/features/grid/options-and-presentation/#gridoptions),
 use the main-thread `canvas` renderer.
 
 ## See also

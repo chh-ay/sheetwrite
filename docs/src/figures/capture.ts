@@ -39,8 +39,13 @@ interface Shot {
   name: string;
   /** The size of the written capture. */
   size: ShotSize;
-  /** `items`: keep only the dashboard's items, with the dashboard's 12 px margin. */
-  crop?: "items";
+  /**
+   * `items`: keep only the dashboard's items, with the dashboard's 12 px margin.
+   * `{ x, y }`: the shot's size from that point of the stage.
+   */
+  crop?: "items" | { readonly x: number; readonly y: number };
+  /** The size of the stage an `{ x, y }` crop is taken from. */
+  stage?: ShotSize;
   /** With `crop: "items"`, the titles of the items to keep; every item by default. */
   cropItems?: readonly string[];
   query: Record<string, string>;
@@ -91,7 +96,7 @@ async function select(page: Page, selection: GridSelection) {
   await settle(page);
 }
 
-const SHOTS: readonly Shot[] = [
+const PAGE_SHOTS: readonly Shot[] = [
   // The dashboard hero, cropped to the items so the chart and the pivot show
   // whole. Shown at about its own width in the docs column, so its labels stay
   // at their 12 px and up.
@@ -374,6 +379,54 @@ const SHOTS: readonly Shot[] = [
   },
 ];
 
+/**
+ * The section pages' opening captures, cropped for tablets and phones: each
+ * keeps the part of the view the section is about, at a size that reads at
+ * those widths. Points are from the top-left of the capture's stage.
+ */
+const SECTION_CROPS: Readonly<
+  Record<
+    string,
+    { readonly tablet: NonNullable<Shot["crop"]>; readonly phone: NonNullable<Shot["crop"]> }
+  >
+> = {
+  // The ribbon's left groups, the formula bar and columns A to E; then columns C to E and the selection.
+  "grid-overview": { tablet: { x: 8, y: 0 }, phone: { x: 248, y: 158 } },
+  // The table under its merged title; then its first three columns.
+  report: { tablet: { x: 0, y: 100 }, phone: { x: 48, y: 120 } },
+  // The PivotChart; then the pivot beside it.
+  "pivot-chart": { tablet: { x: 360, y: 158 }, phone: { x: 48, y: 158 } },
+  // The filtered columns; then Month, Region and Product.
+  filter: { tablet: { x: 8, y: 0 }, phone: { x: 48, y: 66 } },
+  // The formula bar over the sheet; then the formula over the selected cell.
+  "formula-bar": { tablet: { x: 0, y: 0 }, phone: { x: 100, y: 66 } },
+};
+
+const SHOTS: readonly Shot[] = [
+  ...PAGE_SHOTS,
+  ...PAGE_SHOTS.flatMap((shot) => {
+    const crops = SECTION_CROPS[shot.name];
+    return crops === undefined
+      ? []
+      : [
+          {
+            ...shot,
+            name: `${shot.name}-tablet`,
+            size: "sectionTablet" as const,
+            stage: shot.size,
+            crop: crops.tablet,
+          },
+          {
+            ...shot,
+            name: `${shot.name}-phone`,
+            size: "sectionPhone" as const,
+            stage: shot.size,
+            crop: crops.phone,
+          },
+        ];
+  }),
+];
+
 /** A stage tall enough to show a phone dashboard's items without scrolling. */
 const STAGE_HEIGHT_FOR_CROP = 1000;
 /** The dashboard view's padding around its items. */
@@ -425,9 +478,11 @@ async function settle(page: Page) {
 }
 
 async function capture(shot: Shot, origin: string, scratch: string) {
-  // An items crop renders on a tall stage of the capture's width, then keeps the items.
-  const { width } = SHOT_SIZES[shot.size];
-  const height = shot.crop === "items" ? STAGE_HEIGHT_FOR_CROP : SHOT_SIZES[shot.size].height;
+  // An items crop renders on a tall stage of the capture's width, then keeps the
+  // items; an `{ x, y }` crop renders on its stage, then keeps the shot's size.
+  const stage = SHOT_SIZES[shot.stage ?? shot.size];
+  const { width } = stage;
+  const height = shot.crop === "items" ? STAGE_HEIGHT_FOR_CROP : stage.height;
   const browser = await chromium.launch();
   try {
     for (const theme of THEMES)
@@ -472,6 +527,17 @@ async function capture(shot: Shot, origin: string, scratch: string) {
           if (clip.width !== expected.width || clip.height !== expected.height) {
             throw new Error(`${shot.name} crops to ${clip.width}×${clip.height}, not its size`);
           }
+          await page.screenshot({ path: png, clip, animations: "disabled" });
+        } else if (shot.crop !== undefined) {
+          const box = await page.locator("#stage").boundingBox();
+          if (box === null) throw new Error("The stage is not on the page");
+          const { width: cropWidth, height: cropHeight } = SHOT_SIZES[shot.size];
+          const clip = {
+            x: box.x + shot.crop.x,
+            y: box.y + shot.crop.y,
+            width: cropWidth,
+            height: cropHeight,
+          };
           await page.screenshot({ path: png, clip, animations: "disabled" });
         } else {
           await page.locator("#stage").screenshot({ path: png, animations: "disabled" });

@@ -3,6 +3,25 @@ title: Charts
 description: "Add column, bar, line, area, pie, doughnut and scatter charts that read cell ranges and redraw when those cells change; place, move and edit them in the grid."
 ---
 
+A chart reads cell ranges and redraws when they change, whether by an edit, a
+formula, a spill or a pivot. It belongs to a sheet and floats over its cells.
+
+## Add the charts package
+
+Core keeps the chart definitions, and `@sheetwrite/charts` draws them. Install
+it and pass `chartsAddon()` to `initSheetwrite({ addons })` before you create
+grids. Grids created before that draw each chart as a frame with its title.
+
+```sh verify title="Install the charts package"
+npm install @sheetwrite/charts
+```
+
+Without the package, the document still keeps, saves, undoes and synchronizes
+charts, and each one shows as a plain frame with its title. Grids that have no
+charts do not load chart code.
+
+## Draw a line chart
+
 ```ts prelude="core" partial="requires a grid with month names in A2:A4 and revenue in B2:B4" title="A line chart of three months"
 import { chartsAddon } from "@sheetwrite/charts";
 import { initSheetwrite } from "@sheetwrite/core";
@@ -80,24 +99,6 @@ if (result.status !== "applied") throw new Error("The chart was not added");
 ```
 
 </details>
-
-A chart reads cell ranges. It does not copy their values: when a source cell
-changes, by an edit, a formula, a spill or a pivot, the chart redraws. A chart
-belongs to a sheet and floats over its cells.
-
-## Add the charts package
-
-Core keeps the chart definitions, and `@sheetwrite/charts` draws them. Install
-it and pass `chartsAddon()` to `initSheetwrite({ addons })` before you create
-grids. Grids created before that draw each chart as a frame with its title.
-
-```sh verify title="Install the charts package"
-npm install @sheetwrite/charts
-```
-
-Without the package, the document still keeps, saves, undoes and synchronizes
-charts, and each one shows as a plain frame with its title. Grids that have no
-charts do not load chart code.
 
 ## Define a chart
 

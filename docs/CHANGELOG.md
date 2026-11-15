@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Every feature section and the grid, formatting, analysis, data and formula feature pages that showed only a screenshot have a blueprint figure: what a right-click does, which clipboard format a paste uses, a DOM renderer's hooks, what a fill drag writes, how search steps through matches, the five selection shapes, the status bar totals, the shared command model, font and number-format fields, the cells a line chart reads, a pivot's output, what checks a write, a GROUPBY spill and what formula help shows.
+- The opening screenshot of each feature section has tablet and phone crops of the same view (`<name>-tablet` and `<name>-phone`, the new `sectionTablet` and `sectionPhone` sizes), so its text stays readable at 834 and 390 px. A placed screenshot takes them as `narrow`.
+- The Charts page opens with a short lead and a figure of the line chart its example draws, then the install step, then the example. The column chart screenshot moves to Insert and edit in the grid.
+- The worker rendering and collaboration pages open in plain words, without repository paths or commands.
 - The API reference shows `@throws`: a function page lists each under "Throws" (the error and when it is thrown), and a member card shows its parameters, return value and throws as labelled lines instead of raw `@param` and `@returns` text. The API manifest kept no `@throws` before.
 - Code-sample hover popovers show a symbol's summary, with its parameters, return value and throws as tag lines; the doc text from the API manifest no longer shows raw `@param` and `@returns` inline.
 - The API reference shows `InitOutput` (`@sheetwrite/wasm`, `@sheetwrite/formulas`) as one card with no member list: its members are the raw module exports wasm-bindgen generates for the loader, not API to call. `docs:generate` no longer counts them as undescribed. The `free()` method wasm-bindgen adds to each engine class, which has no doc source, gets one shared description.
