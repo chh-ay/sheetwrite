@@ -3,9 +3,9 @@
  *
  * Renamed: non-exported functions, local variables, parameters whose names are not
  * emitted in declaration files, and private class members (`private` or `#name`).
- * Comment mentions inside the symbol's scope written as code (in backticks or as a
- * `@param` name) are updated; bare mentions are reported for review, and a mention
- * after `.` is a property path and stays.
+ * Comment mentions inside the symbol's scope written as code (in backticks, as a
+ * `@param` name or as a `{@link}` target) are updated; bare mentions are reported for
+ * review, and a mention after `.` is a property path and stays.
  *
  * Never renamed: exported or re-exported names, anything declared outside the target
  * files, object and interface property keys (they can cross persisted, wire, public or
@@ -16,13 +16,21 @@
  * name in the file maps to the same form, or when the file uses the old name in a value
  * position the checker resolves to no symbol.
  *
+ * Conflicts are settled in `snake-case-internals.names.json`: per file, the old name and
+ * the snake_case name to use instead. A picked name still must not be bound already, but
+ * an unresolved use of the old name no longer blocks it: picking a name records that the
+ * use was checked.
+ *
  * Every run plans from the type checker's view of the current files, so it can be
  * re-run at any time: output is sorted, and a second `apply` changes nothing.
  *
  * Usage: `bun scripts/snake-case-internals.ts <check|apply> [--project <tsconfig.json>]...
- * [--include <dir>]...`. Without `--project` it runs every `packages/*\/tsconfig.json`.
+ * [--include <dir>]...`. Without `--project` it runs every `packages/*\/tsconfig.json`,
+ * then `tsconfig.verification.json`, `bench/tsconfig.json` and `docs/tsconfig.json`. A
+ * file below a nested `tsconfig.json` (a fixture or consumer project) belongs to that
+ * project and is skipped.
  * `check` lists every pending rename and conflict and exits 1 when any exist; `apply`
- * rewrites the files. Conflicts need a hand-picked name.
+ * rewrites the files. Conflicts need a hand-picked name in the names file.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -92,6 +100,9 @@ export interface RenamePlan {
   readonly edits: ReadonlyMap<string, readonly TextEdit[]>;
 }
 
+/** Hand-picked new names: absolute file name, then old name to new name. */
+export type PickedNames = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
 interface TextEdit {
   readonly start: number;
   readonly end: number;
@@ -111,6 +122,8 @@ interface Candidate {
   readonly file: SourceFile;
   readonly oldName: string;
   readonly newName: string;
+  /** The new name comes from the names file instead of `toSnakeCase`. */
+  readonly picked: boolean;
   /** The member is an ECMAScript `#name`, renamed lexically within its class. */
   readonly is_private_name: boolean;
   /** The same file uses the old name somewhere the checker resolved to no symbol. */
@@ -265,9 +278,13 @@ const KEY_PARENTS = new Set<SyntaxKind>([
   SyntaxKind.EnumMember,
   SyntaxKind.QualifiedName,
   SyntaxKind.JsxAttribute,
+  SyntaxKind.NamedTupleMember,
 ]);
 
-/** Whether `name` is a property key or member name, which can never refer to a local. */
+/**
+ * Whether `name` is a property key, member name or tuple label, which can never refer to
+ * a local.
+ */
 function is_key_position(name: Node): boolean {
   const parent = name.parent;
   if (isBindingElement(parent)) return parent.propertyName === name;
@@ -311,6 +328,28 @@ function is_target(file_name: string, include: readonly string[]): boolean {
   return include.some(
     (directory) => file_name === directory || file_name.startsWith(directory + sep),
   );
+}
+
+/** Whether a directory between the file and the project's own directory has a tsconfig.json. */
+function in_nested_project(
+  file_name: string,
+  project_directory: string,
+  nested: Map<string, boolean>,
+): boolean {
+  for (
+    let directory = dirname(file_name);
+    directory.startsWith(project_directory + sep);
+    directory = dirname(directory)
+  ) {
+    let has_config = nested.get(directory);
+    if (has_config === undefined) {
+      has_config = existsSync(join(directory, "tsconfig.json"));
+      nested.set(directory, has_config);
+    }
+    if (has_config) return true;
+  }
+
+  return false;
 }
 
 const SCOPE_KINDS = new Set<SyntaxKind>([
@@ -382,15 +421,15 @@ function trivia_in(
 
 /**
  * Rename mentions of the old name in comments within the symbol's scope. A mention
- * written as code (in backticks or as a `@param` name) is rewritten. A bare mention
- * may name an OOXML or DOM term with the same spelling, so it is only reported for
- * review. Mentions after a `.` are property paths and stay.
+ * written as code (in backticks, as a `@param` name or as a `{@link}` target) is
+ * rewritten. A bare mention may name an OOXML or DOM term with the same spelling, so it
+ * is only reported for review. Mentions after a `.` are property paths and stay.
  */
 function comment_edits(candidate: Candidate): { edits: TextEdit[]; mentions: CommentMention[] } {
   const text = candidate.file.text;
   const escaped = candidate.oldName.replaceAll("$", "\\$");
   const pattern = new RegExp(`(?<![\\w$#.])${escaped}(?![\\w$])`, "g");
-  const code_prefix = /(`|@param\s+(\{[^}]*\}\s+)?\[?)$/;
+  const code_prefix = /(`|@param\s+(\{[^}]*\}\s+)?\[?|\{@link(code|plain)?\s+)$/;
   const edits: TextEdit[] = [];
   const mentions: CommentMention[] = [];
   for (const [start, end] of trivia_in(candidate.file, comment_scope(candidate))) {
@@ -423,7 +462,7 @@ async function find_conflict(
   candidate: Candidate,
   symbol_names: ReadonlyMap<string, string>,
 ): Promise<string | undefined> {
-  if (candidate.unresolved_use) {
+  if (candidate.unresolved_use && !candidate.picked) {
     return `the checker resolves some \`${candidate.oldName}\` in this file to no symbol`;
   }
 
@@ -455,6 +494,7 @@ async function find_conflict(
 async function collect_candidates(
   project: Project,
   files: readonly SourceFile[],
+  picked_names: PickedNames,
 ): Promise<Map<number, Candidate>> {
   const candidates = new Map<number, Candidate>();
   const exported = new Set<number>();
@@ -520,12 +560,14 @@ async function collect_candidates(
 
       declaration_counts.set(symbol.id, (declaration_counts.get(symbol.id) ?? 0) + 1);
       if (symbol.declarations.length === 1 && !candidates.has(symbol.id)) {
+        const picked = picked_names.get(resolve(file.fileName))?.get(old_name);
         candidates.set(symbol.id, {
           kind,
           declaration: parent,
           file,
           oldName: old_name,
-          newName: toSnakeCase(old_name),
+          newName: picked ?? toSnakeCase(old_name),
+          picked: picked !== undefined,
           is_private_name: isPrivateIdentifier(name),
           unresolved_use: false,
           occurrences: [],
@@ -561,10 +603,14 @@ async function collect_candidates(
   return candidates;
 }
 
-/** Plan every rename in the target files of one TypeScript project. */
+/**
+ * Plan every rename in the target files of one TypeScript project. `picked_names`
+ * replaces the snake_case form of a name in one file, for names that conflict.
+ */
 export async function planRenames(
   project_path: string,
   include: readonly string[],
+  picked_names: PickedNames = new Map(),
 ): Promise<RenamePlan> {
   const config = resolve(project_path);
   const directories =
@@ -579,14 +625,17 @@ export async function planRenames(
     if (!project) throw new Error(`TypeScript did not load ${config}`);
 
     const files: SourceFile[] = [];
+    const nested = new Map<string, boolean>();
     for (const file_name of await project.program.getSourceFileNames()) {
-      if (!is_target(resolve(file_name), directories)) continue;
+      const absolute = resolve(file_name);
+      if (!is_target(absolute, directories)) continue;
+      if (in_nested_project(absolute, dirname(config), nested)) continue;
 
       const file = await project.program.getSourceFile(file_name);
       if (file) files.push(file);
     }
 
-    const candidates = await collect_candidates(project, files);
+    const candidates = await collect_candidates(project, files, picked_names);
     const symbol_names = new Map<string, string>();
     for (const candidate of candidates.values()) {
       symbol_names.set(`${candidate.file.fileName}\0${candidate.newName}`, candidate.oldName);
@@ -690,14 +739,46 @@ interface CliOptions {
   readonly include: readonly string[];
 }
 
-/** Every workspace package project, in a stable order, for runs without `--project`. */
-function package_projects(root: string): string[] {
+const PICKED_NAME = /^(_*|#)[a-z][a-z0-9_]*$/;
+
+/**
+ * Read the names file: `{ "<file from the repository root>": { "<oldName>": "<new_name>" } }`.
+ * Every picked name must be snake_case and keep the old name's `_` or `#` prefix.
+ */
+function read_picked_names(names_file: string, root: string): PickedNames {
+  const parsed = JSON.parse(readFileSync(names_file, "utf8")) as Record<
+    string,
+    Record<string, string>
+  >;
+  const picked = new Map<string, Map<string, string>>();
+  for (const [file, names] of Object.entries(parsed)) {
+    for (const [old_name, new_name] of Object.entries(names)) {
+      const prefix = /^(_*|#)/.exec(old_name)?.[0] ?? "";
+      if (!PICKED_NAME.test(new_name) || !new_name.startsWith(prefix)) {
+        throw new Error(`${names_file}: ${file} ${old_name} -> ${new_name} is not snake_case`);
+      }
+    }
+    picked.set(resolve(root, file), new Map(Object.entries(names)));
+  }
+
+  return picked;
+}
+
+/**
+ * Every workspace package project in a stable order, then the scripts, bench and docs
+ * projects, for runs without `--project`.
+ */
+function default_projects(root: string): string[] {
   const packages = join(root, "packages");
 
-  return readdirSync(packages)
-    .sort()
-    .map((name) => join(packages, name, "tsconfig.json"))
-    .filter((project) => existsSync(project));
+  return [
+    ...readdirSync(packages)
+      .sort()
+      .map((name) => join(packages, name, "tsconfig.json")),
+    join(root, "tsconfig.verification.json"),
+    join(root, "bench/tsconfig.json"),
+    join(root, "docs/tsconfig.json"),
+  ].filter((project) => existsSync(project));
 }
 
 function parse_arguments(args: readonly string[]): CliOptions {
@@ -721,18 +802,23 @@ function parse_arguments(args: readonly string[]): CliOptions {
 
   return {
     mode,
-    projects: projects.length > 0 ? projects : package_projects(process.cwd()),
+    projects: projects.length > 0 ? projects : default_projects(process.cwd()),
     include,
   };
 }
 
 if (import.meta.main) {
   const options = parse_arguments(process.argv.slice(2));
+  const root = resolve(import.meta.dir, "..");
+  const picked_names = read_picked_names(
+    join(import.meta.dir, "snake-case-internals.names.json"),
+    root,
+  );
   let pending = 0;
 
   // Projects run one after another so each plan sees the files the previous apply rewrote.
   for (const project of options.projects) {
-    const plan = await planRenames(project, options.include);
+    const plan = await planRenames(project, options.include, picked_names);
     process.stdout.write(`${relative(process.cwd(), project)}\n${report(plan, process.cwd())}`);
     pending += plan.renames.length + plan.conflicts.length;
 

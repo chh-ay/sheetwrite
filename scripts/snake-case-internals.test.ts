@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join, relative, resolve } from "node:path";
 
 import { applyPlan, planRenames, toSnakeCase } from "./snake-case-internals.js";
 
@@ -9,7 +9,7 @@ const FIXTURES = resolve(import.meta.dir, "fixtures/snake-case-internals");
 
 /** Copy the input fixture project so `apply` never touches the checked-in files. */
 function copyInput(): string {
-  const directory = mkdtempSync(join(tmpdir(), "snake-case-internals-"));
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "snake-case-internals-")));
   cpSync(join(FIXTURES, "input"), directory, { recursive: true });
 
   return directory;
@@ -56,6 +56,52 @@ describe("snake-case-internals", () => {
       "scaledLine -> scaled_line",
     ]);
     expect(plan.renames.map((rename) => rename.oldName)).not.toContain("scaledLine");
+  });
+
+  test("a picked name settles a conflict and is still checked against bound names", async () => {
+    const directory = copyInput();
+
+    try {
+      const tsconfig = join(directory, "tsconfig.json");
+      const pick = async (new_name: string) =>
+        planRenames(
+          tsconfig,
+          [],
+          new Map([[join(directory, "rules.ts"), new Map([["scaledLine", new_name]])]]),
+        );
+
+      const bound = await pick("scaled_line");
+      expect(bound.conflicts.map((conflict) => conflict.oldName)).toEqual(["scaledLine"]);
+
+      const free = await pick("line_scaled");
+      expect(free.conflicts).toEqual([]);
+      expect(
+        free.renames.find((rename) => rename.oldName === "scaledLine")?.newName,
+      ).toBe("line_scaled");
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  test("skips files below a nested tsconfig.json", async () => {
+    const directory = copyInput();
+
+    try {
+      cpSync(join(FIXTURES, "input"), join(directory, "nested"), { recursive: true });
+      const tsconfig = JSON.parse(readFileSync(join(directory, "tsconfig.json"), "utf8"));
+      writeFileSync(
+        join(directory, "tsconfig.json"),
+        JSON.stringify({ ...tsconfig, include: ["**/*.ts"] }),
+      );
+
+      const plan = await planRenames(join(directory, "tsconfig.json"), []);
+
+      expect(new Set(plan.renames.map((rename) => relative(directory, rename.file)))).toEqual(
+        new Set(["rules.ts"]),
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   test("a second run finds nothing to rename and changes no file", async () => {

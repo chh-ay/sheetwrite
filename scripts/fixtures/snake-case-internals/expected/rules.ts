@@ -69,3 +69,14 @@ export function collides(lineValue: number): number {
   const scaled_line = 2;
   return scaledLine * scaled_line;
 }
+
+function pair_product(pair_left: number, pair_right: number): number {
+  return pair_left * pair_right;
+}
+
+/** Sums each pair with {@link pair_product}. */
+export function sumPairs(pairs: readonly [pairLeft: number, pairRight: number][]): number {
+  let pair_total = 0;
+  for (const [pair_left, pair_right] of pairs) pair_total += pair_product(pair_left, pair_right);
+  return pair_total;
+}

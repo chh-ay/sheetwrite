@@ -190,6 +190,7 @@ export const TOOLING_TEST_PATHS = [
   "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
   "scripts/wasm-function-sizes.test.ts",
+  "scripts/snake-case-internals.test.ts",
 ] as const;
 
 export const UNIT_TEST_PATHS = [
