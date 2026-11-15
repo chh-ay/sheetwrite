@@ -450,9 +450,9 @@ export class AutoFilterMenu {
     row.className = "sheetwrite-autofilter-condition";
     const select = document.createElement("select");
     select.setAttribute("aria-label", `Condition ${index}`);
-    if (optional) select.append(new Option("", ""));
+    if (optional) select.append(option("", ""));
     for (const [value, label] of Object.entries(OP_LABELS) as [Op, string][]) {
-      select.append(new Option((kind === "date" && DATE_OP_LABELS[value]) || label, value));
+      select.append(option((kind === "date" && DATE_OP_LABELS[value]) || label, value));
     }
     select.value = op ?? "";
     const input = document.createElement("input");
@@ -698,4 +698,11 @@ function blanksLast(a: CellScalar, b: CellScalar): number {
   const blankB = b === null || b === "";
   if (blankA || blankB) return Number(blankA) - Number(blankB);
   return compareScalars(a, b);
+}
+
+function option(label: string, value: string): HTMLOptionElement {
+  const element = document.createElement("option");
+  element.value = value;
+  element.textContent = label;
+  return element;
 }
