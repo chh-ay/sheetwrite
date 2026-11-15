@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- The docs home cards and section headers, the showcase hub cards, and the database and collaboration proof cards are blueprint pictures: boxes and connectors on the dotted canvas (`BlueprintCard` and `cardLayout`), with text that reaches 4.5:1 in both themes. The old card art for them, and `Panel` and `FRAMEWORK_CARD_HEIGHT`, which only it used, are gone.
 - The API reference shows `@throws`: a function page lists each under "Throws" (the error and when it is thrown), and a member card shows its parameters, return value and throws as labelled lines instead of raw `@param` and `@returns` text. The API manifest kept no `@throws` before.
 - Code-sample hover popovers show a symbol's summary, with its parameters, return value and throws as tag lines; the doc text from the API manifest no longer shows raw `@param` and `@returns` inline.
 - The API reference shows `InitOutput` (`@sheetwrite/wasm`, `@sheetwrite/formulas`) as one card with no member list: its members are the raw module exports wasm-bindgen generates for the loader, not API to call. `docs:generate` no longer counts them as undescribed. The `free()` method wasm-bindgen adds to each engine class, which has no doc source, gets one shared description.

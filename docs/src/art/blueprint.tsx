@@ -362,3 +362,41 @@ export function BlueprintDiagram(
     </div>
   );
 }
+
+/** The step of the dotted canvas a card picture draws itself, as the figure frame's dots. */
+const DOT_STEP = 16;
+
+/**
+ * A card's blueprint picture: boxes and connectors on the dotted canvas,
+ * drawn in the picture, since a card has no figure frame. It is decorative:
+ * the card's title and text say what it shows. The dots run past the canvas,
+ * so a card box of any shape is filled.
+ */
+export function BlueprintCard(
+  props: Readonly<{ layout: BlueprintLayout; class?: string }>,
+): JSX.Element {
+  const dots = `bp-dots-${createUniqueId()}`;
+  const nodes = new Map(props.layout.nodes.map((node) => [node.id, node]));
+  const { width, height } = props.layout;
+  return (
+    <svg
+      aria-hidden="true"
+      class={`sw-art sw-blueprint sw-blueprint--card${props.class === undefined ? "" : ` ${props.class}`}`}
+      focusable="false"
+      viewBox={`0 0 ${width} ${height}`}
+    >
+      <pattern height={DOT_STEP} id={dots} patternUnits="userSpaceOnUse" width={DOT_STEP}>
+        <circle class="bp-dot" cx={1} cy={1} r={1} />
+      </pattern>
+      <rect
+        fill={`url(#${dots})`}
+        height={height * 5}
+        width={width * 5}
+        x={-width * 2}
+        y={-height * 2}
+      />
+      <For each={props.layout.nodes}>{(node) => <Node node={node} />}</For>
+      <For each={props.layout.edges}>{(edge) => <Edge edge={edge} nodes={nodes} />}</For>
+    </svg>
+  );
+}
