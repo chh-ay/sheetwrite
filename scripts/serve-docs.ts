@@ -21,7 +21,8 @@ const server = Bun.serve({
   hostname: "127.0.0.1",
   port,
   async fetch(request) {
-    const pathname = decodeURIComponent(new URL(request.url).pathname);
+    const url = new URL(request.url);
+    const pathname = decodeURIComponent(url.pathname);
     if (LOCAL_VERCEL_SCRIPTS.has(pathname)) {
       return new Response("", {
         headers: { "content-type": "application/javascript; charset=utf-8" },
@@ -33,12 +34,18 @@ const server = Bun.serve({
     if (moved !== undefined) {
       return new Response(null, { status: 308, headers: { location: moved } });
     }
+    // Same trailing-slash redirect as the deployment config.
+    const page = pathname.endsWith("/") ? null : outputPath(route);
+    if (page !== null && (await Bun.file(page).exists())) {
+      return new Response(null, {
+        status: 308,
+        headers: { location: `${url.pathname}/${url.search}` },
+      });
+    }
     const candidate = outputPath(pathname);
     if (candidate !== null) {
       const file = Bun.file(candidate);
       if (await file.exists()) return new Response(file);
-      const index = Bun.file(resolve(candidate, "index.html"));
-      if (await index.exists()) return new Response(index);
     }
     const notFound = Bun.file(resolve(outputRoot, "404.html"));
     return new Response((await notFound.exists()) ? await notFound.arrayBuffer() : "Not found", {

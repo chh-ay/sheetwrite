@@ -14,6 +14,93 @@ export interface MovedPage {
 }
 
 export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
+  // API pages of exports that 0.7.0 removed open the page of what replaces each one;
+  // the 0.7.0 upgrade guide maps old calls to new ones.
+  // An API page has no headings worth forwarding.
+  "/docs/api/charts-register/": {
+    to: "/docs/api/charts/charts-addon/",
+    anchors: {},
+  },
+  "/docs/api/charts-register/register-charts-backend/": {
+    to: "/docs/api/charts/charts-addon/",
+    anchors: {},
+  },
+  "/docs/api/charts/register-charts-backend/": {
+    to: "/docs/api/charts/charts-addon/",
+    anchors: {},
+  },
+  "/docs/api/core-functions/register-function/": {
+    to: "/docs/api/core-functions/functions-addon/",
+    anchors: {},
+  },
+  "/docs/api/core-functions/unregister-function/": {
+    to: "/docs/api/core-functions/functions-addon/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-adapter/": {
+    to: "/docs/api/core-history/history-storage-adapter/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-coordinator-event/": {
+    to: "/docs/api/core-history/history-archive/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-coordinator-options/": {
+    to: "/docs/api/core-history/history-archive-options/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-coordinator/": {
+    to: "/docs/api/core-history/history-archive/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-restore-request/": {
+    to: "/docs/api/core-history/history-archive/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-restore-response/": {
+    to: "/docs/api/core-history/history-archive/",
+    anchors: {},
+  },
+  "/docs/api/core/revision-summary/": {
+    to: "/docs/api/core-history/history-version/",
+    anchors: {},
+  },
+  "/docs/api/core/sanitize-hyperlink-style/": {
+    to: "/docs/api/core/sanitize-cell-style/",
+    anchors: {},
+  },
+  "/docs/api/core/set-chart-renderer-factory/": {
+    to: "/docs/api/core/sheetwrite-addon-context/",
+    anchors: {},
+  },
+  "/docs/api/core/set-chart-view-provider-factory/": {
+    to: "/docs/api/core/sheetwrite-addon-context/",
+    anchors: {},
+  },
+  "/docs/api/core/set-xlsx-table-export-backend/": {
+    to: "/docs/api/core/sheetwrite-addon-context/",
+    anchors: {},
+  },
+  "/docs/api/core/set-xlsx-table-import-backend/": {
+    to: "/docs/api/core/sheetwrite-addon-context/",
+    anchors: {},
+  },
+  "/docs/api/core/set-xlsx-workbook-backend/": {
+    to: "/docs/api/core/sheetwrite-addon-context/",
+    anchors: {},
+  },
+  "/docs/api/xlsx-register/": {
+    to: "/docs/api/xlsx/xlsx-addon/",
+    anchors: {},
+  },
+  "/docs/api/xlsx-register/register-xlsx-backends/": {
+    to: "/docs/api/xlsx/xlsx-addon/",
+    anchors: {},
+  },
+  "/docs/api/xlsx/register-xlsx-backends/": {
+    to: "/docs/api/xlsx/xlsx-addon/",
+    anchors: {},
+  },
   "/docs/guides/accessibility/": {
     to: "/docs/features/accessibility/",
     anchors: {
