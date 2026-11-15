@@ -105,6 +105,25 @@ describe("snake-case-internals", () => {
     }
   });
 
+  test("a reflective call follows a private member of another project", async () => {
+    const directory = copyInput();
+
+    try {
+      writeFileSync(
+        join(directory, "probe.ts"),
+        'export function peek(target: object): unknown {\n  return Reflect.get(target, "remoteMember");\n}\n',
+      );
+      const other_members = new Map([["remoteMember", new Set(["remote_member"])]]);
+      applyPlan(await planRenames(join(directory, "tsconfig.json"), [], new Map(), other_members));
+
+      expect(readFileSync(join(directory, "probe.ts"), "utf8")).toContain(
+        'Reflect.get(target, "remote_member")',
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   test("a second run finds nothing to rename and changes no file", async () => {
     const directory = copyInput();
 

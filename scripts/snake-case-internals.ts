@@ -24,11 +24,12 @@
  * A `private` member is also renamed where it is named by text: `target["name"]`, a
  * reflective call such as `Reflect.get(target, "name")` or `spyOn(target, "name")`. When
  * a reflective call's target does not have the member (it is untyped, or typed as a
- * public interface), the use is renamed only if exactly one private member has that
- * name, and reported for review; when several do, it is a conflict. `target["name"]`
- * and `target.name` on a value without the member are data keys and stay. Uses through
- * an instantiated type, which the checker gives their own symbol, are matched by the
- * member's declaration.
+ * public interface), the string follows the private members with that name in every
+ * project and is reported for review; when they do not all get one new name, it is a
+ * conflict. So `apply` and `check` plan every project once before the real pass.
+ * `target["name"]` and `target.name` on a value without the member are data keys and
+ * stay. Uses through an instantiated type, which the checker gives their own symbol,
+ * are matched by the member's declaration.
  *
  * Every run plans from the type checker's view of the current files, so it can be
  * re-run at any time: output is sorted, and a second `apply` changes nothing.
@@ -117,10 +118,18 @@ export interface RenamePlan {
   readonly conflicts: readonly RenameConflict[];
   readonly mentions: readonly CommentMention[];
   readonly edits: ReadonlyMap<string, readonly TextEdit[]>;
+  /** The project's own `private` members, for name-only uses in other projects. */
+  readonly privateMembers: PrivateMemberNames;
 }
 
 /** Hand-picked new names: absolute file name, then old name to new name. */
 export type PickedNames = ReadonlyMap<string, ReadonlyMap<string, string>>;
+
+/**
+ * Each `private` member's old name, to the names members with that name end with: the new
+ * name, or the old name when a conflict keeps it.
+ */
+export type PrivateMemberNames = ReadonlyMap<string, ReadonlySet<string>>;
 
 interface TextEdit {
   readonly start: number;
@@ -135,8 +144,6 @@ interface Occurrence {
   readonly keeps_key: boolean;
   /** The occurrence is a string literal; only the text inside its quotes changes. */
   readonly is_string: boolean;
-  /** The target's type does not have the member, so the occurrence matched by name only. */
-  readonly name_only: boolean;
 }
 
 interface Candidate {
@@ -151,8 +158,6 @@ interface Candidate {
   readonly is_private_name: boolean;
   /** The same file uses the old name somewhere the checker resolved to no symbol. */
   unresolved_use: boolean;
-  /** Where a name-only use names this member when other private members share the name. */
-  ambiguous_use: string | undefined;
   readonly occurrences: Occurrence[];
 }
 
@@ -545,10 +550,6 @@ async function find_conflict(
     return `the checker resolves some \`${candidate.oldName}\` in this file to no symbol`;
   }
 
-  if (candidate.ambiguous_use !== undefined) {
-    return `\`${candidate.oldName}\` at ${candidate.ambiguous_use} is on a value whose type lacks the member, and more than one private member has that name`;
-  }
-
   const other_old_name = symbol_names.get(`${candidate.file.fileName}\0${candidate.newName}`);
   if (other_old_name !== undefined && other_old_name !== candidate.oldName) {
     return `\`${other_old_name}\` in the same file also becomes \`${candidate.newName}\``;
@@ -581,27 +582,32 @@ function declaration_key(symbol: Symbol): string | undefined {
 }
 
 /**
- * Add the uses of `private` members named by text. When the target's type has a member
- * of that name, it must be the renamed one; otherwise the use matches by name when exactly
- * one private member has it.
+ * Resolve the uses of `private` members named by text. When the target's type has a
+ * private member of this project with that name, the use joins its occurrences. A
+ * reflective call on a target without the member is returned as a name-only use, which
+ * `planRenames` matches against the private members of every project.
  */
 async function add_member_references(
   checker: Checker,
   candidates: ReadonlyMap<number, Candidate>,
   by_declaration: ReadonlyMap<string, Candidate>,
   references: readonly MemberReference[],
-): Promise<void> {
-  const members = new Map<string, Candidate[]>();
+): Promise<MemberReference[]> {
+  const local_names = new Set<string>();
   for (const candidate of candidates.values()) {
-    if (candidate.kind !== "private member" || candidate.is_private_name) continue;
-
-    const listed = members.get(candidate.oldName);
-    if (listed) listed.push(candidate);
-    else members.set(candidate.oldName, [candidate]);
+    if (candidate.kind === "private member" && !candidate.is_private_name) {
+      local_names.add(candidate.oldName);
+    }
   }
 
-  const named = references.filter((reference) => members.has(text_of(reference.name)));
-  if (named.length === 0) return;
+  // `target["name"]` can only name a member of this project; reflective calls can name any.
+  const named = references.filter(
+    (reference) =>
+      !isElementAccessExpression(reference.name.parent) ||
+      local_names.has(text_of(reference.name)),
+  );
+  const name_only: MemberReference[] = [];
+  if (named.length === 0) return name_only;
 
   const types = await checker.getTypeAtLocation(named.map((reference) => reference.target));
   for (const [index, reference] of named.entries()) {
@@ -610,40 +616,30 @@ async function add_member_references(
     const typed = type !== undefined && (type.flags & (TypeFlags.Any | TypeFlags.Unknown)) === 0;
     const property =
       type !== undefined && typed ? await checker.getPropertyOfType(type, name) : undefined;
-    let owner: Candidate | undefined;
-    if (property) {
-      const key = declaration_key(property);
-      owner = key === undefined ? undefined : by_declaration.get(key);
-      // The type has its own member of that name.
-      if (owner === undefined) continue;
-    } else {
+    if (property === undefined) {
       // `target["name"]` on a value without the member reads data.
-      if (isElementAccessExpression(reference.name.parent)) continue;
-
-      const owners = members.get(name) ?? [];
-      if (owners.length !== 1) {
-        const where = `${reference.file.fileName}:${line_of(reference.file, reference.name)}`;
-        for (const other of owners) other.ambiguous_use ??= where;
-        continue;
-      }
-      owner = owners[0];
+      if (!isElementAccessExpression(reference.name.parent)) name_only.push(reference);
+      continue;
     }
 
+    const key = declaration_key(property);
+    const owner = key === undefined ? undefined : by_declaration.get(key);
     owner?.occurrences.push({
       file: reference.file,
       name: reference.name,
       keeps_key: false,
-      is_string: !isIdentifier(reference.name),
-      name_only: property === undefined,
+      is_string: true,
     });
   }
+
+  return name_only;
 }
 
 async function collect_candidates(
   project: Project,
   files: readonly SourceFile[],
   picked_names: PickedNames,
-): Promise<Map<number, Candidate>> {
+): Promise<{ candidates: Map<number, Candidate>; name_only: MemberReference[] }> {
   const candidates = new Map<number, Candidate>();
   const exported = new Set<number>();
   const uses = new Map<number, Occurrence[]>();
@@ -706,7 +702,7 @@ async function collect_candidates(
         continue;
       }
 
-      const occurrence = { file, name, keeps_key, is_string: false, name_only: false };
+      const occurrence = { file, name, keeps_key, is_string: false };
       use_symbols.set(symbol.id, symbol);
       const listed = uses.get(symbol.id);
       if (listed) listed.push(occurrence);
@@ -730,7 +726,6 @@ async function collect_candidates(
           picked: picked !== undefined,
           is_private_name: isPrivateIdentifier(name),
           unresolved_use: false,
-          ambiguous_use: undefined,
           occurrences: [],
         });
       }
@@ -757,7 +752,6 @@ async function collect_candidates(
           name,
           keeps_key: false,
           is_string: false,
-          name_only: false,
         })),
       );
       continue;
@@ -783,19 +777,27 @@ async function collect_candidates(
     candidate?.occurrences.push(...(uses.get(symbol_id) ?? []));
   }
 
-  await add_member_references(project.checker, candidates, by_declaration, references);
+  const name_only = await add_member_references(
+    project.checker,
+    candidates,
+    by_declaration,
+    references,
+  );
 
-  return candidates;
+  return { candidates, name_only };
 }
 
 /**
  * Plan every rename in the target files of one TypeScript project. `picked_names`
  * replaces the snake_case form of a name in one file, for names that conflict.
+ * `other_members` lists the private members of the other projects, which a reflective
+ * call here may name.
  */
 export async function planRenames(
   project_path: string,
   include: readonly string[],
   picked_names: PickedNames = new Map(),
+  other_members: PrivateMemberNames = new Map(),
 ): Promise<RenamePlan> {
   const config = resolve(project_path);
   const directories =
@@ -820,7 +822,7 @@ export async function planRenames(
       if (file) files.push(file);
     }
 
-    const candidates = await collect_candidates(project, files, picked_names);
+    const { candidates, name_only } = await collect_candidates(project, files, picked_names);
     const symbol_names = new Map<string, string>();
     for (const candidate of candidates.values()) {
       symbol_names.set(`${candidate.file.fileName}\0${candidate.newName}`, candidate.oldName);
@@ -830,6 +832,7 @@ export async function planRenames(
     const conflicts: RenameConflict[] = [];
     const mentions = new Map<string, CommentMention>();
     const edits = new Map<string, TextEdit[]>();
+    const private_members = new Map<string, Set<string>>();
     for (const candidate of candidates.values()) {
       const summary = {
         file: candidate.file.fileName,
@@ -838,6 +841,11 @@ export async function planRenames(
         newName: candidate.newName,
       };
       const reason = await find_conflict(project.checker, candidate, symbol_names);
+      if (candidate.kind === "private member" && !candidate.is_private_name) {
+        const names = private_members.get(candidate.oldName) ?? new Set<string>();
+        names.add(reason === undefined ? candidate.newName : candidate.oldName);
+        private_members.set(candidate.oldName, names);
+      }
       if (reason !== undefined) {
         conflicts.push({ ...summary, reason });
         continue;
@@ -854,16 +862,6 @@ export async function planRenames(
         const file_edits = edits.get(occurrence.file.fileName) ?? [];
         file_edits.push({ start, end: occurrence.name.end - quote, text });
         edits.set(occurrence.file.fileName, file_edits);
-        if (occurrence.name_only) {
-          const mention: CommentMention = {
-            file: occurrence.file.fileName,
-            line: line_of(occurrence.file, occurrence.name),
-            oldName: candidate.oldName,
-            newName: candidate.newName,
-            source: "name only",
-          };
-          mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
-        }
       }
 
       const comments = comment_edits(candidate);
@@ -873,6 +871,47 @@ export async function planRenames(
       for (const mention of comments.mentions) {
         mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
       }
+    }
+
+    // A reflective call on a target without the member names it by text only. The string
+    // follows the private members with that name, here and in the other projects, when
+    // they all get one new name.
+    for (const reference of name_only) {
+      const old_name = text_of(reference.name);
+      const names = new Set([
+        ...(private_members.get(old_name) ?? []),
+        ...(other_members.get(old_name) ?? []),
+      ]);
+      if (names.size === 0 || (names.size === 1 && names.has(old_name))) continue;
+
+      const line = line_of(reference.file, reference.name);
+      const [new_name] = [...names];
+      if (names.size > 1 || new_name === undefined) {
+        conflicts.push({
+          file: reference.file.fileName,
+          line,
+          oldName: old_name,
+          newName: [...names].sort().join(" or "),
+          reason: "a reflective call names a private member by text, and the private members with that name do not all get one new name",
+        });
+        continue;
+      }
+
+      const file_edits = edits.get(reference.file.fileName) ?? [];
+      file_edits.push({
+        start: reference.name.getStart(reference.file) + 1,
+        end: reference.name.end - 1,
+        text: new_name,
+      });
+      edits.set(reference.file.fileName, file_edits);
+      const mention: CommentMention = {
+        file: reference.file.fileName,
+        line,
+        oldName: old_name,
+        newName: new_name,
+        source: "name only",
+      };
+      mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
     }
 
     const by_position = (
@@ -885,7 +924,13 @@ export async function planRenames(
     renames.sort(by_position);
     conflicts.sort(by_position);
 
-    return { renames, conflicts, mentions: [...mentions.values()].sort(by_position), edits };
+    return {
+      renames,
+      conflicts,
+      mentions: [...mentions.values()].sort(by_position),
+      edits,
+      privateMembers: private_members,
+    };
   } finally {
     await api.close();
   }
@@ -1018,9 +1063,21 @@ if (import.meta.main) {
   );
   let pending = 0;
 
-  // Projects run one after another so each plan sees the files the previous apply rewrote.
+  // A reflective call in one project can name a private member of another, so every
+  // project is planned once to collect those members.
+  const private_members = new Map<string, Set<string>>();
   for (const project of options.projects) {
     const plan = await planRenames(project, options.include, picked_names);
+    for (const [old_name, names] of plan.privateMembers) {
+      const all = private_members.get(old_name) ?? new Set<string>();
+      for (const name of names) all.add(name);
+      private_members.set(old_name, all);
+    }
+  }
+
+  // Projects run one after another so each plan sees the files the previous apply rewrote.
+  for (const project of options.projects) {
+    const plan = await planRenames(project, options.include, picked_names, private_members);
     process.stdout.write(`${relative(process.cwd(), project)}\n${report(plan, process.cwd())}`);
     pending += plan.renames.length + plan.conflicts.length;
 
