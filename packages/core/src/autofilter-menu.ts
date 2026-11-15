@@ -11,7 +11,7 @@ import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
 /** What a column holds, which picks Excel's Number, Text or Date Filters. */
-export type AutoFilterColumnKind = "number" | "text" | "date";
+type AutoFilterColumnKind = "number" | "text" | "date";
 
 /** One opening of the dropdown, for one column. */
 export interface AutoFilterMenuRequest {
