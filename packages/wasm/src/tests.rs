@@ -35,35 +35,6 @@ pub(crate) fn write_number_column(
     );
 }
 
-/// Inside a page load, loads every cell of a `rows` x `cols` paged sheet as a
-/// clean empty cell, so any range of it is fully loaded.
-pub(crate) fn load_blank_cells(store: &mut CellStore, sheet: usize, rows: usize, cols: usize) {
-    let cells = rows * cols;
-    let offsets: Vec<u32> = (0..cells as u32).collect();
-    let status = store.set_sparse_block(
-        sheet,
-        0,
-        0,
-        rows,
-        cols,
-        &offsets,
-        &vec![crate::types::KIND_EMPTY; cells],
-        &vec![0.0; cells],
-        &[],
-        &[0],
-        &vec![0; cells],
-        &[],
-        Vec::new(),
-        &[],
-        &[],
-    );
-    assert_eq!(
-        status,
-        crate::store::BLOCK_OK,
-        "the blank page load must apply"
-    );
-}
-
 fn assert_close(actual: f64, expected: f64) {
     assert!(
         (actual - expected).abs() < 1e-9,
