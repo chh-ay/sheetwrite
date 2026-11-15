@@ -11,9 +11,13 @@ export type WorkbookTableId = string;
  * into Sheetwrite's independently evaluated worksheet filters.
  */
 export interface WorkbookTableXmlElement {
+  /** SpreadsheetML element name without a prefix, such as `filterColumn`. */
   name: string;
+  /** The element's attributes as unescaped name and value text. */
   attributes: Record<string, string>;
+  /** The element's own text content, unescaped; empty when it has none. */
   text: string;
+  /** Child elements, in document order. */
   children: WorkbookTableXmlElement[];
   /** Style behind a color filter/sort rule; dxfId is regenerated on export. */
   differentialStyle?: CellStyle;
@@ -34,6 +38,7 @@ export type WorkbookTableTotalsFunction =
 
 /** Stable identity and display metadata for one ordered table column. */
 export interface WorkbookTableColumn {
+  /** Stable ID, unique within the table; it stays the same when the column is renamed. */
   id: string;
   /** Case-insensitively unique within the table. */
   name: string;
@@ -49,10 +54,15 @@ export interface WorkbookTableColumn {
 
 /** Bounded native subset of ECMA-376 table style information. */
 export interface WorkbookTableStyle {
+  /** Excel table style name, such as `TableStyleMedium2`. */
   name?: string;
+  /** Whether the first column gets the style's emphasis. */
   showFirstColumn?: boolean;
+  /** Whether the last column gets the style's emphasis. */
   showLastColumn?: boolean;
+  /** Whether rows alternate in colour (banded rows). */
   showRowStripes?: boolean;
+  /** Whether columns alternate in colour (banded columns). */
   showColumnStripes?: boolean;
 }
 
@@ -71,6 +81,7 @@ export type WorkbookTableUnsupportedFeature =
 
 /** Serializable canonical workbook table. Its range includes header/totals rows. */
 export interface WorkbookTable {
+  /** Stable ID, unique in the workbook; it stays the same when the table is renamed. */
   id: WorkbookTableId;
   /** Workbook-global, case-insensitively unique structured-reference name. */
   name: string;
@@ -82,23 +93,34 @@ export interface WorkbookTable {
   headerRow: boolean;
   /** Whether the last range row is the structured-reference totals row. */
   totalsRow: boolean;
+  /** How the table looks in Excel and in the grid. */
   style?: WorkbookTableStyle;
   /** Persisted Excel filter rules; not applied to rows by the Sheetwrite engine. */
   autoFilter?: WorkbookTableXmlElement;
   /** Persisted Excel sort state; not applied to rows by the Sheetwrite engine. */
   sortState?: WorkbookTableXmlElement;
+  /** Excel table features in the file that Sheetwrite keeps but does not model. */
   unsupportedFeatures?: WorkbookTableUnsupportedFeature[];
 }
 
 /** Mutable table fields accepted by the explicit update operation. */
 export interface WorkbookTablePatch {
+  /** Replaces the structured-reference name; unique in the workbook, ignoring case. */
   name?: string;
+  /** Replaces the table's rectangle, header and totals rows included. */
   range?: Range;
+  /** Replaces the columns; there must be one per column of the range. */
   columns?: WorkbookTableColumn[];
+  /** Turns the header row on or off. */
   headerRow?: boolean;
+  /** Turns the totals row on or off. */
   totalsRow?: boolean;
+  /** Replaces the style; `null` removes it. */
   style?: WorkbookTableStyle | null;
+  /** Replaces the saved Excel filter rules; `null` removes them. */
   autoFilter?: WorkbookTableXmlElement | null;
+  /** Replaces the saved Excel sort state; `null` removes it. */
   sortState?: WorkbookTableXmlElement | null;
+  /** Replaces the list of kept Excel features Sheetwrite does not model. */
   unsupportedFeatures?: WorkbookTableUnsupportedFeature[];
 }

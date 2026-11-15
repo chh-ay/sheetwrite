@@ -108,7 +108,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "context-menu",
         size: "panel",
-        alt: "The right-click menu open over a cell of the Orders sheet, with Cut, Copy and Paste, insert and delete commands, sort and filter commands, and Insert Note.",
+        alt: "The right-click menu open over a Region cell of the Orders sheet: Cut, Copy and Paste, Insert, Delete and Clear contents, the Row, Column and Merge submenus, and New note.",
         caption: "Right-clicking a cell opens the bundled menu at the pointer.",
       },
     },
@@ -122,8 +122,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "editing",
         size: "panel",
-        alt: "A copied range of the Orders sheet framed by a dashed border, and a cell below it open in the inline editor with the text being typed.",
-        caption: "A copied range keeps its dashed frame while another cell is edited inline.",
+        alt: "A Region cell of the Orders sheet open in the inline editor, with “ north” typed after EMEA, and the formula bar showing the same text.",
+        caption: "A double-click edits a cell in place; the formula bar shows the same text.",
       },
     },
   ],
@@ -189,7 +189,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "ribbon",
         size: "wide",
-        alt: "The full ribbon's Home tab above the Orders sheet: clipboard, font, alignment, number, styles, cells and editing groups.",
+        alt: "The full ribbon's Home tab above the Orders sheet: the undo, clipboard, font, alignment, number, cells and editing groups.",
         caption: "The full ribbon, Home tab.",
       },
     },
@@ -207,8 +207,9 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "formula-help",
         size: "panel",
-        alt: "A SUMIFS formula being typed in the formula bar: the argument guide shows the signature with the current argument in bold, and the referenced ranges are coloured to match the formula text.",
-        caption: "Formula help in the formula bar: the argument guide and coloured references.",
+        alt: "A SUMIFS formula being typed in the formula bar above the Regions sheet, and the argument guide below it showing the signature with the current argument, rangeAndCriteria, in bold.",
+        caption:
+          "Formula help in the formula bar: the argument guide follows the argument being typed.",
       },
     },
   ],
@@ -283,8 +284,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "number-formats",
         size: "panel",
-        alt: "An attainment cell formatted as 0.0% selected on the Report sheet, with the ribbon's Number menu open, listing its number formats.",
-        caption: "The same numbers in dollars and percentages, and the ribbon's Number menu.",
+        alt: "The Report sheet with revenue and targets in dollars and attainment in percentages, and the ribbon's Number Format list open: General, Number, Currency, Accounting, Short Date, Long Date, Time, Percentage and Scientific.",
+        caption: "Numbers in dollars and percentages, and the ribbon's list of number formats.",
       },
     },
   ],
@@ -305,7 +306,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "chart",
         size: "app",
-        alt: "A column chart of revenue by region floating over the Report sheet, below the cells it reads.",
+        alt: "A column chart of revenue by region floating over the Report sheet, below the cells it reads, selected so its frame and resize handles show.",
         caption: "A chart floats over the cells and redraws when the cells it reads change.",
       },
     },
@@ -316,7 +317,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "pivot",
         size: "panel",
-        alt: "A pivot table of revenue and units by region with a cell of it selected.",
+        alt: "A pivot table of revenue and units by region with a cell of it selected, and the PivotTable Fields list open beside it.",
         caption: "A pivot table of the Orders table: revenue and units by region.",
       },
     },
@@ -327,8 +328,8 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       shot: {
         name: "filter",
         size: "panel",
-        alt: "The Orders sheet with filter buttons in its header row and the Region filter menu open, listing the regions with checkboxes.",
-        caption: "Filters, sorts and other data tools work on the cells.",
+        alt: "The Orders sheet with its columns named Month, Region, Product, Units and Revenue, and the Region column filtered to EMEA: only the EMEA orders show.",
+        caption: "Filtering the Region column to EMEA hides the other orders.",
       },
     },
   ],

@@ -4,6 +4,8 @@ use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::store::names::NameScope;
 use crate::types::{CellRange, FormulaError, Value};
 
+use super::{placed_cell, placed_range};
+
 use super::preview_limits;
 use std::cell::Cell;
 use std::mem::size_of;
@@ -130,6 +132,9 @@ impl EvalMatrix {
         }
         Ok(cells)
     }
+    /// One copy's [`Self::validate_copies`]: what the full engine's array
+    /// functions check before returning a matrix.
+    #[cfg(feature = "analysis")]
     pub(super) fn validate_bytes(&self) -> Result<(), crate::types::FormulaError> {
         self.validate_copies(1)
     }
@@ -229,20 +234,7 @@ pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
 /// cell is a value there, not a range.
 pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     match arg {
-        Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-            names.sheet,
-            *row_start,
-            *col_start,
-            *row_end,
-            *col_end,
-        )),
-        Ast::AbsRange(sheet, row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-            sheet.handle,
-            *row_start,
-            *col_start,
-            *row_end,
-            *col_end,
-        )),
+        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(arg, names),
         Ast::DefinedName(id) => names.read(*id).range(),
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,
@@ -292,13 +284,34 @@ pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRang
                     .and_then(|expression| range_from_ast(expression, names))
             })
         }
-        Ast::Cell(row, col, _) => Some(CellRange::new(formula_sheet, *row, *col, *row, *col)),
-        Ast::AbsCell(sheet, row, col, _) => {
-            Some(CellRange::new(sheet.handle, *row, *col, *row, *col))
+        Ast::Cell(row, col, flags) => {
+            let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+            Some(CellRange::new(
+                formula_sheet,
+                placed_row,
+                placed_col,
+                placed_row,
+                placed_col,
+            ))
         }
-        Ast::Range(r0, c0, r1, c1, _) => Some(CellRange::new(formula_sheet, *r0, *c0, *r1, *c1)),
-        Ast::AbsRange(sheet, r0, c0, r1, c1, _) => {
-            Some(CellRange::new(sheet.handle, *r0, *c0, *r1, *c1))
+        Ast::AbsCell(sheet, row, col, flags) => {
+            let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+            Some(CellRange::new(
+                sheet.handle,
+                placed_row,
+                placed_col,
+                placed_row,
+                placed_col,
+            ))
+        }
+        Ast::Range(r0, c0, r1, c1, flags) => Some(placed_range(
+            formula_sheet,
+            (*r0, *c0),
+            (*r1, *c1),
+            *flags,
+        )),
+        Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
+            Some(placed_range(sheet.handle, (*r0, *c0), (*r1, *c1), *flags))
         }
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,

@@ -36,14 +36,19 @@ export type FormulaTokenKind =
 
 /** One token of a formula. `from` and `to` are UTF-16 offsets into the text. */
 export interface FormulaToken {
+  /** What the token is, for colouring: a number, a reference, an operator, and so on. */
   readonly kind: FormulaTokenKind;
+  /** UTF-16 offset in the formula text where the token starts. */
   readonly from: number;
+  /** UTF-16 offset where the token ends, not included. */
   readonly to: number;
 }
 
 /** A 0-based cell position. */
 export interface FormulaCellPosition {
+  /** Zero-based row. */
   readonly row: number;
+  /** Zero-based column. */
   readonly col: number;
 }
 
@@ -54,11 +59,17 @@ export interface FormulaCellPosition {
  * reference one colour in the text and on the grid.
  */
 export interface FormulaReference {
+  /** UTF-16 offset in the formula text where the reference starts. */
   readonly from: number;
+  /** UTF-16 offset where the reference ends, not included. */
   readonly to: number;
+  /** Sheet name as written, without quotes; `null` for the formula's own sheet. */
   readonly sheet: string | null;
+  /** Top-left cell of the reference. */
   readonly start: FormulaCellPosition;
+  /** Bottom-right cell of the reference; the same as `start` for one cell. */
   readonly end: FormulaCellPosition;
+  /** Colour slot of the reference, counted from 0 in order of first use. */
   readonly colorIndex: number;
 }
 
@@ -68,27 +79,41 @@ export interface FormulaReference {
  * arguments than the function takes or the function is unknown.
  */
 export interface FormulaCall {
+  /** Function name as written. */
   readonly name: string;
+  /** UTF-16 offset where the name starts. */
   readonly from: number;
+  /** UTF-16 offset where the name ends, not included. */
   readonly to: number;
+  /** Zero-based position of the argument the cursor is in. */
   readonly argumentIndex: number;
+  /** Metadata of the function; undefined when the name is unknown. */
   readonly function: FormulaFunctionMetadata | undefined;
+  /** Metadata of the argument the cursor is in. */
   readonly argument: FormulaArgumentMetadata | undefined;
 }
 
 /** Functions whose names start with the name at the cursor, and the span to replace. */
 export interface FormulaCompletion {
+  /** UTF-16 offset where the partial name starts; a chosen match replaces from here. */
   readonly from: number;
+  /** UTF-16 offset where the partial name ends, not included. */
   readonly to: number;
+  /** Functions whose names start with the partial name. */
   readonly matches: readonly FormulaFunctionMetadata[];
 }
 
 /** Everything formula help shows for one formula text and cursor offset. */
 export interface FormulaAnalysis {
+  /** Every token of the formula, in text order. */
   readonly tokens: readonly FormulaToken[];
+  /** Every cell and range reference, in text order. */
   readonly references: readonly FormulaReference[];
+  /** The innermost call around the cursor; `null` outside any call. */
   readonly call: FormulaCall | null;
+  /** Function names that complete the name at the cursor; `null` when none applies. */
   readonly completion: FormulaCompletion | null;
+  /** Syntax errors and unknown function names. */
   readonly diagnostics: readonly FormulaDiagnostic[];
 }
 
@@ -357,6 +382,9 @@ function completionAt(
  *   return analysis.call?.argument?.name ?? null;
  * }
  * ```
+ * @param text - The formula text, starting with `=`.
+ * @param cursor - UTF-16 offset of the cursor in `text`.
+ * @param functions - The functions formulas can call, from `listFunctions`.
  * @see /docs/features/formulas/formula-help/
  */
 export function analyzeFormula(

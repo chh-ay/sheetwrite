@@ -32,6 +32,7 @@ import {
   renderEntryPointInventory,
   renderMovedGuides,
   renderSymbolPage,
+  undocumentedApi,
   unresolvedDocumentationLinks,
 } from "./docs-api.js";
 import {
@@ -671,7 +672,18 @@ export async function generateDocs(analysis: PublicApiAnalysis): Promise<string>
       count + pkg.entryPoints.reduce((subtotal, entry) => subtotal + entry.exports.length, 0),
     0,
   );
-  return `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`;
+  const undocumented = undocumentedApi(analysis.manifest)
+    .filter((api) => api.members.length + api.parameters.length + api.returns.length > 0)
+    .map(
+      (api) =>
+        `  ${api.packageName}: ${api.members.length} members, ${api.parameters.length} parameters, ${api.returns.length} return values`,
+    );
+  return [
+    `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`,
+    ...(undocumented.length === 0
+      ? []
+      : ["Shown without a description in the API reference:", ...undocumented]),
+  ].join("\n");
 }
 
 // Keep this starter surface explicit: removing a symbol must not silently remove its docs gate.

@@ -56,11 +56,12 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::Cell;
 use std::cmp::Ordering;
 
-use crate::calc::{write_col, Ast, Func, NameId, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, NameId, RangeFlags, RefFlags, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
+use crate::sorting::{key96, sort_by_key96};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
@@ -107,6 +108,13 @@ thread_local! {
     /// its guard restores the enclosing value, so nested evaluations keep a
     /// stack on the native stack without a heap list.
     static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
+    /// Rows and columns that relative references of the expression being
+    /// evaluated move by. A conditional-format rule's one parsed expression
+    /// is written for the rule range's top-left cell; at every other cell it
+    /// reads with that cell's distance from it. Only [`read_shifted`] sets
+    /// it, so ordinary recalculation never writes it and always reads
+    /// (0, 0).
+    static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
 }
 
 #[cfg(test)]
@@ -147,6 +155,50 @@ pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
 pub(crate) fn with_formula_origin<R>(origin: (u32, u32), bind: impl FnOnce() -> R) -> R {
     let _origin = FormulaOriginGuard::push(origin);
     bind()
+}
+
+/// Run `read` with relative references moved by `shift`, then restore the
+/// enclosing shift. A shift of (0, 0) reads a tree this evaluation parsed
+/// itself, such as INDIRECT's text: it is placed for the target cell already,
+/// so a conditional-format shift must not move it again.
+pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
+    let enclosing = REFERENCE_SHIFT.with(|current| current.replace(shift));
+    let value = read();
+    REFERENCE_SHIFT.with(|current| current.set(enclosing));
+    value
+}
+
+/// Where a reference node's cell is read in this evaluation: its relative
+/// axes moved by the reference shift, its `$` axes as written. The caller
+/// that sets a shift keeps every shifted reference inside the sheet.
+#[inline]
+pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
+    let (row_shift, col_shift) = REFERENCE_SHIFT.with(Cell::get);
+    (
+        if flags.row_abs() {
+            row
+        } else {
+            row.wrapping_add(row_shift)
+        },
+        if flags.col_abs() {
+            col
+        } else {
+            col.wrapping_add(col_shift)
+        },
+    )
+}
+
+/// The range a reference node names in this evaluation; see [`placed_cell`].
+#[inline]
+pub(crate) fn placed_range(
+    sheet: u32,
+    (row_start, col_start): (u32, u32),
+    (row_end, col_end): (u32, u32),
+    flags: RangeFlags,
+) -> CellRange {
+    let start = placed_cell(row_start, col_start, flags.start);
+    let end = placed_cell(row_end, col_end, flags.end);
+    CellRange::new(sheet, start.0, start.1, end.0, end.1)
 }
 
 /// State shared by every evaluation in one recompute pass: the formulas the
@@ -687,7 +739,9 @@ impl ChangedOutputs {
                 Some((bounds, change.sequence))
             })
             .collect();
-        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+        sort_by_key96(&mut outputs, |(bounds, _)| {
+            key96(0, bounds.sheet, bounds.row_start)
+        });
 
         let leaves = outputs.len().next_power_of_two();
         let mut last_rows = vec![0; leaves * 2];
@@ -1051,7 +1105,7 @@ impl CellStore {
                 break;
             }
 
-            pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
+            sort_by_key96(&mut pending, |(key, ..)| key96(key.sheet, key.row, key.col));
 
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
@@ -1755,15 +1809,19 @@ impl CellStore {
         }
     }
 
-    /// Evaluate a parsed conditional-format expression at one target cell.
-    /// Referenced formula cells use their recomputed cache; the origin guard
-    /// gives zero-argument ROW/COLUMN the target cell's coordinates.
+    /// Evaluate a conditional-format rule's parsed expression at one target
+    /// cell. `shift` is the target's distance from the cell the expression
+    /// is written for, which its relative references move by; the caller
+    /// keeps every shifted reference inside the sheet. The pass recomputes
+    /// nothing, so referenced formula cells use their recomputed cache and no
+    /// other formula evaluates under the shift. The origin guard gives
+    /// zero-argument ROW/COLUMN the target cell's coordinates.
     pub(crate) fn eval_conditional_ast(
         &self,
         ast: &Ast,
         sheet: usize,
-        row: u32,
-        col: u32,
+        target: (u32, u32),
+        shift: (u32, u32),
         results: &mut FormulaResults,
     ) -> EvalResult {
         let affected = FormulaWork::default();
@@ -1771,8 +1829,8 @@ impl CellStore {
             affected: &affected,
             results,
         };
-        let _origin = FormulaOriginGuard::push((row, col));
-        self.eval_ast(ast, sheet, &mut pass, 0)
+        let _origin = FormulaOriginGuard::push(target);
+        read_shifted(shift, || self.eval_ast(ast, sheet, &mut pass, 0))
     }
 
     pub(crate) fn eval_ast(
@@ -1817,16 +1875,26 @@ impl CellStore {
                 let crate::calc::ArrayLiteral { values, .. } = &**array;
                 values.first().cloned().unwrap_or(Value::Blank)
             }
-            Ast::Cell(row, col, _) => {
-                self.eval_at(sheet, *row as usize, *col as usize, pass, depth + 1)
+            Ast::Cell(row, col, flags) => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                self.eval_at(
+                    sheet,
+                    placed_row as usize,
+                    placed_col as usize,
+                    pass,
+                    depth + 1,
+                )
             }
-            Ast::AbsCell(sheet_ref, row, col, _) => self.eval_at(
-                sheet_ref.handle as usize,
-                *row as usize,
-                *col as usize,
-                pass,
-                depth + 1,
-            ),
+            Ast::AbsCell(sheet_ref, row, col, flags) => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                self.eval_at(
+                    sheet_ref.handle as usize,
+                    placed_row as usize,
+                    placed_col as usize,
+                    pass,
+                    depth + 1,
+                )
+            }
             // A sheet reference that ingest did not resolve names another
             // workbook, which has no values here.
             Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {

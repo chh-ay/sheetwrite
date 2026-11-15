@@ -175,9 +175,14 @@ impl<'a> Utf16Offsets<'a> {
 /// constant, 4 name (a function, reference, defined name, table or sheet),
 /// 5 quoted sheet name, 6 table reference in brackets, 7 operator, 8 `:`,
 /// 9 `!`, 10 `#`, 11 `,`, 12 `;`, 13 `(`, 14 `)`, 15 `{`, 16 `}`, 17 bad text.
-#[wasm_bindgen(js_name = formulaTokens)]
+#[wasm_bindgen(
+    js_name = formulaTokens,
+    return_description = "Four numbers per token, in text order: kind, start, end and space."
+)]
 #[must_use]
-pub fn formula_tokens(src: &str) -> Vec<u32> {
+pub fn formula_tokens(
+    #[wasm_bindgen(param_description = "Formula text, with or without the leading `=`.")] src: &str,
+) -> Vec<u32> {
     let tokens = lex_tolerant(src);
     let mut offsets = Utf16Offsets::new(src);
     let mut packed = Vec::with_capacity(tokens.len() * TOKEN_FIELDS);
@@ -274,9 +279,14 @@ fn first_error(src: &str) -> Option<(usize, usize, bool, String)> {
 
 /// The first syntax error in formula text, or `undefined` when the engine's
 /// parser reads the whole formula. A leading `=` is optional, as for a cell.
-#[wasm_bindgen(js_name = checkFormulaSyntax)]
+#[wasm_bindgen(
+    js_name = checkFormulaSyntax,
+    return_description = "The first syntax error, with its UTF-16 span and message; `undefined` when the formula parses."
+)]
 #[must_use]
-pub fn check_formula_syntax(src: &str) -> Option<FormulaSyntaxError> {
+pub fn check_formula_syntax(
+    #[wasm_bindgen(param_description = "Formula text, with or without the leading `=`.")] src: &str,
+) -> Option<FormulaSyntaxError> {
     let (start, end, incomplete, message) = first_error(src)?;
     let mut offsets = Utf16Offsets::new(src);
 

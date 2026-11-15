@@ -48,6 +48,11 @@ impl FormulaId {
     pub(crate) fn index(self) -> usize {
         self.0 as usize
     }
+
+    /// The id as a 32-bit integer, for packed sort keys.
+    pub(crate) const fn raw(self) -> u32 {
+        self.0
+    }
 }
 
 /// Primary membership bits shared by dirty work and active evaluation state.

@@ -13,8 +13,8 @@ use crate::calc::{
     shift_range, Ast, NamedRangeRef, ParseFeatures, StructuredRef, WrittenNames,
 };
 use crate::cells::{
-    encode_num, encode_str_id, payload_num, payload_str_id, DEFAULT_MAX_PAGED_DIRTY_CELLS,
-    DEFAULT_PAGE_CHUNK_ROWS,
+    encode_num, encode_str_id, payload_num, payload_str_id, DirtyRowWrite,
+    DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
 };
 use crate::eval::{IterationLimits, RandomSource};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore};
@@ -23,6 +23,7 @@ use crate::memory::{
     StoreMemoryStats, SHEET_INDEXES_METADATA, STRING_INDEX, STRING_POOL_SPANS, STRING_POOL_UTF8,
 };
 use crate::sheet::{formula_error_at, SheetData};
+use crate::sorting::sort_by_key96;
 use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
 use crate::tables::{Table, TableColumn, TableSlots};
 use crate::types::{
@@ -107,26 +108,35 @@ pub struct SourceSnapshot {
 
 #[wasm_bindgen]
 impl SourceSnapshot {
+    /// Row-major offset, among the captured cells, of each cell with formula
+    /// text, ascending; [`Self::formula_sources`] holds the matching text.
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         self.formula_offsets.clone()
     }
 
+    /// The formula text of each cell in [`Self::formula_offsets`], in order.
     #[wasm_bindgen(js_name = formulaSources)]
     pub fn formula_sources(&self) -> Vec<String> {
         self.formula_sources.clone()
     }
 
+    /// Row-major offset of each cell that refers to one other cell by
+    /// position instead of by formula text, ascending.
     #[wasm_bindgen(js_name = referenceOffsets)]
     pub fn reference_offsets(&self) -> Vec<u32> {
         self.reference_offsets.clone()
     }
 
+    /// The cell each of [`Self::reference_offsets`] refers to, as packed
+    /// `[sheet_handle, row, col]` triples in the same order.
     #[wasm_bindgen(js_name = referenceTargets)]
     pub fn reference_targets(&self) -> Vec<u32> {
         self.reference_targets.clone()
     }
 
+    /// One byte per captured cell, row-major: 1 where another cell's spill
+    /// fills it. Empty when no captured cell is spill-filled.
     #[wasm_bindgen(js_name = spillDerived)]
     pub fn spill_derived(&self) -> Vec<u8> {
         self.spill_derived.clone()
@@ -152,6 +162,8 @@ pub struct RangeSnapshot {
 
 #[wasm_bindgen]
 impl RangeSnapshot {
+    /// Packed `[row, col]` pairs, relative to the range's first cell, of the
+    /// cells with formula text; [`Self::formula_sources`] holds the text.
     #[wasm_bindgen(js_name = formulaOffsets)]
     pub fn formula_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -166,6 +178,8 @@ impl RangeSnapshot {
         offsets
     }
 
+    /// Packed `[row, col]` pairs, relative to the range's first cell, of the
+    /// cells that refer to one other cell by position instead of by formula text.
     #[wasm_bindgen(js_name = referenceOffsets)]
     pub fn reference_offsets(&self) -> Vec<u32> {
         let mut offsets = Vec::new();
@@ -180,6 +194,8 @@ impl RangeSnapshot {
         offsets
     }
 
+    /// The cell each of [`Self::reference_offsets`] refers to, as packed
+    /// `[sheet_handle, row, col]` triples in the same order.
     #[wasm_bindgen(js_name = referenceTargets)]
     pub fn reference_targets(&self) -> Vec<u32> {
         let mut targets = Vec::new();
@@ -195,16 +211,21 @@ impl RangeSnapshot {
         targets
     }
 
+    /// The kind of each cell's stored value (`KIND_*`), one byte per cell,
+    /// column by column.
     #[wasm_bindgen(js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kind.clone()
     }
 
+    /// The style id of each cell, column by column, as in [`Self::kinds`].
     #[wasm_bindgen(js_name = styleIds)]
     pub fn style_ids(&self) -> Vec<u32> {
         self.style.clone()
     }
 
+    /// Bytes the snapshot holds: cell data, its text and formulas. History
+    /// counts it against its memory budget.
     #[wasm_bindgen(js_name = byteLength)]
     pub fn byte_length(&self) -> usize {
         self.kind.len()
@@ -226,6 +247,7 @@ impl RangeSnapshot {
                 .sum::<usize>()
     }
 
+    /// The formula text of each cell in [`Self::formula_offsets`], in order.
     #[wasm_bindgen(js_name = formulaSources)]
     pub fn formula_sources(&self) -> Vec<String> {
         self.formulas
@@ -260,23 +282,41 @@ struct SparseLiteralBlock<'a> {
 }
 
 impl SparseLiteralBlock<'_> {
-    /// Counting-sort entry indexes by column while rejecting invalid offsets.
+    /// Counting-sort entry indexes by column while rejecting invalid or
+    /// repeated offsets. Repeats are found with an offset bitset while it is no
+    /// larger than the entries, else by sorting each column's offsets, so a
+    /// sparse paged block never allocates by its rectangle.
     fn column_entries(&self) -> Option<SparseColumns> {
         let (rows, cols) = self.dimensions;
-        let mut seen = vec![0u64; (rows * cols).div_ceil(u64::BITS as usize)];
+        let cells = rows * cols;
+        let words = cells.div_ceil(u64::BITS as usize);
+        let bitset = words <= self.offsets.len();
         let mut starts = vec![0u32; cols + 1];
-        for &offset in self.offsets {
-            let offset_index = offset as usize;
-            if offset_index >= rows * cols {
-                return None;
+        // Two loops, so the bitset loop indexes a bitset of known length:
+        // one `get_mut` per offset cost a dense load ~3 instructions per cell.
+        if bitset {
+            let mut seen = vec![0u64; words];
+            for &offset in self.offsets {
+                let offset_index = offset as usize;
+                if offset_index >= cells {
+                    return None;
+                }
+                let word = &mut seen[offset_index / u64::BITS as usize];
+                let bit = 1u64 << (offset_index % u64::BITS as usize);
+                if *word & bit != 0 {
+                    return None;
+                }
+                *word |= bit;
+                starts[offset_index % cols + 1] += 1;
             }
-            let word = &mut seen[offset_index / u64::BITS as usize];
-            let bit = 1u64 << (offset_index % u64::BITS as usize);
-            if *word & bit != 0 {
-                return None;
+        } else {
+            for &offset in self.offsets {
+                let offset_index = offset as usize;
+                if offset_index >= cells {
+                    return None;
+                }
+                starts[offset_index % cols + 1] += 1;
             }
-            *word |= bit;
-            starts[offset_index % cols + 1] += 1;
         }
         for col in 0..cols {
             starts[col + 1] += starts[col];
@@ -289,7 +329,23 @@ impl SparseLiteralBlock<'_> {
         }
         starts.rotate_right(1);
         starts[0] = 0;
-        Some(SparseColumns { starts, entries })
+        let columns = SparseColumns { starts, entries };
+        (bitset || self.columns_have_distinct_offsets(&columns)).then_some(columns)
+    }
+
+    /// Whether no column lists an offset twice, by sorting each column's offsets.
+    fn columns_have_distinct_offsets(&self, columns: &SparseColumns) -> bool {
+        let mut column_offsets = Vec::new();
+        columns.starts.windows(2).all(|bounds| {
+            column_offsets.clear();
+            column_offsets.extend(
+                columns.entries[bounds[0] as usize..bounds[1] as usize]
+                    .iter()
+                    .map(|&index| self.offsets[index as usize]),
+            );
+            column_offsets.sort_unstable();
+            column_offsets.windows(2).all(|pair| pair[0] != pair[1])
+        })
     }
 
     fn cell(&self, index: usize) -> (usize, u8, u64, u32) {
@@ -1035,12 +1091,16 @@ impl CellStore {
             .collect()
     }
 
+    /// Rows in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = rowCount)]
     pub fn row_count(&self, sheet: usize) -> usize {
         self.sheets.get(sheet).map_or(0, |s| s.cells.row_count())
     }
 
+    /// Columns in `sheet`; 0 when there is no such sheet.
+    ///
     /// @enginePublic Engine hosts can read sheet dimensions without core metadata.
     #[wasm_bindgen(js_name = colCount)]
     pub fn col_count(&self, sheet: usize) -> usize {
@@ -1119,6 +1179,9 @@ impl CellStore {
         });
     }
 
+    /// Empties the cell at `row`, `col` of `sheet`, removing its value or
+    /// formula, and gives it style `style`.
+    ///
     /// @enginePublic Scalar clearing complements the public scalar value setters.
     #[wasm_bindgen(js_name = clearCell)]
     pub fn clear_cell(&mut self, sheet: usize, row: usize, col: usize, style: u32) {
@@ -1223,12 +1286,12 @@ impl CellStore {
             return BLOCK_SOURCE_INVALID;
         }
 
-        // Paged cells need dirty-overlay preflight and residency checks; spills
-        // need per-cell detachment. Neither can use the dense column writer.
+        // Paged edits need dirty-overlay preflight; a page load does not, and
+        // keeps every edited cell. Spills need per-cell detachment.
         if !offsets.is_empty()
             && formula_offsets.is_empty()
             && reference_offsets.is_empty()
-            && !existing.cells.is_paged()
+            && (hydrating || !existing.cells.is_paged())
             && existing.spill.is_empty()
         {
             let mut block = SparseLiteralBlock {
@@ -1579,8 +1642,8 @@ impl CellStore {
                 references.push((offset, target));
             }
         }
-        formulas.sort_unstable_by_key(|(offset, _)| *offset);
-        references.sort_unstable_by_key(|(offset, _)| *offset);
+        sort_by_key96(&mut formulas, |(offset, _)| u128::from(*offset));
+        sort_by_key96(&mut references, |(offset, _)| u128::from(*offset));
 
         let mut formula_offsets = Vec::with_capacity(formulas.len());
         let mut formula_sources = Vec::with_capacity(formulas.len());
@@ -1688,7 +1751,7 @@ impl CellStore {
                 .checked_add(col as usize)?;
             references.push((offset as u32, target));
         }
-        references.sort_unstable_by_key(|(offset, _)| *offset);
+        sort_by_key96(&mut references, |(offset, _)| u128::from(*offset));
         let mut reference_offsets = Vec::with_capacity(references.len());
         let mut reference_targets = Vec::with_capacity(references.len().saturating_mul(3));
         for (offset, target) in references {
@@ -3083,7 +3146,10 @@ impl CellStore {
         // Dense sheets are capped below u32 coordinates, so keys always exist.
         if !HAS_SOURCES {
             let sheet_data = &mut self.sheets[sheet];
-            if sheet_data.cells.write_dense_block(start, dimensions, &cell) {
+            if sheet_data
+                .cells
+                .write_literal_block(start, dimensions, revision, &cell)
+            {
                 if !sheet_data.formulas.is_empty() {
                     for col in start.1..start.1 + dimensions.1 {
                         for row in start.0..start.0 + dimensions.0 {
@@ -3296,8 +3362,10 @@ impl CellStore {
         self.replace_cell_source_inner(write, false)
     }
 
-    /// Writes a validated, spill-free dense literal block column by column.
-    /// Formula retirement and dirty seeds still describe only listed cells.
+    /// Writes a validated, spill-free literal block column by column: a dense
+    /// block, or a page load into a paged sheet. Formula retirement and dirty
+    /// seeds still describe only listed cells, and a page load leaves cells
+    /// with an unacknowledged edit, and their formulas, alone.
     #[inline(never)]
     fn write_sparse_columns(
         &mut self,
@@ -3309,9 +3377,11 @@ impl CellStore {
         let sheet_data = &mut self.sheets[sheet];
         for (col, bounds) in columns.starts.windows(2).enumerate() {
             let column = &columns.entries[bounds[0] as usize..bounds[1] as usize];
-            sheet_data.cells.write_dense_column_cells(
+            sheet_data.cells.write_column_cells(
                 block.start.1 + col,
-                column.iter().map(|&index| block.cell(index as usize)),
+                column,
+                |index| block.cell(index),
+                DirtyRowWrite::Keep,
             );
         }
         let keys = || {
@@ -3324,7 +3394,9 @@ impl CellStore {
             })
         };
         if !sheet_data.formulas.is_empty() {
-            for key in keys() {
+            let cells = &sheet_data.cells;
+            for key in keys().filter(|&(row, col)| !cells.is_cell_dirty(row as usize, col as usize))
+            {
                 self.graph.replace_entry(
                     &mut sheet_data.formulas,
                     &mut self.formula_slots,
@@ -4253,16 +4325,19 @@ pub struct CellSnapshot {
 
 #[wasm_bindgen]
 impl CellSnapshot {
+    /// The kind of each cell's value (`KIND_*`), as [`CellOut::kind`] reports it.
     #[wasm_bindgen(getter, js_name = kinds)]
     pub fn kinds(&self) -> Vec<u8> {
         self.kinds.clone()
     }
 
+    /// Each cell's number, for number and boolean cells.
     #[wasm_bindgen(getter, js_name = numbers)]
     pub fn numbers(&self) -> Vec<f64> {
         self.numbers.clone()
     }
 
+    /// Each cell's style id.
     #[wasm_bindgen(getter, js_name = styles)]
     pub fn styles(&self) -> Vec<u32> {
         self.styles.clone()
@@ -4274,6 +4349,8 @@ impl CellSnapshot {
         self.text_index.clone()
     }
 
+    /// The text of each cell that has one, in cell order; [`Self::text_index`]
+    /// gives a cell's entry.
     #[wasm_bindgen(getter, js_name = strings)]
     pub fn strings(&self) -> Vec<String> {
         self.strings.clone()

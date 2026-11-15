@@ -990,7 +990,7 @@ impl CellStore {
             if let Some(formula) = oversized.then(|| table.formula_at_position(at)).flatten() {
                 formula.expression = Ast::Array(Box::new(ArrayLiteral {
                     cols: 1,
-                    values: vec![Value::Error(FormulaError::Num)],
+                    values: Rc::from([Value::Error(FormulaError::Num)]),
                 }));
             }
         }
