@@ -647,10 +647,11 @@ export class AutoFilterMenu {
   };
 
   private readonly onRootKey = (event: KeyboardEvent): void => {
+    // The dropdown's keys stay inside it, also the Enter or Escape that just
+    // closed it: the grid behind must not start an edit or move.
+    event.stopPropagation();
     const session = this.session;
     if (!session) return;
-    // The dropdown's keys stay inside it; the grid behind must not move.
-    event.stopPropagation();
     if (event.key === "Escape") {
       event.preventDefault();
       if (!session.presets.hidden) this.togglePresets(false);
