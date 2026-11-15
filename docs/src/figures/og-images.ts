@@ -75,7 +75,7 @@ const PATH_SECTIONS: Readonly<Record<string, string>> = {
   api: "API reference",
   reference: "Reference",
   performance: "Performance",
-  releases: "Release notes",
+  releases: "Releases",
 };
 
 const colours = themeTokens("dark");
