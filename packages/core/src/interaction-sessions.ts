@@ -1,5 +1,5 @@
-import { filterButtonRect } from "./autofilter.js";
 import { cellA1, rangeA1, shiftA1Refs } from "./a1.js";
+import { filterButtonRect } from "./autofilter.js";
 import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
@@ -643,7 +643,12 @@ export class InteractionSessions {
         ),
       );
       const x = e.clientX - viewportRect.left;
-      if (x >= button.x && x <= button.x + button.w && py >= button.y && py <= button.y + button.h) {
+      if (
+        x >= button.x &&
+        x <= button.x + button.w &&
+        py >= button.y &&
+        py <= button.y + button.h
+      ) {
         e.preventDefault();
         const selection = this.deps.selection();
         selection.selectCell(cell.row, cell.col);

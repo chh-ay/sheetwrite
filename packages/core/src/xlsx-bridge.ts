@@ -1,8 +1,8 @@
-import { autoFilterBody } from "./autofilter.js";
 import { isDashboard } from "./dashboard.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
+import { autoFilterBody } from "./store/autofilter.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { ColumnarData } from "./types/data.js";

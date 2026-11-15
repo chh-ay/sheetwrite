@@ -144,9 +144,9 @@ test("a Number Filters condition and Clear Filter From, from the keyboard", asyn
   await form.getByRole("textbox", { name: "Value 1" }).fill("10");
   await form.getByRole("textbox", { name: "Value 1" }).press("Enter");
 
-  await expect.poll(() => filters(page)).toEqual([
-    [1, { kind: "custom", join: "and", conditions: [{ op: "gt", value: 10 }] }],
-  ]);
+  await expect
+    .poll(() => filters(page))
+    .toEqual([[1, { kind: "custom", join: "and", conditions: [{ op: "gt", value: 10 }] }]]);
   await expect.poll(() => shownItems(page)).toEqual(["Item", "Apricot", "fig", "grape"]);
   await expect(grid(page)).toBeFocused();
 

@@ -573,8 +573,8 @@ export class ReadWindowController {
         scrollTop: contentTop,
         scrollLeft: 0,
         rowTops: bodyGeometry?.rowTops,
-      rowHeights: bodyGeometry?.rowHeights,
-      rowNumbers: bodyNumbers,
+        rowHeights: bodyGeometry?.rowHeights,
+        rowNumbers: bodyNumbers,
       });
     }
 

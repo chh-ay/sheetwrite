@@ -102,7 +102,8 @@ async function autoFilterRoundTrip(): Promise<number> {
     const imported = await fromXlsxWorkbook(await toXlsxWorkbook(store));
     const sheet = imported.sheets[0];
     if (
-      JSON.stringify(sheet?.autoFilter) !== JSON.stringify(autoFilterSnapshot.sheets[0]?.autoFilter) ||
+      JSON.stringify(sheet?.autoFilter) !==
+        JSON.stringify(autoFilterSnapshot.sheets[0]?.autoFilter) ||
       JSON.stringify(sheet?.filters) !== JSON.stringify(autoFilterSnapshot.sheets[0]?.filters)
     ) {
       throw new Error("The AutoFilter changed in an XLSX round trip");

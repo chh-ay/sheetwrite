@@ -1,4 +1,3 @@
-import { validCustomFilter } from "../autofilter.js";
 import type { Column } from "../types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type {
@@ -12,6 +11,7 @@ import type {
   SheetVisibility,
   SortKey,
 } from "../types/document.js";
+import { validCustomFilter } from "./autofilter.js";
 
 export function integerAt(value: number): boolean {
   return Number.isInteger(value) && value >= 0;

@@ -731,9 +731,12 @@ function measureAutoFilter(
 
   if (measures("autofilter-dropdown")) {
     let listed: ReturnType<typeof engine.autoFilterValues> | undefined;
-    queries["autofilter-dropdown"] = measure(() => {
-      listed = engine.autoFilterValues(SHEET, COL.city, AUTO_FILTER_LIST_LIMIT);
-    }, plan("autofilter-dropdown", rows));
+    queries["autofilter-dropdown"] = measure(
+      () => {
+        listed = engine.autoFilterValues(SHEET, COL.city, AUTO_FILTER_LIST_LIMIT);
+      },
+      plan("autofilter-dropdown", rows),
+    );
     if (listed?.values.length !== listedCities || listed.kept?.length !== 3) {
       throw new Error(`autofilter ${rows}: the dropdown listed the wrong values`);
     }

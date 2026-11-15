@@ -362,7 +362,12 @@ export class AutoFilterMenu {
     heading.textContent = `Show rows where ${request.header}:`;
 
     const current = request.filter?.kind === "custom" ? request.filter : undefined;
-    const first = this.conditionRow(1, current?.conditions[0]?.op ?? preset.first, false, current?.conditions[0]);
+    const first = this.conditionRow(
+      1,
+      current?.conditions[0]?.op ?? preset.first,
+      false,
+      current?.conditions[0],
+    );
     const second = this.conditionRow(
       2,
       current?.conditions[1]?.op ?? preset.second ?? null,
@@ -405,9 +410,7 @@ export class AutoFilterMenu {
       const [one, two] = conditions;
       if (!one) return;
       const join = radios[1]?.checked ? "or" : "and";
-      this.run(() =>
-        request.apply({ kind: "custom", join, conditions: two ? [one, two] : [one] }),
-      );
+      this.run(() => request.apply({ kind: "custom", join, conditions: two ? [one, two] : [one] }));
     });
 
     session.main.hidden = true;

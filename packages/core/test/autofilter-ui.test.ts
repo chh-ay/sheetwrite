@@ -68,12 +68,17 @@ function mount(): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } 
   Object.defineProperty(host, "clientHeight", { value: 320, configurable: true });
   document.body.appendChild(host);
   const grid = new GridImpl(host, { workbook: store.getWorkbook() }, store);
-  disposers.push(() => store.dispose(), () => grid.destroy());
+  disposers.push(
+    () => store.dispose(),
+    () => grid.destroy(),
+  );
   return { grid, host, store };
 }
 
 const press = (target: HTMLElement, key: string, init: KeyboardEventInit = {}) =>
-  target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }));
+  target.dispatchEvent(
+    new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }),
+  );
 
 /** The grid imports the dropdown lazily; awaiting the same module runs its open callback first. */
 async function dropdown(): Promise<HTMLElement> {

@@ -2,6 +2,8 @@ import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
+import type { AutoFilterMenu, AutoFilterMenuRequest } from "./autofilter-menu.js";
+import { AUTO_FILTER_VALUE_LIMIT, autoFilterColumnKind } from "./autofilter.js";
 import { readBlockArraysOnce } from "./block-ingress.js";
 import {
   fontFor,
@@ -43,8 +45,6 @@ import {
   unknownSheetError,
 } from "./errors.js";
 import { downloadBytesIn, toCsv } from "./export.js";
-import { AUTO_FILTER_VALUE_LIMIT, autoFilterColumnKind } from "./autofilter.js";
-import type { AutoFilterMenu, AutoFilterMenuRequest } from "./autofilter-menu.js";
 import type { FindBar } from "./find-bar.js";
 import { stepFontSizePx, stepNumberFormatDecimals } from "./format-presets.js";
 import { GeometryLayoutController } from "./geometry-layout-controller.js";
@@ -2828,8 +2828,11 @@ export class GridImpl implements Grid {
             ? "TRUE"
             : "FALSE"
           : (value ?? "");
-    const headerValue = this.store.getCell({ sheet: this.activeSheet, row: range.start.row, col })
-      .resolved;
+    const headerValue = this.store.getCell({
+      sheet: this.activeSheet,
+      row: range.start.row,
+      col,
+    }).resolved;
     const { values, kept } = engine.autoFilterValues(
       this.activeSheet,
       col,
@@ -2846,7 +2849,8 @@ export class GridImpl implements Grid {
     const top = viewport.top + cell.y;
     return {
       anchor: { left: viewport.left + cell.x, top, bottom: top + cell.h },
-      header: headerValue === null || headerValue === "" ? `Column ${colToA1(col)}` : format(headerValue),
+      header:
+        headerValue === null || headerValue === "" ? `Column ${colToA1(col)}` : format(headerValue),
       kind,
       values,
       kept,
