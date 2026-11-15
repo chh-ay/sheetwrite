@@ -60,6 +60,22 @@ pub(super) fn bit(bits: &[u64], offset: usize) -> bool {
     bits[offset / BITS_PER_WORD] & (1 << (offset % BITS_PER_WORD)) != 0
 }
 
+/// Whether the `len` bits from `start` are all set, a word at a time.
+pub(super) fn all_bits(bits: &[u64], start: usize, len: usize) -> bool {
+    let mut offset = start;
+    let end = start + len;
+    while offset < end {
+        let shift = offset % BITS_PER_WORD;
+        let take = (BITS_PER_WORD - shift).min(end - offset);
+        let mask = (u64::MAX >> (BITS_PER_WORD - take)) << shift;
+        if bits[offset / BITS_PER_WORD] & mask != mask {
+            return false;
+        }
+        offset += take;
+    }
+    true
+}
+
 #[inline]
 fn set_bit(bits: &mut [u64], offset: usize) {
     bits[offset / BITS_PER_WORD] |= 1 << (offset % BITS_PER_WORD);
