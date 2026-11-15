@@ -123,16 +123,11 @@ pub(super) type KeepDefinition<'k> = dyn FnMut(Option<u32>, &str, &mut DefinedNa
 /// A named formula's scope, name and formula text.
 pub(super) type FormulaSource<'a> = (Option<u32>, &'a str, &'a str);
 
-/// A name's definition in one scope. A formula is held in place, not boxed:
-/// evaluation reads it for every use of the name, and a name has one or two
-/// definitions.
-#[allow(
-    clippy::large_enum_variant,
-    reason = "a boxed Definition cost one more load per name read; target-edit rows measured"
-)]
+/// A name's definition in one scope. A formula is boxed, so a named range,
+/// the common definition, stays small in its name's list.
 pub(super) enum DefinedName {
     Range(NamedRangeRef),
-    Formula(Definition),
+    Formula(Box<Definition>),
 }
 
 pub(super) struct Definition {
@@ -617,7 +612,7 @@ impl NameTable {
             .definitions
             .get_mut(definition)?
         {
-            (_, DefinedName::Formula(formula)) => Some(formula),
+            (_, DefinedName::Formula(formula)) => Some(&mut **formula),
             (_, DefinedName::Range(_)) => None,
         }
     }
@@ -774,6 +769,8 @@ impl NameTable {
                         metadata.add_payload(range.name.len(), range.name.capacity());
                     }
                     DefinedName::Formula(formula) => {
+                        let bytes = std::mem::size_of::<Definition>();
+                        metadata.add_payload(bytes, bytes);
                         metadata.add_payload(formula.name.len(), formula.name.capacity());
                         metadata.add_payload(formula.source.len(), formula.source.capacity());
                         formula.ast.heap_memory_stats(metadata);
@@ -871,7 +868,7 @@ impl CellStore {
             name_scope,
             key.clone(),
             name,
-            DefinedName::Formula(definition),
+            DefinedName::Formula(Box::new(definition)),
         );
         self.rebind_name_users(vec![key]);
         self.recompute_all_sheets();
@@ -1245,8 +1242,12 @@ impl CellStore {
             plain: false,
             reach: NEVER_IN_PLACE,
         };
-        self.names
-            .insert(scope, key, &name, DefinedName::Formula(definition));
+        self.names.insert(
+            scope,
+            key,
+            &name,
+            DefinedName::Formula(Box::new(definition)),
+        );
         Ok(())
     }
 }
