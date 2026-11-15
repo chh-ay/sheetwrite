@@ -63,7 +63,7 @@ use crate::graph::DirtySeeds;
 use crate::sheet::{formula_error_with_entry, SheetData};
 use crate::sorting::{key96, sort_by_key96};
 use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
-use crate::store::names::NameScope;
+use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -1740,9 +1740,7 @@ impl CellStore {
                         // has computed it, reads its own references where
                         // they are written. Top-level evaluations start
                         // unshifted.
-                        return read_shifted((0, 0), || {
-                            self.eval_formula_id(id, pass, depth + 1)
-                        });
+                        return read_shifted((0, 0), || self.eval_formula_id(id, pass, depth + 1));
                     }
                     if self.iteration.is_some() {
                         iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
@@ -2134,8 +2132,9 @@ impl CellStore {
         depth: usize,
     ) -> EvalResult {
         match self.name_scope(sheet).in_place(id) {
-            Some((expression, None)) => self.eval_ast(expression, sheet, pass, depth + 1),
-            Some((expression, Some(shift))) => {
+            Some(InPlace::Range(range)) => self.named_range_value(range, pass, depth),
+            Some(InPlace::Formula(expression)) => self.eval_ast(expression, sheet, pass, depth + 1),
+            Some(InPlace::Shifted(expression, shift)) => {
                 read_shifted(shift, || self.eval_ast(expression, sheet, pass, depth + 1))
             }
             None => self.eval_defined_name_read_family(id, sheet, pass, depth),
@@ -2143,9 +2142,8 @@ impl CellStore {
     }
 
     /// The value of a defined name read through [`NameScope::read`]: its
-    /// cell, its formula's value, or `#NAME?` while undefined (`#REF!` for a
-    /// linked workbook's name the link does not hold). A range of more than
-    /// one cell is `#VALUE!` as a value, as a range written there is.
+    /// range's value, its formula's value, or `#NAME?` while undefined
+    /// (`#REF!` for a linked workbook's name the link does not hold).
     #[inline(never)]
     fn eval_defined_name_read_family(
         &self,
@@ -2161,17 +2159,30 @@ impl CellStore {
             return value;
         }
         match read.range() {
-            Some(range) if range.row_start == range.row_end && range.col_start == range.col_end => {
-                self.eval_at(
-                    range.sheet as usize,
-                    range.row_start as usize,
-                    range.col_start as usize,
-                    pass,
-                    depth + 1,
-                )
-            }
-            Some(_) => Value::Error(FormulaError::Value),
+            Some(range) => self.named_range_value(range, pass, depth),
             None => Value::Error(read.error().unwrap_or(FormulaError::Name)),
+        }
+    }
+
+    /// A name's range as a value: its one cell, or `#VALUE!` for a range of
+    /// more than one cell, as a range written there is.
+    #[inline]
+    fn named_range_value(
+        &self,
+        range: CellRange,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        if range.row_start == range.row_end && range.col_start == range.col_end {
+            self.eval_at(
+                range.sheet as usize,
+                range.row_start as usize,
+                range.col_start as usize,
+                pass,
+                depth + 1,
+            )
+        } else {
+            Value::Error(FormulaError::Value)
         }
     }
 

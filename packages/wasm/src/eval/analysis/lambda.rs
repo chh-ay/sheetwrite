@@ -25,7 +25,7 @@ use super::super::value::number_from_value;
 use super::super::{settled_cell_value, EvalPass};
 use crate::calc::{Ast, Func, LambdaDefinition};
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::NameScope;
+use crate::store::names::{InPlace, NameScope};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT};
 
@@ -912,11 +912,13 @@ impl<'a, 'p> Context<'a, 'p> {
         // A formula read in place holds no LAMBDA when it is shifted: a
         // name's LAMBDA is always placed in a copy.
         let read;
-        let formula = if let Some((formula, _)) = names.in_place(*id) {
-            formula
-        } else {
-            read = names.read(*id);
-            read.formula()?
+        let formula = match names.in_place(*id) {
+            Some(InPlace::Formula(formula) | InPlace::Shifted(formula, _)) => formula,
+            Some(InPlace::Range(_)) => return None,
+            None => {
+                read = names.read(*id);
+                read.formula()?
+            }
         };
         definition(formula, names).ok().cloned()
     }

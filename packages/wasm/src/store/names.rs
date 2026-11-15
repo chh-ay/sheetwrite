@@ -189,6 +189,29 @@ enum NameView<'a> {
     Placed(Box<Ast>),
 }
 
+/// What a defined name stands for when it is read with no guard and no copy
+/// ([`NameScope::in_place`]).
+pub(crate) enum InPlace<'a> {
+    /// A named range.
+    Range(CellRange),
+    /// The name's formula, the same for every cell that reads it.
+    Formula(&'a Ast),
+    /// The name's formula, read with its relative references moved by this
+    /// row and column, the reading cell's.
+    Shifted(&'a Ast, (u32, u32)),
+}
+
+/// The cells a named range covers.
+const fn range_cells(range: &NamedRangeRef) -> CellRange {
+    CellRange::new(
+        range.sheet,
+        range.row_start,
+        range.col_start,
+        range.row_end,
+        range.col_end,
+    )
+}
+
 /// One read of a defined name by a formula ([`NameScope::read`]). While it
 /// lives, a use of the name inside the name's own formula, for the same
 /// cell, reads as undefined; dropping it ends that.
@@ -305,25 +328,26 @@ impl<'a> NameScope<'a> {
         }
     }
 
-    /// The formula `id` holds for this sheet when it can be read in place
-    /// with no cycle guard: it follows no names, is not one reference, and is
-    /// either read alike by every cell (no shift) or moved by the cell being
-    /// read's row and column without leaving the sheet (that shift). What
-    /// evaluation and the walks that bind a formula read without
-    /// [`Self::read`]; inline, since they meet it at every use of a name.
+    /// What `id` stands for when it can be read with no cycle guard and no
+    /// copy: a named range, or a formula that follows no names and is not
+    /// one reference, read alike by every cell or moved by the cell being
+    /// read's row and column without leaving the sheet. What evaluation and
+    /// the walks that bind a formula read without [`Self::read`]; inline,
+    /// since they meet it at every use of a name.
     #[inline]
-    pub(crate) fn in_place(self, id: NameId) -> Option<(&'a Ast, Option<(u32, u32)>)> {
+    pub(crate) fn in_place(self, id: NameId) -> Option<InPlace<'a>> {
         match NameTable::definition_for(self.table.entry(id)?, self.sheet)? {
+            DefinedName::Range(range) => Some(InPlace::Range(range_cells(range))),
             DefinedName::Formula(formula) if formula.plain => {
                 if !formula.positional {
-                    return Some((&formula.expression, None));
+                    return Some(InPlace::Formula(&formula.expression));
                 }
                 let origin = current_formula_origin().unwrap_or_default();
                 formula
                     .fits_at(origin)
-                    .then_some((&formula.expression, Some(origin)))
+                    .then_some(InPlace::Shifted(&formula.expression, origin))
             }
-            DefinedName::Formula(_) | DefinedName::Range(_) => None,
+            DefinedName::Formula(_) => None,
         }
     }
 
@@ -344,13 +368,7 @@ impl<'a> NameScope<'a> {
         let view = match NameTable::definition_for(entry, self.sheet) {
             None if entry.spelling.contains('!') => NameView::Linked,
             None => NameView::Undefined,
-            Some(DefinedName::Range(range)) => NameView::Range(CellRange::new(
-                range.sheet,
-                range.row_start,
-                range.col_start,
-                range.row_end,
-                range.col_end,
-            )),
+            Some(DefinedName::Range(range)) => NameView::Range(range_cells(range)),
             Some(DefinedName::Formula(formula)) if formula.follows_names => {
                 return self.guarded_read(entry, formula)
             }
@@ -1227,12 +1245,8 @@ impl CellStore {
             plain: false,
             reach: NEVER_IN_PLACE,
         };
-        self.names.insert(
-            scope,
-            key,
-            &name,
-            DefinedName::Formula(definition),
-        );
+        self.names
+            .insert(scope, key, &name, DefinedName::Formula(definition));
         Ok(())
     }
 }

@@ -12,7 +12,7 @@ use crate::eval::{
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::NameScope;
+use crate::store::names::{InPlace, NameScope};
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -359,12 +359,13 @@ impl ReadSet {
     /// moves its references by its own shift, which the walks of
     /// [`crate::eval::static_range`] read from the reference shift.
     fn collect_name(&mut self, id: NameId, names: NameScope<'_>, shift: (u32, u32)) {
-        if let Some((expression, own)) = names.in_place(id) {
-            match own {
-                None => self.collect(expression, names, shift),
-                Some(own) => read_shifted(own, || self.collect(expression, names, own)),
+        match names.in_place(id) {
+            Some(InPlace::Range(range)) => return self.push_range(range),
+            Some(InPlace::Formula(expression)) => return self.collect(expression, names, shift),
+            Some(InPlace::Shifted(expression, own)) => {
+                return read_shifted(own, || self.collect(expression, names, own));
             }
-            return;
+            None => {}
         }
         let read = names.read(id);
         if let Some(range) = read.range() {
@@ -438,7 +439,10 @@ fn ast_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
             _,
         ) => true,
         Ast::DefinedName(id) => match names.in_place(*id) {
-            Some((expression, _)) => ast_is_volatile(expression, names),
+            Some(InPlace::Formula(expression) | InPlace::Shifted(expression, _)) => {
+                ast_is_volatile(expression, names)
+            }
+            Some(InPlace::Range(_)) => false,
             None => names
                 .read(*id)
                 .formula()

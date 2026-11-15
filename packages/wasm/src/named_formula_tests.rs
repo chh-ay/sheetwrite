@@ -73,7 +73,11 @@ fn a_formula_a_relative_name_reads_first_reads_its_own_cells() {
     store.set_formula(sheet, 1, 0, "=Right*{1;2}", 0);
     store.set_formula(sheet, 1, 1, "=C2+1", 0);
     store.recompute(sheet);
-    assert_eq!(number(&store, sheet, 2, 0), 22.0, "A3 spills B2*2, and B2 reads C2");
+    assert_eq!(
+        number(&store, sheet, 2, 0),
+        22.0,
+        "A3 spills B2*2, and B2 reads C2"
+    );
 
     store.set_number(sheet, 1, 2, 20.0, 0);
     store.recompute(sheet);

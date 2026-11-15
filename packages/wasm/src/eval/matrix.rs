@@ -304,12 +304,9 @@ pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRang
                 placed_col,
             ))
         }
-        Ast::Range(r0, c0, r1, c1, flags) => Some(placed_range(
-            formula_sheet,
-            (*r0, *c0),
-            (*r1, *c1),
-            *flags,
-        )),
+        Ast::Range(r0, c0, r1, c1, flags) => {
+            Some(placed_range(formula_sheet, (*r0, *c0), (*r1, *c1), *flags))
+        }
         Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
             Some(placed_range(sheet.handle, (*r0, *c0), (*r1, *c1), *flags))
         }
