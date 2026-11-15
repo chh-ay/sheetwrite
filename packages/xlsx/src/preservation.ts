@@ -83,7 +83,7 @@ const RETAINED_KINDS: Readonly<Record<XlsxSourceGraph["owner"], ReadonlySet<stri
 
 /** Whether an internal relationship from `owner` starts a graph this module keeps on save. */
 export function isRetainedRelationship(owner: XlsxSourceGraph["owner"], type: string): boolean {
-  return RETAINED_KINDS[owner].has(relationship_kind(type));
+  return RETAINED_KINDS[owner].has(relationshipKind(type));
 }
 
 const MACRO_WORKBOOK_CONTENT = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
@@ -101,14 +101,14 @@ const HEX_DIGITS_PER_LANE = 8;
 const HEX_RADIX = 16;
 
 /** Frozen parts whose payload CRC and size passed verification in this process. */
-const verified_parts = new WeakSet<XlsxSourcePart>();
-const relationship_target_cache = new WeakMap<XlsxSourcePart, readonly string[]>();
+const verifiedParts = new WeakSet<XlsxSourcePart>();
+const relationshipTargetCache = new WeakMap<XlsxSourcePart, readonly string[]>();
 
-function relationship_kind(type: string): string {
+function relationshipKind(type: string): string {
   return type.slice(type.lastIndexOf("/") + 1);
 }
 
-function encode_base64(bytes: Uint8Array): string {
+function encodeBase64(bytes: Uint8Array): string {
   const chunks: string[] = [];
   for (let offset = 0; offset < bytes.length; offset += BASE64_CHUNK_BYTES) {
     chunks.push(btoa(String.fromCharCode(...bytes.subarray(offset, offset + BASE64_CHUNK_BYTES))));
@@ -116,7 +116,7 @@ function encode_base64(bytes: Uint8Array): string {
   return chunks.join("");
 }
 
-function decode_base64(value: string): Uint8Array {
+function decodeBase64(value: string): Uint8Array {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index++) bytes[index] = binary.charCodeAt(index);
@@ -124,8 +124,8 @@ function decode_base64(value: string): Uint8Array {
 }
 
 /** Reused per digest so hashing a number allocates nothing. */
-const number_scratch = new Float64Array(1);
-const number_words = new Uint32Array(number_scratch.buffer);
+const numberScratch = new Float64Array(1);
+const numberWords = new Uint32Array(numberScratch.buffer);
 
 /**
  * Order-independent 64-bit fingerprint of a sheet's shape and source values.
@@ -134,7 +134,7 @@ const number_words = new Uint32Array(number_scratch.buffer);
  * against stale charts in snapshots edited outside a Store, not against
  * deliberate collisions: whoever can craft a collision can also edit the parts.
  */
-function sheet_digest(sheet: SheetSnapshot, scope: "layout" | "values" = "values"): string {
+function sheetDigest(sheet: SheetSnapshot, scope: "layout" | "values" = "values"): string {
   let low = Math.imul(FNV_OFFSET ^ sheet.rowCount, FNV_PRIME) >>> 0;
   let high = Math.imul(SECOND_LANE_SEED ^ sheet.columns.length, FNV_PRIME) >>> 0;
   const shape = JSON.stringify([
@@ -168,9 +168,9 @@ function sheet_digest(sheet: SheetSnapshot, scope: "layout" | "values" = "values
         mix(value.target.col);
       } else if (typeof value.value === "string") text = value.value;
       else if (typeof value.value === "number") {
-        number_scratch[0] = value.value;
-        mix(number_words[0] ?? 0);
-        mix(number_words[1] ?? 0);
+        numberScratch[0] = value.value;
+        mix(numberWords[0] ?? 0);
+        mix(numberWords[1] ?? 0);
       } else mix(value.value ? 2 : 3);
       // Kind length is not a tag: "literal" and "formula" have the same length.
       const tag =
@@ -198,7 +198,7 @@ function sheet_digest(sheet: SheetSnapshot, scope: "layout" | "values" = "values
   );
 }
 
-function drop_warning(context: XlsxCodecContext, part: string, reason: string): void {
+function dropWarning(context: XlsxCodecContext, part: string, reason: string): void {
   emitWarning(context, {
     code: "unsupported-feature",
     message: `Preserved XLSX part graph ${part} was dropped: ${reason}`,
@@ -206,53 +206,53 @@ function drop_warning(context: XlsxCodecContext, part: string, reason: string): 
   });
 }
 
-function graph_roots(
-  package_file: OpcPackage,
-  workbook_part: string,
-  workbook_xml: Uint8Array,
+function graphRoots(
+  packageFile: OpcPackage,
+  workbookPart: string,
+  workbookXml: Uint8Array,
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
 ): GraphRoot[] {
   const roots: GraphRoot[] = [];
-  for (const relationship of package_file.relationships("")) {
+  for (const relationship of packageFile.relationships("")) {
     if (!relationship.external && isRetainedRelationship("root", relationship.type)) {
       roots.push({ owner: "root", relationship });
     }
   }
 
-  const workbook_root = parseXml(workbook_xml, workbook_part, context);
-  const pivot_caches = xmlChildren(
-    xmlChild(workbook_root, "pivotCaches") ?? workbook_root,
+  const workbookRoot = parseXml(workbookXml, workbookPart, context);
+  const pivotCaches = xmlChildren(
+    xmlChild(workbookRoot, "pivotCaches") ?? workbookRoot,
     "pivotCache",
   );
-  for (const relationship of package_file.relationships(workbook_part)) {
-    const kind = relationship_kind(relationship.type);
+  for (const relationship of packageFile.relationships(workbookPart)) {
+    const kind = relationshipKind(relationship.type);
     if (relationship.external || !isRetainedRelationship("workbook", relationship.type)) continue;
     if (kind !== "pivotCacheDefinition") {
       roots.push({ owner: "workbook", relationship });
       continue;
     }
-    const cache_id = xmlAttribute(
-      pivot_caches.find((cache) => xmlAttribute(cache, "id") === relationship.id) ?? workbook_root,
+    const cacheId = xmlAttribute(
+      pivotCaches.find((cache) => xmlAttribute(cache, "id") === relationship.id) ?? workbookRoot,
       "cacheId",
     );
-    if (cache_id === undefined || !/^\d{1,10}$/.test(cache_id)) {
-      drop_warning(context, relationship.target, "its pivot cache id is missing");
-    } else roots.push({ owner: "workbook", relationship, cacheId: cache_id });
+    if (cacheId === undefined || !/^\d{1,10}$/.test(cacheId)) {
+      dropWarning(context, relationship.target, "its pivot cache id is missing");
+    } else roots.push({ owner: "workbook", relationship, cacheId });
   }
 
-  const sheets_by_name = new Map(snapshot.sheets.map((sheet) => [sheet.name, sheet.id]));
+  const sheetsByName = new Map(snapshot.sheets.map((sheet) => [sheet.name, sheet.id]));
   for (const declaration of xmlChildren(
-    xmlChild(workbook_root, "sheets") ?? workbook_root,
+    xmlChild(workbookRoot, "sheets") ?? workbookRoot,
     "sheet",
   )) {
-    const sheet_id = sheets_by_name.get(decodeXstring(xmlAttribute(declaration, "name") ?? ""));
-    const relationship_id = xmlAttribute(declaration, "id");
-    if (sheet_id === undefined || relationship_id === undefined) continue;
-    const sheet_part = package_file.relationship(workbook_part, relationship_id).target;
-    for (const relationship of package_file.relationships(sheet_part)) {
+    const sheetId = sheetsByName.get(decodeXstring(xmlAttribute(declaration, "name") ?? ""));
+    const relationshipId = xmlAttribute(declaration, "id");
+    if (sheetId === undefined || relationshipId === undefined) continue;
+    const sheetPart = packageFile.relationship(workbookPart, relationshipId).target;
+    for (const relationship of packageFile.relationships(sheetPart)) {
       if (!relationship.external && isRetainedRelationship("sheet", relationship.type)) {
-        roots.push({ owner: "sheet", sheetId: sheet_id, relationship });
+        roots.push({ owner: "sheet", sheetId, relationship });
       }
     }
   }
@@ -260,8 +260,8 @@ function graph_roots(
 }
 
 /** Internal parts reachable from `target`, or undefined when one is missing or rewritten. */
-function reachable_parts(
-  package_file: OpcPackage,
+function reachableParts(
+  packageFile: OpcPackage,
   target: string,
   modelled: ReadonlySet<string>,
 ): string[] | undefined {
@@ -269,11 +269,11 @@ function reachable_parts(
   const pending = [target];
   for (let part = pending.pop(); part !== undefined; part = pending.pop()) {
     if (members.has(part)) continue;
-    if (!package_file.archive.has(part) || REWRITTEN_PART.test(part)) return undefined;
+    if (!packageFile.archive.has(part) || REWRITTEN_PART.test(part)) return undefined;
     members.add(part);
     const relationships = relationshipsPart(part);
-    if (package_file.archive.has(relationships)) members.add(relationships);
-    for (const relationship of package_file.relationships(part)) {
+    if (packageFile.archive.has(relationships)) members.add(relationships);
+    for (const relationship of packageFile.relationships(part)) {
       if (!relationship.external && !modelled.has(relationship.target))
         pending.push(relationship.target);
     }
@@ -293,18 +293,18 @@ export async function capturePreserved(
   modelled: ReadonlySet<string>,
   replacements: ReadonlyMap<string, Uint8Array> = new Map(),
 ): Promise<void> {
-  const workbook_part = packageFile.officeDocumentPart();
-  const roots = graph_roots(
+  const workbookPart = packageFile.officeDocumentPart();
+  const roots = graphRoots(
     packageFile,
-    workbook_part,
-    await packageFile.readBytes(workbook_part),
+    workbookPart,
+    await packageFile.readBytes(workbookPart),
     snapshot,
     context,
   );
   const graphs: XlsxSourceGraph[] = [];
   let digests: Map<string, string> | undefined;
-  const all_sheet_dependencies = (): XlsxSourceDependency[] => {
-    digests ??= new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet_digest(sheet)]));
+  const allSheetDependencies = (): XlsxSourceDependency[] => {
+    digests ??= new Map(snapshot.sheets.map((sheet) => [sheet.id, sheetDigest(sheet)]));
     const known = digests;
     return snapshot.sheets.map((sheet) => ({
       sheetId: sheet.id,
@@ -317,13 +317,13 @@ export async function capturePreserved(
   for (const root of roots) {
     checkAbort(context);
     if (modelled.has(root.relationship.target)) continue;
-    const parts = reachable_parts(packageFile, root.relationship.target, modelled);
+    const parts = reachableParts(packageFile, root.relationship.target, modelled);
     if (!parts) {
-      drop_warning(context, root.relationship.target, "it points at a missing or rewritten part");
+      dropWarning(context, root.relationship.target, "it points at a missing or rewritten part");
       continue;
     }
-    const kind = relationship_kind(root.relationship.type);
-    const reads_cells =
+    const kind = relationshipKind(root.relationship.type);
+    const readsCells =
       kind.startsWith("pivot") ||
       parts.some((part) => CHART_CONTENT.test(packageFile.contentType(part) ?? ""));
     const owner =
@@ -331,14 +331,14 @@ export async function capturePreserved(
         ? undefined
         : snapshot.sheets.find((sheet) => sheet.id === root.sheetId);
     let dependencies: XlsxSourceDependency[] = [];
-    if (reads_cells) dependencies = all_sheet_dependencies();
+    if (readsCells) dependencies = allSheetDependencies();
     else if (owner) {
       dependencies = [
         {
           sheetId: owner.id,
           name: owner.name,
           scope: "layout",
-          digest: sheet_digest(owner, "layout"),
+          digest: sheetDigest(owner, "layout"),
         },
       ];
     }
@@ -354,25 +354,25 @@ export async function capturePreserved(
   }
 
   // Graphs that share a part (a pivot table and its cache) are kept or dropped together.
-  const units = shared_part_units(graphs);
+  const units = sharedPartUnits(graphs);
   const kept: XlsxSourceGraph[] = [];
   const retained = new Map<string, XlsxSourcePart>();
-  const compressed_sizes = new Map<string, number>();
+  const compressedSizes = new Map<string, number>();
   for (const [name, entry] of packageFile.archive.entries) {
-    compressed_sizes.set(asciiFold(name), entry.compressedSize);
+    compressedSizes.set(asciiFold(name), entry.compressedSize);
   }
-  let retained_bytes = 0;
+  let retainedBytes = 0;
   for (const unit of units) {
-    const unit_parts = [...new Set(unit.flatMap((graph) => graph.parts))].filter(
+    const unitParts = [...new Set(unit.flatMap((graph) => graph.parts))].filter(
       (part) => !retained.has(part),
     );
-    const unit_bytes = unit_parts.reduce(
-      (total, part) => total + (compressed_sizes.get(asciiFold(part)) ?? 0),
+    const unitBytes = unitParts.reduce(
+      (total, part) => total + (compressedSizes.get(asciiFold(part)) ?? 0),
       0,
     );
-    if (retained_bytes + unit_bytes > context.limits.maxPreservedBytes) {
+    if (retainedBytes + unitBytes > context.limits.maxPreservedBytes) {
       for (const graph of unit) {
-        drop_warning(
+        dropWarning(
           context,
           graph.target,
           `retained parts would exceed maxPreservedBytes (${context.limits.maxPreservedBytes})`,
@@ -380,8 +380,8 @@ export async function capturePreserved(
       }
       continue;
     }
-    retained_bytes += unit_bytes;
-    for (const part of unit_parts) {
+    retainedBytes += unitBytes;
+    for (const part of unitParts) {
       const replacement = replacements.get(part);
       const entry = replacement
         ? storedEntryFromBytes(replacement)
@@ -397,7 +397,7 @@ export async function capturePreserved(
           method: entry.method,
           crc32: entry.crc32,
           uncompressedSize: entry.uncompressedSize,
-          data: encode_base64(entry.data),
+          data: encodeBase64(entry.data),
         }),
       );
     }
@@ -409,19 +409,19 @@ export async function capturePreserved(
   snapshot.workbook.xlsxSource = admitPreserved(snapshot, context, true);
 }
 
-function shared_part_units(graphs: readonly XlsxSourceGraph[]): XlsxSourceGraph[][] {
+function sharedPartUnits(graphs: readonly XlsxSourceGraph[]): XlsxSourceGraph[][] {
   const units: XlsxSourceGraph[][] = [];
-  const unit_of_part = new Map<string, XlsxSourceGraph[]>();
+  const unitOfPart = new Map<string, XlsxSourceGraph[]>();
   for (const graph of graphs) {
     let unit: XlsxSourceGraph[] | undefined;
     for (const part of graph.parts) {
-      const other = unit_of_part.get(part);
+      const other = unitOfPart.get(part);
       if (!other || other === unit) continue;
       if (!unit) unit = other;
       else {
         unit.push(...other);
         for (const moved of other)
-          for (const moved_part of moved.parts) unit_of_part.set(moved_part, unit);
+          for (const movedPart of moved.parts) unitOfPart.set(movedPart, unit);
         units.splice(units.indexOf(other), 1);
       }
     }
@@ -430,13 +430,13 @@ function shared_part_units(graphs: readonly XlsxSourceGraph[]): XlsxSourceGraph[
       units.push(unit);
     }
     unit.push(graph);
-    for (const part of graph.parts) unit_of_part.set(part, unit);
+    for (const part of graph.parts) unitOfPart.set(part, unit);
   }
   return units;
 }
 
-function stored_entry(part: XlsxSourcePart): StoredZipEntry {
-  const data = decode_base64(part.data);
+function storedEntry(part: XlsxSourcePart): StoredZipEntry {
+  const data = decodeBase64(part.data);
   return {
     method: part.method,
     crc32: part.crc32,
@@ -446,18 +446,18 @@ function stored_entry(part: XlsxSourcePart): StoredZipEntry {
   };
 }
 
-function part_bytes(part: XlsxSourcePart): Uint8Array {
-  const entry = stored_entry(part);
+function partBytes(part: XlsxSourcePart): Uint8Array {
+  const entry = storedEntry(part);
   return entry.method === 0
     ? entry.data
     : inflateSync(entry.data, { out: new Uint8Array(entry.uncompressedSize) });
 }
 
 /** Largest `cNvPr` id; drawing object ids must stay unique within one drawing part. */
-function max_object_id(element: XmlElement): number {
+function maxObjectId(element: XmlElement): number {
   let maximum =
     xmlLocalName(element.name) === "cNvPr" ? Number(xmlAttribute(element, "id")) || 0 : 0;
-  for (const child of element.children) maximum = Math.max(maximum, max_object_id(child));
+  for (const child of element.children) maximum = Math.max(maximum, maxObjectId(child));
   return maximum;
 }
 
@@ -465,59 +465,59 @@ function max_object_id(element: XmlElement): number {
  * Rewrite a kept drawing and its relationships so they also hold `charts`.
  * The kept anchors stay as parsed; new relationship ids skip the kept ones.
  */
-function append_charts_to_drawing(
+function appendChartsToDrawing(
   drawing: XlsxSourcePart,
   relationships: XlsxSourcePart | undefined,
   charts: readonly DrawingChart[],
   context: XlsxCodecContext,
 ): Map<string, Uint8Array> {
-  const relationships_name = relationshipsPart(drawing.name);
-  const root = parseXml(part_bytes(drawing), drawing.name, context);
-  const relationships_root = relationships
-    ? parseXml(part_bytes(relationships), relationships_name, context)
+  const relationshipsName = relationshipsPart(drawing.name);
+  const root = parseXml(partBytes(drawing), drawing.name, context);
+  const relationshipsRoot = relationships
+    ? parseXml(partBytes(relationships), relationshipsName, context)
     : undefined;
-  const used_ids = new Set(
-    (relationships_root?.children ?? []).map((entry) => xmlAttribute(entry, "Id")),
+  const usedIds = new Set(
+    (relationshipsRoot?.children ?? []).map((entry) => xmlAttribute(entry, "Id")),
   );
 
-  let object_id = max_object_id(root);
-  let next_id = 1;
+  let objectId = maxObjectId(root);
+  let nextId = 1;
   let anchors = "";
   let added = "";
   for (const chart of charts) {
-    while (used_ids.has(`rId${next_id}`)) next_id += 1;
-    const id = `rId${next_id++}`;
-    anchors += chart.anchorXml(++object_id, id);
+    while (usedIds.has(`rId${nextId}`)) nextId += 1;
+    const id = `rId${nextId++}`;
+    anchors += chart.anchorXml(++objectId, id);
     added += `<Relationship Id="${id}" Type="${CHART_REL}" Target="${escapeXml(chart.target)}"/>`;
   }
 
-  const relationships_xml = relationships_root
-    ? elementXml(relationships_root, added)
+  const relationshipsXml = relationshipsRoot
+    ? elementXml(relationshipsRoot, added)
     : `<Relationships xmlns="${PACKAGE_RELATIONSHIPS_NS}">${added}</Relationships>`;
   const encoder = new TextEncoder();
   return new Map([
     [drawing.name, encoder.encode(elementXml(root, anchors))],
-    [relationships_name, encoder.encode(relationships_xml)],
+    [relationshipsName, encoder.encode(relationshipsXml)],
   ]);
 }
 
 /** Internal targets of a `.rels` part; parsed once per frozen part. */
-function relationship_targets(
+function relationshipTargets(
   name: string,
   part: XlsxSourcePart,
   context: XlsxCodecContext,
 ): readonly string[] {
-  const cached = relationship_target_cache.get(part);
+  const cached = relationshipTargetCache.get(part);
   if (cached) return cached;
-  const bytes = part_bytes(part);
-  const source_part = relationshipSourcePart(name);
+  const bytes = partBytes(part);
+  const sourcePart = relationshipSourcePart(name);
   const targets = xmlChildren(parseXml(bytes, name, context), "Relationship").flatMap(
     (relationship) =>
       xmlAttribute(relationship, "TargetMode") === "External"
         ? []
-        : [resolveRelationshipTarget(source_part, xmlAttribute(relationship, "Target") ?? "")],
+        : [resolveRelationshipTarget(sourcePart, xmlAttribute(relationship, "Target") ?? "")],
   );
-  if (Object.isFrozen(part)) relationship_target_cache.set(part, targets);
+  if (Object.isFrozen(part)) relationshipTargetCache.set(part, targets);
   return targets;
 }
 
@@ -526,13 +526,13 @@ function relationship_targets(
  * that its relationships parse and stay inside the graph. Returns why the
  * graph is dropped, or undefined to keep it.
  */
-function verify_graph(
+function verifyGraph(
   graph: XlsxSourceGraph,
-  parts_by_name: ReadonlyMap<string, XlsxSourcePart>,
+  partsByName: ReadonlyMap<string, XlsxSourcePart>,
   context: XlsxCodecContext,
 ): string | undefined {
   try {
-    return graph_problem(graph, parts_by_name, context);
+    return graphProblem(graph, partsByName, context);
   } catch (error) {
     // Corrupt, over-limit or malformed parts drop only their graph, so a
     // persisted workbook still opens; abort errors still fail the whole operation.
@@ -547,24 +547,22 @@ function verify_graph(
  * are cached per frozen part, whose bytes cannot change, so saving the same
  * workbook again is free.
  */
-function graph_problem(
+function graphProblem(
   graph: XlsxSourceGraph,
-  parts_by_name: ReadonlyMap<string, XlsxSourcePart>,
+  partsByName: ReadonlyMap<string, XlsxSourcePart>,
   context: XlsxCodecContext,
 ): string | undefined {
   const members = new Set(graph.parts);
   for (const name of graph.parts) {
     if (REWRITTEN_PART.test(name)) return `${name} is a part Sheetwrite rewrites`;
-    const part = parts_by_name.get(name);
+    const part = partsByName.get(name);
     if (!part) return `${name} is missing`;
-    if (!verified_parts.has(part)) {
-      validateStoredEntry(stored_entry(part), context);
-      if (Object.isFrozen(part)) verified_parts.add(part);
+    if (!verifiedParts.has(part)) {
+      validateStoredEntry(storedEntry(part), context);
+      if (Object.isFrozen(part)) verifiedParts.add(part);
     }
     if (!name.endsWith(".rels")) continue;
-    const outside = relationship_targets(name, part, context).find(
-      (target) => !members.has(target),
-    );
+    const outside = relationshipTargets(name, part, context).find((target) => !members.has(target));
     if (outside !== undefined) return `${name} points outside its graph at ${outside}`;
   }
   return undefined;
@@ -584,18 +582,18 @@ export function preparePreserved(
   const source: XlsxSourceSnapshot | undefined = snapshot.workbook.xlsxSource;
   if (!source) return undefined;
   for (const target of source.dropped ?? []) {
-    drop_warning(context, target, "an edit changed data it depends on");
+    dropWarning(context, target, "an edit changed data it depends on");
   }
 
   const sheets = new Map(snapshot.sheets.map((sheet) => [sheet.id, sheet]));
   const digests = new Map<string, string>();
-  const saved_queries = queriesDigest(snapshot.workbook.queries);
-  const parts_by_name = new Map(source.parts.map((part) => [part.name, part]));
+  const savedQueries = queriesDigest(snapshot.workbook.queries);
+  const partsByName = new Map(source.parts.map((part) => [part.name, part]));
   const valid = new Set<XlsxSourceGraph>();
   for (const graph of source.graphs) {
     checkAbort(context);
     // Query definitions changed since import, so the retained Power Query parts are stale.
-    if (graph.queries !== undefined && graph.queries !== saved_queries) {
+    if (graph.queries !== undefined && graph.queries !== savedQueries) {
       queryWarning(
         context,
         `Retained Power Query part ${graph.target} was dropped because the saved queries changed; output tables are written as values`,
@@ -616,14 +614,14 @@ export function preparePreserved(
         const key = `${sheet.id}:${dependency.scope}`;
         let digest = digests.get(key);
         if (digest === undefined) {
-          digest = sheet_digest(sheet, dependency.scope);
+          digest = sheetDigest(sheet, dependency.scope);
           digests.set(key, digest);
         }
         if (digest !== dependency.digest) reason = "an edit changed data it depends on";
       }
     }
-    reason ??= verify_graph(graph, parts_by_name, context);
-    if (reason) drop_warning(context, graph.target, reason);
+    reason ??= verifyGraph(graph, partsByName, context);
+    if (reason) dropWarning(context, graph.target, reason);
     else valid.add(graph);
   }
 
@@ -631,24 +629,23 @@ export function preparePreserved(
   // together, and whole units are dropped once the retained-byte cap is reached.
   const graphs: XlsxSourceGraph[] = [];
   const counted = new Set<string>();
-  let retained_bytes = 0;
-  for (const unit of shared_part_units(source.graphs)) {
+  let retainedBytes = 0;
+  for (const unit of sharedPartUnits(source.graphs)) {
     if (!unit.every((graph) => valid.has(graph))) {
       for (const graph of unit) {
         if (valid.has(graph))
-          drop_warning(context, graph.target, "a graph sharing its parts was dropped");
+          dropWarning(context, graph.target, "a graph sharing its parts was dropped");
       }
       continue;
     }
-    const unit_parts = new Set(
+    const unitParts = new Set(
       unit.flatMap((graph) => graph.parts).filter((name) => !counted.has(name)),
     );
-    let unit_bytes = 0;
-    for (const name of unit_parts)
-      unit_bytes += ((parts_by_name.get(name)?.data.length ?? 0) * 3) / 4;
-    if (retained_bytes + unit_bytes > context.limits.maxPreservedBytes) {
+    let unitBytes = 0;
+    for (const name of unitParts) unitBytes += ((partsByName.get(name)?.data.length ?? 0) * 3) / 4;
+    if (retainedBytes + unitBytes > context.limits.maxPreservedBytes) {
       for (const graph of unit) {
-        drop_warning(
+        dropWarning(
           context,
           graph.target,
           `retained parts would exceed maxPreservedBytes (${context.limits.maxPreservedBytes})`,
@@ -656,40 +653,40 @@ export function preparePreserved(
       }
       continue;
     }
-    retained_bytes += unit_bytes;
-    for (const name of unit_parts) counted.add(name);
+    retainedBytes += unitBytes;
+    for (const name of unitParts) counted.add(name);
     graphs.push(...unit);
   }
   if (graphs.length === 0) return undefined;
 
   const parts = source.parts.filter((part) => counted.has(part.name));
-  const workbook_graphs = graphs.filter((graph) => graph.owner === "workbook");
+  const workbookGraphs = graphs.filter((graph) => graph.owner === "workbook");
   const absolute = (graph: XlsxSourceGraph) => ({ type: graph.type, target: `/${graph.target}` });
   const rewritten = new Map<string, Uint8Array>();
   return {
     rootRelationships: graphs.filter((graph) => graph.owner === "root").map(absolute),
-    workbookRelationships: workbook_graphs.map(absolute),
+    workbookRelationships: workbookGraphs.map(absolute),
     workbookXml(ids) {
-      const pivot_caches = workbook_graphs.flatMap((graph, index) =>
+      const pivotCaches = workbookGraphs.flatMap((graph, index) =>
         graph.cacheId === undefined
           ? []
           : [
               `<pivotCache cacheId="${escapeXml(graph.cacheId)}" r:id="${escapeXml(ids[index] ?? "")}"/>`,
             ],
       );
-      return { pivotCaches: pivot_caches };
+      return { pivotCaches };
     },
     appendCharts(sheet, charts) {
       const graph = graphs.find(
         (entry) => entry.sheetId === sheet.id && relationshipTypeMatches(entry.type, "drawing"),
       );
-      const drawing = graph && parts_by_name.get(graph.target);
+      const drawing = graph && partsByName.get(graph.target);
       if (!drawing) return false;
 
-      const drawing_relationships = parts_by_name.get(relationshipsPart(drawing.name));
-      for (const [name, bytes] of append_charts_to_drawing(
+      const drawingRelationships = partsByName.get(relationshipsPart(drawing.name));
+      for (const [name, bytes] of appendChartsToDrawing(
         drawing,
-        drawing_relationships,
+        drawingRelationships,
         charts,
         context,
       )) {
@@ -698,14 +695,14 @@ export function preparePreserved(
       return true;
     },
     sheet(sheet) {
-      const sheet_graphs = graphs.filter(
+      const sheetGraphs = graphs.filter(
         (graph) => graph.owner === "sheet" && graph.sheetId === sheet.id,
       );
-      if (sheet_graphs.length === 0) return undefined;
+      if (sheetGraphs.length === 0) return undefined;
       return {
-        relationships: sheet_graphs.map(absolute),
+        relationships: sheetGraphs.map(absolute),
         beforeLegacyDrawing(ids) {
-          const drawing = sheet_graphs.findIndex((graph) =>
+          const drawing = sheetGraphs.findIndex((graph) =>
             relationshipTypeMatches(graph.type, "drawing"),
           );
           return drawing < 0 ? "" : `<drawing r:id="${escapeXml(ids[drawing] ?? "")}"/>`;
@@ -717,7 +714,7 @@ export function preparePreserved(
         .filter((part) => !part.name.endsWith(".rels"))
         .map((part) => ({ part: part.name, contentType: part.contentType })),
       // The VBA relationship lives in a Microsoft namespace, not the OOXML one.
-      ...(workbook_graphs.some((graph) => relationship_kind(graph.type) === "vbaProject")
+      ...(workbookGraphs.some((graph) => relationshipKind(graph.type) === "vbaProject")
         ? [{ part: "xl/workbook.xml", contentType: MACRO_WORKBOOK_CONTENT }]
         : []),
     ],
@@ -725,8 +722,8 @@ export function preparePreserved(
       for (const [name, bytes] of rewritten) yield { name, data: bytes };
       for (const part of parts) {
         if (rewritten.has(part.name)) continue;
-        const stored = stored_entry(part);
-        // verify_graph checked these exact bytes; spare the writer a second inflate.
+        const stored = storedEntry(part);
+        // verifyGraph checked these exact bytes; spare the writer a second inflate.
         markStoredEntryVerified(stored);
         yield { name: part.name, stored };
       }

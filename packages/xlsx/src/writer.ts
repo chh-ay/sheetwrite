@@ -129,28 +129,28 @@ export interface WorkbookWriteHook {
   queryTable?(table: WorkbookTable): QueryTableBinding | undefined;
 }
 
-function quoted_sheet(name: string): string {
+function quotedSheet(name: string): string {
   return `'${name.replaceAll("'", "''")}'`;
 }
 
-function formula_for_reference(snapshot: WorkbookSnapshot, source: SnapshotCell["value"]): string {
+function formulaForReference(snapshot: WorkbookSnapshot, source: SnapshotCell["value"]): string {
   if (source.kind !== "ref") throw new TypeError("Sheetwrite: expected reference cell");
   const target = snapshot.sheets.find((sheet) => sheet.id === source.target.sheet);
   if (!target) return "#REF!";
-  return `${quoted_sheet(target.name)}!${cellA1(source.target.row, source.target.col)}`;
+  return `${quotedSheet(target.name)}!${cellA1(source.target.row, source.target.col)}`;
 }
 
-function canonical_json_value(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical_json_value);
+function canonicalJsonValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalJsonValue);
   if (value === null || typeof value !== "object") return value;
   const output: Record<string, unknown> = {};
   for (const key of Object.keys(value).sort()) {
-    output[key] = canonical_json_value((value as Record<string, unknown>)[key]);
+    output[key] = canonicalJsonValue((value as Record<string, unknown>)[key]);
   }
   return output;
 }
 
-function has_exact_border_width(style: CellStyle | undefined): boolean {
+function hasExactBorderWidth(style: CellStyle | undefined): boolean {
   return Object.values(style?.border ?? {}).some(
     (border) => border.width !== undefined && border.width !== 1 && border.width !== 2,
   );
@@ -160,9 +160,9 @@ function has_exact_border_width(style: CellStyle | undefined): boolean {
  * Workbook metadata for the hidden sheet. The saved output of a native pivot
  * is left out: the worksheet holds it as the pivot's rendered cells.
  */
-function metadata_snapshot(
+function metadataSnapshot(
   snapshot: WorkbookSnapshot,
-  native_pivots: ReadonlySet<string>,
+  nativePivots: ReadonlySet<string>,
 ): WorkbookSnapshot {
   const { xlsxSource: _source, ...workbook } = snapshot.workbook;
   return {
@@ -174,7 +174,7 @@ function metadata_snapshot(
       ...(sheet.pivots
         ? {
             pivots: sheet.pivots.map((pivot) => {
-              if (!pivot.savedOutput || !native_pivots.has(pivot.id)) return pivot;
+              if (!pivot.savedOutput || !nativePivots.has(pivot.id)) return pivot;
               const { savedOutput: _saved, ...definition } = pivot;
               return definition;
             }),
@@ -182,7 +182,7 @@ function metadata_snapshot(
         : {}),
       cells: sheet.cells.flatMap((block) => {
         const preserved = block.cells
-          .filter((cell) => cell.value.kind === "ref" || has_exact_border_width(cell.style))
+          .filter((cell) => cell.value.kind === "ref" || hasExactBorderWidth(cell.style))
           .map((cell) => ({
             rowOffset: cell.rowOffset,
             colOffset: cell.colOffset,
@@ -190,7 +190,7 @@ function metadata_snapshot(
               cell.value.kind === "ref"
                 ? structuredClone(cell.value)
                 : ({ kind: "literal", value: null } as const),
-            ...(has_exact_border_width(cell.style) ? { style: structuredClone(cell.style) } : {}),
+            ...(hasExactBorderWidth(cell.style) ? { style: structuredClone(cell.style) } : {}),
           }));
         return preserved.length > 0 ? [{ ...block, cells: preserved }] : [];
       }),
@@ -198,7 +198,7 @@ function metadata_snapshot(
   };
 }
 
-function metadata_sheet_name(snapshot: WorkbookSnapshot): string {
+function metadataSheetName(snapshot: WorkbookSnapshot): string {
   const names = new Set(snapshot.sheets.map((sheet) => sheetNameKey(sheet.name)));
   let name = META_STEM;
   let suffix = 2;
@@ -208,7 +208,7 @@ function metadata_sheet_name(snapshot: WorkbookSnapshot): string {
   return name;
 }
 
-function validate_names(snapshot: WorkbookSnapshot): void {
+function validateNames(snapshot: WorkbookSnapshot): void {
   const names: string[] = [];
   for (const sheet of snapshot.sheets) {
     const validated = validateSheetName(sheet.name, names);
@@ -237,7 +237,7 @@ function validate_names(snapshot: WorkbookSnapshot): void {
   }
 }
 
-function preflight_snapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext): void {
+function preflightSnapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContext): void {
   assertResource(context, "maxSheets", snapshot.sheets.length);
   let cells = 0;
   let merges = 0;
@@ -253,7 +253,7 @@ function preflight_snapshot(snapshot: WorkbookSnapshot, context: XlsxCodecContex
   }
 }
 
-function validation_xml(
+function validationXml(
   rule: DataValidationRule,
   context: XlsxCodecContext,
   sheet: string,
@@ -267,11 +267,11 @@ function validation_xml(
       condition.kind === "list"
         ? condition.values
         : [condition.checkedValue ?? true, condition.uncheckedValue ?? false];
-    const text_values = values.map((value) =>
+    const textValues = values.map((value) =>
       value === null ? "" : typeof value === "boolean" ? (value ? "TRUE" : "FALSE") : String(value),
     );
-    if (text_values.some((value) => /[,\r\n]/.test(value))) return null;
-    const list = text_values.join(",").replaceAll('"', '""');
+    if (textValues.some((value) => /[,\r\n]/.test(value))) return null;
+    const list = textValues.join(",").replaceAll('"', '""');
     if (Array.from(list).length + 2 > 255) return null;
     type = "list";
     formulas = [`"${list}"`];
@@ -306,35 +306,35 @@ function validation_xml(
       if (operator === "equal") formulas = [condition.min!];
     }
   }
-  let help_text = rule.helpText;
-  if (help_text && Array.from(help_text).length > 255) {
+  let helpText = rule.helpText;
+  if (helpText && Array.from(helpText).length > 255) {
     emitWarning(context, {
       code: "validation-loss",
       message: `Validation rule "${rule.id}" prompt/error exceeded 255 characters and was omitted from native XLSX`,
       sheet,
     });
-    help_text = undefined;
+    helpText = undefined;
   }
   const attributes = [
     `type="${type}"`,
     ...(operator ? [`operator="${operator}"`] : []),
     `sqref="${areaA1(rule.range)}"`,
     `allowBlank="${rule.allowBlank === false ? 0 : 1}"`,
-    `showInputMessage="${help_text ? 1 : 0}"`,
+    `showInputMessage="${helpText ? 1 : 0}"`,
     `showErrorMessage="${rule.policy === "allow" ? 0 : 1}"`,
     ...(rule.policy !== "allow"
       ? [`errorStyle="${rule.policy === "reject" ? "stop" : "warning"}"`]
       : []),
-    ...(help_text
+    ...(helpText
       ? [
-          `prompt="${escapeXml(encodeXstring(help_text))}"`,
-          `error="${escapeXml(encodeXstring(help_text))}"`,
+          `prompt="${escapeXml(encodeXstring(helpText))}"`,
+          `error="${escapeXml(encodeXstring(helpText))}"`,
         ]
       : []),
   ].join(" ");
   return `<dataValidation ${attributes}>${formulas.map((formula, index) => `<formula${index + 1}>${escapeXml(encodeXstring(String(formula)))}</formula${index + 1}>`).join("")}</dataValidation>`;
 }
-function conditional_scalar(value: unknown): string | null {
+function conditionalScalar(value: unknown): string | null {
   if (value === null) return null;
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "number") return Number.isFinite(value) ? String(value) : null;
@@ -342,33 +342,33 @@ function conditional_scalar(value: unknown): string | null {
   return null;
 }
 
-function conditional_format_xml(
+function conditionalFormatXml(
   rule: ConditionalFormatRule,
-  dxf_id: number,
+  dxfId: number,
   priority: number,
 ): string | null {
-  const start_col = Math.min(rule.range.start.col, rule.range.end.col);
-  const start_row = Math.min(rule.range.start.row, rule.range.end.row);
+  const startCol = Math.min(rule.range.start.col, rule.range.end.col);
+  const startRow = Math.min(rule.range.start.row, rule.range.end.row);
   const range = areaA1(rule.range);
-  const stop_if_true = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
+  const stopIfTrue = rule.stopIfTrue ? ' stopIfTrue="1"' : "";
   if (rule.when.kind === "formula") {
     const source = rule.when.source.startsWith("=") ? rule.when.source.slice(1) : rule.when.source;
-    return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxf_id}" priority="${priority}"${stop_if_true}><formula>${escapeXml(encodeXstring(source))}</formula></cfRule></conditionalFormatting>`;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>${escapeXml(encodeXstring(source))}</formula></cfRule></conditionalFormatting>`;
   }
   if (rule.when.kind === "contains") {
     const text = rule.when.text;
-    const formula_text = text.replaceAll('"', '""');
-    const anchor = cellA1(start_row, start_col);
+    const formulaText = text.replaceAll('"', '""');
+    const anchor = cellA1(startRow, startCol);
     if (rule.when.matchCase) {
-      return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxf_id}" priority="${priority}"${stop_if_true}><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formula_text))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
+      return `<conditionalFormatting sqref="${range}"><cfRule type="expression" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>ISNUMBER(FIND("${escapeXml(encodeXstring(formulaText))}",${anchor}))</formula></cfRule></conditionalFormatting>`;
     }
-    return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxf_id}" priority="${priority}"${stop_if_true} operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formula_text))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
+    return `<conditionalFormatting sqref="${range}"><cfRule type="containsText" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="containsText" text="${escapeXml(encodeXstring(text))}"><formula>NOT(ISERROR(SEARCH("${escapeXml(encodeXstring(formulaText))}",${anchor})))</formula></cfRule></conditionalFormatting>`;
   }
   if (rule.when.kind === "equal" && rule.when.value === null) {
-    const anchor = cellA1(start_row, start_col);
-    return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxf_id}" priority="${priority}"${stop_if_true}><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
+    const anchor = cellA1(startRow, startCol);
+    return `<conditionalFormatting sqref="${range}"><cfRule type="containsBlanks" dxfId="${dxfId}" priority="${priority}"${stopIfTrue}><formula>LEN(TRIM(${anchor}))=0</formula></cfRule></conditionalFormatting>`;
   }
-  const formula = conditional_scalar(rule.when.value);
+  const formula = conditionalScalar(rule.when.value);
   if (formula === null) return null;
   const operator =
     rule.when.kind === "greaterThan"
@@ -376,10 +376,10 @@ function conditional_format_xml(
       : rule.when.kind === "lessThan"
         ? "lessThan"
         : "equal";
-  return `<conditionalFormatting sqref="${range}"><cfRule type="cellIs" dxfId="${dxf_id}" priority="${priority}"${stop_if_true} operator="${operator}"><formula>${escapeXml(formula)}</formula></cfRule></conditionalFormatting>`;
+  return `<conditionalFormatting sqref="${range}"><cfRule type="cellIs" dxfId="${dxfId}" priority="${priority}"${stopIfTrue} operator="${operator}"><formula>${escapeXml(formula)}</formula></cfRule></conditionalFormatting>`;
 }
 
-function cell_xml(
+function cellXml(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   cell: AbsoluteCell,
@@ -387,13 +387,13 @@ function cell_xml(
   context: XlsxCodecContext,
 ): string {
   const column = sheet.columns[cell.col]!;
-  const merged_style: CellStyle = { ...column.cellStyle, ...cell.source.style };
-  const style_id = styles.register(
-    Object.keys(merged_style).length > 0 ? merged_style : undefined,
-    merged_style.numberFormat ?? column.numberFormat,
+  const mergedStyle: CellStyle = { ...column.cellStyle, ...cell.source.style };
+  const styleId = styles.register(
+    Object.keys(mergedStyle).length > 0 ? mergedStyle : undefined,
+    mergedStyle.numberFormat ?? column.numberFormat,
   );
   const reference = cellA1(cell.row, cell.col);
-  const style_attribute = style_id ? ` s="${style_id}"` : "";
+  const styleAttribute = styleId ? ` s="${styleId}"` : "";
   const value = cell.source.value;
   if (value.kind === "formula" || value.kind === "ref") {
     let formula =
@@ -401,7 +401,7 @@ function cell_xml(
         ? value.src.startsWith("=")
           ? value.src.slice(1)
           : value.src
-        : formula_for_reference(snapshot, value);
+        : formulaForReference(snapshot, value);
     if (formulaContainsExternalReference(formula)) {
       emitWarning(context, {
         code: "external-formula",
@@ -409,26 +409,26 @@ function cell_xml(
         sheet: sheet.name,
         cell: reference,
       });
-      return `<c r="${reference}"${style_attribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(`=${formula}`))}</t></is></c>`;
+      return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(`=${formula}`))}</t></is></c>`;
     }
     if (value.kind === "formula") {
       const converted = context.formulas?.get(value.src);
       if (converted === undefined) throw new Error("Cell formula was not converted");
       formula = converted.startsWith("=") ? converted.slice(1) : converted;
     }
-    return `<c r="${reference}"${style_attribute}><f>${escapeXml(encodeXstring(formula))}</f></c>`;
+    return `<c r="${reference}"${styleAttribute}><f>${escapeXml(encodeXstring(formula))}</f></c>`;
   }
-  if (value.value === null) return `<c r="${reference}"${style_attribute}/>`;
+  if (value.value === null) return `<c r="${reference}"${styleAttribute}/>`;
   if (typeof value.value === "string") {
-    return `<c r="${reference}"${style_attribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(value.value))}</t></is></c>`;
+    return `<c r="${reference}"${styleAttribute} t="inlineStr"><is><t xml:space="preserve">${escapeXml(encodeXstring(value.value))}</t></is></c>`;
   }
   if (typeof value.value === "boolean") {
-    return `<c r="${reference}"${style_attribute} t="b"><v>${value.value ? 1 : 0}</v></c>`;
+    return `<c r="${reference}"${styleAttribute} t="b"><v>${value.value ? 1 : 0}</v></c>`;
   }
-  return `<c r="${reference}"${style_attribute}><v>${value.value}</v></c>`;
+  return `<c r="${reference}"${styleAttribute}><v>${value.value}</v></c>`;
 }
 
-function comments_xml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
+function commentsXml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
@@ -445,7 +445,7 @@ function comments_xml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arr
   return xml.finish();
 }
 
-function comments_vml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
+function commentsVml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8"?>');
   xml.append(
@@ -461,7 +461,7 @@ function comments_vml(sheet: SheetSnapshot, context: XlsxCodecContext): Uint8Arr
   return xml.finish();
 }
 
-function append_table_rule(
+function appendTableRule(
   xml: XmlBuffer,
   rule: WorkbookTableXmlElement,
   styles: StylesRegistry,
@@ -475,7 +475,7 @@ function append_table_rule(
   }
   xml.append(">");
   xml.append(escapeXml(rule.text));
-  for (const child of rule.children) append_table_rule(xml, child, styles);
+  for (const child of rule.children) appendTableRule(xml, child, styles);
   xml.append(`</${rule.name}>`);
 }
 
@@ -485,21 +485,18 @@ type WrittenTable = NonNullable<SheetSnapshot["tables"]>[number];
 const A1_REFERENCE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\d+))?$/u;
 
 /** Whether every `ref` in a kept worksheet `sortState` lies inside the sheet. */
-function sort_state_fits(rule: WorkbookTableXmlElement, rows: number, cols: number): boolean {
+function sortStateFits(rule: WorkbookTableXmlElement, rows: number, cols: number): boolean {
   const reference = rule.attributes.ref;
   if (reference !== undefined) {
     const match = A1_REFERENCE.exec(reference);
     if (!match) return false;
 
-    const [, start_col = "", start_row, end_col = start_col, end_row = start_row] = match;
-    const last_col = Math.max(
-      labelToCol(start_col.toUpperCase()),
-      labelToCol(end_col.toUpperCase()),
-    );
-    const last_row = Math.max(Number(start_row), Number(end_row));
-    if (last_col >= cols || last_row > rows) return false;
+    const [, startCol = "", startRow, endCol = startCol, endRow = startRow] = match;
+    const lastCol = Math.max(labelToCol(startCol.toUpperCase()), labelToCol(endCol.toUpperCase()));
+    const lastRow = Math.max(Number(startRow), Number(endRow));
+    if (lastCol >= cols || lastRow > rows) return false;
   }
-  return rule.children.every((child) => sort_state_fits(child, rows, cols));
+  return rule.children.every((child) => sortStateFits(child, rows, cols));
 }
 
 /**
@@ -508,26 +505,26 @@ function sort_state_fits(rule: WorkbookTableXmlElement, rows: number, cols: numb
  * and Excel repairs a table whose filter or sort ref disagrees with its own.
  * Returns null when a column rule no longer falls inside the table.
  */
-function anchored_table_rule(
+function anchoredTableRule(
   rule: WorkbookTableXmlElement,
   table: WrittenTable,
 ): WorkbookTableXmlElement | null {
   const c0 = table.range.start.col;
   const c1 = table.range.end.col;
-  const first_data = table.range.start.row + (table.headerRow ? 1 : 0);
-  const last_data = table.range.end.row - (table.totalsRow ? 1 : 0);
+  const firstData = table.range.start.row + (table.headerRow ? 1 : 0);
+  const lastData = table.range.end.row - (table.totalsRow ? 1 : 0);
   const span = (left: number, right: number, top: number): string =>
-    `${cellA1(top, left)}:${cellA1(last_data, right)}`;
+    `${cellA1(top, left)}:${cellA1(lastData, right)}`;
   if (rule.name === "autoFilter") {
     const children: WorkbookTableXmlElement[] = [];
     for (const child of rule.children) {
       if (child.name === "filterColumn") {
-        const col_id = Number(child.attributes.colId);
-        if (!Number.isSafeInteger(col_id) || col_id < 0 || col_id > c1 - c0) return null;
+        const colId = Number(child.attributes.colId);
+        if (!Number.isSafeInteger(colId) || colId < 0 || colId > c1 - c0) return null;
         children.push(child);
         continue;
       }
-      const anchored = anchored_table_rule(child, table);
+      const anchored = anchoredTableRule(child, table);
       if (!anchored) return null;
       children.push(anchored);
     }
@@ -538,7 +535,7 @@ function anchored_table_rule(
     };
   }
   if (rule.name !== "sortState") return rule;
-  if (last_data < first_data) return null;
+  if (lastData < firstData) return null;
   const children: WorkbookTableXmlElement[] = [];
   for (const condition of rule.children) {
     const match = /^\$?([A-Za-z]{1,3})\$?\d*(?::\$?([A-Za-z]{1,3})\$?\d*)?$/u.exec(
@@ -551,13 +548,13 @@ function anchored_table_rule(
     if (start < c0 || end > c1 || end < start) return null;
     children.push({
       ...condition,
-      attributes: { ...condition.attributes, ref: span(start, end, first_data) },
+      attributes: { ...condition.attributes, ref: span(start, end, firstData) },
     });
   }
-  return { ...rule, attributes: { ...rule.attributes, ref: span(c0, c1, first_data) }, children };
+  return { ...rule, attributes: { ...rule.attributes, ref: span(c0, c1, firstData) }, children };
 }
 
-function append_anchored_table_rule(
+function appendAnchoredTableRule(
   xml: XmlBuffer,
   rule: WorkbookTableXmlElement | undefined,
   table: WrittenTable,
@@ -565,40 +562,40 @@ function append_anchored_table_rule(
   warn: (message: string) => void,
 ): void {
   if (!rule) return;
-  const anchored = anchored_table_rule(rule, table);
-  if (anchored) append_table_rule(xml, anchored, styles);
+  const anchored = anchoredTableRule(rule, table);
+  if (anchored) appendTableRule(xml, anchored, styles);
   else
     warn(
       `Workbook table ${table.name} ${rule.name} no longer matches the table columns and was not emitted`,
     );
 }
 
-function table_xml(
+function tableXml(
   table: NonNullable<SheetSnapshot["tables"]>[number],
-  native_id: number,
-  sheet_name: string,
+  nativeId: number,
+  sheetName: string,
   context: XlsxCodecContext,
   styles: StylesRegistry,
-  query_table: boolean,
+  queryTable: boolean,
 ): Uint8Array {
   const ref = areaA1(table.range);
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
-    `<table xmlns="${MAIN_NS}" id="${native_id}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}"${query_table ? ' tableType="queryTable"' : ""} headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
+    `<table xmlns="${MAIN_NS}" id="${nativeId}" name="${escapeXml(encodeXstring(table.name))}" displayName="${escapeXml(encodeXstring(table.name))}" ref="${ref}"${queryTable ? ' tableType="queryTable"' : ""} headerRowCount="${table.headerRow ? 1 : 0}" totalsRowCount="${table.totalsRow ? 1 : 0}">`,
   );
-  const warn_rule_loss = (message: string): void => {
-    emitWarning(context, { code: "unsupported-feature", message, sheet: sheet_name });
+  const warnRuleLoss = (message: string): void => {
+    emitWarning(context, { code: "unsupported-feature", message, sheet: sheetName });
   };
-  append_anchored_table_rule(xml, table.autoFilter, table, styles, warn_rule_loss);
-  append_anchored_table_rule(xml, table.sortState, table, styles, warn_rule_loss);
+  appendAnchoredTableRule(xml, table.autoFilter, table, styles, warnRuleLoss);
+  appendAnchoredTableRule(xml, table.sortState, table, styles, warnRuleLoss);
   xml.append(`<tableColumns count="${table.columns.length}">`);
   for (const [index, column] of table.columns.entries()) {
-    const external_totals =
+    const externalTotals =
       column.totalsRowFormula !== undefined &&
       formulaContainsExternalReference(column.totalsRowFormula.text);
     xml.append(
-      `<tableColumn id="${index + 1}"${query_table ? ` queryTableFieldId="${index + 1}"` : ""} name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !external_totals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
+      `<tableColumn id="${index + 1}"${queryTable ? ` queryTableFieldId="${index + 1}"` : ""} name="${escapeXml(encodeXstring(column.name))}"${column.totalsRowLabel !== undefined ? ` totalsRowLabel="${escapeXml(encodeXstring(column.totalsRowLabel))}"` : ""}${column.totalsRowFunction !== undefined && !externalTotals ? ` totalsRowFunction="${escapeXml(column.totalsRowFunction)}"` : ""}>`,
     );
     for (const formula of [column.calculatedColumnFormula, column.totalsRowFormula]) {
       if (!formula) continue;
@@ -606,10 +603,10 @@ function table_xml(
         emitWarning(context, {
           code: "external-formula",
           message: `External-data ${formula.name} on table ${table.name} was not emitted`,
-          sheet: sheet_name,
+          sheet: sheetName,
         });
       } else {
-        append_table_rule(xml, formula, styles);
+        appendTableRule(xml, formula, styles);
       }
     }
     xml.append("</tableColumn>");
@@ -623,21 +620,21 @@ function table_xml(
     emitWarning(context, {
       code: "format-loss",
       message: `Workbook table ${table.name} style flags require a named Excel table style and remain only in Sheetwrite metadata`,
-      sheet: sheet_name,
+      sheet: sheetName,
     });
   }
   for (const feature of table.unsupportedFeatures ?? []) {
     emitWarning(context, {
       code: "unsupported-feature",
       message: `Workbook table ${table.name} declares unsupported feature ${feature}; it remains in Sheetwrite metadata and was not emitted`,
-      sheet: sheet_name,
+      sheet: sheetName,
     });
   }
   xml.append("</table>");
   return xml.finish();
 }
 
-function hyperlink_row_styles(
+function hyperlinkRowStyles(
   sheet: SheetSnapshot,
 ): (row: number, cells: readonly AbsoluteCell[]) => readonly AbsoluteCell[] {
   const pending = (sheet.hyperlinks ?? [])
@@ -695,77 +692,77 @@ function hyperlink_row_styles(
   };
 }
 
-function* hyperlink_styled_rows(
+function* hyperlinkStyledRows(
   sheet: SheetSnapshot,
   rows: Iterable<{ row: number; cells: readonly AbsoluteCell[] }>,
 ): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
-  const apply_styles = hyperlink_row_styles(sheet);
-  for (const { row, cells } of rows) yield { row, cells: apply_styles(row, cells) };
+  const applyStyles = hyperlinkRowStyles(sheet);
+  for (const { row, cells } of rows) yield { row, cells: applyStyles(row, cells) };
 }
 
-function* write_sheet(
+function* writeSheet(
   snapshot: WorkbookSnapshot,
   sheet: SheetSnapshot,
   styles: StylesRegistry,
   context: XlsxCodecContext,
-  sheet_number: number,
-  table_start_id: number,
+  sheetNumber: number,
+  tableStartId: number,
   hook?: WorkbookWriteHook,
-  pivot_relationships: readonly ExtraRelationship[] = [],
+  pivotRelationships: readonly ExtraRelationship[] = [],
 ): Generator<Uint8Array, SheetWriteResult> {
-  const by_row = new Map<number, AbsoluteCell[]>();
+  const byRow = new Map<number, AbsoluteCell[]>();
   for (const block of sheet.cells) {
     for (const source of block.cells) {
       const row = block.startRow + source.rowOffset;
       const col = block.startCol + source.colOffset;
       if (row < 0 || row >= sheet.rowCount || col < 0 || col >= sheet.columns.length) continue;
-      const row_cells = by_row.get(row) ?? [];
-      row_cells.push({ row, col, source });
-      by_row.set(row, row_cells);
+      const rowCells = byRow.get(row) ?? [];
+      rowCells.push({ row, col, source });
+      byRow.set(row, rowCells);
     }
   }
-  const row_metadata = new Map(sheet.rowMeta ?? []);
-  const outline_levels = new Map<number, number>();
-  const collapsed_outline_rows = new Set<number>();
-  const collapsed_summaries = new Set<number>();
-  const outline_span = (sheet.rowGroups ?? []).reduce(
+  const rowMetadata = new Map(sheet.rowMeta ?? []);
+  const outlineLevels = new Map<number, number>();
+  const collapsedOutlineRows = new Set<number>();
+  const collapsedSummaries = new Set<number>();
+  const outlineSpan = (sheet.rowGroups ?? []).reduce(
     (total, group) => total + (group.end - group.start + 1),
     0,
   );
-  assertResource(context, "maxEntryUncompressedBytes", outline_span * 24);
+  assertResource(context, "maxEntryUncompressedBytes", outlineSpan * 24);
   for (const group of sheet.rowGroups ?? []) {
     for (let row = group.start; row <= group.end; row++) {
-      outline_levels.set(row, Math.min(7, (outline_levels.get(row) ?? 0) + 1));
-      if (group.collapsed) collapsed_outline_rows.add(row);
+      outlineLevels.set(row, Math.min(7, (outlineLevels.get(row) ?? 0) + 1));
+      if (group.collapsed) collapsedOutlineRows.add(row);
     }
     if (group.collapsed && group.end + 1 < sheet.rowCount) {
-      collapsed_summaries.add(group.end + 1);
+      collapsedSummaries.add(group.end + 1);
     }
   }
   const rows = new Set([
-    ...by_row.keys(),
-    ...row_metadata.keys(),
-    ...outline_levels.keys(),
-    ...collapsed_summaries,
+    ...byRow.keys(),
+    ...rowMetadata.keys(),
+    ...outlineLevels.keys(),
+    ...collapsedSummaries,
   ]);
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(`<worksheet xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}">`);
   if (sheet.rowGroups?.length) xml.append('<sheetPr><outlinePr summaryBelow="1"/></sheetPr>');
-  const max_row = Math.max(1, sheet.rowCount);
-  const max_col = Math.max(0, sheet.columns.length - 1);
-  xml.append(`<dimension ref="A1:${cellA1(max_row - 1, max_col)}"/>`);
+  const maxRow = Math.max(1, sheet.rowCount);
+  const maxCol = Math.max(0, sheet.columns.length - 1);
+  xml.append(`<dimension ref="A1:${cellA1(maxRow - 1, maxCol)}"/>`);
   xml.append('<sheetViews><sheetView workbookViewId="0">');
   if ((sheet.frozenRows ?? 0) > 0 || (sheet.frozenCols ?? 0) > 0) {
-    const top_left = cellA1(sheet.frozenRows ?? 0, sheet.frozenCols ?? 0);
-    const active_pane =
+    const topLeft = cellA1(sheet.frozenRows ?? 0, sheet.frozenCols ?? 0);
+    const activePane =
       sheet.frozenRows && sheet.frozenCols
         ? "bottomRight"
         : sheet.frozenRows
           ? "bottomLeft"
           : "topRight";
     xml.append(
-      `<pane${sheet.frozenCols ? ` xSplit="${sheet.frozenCols}"` : ""}${sheet.frozenRows ? ` ySplit="${sheet.frozenRows}"` : ""} topLeftCell="${top_left}" activePane="${active_pane}" state="frozen"/>`,
+      `<pane${sheet.frozenCols ? ` xSplit="${sheet.frozenCols}"` : ""}${sheet.frozenRows ? ` ySplit="${sheet.frozenRows}"` : ""} topLeftCell="${topLeft}" activePane="${activePane}" state="frozen"/>`,
     );
   }
   xml.append('</sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>');
@@ -775,40 +772,38 @@ function* write_sheet(
       const column = sheet.columns[index]!;
       // The stored character width includes OOXML's five-pixel padding.
       const width = columnWidthCharacters(column.width);
-      const style_id = styles.register(
+      const styleId = styles.register(
         column.cellStyle,
         column.cellStyle?.numberFormat ?? column.numberFormat,
       );
       xml.append(
-        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${style_id ? ` style="${style_id}"` : ""}/>`,
+        `<col min="${index + 1}" max="${index + 1}" width="${width}" customWidth="1"${column.visible === false ? ' hidden="1"' : ""}${styleId ? ` style="${styleId}"` : ""}/>`,
       );
     }
     xml.append("</cols>");
   }
   xml.append("<sheetData>");
   let processed = 0;
-  const source_rows =
+  const sourceRows =
     hook?.cellRows?.(sheet) ??
     [...rows]
       .sort((left, right) => left - right)
       .map((row) => ({
         row,
-        cells: (by_row.get(row) ?? []).sort((left, right) => left.col - right.col),
+        cells: (byRow.get(row) ?? []).sort((left, right) => left.col - right.col),
       }));
-  const styled_rows = sheet.hyperlinks?.length
-    ? hyperlink_styled_rows(sheet, source_rows)
-    : source_rows;
-  for (const { row, cells } of styled_rows) {
-    const meta = row_metadata.get(row);
-    const hidden = meta?.hidden || collapsed_outline_rows.has(row);
-    const outline_level = outline_levels.get(row);
+  const styledRows = sheet.hyperlinks?.length ? hyperlinkStyledRows(sheet, sourceRows) : sourceRows;
+  for (const { row, cells } of styledRows) {
+    const meta = rowMetadata.get(row);
+    const hidden = meta?.hidden || collapsedOutlineRows.has(row);
+    const outlineLevel = outlineLevels.get(row);
     xml.append(
-      `<row r="${row + 1}"${meta?.height !== undefined ? ` ht="${(meta.height * 72) / 96}" customHeight="1"` : ""}${hidden ? ' hidden="1"' : ""}${outline_level ? ` outlineLevel="${outline_level}"` : ""}${collapsed_summaries.has(row) ? ' collapsed="1"' : ""}>`,
+      `<row r="${row + 1}"${meta?.height !== undefined ? ` ht="${(meta.height * 72) / 96}" customHeight="1"` : ""}${hidden ? ' hidden="1"' : ""}${outlineLevel ? ` outlineLevel="${outlineLevel}"` : ""}${collapsedSummaries.has(row) ? ' collapsed="1"' : ""}>`,
     );
     for (const cell of cells) {
       processed += 1;
       if ((processed & 4_095) === 0) checkAbort(context);
-      xml.append(cell_xml(snapshot, sheet, cell, styles, context));
+      xml.append(cellXml(snapshot, sheet, cell, styles, context));
       const chunk = xml.drain();
       if (chunk) yield* chunk;
     }
@@ -818,17 +813,17 @@ function* write_sheet(
   }
   xml.append("</sheetData>");
   if (sheet.sortKeys?.length && sheet.rowCount > 0) {
-    const reference = `A1:${cellA1(max_row - 1, max_col)}`;
+    const reference = `A1:${cellA1(maxRow - 1, maxCol)}`;
     xml.append(`<sortState ref="${reference}">`);
     for (const key of sheet.sortKeys) {
       xml.append(
-        `<sortCondition ref="${cellA1(0, key.col)}:${cellA1(max_row - 1, key.col)}"${key.ascending ? "" : ' descending="1"'}/>`,
+        `<sortCondition ref="${cellA1(0, key.col)}:${cellA1(maxRow - 1, key.col)}"${key.ascending ? "" : ' descending="1"'}/>`,
       );
     }
     xml.append("</sortState>");
   } else if (sheet.sortState) {
-    if (sort_state_fits(sheet.sortState, sheet.rowCount, sheet.columns.length)) {
-      append_table_rule(xml, sheet.sortState, styles);
+    if (sortStateFits(sheet.sortState, sheet.rowCount, sheet.columns.length)) {
+      appendTableRule(xml, sheet.sortState, styles);
     } else {
       emitWarning(context, {
         code: "unsupported-feature",
@@ -848,7 +843,7 @@ function* write_sheet(
   if (sheet.conditionalFormats?.length) {
     for (let index = 0; index < sheet.conditionalFormats.length; index++) {
       const rule = sheet.conditionalFormats[index]!;
-      const encoded = conditional_format_xml(
+      const encoded = conditionalFormatXml(
         rule,
         styles.registerDifferential(rule.style),
         index + 1,
@@ -866,7 +861,7 @@ function* write_sheet(
   if (sheet.validationRules?.length) {
     const validations: string[] = [];
     for (const rule of sheet.validationRules) {
-      const encoded = validation_xml(rule, context, sheet.name);
+      const encoded = validationXml(rule, context, sheet.name);
       if (encoded) validations.push(encoded);
       else
         emitWarning(context, {
@@ -898,29 +893,29 @@ function* write_sheet(
   }
   let comments: Uint8Array | undefined;
   let vml: Uint8Array | undefined;
-  const relationship_entries: {
+  const relationshipEntries: {
     id: string;
     type: string;
     target: string;
     external?: boolean;
   }[] = [];
-  let next_relationship_id = 1;
-  let legacy_drawing_id: string | undefined;
+  let nextRelationshipId = 1;
+  let legacyDrawingId: string | undefined;
   if (sheet.notes?.length) {
-    const comments_id = `rId${next_relationship_id++}`;
-    legacy_drawing_id = `rId${next_relationship_id++}`;
-    relationship_entries.push(
-      { id: comments_id, type: COMMENTS_REL, target: `../comments${sheet_number}.xml` },
+    const commentsId = `rId${nextRelationshipId++}`;
+    legacyDrawingId = `rId${nextRelationshipId++}`;
+    relationshipEntries.push(
+      { id: commentsId, type: COMMENTS_REL, target: `../comments${sheetNumber}.xml` },
       {
-        id: legacy_drawing_id,
+        id: legacyDrawingId,
         type: VML_REL,
-        target: `../drawings/vmlDrawing${sheet_number}.vml`,
+        target: `../drawings/vmlDrawing${sheetNumber}.vml`,
       },
     );
-    comments = comments_xml(sheet, context);
-    vml = comments_vml(sheet, context);
+    comments = commentsXml(sheet, context);
+    vml = commentsVml(sheet, context);
   }
-  const hyperlink_elements: string[] = [];
+  const hyperlinkElements: string[] = [];
   for (const hyperlink of sheet.hyperlinks ?? []) {
     const source = rangeA1(hyperlink.range.start, hyperlink.range.end);
     const display =
@@ -928,95 +923,95 @@ function* write_sheet(
         ? ""
         : ` display="${escapeXml(encodeXstring(hyperlink.display))}"`;
     if (hyperlink.target.kind === "external") {
-      const relationship_id = `rId${next_relationship_id++}`;
-      relationship_entries.push({
-        id: relationship_id,
+      const relationshipId = `rId${nextRelationshipId++}`;
+      relationshipEntries.push({
+        id: relationshipId,
         type: HYPERLINK_REL,
         target: hyperlink.target.url,
         external: true,
       });
-      hyperlink_elements.push(`<hyperlink ref="${source}" r:id="${relationship_id}"${display}/>`);
+      hyperlinkElements.push(`<hyperlink ref="${source}" r:id="${relationshipId}"${display}/>`);
       continue;
     }
-    const internal_target = hyperlink.target;
-    const target_sheet = snapshot.sheets.find(
-      (candidate) => candidate.id === internal_target.range.sheet,
+    const internalTarget = hyperlink.target;
+    const targetSheet = snapshot.sheets.find(
+      (candidate) => candidate.id === internalTarget.range.sheet,
     );
-    if (!target_sheet) {
+    if (!targetSheet) {
       throw new TypeError(
         boundedErrorText(
-          `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internal_target.range.sheet}`,
+          `Sheetwrite: hyperlink ${hyperlink.id} references missing sheet ${internalTarget.range.sheet}`,
         ),
       );
     }
-    const location = `${quoted_sheet(target_sheet.name)}!${rangeA1(internal_target.range.start, internal_target.range.end)}`;
-    hyperlink_elements.push(
+    const location = `${quotedSheet(targetSheet.name)}!${rangeA1(internalTarget.range.start, internalTarget.range.end)}`;
+    hyperlinkElements.push(
       `<hyperlink ref="${source}" location="${escapeXml(encodeXstring(location))}"${display}/>`,
     );
   }
-  if (hyperlink_elements.length > 0) {
-    xml.append(`<hyperlinks>${hyperlink_elements.join("")}</hyperlinks>`);
+  if (hyperlinkElements.length > 0) {
+    xml.append(`<hyperlinks>${hyperlinkElements.join("")}</hyperlinks>`);
   }
-  const sheet_hook = hook?.sheet?.(sheet, {
-    sheetNumber: sheet_number,
-    name: `xl/worksheets/sheet${sheet_number}.xml`,
+  const sheetHook = hook?.sheet?.(sheet, {
+    sheetNumber,
+    name: `xl/worksheets/sheet${sheetNumber}.xml`,
   });
-  const extra_ids = (sheet_hook?.relationships ?? []).map((relationship) => {
-    const id = `rId${next_relationship_id++}`;
-    relationship_entries.push({ ...relationship, id });
+  const extraIds = (sheetHook?.relationships ?? []).map((relationship) => {
+    const id = `rId${nextRelationshipId++}`;
+    relationshipEntries.push({ ...relationship, id });
     return id;
   });
   // Pivot tables have no worksheet element; Excel finds them through relationships.
-  for (const relationship of pivot_relationships) {
-    relationship_entries.push({ ...relationship, id: `rId${next_relationship_id++}` });
+  for (const relationship of pivotRelationships) {
+    relationshipEntries.push({ ...relationship, id: `rId${nextRelationshipId++}` });
   }
   // Kept parts may use any name, including the ones generated for charts here.
-  const kept_parts = new Set(
+  const keptParts = new Set(
     sheet.charts?.length
       ? (hook?.contentTypeOverrides ?? []).map((override) => override.part.toLowerCase())
       : [],
   );
-  const charts = writeCharts(snapshot, sheet, sheet_number, kept_parts, context);
-  const chart_parts: ZipPart[] = charts?.parts ?? [];
-  const chart_overrides: ContentTypeOverride[] = charts?.overrides ?? [];
+  const charts = writeCharts(snapshot, sheet, sheetNumber, keptParts, context);
+  const chartParts: ZipPart[] = charts?.parts ?? [];
+  const chartOverrides: ContentTypeOverride[] = charts?.overrides ?? [];
   if (charts && !hook?.appendCharts?.(sheet, charts.charts)) {
-    const drawing_part = freePartName(`xl/drawings/sheetwrite-drawing${sheet_number}`, kept_parts);
-    const drawing = chartDrawingParts(drawing_part, charts.charts, context);
-    chart_parts.push(...drawing.parts);
-    chart_overrides.push(drawing.override);
-    const id = `rId${next_relationship_id++}`;
-    relationship_entries.push({ id, type: DRAWING_REL, target: `/${drawing_part}` });
+    const drawingPart = freePartName(`xl/drawings/sheetwrite-drawing${sheetNumber}`, keptParts);
+    const drawing = chartDrawingParts(drawingPart, charts.charts, context);
+    chartParts.push(...drawing.parts);
+    chartOverrides.push(drawing.override);
+    const id = `rId${nextRelationshipId++}`;
+    relationshipEntries.push({ id, type: DRAWING_REL, target: `/${drawingPart}` });
     // CT_Worksheet places `<drawing>` after `<hyperlinks>` and before `<legacyDrawing>`.
     xml.append(`<drawing r:id="${id}"/>`);
   }
-  xml.append(sheet_hook?.beforeLegacyDrawing?.(extra_ids) ?? "");
-  if (legacy_drawing_id) xml.append(`<legacyDrawing r:id="${legacy_drawing_id}"/>`);
-  next_relationship_id = Math.max(next_relationship_id, 3);
-  const table_relationship_ids: string[] = [];
+  xml.append(sheetHook?.beforeLegacyDrawing?.(extraIds) ?? "");
+  if (legacyDrawingId) xml.append(`<legacyDrawing r:id="${legacyDrawingId}"/>`);
+  nextRelationshipId = Math.max(nextRelationshipId, 3);
+  const tableRelationshipIds: string[] = [];
   const tables = (sheet.tables ?? []).map((table, index) => {
-    const native_id = table_start_id + index;
-    const relationship_id = `rId${next_relationship_id++}`;
-    table_relationship_ids.push(relationship_id);
-    relationship_entries.push({
-      id: relationship_id,
+    const nativeId = tableStartId + index;
+    const relationshipId = `rId${nextRelationshipId++}`;
+    tableRelationshipIds.push(relationshipId);
+    relationshipEntries.push({
+      id: relationshipId,
       type: TABLE_REL,
-      target: `../tables/table${native_id}.xml`,
+      target: `../tables/table${nativeId}.xml`,
     });
     const binding = hook?.queryTable?.(table);
     return {
-      part: `xl/tables/table${native_id}.xml`,
-      xml: table_xml(table, native_id, sheet.name, context, styles, binding !== undefined),
+      part: `xl/tables/table${nativeId}.xml`,
+      xml: tableXml(table, nativeId, sheet.name, context, styles, binding !== undefined),
       ...(binding
         ? {
             queryTable: {
-              part: `xl/queryTables/queryTable${native_id}.xml`,
-              xml: queryTableXml(table, native_id, binding),
+              part: `xl/queryTables/queryTable${nativeId}.xml`,
+              xml: queryTableXml(table, nativeId, binding),
               rels: relationshipsXml(
                 [
                   {
                     id: "rId1",
                     type: QUERY_TABLE_REL,
-                    target: `../queryTables/queryTable${native_id}.xml`,
+                    target: `../queryTables/queryTable${nativeId}.xml`,
                   },
                 ],
                 context,
@@ -1028,57 +1023,50 @@ function* write_sheet(
   });
   if (tables.length > 0) {
     xml.append(`<tableParts count="${tables.length}">`);
-    for (const relationship_id of table_relationship_ids) {
-      xml.append(`<tablePart r:id="${relationship_id}"/>`);
+    for (const relationshipId of tableRelationshipIds) {
+      xml.append(`<tablePart r:id="${relationshipId}"/>`);
     }
     xml.append("</tableParts>");
   }
   const relationships =
-    relationship_entries.length > 0 ? relationshipsXml(relationship_entries, context) : undefined;
+    relationshipEntries.length > 0 ? relationshipsXml(relationshipEntries, context) : undefined;
   xml.append("</worksheet>");
   const chunk = xml.drain(true);
   if (chunk) yield* chunk;
-  return {
-    relationships,
-    comments,
-    vml,
-    tables,
-    chartParts: chart_parts,
-    chartOverrides: chart_overrides,
-  };
+  return { relationships, comments, vml, tables, chartParts, chartOverrides };
 }
 
-function metadata_sheet_xml(
+function metadataSheetXml(
   snapshot: WorkbookSnapshot,
-  native_pivots: ReadonlySet<string>,
+  nativePivots: ReadonlySet<string>,
   context: XlsxCodecContext,
 ): Uint8Array {
-  const json = JSON.stringify(canonical_json_value(metadata_snapshot(snapshot, native_pivots)));
+  const json = JSON.stringify(canonicalJsonValue(metadataSnapshot(snapshot, nativePivots)));
   const chunks = [META_MARKER];
-  let chunk_parts: string[] = [];
-  let chunk_bytes = 0;
+  let chunkParts: string[] = [];
+  let chunkBytes = 0;
   for (const character of json) {
     const encoded = encodeXstring(character);
-    const code_point = character.codePointAt(0)!;
+    const codePoint = character.codePointAt(0)!;
     const bytes =
       encoded.length !== character.length
         ? encoded.length
-        : code_point <= 0x7f
+        : codePoint <= 0x7f
           ? 1
-          : code_point <= 0x7ff
+          : codePoint <= 0x7ff
             ? 2
-            : code_point <= 0xffff
+            : codePoint <= 0xffff
               ? 3
               : 4;
-    if (chunk_bytes + bytes > META_CHUNK && chunk_parts.length > 0) {
-      chunks.push(chunk_parts.join(""));
-      chunk_parts = [];
-      chunk_bytes = 0;
+    if (chunkBytes + bytes > META_CHUNK && chunkParts.length > 0) {
+      chunks.push(chunkParts.join(""));
+      chunkParts = [];
+      chunkBytes = 0;
     }
-    chunk_parts.push(character);
-    chunk_bytes += bytes;
+    chunkParts.push(character);
+    chunkBytes += bytes;
   }
-  if (chunk_parts.length > 0) chunks.push(chunk_parts.join(""));
+  if (chunkParts.length > 0) chunks.push(chunkParts.join(""));
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(
@@ -1095,33 +1083,33 @@ function metadata_sheet_xml(
   return xml.finish();
 }
 
-function workbook_xml(
+function workbookXml(
   snapshot: WorkbookSnapshot,
   ordered: readonly SheetSnapshot[],
-  metadata_name: string,
+  metadataName: string,
   context: XlsxCodecContext,
-  pivot_caches: readonly string[],
+  pivotCaches: readonly string[],
 ): Uint8Array {
   const xml = new XmlBuffer(context);
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
-  const requested_active = ordered.findIndex((sheet) => sheet.id === snapshot.workbook.activeSheet);
-  const active_sheet = ordered[requested_active];
-  const active_tab =
-    active_sheet?.visibility === "hidden" || active_sheet?.visibility === "veryHidden"
+  const requestedActive = ordered.findIndex((sheet) => sheet.id === snapshot.workbook.activeSheet);
+  const activeSheet = ordered[requestedActive];
+  const activeTab =
+    activeSheet?.visibility === "hidden" || activeSheet?.visibility === "veryHidden"
       ? ordered.findIndex(
           (sheet) => sheet.visibility !== "hidden" && sheet.visibility !== "veryHidden",
         )
-      : Math.max(0, requested_active);
-  if (active_tab !== requested_active) {
+      : Math.max(0, requestedActive);
+  if (activeTab !== requestedActive) {
     emitWarning(context, {
       code: "unsupported-feature",
       message:
         "A hidden active sheet was preserved, but native Excel activation moved to the first visible sheet",
-      sheet: active_sheet?.name,
+      sheet: activeSheet?.name,
     });
   }
   xml.append(
-    `<workbook xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><bookViews><workbookView activeTab="${active_tab}"/></bookViews><sheets>`,
+    `<workbook xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}"><bookViews><workbookView activeTab="${activeTab}"/></bookViews><sheets>`,
   );
   for (let index = 0; index < ordered.length; index++) {
     const sheet = ordered[index]!;
@@ -1134,12 +1122,12 @@ function workbook_xml(
     );
   }
   xml.append(
-    `<sheet name="${escapeXml(encodeXstring(metadata_name))}" sheetId="${ordered.length + 1}" state="veryHidden" r:id="rId${ordered.length + 1}"/></sheets>`,
+    `<sheet name="${escapeXml(encodeXstring(metadataName))}" sheetId="${ordered.length + 1}" state="veryHidden" r:id="rId${ordered.length + 1}"/></sheets>`,
   );
   if (snapshot.workbook.namedRanges?.length) {
     xml.append("<definedNames>");
     for (const named of snapshot.workbook.namedRanges) {
-      const scope_index =
+      const scopeIndex =
         named.scope === undefined
           ? undefined
           : ordered.findIndex((candidate) => candidate.id === named.scope);
@@ -1152,17 +1140,17 @@ function workbook_xml(
         const range = named.range;
         const sheet = snapshot.sheets.find((candidate) => candidate.id === range.sheet);
         if (sheet === undefined) continue;
-        source = `${quoted_sheet(sheet.name)}!$${colToA1(range.start.col)}$${range.start.row + 1}:$${colToA1(range.end.col)}$${range.end.row + 1}`;
+        source = `${quotedSheet(sheet.name)}!$${colToA1(range.start.col)}$${range.start.row + 1}:$${colToA1(range.end.col)}$${range.end.row + 1}`;
       }
       xml.append(
-        `<definedName name="${escapeXml(encodeXstring(named.name))}"${scope_index !== undefined && scope_index >= 0 ? ` localSheetId="${scope_index}"` : ""}>${escapeXml(encodeXstring(source))}</definedName>`,
+        `<definedName name="${escapeXml(encodeXstring(named.name))}"${scopeIndex !== undefined && scopeIndex >= 0 ? ` localSheetId="${scopeIndex}"` : ""}>${escapeXml(encodeXstring(source))}</definedName>`,
       );
     }
     xml.append("</definedNames>");
   }
-  xml.append(`<calcPr fullCalcOnLoad="1"${iteration_attributes(snapshot)} forceFullCalc="1"/>`);
+  xml.append(`<calcPr fullCalcOnLoad="1"${iterationAttributes(snapshot)} forceFullCalc="1"/>`);
   // CT_Workbook places `<pivotCaches>` directly after `<calcPr>`.
-  if (pivot_caches.length > 0) xml.append(`<pivotCaches>${pivot_caches.join("")}</pivotCaches>`);
+  if (pivotCaches.length > 0) xml.append(`<pivotCaches>${pivotCaches.join("")}</pivotCaches>`);
   xml.append("</workbook>");
   return xml.finish();
 }
@@ -1172,7 +1160,7 @@ function workbook_xml(
  * off so a later "Enable iterative calculation" in Excel keeps them; default
  * workbooks write none, which Excel reads as the same defaults.
  */
-function iteration_attributes(snapshot: WorkbookSnapshot): string {
+function iterationAttributes(snapshot: WorkbookSnapshot): string {
   const calculation = snapshot.workbook.calculation;
   if (
     !calculation ||
@@ -1186,15 +1174,15 @@ function iteration_attributes(snapshot: WorkbookSnapshot): string {
 }
 
 /** Yield worksheet data before constructing later parts, bounded by the XML/ZIP chunk windows. */
-function* write_workbook_parts(
+function* writeWorkbookParts(
   snapshot: WorkbookSnapshot,
   context: XlsxCodecContext,
-  resolve_hook?: WorkbookWriteHookResolver,
+  resolveHook?: WorkbookWriteHookResolver,
 ): Generator<ZipPart> {
-  preflight_snapshot(snapshot, context);
+  preflightSnapshot(snapshot, context);
   if (snapshot.sheets.length === 0)
     throw new RangeError("Sheetwrite: XLSX export requires at least one sheet");
-  validate_names(snapshot);
+  validateNames(snapshot);
   const checked = validateCodecSnapshot(snapshot, context);
   if (!checked.ok) {
     throw new TypeError(
@@ -1204,39 +1192,39 @@ function* write_workbook_parts(
     );
   }
   snapshot = checked.value;
-  const hook = resolve_hook?.(snapshot);
+  const hook = resolveHook?.(snapshot);
   const ordered = [...snapshot.sheets].sort((left, right) => left.order - right.order);
   const styles = new StylesRegistry(context);
   const pivots = preparePivots(snapshot, ordered, styles, context);
-  const metadata_name = metadata_sheet_name(snapshot);
+  const metadataName = metadataSheetName(snapshot);
   const overrides: ContentTypeOverride[] = [
     { part: "xl/workbook.xml", contentType: WORKBOOK_CONTENT },
     { part: "xl/styles.xml", contentType: STYLES_CONTENT },
   ];
-  const workbook_relationships = [];
-  let next_table_id = 1;
+  const workbookRelationships = [];
+  let nextTableId = 1;
   for (const [index, sheet] of ordered.entries()) {
     checkAbort(context);
     const number = index + 1;
     const part = `xl/worksheets/sheet${number}.xml`;
     let result: SheetWriteResult | undefined;
-    const sheet_table_id = next_table_id;
-    function* chunks(export_sheet: SheetSnapshot): Generator<Uint8Array> {
-      result = yield* write_sheet(
+    const sheetTableId = nextTableId;
+    function* chunks(exportSheet: SheetSnapshot): Generator<Uint8Array> {
+      result = yield* writeSheet(
         snapshot,
-        export_sheet,
+        exportSheet,
         styles,
         context,
         number,
-        sheet_table_id,
+        sheetTableId,
         hook,
-        pivots?.sheetRelationships(export_sheet.id),
+        pivots?.sheetRelationships(exportSheet.id),
       );
     }
     yield { name: part, data: chunks(pivots ? pivots.withSavedOutput(sheet) : sheet) };
     if (!result) throw new Error(`Sheetwrite: worksheet ${part} was not consumed before advancing`);
     overrides.push({ part, contentType: WORKSHEET_CONTENT });
-    workbook_relationships.push({
+    workbookRelationships.push({
       id: `rId${number}`,
       type: WORKSHEET_REL,
       target: `worksheets/sheet${number}.xml`,
@@ -1260,51 +1248,51 @@ function* write_workbook_parts(
         overrides.push({ part: table.queryTable.part, contentType: QUERY_TABLE_CONTENT });
       }
     }
-    next_table_id += result.tables.length;
+    nextTableId += result.tables.length;
     for (const part of result.chartParts ?? []) yield part;
     overrides.push(...(result.chartOverrides ?? []));
   }
   for (const part of pivots?.parts ?? []) yield part;
   overrides.push(...(pivots?.overrides ?? []));
-  const metadata_number = ordered.length + 1;
-  const metadata_part = `xl/worksheets/sheet${metadata_number}.xml`;
+  const metadataNumber = ordered.length + 1;
+  const metadataPart = `xl/worksheets/sheet${metadataNumber}.xml`;
   yield {
-    name: metadata_part,
-    data: metadata_sheet_xml(snapshot, pivots?.nativeIds ?? new Set(), context),
+    name: metadataPart,
+    data: metadataSheetXml(snapshot, pivots?.nativeIds ?? new Set(), context),
   };
-  overrides.push({ part: metadata_part, contentType: WORKSHEET_CONTENT });
-  workbook_relationships.push({
-    id: `rId${metadata_number}`,
+  overrides.push({ part: metadataPart, contentType: WORKSHEET_CONTENT });
+  workbookRelationships.push({
+    id: `rId${metadataNumber}`,
     type: WORKSHEET_REL,
-    target: `worksheets/sheet${metadata_number}.xml`,
+    target: `worksheets/sheet${metadataNumber}.xml`,
   });
-  workbook_relationships.push({
-    id: `rId${metadata_number + 1}`,
+  workbookRelationships.push({
+    id: `rId${metadataNumber + 1}`,
     type: STYLES_REL,
     target: "styles.xml",
   });
-  const extra_ids = (hook?.workbookRelationships ?? []).map((relationship, index) => {
-    const id = `rId${metadata_number + 2 + index}`;
-    workbook_relationships.push({ ...relationship, id });
+  const extraIds = (hook?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadataNumber + 2 + index}`;
+    workbookRelationships.push({ ...relationship, id });
     return id;
   });
-  const pivot_ids = (pivots?.workbookRelationships ?? []).map((relationship, index) => {
-    const id = `rId${metadata_number + 2 + extra_ids.length + index}`;
-    workbook_relationships.push({ ...relationship, id });
+  const pivotIds = (pivots?.workbookRelationships ?? []).map((relationship, index) => {
+    const id = `rId${metadataNumber + 2 + extraIds.length + index}`;
+    workbookRelationships.push({ ...relationship, id });
     return id;
   });
-  const pivot_caches = [
-    ...(hook?.workbookXml?.(extra_ids).pivotCaches ?? []),
-    ...(pivots?.pivotCaches(pivot_ids) ?? []),
+  const pivotCaches = [
+    ...(hook?.workbookXml?.(extraIds).pivotCaches ?? []),
+    ...(pivots?.pivotCaches(pivotIds) ?? []),
   ];
   yield { name: "xl/styles.xml", data: styles.toXml() };
   yield {
     name: "xl/workbook.xml",
-    data: workbook_xml(snapshot, ordered, metadata_name, context, pivot_caches),
+    data: workbookXml(snapshot, ordered, metadataName, context, pivotCaches),
   };
   yield {
     name: "xl/_rels/workbook.xml.rels",
-    data: relationshipsXml(workbook_relationships, context),
+    data: relationshipsXml(workbookRelationships, context),
   };
   yield {
     name: "_rels/.rels",
@@ -1319,12 +1307,11 @@ function* write_workbook_parts(
       context,
     ),
   };
-  const override_map = new Map(overrides.map((override) => [override.part, override]));
-  for (const override of hook?.contentTypeOverrides ?? [])
-    override_map.set(override.part, override);
+  const overrideMap = new Map(overrides.map((override) => [override.part, override]));
+  for (const override of hook?.contentTypeOverrides ?? []) overrideMap.set(override.part, override);
   yield {
     name: "[Content_Types].xml",
-    data: contentTypesXml([...override_map.values()], context, hook?.contentTypeDefaults),
+    data: contentTypesXml([...overrideMap.values()], context, hook?.contentTypeDefaults),
   };
   yield* hook?.parts?.() ?? [];
 }
@@ -1335,7 +1322,7 @@ export async function writeWorkbook(
   hook?: WorkbookWriteHookResolver,
 ): Promise<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  return writeZip(write_workbook_parts(snapshot, { ...context, formulas }, hook), context);
+  return writeZip(writeWorkbookParts(snapshot, { ...context, formulas }, hook), context);
 }
 
 export async function* streamWorkbook(
@@ -1344,5 +1331,5 @@ export async function* streamWorkbook(
   hook?: WorkbookWriteHookResolver,
 ): AsyncGenerator<Uint8Array> {
   const formulas = await convertWorkbookFormulas(snapshot, "export");
-  yield* zipChunks(write_workbook_parts(snapshot, { ...context, formulas }, hook), context);
+  yield* zipChunks(writeWorkbookParts(snapshot, { ...context, formulas }, hook), context);
 }

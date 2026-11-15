@@ -48,13 +48,13 @@ export function projectTable(
   assertResource(context, "maxColumnsPerSheet", columns.length);
   assertResource(context, "maxCells", (sheet.rowCount + 1) * columns.length);
 
-  const output_columns = new Int32Array(sheet.columns.length).fill(-1);
+  const outputColumns = new Int32Array(sheet.columns.length).fill(-1);
   columns.forEach((column, index) => {
-    output_columns[column] = index;
+    outputColumns[column] = index;
   });
   const merges: MergeRange[] = [];
   for (const merge of sheet.merges ?? []) {
-    const anchor = output_columns[merge.c0] ?? -1;
+    const anchor = outputColumns[merge.c0] ?? -1;
     if (anchor < 0 || merge.r0 < 0 || merge.r0 >= sheet.rowCount) continue;
     let end = anchor;
     while (end + 1 < columns.length && (columns[end + 1] ?? Infinity) <= merge.c1) end++;
@@ -97,36 +97,36 @@ export function* projectedRows(
   });
   yield { row: 0, cells: header };
 
-  const window_rows = Math.min(
+  const windowRows = Math.min(
     WINDOW_ROWS,
     Math.max(1, Math.floor(WINDOW_CELLS / Math.max(1, columns.length))),
   );
   const covered = new Uint8Array(columns.length);
-  let next_merge = 0;
-  let active_merges: MergeRange[] = [];
-  const expected_rows = sheet.rowCount;
-  const expected_columns = sheet.columns.length;
-  for (let start = 0; start < expected_rows; start += window_rows) {
+  let nextMerge = 0;
+  let activeMerges: MergeRange[] = [];
+  const expectedRows = sheet.rowCount;
+  const expectedColumns = sheet.columns.length;
+  for (let start = 0; start < expectedRows; start += windowRows) {
     checkAbort(context);
-    const end = Math.min(expected_rows, start + window_rows);
+    const end = Math.min(expectedRows, start + windowRows);
     const live = store.getWorkbook().sheets.find((candidate) => candidate.id === sheet.id);
-    if (live?.rowCount !== expected_rows || live.columns.length !== expected_columns) {
+    if (live?.rowCount !== expectedRows || live.columns.length !== expectedColumns) {
       throw new TypeError("Sheetwrite: table changed during streaming XLSX export");
     }
 
     const window = store.getVisibleWindow(sheet.id, { start, end }, columns);
     for (let row = start; row < end; row++) {
-      const output_row = row + 1;
+      const outputRow = row + 1;
       covered.fill(0);
-      active_merges = active_merges.filter((merge) => merge.r1 >= output_row);
-      while (next_merge < merges.length) {
-        const merge = merges[next_merge];
-        if (!merge || merge.r0 > output_row) break;
-        active_merges.push(merge);
-        next_merge++;
+      activeMerges = activeMerges.filter((merge) => merge.r1 >= outputRow);
+      while (nextMerge < merges.length) {
+        const merge = merges[nextMerge];
+        if (!merge || merge.r0 > outputRow) break;
+        activeMerges.push(merge);
+        nextMerge++;
       }
-      for (const merge of active_merges)
-        covered.fill(1, merge.c0 + (merge.r0 === output_row ? 1 : 0), merge.c1 + 1);
+      for (const merge of activeMerges)
+        covered.fill(1, merge.c0 + (merge.r0 === outputRow ? 1 : 0), merge.c1 + 1);
 
       const cells: AbsoluteCell[] = [];
       columns.forEach((source, col) => {
@@ -139,40 +139,40 @@ export function* projectedRows(
         const value = window.values[flat] ?? null;
         if (value === null && Object.keys(style).length === 0) return;
         cells.push({
-          row: output_row,
+          row: outputRow,
           col,
           source: {
-            rowOffset: output_row,
+            rowOffset: outputRow,
             colOffset: col,
             value: { kind: "literal", value },
             ...(Object.keys(style).length > 0 ? { style } : {}),
           },
         });
       });
-      yield { row: output_row, cells };
+      yield { row: outputRow, cells };
     }
   }
 }
 
 /** The one-sheet workbook the writer streams for a projected table. */
-function table_source(
+function tableSource(
   workbook: Workbook,
   store: Store,
   context: XlsxCodecContext,
 ): { snapshot: WorkbookSnapshot; hook: WorkbookWriteHook } | undefined {
   const projection = projectTable(workbook, context);
-  return projection ? projection_source(projection, store, context) : undefined;
+  return projection ? projectionSource(projection, store, context) : undefined;
 }
 
-function projection_source(
+function projectionSource(
   projection: TableProjection,
   store: Store,
   context: XlsxCodecContext,
 ): { snapshot: WorkbookSnapshot; hook: WorkbookWriteHook } {
   const { sheet, columns, merges } = projection;
-  const row_meta: NonNullable<WorkbookSnapshot["sheets"][number]["rowMeta"]> = [];
+  const rowMeta: NonNullable<WorkbookSnapshot["sheets"][number]["rowMeta"]> = [];
   for (const [row, height] of sheet.rowHeights ?? []) {
-    if (row >= 0 && row < sheet.rowCount) row_meta.push([row + 1, { height }]);
+    if (row >= 0 && row < sheet.rowCount) rowMeta.push([row + 1, { height }]);
   }
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
@@ -195,15 +195,15 @@ function projection_source(
         }),
         cells: [],
         merges: [...merges],
-        rowMeta: row_meta,
+        rowMeta,
       },
     ],
   };
 
   function* rows(): Generator<{ row: number; cells: readonly AbsoluteCell[] }> {
     for (const output of projectedRows(projection, store, context)) {
-      const source_row = output.row - 1;
-      if (output.row === 0 || output.cells.length > 0 || sheet.rowHeights?.has(source_row)) {
+      const sourceRow = output.row - 1;
+      if (output.row === 0 || output.cells.length > 0 || sheet.rowHeights?.has(sourceRow)) {
         yield output;
       }
     }
@@ -216,7 +216,7 @@ export async function writeTable(
   store: Store,
   context: XlsxCodecContext,
 ): Promise<Uint8Array> {
-  const source = table_source(workbook, store, context);
+  const source = tableSource(workbook, store, context);
   return source ? writeWorkbook(source.snapshot, context, () => source.hook) : new Uint8Array(0);
 }
 
@@ -225,6 +225,6 @@ export async function* streamTable(
   store: Store,
   context: XlsxCodecContext,
 ): AsyncGenerator<Uint8Array> {
-  const source = table_source(workbook, store, context);
+  const source = tableSource(workbook, store, context);
   if (source) yield* streamWorkbook(source.snapshot, context, () => source.hook);
 }

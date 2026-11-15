@@ -158,12 +158,12 @@ function argb(value: string | undefined): string | undefined {
   return undefined;
 }
 
-function sheetwrite_color(value: string | undefined): string | undefined {
+function sheetwriteColor(value: string | undefined): string | undefined {
   if (!value || !/^[\da-f]{8}$/i.test(value)) return undefined;
   return `#${value.slice(2).toUpperCase()}`;
 }
 
-function tint_color(value: string, tint: number): string {
+function tintColor(value: string, tint: number): string {
   const channels = [0, 2, 4].map(
     (offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255,
   );
@@ -186,7 +186,7 @@ function tint_color(value: string, tint: number): string {
   lightness = Math.round(lightness * 240);
   lightness =
     Math.round(tint < 0 ? lightness * (1 + tint) : lightness * (1 - tint) + 240 * tint) / 240;
-  const hue_channel = (first: number, second: number, offset: number): number => {
+  const hueChannel = (first: number, second: number, offset: number): number => {
     let normalized = offset;
     if (normalized < 0) normalized += 1;
     if (normalized > 1) normalized -= 1;
@@ -205,9 +205,9 @@ function tint_color(value: string, tint: number): string {
               : lightness + saturation - lightness * saturation;
           const first = 2 * lightness - second;
           return [
-            hue_channel(first, second, hue + 1 / 3),
-            hue_channel(first, second, hue),
-            hue_channel(first, second, hue - 1 / 3),
+            hueChannel(first, second, hue + 1 / 3),
+            hueChannel(first, second, hue),
+            hueChannel(first, second, hue - 1 / 3),
           ];
         })();
   return output
@@ -220,7 +220,7 @@ function tint_color(value: string, tint: number): string {
     .toUpperCase();
 }
 
-function parsed_theme_colors(
+function parsedThemeColors(
   root: XmlElement | undefined,
   part: string,
 ): ReadonlyMap<number, string> {
@@ -256,7 +256,7 @@ function parsed_theme_colors(
   return colors;
 }
 
-function resolved_color(
+function resolvedColor(
   element: XmlElement | undefined,
   theme: ReadonlyMap<number, string>,
   context: XlsxCodecContext,
@@ -264,15 +264,15 @@ function resolved_color(
   part: string,
 ): string | undefined {
   if (!element) return undefined;
-  const rgb = sheetwrite_color(xmlAttribute(element, "rgb"));
-  let six_digit = rgb?.slice(1);
-  const theme_index = Number(xmlAttribute(element, "theme"));
+  const rgb = sheetwriteColor(xmlAttribute(element, "rgb"));
+  let sixDigit = rgb?.slice(1);
+  const themeIndex = Number(xmlAttribute(element, "theme"));
   const indexed = Number(xmlAttribute(element, "indexed"));
-  if (!six_digit && Number.isInteger(theme_index)) six_digit = theme.get(theme_index);
-  if (!six_digit && Number.isInteger(indexed) && indexed >= 0 && indexed < INDEXED_COLORS.length) {
-    six_digit = INDEXED_COLORS[indexed];
+  if (!sixDigit && Number.isInteger(themeIndex)) sixDigit = theme.get(themeIndex);
+  if (!sixDigit && Number.isInteger(indexed) && indexed >= 0 && indexed < INDEXED_COLORS.length) {
+    sixDigit = INDEXED_COLORS[indexed];
   }
-  if (!six_digit) {
+  if (!sixDigit) {
     const key = JSON.stringify(element.attributes);
     if (!warnings.has(key)) {
       warnings.add(key);
@@ -284,26 +284,26 @@ function resolved_color(
     }
     return undefined;
   }
-  const raw_tint = xmlAttribute(element, "tint");
-  if (raw_tint !== undefined) {
-    const tint = Number(raw_tint);
+  const rawTint = xmlAttribute(element, "tint");
+  if (rawTint !== undefined) {
+    const tint = Number(rawTint);
     if (!Number.isFinite(tint) || tint < -1 || tint > 1) {
       emitWarning(context, {
         code: "format-loss",
-        message: `Invalid style color tint ${raw_tint} was ignored`,
+        message: `Invalid style color tint ${rawTint} was ignored`,
         part,
       });
     } else {
-      six_digit = tint_color(six_digit, tint);
+      sixDigit = tintColor(sixDigit, tint);
     }
   }
-  return `#${six_digit}`;
+  return `#${sixDigit}`;
 }
 
-function canonical_style(style: CellStyle | undefined): CellStyle | undefined {
+function canonicalStyle(style: CellStyle | undefined): CellStyle | undefined {
   if (!style) return undefined;
   const border = style.border;
-  const ordered_border = border
+  const orderedBorder = border
     ? {
         ...(border.all ? { all: { ...border.all } } : {}),
         ...(border.top ? { top: { ...border.top } } : {}),
@@ -324,19 +324,19 @@ function canonical_style(style: CellStyle | undefined): CellStyle | undefined {
     ...(style.align !== undefined ? { align: style.align } : {}),
     ...(style.verticalAlign !== undefined ? { verticalAlign: style.verticalAlign } : {}),
     ...(style.wrap !== undefined ? { wrap: style.wrap } : {}),
-    ...(ordered_border && Object.keys(ordered_border).length > 0 ? { border: ordered_border } : {}),
+    ...(orderedBorder && Object.keys(orderedBorder).length > 0 ? { border: orderedBorder } : {}),
   };
   return Object.keys(ordered).length > 0 ? ordered : undefined;
 }
 
-function border_style(border: CellBorder | undefined): string | undefined {
+function borderStyle(border: CellBorder | undefined): string | undefined {
   if (!border) return undefined;
   if (border.style === "dashed") return (border.width ?? 1) >= 2 ? "mediumDashed" : "dashed";
   if (border.style === "dotted") return "dotted";
   return (border.width ?? 1) >= 2 ? "medium" : "thin";
 }
 
-function imported_border(
+function importedBorder(
   element: XmlElement | undefined,
   theme: ReadonlyMap<number, string>,
   context: XlsxCodecContext,
@@ -344,36 +344,36 @@ function imported_border(
   part: string,
 ): CellBorder | undefined {
   if (!element) return undefined;
-  const raw_style = xmlAttribute(element, "style");
-  const color = resolved_color(xmlChild(element, "color"), theme, context, warnings, part);
-  if (!raw_style && !color) return undefined;
+  const rawStyle = xmlAttribute(element, "style");
+  const color = resolvedColor(xmlChild(element, "color"), theme, context, warnings, part);
+  if (!rawStyle && !color) return undefined;
   const border: CellBorder = {};
-  if (raw_style === "dashed" || raw_style?.includes("Dash")) border.style = "dashed";
-  else if (raw_style === "dotted") border.style = "dotted";
-  else if (raw_style) border.style = "solid";
+  if (rawStyle === "dashed" || rawStyle?.includes("Dash")) border.style = "dashed";
+  else if (rawStyle === "dotted") border.style = "dotted";
+  else if (rawStyle) border.style = "solid";
   if (
-    raw_style === "medium" ||
-    raw_style === "thick" ||
-    raw_style === "double" ||
-    raw_style?.startsWith("medium")
+    rawStyle === "medium" ||
+    rawStyle === "thick" ||
+    rawStyle === "double" ||
+    rawStyle?.startsWith("medium")
   ) {
     border.width = 2;
-  } else if (raw_style) {
+  } else if (rawStyle) {
     border.width = 1;
   }
   if (color) border.color = color;
   return border;
 }
 
-function style_key(style: CellStyle | undefined, number_format: string | undefined): string {
-  return JSON.stringify([canonical_style(style) ?? null, number_format ?? null]);
+function styleKey(style: CellStyle | undefined, numberFormat: string | undefined): string {
+  return JSON.stringify([canonicalStyle(style) ?? null, numberFormat ?? null]);
 }
 
-function date_number_format(format: string | undefined): boolean {
+function dateNumberFormat(format: string | undefined): boolean {
   if (!format) return false;
-  const has_elapsed_time = /\[(?:h+|m+|s+)\]/i.test(format);
+  const hasElapsedTime = /\[(?:h+|m+|s+)\]/i.test(format);
   const stripped = format.replace(/"[^"]*"|\\.|\[[^\]]*\]/g, "").toLowerCase();
-  return has_elapsed_time || /[ymdhis]/.test(stripped);
+  return hasElapsedTime || /[ymdhis]/.test(stripped);
 }
 
 /** XLSX spells the centered vertical alignment `center`; cell styles say `middle`. */
@@ -383,11 +383,11 @@ const XLSX_VERTICAL: Readonly<Record<CellVerticalAlign, string>> = {
   bottom: "bottom",
 };
 
-function has_alignment(style: CellStyle): boolean {
+function hasAlignment(style: CellStyle): boolean {
   return style.align !== undefined || style.verticalAlign !== undefined || style.wrap !== undefined;
 }
 
-function alignment_xml(style: CellStyle | undefined, differential = false): string {
+function alignmentXml(style: CellStyle | undefined, differential = false): string {
   // Ordinary cells default to center in Sheetwrite, but bottom in OOXML.
   // A differential style instead leaves unspecified fields untouched.
   const vertical = differential
@@ -399,7 +399,7 @@ function alignment_xml(style: CellStyle | undefined, differential = false): stri
 }
 
 /** Alignment fields of a cell or differential style from its `<alignment>` element. */
-function imported_alignment(alignment: XmlElement | undefined, differential = false): CellStyle {
+function importedAlignment(alignment: XmlElement | undefined, differential = false): CellStyle {
   const style: CellStyle = differential ? {} : { verticalAlign: "bottom" };
   if (!alignment) return style;
   const horizontal = xmlAttribute(alignment, "horizontal");
@@ -422,30 +422,30 @@ const DEFAULT_CELL_FONT: FontRecord = {
   fontSize: (11 * 96) / 72,
 };
 
-function font_xml(font: FontRecord, defaults?: FontRecord): string {
+function fontXml(font: FontRecord, defaults?: FontRecord): string {
   let xml = "<font>";
   if (font.bold) xml += "<b/>";
   if (font.italic) xml += "<i/>";
   if (font.underline) xml += "<u/>";
   if (font.strikethrough) xml += "<strike/>";
-  const font_size = font.fontSize ?? defaults?.fontSize;
-  if (font_size !== undefined) xml += `<sz val="${(font_size * 72) / 96}"/>`;
+  const fontSize = font.fontSize ?? defaults?.fontSize;
+  if (fontSize !== undefined) xml += `<sz val="${(fontSize * 72) / 96}"/>`;
   const color = argb(font.color);
   if (color) xml += `<color rgb="${color}"/>`;
   // Validated cell families need no escaping; XML-escape anyway as the boundary rule.
-  const font_family = font.fontFamily ?? defaults?.fontFamily;
-  if (font_family !== undefined) xml += `<name val="${escapeXml(font_family)}"/>`;
+  const fontFamily = font.fontFamily ?? defaults?.fontFamily;
+  if (fontFamily !== undefined) xml += `<name val="${escapeXml(fontFamily)}"/>`;
   return `${xml}</font>`;
 }
 
-function border_side_xml(name: string, border: CellBorder | undefined): string {
-  const style = border_style(border);
+function borderSideXml(name: string, border: CellBorder | undefined): string {
+  const style = borderStyle(border);
   if (!style) return `<${name}/>`;
   const color = argb(border?.color);
   return `<${name} style="${style}">${color ? `<color rgb="${color}"/>` : ""}</${name}>`;
 }
 
-function style_font(style: CellStyle | undefined): FontRecord {
+function styleFont(style: CellStyle | undefined): FontRecord {
   return {
     ...(style?.bold ? { bold: true } : {}),
     ...(style?.italic ? { italic: true } : {}),
@@ -457,28 +457,28 @@ function style_font(style: CellStyle | undefined): FontRecord {
   };
 }
 
-function style_border(style: CellStyle | undefined): BorderRecord {
+function styleBorder(style: CellStyle | undefined): BorderRecord {
   const result: BorderRecord = {};
   for (const side of ["top", "right", "bottom", "left"] as const) {
     const value = style?.border?.[side] ?? style?.border?.all;
-    if (value && (border_style(value) || argb(value.color))) result[side] = value;
+    if (value && (borderStyle(value) || argb(value.color))) result[side] = value;
   }
   return result;
 }
 
-function differential_xml(style: CellStyle): string {
-  const font = style_font(style);
-  const border = style_border(style);
+function differentialXml(style: CellStyle): string {
+  const font = styleFont(style);
+  const border = styleBorder(style);
   let xml = "<dxf>";
-  if (Object.keys(font).length > 0) xml += font_xml(font);
-  const fill_color = argb(style.backgroundColor);
-  if (fill_color) {
-    xml += `<fill><patternFill><bgColor rgb="${fill_color}"/></patternFill></fill>`;
+  if (Object.keys(font).length > 0) xml += fontXml(font);
+  const fillColor = argb(style.backgroundColor);
+  if (fillColor) {
+    xml += `<fill><patternFill><bgColor rgb="${fillColor}"/></patternFill></fill>`;
   }
   if (Object.keys(border).length > 0) {
-    xml += `<border>${border_side_xml("left", border.left)}${border_side_xml("right", border.right)}${border_side_xml("top", border.top)}${border_side_xml("bottom", border.bottom)}</border>`;
+    xml += `<border>${borderSideXml("left", border.left)}${borderSideXml("right", border.right)}${borderSideXml("top", border.top)}${borderSideXml("bottom", border.bottom)}</border>`;
   }
-  if (has_alignment(style)) xml += alignment_xml(style, true);
+  if (hasAlignment(style)) xml += alignmentXml(style, true);
   return `${xml}</dxf>`;
 }
 
@@ -486,11 +486,11 @@ function differential_xml(style: CellStyle): string {
 export class StylesRegistry {
   readonly #context: XlsxCodecContext;
   readonly #styles: { style?: CellStyle; numberFormat?: string }[] = [{}];
-  readonly #style_ids = new Map<string, number>([[style_key(undefined, undefined), 0]]);
+  readonly #styleIds = new Map<string, number>([[styleKey(undefined, undefined), 0]]);
   readonly #differentials: CellStyle[] = [];
-  readonly #differential_ids = new Map<string, number>();
-  readonly #custom_formats: string[] = [];
-  readonly #custom_format_ids = new Map<string, number>();
+  readonly #differentialIds = new Map<string, number>();
+  readonly #customFormats: string[] = [];
+  readonly #customFormatIds = new Map<string, number>();
 
   constructor(context: XlsxCodecContext) {
     this.#context = context;
@@ -503,22 +503,22 @@ export class StylesRegistry {
   numberFormatId(format: string): number {
     const builtin = Object.entries(BUILTIN_NUMBER_FORMATS).find(([, value]) => value === format);
     if (builtin) return Number(builtin[0]);
-    let custom = this.#custom_format_ids.get(format);
+    let custom = this.#customFormatIds.get(format);
     if (custom === undefined) {
-      custom = 164 + this.#custom_formats.length;
-      this.#custom_formats.push(format);
-      this.#custom_format_ids.set(format, custom);
+      custom = 164 + this.#customFormats.length;
+      this.#customFormats.push(format);
+      this.#customFormatIds.set(format, custom);
     }
     return custom;
   }
 
   register(style: CellStyle | undefined, numberFormat: string | undefined): number {
-    const cleaned_style = canonical_style(style);
-    const cleaned_format = numberFormat && numberFormat !== "General" ? numberFormat : undefined;
-    const key = style_key(cleaned_style, cleaned_format);
-    const existing = this.#style_ids.get(key);
+    const cleanedStyle = canonicalStyle(style);
+    const cleanedFormat = numberFormat && numberFormat !== "General" ? numberFormat : undefined;
+    const key = styleKey(cleanedStyle, cleanedFormat);
+    const existing = this.#styleIds.get(key);
     if (existing !== undefined) return existing;
-    for (const [side, border] of Object.entries(cleaned_style?.border ?? {})) {
+    for (const [side, border] of Object.entries(cleanedStyle?.border ?? {})) {
       if (border?.width !== undefined && border.width !== 1 && border.width !== 2) {
         emitWarning(this.#context, {
           code: "format-loss",
@@ -529,15 +529,15 @@ export class StylesRegistry {
     }
     const id = this.#styles.length;
     assertResource(this.#context, "maxStyles", id + 1);
-    this.#styles.push({ style: cleaned_style, numberFormat: cleaned_format });
-    this.#style_ids.set(key, id);
+    this.#styles.push({ style: cleanedStyle, numberFormat: cleanedFormat });
+    this.#styleIds.set(key, id);
     return id;
   }
 
   registerDifferential(style: CellStyle): number {
-    const cleaned = canonical_style(style) ?? {};
+    const cleaned = canonicalStyle(style) ?? {};
     const key = JSON.stringify(cleaned);
-    const existing = this.#differential_ids.get(key);
+    const existing = this.#differentialIds.get(key);
     if (existing !== undefined) return existing;
     for (const [side, border] of Object.entries(cleaned.border ?? {})) {
       if (border?.width !== undefined && border.width !== 1 && border.width !== 2) {
@@ -551,7 +551,7 @@ export class StylesRegistry {
     const id = this.#differentials.length;
     assertResource(this.#context, "maxStyles", this.#styles.length + id + 1);
     this.#differentials.push(cleaned);
-    this.#differential_ids.set(key, id);
+    this.#differentialIds.set(key, id);
     return id;
   }
 
@@ -559,9 +559,9 @@ export class StylesRegistry {
     const fonts: FontRecord[] = [{}];
     const fills: FillRecord[] = [{}, {}];
     const borders: BorderRecord[] = [{}];
-    const font_ids = new Map<string, number>([["{}", 0]]);
-    const fill_ids = new Map<string, number>([["{}", 0]]);
-    const border_ids = new Map<string, number>([["{}", 0]]);
+    const fontIds = new Map<string, number>([["{}", 0]]);
+    const fillIds = new Map<string, number>([["{}", 0]]);
+    const borderIds = new Map<string, number>([["{}", 0]]);
     const xfs: {
       fontId: number;
       fillId: number;
@@ -572,57 +572,51 @@ export class StylesRegistry {
 
     for (const record of this.#styles) {
       const style = record.style;
-      const font = style_font(style);
+      const font = styleFont(style);
       const fill: FillRecord = argb(style?.backgroundColor)
         ? { backgroundColor: style!.backgroundColor }
         : {};
-      const border = style_border(style);
-      const font_key = JSON.stringify(font);
-      const fill_key = JSON.stringify(fill);
-      const border_key = JSON.stringify(border);
-      let font_id = font_ids.get(font_key);
-      if (font_id === undefined) {
-        font_id = fonts.length;
+      const border = styleBorder(style);
+      const fontKey = JSON.stringify(font);
+      const fillKey = JSON.stringify(fill);
+      const borderKey = JSON.stringify(border);
+      let fontId = fontIds.get(fontKey);
+      if (fontId === undefined) {
+        fontId = fonts.length;
         fonts.push(font);
-        font_ids.set(font_key, font_id);
+        fontIds.set(fontKey, fontId);
       }
-      let fill_id = fill_ids.get(fill_key);
-      if (fill_id === undefined) {
-        fill_id = fills.length;
+      let fillId = fillIds.get(fillKey);
+      if (fillId === undefined) {
+        fillId = fills.length;
         fills.push(fill);
-        fill_ids.set(fill_key, fill_id);
+        fillIds.set(fillKey, fillId);
       }
-      let border_id = border_ids.get(border_key);
-      if (border_id === undefined) {
-        border_id = borders.length;
+      let borderId = borderIds.get(borderKey);
+      if (borderId === undefined) {
+        borderId = borders.length;
         borders.push(border);
-        border_ids.set(border_key, border_id);
+        borderIds.set(borderKey, borderId);
       }
-      const num_fmt_id = record.numberFormat ? this.numberFormatId(record.numberFormat) : 0;
-      xfs.push({
-        fontId: font_id,
-        fillId: fill_id,
-        borderId: border_id,
-        numFmtId: num_fmt_id,
-        alignment: style,
-      });
+      const numFmtId = record.numberFormat ? this.numberFormatId(record.numberFormat) : 0;
+      xfs.push({ fontId, fillId, borderId, numFmtId, alignment: style });
     }
 
     const xml = new XmlBuffer(this.#context);
     xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
     xml.append(`<styleSheet xmlns="${MAIN_NS}">`);
-    const custom_formats = this.#custom_formats;
-    if (custom_formats.length > 0) {
-      xml.append(`<numFmts count="${custom_formats.length}">`);
-      for (let index = 0; index < custom_formats.length; index++) {
+    const customFormats = this.#customFormats;
+    if (customFormats.length > 0) {
+      xml.append(`<numFmts count="${customFormats.length}">`);
+      for (let index = 0; index < customFormats.length; index++) {
         xml.append(
-          `<numFmt numFmtId="${164 + index}" formatCode="${escapeXml(custom_formats[index]!)}"/>`,
+          `<numFmt numFmtId="${164 + index}" formatCode="${escapeXml(customFormats[index]!)}"/>`,
         );
       }
       xml.append("</numFmts>");
     }
     xml.append(`<fonts count="${fonts.length}">`);
-    for (const font of fonts) xml.append(font_xml(font, DEFAULT_CELL_FONT));
+    for (const font of fonts) xml.append(fontXml(font, DEFAULT_CELL_FONT));
     xml.append("</fonts>");
     xml.append(
       `<fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>`,
@@ -637,7 +631,7 @@ export class StylesRegistry {
     xml.append(`<borders count="${borders.length}">`);
     for (const border of borders) {
       xml.append(
-        `<border>${border_side_xml("left", border.left)}${border_side_xml("right", border.right)}${border_side_xml("top", border.top)}${border_side_xml("bottom", border.bottom)}<diagonal/></border>`,
+        `<border>${borderSideXml("left", border.left)}${borderSideXml("right", border.right)}${borderSideXml("top", border.top)}${borderSideXml("bottom", border.bottom)}<diagonal/></border>`,
       );
     }
     xml.append("</borders>");
@@ -651,7 +645,7 @@ export class StylesRegistry {
       xml.append(
         `<xf numFmtId="${xf.numFmtId}" fontId="${xf.fontId}" fillId="${xf.fillId}" borderId="${xf.borderId}" xfId="0"${xf.numFmtId ? ' applyNumberFormat="1"' : ""}${xf.fontId ? ' applyFont="1"' : ""}${xf.fillId > 1 ? ' applyFill="1"' : ""}${xf.borderId ? ' applyBorder="1"' : ""} applyAlignment="1">`,
       );
-      xml.append(alignment_xml(alignment));
+      xml.append(alignmentXml(alignment));
       xml.append("</xf>");
     }
     xml.append("</cellXfs>");
@@ -660,7 +654,7 @@ export class StylesRegistry {
     );
     if (this.#differentials.length > 0) {
       xml.append(`<dxfs count="${this.#differentials.length}">`);
-      for (const style of this.#differentials) xml.append(differential_xml(style));
+      for (const style of this.#differentials) xml.append(differentialXml(style));
       xml.append("</dxfs>");
     }
     xml.append("</styleSheet>");
@@ -668,7 +662,7 @@ export class StylesRegistry {
   }
 }
 
-function integer_attribute(element: XmlElement, name: string, fallback = 0): number {
+function integerAttribute(element: XmlElement, name: string, fallback = 0): number {
   const raw = xmlAttribute(element, name);
   if (raw === undefined) return fallback;
   const value = Number(raw);
@@ -680,13 +674,13 @@ function integer_attribute(element: XmlElement, name: string, fallback = 0): num
   return value;
 }
 
-function font_property_enabled(element: XmlElement | undefined): boolean {
+function fontPropertyEnabled(element: XmlElement | undefined): boolean {
   if (!element) return false;
   const value = xmlAttribute(element, "val");
   return value === undefined || xmlBoolean(value);
 }
 
-function parsed_differential_style(
+function parsedDifferentialStyle(
   dxf: XmlElement,
   theme: ReadonlyMap<number, string>,
   context: XlsxCodecContext,
@@ -695,59 +689,59 @@ function parsed_differential_style(
 ): CellStyle {
   const style: CellStyle = {};
   const font = xmlChild(dxf, "font");
-  if (font_property_enabled(font ? xmlChild(font, "b") : undefined)) style.bold = true;
-  if (font_property_enabled(font ? xmlChild(font, "i") : undefined)) style.italic = true;
+  if (fontPropertyEnabled(font ? xmlChild(font, "b") : undefined)) style.bold = true;
+  if (fontPropertyEnabled(font ? xmlChild(font, "i") : undefined)) style.italic = true;
   const underline = font ? xmlChild(font, "u") : undefined;
-  const underline_value = underline ? xmlAttribute(underline, "val") : undefined;
+  const underlineValue = underline ? xmlAttribute(underline, "val") : undefined;
   if (
     underline &&
-    underline_value !== "none" &&
-    underline_value !== "0" &&
-    underline_value?.toLowerCase() !== "false"
+    underlineValue !== "none" &&
+    underlineValue !== "0" &&
+    underlineValue?.toLowerCase() !== "false"
   ) {
     style.underline = true;
   }
-  if (font_property_enabled(font ? xmlChild(font, "strike") : undefined)) {
+  if (fontPropertyEnabled(font ? xmlChild(font, "strike") : undefined)) {
     style.strikethrough = true;
   }
-  const font_size = Number(font ? xmlAttribute(xmlChild(font, "sz") ?? font, "val") : undefined);
-  if (Number.isFinite(font_size) && font_size > 0) style.fontSize = (font_size * 96) / 72;
-  const font_color = resolved_color(
+  const fontSize = Number(font ? xmlAttribute(xmlChild(font, "sz") ?? font, "val") : undefined);
+  if (Number.isFinite(fontSize) && fontSize > 0) style.fontSize = (fontSize * 96) / 72;
+  const fontColor = resolvedColor(
     font ? xmlChild(font, "color") : undefined,
     theme,
     context,
     warnings,
     part,
   );
-  if (font_color) style.color = font_color;
+  if (fontColor) style.color = fontColor;
   const fill = xmlChild(dxf, "fill");
   const pattern = fill ? xmlChild(fill, "patternFill") : undefined;
-  const pattern_type = pattern ? xmlAttribute(pattern, "patternType") : undefined;
-  const differential_fill = pattern
-    ? resolved_color(
-        xmlChild(pattern, pattern_type === "solid" ? "fgColor" : "bgColor"),
+  const patternType = pattern ? xmlAttribute(pattern, "patternType") : undefined;
+  const differentialFill = pattern
+    ? resolvedColor(
+        xmlChild(pattern, patternType === "solid" ? "fgColor" : "bgColor"),
         theme,
         context,
         warnings,
         part,
       )
     : undefined;
-  if (differential_fill) {
-    style.backgroundColor = differential_fill;
-  } else if (pattern_type && pattern_type !== "none" && pattern_type !== "gray125") {
+  if (differentialFill) {
+    style.backgroundColor = differentialFill;
+  } else if (patternType && patternType !== "none" && patternType !== "gray125") {
     emitWarning(context, {
       code: "format-loss",
-      message: `Non-solid conditional-format fill pattern ${pattern_type} cannot be represented and was dropped`,
+      message: `Non-solid conditional-format fill pattern ${patternType} cannot be represented and was dropped`,
       part,
     });
   }
   const border = xmlChild(dxf, "border");
   if (border) {
     const parsed = {
-      top: imported_border(xmlChild(border, "top"), theme, context, warnings, part),
-      right: imported_border(xmlChild(border, "right"), theme, context, warnings, part),
-      bottom: imported_border(xmlChild(border, "bottom"), theme, context, warnings, part),
-      left: imported_border(xmlChild(border, "left"), theme, context, warnings, part),
+      top: importedBorder(xmlChild(border, "top"), theme, context, warnings, part),
+      right: importedBorder(xmlChild(border, "right"), theme, context, warnings, part),
+      bottom: importedBorder(xmlChild(border, "bottom"), theme, context, warnings, part),
+      left: importedBorder(xmlChild(border, "left"), theme, context, warnings, part),
     };
     if (parsed.top || parsed.right || parsed.bottom || parsed.left) {
       style.border = {};
@@ -758,7 +752,7 @@ function parsed_differential_style(
     }
   }
   const alignment = xmlChild(dxf, "alignment");
-  Object.assign(style, imported_alignment(alignment, true));
+  Object.assign(style, importedAlignment(alignment, true));
   return style;
 }
 
@@ -786,18 +780,18 @@ export class ParsedStyles {
       return;
     }
     assertXmlRoot(root, "styleSheet", MAIN_NAMESPACES, part);
-    const theme = parsed_theme_colors(themeRoot, themePart);
+    const theme = parsedThemeColors(themeRoot, themePart);
     const formats = this.#formats;
     for (const [id, value] of Object.entries(BUILTIN_NUMBER_FORMATS)) {
       formats.set(Number(id), value);
     }
-    const number_formats = xmlChildren(
+    const numberFormats = xmlChildren(
       xmlChild(root, "numFmts") ?? { attributes: {}, children: [], name: "", text: "" },
       "numFmt",
     );
-    assertResource(context, "maxStyles", number_formats.length);
-    for (const format of number_formats) {
-      const id = integer_attribute(format, "numFmtId", -1);
+    assertResource(context, "maxStyles", numberFormats.length);
+    for (const format of numberFormats) {
+      const id = integerAttribute(format, "numFmtId", -1);
       const code = xmlAttribute(format, "formatCode");
       if (id < 0 || code === undefined) {
         throw new TypeError("Sheetwrite: invalid XLSX custom number format");
@@ -811,13 +805,13 @@ export class ParsedStyles {
     // Every XLSX font names a family and size, usually the workbook default.
     // Only a different family or size becomes a cell style, so ordinary text
     // keeps the grid's theme font.
-    const default_name_element = fonts[0] ? xmlChild(fonts[0], "name") : undefined;
-    const default_font_name = default_name_element
-      ? xmlAttribute(default_name_element, "val")
+    const defaultNameElement = fonts[0] ? xmlChild(fonts[0], "name") : undefined;
+    const defaultFontName = defaultNameElement
+      ? xmlAttribute(defaultNameElement, "val")
       : undefined;
-    const default_size_element = fonts[0] ? xmlChild(fonts[0], "sz") : undefined;
-    const default_font_size = default_size_element
-      ? Number(xmlAttribute(default_size_element, "val"))
+    const defaultSizeElement = fonts[0] ? xmlChild(fonts[0], "sz") : undefined;
+    const defaultFontSize = defaultSizeElement
+      ? Number(xmlAttribute(defaultSizeElement, "val"))
       : undefined;
     const fills = xmlChildren(
       xmlChild(root, "fills") ?? { attributes: {}, children: [], name: "", text: "" },
@@ -841,7 +835,7 @@ export class ParsedStyles {
       "maxStyles",
       Math.max(fonts.length, fills.length, borders.length, xfs.length),
     );
-    const color_warnings = new Set<string>();
+    const colorWarnings = new Set<string>();
     for (const [index, expected] of ["none", "gray125"].entries()) {
       const pattern = fills[index] ? xmlChild(fills[index]!, "patternFill") : undefined;
       const actual = pattern ? (xmlAttribute(pattern, "patternType") ?? "none") : undefined;
@@ -853,96 +847,90 @@ export class ParsedStyles {
         });
       }
     }
-    this.#styles = xfs.map((xf, style_index) => {
-      const font_id = integer_attribute(xf, "fontId");
-      const fill_id = integer_attribute(xf, "fillId");
-      const border_id = integer_attribute(xf, "borderId");
-      const num_fmt_id = integer_attribute(xf, "numFmtId");
-      if (font_id >= fonts.length || fill_id >= fills.length || border_id >= borders.length) {
+    this.#styles = xfs.map((xf, styleIndex) => {
+      const fontId = integerAttribute(xf, "fontId");
+      const fillId = integerAttribute(xf, "fillId");
+      const borderId = integerAttribute(xf, "borderId");
+      const numFmtId = integerAttribute(xf, "numFmtId");
+      if (fontId >= fonts.length || fillId >= fills.length || borderId >= borders.length) {
         throw new TypeError(
-          `Sheetwrite: invalid XLSX style ${style_index} references font ${font_id}, fill ${fill_id}, or border ${border_id}`,
+          `Sheetwrite: invalid XLSX style ${styleIndex} references font ${fontId}, fill ${fillId}, or border ${borderId}`,
         );
       }
       const style: CellStyle = {};
-      const font = fonts[font_id]!;
-      if (font_property_enabled(xmlChild(font, "b"))) style.bold = true;
-      if (font_property_enabled(xmlChild(font, "i"))) style.italic = true;
+      const font = fonts[fontId]!;
+      if (fontPropertyEnabled(xmlChild(font, "b"))) style.bold = true;
+      if (fontPropertyEnabled(xmlChild(font, "i"))) style.italic = true;
       const underline = xmlChild(font, "u");
-      const underline_value = underline ? xmlAttribute(underline, "val") : undefined;
+      const underlineValue = underline ? xmlAttribute(underline, "val") : undefined;
       if (
         underline &&
-        underline_value !== "none" &&
-        underline_value !== "0" &&
-        underline_value?.toLowerCase() !== "false"
+        underlineValue !== "none" &&
+        underlineValue !== "0" &&
+        underlineValue?.toLowerCase() !== "false"
       ) {
         style.underline = true;
       }
       if (
-        underline_value &&
-        ["double", "singleAccounting", "doubleAccounting"].includes(underline_value) &&
-        !color_warnings.has(`underline:${font_id}`)
+        underlineValue &&
+        ["double", "singleAccounting", "doubleAccounting"].includes(underlineValue) &&
+        !colorWarnings.has(`underline:${fontId}`)
       ) {
-        color_warnings.add(`underline:${font_id}`);
+        colorWarnings.add(`underline:${fontId}`);
         emitWarning(context, {
           code: "format-loss",
-          message: `Excel ${underline_value} underline was reduced to boolean underline`,
+          message: `Excel ${underlineValue} underline was reduced to boolean underline`,
           part,
         });
       }
-      if (font_property_enabled(xmlChild(font, "strike"))) style.strikethrough = true;
+      if (fontPropertyEnabled(xmlChild(font, "strike"))) style.strikethrough = true;
       const size = Number(
         xmlAttribute(
           xmlChild(font, "sz") ?? { attributes: {}, children: [], name: "", text: "" },
           "val",
         ),
       );
-      if (Number.isFinite(size) && size > 0 && size !== default_font_size) {
+      if (Number.isFinite(size) && size > 0 && size !== defaultFontSize) {
         style.fontSize = (size * 96) / 72;
       }
-      const font_color = resolved_color(
-        xmlChild(font, "color"),
-        theme,
-        context,
-        color_warnings,
-        part,
-      );
-      if (font_color) style.color = font_color;
-      const name_element = xmlChild(font, "name");
-      const font_name = name_element ? xmlAttribute(name_element, "val") : undefined;
-      if (font_name !== undefined && font_name !== default_font_name) {
-        if (isCellFontFamily(font_name)) {
-          style.fontFamily = font_name;
-        } else if (!color_warnings.has(`font-name:${font_id}`)) {
-          color_warnings.add(`font-name:${font_id}`);
+      const fontColor = resolvedColor(xmlChild(font, "color"), theme, context, colorWarnings, part);
+      if (fontColor) style.color = fontColor;
+      const nameElement = xmlChild(font, "name");
+      const fontName = nameElement ? xmlAttribute(nameElement, "val") : undefined;
+      if (fontName !== undefined && fontName !== defaultFontName) {
+        if (isCellFontFamily(fontName)) {
+          style.fontFamily = fontName;
+        } else if (!colorWarnings.has(`font-name:${fontId}`)) {
+          colorWarnings.add(`font-name:${fontId}`);
           emitWarning(context, {
             code: "format-loss",
-            message: `Font "${font_name.slice(0, 64)}" cannot be represented and was dropped`,
+            message: `Font "${fontName.slice(0, 64)}" cannot be represented and was dropped`,
             part,
           });
         }
       }
 
-      if (fill_id > 1) {
-        const fill = fills[fill_id]!;
+      if (fillId > 1) {
+        const fill = fills[fillId]!;
         const pattern = xmlChild(fill, "patternFill");
-        const pattern_type = pattern ? (xmlAttribute(pattern, "patternType") ?? "none") : undefined;
-        if (pattern_type === "solid") {
-          const color = resolved_color(
+        const patternType = pattern ? (xmlAttribute(pattern, "patternType") ?? "none") : undefined;
+        if (patternType === "solid") {
+          const color = resolvedColor(
             xmlChild(pattern!, "fgColor"),
             theme,
             context,
-            color_warnings,
+            colorWarnings,
             part,
           );
           if (color) style.backgroundColor = color;
         } else if (
-          pattern_type !== undefined &&
-          pattern_type !== "none" &&
-          pattern_type !== "gray125"
+          patternType !== undefined &&
+          patternType !== "none" &&
+          patternType !== "gray125"
         ) {
           emitWarning(context, {
             code: "format-loss",
-            message: `Non-solid fill pattern ${pattern_type} cannot be represented and was dropped`,
+            message: `Non-solid fill pattern ${patternType} cannot be represented and was dropped`,
             part,
           });
         } else if (xmlChild(fill, "gradientFill")) {
@@ -954,14 +942,14 @@ export class ParsedStyles {
         }
       }
 
-      const border = borders[border_id]!;
+      const border = borders[borderId]!;
       if (
         (xmlBoolean(xmlAttribute(border, "diagonalUp")) ||
           xmlBoolean(xmlAttribute(border, "diagonalDown")) ||
           xmlAttribute(xmlChild(border, "diagonal") ?? border, "style")) &&
-        !color_warnings.has(`diagonal:${border_id}`)
+        !colorWarnings.has(`diagonal:${borderId}`)
       ) {
-        color_warnings.add(`diagonal:${border_id}`);
+        colorWarnings.add(`diagonal:${borderId}`);
         emitWarning(context, {
           code: "format-loss",
           message: "Diagonal border presentation cannot be represented and was dropped",
@@ -969,10 +957,10 @@ export class ParsedStyles {
         });
       }
       const parsed = {
-        top: imported_border(xmlChild(border, "top"), theme, context, color_warnings, part),
-        right: imported_border(xmlChild(border, "right"), theme, context, color_warnings, part),
-        bottom: imported_border(xmlChild(border, "bottom"), theme, context, color_warnings, part),
-        left: imported_border(xmlChild(border, "left"), theme, context, color_warnings, part),
+        top: importedBorder(xmlChild(border, "top"), theme, context, colorWarnings, part),
+        right: importedBorder(xmlChild(border, "right"), theme, context, colorWarnings, part),
+        bottom: importedBorder(xmlChild(border, "bottom"), theme, context, colorWarnings, part),
+        left: importedBorder(xmlChild(border, "left"), theme, context, colorWarnings, part),
       };
       if (parsed.top || parsed.right || parsed.bottom || parsed.left) {
         style.border = {};
@@ -981,16 +969,16 @@ export class ParsedStyles {
         if (parsed.bottom) style.border.bottom = parsed.bottom;
         if (parsed.left) style.border.left = parsed.left;
       }
-      Object.assign(style, imported_alignment(xmlChild(xf, "alignment")));
-      const number_format = formats.get(num_fmt_id);
+      Object.assign(style, importedAlignment(xmlChild(xf, "alignment")));
+      const numberFormat = formats.get(numFmtId);
       return {
         ...(Object.keys(style).length > 0 ? { style } : {}),
-        ...(number_format && number_format !== "General" ? { numberFormat: number_format } : {}),
-        date: date_number_format(number_format),
+        ...(numberFormat && numberFormat !== "General" ? { numberFormat } : {}),
+        date: dateNumberFormat(numberFormat),
       };
     });
     this.#differentials = differentials.map((dxf) =>
-      parsed_differential_style(dxf, theme, context, color_warnings, part),
+      parsedDifferentialStyle(dxf, theme, context, colorWarnings, part),
     );
     if (this.#styles.length === 0) {
       this.#styles.push({ date: false, style: { verticalAlign: "bottom" } });
