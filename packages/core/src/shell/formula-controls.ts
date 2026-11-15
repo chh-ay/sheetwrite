@@ -148,7 +148,7 @@ export interface FormulaBarOptions {
 
 /** A formula bar piece; `setReadOnly` blocks commits without unmounting. */
 export interface FormulaBarPiece extends ShellPiece {
-  /** Turns committing from the bar off or on. */
+  /** Stops or allows writing to the cell from the bar. */
   setReadOnly(readOnly: boolean): void;
 }
 

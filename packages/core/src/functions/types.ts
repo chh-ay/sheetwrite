@@ -28,7 +28,7 @@ export interface FormulaFunctionMetadata {
   readonly returnKind: string;
   /** Example formulas for help, such as `=TAXRATE("EU")`. */
   readonly examples?: readonly string[];
-  /** Whether the function is recalculated on every recalculation, like `NOW`. */
+  /** Whether the function's result can change at every recalculation, like `NOW`. */
   readonly volatile?: boolean;
 }
 

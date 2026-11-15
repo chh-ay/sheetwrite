@@ -54,6 +54,8 @@ export type {
  *   ]);
  * }
  * ```
+ *
+ * @returns The engine, once its WASM is loaded.
  */
 export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
   // The bridge also stays lazy: unused queries must not allocate text codecs.
@@ -90,6 +92,8 @@ export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise
  *   ],
  * });
  * ```
+ *
+ * @returns The add-on, for the `addons` list of `initSheetwrite`.
  */
 export function queriesAddon(
   options: QueriesAddonOptions = {},
@@ -111,6 +115,8 @@ export function queriesAddon(
  *   return codec.encode(snapshot.workbook.queries ?? []).section;
  * }
  * ```
+ *
+ * @returns The codec, once the queries WASM is loaded.
  */
 export async function loadPowerQueryCodec(
   options: QueryEngineOptions = {},

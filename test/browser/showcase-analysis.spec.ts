@@ -171,3 +171,69 @@ test("a chart's right-click menu deletes it, and undo brings it back", async ({ 
   await page.keyboard.press("ControlOrMeta+z");
   await expect(chartObjects(page)).toHaveCount(1);
 });
+
+// #727: a chart over the cells painted the stylesheet's background, not the grid's theme.
+for (const scheme of ["light", "dark"] as const) {
+  test(`a chart and a PivotChart sit on the grid's themed background (${scheme})`, async ({
+    page,
+  }) => {
+    await open(page);
+    // The showcase themes its grid from the site's tokens and follows the site's scheme.
+    await page.evaluate(
+      ([colorScheme, sheet, id, pivot]) => {
+        const grid = window.__sheetwriteAnalysisGrid;
+        const current = grid?.getCharts(sheet).find((entry) => entry.id === id);
+        if (!grid || !current) throw new Error(`Chart ${id} is missing`);
+        document.documentElement.dataset.theme = colorScheme;
+        const anchor = { ...current.anchor, row: current.anchor.row + 20 };
+        grid.setChart(
+          { ...current, id: "pivot-chart", kind: "column", pivot, series: [], anchor },
+          sheet,
+        );
+      },
+      [scheme, SUMMARY, CHART, PIVOT] as const,
+    );
+    await expect(chartObjects(page)).toHaveCount(2);
+
+    /** The grid's effective background and text colour, and what each chart computes. */
+    const colors = () =>
+      page.evaluate(() => {
+        const probe = document.createElement("span");
+        document.body.append(probe);
+        const resolve = (color: string | undefined) => {
+          probe.style.color = color ?? "";
+          return getComputedStyle(probe).color;
+        };
+        const effective = window.__sheetwriteAnalysisGrid?.getEffectiveTheme();
+        const grid = { bg: resolve(effective?.bg), fg: resolve(effective?.fg) };
+        probe.remove();
+        const charts = [...document.querySelectorAll('[aria-roledescription="chart"]')].map(
+          (frame) => {
+            const style = getComputedStyle(frame);
+            return { bg: style.backgroundColor, fg: style.color };
+          },
+        );
+        return { grid, charts };
+      });
+
+    const site = await colors();
+    // The stylesheet's dark default, which the charts kept before.
+    expect(site.grid.bg).not.toBe("rgb(11, 11, 12)");
+    expect(site.charts).toEqual([site.grid, site.grid]);
+
+    await page.evaluate((colorScheme) => {
+      window.__sheetwriteAnalysisGrid?.setTheme(
+        colorScheme === "dark"
+          ? { bg: "#101828", fg: "#e5e7eb" }
+          : { bg: "#fdf6e3", fg: "#1f2937" },
+      );
+    }, scheme);
+    const themed = await colors();
+    expect(themed.grid).toEqual(
+      scheme === "dark"
+        ? { bg: "rgb(16, 24, 40)", fg: "rgb(229, 231, 235)" }
+        : { bg: "rgb(253, 246, 227)", fg: "rgb(31, 41, 55)" },
+    );
+    expect(themed.charts).toEqual([themed.grid, themed.grid]);
+  });
+}

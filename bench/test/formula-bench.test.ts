@@ -290,6 +290,7 @@ describe("formula regression gate", () => {
       "incremental-dependency-closure-edit",
       "spill-sequence-admission",
       "spill-filter-same-range",
+      "conditional-format-window",
       "take-sort-filter",
     ]);
     const baseline = formulaFixture("full");

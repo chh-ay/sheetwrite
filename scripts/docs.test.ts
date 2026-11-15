@@ -214,6 +214,68 @@ describe("API reference pages", () => {
     expect(runPage).not.toContain("## Returns");
   });
 
+  it("shows @throws on function pages and param, returns and throws as lines on member cards", async () => {
+    const resolve = apiExport(
+      "resolveLimits",
+      "function",
+      "(overrides?: object): object",
+      "Merge limits.\n@param overrides Limits to change.\n@returns A frozen copy.\n@throws SheetwriteError with code `invalid-limits` when a value is negative.",
+    );
+    const backend = apiExport(
+      "Backend",
+      "interface",
+      "interface Backend {\n  write(workbook: object): Promise<Uint8Array>;\n}",
+      "A backend.",
+      [
+        {
+          name: "write",
+          documentation:
+            "Write a workbook.\n@param workbook The workbook.\n@returns The file's bytes.\n@throws `TypeError` when it is closed.",
+        },
+      ],
+    );
+    const entry = entryPoint(".", [resolve, backend]);
+    const pkg: ApiPackage = { name: "@sheetwrite/core", entryPoints: [entry] };
+    const page = await renderSymbolPage(pkg, entry, resolve);
+    expect(section(page, /## Throws[\s\S]*?<\/div>\n/)).toContain(
+      "SheetwriteError with code <code>invalid-limits</code> when a value is negative.",
+    );
+    expect(section(page, /## Returns[\s\S]*?## Throws/)).not.toContain("SheetwriteError");
+    const card = section(
+      await renderSymbolPage(pkg, entry, backend),
+      /<article class="api-card api-member"[\s\S]*?<\/article>/,
+    );
+    expect(card).toContain('<p class="api-card__doc">Write a workbook.</p>');
+    expect(card).toContain("<dt>Parameter</dt><dd><code>workbook</code> The workbook.</dd>");
+    expect(card).toContain("<dt>Returns</dt><dd>The file's bytes.</dd>");
+    expect(card).toContain("<dt>Throws</dt><dd><code>TypeError</code> when it is closed.</dd>");
+    expect(card).not.toContain("@param");
+  });
+
+  it("leaves wasm-bindgen glue off the count: InitOutput's members, and free() on generated classes", async () => {
+    const output = apiExport(
+      "InitOutput",
+      "interface",
+      "interface InitOutput {\n  readonly memory: WebAssembly.Memory;\n  readonly cellstore_new: () => number;\n}",
+    );
+    const generated = {
+      ...apiExport("CellOut", "class", "class CellOut {\n  free(): void;\n}"),
+      source: "pkg/sheetwrite_wasm.d.ts#L7",
+    };
+    const entry = entryPoint(".", [output, generated]);
+    const pkg: ApiPackage = { name: "@sheetwrite/wasm", entryPoints: [entry] };
+    const page = await renderSymbolPage(pkg, entry, output);
+    expect(page).not.toContain("## Members");
+    // The declaration still shows the whole type.
+    expect(page).toContain("cellstore_new");
+    expect(await renderSymbolPage(pkg, entry, generated)).toContain(
+      "Releases the object's WASM memory",
+    );
+    expect(undocumentedApi({ formatVersion: 2, packages: [pkg] })).toEqual([
+      { packageName: "@sheetwrite/wasm", members: [], parameters: [], returns: [] },
+    ]);
+  });
+
   it("groups members into properties, methods and events, function-typed properties as methods", async () => {
     const shape = apiExport(
       "ShapeExample",

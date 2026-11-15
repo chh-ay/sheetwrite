@@ -102,7 +102,7 @@ export type ConditionalFormatPredicate =
 export interface ConditionalFormatRule {
   /** Cells the rule is tested on. */
   range: Range;
-  /** Test each cell's value must pass for `style` to apply. */
+  /** The test a cell's value must pass for `style` to apply. */
   when: ConditionalFormatPredicate;
   /** Style merged over a matching cell's own style. */
   style: CellStyle;

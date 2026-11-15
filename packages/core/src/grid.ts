@@ -2939,6 +2939,7 @@ export class GridImpl implements Grid {
     this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
     this.renderer.setTheme(this.theme);
     this.domOverlay.setTheme(this.theme);
+    this.objectLayer.setTheme(this.theme);
     this.syncTabBarTheme();
     this.rebuildIndex();
     this.rebuildColumnIndex();
@@ -3441,7 +3442,7 @@ export class GridImpl implements Grid {
         }).resolved;
 
         const numberFormat = stepNumberFormatDecimals(
-          this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
+          this.getFocusCellStyle().numberFormat,
           direction,
           typeof value === "number" ? value : undefined,
           column?.numberLocale,
@@ -3588,7 +3589,11 @@ export class GridImpl implements Grid {
       row: this.toDataRow(anchor.row),
       col: anchor.col,
     });
-    return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
+    const column = this.sheet().columns[anchor.col];
+    const style: CellStyle = { ...column?.cellStyle, ...cell.style };
+    // Without a style's format the cell shows its column's, as the canvas paints it.
+    const numberFormat = style.numberFormat ?? column?.numberFormat;
+    return numberFormat === undefined ? style : { ...style, numberFormat };
   }
 
   async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
