@@ -150,4 +150,44 @@ describe("AutoFilter XLSX interchange", () => {
       expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
     ]);
   });
+
+  it("keeps one filter per column: a repeated filterColumn is dropped with a warning", async () => {
+    const { warnings, onWarning } = collectWarnings();
+    const cells = Array.from(
+      { length: 4 },
+      (_unused, row) => `<row r="${row + 1}"><c r="A${row + 1}"><v>${row}</v></c></row>`,
+    ).join("");
+    const repeated = Array.from(
+      { length: 50 },
+      (_unused, index) =>
+        `<filterColumn colId="0"><filters><filter val="${index + 1}"/></filters></filterColumn>`,
+    ).join("");
+    const imported = sheetAt(
+      await backend.fromXlsxWorkbook(
+        oneSheet(`<sheetData>${cells}</sheetData><autoFilter ref="A1:A4">${repeated}</autoFilter>`),
+        { onWarning },
+      ),
+    );
+    expect(imported.filters).toEqual([[0, { kind: "values", values: [1] }]]);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings.every((warning) => warning.code === "unsupported-feature")).toBe(true);
+  });
+
+  it("drops a custom filter whose operator is not Excel's, not the whole import", async () => {
+    const { warnings, onWarning } = collectWarnings();
+    const imported = sheetAt(
+      await backend.fromXlsxWorkbook(
+        oneSheet(
+          '<sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="2"><c r="A2"><v>2</v></c></row></sheetData>' +
+            '<autoFilter ref="A1:A2"><filterColumn colId="0"><customFilters><customFilter operator="constructor" val="1"/></customFilters></filterColumn></autoFilter>',
+        ),
+        { onWarning },
+      ),
+    );
+    expect(imported.autoFilter?.range.end).toEqual({ row: 1, col: 0 });
+    expect(imported.filters).toBeUndefined();
+    expect(warnings).toEqual([
+      expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
+    ]);
+  });
 });

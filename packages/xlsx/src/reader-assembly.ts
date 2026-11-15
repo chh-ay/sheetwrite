@@ -338,7 +338,7 @@ export function buildWorkbookSheets(
       ...(notes.length > 0 ? { notes } : {}),
       ...(sortKeys.length > 0 ? { sortKeys } : {}),
       ...(sortState ? { sortState: structuredClone(sortState) } : {}),
-      ...snapshotAutoFilter(source.autoFilter, meta, id, snapshotCells, columns, rowCount),
+      ...snapshotAutoFilter(source.autoFilter, meta, id, snapshotCells, columns, rowCount, context),
       ...(tables.length > 0 ? { tables } : {}),
       cells:
         snapshotCells.length > 0
