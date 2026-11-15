@@ -1957,6 +1957,9 @@ fn multi_filter_kinds_match_resolved_cell_values() {
     assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
 }
 
+/// A COUNTIF criterion and the rows a custom filter with it keeps.
+type CriterionCase = (&'static str, &'static [u32]);
+
 /// Excel's custom `AutoFilter` matches as COUNTIF criteria do: each row of the
 /// table is a condition, as the filter dialog writes it, and the rows it keeps.
 #[test]
@@ -1989,7 +1992,7 @@ fn custom_filters_match_as_countif_criteria() {
         )
     };
 
-    let table: &[(&str, &[u32])] = &[
+    let table: &[CriterionCase] = &[
         // Numbers compare with numbers only.
         ("=5", &[0]),
         (">5", &[1]),
