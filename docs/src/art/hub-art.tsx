@@ -104,7 +104,7 @@ const HUB_LAYOUTS = {
   ),
   // The grid's lifecycle in a host element.
   vanilla: framework(
-    [{ title: "", code: ["createGrid(host)"] }],
+    [{ title: "", code: ["createGrid()"] }],
     [{ title: "Grid", tone: "accent" }],
     [{ title: "", code: ["destroy()"] }],
   ),

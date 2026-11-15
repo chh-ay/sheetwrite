@@ -33,6 +33,8 @@ const MIN_GAP = 18;
 const MIN_SPACE = 6;
 /** A box's text starts this far in from its left edge and keeps this much room on the right. */
 const PADDING = 14 + 10;
+/** Arrows that fan into one box land at least this far apart, clear of the geometry check's 8. */
+const FAN_ARROW_SPACING = 12;
 
 /** About how wide a box must be: the title is 13 px, captions 12 px, code 11 px mono. */
 function boxWidth(box: CardBox): number {
@@ -58,13 +60,21 @@ export function cardLayout(
   const widths = columns.map((column) => Math.max(...column.map(boxWidth)));
   const used = widths.reduce((sum, width) => sum + width, 0);
   const gap = columns.length > 1 ? (canvas.width - 2 * MARGIN - used) / (columns.length - 1) : 0;
-  const describe = columns.map((column) => column.map((box) => box.title).join(", ")).join(" → ");
+  const describe = columns
+    .map((column) => column.map((box) => box.title || box.code?.[0]).join(", "))
+    .join(" → ");
   if (gap < MIN_GAP) throw new Error(`The card picture ${describe} is too wide for its canvas`);
   const nodes: BlueprintNode[][] = [];
   let x = columns.length > 1 ? MARGIN : (canvas.width - used) / 2;
   columns.forEach((column, columnIndex) => {
     const w = widths[columnIndex] ?? 0;
-    const heights = column.map((box) => nodeHeight(box));
+    // A single box that a fan joins is tall enough for its arrows to land apart.
+    const fan = Math.max(
+      columns[columnIndex - 1]?.length ?? 0,
+      columns[columnIndex + 1]?.length ?? 0,
+    );
+    const fanHeight = column.length === 1 && fan > 1 ? FAN_ARROW_SPACING * (fan + 1) : 0;
+    const heights = column.map((box) => Math.max(nodeHeight(box), fanHeight));
     const space =
       (canvas.height - 2 * MARGIN - heights.reduce((sum, h) => sum + h, 0)) / (column.length + 1);
     if (space < MIN_SPACE)

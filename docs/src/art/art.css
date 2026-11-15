@@ -449,3 +449,7 @@
 .sw-hub-preview > .sw-blueprint--card {
   height: 100%;
 }
+/* A docs section card's picture spans the card's top edge to edge, as its art box does. */
+.sw-blueprint--card.sw-card__art {
+  width: calc(100% + 2 * var(--sw-space-5));
+}
