@@ -603,8 +603,7 @@ async function add_member_references(
   // `target["name"]` can only name a member of this project; reflective calls can name any.
   const named = references.filter(
     (reference) =>
-      !isElementAccessExpression(reference.name.parent) ||
-      local_names.has(text_of(reference.name)),
+      !isElementAccessExpression(reference.name.parent) || local_names.has(text_of(reference.name)),
   );
   const name_only: MemberReference[] = [];
   if (named.length === 0) return name_only;
@@ -892,7 +891,8 @@ export async function planRenames(
           line,
           oldName: old_name,
           newName: [...names].sort().join(" or "),
-          reason: "a reflective call names a private member by text, and the private members with that name do not all get one new name",
+          reason:
+            "a reflective call names a private member by text, and the private members with that name do not all get one new name",
         });
         continue;
       }

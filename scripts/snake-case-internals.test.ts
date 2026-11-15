@@ -76,9 +76,9 @@ describe("snake-case-internals", () => {
 
       const free = await pick("line_scaled");
       expect(free.conflicts).toEqual([]);
-      expect(
-        free.renames.find((rename) => rename.oldName === "scaledLine")?.newName,
-      ).toBe("line_scaled");
+      expect(free.renames.find((rename) => rename.oldName === "scaledLine")?.newName).toBe(
+        "line_scaled",
+      );
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
