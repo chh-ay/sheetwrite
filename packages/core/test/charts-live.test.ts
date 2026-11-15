@@ -408,6 +408,23 @@ describe("resolveChartView", () => {
 });
 
 describe("chart identities and resolution", () => {
+  it("keeps an earlier view's definition when the chart is edited", () => {
+    const { store } = setup();
+    const view = resolveChartView(store, "data", "sales");
+    expect(view?.series[0]?.values).toEqual([10, 20]);
+
+    // An edit replaces the definition; the old view keeps its own.
+    apply(store, [
+      {
+        op: "setChart",
+        sheet: "data",
+        chart: { ...chart("sales", range("data", 0, 1, 1, 1)), title: "New" },
+      },
+    ]);
+    expect(view?.chart.title).toBeUndefined();
+    expect(resolveChartView(store, "data", "sales")?.chart.title).toBe("New");
+  });
+
   it("freezes the shared definition in development builds, and the store keeps working", () => {
     const { store } = setup();
     const previous = process.env.NODE_ENV;
