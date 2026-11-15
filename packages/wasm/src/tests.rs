@@ -2016,7 +2016,11 @@ fn custom_filters_match_as_countif_criteria() {
         ("=#DIV/0!", &[9]),
     ];
     for (criterion, expected) in table {
-        assert_eq!(custom(&[criterion], false), expected.to_vec(), "{criterion}");
+        assert_eq!(
+            custom(&[criterion], false),
+            expected.to_vec(),
+            "{criterion}"
+        );
     }
 
     assert_eq!(custom(&[">=5", "<10"], false), vec![0]);

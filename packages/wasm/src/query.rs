@@ -1157,7 +1157,8 @@ fn criterion_matches_cell(
 ) -> bool {
     let slots = &store.formula_slots;
     match kind {
-        1 => numeric_cell_value(sheet, index, slots).is_some_and(|value| criterion.matches_number(value)),
+        1 => numeric_cell_value(sheet, index, slots)
+            .is_some_and(|value| criterion.matches_number(value)),
         3 => boolean_cell_value(sheet, index, slots)
             .is_some_and(|value| criterion.matches(&Value::Bool(value))),
         2 => {
