@@ -1012,11 +1012,11 @@ impl CellStore {
             return DistinctColumn::default();
         }
         let row_count = data.cells.row_count();
-        let rows = rows
+        let in_sheet = rows
             .iter()
             .map(|&row| row as usize)
             .filter(move |&row| row < row_count);
-        distinct_over(self, data, col, rows, limit)
+        distinct_over(self, data, col, in_sheet, limit)
     }
 
     /// `dataEdge` in a view order, where `order[i]` is the data row shown at
