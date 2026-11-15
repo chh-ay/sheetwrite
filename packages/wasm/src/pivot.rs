@@ -28,6 +28,7 @@ use crate::eval::analysis::grouping::{
     compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL,
 };
 use crate::float_text::NumberText;
+use crate::sorting::sort_indices_by;
 use crate::store::pivot_output::MAX_PIVOT_OUTPUT_CELLS;
 use crate::types::{FormulaError, Value};
 
@@ -573,7 +574,7 @@ impl Axis {
         let mut children: Vec<u32> = (1..self.groups.len() as u32)
             .filter(|&group| self.groups[group as usize].rows > 0)
             .collect();
-        children.sort_unstable_by(|&left, &right| {
+        sort_indices_by(&mut children, &mut |left, right| {
             let (left_group, right_group) =
                 (&self.groups[left as usize], &self.groups[right as usize]);
             left_group.parent.cmp(&right_group.parent).then_with(|| {
