@@ -346,10 +346,12 @@ impl Aggregator {
         let expression = names.bound_value(written);
         // A function name such as `SUM` binds as a defined name that nothing
         // defines.
-        let written_name = match expression {
-            Ast::Name(name) => Some(name.to_ascii_uppercase()),
-            Ast::DefinedName(id) => Some(names.spelling(*id).to_ascii_uppercase()),
-            _ => None,
+        let written_name = if let Ast::Name(name) = expression {
+            Some(name.to_ascii_uppercase())
+        } else if let Ast::DefinedName(id) = expression {
+            Some(names.spelling(*id).to_ascii_uppercase())
+        } else {
+            None
         };
         if let Some(label) = written_name {
             if !AGGREGATORS.contains(&label.as_str()) {

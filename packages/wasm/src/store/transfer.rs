@@ -157,12 +157,12 @@ impl CellStore {
                 ast,
                 source,
                 ReadSet { cells, ranges },
-                is_reference,
                 features,
                 self.name_scope(sheet as usize),
             )
         });
         entry.set_source_error(source_error);
+        entry.set_reference(is_reference);
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(has_spill_refs);
         entry.set_produces_array(produces_array);
@@ -358,7 +358,7 @@ impl CellStore {
                 out.u32(scope_sheet);
             }
 
-            out.text(key);
+            out.text(&super::workbook_name_key(key));
             out.text(&range.name);
             out.u32(range.sheet);
             out.u32(range.row_start);
@@ -367,7 +367,7 @@ impl CellStore {
             out.u32(range.col_end);
         }
 
-        let formulas: Vec<(Option<u32>, &str, &str)> = self.named_formula_sources().collect();
+        let formulas: Vec<names::FormulaSource<'_>> = self.named_formula_sources().collect();
         out.usize(formulas.len());
         for (scope, name, source) in formulas {
             out.bool(scope.is_some());

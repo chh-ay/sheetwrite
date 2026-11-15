@@ -565,6 +565,13 @@ impl FormulaEntry {
         self.set_flag(Self::VOLATILE, volatile);
     }
 
+    /// Mark the formula as one reference (`=A1`, `=Sheet2!B3:C4`), as a
+    /// transferred formula records it.
+    #[cfg(any(target_arch = "wasm32", test))]
+    pub(crate) const fn set_reference(&mut self, reference: bool) {
+        self.set_flag(Self::REFERENCE, reference);
+    }
+
     /// Runtime references share the existing spill-resolution path and flag.
     /// This avoids a new entry field or checks on formulas without these calls.
     pub(crate) const fn has_spill_refs(&self) -> bool {
@@ -673,7 +680,6 @@ impl FormulaEntry {
         mut ast: Option<Ast>,
         source: String,
         reads: ReadSet,
-        is_reference: bool,
         features: ParseFeatures,
         names: NameScope<'_>,
     ) -> Self {
@@ -688,7 +694,6 @@ impl FormulaEntry {
             reads,
             flags: 0,
         };
-        entry.set_flag(Self::REFERENCE, is_reference);
         entry.set_flag(Self::TABLE_REFS, features.table_refs);
         entry.set_flag(Self::NAME_REFS, features.names);
         entry.set_flag(

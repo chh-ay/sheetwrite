@@ -936,11 +936,11 @@ impl CellStore {
         }
 
         let mut changed_names = Vec::new();
-        self.names.settled().retain(&mut |scope, key, definition| {
+        self.names.settled().retain(&mut |scope, spelling, definition| {
             let removed = scope == Some(sheet as u32)
                 || matches!(definition, names::DefinedName::Range(range) if range.sheet == sheet as u32);
             if removed {
-                changed_names.push(key.to_owned());
+                changed_names.push(workbook_name_key(spelling));
             }
             !removed
         });
@@ -4033,7 +4033,7 @@ impl CellStore {
         columns: bool,
         changed: &mut Vec<String>,
     ) {
-        self.names.settled().retain(&mut |_, key, definition| {
+        self.names.settled().retain(&mut |_, spelling, definition| {
             let names::DefinedName::Range(range) = definition else {
                 return true;
             };
@@ -4049,7 +4049,7 @@ impl CellStore {
             if shifted == Some((*start, *end)) {
                 return true;
             }
-            changed.push(key.to_owned());
+            changed.push(workbook_name_key(spelling));
             let Some(span) = shifted else {
                 return false;
             };

@@ -910,12 +910,11 @@ impl<'a, 'p> Context<'a, 'p> {
             return definition(expression, names).ok().cloned();
         };
         let read;
-        let formula = match names.shared_formula(*id) {
-            Some(formula) => formula,
-            None => {
-                read = names.read(*id);
-                read.formula()?
-            }
+        let formula = if let Some(formula) = names.shared_formula(*id) {
+            formula
+        } else {
+            read = names.read(*id);
+            read.formula()?
         };
         definition(formula, names).ok().cloned()
     }

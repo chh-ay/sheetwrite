@@ -704,7 +704,7 @@ impl NameId {
     pub(crate) fn at(index: usize) -> Option<Self> {
         u32::try_from(index)
             .ok()
-            .and_then(|index| index.checked_add(1))
+            .and_then(|narrow| narrow.checked_add(1))
             .and_then(std::num::NonZeroU32::new)
             .map(Self)
     }
