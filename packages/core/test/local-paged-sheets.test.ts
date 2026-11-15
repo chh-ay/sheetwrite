@@ -1,8 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { DEFAULT_SNAPSHOT_RESOURCE_LIMITS } from "../src/document-protocol.js";
+import {
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  SnapshotResourceError,
+} from "../src/document-protocol.js";
 import { createGrid, initSheetwrite } from "../src/index.js";
 import { SheetwriteStore } from "../src/store.js";
+import { storeEngine } from "../src/store/engine-registry.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Column, Workbook } from "../src/types.js";
 import { mountHost } from "./fixtures.js";
@@ -108,5 +112,75 @@ describe("a grid over a sheet past the dense cell limit", () => {
       grid.destroy();
       host.remove();
     }
+  });
+});
+
+describe("the host's dense and local limits", () => {
+  function sheetsOf(...shapes: [rows: number, width: number][]): Workbook {
+    return {
+      activeSheet: "s0",
+      sheets: shapes.map(([rowCount, width], index) => ({
+        id: `s${index}`,
+        name: `Sheet ${index}`,
+        rowCount,
+        columns: columns(width),
+      })),
+    };
+  }
+
+  function engineOf(store: SheetwriteStore) {
+    const engine = storeEngine(store);
+    if (!engine) throw new Error("expected a registered engine");
+    return engine;
+  }
+
+  it("place sheets in the engine as validation does when the host lowers them", () => {
+    const store = new SheetwriteStore(sheetsOf([10, 10], [10, 10]), undefined, {
+      snapshotResourceLimits: { maxDenseCells: 100, maxLocalPagedCells: 150 },
+    });
+    try {
+      expect(engineOf(store).isLocalPaged("s0")).toBe(false);
+      expect(engineOf(store).isLocalPaged("s1")).toBe(true);
+      const fits = store.applyTransaction({
+        patches: [{ op: "addRows", sheet: "s1", at: 0, count: 5 }],
+      });
+      expect(fits.status).toBe("applied");
+      const refused = store.applyTransaction({
+        patches: [{ op: "addRows", sheet: "s1", at: 0, count: 1 }],
+      });
+      expect(refused.status).toBe("rejected");
+      if (refused.status !== "rejected") throw new Error("expected a rejected transaction");
+      expect(refused.issues[0]).toMatchObject({ resource: "local-paged-cells", max: 150 });
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("are capped at the engine's ceilings when the host raises them", () => {
+    const limits = { maxDenseCells: 10_000_000, maxLocalPagedCells: 30_000_000 };
+    const store = new SheetwriteStore(sheetsOf([ROWS, COLUMNS]), undefined, {
+      snapshotResourceLimits: limits,
+    });
+    try {
+      expect(engineOf(store).isLocalPaged("s0")).toBe(true);
+    } finally {
+      store.dispose();
+    }
+
+    // 5,000,010 local cells plus 16,000,000 pass the engine's 20,000,000, so
+    // validation refuses the workbook before the engine allocates anything.
+    let refusal: unknown;
+    try {
+      new SheetwriteStore(sheetsOf([ROWS, COLUMNS], [1_000_000, 16]), undefined, {
+        snapshotResourceLimits: limits,
+      }).dispose();
+    } catch (error) {
+      refusal = error;
+    }
+    expect(refusal).toBeInstanceOf(SnapshotResourceError);
+    expect(refusal).toMatchObject({
+      resource: "maxLocalPagedCells",
+      limit: DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells,
+    });
   });
 });

@@ -11,8 +11,8 @@ import {
 } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
-  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   isEngineBuiltTransaction,
+  resolveSnapshotResourceLimits,
   resolveTransactionResourceLimits,
   resolveTransactionResourceValidation,
   SnapshotResourceError,
@@ -232,13 +232,10 @@ export class SheetwriteStore implements Store {
       resourceLimits: options.snapshotResourceLimits,
     });
     // The assertion above has validated every override.
-    this.snapshotResourceLimits = {
-      ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
-      ...options.snapshotResourceLimits,
-    };
+    this.snapshotResourceLimits = resolveSnapshotResourceLimits(options.snapshotResourceLimits);
 
     try {
-      this.dataEngine = new StoreDataEngine(workbook, data, options);
+      this.dataEngine = new StoreDataEngine(workbook, data, options, this.snapshotResourceLimits);
     } catch (error) {
       if (!isSnapshotAllocationFailure(error)) throw error;
       const resource = storage === "dense" ? "maxDenseCells" : "maxLogicalCellsPerSheet";
@@ -248,12 +245,9 @@ export class SheetwriteStore implements Store {
         actual = storage === "dense" ? actual + cells : Math.max(actual, cells);
       }
 
-      throw new SnapshotResourceError(
-        resource,
-        options.snapshotResourceLimits?.[resource] ?? DEFAULT_SNAPSHOT_RESOURCE_LIMITS[resource],
-        actual,
-        { cause: error },
-      );
+      throw new SnapshotResourceError(resource, this.snapshotResourceLimits[resource], actual, {
+        cause: error,
+      });
     }
 
     this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));

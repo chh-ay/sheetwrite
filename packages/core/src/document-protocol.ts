@@ -400,15 +400,30 @@ export interface SnapshotResourceLimits {
   maxSerializedBytes: number;
   /** Logical row-by-column cells in any sheet; defaults to 4,294,967,295. */
   maxLogicalCellsPerSheet: number;
-  /** Aggregate cells allocated by dense storage; defaults to 5,000,000. */
+  /**
+   * Aggregate cells allocated by dense storage; defaults to 5,000,000, the
+   * engine's ceiling. A larger value is capped at the ceiling; a dense sheet
+   * past it continues in local pages.
+   */
   maxDenseCells: number;
   /**
    * Aggregate logical cells of local sheets: sheets of a dense-storage
    * workbook past `maxDenseCells`, which the engine keeps in pages it never
-   * evicts; defaults to 20,000,000, the engine's ceiling.
+   * evicts; defaults to 20,000,000, the engine's ceiling. A larger value is
+   * capped at the ceiling; 0 refuses every sheet past `maxDenseCells`.
    */
   maxLocalPagedCells: number;
 }
+
+/**
+ * The engine's own ceilings on dense and local-page cells. The engine is
+ * given the host's limits, capped at these, so core and engine place and
+ * refuse sheets the same way.
+ */
+const ENGINE_STORAGE_CEILINGS = {
+  maxDenseCells: 5_000_000,
+  maxLocalPagedCells: 20_000_000,
+} as const;
 
 /** Conservative defaults that retain the million-row paged-sheet contract. */
 export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> = Object.freeze({
@@ -425,16 +440,20 @@ export const DEFAULT_SNAPSHOT_RESOURCE_LIMITS: Readonly<SnapshotResourceLimits> 
   // Bound logical sheet area even when paged storage defers physical allocation.
   maxLogicalCellsPerSheet: 0xffff_ffff,
   // Bound eager dense allocation across the workbook.
-  maxDenseCells: 5_000_000,
+  maxDenseCells: ENGINE_STORAGE_CEILINGS.maxDenseCells,
   // Bound local pages, which a full sheet fills at about 13 bytes a cell.
-  maxLocalPagedCells: 20_000_000,
+  maxLocalPagedCells: ENGINE_STORAGE_CEILINGS.maxLocalPagedCells,
 });
 
 /** Validation and allocation policy for an untrusted workbook snapshot. */
 export interface SnapshotValidationOptions {
   /** Allocation model used for capacity checks; defaults to `dense`. */
   storage?: SnapshotStorageMode;
-  /** Non-negative safe-integer overrides merged over `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`. */
+  /**
+   * Non-negative safe-integer overrides merged over
+   * `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`; `maxDenseCells` and
+   * `maxLocalPagedCells` are capped at the engine's ceilings.
+   */
   resourceLimits?: Partial<SnapshotResourceLimits>;
 }
 
@@ -624,7 +643,7 @@ function resolveSnapshotValidationOptions(
       message: "Snapshot storage must be dense or paged",
     };
   }
-  const limits: SnapshotResourceLimits = { ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
+  const overrides: Partial<SnapshotResourceLimits> = {};
   for (const resource of SNAPSHOT_RESOURCE_KEYS) {
     const override = options.resourceLimits?.[resource];
     if (override === undefined) continue;
@@ -635,9 +654,30 @@ function resolveSnapshotValidationOptions(
         message: `${resource} must be a non-negative safe integer`,
       };
     }
-    limits[resource] = override;
+    overrides[resource] = override;
   }
-  return { storage, limits };
+  return { storage, limits: resolveSnapshotResourceLimits(overrides) };
+}
+
+/**
+ * `DEFAULT_SNAPSHOT_RESOURCE_LIMITS` with validated `overrides` over it, and
+ * `maxDenseCells` and `maxLocalPagedCells` capped at the engine's ceilings,
+ * which the store also gives the engine.
+ */
+export function resolveSnapshotResourceLimits(
+  overrides: Partial<SnapshotResourceLimits> = {},
+): SnapshotResourceLimits {
+  const limits: SnapshotResourceLimits = { ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS };
+  for (const resource of SNAPSHOT_RESOURCE_KEYS) {
+    const override = overrides[resource];
+    if (override !== undefined) limits[resource] = override;
+  }
+  limits.maxDenseCells = Math.min(limits.maxDenseCells, ENGINE_STORAGE_CEILINGS.maxDenseCells);
+  limits.maxLocalPagedCells = Math.min(
+    limits.maxLocalPagedCells,
+    ENGINE_STORAGE_CEILINGS.maxLocalPagedCells,
+  );
+  return limits;
 }
 
 /** Cells a dense-storage workbook holds so far, by where the engine keeps them. */

@@ -29,8 +29,8 @@ impl SheetData {
         Ok(Self::with_cells(CellStorage::try_new(n_cols, row_count)?))
     }
 
-    /// A sheet in local pages from the start: dense sheets of the workbook
-    /// already hold [`crate::cells::MAX_DENSE_CELLS`].
+    /// A sheet in local pages from the start, for a sheet that would take the
+    /// workbook past its dense-cell limit. The store checks the local limit.
     pub(crate) fn try_new_local(n_cols: usize, row_count: usize) -> Result<Self, String> {
         Ok(Self::with_cells(CellStorage::try_new_local(
             n_cols, row_count,

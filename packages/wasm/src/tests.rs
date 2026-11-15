@@ -183,8 +183,10 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     );
     assert_eq!(checked_dense_cell_count(1, MAX_DENSE_CELLS + 1), None);
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
-    assert!(SheetData::try_new(usize::MAX, 2)
-        .is_ok_and(|past_the_cap| past_the_cap.cells.is_local_paged()));
+    assert!(
+        SheetData::try_new(usize::MAX, 2).is_err(),
+        "a dense sheet past the cap is refused; the store places it in local pages"
+    );
     let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
     assert_eq!(
         at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),

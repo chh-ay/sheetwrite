@@ -24,8 +24,9 @@ type SheetLimitIssue = Extract<MutationIssue, { kind: "resource-limit" }>;
  * so a store never commits a sheet that its own snapshot would refuse to
  * load. A dense sheet that would pass `maxDenseCells` across the workbook
  * continues in local pages, as the engine does, and local sheets end at
- * `maxLocalPagedCells` across the workbook. The defaults match the engine's
- * ceilings, so the engine never refuses an insert this check lets through.
+ * `maxLocalPagedCells` across the workbook. The store gives the engine the
+ * same two limits, capped at its ceilings, so the engine places and refuses
+ * every insert as this check does.
  */
 export class SheetGrowth {
   private denseCells = 0;

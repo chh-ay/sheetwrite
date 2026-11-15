@@ -94,6 +94,50 @@ fn local_growth_past_the_workbook_budget_changes_nothing() {
 }
 
 #[test]
+fn host_storage_limits_place_sheets_and_refuse_growth() {
+    const DENSE_LIMIT: usize = 100;
+    const LOCAL_LIMIT: usize = 300;
+    const WIDTH: usize = 10;
+    let mut store = CellStore::new();
+    store.set_storage_limits(DENSE_LIMIT, LOCAL_LIMIT);
+
+    let dense = store.add_sheet(WIDTH, DENSE_LIMIT / WIDTH);
+    assert!(!store.is_local_paged(dense), "exactly at the dense limit");
+    let local = store.add_sheet(WIDTH, DENSE_LIMIT / WIDTH);
+    assert!(store.is_local_paged(local), "past the dense limit");
+    assert!(
+        store.try_add_sheet(WIDTH, 21).is_err(),
+        "210 more local cells pass the local limit"
+    );
+
+    assert!(store.add_rows(dense, 0, 1));
+    assert!(
+        store.is_local_paged(dense),
+        "growing past the dense limit moves the sheet to local pages"
+    );
+    assert!(
+        !store.add_rows(dense, 0, WIDTH + 1),
+        "310 local cells pass the local limit"
+    );
+    assert_eq!(store.row_count(dense), DENSE_LIMIT / WIDTH + 1);
+}
+
+#[test]
+fn host_storage_limits_above_the_engine_ceilings_are_capped() {
+    let mut store = CellStore::new();
+    store.set_storage_limits(usize::MAX, usize::MAX);
+
+    let local = store.add_sheet(1, MAX_DENSE_CELLS + 1);
+    assert!(
+        store.is_local_paged(local),
+        "past the engine's dense ceiling"
+    );
+    assert!(store
+        .try_add_sheet(1, MAX_LOCAL_PAGED_CELLS - MAX_DENSE_CELLS)
+        .is_err());
+}
+
+#[test]
 fn a_paged_sheet_rejects_a_chunk_size_it_cannot_round() {
     let mut store = CellStore::new();
     let oversized_chunk_rows = usize::MAX / 2 + 2;

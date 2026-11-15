@@ -419,6 +419,12 @@ pub struct CellStore {
     pub(crate) volatile_serial: f64,
     pub(crate) random: RandomSource,
     pub(crate) spill_owner_cell_limit: usize,
+    /// Cells dense sheets may hold across the workbook, at most
+    /// [`MAX_DENSE_CELLS`]; the host's `maxDenseCells`.
+    dense_cell_limit: usize,
+    /// Logical cells local sheets may hold across the workbook, at most
+    /// [`MAX_LOCAL_PAGED_CELLS`]; the host's `maxLocalPagedCells`.
+    local_paged_cell_limit: usize,
     /// Iterative calculation limits; `None` while iteration is off, as in a
     /// new Excel workbook, so circular references show `#CYCLE!`. Boxed so
     /// workbooks that never turn iteration on pay one pointer.
@@ -522,6 +528,8 @@ impl CellStore {
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
+            dense_cell_limit: MAX_DENSE_CELLS,
+            local_paged_cell_limit: MAX_LOCAL_PAGED_CELLS,
             iteration: None,
             pivots: None,
             #[cfg(feature = "analysis")]
@@ -660,6 +668,17 @@ impl CellStore {
         self.sheets
             .get(sheet)
             .is_some_and(|data| data.cells.is_local_paged())
+    }
+
+    /// Sets the workbook-wide limits on dense cells and on local-page cells,
+    /// each capped at the engine's ceiling (5,000,000 and 20,000,000). A sheet
+    /// added or grown past the dense limit continues in local pages, and one
+    /// that would pass the local limit is refused. Sheets already held stay
+    /// where they are, so a host sets the limits before adding sheets.
+    #[wasm_bindgen(js_name = setStorageLimits)]
+    pub fn set_storage_limits(&mut self, dense_cells: usize, local_paged_cells: usize) {
+        self.dense_cell_limit = dense_cells.min(MAX_DENSE_CELLS);
+        self.local_paged_cell_limit = local_paged_cells.min(MAX_LOCAL_PAGED_CELLS);
     }
 
     /// `[chunks, loaded cells, dirty cells, clean chunk bytes, fully loaded, dirty bytes]`.
@@ -2229,8 +2248,8 @@ impl CellStore {
     fn begin_structural_edit(&mut self, sheet: usize, rows: usize, cols: usize) -> bool {
         let cells = rows.saturating_mul(cols);
         let data = &self.sheets[sheet];
-        // Dense sheets share `MAX_DENSE_CELLS` across the workbook; a dense
-        // sheet that would pass it continues in local pages.
+        // Dense sheets share the dense-cell limit across the workbook; a
+        // dense sheet that would pass it continues in local pages.
         let to_local = !data.cells.is_paged() && !self.dense_cells_fit(Some(sheet), cells);
         if (to_local || data.cells.is_local_paged())
             && !self.local_paged_cells_fit(Some(sheet), cells)
@@ -3583,7 +3602,8 @@ impl CellStore {
             SheetData::try_new_local(n_cols, row_count)?
         } else {
             return Err(format!(
-                "local sheet resource limit exceeded: {n_cols} columns by {row_count} rows passes {MAX_LOCAL_PAGED_CELLS} cells across the workbook"
+                "local sheet resource limit exceeded: {n_cols} columns by {row_count} rows passes {} cells across the workbook",
+                self.local_paged_cell_limit
             ));
         };
         let index = self.sheets.len();
@@ -3605,7 +3625,7 @@ impl CellStore {
             .expect("a small sheet converts");
     }
 
-    /// Whether dense sheets fit [`MAX_DENSE_CELLS`] with one sheet, `sheet`
+    /// Whether dense sheets fit the dense-cell limit with one sheet, `sheet`
     /// when it exists already, holding `cells` cells densely.
     fn dense_cells_fit(&self, sheet: Option<usize>, cells: usize) -> bool {
         let others = self
@@ -3617,10 +3637,10 @@ impl CellStore {
             })
             .map(|(_, data)| data.cells.row_count().saturating_mul(data.cells.n_cols()))
             .fold(0usize, usize::saturating_add);
-        others.saturating_add(cells) <= MAX_DENSE_CELLS
+        others.saturating_add(cells) <= self.dense_cell_limit
     }
 
-    /// Whether local sheets fit [`MAX_LOCAL_PAGED_CELLS`] with one sheet,
+    /// Whether local sheets fit the local-cell limit with one sheet,
     /// `sheet` when it exists already, holding `cells` logical cells.
     fn local_paged_cells_fit(&self, sheet: Option<usize>, cells: usize) -> bool {
         let others = self
@@ -3630,7 +3650,7 @@ impl CellStore {
             .filter(|&(index, _)| Some(index) != sheet && self.sheet_alive[index])
             .map(|(_, data)| data.cells.local_paged_cells())
             .fold(0usize, usize::saturating_add);
-        others.saturating_add(cells) <= MAX_LOCAL_PAGED_CELLS
+        others.saturating_add(cells) <= self.local_paged_cell_limit
     }
 
     pub(crate) fn intern(&mut self, s: &str) -> u32 {

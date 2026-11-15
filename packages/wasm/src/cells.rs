@@ -104,12 +104,16 @@ pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
 /// The largest chunk a paged sheet accepts: the rows of a whole sheet.
 pub(crate) const MAX_PAGE_CHUNK_ROWS: usize = crate::calc::SHEET_ROWS as usize;
 
-/// Aggregate eager-allocation ceiling mirrored by `DEFAULT_SNAPSHOT_RESOURCE_LIMITS`.
+/// The engine's ceiling on dense cells across a workbook, mirrored by
+/// `DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells`. A host may set a lower
+/// limit per store.
 pub(crate) const MAX_DENSE_CELLS: usize = 5_000_000;
 
-/// The logical cells (rows times columns) that local sheets may hold across a
-/// workbook. A full local sheet costs about as much as a dense one, 13 bytes a
-/// cell, so this bounds them at about 260 MB.
+/// The engine's ceiling on the logical cells (rows times columns) that local
+/// sheets hold across a workbook, mirrored by
+/// `DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxLocalPagedCells`. A full local sheet
+/// costs about as much as a dense one, 13 bytes a cell, so this bounds them at
+/// about 260 MB. A host may set a lower limit per store.
 pub(crate) const MAX_LOCAL_PAGED_CELLS: usize = 20_000_000;
 
 /// Rows per page of a local sheet: a dense sheet that grew past
@@ -209,12 +213,10 @@ impl CellStorage {
         }
     }
 
-    /// A dense sheet, or a local paged one when the grid passes
-    /// [`MAX_DENSE_CELLS`].
+    /// A dense sheet, or an error when the grid passes [`MAX_DENSE_CELLS`].
+    /// Whether a sheet goes dense or local is the store's choice, against its
+    /// workbook-wide limits.
     pub(crate) fn try_new(n_cols: usize, row_count: usize) -> Result<Self, String> {
-        if checked_dense_cell_count(n_cols, row_count).is_none() {
-            return Self::try_new_local(n_cols, row_count);
-        }
         let (kind, payload, style) = try_dense_buffers(n_cols, row_count)?;
 
         Ok(Self {
@@ -228,7 +230,8 @@ impl CellStorage {
         })
     }
 
-    /// A sheet whose cells live in local pages: no datasource, every cell loaded.
+    /// A sheet whose cells live in local pages: no datasource, every cell
+    /// loaded. The store checks its workbook's local-cell limit first.
     pub(crate) fn try_new_local(n_cols: usize, row_count: usize) -> Result<Self, String> {
         Ok(Self {
             n_cols,
@@ -738,14 +741,8 @@ impl CellStorage {
         col * self.row_count + row
     }
 
-    /// Whether a dense grid of `rows` by `cols` passes [`MAX_DENSE_CELLS`], so
-    /// growing to it moves the sheet to local pages.
-    pub(crate) fn grows_past_dense_cap(&self, rows: usize, cols: usize) -> bool {
-        self.paged.is_none() && checked_dense_cell_count(cols, rows).is_none()
-    }
-
-    /// The logical cells this sheet counts toward [`MAX_LOCAL_PAGED_CELLS`]:
-    /// all of them for a local sheet, none otherwise.
+    /// The logical cells this sheet counts toward the store's local-cell
+    /// limit: all of them for a local sheet, none otherwise.
     pub(crate) fn local_paged_cells(&self) -> usize {
         if self.is_local_paged() {
             self.row_count.saturating_mul(self.n_cols)
@@ -821,9 +818,6 @@ impl CellStorage {
         let new_count = old
             .checked_add(count)
             .ok_or_else(|| format!("{old} rows plus {count} rows overflow the row count"))?;
-        if self.grows_past_dense_cap(new_count, self.n_cols) {
-            self.convert_to_local_paged()?;
-        }
         if self.is_paged() {
             self.invalidate_derived();
             if let Some(paged) = &mut self.paged {
@@ -897,9 +891,6 @@ impl CellStorage {
         let new_cols = old_cols
             .checked_add(count)
             .ok_or_else(|| format!("{old_cols} columns plus {count} columns overflow"))?;
-        if self.grows_past_dense_cap(self.row_count, new_cols) {
-            self.convert_to_local_paged()?;
-        }
         if self.is_paged() {
             self.invalidate_derived();
             if let Some(paged) = &mut self.paged {
