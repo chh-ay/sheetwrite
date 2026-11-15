@@ -1119,8 +1119,7 @@ fn distinct_over(
                 );
             } else if kind == 3 {
                 out.numbers.push(
-                    if boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default()
-                    {
+                    if boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default() {
                         1.0
                     } else {
                         0.0
