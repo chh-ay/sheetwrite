@@ -242,7 +242,7 @@ export function RibbonCommandsDiagram() {
     <FanFigure
       source={{
         title: "One command model",
-        lines: ["The same commands, glyphs and enabled state, read from getCommandState"],
+        lines: ["The same commands, glyphs and enabled", "state, read from getCommandState"],
       }}
       text={{
         title: "The toolbar, the ribbons and your own controls share one command model",
@@ -571,22 +571,29 @@ export function GroupBySpillDiagram() {
 /** Formula help: what the editors show while a formula is typed. */
 export function FormulaHelpPartsDiagram() {
   return (
-    <FanFigure
-      source={{
-        title: "A formula in the cell editor or the formula bar",
-        code: ["=ROUND(A1, "],
-      }}
+    <TileFigure
+      columns={3}
+      narrowColumns={1}
       text={{
         title: "What formula help shows while you type",
         description:
           "While a cell editor or the formula bar holds a formula, the grid shows autocomplete for the function name at the caret, the argument guide with the current argument in bold, live errors underlined in the text, a colour for each reference and its range, and a preview of the result when the formula has no problem.",
       }}
       tiles={[
-        { title: "Autocomplete", lines: ["Functions that", "start with the name"] },
-        { title: "Argument guide", code: ["ROUND(number,", "  digits)"], tone: "accent" },
-        { title: "Live errors", lines: ["Underlined, as the", "engine's parser sees"] },
-        { title: "Colours", lines: ["Each reference and", "its range"] },
-        { title: "Preview", code: ["= 0.99"] },
+        { title: "Autocomplete", lines: ["Functions that start", "with the name at the caret"] },
+        {
+          title: "Argument guide",
+          code: ["ROUND(number, digits)"],
+          lines: ["The current argument", "in bold"],
+          tone: "accent",
+        },
+        { title: "Live errors", lines: ["Underlined where the", "engine's parser fails"] },
+        { title: "Coloured references", lines: ["Each reference and its", "range share a colour"] },
+        {
+          title: "Result preview",
+          code: ["= 0.99"],
+          lines: ["When the formula has", "no problem"],
+        },
       ]}
     />
   );
