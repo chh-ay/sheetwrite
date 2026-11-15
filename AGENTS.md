@@ -25,6 +25,6 @@ Do not add a unit test the change does not need.
 - Do not add a test that already passes on the old code.
 - Do not add a test that mocks the function you changed and then asserts on that mock.
 - Do not add a snapshot or a large fixture for a one-line fix.
-- A change that no unit test can reach (canvas paint, real keyboard or clipboard input, browser layout) needs steps in the PR body under "Test plan", or a browser test in `test/browser`. Do not add a test file that cannot run the changed code.
+- A change that no unit test can reach (canvas paint, real keyboard or clipboard input, browser layout) needs steps in the PR body under "Test plan". Do not add a test file that cannot run the changed code.
 
 Test layout: TypeScript unit tests are in `packages/*/test` and run with `bun run test:unit` (`bun test`, no Jest). Rust tests are `#[test]` functions in the crates. Browser tests are in `test/browser` and run with `bun run test:browser` (Playwright).
