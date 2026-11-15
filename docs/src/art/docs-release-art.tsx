@@ -1,6 +1,6 @@
-// The visual summary that opens each older release post: one tile per
-// highlight, led by its number or its one-word change. Every number and claim
-// comes from that release's Highlights and Changes sections.
+// The visual summary of each release post: one tile per highlight, led by its
+// number or its one-word change. Every number and claim comes from that
+// release's Highlights and Changes sections.
 import type { JSX } from "solid-js";
 
 import { TileFigure } from "./blueprint-layouts.js";
@@ -112,6 +112,21 @@ const RELEASES: readonly Release[] = [
         "XLSX safety rejects",
         ["Too much expansion is", "rejected before any", "part is read"],
       ],
+    ],
+  },
+  {
+    version: "0.7.0",
+    highlights: [
+      [
+        "12 columns",
+        "Dashboards",
+        ["Pivots, slicers,", "PivotCharts and KPI", "cards on one sheet"],
+      ],
+      ["CALCULATE", "Data model", ["Related tables, and", "measures in pivots"]],
+      ["In place", "Sort", ["Moves the cells, as", "Excel's Sort does"]],
+      ["[Budget.xlsx]", "Linked workbooks", ["Formulas read the", "values a link saved"]],
+      ["Power Query M", "Saved queries", ["Refresh tables from", "CSV, JSON or your data"]],
+      ["Restore", "Version history", ["Save, compare and", "restore versions"]],
     ],
   },
 ];

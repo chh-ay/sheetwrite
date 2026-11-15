@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The 0.7.0 release notes show performance as lanes against 0.6.1, one row per workload with each machine's result in the words of the text, from a new `perf-lanes` fence. They open their highlights with a blueprint summary, and the highlight cards show each panel cropped from its capture (`card-*` shots, the new `highlight` size) instead of the whole app shrunk to a sliver.
+- The 0.7.0 upgrade guide no longer says how its code is built.
 - The API reference shows `@throws`: a function page lists each under "Throws" (the error and when it is thrown), and a member card shows its parameters, return value and throws as labelled lines instead of raw `@param` and `@returns` text. The API manifest kept no `@throws` before.
 - Code-sample hover popovers show a symbol's summary, with its parameters, return value and throws as tag lines; the doc text from the API manifest no longer shows raw `@param` and `@returns` inline.
 - The API reference shows `InitOutput` (`@sheetwrite/wasm`, `@sheetwrite/formulas`) as one card with no member list: its members are the raw module exports wasm-bindgen generates for the loader, not API to call. `docs:generate` no longer counts them as undescribed. The `free()` method wasm-bindgen adds to each engine class, which has no doc source, gets one shared description.

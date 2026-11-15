@@ -7,9 +7,8 @@ description: Replace the removed sort, revision and add-on registration APIs, up
 > 0.7.0 is the next release and is not published yet. This guide tracks the
 > changes already merged for it, so an upgrade can be planned ahead.
 
-Each section lists what changed in 0.7.0 and what replaces it. The "before"
-code is 0.6 code; the "after" code is compiled against the 0.7.0 packages when
-the docs are built.
+Each section lists what changed in 0.7.0 and what replaces it. "Before" code
+is 0.6 code, and "after" code is 0.7.0 code.
 
 ## Update packages together
 

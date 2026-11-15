@@ -7,11 +7,16 @@ import {
   scalePosition,
 } from "./scale.js";
 
-/** One series' value on a lane; `value: null` is a pending result and draws no mark. */
+/** One series' value on a lane; `value: null` without a `range` is a pending result and draws no mark. */
 export interface LaneSeries {
   readonly key: string;
   readonly label: string;
   readonly value: number | null;
+  /**
+   * A result reported as a range, such as "11.5–18× faster" over several
+   * machines: a bar between its ends with a mark on each end. `value` is null then.
+   */
+  readonly range?: readonly [low: number, high: number];
   /** The value as words, for the description: "16.6× faster", "pending". */
   readonly valueText: string;
   readonly shape: FigureShape;
@@ -33,6 +38,9 @@ export interface LaneProps {
 }
 
 const MARK_RADIUS = 5;
+/** The thickness of a range's bar, and the smaller marks on its ends. */
+const RANGE_HEIGHT = 4;
+const RANGE_MARK_RADIUS = 4;
 /** One series sits on the lane's middle line; each further series adds a track this far apart. */
 const TRACK_GAP = 10;
 const SINGLE_TRACK_HEIGHT = 18;
@@ -71,23 +79,39 @@ export function Lane({ label, scale, series, origin, gridlines = [] }: LaneProps
         />
       )}
       {series.map((entry, index) => {
-        if (entry.value === null) return null;
-        const at = scalePosition(scale, entry.value);
+        const ends = entry.range ?? (entry.value === null ? [] : [entry.value]);
+        if (ends.length === 0) return null;
+        const positions = ends.map((value) => scalePosition(scale, value));
+        const first = Math.min(...positions);
+        const last = Math.max(...positions);
         const middle = SINGLE_TRACK_HEIGHT / 2 + TRACK_GAP * index;
+        const radius = entry.range === undefined ? MARK_RADIUS : RANGE_MARK_RADIUS;
         return (
           <g data-tone={entry.tone} key={entry.key}>
             {originAt === undefined ? null : (
               <line
                 className="fig-lane__stem"
-                x1={`${Math.min(originAt, at)}%`}
-                x2={`${Math.max(originAt, at)}%`}
+                x1={`${Math.min(originAt, first)}%`}
+                x2={`${Math.max(originAt, last)}%`}
                 y1={middle}
                 y2={middle}
               />
             )}
-            <svg className="fig-mark" overflow="visible" x={`${at}%`} y={middle}>
-              <path d={markPath(entry.shape, MARK_RADIUS)} />
-            </svg>
+            {entry.range === undefined ? null : (
+              <rect
+                className="fig-lane__range"
+                height={RANGE_HEIGHT}
+                rx={RANGE_HEIGHT / 2}
+                width={`${Math.max(0.5, last - first)}%`}
+                x={`${first}%`}
+                y={middle - RANGE_HEIGHT / 2}
+              />
+            )}
+            {positions.map((at) => (
+              <svg className="fig-mark" key={at} overflow="visible" x={`${at}%`} y={middle}>
+                <path d={markPath(entry.shape, radius)} />
+              </svg>
+            ))}
           </g>
         );
       })}
