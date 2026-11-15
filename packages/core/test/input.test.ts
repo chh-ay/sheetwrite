@@ -185,6 +185,87 @@ describe("pointer input: touch policy", () => {
     store.dispose();
   });
 
+  it("continues a number series to the right and copies the source format, as Excel does", () => {
+    const { grid, store, scroller, workbook } = makeGrid();
+    const at = (col: number) => ({ sheet: "s1", row: 1, col });
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: at(0), value: { kind: "literal", value: 1 } },
+        { op: "set", addr: at(1), value: { kind: "literal", value: 2 }, style: { bold: true } },
+      ],
+    });
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 1, col: 1 } },
+    });
+
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(1, 2, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(1, 2, workbook)));
+
+    expect(store.getCell(at(2)).resolved).toBe(3);
+    expect(store.getCell(at(2)).style.bold).toBeUndefined();
+    grid.setSelection({ kind: "cell", addr: at(1) });
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(1, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(3, 1, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(3, 1, workbook)));
+    expect(store.getCell({ sheet: "s1", row: 3, col: 1 }).style.bold).toBe(true);
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("fills down as far as the next column's data on a fill-handle double-click", () => {
+    const { grid, store, scroller, workbook, host } = makeGrid();
+    store.applyTransaction({
+      patches: [
+        {
+          op: "clearRange",
+          range: { sheet: "s1", start: { row: 1, col: 2 }, end: { row: 9, col: 2 } },
+        },
+        {
+          op: "clearRange",
+          range: { sheet: "s1", start: { row: 7, col: 1 }, end: { row: 9, col: 1 } },
+        },
+      ],
+    });
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 2 } });
+
+    const handle = fillHandlePoint(0, 2, workbook);
+    scroller.dispatchEvent(new MouseEvent("dblclick", { ...handle, bubbles: true }));
+
+    expect(store.getCell({ sheet: "s1", row: 6, col: 2 }).resolved).toBe("Phnom Penh");
+    expect(store.getCell({ sheet: "s1", row: 7, col: 2 }).resolved).toBeNull();
+    expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("copies the top row and its format into the selection with Ctrl+D", () => {
+    const { grid, store, host } = makeGrid();
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 1 },
+          value: { kind: "formula", src: "=A1" },
+          style: { bold: true },
+        },
+      ],
+    });
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } },
+    });
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "d", ctrlKey: true, bubbles: true, cancelable: true }),
+    );
+
+    expect(store.getFormula({ sheet: "s1", row: 2, col: 1 })).toBe("=A3");
+    expect(store.getCell({ sheet: "s1", row: 2, col: 1 }).style.bold).toBe(true);
+    grid.destroy();
+    store.dispose();
+  });
+
   it.each([
     { row: 3, col: 1, formula: "=A4" },
     { row: 0, col: 1, formula: "=A1" },
@@ -216,15 +297,16 @@ describe("pointer input: touch policy", () => {
   it("fills 20,000 cells under default limits and restores them with one undo", () => {
     const targetRow = 20_000;
     const { grid, store, scroller, workbook } = makeGrid(targetRow + 1);
-    const target = { sheet: "s1", row: targetRow, col: 0 };
+    // The city column holds plain text, which a fill copies; names end in a number and count.
+    const target = { sheet: "s1", row: targetRow, col: 2 };
     const before = store.getCell(target).resolved;
     const source = store.getCell({ ...target, row: 0 }).resolved;
     const firstBefore = store.getCell({ ...target, row: 1 }).resolved;
     grid.setSelection({ kind: "cell", addr: { ...target, row: 0 } });
 
-    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 0, workbook)));
-    scroller.dispatchEvent(pointer("pointermove", cellPoint(targetRow, 0, workbook)));
-    scroller.dispatchEvent(pointer("pointerup", cellPoint(targetRow, 0, workbook)));
+    scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(0, 2, workbook)));
+    scroller.dispatchEvent(pointer("pointermove", cellPoint(targetRow, 2, workbook)));
+    scroller.dispatchEvent(pointer("pointerup", cellPoint(targetRow, 2, workbook)));
     expect(store.getCell(target).resolved).toBe(source);
 
     grid.actions.undo();

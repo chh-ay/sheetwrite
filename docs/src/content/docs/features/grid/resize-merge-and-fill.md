@@ -81,17 +81,29 @@ Merging combines the selected range into one cell. The top-left value shows, and
 
 ## Drag-to-fill
 
-A small fill handle sits at the bottom-right corner of the selection. Drag it **down, up, left, or right** to fill the source block across the new region. The dominant axis wins. The grid tiles (repeats) the source to cover the target.
+A small fill handle sits at the bottom-right corner of the selection. Drag it **down, up, left, or right** to fill the new region. The dominant axis wins. As in Excel, the fill continues a series along the direction you drag and copies everything else, with each source cell's format:
 
-For example, after unmerging, select A1:B2 from Full setup and drag the fill handle down through row 4. The source repeats; it does not become a numeric series:
+| Source | Fill |
+| --- | --- |
+| One number | Copies it. |
+| One date (a date number format or a date column) | Counts up by one day per cell. |
+| Numbers with a constant step, such as 1, 2 | Continues the step: 3, 4, … |
+| Other numbers, such as 1, 2, 4 | Continues their linear trend. |
+| Day or month names (`Mon`, `Monday`, `Jan`, `January`) | Continues the list in the same letter case. |
+| Text that ends in a number (`Item 1`, `Q01`) | Counts the number up, keeping leading zeros. |
+| Formulas and other text | Copies the source cells in turn. |
 
-<div class="sw-grid-result" data-caption="Result: filling A1:B2 down through row 4 repeats 10, 30 and 20, 40. Rows 3 and 4 are the new copies; this static illustration has no draggable handle.">
+Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one number then counts up by 1, and a series is copied. Double-click the fill handle to fill down as far as the data in the column next to the selection reaches. Ctrl/Cmd + D and Ctrl/Cmd + R copy the top row or left column of the selection, with its format, into the rest of it; with one cell selected they copy the cell above or to the left.
+
+For example, after unmerging, select A1:B2 from Full setup and drag the fill handle down through row 4. Each column continues its step:
+
+<div class="sw-grid-result" data-caption="Result: filling A1:B2 down through row 4 continues 10, 20 with 30, 40 and 30, 40 with 50, 60; this static illustration has no draggable handle.">
 
 | 10 | 30 |
 | --- | --- |
 | 20 | 40 |
-| 10 | 30 |
-| 20 | 40 |
+| 30 | 50 |
+| 40 | 60 |
 
 </div>
 

@@ -21,6 +21,9 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   clearContents: [{ key: "Delete" }, { key: "Backspace" }],
   // Excel opens the note editor with Shift+F2.
   editNote: ["Shift+F2"],
+  // Excel's Fill Down and Fill Right.
+  fillDown: ["Mod+D"],
+  fillRight: ["Mod+R"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;
