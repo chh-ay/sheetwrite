@@ -660,11 +660,11 @@ describe("setBlock arrays at every entry point", () => {
   /** Text over the byte limit of `limitedGrid`. */
   const overLimit = "kept, now longer than the byte limit allows";
   /** A grid whose byte limit fits `setBlock(["kept", "text"])` exactly. */
-  const limitedGrid = () => {
+  const limitedGrid = (workbook = makeWorkbook(4)) => {
     const exact = validateTransactionResources([setBlock(["kept", "text"])]);
     if (!exact.ok) throw new Error("expected a measurable block");
     return new GridImpl(mountHost(), {
-      workbook: makeWorkbook(4),
+      workbook,
       transactionResourceLimits: { maxEncodedBytes: exact.encodedBytes },
     });
   };
@@ -832,7 +832,12 @@ describe("setBlock arrays at every entry point", () => {
   }
 
   it("re-measures an entry a permission callback turned into a getter", () => {
-    const grid = limitedGrid();
+    // The resolver is asked only about edits to a protected range.
+    const workbook = makeWorkbook(4);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("fixture is missing its sheet");
+    sheet.protectedRanges = [{ id: "locked", range }];
+    const grid = limitedGrid(workbook);
     let installed = false;
     grid.store.setProtectionResolver(({ operation }) => {
       if (!installed) smallThenOverLimit(operation);
