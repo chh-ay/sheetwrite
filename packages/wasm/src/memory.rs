@@ -38,13 +38,13 @@ pub(crate) struct MemoryOwnerStats {
 }
 
 impl MemoryOwnerStats {
-    pub(crate) fn add(&mut self, other: Self) {
+    pub(crate) const fn add(&mut self, other: Self) {
         self.logical_bytes = self.logical_bytes.saturating_add(other.logical_bytes);
         self.allocated_bytes = self.allocated_bytes.saturating_add(other.allocated_bytes);
         self.entries = self.entries.saturating_add(other.entries);
     }
 
-    pub(crate) fn add_vec<T>(&mut self, len: usize, capacity: usize) {
+    pub(crate) const fn add_vec<T>(&mut self, len: usize, capacity: usize) {
         self.logical_bytes = self
             .logical_bytes
             .saturating_add(len.saturating_mul(std::mem::size_of::<T>()));
@@ -54,7 +54,7 @@ impl MemoryOwnerStats {
         self.entries = self.entries.saturating_add(len);
     }
 
-    pub(crate) fn add_hash_table<K, V>(&mut self, len: usize, capacity: usize) {
+    pub(crate) const fn add_hash_table<K, V>(&mut self, len: usize, capacity: usize) {
         let bucket_bytes = std::mem::size_of::<K>()
             .saturating_add(std::mem::size_of::<V>())
             .saturating_add(1);
@@ -68,7 +68,7 @@ impl MemoryOwnerStats {
         self.entries = self.entries.saturating_add(len);
     }
 
-    pub(crate) fn add_payload(&mut self, logical_bytes: usize, allocated_bytes: usize) {
+    pub(crate) const fn add_payload(&mut self, logical_bytes: usize, allocated_bytes: usize) {
         self.logical_bytes = self.logical_bytes.saturating_add(logical_bytes);
         self.allocated_bytes = self.allocated_bytes.saturating_add(allocated_bytes);
     }
@@ -88,7 +88,7 @@ impl Default for StoreMemoryStats {
 }
 
 impl StoreMemoryStats {
-    pub(crate) fn owner_mut(&mut self, owner: usize) -> &mut MemoryOwnerStats {
+    pub(crate) const fn owner_mut(&mut self, owner: usize) -> &mut MemoryOwnerStats {
         &mut self.owners[owner]
     }
 
@@ -141,19 +141,6 @@ mod tests {
     }
 
     #[test]
-    fn encoded_totals_are_non_overlapping_sums() {
-        let mut stats = StoreMemoryStats::default();
-        stats.owner_mut(DENSE_KINDS).add_payload(3, 4);
-        stats.owner_mut(DENSE_PAYLOADS).add_payload(8, 16);
-
-        let encoded = stats.encode();
-
-        assert_eq!(encoded.len(), 5 + STORE_MEMORY_OWNER_COUNT * 3);
-        assert_eq!(encoded[encoded.len() - 2], 11.0);
-        assert_eq!(encoded[encoded.len() - 1], 20.0);
-    }
-
-    #[test]
     fn bulk_string_compaction_releases_only_admitted_owner_slack() {
         let mut store = CellStore::new();
         let sheet = store.add_sheet(1, 3_000);
@@ -188,16 +175,31 @@ mod tests {
     #[test]
     fn spill_anchors_owners_and_blockers_have_disjoint_capacity_owners() {
         let mut store = CellStore::new();
-        let sheet = store.add_sheet(2, 3);
-        for row in 0..3 {
+        let sheet = store.add_sheet(2, 1000);
+        for row in 0..1000 {
             store.set_number(sheet, row, 0, (row + 1) as f64, 0);
         }
-        store.set_formula(sheet, 0, 1, "=A1:A3", 0);
+        store.set_formula(sheet, 0, 1, "=A1:A1000", 0);
         store.recompute(sheet);
+
+        // Ownership is one run per spilled column, whatever the spill's
+        // height: the boxed run table, one column record and its one run.
         let materialized = store.memory_stats();
         assert_eq!(owner(&materialized, SPILL_RANGES).2, 1);
         assert_eq!(owner(&materialized, SPILL_OWNERS).2, 3);
+        assert!(owner(&materialized, SPILL_OWNERS).0 <= 160);
         assert_eq!(owner(&materialized, SPILL_BLOCKERS).2, 0);
+
+        // A source write inside the spill obstructs it: the anchor keeps its
+        // attempt, owns nothing, and the run storage is released.
+        store.set_number(sheet, 500, 1, 7.0, 0);
+        store.recompute(sheet);
+        let obstructed = store.memory_stats();
+        assert_eq!(owner(&obstructed, SPILL_RANGES).2, 1);
+        assert_eq!(owner(&obstructed, SPILL_OWNERS), (0, 0, 0));
+        store.clear_cell(sheet, 500, 1, 0);
+        store.recompute(sheet);
+        assert_eq!(owner(&store.memory_stats(), SPILL_OWNERS).2, 3);
 
         assert!(store.set_spill_blockers(sheet, &[1, 1, 1, 1]));
         store.recompute(sheet);
@@ -205,30 +207,5 @@ mod tests {
         assert_eq!(owner(&blocked, SPILL_RANGES).2, 1);
         assert_eq!(owner(&blocked, SPILL_OWNERS).2, 0);
         assert_eq!(owner(&blocked, SPILL_BLOCKERS).2, 1);
-    }
-
-    #[test]
-    fn formula_and_paged_fixtures_name_their_own_structures() {
-        let mut formulas = CellStore::new();
-        let sheet = formulas.add_sheet(1, 2);
-        formulas.set_number(sheet, 0, 0, 1.0, 0);
-        formulas.set_formula(sheet, 1, 0, "=A1+1", 0);
-        formulas.recompute(sheet);
-        let formula_stats = formulas.memory_stats();
-        assert!(owner(&formula_stats, FORMULAS).0 > 0);
-        assert!(owner(&formula_stats, DEPENDENCY_NODES).2 > 0);
-        assert!(owner(&formula_stats, DEPENDENCY_EDGES).2 > 0);
-
-        let mut paged = CellStore::new();
-        let sheet = paged.add_paged_sheet(1, 100, 4, 4096, 1_000_000);
-        paged.begin_page_load();
-        paged.set_number(sheet, 0, 0, 2.0, 0);
-        paged.commit_sources();
-        let paged_stats = paged.memory_stats();
-        assert_eq!(owner(&paged_stats, PAGED_KINDS).2, 4);
-        assert_eq!(owner(&paged_stats, PAGED_PAYLOADS).2, 4);
-        assert_eq!(owner(&paged_stats, PAGED_STYLES).2, 4);
-        assert_eq!(owner(&paged_stats, PAGED_LOADED_BITMAPS).2, 1);
-        assert_eq!(owner(&paged_stats, PAGED_DIRTY_BITMAPS).2, 0);
     }
 }

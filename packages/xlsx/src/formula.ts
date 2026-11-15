@@ -4,105 +4,6 @@ import {
   type XlsxFormulaEngine,
 } from "@sheetwrite/core";
 
-const EXTERNAL_DATA_FUNCTION =
-  /(^|[^A-Z0-9_.])(?:_xlfn\.)?(DDE|RTD|WEBSERVICE|FILTERXML|CUBEMEMBER|CUBEVALUE|CUBESET|CUBESETCOUNT|CUBERANKEDMEMBER)\s*\(/i;
-/** An external-book qualifier: a link index (`[1]`) or a workbook file name (`[Budget.xlsx]`). */
-const EXTERNAL_BOOK = /^(?:\d+|[^\]]+\.(?:xlsx?|xlsm|xlsb|xlam|ods|csv))$/i;
-/** Characters that end a table name, so a following `[` opens a structured reference. */
-const TABLE_NAME_END = /[\p{L}\p{N}_.\\]/u;
-/** Characters that start the sheet name or `!` after an external-book qualifier. */
-const QUALIFIED_NAME_START = /[\p{L}_\\!']/u;
-
-/**
- * Index after the bracket that closes the `[` at `open`. Brackets nest, and
- * `'` escapes the next character, as in a structured reference.
- */
-function closingBracket(formula: string, open: number): number {
-  let depth = 0;
-  let index = open;
-  while (index < formula.length) {
-    const char = formula.charAt(index);
-    if (char === "'") {
-      index += 2;
-      continue;
-    }
-
-    index += 1;
-    if (char === "[") depth += 1;
-    if (char === "]") depth -= 1;
-    if (depth === 0) return index;
-  }
-  return index;
-}
-
-/** Index after the quote that closes the `quote` at `open`; a doubled quote is one character. */
-function closingQuote(formula: string, open: number, quote: string): number {
-  let index = open + 1;
-  while (index < formula.length) {
-    if (formula.charAt(index) !== quote) {
-      index += 1;
-    } else if (formula.charAt(index + 1) === quote) {
-      index += 2;
-    } else {
-      return index + 1;
-    }
-  }
-  return index;
-}
-
-/** Whether a quoted sheet name, such as `'C:\Books\[Budget.xlsx]Annual'`, names another workbook. */
-function quotedNameHasExternalBook(name: string): boolean {
-  const open = name.indexOf("[");
-  const close = name.indexOf("]", open);
-  return open >= 0 && close > open && EXTERNAL_BOOK.test(name.slice(open + 1, close));
-}
-
-/**
- * Whether the `[...]` from `open` to `end` qualifies a sheet or name in another
- * workbook (`[1]Sheet1!A1`, `[1]!Name`), rather than a structured reference
- * such as `Sales[2023]` or `[@2023]`.
- */
-function isExternalBook(formula: string, open: number, end: number): boolean {
-  if (open > 0 && TABLE_NAME_END.test(formula.charAt(open - 1))) return false;
-
-  const content = formula.slice(open + 1, end - 1);
-  return EXTERNAL_BOOK.test(content) && QUALIFIED_NAME_START.test(formula.charAt(end));
-}
-
-/** Detect formula constructs that would keep an external workbook/data source live. */
-export function formulaContainsExternalReference(formula: string): boolean {
-  let executable = "";
-  let index = 0;
-  while (index < formula.length) {
-    const char = formula.charAt(index);
-    if (char === '"') {
-      executable += " ";
-      index = closingQuote(formula, index, '"');
-      continue;
-    }
-
-    if (char === "'") {
-      const end = closingQuote(formula, index, "'");
-      if (quotedNameHasExternalBook(formula.slice(index + 1, end - 1))) return true;
-      executable += " ";
-      index = end;
-      continue;
-    }
-
-    if (char === "[") {
-      const end = closingBracket(formula, index);
-      if (isExternalBook(formula, index, end)) return true;
-      executable += " ";
-      index = end;
-      continue;
-    }
-
-    executable += char;
-    index += 1;
-  }
-  return EXTERNAL_DATA_FUNCTION.test(executable);
-}
-
 /** The distinct cell and defined-name formula sources of a workbook. */
 export function workbookFormulaSources(snapshot: WorkbookSnapshot): string[] {
   const sources = new Set<string>();
@@ -138,16 +39,47 @@ export function convertFormulaSources(
   return results;
 }
 
+/** Quoted text, which no OOXML spelling rule changes. */
+const XLSX_STRING = String.raw`"(?:[^"]|"")*"`;
+/** A cell reference with an optional sheet qualifier, such as `A1` or `'My Sheet'!$B$2`. */
+const XLSX_CELL = String.raw`(?:(?:'(?:[^']|'')+'|[A-Za-z_][A-Za-z0-9_.]*)!)?\$?[A-Za-z]{1,3}\$?[0-9]+(?![A-Za-z0-9_.(#\[])`;
+/** A number, never split: digits, a dot or a letter cannot follow it. */
+const XLSX_NUMBER = String.raw`(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[Ee][+-]?[0-9]+)?(?![0-9.A-Za-z_])`;
+/** Range, arithmetic, text and comparison operators, and spaces. */
+const XLSX_OPERATOR = "[-+*/^&=<>%: ]";
 /**
- * Convert the workbook's distinct formula sources in one engine call. A
- * workbook without formulas leaves the engine unloaded.
+ * Sources made only of cell and range references, numbers, quoted text and
+ * operators. The engine's OOXML spelling rules change only function names,
+ * local names, spill references and table references, none of which can occur
+ * here, so these sources are their own OOXML spelling.
+ */
+const PLAIN_XLSX_FORMULA = new RegExp(
+  `^=?(?:${XLSX_STRING}|${XLSX_CELL}|${XLSX_NUMBER}|${XLSX_OPERATOR})*$`,
+);
+
+/**
+ * Convert the workbook's distinct formula sources in one engine call. On
+ * export, plain sources skip the call; a workbook with no other formula leaves
+ * the engine unloaded.
  */
 export async function convertWorkbookFormulas(
   snapshot: WorkbookSnapshot,
   direction: "import" | "export",
 ): Promise<ReadonlyMap<string, string>> {
   const formulas = workbookFormulaSources(snapshot);
-  if (formulas.length === 0) return new Map();
+  const pending =
+    direction === "export"
+      ? formulas.filter((source) => !PLAIN_XLSX_FORMULA.test(source))
+      : formulas;
+  const converted =
+    pending.length === 0
+      ? new Map<string, string>()
+      : await withXlsxFormulaEngine((engine) => convertFormulaSources(engine, pending, direction));
+  if (pending.length === formulas.length) return converted;
 
-  return withXlsxFormulaEngine((engine) => convertFormulaSources(engine, formulas, direction));
+  const results = new Map(converted);
+  for (const source of formulas) {
+    if (!results.has(source)) results.set(source, source);
+  }
+  return results;
 }

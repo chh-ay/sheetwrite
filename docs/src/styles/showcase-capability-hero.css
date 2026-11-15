@@ -2,38 +2,39 @@
   .sw-capability-hero {
     display: grid;
     grid-template-columns: minmax(0, 1.65fr) minmax(16rem, 1fr);
-    gap: clamp(1.5rem, 4vw, 3.5rem);
+    gap: clamp(var(--sw-space-6), 4vw, var(--sw-space-16));
     align-items: start;
     width: 100%;
     margin-inline: auto;
-    padding-block: clamp(1rem, 2vw, 1.5rem) clamp(1rem, 2vw, 1.25rem);
+    padding-block: clamp(var(--sw-space-4), 2vw, var(--sw-space-6))
+      clamp(var(--sw-space-4), 2vw, var(--sw-space-5));
   }
 
   .sw-capability-hero__eyebrow {
-    margin: 0 0 0.65rem;
+    margin: 0 0 var(--sw-space-3);
     color: var(--sw-accent-strong);
     font-family: var(--sw-font-body);
-    font-size: 0.78rem;
-    font-weight: 650;
-    letter-spacing: 0.1em;
+    font-size: var(--sw-text-caption);
+    font-weight: var(--sw-weight-semibold);
+    letter-spacing: var(--sw-tracking-eyebrow);
   }
 
   .sw-capability-hero h1 {
     margin: 0;
     color: var(--sw-fg-strong);
     font-family: var(--sw-font-display);
-    font-size: clamp(1.9rem, 3vw, 2.6rem);
-    font-weight: 700;
+    font-size: var(--sw-text-h1);
+    font-weight: var(--sw-weight-bold);
     line-height: 1.08;
-    letter-spacing: -0.04em;
+    letter-spacing: var(--sw-tracking-display);
     text-wrap: balance;
   }
 
   .sw-capability-hero__lede {
     max-width: 44rem;
-    margin: 0.75rem 0 0;
+    margin: var(--sw-space-3) 0 0;
     color: var(--sw-fg-muted);
-    font-size: 1rem;
+    font-size: var(--sw-text-body);
     line-height: 1.55;
   }
 
@@ -42,7 +43,7 @@
     grid-template-columns: minmax(0, 1fr);
     gap: 0;
     margin: 0;
-    padding-left: 1.5rem;
+    padding-left: var(--sw-space-6);
     border-left: 1px solid var(--sw-border);
   }
 
@@ -51,22 +52,22 @@
     display: flex;
     align-items: baseline;
     justify-content: space-between;
-    gap: 1rem;
-    padding: 0.65rem 0;
+    gap: var(--sw-space-4);
+    padding: var(--sw-space-3) 0;
     border-bottom: 1px solid var(--sw-border);
   }
 
   .sw-capability-hero__facts dt {
     margin: 0;
     color: var(--sw-fg-muted);
-    font-size: var(--sw-type-sm);
+    font-size: var(--sw-text-small);
   }
 
   .sw-capability-hero__facts dd {
     margin: 0;
     color: var(--sw-fg-strong);
-    font-size: var(--sw-type-sm);
-    font-weight: 650;
+    font-size: var(--sw-text-small);
+    font-weight: var(--sw-weight-semibold);
     text-align: right;
     overflow-wrap: anywhere;
   }
@@ -83,7 +84,7 @@
   }
   .sw-capability-hero__lede a {
     color: var(--sw-accent-strong);
-    font-weight: 600;
+    font-weight: var(--sw-weight-semibold);
     text-decoration: none;
     white-space: nowrap;
   }

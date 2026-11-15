@@ -159,7 +159,8 @@ export type SheetwriteErrorOperation =
   | "hyperlink-activate"
   | "keyboard-configure"
   | "chart-view"
-  | "host-function";
+  | "host-function"
+  | "external-link";
 
 /**
  * Every `SheetwriteErrorOperation`, for hosts that list the operations at run
@@ -196,6 +197,7 @@ export const SHEETWRITE_ERROR_OPERATIONS = [
   "keyboard-configure",
   "chart-view",
   "host-function",
+  "external-link",
 ] as const satisfies readonly SheetwriteErrorOperation[];
 
 /** JSON-safe values accepted in a public failure context. */
@@ -212,16 +214,26 @@ export type SheetwriteErrorContext = Readonly<Record<string, SheetwriteErrorCont
 
 /** Structural form preserved across realms and JSON serialization. */
 export interface SheetwriteErrorEnvelope {
+  /** Error class name, such as `"SheetwriteError"` or `"PersistenceError"`. */
   readonly name: string;
+  /** Human-readable explanation for logs; branch on `code`, not on this text. */
   readonly message: string;
+  /** Stable failure category to branch on, such as `"resource-limit"`. */
   readonly code: SheetwriteErrorCode;
+  /** The Sheetwrite operation that failed, such as `"xlsx-import"`. */
   readonly operation: SheetwriteErrorOperation;
+  /** JSON-safe details about the failure, such as the limit that was hit. */
   readonly context?: SheetwriteErrorContext;
+  /** Whether trying the same call again can succeed; absent when Sheetwrite cannot tell. */
   readonly retryable?: boolean;
 }
 
 /** Optional cause, diagnostic context, and boundary-known retryability. */
 export interface SheetwriteErrorOptions extends ErrorOptions {
+  /**
+   * JSON-safe details to attach. A frozen copy is kept, so later changes to the
+   * object do not show; an oversized one becomes `{ truncated: true }`.
+   */
   context?: SheetwriteErrorContext;
   /** Present only when Sheetwrite can determine retryability from the boundary itself. */
   retryable?: boolean;
@@ -467,12 +479,18 @@ function isSheetwriteErrorContext(context: unknown): context is SheetwriteErrorC
  * context strings, because both can quote host or file data.
  */
 export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
+  /** Error class name; subclasses such as `PersistenceError` set their own. */
   override readonly name: string = "SheetwriteError";
+  /** JSON-safe details about the failure, copied and frozen when the error is made. */
   readonly context?: SheetwriteErrorContext;
+  /** Whether trying the same call again can succeed; absent when Sheetwrite cannot tell. */
   readonly retryable?: boolean;
 
+  /** Creates an error for `operation` with the stable `code`; a message over 8 KiB of UTF-8 is shortened. */
   constructor(
+    /** Stable failure category to branch on, such as `"resource-limit"`. */
     readonly code: SheetwriteErrorCode,
+    /** The Sheetwrite operation that failed, such as `"xlsx-import"`. */
     readonly operation: SheetwriteErrorOperation,
     message: string,
     options: SheetwriteErrorOptions = {},
@@ -491,6 +509,7 @@ export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
     this.retryable = options.retryable;
   }
 
+  /** The envelope as a plain object, for `JSON.stringify` or `postMessage`; `name` is always `"SheetwriteError"`. */
   toJSON(): SheetwriteErrorEnvelope {
     return {
       name: "SheetwriteError",
@@ -509,6 +528,10 @@ export class SheetwriteError extends Error implements SheetwriteErrorEnvelope {
  * and `operation`, and a JSON-safe `context` when present. The guard does not
  * check `code` against a list, so a code from a newer Sheetwrite still passes;
  * handle unknown codes in the `default` branch of a `switch`.
+ *
+ * @param value - Anything caught or received, such as a `catch` binding or a
+ *   parsed message from a worker.
+ * @returns `true` when `value` has the shape of a Sheetwrite error envelope.
  */
 export function isSheetwriteError(value: unknown): value is SheetwriteErrorEnvelope {
   if (value instanceof SheetwriteError) return true;

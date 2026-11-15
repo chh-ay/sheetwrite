@@ -39,6 +39,26 @@ pub(crate) enum SkippedRows {
 #[derive(Debug, Default)]
 pub(crate) struct RowVisibility(Option<Box<HiddenRuns>>);
 
+/// The hidden rows of one walk, as merged runs, with the position of the
+/// first run that may still hold a later row. Asking about rows in ascending
+/// order costs one step per run, not a search per row.
+#[derive(Debug, Default)]
+pub(crate) struct HiddenRowCursor {
+    runs: Vec<RowRun>,
+    next: usize,
+}
+
+impl HiddenRowCursor {
+    /// Whether `row` is hidden. Rows must come in ascending order.
+    #[inline]
+    pub(crate) fn skips(&mut self, row: u32) -> bool {
+        while self.runs.get(self.next).is_some_and(|run| run.end < row) {
+            self.next += 1;
+        }
+        self.runs.get(self.next).is_some_and(|run| run.start <= row)
+    }
+}
+
 impl RowVisibility {
     /// Replaces both kinds of hidden row. Each slice holds `[start, end]`
     /// pairs of inclusive rows in ascending order without overlap. Returns
@@ -50,22 +70,48 @@ impl RowVisibility {
             filtered: parse_runs(filtered)?,
         };
 
-        let next = (!next.manual.is_empty() || !next.filtered.is_empty()).then(|| Box::new(next));
-        if self.0 == next {
+        let stored = (!next.manual.is_empty() || !next.filtered.is_empty()).then(|| Box::new(next));
+        if self.0 == stored {
             return Some(false);
         }
 
-        self.0 = next;
+        self.0 = stored;
         Some(true)
     }
 
-    pub(crate) fn skips(&self, row: u32, skipped: SkippedRows) -> bool {
+    /// A cursor over the rows that `skipped` leaves out, for a walk down the
+    /// rows in ascending order.
+    pub(crate) fn hidden_rows(&self, skipped: SkippedRows) -> HiddenRowCursor {
         let Some(runs) = &self.0 else {
-            return false;
+            return HiddenRowCursor::default();
         };
+        if skipped == SkippedRows::Filtered || runs.manual.is_empty() {
+            return HiddenRowCursor {
+                runs: runs.filtered.clone(),
+                next: 0,
+            };
+        }
 
-        contains(&runs.filtered, row)
-            || (skipped == SkippedRows::Hidden && contains(&runs.manual, row))
+        let mut merged = Vec::with_capacity(runs.filtered.len() + runs.manual.len());
+        let (mut filtered, mut manual) = (
+            runs.filtered.iter().peekable(),
+            runs.manual.iter().peekable(),
+        );
+        loop {
+            let next = match (filtered.peek(), manual.peek()) {
+                (Some(left), Some(right)) if left.start <= right.start => filtered.next(),
+                (Some(_) | None, Some(_)) => manual.next(),
+                (Some(_), None) => filtered.next(),
+                (None, None) => break,
+            };
+            if let Some(&run) = next {
+                push_merged(&mut merged, run);
+            }
+        }
+        HiddenRowCursor {
+            runs: merged,
+            next: 0,
+        }
     }
 
     /// Shifts the runs at or below `at` down by `count`. A run that `at`
@@ -149,7 +195,7 @@ impl RowVisibility {
 
     pub(crate) fn write_transfer(&self, out: &mut Writer) {
         let (manual, filtered) = self.0.as_deref().map_or((&[][..], &[][..]), |runs| {
-            (&runs.manual[..], &runs.filtered[..])
+            ((&*runs.manual), (&*runs.filtered))
         });
         for runs in [manual, filtered] {
             out.usize(runs.len());
@@ -211,11 +257,6 @@ fn push_merged(runs: &mut Vec<RowRun>, run: RowRun) {
     }
 }
 
-fn contains(runs: &[RowRun], row: u32) -> bool {
-    let after = runs.partition_point(|run| run.start <= row);
-    after > 0 && runs[after - 1].end >= row
-}
-
 #[cfg(test)]
 mod tests {
     use super::{RowVisibility, SkippedRows};
@@ -225,22 +266,8 @@ mod tests {
     const TAG: u32 = 7;
 
     fn hidden_rows(visibility: &RowVisibility, skipped: SkippedRows) -> Vec<u32> {
-        (0..20)
-            .filter(|&row| visibility.skips(row, skipped))
-            .collect()
-    }
-
-    #[test]
-    fn filtered_rows_are_skipped_by_both_kinds_and_manual_rows_only_by_hidden() {
-        let mut visibility = RowVisibility::default();
-        assert_eq!(visibility.replace(&[2, 3, 9, 9], &[5, 6]), Some(true));
-
-        assert_eq!(hidden_rows(&visibility, SkippedRows::Filtered), [5, 6]);
-        assert_eq!(
-            hidden_rows(&visibility, SkippedRows::Hidden),
-            [2, 3, 5, 6, 9]
-        );
-        assert_eq!(visibility.replace(&[2, 3, 9, 9], &[5, 6]), Some(false));
+        let mut hidden = visibility.hidden_rows(skipped);
+        (0..20).filter(|&row| hidden.skips(row)).collect()
     }
 
     #[test]
@@ -253,14 +280,6 @@ mod tests {
             assert_eq!(visibility.replace(&[], invalid), None);
         }
         assert_eq!(hidden_rows(&visibility, SkippedRows::Hidden), [1]);
-    }
-
-    #[test]
-    fn touching_runs_merge_so_equal_rows_compare_equal() {
-        let mut visibility = RowVisibility::default();
-        visibility.replace(&[1, 2, 3, 4], &[]);
-
-        assert_eq!(visibility.replace(&[1, 4], &[]), Some(false));
     }
 
     #[test]

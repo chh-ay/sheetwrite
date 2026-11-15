@@ -1,3 +1,5 @@
+//! Joins of every kind and source parsing through the public interface.
+
 mod support;
 
 use sheetwrite_queries::{execute, parse_source, ColumnType, JoinKind, Limits, SourceSpec, Value};

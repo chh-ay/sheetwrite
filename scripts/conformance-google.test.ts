@@ -6,7 +6,6 @@ import {
   captureGoogleWithDependencies,
   type GoogleCaptureDependencies,
   loadCorpus,
-  MAX_GOOGLE_CASES_PER_WORKBOOK,
   validateGoogleCaptureArtifact,
 } from "./conformance.js";
 
@@ -122,37 +121,6 @@ async function arrayCorpus(): Promise<ConformanceCorpus> {
 }
 
 describe("bounded Google Sheets capture", () => {
-  it("partitions quota-bounded workbooks and preserves case ordering", async () => {
-    const corpus = await formulaCorpus(MAX_GOOGLE_CASES_PER_WORKBOOK + 1);
-    const mock = mockGoogle();
-    await expect(captureGoogleWithDependencies(corpus, mock.dependencies)).resolves.toBe(
-      "memory://google-capture",
-    );
-    const artifact = mock.artifact();
-    expect(artifact.observations.map((entry) => entry.caseId)).toEqual(
-      corpus.cases.map((entry) => entry.id),
-    );
-    const counts = (artifact.workbooks as Array<{ caseCount: number }>).map(
-      (entry) => entry.caseCount,
-    );
-    expect(counts.length).toBeGreaterThan(1);
-    for (const count of counts) expect(count).toBeLessThanOrEqual(MAX_GOOGLE_CASES_PER_WORKBOOK);
-    expect(counts.reduce((sum, count) => sum + count, 0)).toBe(corpus.cases.length);
-
-    // Each workbook is written before it is read and deleted before the capture persists.
-    const persisted = mock.calls.indexOf("persist");
-    counts.forEach((_, index) => {
-      const at = (step: string) => mock.calls.indexOf(`${step}:${index}`);
-      expect(at("update")).toBeGreaterThan(-1);
-      expect(at("update")).toBeLessThan(at("read"));
-      expect(at("delete")).toBeGreaterThan(at("read"));
-      expect(at("delete")).toBeLessThan(persisted);
-    });
-    expect(
-      validateGoogleCaptureArtifact(artifact, corpus, mock.dependencies.producerVersion),
-    ).toEqual([]);
-  });
-
   it("deletes a temporary workbook when a batch read fails", async () => {
     const corpus = await formulaCorpus(2);
     const mock = mockGoogle({ failReadBatch: 0 });

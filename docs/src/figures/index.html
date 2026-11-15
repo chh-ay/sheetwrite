@@ -1,0 +1,27 @@
+<!doctype html>
+<!-- The stage of the docs screenshots, served on its own by
+     scripts/docs-figure-shots.ts; it is not part of the site. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Sheetwrite screenshot stage</title>
+    <style>
+      body {
+        margin: 0;
+        background: var(--sw-surface-0);
+        font-family: var(--sw-font-body);
+      }
+      /* Axis labels at 12 px, so they stay legible at the size the docs show
+         a capture. */
+      .sheetwrite-chart-value-axis,
+      .sheetwrite-chart-category-axis {
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script type="module" src="./stage.ts"></script>
+  </body>
+</html>

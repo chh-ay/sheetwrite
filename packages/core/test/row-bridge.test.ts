@@ -275,7 +275,7 @@ describe("RowBridge", () => {
           getRowId: (row) => row.id,
           maxRecentTransactions,
         }),
-      ).toThrow("Sheetwrite: maxRecentTransactions must be a positive safe integer");
+      ).toThrow(expect.objectContaining({ code: "invalid-argument", operation: "row-bridge" }));
     },
   );
 

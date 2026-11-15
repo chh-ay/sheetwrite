@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
-import { relative, resolve } from "node:path";
+import { dirname, relative, resolve } from "node:path";
 
+import { assertIconSheetEmitted } from "../icon-sheet.mjs";
 import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
@@ -44,11 +45,21 @@ const PANEL_MARKER = "sheetwrite-panel-section";
 const SORT_PANEL_MARKER = "My data has headers";
 // The Queries & Connections panel is its own chunk too; its section title survives minifiers.
 const QUERY_PANEL_MARKER = "Kept from the file";
+// The Edit Links panel is its own chunk; its empty-state text survives minifiers.
+const EDIT_LINKS_PANEL_MARKER = "This workbook has no links to other workbooks.";
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
+// Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
+// and the pivot field model, whose aggregation captions start like the function table.
+const DASHBOARD_SHARED_MARKERS = ["chart-data-", '["SUM","Sum"]'];
+// The add-on registry loads only when a page installs an add-on; its error text survives minifiers.
+const ADDON_REGISTRY_MARKER = "is listed more than once.";
+// The registry loads the XLSX slots and the query command seam on first use; webpack keeps the
+// names of exports that a dynamic import reads.
+const ADDON_SEAM_MARKERS = ["setXlsxWorkbookBackend", "registerQueryCommands"];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
@@ -56,17 +67,26 @@ const chromeChunks = [];
 const panelChunks = [];
 const sortPanelChunks = [];
 const queryPanelChunks = [];
+const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const dashboardChunks = [];
 const workers = [];
+const addonRegistryChunks = [];
+const addonSeamChunks = [];
 const documentChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
   if (code.includes(QUERY_PANEL_MARKER)) queryPanelChunks.push(file);
+  else if (code.includes(EDIT_LINKS_PANEL_MARKER)) editLinksPanelChunks.push(file);
+  else if (code.includes(ADDON_REGISTRY_MARKER)) addonRegistryChunks.push(file);
+  else if (ADDON_SEAM_MARKERS.some((marker) => code.includes(marker))) addonSeamChunks.push(file);
   else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  // Before the function table: the shared dashboard code also lists the pivot aggregations.
+  else if (DASHBOARD_SHARED_MARKERS.some((marker) => code.includes(marker)))
+    dashboardChunks.push(file);
   else if (code.includes(FUNCTION_TABLE_MARKER)) functionTableChunks.push(file);
   else if (code.includes(CHROME_MARKER) || code.includes(TOOLBAR_MARKER)) {
     chromeChunks.push(file);
@@ -91,8 +111,18 @@ if (sortPanelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sortPanelChunks.length}`);
 if (queryPanelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack query panel chunk, got ${queryPanelChunks.length}`);
+if (editLinksPanelChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack Edit Links panel chunk, got ${editLinksPanelChunks.length}`,
+  );
+}
 if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
+if (addonRegistryChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
+  );
+}
 if (functionTableChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack function table chunk, got ${functionTableChunks.length}`,
@@ -113,6 +143,12 @@ if (mainCode.includes(SORT_PANEL_MARKER)) {
 if (mainCode.includes(QUERY_PANEL_MARKER)) {
   throw new Error("The query panel is in webpack's main.js; it must load lazily");
 }
+if (mainCode.includes(EDIT_LINKS_PANEL_MARKER)) {
+  throw new Error("The Edit Links panel is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(ADDON_REGISTRY_MARKER)) {
+  throw new Error("The add-on registry is in webpack's main.js; it must load lazily");
+}
 if (mainCode.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
 }
@@ -132,6 +168,19 @@ if (mainCode.includes(STORE_MARKER)) {
   throw new Error("Store helpers are in webpack's main.js; a lazy module imports the store");
 }
 
+// webpack.styles.config.js builds core's stylesheet on its own.
+const stylesRoot = resolve("dist-styles");
+const stylesheet = await readFile(resolve(stylesRoot, "styles.css"), "utf8");
+if (!stylesheet.includes(".sheetwrite-tabstrip")) {
+  throw new Error("webpack did not inline the parts that core's styles.css imports");
+}
+await assertIconSheetEmitted({
+  bundler: "webpack",
+  stylesheets: [{ path: resolve(stylesRoot, "styles.css"), text: stylesheet }],
+  resolveUrl: (url, path) => resolve(dirname(path), url),
+  packagedSheet: resolve("node_modules/@sheetwrite/core/styles/icons.svg"),
+});
+
 const assets = publicFiles.map((file) => {
   const kind = file.endsWith(".js") ? "javascript" : file.endsWith(".css") ? "css" : "wasm";
   let owner;
@@ -148,13 +197,17 @@ const assets = publicFiles.map((file) => {
       panelChunks,
       sortPanelChunks,
       queryPanelChunks,
+      editLinksPanelChunks,
       functionTableChunks,
       findChunks,
       documentChunks,
       dashboardChunks,
+      addonRegistryChunks,
+      addonSeamChunks,
     ].some((chunks) => chunks.includes(file))
   ) {
-    // The function table loads from the panels and formula help, as Vite's chrome graph counts it.
+    // The function table loads from the panels and formula help, and the add-on registry from
+    // `initSheetwrite`, as Vite's chrome graph counts them.
     owner = "chrome-async";
     roles = ["chrome-async"];
   } else {

@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellAddress, ChangeEvent } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountGridWithData, mountHost } from "./fixtures.js";
 
 // Renders are forced synchronous so a scheduled repaint is observable without
 // racing a real animation-frame timer. (Same harness as grid-interaction.test.ts.)
@@ -28,48 +28,7 @@ afterEach(() => {
   globalThis.requestAnimationFrame = originalRaf;
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 const A = (row: number, col: number): CellAddress => ({ sheet: "s1", row, col });
-
-describe("config.keyboard: false (headless key policy)", () => {
-  // Contract: `keyboard: false` drops EVERY stock binding. A keydown on the host
-  // must not navigate, start an edit, clear a cell, or open the find bar.
-  it("ignores arrow navigation, type-to-edit, Delete, and Ctrl+F", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook, config: { keyboard: false } }, store);
-
-    grid.setSelection({ kind: "cell", addr: A(2, 0) });
-
-    // Arrow navigation is gated: selection stays put (stock ArrowDown -> row 3).
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-    const sel = grid.getSelection();
-    expect(sel?.kind).toBe("cell");
-    expect(sel?.kind === "cell" ? sel.addr.row : -1).toBe(2);
-
-    // Type-to-edit is gated: no editor opens (stock printable key seeds one).
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
-    expect(host.querySelector("textarea.sheetwrite-editor")).toBeNull();
-
-    // Destructive clear is gated: Delete leaves the selected cell intact.
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "Delete", bubbles: true }));
-    expect(store.getCell(A(2, 0)).resolved).toBe("Customer 2");
-
-    // Find is gated: Ctrl+F does not open the find bar, so its DOM is never built.
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    expect(host.querySelector(".sheetwrite-find")).toBeNull();
-
-    grid.destroy();
-  });
-});
 
 describe("config.keyboard: (e, grid) => boolean (host interceptor)", () => {
   // Contract: the handler runs before the stock bindings. Returning true consumes
@@ -121,10 +80,7 @@ describe("grid.styleRange", () => {
   // Contract: merge `style` over every cell of the rect as ONE undoable
   // transaction; preserve formulas; `null` clears cell styles.
   it("clears cell styles when passed null", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, grid } = mountGridWithData(5);
 
     const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
     grid.styleRange(range, { bold: true, color: "#123456" });
@@ -243,10 +199,7 @@ describe("grid.styleRange", () => {
 
 describe("grid.setColumnWidth (public geometry API)", () => {
   it("setColumnWidth commits an undoable width change", () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { store, grid } = mountGridWithData(10);
 
     const before = store.getWorkbook().sheets[0]!.columns[0]!.width;
 

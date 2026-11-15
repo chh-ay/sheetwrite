@@ -3,12 +3,14 @@ import { existsSync } from "node:fs";
 import { readdir, readFile, rm } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 
+import { GENERATED_CONTENT_DIRECTORIES } from "../docs/src/lib/generated-content.js";
 import { MOVED_HEADINGS } from "../docs/src/lib/moved-headings.js";
-import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
 import {
   collectCapabilityIssues,
   collectMissingCapabilityFiles,
+  collectMovedShowcaseIssues,
 } from "../docs/src/showcases/capability-validation.js";
 import {
   collectCompatibilityIssues,
@@ -30,6 +32,7 @@ import {
   renderEntryPointInventory,
   renderMovedGuides,
   renderSymbolPage,
+  undocumentedApi,
   unresolvedDocumentationLinks,
 } from "./docs-api.js";
 import {
@@ -43,14 +46,17 @@ import {
   markdownDocuments,
   readReadmes,
   siteLinkIssues,
+  trackerReferenceIssues,
   unresolvedCssTokens,
   validateMarkdown,
 } from "./docs-content-checks.js";
+import { expectedChangelogFeed } from "./docs-feed.js";
 import { expectedLlmsFiles } from "./docs-llms.js";
 import { entrySlug } from "./docs-paths.js";
 import {
   renderEvidenceText,
   renderLandingBench,
+  renderLandingStory,
   splitPerformancePages,
 } from "./docs-performance.js";
 import {
@@ -59,8 +65,8 @@ import {
   exists,
   type ExpectedFile,
   generatedDataRoot,
-  GENERATED_CONTENT_DIRECTORIES,
   generatedManifestPath,
+  generatedPublicRoots,
   isGeneratedContent,
   type MarkdownDocument,
   MIGRATION_ROUTES,
@@ -71,9 +77,11 @@ import {
 import { siteDataFiles } from "./docs-site-data.js";
 import {
   loadFormulaContractInventory,
+  loadFormulaReferenceEntries,
   renderExcelCoveragePage,
   renderFormulaFunctionPages,
 } from "./formula-docs.js";
+import { extractFigureAssets } from "./perf-figures.js";
 import type { ApiExport, PublicApiAnalysis, PublicApiManifest } from "./public-api.js";
 import { writeIfChanged } from "./script-io.js";
 
@@ -115,6 +123,7 @@ export const ADAPTER_DOC_CONTRACT = {
     "mutationPolicy",
     "transactionResourceLimits",
     "hyperlinkActivation",
+    "addons",
     "theme",
     "readOnly",
     "config",
@@ -254,10 +263,12 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     ...(await collectCompatibilityDigestIssues()),
   ];
   if (compatibilityIssues.length > 0) throw new Error(compatibilityIssues.join("\n"));
-  const [formulaInventory, publishedCompatibilityResults] = await Promise.all([
-    loadFormulaContractInventory(repositoryRoot),
-    compatibilityResults(),
-  ]);
+  const [formulaInventory, formulaReferenceEntries, publishedCompatibilityResults] =
+    await Promise.all([
+      loadFormulaContractInventory(repositoryRoot),
+      loadFormulaReferenceEntries(repositoryRoot),
+      compatibilityResults(),
+    ]);
 
   // Link resolution and entry pages read declaration shapes synchronously, so every
   // manifest declaration is parsed up front, in one batch.
@@ -276,6 +287,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
   const apiFiles: ExpectedFile[] = [
     { path: join(contentRoot, "api/index.md"), content: renderApiIndex(manifest) },
     { path: join(generatedDataRoot, "landing-bench.json"), content: await renderLandingBench() },
+    { path: join(generatedDataRoot, "landing-story.html"), content: await renderLandingStory() },
   ];
   const symbolOwners = new Map<string, string>();
   for (const pkg of manifest.packages) {
@@ -352,7 +364,7 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
     }
   }
 
-  const formulaPages = renderFormulaFunctionPages(formulaInventory);
+  const formulaPages = renderFormulaFunctionPages(formulaInventory, formulaReferenceEntries);
   const excelCatalog: unknown = JSON.parse(
     await readFile(join(repositoryRoot, "scripts/excel-functions.json"), "utf8"),
   );
@@ -372,6 +384,16 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       content: renderCompatibilityResults(),
     },
     ...formulaPages.map((page) => ({ path: join(contentRoot, page.route), content: page.content })),
+    ...formulaPages.flatMap(({ table }) =>
+      table === undefined
+        ? []
+        : [
+            {
+              path: join(generatedDataRoot, `formula-tables/${table.family}.html`),
+              content: table.html,
+            },
+          ],
+    ),
     { path: join(contentRoot, excelCoverage.route), content: excelCoverage.content },
     ...siteDataFiles(manifest, formulaPages),
     {
@@ -393,14 +415,27 @@ export async function expectedGeneratedFiles(manifest: PublicApiManifest): Promi
       path: join(generatedDataRoot, "compatibility-results.json"),
       content: stableJson(publishedCompatibilityResults),
     },
-    ...splitPerformancePages(await renderEvidenceText()).map((page) => ({
-      path: join(contentRoot, page.route),
-      content: page.content,
-    })),
+    // The landing shows the counts only; the full results ship with their own page.
+    {
+      path: join(generatedDataRoot, "compatibility-summary.json"),
+      content: stableJson(publishedCompatibilityResults.testSet),
+    },
+    // Each figure leaves its page for a static HTML asset, so the page's script carries a placeholder.
+    ...splitPerformancePages(await renderEvidenceText()).flatMap((page) => {
+      const { content, assets } = extractFigureAssets(page.slug, page.content);
+      return [
+        { path: join(contentRoot, page.route), content },
+        ...assets.map((asset) => ({
+          path: join(generatedDataRoot, `perf-figures/${asset.name}.html`),
+          content: asset.html,
+        })),
+      ];
+    }),
     { path: generatedManifestPath, content: stableJson(manifest) },
     { path: docsContractPath, content: stableJson(contract) },
   ];
   files.push(...(await expectedLlmsFiles(manifest, repositoryRoot, files)));
+  files.push(expectedChangelogFeed());
   const unowned = files.filter(
     (file) => file.path.startsWith(`${contentRoot}${sep}`) && !isGeneratedContent(file.path),
   );
@@ -431,6 +466,7 @@ async function removeStaleGeneratedFiles(expected: readonly ExpectedFile[]): Pro
   const roots = [
     generatedDataRoot,
     ...GENERATED_CONTENT_DIRECTORIES.map((directory) => join(contentRoot, directory)),
+    ...generatedPublicRoots,
   ];
   for (const root of roots) {
     for (const path of await filesUnder(root)) {
@@ -461,7 +497,22 @@ async function siteDocuments(expected: readonly ExpectedFile[]): Promise<Markdow
   const generated = expected.filter(
     (file) => file.path.startsWith(`${contentRoot}${sep}`) && /\.mdx?$/.test(file.path),
   );
-  return [...authored, ...generated];
+  // The site inlines a formula table into the page that names it
+  // (docs/src/islands/content.tsx), so the table's row ids are that page's anchors.
+  const tableRoot = join(generatedDataRoot, "formula-tables");
+  const tables = new Map(
+    expected
+      .filter((file) => file.path.startsWith(`${tableRoot}${sep}`))
+      .map((file): [string, string] => [
+        relative(tableRoot, file.path).replace(/\.html$/, ""),
+        file.content,
+      ]),
+  );
+  const withTables = generated.map((file) => {
+    const table = tables.get(/<FormulaReference family="([^"]+)">/.exec(file.content)?.[1] ?? "");
+    return table === undefined ? file : { ...file, content: `${file.content}\n${table}` };
+  });
+  return [...authored, ...withTables];
 }
 
 async function checkDocs(
@@ -484,7 +535,14 @@ async function checkDocs(
   }
   failures.push(...movedPageIssues(MOVED_PAGES, documents, MOVED_HEADINGS));
   failures.push(...(await siteLinkIssues(documents)));
-  failures.push(...(await validateMarkdown(documents, manifest)));
+  failures.push(...trackerReferenceIssues(documents));
+  const publicRoot = join(repositoryRoot, "docs/public");
+  const generatedPublicFiles = new Set(
+    expected
+      .filter((file) => file.path.startsWith(`${publicRoot}${sep}`))
+      .map((file) => `/${posix(relative(publicRoot, file.path))}`),
+  );
+  failures.push(...(await validateMarkdown(documents, manifest, generatedPublicFiles)));
   failures.push(...(await unresolvedCssTokens(join(repositoryRoot, "docs/src"))));
   failures.push(...adapterContractIssues(manifest));
 
@@ -614,7 +672,18 @@ export async function generateDocs(analysis: PublicApiAnalysis): Promise<string>
       count + pkg.entryPoints.reduce((subtotal, entry) => subtotal + entry.exports.length, 0),
     0,
   );
-  return `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`;
+  const undocumented = undocumentedApi(analysis.manifest)
+    .filter((api) => api.members.length + api.parameters.length + api.returns.length > 0)
+    .map(
+      (api) =>
+        `  ${api.packageName}: ${api.members.length} members, ${api.parameters.length} parameters, ${api.returns.length} return values`,
+    );
+  return [
+    `Generated ${entryCount} API entry-point indexes, ${symbolCount} symbol pages, and documentation contracts`,
+    ...(undocumented.length === 0
+      ? []
+      : ["Shown without a description in the API reference:", ...undocumented]),
+  ].join("\n");
 }
 
 // Keep this starter surface explicit: removing a symbol must not silently remove its docs gate.
@@ -650,9 +719,9 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/react": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/vue": ["Sheetwrite", "SheetwriteGrid"],
   "@sheetwrite/svelte": ["Sheetwrite", "SheetwriteGrid"],
-  "@sheetwrite/xlsx": ["registerXlsxBackends"],
+  "@sheetwrite/xlsx": ["xlsxAddon"],
   "@sheetwrite/queries": ["loadQueryEngine"],
-  "@sheetwrite/charts": ["createChartViewCache", "registerChartsBackend"],
+  "@sheetwrite/charts": ["createChartViewCache", "chartsAddon"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],
 };
@@ -695,6 +764,7 @@ export async function verifyDocs(analysis: PublicApiAnalysis): Promise<string> {
     ...collectMissingCapabilityFiles(CAPABILITY_INVENTORY, CAPABILITY_OWNERS, (path) =>
       existsSync(join(repositoryRoot, path)),
     ),
+    ...collectMovedShowcaseIssues(MOVED_SHOWCASES, CAPABILITY_OWNERS),
   );
   if (failures.length > 0) throw new Error(failures.join("\n"));
   return "Documentation contract check passed";

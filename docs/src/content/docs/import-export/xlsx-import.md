@@ -25,8 +25,10 @@ on first import; core does not load the XLSX codec unless the host registers it.
 ## Replace a document through the API
 
 ```ts compile title="Open an XLSX file in the current grid"
-import { fromXlsxWorkbookFile, type Grid } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbookFile, type Grid, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const grid: Grid;
 declare const file: File;
@@ -51,8 +53,10 @@ session and document identity for the imported workbook; import is not broadcast
 as a transaction to the old session.
 
 ```ts prelude="core" partial="bytes is an ArrayBuffer or Uint8Array from an XLSX file" title="Open a workbook"
-import { fromXlsxWorkbook, SheetwriteStore } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbook, SheetwriteStore, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const bytes: ArrayBuffer | Uint8Array;
 const snapshot = await fromXlsxWorkbook(bytes, {
@@ -86,9 +90,9 @@ import {
   fromXlsxWorkbook, initSheetwrite, SheetwriteStore, toXlsxWorkbook,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { xlsxAddon } from "@sheetwrite/xlsx";
 
-await initSheetwrite();
+await initSheetwrite({ addons: [xlsxAddon()] });
 const source: WorkbookSnapshot = {
   schemaVersion: 1,
   workbook: { activeSheet: "s" },

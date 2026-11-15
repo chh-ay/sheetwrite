@@ -62,9 +62,9 @@ const isAnalysis = build === "@sheetwrite/formulas";
 const [selected, other] = isAnalysis ? [formulas, defaultEngine] : [defaultEngine, formulas];
 // Concurrent selection of one engine shares initialization; a later call without
 // an engine keeps it, and a different engine is rejected without being loaded.
-await Promise.all([initSheetwrite(undefined, selected), initSheetwrite(undefined, selected)]);
+await Promise.all([initSheetwrite({ engine: selected }), initSheetwrite({ engine: selected })]);
 await initSheetwrite();
-await assert.rejects(initSheetwrite(undefined, other), { message: ENGINE_SWITCH_ERROR });
+await assert.rejects(initSheetwrite({ engine: other }), { message: ENGINE_SWITCH_ERROR });
 assert.equal(selected.isLoaded(), true, "selected engine must be loaded");
 assert.equal(other.isLoaded(), false, "the other engine must never be initialized");
 if (isAnalysis) {

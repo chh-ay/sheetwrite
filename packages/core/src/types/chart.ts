@@ -12,40 +12,98 @@ export interface ChartAnchor {
   row: number;
   /** 0-based column of the cell that holds the top-left corner. */
   col: number;
+  /** Distance from that cell's left edge to the chart's left edge, in CSS pixels; 0 or more. */
   offsetX: number;
+  /** Distance from that cell's top edge to the chart's top edge, in CSS pixels; 0 or more. */
   offsetY: number;
+  /** Width of the chart in CSS pixels; more than 0. */
   width: number;
+  /** Height of the chart in CSS pixels; more than 0. */
   height: number;
 }
 
 /** Sources are read in row-major order. */
 export interface ChartSeries {
+  /** Name shown in the legend; it wins over `nameRange`. */
   name?: string;
+  /** Cell that holds the name; only its top-left cell is read. */
   nameRange?: ChartRange;
+  /** Cells that hold the values to plot. */
   values: ChartRange;
+  /** Cells that hold the category labels; several columns or rows give levels of labels. */
   categories?: ChartRange;
 }
 
 /** Persisted chart definition; IDs are unique within the owning sheet. */
 export interface ChartDefinition {
+  /** Stable ID, unique on the sheet. */
   id: string;
+  /** The chart type, such as `column` or `line`. */
   kind: ChartKind;
   /** Text above the chart; `undefined` shows no title. */
   title?: string;
-  /** Axis titles; `undefined` shows no axis titles. */
-  axes?: { xTitle?: string; yTitle?: string };
+  /**
+   * Axis titles and the category label layout; `undefined` shows no axis
+   * titles and one row of labels per category level.
+   */
+  axes?: {
+    xTitle?: string;
+    yTitle?: string;
+    /**
+     * `false` draws all category levels in one row, each label the texts of
+     * its levels from the outside in, as Excel does when Format Axis ›
+     * Multi-level Category Labels is cleared. Absent or `true` draws one row
+     * of labels per level.
+     */
+    multiLevelLabels?: boolean;
+  };
   /** Legend position; `undefined` lets the renderer use its default position. */
   legend?: "none" | "top" | "right" | "bottom" | "left";
+  /** Where the chart sits on the sheet, and its size. */
   anchor: ChartAnchor;
+  /** The data series, in drawing order; empty when `pivot` is set. */
   series: ChartSeries[];
+  /**
+   * The ID of a pivot on the same sheet whose result the chart shows, as an
+   * Excel PivotChart does: the leaf row items are the categories, the outer
+   * row items are the outer category levels, and each value field (for each
+   * column item) is a series. Subtotals and grand totals are never points.
+   * `series` is empty then.
+   */
+  pivot?: string;
+  /**
+   * The value fields of the pivot that the chart plots, by position in the
+   * pivot's `values`, as the Field List picks a PivotChart's values in
+   * Excel. Absent plots every value field. Only valid with `pivot`.
+   */
+  pivotValues?: number[];
+}
+
+/**
+ * One outer level of multi-level category labels, as Excel reads a category
+ * range of several columns (or rows) or the outer row fields of a PivotChart.
+ */
+export interface ChartCategoryLevel {
+  /**
+   * One entry per category. A label starts a group that runs to the next
+   * label on this level or to the next group on an outer level; `null`
+   * continues the group, as a blank cell does in Excel.
+   */
+  labels: Array<string | number | boolean | null>;
+  /** Format code per label, as `categoryFormats`. */
+  formats: Array<string | null>;
 }
 
 /** Resolved plain data; the renderer does not read cells. Arrays follow source cells in row-major order. */
 export interface ChartSeriesView {
+  /** The series name: `name`, else the text of `nameRange`, else `Series 1` and so on. */
   name: string;
   /** Numeric cells; text, booleans, errors and empty cells are `null` (a gap). */
   values: Array<number | null>;
+  /** The label of each category: the innermost level when the categories have levels. */
   categories: Array<string | number | boolean | null>;
+  /** The outer levels of the categories, outermost first; empty when the categories have one level. */
+  categoryLevels: ChartCategoryLevel[];
   /** Excel format code per value, as the grid paints it: cell style, then column style, then column format. */
   numberFormats: Array<string | null>;
   /** Format code per category; date categories are serial numbers and need it to show as dates. */
@@ -58,15 +116,36 @@ export interface ChartSeriesView {
   referenceError: boolean;
 }
 
+/** `T` with every property, array and nested object read-only. */
+type DeepReadonly<T> = T extends readonly (infer Element)[]
+  ? ReadonlyArray<DeepReadonly<Element>>
+  : T extends object
+    ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
+    : T;
+
+/**
+ * A chart definition that its holder must not modify. A `ChartView` hands out
+ * the store's own definition, so it is typed read-only all the way down.
+ */
+export type ReadonlyChartDefinition = DeepReadonly<ChartDefinition>;
+
 /** One immutable-by-convention rendering input, refreshed on chart-change events. */
 export interface ChartView {
-  chart: ChartDefinition;
+  /**
+   * The store's own definition, not a copy. The store replaces a chart when
+   * it changes and never writes into one. Development builds freeze it, so a
+   * write throws; copy it (for example with `structuredClone`) to edit it.
+   */
+  chart: ReadonlyChartDefinition;
+  /** The resolved data of each series, in drawing order. */
   series: ChartSeriesView[];
 }
 
 /** Stable identity of one chart: the sheet that owns it and its ID on that sheet. */
 export interface ChartRef {
+  /** Stable ID of the sheet that holds the chart. */
   readonly sheet: SheetId;
+  /** The chart's ID on that sheet. */
   readonly id: string;
 }
 
@@ -78,7 +157,8 @@ export interface ChartRef {
 export interface ChartChangeEvent {
   /**
    * Store epoch after the commit. `undefined` when the store sent its change
-   * event without an epoch, which a custom `Store` can do.
+   * event without an epoch, which a custom `Store` can do, or when the pivot
+   * views that charts over pivots read were computed again without a commit.
    */
   readonly epoch: number | undefined;
   /** Charts to resolve again, in commit order of the edits that touched them. */
@@ -102,6 +182,7 @@ export interface ChartViewProvider {
 export interface MountedChart {
   /** Core calls this after it changes the box size in CSS pixels. */
   resize(width: number, height: number): void;
+  /** Core calls this before it removes the chart's box; free what the chart holds. */
   dispose(): void;
 }
 
@@ -109,5 +190,6 @@ export interface MountedChart {
 export interface ChartRenderer {
   /** `host` is an empty element that core owns, positions and clips. */
   mount(host: HTMLElement, chart: ChartRef, size: { width: number; height: number }): MountedChart;
+  /** Core calls this when the grid is destroyed, after every chart is disposed. */
   dispose(): void;
 }

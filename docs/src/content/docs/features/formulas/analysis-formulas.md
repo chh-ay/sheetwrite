@@ -37,7 +37,7 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 const grid = createGrid(host, {
   workbook: {
     activeSheet: "sheet1",
@@ -80,7 +80,7 @@ of the API does not change.
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 With the default engine, these functions return `#NAME?`, and formula assist
@@ -117,7 +117,7 @@ the cells they fill.
 `GROUPBY` groups rows by one or more key columns and aggregates the values. It
 adds a total row by default.
 
-```text partial="formula examples" title="Revenue by region"
+```formula partial="formula examples" title="Revenue by region"
 =GROUPBY(A1:A12, E1:E12, SUM)
 ```
 
@@ -130,7 +130,7 @@ adds a total row by default.
 
 `PIVOTBY` adds column keys:
 
-```text partial="formula examples" title="Revenue by region and product"
+```formula partial="formula examples" title="Revenue by region and product"
 =PIVOTBY(A1:A12, B1:B12, E1:E12, SUM)
 ```
 
@@ -316,7 +316,7 @@ Sheetwrite has two engine builds with the same API. `@sheetwrite/wasm` is the de
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 | Family | Examples |
@@ -344,7 +344,8 @@ The default engine returns `#NAME?` for these functions, and formula assist does
 
 Limits of the full engine:
 
-- `LAMBDA` parameters bind lexically, and `LET` can bind a `LAMBDA`. An uncalled `LAMBDA` returns `#CALC!`. A call with the wrong number of arguments returns `#VALUE!`. Calls are limited to a depth of 64 and 2,000,000 work units per outer helper; more returns `#NUM!`.
+- `LAMBDA` parameters bind lexically, and `LET` can bind a `LAMBDA`. An uncalled `LAMBDA` returns `#CALC!`. A call with the wrong number of arguments returns `#VALUE!`. Calls nest at most 64 deep, and one outer helper or call makes at most 2,000,000 `LAMBDA` calls; more returns `#NUM!`. The size of a `LAMBDA`'s body does not count against either limit.
 - `GROUPBY` and `PIVOTBY` accept one built-in function name, such as `SUM`, or a `LAMBDA` with one or two parameters. A vector of functions, such as `HSTACK(SUM,AVERAGE)`, returns `#VALUE!`.
+- `GROUPBY` and `PIVOTBY` read every source row of a full worksheet. The source rows do not count against the 2,000,000-operation limit; the groups, the sorting, the result cells and the rows passed to each `LAMBDA` or other function do. Each source value also counts once for every group, subtotal and total it belongs to, up to 16,777,216 in all (with two row fields, one column field and one value column, a source row counts 11). Past either limit, or past the 1,000,000-cell result limit, they return `#NUM!`.
 - Regex functions do not support lookaround, backreferences, or Unicode classes. Such patterns return `#VALUE!`, never a wrong match.
 

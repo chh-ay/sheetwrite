@@ -1,11 +1,12 @@
 import { describe, expect, it } from "bun:test";
 
+import { sanitizeChartDefinition } from "../src/chart-definition.js";
+import { pivotChartView } from "../src/dashboard/dashboard-chart.js";
 import {
-  chartFromRange,
-  DEFAULT_CHART_HEIGHT,
-  DEFAULT_CHART_WIDTH,
-  nextChartId,
+  pivotValueCaptions,
+  plotsPivotValue,
   selectionRange,
+  withPivotValue,
 } from "../src/panels/chart-model.js";
 import {
   defaultAggregation,
@@ -16,8 +17,8 @@ import {
   shiftField,
   sourceDataRange,
   type FieldFacts,
+  withMeasureValue,
 } from "../src/panels/pivot-model.js";
-import { formatRangeText, parseRangeText } from "../src/panels/range-text.js";
 import type { CellScalar, PivotDefinition, Range, WorkbookTable } from "../src/types.js";
 
 const SHEETS = [
@@ -31,101 +32,7 @@ const range = (sheet: string, r0: number, c0: number, r1: number, c1: number): R
   end: { row: r1, col: c1 },
 });
 
-/** Cells of a block that starts at A1, row-major. */
-function reader(rows: CellScalar[][]): (row: number, col: number) => CellScalar {
-  return (row, col) => rows[row]?.[col] ?? null;
-}
-
 describe("chart from a selection", () => {
-  it("uses the first row as series names and the first column as categories when they are text", () => {
-    const cells = [
-      [null, "North", "South"],
-      ["Jan", 1, 2],
-      ["Feb", 3, 4],
-    ];
-    const chart = chartFromRange(range("s1", 0, 0, 2, 2), reader(cells), "chart-1", 10);
-
-    expect(chart).toEqual({
-      id: "chart-1",
-      kind: "column",
-      anchor: {
-        row: 0,
-        col: 3,
-        offsetX: 0,
-        offsetY: 0,
-        width: DEFAULT_CHART_WIDTH,
-        height: DEFAULT_CHART_HEIGHT,
-      },
-      series: [
-        {
-          values: range("s1", 1, 1, 2, 1),
-          nameRange: range("s1", 0, 1, 0, 1),
-          categories: range("s1", 1, 0, 2, 0),
-        },
-        {
-          values: range("s1", 1, 2, 2, 2),
-          nameRange: range("s1", 0, 2, 0, 2),
-          categories: range("s1", 1, 0, 2, 0),
-        },
-      ],
-    });
-  });
-
-  it("plots every cell when the block has no text headers", () => {
-    const cells = [
-      [1, 2],
-      [3, 4],
-    ];
-    const chart = chartFromRange(range("s1", 0, 0, 1, 1), reader(cells), "chart-1", 10);
-
-    expect(chart.series).toEqual([
-      { values: range("s1", 0, 0, 1, 0) },
-      { values: range("s1", 0, 1, 1, 1) },
-    ]);
-  });
-
-  it("keeps a numeric first column as a series", () => {
-    const cells = [
-      ["Year", "Sales"],
-      [2024, 5],
-      [2025, 7],
-    ];
-    const chart = chartFromRange(range("s1", 0, 0, 2, 1), reader(cells), "chart-1", 10);
-
-    expect(chart.series.map((series) => series.categories)).toEqual([undefined, undefined]);
-    expect(chart.series.map((series) => series.nameRange)).toEqual([
-      range("s1", 0, 0, 0, 0),
-      range("s1", 0, 1, 0, 1),
-    ]);
-  });
-
-  it("reads a bounded number of cells for a whole-column selection", () => {
-    let reads = 0;
-    const read = (): CellScalar => {
-      reads += 1;
-      return 1;
-    };
-    const chart = chartFromRange(range("s1", 0, 0, 999_999, 1), read, "chart-1", 10);
-
-    expect(reads).toBeLessThanOrEqual(10_002);
-    // The definition still covers the whole selection.
-    expect(chart.series[0]?.values).toEqual(range("s1", 0, 0, 999_999, 0));
-  });
-
-  it("stays inside the sheet when the selection ends at the last column", () => {
-    const chart = chartFromRange(range("s1", 4, 8, 6, 9), reader([]), "chart-1", 10);
-    expect(chart.anchor.col).toBe(9);
-    expect(chart.anchor.row).toBe(4);
-  });
-
-  it("names a chart with the first free ID", () => {
-    const charts = [{ id: "chart-2" }, { id: "chart-3" }].map((partial) => ({
-      ...chartFromRange(range("s1", 0, 0, 0, 0), reader([]), partial.id, 10),
-    }));
-    expect(nextChartId(charts)).toBe("chart-4");
-    expect(nextChartId([])).toBe("chart-1");
-  });
-
   it("resolves cells, ranges, rows and columns to rectangles", () => {
     expect(selectionRange(null, SHEETS)).toBeNull();
     expect(selectionRange({ kind: "cell", addr: { sheet: "s1", row: 2, col: 3 } }, SHEETS)).toEqual(
@@ -143,38 +50,121 @@ describe("chart from a selection", () => {
   });
 });
 
-describe("A1 range text", () => {
-  it("parses cells, ranges, $ markers and sheet prefixes", () => {
-    expect(parseRangeText("B2:D9", SHEETS, "s1")).toEqual({ range: range("s1", 1, 1, 8, 3) });
-    expect(parseRangeText(" $b$7 ", SHEETS, "s1")).toEqual({ range: range("s1", 6, 1, 6, 1) });
-    expect(parseRangeText("D9:B2", SHEETS, "s1")).toEqual({ range: range("s1", 1, 1, 8, 3) });
-    expect(parseRangeText("'Q1 Sales'!A1:B2", SHEETS, "s1")).toEqual({
-      range: range("s2", 0, 0, 1, 1),
-    });
-    expect(parseRangeText("sales!C3", SHEETS, "s2")).toEqual({ range: range("s1", 2, 2, 2, 2) });
+describe("values of a chart over a pivot", () => {
+  const chart = {
+    id: "c1",
+    kind: "column" as const,
+    anchor: { row: 0, col: 0, offsetX: 0, offsetY: 0, width: 480, height: 288 },
+    series: [],
+    pivot: "p1",
+  };
+
+  it("captions values as the Field List does: own name, measure name, or aggregation of field", () => {
+    const captions = pivotValueCaptions(
+      [
+        { field: 1, aggregation: "SUM" },
+        { measure: "m1" },
+        { field: 2, aggregation: "COUNTA", name: "Orders" },
+        { measure: "gone" },
+      ],
+      (field) => ["Region", "Amount", "Id"][field] ?? "",
+      (id) => (id === "m1" ? "Margin" : undefined),
+    );
+    expect(captions).toEqual(["Sum of Amount", "Margin", "Orders", "gone"]);
   });
 
-  it("rejects malformed text, unknown sheets and cells outside the sheet", () => {
-    expect(parseRangeText("hello", SHEETS, "s1")).toHaveProperty("error");
-    expect(parseRangeText("A0", SHEETS, "s1")).toHaveProperty("error");
-    expect(parseRangeText("Nope!A1", SHEETS, "s1")).toEqual({ error: "No sheet has this name." });
-    expect(parseRangeText("'Q1 Sales'!E1", SHEETS, "s1")).toEqual({
-      error: "The range is outside the sheet.",
-    });
-    expect(parseRangeText("A101", SHEETS, "s1")).toEqual({
-      error: "The range is outside the sheet.",
-    });
+  it("toggles one value, keeps at least one, and drops the list when every value is plotted", () => {
+    const one = withPivotValue(chart, 3, 0, false);
+    expect(one?.pivotValues).toEqual([1, 2]);
+    expect(plotsPivotValue(one ?? chart, 0)).toBe(false);
+    const only = withPivotValue(withPivotValue(one ?? chart, 3, 1, false) ?? chart, 3, 2, false);
+    expect(only).toBeNull();
+    expect(withPivotValue(one ?? chart, 3, 0, true)).toEqual(chart);
   });
 
-  it("writes the sheet name only for another sheet, quoted when needed", () => {
-    expect(formatRangeText(range("s1", 1, 1, 8, 3), SHEETS, "s1")).toBe("B2:D9");
-    expect(formatRangeText(range("s2", 0, 0, 0, 0), SHEETS, "s1")).toBe("'Q1 Sales'!A1");
-    expect(formatRangeText(range("s1", 0, 0, 1, 0), SHEETS, "s2")).toBe("Sales!A1:A2");
+  it("accepts value positions only on a chart over a pivot, distinct and in bounds", () => {
+    expect(sanitizeChartDefinition({ ...chart, pivotValues: [2, 0] })?.pivotValues).toEqual([2, 0]);
+    const { pivot: _pivot, ...plain } = chart;
+    for (const invalid of [
+      { ...plain, pivotValues: [0] },
+      { ...chart, pivotValues: [] },
+      { ...chart, pivotValues: [1, 1] },
+      { ...chart, pivotValues: [-1] },
+      { ...chart, pivotValues: [0.5] },
+      { ...chart, pivotValues: [32] },
+    ]) {
+      expect(sanitizeChartDefinition(invalid)).toBeNull();
+    }
   });
 
-  it("reads back what it writes", () => {
-    const text = formatRangeText(range("s2", 2, 1, 4, 3), SHEETS, "s1");
-    expect(parseRangeText(text, SHEETS, "s1")).toEqual({ range: range("s2", 2, 1, 4, 3) });
+  it("fills the category levels from the outer row fields, outermost first", () => {
+    // Year, then region, then segment, in tabular layout: a repeated outer label is blank.
+    const output = {
+      rows: 6,
+      cols: 4,
+      headerRows: 1,
+      labelCols: 3,
+      cells: [
+        ...["Year", "Region", "Segment", "Sum of Amount"],
+        ...[2024, "East", "Online", 1],
+        ...[null, null, "Retail", 2],
+        ...[null, "West", "Retail", 3],
+        ...[2025, "West", "Retail", 4],
+        ...[null, null, "Online", 5],
+      ],
+    };
+    const [series] = pivotChartView(chart, output, []).series;
+
+    expect(series?.categories).toEqual(["Online", "Retail", "Retail", "Retail", "Online"]);
+    // West under 2025 starts a new group because the year group starts there.
+    expect(series?.categoryLevels).toEqual([
+      { labels: [2024, null, null, 2025, null], formats: [null, null, null, null, null] },
+      { labels: ["East", null, "West", "West", null], formats: [null, null, null, null, null] },
+    ]);
+    expect(series?.values).toEqual([1, 2, 3, 4, 5]);
+  });
+});
+
+describe("measures in the field list and the Measures panel", () => {
+  const orders: WorkbookTable = {
+    id: "orders",
+    name: "Orders",
+    range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
+    columns: [
+      { id: "region", name: "Region" },
+      { id: "amount", name: "Amount" },
+    ],
+    headerRow: true,
+    totalsRow: false,
+  };
+  const pivot: PivotDefinition = {
+    id: "p1",
+    name: "P1",
+    source: { table: "orders" },
+    anchor: { row: 0, col: 4 },
+    rows: [0],
+    columns: [],
+    values: [{ field: 1, aggregation: "SUM" }],
+  };
+
+  it("adds a measure as the last value, turning a table source into a model source", () => {
+    const next = withMeasureValue(pivot, [orders], "total");
+    expect(next?.source).toEqual({
+      model: {
+        table: "orders",
+        fields: [
+          { table: "orders", column: "region" },
+          { table: "orders", column: "amount" },
+        ],
+      },
+    });
+    expect(next?.values).toEqual([{ field: 1, aggregation: "SUM" }, { measure: "total" }]);
+    expect(next && withMeasureValue(next, [orders], "total")).toBeNull();
+    const range = {
+      ...pivot,
+      source: { range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } } },
+    };
+    expect(withMeasureValue(range, [orders], "total")).toBeNull();
   });
 });
 

@@ -1,3 +1,5 @@
+import type { EngineInstance } from "@sheetwrite/wasm";
+
 import { lendEngine } from "./engine.js";
 import { formulaLexes } from "./formula-token-kinds.js";
 
@@ -16,17 +18,57 @@ export interface XlsxFormulaEngine {
   copy(formula: string, rowDelta: number, colDelta: number): string;
 }
 
+/** Adapt the engine's sparse joined batch without round-tripping unchanged strings through WASM. */
+function convertSources(
+  engine: EngineInstance,
+  formulas: string[],
+  direction: "import" | "export",
+): string[] {
+  if (formulas.length === 0) return [];
+
+  const ends = new Uint32Array(formulas.length);
+  let length = 0;
+  let position = 0;
+  for (const source of formulas) {
+    length += source.length;
+    ends[position++] = length;
+  }
+  if (length > 0xffff_ffff) {
+    throw new RangeError("Sheetwrite: XLSX formula batch exceeds UTF-16 offset capacity");
+  }
+  const indices = new Uint32Array(formulas.length);
+  const converted = engine.convertXlsxFormulas(
+    formulas.join(""),
+    ends,
+    direction === "export",
+    indices,
+  );
+
+  const results = formulas.slice();
+  let indexPosition = 0;
+  for (const source of converted) {
+    const index = indices[indexPosition++];
+    if (index === undefined || index >= results.length) {
+      throw new Error("Sheetwrite: XLSX formula change has no input source");
+    }
+    results[index] = source;
+  }
+  return results;
+}
+
 /**
  * Run `use` with the engine's formula text operations, in one engine
  * session. XLSX codecs can run before `initSheetwrite()`: an initialized
  * document lends its engine, and otherwise a temporary instance releases its
  * memory when `use` returns.
+ *
+ * @param use - Called once with the formula operations; do not keep them after it returns.
+ * @returns A promise of what `use` returned.
  */
 export function withXlsxFormulaEngine<T>(use: (formulas: XlsxFormulaEngine) => T): Promise<T> {
   return lendEngine((engine) =>
     use({
-      convert: (formulas, direction) =>
-        engine.convertXlsxFormulas(formulas, direction === "export"),
+      convert: (formulas, direction) => convertSources(engine, formulas, direction),
       lexes: (formula) => formulaLexes(engine, formula),
       copy: (formula, rowDelta, colDelta) => engine.translateFormula(formula, rowDelta, colDelta),
     }),

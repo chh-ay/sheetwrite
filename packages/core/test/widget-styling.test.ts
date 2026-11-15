@@ -5,7 +5,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { GridConfig, Theme } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { coreStyles, elementAdded, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 // A full, deliberately un-themey palette. Passing every Theme field avoids
 // Partial-merge ambiguity, and the distinctive hex values make the seeded
@@ -61,14 +61,6 @@ afterEach(() => {
   globalThis.requestAnimationFrame = originalRaf;
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 // `config: {}` is truthy with no flag disabled, so the grid mounts the default
 // toolbar; the context menu and find bar are on by default. A caller-supplied
 // store keeps this WASM-light. The toolbar loads lazily: awaiting its module
@@ -100,24 +92,45 @@ function mustFind<T extends Element = HTMLElement>(host: HTMLElement, selector: 
 }
 
 describe("built-in widget styling", () => {
-  // ── Seeding: theme → host-root custom properties ───────────────────────────
-  // Contract: construction seeds every widget token on the shared host root
-  // (the ancestor that parents each widget), verbatim from the resolved theme.
-  // These are what styles.css reads via var(); if seeding drops or mismaps a
-  // field the widgets silently lose their theme.
-  it("seeds the widget custom properties onto the host root from the theme", async () => {
+  // Contract: every widget token the stylesheets read either is seeded or
+  // falls back to a value derived from seeded tokens, so no widget paints a
+  // light-theme colour under a dark theme. The menu shadow and the disabled
+  // row opacity are the same in every theme and fall back to plain values.
+  it("derives every unseeded widget custom property from seeded ones", async () => {
     const { host } = await makeGrid();
-    const prop = (name: string): string => host.style.getPropertyValue(name);
+    const seeded = (name: string) => host.style.getPropertyValue(name) !== "";
+    const constants: Readonly<Record<string, true>> = {
+      "--sheetwrite-menu-shadow": true,
+      "--sheetwrite-menu-disabled-opacity": true,
+    };
+    const reads: { name: string; fallback: string }[] = [];
+    for (const css of [
+      coreStyles(),
+      readFileSync(new URL("../shell.css", import.meta.url), "utf8"),
+    ]) {
+      for (const match of css.matchAll(/var\((--sheetwrite-(?:widget|toolbar|menu)-[a-z-]+)/g)) {
+        // The fallback runs from the first comma to the parenthesis that closes this var().
+        let depth = 1;
+        let end = (match.index ?? 0) + match[0].length;
+        while (depth > 0 && end < css.length) {
+          const char = css[end];
+          if (char === "(") depth += 1;
+          if (char === ")") depth -= 1;
+          end += 1;
+        }
+        const rest = css.slice((match.index ?? 0) + match[0].length, end - 1);
+        reads.push({ name: match[1] ?? "", fallback: rest.replace(/^\s*,\s*/, "") });
+      }
+    }
+    const problems = reads.filter(({ name, fallback }) => {
+      if (seeded(name)) return false;
+      const used = [...fallback.matchAll(/var\((--[a-z-]+)/g)].map((match) => match[1] ?? "");
+      if (constants[name]) return used.length > 0;
+      return used.length === 0 || !used.every(seeded);
+    });
 
-    expect(prop("--sheetwrite-widget-bg")).toBe(THEME.bg);
-    expect(prop("--sheetwrite-widget-fg")).toBe(THEME.fg);
-    expect(prop("--sheetwrite-widget-border")).toBe(THEME.gridLine);
-    expect(prop("--sheetwrite-widget-accent")).toBe(THEME.headerFg);
-    expect(prop("--sheetwrite-widget-selection")).toBe(THEME.selection);
-    expect(prop("--sheetwrite-toolbar-bg")).toBe(THEME.headerBg);
-    expect(prop("--sheetwrite-toolbar-fg")).toBe(THEME.headerFg);
-    expect(prop("--sheetwrite-menu-hover")).toBe(THEME.gridLine);
-    expect(prop("--sheetwrite-widget-font")).toBe(THEME.font);
+    expect(reads.length).toBeGreaterThan(0);
+    expect(problems).toEqual([]);
   });
 
   // ── Computed-style parity + host override (the core restyling proof) ───────
@@ -126,7 +139,7 @@ describe("built-in widget styling", () => {
   // widget element wins over the ancestor-inherited value WITHOUT !important —
   // which is the whole point of seeding on the root, not the widget.
   it("resolves seeded vars to themed colors and lets a host rule override without !important", async () => {
-    injectStyle(readFileSync(new URL("../styles.css", import.meta.url), "utf8"));
+    injectStyle(coreStyles());
 
     const { host } = await makeGrid();
 
@@ -156,46 +169,41 @@ describe("built-in widget styling", () => {
       injectStyle(".sheetwrite-find { --sheetwrite-widget-bg: #abcabc; }");
       const overridden = getComputedStyle(findEl).background;
       expect(overridden).toBe("#abcabc");
-      expect(overridden).not.toBe(THEME.bg);
     } else {
       // Fallback: the seeding + structure contract still holds.
       expect(host.style.getPropertyValue("--sheetwrite-widget-bg")).toBe(THEME.bg);
       expect(getComputedStyle(findEl).display).toBe("flex");
     }
   });
-  it("renders icon strings as text and supports reusable SVG nodes and factories", async () => {
-    const shared = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-    shared.setAttribute("data-icon", "shared");
+});
 
-    const { host } = await makeGrid({
-      toolbar: [
-        { action: "bold", icon: '<img src=x onerror="alert(1)">' },
-        { action: "italic", icon: shared },
-        { action: "underline", icon: shared },
-        {
-          action: "strikethrough",
-          icon: () => {
-            const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-            svg.setAttribute("data-icon", "factory");
-            return svg;
-          },
-        },
+describe("stylesheet parts", () => {
+  // Warning deduplication lasts for the whole module lifetime. Each mode needs
+  // a fresh process, independent of widgets mounted by earlier tests.
+  it.each([
+    ["development", "1"],
+    ["production", "0"],
+  ])("checks missing styles in %s builds", async (mode, expectedWarnings) => {
+    const probe = Bun.spawn(
+      [
+        process.execPath,
+        "--preload",
+        "./test-setup.ts",
+        "./packages/core/test/style-parts-probe.ts",
+        expectedWarnings,
       ],
-    });
-
-    const glyph = (command: string): HTMLElement =>
-      mustFind<HTMLElement>(host, `[data-command="${command}"] .sheetwrite-ribbon-icon`);
-
-    const raw = glyph("bold");
-    expect(raw.textContent).toBe('<img src=x onerror="alert(1)">');
-    expect(raw.children).toHaveLength(0);
-
-    const italic = glyph("italic");
-    const underline = glyph("underline");
-    expect(italic.querySelector("svg[data-icon=shared]")).not.toBeNull();
-    expect(underline.querySelector("svg[data-icon=shared]")).not.toBeNull();
-    expect(italic.firstElementChild).not.toBe(underline.firstElementChild);
-
-    expect(glyph("strikethrough").querySelector("svg[data-icon=factory]")).not.toBeNull();
+      {
+        cwd: new URL("../../..", import.meta.url).pathname,
+        env: { ...process.env, NODE_ENV: mode },
+        stdout: "pipe",
+        stderr: "pipe",
+      },
+    );
+    const [exitCode, stdout, stderr] = await Promise.all([
+      probe.exited,
+      new Response(probe.stdout).text(),
+      new Response(probe.stderr).text(),
+    ]);
+    expect({ exitCode, stdout, stderr }).toEqual({ exitCode: 0, stdout: "", stderr: "" });
   });
 });

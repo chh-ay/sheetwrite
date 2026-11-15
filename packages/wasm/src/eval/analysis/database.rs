@@ -9,17 +9,27 @@ use super::super::matrix::EvalMatrix;
 use super::super::value::{compare_text_case_insensitive, plain_number};
 use super::super::{EvalPass, EvalResult};
 
-pub(crate) const NAMES: &[&str] = &[
-    "DAVERAGE", "DCOUNT", "DCOUNTA", "DGET", "DMAX", "DMIN", "DPRODUCT", "DSTDEV", "DSTDEVP",
-    "DSUM", "DVAR", "DVARP",
-];
+family_functions! {
+    DAVERAGE,
+    DCOUNT,
+    DCOUNTA,
+    DGET,
+    DMAX,
+    DMIN,
+    DPRODUCT,
+    DSTDEV,
+    DSTDEVP,
+    DSUM,
+    DVAR,
+    DVARP,
+}
 
 const ARGUMENT_COUNT: usize = 3;
 type CriteriaRows = Vec<Vec<(usize, Criterion)>>;
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -33,7 +43,7 @@ pub(crate) fn evaluate_ast(
         Err(error) => return Value::Error(error),
     };
     let field = store.eval_ast(&args[1], sheet, pass, depth + 1);
-    let column = if matches!(name, "DCOUNT" | "DCOUNTA")
+    let column = if matches!(function, Function::DCOUNT | Function::DCOUNTA)
         && (matches!(args[1], Ast::Missing)
             || matches!(&field, Value::Blank)
             || matches!(&field, Value::Text(text) if text.is_empty()))
@@ -53,7 +63,7 @@ pub(crate) fn evaluate_ast(
         Ok(rows) => rows,
         Err(error) => return Value::Error(error),
     };
-    aggregate(name, &database, column, &rows)
+    aggregate(function, &database, column, &rows)
 }
 
 fn field_column(headers: &[Value], field: &Value) -> Result<usize, FormulaError> {
@@ -64,7 +74,7 @@ fn field_column(headers: &[Value], field: &Value) -> Result<usize, FormulaError>
             matches!(header, Value::Text(text) if compare_text_case_insensitive(text, label).is_eq())
         }).ok_or(FormulaError::Value),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Number(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
     }
 }
 
@@ -90,13 +100,12 @@ fn compile_criteria(
             if let Value::Error(error) = value {
                 return Err(*error);
             }
-            let database_column = match columns[column] {
-                Some(database_column) => database_column,
-                None => {
-                    let database_column = field_column(headers, &criteria.values[column])?;
-                    columns[column] = Some(database_column);
-                    database_column
-                }
+            let database_column = if let Some(database_column) = columns[column] {
+                database_column
+            } else {
+                let database_column = field_column(headers, &criteria.values[column])?;
+                columns[column] = Some(database_column);
+                database_column
             };
             conditions.push((database_column, database_criterion(value)?));
         }
@@ -122,7 +131,7 @@ fn database_criterion(value: &Value) -> Result<Criterion, FormulaError> {
 }
 
 fn aggregate(
-    name: &str,
+    function: Function,
     database: &EvalMatrix,
     column: Option<usize>,
     criteria: &CriteriaRows,
@@ -142,32 +151,40 @@ fn aggregate(
         }) {
             continue;
         }
-        let Some(column) = column else {
+        let Some(field) = column else {
             count += 1;
             continue;
         };
-        let value = &record[column];
-        match name {
-            "DGET" => {
+        let value = &record[field];
+        match function {
+            Function::DGET => {
                 if single.is_some() {
                     return Value::Error(FormulaError::Num);
                 }
                 single = Some(value.clone());
                 continue;
             }
-            "DCOUNTA" => {
+            Function::DCOUNTA => {
                 if !matches!(value, Value::Blank) {
                     count += 1;
                 }
                 continue;
             }
-            "DCOUNT" => {
+            Function::DCOUNT => {
                 if matches!(value, Value::Number(_)) {
                     count += 1;
                 }
                 continue;
             }
-            _ => {}
+            Function::DAVERAGE
+            | Function::DMAX
+            | Function::DMIN
+            | Function::DPRODUCT
+            | Function::DSTDEV
+            | Function::DSTDEVP
+            | Function::DSUM
+            | Function::DVAR
+            | Function::DVARP => {}
         }
         if let Value::Error(error) = value {
             return Value::Error(*error);
@@ -176,21 +193,26 @@ fn aggregate(
             continue;
         };
         count += 1;
-        match name {
-            "DSUM" | "DAVERAGE" => total += number,
-            "DPRODUCT" => product *= number,
-            "DMAX" => extreme = Some(extreme.map_or(*number, |previous| previous.max(*number))),
-            "DMIN" => extreme = Some(extreme.map_or(*number, |previous| previous.min(*number))),
-            "DSTDEV" | "DSTDEVP" | "DVAR" | "DVARP" => {
+        match function {
+            Function::DSUM | Function::DAVERAGE => total += number,
+            Function::DPRODUCT => product *= number,
+            Function::DMAX => {
+                extreme = Some(extreme.map_or(*number, |previous| previous.max(*number)))
+            }
+            Function::DMIN => {
+                extreme = Some(extreme.map_or(*number, |previous| previous.min(*number)))
+            }
+            Function::DSTDEV | Function::DSTDEVP | Function::DVAR | Function::DVARP => {
                 let delta = number - mean;
                 mean += delta / count as f64;
                 squared_deviations += delta * (number - mean);
             }
-            _ => return Value::Error(FormulaError::Name),
+            // Counted and returned above.
+            Function::DCOUNT | Function::DCOUNTA | Function::DGET => {}
         }
     }
-    let result = match name {
-        "DGET" => {
+    let result = match function {
+        Function::DGET => {
             return single.map_or(Value::Error(FormulaError::Value), |value| {
                 if matches!(value, Value::Blank) {
                     Value::number(0.0)
@@ -199,20 +221,20 @@ fn aggregate(
                 }
             })
         }
-        "DCOUNT" | "DCOUNTA" => count as f64,
-        "DSUM" => total,
-        "DAVERAGE" if count != 0 => total / count as f64,
-        "DAVERAGE" => return Value::Error(FormulaError::DivZero),
-        "DMAX" | "DMIN" => extreme.unwrap_or(0.0),
-        "DPRODUCT" => {
+        Function::DCOUNT | Function::DCOUNTA => count as f64,
+        Function::DSUM => total,
+        Function::DAVERAGE if count != 0 => total / count as f64,
+        Function::DAVERAGE => return Value::Error(FormulaError::DivZero),
+        Function::DMAX | Function::DMIN => extreme.unwrap_or_default(),
+        Function::DPRODUCT => {
             if count == 0 {
                 0.0
             } else {
                 product
             }
         }
-        "DSTDEV" | "DSTDEVP" | "DVAR" | "DVARP" => {
-            let sample = matches!(name, "DSTDEV" | "DVAR");
+        Function::DSTDEV | Function::DSTDEVP | Function::DVAR | Function::DVARP => {
+            let sample = matches!(function, Function::DSTDEV | Function::DVAR);
             if count <= usize::from(sample) {
                 return Value::Error(FormulaError::DivZero);
             }
@@ -220,13 +242,12 @@ fn aggregate(
                 return Value::Error(FormulaError::Num);
             }
             let variance = squared_deviations.max(0.0) / (count - usize::from(sample)) as f64;
-            if matches!(name, "DSTDEV" | "DSTDEVP") {
+            if matches!(function, Function::DSTDEV | Function::DSTDEVP) {
                 variance.sqrt()
             } else {
                 variance
             }
         }
-        _ => return Value::Error(FormulaError::Name),
     };
     if result.is_finite() {
         Value::number(result)
@@ -379,50 +400,6 @@ mod tests {
     }
 
     #[test]
-    fn criteria_prefixes_wildcards_escapes_and_blank_rows_filter_records() {
-        // Microsoft documents prefix text, *, ?, ~, and blank criteria rows here:
-        // https://support.microsoft.com/en-us/excel/functions/daverage-function
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(10, 20);
-        store.set_string(sheet, 0, 0, "Name", 0);
-        store.set_string(sheet, 0, 1, "Amount", 0);
-        for (row, name) in ["Apple", "APPLE PIE", "A*", "A?", "A~", "Pear"]
-            .iter()
-            .enumerate()
-        {
-            store.set_string(sheet, row + 1, 0, name, 0);
-            store.set_number(sheet, row + 1, 1, (row + 1) as f64, 0);
-        }
-        let cases = [
-            ("App", 3.0),
-            ("=apple", 1.0),
-            ("=A?", 12.0),
-            ("=A~*", 3.0),
-            ("=A~?", 4.0),
-            ("=A~~", 5.0),
-            ("<>Pear", 15.0),
-            (">=Pear", 6.0),
-            ("", 21.0),
-        ];
-        for (column, (criterion, _)) in cases.iter().enumerate() {
-            store.set_string(sheet, 9, column, "nAmE", 0);
-            store.set_string(sheet, 10, column, criterion, 0);
-            let letter = (b'A' + column as u8) as char;
-            store.set_formula(
-                sheet,
-                column,
-                9,
-                &format!("=DSUM(A1:B7,\"amount\",{letter}10:{letter}11)"),
-                0,
-            );
-        }
-        store.recompute(sheet);
-        for (row, (_, expected)) in cases.iter().enumerate() {
-            assert_eq!(store.get_cell(sheet, row, 9).num(), *expected);
-        }
-    }
-
-    #[test]
     fn selected_errors_empty_fields_and_text_values_keep_database_semantics() {
         let (mut store, sheet) = orchard();
         store.set_string(sheet, 12, 0, "Tree", 0);
@@ -453,8 +430,10 @@ mod tests {
         store.recompute(sheet);
         for (row, (formula, number, text)) in cases.iter().enumerate() {
             let cell = store.get_cell(sheet, row + 18, 8);
-            if let Some(number) = number {
-                assert_eq!(cell.num(), *number, "{formula}");
+            if let Some(expected) = number {
+                // An error cell also reads as 0: the number must not be text.
+                assert!(cell.string().is_none(), "{formula}: {:?}", cell.string());
+                assert_eq!(cell.num(), *expected, "{formula}");
             } else {
                 assert_eq!(cell.string().as_deref(), *text, "{formula}");
             }

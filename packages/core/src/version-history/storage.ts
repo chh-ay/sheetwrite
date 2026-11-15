@@ -808,6 +808,7 @@ export class MemoryHistoryStorage extends AtomicHistoryStorage {
   private readonly documents = new Map<string, MemoryDocument>();
   private lock = Promise.resolve();
 
+  /** Runs `action` in one atomic transaction over the stored archive; a failure leaves it unchanged. */
   protected async transact<T>(
     request: HistoryStorageRequest,
     action: (transaction: HistoryStorageTransaction) => Promise<T>,

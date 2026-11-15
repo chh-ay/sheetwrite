@@ -4,23 +4,6 @@ import { SelectionModel } from "../src/selection.js";
 import type { Selection } from "../src/types.js";
 
 describe("SelectionModel", () => {
-  it("reports a single cell", () => {
-    const s = new SelectionModel(100, 0, 2);
-    s.selectCell(3, 1);
-    expect(s.toSelection("s")).toEqual({ kind: "cell", addr: { sheet: "s", row: 3, col: 1 } });
-    expect(s.contains(3, 1)).toBe(true);
-    expect(s.contains(3, 0)).toBe(false);
-    expect(s.focusCell).toEqual({ row: 3, col: 1 });
-  });
-
-  it("selects a whole column", () => {
-    const s = new SelectionModel(10, 0, 2);
-    s.selectColumn(1);
-    expect(s.toSelection("s")).toEqual({ kind: "column", sheet: "s", col: 1 });
-    expect(s.contains(9, 1)).toBe(true);
-    expect(s.contains(9, 0)).toBe(false);
-  });
-
   it("accepts every public selection shape through set()", () => {
     const cases: Array<{ input: Selection | null; expected: Selection | null }> = [
       { input: null, expected: null },

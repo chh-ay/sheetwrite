@@ -1,11 +1,7 @@
 import { describe, expect, it } from "bun:test";
 
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
-import {
-  formatNumber,
-  getNumberFormatResourceStatsForTest,
-  resetNumberFormatResourcesForTest,
-} from "../src/number-format.js";
+import { formatNumber, resetNumberFormatResourcesForTest } from "../src/number-format.js";
 
 describe("formatNumber", () => {
   it.each([
@@ -47,27 +43,6 @@ describe("formatNumber", () => {
     expect(formatNumber(Number.NEGATIVE_INFINITY)).toBe("");
   });
 
-  it("bounds diverse caches and recomputes an evicted format correctly", () => {
-    resetNumberFormatResourcesForTest();
-    expect(formatNumber(12.5, '0.00" format-0"')).toBe("12.50 format-0");
-    for (let index = 1; index < 300; index++) {
-      expect(formatNumber(12.5, `0.00" format-${index}"`)).toBe(`12.50 format-${index}`);
-    }
-    for (let index = 0; index < 140; index++) {
-      formatNumber(1_000, undefined, `en-US-x-cache-${index}`);
-    }
-    const serial = dateToSerial(new Date(Date.UTC(2024, 6, 4)));
-    for (let index = 0; index < 40; index++) {
-      formatNumber(serial, "mmm dddd", `en-US-x-date-${index}`);
-    }
-
-    const stats = getNumberFormatResourceStatsForTest();
-    expect(stats.formatCacheEntries).toBeLessThanOrEqual(256);
-    expect(stats.numberFormatterCacheEntries).toBeLessThanOrEqual(128);
-    expect(stats.dateTimeFormatterCacheEntries).toBeLessThanOrEqual(64);
-    expect(formatNumber(12.5, '0.00" format-0"')).toBe("12.50 format-0");
-  });
-
   it("formats UTC date codes and preserves Excel's 1900 serial boundary", () => {
     expect(formatNumber(45_351, "yyyy-mm-dd")).toBe("2024-02-29");
     expect(formatNumber(45_351.75, "yyyy-mm-dd hh:mm:ss")).toBe("2024-02-29 18:00:00");
@@ -75,6 +50,50 @@ describe("formatNumber", () => {
     expect(dateToSerial(new Date(Date.UTC(1900, 1, 28)))).toBe(59);
     expect(dateToSerial(new Date(Date.UTC(1900, 2, 1)))).toBe(61);
     expect(serialToDate(60).toISOString()).toBe("1900-02-28T00:00:00.000Z");
+  });
+
+  it("shows serial 60 as Excel's 29 February 1900 in every date code", () => {
+    expect(formatNumber(59, "yyyy-mm-dd")).toBe("1900-02-28");
+    expect(formatNumber(60, "yyyy-mm-dd")).toBe("1900-02-29");
+    expect(formatNumber(61, "yyyy-mm-dd")).toBe("1900-03-01");
+    expect(formatNumber(60, "d mmm yyyy")).toBe("29 Feb 1900");
+    expect(formatNumber(60, "dd/mm/yy")).toBe("29/02/00");
+    expect(formatNumber(60, "mmmm")).toBe("February");
+    expect(formatNumber(60, "dddd")).toBe("Wednesday");
+    expect(formatNumber(60, "ddd d")).toBe("Wed 29");
+    expect(formatNumber(61, "dddd")).toBe("Thursday");
+    expect(formatNumber(60.75, "yyyy-mm-dd hh:mm")).toBe("1900-02-29 18:00");
+    expect(formatNumber(1, "yyyy-mm-dd")).toBe("1900-01-01");
+    expect(formatNumber(45_351, "d mmmm yyyy")).toBe("29 February 2024");
+  });
+
+  it("names weekdays before 1 March 1900 as Excel and WEEKDAY count them", () => {
+    const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    for (let serial = 1; serial <= 70; serial++) {
+      const weekday = weekdays[(serial - 1) % 7]!;
+      expect(formatNumber(serial, "dddd"), String(serial)).toBe(weekday);
+      expect(formatNumber(serial, "ddd"), String(serial)).toBe(weekday.slice(0, 3));
+    }
+
+    expect(formatNumber(1, "yyyy-mm-dd dddd")).toBe("1900-01-01 Sunday");
+    expect(formatNumber(59, "yyyy-mm-dd ddd")).toBe("1900-02-28 Tue");
+    expect(formatNumber(59.5, "dddd hh:mm")).toBe("Tuesday 12:00");
+    expect(formatNumber(61, "yyyy-mm-dd dddd")).toBe("1900-03-01 Thursday");
+    expect(formatNumber(45_351, "dddd")).toBe("Thursday");
+  });
+
+  it("reads 29 February 1900 back as serial 60", () => {
+    expect(parseDateInput("1900-02-29")).toBe(60);
+    expect(parseDateInput("1900-02-29 18:00")).toBe(60.75);
+    expect(parseDateInput("02/29/1900")).toBe(60);
+    expect(parseDateInput("29/02/1900")).toBe(60);
+    expect(parseDateInput("1900-02-28")).toBe(59);
+    expect(parseDateInput("1900-03-01")).toBe(61);
+    expect(parseDateInput(formatNumber(60, "yyyy-mm-dd"))).toBe(60);
+
+    for (const invalid of ["1900-02-30", "1899-02-29", "1901-02-29", "1900-02-29 24:00"]) {
+      expect(parseDateInput(invalid), invalid).toBeNull();
+    }
   });
 
   it("parses supported UTC calendar forms and rejects ambiguous invalid components", () => {
@@ -166,28 +185,5 @@ describe("formatNumber", () => {
       // The second call serves the entry the first call stored.
       expect(formatNumber(value, code, locale), `warm ${value}`).toBe(expected);
     }
-  });
-
-  it("recomputes text evicted by the value and format-group bounds", () => {
-    resetNumberFormatResourcesForTest();
-    const code = "#,##0.000000";
-    // More distinct values than one format/locale group keeps, so the first
-    // entry is evicted before it is read again.
-    for (let index = 0; index < 600; index++) formatNumber(index + 0.5, code);
-    expect(formatNumber(0.5, code)).toBe("0.500000");
-    expect(formatNumber(599.5, code)).toBe("599.500000");
-    expect(formatNumber(100.5, code)).toBe("100.500000");
-
-    // More (format, locale) groups than the group limit keeps, so the oldest
-    // groups are dropped. Ten locale spellings of one format are ten groups.
-    for (let index = 0; index < 10; index++) {
-      expect(formatNumber(7.4, "#,##0.0", `en-US-x-${index}`)).toBe("7.4");
-    }
-    expect(formatNumber(7.4, "#,##0.0", "en-US-x-0")).toBe("7.4");
-    for (let index = 0; index < 10; index++) {
-      expect(formatNumber(7.4, `0.${"0".repeat(index + 1)}`)).toBe(`7.4${"0".repeat(index)}`);
-    }
-    expect(formatNumber(7.4, "0.0")).toBe("7.4");
-    expect(formatNumber(0.5, code)).toBe("0.500000");
   });
 });

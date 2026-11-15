@@ -44,7 +44,7 @@ const SCENARIOS = [
 const scenario = optionValue(process.argv, "--scenario");
 const selectedScenarios = scenario === undefined ? SCENARIOS : [scenario];
 const WASM_PATH = new URL("../../packages/wasm/pkg/sheetwrite_wasm_bg.wasm", import.meta.url);
-await initSheetwrite(readFileSync(WASM_PATH));
+await initSheetwrite({ source: readFileSync(WASM_PATH) });
 const restoreCanvas = installCanvasTestStubs();
 const originalFrame = globalThis.requestAnimationFrame;
 globalThis.requestAnimationFrame = ((callback: FrameRequestCallback): number => {

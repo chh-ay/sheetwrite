@@ -1,97 +1,73 @@
-import { type ComponentType, lazy, Suspense, useState } from "react";
+import { createSignal, For } from "solid-js";
 
+import { Markup } from "../../islands/markup.js";
 import { onTabListKey } from "../tabKeys.js";
-import VanillaSnippet from "./snippets/vanilla.mdx";
 
-type SnippetModule = { default: ComponentType };
-
-/** Loads a hidden tab's snippet on first intent, then renders it from the cache. */
-function deferredSnippet(load: () => Promise<SnippetModule>) {
-  let pending: Promise<SnippetModule> | undefined;
-  const preload = () => {
-    pending ??= load();
-    return pending;
-  };
-  return { Snippet: lazy(preload), preload };
-}
-
-// Kept out of the route file so snippet imports stay behind the landing
-// component boundary rather than in the always-loaded route module.
-// Only the default tab is eagerly imported; the others load on intent.
-const FRAMEWORKS = [
-  {
-    id: "vanilla",
-    label: "Vanilla",
-    Snippet: VanillaSnippet,
-    preload: () => undefined,
-  },
-  {
-    id: "react",
-    label: "React",
-    ...deferredSnippet(() => import("./snippets/react.mdx")),
-  },
-  {
-    id: "vue",
-    label: "Vue",
-    ...deferredSnippet(() => import("./snippets/vue.mdx")),
-  },
-  {
-    id: "svelte",
-    label: "Svelte",
-    ...deferredSnippet(() => import("./snippets/svelte.mdx")),
-  },
+/** The landing's frameworks, in tab order; the route renders one snippet per entry. */
+export const CODE_TAB_FRAMEWORKS = [
+  { id: "vanilla", label: "Vanilla" },
+  { id: "react", label: "React" },
+  { id: "vue", label: "Vue" },
+  { id: "svelte", label: "Svelte" },
 ] as const;
 
-type FrameworkId = (typeof FRAMEWORKS)[number]["id"];
+type FrameworkId = (typeof CODE_TAB_FRAMEWORKS)[number]["id"];
 
-export function CodeTabs() {
-  const [active, setActive] = useState<FrameworkId>("vanilla");
-  const current = FRAMEWORKS.find((framework) => framework.id === active) ?? FRAMEWORKS[0];
+/** Props of {@link CodeTabs}: each framework's snippet, as finished markup in tab order. */
+export interface CodeTabsProps {
+  readonly panels: readonly string[];
+}
+
+/**
+ * The landing's framework snippets, ported from
+ * docs/src/components/landing/CodeTabs.tsx. Every snippet is markup in the
+ * page (hidden until its tab is chosen), so choosing a tab loads nothing; the
+ * island reads the panels back from the page when it hydrates.
+ */
+export function CodeTabs(props: CodeTabsProps) {
+  const [active, setActive] = createSignal<FrameworkId>("vanilla");
+  const ids = CODE_TAB_FRAMEWORKS.map((framework) => framework.id);
   return (
-    <div className="sw-code-tabs">
+    <div class="sw-code-tabs">
       {/* oxlint-disable-next-line jsx-a11y/interactive-supports-focus -- the tabs inside take focus; the tab list itself does not. */}
       <div
         aria-label="Framework"
-        className="sw-code-tabs__list"
+        class="sw-code-tabs__list"
         onKeyDown={(event) =>
-          onTabListKey(
-            event,
-            FRAMEWORKS.map((framework) => framework.id),
-            active,
-            setActive,
-            (id) => `landing-tab-${id}`,
-          )
+          onTabListKey(event, ids, active(), setActive, (id) => `landing-tab-${id}`)
         }
         role="tablist"
       >
-        {FRAMEWORKS.map((framework) => (
-          <button
-            aria-controls={`landing-code-${framework.id}`}
-            aria-selected={framework.id === active}
-            data-framework={framework.id}
-            id={`landing-tab-${framework.id}`}
-            key={framework.id}
-            onClick={() => setActive(framework.id)}
-            onFocus={framework.preload}
-            onPointerEnter={framework.preload}
-            role="tab"
-            tabIndex={framework.id === active ? 0 : -1}
-            type="button"
+        <For each={CODE_TAB_FRAMEWORKS}>
+          {(framework) => (
+            <button
+              aria-controls={`landing-code-${framework.id}`}
+              aria-selected={framework.id === active()}
+              data-framework={framework.id}
+              id={`landing-tab-${framework.id}`}
+              onClick={() => setActive(framework.id)}
+              role="tab"
+              tabIndex={framework.id === active() ? 0 : -1}
+              type="button"
+            >
+              {framework.label}
+            </button>
+          )}
+        </For>
+      </div>
+      <For each={CODE_TAB_FRAMEWORKS}>
+        {(framework, index) => (
+          <div
+            aria-labelledby={`landing-tab-${framework.id}`}
+            class="sw-code-tabs__panel"
+            hidden={framework.id !== active()}
+            id={`landing-code-${framework.id}`}
+            role="tabpanel"
           >
-            {framework.label}
-          </button>
-        ))}
-      </div>
-      <div
-        aria-labelledby={`landing-tab-${current.id}`}
-        className="sw-code-tabs__panel"
-        id={`landing-code-${current.id}`}
-        role="tabpanel"
-      >
-        <Suspense fallback={null}>
-          <current.Snippet />
-        </Suspense>
-      </div>
+            <Markup html={props.panels[index()] ?? ""} />
+          </div>
+        )}
+      </For>
     </div>
   );
 }

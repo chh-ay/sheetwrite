@@ -246,7 +246,7 @@ export async function runPagedStorageBench(
   engine: "wasm" | "formulas",
   samples: number,
 ): Promise<PagedStorageResult> {
-  await initSheetwrite(undefined, engine === "formulas" ? formulas : wasm);
+  await initSheetwrite({ engine: engine === "formulas" ? formulas : wasm });
 
   const cases = Object.fromEntries(
     PAGED_STORAGE_CASES.map((name) => [name, measure(SAMPLERS[name], samples)]),

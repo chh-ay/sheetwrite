@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 use crate::formula_slots::{FormulaResults, FormulaStore};
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{translate_relative_refs, Ast};
+use crate::calc::{relative_reach, translate_relative_refs, Ast, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{payload_num, payload_str_id};
 use crate::memory::{StoreMemoryStats, SHEET_INDEXES_METADATA};
 use crate::query::matches_needle;
@@ -22,22 +22,73 @@ const NO_STYLE_ID: u32 = 0;
 
 /// One conditional-format predicate, mirroring the host's rule kinds. String
 /// needles for case-insensitive `Contains` are pre-lowercased at rule-set time;
-/// formula ASTs are parsed once and translated from their stored anchor per cell.
+/// formula ASTs are parsed once, written for the rule range's top-left cell,
+/// and read at every other covered cell with that cell's distance from it.
 enum CondPred {
     GtNum(f64),
     LtNum(f64),
     EqNum(f64),
     EqStr(String),
     EqEmpty,
-    Contains {
-        needle: String,
-        match_case: bool,
-    },
-    Formula {
-        ast: Ast,
-        anchor_row: u32,
-        anchor_col: u32,
-    },
+    Contains { needle: String, match_case: bool },
+    Formula(FormulaRule),
+}
+
+/// A formula rule's parsed expression, written for the rule range's top-left
+/// cell, and its [`relative_reach`]: how far its references can move before
+/// one leaves the sheet.
+struct FormulaRule {
+    ast: Ast,
+    reach: (u32, u32),
+}
+
+/// A cell a rule covers, and its distance in rows and columns from the rule
+/// range's top-left cell.
+#[derive(Clone, Copy)]
+struct CoveredCell {
+    target: (u32, u32),
+    shift: (u32, u32),
+}
+
+impl FormulaRule {
+    /// Whether the formula holds at `cell`. The expression is read in place
+    /// with the cell's shift. Where the shift would move a reference out of
+    /// the sheet, or the formula reads a defined name holding a relative
+    /// reference, a translated copy keeps the result of placing the formula
+    /// at the cell: `#REF!` for the moved reference, the name where it was.
+    fn holds(
+        &self,
+        store: &CellStore,
+        sheet: usize,
+        cell: CoveredCell,
+        results: &mut FormulaResults,
+    ) -> bool {
+        let CoveredCell { target, shift } = cell;
+        results.clear();
+        let in_sheet = shift.0.saturating_add(self.reach.0) <= SHEET_ROWS
+            && shift.1.saturating_add(self.reach.1) <= SHEET_COLS;
+        let result = if in_sheet {
+            store.eval_conditional_ast(&self.ast, sheet, target, shift, results)
+        } else {
+            let translated = translated_formula(&self.ast, shift);
+            store.eval_conditional_ast(&translated, sheet, target, (0, 0), results)
+        };
+        match result {
+            Value::Bool(holds) => holds,
+            Value::Number(number) => number != 0.0,
+            Value::Text(_) | Value::Blank | Value::Error(_) => false,
+        }
+    }
+}
+
+/// A copy of `ast` placed `shift` rows and columns further, for the rare
+/// cell [`FormulaRule::holds`] cannot read in place.
+#[cold]
+#[inline(never)]
+fn translated_formula(ast: &Ast, shift: (u32, u32)) -> Ast {
+    let mut translated = ast.clone();
+    translate_relative_refs(&mut translated, i64::from(shift.0), i64::from(shift.1));
+    translated
 }
 
 /// One conditional-format rule: a normalized cell rectangle plus a predicate.
@@ -81,10 +132,14 @@ impl ConditionalRules {
                 let text = match &rule.pred {
                     CondPred::EqStr(value) => Some(value),
                     CondPred::Contains { needle, .. } => Some(needle),
-                    _ => None,
+                    CondPred::GtNum(_)
+                    | CondPred::LtNum(_)
+                    | CondPred::EqNum(_)
+                    | CondPred::EqEmpty
+                    | CondPred::Formula(_) => None,
                 };
-                if let Some(text) = text {
-                    metadata.add_payload(text.len(), text.capacity());
+                if let Some(payload) = text {
+                    metadata.add_payload(payload.len(), payload.capacity());
                 }
             }
         }
@@ -137,8 +192,8 @@ impl CellStore {
                 break;
             };
 
-            let num = nums.get(i).copied().unwrap_or(0.0);
-            let flag = flags.get(i).copied().unwrap_or(0);
+            let num = nums.get(i).copied().unwrap_or_default();
+            let flag = flags.get(i).copied().unwrap_or_default();
             let match_case = flag & 1 != 0;
 
             let pred = match kind {
@@ -155,14 +210,14 @@ impl CellStore {
                     },
                     match_case,
                 },
-                6 => CondPred::Formula {
-                    ast: formula_asts
+                6 => {
+                    let ast = formula_asts
                         .get(i)
                         .and_then(Clone::clone)
-                        .unwrap_or(Ast::InvalidRef),
-                    anchor_row: r0,
-                    anchor_col: c0,
-                },
+                        .unwrap_or(Ast::InvalidRef);
+                    let reach = relative_reach(&ast);
+                    CondPred::Formula(FormulaRule { ast, reach })
+                }
                 _ => continue,
             };
 
@@ -196,9 +251,9 @@ impl CellStore {
         let Some(s) = self.sheets.get(sheet) else {
             return WindowView::empty(self.strings.epoch);
         };
-        let row_start = row_start.min(s.cells.row_count());
-        let row_end = row_end.min(s.cells.row_count());
-        let n_rows = row_end.saturating_sub(row_start);
+        let clamped_row_start = row_start.min(s.cells.row_count());
+        let clamped_row_end = row_end.min(s.cells.row_count());
+        let n_rows = clamped_row_end.saturating_sub(clamped_row_start);
         let n_cols = cols.len();
         let Some(mut cells) = WindowCells::new(n_rows, n_cols) else {
             return WindowView::empty(self.strings.epoch);
@@ -211,8 +266,8 @@ impl CellStore {
             }
 
             if let Some(column) = s.cells.dense_column(col) {
-                for row in row_start..row_end {
-                    let dst = (row - row_start) * n_cols + col_index;
+                for row in clamped_row_start..clamped_row_end {
+                    let dst = (row - clamped_row_start) * n_cols + col_index;
                     cells.fill(
                         s,
                         row,
@@ -225,20 +280,20 @@ impl CellStore {
                 continue;
             }
 
-            let mut start = s.cells.idx(row_start, col);
-            let end = s.cells.idx(row_end, col);
+            let mut start = s.cells.idx(clamped_row_start, col);
+            let end = s.cells.idx(clamped_row_end, col);
             while start < end {
                 let run = s.cells.run(start, end);
                 run.visit_paged(|src, resolved| {
                     let row = src - col * s.cells.row_count();
-                    let dst = (row - row_start) * n_cols + col_index;
+                    let dst = (row - clamped_row_start) * n_cols + col_index;
                     cells.fill(s, row, col, dst, resolved, &self.formula_slots);
                 });
                 start = run.end;
             }
         }
 
-        let row_start_u = row_start as u32;
+        let row_start_u = clamped_row_start as u32;
         let cond_matches =
             cond_matches_for_window(self, sheet, |ri| row_start_u + ri as u32, cols, &cells);
 
@@ -265,15 +320,15 @@ impl CellStore {
 
             if let Some(column) = s.cells.dense_column(col) {
                 for (row_index, &row) in rows.iter().enumerate() {
-                    let row = row as usize;
-                    if row < s.cells.row_count() {
+                    let sheet_row = row as usize;
+                    if sheet_row < s.cells.row_count() {
                         let dst = row_index * n_cols + col_index;
                         cells.fill(
                             s,
-                            row,
+                            sheet_row,
                             col,
                             dst,
-                            Some(column.cell(row)),
+                            Some(column.cell(sheet_row)),
                             &self.formula_slots,
                         );
                     }
@@ -371,12 +426,12 @@ impl WindowCells {
             }
             KIND_FORMULA => {
                 let key = cell_key(row, col);
-                let entry = key.and_then(|key| sheet.formulas.get(key, slots));
-                let error = key.and_then(|key| formula_error_with_entry(sheet, key, entry));
-                if let Some(error) = error {
+                let entry = key.and_then(|cell| sheet.formulas.get(cell, slots));
+                let error = key.and_then(|cell| formula_error_with_entry(sheet, cell, entry));
+                if let Some(found) = error {
                     self.kind[dst] = KIND_STRING;
                     self.str_local[dst] =
-                        local_error_index(error, &mut self.error_slots, &mut self.strings);
+                        local_error_index(found, &mut self.error_slots, &mut self.strings);
                 } else {
                     self.kind[dst] = KIND_NUMBER;
                     self.num[dst] = payload_num(payload);
@@ -408,7 +463,7 @@ fn local_error_index(
     let slot = &mut slots[error.slot()];
     if *slot < 0 {
         *slot = strings.len() as i32;
-        strings.push(error.sentinel().to_string());
+        strings.push(error.sentinel().to_owned());
     }
     *slot
 }
@@ -445,31 +500,19 @@ fn cond_matches_for_window<F: Fn(usize) -> u32>(
                     continue;
                 }
                 let hit = match &rule.pred {
-                    CondPred::Formula {
-                        ast,
-                        anchor_row,
-                        anchor_col,
-                    } => {
-                        let mut translated = ast.clone();
-                        translate_relative_refs(
-                            &mut translated,
-                            i64::from(data_row) - i64::from(*anchor_row),
-                            i64::from(col) - i64::from(*anchor_col),
-                        );
-                        results.clear();
-                        match store.eval_conditional_ast(
-                            &translated,
-                            sheet_index,
-                            data_row,
-                            col,
-                            &mut results,
-                        ) {
-                            Value::Bool(value) => value,
-                            Value::Number(value) => value != 0.0,
-                            _ => false,
-                        }
+                    CondPred::Formula(formula) => {
+                        let cell = CoveredCell {
+                            target: (data_row, col),
+                            shift: (data_row - rule.r0, col - rule.c0),
+                        };
+                        formula.holds(store, sheet_index, cell, &mut results)
                     }
-                    predicate => cond_pred_matches(
+                    predicate @ (CondPred::GtNum(_)
+                    | CondPred::LtNum(_)
+                    | CondPred::EqNum(_)
+                    | CondPred::EqStr(_)
+                    | CondPred::EqEmpty
+                    | CondPred::Contains { .. }) => cond_pred_matches(
                         predicate,
                         cells.kind[dst],
                         cells.num[dst],
@@ -506,7 +549,7 @@ fn cond_pred_matches(pred: &CondPred, kind: u8, num: f64, text: Option<&str>) ->
             }
             text.is_some_and(|hay| matches_needle(hay, needle, !match_case, false))
         }
-        CondPred::Formula { .. } => false,
+        CondPred::Formula(_) => false,
     }
 }
 
@@ -532,6 +575,7 @@ const WINDOW_PACKED_VERSION: u32 = 1;
 const WINDOW_PACKED_HEADER_BYTES: usize = 10 * std::mem::size_of::<u32>();
 
 /// A bulk window of resolved cells, row-major over `n_rows x n_cols`.
+#[derive(Debug)]
 #[wasm_bindgen]
 pub struct WindowView {
     string_pool_epoch: u32,
@@ -627,7 +671,11 @@ fn pack_window(cells: &WindowCells, cond_matches: &[u32]) -> Option<Vec<u8>> {
     for value in cond_matches {
         packed.extend_from_slice(&value.to_le_bytes());
     }
-    debug_assert_eq!(packed.len(), total_bytes);
+    debug_assert_eq!(
+        packed.len(),
+        total_bytes,
+        "the packed buffer has the length computed before packing"
+    );
     Some(packed)
 }
 
@@ -637,17 +685,28 @@ fn align_to_8(value: usize) -> Option<usize> {
 
 #[wasm_bindgen]
 impl WindowView {
+    /// The string pool epoch the window was read in. Its string ids are
+    /// valid only within that epoch (see `CellStore::string_pool_epoch`).
     #[wasm_bindgen(js_name = stringPoolEpoch)]
+    #[must_use]
     pub fn string_pool_epoch(&self) -> u32 {
         self.string_pool_epoch
     }
 
+    /// Rows in the window.
+    ///
+    /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nRows)]
+    #[must_use]
     pub fn n_rows(&self) -> u32 {
         self.n_rows
     }
 
+    /// Columns in the window.
+    ///
+    /// @enginePublic Result dimensions let engine hosts interpret a window without core.
     #[wasm_bindgen(getter, js_name = nCols)]
+    #[must_use]
     pub fn n_cols(&self) -> u32 {
         self.n_cols
     }

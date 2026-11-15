@@ -4,6 +4,7 @@ use std::mem;
 
 use wasm_bindgen::prelude::*;
 
+use crate::buffers::saturating_u32;
 use crate::m::{decode_queries, emit_section, encode_queries, import_section, PlanWriter};
 use crate::plan::{Diagnostic, Limits};
 use crate::plan_wire::{PlanWire, NO_COLUMN};
@@ -13,7 +14,7 @@ use crate::transport::error;
 const MAX_SECTION_BYTES: usize = 4 * 1024 * 1024;
 
 /// A string table with one entry per item, packed as UTF-8 plus offsets.
-#[derive(Default)]
+#[derive(Debug, Default)]
 struct Strings {
     text: Vec<u8>,
     offsets: Vec<u32>,
@@ -26,8 +27,7 @@ impl Strings {
         }
 
         self.text.extend_from_slice(value.as_bytes());
-        self.offsets
-            .push(u32::try_from(self.text.len()).unwrap_or(u32::MAX));
+        self.offsets.push(saturating_u32(self.text.len()));
     }
 
     fn finish(mut self) -> Self {
@@ -39,12 +39,13 @@ impl Strings {
     }
 }
 
-fn index(value: usize) -> u32 {
-    u32::try_from(value).unwrap_or(u32::MAX)
-}
-
 /// Section text, member names, and differences as (query, step or `NO_COLUMN`, code) triples.
 #[wasm_bindgen(js_name = PowerQuerySection)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct PowerQuerySection {
     text: String,
     members: Strings,
@@ -88,6 +89,7 @@ impl PowerQuerySection {
 
 /// Writes saved queries, encoded as query-list lanes, as one M section.
 #[wasm_bindgen(js_name = emitPowerQuery)]
+#[allow(unreachable_pub, reason = "a wasm-bindgen export")]
 pub fn emit_power_query(
     codes: &[u32],
     numbers: &[f64],
@@ -114,9 +116,9 @@ pub fn emit_power_query(
     let mut losses = Vec::with_capacity(section.losses.len() * 3);
     let mut loss_codes = Strings::default();
     for (position, loss) in section.losses.iter().enumerate() {
-        losses.push(index(loss.query));
-        losses.push(loss.step.map_or(NO_COLUMN, index));
-        losses.push(index(position));
+        losses.push(saturating_u32(loss.query));
+        losses.push(loss.step.map_or(NO_COLUMN, saturating_u32));
+        losses.push(saturating_u32(position));
         loss_codes.push(loss.code);
     }
 
@@ -131,6 +133,11 @@ pub fn emit_power_query(
 /// Imported queries as query-list lanes, and unsupported members as
 /// (start, end) byte spans with name, reason and detail strings.
 #[wasm_bindgen(js_name = PowerQueryImport)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct PowerQueryImport {
     queries: PlanWriter,
     spans: Vec<u32>,
@@ -179,6 +186,7 @@ impl PowerQueryImport {
 
 /// Reads an M section document without evaluating it.
 #[wasm_bindgen(js_name = importPowerQuery)]
+#[allow(unreachable_pub, reason = "a wasm-bindgen export")]
 pub fn import_power_query(text: &str) -> Result<PowerQueryImport, JsValue> {
     if text.len() > MAX_SECTION_BYTES {
         return Err(error(Diagnostic::limit()));
@@ -193,8 +201,8 @@ pub fn import_power_query(text: &str) -> Result<PowerQueryImport, JsValue> {
     let mut spans = Vec::with_capacity(unsupported.len() * 2);
     let mut strings = Strings::default();
     for entry in &unsupported {
-        spans.push(index(entry.span.start));
-        spans.push(index(entry.span.end));
+        spans.push(saturating_u32(entry.span.start));
+        spans.push(saturating_u32(entry.span.end));
         strings.push(&entry.member);
         strings.push(entry.reason);
         strings.push(&entry.detail);

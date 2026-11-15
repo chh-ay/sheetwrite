@@ -11,3 +11,7 @@ Default vocabulary: `needs-triage`, `needs-info`, `triaged`, `ready-for-agent`, 
 ### Domain docs
 
 Single-context: one root `GLOSSARY.md`. Design decisions are tracked as GitHub issues labelled `proposal`, not in `docs/adr/`. See `docs/agents/domain.md`.
+
+### Rust code
+
+Before changing any Rust crate (`packages/wasm`, `packages/wasm/history`, `packages/queries/engine`), read `docs/contributing/rust.md`: the lint policy and the performance conventions. Check with `bun run lint:rust`.

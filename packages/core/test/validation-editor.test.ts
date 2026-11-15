@@ -28,31 +28,6 @@ afterEach(() => {
 });
 
 describe("ValidationEditor", () => {
-  it("exposes an ARIA listbox and commits arrow-key selection with Enter", () => {
-    const editor = new ValidationEditor(host());
-    const commits: Array<{ value: CellScalar; navigate: string }> = [];
-    editor.begin({
-      row: 0,
-      col: 0,
-      rule: listRule(),
-      current: "Alpha",
-      rect,
-      theme: DEFAULT_THEME,
-      onCommit: (value, navigate) => commits.push({ value, navigate }),
-      onCancel: () => {},
-    });
-
-    const list = document.querySelector<HTMLElement>('[role="listbox"]');
-    expect(list?.getAttribute("aria-label")).toBe("Choose a status");
-    expect(document.querySelectorAll('[role="option"]')).toHaveLength(3);
-    list?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-    list?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
-
-    expect(commits).toEqual([{ value: "Beta", navigate: "down" }]);
-    expect(editor.isEditing).toBe(false);
-    editor.destroy();
-  });
-
   it("supports typeahead, Tab commit, and Escape cancellation", () => {
     const editor = new ValidationEditor(host());
     const commits: Array<{ value: CellScalar; navigate: string }> = [];

@@ -1,0 +1,18 @@
+```ts prelude="core" title="interoperability.ts"
+import { fromXlsxWorkbook, toXlsxWorkbook } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+// The XLSX codec loads as an add-on, outside the first chunk
+await initSheetwrite({ addons: [xlsxAddon()] });
+
+// Export the live workbook, then read the bytes back; each fidelity loss
+// arrives as a warning instead of a silent change
+const warnings: unknown[] = [];
+const bytes = await toXlsxWorkbook(grid.exportSnapshot(), {
+  onWarning: (warning) => warnings.push(warning),
+});
+const reopened = await fromXlsxWorkbook(bytes, {
+  onWarning: (warning) => warnings.push(warning),
+});
+createGridFromSnapshot(host, reopened);
+```

@@ -301,8 +301,16 @@ export class StoreViewState {
     this.engineHiddenRows.dispose();
   }
 
-  distinctValues(sheet: SheetId, col: number, limit: number): CellScalar[] {
-    const column = this.wasm.distinctValues(this.sheets.handleOf(sheet), col, limit);
+  distinctValues(
+    sheet: SheetId,
+    col: number,
+    limit: number,
+    rows?: { start: number; end: number },
+  ): CellScalar[] {
+    const handle = this.sheets.handleOf(sheet);
+    const column = rows
+      ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit)
+      : this.wasm.distinctValues(handle, col, limit);
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
     const texts = column.takeTexts();

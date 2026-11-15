@@ -6,6 +6,7 @@
       "entry": [
         "src/index.ts",
         "src/adapter.ts",
+        "src/external-links.ts",
         "src/functions.ts",
         "src/history-archive.ts",
         "src/history-indexeddb.ts",
@@ -13,7 +14,9 @@
         "src/shell.ts",
         "src/testing.ts",
         "src/worker.ts",
-        "test/**/*.test.ts"
+        "test/**/*.test.ts",
+        "test/*-probe.ts",
+        "test/*.full-engine.ts"
       ],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },

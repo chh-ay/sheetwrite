@@ -4,6 +4,13 @@
 // the grid after Enter/Escape through the caller-provided callback.
 
 import { colToA1, labelToCol } from "../a1.js";
+import { editDraftFor } from "../edit-draft.js";
+import {
+  EDIT_SURFACE_ATTRIBUTE,
+  editorLineCount,
+  insertEditorLineBreak,
+  sizeEditorTextarea,
+} from "../editor-textarea.js";
 import { FormulaAssist } from "../formula-assist.js";
 import { Scope } from "../scope.js";
 import { selectionCell } from "../selection.js";
@@ -12,7 +19,9 @@ import { commitCellInput } from "./grid-binding.js";
 
 /** A mounted shell piece: its root element plus an idempotent teardown. */
 export interface ShellPiece {
+  /** The piece's root element, already appended to its host. */
   readonly element: HTMLElement;
+  /** Removes the piece and its listeners; calling it twice is safe. */
   destroy(): void;
 }
 
@@ -32,6 +41,8 @@ const A1_CELL_OR_RANGE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\
  * on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
  * accepted. Invalid or out-of-bounds references set `aria-invalid` and make
  * no grid calls; Escape restores the displayed reference.
+ *
+ * @param host - Element the name box is appended to.
  */
 export function createNameBox(
   host: HTMLElement,
@@ -125,6 +136,8 @@ export function createNameBox(
   };
 }
 
+const FORMULA_BAR_MIN_HEIGHT = 26;
+
 /** Host elements and callbacks used to bind a formula bar to a Grid. */
 export interface FormulaBarOptions {
   /** Called after Enter commits or Escape cancels, so the grid regains focus. */
@@ -135,6 +148,7 @@ export interface FormulaBarOptions {
 
 /** A formula bar piece; `setReadOnly` blocks commits without unmounting. */
 export interface FormulaBarPiece extends ShellPiece {
+  /** Stops or allows writing to the cell from the bar. */
   setReadOnly(readOnly: boolean): void;
 }
 
@@ -142,18 +156,27 @@ export interface FormulaBarPiece extends ShellPiece {
  * Detached formula bar: mirrors the focused cell's editable text (exact
  * formula source, else literal text) and commits on Enter through the grid's
  * undoable transaction path, targeting the data address captured with the
- * draft — correct even under an active sort/filter view. A focused, dirty
- * draft is never overwritten by selection/change events; Escape restores the
- * last stable text. While focused, it shows formula help as the cell editor
- * does.
+ * draft — correct even under an active sort/filter view.
+ *
+ * During a cell edit the bar and the cell editor share one draft, as in
+ * Excel: typing in the editor shows in the bar keystroke by keystroke, and
+ * typing in the bar shows in the cell, which opens its editor without taking
+ * focus. Escape in either restores the stored text in both. A focused draft
+ * is never overwritten by selection/change events. While focused, the bar
+ * shows formula help as the cell editor does.
+ *
+ * @param host - Element the formula bar is appended to.
  */
 export function createFormulaBar(
   host: HTMLElement,
   grid: Grid,
   options: FormulaBarOptions = {},
 ): FormulaBarPiece {
-  const input = document.createElement("input");
-  input.type = "text";
+  const input = document.createElement("textarea");
+  input.rows = 1;
+  input.wrap = "off";
+  input.setAttribute("aria-multiline", "true");
+  input.setAttribute(EDIT_SURFACE_ATTRIBUTE, "");
   input.className = "sheetwrite-shell-formula";
   input.setAttribute("aria-label", options.label ?? "Formula bar");
   input.autocomplete = "off";
@@ -162,6 +185,7 @@ export function createFormulaBar(
   const assist = new FormulaAssist({
     highlightCells: (ranges) => grid.highlightCells(ranges),
     sheet: () => grid.getActiveSheet(),
+    cell: () => snapshot?.address ?? null,
     store: grid.store,
   });
 
@@ -169,26 +193,58 @@ export function createFormulaBar(
   let committed = "";
   let dirty = false;
   let readOnly = false;
+  let composing = false;
+  /** The built-in grid's draft channel; another `Grid` implementation has none. */
+  const draft = editDraftFor(grid);
+  /** A cell edit is open and the bar shows its draft. */
+  let editing = false;
+  /** Lines the bar was last sized for. */
+  let sizedLines = -1;
+
+  const size = (): void => {
+    sizeEditorTextarea(input, FORMULA_BAR_MIN_HEIGHT);
+    sizedLines = editorLineCount(input.value);
+  };
 
   const refresh = (): void => {
-    if (document.activeElement === input && dirty) return;
+    if (editing || (document.activeElement === input && dirty)) return;
     const focus = selectionCell(grid.getSelection());
     snapshot = focus ? grid.getCellInput(focus.row, focus.col) : null;
     committed = snapshot?.text ?? "";
     input.value = committed;
+    size();
     dirty = false;
     if (document.activeElement === input) assist.update();
   };
 
+  const restore = (): void => {
+    dirty = false;
+    if (editing) {
+      // The cancel reaches the bar through the draft's `end`, which restores it.
+      draft?.cancel();
+      return;
+    }
+    input.value = committed;
+    size();
+    assist.update();
+  };
+
   const commit = (): void => {
     if (readOnly || !snapshot) return;
-    commitCellInput(grid, snapshot, input.value);
+    if (editing) draft?.commit();
+    else commitCellInput(grid, snapshot, input.value);
     dirty = false;
     options.focusGrid?.();
   };
 
   const onKeydown = (event: KeyboardEvent): void => {
-    if (assist.handleKeyDown(event)) {
+    if (composing || event.isComposing) {
+      event.stopPropagation();
+      return;
+    }
+    if (insertEditorLineBreak(event, input)) {
+      event.stopPropagation();
+    } else if (assist.handleKeyDown(event)) {
       event.stopPropagation();
     } else if (event.key === "Enter") {
       event.preventDefault();
@@ -197,8 +253,7 @@ export function createFormulaBar(
     } else if (event.key === "Escape") {
       event.preventDefault();
       event.stopPropagation();
-      input.value = committed;
-      dirty = false;
+      restore();
       options.focusGrid?.();
     }
   };
@@ -206,13 +261,48 @@ export function createFormulaBar(
   // Typing, paste, drop and IME all fire `input`; a key alone does not change the draft.
   const onInput = (): void => {
     dirty = true;
+    size();
     assist.update();
+    if (readOnly) return;
+    editing = draft?.setText(input.value, input.selectionStart, input.selectionEnd) ?? false;
   };
-  const onFocus = (): void => assist.attach(input, null);
+  const onFocus = (): void => {
+    size();
+    assist.attach(input, null);
+  };
   const onBlur = (): void => assist.detach();
+
+  /** The cell editor's draft: shown here unless the user is typing in the bar. */
+  const onEditInput = (text: string): void => {
+    editing = true;
+    if (document.activeElement === input || input.value === text) return;
+    input.value = text;
+    dirty = true;
+    // Typing within a line keeps the bar's height, so it is laid out only at a line break.
+    if (editorLineCount(text) !== sizedLines) size();
+  };
+  const onEditEnd = (): void => {
+    editing = false;
+    dirty = false;
+    refresh();
+  };
 
   const lifetime = new Scope();
   const { signal } = lifetime;
+  input.addEventListener(
+    "compositionstart",
+    () => {
+      composing = true;
+    },
+    { signal },
+  );
+  input.addEventListener(
+    "compositionend",
+    () => {
+      composing = false;
+    },
+    { signal },
+  );
   input.addEventListener("keydown", onKeydown, { signal });
   input.addEventListener("input", onInput, { signal });
   input.addEventListener("focus", onFocus, { signal });
@@ -220,8 +310,9 @@ export function createFormulaBar(
   lifetime.add(grid.on("selection", refresh));
   lifetime.add(grid.on("change", refresh));
   lifetime.add(grid.on("active-sheet", refresh));
-  refresh();
+  if (draft) lifetime.add(draft.subscribe({ text: onEditInput, end: onEditEnd }));
   host.appendChild(input);
+  refresh();
   lifetime.add(() => input.remove());
   lifetime.add(() => assist.detach());
 
@@ -230,11 +321,8 @@ export function createFormulaBar(
     setReadOnly(value: boolean) {
       readOnly = value;
       input.readOnly = value;
-      if (value) {
-        // A pending draft cannot commit anymore; restore the stable text.
-        input.value = committed;
-        dirty = false;
-      }
+      // A pending draft cannot commit anymore; restore the stable text.
+      if (value) restore();
     },
     destroy: () => lifetime.close(),
   };

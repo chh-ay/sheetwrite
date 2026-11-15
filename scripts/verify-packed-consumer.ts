@@ -121,10 +121,9 @@ const packageSpecs: PackageSpec[] = [
   {
     directory: "packages/xlsx",
     extraFiles: [
-      "dist/register.d.ts",
-      "dist/register.js",
-      "dist/registration.d.ts",
-      "dist/registration.js",
+      "dist/addon.d.ts",
+      "dist/addon.js",
+      "dist/codec.js",
       "dist/table-export.d.ts",
       "dist/table-export.js",
       "dist/table-import.d.ts",
@@ -135,12 +134,7 @@ const packageSpecs: PackageSpec[] = [
   },
   {
     directory: "packages/charts",
-    extraFiles: [
-      "dist/registration.d.ts",
-      "dist/registration.js",
-      "dist/view-cache.d.ts",
-      "dist/view-cache.js",
-    ],
+    extraFiles: ["dist/addon.d.ts", "dist/addon.js", "dist/view-cache.d.ts", "dist/view-cache.js"],
   },
   { directory: "packages/react" },
   { directory: "packages/vue" },
@@ -327,10 +321,15 @@ async function verifyAdapterStylesheets(consumerRoot: string): Promise<void> {
            treeShaking: true,
            write: false,
            outdir: "stylesheet-probe",
+           // icons.css loads the icon sheet as a file; esbuild needs a loader for it.
+           loader: { ".svg": "file" },
          });
          const css = result.outputFiles.filter(file => file.path.endsWith(".css"));
          if (!css.some(file => file.text.includes(".sheetwrite"))) {
            throw new Error(framework + " packed stylesheet was removed by tree shaking");
+         }
+         if (!result.outputFiles.some(file => file.path.endsWith(".svg"))) {
+           throw new Error(framework + " packed stylesheet did not emit the icon sheet");
          }
        }`,
     ],

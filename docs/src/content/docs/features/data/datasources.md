@@ -21,7 +21,7 @@ createGrid(host, {
 
 For this result, the workbook columns are `label`, `quantity`, `price`, and `total`, in that order. The host endpoint returns `[{ "label": "Notebook", "quantity": 3, "price": 8 }, { "label": "Pen", "quantity": 5, "price": 2 }]`. The adapter below supplies the formula and bold currency style for each total; D1 evaluates `=B1*C1`.
 
-**Try it live:** [Engine showcase](/showcases/engine/) — jump between rows and inspect the datasource request and arrival events. Its datasource is local to the page, not a remote server.
+**Try it live:** [Performance showcase](/showcases/performance/) — move through a paged datasource of a million rows and watch which pages it requests and keeps. Its datasource is local to the page, not a remote server.
 
 Start with the host and initialization in [Your first grid](/docs/start/first-grid/), replacing eager `data` with `datasource`. A `DataSource` loads cancellable pages for the visible window, so the grid does not need the whole sheet in memory. The HTTP endpoint and its backing data remain your responsibility.
 
@@ -114,6 +114,15 @@ A visible formula can read cells outside the visible window. For example, a vari
 - The painted cells and their bounded dependency closure stay protected from clean-cache eviction while visible.
 - Bulk reads such as exports and search use separate, transient protection. They do not replace the viewport's pins.
 - Reads from other sheets are not loaded this way. Return those values from the datasource, or keep that sheet dense.
+
+## Prefetch while scrolling
+
+The grid requests rows ahead of the scroll before they come into view. It measures how fast the view moves, averaged over the last 100 ms, and how long your `getRows` takes (the 90th percentile of recent requests).
+
+- The lookahead covers the distance the view travels during one fetch, plus one view. It grows on a slow datasource and shrinks as a fling slows down. Slow wheel scrolling looks one view ahead.
+- When the view scrolls across columns of a `"windowed"` datasource, the grid also requests the columns ahead, for the visible rows.
+- During a fast fling or a scrollbar drag the view passes the rows next to it before a request could return. The grid requests the rows where the view will be when the request returns instead, and aborts requests for rows it has already passed.
+- On a paged sheet, prefetched cells stay within the `cacheBytes` budget left beside the visible cells.
 
 ## Edge cases and limits
 

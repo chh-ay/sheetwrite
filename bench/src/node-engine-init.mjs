@@ -35,7 +35,7 @@ if (root !== undefined && baselineVersion !== undefined) {
 // The selected checkout is only known at runtime; core remains the current harness.
 const provider = await import(new URL("loader-node.mjs", engineDirectory).href);
 const started = performance.now();
-await initSheetwrite(undefined, provider);
+await initSheetwrite({ engine: provider });
 process.stdout.write(
   `${JSON.stringify({ elapsedMs: performance.now() - started, node: process.version, wasmSha256 })}\n`,
 );

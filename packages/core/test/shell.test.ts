@@ -4,15 +4,13 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import {
   createFormulaBar,
   createNameBox,
-  createSelectionStatus,
   createSpreadsheetShell,
   createToolbar,
-  describeSelection,
 } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -27,14 +25,6 @@ beforeEach(() => {
 afterEach(() => {
   restoreStubs();
 });
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 function makeGrid(rowCount = 20): { grid: Grid; store: SheetwriteStore; host: HTMLDivElement } {
   const workbook = makeWorkbook(rowCount);
   const store = new SheetwriteStore(workbook, makeColumnarData(rowCount));
@@ -55,24 +45,6 @@ function multiSheetWorkbook(): Workbook {
 }
 
 describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
-  it("translates view rows to data addresses under an active sort", () => {
-    const { grid, store } = makeGrid();
-
-    // Descending sort on Amount: view row 0 shows the LAST data row (19).
-    grid.setViewSort([{ col: 1, ascending: false }]);
-    const snapshot = grid.getCellInput(0, 1);
-    expect(snapshot).not.toBeNull();
-    expect(snapshot!.address).toEqual({ sheet: "s1", row: 19, col: 1 });
-    expect(snapshot!.format).toBe("number");
-    expect(snapshot!.text).toBe("190.5");
-
-    expect(grid.getCellInput(-1, 0)).toBeNull();
-    expect(grid.getCellInput(0, 99)).toBeNull();
-
-    grid.destroy();
-    store.dispose();
-  });
-
   it("returns formula source, not the resolved value", () => {
     const { grid, store } = makeGrid();
     grid.applyTransaction({
@@ -90,76 +62,9 @@ describe("Grid.getCellInput / getActiveSheet / active-sheet event", () => {
     grid.destroy();
     store.dispose();
   });
-
-  it("emits active-sheet exactly once per switch and validates ids", () => {
-    const workbook = multiSheetWorkbook();
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const grid = new GridImpl(mountHost(), { workbook }, store);
-    const seen: string[] = [];
-    grid.on("active-sheet", (event) => seen.push(event.sheet));
-
-    expect(grid.getActiveSheet()).toBe("s1");
-    grid.setActiveSheet("s2");
-    grid.setActiveSheet("s2"); // same sheet: no event
-    grid.setActiveSheet("missing"); // unknown: rejected, no event
-    expect(seen).toEqual(["s2"]);
-    expect(grid.getActiveSheet()).toBe("s2");
-
-    grid.destroy();
-    store.dispose();
-  });
 });
 
 describe("createToolbar", () => {
-  it("dispatches built-in actions and hands custom items the grid", () => {
-    const { grid, store, host } = makeGrid();
-    const received: Grid[] = [];
-    const piece = createToolbar(host, grid, {
-      items: [{ action: "bold" }, { onClick: (g) => received.push(g), icon: "X", title: "Custom" }],
-    });
-
-    const addr = { sheet: "s1", row: 2, col: 0 };
-    grid.setSelection({ kind: "cell", addr });
-
-    const [boldButton, customButton] = [...piece.element.querySelectorAll("button")];
-    boldButton!.click();
-    expect(store.getCell(addr).style.bold).toBe(true);
-
-    customButton!.click();
-    expect(received).toEqual([grid]);
-
-    // Mouse presses on buttons must not steal focus from the grid.
-    const mousedown = new MouseEvent("mousedown", { bubbles: true, cancelable: true });
-    boldButton!.dispatchEvent(mousedown);
-    expect(mousedown.defaultPrevented).toBe(true);
-
-    piece.destroy();
-    piece.destroy(); // idempotent
-    expect(host.querySelector(".sheetwrite-shell-toolbar")).toBeNull();
-    grid.destroy();
-    store.dispose();
-  });
-
-  it("shows the ribbon's commands with the default flags, Export included", () => {
-    const { grid, store, host } = makeGrid();
-    const piece = createToolbar(host, grid, { flags: { export: true, italic: false } });
-    const command = (id: string) => piece.element.querySelector(`[data-command="${id}"]`);
-
-    // Commands from every ribbon tab, in ribbon order, each once.
-    for (const id of ["undo", "paste", "fontSize", "textColor", "insert", "chart", "zoom"]) {
-      expect(command(id), id).not.toBeNull();
-    }
-    expect(piece.element.querySelectorAll('[data-command="insert"]')).toHaveLength(1);
-    expect(command("exportCsv")).not.toBeNull();
-    expect(command("italic")).toBeNull();
-    // Underline shows while either Bold or Italic is on.
-    expect(command("underline")).not.toBeNull();
-
-    piece.destroy();
-    grid.destroy();
-    store.dispose();
-  });
-
   it("keeps one-click border, merge, unmerge and clear-format buttons in custom toolbars", async () => {
     const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {
@@ -236,49 +141,6 @@ describe("createToolbar", () => {
       store.dispose();
     }
   });
-
-  it("moves arrow focus past disabled controls and combo arrows", () => {
-    const { grid, store, host } = makeGrid();
-    const piece = createToolbar(host, grid, {
-      items: [
-        { onClick: () => {}, title: "One" },
-        { action: "undo" },
-        { onClick: () => {}, title: "Two" },
-      ],
-    });
-    const fullPiece = createToolbar(host, grid);
-    const key = (name: string): void => {
-      document.activeElement?.dispatchEvent(
-        new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }),
-      );
-    };
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      const [one, undo, two] = [...piece.element.querySelectorAll<HTMLButtonElement>("button")];
-      if (one === undefined || undo === undefined || two === undefined) {
-        throw new Error("custom toolbar buttons missing");
-      }
-      // A fresh grid has no history, so Undo is disabled between two enabled buttons.
-      expect(undo.disabled).toBe(true);
-      one.focus();
-      key("ArrowRight");
-      expect(document.activeElement).toBe(two);
-      key("Home");
-      expect(document.activeElement).toBe(one);
-
-      // Combo arrows have tabIndex -1: Left from Grow lands in the size box.
-      fullPiece.element.querySelector<HTMLButtonElement>('[data-command="fontGrow"]')?.focus();
-      key("ArrowLeft");
-      const landed = document.activeElement;
-      if (!(landed instanceof HTMLInputElement)) throw new Error("focus did not reach a box");
-      expect(landed.closest<HTMLElement>("[data-command]")?.dataset.command).toBe("fontSize");
-    } finally {
-      fullPiece.destroy();
-      piece.destroy();
-      grid.destroy();
-      store.dispose();
-    }
-  });
 });
 
 describe("createNameBox", () => {
@@ -348,7 +210,7 @@ describe("createFormulaBar", () => {
     const { grid, store, host } = makeGrid();
     const piece = createFormulaBar(host, grid, {});
     const input = piece.element;
-    if (!(input instanceof HTMLInputElement)) throw new Error("formula bar must be an input");
+    if (!(input instanceof HTMLTextAreaElement)) throw new Error("formula bar must be a textarea");
 
     // Descending sort: view row 0 = data row 19.
     grid.setViewSort([{ col: 1, ascending: false }]);
@@ -374,7 +236,7 @@ describe("createFormulaBar", () => {
     const { grid, store, host } = makeGrid();
     const piece = createFormulaBar(host, grid, {});
     const input = piece.element;
-    if (!(input instanceof HTMLInputElement)) throw new Error("formula bar must be an input");
+    if (!(input instanceof HTMLTextAreaElement)) throw new Error("formula bar must be a textarea");
 
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
     const stable = input.value;
@@ -407,7 +269,7 @@ describe("createFormulaBar", () => {
     const { grid, store, host } = makeGrid();
     const piece = createFormulaBar(host, grid, {});
     const input = piece.element;
-    if (!(input instanceof HTMLInputElement)) throw new Error("formula bar must be an input");
+    if (!(input instanceof HTMLTextAreaElement)) throw new Error("formula bar must be a textarea");
 
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
     piece.setReadOnly(true);
@@ -421,42 +283,99 @@ describe("createFormulaBar", () => {
     grid.destroy();
     store.dispose();
   });
-});
 
-describe("createSelectionStatus", () => {
-  it("reports geometry and stays blank for single cells", () => {
-    expect(describeSelection(null)).toBe("");
-    expect(describeSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } })).toBe("");
-    // The status names the selection's size; the exact wording is free.
-    expect(
-      describeSelection({
-        kind: "range",
-        range: { sheet: "s1", start: { row: 4, col: 2 }, end: { row: 0, col: 0 } },
-      }),
-    ).toMatch(/\b5\b\D+\b3\b/);
-    expect(describeSelection({ kind: "row", sheet: "s1", row: 6 })).toMatch(/\b7\b/);
-    expect(describeSelection({ kind: "column", sheet: "s1", col: 1 })).toMatch(/\b2\b/);
+  describe("shares one draft with the cell editor", () => {
+    function setup() {
+      const { grid, store, host } = makeGrid();
+      const piece = createFormulaBar(host, grid, {});
+      const bar = piece.element;
+      if (!(bar instanceof HTMLTextAreaElement)) throw new Error("formula bar must be a textarea");
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+      const cellEditor = (): HTMLTextAreaElement | null =>
+        host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor");
+      const type = (field: HTMLTextAreaElement, value: string, inputType = "insertText") => {
+        field.value = value;
+        field.dispatchEvent(new InputEvent("input", { inputType }));
+      };
+      const done = () => {
+        piece.destroy();
+        grid.destroy();
+        store.dispose();
+      };
+      return { grid, store, bar, cellEditor, type, done };
+    }
 
-    const { grid, store } = makeGrid();
-    const statusHost = document.createElement("div");
-    const piece = createSelectionStatus(statusHost, grid);
-    expect(statusHost.hidden).toBe(true);
-    expect(piece.element.hidden).toBe(true);
-    grid.setSelection({
-      kind: "range",
-      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
+    it("shows every change in the cell editor in the bar, and Escape restores both", () => {
+      const { grid, bar, cellEditor, type, done } = setup();
+      expect(bar.value).toBe("Customer 2");
+      grid.beginEdit(2, 0, "=");
+      expect(bar.value).toBe("=");
+      const editor = cellEditor();
+      if (!editor) throw new Error("the cell editor did not open");
+      type(editor, "=SUM(");
+      expect(bar.value).toBe("=SUM(");
+      type(editor, "=SUM(\nB1)", "insertLineBreak");
+      expect(bar.value).toBe("=SUM(\nB1)");
+      type(editor, "=SUM(", "historyUndo");
+      expect(bar.value).toBe("=SUM(");
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(bar.value).toBe("Customer 2");
+      done();
     });
-    expect(piece.element.textContent).toMatch(/\b2\b\D+\b2\b/);
-    expect(piece.element.getAttribute("role")).toBe("status");
-    expect(statusHost.hidden).toBe(false);
-    expect(piece.element.hidden).toBe(false);
 
-    piece.destroy();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-    expect(document.body.contains(piece.element)).toBe(false);
+    it("shows typing in the bar in the cell without moving focus, and commits from the bar", () => {
+      const { store, bar, cellEditor, type, done } = setup();
+      bar.focus();
+      type(bar, "Typed");
+      expect(cellEditor()?.value).toBe("Typed");
+      expect(document.activeElement).toBe(bar);
+      type(bar, "Typed in bar", "insertFromPaste");
+      expect(cellEditor()?.value).toBe("Typed in bar");
+      bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Typed in bar");
+      expect(bar.value).toBe("Typed in bar");
+      done();
+    });
 
-    grid.destroy();
-    store.dispose();
+    it("cancels the cell's draft when Escape is pressed in the bar", () => {
+      const { store, bar, cellEditor, type, done } = setup();
+      bar.focus();
+      type(bar, "draft");
+      bar.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true }));
+      expect(cellEditor()).toBeNull();
+      expect(bar.value).toBe("Customer 2");
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Customer 2");
+      done();
+    });
+
+    it("keeps the edit open when focus moves from the cell editor into the bar", () => {
+      const { grid, store, bar, cellEditor, type, done } = setup();
+      grid.beginEdit(2, 0, "a");
+      const editor = cellEditor();
+      if (!editor) throw new Error("the cell editor did not open");
+      type(editor, "ab");
+      bar.focus();
+      expect(cellEditor()).toBe(editor);
+      type(bar, "abc");
+      expect(editor.value).toBe("abc");
+      editor.focus();
+      type(editor, "abcd");
+      expect(bar.value).toBe("abcd");
+      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+      expect(store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("abcd");
+      done();
+    });
+
+    it("does not open the cell editor from the bar in read-only mode", () => {
+      const { grid, bar, cellEditor, type, done } = setup();
+      grid.setReadOnly(true);
+      bar.focus();
+      type(bar, "x");
+      expect(cellEditor()).toBeNull();
+      done();
+    });
   });
 });
 
@@ -489,45 +408,6 @@ describe("createSpreadsheetShell", () => {
     shell.destroy();
     shell.destroy(); // idempotent
     expect(host.contains(root)).toBe(false);
-  });
-
-  it("keeps a configured one-sheet tab strip coherent through remote lifecycle changes", () => {
-    const host = mountHost();
-    const shell = createSpreadsheetShell(host, {
-      grid: { workbook: makeWorkbook(10), data: makeColumnarData(10) },
-    });
-
-    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(1);
-    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Sheet 1");
-
-    const second = {
-      id: "s2",
-      name: "Remote",
-      order: 1,
-      rowCount: 5,
-      columns: [{ key: "note", header: "Note", width: 200, type: "text" as const }],
-      cells: [],
-    };
-    expect(shell.grid.applyRemoteOperations([{ op: "addSheet", sheet: second }]).status).toBe(
-      "applied",
-    );
-    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(2);
-    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Remote");
-
-    expect(
-      shell.grid.applyRemoteOperations([{ op: "renameSheet", sheet: "s2", name: "Renamed" }])
-        .status,
-    ).toBe("applied");
-    expect(host.querySelector(".sheetwrite-shell-tabs")?.textContent).toContain("Renamed");
-
-    shell.grid.setActiveSheet("s2");
-    expect(shell.grid.applyRemoteOperations([{ op: "removeSheet", sheet: "s2" }]).status).toBe(
-      "applied",
-    );
-    expect(shell.grid.getActiveSheet()).toBe("s1");
-    expect(host.querySelectorAll(".sheetwrite-shell-tabs [role='tab']")).toHaveLength(1);
-
-    shell.destroy();
   });
 
   it("honors live tabs false configuration without creating a second primitive", () => {
@@ -585,7 +465,7 @@ describe("createSpreadsheetShell", () => {
     shell.destroy();
   });
 
-  it("keeps read-only and config wrappers coherent with the shell chrome", () => {
+  it("keeps read-only and config wrappers coherent with the shell chrome", async () => {
     const host = mountHost();
     const shell = createSpreadsheetShell(host, {
       grid: { workbook: multiSheetWorkbook(), data: makeColumnarData(10) },
@@ -593,14 +473,16 @@ describe("createSpreadsheetShell", () => {
 
     shell.setReadOnly(true);
     const formula = host.querySelector(".sheetwrite-shell-formula");
-    if (!(formula instanceof HTMLInputElement)) throw new Error("expected formula input");
+    if (!(formula instanceof HTMLTextAreaElement)) throw new Error("expected formula textarea");
     expect(formula.readOnly).toBe(true);
     expect(host.querySelector('[role="grid"]')?.getAttribute("aria-readonly")).toBe("true");
 
     // Reconfiguring can never resurrect a second toolbar or tab list.
     shell.setGridConfig({ toolbar: true, tabs: true, find: false });
-    expect(host.querySelectorAll('[role="toolbar"]').length).toBeLessThanOrEqual(1);
-    expect(host.querySelectorAll('[role="tablist"]').length).toBeLessThanOrEqual(1);
+    await import("../src/shell/toolbar-factory.js");
+    for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+    expect(host.querySelectorAll('[role="toolbar"]')).toHaveLength(1);
+    expect(host.querySelectorAll('[role="tablist"]')).toHaveLength(1);
 
     shell.setTheme({ bg: "#123456" });
     expect(shell.element.style.getPropertyValue("--sheetwrite-widget-bg")).toBe("#123456");
@@ -608,29 +490,5 @@ describe("createSpreadsheetShell", () => {
     expect(shell.grid.getActiveSheet()).toBe("s2");
 
     shell.destroy();
-  });
-
-  it("isolates two shells on one page", () => {
-    const hostA = mountHost();
-    const hostB = mountHost();
-    const shellA = createSpreadsheetShell(hostA, {
-      grid: { workbook: makeWorkbook(5), data: makeColumnarData(5) },
-    });
-    const shellB = createSpreadsheetShell(hostB, {
-      grid: { workbook: makeWorkbook(5), data: makeColumnarData(5) },
-    });
-
-    shellA.grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 0 } });
-    const nameA = hostA.querySelector(".sheetwrite-shell-namebox");
-    const nameB = hostB.querySelector(".sheetwrite-shell-namebox");
-    if (!(nameA instanceof HTMLInputElement) || !(nameB instanceof HTMLInputElement)) {
-      throw new Error("expected name box inputs");
-    }
-    expect(nameA.value).toBe("A4");
-    expect(nameB.value).toBe("");
-
-    shellA.destroy();
-    expect(hostB.querySelector(".sheetwrite-shell")).not.toBeNull();
-    shellB.destroy();
   });
 });

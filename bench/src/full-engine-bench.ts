@@ -9,10 +9,10 @@ import type * as Formulas from "@sheetwrite/formulas";
 import {
   type CompleteFormulaBenchmarkResult,
   type CompleteFormulaWorkloadResult,
-  collectFixture,
   formulaSourceEnginePackage,
-  validateRecordedFormulaCapture,
-} from "./formula-bench.js";
+  FORMULA_SUPPORT_SOURCE_FILES,
+} from "./formula-artifact.js";
+import { collectFixture, validateRecordedFormulaCapture } from "./formula-bench.js";
 import {
   benchmarkEnginePath,
   captureEngineBaselineContext,
@@ -21,6 +21,7 @@ import {
   validateExactMatrix,
   validateRawStat,
 } from "./gate-protocol.js";
+import { writeNumberColumn } from "./packed-fixture.js";
 import { type ProtocolCaptureMeta, protocolCaptureMeta } from "./protocol-meta.js";
 import { resultsDirectory } from "./results-dir.js";
 import { type Stat, summarize } from "./stats.js";
@@ -66,6 +67,7 @@ export interface FullEngineResult {
 const INIT_METHOD =
   "five fresh Node processes; monotonic time around initSheetwrite only; imports and process startup excluded; filesystem cache not cleared";
 const SOURCE_PATHS = [
+  ...FORMULA_SUPPORT_SOURCE_FILES,
   "bench/src/full-engine-bench.ts",
   "bench/src/formula-bench.ts",
   "bench/src/gate-protocol.ts",
@@ -122,7 +124,15 @@ export function validateFullEngineResult(result: FullEngineResult): void {
     throw new Error("invalid engine metadata");
   if (result.schemaVersion !== 2 || result.initializationMethod !== INIT_METHOD)
     throw new Error("engine protocol mismatch");
-  exactKeys(result.sourceFiles, SOURCE_PATHS, "engine source files");
+  exactKeys(
+    result.sourceFiles,
+    FORMULA_SUPPORT_SOURCE_FILES.some((path) => path in result.sourceFiles)
+      ? SOURCE_PATHS
+      : SOURCE_PATHS.filter(
+          (path) => !(FORMULA_SUPPORT_SOURCE_FILES as readonly string[]).includes(path),
+        ),
+    "engine source files",
+  );
   if (
     Object.values(result.sourceFiles).some((digest) => !/^[0-9a-f]{64}$/u.test(digest)) ||
     result.sourceDigest !== sourceDigest(result)
@@ -259,14 +269,16 @@ export function validateFullEngineResult(result: FullEngineResult): void {
 function analysisFixture(formulas: typeof Formulas, formula: string) {
   const store = new formulas.CellStore();
   const sheet = store.addSheet(6, ANALYSIS_COUNT);
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     0,
     0,
     Float64Array.from({ length: 100 }, (_, row) => row + 1),
     0,
   );
-  store.setColumnNumbers(
+  writeNumberColumn(
+    store,
     sheet,
     1,
     0,
@@ -274,27 +286,29 @@ function analysisFixture(formulas: typeof Formulas, formula: string) {
     0,
   );
   if (formula.startsWith("=XIRR")) {
-    store.setColumnNumbers(sheet, 0, 0, new Float64Array([-100, 110]), 0);
-    store.setColumnNumbers(sheet, 1, 0, new Float64Array([1, 366]), 0);
+    writeNumberColumn(store, sheet, 0, 0, new Float64Array([-100, 110]), 0);
+    writeNumberColumn(store, sheet, 1, 0, new Float64Array([1, 366]), 0);
   }
   if (formula.includes("MMULT")) {
-    store.setColumnNumbers(sheet, 0, 0, new Float64Array([1, 3]), 0);
-    store.setColumnNumbers(sheet, 1, 0, new Float64Array([2, 4]), 0);
-    store.setColumnNumbers(sheet, 2, 0, new Float64Array([5, 7]), 0);
-    store.setColumnNumbers(sheet, 3, 0, new Float64Array([6, 8]), 0);
+    writeNumberColumn(store, sheet, 0, 0, new Float64Array([1, 3]), 0);
+    writeNumberColumn(store, sheet, 1, 0, new Float64Array([2, 4]), 0);
+    writeNumberColumn(store, sheet, 2, 0, new Float64Array([5, 7]), 0);
+    writeNumberColumn(store, sheet, 3, 0, new Float64Array([6, 8]), 0);
   }
   // The database has its own header row. Its final value is not part of the regression data.
   if (formula.startsWith("=DSUM")) {
     store.setString(sheet, 0, 0, "key", 0);
     store.setString(sheet, 0, 1, "value", 0);
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       0,
       1,
       Float64Array.from({ length: 100 }, (_, row) => row + 1),
       0,
     );
-    store.setColumnNumbers(
+    writeNumberColumn(
+      store,
       sheet,
       1,
       1,

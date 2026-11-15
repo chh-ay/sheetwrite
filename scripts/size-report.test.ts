@@ -11,37 +11,55 @@ import { validateBundlerEvidence, validateComparableAttribution } from "./size-b
 import { classifyPackedPath, summarizePack } from "./size-install.js";
 import { BUNDLER_SOURCE_MAP_MODE, SIZE_PROTOCOL_VERSION } from "./size-report.js";
 
+type Bundler = "next" | "vite" | "webpack";
+
+const MINIFIERS: Record<Bundler, { version: string; minifier: { name: string; version: string } }> =
+  {
+    next: { version: "15.5.9", minifier: { name: "next-swc", version: "15.5.9" } },
+    vite: { version: "7.2.2", minifier: { name: "esbuild", version: "0.25.12" } },
+    webpack: { version: "5.102.1", minifier: { name: "terser-webpack-plugin", version: "5.3.14" } },
+  };
+const EAGER_IMPORTS = ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"];
+
+function provenance(bundler: Bundler) {
+  return {
+    buildMode: "production",
+    minified: true,
+    minifier: MINIFIERS[bundler].minifier,
+    externals: [] as string[],
+    target: "browser",
+    sourceMaps: BUNDLER_SOURCE_MAP_MODE,
+    attributionMethod: "source-map-generated-spans-with-explicit-opaque-assets-v2",
+  };
+}
+
+const asset = (role: string, kind = "javascript", path = `dist/${role}.js`) => ({
+  path,
+  kind,
+  owner: role,
+  roles: [role],
+});
+
 function evidence(
-  assets: unknown[],
+  assets: Array<{ path: string; kind: string; roles: string[] }>,
+  bundler: Bundler = "webpack",
   overrides: Record<string, unknown> = {},
 ): Record<string, unknown> {
-  const initialPath =
-    (assets as Array<{ path?: unknown; kind?: unknown; roles?: unknown }>).find(
-      (asset) =>
-        asset.kind === "javascript" &&
-        Array.isArray(asset.roles) &&
-        asset.roles.includes("core-initial"),
-    )?.path ?? "dist/main.js";
+  const initial = assets.find(
+    (entry) => entry.kind === "javascript" && entry.roles.includes("core-initial"),
+  );
   return {
     schemaVersion: SIZE_PROTOCOL_VERSION,
-    bundler: "webpack",
-    version: "5.102.1",
+    bundler,
+    version: MINIFIERS[bundler].version,
     assets,
-    provenance: {
-      buildMode: "production",
-      minified: true,
-      minifier: { name: "terser-webpack-plugin", version: "5.3.14" },
-      externals: [],
-      target: "browser",
-      sourceMaps: BUNDLER_SOURCE_MAP_MODE,
-      attributionMethod: "source-map-generated-spans-with-explicit-opaque-assets-v2",
-    },
+    provenance: provenance(bundler),
     attribution: [
       {
         name: "core-first-paint",
         entry: "src/main.js",
-        eagerImports: ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
-        assets: [{ path: initialPath, sha256: "a".repeat(64) }],
+        eagerImports: EAGER_IMPORTS,
+        assets: [{ path: initial?.path ?? "dist/main.js", sha256: "a".repeat(64) }],
         generatedBytes: 10,
         modules: [
           {
@@ -59,57 +77,34 @@ function evidence(
   };
 }
 
-function comparableEvidence(bundler: "next" | "vite", overrides: Record<string, unknown> = {}) {
-  const roles =
-    bundler === "next"
-      ? ["core-initial"]
-      : [
-          "core-initial",
-          "react-initial",
-          "vue-initial",
-          "svelte-initial",
-          "shell-initial",
-          "worker-async",
-          "xlsx-async",
-          "charts-async",
-          "queries-async",
-          "chrome-async",
-        ];
-  const assets = roles.map((role) => ({
-    path: `dist/${role}.js`,
-    kind: "javascript",
-    owner: role,
-    roles: [role],
-  }));
-  assets.push({
-    path: "dist/runtime.wasm",
-    kind: "wasm",
-    owner: "core-initial",
-    roles: ["core-initial"],
-  });
-  return validateBundlerEvidence(
-    evidence(assets, {
-      bundler,
-      version: bundler === "next" ? "15.5.9" : "7.2.2",
-      provenance: {
-        buildMode: "production",
-        minified: true,
-        minifier: {
-          name: bundler === "next" ? "next-swc" : "esbuild",
-          version: bundler === "next" ? "15.5.9" : "0.25.12",
-        },
-        externals: [],
-        target: "browser",
-        sourceMaps: BUNDLER_SOURCE_MAP_MODE,
-        attributionMethod: "source-map-generated-spans-with-explicit-opaque-assets-v2",
-      },
-      ...overrides,
-    }),
-  );
+const VITE_ROLES = [
+  "core-initial",
+  "react-initial",
+  "vue-initial",
+  "svelte-initial",
+  "shell-initial",
+  "worker-async",
+  "xlsx-async",
+  "charts-async",
+  "queries-async",
+  "chrome-async",
+];
+
+function comparable(bundler: "next" | "vite", overrides: Record<string, unknown> = {}) {
+  const roles = bundler === "next" ? ["core-initial"] : VITE_ROLES;
+  const assets = [
+    ...roles.map((role) => asset(role)),
+    asset("core-initial", "wasm", "dist/runtime.wasm"),
+  ];
+  return validateBundlerEvidence(evidence(assets, bundler, overrides));
 }
 
 describe("packed file classification", () => {
   it("fails closed on unclassified files and inconsistent unpacked sizes", () => {
+    expect(classifyPackedPath("dist/icons.svg")).toBe("assets");
+    // The icon sheet's layout manifest is the only JSON asset.
+    expect(classifyPackedPath("dist/icons.json")).toBe("assets");
+    expect(() => classifyPackedPath("dist/unexpected.json")).toThrow("Unclassified");
     expect(() => classifyPackedPath("dist/unexpected.bin")).toThrow("Unclassified");
     expect(() =>
       summarizePack("test", {
@@ -123,129 +118,98 @@ describe("packed file classification", () => {
       }),
     ).toThrow("do not equal");
   });
-
-  it("counts the icon sheet and its layout manifest as static assets, and nothing else in JSON", () => {
-    expect(classifyPackedPath("dist/icons.svg")).toBe("assets");
-    expect(classifyPackedPath("dist/icons.json")).toBe("assets");
-    expect(() => classifyPackedPath("dist/unexpected.json")).toThrow("Unclassified");
-  });
 });
 
 describe("manifest ownership", () => {
-  const complete = [
-    {
-      path: "dist/main-renamed.js",
-      kind: "javascript",
-      owner: "core-initial",
-      roles: ["core-initial"],
-    },
-    {
-      path: "dist/worker-any-hash.js",
-      kind: "javascript",
-      owner: "worker-async",
-      roles: ["worker-async"],
-    },
-    {
-      path: "dist/worker-ribbon-hash.js",
-      kind: "javascript",
-      owner: "chrome-async",
-      roles: ["chrome-async"],
-    },
-    {
-      path: "dist/runtime-any-hash.wasm",
-      kind: "wasm",
-      owner: "core-initial",
-      roles: ["core-initial"],
-    },
+  const [core, worker, ribbon, wasm] = [
+    asset("core-initial", "javascript", "dist/main-renamed.js"),
+    asset("worker-async", "javascript", "dist/worker-any-hash.js"),
+    asset("chrome-async", "javascript", "dist/worker-ribbon-hash.js"),
+    asset("core-initial", "wasm", "dist/runtime-any-hash.wasm"),
   ];
 
-  it("rejects missing, duplicate, unclassified, and leaked assets", () => {
-    expect(() => validateBundlerEvidence(evidence(complete.slice(0, 1)))).toThrow(
-      "missing required worker-async",
-    );
-    expect(() => validateBundlerEvidence(evidence([...complete, complete[0]]))).toThrow(
-      "duplicate asset",
-    );
-    expect(() =>
-      validateBundlerEvidence(
-        evidence([{ ...complete[0], owner: "unclassified" }, ...complete.slice(1)]),
-      ),
-    ).toThrow("missing path, kind, owner, or roles");
-    expect(() =>
-      validateBundlerEvidence(
-        evidence([
-          complete[0],
-          { ...complete[1], roles: ["core-initial", "worker-async"] },
-          complete[2],
-          complete[3],
-        ]),
-      ),
-    ).toThrow("leaked into an initial entry");
-    // The lazy ribbon chunk is held to the same rule as the worker.
-    expect(() =>
-      validateBundlerEvidence(
-        evidence([
-          complete[0],
-          complete[1],
-          { ...complete[2], roles: ["chrome-async", "core-initial"] },
-          complete[3],
-        ]),
-      ),
-    ).toThrow("leaked into an initial entry");
+  it.each([
+    ["a missing required asset", [core], "missing required worker-async"],
+    ["a duplicate asset", [core, worker, ribbon, wasm, core], "duplicate asset"],
+    [
+      "a worker leaked into an initial entry",
+      [core, { ...worker, roles: ["core-initial", "worker-async"] }, ribbon, wasm],
+      "leaked into an initial entry",
+    ],
+    [
+      "an unclassified asset",
+      [{ ...core, owner: "unclassified" }, worker, ribbon, wasm],
+      "missing path, kind, owner, or roles",
+    ],
+    [
+      "a lazy chunk leaked into an initial entry",
+      [core, worker, { ...ribbon, roles: ["chrome-async", "core-initial"] }, wasm],
+      "leaked into an initial entry",
+    ],
+  ])("rejects %s", (_label, assets, message) => {
+    expect(() => validateBundlerEvidence(evidence(assets))).toThrow(message);
   });
 
   it("rejects incomparable modes, externals, and eager imports", () => {
-    const next = comparableEvidence("next");
-    const vite = comparableEvidence("vite");
-    const development = comparableEvidence("vite", {
-      provenance: { ...vite.provenance, buildMode: "development" },
-    });
-    expect(() => validateComparableAttribution([next, development])).toThrow(
-      "not a minified production browser build",
-    );
-    const externalized = comparableEvidence("vite", {
-      provenance: { ...vite.provenance, externals: ["react"] },
-    });
-    expect(() => validateComparableAttribution([next, externalized])).toThrow(
-      "incomparable externals",
-    );
-    const differentImports = comparableEvidence("vite", {
-      attribution: vite.attribution.map((entry) => ({
-        ...entry,
-        eagerImports: ["@sheetwrite/core#createGrid"],
-      })),
-    });
-    expect(() => validateComparableAttribution([next, differentImports])).toThrow(
-      "eager imports differ",
-    );
+    const next = comparable("next");
+    const vite = comparable("vite");
+    for (const [overrides, message] of [
+      [
+        { provenance: { ...vite.provenance, buildMode: "development" } },
+        "not a minified production browser build",
+      ],
+      [{ provenance: { ...vite.provenance, externals: ["react"] } }, "incomparable externals"],
+      [
+        {
+          attribution: vite.attribution.map((entry) => ({
+            ...entry,
+            eagerImports: ["@sheetwrite/core#createGrid"],
+          })),
+        },
+        "eager imports differ",
+      ],
+    ] as const) {
+      expect(() => validateComparableAttribution([next, comparable("vite", overrides)])).toThrow(
+        message,
+      );
+    }
   });
 });
 
-function firstPaintEvidence(): Record<string, unknown> {
+interface FirstPaintVariant {
+  initialJavaScript: { rawBytes: number; gzipBytes: number; brotliBytes: number };
+  timing: FirstPaintTiming;
+  checksum: string;
+}
+interface FirstPaintFixture {
+  provenance: ReturnType<typeof provenance>;
+  baseline: FirstPaintVariant;
+  candidate: FirstPaintVariant;
+  delta: { rawBytes: number; gzipBytes: number; brotliBytes: number; brotliPercent: number };
+}
+
+const steady = (ms: number): number[] => new Array(10).fill(ms);
+
+function timing(samplesMs: number[]): FirstPaintTiming {
+  const sorted = [...samplesMs].sort((left, right) => left - right);
+  const rank = (fraction: number) => sorted[Math.ceil(sorted.length * fraction) - 1] ?? Number.NaN;
+  return { samplesMs, medianMs: rank(0.5), p95Ms: rank(0.95) };
+}
+
+function firstPaintEvidence() {
   const fixture = (bundler: "next" | "vite") => ({
     bundler,
-    version: bundler === "next" ? "15.5.9" : "7.2.2",
-    provenance: {
-      buildMode: "production",
-      minified: true,
-      minifier: {
-        name: bundler === "next" ? "next-swc" : "esbuild",
-        version: bundler === "next" ? "15.5.9" : "0.25.12",
-      },
-      externals: [],
-      target: "browser",
-      sourceMaps: BUNDLER_SOURCE_MAP_MODE,
-      attributionMethod: "source-map-generated-spans-with-explicit-opaque-assets-v2",
-    },
-    eagerImports: ["@sheetwrite/core#createGrid", "@sheetwrite/core#initSheetwrite"],
+    version: MINIFIERS[bundler].version,
+    provenance: provenance(bundler),
+    eagerImports: EAGER_IMPORTS,
     baseline: {
       initialJavaScript: { rawBytes: 200_000, gzipBytes: 70_000, brotliBytes: 60_000 },
-      timing: { samplesMs: new Array(10).fill(20), medianMs: 20, p95Ms: 20 },
+      timing: timing(steady(20)),
       checksum: "a".repeat(64),
     },
     candidate: {
       initialJavaScript: { rawBytes: 160_000, gzipBytes: 56_000, brotliBytes: 50_000 },
-      timing: { samplesMs: new Array(10).fill(19), medianMs: 19, p95Ms: 19 },
+      timing: timing(steady(19)),
       checksum: "a".repeat(64),
       deferredChunk: "assets/clipboard-controller.js",
       interaction: {
@@ -276,7 +240,7 @@ function firstPaintEvidence(): Record<string, unknown> {
       percent: 10,
       timing: "median-and-p95-no-slower",
     },
-    fixtures: [fixture("next"), fixture("vite")],
+    fixtures: [fixture("next"), fixture("vite")] as [FirstPaintFixture, FirstPaintFixture],
   };
 }
 
@@ -287,77 +251,38 @@ describe("first-paint counterfactual evidence", () => {
     expect(firstPaintGate(evidence)).toEqual({ admitted: true, reasons: [] });
   });
 
-  it("rejects incomparable semantics, provenance, samples, and recorded deltas", () => {
-    const mutations = [
-      (evidence: Record<string, unknown>) => {
-        const fixture = (evidence.fixtures as Array<Record<string, unknown>>)[0]!;
-        (fixture.candidate as Record<string, unknown>).checksum = "b".repeat(64);
-      },
-      (evidence: Record<string, unknown>) => {
-        const fixture = (evidence.fixtures as Array<Record<string, unknown>>)[0]!;
-        (fixture.provenance as Record<string, unknown>).buildMode = "development";
-      },
-      (evidence: Record<string, unknown>) => {
-        const fixture = (evidence.fixtures as Array<Record<string, unknown>>)[0]!;
-        const candidate = fixture.candidate as Record<string, unknown>;
-        (candidate.timing as Record<string, unknown>).samplesMs = [19];
-      },
-      (evidence: Record<string, unknown>) => {
-        const fixture = (evidence.fixtures as Array<Record<string, unknown>>)[0]!;
-        (fixture.delta as Record<string, unknown>).brotliBytes = 9_999;
-      },
-    ];
-    for (const mutate of mutations) {
-      const evidence = structuredClone(firstPaintEvidence());
-      mutate(evidence);
-      expect(() => validateFirstPaintEvidence(evidence)).toThrow();
-    }
+  it.each<[string, (fixture: FirstPaintFixture) => void]>([
+    ["checksum", (fixture) => (fixture.candidate.checksum = "b".repeat(64))],
+    ["provenance", (fixture) => (fixture.provenance.buildMode = "development")],
+    ["samples", (fixture) => (fixture.candidate.timing.samplesMs = [19])],
+    ["recorded delta", (fixture) => (fixture.delta.brotliBytes = 9_999)],
+  ])("rejects an incomparable %s", (_label, mutate) => {
+    const evidence = firstPaintEvidence();
+    mutate(evidence.fixtures[0]);
+    expect(() => validateFirstPaintEvidence(evidence)).toThrow();
   });
 
-  it("blocks admission when any one size or timing gate fails", () => {
-    const timing = (samplesMs: number[]): FirstPaintTiming => {
-      const sorted = [...samplesMs].sort((left, right) => left - right);
-      const rank = (fraction: number) => sorted[Math.ceil(sorted.length * fraction) - 1]!;
-      return { samplesMs, medianMs: rank(0.5), p95Ms: rank(0.95) };
-    };
-    const steady = (ms: number) => new Array(10).fill(ms);
-    // Each case changes the vite fixture so that exactly one gate fails.
-    const cases: Array<{
-      gate: string;
-      baselineBrotli?: number;
-      candidateBrotli?: number;
-      baselineMs?: number[];
-      candidateMs?: number[];
-    }> = [
-      { gate: "bytes", candidateBrotli: 60_000 - (FIRST_PAINT_BROTLI_GATE_BYTES - 1) },
-      { gate: "percent", baselineBrotli: 100_000, candidateBrotli: 92_000 },
-      { gate: "median", baselineMs: [...steady(20).slice(1), 40], candidateMs: steady(21) },
-      { gate: "p95", candidateMs: [...steady(19).slice(1), 25] },
-    ];
-    for (const { gate, baselineBrotli, candidateBrotli, baselineMs, candidateMs } of cases) {
-      const evidence = firstPaintEvidence();
-      type Variant = { initialJavaScript: { brotliBytes: number }; timing: FirstPaintTiming };
-      const vite = (
-        evidence.fixtures as Array<{
-          baseline: Variant;
-          candidate: Variant;
-          delta: { brotliBytes: number; brotliPercent: number };
-        }>
-      )[1]!;
-      if (baselineBrotli !== undefined)
-        vite.baseline.initialJavaScript.brotliBytes = baselineBrotli;
-      if (candidateBrotli !== undefined)
-        vite.candidate.initialJavaScript.brotliBytes = candidateBrotli;
-      if (baselineMs) vite.baseline.timing = timing(baselineMs);
-      if (candidateMs) vite.candidate.timing = timing(candidateMs);
-      const baselineBytes = vite.baseline.initialJavaScript.brotliBytes;
-      const reduction = baselineBytes - vite.candidate.initialJavaScript.brotliBytes;
-      vite.delta.brotliBytes = reduction;
-      vite.delta.brotliPercent = (reduction / baselineBytes) * 100;
+  it.each([
+    ["bytes", { candidateBrotli: 60_000 - (FIRST_PAINT_BROTLI_GATE_BYTES - 1) }],
+    ["percent", { baselineBrotli: 100_000, candidateBrotli: 92_000 }],
+    ["median", { baselineMs: [...steady(20).slice(1), 40], candidateMs: steady(21) }],
+    ["p95", { candidateMs: [...steady(19).slice(1), 25] }],
+  ] as const)("blocks admission when only the %s gate fails", (_gate, change) => {
+    const evidence = firstPaintEvidence();
+    const vite = evidence.fixtures[1];
+    if ("baselineBrotli" in change)
+      vite.baseline.initialJavaScript.brotliBytes = change.baselineBrotli;
+    if ("candidateBrotli" in change)
+      vite.candidate.initialJavaScript.brotliBytes = change.candidateBrotli;
+    if ("baselineMs" in change) vite.baseline.timing = timing([...change.baselineMs]);
+    if ("candidateMs" in change) vite.candidate.timing = timing([...change.candidateMs]);
+    const baselineBytes = vite.baseline.initialJavaScript.brotliBytes;
+    const reduction = baselineBytes - vite.candidate.initialJavaScript.brotliBytes;
+    vite.delta.brotliBytes = reduction;
+    vite.delta.brotliPercent = (reduction / baselineBytes) * 100;
 
-      const decision = firstPaintGate(evidence);
-      expect(decision.admitted, gate).toBe(false);
-      expect(decision.reasons, gate).toHaveLength(1);
-    }
+    const decision = firstPaintGate(evidence);
+    expect(decision.admitted).toBe(false);
+    expect(decision.reasons).toHaveLength(1);
   });
 });

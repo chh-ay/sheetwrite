@@ -11,7 +11,10 @@ import {
   validateReleasePackageVersions,
 } from "./changeset-ci.js";
 import {
+  BUILD_NODES,
+  COVERED_PACKAGE_TEST_ROOTS,
   PUBLISHABLE_PACKAGE_ORDER,
+  RUST_BUILD_NODES,
   TOOLING_TEST_PATHS,
   TYPECHECK_NODES,
   UNIT_TEST_PATHS,
@@ -72,7 +75,7 @@ async function graphFixture(extraPackage?: { readonly name: string; readonly bui
   );
   await writeFile(
     join(root, "docs/package.json"),
-    `${JSON.stringify({ name: "@sheetwrite/docs-start", scripts: { typecheck: "typecheck" } })}\n`,
+    `${JSON.stringify({ name: "@sheetwrite/docs", scripts: { typecheck: "typecheck" } })}\n`,
   );
   return root;
 }
@@ -132,7 +135,13 @@ describe("canonical workspace graph", () => {
         ),
       ).toHaveLength(1);
     }
-    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + verificationProjects.length);
+    const nodeProjects = TYPECHECK_NODES.flatMap((node) => {
+      const index = node.command.indexOf("-p");
+      return index >= 0 ? [node.command[index + 1] ?? ""] : [];
+    });
+    expect(nodeProjects.filter((project) => !existsSync(join(root, project)))).toEqual([]);
+    expect(new Set(nodeProjects).size).toBe(nodeProjects.length);
+    expect(TYPECHECK_NODES).toHaveLength(workspaceNames.length + nodeProjects.length);
   });
 
   it("runs every script test suite from exactly one test list", async () => {
@@ -147,37 +156,73 @@ describe("canonical workspace graph", () => {
     expect(suites.filter((suite) => !listed.includes(suite)).sort()).toEqual([]);
     expect(listed.filter((path) => !existsSync(join(root, path)))).toEqual([]);
   });
-});
 
-describe("changeset workspace contract", () => {
-  it("resolves every configured ignore to an existing workspace", async () => {
+  it("runs every unit suite in CI once, either uncovered or under coverage", async () => {
     const root = resolve(import.meta.dir, "..");
-    const rootManifest = JSON.parse(await readFile(join(root, "package.json"), "utf8")) as {
-      readonly workspaces: readonly string[];
-    };
-    const changesetConfig = JSON.parse(
-      await readFile(join(root, ".changeset/config.json"), "utf8"),
-    ) as {
-      readonly ignore: readonly string[];
-    };
-    const workspaceNames = new Set<string>();
-    for (const workspace of rootManifest.workspaces) {
-      const glob = new Bun.Glob(`${workspace}/package.json`);
-      for await (const path of glob.scan({ cwd: root, onlyFiles: true })) {
-        const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
-          readonly name?: string;
-        };
-        if (manifest.name) workspaceNames.add(manifest.name);
+    const result = Bun.spawnSync(
+      ["bun", "scripts/workspace-tooling.ts", "test-unit-uncovered", "--dry-run"],
+      { cwd: root, stdout: "pipe", stderr: "pipe" },
+    );
+    expect(result.exitCode, result.stderr.toString()).toBe(0);
+    const command = result.stdout
+      .toString()
+      .split("\n")
+      .map((line) => line.split("\t"))
+      .find(([id]) => id === "test:unit:uncovered")?.[1];
+    if (command === undefined)
+      throw new Error("test-unit-uncovered has no test:unit:uncovered node");
+    const paths = command
+      .split(" ")
+      .slice(2)
+      .map((argument) => JSON.parse(argument) as string);
+
+    const packageTestDirectories: string[] = [];
+    for await (const path of new Bun.Glob("packages/*/test").scan({
+      cwd: root,
+      onlyFiles: false,
+    })) {
+      packageTestDirectories.push(path);
+    }
+    const packageRuns = [
+      ...paths.filter((path) => path.startsWith("packages/")),
+      ...COVERED_PACKAGE_TEST_ROOTS,
+    ];
+    expect(packageRuns.sort()).toEqual(packageTestDirectories.sort());
+    expect(paths.filter((path) => !path.startsWith("packages/"))).toEqual(
+      UNIT_TEST_PATHS.filter((path) => path !== "packages"),
+    );
+  });
+
+  it("runs one cargo build up front for each wasm-pack package build", async () => {
+    const root = resolve(import.meta.dir, "..");
+    const wasmPackBuilds: string[] = [];
+    for await (const path of new Bun.Glob("packages/*/package.json").scan({ cwd: root })) {
+      const manifest = JSON.parse(await readFile(join(root, path), "utf8")) as {
+        readonly scripts?: { readonly build?: string };
+      };
+      for (const command of manifest.scripts?.build?.split("&&") ?? []) {
+        if (command.includes("wasm-pack build")) wasmPackBuilds.push(command.trim());
       }
     }
 
-    for (const ignore of changesetConfig.ignore) {
-      const escaped = ignore.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-      const pattern = new RegExp(`^${escaped.replaceAll("*", ".*").replaceAll("?", ".")}$`);
-      expect([...workspaceNames].some((name) => pattern.test(name))).toBeTrue();
-    }
+    expect(BUILD_NODES[0]?.command).toEqual(["bun", "scripts/workspace-tooling.ts", "build-rust"]);
+    expect(RUST_BUILD_NODES).toHaveLength(wasmPackBuilds.length);
+    // The full engine's wasm-pack build uses the target directory its cargo build fills.
+    expect(wasmPackBuilds).toContain(
+      "CARGO_TARGET_DIR=../wasm/target/analysis wasm-pack build ../wasm --target web --out-dir ../formulas/pkg -- --features analysis",
+    );
+    const formulas = RUST_BUILD_NODES.find((node) => node.id === "cargo:@sheetwrite/formulas");
+    expect(formulas?.cwd).toBe("packages/wasm");
+    expect(formulas?.command.slice(-4)).toEqual([
+      "--features",
+      "analysis",
+      "--target-dir",
+      "target/analysis",
+    ]);
   });
+});
 
+describe("changeset workspace contract", () => {
   it("routes release and package-size-history branches", () => {
     expect(releaseVersionFromHeadRef("0.3.1")).toBe("0.3.1");
     expect(releaseVersionFromHeadRef("release/version-0.4.0")).toBe("0.4.0");

@@ -1,4 +1,4 @@
-import { serialToDate } from "./date-serial.js";
+import { FICTIONAL_LEAP_DAY_SERIAL, serialToDate, serialToWeekdayDate } from "./date-serial.js";
 
 interface NumericDescriptor {
   percent: boolean;
@@ -486,11 +486,18 @@ function calendarFormatter(
   );
 }
 
+/**
+ * Render date tokens for a serial. `serialToDate` gives serial 60 as 28 February
+ * 1900, which has the year, month and time Excel shows for its fictional 29
+ * February, so only the day of the month changes. Weekday names follow Excel's
+ * count through `serialToWeekdayDate`, which differs from the real date's before 1
+ * March 1900.
+ */
 function renderDate(serial: number, tokens: readonly DateToken[], locale: string): string {
   const date = serialToDate(serial);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth() + 1;
-  const day = date.getUTCDate();
+  const day = Math.floor(serial) === FICTIONAL_LEAP_DAY_SERIAL ? 29 : date.getUTCDate();
   const hour24 = date.getUTCHours();
   const minute = date.getUTCMinutes();
   const second = date.getUTCSeconds();
@@ -537,7 +544,7 @@ function renderDate(serial: number, tokens: readonly DateToken[], locale: string
           locale,
           "weekday",
           token.kind === "weekdayLong" ? "long" : "short",
-        ).format(date);
+        ).format(serialToWeekdayDate(serial));
         break;
 
       case "hour": {
@@ -574,6 +581,12 @@ const GENERAL_CODE_RE = /^general$/i;
  * separators, percent/scientific notation, UTC date/time tokens, four-section
  * positive/negative/zero/text codes, quoted literals, and backslash escapes.
  * `General` formats exactly like an omitted code.
+ *
+ * @param value - The number to format; a string is placed into the code's text section.
+ * @param format - Excel number-format code, such as `#,##0.00` or `yyyy-mm-dd`;
+ *   when it is omitted, the value is formatted as with `General`.
+ * @param locale - BCP 47 locale for the decimal and group separators; defaults to `en-US`.
+ * @returns The value as Excel would show it with that code.
  */
 export function formatNumber(value: number | string, format?: string, locale = "en-US"): string {
   const code = format !== undefined && GENERAL_CODE_RE.test(format) ? undefined : format;

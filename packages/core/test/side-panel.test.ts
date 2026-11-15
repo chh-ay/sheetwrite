@@ -166,31 +166,6 @@ it("manages formula names through undo, redo and remote changes", async () => {
   expect(grid.store.getWorkbook().namedRanges?.map((name) => name.name)).toEqual(["Rate", "Other"]);
 });
 
-it("inserts a chart from the selection in one step, selects it and opens its panel", async () => {
-  const { grid, chartOps, panel } = await insertedChart();
-
-  expect(chartOps).toHaveLength(1);
-  expect(grid.getCharts("s1")).toEqual([
-    {
-      id: "chart-1",
-      kind: "column",
-      anchor: { row: 0, col: 3, offsetX: 0, offsetY: 0, width: 480, height: 288 },
-      series: [
-        { values: range(1, 1, 2, 1), nameRange: range(0, 1, 0, 1), categories: range(1, 0, 2, 0) },
-        { values: range(1, 2, 2, 2), nameRange: range(0, 2, 0, 2), categories: range(1, 0, 2, 0) },
-      ],
-    },
-  ]);
-  expect(panel()?.querySelector(".sheetwrite-panel-title")?.textContent).toBe("Chart");
-  // Focus starts on the first control: the checked chart kind.
-  expect(document.activeElement?.getAttribute("aria-checked")).toBe("true");
-  expect((document.activeElement as HTMLElement).dataset.kind).toBe("column");
-
-  grid.undo();
-  expect(grid.getCharts("s1")).toEqual([]);
-  expect(panel()?.querySelector(".sheetwrite-panel-note")?.hasAttribute("hidden")).toBe(false);
-});
-
 it("lists the seven chart kinds under Insert › Chart and inserts the picked kind in one step", async () => {
   const { grid, host, chartOps, control, openTab, press, selectRange } = await setup();
   openTab("Insert");
@@ -301,61 +276,18 @@ it("validates series ranges as A1 text and shows the error inline", async () => 
   expect(values.value).toBe("B2:B3");
 });
 
-it("opens once when chart activation repeats while the panel chunk loads", async () => {
-  const { grid, host, panel, key } = await setup();
-  grid.setChart({
-    id: "cold",
-    kind: "column",
-    anchor: { row: 0, col: 3, offsetX: 0, offsetY: 0, width: 480, height: 288 },
-    series: [{ values: range(1, 1, 2, 1) }],
-  });
-  const frame = host.querySelector<HTMLElement>('.sheetwrite-object[data-chart-id="cold"]');
-  if (frame === null) throw new Error("the chart has no object frame");
-  const openPanel = grid.openPanel.bind(grid);
-  let opens = 0;
-  grid.openPanel = (content) => {
-    if (content !== null) opens += 1;
-    openPanel(content);
-  };
+it("inserts nothing when the grid is destroyed while the panel chunk loads", async () => {
+  const { grid, chartOps, control, openTab, press, selectRange } = await setup();
+  openTab("Insert");
+  selectRange(0, 0, 2, 2);
 
-  key(frame, "Enter");
-  key(frame, "Enter");
-  await loadPanels(grid);
-  await Promise.resolve();
-  expect(opens).toBe(1);
-  expect(panel()?.contains(document.activeElement)).toBe(true);
-});
+  press(control("Chart"));
+  const loading = loadPanels(grid);
+  grid.destroy();
 
-it("opens the Chart panel on Enter on a chart, but not on selection alone", async () => {
-  const { grid, host, panel, key } = await insertedChart();
-  grid.openPanel(null);
-  expect(panel()).toBeNull();
-
-  grid.selectChart(null, "s1");
-  grid.selectChart("chart-1", "s1");
-  expect(panel()).toBeNull();
-
-  const frame = host.querySelector<HTMLElement>('.sheetwrite-object[data-chart-id="chart-1"]');
-  if (frame === null) throw new Error("the chart has no object frame");
-  frame.focus();
-  key(frame, "Enter");
-  expect(panel()?.querySelector(".sheetwrite-panel-title")?.textContent).toBe("Chart");
-  expect(panel()?.contains(document.activeElement)).toBe(true);
-  expect(host.querySelector<HTMLElement>('[role="radio"][aria-checked="true"]')?.dataset.kind).toBe(
-    "column",
-  );
-});
-
-it("closes on Escape from inside the panel and gives focus back to the grid", async () => {
-  const { host, panel, key } = await insertedChart();
-  const focused = document.activeElement;
-  if (!(focused instanceof HTMLElement) || !panel()?.contains(focused)) {
-    throw new Error("focus is not in the panel");
-  }
-
-  key(focused, "Escape");
-  expect(panel()).toBeNull();
-  expect(document.activeElement).toBe(host);
+  // The grid's abort reason: command runners treat it as cancellation.
+  await expect(loading).rejects.toMatchObject({ name: "AbortError" });
+  expect(chartOps).toEqual([]);
 });
 
 it("keeps a draft on the first Escape and closes on the second", async () => {

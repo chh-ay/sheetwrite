@@ -1,22 +1,29 @@
 ---
 title: Custom functions
-description: Register synchronous JavaScript functions that formulas can call, with metadata that formula help reads.
+description: Give formulas synchronous JavaScript functions through the functions add-on, with metadata that formula help reads.
 ---
 
-```ts prelude="core" partial="requires a grid initialized with the full engine and the inputs shown below" title="Register a host function"
-import { registerFunction } from "@sheetwrite/core/functions";
+```ts prelude="core" partial="requires the full engine, and a grid created after this call with the inputs shown below" title="Give every grid a host function"
+import { functionsAddon } from "@sheetwrite/core/functions";
+import * as formulas from "@sheetwrite/formulas";
 
-registerFunction(
-  grid.store,
-  {
-    name: "TAXRATE",
-    description: "Sales tax rate of a region.",
-    arguments: [{ name: "region", types: ["text"] }],
-    returnKind: "number",
-    examples: ['=TAXRATE("EU")'],
-  },
-  (region) => (region === "EU" ? 0.2 : 0.07),
-);
+await initSheetwrite({
+  engine: formulas,
+  addons: [
+    functionsAddon([
+      {
+        metadata: {
+          name: "TAXRATE",
+          description: "Sales tax rate of a region.",
+          arguments: [{ name: "region", types: ["text"] }],
+          returnKind: "number",
+          examples: ['=TAXRATE("EU")'],
+        },
+        implementation: (region) => (region === "EU" ? 0.2 : 0.07),
+      },
+    ]),
+  ],
+});
 grid.store.applyTransaction({
   patches: [
     { op: "set", addr: { sheet: "sheet1", row: 0, col: 0 }, value: { kind: "literal", value: "EU" } },
@@ -36,9 +43,9 @@ grid.store.applyTransaction({
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="Register a host function in a grid"
+```ts compile title="Give a grid a host function"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
-import { registerFunction } from "@sheetwrite/core/functions";
+import { functionsAddon } from "@sheetwrite/core/functions";
 import * as formulas from "@sheetwrite/formulas";
 import "@sheetwrite/core/styles.css";
 
@@ -46,7 +53,23 @@ const host = document.querySelector<HTMLElement>("#grid");
 if (host === null) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({
+  engine: formulas,
+  addons: [
+    functionsAddon([
+      {
+        metadata: {
+          name: "TAXRATE",
+          description: "Sales tax rate of a region.",
+          arguments: [{ name: "region", types: ["text"] }],
+          returnKind: "number",
+          examples: ['=TAXRATE("EU")'],
+        },
+        implementation: (region) => (region === "EU" ? 0.2 : 0.07),
+      },
+    ]),
+  ],
+});
 const grid = createGrid(host, {
   workbook: {
     activeSheet: "sheet1",
@@ -61,17 +84,6 @@ const grid = createGrid(host, {
   data: { rowCount: 1, columns: { region: [null], rate: [null] } },
 });
 
-registerFunction(
-  grid.store,
-  {
-    name: "TAXRATE",
-    description: "Sales tax rate of a region.",
-    arguments: [{ name: "region", types: ["text"] }],
-    returnKind: "number",
-    examples: ['=TAXRATE("EU")'],
-  },
-  (region) => (region === "EU" ? 0.2 : 0.07),
-);
 grid.store.applyTransaction({
   patches: [
     { op: "set", addr: { sheet: "sheet1", row: 0, col: 0 }, value: { kind: "literal", value: "EU" } },
@@ -85,13 +97,29 @@ grid.store.applyTransaction({
 
 ## Registration
 
-Host functions need the full engine. Select it with `initSheetwrite(undefined, formulas)`, where `formulas` is `import * as formulas from "@sheetwrite/formulas"`, before you create the store. On the default engine, `registerFunction` throws a `SheetwriteError` with code `optional-backend-unavailable`, so the default engine binary does not grow.
+Host functions need the full engine. Select it with `initSheetwrite({ engine: formulas })`, where `formulas` is `import * as formulas from "@sheetwrite/formulas"`. On the default engine, `createGrid` throws a `SheetwriteError` with code `optional-backend-unavailable` for a grid with host functions, so the default engine binary does not grow.
 
-Import the functions from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its JavaScript.
+Import `functionsAddon` from `@sheetwrite/core/functions`. An application that does not import this entry carries none of its JavaScript.
 
-`registerFunction(store, metadata, implementation)` adds a function to one store and recalculates every formula. Registering the same name again replaces the function. `unregisterFunction(store, name)` removes it, and formulas that call it show `#NAME?`. Names are not case-sensitive.
+Each function is `{ metadata, implementation }`. The functions given to `functionsAddon([...])` apply to every grid created after `initSheetwrite`. Functions for one grid go in its settings, and apply to that grid only:
 
-A name must start with a letter or `_` and contain only letters, digits, `_` and `.`. The store refuses a name that is a built-in function of the active engine or a cell reference, such as `A1` or `R1C1`. A refused name or malformed metadata throws a `SheetwriteError` with code `invalid-function`.
+```ts prelude="core" partial="requires initSheetwrite with the full engine and functionsAddon()" title="A function for one grid"
+const rates = createGrid(host, {
+  workbook,
+  addons: {
+    functions: [
+      {
+        metadata: { name: "FXRATE", description: "Exchange rate to EUR.", arguments: [], returnKind: "number" },
+        implementation: () => 0.92,
+      },
+    ],
+  },
+});
+```
+
+A grid-specific function replaces an init function with the same name in that grid. Functions register when the grid is created; there is no later add or remove. Names are not case-sensitive.
+
+A name must start with a letter or `_` and contain only letters, digits, `_` and `.`. A name that is a built-in function of the active engine or a cell reference, such as `A1` or `R1C1`, or malformed metadata, makes `createGrid` throw a `SheetwriteError` with code `invalid-function`.
 
 ## Arguments and results
 
@@ -112,15 +140,15 @@ Set `volatile: true` in the metadata for a function whose result can change with
 
 ## Snapshots and collaboration
 
-Snapshots, history and collaboration keep only the formula text. A store loaded from a snapshot shows `#NAME?` for a host function until the host registers it again. Each client calculates host functions locally, so each client must register the same functions to show the same values.
+Snapshots, history and collaboration keep only the formula text. A store loaded from a snapshot outside a grid shows `#NAME?` for a host function. Each client calculates host functions locally, so each client must give its grids the same functions to show the same values.
 
 ## In the ribbon and toolbar
 
-While the store has a registered function, the ribbon's **Formulas** tab shows **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. Formula autocomplete and the argument guide list host functions with the built-in functions; see [Formula help](/docs/features/formulas/formula-help/). See [Toolbar and ribbon](/docs/features/grid/toolbar-and-ribbon/#ribbon).
+In a grid with host functions, the ribbon's **Formulas** tab shows **Insert Function**, and the toolbar shows the same command. It lists the host functions with their signature and description; a pick starts `=NAME(` in the focus cell. Formula autocomplete and the argument guide list host functions with the built-in functions; see [Formula help](/docs/features/formulas/formula-help/). See [Toolbar and ribbon](/docs/features/grid/toolbar-and-ribbon/#ribbon).
 
 ## Function metadata
 
-`await listFunctions(store)` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in registration order. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
+`await listFunctions(store)` returns one list of `FormulaFunctionMetadata`: the built-in functions of the active engine, then the host functions of the store in the order the grid registered them. The table of built-in functions loads on the first call, so an application that never asks for it does not download it. Built-in and host functions use the same fields:
 
 | Field | Meaning |
 | --- | --- |

@@ -7601,7 +7601,7 @@
       "id": "external-workbook",
       "title": "Arbitrary external workbook references",
       "status": "unsupported",
-      "scope": "References to arbitrary workbook files are not loaded or dereferenced.",
+      "scope": "Sheetwrite never opens another workbook file. A reference reads the values saved for its link, as Excel keeps them in XLSX external link parts, and is #REF! when the workbook holds no values for it.",
       "examples": ["'[Book.xlsx]Sheet1'!A1"],
       "source": "microsoft-excel-functions",
       "section": "Lookup and reference functions",

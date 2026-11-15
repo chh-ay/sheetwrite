@@ -4,10 +4,6 @@
 //! [`FormulaGraph`] owns the workbook dependency index and keeps it in step
 //! with entry replacements, dropping it for rewrites it cannot patch.
 
-use std::collections::hash_set;
-
-use rustc_hash::FxHashSet;
-
 use crate::eval::{build_dep_index, DepIndex};
 use crate::formula_slots::{FormulaId, FormulaStore};
 use crate::memory::{
@@ -19,9 +15,8 @@ use crate::transfer::Writer;
 use crate::transfer::{Reader, TransferResult};
 use crate::types::{AbsCellKey, CellKey, FormulaEntry};
 
-/// `FxHashSet::clear` walks every retained bucket, so a dirty set inflated by
-/// one giant paste is dropped instead of cleared; otherwise it would tax every
-/// later single-cell transaction.
+/// A dirty list inflated by one giant paste is dropped instead of cleared, so
+/// later single-cell transactions do not keep its memory.
 const RETAINED_DIRTY_CAPACITY: usize = 4096;
 
 /// Bulk writes stay range-scoped without letting many disjoint edits grow
@@ -56,7 +51,7 @@ impl DirtyRect {
         })
     }
 
-    fn cell(cell: CellKey) -> Self {
+    const fn cell(cell: CellKey) -> Self {
         Self {
             row_start: cell.0,
             col_start: cell.1,
@@ -65,14 +60,14 @@ impl DirtyRect {
         }
     }
 
-    pub(crate) fn contains(self, cell: CellKey) -> bool {
+    pub(crate) const fn contains(self, cell: CellKey) -> bool {
         self.row_start <= cell.0
             && cell.0 <= self.row_end
             && self.col_start <= cell.1
             && cell.1 <= self.col_end
     }
 
-    pub(crate) fn intersects(self, other: Self) -> bool {
+    pub(crate) const fn intersects(self, other: Self) -> bool {
         self.row_start <= other.row_end
             && other.row_start <= self.row_end
             && self.col_start <= other.col_end
@@ -94,10 +89,124 @@ impl DirtyRect {
     }
 }
 
+/// Exact dirty source cells in one flat list: a sorted, unique prefix and an
+/// unsorted tail. Writes in address order (a load or a fill) extend the
+/// prefix, and a write already in it is found by binary search. Other single
+/// writes append to the tail, which may hold repeats, so the list is sorted
+/// and deduplicated in place before it grows: repeated edits of a few cells
+/// stay bounded without hashing.
+#[derive(Default)]
+struct DirtyCells {
+    cells: Vec<CellKey>,
+    sorted_len: usize,
+}
+
+impl DirtyCells {
+    fn insert(&mut self, key: CellKey) {
+        let len = self.cells.len();
+        let Some(&last) = self.cells.last() else {
+            self.cells.push(key);
+            self.sorted_len = 1;
+            return;
+        };
+        if last == key {
+            return;
+        }
+
+        if self.sorted_len == len && last < key {
+            self.cells.push(key);
+            self.sorted_len += 1;
+            return;
+        }
+
+        let prefix = self.cells.get(..self.sorted_len).unwrap_or_default();
+        if prefix.binary_search(&key).is_ok() {
+            return;
+        }
+
+        // Fold before growing. Room for as many cells again as survive the
+        // fold keeps each fold amortized.
+        if len == self.cells.capacity() {
+            self.cells.sort_unstable();
+            self.cells.dedup();
+            self.sorted_len = self.cells.len();
+            if self.cells.binary_search(&key).is_ok() {
+                return;
+            }
+
+            self.cells.reserve(self.cells.len());
+            if self.cells.last().is_none_or(|&last| last < key) {
+                self.sorted_len += 1;
+            }
+        }
+
+        self.cells.push(key);
+    }
+
+    /// Adds a batch in one step. A batch is usually one ascending run (a
+    /// vacated or reinstalled spill): it either continues the sorted list or
+    /// merges with it in one linear pass, where a binary search per cell
+    /// would not be linear. Any other batch is sorted in with the list.
+    fn extend(&mut self, keys: impl IntoIterator<Item = CellKey>) {
+        let start = self.cells.len();
+        let sorted = self.sorted_len == start;
+        let mut ascending = true;
+        for key in keys {
+            let last = self.cells.last().copied();
+            if last == Some(key) {
+                continue;
+            }
+
+            if self.cells.len() > start {
+                ascending &= last.is_none_or(|last_key| last_key < key);
+            }
+            self.cells.push(key);
+        }
+
+        let (old, new) = self.cells.split_at(start);
+        let continues = match (old.last(), new.first()) {
+            (Some(last), Some(first)) => last < first,
+            _ => true,
+        };
+        if sorted && ascending && !continues {
+            self.cells = merge_unique(old, new);
+        } else if !(sorted && ascending) {
+            self.cells.sort_unstable();
+            self.cells.dedup();
+        }
+        self.sorted_len = self.cells.len();
+    }
+
+    const fn is_empty(&self) -> bool {
+        self.cells.is_empty()
+    }
+}
+
+/// Merges two ascending, unique lists into one, keeping a cell in both once.
+fn merge_unique(old: &[CellKey], new: &[CellKey]) -> Vec<CellKey> {
+    let mut merged = Vec::with_capacity(old.len() + new.len());
+    let mut old_index = 0;
+    let mut new_index = 0;
+    while let (Some(&old_key), Some(&new_key)) = (old.get(old_index), new.get(new_index)) {
+        if old_key <= new_key {
+            merged.push(old_key);
+            old_index += 1;
+            new_index += usize::from(old_key == new_key);
+        } else {
+            merged.push(new_key);
+            new_index += 1;
+        }
+    }
+
+    merged.extend_from_slice(old.get(old_index..).unwrap_or_default());
+    merged.extend_from_slice(new.get(new_index..).unwrap_or_default());
+    merged
+}
+
 /// What one sheet contributes to the next recompute.
 pub(crate) enum DirtySeeds<'a> {
     All,
-    Cells(hash_set::Iter<'a, CellKey>),
+    Cells(std::slice::Iter<'a, CellKey>),
     Ranges(&'a [DirtyRect]),
 }
 
@@ -105,14 +214,14 @@ pub(crate) enum DirtySeeds<'a> {
 /// writes store bounds, and structural/load paths stay whole-sheet. Switching
 /// from cells to ranges carries every earlier cell into the bounded list.
 enum DirtyState {
-    Cells(FxHashSet<CellKey>),
+    Cells(DirtyCells),
     Ranges(Vec<DirtyRect>),
     All,
 }
 
 impl Default for DirtyState {
     fn default() -> Self {
-        Self::Cells(FxHashSet::default())
+        Self::Cells(DirtyCells::default())
     }
 }
 
@@ -141,9 +250,9 @@ pub(crate) fn offset_or_search<T>(
     offset: u32,
     key_of: impl Fn(&T) -> u32,
 ) -> Option<usize> {
-    let offset = offset as usize;
-    if items.get(offset).is_some_and(|item| key_of(item) == key) {
-        return Some(offset);
+    let position = offset as usize;
+    if items.get(position).is_some_and(|item| key_of(item) == key) {
+        return Some(position);
     }
 
     // Loads look up each new address before it is added; past the end is a miss.
@@ -237,12 +346,12 @@ pub(crate) struct SheetFormulas {
 impl SheetFormulas {
     /// Formula-free sheets can skip graph and evaluator work.
     #[inline]
-    pub(crate) fn is_empty(&self) -> bool {
+    pub(crate) const fn is_empty(&self) -> bool {
         self.count == 0
     }
 
     /// Count sources without scanning sparse address pages.
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.count
     }
 
@@ -258,7 +367,12 @@ impl SheetFormulas {
         let first_band = pages.first()?.band;
         let page = offset_or_search(pages, band, band.wrapping_sub(first_band), |page| page.band)?;
         let cells = &pages.get(page)?.cells;
-        let offset = offset_or_search(cells, row, row % FORMULA_INDEX_PAGE_ROWS, |&(row, _)| row)?;
+        let offset = offset_or_search(
+            cells,
+            row,
+            row % FORMULA_INDEX_PAGE_ROWS,
+            |&(cell_row, _)| cell_row,
+        )?;
         cells.get(offset).map(|&(_, id)| id)
     }
 
@@ -301,7 +415,7 @@ impl SheetFormulas {
 
     /// Avoid a workbook membership scan for non-volatile sheets.
     #[inline]
-    pub(crate) fn has_volatile(&self) -> bool {
+    pub(crate) const fn has_volatile(&self) -> bool {
         self.volatile_count != 0
     }
 
@@ -331,13 +445,18 @@ impl SheetFormulas {
         (self.subtotal_count != 0).then(move || slots.subtotal_keys(sheet))
     }
 
+    /// Adds `id` at `key`. Returns `false`, leaving the index unchanged, when
+    /// another formula already holds `key`. A new formula goes to an empty
+    /// address, and a moved one that cannot index is retired, so an occupied
+    /// formula slot is always indexed at its location.
     #[inline(never)]
-    fn index_id(&mut self, key: CellKey, id: FormulaId) {
+    #[must_use]
+    fn index_id(&mut self, key: CellKey, id: FormulaId) -> bool {
         let column = match insert_position(&self.columns, key.1, |column| column.col) {
             Ok(column) => column,
             Err(column) => {
                 if self.columns.get(column..).is_none() {
-                    return;
+                    return false;
                 }
                 if self.columns.capacity() == 0 {
                     self.columns.reserve_exact(FORMULA_INDEX_INITIAL_CAPACITY);
@@ -352,16 +471,16 @@ impl SheetFormulas {
                 column
             }
         };
-        let Some(column) = self.columns.get_mut(column) else {
-            return;
+        let Some(formula_column) = self.columns.get_mut(column) else {
+            return false;
         };
-        let pages = &mut column.pages;
+        let pages = &mut formula_column.pages;
         let band = key.0 / FORMULA_INDEX_PAGE_ROWS;
         let page = match insert_position(pages, band, |page| page.band) {
             Ok(page) => page,
             Err(page) => {
                 if pages.get(page..).is_none() {
-                    return;
+                    return false;
                 }
 
                 // A full page before this band means a dense column: reserve
@@ -387,21 +506,23 @@ impl SheetFormulas {
                 page
             }
         };
-        let Some(page) = pages.get_mut(page) else {
-            return;
+        let Some(formula_page) = pages.get_mut(page) else {
+            return false;
         };
-        let cells = &mut page.cells;
+        let cells = &mut formula_page.cells;
         let Err(offset) = insert_position(cells, key.0, |&(row, _)| row) else {
-            return;
+            return false;
         };
         if cells.get(offset..).is_none() {
-            return;
+            return false;
         }
         cells.insert(offset, (key.0, id));
         self.count += 1;
+        true
     }
 
-    /// Source import and rewrites keep an existing formula id when possible.
+    /// A transfer stores each formula it reads at its cell.
+    #[cfg(any(target_arch = "wasm32", test))]
     pub(crate) fn insert(
         &mut self,
         key: CellKey,
@@ -428,22 +549,25 @@ impl SheetFormulas {
         slots: &mut FormulaStore,
     ) -> (Option<FormulaEntry>, Option<FormulaId>) {
         match (self.id(key), entry) {
-            (Some(id), Some(entry)) => {
+            (Some(id), Some(new_entry)) => {
                 self.volatile_count -= usize::from(slots.is_volatile(id));
                 self.subtotal_count -= usize::from(slots.is_subtotal(id));
-                let previous = slots.replace(id, entry);
+                let previous = slots.replace(id, new_entry);
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
                 (previous, Some(id))
             }
             (Some(id), None) => (self.remove_id(key, id, slots), Some(id)),
-            (None, Some(entry)) => {
-                let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), entry) else {
+            (None, Some(new_entry)) => {
+                let Some(id) = slots.allocate(AbsCellKey::from_local(sheet, key), new_entry) else {
                     return (None, None);
                 };
+                // `key` holds no formula (`self.id(key)` is `None` above), so
+                // the new id always indexes.
+                let indexed = self.index_id(key, id);
+                debug_assert!(indexed, "a new formula indexes at an empty address");
                 self.volatile_count += usize::from(slots.is_volatile(id));
                 self.subtotal_count += usize::from(slots.is_subtotal(id));
-                self.index_id(key, id);
                 (None, Some(id))
             }
             (None, None) => (None, None),
@@ -512,12 +636,12 @@ impl SheetFormulas {
     ) {
         self.move_entries(slots, |(row, col), entry| {
             entry.shift_rows(at, i64::from(count), sheet, sheet);
-            let row = if row >= at {
+            let moved_row = if row >= at {
                 row.saturating_add(count)
             } else {
                 row
             };
-            Some((row, col))
+            Some((moved_row, col))
         });
     }
 
@@ -550,12 +674,12 @@ impl SheetFormulas {
     ) {
         self.move_entries(slots, |(row, col), entry| {
             entry.shift_cols(at, i64::from(count), sheet, sheet);
-            let col = if col >= at {
+            let moved_col = if col >= at {
                 col.saturating_add(count)
             } else {
                 col
             };
-            Some((row, col))
+            Some((row, moved_col))
         });
     }
 
@@ -594,10 +718,13 @@ impl SheetFormulas {
                 let Some(entry) = slots.get_mut(id) else {
                     continue;
                 };
-                if let Some(key) = relocate((row, column.col), entry) {
+                // Two formulas meet at one address only when a shift saturates
+                // at the last row or column; the later one is retired with the
+                // moved-out ones.
+                let moved = relocate((row, column.col), entry);
+                if let Some(key) = moved.filter(|&key| self.index_id(key, id)) {
                     slots.relocate(id, AbsCellKey::from_local(previous.sheet as usize, key));
                     slots.refresh_flags(id);
-                    self.index_id(key, id);
                     self.volatile_count += usize::from(slots.is_volatile(id));
                     self.subtotal_count += usize::from(slots.is_subtotal(id));
                 } else {
@@ -633,12 +760,14 @@ impl SheetFormulas {
 
     /// A bulk writer adds seeds without collecting a second temporary set.
     pub(crate) fn mark_cells_dirty(&mut self, keys: impl IntoIterator<Item = CellKey>) {
-        if matches!(self.dirty, DirtyState::All) {
-            return;
-        }
-
-        for key in keys {
-            self.mark_cell_dirty(key);
+        match &mut self.dirty {
+            DirtyState::Cells(cells) => cells.extend(keys),
+            DirtyState::Ranges(ranges) => {
+                for key in keys {
+                    Self::add_dirty_rect(ranges, DirtyRect::cell(key));
+                }
+            }
+            DirtyState::All => {}
         }
     }
 
@@ -654,7 +783,7 @@ impl SheetFormulas {
 
         if let DirtyState::Cells(cells) = std::mem::take(&mut self.dirty) {
             let mut ranges = vec![rect];
-            for cell in cells {
+            for cell in cells.cells {
                 Self::add_dirty_rect(&mut ranges, DirtyRect::cell(cell));
             }
             self.dirty = DirtyState::Ranges(ranges);
@@ -678,6 +807,22 @@ impl SheetFormulas {
         if let Some(last) = ranges.last_mut() {
             let merged = last.union(rect);
             if merged.area() == last.area() + rect.area() {
+                *last = merged;
+                return;
+            }
+
+            // A block written row by row (or column by column) reaches each
+            // new row one cell at a time. Growing the latest rectangle by
+            // that whole adjacent row keeps the block one rectangle; the
+            // row's other cells are marked early, and the next writes are
+            // usually exactly those cells.
+            let next_row = last.row_end.checked_add(1) == Some(rect.row_start)
+                && last.col_start <= rect.col_start
+                && rect.col_end <= last.col_end;
+            let next_col = last.col_end.checked_add(1) == Some(rect.col_start)
+                && last.row_start <= rect.row_start
+                && rect.row_end <= last.row_end;
+            if next_row || next_col {
                 *last = merged;
                 return;
             }
@@ -706,8 +851,9 @@ impl SheetFormulas {
     /// Keep only small seed capacity after the pass consumes it.
     pub(crate) fn clear_dirty(&mut self) {
         if let DirtyState::Cells(cells) = &mut self.dirty {
-            if cells.capacity() <= RETAINED_DIRTY_CAPACITY {
-                cells.clear();
+            if cells.cells.capacity() <= RETAINED_DIRTY_CAPACITY {
+                cells.cells.clear();
+                cells.sorted_len = 0;
                 return;
             }
         }
@@ -719,12 +865,12 @@ impl SheetFormulas {
     pub(crate) fn dirty_seeds(&self) -> DirtySeeds<'_> {
         match &self.dirty {
             DirtyState::All => DirtySeeds::All,
-            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.iter()),
+            DirtyState::Cells(cells) => DirtySeeds::Cells(cells.cells.iter()),
             DirtyState::Ranges(ranges) => DirtySeeds::Ranges(ranges),
         }
     }
 
-    /// Count the sparse index here; entries are owned by FormulaStore.
+    /// Count the sparse index here; entries are owned by `FormulaStore`.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
         formulas.add_vec::<FormulaColumn>(self.columns.len(), self.columns.capacity());
@@ -737,7 +883,7 @@ impl SheetFormulas {
         let metadata = stats.owner_mut(SHEET_INDEXES_METADATA);
         match &self.dirty {
             DirtyState::Cells(cells) => {
-                metadata.add_hash_table::<CellKey, ()>(cells.len(), cells.capacity())
+                metadata.add_vec::<CellKey>(cells.cells.len(), cells.cells.capacity())
             }
             DirtyState::Ranges(ranges) => {
                 metadata.add_vec::<DirtyRect>(ranges.len(), ranges.capacity())
@@ -751,8 +897,8 @@ impl SheetFormulas {
             DirtyState::All => out.u32(0),
             DirtyState::Cells(cells) => {
                 out.u32(1);
-                out.usize(cells.len());
-                for &(row, col) in cells {
+                out.usize(cells.cells.len());
+                for &(row, col) in &cells.cells {
                     out.u32(row);
                     out.u32(col);
                 }
@@ -775,7 +921,7 @@ impl SheetFormulas {
         let dirty = match input.u32()? {
             0 => DirtyState::All,
             1 => {
-                let mut cells = FxHashSet::default();
+                let mut cells = DirtyCells::default();
                 for _ in 0..input.count()? {
                     cells.insert((input.u32()?, input.u32()?));
                 }
@@ -877,7 +1023,9 @@ impl FormulaGraph {
     ) {
         let unchanged = match (&previous, next) {
             (None, None) => true,
-            (Some(previous), Some(next)) => DepIndex::dependency_graph_unchanged(previous, next),
+            (Some(old_entry), Some(new_entry)) => {
+                DepIndex::dependency_graph_unchanged(old_entry, new_entry)
+            }
             _ => false,
         };
         if unchanged {
@@ -905,12 +1053,12 @@ impl FormulaGraph {
 
     /// The index as of the last [`Self::ensure_index`]; `None` after an
     /// invalidation.
-    pub(crate) fn index(&self) -> Option<&DepIndex> {
+    pub(crate) const fn index(&self) -> Option<&DepIndex> {
         self.index.as_ref()
     }
 
     #[cfg(test)]
-    pub(crate) fn epoch(&self) -> u64 {
+    pub(crate) const fn epoch(&self) -> u64 {
         self.epoch
     }
 
@@ -934,5 +1082,116 @@ impl FormulaGraph {
             epoch: input.u64()?,
             index: None,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::DirtyCells;
+    use crate::store::CellStore;
+
+    /// Every occupied formula slot is the formula indexed at its location,
+    /// and no sheet indexes more formulas than there are occupied slots.
+    fn assert_slots_indexed(store: &CellStore, step: &str) {
+        let mut occupied = 0;
+        for (id, key) in store.formula_slots.occupied() {
+            occupied += 1;
+            let indexed = store
+                .sheets
+                .get(key.sheet as usize)
+                .and_then(|sheet| sheet.formulas.id(key.local()));
+            assert_eq!(indexed, Some(id), "{step}: slot {id:?} at {key:?}");
+        }
+        let indexed: usize = store.sheets.iter().map(|sheet| sheet.formulas.len()).sum();
+        assert_eq!(
+            occupied, indexed,
+            "{step}: occupied slots and indexed formulas"
+        );
+    }
+
+    /// The order walk relies on every occupied formula slot being indexed at
+    /// its location. Each path that fills, moves or empties slots keeps it.
+    #[test]
+    fn every_slot_stays_indexed_at_its_location() {
+        let mut store = CellStore::new();
+        let data = store.add_sheet(6, 40);
+        let other = store.add_sheet(4, 10);
+        store.set_sheet_name(data, "data", "Data");
+        store.set_sheet_name(other, "other", "Other");
+        for row in 0..20 {
+            store.set_number(data, row, 0, row as f64, 0);
+            store.set_formula(data, row, 1, &format!("=A{}+1", row + 1), 0);
+            store.set_formula(data, row, 2, &format!("=B{}*2", row + 1), 0);
+        }
+        store.set_formula(other, 0, 0, "=SUM(Data!C1:C20)", 0);
+        store.recompute(data);
+        assert_slots_indexed(&store, "load");
+
+        store.set_formula(data, 3, 1, "=A4-1", 0);
+        assert_slots_indexed(&store, "formula edit");
+        store.set_number(data, 4, 1, 7.0, 0);
+        assert_slots_indexed(&store, "literal over a formula");
+        store.clear_cell(data, 5, 2, 0);
+        assert_slots_indexed(&store, "clear");
+
+        assert!(store.add_rows(data, 2, 3));
+        assert_slots_indexed(&store, "row insert");
+        assert!(store.remove_rows(data, 10, 2));
+        assert_slots_indexed(&store, "row delete");
+        assert!(store.insert_cols(data, 1, 1));
+        assert_slots_indexed(&store, "column insert");
+        assert!(store.remove_cols(data, 4, 1));
+        assert_slots_indexed(&store, "column delete");
+
+        store.move_rows(data, 0, 2, 12);
+        assert_slots_indexed(&store, "row move");
+        store.move_cols(data, 1, 1, 4);
+        assert_slots_indexed(&store, "column move");
+
+        let order: Vec<u32> = (0..8).rev().collect();
+        store.permute_rows(data, 0, 0, 5, &order);
+        assert_slots_indexed(&store, "sort");
+
+        assert!(store.set_named_range("Values", -1, data, 0, 0, 5, 0));
+        store.set_formula(other, 1, 0, "=SUM(Values)", 0);
+        assert!(store.rename_sheet(data, "data", "Numbers"));
+        assert_slots_indexed(&store, "names and renames");
+
+        let bytes = store.export_memory_state();
+        let mut restored = CellStore::read_memory_state(&bytes).expect("same-build transfer");
+        assert_slots_indexed(&restored, "transfer");
+
+        assert!(restored.remove_sheet(other));
+        restored.recompute(data);
+        assert_slots_indexed(&restored, "sheet removal");
+    }
+
+    /// The distinct cells a list holds, in address order.
+    fn distinct(dirty: &DirtyCells) -> Vec<(u32, u32)> {
+        let mut cells = dirty.cells.clone();
+        cells.sort_unstable();
+        cells.dedup();
+        cells
+    }
+
+    /// Scattered repeated writes keep every cell and fold duplicates, so the
+    /// list stays within twice the distinct cells.
+    #[test]
+    fn scattered_repeats_fold_and_keep_every_cell() {
+        let mut cells = DirtyCells::default();
+        let keys: Vec<_> = (0..300u32)
+            .map(|index| ((index * 37) % 101, index % 3))
+            .collect();
+        for _ in 0..20 {
+            for &key in &keys {
+                cells.insert(key);
+            }
+        }
+
+        let mut expected = keys;
+        expected.sort_unstable();
+        expected.dedup();
+        assert_eq!(distinct(&cells), expected);
+        assert!(cells.cells.len() <= 2 * expected.len());
     }
 }

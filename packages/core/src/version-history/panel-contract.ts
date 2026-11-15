@@ -8,19 +8,24 @@ import type { HistoryListPage, HistoryVersion } from "./types.js";
 
 /** The archive calls the version history panel makes; `HistoryArchive` provides them. */
 export interface HistoryPanelArchive {
+  /** Names the archived head as a new version. */
   saveVersion(
     name: string,
     authorId: string,
     time: number,
     signal?: AbortSignal,
   ): Promise<HistoryVersion>;
+  /** Returns one page of versions, newest first. */
   listVersions(options?: {
     maxEntries?: number;
     cursor?: string;
     signal?: AbortSignal;
   }): Promise<HistoryListPage>;
+  /** Rebuilds the document as it was at one version. */
   readVersion(id: string, signal?: AbortSignal): Promise<WorkbookSnapshot>;
+  /** Returns one page of the cell changes between two versions. */
   diffVersions(request: HistoryDiffRequest): Promise<HistoryDiffPage>;
+  /** Restores all or part of a version into the grid as one undoable change. */
   restoreVersion(
     grid: Grid,
     id: string,
@@ -29,8 +34,8 @@ export interface HistoryPanelArchive {
   ): Promise<ApplyTransactionResult>;
 }
 
-/** Host identity and persistence used by the optional history panel. */
-export interface HistoryCommandsOptions {
+/** Host identity and persistence of one grid's version history panel. */
+export interface HistoryAddonOptions {
   /** Archive of the committed document shown by the grid. */
   archive: HistoryPanelArchive;
   /** Authenticated person saving named versions. */

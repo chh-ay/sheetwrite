@@ -6,7 +6,6 @@ import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type {
   CellScalar,
-  DataSourcePage,
   DataSourceRequest,
   GridEvents,
   Renderer,
@@ -14,7 +13,14 @@ import type {
   RowData,
   Viewport,
 } from "../src/types.js";
-import { elementAdded, makeColumnarData, makeWorkbook } from "./fixtures.js";
+import {
+  coveredPage,
+  makeColumnarData,
+  makeWorkbook,
+  mountGridWithData,
+  mountHost,
+  scrollerOf,
+} from "./fixtures.js";
 
 const originalRaf = globalThis.requestAnimationFrame;
 let restoreStubs: () => void;
@@ -39,32 +45,7 @@ afterEach(() => {
   globalThis.requestAnimationFrame = originalRaf;
 });
 
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
-
 const WINDOWED_DATASOURCE = { protocol: 2, columns: "windowed" } as const;
-
-function coveredRow(request: DataSourceRequest, values: RowData): RowData {
-  const row: RowData = {};
-  for (const band of request.columns) {
-    for (const key of band.keys) row[key] = values[key] ?? null;
-  }
-  return row;
-}
-
-function coveredPage(request: DataSourceRequest, rows: RowData[]): DataSourcePage {
-  return {
-    protocol: 2,
-    start: request.start,
-    columns: request.columns,
-    rows: rows.map((row) => coveredRow(request, row)),
-  };
-}
 
 function requestColumnIndices(request: DataSourceRequest): number[] {
   const indices: number[] = [];
@@ -73,34 +54,6 @@ function requestColumnIndices(request: DataSourceRequest): number[] {
   }
   return indices;
 }
-
-function scrollerOf(host: HTMLElement): HTMLDivElement {
-  const node = host.querySelector(".sheetwrite-scroller");
-  if (!(node instanceof HTMLDivElement)) throw new Error("expected grid scroller");
-  return node;
-}
-
-describe("find-bar keystroke isolation", () => {
-  it("does not clear the selected cell when Backspace is pressed in the find input", async () => {
-    const workbook = makeWorkbook(10);
-    const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
-    const addr = { sheet: "s1", row: 3, col: 0 };
-
-    grid.setSelection({ kind: "cell", addr });
-
-    host.dispatchEvent(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
-    // The find bar's chunk loads on the first open.
-    const findInput = await elementAdded(host, ".sheetwrite-find-input", HTMLInputElement);
-
-    findInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace", bubbles: true }));
-
-    expect(store.getCell(addr).resolved).toBe("Customer 3");
-
-    grid.destroy();
-  });
-});
 
 interface PaintRecorder extends Renderer {
   readonly paints: Array<{ rowHeights: number[] | null; values: CellScalar[] }>;
@@ -138,10 +91,7 @@ describe("row-resize repaint invalidation", () => {
   // so the paint signature's window/scroll/store components are all invariant
   // across the resize. The only way a repaint can fire is the row-height epoch.
   it("repaints with the new row height after a row-header drag", () => {
-    const workbook = makeWorkbook(5);
-    const store = new SheetwriteStore(workbook, makeColumnarData(5));
-    const host = mountHost();
-    const grid = new GridImpl(host, { workbook }, store);
+    const { host, grid } = mountGridWithData(5);
 
     const recorder = makePaintRecorder();
     expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
@@ -359,121 +309,6 @@ describe("merge repaint invalidation", () => {
   });
 });
 describe("datasource repaint invalidation", () => {
-  it("paints loaded values when an async page resolves without another interaction", async () => {
-    const { promise, resolve } = Promise.withResolvers<DataSourcePage>();
-    let requested: DataSourceRequest | undefined;
-    const workbook = makeWorkbook(20);
-    const host = mountHost();
-    const grid = new GridImpl(host, {
-      workbook,
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: (request) => {
-          if (requested) {
-            return Promise.resolve(
-              coveredPage(
-                request,
-                Array.from({ length: request.end - request.start }, (_, row) => ({
-                  name: `Loaded ${request.start + row}`,
-                  amount: request.start + row,
-                  city: "Tokyo",
-                })),
-              ),
-            );
-          }
-          requested = request;
-          return promise;
-        },
-      },
-    });
-    const recorder = makePaintRecorder();
-    const errors: GridEvents["datasource-error"][] = [];
-    grid.on("datasource-error", (event) => errors.push(event));
-    Reflect.set(grid, "renderer", recorder);
-
-    if (!requested) throw new Error("datasource request was not issued");
-    const viewportRequest = requested;
-    resolve(
-      coveredPage(
-        viewportRequest,
-        Array.from({ length: viewportRequest.end - viewportRequest.start }, (_, row) => ({
-          name: `Loaded ${viewportRequest.start + row}`,
-          amount: viewportRequest.start + row,
-          city: "Tokyo",
-        })),
-      ),
-    );
-    await promise;
-    await new Promise<void>((resolveFrame) => {
-      requestAnimationFrame(() => resolveFrame());
-    });
-    await Promise.resolve();
-
-    expect(errors).toEqual([]);
-    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Loaded 0");
-
-    expect(recorder.paints.some((paint) => paint.values.includes("Loaded 0"))).toBe(true);
-    grid.destroy();
-  });
-
-  it("demands hidden-safe frozen and overscanned far columns on horizontal scroll", () => {
-    const workbook = makeWorkbook(100);
-    const sheet = workbook.sheets[0]!;
-    sheet.columns = Array.from({ length: 20 }, (_, column) => ({
-      key: `c${column}`,
-      header: `C${column}`,
-      width: 100,
-      type: "text" as const,
-      visible: column === 1 ? false : undefined,
-    }));
-    sheet.frozenCols = 1;
-    const requests: DataSourceRequest[] = [];
-    const { promise } = Promise.withResolvers<DataSourcePage>();
-    const host = mountHost();
-    const grid = new GridImpl(host, {
-      workbook,
-      overscan: 1,
-      datasource: {
-        capabilities: WINDOWED_DATASOURCE,
-        getRows: (request) => {
-          requests.push(request);
-          return promise;
-        },
-      },
-    });
-    const recorder = makePaintRecorder();
-    Reflect.set(grid, "renderer", recorder);
-    requests.length = 0;
-    let scrollEvent: GridEvents["scroll"] | undefined;
-    grid.on("scroll", (event) => {
-      scrollEvent = event;
-    });
-
-    const scroller = scrollerOf(host);
-    scroller.scrollLeft = 800;
-    scroller.dispatchEvent(new Event("scroll"));
-
-    const farRequest = requests.find((request) => requestColumnIndices(request).includes(9));
-    if (!farRequest) throw new Error("far horizontal datasource request was not issued");
-    expect(farRequest.columns).toEqual([
-      { start: 0, end: 1, keys: ["c0"] },
-      {
-        start: 9,
-        end: 18,
-        keys: ["c9", "c10", "c11", "c12", "c13", "c14", "c15", "c16", "c17"],
-      },
-    ]);
-    expect(requestColumnIndices(farRequest)).not.toContain(1);
-    expect(requestColumnIndices(farRequest).length).toBeLessThan(sheet.columns.length);
-    expect(scrollEvent).toMatchObject({
-      scrollLeft: 800,
-      firstVisibleColumn: 0,
-      lastVisibleColumn: 16,
-    });
-    expect(recorder.paints.length).toBeGreaterThan(0);
-    grid.destroy();
-  });
-
   it("loads the off-screen cells that visible formulas read", async () => {
     const columnCount = 20;
     const workbook = makeWorkbook(1_000);

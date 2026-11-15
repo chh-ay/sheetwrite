@@ -122,8 +122,22 @@ async function worker(): Promise<StreamingMemoryResult> {
   const xlsx = (await import(
     pathToFileURL(resolve(root, "packages/xlsx/src/workbook.ts")).href
   )) as { sheetwriteWorkbookBackend: XlsxWorkbookBackend };
-  await core.initSheetwrite();
-  core.setXlsxWorkbookBackend(xlsx.sheetwriteWorkbookBackend);
+  // A baseline checkout from before the add-on API takes no options object and has the setter instead.
+  const legacySetter = Reflect.get(core, "setXlsxWorkbookBackend");
+  if (typeof legacySetter === "function") {
+    await core.initSheetwrite();
+    legacySetter(xlsx.sheetwriteWorkbookBackend);
+  } else {
+    await core.initSheetwrite({
+      addons: [
+        {
+          name: "streaming-memory-bench",
+          setup: (context) => context.xlsx({ workbook: xlsx.sheetwriteWorkbookBackend }),
+        },
+      ],
+    });
+  }
+
   const options = {
     maxCells: rows * COLUMNS,
     resourceLimits: {

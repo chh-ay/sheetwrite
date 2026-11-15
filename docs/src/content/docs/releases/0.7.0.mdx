@@ -1,0 +1,321 @@
+---
+title: Sheetwrite 0.7.0
+description: "Sheetwrite 0.7.0: dashboards, a data model with measures, in-place sort, linked workbooks, saved queries and version history, and what to change when you upgrade."
+---
+
+<Note>
+  0.7.0 is the next release and is not published yet. These notes track the changes already
+  merged for it.
+</Note>
+
+Sheetwrite 0.7.0 turns a workbook into an analysis tool. Tables relate to each other in a data
+model, measures calculate over it, and dashboards put pivots, slicers, PivotCharts and KPI cards
+on one sheet. Sort moves the cells, as Excel's Sort does. Formulas read other workbooks, saved
+queries refresh tables from your sources, and version history saves, compares and restores
+versions. Every add-on now installs through one call. Read the [breaking changes](#breaking-changes)
+before you upgrade.
+
+<Frame
+  caption="A dashboard over the data model: KPI cards, a region slicer, a PivotChart and a pivot with a share-of-total measure."
+  tabletCaption="A dashboard over the data model, filtered by the Region slicer: KPI cards beside a PivotChart of revenue by month."
+  phoneCaption="A dashboard over the data model, filtered by the Region slicer: KPI cards above a PivotChart of revenue by month."
+>
+  <Screenshot
+    name="dashboard"
+    size="dashboard"
+    tablet="dashboard-tablet"
+    tabletAlt="A dashboard with a Region slicer set to Americas and EMEA, KPI cards for revenue, units sold and target in a column, and a column chart of revenue by month beside them."
+    phone="dashboard-phone"
+    phoneAlt="A dashboard laid out in one column: a Region slicer set to Americas and EMEA, a Revenue KPI card, Units sold and Target cards side by side, and a column chart of revenue by month."
+    alt="A dashboard sheet with three KPI cards for revenue, units sold and target attainment, a Region slicer with Americas and EMEA selected, a column chart of revenue by month and a pivot of revenue and share by product."
+  />
+</Frame>
+
+## Highlights
+
+<CardGroup cols={2}>
+  <Card title="Dashboards" screenshot="dashboard-filtered" size="dashboardRow" alt="A PivotChart of revenue by month and a pivot of revenue and share by product, both filtered to the APAC region by a slicer." href="/docs/features/analysis/dashboards/">
+    Pivots, slicers, PivotCharts and KPI cards on a 12-column dashboard sheet. Slicers filter
+    every pivot they reach through relationships.
+  </Card>
+  <Card title="Data model and measures" screenshot="data-model" alt="The Data Model panel lists the Orders and Regions tables and their relationship." href="/docs/features/analysis/data-model/">
+    Relate tables one-to-many, pivot over related tables, and write measures with `CALCULATE`
+    and `ALL`.
+  </Card>
+  <Card title="Sort in place" screenshot="sort" alt="The Sort panel with a sort level, a header row option and Sort view only." href="/docs/features/data/data-operations/#sort-cells-in-place">
+    Sort commands move the cells in Excel's sort order, as one undoable, synced change. The
+    display-only sort is now the view sort.
+  </Card>
+  <Card title="Linked workbooks" screenshot="edit-links" alt="The Edit Links panel lists a linked workbook with Update Values, Change Source and Break Link." href="/docs/features/formulas/">
+    Formulas such as `[Budget.xlsx]Annual!C10` read the values a link saved. Update, change or
+    break links from Edit Links.
+  </Card>
+  <Card title="Saved queries" screenshot="queries" alt="The Queries and Connections panel lists the saved queries of the workbook." href="/docs/features/data/">
+    The optional `@sheetwrite/queries` engine refreshes tables from CSV, JSON or host data, and
+    XLSX keeps queries as Power Query M.
+  </Card>
+  <Card title="Version history" screenshot="version-history" alt="The Version History panel lists saved versions with their authors." href="/docs/features/data/persistence/#opt-in-version-archives">
+    Save named versions, compare two versions cell by cell with authors, and restore a
+    workbook, sheet or range.
+  </Card>
+  <Card title="Formula help" screenshot="formula-help" alt="The cell editor shows the SUMIFS argument guide while a formula is typed." href="/docs/features/formulas/">
+    Autocomplete, an argument guide, live syntax errors, reference colours and Explain Formula
+    in the cell editor and the formula bar.
+  </Card>
+  <Card title="Compact ribbon" screenshot="compact-ribbon" alt="The compact ribbon folds its groups into menus at a narrow width." href="/docs/features/grid/">
+    One command model drives the toolbar, the full ribbon and a new compact ribbon for narrow
+    layouts.
+  </Card>
+</CardGroup>
+
+## Analysis
+
+### Data model
+
+- Workbook tables relate one-to-many by stable table and column IDs, with undoable, synced
+  `setRelationship` and `removeRelationship` operations.
+  `SheetwriteStore.getRelationshipStatus(id)` reports unmatched keys, duplicate lookup keys,
+  type mismatches and removed columns.
+- Pivot tables use fields from related tables with the `{ model: { table, fields } }` source.
+  The pivot field list shows the columns of related tables, and adding one turns a table pivot
+  into a model pivot in one undo step.
+- Data › Data Tools has **Data Model**, **Relationships** and **Measures** panels.
+
+### Measures
+
+- Measures are formulas over model columns, calculated in the filter context of each pivot cell,
+  with a `{ measure }` value field and `setMeasure` / `removeMeasure` operations.
+- Measures read related tables, refer to other measures by `[Name]`, follow renames, and
+  `GETPIVOTDATA` reads them by name.
+- `CALCULATE(expression, filter, …)` with column comparisons and `ALL(Table[Column])` changes
+  the filter context.
+
+### Dashboards
+
+- Dashboard sheets (`kind: "dashboard"`) hold pivot, slicer, chart and KPI items on a 12-column
+  grid. Items move and resize with the mouse and the keyboard, and Insert › New Dashboard adds
+  one.
+- Slicers filter every pivot whose table reaches the slicer column through relationships, and
+  dim or hide values that no row has under the other slicers.
+- PivotCharts and KPI cards: a chart item charts a pivot, and a KPI card shows one measure in
+  the slicers' filter context.
+- XLSX export writes each dashboard as a worksheet of its current values, with PivotCharts as
+  native charts, and the dashboard opens as a dashboard again.
+
+### Charts
+
+- Charts over a pivot plot its leaf items, as Excel PivotCharts do, and can plot only some of
+  its values, measures included.
+- Multi-level category labels, as Excel draws them, kept in XLSX as `c:multiLvlStrRef`.
+- XLSX import and export read and write Excel column, bar, line, area, pie, doughnut and scatter
+  charts.
+
+## Data
+
+### Sort in place
+
+- `store.sortRange` and `grid.sortRange` sort the cells, as Excel does: one undoable, synced
+  change with the `permuteRows` operation and the `"sort"` commit reason. Formulas, merged
+  cells, spill ranges and tables follow Excel's rules.
+- Sort A to Z and Sort Z to A sort in place from the ribbon, the toolbar and the column menu.
+  Data › Custom Sort opens a Sort panel with sort levels, a header row and a "Sort view only"
+  option.
+- Sorts use Excel's sort order: case-insensitive text in Excel's character order, errors after
+  logical values, and blanks last in both directions.
+
+### Linked workbooks
+
+- Formulas accept references to other workbooks, such as `[Budget.xlsx]Annual!C10`, and to
+  their defined names, such as `Budget.xlsx!Total`. They show the values the link saved, or
+  `#REF!` without them.
+- XLSX import keeps external links and the values Excel saved, and export writes them back.
+- `externalLinksAddon({ resolve })` updates links from your resolver, points them at another
+  workbook or breaks them into values, as one undoable change. Data › Queries & Connections ›
+  Edit Links runs the same commands.
+
+### Saved queries
+
+- The optional `@sheetwrite/queries` package is a columnar query engine for CSV, JSON and typed
+  host batches, in a lazily loaded 85 KB gzip WebAssembly module.
+- Saved workbook queries refresh into workbook tables through `queriesAddon({ fetchSource })`:
+  one undoable, synced transaction per refresh, with sources loaded only through your callback.
+- Data › Get Data, Refresh All and Queries & Connections in the ribbon and toolbar. XLSX keeps
+  saved queries as Power Query M.
+
+### Version history
+
+- `historyAddon()` adds Review › Version History and Save Version: save named versions, compare
+  a version with the current document, preview it read-only, and restore the workbook, a sheet
+  or a range.
+- `HistoryArchive` stores versions in content-addressed chunks through a
+  `HistoryStorageAdapter` or the built-in IndexedDB adapter, and `diffVersions` pages changed
+  cells with their authors, computed by a 17 KB gzip WebAssembly kernel that loads only when a
+  comparison opens.
+- `SyncCoordinatorOptions.authorId` records who made each change.
+
+## Formulas
+
+- Defined-name formulas, named LAMBDAs and a Name Manager.
+- Formula help in the cell editor and the formula bar: autocomplete, an argument guide, live
+  syntax errors, reference colours and Formulas › Explain Formula. Alt+Enter adds a line break, and both
+  editors grow to eight lines.
+- Custom JavaScript functions with metadata install with `functionsAddon([...])` and appear in
+  Formulas › Insert Function.
+- The full engine adds Excel's engineering, complex number, Bessel, `CONVERT`, remaining
+  financial, Excel 2007 statistics, byte-width text and `GETPIVOTDATA` functions. Both engines
+  add 30 math functions, `LOOKUP`, `TRIMRANGE`, the `A` statistics and the information
+  functions. See [Excel function coverage](/docs/reference/excel-function-coverage/).
+
+## Grid and editing
+
+- The toolbar, the full ribbon and a new compact ribbon (`config.ribbon: { mode: "compact" }`)
+  render one command model.
+- File › Import XLSX opens a workbook in the current grid, and `grid.importWorkbook` replaces
+  the document without recreating the grid.
+- `grid.trimMemory()` gives back memory an open grid can build again.
+- Moving rows or columns moves the cells, as Excel's Insert Cut Cells does, and every reference
+  follows them.
+
+## Performance
+
+Recalculation takes 0.837–0.861 of the time on average across the 53 formula workloads with dense
+formula IDs, and 0.835–0.912 of that with
+flat dependency arrays, on Linux and Mac
+with both engines. Selected workloads:
+
+| Workload | Faster by |
+| --- | --- |
+| 200 `INDEX`/`MATCH` lookups over 100,000 rows | 85–132× |
+| `COUNTIF` with a number criterion, 100k cells | 11.5–18× |
+| `SUM` over two 100k ranges | 2.15–6.62× |
+| Row edit in a 100,000-formula workbook | 3.80× |
+| Range formulas over loaded pages | 3.01–3.10× |
+| One-formula range edit, 100k workbook | 2.53–3.26× |
+| Lookup edits and repeated lookups | 1.2–3.0× |
+| First recalculation of 100k formulas | 1.55–1.87× |
+| Loading formulas | 1.21–1.46× |
+
+The dependency index for 100k formulas shrinks from 7.67 MB to 1.21 MB.
+
+## Breaking changes
+
+The [0.7.0 upgrade guide](/docs/start/upgrade-to-0-7-0/) lists every change with its
+replacement. The changes most apps meet:
+
+### Add-ons install through `initSheetwrite`
+
+<Compare before="0.6" after="0.7.0">
+
+```js partial="0.6 code; these imports and arguments no longer exist"
+import "@sheetwrite/charts/register";
+import "@sheetwrite/xlsx/register";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite(undefined, formulas);
+```
+
+```ts compile
+import { chartsAddon } from "@sheetwrite/charts";
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({
+  engine: formulas,
+  addons: [chartsAddon(), xlsxAddon()],
+});
+```
+
+</Compare>
+
+`registerChartsBackend`, `registerXlsxBackends`, the chart and XLSX backend setters and the
+positional `initSheetwrite(source, engine)` are removed with the `/register` imports.
+
+### Sort moves the cells
+
+<Compare before="0.6" after="0.7.0">
+
+```js partial="0.6 code"
+// Sorted the view only.
+grid.sortBy(2, true);
+grid.setSort([{ col: 2, ascending: true }]);
+```
+
+```ts compile
+import type { Grid } from "@sheetwrite/core";
+
+export function sortByRegion(grid: Grid) {
+  // Sorts the cells, as Excel does.
+  grid.sortBy(2, true);
+  // The display-only sort.
+  grid.setViewSort([{ col: 2, ascending: true }]);
+}
+```
+
+</Compare>
+
+`store.sortBy`, `store.sortByMulti`, `grid.setSort` and `grid.sortByMulti` are removed. An
+imported worksheet `sortState` is kept, not applied as a view sort.
+
+### Revisions move to version history
+
+<Compare before="0.6" after="0.7.0">
+
+```js partial="0.6 code"
+const revisions = new RevisionCoordinator(adapter, { documentId, serverVersion });
+const [latest] = await revisions.list();
+await revisions.restore(latest.version, crypto.randomUUID());
+```
+
+```ts compile
+import type { Grid, SyncCoordinator } from "@sheetwrite/core";
+import { HistoryArchive, type HistoryStorageAdapter } from "@sheetwrite/core/history";
+
+export async function restoreLatest(
+  grid: Grid,
+  sync: SyncCoordinator,
+  storage: HistoryStorageAdapter,
+) {
+  const archive = await HistoryArchive.open({ documentId: "workbook-42", storage });
+  const { versions } = await archive.listVersions({ maxEntries: 20 });
+  const latest = versions[0];
+  if (latest === undefined) return;
+  return archive.restoreVersion(grid, latest.id, { kind: "workbook" }, { sync });
+}
+```
+
+</Compare>
+
+### Removed engine bindings
+
+Direct `@sheetwrite/wasm` and `@sheetwrite/formulas` users must replace these bindings:
+
+| Removed | Replacement |
+| --- | --- |
+| `CellStore.setColumnNumbers`, `setColumnStrings`, `setColumnStringsPacked` | `setColumnBlockPacked`, `setBlockPacked` or `setSparseBlock` |
+| `DiffKernel.clearPage` | Consume the page arrays; the next `compare` starts a new page |
+| `DiffKernel.pageLength` | Read the length of a returned page array |
+
+The scalar setters and `clearCell`, `CellStore.rowCount` / `colCount`, and
+`WindowView.nRows` / `nCols` remain public APIs.
+
+### Errors and cancellation
+
+- Bad input and passed limits throw a `SheetwriteError` (`invalid-argument`, `not-found`,
+  `invalid-limits`) instead of `RangeError`, `TypeError` or `Error`.
+- Aborted XLSX, CSV, comment and sync calls reject with the signal's reason.
+- A WebAssembly trap throws `engine-failed` and makes every grid on that engine read-only.
+
+### Direct XLSX formula conversion
+
+Direct callers of `@sheetwrite/wasm` or `@sheetwrite/formulas` now pass joined
+sources, cumulative UTF-16 ends and a changed-index buffer to `convertXlsxFormulas`,
+which returns only the changed formulas. The scalar `formulaToXlsx` and `formulaFromXlsx`
+exports are removed; use a one-source batch instead. Core's
+`XlsxFormulaEngine.convert` keeps its array interface. See
+[Direct engine calls](/docs/start/upgrade-to-0-7-0/#direct-engine-calls).
+
+<Card title="Upgrade to 0.7.0" icon="arrow-right" href="/docs/start/upgrade-to-0-7-0/" cta="Open the guide">
+  Every removed and changed API with its replacement, the document operations to accept on your
+  server, and the behavior changes you will notice.
+</Card>

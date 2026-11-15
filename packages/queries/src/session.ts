@@ -2,6 +2,7 @@ import type {
   ApplyTransactionResult,
   DocumentOp,
   Grid,
+  QueryCommands,
   Range,
   SavedQuery,
   SavedQueryOutput,
@@ -10,7 +11,6 @@ import type {
   Workbook,
   WorkbookTable,
 } from "@sheetwrite/core";
-import { registerQueryCommands } from "@sheetwrite/core";
 
 import { sessionCommands } from "./commands.js";
 import { QueryError } from "./errors.js";
@@ -28,9 +28,11 @@ import type {
 
 /** What the host must load for one saved query. It never carries credentials. */
 export interface QueryFetchRequest {
+  /** Id of the saved query being refreshed. */
   readonly queryId: string;
   /** Host-defined source identity; the host maps it to its own credentials and policy. */
   readonly sourceId: string;
+  /** Source kind from the saved definition: `csv` and `json` take bytes back, `host` a batch. */
   readonly kind: SavedQuerySource["kind"];
   /** Public, credential-free locator from the saved definition, if any. */
   readonly locator?: string;
@@ -43,6 +45,7 @@ export type QueryFetchResult =
 
 /** The signal aborts when the refresh is cancelled or the session is disposed. */
 export interface QueryFetchContext {
+  /** Pass it to `fetch` so a cancelled refresh stops the download. */
   readonly signal: AbortSignal;
 }
 
@@ -54,7 +57,9 @@ export type QueryFetchSource = (
 
 /** Host I/O for a session; the engine limits apply to every parse and execution. */
 export interface QuerySessionOptions {
+  /** Loads each saved query's source; the session has no other way to reach data. */
   readonly fetchSource: QueryFetchSource;
+  /** Overrides for the engine's limits; unset ones keep their defaults. */
   readonly limits?: Partial<QueryLimits>;
 }
 
@@ -79,6 +84,7 @@ export type QueryRefreshResult =
 
 /** The signal cancels a pending refresh before it writes anything. */
 export interface QueryRefreshOptions {
+  /** Aborting it before the write makes the refresh resolve `{ status: "aborted" }`. */
   readonly signal?: AbortSignal;
 }
 
@@ -342,11 +348,15 @@ function planOutput(
   return { range, patches };
 }
 
-/** Builds a session over an already loaded engine; the package entry points load it. */
+/**
+ * Builds a session over an already loaded engine; the queries add-on loads it.
+ * `registerCommands` shows the grid's Data commands while the session lives.
+ */
 export function createSessionWithEngine(
   grid: Grid,
   engine: QueryEngine,
   options: QuerySessionOptions,
+  registerCommands: (commands: QueryCommands) => () => void,
 ): QuerySession {
   const lifetime = new AbortController();
 
@@ -508,7 +518,7 @@ export function createSessionWithEngine(
 
   // The grid's Get Data, Refresh All and Queries & Connections commands appear
   // while this session is alive.
-  const unregister = registerQueryCommands(grid, sessionCommands(session));
+  const unregister = registerCommands(sessionCommands(session));
 
   return session;
 }

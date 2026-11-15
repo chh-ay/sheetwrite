@@ -1,5 +1,6 @@
 export type {
   ChartAnchor,
+  ChartCategoryLevel,
   ChartChangeEvent,
   ChartDefinition,
   ChartKind,
@@ -10,8 +11,9 @@ export type {
   ChartSeriesView,
   ChartView,
   MountedChart,
+  ReadonlyChartDefinition,
 } from "@sheetwrite/core";
 export { type ChartViewCache, createChartViewCache } from "./view-cache.js";
 export { createChartRenderer } from "./chart-renderer.js";
 export { type ChartSize, type ChartSvgOptions, renderChartSvg } from "./chart-svg.js";
-export { registerChartsBackend } from "./registration.js";
+export { chartsAddon } from "./addon.js";

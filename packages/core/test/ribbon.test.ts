@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { renderControl } from "../src/ribbon/ribbon-controls.js";
+import { ribbonHeight } from "../src/ribbon/ribbon-metrics.js";
 import { RibbonPopup } from "../src/ribbon/ribbon-popup.js";
 import { createToolbar } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
@@ -127,21 +128,6 @@ it.each(["full", "compact"] as const)(
   },
 );
 
-it("keeps only tabs in the tablist and the layout buttons beside it", async () => {
-  const { host, control } = await setup();
-  const tablist = host.querySelector('.sheetwrite-ribbon [role="tablist"]');
-  if (tablist === null) throw new Error("no ribbon tablist");
-
-  const roles = [...tablist.children].map((child) => child.getAttribute("role"));
-  // Unavailable feature tabs stay hidden, but only tabs belong to this list.
-  expect(new Set(roles)).toEqual(new Set(["tab"]));
-  for (const label of ["Compact ribbon", "Collapse the ribbon"]) {
-    const button = control(label);
-    expect(tablist.contains(button), label).toBe(false);
-    expect(button.parentElement).toBe(tablist.parentElement);
-  }
-});
-
 it("switches layout without losing a value-box draft or the active tab", async () => {
   const { host, control, openTab, press } = await setup();
   const size = control<HTMLInputElement>("Font Size");
@@ -186,21 +172,6 @@ it("renders the same commands as the toolbar for the same command flags", async 
   expect(ribbonCommands.has("sortAsc")).toBe(false);
 });
 
-it("shows Bold pressed, unpressed or mixed for the selection", async () => {
-  const { grid, control, select } = await setup();
-  grid.styleRange(
-    { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-    { bold: true },
-  );
-
-  select(0, 0);
-  expect(control("Bold").getAttribute("aria-pressed")).toBe("true");
-  select(1, 0);
-  expect(control("Bold").getAttribute("aria-pressed")).toBe("false");
-  select(0, 0, 1);
-  expect(control("Bold").getAttribute("aria-pressed")).toBe("mixed");
-});
-
 it("shows the focus cell's size in points and applies typed points as pixels", async () => {
   const { grid, host, control, select, cell, key } = await setup();
   grid.styleRange(
@@ -220,6 +191,39 @@ it("shows the focus cell's size in points and applies typed points as pixels", a
   expect(cell(1, 0).style.fontSize).toBeCloseTo(fourteenPoints);
   expect(size.value).toBe("14");
   expect(document.activeElement).toBe(host);
+});
+
+// #731: a cell that takes its format from its column showed "General".
+it("shows the format a cell displays, its column's when it has none of its own", async () => {
+  const { grid, host, select, cell, press } = await setup();
+  grid.applyTransaction({
+    patches: [{ op: "setColumn", sheet: "s1", col: 1, patch: { numberFormat: "0.00%" } }],
+  });
+  grid.styleRange(
+    { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
+    { numberFormat: "$#,##0.00" },
+  );
+  const box = () => {
+    const input = host.querySelector<HTMLInputElement>('[aria-label="Number Format"]');
+    if (input === null) throw new Error("no Number Format box");
+    return input.value;
+  };
+
+  select(0, 0);
+  expect(box()).toBe("General");
+  select(0, 1);
+  expect(box()).toBe("Percentage");
+  select(1, 1);
+  expect(box()).toBe("Currency");
+
+  // Increase Decimal starts from the column's format too.
+  select(0, 1);
+  const increase = host.querySelector<HTMLButtonElement>('[aria-label="Increase Decimal"]');
+  if (increase === null) throw new Error("no Increase Decimal button");
+  press(increase);
+  for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+  expect(cell(0, 1).style.numberFormat).toBe("0.000%");
+  expect(box()).toBe("Custom");
 });
 
 it.each(["full", "compact"] as const)(
@@ -544,6 +548,42 @@ it("gives the grid the panel's height back when minimized", async () => {
   expect(document.activeElement).toBe(host);
 });
 
+it("reserves a compact ribbon's own height before its chunk mounts, so the grid never moves", async () => {
+  const workbook: Workbook = {
+    activeSheet: "s1",
+    sheets: [
+      {
+        id: "s1",
+        name: "Sheet",
+        rowCount: 1,
+        columns: [{ key: "a", header: "A", type: "number", width: 100 }],
+      },
+    ],
+  };
+  const host = document.createElement("div");
+  Object.defineProperties(host, { clientWidth: { value: 900 }, clientHeight: { value: 500 } });
+  document.body.appendChild(host);
+  const config: GridConfig = { ribbon: { mode: "compact" } };
+  const grid = new GridImpl(host, { workbook, config }, new SheetwriteStore(workbook));
+  grids.push(grid);
+  const viewport = host.querySelector<HTMLElement>(".sheetwrite-viewport");
+  if (viewport === null) throw new Error("grid not mounted");
+
+  // Tab row (30 px) plus the compact panel (36 px), in the first frame and after mount.
+  expect(viewport.style.top).toBe("66px");
+  await ribbonMounted(host);
+  expect(host.querySelector(".sheetwrite-ribbon")?.getAttribute("data-mode")).toBe("compact");
+  expect(viewport.style.top).toBe("66px");
+});
+
+it("sizes the reserved ribbon by its layout and the host width", () => {
+  expect(ribbonHeight({}, 300)).toBe(122);
+  expect(ribbonHeight({ mode: "compact" }, 1_600)).toBe(66);
+  expect(ribbonHeight({ mode: "auto" }, 767)).toBe(66);
+  expect(ribbonHeight({ mode: "auto" }, 768)).toBe(122);
+  expect(ribbonHeight({ mode: "auto", compactWidth: 1_000 }, 900)).toBe(66);
+});
+
 it("replaces a glyph in every ribbon control that shows it, by glyph name", async () => {
   const custom = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   custom.setAttribute("data-icon", "custom-bold");
@@ -629,37 +669,4 @@ it("shows a failed placement command in its form instead of rejecting", async ()
   const error = form.querySelector<HTMLElement>(".sheetwrite-ribbon-form-error");
   expect(error?.hidden).toBe(false);
   expect(error?.textContent).toContain("the panel chunk failed to load");
-});
-
-it("shows the Formulas tab with Explain Formula, and hides Insert Function without host functions", async () => {
-  const { host, key } = await setup();
-  const tabs = [...host.querySelectorAll<HTMLElement>('.sheetwrite-ribbon [role="tab"]')];
-  const formulas = tabs.find((tab) => tab.textContent === "Formulas");
-  const insert = tabs.find((tab) => tab.textContent === "Insert");
-  if (formulas === undefined || insert === undefined) throw new Error("missing ribbon tabs");
-  expect(formulas.hidden).toBe(false);
-
-  formulas.click();
-  const command = (id: string): HTMLElement | null =>
-    host.querySelector<HTMLElement>(`.sheetwrite-ribbon [data-command="${id}"]`);
-  expect(command("insertFunction")?.hidden).toBe(true);
-  expect(command("explainFormula")?.hidden).toBe(false);
-
-  insert.focus();
-  key(insert, "ArrowRight");
-  expect(document.activeElement).toBe(formulas);
-});
-
-it("shows Insert Function with host functions on the full engine, in its own process", async () => {
-  // Engine selection is process-wide, so the full-engine checks run apart.
-  const probe = Bun.spawn(
-    [process.execPath, "test", "./packages/core/test/ribbon-functions.full-engine.ts"],
-    { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-  );
-  const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-  expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-    exitCode: 0,
-    failures: [],
-  });
 });

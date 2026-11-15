@@ -1,6 +1,6 @@
 <script lang="ts" generics="Row extends Record<string, CellScalar>, Id extends RowBridgeId = RowBridgeId">
 import type { CellScalar } from "@sheetwrite/core";
-import { createSimpleGridInput, createSimpleRowBridge, SheetwriteError } from "@sheetwrite/core/adapter";
+import { assertGridSize, createSimpleGridInput, createSimpleRowBridge } from "@sheetwrite/core/adapter";
 import type { RowBridgeId } from "@sheetwrite/core/adapter";
 import GridComponent from "./Grid.svelte";
 import type { SheetwriteGridProps, SheetwriteProps } from "./props.js";
@@ -26,17 +26,9 @@ let rowBridge = $derived(
   }),
 );
 let resolvedProps = $derived.by(() => {
+  assertGridSize({ height: props.height, fill: props.fill });
   const forwarded = { ...props, ...input, rowBridge };
   return forwarded as unknown as SheetwriteGridProps;
-});
-
-$effect(() => {
-  if (
-    (props.height === undefined && !props.fill) ||
-    (props.height !== undefined && props.fill)
-  ) {
-    throw new SheetwriteError("invalid-argument", "create-grid", "Sheetwrite: provide exactly one of height or fill");
-  }
 });
 </script>
 

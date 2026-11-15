@@ -1,0 +1,433 @@
+/* What an engine change does to every workload (docs/src/lib/release-change.ts):
+   counts first, then one dot per changed workload on an axis centred on the
+   release it is measured against, then every number on demand. */
+
+.change {
+  container: change / inline-size;
+  margin: var(--sw-space-6) 0 var(--sw-space-8);
+  padding: var(--sw-space-6);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xl);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-variant-numeric: tabular-nums;
+}
+
+.sw-prose .change :is(p, ul) {
+  margin: 0;
+}
+
+.sw-prose .change ul,
+.change ul {
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .change li,
+.change li {
+  margin: 0;
+}
+
+.change__title {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-body);
+  font-weight: 650;
+}
+
+.change__machine {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-0-5) var(--sw-space-2);
+  margin-top: var(--sw-space-2) !important;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.change__machine .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+.change__machine span {
+  flex-basis: 100%;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+/* ---- Machine switch: one machine's panel, or every machine side by side ---- */
+
+.change > .machine-switch {
+  margin-top: var(--sw-space-3);
+}
+
+.change:has(> .machine-switch) .change__panel {
+  display: none;
+}
+
+.change:has(input[value="linux"]:checked) .change__panel[data-machine="linux"],
+.change:has(input[value="mac"]:checked) .change__panel[data-machine="mac"],
+.change:has(input[value="all"]:checked) .change__panel[data-machine="all"] {
+  display: block;
+}
+
+.change__columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+  gap: var(--sw-space-5);
+}
+
+.change__column {
+  padding-top: var(--sw-space-1);
+}
+
+.change__pending {
+  margin-top: var(--sw-space-1) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+/* ---- Counts ---- */
+
+.change__counts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sw-space-3);
+  margin-top: var(--sw-space-4) !important;
+}
+
+.change__counts li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sw-space-2);
+  padding: var(--sw-space-3) var(--sw-space-4);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-0);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.change__counts b {
+  font: 700 clamp(1.5rem, 1.2rem + 1.2cqi, 2rem) / 1 var(--sw-font-display, inherit);
+  letter-spacing: -0.02em;
+}
+
+.change__counts [data-verdict="better"] b {
+  color: var(--sw-success);
+}
+
+.change__counts [data-verdict="worse"] b {
+  color: var(--sw-danger);
+}
+
+/* A count of zero is a plain fact, not an alarm or a win. */
+.change__counts [data-zero] b {
+  color: var(--sw-fg-muted);
+}
+
+.change__size {
+  margin-top: var(--sw-space-3) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.change__size b {
+  font-weight: 650;
+}
+
+.change__size[data-verdict="better"] b {
+  color: var(--sw-success);
+}
+
+.change__size[data-verdict="worse"] b {
+  color: var(--sw-danger);
+}
+
+/* The phone toggle: a real checkbox behind its label, shown only on phones. */
+.change__toggle {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.change__toggle-label {
+  display: none;
+  margin-top: var(--sw-space-2);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.change__toggle-label:hover {
+  color: var(--sw-accent-strong);
+}
+
+.change__toggle:focus-visible + .change__rows + .change__toggle-label {
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
+}
+
+.change__toggle:not(:checked) ~ .change__toggle-label [data-open],
+.change__toggle:checked ~ .change__toggle-label [data-closed] {
+  display: none;
+}
+
+.change__counts [data-verdict="noise"] b {
+  color: var(--sw-fg-strong);
+}
+
+/* ---- Overview: a dot per changed workload, centred on the base release ---- */
+
+.change__overview {
+  margin-top: var(--sw-space-5);
+}
+
+.change__axis-title {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.change__axis,
+.change__row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 17rem) minmax(0, 1fr) 9rem;
+  align-items: center;
+  column-gap: var(--sw-space-4);
+}
+
+.change__axis {
+  margin-top: var(--sw-space-2);
+  padding-bottom: var(--sw-space-1-5);
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.change__ticks {
+  position: relative;
+  grid-column: 2;
+  height: 1.25rem;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.25rem var(--sw-font-mono);
+}
+
+.change__ticks span {
+  position: absolute;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* The end labels stay inside the lane; the others centre on their gridline. */
+.change__ticks span:first-child {
+  transform: none;
+}
+
+.change__ticks span:last-child {
+  transform: translateX(-100%);
+}
+
+.change__ticks span[data-centre] {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.change__rows {
+  padding-top: var(--sw-space-1) !important;
+}
+
+.change__row {
+  min-height: 1.875rem;
+  margin: 0 calc(var(--sw-space-2) * -1) !important;
+  padding: 0 var(--sw-space-2);
+  border-radius: var(--sw-radius-md);
+  transition: background-color var(--sw-motion-fast, 120ms) ease;
+}
+
+.change__row:hover {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.change__label {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.change__lane {
+  min-width: 0;
+}
+
+.change__verdict {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--sw-space-1);
+  font-size: var(--sw-text-small);
+  white-space: nowrap;
+}
+
+.change__row[data-verdict="better"] .change__verdict {
+  color: var(--sw-success);
+}
+
+.change__row[data-verdict="worse"] .change__verdict {
+  color: var(--sw-danger);
+}
+
+.change__verdict b {
+  font-weight: 650;
+}
+
+/* ---- Disclosures ---- */
+
+.change__more {
+  margin-top: var(--sw-space-3);
+}
+
+.change__more > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.change__more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.change__more > summary::before {
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentcolor;
+  content: "";
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: rotate var(--sw-motion-fast, 120ms) ease;
+}
+
+.change__more[open] > summary::before {
+  rotate: 90deg;
+}
+
+.change__more > summary:hover {
+  color: var(--sw-accent-strong);
+}
+
+.change__noise {
+  margin-top: var(--sw-space-2) !important;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.7;
+}
+
+.change__table {
+  margin-top: var(--sw-space-3);
+  overflow-x: auto;
+}
+
+.sw-prose .change__data,
+.change__data {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+}
+
+.change__data caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sw-prose .change__data :is(th, td),
+.change__data :is(th, td) {
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  background: none;
+  color: var(--sw-fg-muted);
+  font: 400 var(--sw-text-caption) / 1.4 var(--sw-font-mono);
+  letter-spacing: normal;
+  text-align: right;
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.sw-prose .change__data :is(th[scope="row"], thead th:first-child),
+.change__data :is(th[scope="row"], thead th:first-child) {
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+  text-align: left;
+}
+
+.sw-prose .change__data thead th,
+.change__data thead th {
+  font-family: var(--sw-font-body, inherit);
+  font-weight: 600;
+}
+
+/* Headings and names wrap, so the numbers fit the figure at desktop and tablet widths. */
+.sw-prose .change__data :is(thead th, th[scope="row"]),
+.change__data :is(thead th, th[scope="row"]) {
+  white-space: normal;
+}
+
+.change__data td b {
+  color: var(--sw-fg-strong);
+}
+
+.change__data tbody tr:hover :is(td, th) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+/* ---- Phones: labels on their own line, the lane full width ---- */
+
+@container change (max-width: 40rem) {
+  /* Row 11 on: PHONE_ROWS in docs/src/lib/release-change.ts is 10. */
+  .change__toggle:not(:checked) + .change__rows .change__row:nth-child(n + 11) {
+    display: none;
+  }
+
+  .change__toggle-label {
+    display: inline-flex;
+  }
+
+  .change__counts li {
+    flex-direction: column;
+    gap: var(--sw-space-1);
+  }
+
+  .change__axis,
+  .change__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .change__ticks {
+    grid-column: 1 / -1;
+  }
+
+  .change__label {
+    grid-column: 1 / -1;
+    padding-top: var(--sw-space-1);
+    font-size: var(--sw-text-caption);
+  }
+
+  .change__lane {
+    grid-column: 1;
+  }
+}
+
+@media (max-width: 40rem) {
+  .change {
+    margin-inline: calc(var(--sw-space-2) * -1);
+    padding: var(--sw-space-4);
+  }
+}

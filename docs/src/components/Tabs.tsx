@@ -1,135 +1,165 @@
+import { readPreference, writePreference } from "@docs/lib/preference-storage.js";
 import {
-  Children,
-  isValidElement,
-  type ReactElement,
-  type ReactNode,
-  useEffect,
-  useId,
-  useMemo,
-  useState,
-} from "react";
+  children,
+  createEffect,
+  createMemo,
+  createSignal,
+  createUniqueId,
+  For,
+  type JSX,
+  mergeProps,
+  onCleanup,
+  Show,
+} from "solid-js";
 
-import { readPreference, writePreference } from "../lib/preference-storage.js";
 import { onTabListKey } from "./tabKeys.js";
 
-interface TabItemProps {
-  label: string;
-  children: ReactNode;
+/** Props of {@link Tab}: one panel of a {@link Tabs} group. */
+interface TabProps {
+  readonly title: string;
+  readonly children?: JSX.Element;
 }
 
+/** Props of {@link Tabs}. */
 interface TabsProps {
-  syncKey?: string;
-  children: ReactNode;
+  /**
+   * Tabs with the same `sync` value switch together across the site, and the
+   * choice is remembered: `framework` and `package-manager` are the two used.
+   */
+  readonly sync?: string;
+  /** The tab list's accessible name. */
+  readonly label?: string;
+  /** `code`: the tabs head a code block (CodeGroup), drawn as its title bar. */
+  readonly variant?: "code";
+  readonly children?: JSX.Element;
 }
 
 const TAB_EVENT = "sheetwrite:docs-tab";
+/** Preference keys keep the old prefix, so a reader's earlier choice still applies. */
+const PREFERENCE_PREFIX = "sheetwrite-";
 
-/** Payload of the tab event: the synchronised group and the label it selected. */
+/** Payload of the tab event: the synchronised group and the title it selected. */
 interface TabEventDetail {
   readonly key: string;
-  readonly label: string;
+  readonly title: string;
 }
 
 function isTabEventDetail(value: unknown): value is TabEventDetail {
   if (typeof value !== "object" || value === null) return false;
 
-  const detail: { key?: unknown; label?: unknown } = value;
-  return typeof detail.key === "string" && typeof detail.label === "string";
+  const detail: { key?: unknown; title?: unknown } = value;
+  return typeof detail.key === "string" && typeof detail.title === "string";
 }
 
-function tabEvent(detail: TabEventDetail): CustomEvent<TabEventDetail> {
-  return new CustomEvent(TAB_EVENT, { detail });
+/** Whether a resolved child of {@link Tabs} is a {@link Tab} descriptor. */
+export function isTab(child: unknown): child is TabProps {
+  if (typeof child !== "object" || child === null) return false;
+  // Rendered nodes (text, markup between the tabs) are no Tab; the server has no Node.
+  if (typeof Node !== "undefined" && child instanceof Node) return false;
+  const tab: { title?: unknown } = child;
+  return typeof tab.title === "string";
 }
 
-export function TabItem({ children }: Readonly<TabItemProps>) {
-  return children;
+/**
+ * One panel; {@link Tabs} renders it. Solid renders children eagerly, so a Tab
+ * renders nothing itself: it hands its props to Tabs, whose panel reads the
+ * (lazy) `children` where the panel is drawn.
+ */
+export function Tab(props: Readonly<TabProps>): JSX.Element {
+  return props as unknown as JSX.Element;
 }
 
-export function Tabs({ children, syncKey }: Readonly<TabsProps>) {
-  const tabs = useMemo(
-    () =>
-      Children.toArray(children).filter(
-        (child): child is ReactElement<TabItemProps> =>
-          isValidElement<TabItemProps>(child) && typeof child.props.label === "string",
-      ),
-    [children],
+/**
+ * Switchable panels. Pages write `<Tabs>` and
+ * `<Tab title>` in MDX; CodeGroup becomes a `variant="code"` Tabs at build time.
+ */
+export function Tabs(rawProps: Readonly<TabsProps>) {
+  const props = mergeProps({ label: "Choose a version" }, rawProps);
+  const resolved = children(() => props.children);
+  const tabs = createMemo(() =>
+    resolved.toArray().flatMap((child) => (isTab(child) ? [child] : [])),
   );
-  const [selected, setSelected] = useState(0);
-  const id = useId();
-  const labels = useMemo(() => tabs.map((tab) => tab.props.label), [tabs]);
-  const tabElementId = (label: string) => `${id}-tab-${labels.indexOf(label)}`;
+  const [selected, setSelected] = createSignal(0);
+  const id = createUniqueId();
+  const titles = createMemo(() => tabs().map((tab) => tab.title));
+  const tabElementId = (title: string) => `${id}-tab-${titles().indexOf(title)}`;
+  const preferenceKey = () =>
+    props.sync === undefined ? undefined : `${PREFERENCE_PREFIX}${props.sync}`;
 
-  useEffect(() => {
-    if (syncKey === undefined) return;
-    const stored = readPreference(syncKey);
-    const index = tabs.findIndex((tab) => tab.props.label === stored);
+  createEffect(() => {
+    const key = preferenceKey();
+    const current = titles();
+    if (key === undefined) return;
+    const stored = readPreference(key);
+    const index = current.indexOf(stored ?? "");
     if (index >= 0) setSelected(index);
 
     const onChange = (event: Event) => {
       if (!(event instanceof CustomEvent)) return;
 
       const detail: unknown = event.detail;
-      if (!isTabEventDetail(detail) || detail.key !== syncKey) return;
+      if (!isTabEventDetail(detail) || detail.key !== key) return;
 
-      const next = tabs.findIndex((tab) => tab.props.label === detail.label);
+      const next = current.indexOf(detail.title);
       if (next >= 0) setSelected(next);
     };
     window.addEventListener(TAB_EVENT, onChange);
-    return () => window.removeEventListener(TAB_EVENT, onChange);
-  }, [syncKey, tabs]);
+    onCleanup(() => window.removeEventListener(TAB_EVENT, onChange));
+  });
 
   const select = (index: number) => {
     setSelected(index);
-    if (syncKey === undefined) return;
-
-    const label = labels[index];
-    if (label === undefined) return;
-    writePreference(syncKey, label);
-    window.dispatchEvent(tabEvent({ key: syncKey, label }));
+    const title = titles()[index];
+    const key = preferenceKey();
+    if (key === undefined || title === undefined) return;
+    writePreference(key, title);
+    window.dispatchEvent(new CustomEvent<TabEventDetail>(TAB_EVENT, { detail: { key, title } }));
   };
 
-  if (tabs.length === 0) return null;
-
   return (
-    <div className="sw-tabs">
-      <div className="sw-tabs__list" role="tablist" aria-label="Framework">
-        {tabs.map((tab, index) => (
-          <button
-            aria-controls={`${id}-panel-${index}`}
-            aria-selected={index === selected}
-            id={`${id}-tab-${index}`}
-            key={tab.props.label}
-            onClick={() => select(index)}
-            onKeyDown={(event) =>
-              onTabListKey(
-                event,
-                labels,
-                tab.props.label,
-                (label) => select(labels.indexOf(label)),
-                tabElementId,
-              )
-            }
-            role="tab"
-            // Only the selected tab is in the Tab sequence; arrow keys move between tabs.
-            tabIndex={index === selected ? 0 : -1}
-            type="button"
-          >
-            {tab.props.label}
-          </button>
-        ))}
-      </div>
-      {tabs.map((tab, index) => (
-        <div
-          aria-labelledby={`${id}-tab-${index}`}
-          className="sw-tabs__panel"
-          hidden={index !== selected}
-          id={`${id}-panel-${index}`}
-          key={tab.props.label}
-          role="tabpanel"
-        >
-          {tab.props.children}
+    <Show when={tabs().length > 0}>
+      <div class="sw-tabs" data-variant={props.variant}>
+        <div aria-label={props.label} class="sw-tabs__list" role="tablist">
+          <For each={tabs()}>
+            {(tab, index) => (
+              <button
+                aria-controls={`${id}-panel-${index()}`}
+                aria-selected={index() === selected()}
+                id={`${id}-tab-${index()}`}
+                onClick={() => select(index())}
+                onKeyDown={(event) =>
+                  onTabListKey(
+                    event,
+                    titles(),
+                    tab.title,
+                    (title) => select(titles().indexOf(title)),
+                    tabElementId,
+                  )
+                }
+                role="tab"
+                // Only the selected tab is in the Tab sequence; arrow keys move between tabs.
+                tabIndex={index() === selected() ? 0 : -1}
+                type="button"
+              >
+                {tab.title}
+              </button>
+            )}
+          </For>
         </div>
-      ))}
-    </div>
+        <For each={tabs()}>
+          {(tab, index) => (
+            <div
+              aria-labelledby={`${id}-tab-${index()}`}
+              class="sw-tabs__panel"
+              hidden={index() !== selected()}
+              id={`${id}-panel-${index()}`}
+              role="tabpanel"
+            >
+              {tab.children}
+            </div>
+          )}
+        </For>
+      </div>
+    </Show>
   );
 }

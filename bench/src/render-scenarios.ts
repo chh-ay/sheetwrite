@@ -41,6 +41,16 @@ const FROZEN_PANE_COUNT = 4;
 export const WRAP_HEAVY_TEXT_LENGTH = 200;
 /** Marker prefix of the wrapped body text installed by `wrap-heavy.scroll`. */
 export const WRAP_HEAVY_TEXT_PREFIX = "diagnostic-wrap-";
+/** One grapheme of two code units (a letter and a combining accent), repeated by `wrap-unicode.paint.*`. */
+const WRAP_UNICODE_GRAPHEME = "e\u0301";
+/** Grapheme count of the one wrapped cell each `wrap-unicode.paint.*` scenario paints. */
+const WRAP_UNICODE_GRAPHEMES: Partial<Record<ScenarioId, number>> = {
+  "wrap-unicode.paint.200": 200,
+  "wrap-unicode.paint.2000": 2_000,
+  "wrap-unicode.paint.20000": 20_000,
+};
+/** Body cell that holds the wrapped text: visible at the top-left of the first frame. */
+export const WRAP_UNICODE_CELL = { row: 1, col: 2 } as const;
 /** Marker prefix of the searchable body text installed by `search-many.scroll`. */
 export const SEARCH_MATCH_PREFIX = "diagnostic-search-";
 /** Amount that separates the two conditional-format style rules. */
@@ -72,6 +82,14 @@ export interface GeometryObservation {
   readonly lastRow: number;
   readonly lastTop: number;
 }
+/**
+ * Uniform geometry builds timed as one action. One build takes about 0.1 µs,
+ * far below the browser clock (coarsened to 100 µs without cross-origin
+ * isolation), so timing builds one by one measures clock noise and a fast
+ * machine cannot reach the aggregate minimum within the action cap.
+ */
+export const GEOMETRY_BUILDS_PER_ACTION = 10_000;
+
 export function measureUnresizedMillionRowGeometry(): GeometryObservation {
   const index = new OffsetIndex(1_000_000, 28);
   const middle = index.rowAtOffset(14_000_005);
@@ -175,6 +193,9 @@ export interface FrozenPaneProbe {
 export interface RenderBenchDiagnosticAdapter extends RenderBenchAdapter {
   installWrapHeavy(rowCount: number): void;
   clearWrapHeavy(): void;
+  /** Writes `text` with wrapping into {@link WRAP_UNICODE_CELL}. */
+  installWrapUnicode(text: string): void;
+  clearWrapUnicode(): void;
   installSearchMatches(rowCount: number): void;
   clearSearchMatches(): void;
   beginSearch(query: string): void;
@@ -188,8 +209,6 @@ export interface RenderBenchDiagnosticAdapter extends RenderBenchAdapter {
   clearConditionalFormats(): void;
   installCurrencyFormat(): void;
   clearCurrencyFormat(): void;
-  installDateSerials(rowCount: number): void;
-  clearDateSerials(): void;
   resolvedStyle(row: number, col: number): ResolvedStyleProbe;
   formattedText(row: number, col: number): string;
 }
@@ -219,10 +238,53 @@ export class ScenarioValidationError extends Error {
 interface ScenarioActions {
   readonly setup?: () => void;
   readonly measureWindowTransfer?: boolean;
+  /** Operations one timed `action` call performs; defaults to one. */
+  readonly operationsPerAction?: number;
   readonly prepare: () => void;
   readonly action: () => void;
   readonly cleanup: () => void;
   readonly validateEffect: (observations: ValidationObservation[]) => void;
+}
+
+/** A value read back for an untimed restore; scenario writes take only scalars. */
+function restorableValue(value: unknown, cell: string): string | number | null {
+  if (value === null || typeof value === "string" || typeof value === "number") return value;
+  throw new ScenarioValidationError(`${cell} holds a ${typeof value} that cannot be restored`);
+}
+
+/**
+ * Room for the altering rows to insert `ALTER_COUNT` rows. A sheet at the
+ * row or dense-cell limit refuses an insert, so `make` removes `ALTER_COUNT`
+ * rows just above the last one (untimed, once per scenario) and `restore`
+ * puts them back with their values. Rows near the top, the middle sentinel
+ * and the last row stay where they are.
+ */
+function rowHeadroom(
+  adapter: RenderBenchAdapter,
+  dataset: ColumnarDataset,
+): { make: () => void; restore: () => void } {
+  const start = dataset.rowCount - 1 - ALTER_COUNT;
+  const saved: (string | number | null)[] = [];
+  return {
+    make: () => {
+      saved.length = 0;
+      for (let row = start; row < start + ALTER_COUNT; row++) {
+        for (let col = 0; col < adapter.colCount; col++) {
+          saved.push(restorableValue(adapter.cellValue(row, col), `row ${row} column ${col}`));
+        }
+      }
+      adapter.removeRows(start, ALTER_COUNT);
+    },
+    restore: () => {
+      adapter.insertRows(start, ALTER_COUNT);
+      let index = 0;
+      for (let row = start; row < start + ALTER_COUNT; row++) {
+        for (let col = 0; col < adapter.colCount; col++) {
+          adapter.setCellValue(row, col, saved[index++] ?? null);
+        }
+      }
+    },
+  };
 }
 
 function usedJsHeapBytes(): number | null {
@@ -569,6 +631,48 @@ function scenarioActions(
     };
   }
 
+  const wrapUnicodeGraphemes = WRAP_UNICODE_GRAPHEMES[scenarioId];
+  if (wrapUnicodeGraphemes !== undefined) {
+    const diagnostics = diagnosticAdapter(adapter);
+    const text = WRAP_UNICODE_GRAPHEME.repeat(wrapUnicodeGraphemes);
+    const { row, col } = WRAP_UNICODE_CELL;
+    const action = (): void => adapter.repaint();
+    return {
+      setup: () => {
+        adapter.prepareScroll("top", false);
+        diagnostics.installWrapUnicode(text);
+      },
+      prepare: () => {},
+      action,
+      cleanup: () => {},
+      validateEffect: (observations) => {
+        try {
+          action();
+          checkpoint(
+            observations,
+            `${scenarioId} paints the whole wrapped text`,
+            true,
+            adapter.cellValue(row, col) === text,
+          );
+          checkpoint(
+            observations,
+            `${scenarioId} keeps the wrap flag on the painted cell`,
+            true,
+            diagnostics.resolvedStyle(row, col).wrap,
+          );
+        } finally {
+          diagnostics.clearWrapUnicode();
+        }
+        checkpoint(
+          observations,
+          `${scenarioId} restores the unwrapped body cell`,
+          false,
+          diagnostics.resolvedStyle(row, col).wrap,
+        );
+      },
+    };
+  }
+
   if (scenarioId === "search-many.scroll") {
     const steps = longScrollSteps(dataset);
     const matchedRows = dataset.rowCount - 1;
@@ -826,10 +930,7 @@ function scenarioActions(
       for (const width of columnSteps) adapter.scrollBy("left", width);
     };
     return {
-      setup: () => {
-        diagnostics.installCurrencyFormat();
-        diagnostics.installDateSerials(dataset.rowCount - 1);
-      },
+      setup: () => diagnostics.installCurrencyFormat(),
       prepare,
       action,
       cleanup: () => {},
@@ -872,7 +973,6 @@ function scenarioActions(
           );
         } finally {
           diagnostics.clearCurrencyFormat();
-          diagnostics.clearDateSerials();
         }
       },
     };
@@ -911,9 +1011,12 @@ function scenarioActions(
   if (scenarioId === "geometry-unresized.1m") {
     let observed: GeometryObservation | undefined;
     const action = (): void => {
-      observed = adapter.measureUnresizedMillionRowGeometry();
+      for (let build = 0; build < GEOMETRY_BUILDS_PER_ACTION; build++) {
+        observed = adapter.measureUnresizedMillionRowGeometry();
+      }
     };
     return {
+      operationsPerAction: GEOMETRY_BUILDS_PER_ACTION,
       prepare: () => {},
       action,
       cleanup: () => {},
@@ -938,8 +1041,11 @@ function scenarioActions(
   }
 
   if (scenarioId === "formatted-paint.top-left") {
-    const originalDate = dataset.date[0]!;
-    const originalAmount = dataset.amount[0]!;
+    // Restore what the cells held, not dataset text: Sheetwrite ingests the
+    // date column's ISO text as serials, and writing the text back would leave
+    // later scenarios a document that differs from a freshly loaded one.
+    let originalDate: string | number | null = null;
+    let originalAmount: string | number | null = null;
     adapter.resetFormatResources();
     const prepare = (): void => {
       adapter.setCellValue(0, 1, 45_351);
@@ -951,6 +1057,10 @@ function scenarioActions(
       adapter.setCellValue(0, 4, originalAmount);
     };
     return {
+      setup: () => {
+        originalDate = restorableValue(adapter.cellValue(0, 1), "A1 date cell");
+        originalAmount = restorableValue(adapter.cellValue(0, 4), "A1 amount cell");
+      },
       prepare,
       action,
       cleanup,
@@ -1005,6 +1115,10 @@ function scenarioActions(
   }
 
   if (scenarioId === "merge-heavy.paint") {
+    // Compare against the value before merging, not dataset text: the loaded
+    // date cell holds the ingested serial, so a fixed text expectation passes
+    // only after another scenario has rewritten the cell.
+    const coveredBeforeMerge = adapter.cellValue(0, 1);
     adapter.installMergeHeavy();
     adapter.resetMergeResources();
     const action = (): void => adapter.repaint();
@@ -1018,7 +1132,10 @@ function scenarioActions(
           checkpoint(
             observations,
             "merge-heavy.paint preserves anchor and covered-cell values",
-            JSON.stringify([dataset.id[0], adapter.id === "sheetwrite" ? dataset.date[0] : null]),
+            JSON.stringify([
+              dataset.id[0],
+              adapter.id === "sheetwrite" ? coveredBeforeMerge : null,
+            ]),
             JSON.stringify([adapter.cellValue(0, 0), adapter.cellValue(0, 1)]),
           );
           if (adapter.id === "sheetwrite") {
@@ -1173,60 +1290,77 @@ function scenarioActions(
   }
 
   if (scenarioId === "altering.insert-5-rows-top") {
+    const headroom = rowHeadroom(adapter, dataset);
     const action = (): void => adapter.insertRows(1, ALTER_COUNT);
     const cleanup = (): void => adapter.removeRows(1, ALTER_COUNT);
     return {
+      setup: headroom.make,
       prepare: () => {},
       action,
       cleanup,
       validateEffect: (observations) => {
-        withEffectCleanup(action, cleanup, () => {
-          checkpoint(
-            observations,
-            "insert increases row count",
-            dataset.rowCount + ALTER_COUNT,
-            adapter.rowCount(),
-          );
-          checkpoint(
-            observations,
-            "insert preserves preceding sentinel",
-            dataset.id[0],
-            adapter.cellValue(0, 0),
-          );
-          checkpoint(
-            observations,
-            "insert shifts following sentinel",
-            dataset.id[1],
-            adapter.cellValue(6, 0),
-          );
-        });
+        try {
+          withEffectCleanup(action, cleanup, () => {
+            checkpoint(
+              observations,
+              "insert increases row count",
+              dataset.rowCount,
+              adapter.rowCount(),
+            );
+            checkpoint(
+              observations,
+              "insert preserves preceding sentinel",
+              dataset.id[0],
+              adapter.cellValue(0, 0),
+            );
+            checkpoint(
+              observations,
+              "insert shifts following sentinel",
+              dataset.id[1],
+              adapter.cellValue(6, 0),
+            );
+          });
+        } finally {
+          headroom.restore();
+        }
       },
     };
   }
 
   if (scenarioId === "altering.remove-5-rows-top") {
+    const headroom = rowHeadroom(adapter, dataset);
     const prepare = (): void => adapter.insertRows(1, ALTER_COUNT);
     const action = (): void => adapter.removeRows(1, ALTER_COUNT);
     return {
+      setup: headroom.make,
       prepare,
       action,
       cleanup: () => {},
       validateEffect: (observations) => {
-        prepare();
-        action();
-        checkpoint(observations, "remove restores row count", dataset.rowCount, adapter.rowCount());
-        checkpoint(
-          observations,
-          "remove preserves preceding sentinel",
-          dataset.id[0],
-          adapter.cellValue(0, 0),
-        );
-        checkpoint(
-          observations,
-          "remove restores following sentinel",
-          dataset.id[1],
-          adapter.cellValue(1, 0),
-        );
+        try {
+          prepare();
+          action();
+          checkpoint(
+            observations,
+            "remove restores row count",
+            dataset.rowCount - ALTER_COUNT,
+            adapter.rowCount(),
+          );
+          checkpoint(
+            observations,
+            "remove preserves preceding sentinel",
+            dataset.id[0],
+            adapter.cellValue(0, 0),
+          );
+          checkpoint(
+            observations,
+            "remove restores following sentinel",
+            dataset.id[1],
+            adapter.cellValue(1, 0),
+          );
+        } finally {
+          headroom.restore();
+        }
       },
     };
   }
@@ -1273,6 +1407,9 @@ function stepFailure(step: ScenarioStep, error: unknown): Error {
   return wrapped;
 }
 
+/** Guards against an action that never accumulates measurable time. */
+const MAXIMUM_ACTIONS_PER_SAMPLE = 1_000_000;
+
 function aggregateSample(
   adapter: RenderBenchAdapter,
   actions: ScenarioActions,
@@ -1280,6 +1417,8 @@ function aggregateSample(
 ): MeasuredSample {
   let durationMs = 0;
   let operationCount = 0;
+  let actionCount = 0;
+  const operationsPerAction = actions.operationsPerAction ?? 1;
   const transferCounters = {
     logicalFrames: 0,
     windowReadRequests: 0,
@@ -1326,10 +1465,11 @@ function aggregateSample(
       throw new RangeError(`invalid operation duration: ${elapsed}`);
     }
     durationMs += elapsed;
-    operationCount++;
-    if (operationCount > 1_000_000) {
+    operationCount += operationsPerAction;
+    actionCount++;
+    if (actionCount > MAXIMUM_ACTIONS_PER_SAMPLE) {
       throw new RangeError(
-        `aggregate did not reach ${minimumDurationMs} ms within 1,000,000 operations`,
+        `aggregate did not reach ${minimumDurationMs} ms within ${MAXIMUM_ACTIONS_PER_SAMPLE.toLocaleString("en-US")} actions`,
       );
     }
   } while (durationMs < minimumDurationMs);

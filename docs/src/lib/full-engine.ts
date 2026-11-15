@@ -25,7 +25,7 @@ export async function initFullEngine(): Promise<boolean> {
   const formulas = await import("@sheetwrite/formulas");
 
   try {
-    await initSheetwrite(undefined, formulas);
+    await initSheetwrite({ engine: formulas });
   } catch (cause) {
     if (isEngineConflict(cause) && !sessionStorage.getItem(ENGINE_RELOAD_KEY)) {
       sessionStorage.setItem(ENGINE_RELOAD_KEY, "1");

@@ -47,6 +47,7 @@ export interface Measure {
  * its error in the pivot cells that calculate the measure.
  */
 export interface MeasureStatus {
+  /** `ok` when the measure can be calculated; otherwise why it cannot. */
   status: "ok" | "syntax" | "missingTable" | "unavailable";
 }
 

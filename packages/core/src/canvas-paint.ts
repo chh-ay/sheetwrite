@@ -1,4 +1,5 @@
 import { EMPTY_STYLE } from "./cell-style-fields.js";
+import { automaticTextColor } from "./color-contrast.js";
 import { formatNumber } from "./number-format.js";
 import type {
   CellAlign,
@@ -185,15 +186,65 @@ const WHITESPACE = /\s/;
 const MAY_HAVE_CLUSTERS = /[\u0300-\uffff]/;
 let graphemeSegmenter: Intl.Segmenter | undefined;
 
-/** End offset of each grapheme, or null when every code unit is one. */
-function graphemeEnds(paragraph: string): number[] | null {
-  if (!MAY_HAVE_CLUSTERS.test(paragraph)) return null;
-  graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
-  const ends: number[] = [];
-  for (const { index, segment } of graphemeSegmenter.segment(paragraph)) {
-    ends.push(index + segment.length);
+/**
+ * Break units of one paragraph: graphemes, or plain code units when they
+ * coincide (no segmentation, no allocation). Graphemes are segmented only as
+ * far as the layout has asked, plus one, so a cell that draws a few lines of a
+ * long paragraph never segments the rest of it.
+ */
+class BreakUnits {
+  /** End offset of each grapheme segmented so far; unused for plain code units. */
+  private readonly ends: number[] = [];
+  private segments: Iterator<Intl.SegmentData> | undefined;
+  private isClustered = false;
+  /** Units known to exist. Exact once `segments` is undefined. */
+  private known = 0;
+
+  /** Starts on `paragraph`, reusing the offset buffer of the previous one. */
+  reset(paragraph: string): void {
+    this.ends.length = 0;
+    this.isClustered = MAY_HAVE_CLUSTERS.test(paragraph);
+    if (this.isClustered) {
+      graphemeSegmenter ??= new Intl.Segmenter(undefined, { granularity: "grapheme" });
+      this.segments = graphemeSegmenter.segment(paragraph)[Symbol.iterator]();
+      this.known = 0;
+    } else {
+      this.segments = undefined;
+      this.known = paragraph.length;
+    }
   }
-  return ends;
+
+  /**
+   * `unit`, or the last unit when the paragraph has fewer. Segments one unit
+   * past it, so {@link isLast} is exact for the result.
+   */
+  clamp(unit: number): number {
+    while (this.segments !== undefined && this.known <= unit + 1) {
+      const next = this.segments.next();
+      if (next.done === true) {
+        this.segments = undefined;
+        break;
+      }
+      this.ends.push(next.value.index + next.value.segment.length);
+      this.known += 1;
+    }
+    return Math.min(unit, this.known - 1);
+  }
+
+  /** Whether the paragraph has `unit`; segments up to it. */
+  has(unit: number): boolean {
+    return this.clamp(unit) === unit;
+  }
+
+  /** Whether `unit`, already returned by {@link clamp}, ends the paragraph. */
+  isLast(unit: number): boolean {
+    return this.segments === undefined && unit === this.known - 1;
+  }
+
+  /** End offset of `unit`, already returned by {@link clamp}. */
+  endOf(unit: number): number {
+    return this.isClustered ? (this.ends[unit] ?? 0) : unit + 1;
+  }
 }
 
 /**
@@ -221,6 +272,7 @@ function layoutTextLinesInto(
   lines: string[],
 ): string[] {
   const limit = Math.max(1, maxLines);
+  const units = new BreakUnits();
 
   for (const paragraph of text.split("\n")) {
     if (lines.length >= limit) break;
@@ -229,29 +281,25 @@ function layoutTextLinesInto(
       continue;
     }
 
-    // Break units: graphemes, or plain code units when they coincide (no allocation).
-    const ends = graphemeEnds(paragraph);
-    const count = ends === null ? paragraph.length : ends.length;
-    const endOf = (unit: number): number => (ends === null ? unit + 1 : (ends[unit] ?? 0));
-
+    units.reset(paragraph);
     let first = 0;
     let start = 0;
     let guess = FIRST_LINE_GUESS;
     const overflows = (unit: number): boolean =>
-      ctx.measureText(paragraph.slice(start, endOf(unit))).width > width;
+      ctx.measureText(paragraph.slice(start, units.endOf(unit))).width > width;
 
-    while (first < count && lines.length < limit) {
+    while (lines.length < limit && units.has(first)) {
       // Gallop: grow the probe until it overflows or the paragraph ends.
       let fits = first - 1;
       let over = -1;
       for (let step = guess; ; step *= 2) {
-        const probe = Math.min(count - 1, fits + step);
+        const probe = units.clamp(fits + step);
         if (overflows(probe)) {
           over = probe;
           break;
         }
         fits = probe;
-        if (probe === count - 1) break;
+        if (units.isLast(probe)) break;
       }
       if (over === -1) {
         lines.push(paragraph.slice(start));
@@ -275,14 +323,14 @@ function layoutTextLinesInto(
       if (overflowUnit > first) {
         last = overflowUnit - 1;
         for (let unit = overflowUnit; unit >= first; unit--) {
-          if (WHITESPACE.test(paragraph[endOf(unit) - 1] ?? "")) {
+          if (WHITESPACE.test(paragraph[units.endOf(unit) - 1] ?? "")) {
             last = unit;
             break;
           }
         }
       }
 
-      const end = endOf(last);
+      const end = units.endOf(last);
       lines.push(paragraph.slice(start, end));
       guess = last - first + 1;
       first = last + 1;
@@ -391,6 +439,10 @@ interface PaintState {
   digitWidth: number;
   hashWidth: number;
   fontCache: Map<string, string>;
+  /** Automatic text colour per explicit cell fill, for this frame's theme. */
+  cellTextOnFill: Map<string, string>;
+  /** Automatic text colour per explicit header fill, for this frame's theme. */
+  headerTextOnFill: Map<string, string>;
 }
 
 function applyFont(ctx: Ctx, state: PaintState, font: string): void {
@@ -405,6 +457,28 @@ function applyFill(ctx: Ctx, state: PaintState, fill: string): void {
     ctx.fillStyle = fill;
     state.lastFill = fill;
   }
+}
+
+/**
+ * Automatic text colour on an explicit fill, chosen by contrast against it and
+ * computed once per distinct fill a frame paints. Resolving a named colour
+ * goes through `ctx.fillStyle`, so the applied fill is forgotten afterwards.
+ */
+function textOnFill(
+  ctx: Ctx,
+  state: PaintState,
+  cache: Map<string, string>,
+  fill: string,
+  foreground: string,
+  background: string,
+): string {
+  let color = cache.get(fill);
+  if (color === undefined) {
+    color = automaticTextColor(fill, foreground, background, ctx);
+    state.lastFill = "";
+    cache.set(fill, color);
+  }
+  return color;
 }
 
 export interface PaintDamage {
@@ -524,6 +598,8 @@ export function paintFrame(
     digitWidth: 0,
     hashWidth: 0,
     fontCache: new Map(),
+    cellTextOnFill: new Map(),
+    headerTextOnFill: new Map(),
   };
 
   const styleCache = new Map<number, CellStyle>();
@@ -860,7 +936,21 @@ function paintCell(
 
   const effectiveFont = fontFor(theme, effective, layout.zoom ?? 1, state.fontCache);
   applyFont(ctx, state, effectiveFont);
-  applyFill(ctx, state, effective.color ?? theme.fg);
+  applyFill(
+    ctx,
+    state,
+    effective.color ??
+      (effective.backgroundColor
+        ? textOnFill(
+            ctx,
+            state,
+            state.cellTextOnFill,
+            effective.backgroundColor,
+            theme.fg,
+            theme.bg,
+          )
+        : theme.fg),
+  );
 
   const align =
     effective.align ??
@@ -1029,7 +1119,21 @@ function paintHeader(
         state.fontCache,
       ),
     );
-    applyFill(ctx, state, headerStyle?.color ?? theme.headerFg);
+    applyFill(
+      ctx,
+      state,
+      headerStyle?.color ??
+        (headerStyle?.backgroundColor
+          ? textOnFill(
+              ctx,
+              state,
+              state.headerTextOnFill,
+              headerStyle.backgroundColor,
+              theme.headerFg,
+              theme.headerBg,
+            )
+          : theme.headerFg),
+    );
 
     const align = headerStyle?.align ?? "center";
     ctx.save();
@@ -1160,7 +1264,7 @@ export function intersectingMerges(
   return queryMerges(prepared, rowStart, rowEnd - 1, minimumColumn, maximumColumn);
 }
 
-export function horizontalMergeGaps(
+function horizontalMergeGaps(
   prepared: PreparedMergeIndex,
   row: number,
   columnMinimum = Number.NEGATIVE_INFINITY,
@@ -1171,7 +1275,7 @@ export function horizontalMergeGaps(
     .sort((a, b) => a.c0 - b.c0 || a.c1 - b.c1);
 }
 
-export function verticalMergeGaps(
+function verticalMergeGaps(
   prepared: PreparedMergeIndex,
   column: number,
   rowMinimum = Number.NEGATIVE_INFINITY,

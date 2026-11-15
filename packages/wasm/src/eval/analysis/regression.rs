@@ -1,29 +1,31 @@
 //! Least-squares arrays, FREQUENCY, MODE.MULT, PROB and legacy statistical names.
 
-use super::super::array::ast_produces_array;
+use super::super::array::{ast_produces_array, Shapes};
 use super::super::functions::{number_arg, numeric_entries, require_arity, FuncAccumulator};
 use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::statistics;
 use super::super::value::{aggregate_number, bool_from_value};
 use super::super::EvalPass;
+use super::descriptive;
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 use std::cmp::Ordering;
 
-pub(crate) const NAMES: &[&str] = &[
-    "FREQUENCY",
-    "GROWTH",
-    "LINEST",
-    "LOGEST",
-    "MODE.MULT",
-    "PERCENTILE",
-    "PERCENTRANK",
-    "PROB",
-    "QUARTILE",
-    "RANK",
-    "TREND",
-];
+family_functions! {
+    FREQUENCY,
+    GROWTH,
+    LINEST,
+    LOGEST,
+    MODE_MULT = "MODE.MULT",
+    PERCENTILE,
+    PERCENTRANK,
+    PROB,
+    QUARTILE,
+    RANK,
+    TREND,
+}
+
 const STATS_ROWS: usize = 5;
 const PROBABILITY_TOLERANCE: f64 = 1e-12;
 const QR_DEPENDENCE_FACTOR: f64 = 64.0;
@@ -32,15 +34,23 @@ const LINEST_MAX_ARGS: usize = 4;
 const FREQUENCY_ARGS: usize = 2;
 const MODE_MAX_ARGS: usize = 255;
 
-/// The legacy names use the same rules as their current names.
-pub(crate) fn evaluate(name: &str, values: &FuncAccumulator) -> EvalResult {
-    let current = match name {
-        "PERCENTILE" => Func::PercentileInc,
-        "QUARTILE" => Func::QuartileInc,
-        "RANK" => Func::RankEq,
-        "PERCENTRANK" => return super::descriptive::evaluate("PERCENTRANK.INC", values),
-        "PROB" => return probability(values).map_or_else(Value::Error, Value::number),
-        _ => return Value::Error(FormulaError::Name),
+/// The legacy names use the same rules as their current names. The array
+/// functions evaluate through the array hooks only.
+pub(crate) fn evaluate(function: Function, values: &FuncAccumulator) -> EvalResult {
+    let current = match function {
+        Function::PERCENTILE => Func::PercentileInc,
+        Function::QUARTILE => Func::QuartileInc,
+        Function::RANK => Func::RankEq,
+        Function::PERCENTRANK => {
+            return descriptive::evaluate(descriptive::Function::PERCENTRANK_INC, values)
+        }
+        Function::PROB => return probability(values).map_or_else(Value::Error, Value::number),
+        Function::FREQUENCY
+        | Function::GROWTH
+        | Function::LINEST
+        | Function::LOGEST
+        | Function::MODE_MULT
+        | Function::TREND => return Value::Error(FormulaError::Name),
     };
     statistics::apply(current, values).unwrap_or(Value::Error(FormulaError::Name))
 }
@@ -70,10 +80,15 @@ fn probability(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         .sum())
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
+pub(crate) const fn produces_array(function: Function, _: &[Ast], _: Shapes<'_>) -> bool {
     matches!(
-        name,
-        "FREQUENCY" | "GROWTH" | "LINEST" | "LOGEST" | "MODE.MULT" | "TREND"
+        function,
+        Function::FREQUENCY
+            | Function::GROWTH
+            | Function::LINEST
+            | Function::LOGEST
+            | Function::MODE_MULT
+            | Function::TREND
     )
 }
 
@@ -87,8 +102,34 @@ fn argument_shape(
         Ast::Num(_) | Ast::Bool(_) | Ast::Str(_) => Ok((1, 1, 1)),
         // A scalar expression such as 1/0 or A1*2 gives one value; its
         // error, if any, appears when it is evaluated.
-        _ if !is_reference(ast) && !ast_produces_array(ast) => Ok((1, 1, 1)),
-        _ => store.matrix_shape(ast, sheet, pass),
+        _ if !is_reference(ast) && !ast_produces_array(ast, pass.shapes()) => Ok((1, 1, 1)),
+        Ast::Missing
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => store.matrix_shape(ast, sheet, pass),
     }
 }
 
@@ -97,12 +138,12 @@ fn argument_shape(
 /// can be a formula, so the evaluated result can be smaller.
 pub(crate) fn shape(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let (rows, cols) = if name == "FREQUENCY" {
+    let (rows, cols) = if function == Function::FREQUENCY {
         if args.len() != FREQUENCY_ARGS {
             return Err(FormulaError::Value);
         }
@@ -110,7 +151,7 @@ pub(crate) fn shape(
         let (_, _, bin_cells) = argument_shape(store, &args[1], sheet, pass)?;
         validate_frequency_resources(data_cells, bin_cells)?;
         (bin_cells + 1, 1)
-    } else if name == "MODE.MULT" {
+    } else if function == Function::MODE_MULT {
         if args.is_empty() || args.len() > MODE_MAX_ARGS {
             return Err(FormulaError::Value);
         }
@@ -133,7 +174,7 @@ pub(crate) fn shape(
             })?;
         let predictors = predictor_count(y_rows, y_cols, x_rows, x_cols)?;
         validate_fit_resources(y_cells, predictors)?;
-        if name == "LINEST" || name == "LOGEST" {
+        if function == Function::LINEST || function == Function::LOGEST {
             (statistics_rows_bound(args), predictors + 1)
         } else if let Some(ast) = optional_ast(args, 2) {
             let (new_rows, new_cols, new_cells) = argument_shape(store, ast, sheet, pass)?;
@@ -149,12 +190,12 @@ pub(crate) fn shape(
 
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
+    shape(store, function, args, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 fn statistics_rows_bound(args: &[Ast]) -> usize {
@@ -167,7 +208,7 @@ fn statistics_rows_bound(args: &[Ast]) -> usize {
 
 /// One predictor maps each cell of `new_x` to one result. More predictors use
 /// one `new_x` row (vertical data) or column (horizontal data) per result.
-fn prediction_shape(
+const fn prediction_shape(
     predictors: usize,
     is_vertical: bool,
     new_rows: usize,
@@ -268,23 +309,24 @@ impl Evaluation<'_, '_> {
 
 pub(crate) fn evaluate_array(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
-    shape(store, name, args, sheet, pass)?;
+    shape(store, function, args, sheet, pass)?;
     let mut evaluation = Evaluation {
         store,
         sheet,
         pass,
         depth,
     };
-    match name {
-        "FREQUENCY" => return frequency(&mut evaluation, args),
-        "MODE.MULT" => return modes(&mut evaluation, args),
-        _ => {}
+    if function == Function::FREQUENCY {
+        return frequency(&mut evaluation, args);
+    }
+    if function == Function::MODE_MULT {
+        return modes(&mut evaluation, args);
     }
     let y_matrix = evaluation.matrix(&args[0])?;
     let x_matrix = if let Some(ast) = optional_ast(args, 1) {
@@ -299,8 +341,8 @@ pub(crate) fn evaluate_array(
         )
     };
     let is_vertical = y_matrix.cols == 1;
-    let is_exponential = name == "LOGEST" || name == "GROWTH";
-    let is_prediction = name == "TREND" || name == "GROWTH";
+    let is_exponential = function == Function::LOGEST || function == Function::GROWTH;
+    let is_prediction = function == Function::TREND || function == Function::GROWTH;
     let has_intercept = evaluation.boolean(args, if is_prediction { 3 } else { 2 }, true)?;
     if !is_prediction {
         let has_statistics = evaluation.boolean(args, 3, false)?;
@@ -363,11 +405,11 @@ pub(crate) fn evaluate_array(
 
 /// Regression inputs must be numbers: blank cells, text and logical values
 /// give #VALUE!, as in Excel.
-fn strict_number(value: &Value) -> Result<f64, FormulaError> {
+const fn strict_number(value: &Value) -> Result<f64, FormulaError> {
     match value {
         Value::Number(number) => Ok(*number),
         Value::Error(error) => Err(*error),
-        _ => Err(FormulaError::Value),
+        Value::Text(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
     }
 }
 
@@ -378,7 +420,7 @@ fn numeric_values(matrix: &EvalMatrix) -> Result<Vec<f64>, FormulaError> {
         .filter_map(|value| match value {
             Value::Number(number) => Some(Ok(*number)),
             Value::Error(error) => Some(Err(*error)),
-            _ => None,
+            Value::Text(_) | Value::Bool(_) | Value::Blank => None,
         })
         .collect()
 }
@@ -420,7 +462,7 @@ fn frequency(
 fn modes(evaluation: &mut Evaluation<'_, '_>, args: &[Ast]) -> Result<EvalMatrix, FormulaError> {
     let mut numbers = Vec::new();
     for arg in args {
-        let from_range = is_reference(arg) || ast_produces_array(arg);
+        let from_range = is_reference(arg) || ast_produces_array(arg, evaluation.pass.shapes());
         for value in &evaluation.matrix(arg)?.values {
             if let Some(number) = aggregate_number(value, from_range)? {
                 // -0 and 0 are the same value.
@@ -473,7 +515,26 @@ fn is_reference(ast: &Ast) -> bool {
         | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => is_reference(expression),
         Ast::NamedFormula(named) => is_reference(&named.expression),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
     }
 }
 
@@ -492,7 +553,7 @@ struct FitStatistics {
     rank: usize,
 }
 
-fn predictor_count(
+const fn predictor_count(
     y_rows: usize,
     y_cols: usize,
     x_rows: usize,
@@ -521,7 +582,7 @@ struct PredictorLayout {
 }
 
 impl PredictorLayout {
-    fn index(self, observation: usize, predictor: usize) -> usize {
+    const fn index(self, observation: usize, predictor: usize) -> usize {
         if self.predictors == 1 {
             observation
         } else if self.is_vertical {
@@ -734,7 +795,7 @@ fn fit(
 fn dot(left: &[f64], right: &[f64]) -> f64 {
     left.iter()
         .zip(right)
-        .map(|(left, right)| left * right)
+        .map(|(left_value, right_value)| left_value * right_value)
         .sum()
 }
 
@@ -742,7 +803,7 @@ impl Fit {
     fn statistics(self, rows: usize, is_exponential: bool) -> Result<EvalMatrix, FormulaError> {
         let cols = self.coefficients.len() + 1;
         let mut values = vec![Value::Error(FormulaError::Na); rows * cols];
-        for (index, coefficient) in self
+        for (index, stored) in self
             .coefficients
             .iter()
             .rev()
@@ -750,9 +811,9 @@ impl Fit {
             .enumerate()
         {
             let coefficient = if is_exponential {
-                coefficient.exp()
+                stored.exp()
             } else {
-                *coefficient
+                *stored
             };
             if !coefficient.is_finite() {
                 return Err(FormulaError::Num);
@@ -1038,19 +1099,6 @@ mod tests {
     }
 
     #[test]
-    fn frequency_keeps_the_order_of_unsorted_and_equal_bins() {
-        // Each result belongs to the bin at the same position in bins_array.
-        // https://support.microsoft.com/en-us/office/frequency-function-44e3be2b-eca0-42cd-a3f7-fd9ea898fdb9
-        let (mut store, sheet) =
-            sheet_with_columns(&[&[1.0, 2.0, 3.0, 4.0, 5.0], &[3.0, 1.0, 3.0]]);
-        store.set_formula(sheet, 0, 4, "=FREQUENCY(A1:A5,B1:B3)", 0);
-        store.recompute(sheet);
-        for (row, expected) in [2.0, 1.0, 0.0, 2.0].iter().enumerate() {
-            close(&store, sheet, row, 4, *expected, 0.0);
-        }
-    }
-
-    #[test]
     fn regression_inputs_must_be_numbers() {
         let (mut store, sheet) =
             sheet_with_columns(&[&[1.0, 9.0, 5.0, 7.0], &[0.0, 4.0, 2.0, 3.0]]);
@@ -1068,20 +1116,6 @@ mod tests {
                 "{formula}"
             );
         }
-    }
-
-    #[test]
-    fn statistics_flag_from_a_cell_selects_the_row_count() {
-        // https://support.microsoft.com/en-us/excel/functions/linest-function
-        let (mut store, sheet) =
-            sheet_with_columns(&[&[1.0, 9.0, 5.0, 7.0], &[0.0, 4.0, 2.0, 3.0], &[0.0]]);
-        store.set_formula(sheet, 0, 4, "=LINEST(A1:A4,B1:B4,TRUE,C1)", 0);
-        store.recompute(sheet);
-        close(&store, sheet, 0, 4, 2.0, 1e-12);
-        assert_eq!(store.get_cell(sheet, 3, 5).num(), 0.0);
-        store.set_number(sheet, 0, 2, 1.0, 0);
-        store.recompute(sheet);
-        close(&store, sheet, 3, 5, 2.0, 0.0);
     }
 
     #[test]

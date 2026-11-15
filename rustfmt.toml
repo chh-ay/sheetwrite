@@ -1,0 +1,5 @@
+# rustfmt settings for the three Rust crates; rustfmt reads the nearest
+# rustfmt.toml above each file. Only options of the pinned stable toolchain.
+max_width = 100
+use_field_init_shorthand = true
+use_try_shorthand = true

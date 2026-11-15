@@ -1,55 +1,70 @@
-import { Link, useLocation } from "@tanstack/react-router";
+import releaseFacts from "@docs/generated/release-facts.json" with { type: "json" };
 
-import { LATEST_RELEASE, releaseHref } from "../lib/releases.js";
-import type { CapabilityOwnerId } from "../showcases/capabilities.js";
+import { BrandMark } from "./BrandMark.js";
+import { Icon } from "./Icon.js";
 import { ThemeToggle } from "./ThemeToggle.js";
 
-interface SiteTopbarProps {
-  /**
-   * Declares showcase context for routes outside `/showcases/` (the framework
-   * workbenches). Routes inside the family are recognised from the URL, so a
-   * page can never lose its "where am I" marker by passing the wrong id.
-   */
-  active?: CapabilityOwnerId | "showcases";
+const REPOSITORY_URL = "https://github.com/chh-ay/sheetwrite";
+
+type Section = "docs" | "showcases" | "releases" | undefined;
+
+function currentSection(pathname: string): Section {
+  if (pathname.startsWith(releaseFacts.releasesHref)) return "releases";
+  if (pathname.startsWith("/docs/")) return "docs";
+  if (pathname.startsWith("/showcases/")) return "showcases";
+  return undefined;
 }
 
 /**
- * The one product topbar: brand, Docs, showcases, What's new, GitHub, theme.
- * Shared by the landing and every showcase so the site has a single chrome.
- * Framework deep links and benchmark navigation live in their dedicated surfaces.
+ * The site header outside the documentation, ported from
+ * docs/src/components/SiteTopbar.tsx: brand, Docs, Showcases, Releases, GitHub
+ * and the theme toggle. On phones the site links open from the menu button as
+ * a native popover (open, close, Escape, light dismiss and focus come from the
+ * browser, without script). The theme toggle's behaviour is in lib/shell.ts.
  */
-export function SiteTopbar({ active }: Readonly<SiteTopbarProps>) {
-  const pathname = useLocation({ select: (location) => location.pathname });
-  // The hub is the destination itself; every other page in the family is one
-  // step below it.
-  const isShowcaseHub = pathname === "/showcases/";
-  const inShowcaseFamily =
-    isShowcaseHub || pathname.startsWith("/showcases/") || active !== undefined;
+export function SiteTopbar(props: { readonly pathname: string }) {
+  const section = () => currentSection(props.pathname);
+  // A section's own page is the destination; deeper pages are inside the section.
+  const marker = (name: Exclude<Section, undefined>, href: string) =>
+    section() !== name ? undefined : props.pathname === href ? "page" : "true";
+
   return (
-    <header className="sw-showcase-nav sw-product-nav">
-      <Link aria-label="Sheetwrite home" className="sw-showcase-brand" to="/">
-        <svg aria-hidden="true" viewBox="0 0 32 32">
-          <rect height="26" rx="5" width="26" x="3" y="3" />
-          <path d="M3 11h26M11 3v26M20 11v18M11 20h18" />
-        </svg>
+    <header class="sw-header" data-has-search="false">
+      <a aria-label="Sheetwrite home" class="sw-header__brand" href="/">
+        <BrandMark />
         <span>Sheetwrite</span>
-      </Link>
-      <nav aria-label="Site">
-        <Link to="/docs/">Docs</Link>
-        <Link
-          activeOptions={{ exact: true }}
-          aria-current={isShowcaseHub ? "page" : inShowcaseFamily ? "true" : undefined}
-          to="/showcases/"
-        >
+      </a>
+      <nav aria-label="Site" class="sw-header__nav" id="site-nav" popover="auto">
+        <a aria-current={marker("docs", "/docs/")} href="/docs/">
+          Docs
+        </a>
+        <a aria-current={marker("showcases", "/showcases/")} href="/showcases/">
           Showcases
-        </Link>
-        <Link to={releaseHref(LATEST_RELEASE.version)}>
-          What's new <span className="sw-product-nav__version">v{LATEST_RELEASE.version}</span>
-        </Link>
+        </a>
+        <a
+          aria-current={marker("releases", releaseFacts.releasesHref)}
+          href={releaseFacts.releasesHref}
+        >
+          Releases
+          <span class="sw-header__version">v{releaseFacts.latest.version}</span>
+        </a>
+        <a class="sw-header__nav-github" href={REPOSITORY_URL}>
+          GitHub
+        </a>
       </nav>
-      <div className="sw-showcase-nav__actions">
-        <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
+      <div class="sw-header__actions">
+        <a class="sw-header__link" href={REPOSITORY_URL}>
+          GitHub
+        </a>
         <ThemeToggle />
+        <button
+          aria-label="Site menu"
+          class="sw-icon-button sw-header__menu"
+          popovertarget="site-nav"
+          type="button"
+        >
+          <Icon name="menu" />
+        </button>
       </div>
     </header>
   );

@@ -1,19 +1,12 @@
 import { expect, it } from "bun:test";
-import { readdirSync, readFileSync } from "node:fs";
 
+import { renderEvidenceText } from "../../scripts/docs-performance.js";
 import { RELEASE_ARTIFACTS, RELEASE_SMOKE_COMMANDS } from "../src/release-capture.js";
 
-/** The Performance section publishes the evidence over several pages. */
-function evidencePages(): string {
-  const directory = new URL("../../docs/src/content/docs/performance/", import.meta.url);
-  return readdirSync(directory)
-    .filter((name) => name.endsWith(".md"))
-    .map((name) => readFileSync(new URL(name, directory), "utf8"))
-    .join("\n");
-}
-
-it("publishes every captured artifact on the evidence pages", () => {
-  const pages = evidencePages();
+// The Performance pages are generated from this text, so the test renders it
+// instead of reading pages that only exist after `docs:generate`.
+it("publishes every captured artifact on the evidence pages", async () => {
+  const pages = await renderEvidenceText();
   for (const artifact of RELEASE_ARTIFACTS) {
     expect(pages).toContain(`bench/results/${artifact}`);
   }

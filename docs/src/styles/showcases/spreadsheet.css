@@ -1,0 +1,17 @@
+/* The spreadsheet showcase's window narrows in place, so the ribbon's fold is
+   visible, not simulated. */
+.sw-spreadsheet-window {
+  margin: 0 auto;
+  transition: max-width var(--sw-motion-slow) var(--sw-motion-standard);
+}
+
+.sw-spreadsheet-widths {
+  display: inline-flex;
+  gap: var(--sw-space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sw-spreadsheet-window {
+    transition: none;
+  }
+}

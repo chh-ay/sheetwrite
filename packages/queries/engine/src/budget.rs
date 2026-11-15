@@ -1,7 +1,5 @@
 //! A refresh-local byte budget bounds text-heavy expansion across all output columns.
 
-use std::mem::size_of;
-
 use crate::column::{Column, Value};
 use crate::plan::{ColumnType, Diagnostic, Limits};
 
@@ -17,7 +15,7 @@ pub(crate) struct OutputBudget {
 
 impl OutputBudget {
     /// The budget belongs to one output construction, never a retained query cache.
-    pub(crate) fn new(limits: &Limits) -> Self {
+    pub(crate) const fn new(limits: &Limits) -> Self {
         Self {
             remaining: limits.max_output_bytes,
         }
@@ -25,13 +23,14 @@ impl OutputBudget {
 
     /// Admission happens before a cell can grow any payload buffer.
     pub(crate) fn push(&mut self, column: &mut Column, value: Value<'_>) -> Result<(), Diagnostic> {
-        let value = match value {
-            Value::Number(number) if !number.is_finite() => Value::Error("conversion"),
-            other => other,
+        let admitted = if matches!(value, Value::Number(number) if !number.is_finite()) {
+            Value::Error("conversion")
+        } else {
+            value
         };
 
-        self.admit(column.column_type(), value)?;
-        column.push(value)
+        self.admit(column.column_type(), admitted)?;
+        column.push(admitted)
     }
 
     /// Existing batches use the same weights as newly constructed outputs.
@@ -61,8 +60,8 @@ fn payload_bytes(kind: ColumnType, value: Value<'_>) -> Result<usize, Diagnostic
         ColumnType::Date => size_of::<i32>(),
         ColumnType::DateTime => size_of::<i64>(),
         ColumnType::Text => {
-            let bytes = if let Value::Text(value) = value {
-                value.len()
+            let bytes = if let Value::Text(text) = value {
+                text.len()
             } else {
                 0
             };

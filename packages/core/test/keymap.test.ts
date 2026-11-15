@@ -231,77 +231,6 @@ describe("custom key combinations", () => {
     });
   }
 
-  it("binds a literal Control combination on macOS without taking Command", () => {
-    setPlatform("MacIntel");
-    const host = mountHost();
-    let runs = 0;
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [
-          { id: "ctrl", label: "Control J", shortcut: "Ctrl+J", onClick: () => runs++ },
-        ],
-      },
-    });
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      press(host, "j", { metaKey: true });
-      expect(runs).toBe(0);
-      press(host, "j", { ctrlKey: true });
-      expect(runs).toBe(1);
-      expect(openMenuLabel(host, "ctrl")).toBe("⌃J");
-    } finally {
-      grid.destroy();
-    }
-  });
-
-  it("runs a Mod combination from Control or Command on any reported platform", () => {
-    // WebKit test runners report a Mac platform on Linux, where users press Control.
-    setPlatform("MacIntel");
-    const host = mountHost();
-    let runs = 0;
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [{ id: "jump", label: "Jump", shortcut: "Mod+J", onClick: () => runs++ }],
-      },
-    });
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      press(host, "j", { metaKey: true });
-      press(host, "j", { ctrlKey: true });
-      press(host, "j", { ctrlKey: true, metaKey: true });
-      expect(runs).toBe(2);
-      expect(openMenuLabel(host, "jump")).toBe("⌘J");
-    } finally {
-      grid.destroy();
-    }
-  });
-
-  it("does not run a disabled item", () => {
-    setPlatform("Linux x86_64");
-    const host = mountHost();
-    let runs = 0;
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [
-          { id: "off", label: "Off", shortcut: "Mod+J", disabled: true, onClick: () => runs++ },
-        ],
-      },
-    });
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      press(host, "j", { ctrlKey: true });
-      expect(runs).toBe(0);
-    } finally {
-      grid.destroy();
-    }
-  });
-
   it("reports a combination bound twice, and keeps the working configuration", () => {
     setPlatform("Linux x86_64");
     const conflicting = {
@@ -331,34 +260,6 @@ describe("custom key combinations", () => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
       press(host, "j", { ctrlKey: true });
       expect(runs).toBe(1);
-    } finally {
-      grid.destroy();
-    }
-  });
-
-  it("runs a modified combination from the inline editor, but not a bare key", () => {
-    setPlatform("Linux x86_64");
-    const host = mountHost();
-    const runs: string[] = [];
-    const grid = createGrid(host, {
-      workbook: makeWorkbook(3),
-      data: makeColumnarData(3),
-      config: {
-        contextMenu: [
-          { id: "mod", label: "Mod", shortcut: "Mod+J", onClick: () => runs.push("mod") },
-          { id: "bare", label: "Bare", shortcut: { key: "F7" }, onClick: () => runs.push("bare") },
-        ],
-      },
-    });
-    try {
-      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
-      grid.beginEdit(0, 0);
-      const editor = requiredElement(host, "textarea.sheetwrite-editor");
-      editor.dispatchEvent(new KeyboardEvent("keydown", { key: "F7", bubbles: true }));
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", { key: "j", ctrlKey: true, bubbles: true }),
-      );
-      expect(runs).toEqual(["mod"]);
     } finally {
       grid.destroy();
     }

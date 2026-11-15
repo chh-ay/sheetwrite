@@ -5,6 +5,7 @@ import { API, type Diagnostic, type Project } from "typescript/unstable/async";
 
 import { MOVED_PAGES, type MovedPage } from "../docs/src/lib/moved-pages.js";
 import { DOCS_NAVIGATION, navigationPages } from "../docs/src/lib/navigation.js";
+import { isRunnableMeta, RUNNABLE_IMPORTS } from "../docs/src/lib/runnable-code.js";
 import { collectFenceHovers, isHighQualityHover } from "../docs/src/lib/sheetwrite-code-hovers.js";
 import { SheetwriteTypeEngine } from "../docs/src/lib/sheetwrite-type-engine.js";
 import { routeForContentPath } from "./docs-paths.js";
@@ -99,6 +100,28 @@ export async function siteLinkIssues(documents: readonly MarkdownDocument[]): Pr
     }
   }
   return unresolvedSiteLinks(links, documents);
+}
+
+const TRACKER_REFERENCE =
+  /github\.com\/chh-ay\/sheetwrite\/(?:pull|issues)\b|\bPR #\d+|\[#\d+\](?=\()|(?<![\w&])\(#\d+\)/g;
+
+/**
+ * Readers need what a page says, not which pull request or issue changed it,
+ * so docs pages do not link the tracker or cite pull request numbers.
+ */
+export function trackerReferenceIssues(documents: readonly MarkdownDocument[]): string[] {
+  const failures: string[] = [];
+  for (const document of documents) {
+    const source = posix(relative(repositoryRoot, document.path));
+    document.content.split("\n").forEach((line, index) => {
+      for (const match of line.matchAll(TRACKER_REFERENCE)) {
+        failures.push(
+          `${source}:${index + 1} cites the tracker (${match[0]}); describe the change instead`,
+        );
+      }
+    });
+  }
+  return failures;
 }
 
 export async function markdownDocuments(root: string): Promise<MarkdownDocument[]> {
@@ -198,6 +221,29 @@ function packageAndSubpath(
   return { packageName: match[1] ?? "", subpath: match[2] === undefined ? "." : `./${match[2]}` };
 }
 
+/**
+ * A runnable fence runs in the playground as written: it must be a complete,
+ * compile-checked TypeScript example, and it may import only the packages the
+ * playground loads.
+ */
+function runnableFenceIssues(document: MarkdownDocument, fence: Fence, partial: boolean): string[] {
+  const location = `${posix(relative(repositoryRoot, document.path))}:${fence.line}`;
+  const failures: string[] = [];
+  if (fence.language !== "ts" || !/(?:^|\s)compile(?:\s|$)/.test(fence.meta) || partial) {
+    failures.push(`${location} runnable is only valid on a complete \`ts compile\` fence`);
+  }
+  const imports = fence.code.matchAll(
+    /\bfrom\s*["']([^"']+)["']|\bimport\s*\(?\s*["']([^"']+)["']/g,
+  );
+  for (const match of imports) {
+    const specifier = match[1] ?? match[2] ?? "";
+    if (!(RUNNABLE_IMPORTS as readonly string[]).includes(specifier)) {
+      failures.push(`${location} runnable example imports ${specifier}, which Try it cannot load`);
+    }
+  }
+  return failures;
+}
+
 function validateImports(
   document: MarkdownDocument,
   fence: Fence,
@@ -263,7 +309,6 @@ const SNIPPET_COMPILER_OPTIONS = {
     "@sheetwrite/svelte": ["../packages/svelte/src/index.ts"],
     "@sheetwrite/vue": ["../packages/vue/dist/index.d.ts"],
     "@sheetwrite/xlsx": ["../packages/xlsx/dist/index.d.ts"],
-    "@sheetwrite/xlsx/register": ["../packages/xlsx/dist/register.d.ts"],
   },
   skipLibCheck: false,
   strict: true,
@@ -364,12 +409,83 @@ function validateVerifiedShell(
   return failures;
 }
 
+/**
+ * Checks fences, imports and internal links. `generatedPublicFiles` holds the
+ * site paths of files the docs generator writes to `docs/public` (such as
+ * `/changelog/rss.xml`), so a page can link one before it is on disk.
+ */
 export async function validateMarkdown(
   documents: readonly MarkdownDocument[],
   manifest: PublicApiManifest,
+  generatedPublicFiles: ReadonlySet<string> = new Set(),
+): Promise<string[]> {
+  const hoverAnalyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
+  try {
+    // Every typed fence is requested at once so the type engine analyzes them in one batch.
+    const hoverFailures = Promise.all(
+      documents.flatMap((document) => fenceHoverFailures(document, hoverAnalyzer)),
+    );
+    const failures = await validateDocuments(documents, manifest, generatedPublicFiles);
+    failures.push(...(await hoverFailures).flat());
+    return failures;
+  } finally {
+    await hoverAnalyzer.dispose();
+  }
+}
+
+type TypedFence = Fence & { language: "ts" | "tsx" | "vue" | "svelte" };
+
+function isTypedFence(fence: Fence): fence is TypedFence {
+  return (
+    (fence.language === "ts" ||
+      fence.language === "tsx" ||
+      fence.language === "vue" ||
+      fence.language === "svelte") &&
+    !/(?:^|\s)generated(?:\s|$)/.test(fence.meta)
+  );
+}
+
+function fenceHoverFailures(
+  document: MarkdownDocument,
+  analyzer: SheetwriteTypeEngine,
+): Promise<string[]>[] {
+  let fences: Fence[];
+  try {
+    fences = parseFences(document.content);
+  } catch (error) {
+    // validateDocuments reports the unclosed fence for this document.
+    if (error instanceof Error) return [];
+    throw error;
+  }
+  const page = posix(relative(repositoryRoot, document.path));
+  return fences.filter(isTypedFence).map(async (fence) => {
+    try {
+      const hovers = await collectFenceHovers(
+        fence.code,
+        fence.language,
+        analyzer,
+        fenceMetaValue(fence.meta, "prelude"),
+      );
+      return hovers
+        .filter((hover) => !isHighQualityHover(hover, fence.language))
+        .map(
+          (hover) =>
+            `${page}:${fence.line + hover.line} low-quality hover for ${hover.target}: ${hover.text}`,
+        );
+    } catch (error) {
+      return [
+        `${page}:${fence.line} hover analysis failed: ${error instanceof Error ? error.message : String(error)}`,
+      ];
+    }
+  });
+}
+
+async function validateDocuments(
+  documents: readonly MarkdownDocument[],
+  manifest: PublicApiManifest,
+  generatedPublicFiles: ReadonlySet<string>,
 ): Promise<string[]> {
   const failures: string[] = [];
-  const hoverAnalyzer = new SheetwriteTypeEngine({ cwd: join(repositoryRoot, "docs") });
   const compiled: Array<{ document: MarkdownDocument; fence: Fence }> = [];
   // Generated pages are checked as rendered, before any copy is on disk.
   const documentPaths = new Set(documents.map((document) => document.path));
@@ -401,25 +517,14 @@ export async function validateMarkdown(
       const partial = /(?:^|\s)partial=(?:"[^"]+"|'[^']+')/.test(fence.meta);
       const prelude = fenceMetaValue(fence.meta, "prelude");
       if (typedLanguage && !generated) {
-        const language = fence.language as "ts" | "tsx" | "vue" | "svelte";
         if (partial && prelude === undefined) {
           failures.push(
             `${posix(relative(repositoryRoot, document.path))}:${fence.line} typed partial fence requires a named hover prelude`,
           );
         }
-        try {
-          const hovers = collectFenceHovers(fence.code, language, hoverAnalyzer, prelude);
-          for (const hover of hovers) {
-            if (isHighQualityHover(hover, language)) continue;
-            failures.push(
-              `${posix(relative(repositoryRoot, document.path))}:${fence.line + hover.line} low-quality hover for ${hover.target}: ${hover.text}`,
-            );
-          }
-        } catch (error) {
-          failures.push(
-            `${posix(relative(repositoryRoot, document.path))}:${fence.line} hover analysis failed: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        }
+      }
+      if (isRunnableMeta(fence.meta)) {
+        failures.push(...runnableFenceIssues(document, fence, partial));
       }
       if (/(?:^|\s)compile(?:\s|$)/.test(fence.meta)) {
         if (fence.language !== "ts" && fence.language !== "tsx") {
@@ -452,6 +557,7 @@ export async function validateMarkdown(
       }
       const [targetWithoutFragment = "", fragment] = rawTarget.split("#", 2);
       const [targetRoute = ""] = targetWithoutFragment.split("?", 1);
+      if (generatedPublicFiles.has(targetRoute)) continue;
       let targetPath: string | undefined;
       if (targetRoute === "") targetPath = document.path;
       else if (targetRoute.startsWith("/docs/")) {

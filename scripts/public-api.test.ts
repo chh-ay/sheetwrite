@@ -38,16 +38,14 @@ export interface XlsxWorkbookBackend { toXlsxWorkbook(): Promise<Uint8Array>; }
 export declare function toXlsxTable(): Promise<Uint8Array>;
 /** Imports a table through the registered backend. */
 export declare function fromXlsxTable(): Promise<unknown>;
-/** Registers table export. */
-export declare function setXlsxTableExportBackend(backend: XlsxTableExportBackend): void;
-/** Registers table import. */
-export declare function setXlsxTableImportBackend(backend: XlsxTableImportBackend): void;
+/** Optional package installed by initSheetwrite. */
+export interface SheetwriteAddon { name: string; setup(context: unknown): void; }
+/** Loads the engine and installs add-ons. */
+export declare function initSheetwrite(options?: { addons?: SheetwriteAddon[] }): Promise<void>;
 /** Exports a workbook through the registered backend. */
 export declare function toXlsxWorkbook(): Promise<Uint8Array>;
 /** Imports a workbook through the registered backend. */
 export declare function fromXlsxWorkbook(): Promise<unknown>;
-/** Registers workbook interchange. */
-export declare function setXlsxWorkbookBackend(backend: XlsxWorkbookBackend): void;
 /** Generic public fixture type. */
 export interface Box<T extends string = string> { value: T; }
 `;
@@ -134,6 +132,8 @@ describe("re-export documentation", () => {
       " * @see DataSource",
       " */",
       "export declare class Service {",
+      "  /** Make a service for `name`. */",
+      "  constructor(name: string);",
       "  /** Run the service.",
       "   * @example",
       "   * ```ts",
@@ -160,6 +160,39 @@ describe("re-export documentation", () => {
       documentation:
         "Run the service.\n@example\n```ts\nservice.run();\n```\n@see\nhttps://example.com/run",
     });
+    expect(service?.memberDocs).toContainEqual({
+      name: "constructor",
+      documentation: "Make a service for `name`.",
+    });
+  });
+
+  it("keeps param, returns and throws tags, a thrown type as code, and drops empty ones", async () => {
+    const tagged = [
+      "/**",
+      " * Mounts a widget.",
+      " * @param {object} host - Element the widget mounts into.",
+      " * @param size",
+      " * @returns {number} The widget's id.",
+      " * @throws {TypeError} when `host` is detached.",
+      " * @throws SheetwriteError with code `aborted` when cancelled.",
+      " */",
+      "export declare function mount(host: object, size: number): number;",
+      "/**",
+      " * Reads nothing.",
+      " * @returns {number}",
+      " */",
+      "export declare function nothing(): number;",
+    ].join("\n");
+    const { manifest } = await analyzePublicApi(
+      await fixture(`${canonicalDeclarations}\n${tagged}`),
+    );
+    const exports = manifest.packages[0]?.entryPoints[0]?.exports ?? [];
+    const documentation = (name: string) =>
+      exports.find((candidate) => candidate.name === name)?.documentation;
+    expect(documentation("mount")).toBe(
+      "Mounts a widget.\n@param host - Element the widget mounts into.\n@returns The widget's id.\n@throws `TypeError` when `host` is detached.\n@throws SheetwriteError with code `aborted` when cancelled.",
+    );
+    expect(documentation("nothing")).toBe("Reads nothing.");
   });
 });
 describe("interface heritage flattening", () => {
@@ -203,43 +236,28 @@ export interface AdapterProps extends OwnedHandlers, ExternalBase {
   });
 });
 describe("public API policy", () => {
-  it("rejects untyped error payloads and direct built-in Error subclasses", async () => {
+  it("rejects untyped error payloads, Error subclasses and ambiguous re-exports", async () => {
     const root = await fixture(
       `${canonicalDeclarations}
 /** Untyped operational failure. */
 export interface OperationalFailure { error: unknown; }
 /** Non-canonical public exception. */
-export class LegacyFailure extends RangeError {}`,
+export class LegacyFailure extends RangeError {}
+export * from "./left.js";
+export * from "./right.js";`,
+      {
+        "left.d.ts": "export interface Duplicate { left: true }\n",
+        "right.d.ts": "export interface Duplicate { right: true }\n",
+      },
     );
     const { issues } = await analyzePublicApi(root);
-    expect(issues).toContainEqual(
-      expect.objectContaining({
-        code: "unstable-error-contract",
-        symbol: "OperationalFailure",
-      }),
+    expect(issues).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: "unstable-error-contract", symbol: "OperationalFailure" }),
+        expect.objectContaining({ code: "unstable-error-contract", symbol: "LegacyFailure" }),
+        expect.objectContaining({ code: "duplicate-export" }),
+      ]),
     );
-    expect(issues).toContainEqual(
-      expect.objectContaining({
-        code: "unstable-error-contract",
-        symbol: "LegacyFailure",
-      }),
-    );
-  });
-
-  it("rejects ambiguous duplicate re-exports", async () => {
-    const root = await fixture(
-      `${canonicalDeclarations}\nexport * from "./left.js";\nexport * from "./right.js";\n`,
-    );
-    await writeFile(
-      join(root, "packages/core/left.d.ts"),
-      "export interface Duplicate { left: true }\n",
-    );
-    await writeFile(
-      join(root, "packages/core/right.d.ts"),
-      "export interface Duplicate { right: true }\n",
-    );
-    const result = await analyzePublicApi(root);
-    expect(result.issues).toContainEqual(expect.objectContaining({ code: "duplicate-export" }));
   });
 
   it("writes one export and signature digest per line and reads them back", async () => {
@@ -282,60 +300,30 @@ export class LegacyFailure extends RangeError {}`,
     await expect(readPublicApiBaseline(root)).rejects.toThrow("not one export per line");
   });
 
-  it("reports unlisted, removed and changed exports", async () => {
-    const { manifest } = await analyzePublicApi(await fixture());
-    const baseline = baselineFromManifest(manifest);
-    expect(checkPublicApiBaseline(manifest, baseline)).toEqual([]);
+  it("reports unlisted, removed and changed signatures but not documentation edits", async () => {
+    const baseline = baselineFromManifest((await analyzePublicApi(await fixture())).manifest);
+    const issuesAfter = async (from: string, to: string) =>
+      checkPublicApiBaseline(
+        (await analyzePublicApi(await fixture(canonicalDeclarations.replace(from, to)))).manifest,
+        baseline,
+      ).map((issue) => [issue.code, issue.symbol]);
 
-    const renamed = await analyzePublicApi(
-      await fixture(
-        canonicalDeclarations.replace("interface DataSource", "interface DataProvider"),
-      ),
-    );
-    expect(
-      checkPublicApiBaseline(renamed.manifest, baseline).map((issue) => [issue.code, issue.symbol]),
-    ).toEqual([
+    expect(await issuesAfter("interface DataSource", "interface DataProvider")).toEqual([
       ["unlisted-export", "DataProvider"],
       ["removed-export", "DataSource"],
     ]);
-  });
-
-  it("detects optionality, union and generic-constraint drift but not documentation edits", async () => {
-    const baseline = baselineFromManifest((await analyzePublicApi(await fixture())).manifest);
-    const mutations: Array<[string, string]> = [
-      [
-        canonicalDeclarations.replace("getRows(request: unknown)", "getRows?(request: unknown)"),
-        "DataSource",
-      ],
-      [
-        canonicalDeclarations.replace(
-          'export type DocumentOp = { op: "set" };',
-          'export type DocumentOp = { op: "set" } | { op: "clear" };',
-        ),
-        "DocumentOp",
-      ],
-      [
-        canonicalDeclarations.replace(
-          "Box<T extends string = string>",
-          "Box<T extends string | number = string>",
-        ),
-        "Box",
-      ],
-    ];
-    for (const [declarations, symbol] of mutations) {
-      const { manifest } = await analyzePublicApi(await fixture(declarations));
-      expect(checkPublicApiBaseline(manifest, baseline)).toContainEqual(
-        expect.objectContaining({ code: "changed-signature", symbol }),
-      );
+    for (const [from, to, symbol] of [
+      ["getRows(request: unknown)", "getRows?(request: unknown)", "DataSource"],
+      ['{ op: "set" };', '{ op: "set" } | { op: "clear" };', "DocumentOp"],
+      ["Box<T extends string = string>", "Box<T extends string | number = string>", "Box"],
+    ] as const) {
+      expect(await issuesAfter(from, to)).toContainEqual(["changed-signature", symbol]);
     }
-    const redocumented = await analyzePublicApi(
-      await fixture(
-        canonicalDeclarations.replace(
-          "/** Canonical document operation. */",
-          "/** Changed document operation. */",
-        ),
+    expect(
+      await issuesAfter(
+        "/** Canonical document operation. */",
+        "/** Changed document operation. */",
       ),
-    );
-    expect(checkPublicApiBaseline(redocumented.manifest, baseline)).toEqual([]);
+    ).toEqual([]);
   }, 20_000);
 });

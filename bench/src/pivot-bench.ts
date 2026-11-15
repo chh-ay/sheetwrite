@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 
 import { CellStore, load } from "@sheetwrite/formulas";
 
+import { writeNumberColumn } from "./packed-fixture.js";
 import { protocolCaptureMeta } from "./protocol-meta.js";
 import { now, summarize } from "./stats.js";
 
@@ -38,7 +39,7 @@ try {
     const values = Float64Array.from({ length: SOURCE_ROWS }, (_, row) =>
       field < 4 ? Math.floor(row / AXIS_CARDINALITY ** field) % AXIS_CARDINALITY : row + field,
     );
-    store.setColumnNumbers(source, field, 1, values, 0);
+    writeNumberColumn(store, source, field, 1, values, 0);
   }
   store.commitSources();
   const baselineBytes = retainedBytes(store.memoryStats());

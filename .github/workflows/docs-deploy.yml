@@ -81,10 +81,11 @@ jobs:
       # builds the packages again from the same commit.
       - name: Build packages
         run: bun run build
+      # The production build has no /test/ fixture pages.
       - name: Type check and build production docs
         run: |
-          bun run --filter '@sheetwrite/docs-start' typecheck
-          bun run --filter '@sheetwrite/docs-start' build:site
+          bun run --filter '@sheetwrite/docs' typecheck
+          bun run --filter '@sheetwrite/docs' build
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
       - name: Upload production docs
@@ -96,9 +97,47 @@ jobs:
           include-hidden-files: true
           retention-days: 1
 
+  check:
+    name: Check Production Docs
+    needs: build
+    runs-on: ubuntu-latest
+    # The image ships the browsers and their system libraries (as in ci.yml).
+    # Keep the tag equal to the locked @playwright/test version.
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --user 1001
+    timeout-minutes: 20
+    steps:
+      - name: Checkout built commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      # setup-bun needs unzip, which the Playwright image lacks; npm ships the
+      # same pinned Bun binary as a package.
+      - name: Setup Bun
+        run: |
+          npm install --prefix "$HOME/.bun-npm" --no-save "bun@$BUN_VERSION"
+          echo "$HOME/.bun-npm/node_modules/.bin" >> "$GITHUB_PATH"
+          test "$("$HOME/.bun-npm/node_modules/.bin/bun" --version)" = "$BUN_VERSION"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Download built production docs
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: production-docs-deployment
+          path: .vercel/output
+      # Every browser spec but those of the /test/ fixture pages, which only a
+      # test build has (ci.yml's Browser Smoke runs them).
+      - name: Exercise the packaged site
+        env:
+          DOCS_OUTPUT_DIR: .vercel/output/static
+          FIXTURE_SPECS: datasource-prefetch|examples|formulas-engine|framework-lifecycle|grid-memory|island-activation
+        run: bun run test:browser --project chromium --workers=2 "^(?!.*/($FIXTURE_SPECS)\.spec\.ts$).*\.spec\.ts$"
+
   deploy:
     name: Deploy Production Docs
-    needs: build
+    needs: [build, check]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: Production

@@ -7,6 +7,7 @@ import {
   type Workbook,
 } from "@sheetwrite/core";
 import { createSpreadsheetShell, type SpreadsheetShell } from "@sheetwrite/core/shell";
+import type { QuerySession } from "@sheetwrite/queries";
 
 import { observeSiteTheme } from "../../lib/site-theme.js";
 import { siteGridTheme } from "../site-grid-theme.js";
@@ -225,22 +226,14 @@ const TARGETS_QUERY: SavedQuery = {
   },
 };
 
-/**
- * Connects a query session after the shell is shown. The query package and
- * its WASM load only here, never with the grid.
- */
-async function connectQueries(grid: Grid): Promise<() => void> {
-  const { createQuerySession } = await import("@sheetwrite/queries");
-  const session = await createQuerySession(grid, {
-    fetchSource: async () => ({ kind: "bytes", bytes: new TextEncoder().encode(TARGETS_CSV) }),
-  });
+/** Saves and runs the targets query through the grid's query session. */
+async function loadTargets(session: QuerySession): Promise<void> {
   const defined = session.define(TARGETS_QUERY);
   if (defined.status !== "applied")
     throw new Error(`The targets query was not saved: ${defined.status}`);
   const refreshed = await session.refreshAll();
   if (refreshed.status !== "applied")
     throw new Error(`The targets query did not load: ${refreshed.status}`);
-  return () => session.dispose();
 }
 
 export interface SpreadsheetScenario {
@@ -257,30 +250,41 @@ export interface SpreadsheetScenario {
 export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenario {
   let shell: SpreadsheetShell | null = null;
   let disposed = false;
-  let stopQueries: (() => void) | undefined;
 
-  const ready = initSheetwrite()
-    .then(() => {
-      if (disposed) return;
-      shell = createSpreadsheetShell(host, {
-        ribbon: { mode: "auto" },
-        grid: { workbook: salesWorkbook(), theme: siteGridTheme(), config: {} },
-      });
-      const result = shell.grid.applyTransaction({ patches: salesOperations() });
-      if (result.status === "rejected") {
-        throw new Error(
-          `The sales workbook did not load: ${result.issues[0]?.message ?? "rejected"}`,
-        );
-      }
-      if (result.status !== "applied")
-        throw new Error(`The sales workbook did not load: ${result.status}`);
-      shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
-      return connectQueries(shell.grid);
-    })
-    .then((disconnect) => {
-      if (disposed) disconnect?.();
-      else stopQueries = disconnect;
+  const ready = (async () => {
+    // The query package is a separate chunk; its engine and WASM load once
+    // this page's grid exists. Only this grid gets a source, so other pages'
+    // grids have no query session.
+    const { queriesAddon, querySessionOf } = await import("@sheetwrite/queries");
+    await initSheetwrite({ addons: [queriesAddon()] });
+    if (disposed) return;
+    shell = createSpreadsheetShell(host, {
+      ribbon: { mode: "auto" },
+      grid: {
+        workbook: salesWorkbook(),
+        theme: siteGridTheme(),
+        config: {},
+        addons: {
+          queries: {
+            fetchSource: async () => ({
+              kind: "bytes",
+              bytes: new TextEncoder().encode(TARGETS_CSV),
+            }),
+          },
+        },
+      },
     });
+    const result = shell.grid.applyTransaction({ patches: salesOperations() });
+    if (result.status === "rejected") {
+      throw new Error(
+        `The sales workbook did not load: ${result.issues[0]?.message ?? "rejected"}`,
+      );
+    }
+    if (result.status !== "applied")
+      throw new Error(`The sales workbook did not load: ${result.status}`);
+    shell.grid.setSelection({ kind: "cell", addr: { sheet: SALES_SHEET, row: 1, col: 6 } });
+    await loadTargets(await querySessionOf(shell.grid));
+  })();
 
   const stopTheme = observeSiteTheme(() => shell?.setTheme(siteGridTheme()));
 
@@ -290,7 +294,6 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
     dispose() {
       disposed = true;
       stopTheme();
-      stopQueries?.();
       shell?.destroy();
       shell = null;
     },

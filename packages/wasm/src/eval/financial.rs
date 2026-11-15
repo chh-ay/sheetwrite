@@ -14,6 +14,10 @@ const ROOT_X_REL_TOLERANCE: f64 = 1e-12;
 const ROOT_X_MIN: f64 = -36.0;
 const ROOT_X_MAX: f64 = 700.0;
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Pv => pv(values),
@@ -273,7 +277,7 @@ fn cashflow_number(entry: &FuncValue) -> Result<Option<f64>, FormulaError> {
     }
 }
 
-fn finite(value: f64) -> Result<f64, FormulaError> {
+const fn finite(value: f64) -> Result<f64, FormulaError> {
     if value.is_finite() {
         Ok(value)
     } else {
@@ -288,7 +292,7 @@ struct RootSample {
 }
 
 impl RootSample {
-    fn new(value: f64, scale: f64) -> Result<Self, FormulaError> {
+    const fn new(value: f64, scale: f64) -> Result<Self, FormulaError> {
         if value.is_nan() || scale.is_nan() {
             Err(FormulaError::Num)
         } else {
@@ -443,11 +447,11 @@ fn solve_root(
 }
 
 fn choose_bracket(
-    left: Option<RootBracket>,
-    right: Option<RootBracket>,
+    left_bracket: Option<RootBracket>,
+    right_bracket: Option<RootBracket>,
     initial_x: f64,
 ) -> Option<RootBracket> {
-    match (left, right) {
+    match (left_bracket, right_bracket) {
         (Some(left), Some(right)) => {
             if bracket_distance(left, initial_x) <= bracket_distance(right, initial_x) {
                 Some(left)
@@ -519,7 +523,7 @@ fn secant_candidate(bracket: RootBracket) -> Option<f64> {
     candidate.is_finite().then_some(candidate)
 }
 
-fn opposite_signs(left: RootSample, right: RootSample) -> bool {
+const fn opposite_signs(left: RootSample, right: RootSample) -> bool {
     left.value.is_sign_positive() != right.value.is_sign_positive()
 }
 
@@ -550,14 +554,14 @@ mod tests {
     }
 
     fn irr_args(cashflows: impl IntoIterator<Item = f64>, guess: Option<f64>) -> FuncAccumulator {
-        let cashflows: Vec<f64> = cashflows.into_iter().collect();
+        let collected: Vec<f64> = cashflows.into_iter().collect();
         let mut values = FuncAccumulator::default();
-        for cashflow in cashflows {
+        for cashflow in collected {
             values.push_range(Value::Number(cashflow)).unwrap();
         }
         values.finish_arg(1, values.len()).unwrap();
-        if let Some(guess) = guess {
-            values.push_scalar(Value::Number(guess)).unwrap();
+        if let Some(rate_guess) = guess {
+            values.push_scalar(Value::Number(rate_guess)).unwrap();
             values.finish_arg(1, 1).unwrap();
         }
         values
@@ -566,7 +570,9 @@ mod tests {
     fn result_number(func: Func, values: &FuncAccumulator) -> f64 {
         match apply(func, values).unwrap() {
             Value::Number(value) => value,
-            value => panic!("expected number, got {value:?}"),
+            value @ (Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_)) => {
+                panic!("expected number, got {value:?}")
+            }
         }
     }
 

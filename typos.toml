@@ -1,0 +1,13 @@
+# Spelling check for the Rust crates: `typos` over the paths that
+# `bun scripts/rust-lint.ts` passes it.
+
+[default.extend-words]
+# Excel function names.
+AVERAGEIFS = "AVERAGEIFS"
+PERMUT = "PERMUT"
+TTEST = "TTEST"
+# Wildcard and text-comparison test inputs.
+Abd = "Abd"
+CAF = "CAF"
+# `i·z` in complex-number formulas.
+iz = "iz"

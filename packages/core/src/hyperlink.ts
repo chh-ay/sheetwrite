@@ -24,7 +24,12 @@ const ENCODED_CONTROL_CHARACTERS = /%(?:0[0-9a-f]|1[0-9a-f]|7f)/iu;
 const HYPERLINK_KEYS = new Set(["id", "range", "target", "display", "style"]);
 const TARGET_KEYS = new Set(["kind", "url", "range"]);
 
-/** Validate, but never activate or fetch, an external hyperlink target. */
+/**
+ * Validate, but never activate or fetch, an external hyperlink target.
+ *
+ * @param url - The link target, such as `https://example.com`.
+ * @returns `true` only for a bounded `https:` URL without user name or password, or a `mailto:` address.
+ */
 export function isSafeExternalHyperlink(url: string): boolean {
   if (
     url.length === 0 ||
@@ -54,7 +59,12 @@ export function isSafeExternalHyperlink(url: string): boolean {
   }
 }
 
-/** Whether an identifier is bounded, non-empty, trimmed, and free of control characters. */
+/**
+ * Whether an identifier is bounded, non-empty, trimmed, and free of control characters.
+ *
+ * @param id - A hyperlink ID.
+ * @returns `true` when the ID is 1 to the maximum length, has no space at either end, and no control characters.
+ */
 export function isValidHyperlinkId(id: string): boolean {
   return (
     id.length > 0 &&
@@ -77,7 +87,12 @@ function sanitizeTarget(value: unknown): HyperlinkTarget | null {
   return range ? { kind: "internal", range } : null;
 }
 
-/** Sanitize one untrusted clipboard/snapshot value without cloning its object graph. */
+/**
+ * Sanitize one untrusted clipboard/snapshot value without cloning its object graph.
+ *
+ * @param value - A hyperlink from outside your code, such as parsed JSON.
+ * @returns A new hyperlink with only the known fields, or `null` when any part is invalid or unsafe.
+ */
 export function sanitizeCellHyperlink(value: unknown): CellHyperlink | null {
   const link = dataProperties(value, HYPERLINK_KEYS);
   if (!link || typeof link.id !== "string" || !isValidHyperlinkId(link.id)) return null;
@@ -103,7 +118,12 @@ export function sanitizeCellHyperlink(value: unknown): CellHyperlink | null {
   };
 }
 
-/** Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers. */
+/**
+ * Shape/security validation shared by mutation, snapshot, clipboard, and activation barriers.
+ *
+ * @param value - A hyperlink from outside your code.
+ * @returns `true` when `value` is a valid, safe hyperlink.
+ */
 export function isValidCellHyperlink(value: unknown): value is CellHyperlink {
   return sanitizeCellHyperlink(value) !== null;
 }
@@ -115,7 +135,11 @@ export function cloneCellHyperlink(link: CellHyperlink): CellHyperlink {
   return cloned;
 }
 
-/** Return the first validated hyperlink covering an address, or null when none does. */
+/**
+ * Return the first validated hyperlink covering an address, or null when none does.
+ *
+ * @returns A copy of the hyperlink, or `null`.
+ */
 export function hyperlinkAt(workbook: Workbook, address: CellAddress): CellHyperlink | null {
   const sheet = workbook.sheets.find((candidate) => candidate.id === address.sheet);
   if (!sheet) return null;

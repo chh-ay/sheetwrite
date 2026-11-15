@@ -1,0 +1,18 @@
+```ts prelude="core" title="sort.ts"
+const orders = { sheet: "orders", start: { row: 0, col: 0 }, end: { row: 39, col: 5 } };
+const REGION = 1;
+const REVENUE = 5;
+
+// Sort the cells in place: one undo step, one transaction for collaborators.
+grid.sortRange(orders, [
+  { col: REGION, ascending: true },
+  { col: REVENUE, ascending: false },
+]);
+
+// Sort the view only: the grid shows the new order, the cells keep their rows.
+grid.setViewSort([{ col: REVENUE, ascending: false }]);
+grid.setViewSort([]);
+
+// Data › Custom Sort: sort levels, a header row and "Sort view only".
+grid.actions.customSort();
+```

@@ -92,7 +92,7 @@ npm install @sheetwrite/formulas
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 Both engines have the same API. Select one before you create a Grid or a store. See [Choose an engine](https://www.sheetwrite.dev/docs/start/choose-an-engine/), [Analysis formulas](https://www.sheetwrite.dev/docs/features/formulas/analysis-formulas/) and the [function reference](https://www.sheetwrite.dev/docs/reference/formula-functions/).
@@ -107,17 +107,20 @@ npm install @sheetwrite/xlsx
 ```
 
 ```ts
-import "@sheetwrite/xlsx/register";
 import {
   fromXlsxTable,
   fromXlsxWorkbook,
+  initSheetwrite,
   toXlsxTable,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 ```
 
 `grid.exportXlsx()` and framework toolbar XLSX actions use the table backend and
-therefore require registration. `toXlsxTable` / `fromXlsxTable` provide
+therefore require the XLSX add-on. `toXlsxTable` / `fromXlsxTable` provide
 first-row-header, first-sheet interchange; `toXlsxWorkbook` /
 `fromXlsxWorkbook` preserve multi-sheet snapshots, formula source, native
 workbook tables and structured references, safe HTTPS/mailto or internal

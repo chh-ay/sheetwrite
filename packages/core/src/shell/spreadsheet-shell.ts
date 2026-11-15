@@ -7,11 +7,7 @@
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
 import { sheetNameKey } from "../name-key.js";
-import {
-  assertRibbonConfig,
-  RIBBON_EXPANDED_HEIGHT,
-  TOOLBAR_HEIGHT,
-} from "../ribbon/ribbon-metrics.js";
+import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { Scope } from "../scope.js";
 import { changesSheetTabs, SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
@@ -101,7 +97,8 @@ function mountRibbon(
 ): ShellPiece {
   return mountWhenLoaded(
     host,
-    RIBBON_EXPANDED_HEIGHT,
+    // The ribbon spans its row, so the row's width decides its layout now.
+    ribbonHeight(layout, host.clientWidth),
     async () => {
       const { createRibbon } = await import("./ribbon-factory.js");
       return () =>
@@ -126,7 +123,9 @@ export interface SpreadsheetShellOptions {
   ribbon?: boolean | RibbonConfig;
   /** Event callbacks forwarded from the owned grid. */
   onChange?: (event: ChangeEvent) => void;
+  /** Called when the grid's selection changes; `null` when nothing is selected. */
   onSelectionChange?: (selection: Selection | null) => void;
+  /** Called once with the grid, after the shell has mounted it. */
   onReady?: (grid: Grid) => void;
 }
 
@@ -136,11 +135,15 @@ export interface SpreadsheetShell {
   readonly grid: Grid;
   /** The shell's root element (already appended to the mount host). */
   readonly element: HTMLElement;
+  /** Merge `theme` over the grid's theme; the shell's own chrome follows it. */
   setTheme(theme: Partial<Theme>): void;
+  /** Turn editing off or on for the grid and the shell's toolbar. */
   setReadOnly(readOnly: boolean): void;
   /** Reconfigure the grid; the shell keeps its own toolbar/tabs suppressed. */
   setGridConfig(config: GridConfig | undefined): void;
+  /** Show the sheet with this stable ID. */
   setActiveSheet(id: SheetId): void;
+  /** Remove the shell, its grid and all its DOM; calling it twice is safe. */
   destroy(): void;
 }
 
@@ -155,6 +158,8 @@ function shellGridConfig(config: GridConfig | undefined): GridConfig {
  * selection status. The host must have a real size; the shell fills it. Returns
  * the shell handle; `destroy` tears down every piece, the grid, and the shell
  * DOM, and is safe to call twice.
+ *
+ * @param host - Element the shell is appended to and fills; give it a size.
  */
 export function createSpreadsheetShell(
   host: HTMLElement,

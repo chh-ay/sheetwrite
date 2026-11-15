@@ -16,20 +16,32 @@ mod functions;
 mod index;
 mod info;
 mod iteration;
-mod literal_criteria;
+mod let_slots;
 mod lookup;
 #[cfg(test)]
 mod lookup_rule_tests;
 mod math;
 mod matrix;
 mod number_format;
+#[cfg(test)]
+mod number_format_corpus_tests;
 mod operators;
+#[cfg(test)]
+mod pass_rule_tests;
+mod preview;
+mod preview_limits;
+#[cfg(test)]
+mod preview_tests;
 mod random;
+mod range_criteria;
 mod range_fold;
+mod range_products;
 mod range_reader;
+mod range_view;
 mod reference;
 #[cfg(feature = "analysis")]
 pub(crate) mod regex_patterns;
+mod statistic_args;
 mod statistics;
 mod subtotal;
 #[cfg(test)]
@@ -41,16 +53,16 @@ mod value;
 mod wildcard;
 
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::cell::RefCell;
+use std::cell::Cell;
 use std::cmp::Ordering;
 
-use crate::calc::{write_col, Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{write_col, Ast, Func, RangeFlags, RefFlags, SHEET_COLS, SHEET_ROWS};
 use crate::cells::{encode_num, encode_str_id, payload_num, payload_str_id, DenseSourceRun};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore, FormulaWork};
 use crate::graph::DirtySeeds;
-use crate::row_visibility::SkippedRows;
 use crate::sheet::{formula_error_with_entry, SheetData};
-use crate::spill::{spill_ownership_within_budget, SpillRange};
+use crate::sorting::{key96, sort_by_key96};
+use crate::spill::{spill_ownership_within_budget, SpillRange, VacatedSpill};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, AbsCellKey, CellRange, EvalResult, FormulaError, StringStorage,
@@ -58,13 +70,11 @@ use crate::types::{
     RANGE_CELL_LIMIT,
 };
 
-pub(crate) use array::ast_produces_array;
 use array::dynamic_recompute_within_limit;
+pub(crate) use array::{ast_produces_array, Shapes};
 pub(crate) use criteria::sum_range_extent;
-use criteria::{aggregate_if, extreme_if, Criterion, IfExtreme, IfSum};
+use criteria::{aggregate_if, extreme_if, Criterion};
 use date::host_clock_serial;
-#[cfg(test)]
-pub(crate) use date::set_test_clock;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{
     collect_affected_formulas, direct_readers, seed_additional_depth_errors,
@@ -73,28 +83,37 @@ use dependency::{
 use functions::{apply_func, treats_cell_as_reference, FuncAccumulator, ReductionFold};
 pub(crate) use iteration::IterationLimits;
 use iteration::IterationPassGuard;
-use literal_criteria::CriteriaFold;
+pub(crate) use let_slots::{resolve_let_names, LetFrame};
 pub(crate) use lookup::LookupStates;
 use lookup::{option_code, positive_index};
 pub(crate) use matrix::range_from_ast as static_range;
+use matrix::{argument_range, optional_ast, range_from_ast, EvalMatrix};
 pub(crate) use matrix::{intersection_range, matrix_resource_stats, reset_matrix_resource_stats};
-use matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
+#[cfg(feature = "analysis")]
+pub(crate) use operators::comparison;
 pub(crate) use random::RandomSource;
+use range_criteria::{CriteriaFold, CriteriaRead};
 use range_reader::RangeReader;
 use reference::{finish_runtime_reads, start_runtime_reads, RewriteScope, RuntimeReads};
+use statistic_args::StatisticCall;
 pub(crate) use subtotal::ast_calls_subtotal;
-use subtotal::SkippedCells;
 use value::{bool_from_value, cached_formula_value, compare_values, text_from_value};
 
 const LET_BINDING_LIMIT: usize = 126;
 const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
 thread_local! {
-    static FORMULA_ORIGINS: RefCell<Vec<(u32, u32)>> = const { RefCell::new(Vec::new()) };
-    /// Values of the LET bindings of the evaluation in progress, indexed by
-    /// the slots of its expanded expression. Empty while no LET is running,
-    /// which leaves a slot use to evaluate its expression directly.
-    static LET_SLOT_VALUES: RefCell<Vec<Option<EvalResult>>> = const { RefCell::new(Vec::new()) };
+    /// The cell whose formula is being evaluated. Each evaluation sets it and
+    /// its guard restores the enclosing value, so nested evaluations keep a
+    /// stack on the native stack without a heap list.
+    static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
+    /// Rows and columns that relative references of the expression being
+    /// evaluated move by. A conditional-format rule's one parsed expression
+    /// is written for the rule range's top-left cell; at every other cell it
+    /// reads with that cell's distance from it. Only [`read_shifted`] sets
+    /// it, so ordinary recalculation never writes it and always reads
+    /// (0, 0).
+    static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
 }
 
 #[cfg(test)]
@@ -104,48 +123,73 @@ thread_local! {
     pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Runs `evaluate` with one empty slot per binding of a LET expansion and
-/// restores the slots of the enclosing evaluation afterwards.
-pub(super) fn with_let_slots<Output>(slots: u32, evaluate: impl FnOnce() -> Output) -> Output {
-    let previous = LET_SLOT_VALUES
-        .with(|values| std::mem::replace(&mut *values.borrow_mut(), vec![None; slots as usize]));
-    let result = evaluate();
-    LET_SLOT_VALUES.with(|values| *values.borrow_mut() = previous);
-    result
+/// Sets the formula origin for one evaluation and restores the enclosing
+/// origin when dropped.
+struct FormulaOriginGuard {
+    enclosing: Option<(u32, u32)>,
 }
-
-fn cached_let_slot(slot: u32) -> Option<EvalResult> {
-    LET_SLOT_VALUES.with(|values| values.borrow().get(slot as usize).cloned().flatten())
-}
-
-fn remember_let_slot(slot: u32, value: EvalResult) {
-    LET_SLOT_VALUES.with(|values| {
-        if let Some(entry) = values.borrow_mut().get_mut(slot as usize) {
-            *entry = Some(value);
-        }
-    });
-}
-
-struct FormulaOriginGuard;
 
 impl FormulaOriginGuard {
     fn push(origin: (u32, u32)) -> Self {
-        FORMULA_ORIGINS.with(|origins| origins.borrow_mut().push(origin));
-        Self
+        let enclosing = FORMULA_ORIGIN.with(|current| current.replace(Some(origin)));
+        Self { enclosing }
     }
 }
 
 impl Drop for FormulaOriginGuard {
     fn drop(&mut self) {
-        FORMULA_ORIGINS.with(|origins| {
-            origins.borrow_mut().pop();
-        });
+        let enclosing = self.enclosing;
+        FORMULA_ORIGIN.with(|current| current.set(enclosing));
     }
 }
 
 /// The cell whose formula is being evaluated, or nothing outside a formula.
 pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
-    FORMULA_ORIGINS.with(|origins| origins.borrow().last().copied())
+    FORMULA_ORIGIN.with(Cell::get)
+}
+
+/// Run `read` with relative references moved by `shift`, then restore the
+/// enclosing shift. A shift of (0, 0) reads a tree this evaluation parsed
+/// itself, such as INDIRECT's text: it is placed for the target cell already,
+/// so a conditional-format shift must not move it again.
+pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
+    let enclosing = REFERENCE_SHIFT.with(|current| current.replace(shift));
+    let value = read();
+    REFERENCE_SHIFT.with(|current| current.set(enclosing));
+    value
+}
+
+/// Where a reference node's cell is read in this evaluation: its relative
+/// axes moved by the reference shift, its `$` axes as written. The caller
+/// that sets a shift keeps every shifted reference inside the sheet.
+#[inline]
+pub(crate) fn placed_cell(row: u32, col: u32, flags: RefFlags) -> (u32, u32) {
+    let (row_shift, col_shift) = REFERENCE_SHIFT.with(Cell::get);
+    (
+        if flags.row_abs() {
+            row
+        } else {
+            row.wrapping_add(row_shift)
+        },
+        if flags.col_abs() {
+            col
+        } else {
+            col.wrapping_add(col_shift)
+        },
+    )
+}
+
+/// The range a reference node names in this evaluation; see [`placed_cell`].
+#[inline]
+pub(crate) fn placed_range(
+    sheet: u32,
+    (row_start, col_start): (u32, u32),
+    (row_end, col_end): (u32, u32),
+    flags: RangeFlags,
+) -> CellRange {
+    let start = placed_cell(row_start, col_start, flags.start);
+    let end = placed_cell(row_end, col_end, flags.end);
+    CellRange::new(sheet, start.0, start.1, end.0, end.1)
 }
 
 /// State shared by every evaluation in one recompute pass: the formulas the
@@ -156,6 +200,20 @@ pub(crate) struct EvalPass<'a> {
     pub(crate) affected: &'a FormulaWork,
     /// Results and active-call bits exist only for this pass.
     pub(crate) results: &'a mut FormulaResults,
+}
+
+impl EvalPass<'_> {
+    /// What shape checks know about the LAMBDA parameters of the calls in
+    /// progress.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn shapes(&self) -> Shapes<'_> {
+        Shapes::of(self.results.call_frame())
+    }
+
+    #[cfg(not(feature = "analysis"))]
+    pub(crate) const fn shapes(&self) -> Shapes<'static> {
+        Shapes::NONE
+    }
 }
 
 fn literal_cell_value(strings: &StringStorage, kind: u8, payload: u64) -> Value {
@@ -174,7 +232,7 @@ pub(crate) fn calculated_slot(strings: &mut StringStorage, value: &Value) -> (u8
     match value {
         Value::Number(number) => (KIND_NUMBER, encode_num(*number)),
         Value::Text(text) => (KIND_STRING, encode_str_id(strings.intern(text))),
-        Value::Bool(value) => (KIND_BOOL, encode_num(f64::from(*value))),
+        Value::Bool(flag) => (KIND_BOOL, encode_num(f64::from(*flag))),
         Value::Blank => (KIND_EMPTY, 0),
         Value::Error(error) => (KIND_FORMULA, error.slot() as u64),
     }
@@ -193,19 +251,18 @@ pub(crate) fn settled_cell_value(
     if !sheet.cells.contains_cell(row, col) {
         return Value::Error(FormulaError::Ref);
     }
-    if !sheet.cells.is_loaded(row, col) {
+    let Some((source_kind, source_payload)) = sheet.cells.loaded_source_at(row, col) else {
         return Value::Error(FormulaError::Loading);
-    }
+    };
 
     let index = sheet.cells.idx(row, col);
-    let source_kind = sheet.cells.source_kind_at(index);
     let (kind, payload) = if source_kind == KIND_EMPTY {
         sheet
             .cells
             .calculated_cell_at(index)
             .unwrap_or((KIND_EMPTY, 0))
     } else {
-        (source_kind, sheet.cells.source_payload_at(index))
+        (source_kind, source_payload)
     };
     if kind != KIND_FORMULA {
         return literal_cell_value(strings, kind, payload);
@@ -247,8 +304,9 @@ impl<'a> LiteralSources<'a> {
 }
 
 /// One LET binding: its name, its expression, how many earlier bindings its
-/// expression can see, and the slot its value is kept in.
-type LetBinding<'a> = (&'a str, &'a Ast, usize, u32);
+/// expression can see, the slot its value is kept in, and how many LAMBDAs
+/// enclose it inside the expansion.
+type LetBinding<'a> = (&'a str, &'a Ast, usize, u32, u16);
 
 /// Expands a LET call into an expression tree where every binding use carries
 /// the slot its value is kept in, and reports how many slots the tree holds.
@@ -259,7 +317,7 @@ pub(super) fn expand_let_ast(args: &[Ast]) -> Result<(Ast, u32), FormulaError> {
         .map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
     let mut next_slot = 0u32;
-    let expanded = expand_let_args(args, &mut bindings, &mut nodes, &mut next_slot)?;
+    let expanded = expand_let_args(args, &mut bindings, &mut nodes, &mut next_slot, 0)?;
     Ok((expanded, next_slot))
 }
 
@@ -270,23 +328,33 @@ pub(crate) fn expand_let_reachable_ast(ast: &Ast) -> Result<Ast, FormulaError> {
     bindings.try_reserve(4).map_err(|_| FormulaError::Num)?;
     let mut nodes = 0usize;
     let mut next_slot = 0u32;
-    expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot)
+    expand_let_node(ast, &mut bindings, &mut nodes, &mut next_slot, 0)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "two Ast variants exist only with the analysis feature, so a full list differs by build; every node other than a name rejects the LET"
+)]
 fn expand_let_args<'a>(
     args: &'a [Ast],
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
     next_slot: &mut u32,
+    lambdas: u16,
 ) -> Result<Ast, FormulaError> {
     if args.len() < 3 || args.len().is_multiple_of(2) || args.len() / 2 > LET_BINDING_LIMIT {
         return Err(FormulaError::Value);
     }
     let original_len = bindings.len();
     for pair in args[..args.len() - 1].as_chunks::<2>().0 {
-        let Ast::Name(name) = &pair[0] else {
-            bindings.truncate(original_len);
-            return Err(FormulaError::Value);
+        // A resolved LET keeps each binding's name in its `LetName`.
+        let name = match &pair[0] {
+            Ast::Name(name) => name.as_ref(),
+            Ast::LetName { name, .. } => &**name,
+            _ => {
+                bindings.truncate(original_len);
+                return Err(FormulaError::Value);
+            }
         };
         if !valid_let_name(name) {
             bindings.truncate(original_len);
@@ -295,14 +363,14 @@ fn expand_let_args<'a>(
         let visible = bindings.len();
         let slot = *next_slot;
         *next_slot = next_slot.checked_add(1).ok_or(FormulaError::Num)?;
-        bindings.push((name.as_str(), &pair[1], visible, slot));
+        bindings.push((name, &pair[1], visible, slot, lambdas));
     }
-    let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot);
+    let result = expand_let_node(&args[args.len() - 1], bindings, nodes, next_slot, lambdas);
     bindings.truncate(original_len);
     result
 }
 
-fn valid_let_name(name: &str) -> bool {
+pub(super) fn valid_let_name(name: &str) -> bool {
     let mut chars = name.chars();
     chars
         .next()
@@ -319,120 +387,211 @@ fn count_let_node(nodes: &mut usize) -> Result<(), FormulaError> {
     }
 }
 
+/// Expands the LET bindings `ast` uses. `lambdas` counts the LAMBDAs around
+/// `ast` inside the expansion: a binding copied under more LAMBDAs than it
+/// was written under has its parameter uses reach that many further out.
 fn expand_let_node<'a>(
     ast: &'a Ast,
     bindings: &mut Vec<LetBinding<'a>>,
     nodes: &mut usize,
     next_slot: &mut u32,
+    lambdas: u16,
 ) -> Result<Ast, FormulaError> {
-    if let Ast::Name(name) = ast {
-        if let Some((_, expression, visible, slot)) = bindings
-            .iter()
-            .rev()
-            .find(|(binding, _, _, _)| binding.eq_ignore_ascii_case(name))
-            .copied()
-        {
-            let hidden = bindings.split_off(visible);
-            let result = expand_let_node(expression, bindings, nodes, next_slot);
-            bindings.extend(hidden);
-            return Ok(Ast::LetSlot {
-                slot,
-                expression: Box::new(result?),
-            });
-        }
-    }
-    count_let_node(nodes)?;
-    #[cfg(feature = "analysis")]
-    if let Ast::UnknownFunc(name, args) = ast {
-        if let Some((_, expression, visible, _)) = bindings
+    // A resolved use expands like the name it keeps.
+    let used_name = match ast {
+        Ast::Name(name) => Some(name.as_ref()),
+        Ast::LetName { name, .. } => Some(&**name),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
+    };
+    if let Some(name) = used_name {
+        if let Some((_, expression, visible, slot, bound_in)) = bindings
             .iter()
             .rev()
             .find(|(binding, ..)| binding.eq_ignore_ascii_case(name))
             .copied()
         {
             let hidden = bindings.split_off(visible);
-            let callee = expand_let_node(expression, bindings, nodes, next_slot);
+            let expanded = expand_let_node(expression, bindings, nodes, next_slot, bound_in);
             bindings.extend(hidden);
-            let callee = callee?;
+            let mut result = expanded?;
+            shift_parameters(&mut result, lambdas - bound_in);
+            return Ok(Ast::LetSlot {
+                slot,
+                expression: Box::new(result),
+            });
+        }
+    }
+    count_let_node(nodes)?;
+    #[cfg(feature = "analysis")]
+    if let Ast::UnknownFunc(call) = ast {
+        let crate::calc::UnknownCall { name, args } = &**call;
+        if let Some((_, expression, visible, _, bound_in)) = bindings
+            .iter()
+            .rev()
+            .find(|(binding, ..)| binding.eq_ignore_ascii_case(name))
+            .copied()
+        {
+            let hidden = bindings.split_off(visible);
+            let expanded_callee = expand_let_node(expression, bindings, nodes, next_slot, bound_in);
+            bindings.extend(hidden);
+            let mut callee = expanded_callee?;
+            shift_parameters(&mut callee, lambdas - bound_in);
             let mut invocation = vec![callee];
             invocation.extend(
                 args.iter()
-                    .map(|argument| expand_let_node(argument, bindings, nodes, next_slot))
+                    .map(|argument| expand_let_node(argument, bindings, nodes, next_slot, lambdas))
                     .collect::<Result<Vec<_>, _>>()?,
             );
-            return Ok(Ast::UnknownFunc(analysis::lambda::CALL.into(), invocation));
+            return Ok(Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+                name: analysis::lambda::CALL.into(),
+                args: invocation.into(),
+            })));
         }
     }
+    let expand =
+        |arg: &'a Ast,
+         bindings: &mut Vec<LetBinding<'a>>,
+         nodes: &mut usize,
+         next_slot: &mut u32| { expand_let_node(arg, bindings, nodes, next_slot, lambdas) };
     Ok(match ast {
+        // The body sits one LAMBDA deeper; the expansion is this tree's own
+        // definition.
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(analysis::LAMBDA_ID), args) if !args.is_empty() => {
-            let mut captured = Vec::with_capacity(bindings.len());
-            for (name, expression, visible, slot) in bindings.iter().copied() {
-                if args[..args.len() - 1].iter().any(|parameter| {
-                    matches!(parameter, Ast::Name(parameter) if parameter.eq_ignore_ascii_case(name))
-                }) { continue; }
-                let mut earlier = bindings[..visible].to_vec();
-                let expanded = expand_let_node(expression, &mut earlier, nodes, next_slot)?;
-                captured.push((
-                    name,
-                    Ast::LetSlot {
-                        slot,
-                        expression: Box::new(expanded),
-                    },
-                ));
-            }
-            let mut definition = args[..args.len() - 1].to_vec();
-            definition.push(analysis::lambda::capture(&args[args.len() - 1], &captured)?);
-            Ast::Func(Func::Analysis(analysis::LAMBDA_ID), definition)
+        Ast::Lambda(definition) => {
+            let body = expand_let_node(&definition.body, bindings, nodes, next_slot, lambdas + 1)?;
+            Ast::Lambda(std::rc::Rc::new(crate::calc::LambdaDefinition {
+                parameters: definition.parameters.clone(),
+                body,
+            }))
         }
-        Ast::Func(Func::Let, args) => return expand_let_args(args, bindings, nodes, next_slot),
+        Ast::Func(Func::Let, args) => {
+            return expand_let_args(args, bindings, nodes, next_slot, lambdas)
+        }
         Ast::Func(func, args) => Ast::Func(
             *func,
             args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
-                .collect::<Result<Vec<_>, _>>()?,
+                .map(|arg| expand(arg, bindings, nodes, next_slot))
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
         ),
-        Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
-            name.clone(),
-            args.iter()
-                .map(|arg| expand_let_node(arg, bindings, nodes, next_slot))
-                .collect::<Result<Vec<_>, _>>()?,
-        ),
+        Ast::UnknownFunc(call) => Ast::UnknownFunc(Box::new(crate::calc::UnknownCall {
+            name: call.name.clone(),
+            args: call
+                .args
+                .iter()
+                .map(|arg| expand(arg, bindings, nodes, next_slot))
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
+        })),
         Ast::Bin(op, left, right) => Ast::Bin(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
-            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
+            Box::new(expand(left, bindings, nodes, next_slot)?),
+            Box::new(expand(right, bindings, nodes, next_slot)?),
         ),
         Ast::Cmp(op, left, right) => Ast::Cmp(
             *op,
-            Box::new(expand_let_node(left, bindings, nodes, next_slot)?),
-            Box::new(expand_let_node(right, bindings, nodes, next_slot)?),
+            Box::new(expand(left, bindings, nodes, next_slot)?),
+            Box::new(expand(right, bindings, nodes, next_slot)?),
         ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(expand_let_node(
-            inner, bindings, nodes, next_slot,
-        )?)),
-        Ast::Pos(inner) => Ast::Pos(Box::new(expand_let_node(
-            inner, bindings, nodes, next_slot,
-        )?)),
-        Ast::Percent(inner) => Ast::Percent(Box::new(expand_let_node(
-            inner, bindings, nodes, next_slot,
-        )?)),
+        Ast::Neg(inner) => Ast::Neg(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Pos(inner) => Ast::Pos(Box::new(expand(inner, bindings, nodes, next_slot)?)),
+        Ast::Percent(inner) => Ast::Percent(Box::new(expand(inner, bindings, nodes, next_slot)?)),
         other => other.clone(),
     })
 }
 
+/// Makes the parameter uses in `ast` that reach outside it reach `by`
+/// LAMBDAs further out, for a copy placed under `by` more LAMBDAs.
+#[cfg(feature = "analysis")]
+fn shift_parameters(ast: &mut Ast, by: u16) {
+    fn shift(ast: &mut Ast, by: u16, inside: u16) {
+        match ast {
+            Ast::Parameter { depth, .. } if *depth >= inside => *depth += by,
+            Ast::Lambda(definition) => {
+                shift(&mut std::rc::Rc::make_mut(definition).body, by, inside + 1);
+            }
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Parameter { .. }
+            | Ast::RegexPattern(_)
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(_)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(_)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Func(..)
+            | Ast::UnknownFunc(_)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array(_) => {
+                ast.fold_children_mut(&mut |child| {
+                    shift(child, by, inside);
+                    false
+                });
+            }
+        }
+    }
+    if by > 0 {
+        shift(ast, by, 0);
+    }
+}
+
+#[cfg(not(feature = "analysis"))]
+const fn shift_parameters(_ast: &mut Ast, _by: u16) {}
+
 /// The match and search modes of XMATCH and XLOOKUP. A missing argument takes
 /// its default, and an argument error is returned unchanged.
 fn lookup_modes(
-    match_mode: Option<Value>,
-    search_mode: Option<Value>,
+    match_mode_arg: Option<Value>,
+    search_mode_arg: Option<Value>,
 ) -> Result<(i32, i32), FormulaError> {
-    let match_mode = match match_mode.as_ref().map(option_code).transpose()? {
+    let match_mode = match match_mode_arg.as_ref().map(option_code).transpose()? {
         None => 0,
         Some(mode @ -1..=2) => mode,
         Some(_) => return Err(FormulaError::Value),
     };
-    let search_mode = match search_mode.as_ref().map(option_code).transpose()? {
+    let search_mode = match search_mode_arg.as_ref().map(option_code).transpose()? {
         None => 1,
         Some(mode @ (-2 | -1 | 1 | 2)) => mode,
         Some(_) => return Err(FormulaError::Value),
@@ -451,9 +610,9 @@ fn address_text(
         return Err(FormulaError::Value);
     }
     let mut output = String::new();
-    if let Some(sheet) = sheet {
+    if let Some(sheet_name) = sheet {
         output.push('\'');
-        output.push_str(&sheet.replace('\'', "''"));
+        output.push_str(&sheet_name.replace('\'', "''"));
         output.push_str("'!");
     }
     let row_absolute = matches!(abs, 1 | 2);
@@ -562,10 +721,6 @@ struct ChangedOutputs {
     /// and `2i + 1`, and leaf `leaves + k` is output `k`.
     last_rows: Vec<u32>,
     leaves: usize,
-    /// Tree nodes the reads visited. Tests read it to bound the check's
-    /// work, which no value can show.
-    #[cfg(test)]
-    visited: std::cell::Cell<usize>,
 }
 
 impl ChangedOutputs {
@@ -577,7 +732,9 @@ impl ChangedOutputs {
                 Some((bounds, change.sequence))
             })
             .collect();
-        outputs.sort_unstable_by_key(|(bounds, _)| (bounds.sheet, bounds.row_start));
+        sort_by_key96(&mut outputs, |(bounds, _)| {
+            key96(0, bounds.sheet, bounds.row_start)
+        });
 
         let leaves = outputs.len().next_power_of_two();
         let mut last_rows = vec![0; leaves * 2];
@@ -592,8 +749,6 @@ impl ChangedOutputs {
             outputs,
             last_rows,
             leaves,
-            #[cfg(test)]
-            visited: std::cell::Cell::new(0),
         }
     }
 
@@ -626,9 +781,6 @@ impl ChangedOutputs {
         if stop <= first || end <= start || self.last_rows[node] < read.row_start {
             return;
         }
-
-        #[cfg(test)]
-        self.visited.set(self.visited.get() + 1);
 
         if stop - start == 1 {
             let (bounds, sequence) = self.outputs[start];
@@ -702,14 +854,16 @@ impl CellStore {
     /// dependents at the instant the host already stored. Pending source
     /// changes of those sheets join the same pass.
     pub(crate) fn recompute_volatile_formulas(&mut self) {
-        let seeds: Vec<usize> = self
+        let volatile_sheets: Vec<usize> = self
             .sheets
             .iter()
             .enumerate()
             .filter_map(|(sheet, data)| data.formulas.has_volatile().then_some(sheet))
             .collect();
         #[cfg(feature = "host-functions")]
-        let seeds = self.with_custom_volatile_seeds(seeds);
+        let seeds = self.with_custom_volatile_seeds(volatile_sheets);
+        #[cfg(not(feature = "host-functions"))]
+        let seeds = volatile_sheets;
 
         self.recompute_at_volatile_serial(&seeds);
     }
@@ -770,12 +924,20 @@ impl CellStore {
     where
         I: IntoIterator<Item = usize> + Clone,
     {
+        if let (Some(changes), Some(work)) = (self.recalculation.as_deref_mut(), affected) {
+            for key in work.keys(&self.formula_slots) {
+                changes.cell(key.sheet, key.row, key.col);
+            }
+        }
         if self.pivots.is_some() {
             self.capture_pivot_changes(sheets.clone(), affected);
         }
 
         for sheet in sheets {
             if let Some(data) = self.sheets.get_mut(sheet) {
+                if let Some(changes) = self.recalculation.as_deref_mut() {
+                    changes.dirty_seeds(sheet, data);
+                }
                 data.finish_recompute();
             }
         }
@@ -798,11 +960,6 @@ impl CellStore {
     /// affect. It does not settle pivot tables, which is why the pivot settle
     /// loops call it between their own steps.
     pub(crate) fn recompute_formulas(&mut self, seeds: &[usize]) {
-        #[cfg(test)]
-        {
-            self.formula_passes += 1;
-        }
-
         if seeds.is_empty() {
             return;
         }
@@ -846,21 +1003,12 @@ impl CellStore {
             }
         }
 
-        #[cfg(test)]
-        let selected_by_seeds = affected.len();
-        #[cfg(test)]
-        {
-            self.recomputed_formulas += selected_by_seeds;
-        }
-
         if affected.is_empty() {
             self.finish_recompute(seeds.iter().copied(), None);
             memo.finish(affected);
             self.formula_results = Some(memo);
             return;
         }
-
-        memo.prepare(self.formula_slots.slots(), affected.len());
 
         let found_cycle = self.graph.index().is_some_and(|index| {
             seed_dependency_depth_errors(
@@ -879,16 +1027,10 @@ impl CellStore {
             .index()
             .is_some_and(|index| !index.has_dynamic_arrays())
         {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.evaluate_pass(&mut pass, found_cycle);
-
-            for id in affected.ids() {
-                if let Some(result) = pass.results.remove(id) {
-                    self.store_formula_result(id, result);
-                }
+            if self.independent_pass() {
+                self.evaluate_independent_pass(&affected, &mut memo);
+            } else {
+                self.evaluate_selected(&affected, &mut memo, found_cycle);
             }
 
             self.finish_recompute(seeds.iter().copied(), Some(&affected));
@@ -898,12 +1040,9 @@ impl CellStore {
             return;
         }
 
+        self.flush_seeded(&mut memo);
         if let Some(limits) = self.iteration.as_deref().copied().filter(|_| found_cycle) {
-            let mut pass = EvalPass {
-                affected: &affected,
-                results: &mut memo,
-            };
-            self.settle_circular_references(&mut pass, limits, false);
+            self.settle_circular_references(&affected, &mut memo, limits, false);
         }
 
         let mut seeded_sheets: FxHashSet<usize> = seeds.iter().copied().collect();
@@ -926,6 +1065,8 @@ impl CellStore {
         // evaluation of this pass. The graph does not list them, so a spill
         // change inside one makes that anchor stale. Dropped with the pass.
         let mut runtime_readers: FxHashMap<AbsCellKey, RuntimeReads> = FxHashMap::default();
+        // The spill each anchor held before it runs again, reused by every anchor.
+        let mut vacated_spill = VacatedSpill::default();
 
         loop {
             let mut pending: Vec<(AbsCellKey, Ast, bool)> = affected
@@ -957,12 +1098,12 @@ impl CellStore {
                 break;
             }
 
-            pending.sort_unstable_by_key(|(key, ..)| (key.sheet, key.row, key.col));
+            sort_by_key96(&mut pending, |(key, ..)| key96(key.sheet, key.row, key.col));
 
             let mut changed_sheets = FxHashSet::default();
             let mut spill_changes: Vec<SpillChange> = Vec::new();
 
-            for (key, ast, has_spill_refs) in pending {
+            for (key, stored_ast, has_spill_refs) in pending {
                 let Some(id) = self.formula_id(key) else {
                     continue;
                 };
@@ -973,10 +1114,11 @@ impl CellStore {
                 let local = key.local();
                 let output_sheet = key.sheet as usize;
                 let data = &mut self.sheets[output_sheet];
-                let vacated_range = data.spill.installed(local);
-                let vacated = data.spill.clear_keeping_values(local, &mut data.cells);
+                let vacated_range = data
+                    .spill
+                    .vacate(local, &mut data.cells, &mut vacated_spill);
 
-                memo.remove(id);
+                memo.unsettle(id);
                 let mut pass = EvalPass {
                     affected: &affected,
                     results: &mut memo,
@@ -990,9 +1132,9 @@ impl CellStore {
                 FORMULA_EVALUATIONS.with(|count| count.set(count.get() + 1));
                 let enclosing_reads = has_spill_refs.then(start_runtime_reads);
                 let ast = if has_spill_refs {
-                    self.resolve_spill_refs(&ast, output_sheet, &mut pass, 0)
+                    self.resolve_spill_refs(&stored_ast, output_sheet, &mut pass, 0)
                 } else {
-                    ast
+                    stored_ast
                 };
 
                 let evaluated = match self.dynamic_array_bound(&ast, output_sheet, &mut pass) {
@@ -1009,7 +1151,12 @@ impl CellStore {
                                     None if has_spill_refs => {
                                         match self.eval_ast(&ast, output_sheet, &mut pass, 0) {
                                             Value::Error(error) => Err(error),
-                                            value => Ok(EvalMatrix::new(1, 1, vec![value])),
+                                            value @ (Value::Number(_)
+                                            | Value::Text(_)
+                                            | Value::Bool(_)
+                                            | Value::Blank) => {
+                                                Ok(EvalMatrix::new(1, 1, vec![value]))
+                                            }
                                         }
                                     }
                                     None => Err(FormulaError::Value),
@@ -1022,12 +1169,13 @@ impl CellStore {
                             // pass fail before reading their ranges.
                             evaluated.and_then(|matrix| {
                                 let excess = matrix.values.len().saturating_sub(bound);
-                                match dynamic_recompute_within_limit(spill_work, excess) {
-                                    Some(total) => spill_work = total,
-                                    None => {
-                                        spill_work = usize::MAX;
-                                        return Err(FormulaError::Num);
-                                    }
+                                if let Some(total) =
+                                    dynamic_recompute_within_limit(spill_work, excess)
+                                {
+                                    spill_work = total
+                                } else {
+                                    spill_work = usize::MAX;
+                                    return Err(FormulaError::Num);
                                 }
                                 Ok(matrix)
                             })
@@ -1041,8 +1189,17 @@ impl CellStore {
                         Value::Error(error) => Err(error),
                         // A runtime reference that resolved to one cell can
                         // leave a scalar expression; its value is the result.
-                        value if has_spill_refs => Ok(EvalMatrix::new(1, 1, vec![value])),
-                        _ => Err(FormulaError::Value),
+                        value @ (Value::Number(_)
+                        | Value::Text(_)
+                        | Value::Bool(_)
+                        | Value::Blank)
+                            if has_spill_refs =>
+                        {
+                            Ok(EvalMatrix::new(1, 1, vec![value]))
+                        }
+                        Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                            Err(FormulaError::Value)
+                        }
                     },
                 };
                 pass.results.visiting.remove(id);
@@ -1055,7 +1212,7 @@ impl CellStore {
                     }
                 }
 
-                let mut changed = match evaluated {
+                let changed = match evaluated {
                     // A reference that resolved to one cell is a plain value,
                     // as in Excel: it owns no spill cell and spends none of
                     // the spill-owner budget.
@@ -1064,16 +1221,19 @@ impl CellStore {
                         if data.spill.attempt(local).is_some() {
                             data.spill.forget(local, &mut data.cells);
                         }
-                        pass.results.insert(id, matrix.into_first());
+                        pass.results.pull(id, matrix.into_first());
                         Vec::new()
                     }
-                    evaluated => self.install_spill_result(key, evaluated, pass.results),
+                    result => self.install_spill_result(key, result, &vacated_spill, pass.results),
                 };
                 if self.iteration.is_some() {
                     if let Some(value) = self.finish_runtime_formula(key, &mut pass) {
-                        pass.results.insert(id, value);
+                        pass.results.pull(id, value);
                     }
                 }
+                // The anchor and any formula it pulled are written before the
+                // next anchor runs, after its spill is installed.
+                self.flush_pulled(&mut memo);
 
                 // Formulas that use `A1#` read only the anchor cell. The anchor
                 // counts as changed when its spill range or spilled cells
@@ -1100,31 +1260,17 @@ impl CellStore {
                     }
                 }
 
-                // A spill that comes back over the same cells reports only the
-                // cells whose value changed. Otherwise every vacated cell
-                // changed too, before the new spill was installed.
-                let reinstalled = installed_range == vacated_range
-                    && vacated.len() == changed.len()
-                    && vacated
-                        .iter()
-                        .zip(&changed)
-                        .all(|((vacated_cell, _), cell)| vacated_cell == cell);
-                if reinstalled {
-                    let cells = &self.sheets[output_sheet].cells;
-                    let mut previous = vacated.iter().map(|&(_, value)| value);
-                    changed.retain(|&(row, col)| {
-                        let current =
-                            cells.calculated_cell_at(cells.idx(row as usize, col as usize));
-                        previous.next().flatten() != current
-                    });
-                } else if !vacated.is_empty() {
-                    let cleared: Vec<(u32, u32)> = vacated.iter().map(|&(cell, _)| cell).collect();
+                // The install reported the cells whose value changed; the
+                // vacated cells it did not write back were cleared.
+                let cleared = vacated_spill.cleared_outside(installed_range);
+                if !cleared.is_empty() {
                     spill_changes.push(SpillChange {
                         sheet: output_sheet,
                         sequence,
                         output_cells: cleared.len(),
                         cells: cleared.clone(),
                     });
+                    self.record_recalculated_cells(output_sheet, &cleared);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(cleared);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1142,6 +1288,7 @@ impl CellStore {
                 }
 
                 if !changed.is_empty() {
+                    self.record_recalculated_cells(output_sheet, &changed);
                     self.sheets[output_sheet].formulas.mark_cells_dirty(changed);
                     changed_sheets.insert(output_sheet);
                     seeded_sheets.insert(output_sheet);
@@ -1149,6 +1296,7 @@ impl CellStore {
             }
 
             let Some(index) = self.graph.index() else {
+                self.flush_pulled(&mut memo);
                 memo.finish(affected);
                 self.formula_results = Some(memo);
                 return;
@@ -1168,10 +1316,6 @@ impl CellStore {
             if !runtime_readers.is_empty() {
                 let outputs = ChangedOutputs::new(&spill_changes);
                 stale_readers.extend(stale_runtime_readers(&runtime_readers, &outputs));
-                #[cfg(test)]
-                {
-                    self.stale_reader_visits += outputs.visited.get();
-                }
             }
             for change in spill_changes {
                 stale_readers.extend(
@@ -1234,12 +1378,7 @@ impl CellStore {
                     &mut memo,
                 );
             }
-        }
-
-        #[cfg(test)]
-        {
-            // Spill changes select the formulas that read them.
-            self.recomputed_formulas += affected.len() - selected_by_seeds;
+            self.flush_seeded(&mut memo);
         }
 
         let found_cycle = self.graph.index().is_some_and(|index| {
@@ -1262,17 +1401,7 @@ impl CellStore {
             }
         });
 
-        let mut pass = EvalPass {
-            affected: &affected,
-            results: &mut memo,
-        };
-        self.evaluate_pass(&mut pass, found_cycle);
-
-        for id in affected.ids() {
-            if let Some(result) = pass.results.remove(id) {
-                self.store_formula_result(id, result);
-            }
-        }
+        self.evaluate_selected(&affected, &mut memo, found_cycle);
 
         self.finish_recompute(seeded_sheets.iter().copied(), Some(&affected));
         memo.finish(affected);
@@ -1283,6 +1412,7 @@ impl CellStore {
         &mut self,
         key: AbsCellKey,
         result: Result<EvalMatrix, FormulaError>,
+        vacated: &VacatedSpill,
         results: &mut FormulaResults,
     ) -> Vec<(u32, u32)> {
         let sheet = key.sheet as usize;
@@ -1295,19 +1425,19 @@ impl CellStore {
             Err(error) => {
                 let data = &mut self.sheets[sheet];
                 data.spill.forget(local, &mut data.cells);
-                results.insert(id, Value::Error(error));
+                results.pull(id, Value::Error(error));
                 return Vec::new();
             }
         };
         let Some(range) = SpillRange::new(local, matrix.rows, matrix.cols) else {
             let data = &mut self.sheets[sheet];
             data.spill.forget(local, &mut data.cells);
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         };
         let data = &mut self.sheets[sheet];
         if let Err(error) = data.spill.admit(range, &mut data.cells, &data.formulas) {
-            results.insert(id, Value::Error(error));
+            results.pull(id, Value::Error(error));
             return Vec::new();
         }
 
@@ -1322,20 +1452,160 @@ impl CellStore {
         let data = &mut self.sheets[sheet];
         if !within_budget {
             data.spill.compact(&mut data.cells);
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
         if !data.spill.reserve(range, &mut data.cells) {
-            results.insert(id, Value::Error(FormulaError::Num));
+            results.pull(id, Value::Error(FormulaError::Num));
             return Vec::new();
         }
 
         let first = matrix.values.first().cloned().unwrap_or(Value::Blank);
-        results.insert(id, first);
+        results.pull(id, first);
         let strings = &mut self.strings;
-        data.spill.install(range, &mut data.cells, |offset| {
-            calculated_slot(strings, &matrix.values[offset])
-        })
+        let value_at = |offset: usize| calculated_slot(strings, &matrix.values[offset]);
+        if vacated.owned_cells() == 0 {
+            data.spill.install(range, &mut data.cells, value_at)
+        } else {
+            data.spill
+                .reinstall(range, &mut data.cells, vacated, value_at)
+        }
+    }
+
+    /// Whether no selected formula can read another one during the pass: no
+    /// static formula-to-formula reads, no runtime references (`OFFSET` and
+    /// `INDIRECT` are volatile) and no iteration. Each formula then reads
+    /// only stored values, so its result can go to storage at once.
+    fn independent_pass(&self) -> bool {
+        self.iteration.is_none()
+            && !self.formula_slots.has_volatile()
+            && self
+                .graph
+                .index()
+                .is_some_and(|index| !index.has_formula_dependencies())
+    }
+
+    /// Evaluates each selected formula once and writes its result to storage
+    /// at once: no pass result table, active-call bits or second write loop.
+    fn evaluate_independent_pass(&mut self, affected: &FormulaWork, memo: &mut FormulaResults) {
+        for id in affected.ids() {
+            let mut pass = EvalPass {
+                affected,
+                results: memo,
+            };
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            self.store_formula_result(id, result);
+        }
+    }
+
+    /// Writes the pulled results to storage and marks them settled. Most
+    /// formulas pull nothing, so the check stays inline and the loop does not.
+    #[inline]
+    pub(super) fn flush_pulled(&mut self, results: &mut FormulaResults) {
+        if results.has_pulled() {
+            self.write_pulled(results);
+        }
+    }
+
+    #[inline(never)]
+    fn write_pulled(&mut self, results: &mut FormulaResults) {
+        while let Some((id, result)) = results.pop_pulled() {
+            self.settle_result(id, result, results);
+        }
+    }
+
+    /// Writes the errors the depth walk seeded. With iteration on, `#CYCLE!`
+    /// results wait in the pulled list: the component pass replaces them and
+    /// starts from the values the cells held before this pass.
+    fn flush_seeded(&mut self, results: &mut FormulaResults) {
+        if !results.seeded.is_empty() {
+            self.write_seeded(results);
+        }
+    }
+
+    #[inline(never)]
+    fn write_seeded(&mut self, results: &mut FormulaResults) {
+        let mut seeded = std::mem::take(&mut results.seeded);
+        let iterating = self.iteration.is_some();
+        for (id, error) in seeded.drain(..) {
+            if iterating && error == FormulaError::Cycle {
+                results.pull(id, Value::Error(error));
+            } else {
+                self.settle_result(id, Value::Error(error), results);
+            }
+        }
+        results.seeded = seeded;
+    }
+
+    /// Evaluates every selected formula once, each after the formulas it
+    /// reads, and writes its result before the next one runs.
+    fn evaluate_selected(
+        &mut self,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
+        found_cycle: bool,
+    ) {
+        self.flush_seeded(results);
+        match self.iteration.as_deref().copied() {
+            Some(limits) if found_cycle => {
+                self.settle_circular_references(affected, results, limits, true)
+            }
+            _ => self.flush_pulled(results),
+        }
+        if results.ordered {
+            // The walk lists every selected formula it did not resolve to an
+            // error, and those errors are already written.
+            let order = std::mem::take(&mut results.order);
+            for &id in &order {
+                self.evaluate_one(id, affected, results);
+            }
+            results.order = order;
+        } else {
+            for id in affected.ids() {
+                self.evaluate_one(id, affected, results);
+            }
+        }
+    }
+
+    /// Evaluates `id` unless this pass already has its result, then writes it
+    /// and any formula it pulled.
+    pub(super) fn evaluate_one(
+        &mut self,
+        id: FormulaId,
+        affected: &FormulaWork,
+        results: &mut FormulaResults,
+    ) {
+        // Between top-level formulas only iteration's seeded cycles wait in
+        // the pulled list, so most checks need only the settled bit.
+        if results.is_settled(id) || (results.has_pulled() && results.has(id)) {
+            return;
+        }
+        let mut pass = EvalPass { affected, results };
+        if self.iteration.is_some() {
+            let _ = self.eval_formula_id(id, &mut pass, 0);
+        } else {
+            // Without iteration nothing on the evaluation path needs this
+            // result before it is written, so it goes straight to the cell.
+            pass.results.visiting.insert(id);
+            let result = self.eval_formula_body(id, &mut pass, 0);
+            pass.results.visiting.remove(id);
+            self.settle_result(id, result, results);
+        }
+        self.flush_pulled(results);
+    }
+
+    /// Writes `id`'s result and marks it settled for this pass. One
+    /// out-of-line copy serves every writer; the call is small next to the
+    /// evaluation it follows.
+    #[inline(never)]
+    pub(super) fn settle_result(
+        &mut self,
+        id: FormulaId,
+        result: EvalResult,
+        results: &mut FormulaResults,
+    ) {
+        self.store_formula_result(id, result);
+        results.settle(id);
     }
 
     fn store_formula_result(&mut self, id: FormulaId, result: EvalResult) {
@@ -1350,7 +1620,7 @@ impl CellStore {
 
         let interned = match &result {
             Value::Text(text) => Some(self.intern(text)),
-            _ => None,
+            Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => None,
         };
         let sheet = key.sheet as usize;
         let Some(data) = self.sheets.get_mut(sheet) else {
@@ -1397,18 +1667,17 @@ impl CellStore {
             return Value::Error(FormulaError::Ref);
         }
 
-        if !s.cells.is_loaded(row, col) {
+        let Some((source_kind, source_payload)) = s.cells.loaded_source_at(row, col) else {
             return Value::Error(FormulaError::Loading);
-        }
+        };
 
         let i = s.cells.idx(row, col);
         // Literal sources cannot be shadowed by calculated output. Decode their
         // payload directly instead of resolving the overlay a second time.
-        let source_kind = s.cells.source_kind_at(i);
         let (kind, payload) = if source_kind == KIND_EMPTY {
             s.cells.calculated_cell_at(i).unwrap_or((KIND_EMPTY, 0))
         } else {
-            (source_kind, s.cells.source_payload_at(i))
+            (source_kind, source_payload)
         };
 
         // Literal range scans avoid per-cell formula and calculated-error lookups.
@@ -1419,8 +1688,24 @@ impl CellStore {
 
         if let Some(key) = cell_key(row, col) {
             if let Some(id) = s.formulas.id(key) {
+                // A settled formula's result is already in its cell, read as
+                // a clean formula is; iteration still records the read.
                 if pass.affected.contains(id) {
-                    return self.eval_formula_id(id, pass, depth + 1);
+                    if !pass.results.is_settled(id) {
+                        return self.eval_formula_id(id, pass, depth + 1);
+                    }
+                    if self.iteration.is_some() {
+                        iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
+                    }
+                    // This pass wrote the whole result, errors included, to
+                    // the calculated slot, so no source-error lookup is needed.
+                    return match s.cells.calculated_cell_at(i) {
+                        Some((KIND_FORMULA, payload)) => Value::Error(
+                            FormulaError::from_slot(payload).unwrap_or(FormulaError::Ref),
+                        ),
+                        Some((kind, payload)) => literal_cell_value(&self.strings, kind, payload),
+                        None => Value::number(s.cells.num_at(i)),
+                    };
                 }
 
                 return cached_formula_value(
@@ -1439,18 +1724,6 @@ impl CellStore {
         Value::number(s.cells.num_at(i))
     }
 
-    pub(crate) fn eval_formula_cell(
-        &self,
-        key: AbsCellKey,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-    ) -> EvalResult {
-        let Some(id) = self.formula_id(key) else {
-            return Value::Number(0.0);
-        };
-        self.eval_formula_id(id, pass, depth)
-    }
-
     /// Evaluate a selected id without repeating its address-index lookup.
     pub(crate) fn eval_formula_id(
         &self,
@@ -1464,7 +1737,11 @@ impl CellStore {
         let Some(key) = self.formula_slots.location(id) else {
             return Value::Error(FormulaError::Ref);
         };
-        if let Some(result) = pass.results.get(id) {
+        if pass.results.is_settled(id) {
+            let (row, col) = key.local();
+            return self.eval_at(key.sheet as usize, row as usize, col as usize, pass, depth);
+        }
+        if let Some(result) = pass.results.pulled(id) {
             if self.iteration.is_some() {
                 iteration::record_iteration_read(key);
             }
@@ -1479,7 +1756,7 @@ impl CellStore {
         }
         let result = self.eval_formula_body(id, pass, depth);
         pass.results.visiting.remove(id);
-        pass.results.insert(id, result.clone());
+        pass.results.pull(id, result.clone());
         if self.iteration.is_some() {
             self.finish_runtime_formula(key, pass).unwrap_or(result)
         } else {
@@ -1525,15 +1802,19 @@ impl CellStore {
         }
     }
 
-    /// Evaluate a parsed conditional-format expression at one target cell.
-    /// Referenced formula cells use their recomputed cache; the origin guard
-    /// gives zero-argument ROW/COLUMN the target cell's coordinates.
+    /// Evaluate a conditional-format rule's parsed expression at one target
+    /// cell. `shift` is the target's distance from the cell the expression
+    /// is written for, which its relative references move by; the caller
+    /// keeps every shifted reference inside the sheet. The pass recomputes
+    /// nothing, so referenced formula cells use their recomputed cache and no
+    /// other formula evaluates under the shift. The origin guard gives
+    /// zero-argument ROW/COLUMN the target cell's coordinates.
     pub(crate) fn eval_conditional_ast(
         &self,
         ast: &Ast,
         sheet: usize,
-        row: u32,
-        col: u32,
+        target: (u32, u32),
+        shift: (u32, u32),
         results: &mut FormulaResults,
     ) -> EvalResult {
         let affected = FormulaWork::default();
@@ -1541,8 +1822,8 @@ impl CellStore {
             affected: &affected,
             results,
         };
-        let _origin = FormulaOriginGuard::push((row, col));
-        self.eval_ast(ast, sheet, &mut pass, 0)
+        let _origin = FormulaOriginGuard::push(target);
+        read_shifted(shift, || self.eval_ast(ast, sheet, &mut pass, 0))
     }
 
     pub(crate) fn eval_ast(
@@ -1558,14 +1839,21 @@ impl CellStore {
 
         match ast {
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
+            Ast::Parameter { depth, index, .. } => {
+                analysis::lambda::parameter_value(self, pass.results.call_frame(), *depth, *index)
+            }
             #[cfg(feature = "analysis")]
             Ast::RegexPattern(pattern) => Value::text(pattern.text()),
+            // A LAMBDA is not a value until it is called.
             #[cfg(feature = "analysis")]
-            Ast::UnknownFunc(name, args) if name == analysis::lambda::CALL => {
+            Ast::Lambda(_) => Value::Error(FormulaError::Calc),
+            #[cfg(feature = "analysis")]
+            Ast::UnknownFunc(call) if call.name == analysis::lambda::CALL => {
+                let crate::calc::UnknownCall { args, .. } = &**call;
+
                 analysis::lambda::evaluate(
                     self,
-                    analysis::lambda::CALL,
+                    analysis::lambda::Invocation::Call,
                     args,
                     sheet,
                     pass,
@@ -1573,43 +1861,69 @@ impl CellStore {
                 )
             }
             Ast::Num(n) => Value::number(*n),
-            Ast::Str(text) => Value::text(text.as_str()),
+            Ast::Str(text) => Value::Text(std::rc::Rc::clone(text)),
             Ast::Bool(value) => Value::Bool(*value),
             Ast::Missing => Value::Blank,
-            Ast::Array { values, .. } => values.first().cloned().unwrap_or(Value::Blank),
-            Ast::Cell(row, col, _) => {
-                self.eval_at(sheet, *row as usize, *col as usize, pass, depth + 1)
+            Ast::Array(array) => {
+                let crate::calc::ArrayLiteral { values, .. } = &**array;
+                values.first().cloned().unwrap_or(Value::Blank)
             }
-            Ast::AbsCell(sheet_ref, row, col, _) => self.eval_at(
-                sheet_ref.handle as usize,
-                *row as usize,
-                *col as usize,
-                pass,
-                depth + 1,
-            ),
+            Ast::Cell(row, col, flags) => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                self.eval_at(
+                    sheet,
+                    placed_row as usize,
+                    placed_col as usize,
+                    pass,
+                    depth + 1,
+                )
+            }
+            Ast::AbsCell(sheet_ref, row, col, flags) => {
+                let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+                self.eval_at(
+                    sheet_ref.handle as usize,
+                    placed_row as usize,
+                    placed_col as usize,
+                    pass,
+                    depth + 1,
+                )
+            }
             // A sheet reference that ingest did not resolve names another
             // workbook, which has no values here.
             Ast::SheetCell(..) | Ast::SheetRange(..) | Ast::InvalidRef => {
                 Value::Error(FormulaError::Ref)
             }
-            Ast::LetSlot { slot, expression } => match cached_let_slot(*slot) {
-                Some(value) => value,
-                None => {
+            Ast::LetSlot { slot, expression } => {
+                let known = pass
+                    .results
+                    .let_frame()
+                    .and_then(|frame| frame.expanded_value(*slot));
+                if let Some(value) = known {
+                    value
+                } else {
                     let value = self.eval_ast(expression, sheet, pass, depth);
-                    remember_let_slot(*slot, value.clone());
+                    if let Some(frame) = pass.results.existing_let_frame_mut() {
+                        frame.remember_expanded(*slot, value.clone());
+                    }
                     value
                 }
-            },
+            }
+            Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
             Ast::NamedFormula(named) => self.eval_named_formula_family(named, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
-            Ast::UnknownFunc(name, arguments) => {
+            Ast::UnknownFunc(call) => {
+                let crate::calc::UnknownCall {
+                    name,
+                    args: arguments,
+                } = &**call;
+
                 self.eval_custom_function(name, arguments, sheet, pass, depth + 1)
             }
             // With host functions the arm above takes every unknown call; the
             // default engine keeps this arm as it was, so its binary does not
             // change.
             #[cfg_attr(feature = "host-functions", allow(unreachable_patterns))]
-            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(..) => {
+            Ast::Name(_) | Ast::UnresolvedStructured(_) | Ast::UnknownFunc(_) => {
                 Value::Error(FormulaError::Name)
             }
             Ast::NamedRange(named)
@@ -1639,18 +1953,48 @@ impl CellStore {
                 let op = match ast {
                     Ast::Neg(_) => operators::UnaryOp::Neg,
                     Ast::Pos(_) => operators::UnaryOp::Pos,
-                    _ => operators::UnaryOp::Percent,
+                    Ast::Num(_)
+                    | Ast::Str(_)
+                    | Ast::Bool(_)
+                    | Ast::Missing
+                    | Ast::Name(_)
+                    | Ast::NamedRange(_)
+                    | Ast::NamedFormula(_)
+                    | Ast::UnresolvedStructured(_)
+                    | Ast::Structured(_)
+                    | Ast::Cell(..)
+                    | Ast::SheetCell(..)
+                    | Ast::AbsCell(..)
+                    | Ast::Range(..)
+                    | Ast::SheetRange(..)
+                    | Ast::AbsRange(..)
+                    | Ast::SheetSpan(_)
+                    | Ast::InvalidRef
+                    | Ast::Func(..)
+                    | Ast::UnknownFunc(..)
+                    | Ast::Bin(..)
+                    | Ast::Cmp(..)
+                    | Ast::Percent(_)
+                    | Ast::LetSlot { .. }
+                    | Ast::LetName { .. }
+                    | Ast::Array { .. } => operators::UnaryOp::Percent,
+                    #[cfg(feature = "analysis")]
+                    Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+                        operators::UnaryOp::Percent
+                    }
                 };
                 operators::unary(op, &self.eval_ast(expr, sheet, pass, depth + 1))
             }
             Ast::Bin(op, left, right) => {
-                let left = self.eval_ast(left, sheet, pass, depth + 1);
-                operators::binary(*op, &left, || self.eval_ast(right, sheet, pass, depth + 1))
+                let left_value = self.eval_ast(left, sheet, pass, depth + 1);
+                operators::binary(*op, &left_value, || {
+                    self.eval_ast(right, sheet, pass, depth + 1)
+                })
             }
             Ast::Cmp(op, left, right) => {
-                let left = self.eval_ast(left, sheet, pass, depth + 1);
-                let right = self.eval_ast(right, sheet, pass, depth + 1);
-                operators::comparison(*op, &left, &right)
+                let left_value = self.eval_ast(left, sheet, pass, depth + 1);
+                let right_value = self.eval_ast(right, sheet, pass, depth + 1);
+                operators::comparison(*op, &left_value, &right_value)
             }
             Ast::Func(
                 Func::Filter
@@ -1675,6 +2019,66 @@ impl CellStore {
             }
             Ast::Func(func, args) => self.eval_func(*func, args, sheet, pass, depth + 1),
         }
+    }
+
+    /// Evaluates a LET whose names were resolved to slots when the formula
+    /// was entered: binds each slot to its expression in the original tree,
+    /// then evaluates the result expression. A binding is evaluated on its
+    /// first use, as the expansion does.
+    #[inline(never)]
+    fn eval_let_family(
+        &self,
+        args: &[Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let Some((result, bindings)) = args.split_last() else {
+            return Value::Error(FormulaError::Value);
+        };
+        let first_slot = match bindings.first() {
+            Some(Ast::LetName { slot, .. }) => *slot,
+            _ => return Value::Error(FormulaError::Value),
+        };
+        let frame = pass.results.let_frame_mut();
+        let opened = frame.open_resolved(first_slot);
+        for pair in bindings.chunks(2) {
+            if let [Ast::LetName { slot, .. }, expression] = pair {
+                frame.bind(*slot, expression);
+            }
+        }
+        let value = self.eval_ast(result, sheet, pass, depth + 1);
+        pass.results.let_frame_mut().close_resolved(opened);
+        value
+    }
+
+    /// The value of a resolved LET name: its slot's value, or its binding's
+    /// value on first use, kept in the slot.
+    #[inline(never)]
+    fn eval_let_name_family(
+        &self,
+        slot: u32,
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        let Some(frame) = pass.results.let_frame() else {
+            return Value::Error(FormulaError::Name);
+        };
+        if let Some(value) = frame.resolved_value(slot) {
+            return value;
+        }
+        // SAFETY: a resolved name occurs only inside its LET, which binds the
+        // slot before evaluating anything in it and is still being evaluated.
+        #[allow(unsafe_code, reason = "calls `LetFrame::binding`; see its reason")]
+        let Some(expression) = (unsafe { frame.binding(slot) }) else {
+            return Value::Error(FormulaError::Name);
+        };
+        let value = self.eval_ast(expression, sheet, pass, depth);
+        if let Some(frame) = pass.results.existing_let_frame_mut() {
+            frame.remember_resolved(slot, value.clone());
+        }
+        value
     }
 
     /// The value of a defined name's formula. Out of line, so the name adds
@@ -1705,6 +2109,10 @@ impl CellStore {
     /// every family was inlined into it. `#[inline(never)]` keeps the handlers
     /// out of line in LLVM. wasm-opt inlines one-caller functions again
     /// afterwards, so `packages/wasm/Cargo.toml` passes it `--no-inline=*_family`.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "every function without its own arm takes the generic path; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_func(
         &self,
         func: Func,
@@ -1719,39 +2127,44 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
-            if let Some(family) = analysis::family(name) {
-                if let Some(hooks) = &family.array {
-                    if (hooks.produces_array)(name, args) {
-                        return match (hooks.evaluate)(self, name, args, sheet, pass, depth)
-                            .and_then(|matrix| {
-                                matrix.validate_bytes()?;
-                                Ok(matrix)
-                            }) {
-                            Ok(matrix) => matrix.into_first(),
-                            Err(error) => Value::Error(error),
-                        };
-                    }
+            let family = analysis::family(id);
+            if let Some(hooks) = &family.array {
+                if (hooks.produces_array)(id, args, pass.shapes()) {
+                    return match (hooks.evaluate)(self, id, args, sheet, pass, depth).and_then(
+                        |matrix| {
+                            matrix.validate_bytes()?;
+                            Ok(matrix)
+                        },
+                    ) {
+                        Ok(matrix) => matrix.into_first(),
+                        Err(error) => Value::Error(error),
+                    };
                 }
-                if let Some(evaluate) = family.evaluate_ast {
-                    return evaluate(self, name, args, sheet, pass, depth);
-                }
+            }
+            if let Some(evaluate) = family.evaluate_ast {
+                return evaluate(self, id, args, sheet, pass, depth);
             }
         }
 
         if func == Func::Let {
+            if matches!(args.first(), Some(Ast::LetName { .. })) {
+                return self.eval_let_family(args, sheet, pass, depth);
+            }
             return match expand_let_ast(args) {
-                Ok((expanded, slots)) => with_let_slots(slots, || {
+                Ok((expanded_ast, slots)) => {
+                    let enclosing = pass.results.let_frame_mut().open_expanded(slots);
                     let expanded = self.resolve_let_runtime_refs(
                         args,
-                        expanded,
+                        expanded_ast,
                         sheet,
                         pass,
                         depth + 1,
                         RewriteScope::Nested,
                     );
-                    self.eval_ast(&expanded, sheet, pass, depth + 1)
-                }),
+                    let value = self.eval_ast(&expanded, sheet, pass, depth + 1);
+                    pass.results.let_frame_mut().close_expanded(enclosing);
+                    value
+                }
                 Err(error) => Value::Error(error),
             };
         }
@@ -1775,18 +2188,17 @@ impl CellStore {
             if !(2..=3).contains(&args.len()) {
                 return Value::Error(FormulaError::Value);
             }
-            let condition = &args[0];
-            let condition = self.eval_ast(condition, sheet, pass, depth + 1);
+            let condition = self.eval_ast(&args[0], sheet, pass, depth + 1);
             let use_true_branch = match bool_from_value(&condition) {
                 Ok(value) => value,
                 Err(error) => return Value::Error(error),
             };
-            let branch = if use_true_branch {
+            let chosen = if use_true_branch {
                 args.get(1)
             } else {
                 args.get(2)
             };
-            return if let Some(branch) = branch {
+            return if let Some(branch) = chosen {
                 self.eval_ast(branch, sheet, pass, depth + 1)
             } else {
                 Value::Number(0.0)
@@ -1867,6 +2279,27 @@ impl CellStore {
             _ => {}
         }
 
+        if func == Func::SumProduct {
+            if let Some(result) = self.sum_product_range_family(args, sheet, depth + 1) {
+                return result;
+            }
+        }
+
+        if let Some(statistic) = statistics::number_statistic(func) {
+            let call = StatisticCall {
+                statistic,
+                func,
+                args,
+                sheet,
+                depth,
+            };
+            return self.eval_statistics_family(&call, pass);
+        }
+
+        if func == Func::Subtotal {
+            return self.eval_subtotal_family(args, sheet, pass, depth);
+        }
+
         if func == Func::Sum {
             if let Some(result) = self.eval_sum_family(args, sheet, pass, depth + 1) {
                 return result;
@@ -1879,71 +2312,51 @@ impl CellStore {
 
         #[cfg(feature = "analysis")]
         if let Func::Analysis(id) = func {
-            let name = analysis::name(id);
-            let result = match name {
-                "SUMSQ" => analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1),
-                "SUMX2MY2" | "SUMX2PY2" | "SUMXMY2" => analysis::math::streamed_paired_squares(
-                    self,
-                    name,
-                    args,
-                    sheet,
-                    pass,
-                    depth + 1,
-                ),
+            let result = match id {
+                analysis::SUMSQ_ID => {
+                    analysis::math::streamed_sum_squares(self, args, sheet, pass, depth + 1)
+                }
+                analysis::SUMX2MY2_ID | analysis::SUMX2PY2_ID | analysis::SUMXMY2_ID => {
+                    analysis::math::streamed_paired_squares(
+                        self,
+                        analysis::math::Function::of(id),
+                        args,
+                        sheet,
+                        pass,
+                        depth + 1,
+                    )
+                }
                 _ => None,
             };
-            if let Some(result) = result {
-                return result;
+            if let Some(handled) = result {
+                return handled;
             }
         }
 
         let mut values = FuncAccumulator::default();
-        for (index, arg) in args.iter().enumerate() {
-            let range = match arg {
-                Ast::Range(row_start, col_start, row_end, col_end, _) => Some(CellRange::new(
-                    sheet as u32,
-                    *row_start,
-                    *col_start,
-                    *row_end,
-                    *col_end,
-                )),
-                Ast::AbsRange(sheet_ref, row_start, col_start, row_end, col_end, _) => Some(
-                    CellRange::new(sheet_ref.handle, *row_start, *col_start, *row_end, *col_end),
-                ),
-                Ast::NamedRange(named) => Some(CellRange::new(
-                    named.sheet,
-                    named.row_start,
-                    named.col_start,
-                    named.row_end,
-                    named.col_end,
-                )),
-                Ast::Structured(reference) => Some(CellRange::new(
-                    reference.sheet,
-                    reference.row_start,
-                    reference.col,
-                    reference.row_end,
-                    reference.col,
-                )),
-                Ast::Func(Func::Intersect, operands) => intersection_range(operands, sheet).ok(),
-                // SUBTOTAL reads a cell argument as a one-cell reference, so
-                // the cell's row can be hidden.
-                Ast::Cell(row, col, _) if func == Func::Subtotal && index > 0 => {
-                    Some(CellRange::new(sheet as u32, *row, *col, *row, *col))
+        for arg in args {
+            // An array parameter's values go straight into the accumulator.
+            #[cfg(feature = "analysis")]
+            if let Some(read) = analysis::lambda::read_parameter_values(
+                self,
+                pass.results.call_frame(),
+                arg,
+                &mut |value| {
+                    if let Value::Error(error) = value {
+                        return Err(error);
+                    }
+                    values.push_range(value)
+                },
+            ) {
+                let finished =
+                    read.and_then(|(rows, cols)| values.finish_arg_with_missing(rows, cols, false));
+                if let Err(error) = finished {
+                    return Value::Error(error);
                 }
-                Ast::AbsCell(sheet_ref, row, col, _) if func == Func::Subtotal && index > 0 => {
-                    Some(CellRange::new(sheet_ref.handle, *row, *col, *row, *col))
-                }
-                _ => None,
-            };
-            let shape = if let Some(range) = range {
-                let skipped = (func == Func::Subtotal && index > 0).then(|| SkippedCells {
-                    rows: Some(
-                        math::subtotal_function(&values)
-                            .map_or(SkippedRows::Filtered, |(_, rows)| rows),
-                    ),
-                    nested_subtotals: true,
-                });
-                match self.push_range_values(range, skipped, pass, depth + 1, &mut values) {
+                continue;
+            }
+            let shape = if let Some(area) = argument_range(arg, sheet) {
+                match self.eval_range_values(area, pass, depth + 1, &mut values) {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
@@ -1952,7 +2365,7 @@ impl CellStore {
                     Ok(shape) => shape,
                     Err(error) => return Value::Error(error),
                 }
-            } else if ast_produces_array(arg) {
+            } else if ast_produces_array(arg, pass.shapes()) {
                 match self.eval_dynamic_array(arg, sheet, pass, depth + 1) {
                     Some(Ok(matrix)) => {
                         if let Err(error) = matrix.validate_copies(2) {
@@ -2019,6 +2432,10 @@ impl CellStore {
     /// `COLUMN(S)` and `ADDRESS`. See `eval_func` for why families live in
     /// out-of-line `*_family` handlers.
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_reference_family(
         &self,
         func: Func,
@@ -2043,9 +2460,9 @@ impl CellStore {
             if args.len() < 2 {
                 return Value::Error(FormulaError::Value);
             }
-            let index = self.eval_ast(&args[0], sheet, pass, depth + 1);
-            let index = match positive_index(&index) {
-                Ok(index) if index + 1 < args.len() => index + 1,
+            let index_value = self.eval_ast(&args[0], sheet, pass, depth + 1);
+            let index = match positive_index(&index_value) {
+                Ok(position) if position + 1 < args.len() => position + 1,
                 Ok(_) => return Value::Error(FormulaError::Value),
                 Err(error) => return Value::Error(error),
             };
@@ -2155,7 +2572,7 @@ impl CellStore {
             };
             let sheet_name = match optional_ast(args, 4) {
                 Some(ast) => match text_from_value(&scalar(ast, pass)) {
-                    Ok(value) => Some(value),
+                    Ok(value) => Some(value.into_owned()),
                     Err(error) => return Value::Error(error),
                 },
                 None => None,
@@ -2229,6 +2646,10 @@ impl CellStore {
 
     /// The `IS*` tests, `TYPE`, `N`, `T`, and the cell information functions.
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_information_family(
         &self,
         func: Func,
@@ -2272,13 +2693,13 @@ impl CellStore {
                     Value::Error(_) => 16.0,
                 }),
                 Func::N => match value {
-                    Value::Number(value) => Value::number(value),
-                    Value::Bool(value) => Value::number(if value { 1.0 } else { 0.0 }),
+                    Value::Number(number) => Value::number(number),
+                    Value::Bool(flag) => Value::number(if flag { 1.0 } else { 0.0 }),
                     Value::Error(error) => Value::Error(error),
                     Value::Text(_) | Value::Blank => Value::Number(0.0),
                 },
                 Func::T => match value {
-                    Value::Text(value) => Value::Text(value),
+                    Value::Text(text) => Value::Text(text),
                     Value::Error(error) => Value::Error(error),
                     Value::Number(_) | Value::Bool(_) | Value::Blank => Value::text(""),
                 },
@@ -2341,59 +2762,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Result<EvalMatrix, FormulaError> {
-        let sheet = range.sheet as usize;
-        let Some(data) = self.sheets.get(sheet) else {
-            return Err(FormulaError::Ref);
-        };
-        if data.cells.row_count() == 0
-            || data.cells.n_cols() == 0
-            || range.row_start as usize >= data.cells.row_count()
-            || range.col_start as usize >= data.cells.n_cols()
-        {
-            return Err(FormulaError::Ref);
-        }
-        let row_start = range.row_start as usize;
-        let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
-        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
-        let rows = row_end - row_start + 1;
-        let cols = col_end - col_start + 1;
-        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
-        let mut payload_bytes = total
-            .checked_mul(std::mem::size_of::<Value>())
-            .ok_or(FormulaError::Num)?;
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                let index = data.cells.idx(row, col);
-                if matches!(data.cells.kind_at(index), KIND_STRING | KIND_FORMULA) {
-                    if let Some(text) =
-                        string_from_pool_ref(&self.strings, data.cells.str_id_at(index))
-                    {
-                        payload_bytes = payload_bytes
-                            .checked_add(text.len())
-                            .ok_or(FormulaError::Num)?;
-                        if payload_bytes > SPILL_MAX_BYTES {
-                            return Err(FormulaError::Num);
-                        }
-                    }
-                }
-            }
-        }
-        let mut values = Vec::with_capacity(total);
-        let literals = LiteralSources::new(data, depth);
-        for row in row_start..=row_end {
-            for col in col_start..=col_end {
-                if !data.cells.is_loaded(row, col) {
-                    return Err(FormulaError::Loading);
-                }
-                let index = data.cells.idx(row, col);
-                let value = literals
-                    .and_then(|sources| sources.value_at(&self.strings, index))
-                    .unwrap_or_else(|| self.eval_at(sheet, row, col, pass, depth + 1));
-                values.push(value);
-            }
-        }
-        Ok(EvalMatrix::new(rows, cols, values))
+        range_view::RangeView::new(self, range, depth)?.materialize(pass)
     }
 
     fn eval_criterion(
@@ -2438,6 +2807,10 @@ impl CellStore {
     /// Walks the criteria functions over their ranges instead of
     /// materializing them. `None` keeps the materialized path, which also
     /// handles computed arguments, missing arguments and dynamic arrays.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
     fn streamed_criteria(
         &self,
         func: Func,
@@ -2469,7 +2842,7 @@ impl CellStore {
         }
         let range = range_from_ast(&args[0], sheet)?;
         let reader_depth = depth + 1;
-        let mut reader = match RangeReader::new(self, range, reader_depth) {
+        let reader = match RangeReader::new(self, range, reader_depth) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2480,26 +2853,15 @@ impl CellStore {
         if let Some(count) = self.dense_number_count_if_family(range, &criterion, reader_depth) {
             return Some(Value::number(count as f64));
         }
-        if let Some(cells) = reader.literal_columns() {
-            return Some(self.literal_criteria_family(
-                CriteriaFold::Count,
-                None,
-                &[(cells, &criterion)],
-            ));
-        }
-        let mut matches = 0.0;
-        loop {
-            match reader.next_allow_errors(pass) {
-                Ok(Some(value)) => {
-                    if criterion.matches(&value) {
-                        matches += 1.0;
-                    }
-                }
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut [(reader, &criterion)],
+                value_first: false,
             }
-        }
-        Some(Value::number(matches))
+            .finish(self, pass),
+        )
     }
 
     /// COUNTIF with a numeric criterion over dense columns that hold only
@@ -2534,8 +2896,8 @@ impl CellStore {
         let mut count = 0;
         for col in range.col_start as usize..=col_end {
             let column = cells.dense_column(col)?;
-            let (kinds, numbers) = column.raw_slices();
-            let kinds = kinds.get(row_start..=row_end)?;
+            let (column_kinds, numbers) = column.raw_slices();
+            let kinds = column_kinds.get(row_start..=row_end)?;
             // A literal's raw kind is its kind, and a number's payload is its
             // `f64` bits. Formulas and blanks have other raw kinds.
             if kinds.iter().any(|&kind| kind != KIND_NUMBER) {
@@ -2577,39 +2939,16 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
-        if let Some(ranges) = readers
-            .iter()
-            .map(RangeReader::literal_columns)
-            .collect::<Option<Vec<_>>>()
-        {
-            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
-            return Some(self.literal_criteria_family(CriteriaFold::Count, None, &pairs));
-        }
-        let mut matches = 0.0;
-        loop {
-            let first = match readers[0].next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let mut row_matches = criteria[0].matches(&first);
-            for index in 1..readers.len() {
-                let candidate = match readers[index].next_allow_errors(pass) {
-                    Ok(Some(value)) => value,
-                    // The shapes are checked equal, so every reader ends on
-                    // the same row.
-                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                    Err(error) => return Some(Value::Error(error)),
-                };
-                if !criteria[index].matches(&candidate) {
-                    row_matches = false;
-                }
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Count,
+                values: None,
+                criteria: &mut pairs,
+                value_first: false,
             }
-            if row_matches {
-                matches += 1.0;
-            }
-        }
-        Some(Value::number(matches))
+            .finish(self, pass),
+        )
     }
 
     fn streamed_sum_if(
@@ -2624,7 +2963,7 @@ impl CellStore {
             return None;
         }
         let criteria_range = range_from_ast(&args[0], sheet)?;
-        let mut criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
+        let criteria_reader = match RangeReader::new(self, criteria_range, depth + 1) {
             Ok(reader) => reader,
             Err(error) => return Some(Value::Error(error)),
         };
@@ -2647,35 +2986,17 @@ impl CellStore {
         if criteria_reader.shape() != value_reader.shape() {
             return Some(Value::Error(FormulaError::Value));
         }
-        if let (Some(cells), Some(values)) = (
-            criteria_reader.literal_columns(),
-            value_reader.literal_columns(),
-        ) {
-            let fold = CriteriaFold::Sum {
-                average: func == Func::AverageIf,
-            };
-            return Some(self.literal_criteria_family(fold, Some(&values), &[(cells, &criterion)]));
-        }
-        let mut fold = IfSum::new();
-        loop {
-            let candidate = match criteria_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let value = match value_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                // The shapes are checked equal, so both readers end together.
-                Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                Err(error) => return Some(Value::Error(error)),
-            };
-            if criterion.matches(&candidate) {
-                if let Err(error) = fold.add(&value) {
-                    return Some(Value::Error(error));
-                }
+        Some(
+            CriteriaRead {
+                fold: CriteriaFold::Sum {
+                    average: func == Func::AverageIf,
+                },
+                values: Some(&mut value_reader),
+                criteria: &mut [(criteria_reader, &criterion)],
+                value_first: false,
             }
-        }
-        Some(fold.finish(func == Func::AverageIf))
+            .finish(self, pass),
+        )
     }
 
     fn streamed_sum_ifs_or_extreme(
@@ -2712,66 +3033,32 @@ impl CellStore {
             readers.push(reader);
             criteria.push(criterion);
         }
-        let extreme = matches!(func, Func::MaxIfs | Func::MinIfs);
-        if let (Some(values), Some(ranges)) = (
-            value_reader.literal_columns(),
-            readers
-                .iter()
-                .map(RangeReader::literal_columns)
-                .collect::<Option<Vec<_>>>(),
-        ) {
-            let fold = if extreme {
-                CriteriaFold::Extreme {
-                    maximum: func == Func::MaxIfs,
-                }
-            } else {
-                CriteriaFold::Sum {
-                    average: func == Func::AverageIfs,
-                }
-            };
-            let pairs: Vec<_> = ranges.into_iter().zip(&criteria).collect();
-            return Some(self.literal_criteria_family(fold, Some(&values), &pairs));
-        }
-        let mut sums = IfSum::new();
-        let mut extremes = IfExtreme::new(func == Func::MaxIfs);
-        loop {
-            let value = match value_reader.next_allow_errors(pass) {
-                Ok(Some(value)) => value,
-                Ok(None) => break,
-                Err(error) => return Some(Value::Error(error)),
-            };
-            let mut row_matches = true;
-            for index in 0..readers.len() {
-                let candidate = match readers[index].next_allow_errors(pass) {
-                    Ok(Some(value)) => value,
-                    // The shapes are checked equal, so every reader ends on
-                    // the same row.
-                    Ok(None) => return Some(Value::Error(FormulaError::Value)),
-                    Err(error) => return Some(Value::Error(error)),
-                };
-                if !criteria[index].matches(&candidate) {
-                    row_matches = false;
-                }
+        let fold = if matches!(func, Func::MaxIfs | Func::MinIfs) {
+            CriteriaFold::Extreme {
+                maximum: func == Func::MaxIfs,
             }
-            if row_matches {
-                let folded = if extreme {
-                    extremes.add(&value)
-                } else {
-                    sums.add(&value)
-                };
-                if let Err(error) = folded {
-                    return Some(Value::Error(error));
-                }
-            }
-        }
-        Some(if extreme {
-            extremes.finish()
         } else {
-            sums.finish(func == Func::AverageIfs)
-        })
+            CriteriaFold::Sum {
+                average: func == Func::AverageIfs,
+            }
+        };
+        let mut pairs: Vec<_> = readers.into_iter().zip(&criteria).collect();
+        Some(
+            CriteriaRead {
+                fold,
+                values: Some(&mut value_reader),
+                criteria: &mut pairs,
+                value_first: true,
+            }
+            .finish(self, pass),
+        )
     }
 
     #[inline(never)]
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_criteria_family(
         &self,
         func: Func,
@@ -2860,8 +3147,8 @@ impl CellStore {
                                 ),
                                 None => (criteria_range.rows as u32, criteria_range.cols as u32),
                             };
-                            let range = sum_range_extent(range, rows, cols);
-                            self.eval_range_matrix(range, pass, depth + 1)
+                            let sum_range = sum_range_extent(range, rows, cols);
+                            self.eval_range_matrix(sum_range, pass, depth + 1)
                         }
                         None => self.eval_matrix_arg(ast, sheet, pass, depth + 1),
                     };
@@ -2921,22 +3208,10 @@ impl CellStore {
         }
     }
 
+    /// Pushes the cells of `range` as one argument.
     fn eval_range_values(
         &self,
         range: CellRange,
-        pass: &mut EvalPass<'_>,
-        depth: usize,
-        values: &mut FuncAccumulator,
-    ) -> Result<(usize, usize), FormulaError> {
-        self.push_range_values(range, None, pass, depth, values)
-    }
-
-    /// Pushes the cells of `range` as one argument. A cell that `skipped`
-    /// names is pushed as blank without evaluation, which keeps the shape.
-    fn push_range_values(
-        &self,
-        range: CellRange,
-        skipped: Option<SkippedCells>,
         pass: &mut EvalPass<'_>,
         depth: usize,
         values: &mut FuncAccumulator,
@@ -2968,27 +3243,20 @@ impl CellStore {
         if total > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
+        preview_limits::range(
+            s,
+            (row_start, col_start),
+            (row_len, col_len),
+            preview_limits::RangeRead::Cells,
+        )?;
 
         values.reserve(total as usize)?;
         let literals = LiteralSources::new(s, depth);
 
         for row in row_start..=row_end {
-            if skipped.is_some_and(|skipped| skipped.skips_row(s, row as u32)) {
-                for _ in col_start..=col_end {
-                    values.push_range(Value::Blank)?;
-                }
-                continue;
-            }
-
             for col in col_start..=col_end {
                 if !s.cells.is_loaded(row, col) {
                     return Err(FormulaError::Loading);
-                }
-                if skipped.is_some_and(|skipped| {
-                    skipped.skips_cell(s, row as u32, col as u32, &self.formula_slots)
-                }) {
-                    values.push_range(Value::Blank)?;
-                    continue;
                 }
 
                 let i = s.cells.idx(row, col);

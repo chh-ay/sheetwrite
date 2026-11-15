@@ -3,12 +3,21 @@
 // keyboard through the menu button on each field. Each change is ONE
 // `grid.setPivot`, so it is one undo step and the output updates at once.
 
+import { scanColumnValues } from "../data-window-reads.js";
 import { Scope } from "../scope.js";
+import { storeEngine } from "../store/engine-registry.js";
+import { patchSheetId } from "../store/ranges.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { TableColumnRef } from "../types/data-model.js";
+import type { DocumentOp } from "../types/document.js";
 import type { Grid, GridPanel } from "../types/grid.js";
-import type { PivotDefinition, PivotFieldType, PivotSourceField } from "../types/pivot.js";
+import type {
+  PivotDefinition,
+  PivotFieldType,
+  PivotSource,
+  PivotSourceField,
+} from "../types/pivot.js";
 import { panelSection, rebuildPanel, rejectionMessage, selectOf } from "./panel-dom.js";
 import { menuButton, type PanelMenuItem } from "./panel-menu.js";
 import {
@@ -31,11 +40,15 @@ import {
   baseTable,
   relatedTables,
   valuesType,
+  withMeasureValue,
   withModelField,
   type FieldFacts,
   type PivotArea,
   type PivotPlacement,
 } from "./pivot-model.js";
+
+/** The badge of a measure in the field list, as Excel marks measures with fx. */
+const MEASURE_BADGE = "fx";
 
 const TYPE_BADGES: Readonly<Record<PivotFieldType, string>> = {
   number: "Number",
@@ -81,7 +94,16 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   let message: string | null = null;
   // The value field whose number format form is open.
   let formatting: number | null = null;
-  let rendered = "";
+  /** Definition, data model and message the panel was built from, as JSON. */
+  let renderedStructure = "";
+  let renderedFields: readonly PivotSourceField[] = [];
+  /** Sheets the pivot reads cells from, as of the last definition read; empty without a pivot. */
+  let sourceSheets: ReadonlySet<SheetId> = new Set();
+  /**
+   * Whether the source sheets hold literal cells only, so that only writes to
+   * them change the fields. Undefined until checked; a write to one clears it.
+   */
+  let sourcesAreLiteral: boolean | undefined;
 
   /**
    * Distinct values of one source field, at most one more than a filter may
@@ -99,13 +121,36 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
           ?.columns.findIndex((column) => column.id === modelField.column) ?? -1)
       : field;
     if (offset < 0) return [];
+
     // Related fields can be blank because a fact key has no matching row.
     const seen = new Set<CellScalar>(modelField ? [null] : []);
     const col = range.start.col + offset;
-    for (let row = range.start.row; row <= range.end.row; row++) {
-      seen.add(grid.store.getCell({ sheet: range.sheet, row, col }).resolved);
-      if (seen.size > MAX_FILTER_VALUES) break;
+    const keep = (value: CellScalar): boolean => {
+      seen.add(value);
+      return seen.size <= MAX_FILTER_VALUES;
+    };
+
+    // The engine scans the source rows in one call; a custom store, or a
+    // paged sheet that is not fully loaded, is read through data windows.
+    const engine = storeEngine(grid.store);
+    if (engine && engine.queryCapability(range.sheet).status === "complete") {
+      const rows = { start: range.start.row, end: range.end.row + 1 };
+      // The engine keeps 0 and -0 apart and the Set merges them, so one more
+      // value still shows an overflow.
+      const limit = MAX_FILTER_VALUES + 2;
+      for (const value of engine.distinctValues(range.sheet, col, limit, rows)) {
+        if (!keep(value)) break;
+      }
+    } else {
+      const span = {
+        sheet: range.sheet,
+        col,
+        startRow: range.start.row,
+        endRow: range.end.row,
+      };
+      scanColumnValues(grid.store, span, keep);
     }
+
     return [...seen].sort(compareScalars);
   };
 
@@ -159,6 +204,58 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     const placed =
       to === "values" ? next.values.length - 1 : areaFields(next, to).lastIndexOf(added.field);
     commit(next, `${to}-${placed}-menu`);
+  };
+
+  /**
+   * One section per table that holds measures, with the measures the pivot
+   * does not show yet, as Excel's Field List lists measures under their
+   * home table. A measure goes to Values only.
+   */
+  const appendMeasures = (target: HTMLElement, pivot: PivotDefinition): void => {
+    if (baseTable(pivot.source) === undefined) return;
+    const workbook = grid.store.getWorkbook();
+    const tables = workbook.sheets.flatMap((candidate) => candidate.tables ?? []);
+    const shown = new Set(
+      pivot.values.flatMap((value) => ("measure" in value ? [value.measure] : [])),
+    );
+    for (const table of tables) {
+      const measures = (workbook.dataModel?.measures ?? []).filter(
+        (measure) => measure.table === table.id && !shown.has(measure.id),
+      );
+      if (measures.length === 0) continue;
+      const section = panelSection(`Measures: ${table.name}`);
+      const list = document.createElement("ul");
+      list.className = "sheetwrite-panel-fields";
+      list.setAttribute("aria-label", `${table.name} measures`);
+      for (const measure of measures) {
+        const item = document.createElement("li");
+        item.className = "sheetwrite-panel-field-item";
+        const name = document.createElement("span");
+        name.className = "sheetwrite-panel-field-name";
+        name.textContent = measure.name;
+        const badge = document.createElement("span");
+        badge.className = "sheetwrite-panel-badge";
+        badge.textContent = MEASURE_BADGE;
+        const menu = menuButton(
+          `${measure.name} measure actions`,
+          `measure-${measure.id}-menu`,
+          () => [
+            {
+              label: "Add to Values",
+              run: () => {
+                const next = withMeasureValue(pivot, tables, measure.id);
+                if (next !== null) commit(next, `values-${next.values.length - 1}-menu`);
+              },
+            },
+          ],
+          lifetime.signal,
+        );
+        item.append(name, badge, menu);
+        list.appendChild(item);
+      }
+      section.appendChild(list);
+      target.appendChild(section);
+    }
   };
 
   /**
@@ -280,6 +377,7 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
     fieldSection.appendChild(fieldList);
     target.appendChild(fieldSection);
     appendRelatedTables(target, pivot);
+    appendMeasures(target, pivot);
 
     for (const [area, label] of PIVOT_AREAS) {
       target.appendChild(
@@ -316,20 +414,130 @@ function renderPivotPanel(body: HTMLElement, grid: Grid, sheet: SheetId, id: str
   /** Rebuild when the definition, its fields, the relationships or the message changed. */
   const refresh = (force = false): void => {
     const pivot = read();
-    const signature = JSON.stringify([
-      pivot,
-      pivot === null ? [] : grid.getPivotFields(sheet, id),
-      grid.store.getWorkbook().dataModel,
-      message,
-    ]);
-    if (!force && signature === rendered) return;
-    rendered = signature;
+    const fields = pivot === null ? [] : grid.getPivotFields(sheet, id);
+    const structure = JSON.stringify([pivot, grid.store.getWorkbook().dataModel, message]);
+    sourceSheets = pivot === null ? new Set() : pivotSourceSheets(grid, pivot.source);
+    sourcesAreLiteral = undefined;
+    if (!force && structure === renderedStructure && sameFields(fields, renderedFields)) return;
+    renderedStructure = structure;
+    renderedFields = fields;
+    rebuildPanel(body, build);
+  };
+
+  /**
+   * After a commit that only wrote cells. The definition, tables and data
+   * model are as they were, so only the fields' names and types can change,
+   * and only when a written cell or a formula is on a source sheet.
+   */
+  const refreshFields = (patches: readonly DocumentOp[]): void => {
+    if (sourceSheets.size === 0) return;
+    const writesSource = patches.some((patch) => {
+      const written = patchSheetId(patch);
+      return written === null || sourceSheets.has(written);
+    });
+    if (writesSource) {
+      sourcesAreLiteral = undefined;
+    } else {
+      sourcesAreLiteral ??= holdsLiteralsOnly(grid, sourceSheets, { sheet, id });
+      if (sourcesAreLiteral) return;
+    }
+    const fields = grid.getPivotFields(sheet, id);
+    if (sameFields(fields, renderedFields)) return;
+    renderedFields = fields;
     rebuildPanel(body, build);
   };
 
   refresh(true);
-  lifetime.add(grid.on("change", () => refresh()));
+  lifetime.add(
+    grid.on("change", (event) => {
+      const { patches } = event.transaction;
+      if (patches.every(writesCellsOnly)) refreshFields(patches);
+      else refresh();
+    }),
+  );
   return () => lifetime.close();
+}
+
+/**
+ * Sheets whose cells `source` reads. A table or model source reads its base
+ * table and, through relationships, other tables, so it counts every sheet
+ * that holds a table.
+ */
+function pivotSourceSheets(grid: Grid, source: PivotSource): Set<SheetId> {
+  if ("range" in source) return new Set([source.range.sheet]);
+  const sheets = grid.store.getWorkbook().sheets;
+  return new Set(
+    sheets.filter((candidate) => (candidate.tables?.length ?? 0) > 0).map(({ id }) => id),
+  );
+}
+
+/**
+ * Whether `sheets` hold literal cells only: fully loaded, with no formula,
+ * reference or other pivot's output. Their values then change only through
+ * writes to them. `own` is the panel's pivot, whose output follows its source.
+ */
+function holdsLiteralsOnly(
+  grid: Grid,
+  sheets: ReadonlySet<SheetId>,
+  own: { readonly sheet: SheetId; readonly id: string },
+): boolean {
+  const engine = storeEngine(grid.store);
+  if (!engine) return false;
+  for (const sheet of sheets) {
+    if (engine.isPaged(sheet)) return false;
+    const otherPivot = grid
+      .getPivots(sheet)
+      .some((pivot) => sheet !== own.sheet || pivot.id !== own.id);
+    if (otherPivot) return false;
+    const sources = engine.captureSheetSources(sheet);
+    if (
+      sources === null ||
+      sources.formulaOffsets.length > 0 ||
+      sources.referenceOffsets.length > 0
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Whether `patch` changes only cell content or formatting. Such a commit
+ * leaves pivot definitions, tables and the data model as they were.
+ */
+function writesCellsOnly(patch: DocumentOp): boolean {
+  switch (patch.op) {
+    case "set":
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+    case "clearRange":
+    case "setRangeStyle":
+    case "setNote":
+    case "setHyperlink":
+    case "removeHyperlink":
+      return true;
+    default:
+      return false;
+  }
+}
+
+function sameFields(
+  left: readonly PivotSourceField[],
+  right: readonly PivotSourceField[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((field, index) => {
+      const other = right[index];
+      return (
+        other !== undefined &&
+        field.index === other.index &&
+        field.header === other.header &&
+        field.type === other.type
+      );
+    })
+  );
 }
 
 function note(text: string, alert = false): HTMLElement {

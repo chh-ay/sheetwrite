@@ -1,5 +1,7 @@
-import { clamp, count, ease, fadeWindow, lerp, span } from "./scene-math.js";
-import { useTimeline } from "./useTimeline.js";
+import { clamp, count, ease, fadeWindow, lerp, span } from "@docs/components/landing/scene-math.js";
+import { For } from "solid-js";
+
+import { createTimeline } from "./timeline.js";
 
 /**
  * How one paste travels through the three layers, as a scripted 13-second
@@ -12,8 +14,8 @@ import { useTimeline } from "./useTimeline.js";
  * 4. The Grid sends one change event; your application logs it.
  * 5. Your application saves the operations; your server's version goes up.
  *
- * Each frame is drawn from the loop time through useTimeline. Reduced motion
- * shows the finished picture: everything filled and saved at v43.
+ * Each frame is drawn from the loop time through createTimeline. Reduced
+ * motion shows the finished picture: everything filled and saved at v43.
  */
 
 const LOOP_SECONDS = 13;
@@ -226,19 +228,19 @@ function createDraw(root: HTMLElement): (t: number) => void {
 
 /* ---- Component --------------------------------------------------------------- */
 
-function Packet({ name, label, width }: Readonly<{ name: string; label: string; width: number }>) {
+function Packet(props: Readonly<{ name: string; label: string; width: number }>) {
   return (
-    <g className="as-packet" data-packet={name}>
-      <rect height={22} rx={11} width={width} x={-width / 2} y={-11} />
-      <text textAnchor="middle" x={0} y={4}>
-        {label}
+    <g class="as-packet" data-packet={props.name}>
+      <rect height={22} rx={11} width={props.width} x={-props.width / 2} y={-11} />
+      <text text-anchor="middle" x={0} y={4}>
+        {props.label}
       </text>
     </g>
   );
 }
 
 export function ArchitectureScene() {
-  const { ref, seek } = useTimeline<HTMLDivElement>({
+  const { ref, seek } = createTimeline<HTMLDivElement>({
     loopSeconds: LOOP_SECONDS,
     stillSeconds: STILL_SECONDS,
     create: createDraw,
@@ -246,90 +248,96 @@ export function ArchitectureScene() {
   const appX = layerX("app");
   const engineX = layerX("engine");
   return (
-    <div className="sw-arch" data-landing-running="false" ref={ref}>
-      <svg aria-hidden="true" className="as" viewBox="0 0 960 362">
-        {LAYERS.map((layer) => (
-          <g className="as-layer" data-layer={layer.id} key={layer.id}>
-            <rect
-              className="as-glow"
-              data-layer={layer.id}
-              data-part="glow"
-              height={BOX.h + 12}
-              rx={18}
-              width={BOX.w + 12}
-              x={layer.x - 6}
-              y={BOX.y - 6}
-            />
-            <rect className="as-box" height={BOX.h} rx={14} width={BOX.w} x={layer.x} y={BOX.y} />
-            <text className="as-owner" x={layer.x + 20} y={BOX.y + 28}>
-              {layer.owner}
-            </text>
-            <text className="as-title" x={layer.x + 20} y={BOX.y + 54}>
-              {layer.title}
-            </text>
-            {layer.lines.map((line, index) => (
-              <text className="as-line" key={line} x={layer.x + 20} y={BOX.y + 86 + index * 22}>
-                {line}
+    <div class="sw-arch" data-landing-running="false" ref={ref}>
+      <svg aria-hidden="true" class="as" viewBox="0 0 960 362">
+        <For each={LAYERS}>
+          {(layer) => (
+            <g class="as-layer" data-layer={layer.id}>
+              <rect
+                class="as-glow"
+                data-layer={layer.id}
+                data-part="glow"
+                height={BOX.h + 12}
+                rx={18}
+                width={BOX.w + 12}
+                x={layer.x - 6}
+                y={BOX.y - 6}
+              />
+              <rect class="as-box" height={BOX.h} rx={14} width={BOX.w} x={layer.x} y={BOX.y} />
+              <text class="as-owner" x={layer.x + 20} y={BOX.y + 28}>
+                {layer.owner}
               </text>
-            ))}
-            <line
-              className="as-divider"
-              x1={layer.x + 20}
-              x2={layer.x + BOX.w - 20}
-              y1={VISUAL_Y - 22}
-              y2={VISUAL_Y - 22}
-            />
-          </g>
-        ))}
+              <text class="as-title" x={layer.x + 20} y={BOX.y + 54}>
+                {layer.title}
+              </text>
+              <For each={layer.lines}>
+                {(line, index) => (
+                  <text class="as-line" x={layer.x + 20} y={BOX.y + 86 + index() * 22}>
+                    {line}
+                  </text>
+                )}
+              </For>
+              <line
+                class="as-divider"
+                x1={layer.x + 20}
+                x2={layer.x + BOX.w - 20}
+                y1={VISUAL_Y - 22}
+                y2={VISUAL_Y - 22}
+              />
+            </g>
+          )}
+        </For>
 
         {/* Grid: the mini canvas. */}
-        {CELLS.map((cell) => (
-          <rect
-            className="as-cell"
-            data-filled="true"
-            data-part="cell"
-            height={GRID_CELLS.size}
-            key={cell.index}
-            rx={3}
-            width={GRID_CELLS.size}
-            x={cellX(cell.col)}
-            y={cellY(cell.row)}
-          />
-        ))}
-        <text className="as-caption" data-part="pasted" x={layerX("grid") + 20} y={CAPTION_Y}>
+        <For each={CELLS}>
+          {(cell) => (
+            <rect
+              class="as-cell"
+              data-filled="true"
+              data-part="cell"
+              height={GRID_CELLS.size}
+              rx={3}
+              width={GRID_CELLS.size}
+              x={cellX(cell.col)}
+              y={cellY(cell.row)}
+            />
+          )}
+        </For>
+        <text class="as-caption" data-part="pasted" x={layerX("grid") + 20} y={CAPTION_Y}>
           20,000 cells pasted
         </text>
 
         {/* Engine: the column store. */}
-        {COLUMNS.map((index) => (
-          <rect
-            className="as-column"
-            data-part="column"
-            height={COLUMN.h}
-            key={index}
-            rx={3}
-            width={COLUMN.w}
-            x={engineX + 20 + index * (COLUMN.w + COLUMN.gap)}
-            y={VISUAL_Y - 14}
-          />
-        ))}
-        <text className="as-caption" data-part="formulas" x={engineX + 20} y={CAPTION_Y}>
+        <For each={COLUMNS}>
+          {(index) => (
+            <rect
+              class="as-column"
+              data-part="column"
+              height={COLUMN.h}
+              rx={3}
+              width={COLUMN.w}
+              x={engineX + 20 + index * (COLUMN.w + COLUMN.gap)}
+              y={VISUAL_Y - 14}
+            />
+          )}
+        </For>
+        <text class="as-caption" data-part="formulas" x={engineX + 20} y={CAPTION_Y}>
           312 formulas recalculated
         </text>
 
         {/* Application: the event log. */}
-        <text className="as-log" data-part="log" x={appX + 20} y={VISUAL_Y}>
+        <text class="as-log" data-part="log" x={appX + 20} y={VISUAL_Y}>
           <tspan x={appX + 20}>onChange</tspan>
-          <tspan className="as-log-detail" dy={22} x={appX + 20}>
+          <tspan class="as-log-detail" dy={22} x={appX + 20}>
             20,000 operations
           </tspan>
         </text>
-        <text className="as-log" data-part="log" x={appX + 20} y={CAPTION_Y}>
+        <text class="as-log" data-part="log" x={appX + 20} y={CAPTION_Y}>
           save → your server
         </text>
 
         {/* Lanes between the layers. */}
-        <g className="as-lanes">
+        <g class="as-lanes">
           <line data-lane="tx" x1={LANE.tx.from} x2={LANE.tx.to} y1={LANE.tx.y} y2={LANE.tx.y} />
           <text x={655} y={LANE.tx.y - 12}>
             1 transaction
@@ -363,12 +371,12 @@ export function ArchitectureScene() {
           />
         </g>
 
-        <g className="as-server">
+        <g class="as-server">
           <rect height={SERVER.h} rx={10} width={SERVER.w} x={SERVER.x} y={SERVER.y} />
           <text x={SERVER.x + 90} y={SERVER.y + 25}>
             Your server
           </text>
-          <g className="as-version" data-part="version-chip">
+          <g class="as-version" data-part="version-chip">
             <rect height={22} rx={11} width={52} x={SERVER.x + 152} y={SERVER.y + 9} />
             <text data-part="version" x={SERVER.x + 178} y={SERVER.y + 24}>
               v43
@@ -376,23 +384,23 @@ export function ArchitectureScene() {
           </g>
         </g>
 
-        {EDITS.map((cell) => (
-          <circle className="as-edit" data-part="edit" key={cell.index} r={3.5} />
-        ))}
+        <For each={EDITS}>{() => <circle class="as-edit" data-part="edit" r={3.5} />}</For>
         <Packet label="1 tx" name="tx" width={52} />
         <Packet label="window" name="window" width={70} />
         <Packet label="change" name="change" width={70} />
         <Packet label="save" name="save" width={52} />
       </svg>
-      <ol className="sw-arch__steps">
-        {STEPS.map((step, index) => (
-          <li data-current={index === STEPS.length - 1} data-step={index + 1} key={step}>
-            <button onClick={() => seek(STEP_TIMES[index] ?? 0)} type="button">
-              <span>{String(index + 1).padStart(2, "0")}</span>
-              {step}
-            </button>
-          </li>
-        ))}
+      <ol class="sw-arch__steps">
+        <For each={STEPS}>
+          {(step, index) => (
+            <li data-current={String(index() === STEPS.length - 1)} data-step={index() + 1}>
+              <button onClick={() => seek(STEP_TIMES[index()] ?? 0)} type="button">
+                <span>{String(index() + 1).padStart(2, "0")}</span>
+                {step}
+              </button>
+            </li>
+          )}
+        </For>
       </ol>
     </div>
   );

@@ -20,7 +20,7 @@ afterEach(() => {
   restoreCanvas();
 });
 
-it("inserts and removes rows above the snapshot admission limit in a live grid", () => {
+it("refuses rows past the row limit in a live grid and still moves rows below it", () => {
   const host = document.createElement("div");
   document.body.appendChild(host);
   const amounts = new Float64Array(INITIAL_ROWS);
@@ -33,25 +33,28 @@ it("inserts and removes rows above the snapshot admission limit in a live grid",
   const amountAt = (row: number) => grid.store.getCell({ sheet: "s1", row, col: 1 }).resolved;
 
   try {
+    const refused = grid.store.applyTransaction({
+      patches: [{ op: "addRows", sheet: "s1", at: 1, count: INSERTED_ROWS }],
+    });
+    expect(refused).toMatchObject({
+      status: "rejected",
+      issues: [{ kind: "resource-limit", resource: "sheet-rows", max: INITIAL_ROWS }],
+    });
+    expect(grid.store.viewRowCount("s1")).toBe(INITIAL_ROWS);
+
+    const removed = grid.store.applyTransaction({
+      patches: [{ op: "removeRows", sheet: "s1", at: 2, count: INSERTED_ROWS }],
+    });
+    expect(removed.status).toBe("applied");
     const inserted = grid.store.applyTransaction({
       patches: [{ op: "addRows", sheet: "s1", at: 1, count: INSERTED_ROWS }],
     });
     expect(inserted.status).toBe("applied");
     grid.refresh();
 
-    expect(grid.store.viewRowCount("s1")).toBe(INITIAL_ROWS + INSERTED_ROWS);
-    expect(amountAt(0)).toBe(10);
-    expect(amountAt(1 + INSERTED_ROWS)).toBe(20);
-
-    const removed = grid.store.applyTransaction({
-      patches: [{ op: "removeRows", sheet: "s1", at: 1, count: INSERTED_ROWS }],
-    });
-    expect(removed.status).toBe("applied");
-    grid.refresh();
-
     expect(grid.store.viewRowCount("s1")).toBe(INITIAL_ROWS);
     expect(amountAt(0)).toBe(10);
-    expect(amountAt(1)).toBe(20);
+    expect(amountAt(1 + INSERTED_ROWS)).toBe(20);
   } finally {
     grid.destroy();
     host.remove();

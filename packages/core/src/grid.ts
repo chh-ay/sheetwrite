@@ -1,6 +1,8 @@
 import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
+import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
+import { readBlockArraysOnce } from "./block-ingress.js";
 import {
   fontFor,
   intersectingMerges,
@@ -12,6 +14,7 @@ import { CanvasRenderer } from "./canvas-renderer.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
+import { isDashboard } from "./dashboard.js";
 import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { DatasourceController } from "./datasource-controller.js";
 import { DocumentController } from "./document-controller.js";
@@ -22,6 +25,7 @@ import {
   validateTransactionResources,
 } from "./document-protocol.js";
 import { DomOverlay } from "./dom-overlay.js";
+import { type EditDraftSink, registerEditDraft } from "./edit-draft.js";
 import {
   ENGINE_LOAD_HINT,
   engineFailedError,
@@ -69,11 +73,7 @@ import {
 } from "./resource-accounting.js";
 import { registerGridDocument } from "./restore-commit.js";
 import type { CommandToolbar } from "./ribbon/command-toolbar.js";
-import {
-  assertRibbonConfig,
-  RIBBON_EXPANDED_HEIGHT,
-  TOOLBAR_HEIGHT,
-} from "./ribbon/ribbon-metrics.js";
+import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "./ribbon/ribbon-metrics.js";
 import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
@@ -97,10 +97,12 @@ import {
   viewSortPatch,
 } from "./store/view-patches.js";
 import { StyleActions } from "./style-actions.js";
+import { checkStylePart } from "./style-parts.js";
 import {
   beginGridTransactionAdmission,
   hasGridTransactionAdmission,
 } from "./transaction-admission.js";
+import type { SheetwriteAddon } from "./types/addon.js";
 import type {
   CellHyperlink,
   CellScalar,
@@ -370,37 +372,71 @@ function adaptiveRowHeaderWidth(theme: Theme, dataRowCount: number): number {
   return Math.max(theme.rowHeaderWidth, Math.ceil(digits * fontPx * 0.6 + 12));
 }
 
+/** Options of {@link initSheetwrite}. */
+export interface InitSheetwriteOptions {
+  /** Engine module; defaults to `@sheetwrite/wasm`. Pass `@sheetwrite/formulas` for the full engine. */
+  engine?: SheetwriteEngine;
+  /** Explicit WASM bytes or location, for bundlers that cannot resolve the engine asset. */
+  source?: BufferSource | URL | string | Request | WebAssembly.Module;
+  /**
+   * Add-ons to install, in this order, after the engine loads. A name listed
+   * twice rejects; a name installed by an earlier call is kept.
+   */
+  addons?: readonly SheetwriteAddon[];
+}
+
 /**
- * Load one WASM engine before `createGrid`. The default is `@sheetwrite/wasm`.
- * Pass the `@sheetwrite/formulas` module as the second argument to select the full engine.
+ * The add-on registry, once `initSheetwrite` installed any add-on. Its module
+ * loads only then, so a page without add-ons carries none of its code.
+ */
+let addons: AddonRegistry | undefined;
+
+/**
+ * Load one WASM engine and install add-ons before `createGrid`.
  *
  * @example
  * ```ts
+ * import { chartsAddon } from "@sheetwrite/charts";
  * import { initSheetwrite } from "@sheetwrite/core";
  * import * as formulas from "@sheetwrite/formulas";
+ * import { xlsxAddon } from "@sheetwrite/xlsx";
  *
- * await initSheetwrite(undefined, formulas);
+ * await initSheetwrite({ engine: formulas, addons: [chartsAddon(), xlsxAddon()] });
  * ```
  * @see /docs/start/choose-an-engine/
  * @see createGrid
  */
-export async function initSheetwrite(
-  source?: BufferSource | URL | string | Request | WebAssembly.Module,
-  engine?: SheetwriteEngine,
-): Promise<void> {
+export async function initSheetwrite(options: InitSheetwriteOptions = {}): Promise<void> {
   try {
-    await loadEngine(source, engine);
+    await loadEngine(options.source, options.engine);
   } catch (error) {
     throw normalizeSheetwriteError(error, "initialization-failed", "initialize");
   }
+
+  if (options.addons?.length) {
+    const registry = await import("./addons.js");
+    addons = registry.addonRegistry;
+    await addons.install(options.addons);
+  }
 }
 
-/** Whether `initSheetwrite` has completed — the single readiness source. */
+/**
+ * Whether `initSheetwrite` has completed — the single readiness source.
+ *
+ * @returns `true` once the engine has loaded, so `createGrid` will not throw
+ *   for a missing engine; add-ons may still be installing.
+ */
 export function isSheetwriteReady(): boolean {
   return isLoaded();
 }
 
-/** Read `--sheetwrite-*` CSS custom properties into a partial theme. */
+/**
+ * Read `--sheetwrite-*` CSS custom properties into a partial theme.
+ *
+ * @param el - Element whose computed style is read. Custom properties inherit,
+ *   so any element inside the themed container works.
+ * @returns Only the theme fields whose property is set; empty outside a browser.
+ */
 export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
   if (typeof getComputedStyle !== "function") return {};
 
@@ -463,6 +499,8 @@ export function resolveThemeFromCss(el: HTMLElement): Partial<Theme> {
  * // Call when the host view is removed.
  * grid.destroy();
  * ```
+ * @param host - Element the grid renders into. The grid fills it and follows its
+ *   size, so give it a height.
  * @see Grid
  * @see GridOptions
  */
@@ -474,6 +512,7 @@ export function createGrid(host: HTMLElement, opts: GridOptions): Grid {
       `Sheetwrite: await initSheetwrite() before createGrid(). ${ENGINE_LOAD_HINT}`,
     );
   }
+
   return new GridImpl(host, opts);
 }
 
@@ -544,6 +583,9 @@ export class GridImpl implements Grid {
   private readonly viewportEl: HTMLDivElement;
   private readonly customRenderers = new Map<string, CellRenderer>();
   private readonly customEditors = new Map<string, CellEditor>();
+
+  /** The shell's formula bar hearing the cell edit's draft (internal, see `edit-draft.ts`). */
+  private readonly editDraftListeners = new Set<EditDraftSink>();
 
   private readonly listeners: { [K in keyof GridEvents]: Set<(e: GridEvents[K]) => void> } = {
     change: new Set(),
@@ -631,6 +673,18 @@ export class GridImpl implements Grid {
     store?: Store,
     ownsStore = store === undefined,
   ) {
+    // Settings for an add-on that `initSheetwrite` did not install reject before anything is built.
+    for (const name in opts.addons) {
+      if (!addons?.has(name)) {
+        throw new SheetwriteError(
+          "invalid-argument",
+          "create-grid",
+          `Sheetwrite: add-on "${name}" is not installed.`,
+          { context: { addon: name } },
+        );
+      }
+    }
+
     assertRibbonConfig(opts.config?.ribbon);
     this.keymap = new Keymap(opts.config);
     this.transactionResourceLimits = resolveTransactionResourceLimits(
@@ -719,6 +773,15 @@ export class GridImpl implements Grid {
       trustedResourceCallbacks: true,
     });
     registerGridDocument(this, this.document);
+    registerEditDraft(this, {
+      subscribe: (listener) => {
+        this.editDraftListeners.add(listener);
+        return () => this.editDraftListeners.delete(listener);
+      },
+      setText: (text, start, end) => this.interactions.setEditText(text, start, end),
+      commit: () => this.interactions.commitEdit(),
+      cancel: () => this.interactions.cancelEdit(),
+    });
 
     // Headless hosts opt out of (or intercept) the stock key bindings once at
     // construction; the input controller consults this on every keydown.
@@ -858,6 +921,7 @@ export class GridImpl implements Grid {
 
     // host chrome: optional toolbar (top) + viewport (cells) + optional tab bar.
     host.classList.add("sheetwrite");
+    checkStylePart(host, "grid", "The grid");
     host.style.position = host.style.position || "relative";
     host.style.overflow = "hidden";
     if (!host.hasAttribute("tabindex")) host.tabIndex = 0;
@@ -899,6 +963,14 @@ export class GridImpl implements Grid {
       columnHeader: (col) => this.columnHeader(col),
       toViewRow: (row) => this.toViewRow(row),
       editListeners: this.listeners,
+      editDraft: {
+        text: (value) => {
+          for (const listener of this.editDraftListeners) listener.text(value);
+        },
+        end: () => {
+          for (const listener of this.editDraftListeners) listener.end();
+        },
+      },
       openFind: (options) => this.openFindBar(options),
       store: this.store,
       loadable: this.loadable,
@@ -1042,7 +1114,11 @@ export class GridImpl implements Grid {
       store: this.store,
       geometry: this.geometry,
       activeSheet: () => this.activeSheet,
-      charts: () => this.sheetById(this.activeSheet)?.charts ?? [],
+      charts: () => {
+        // A dashboard draws its charts in its items, not over cells.
+        const sheet = this.sheetById(this.activeSheet);
+        return isDashboard(sheet) ? [] : (sheet?.charts ?? []);
+      },
       theme: () => this.theme,
       zoom: () => this.zoom,
       readOnly: () => this.readOnly,
@@ -1136,6 +1212,8 @@ export class GridImpl implements Grid {
     // Registered last: a constructor that throws earlier leaves no listener
     // behind. A trap in the first paint reaches `onEngineFailed` through `onEngineTrap`.
     this.removeEngineFailureListener = onEngineFailure((failure) => this.onEngineFailed(failure));
+    // A failing add-on hook destroys this grid and rethrows.
+    addons?.attach(this, opts.addons);
   }
 
   /**
@@ -1216,6 +1294,7 @@ export class GridImpl implements Grid {
     else if (change === "view") this.notes.hideCard();
 
     if (effects & (REBUILD_ROWS | RECONCILE_VIEW)) this.rebuildIndex();
+    else if (effects & RESIZE_ROWS) this.resizeRows(event.transaction.patches);
     if (effects & REBUILD_COLUMNS) this.rebuildColumnIndex();
     if (effects & (REBUILD_COLUMNS | APPLY_LAYOUT)) this.applyLayout();
     if (effects & GEOMETRY_CHANGED) this.readWindows.invalidateData();
@@ -1296,10 +1375,11 @@ export class GridImpl implements Grid {
         patch.op === "addRows" ||
         patch.op === "removeRows" ||
         patch.op === "moveRows" ||
-        patch.op === "setRowMeta" ||
         (patch.op === "setSheetMeta" && patch.patch.rowGroups !== undefined)
       ) {
         effects |= REBUILD_ROWS;
+      } else if (patch.op === "setRowMeta") {
+        effects |= RESIZE_ROWS;
       } else if (
         patch.op === "addColumns" ||
         patch.op === "removeColumns" ||
@@ -1735,6 +1815,16 @@ export class GridImpl implements Grid {
       this.renderer.setTheme(this.theme);
       this.domOverlay.setTheme(this.theme);
     }
+    this.syncSizer();
+  }
+
+  /** Give the row index the committed heights of a change that only resized rows. */
+  private resizeRows(patches: readonly DocumentOp[]): void {
+    const rows: number[] = [];
+    for (const patch of patches) {
+      if (patch.op === "setRowMeta" && patch.sheet === this.activeSheet) rows.push(patch.row);
+    }
+    this.geometry.updateRowHeights(rows);
     this.syncSizer();
   }
 
@@ -2534,7 +2624,9 @@ export class GridImpl implements Grid {
       return;
     }
 
-    this.toolbarHeight = RIBBON_EXPANDED_HEIGHT;
+    // The ribbon spans the host, so the host's width decides its layout now.
+    const layout = typeof config.ribbon === "object" ? config.ribbon : {};
+    this.toolbarHeight = ribbonHeight(layout, this.host.clientWidth);
     void import("./ribbon/ribbon.js").then(({ Ribbon: RibbonClass }) => {
       if (!build.closed) this.mountRibbon(build, RibbonClass, config);
     }, failed);
@@ -2721,8 +2813,14 @@ export class GridImpl implements Grid {
   }
 
   applyTransaction(transaction: GridTransaction): ApplyTransactionResult {
+    // The controller receives a private copy of the caller's operations, with
+    // each setBlock's cell arrays read once. Validation, the store and the
+    // change event all see the copy, so they reuse this measurement.
+    const patches = Array.isArray(transaction.patches)
+      ? (readBlockArraysOnce(transaction.patches) ?? transaction.patches.slice())
+      : transaction.patches;
     const resourceValidation = validateTransactionResources(
-      transaction.patches,
+      patches,
       this.transactionResourceLimits,
     );
     if (!resourceValidation.ok) {
@@ -2732,15 +2830,10 @@ export class GridImpl implements Grid {
         issues: [resourceValidation.issue],
       };
     }
-    // The controller receives a private copy of the caller's operations. The
-    // copy is verified against the measured payload, so the controller and the
-    // store reuse this measurement instead of walking it again.
-    const patches = transaction.patches.slice();
     const admitted = admitTransactionResources(
       patches,
       this.transactionResourceLimits,
       resourceValidation,
-      transaction.patches,
     );
     return this.document.commit(patches, "api", admitted);
   }
@@ -2846,6 +2939,7 @@ export class GridImpl implements Grid {
     this.theme = this.withAdaptiveGutter(scaled, this.sheet().rowCount);
     this.renderer.setTheme(this.theme);
     this.domOverlay.setTheme(this.theme);
+    this.objectLayer.setTheme(this.theme);
     this.syncTabBarTheme();
     this.rebuildIndex();
     this.rebuildColumnIndex();
@@ -2879,10 +2973,22 @@ export class GridImpl implements Grid {
 
   insertRows(at: number, count = 1): void {
     if (count <= 0) return;
-    this.document.commit(
-      [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
-      "structure",
+    this.reportRejectedInsert(
+      this.document.commit(
+        [{ op: "addRows", sheet: this.activeSheet, at: Math.max(0, at), count }],
+        "structure",
+      ),
     );
+  }
+
+  /**
+   * A row or column insert past a document limit is refused; the user reads
+   * which limit in the grid's alert, beside the `mutation-rejected` event.
+   */
+  private reportRejectedInsert(outcome: ApplyTransactionResult): void {
+    if (outcome.status !== "rejected") return;
+    const issue = outcome.issues.find((candidate) => candidate.kind === "resource-limit");
+    if (issue) this.actionFeedback.show(issue.message);
   }
 
   removeRows(at: number, count = 1): void {
@@ -2904,16 +3010,18 @@ export class GridImpl implements Grid {
   insertColumns(at: number, count = 1): void {
     if (count <= 0) return;
     const insertAt = Math.max(0, Math.min(at, this.sheet().columns.length));
-    this.document.commit(
-      [
-        {
-          op: "addColumns",
-          sheet: this.activeSheet,
-          at: insertAt,
-          columns: this.makeBlankColumns(insertAt, count),
-        },
-      ],
-      "structure",
+    this.reportRejectedInsert(
+      this.document.commit(
+        [
+          {
+            op: "addColumns",
+            sheet: this.activeSheet,
+            at: insertAt,
+            columns: this.makeBlankColumns(insertAt, count),
+          },
+        ],
+        "structure",
+      ),
     );
   }
 
@@ -3334,7 +3442,7 @@ export class GridImpl implements Grid {
         }).resolved;
 
         const numberFormat = stepNumberFormatDecimals(
-          this.getFocusCellStyle().numberFormat ?? column?.numberFormat,
+          this.getFocusCellStyle().numberFormat,
           direction,
           typeof value === "number" ? value : undefined,
           column?.numberLocale,
@@ -3436,12 +3544,14 @@ export class GridImpl implements Grid {
         const { pickXlsxWorkbook } = await import("./workbook-io.js");
         await pickXlsxWorkbook(this, this.host, this.lifetime);
       },
-      versionHistory: () => this.config?.history?.(this, "open"),
+      versionHistory: () => this.historyCommand?.("open"),
       // The dashboard chunk names and adds the sheet; first paint carries only this call.
       newDashboard: () =>
-        void import("./dashboard/dashboard-layout.js").then((m) => m.newDashboard(this)),
+        void import("./dashboard/dashboard-layout.js").then((m) => {
+          if (!this.lifetime.closed) m.newDashboard(this);
+        }),
       saveVersion: () => {
-        if (!this.readOnly) this.config?.history?.(this, "save");
+        if (!this.readOnly) this.historyCommand?.("save");
       },
       editNote: () => {
         // Same gate as the cell editor: do not open an editor whose save must fail.
@@ -3479,7 +3589,11 @@ export class GridImpl implements Grid {
       row: this.toDataRow(anchor.row),
       col: anchor.col,
     });
-    return { ...this.sheet().columns[anchor.col]?.cellStyle, ...cell.style };
+    const column = this.sheet().columns[anchor.col];
+    const style: CellStyle = { ...column?.cellStyle, ...cell.style };
+    // Without a style's format the cell shows its column's, as the canvas paints it.
+    const numberFormat = style.numberFormat ?? column?.numberFormat;
+    return numberFormat === undefined ? style : { ...style, numberFormat };
   }
 
   async summarizeSelection(signal?: AbortSignal): Promise<SelectionSummary | null> {
@@ -3600,7 +3714,7 @@ export class GridImpl implements Grid {
     }
     if (command === "versionHistory" || command === "saveVersion") {
       return {
-        disabled: !this.config?.history || (command === "saveVersion" && this.readOnly),
+        disabled: !this.historyCommand || (command === "saveVersion" && this.readOnly),
         activity: "inactive",
       };
     }
@@ -3998,6 +4112,14 @@ export class GridImpl implements Grid {
     });
   }
 
+  /** Opens the history panel or its Save Version form; the history add-on sets it. */
+  declare historyCommand?: (action: "open" | "save") => void;
+
+  /** Run `cleanup` when the grid is destroyed. */
+  addCleanup(cleanup: () => void): void {
+    this.lifetime.add(cleanup);
+  }
+
   /**
    * Closing the root scope first aborts every running operation and frees the
    * chrome, panels and timers it owns. The grid's own parts follow in a fixed
@@ -4132,9 +4254,11 @@ const REBUILD_COLUMNS = 8;
 const APPLY_LAYOUT = 16;
 const SHEETS_CHANGED = 32;
 const RESET_DATASOURCE = 64;
+/** Row heights changed without moving, hiding or showing rows. */
+const RESIZE_ROWS = 128;
 
 /** Effects that change which cells the view shows or where they sit. */
-const VIEW_EFFECTS = REBUILD_ROWS | RECONCILE_VIEW | REBUILD_COLUMNS | APPLY_LAYOUT;
+const VIEW_EFFECTS = REBUILD_ROWS | RESIZE_ROWS | RECONCILE_VIEW | REBUILD_COLUMNS | APPLY_LAYOUT;
 
 /** Validation, hyperlinks, protection and charts sit on a sheet without moving its cells. */
 function annotatesSheet(patch: DocumentOp): boolean {

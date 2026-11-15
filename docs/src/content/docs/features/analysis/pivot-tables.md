@@ -31,7 +31,7 @@ grid.setPivot({
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="A full-engine grid with a pivot of four orders"
+```ts compile runnable title="A full-engine grid with a pivot of four orders"
 import { createGrid, initSheetwrite, type Workbook } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 
@@ -40,7 +40,7 @@ if (!host) throw new Error("Missing #grid host");
 host.style.height = "320px";
 
 // Pivot tables need the full engine.
-await initSheetwrite(undefined, await import("@sheetwrite/formulas"));
+await initSheetwrite({ engine: await import("@sheetwrite/formulas") });
 
 const workbook: Workbook = {
   activeSheet: "summary",
@@ -120,6 +120,10 @@ sheet or a cell. Then the field list opens in the side panel.
 
 With the default engine, **Insert › PivotTable** is disabled, and its tooltip
 says that pivot tables need the full engine.
+
+## Styles
+
+The PivotTable Fields panel needs `@sheetwrite/core/styles/panels.css`. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
 
 ## Define a pivot
 
@@ -256,5 +260,5 @@ saved output back when no fresh rendered values replace it.
 
 Unsupported or opaque imported pivots are different: their original parts are
 preserved only while the workbook is unchanged. Editing the workbook drops those
-opaque parts under the XLSX preservation policy (#179), with a warning. This does
+opaque parts under the [XLSX preservation policy](/docs/import-export/kept-parts-and-round-trips/), with a warning. This does
 not drop represented pivot definitions.

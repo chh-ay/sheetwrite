@@ -1,0 +1,4694 @@
+{
+  "protocol": "sheetwrite-version-comparison-v1",
+  "machine": "Mac",
+  "measuredAt": "2026-11-12T04:05:36.845Z",
+  "host": {
+    "platform": "darwin",
+    "release": "27.2.0",
+    "cpuModel": "Apple M5 Pro",
+    "logicalCpus": 15,
+    "bun": "1.4.4",
+    "affinity": null
+  },
+  "rounds": 8,
+  "order": "versions ABC in even rounds and CBA in odd rounds, engines default/full then full/default; one fresh process per version, engine and part",
+  "commits": {
+    "0.5.4": "npm",
+    "0.6.1": "npm",
+    "0.7.0": "6f20ac05643466e166490000661d1fcb27ec136b"
+  },
+  "method": {
+    "recalculation": "each row builds its fixture untimed, runs 3 warm-up edits of A1, then 3 samples that repeat the edit until 50 ms (at least 3 edits) and record the mean per edit; every sample checks the recalculated value",
+    "rows": [
+      {
+        "id": "fan-out-100k",
+        "description": "100,000 formulas =$A$1+n; the edit recalculates all of them"
+      },
+      {
+        "id": "chain-64",
+        "description": "a 64-cell chain =A(n-1)+1 down column A (the benchmark's deepest linear-chain row)"
+      },
+      {
+        "id": "diamond-32",
+        "description": "32 levels of B/C branches joined in D (96 formulas, the benchmark's diamond-edit row)"
+      },
+      {
+        "id": "shared-range-10k",
+        "description": "10,000 formulas =SUM($A$1:$A$100)"
+      },
+      {
+        "id": "distinct-range-10k",
+        "description": "10,000 formulas over distinct ten-row ranges; the edit reaches one"
+      },
+      {
+        "id": "closure-100k",
+        "description": "100,000 independent B/C pairs (200,000 formulas); the edit reaches one pair"
+      },
+      {
+        "id": "sum-100k",
+        "description": "one =SUM(A1:A100000)"
+      }
+    ],
+    "memory": "process RSS around loading 100,000 formulas =An+1 into a 100,000-row store (in 10,000-formula transactions), with a forced GC before and after; retained = RSS after minus RSS before; peak = the highest RSS during the load (sampled every millisecond on a worker thread, or the kernel max RSS when the load raised it) minus RSS before",
+    "xlsx": "50,000 rows x 6 columns (2 text, 2 number, 2 formula columns, 100,000 formulas). Export: toXlsxWorkbook(store.exportSnapshot()). Import: fromXlsxWorkbook(bytes) plus SheetwriteStore.fromSnapshot, of one file written by 0.5.4 for every version. 1 warm-up and 3 samples per process, process median",
+    "sizes": "raw and Brotli quality 11 of the engine's .wasm and of the browser entry's JS import closure",
+    "aaSpread": "largest |1 - median(ABC rounds) / median(CBA rounds)| over versions and engines, per metric"
+  },
+  "importFile": {
+    "writtenBy": "0.5.4",
+    "packageVersions": {
+      "core": "0.5.4",
+      "wasm": "0.5.4",
+      "formulas": "0.5.4",
+      "xlsx": "0.5.4"
+    },
+    "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+    "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+    "importFileSha256": "854a37ee2a965eefd22781b30e54db979de18a69635dcb3cb355654dcac8025d",
+    "importFileBytes": 1720161
+  },
+  "versions": {
+    "0.5.4": {
+      "packageVersions": {
+        "core": "0.5.4",
+        "wasm": "0.5.4",
+        "formulas": "0.5.4",
+        "xlsx": "0.5.4"
+      },
+      "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+      "sizes": {
+        "default": {
+          "wasm": {
+            "rawBytes": 882494,
+            "brotliBytes": 257126,
+            "sha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40"
+          },
+          "js": {
+            "files": [
+              "loader-browser.mjs",
+              "loader-state.mjs",
+              "pkg/sheetwrite_wasm.js",
+              "pkg/sheetwrite_wasm_factory.js"
+            ],
+            "rawBytes": 84894,
+            "brotliBytes": 12577
+          },
+          "totalBrotliBytes": 269703
+        },
+        "full": {
+          "wasm": {
+            "rawBytes": 1165254,
+            "brotliBytes": 345105,
+            "sha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d"
+          },
+          "js": {
+            "files": [
+              "loader-browser.mjs",
+              "loader-state.mjs",
+              "pkg/sheetwrite_wasm.js",
+              "pkg/sheetwrite_wasm_factory.js"
+            ],
+            "rawBytes": 85207,
+            "brotliBytes": 12650
+          },
+          "totalBrotliBytes": 357755
+        }
+      }
+    },
+    "0.6.1": {
+      "packageVersions": {
+        "core": "0.6.1",
+        "wasm": "0.6.1",
+        "formulas": "0.6.1",
+        "xlsx": "0.6.1"
+      },
+      "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+      "sizes": {
+        "default": {
+          "wasm": {
+            "rawBytes": 1016368,
+            "brotliBytes": 297998,
+            "sha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4"
+          },
+          "js": {
+            "files": [
+              "loader-browser.mjs",
+              "loader-state.mjs",
+              "pkg/sheetwrite_wasm.js",
+              "pkg/sheetwrite_wasm_factory.js"
+            ],
+            "rawBytes": 83898,
+            "brotliBytes": 12962
+          },
+          "totalBrotliBytes": 310960
+        },
+        "full": {
+          "wasm": {
+            "rawBytes": 1414949,
+            "brotliBytes": 419914,
+            "sha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96"
+          },
+          "js": {
+            "files": [
+              "loader-browser.mjs",
+              "loader-state.mjs",
+              "pkg/sheetwrite_wasm.js",
+              "pkg/sheetwrite_wasm_factory.js"
+            ],
+            "rawBytes": 86158,
+            "brotliBytes": 13328
+          },
+          "totalBrotliBytes": 433242
+        }
+      }
+    },
+    "0.7.0": {
+      "packageVersions": {
+        "core": "0.6.1",
+        "wasm": "0.6.1",
+        "formulas": "0.6.1",
+        "xlsx": "0.6.1"
+      },
+      "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+      "sizes": {
+        "default": {
+          "wasm": {
+            "rawBytes": 1155153,
+            "brotliBytes": 354821,
+            "sha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45"
+          },
+          "js": {
+            "files": [
+              "loader-browser.mjs",
+              "loader-state.mjs",
+              "pkg/sheetwrite_wasm.js",
+              "pkg/sheetwrite_wasm_factory.js"
+            ],
+            "rawBytes": 105417,
+            "brotliBytes": 16389
+          },
+          "totalBrotliBytes": 371210
+        },
+        "full": {
+          "wasm": {
+            "rawBytes": 1696220,
+            "brotliBytes": 526044,
+            "sha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791"
+          },
+          "js": {
+            "files": [
+              "loader-browser.mjs",
+              "loader-state.mjs",
+              "pkg/sheetwrite_wasm.js",
+              "pkg/sheetwrite_wasm_factory.js"
+            ],
+            "rawBytes": 113832,
+            "brotliBytes": 17615
+          },
+          "totalBrotliBytes": 543659
+        }
+      }
+    }
+  },
+  "summary": {
+    "0.5.4": {
+      "default": {
+        "recalcRowMedianMs": {
+          "fan-out-100k": 31.751833333333344,
+          "chain-64": 0.032406437148933875,
+          "diamond-32": 0.051500986947055,
+          "shared-range-10k": 3.25005209375,
+          "distinct-range-10k": 0.01667835357321685,
+          "closure-100k": 0.0026006194127536734,
+          "sum-100k": 0.32897076530787617
+        },
+        "recalcGeomeanMs": 0.15799447225479685,
+        "retainedMiB": 71.42204666137695,
+        "peakMiB": 143.6720085144043,
+        "importMs": 1127.0117504999998,
+        "exportMs": 564.4662909999997
+      },
+      "full": {
+        "recalcRowMedianMs": {
+          "fan-out-100k": 32.1655765,
+          "chain-64": 0.032330082451774926,
+          "diamond-32": 0.05180418194076732,
+          "shared-range-10k": 3.279501343750006,
+          "distinct-range-10k": 0.016724794816606763,
+          "closure-100k": 0.0026170074998010185,
+          "sum-100k": 0.3340638866666662
+        },
+        "recalcGeomeanMs": 0.15912485153828554,
+        "retainedMiB": 70.72671127319336,
+        "peakMiB": 135.28922271728516,
+        "importMs": 1141.944646,
+        "exportMs": 570.2077080000001
+      }
+    },
+    "0.6.1": {
+      "default": {
+        "recalcRowMedianMs": {
+          "fan-out-100k": 11.333737500000002,
+          "chain-64": 0.011586173278893594,
+          "diamond-32": 0.015855087493630335,
+          "shared-range-10k": 1.1834491162790708,
+          "distinct-range-10k": 0.015423449951895941,
+          "closure-100k": 0.0019043436117546898,
+          "sum-100k": 0.35734345357142844
+        },
+        "recalcGeomeanMs": 0.08243127372167376,
+        "retainedMiB": 85.48459243774414,
+        "peakMiB": 186.1720314025879,
+        "importMs": 1051.2290625,
+        "exportMs": 482.03770799999984
+      },
+      "full": {
+        "recalcRowMedianMs": {
+          "fan-out-100k": 11.158012399999995,
+          "chain-64": 0.01157222517561958,
+          "diamond-32": 0.01599044611448672,
+          "shared-range-10k": 1.1786342093023263,
+          "distinct-range-10k": 0.015372761687316872,
+          "closure-100k": 0.0019181156080296628,
+          "sum-100k": 0.36161795323740986
+        },
+        "recalcGeomeanMs": 0.0824713030509088,
+        "retainedMiB": 84.07046127319336,
+        "peakMiB": 169.83599853515625,
+        "importMs": 1043.882271,
+        "exportMs": 475.93614549999984
+      }
+    },
+    "0.7.0": {
+      "default": {
+        "recalcRowMedianMs": {
+          "fan-out-100k": 2.6617072368421035,
+          "chain-64": 0.005929785758662515,
+          "diamond-32": 0.01054514681160923,
+          "shared-range-10k": 0.41536707851239707,
+          "distinct-range-10k": 0.015803349329586554,
+          "closure-100k": 0.001718137147237698,
+          "sum-100k": 0.06527389517839319
+        },
+        "recalcGeomeanMs": 0.03837363380919771,
+        "retainedMiB": 52.27357482910156,
+        "peakMiB": 152.87511444091797,
+        "importMs": 1024.7269585,
+        "exportMs": 511.1712499999999
+      },
+      "full": {
+        "recalcRowMedianMs": {
+          "fan-out-100k": 2.672574578947369,
+          "chain-64": 0.00587472577976701,
+          "diamond-32": 0.010341821274041957,
+          "shared-range-10k": 0.4279206582645224,
+          "distinct-range-10k": 0.015662515930085018,
+          "closure-100k": 0.0017187649752849565,
+          "sum-100k": 0.06512572759370178
+        },
+        "recalcGeomeanMs": 0.03834181060019186,
+        "retainedMiB": 46.53919982910156,
+        "peakMiB": 144.3672866821289,
+        "importMs": 1036.9363755,
+        "exportMs": 515.4248955
+      }
+    }
+  },
+  "aaSpreadPercent": {
+    "recalcGeomean": 0.8748302895701388,
+    "retained": 8.077821710726107,
+    "peak": 2.410426204075322,
+    "import": 1.637381371566371,
+    "export": 1.1386145334108422
+  },
+  "samples": [
+    {
+      "round": 0,
+      "order": 0,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            34.81455566666667,
+            34.73276366666668,
+            34.462250000000004
+          ],
+          "chain-64": [
+            0.0339847432065218,
+            0.03270318312622634,
+            0.03279502754098362
+          ],
+          "diamond-32": [
+            0.05248727701993698,
+            0.053493539037433216,
+            0.053150416578108525
+          ],
+          "shared-range-10k": [
+            3.5015249999999924,
+            3.428147199999997,
+            3.4811194666666627
+          ],
+          "distinct-range-10k": [
+            0.016682996997998665,
+            0.016654165501165438,
+            0.017005893913634804
+          ],
+          "closure-100k": [
+            0.0026862553991619364,
+            0.002709801105571201,
+            0.00259535734675871
+          ],
+          "sum-100k": [
+            0.3632095434782619,
+            0.3572574428571443,
+            0.3568105815602813
+          ]
+        },
+        "exportMs": [
+          556.7031660000002,
+          555.815458,
+          564.0479169999999
+        ],
+        "importMs": [
+          1118.5654159999995,
+          1118.0420839999997,
+          1141.6932080000006
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "order": 1,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 80561040,
+          "rssAfterBytes": 161039392,
+          "maxRssBeforeBytes": 88784896,
+          "maxRssBytes": 234406912,
+          "sampledPeakRssBytes": 234406944,
+          "buildSetNewPeak": true,
+          "retainedBytes": 80478352,
+          "peakBytes": 153845904
+        }
+      }
+    },
+    {
+      "round": 0,
+      "order": 2,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.839500000000005,
+            31.75481933333333,
+            31.676638999999984
+          ],
+          "chain-64": [
+            0.03445090082644626,
+            0.0322823060038735,
+            0.03225308961960026
+          ],
+          "diamond-32": [
+            0.05210933229166663,
+            0.05225905538140025,
+            0.051849740932642455
+          ],
+          "shared-range-10k": [
+            3.2856979375000037,
+            3.373883333333333,
+            3.298140625000002
+          ],
+          "distinct-range-10k": [
+            0.016640155407653894,
+            0.017250704380820995,
+            0.017070729600546234
+          ],
+          "closure-100k": [
+            0.0026199980088031922,
+            0.0025464262069668127,
+            0.0026379275652862067
+          ],
+          "sum-100k": [
+            0.33324254966887473,
+            0.33104330921052477,
+            0.3311826754966898
+          ]
+        },
+        "exportMs": [
+          572.3722910000001,
+          579.2064589999995,
+          560.4271669999998
+        ],
+        "importMs": [
+          1123.448958,
+          1159.2562909999997,
+          1174.2464999999993
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "order": 3,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 83542904,
+          "rssAfterBytes": 159204384,
+          "maxRssBeforeBytes": 91193344,
+          "maxRssBytes": 225166336,
+          "sampledPeakRssBytes": 225166368,
+          "buildSetNewPeak": true,
+          "retainedBytes": 75661480,
+          "peakBytes": 141623464
+        }
+      }
+    },
+    {
+      "round": 0,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            11.682358399999998,
+            12.743150000000004,
+            14.343562500000004
+          ],
+          "chain-64": [
+            0.012159038414782402,
+            0.011504600874166087,
+            0.011419168988353509
+          ],
+          "diamond-32": [
+            0.015788706346700352,
+            0.016140224661071637,
+            0.015665635338345845
+          ],
+          "shared-range-10k": [
+            1.2016577380952396,
+            1.1911924761904786,
+            1.4591059714285717
+          ],
+          "distinct-range-10k": [
+            0.01598625319693098,
+            0.01564037910541129,
+            0.015737112020138503
+          ],
+          "closure-100k": [
+            0.0018697275922671345,
+            0.001938985199535064,
+            0.0019084180445995168
+          ],
+          "sum-100k": [
+            0.36218045323740994,
+            0.3611741582733806,
+            0.3624057971014505
+          ]
+        },
+        "exportMs": [
+          474.2617089999999,
+          493.18062499999996,
+          482.55179099999987
+        ],
+        "importMs": [
+          1029.128791,
+          1029.5738330000004,
+          1056.0816249999998
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 84657064,
+          "rssAfterBytes": 166724664,
+          "maxRssBeforeBytes": 92422144,
+          "maxRssBytes": 272548864,
+          "sampledPeakRssBytes": 272548920,
+          "buildSetNewPeak": true,
+          "retainedBytes": 82067600,
+          "peakBytes": 187891856
+        }
+      }
+    },
+    {
+      "round": 0,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            11.271216599999992,
+            11.704641800000001,
+            11.494291599999997
+          ],
+          "chain-64": [
+            0.012432465191447042,
+            0.011574209027777779,
+            0.01130653221795161
+          ],
+          "diamond-32": [
+            0.01599092580748319,
+            0.016422509359605902,
+            0.01571031008482566
+          ],
+          "shared-range-10k": [
+            1.1877296511627926,
+            1.1748178372093017,
+            1.2039057380952403
+          ],
+          "distinct-range-10k": [
+            0.01554357071806029,
+            0.015540501243008141,
+            0.015401344625808461
+          ],
+          "closure-100k": [
+            0.001901587206206733,
+            0.0019535683922641133,
+            0.001937253002712131
+          ],
+          "sum-100k": [
+            0.3616462805755402,
+            0.3614109712230225,
+            0.36492270289854983
+          ]
+        },
+        "exportMs": [
+          478.7694999999999,
+          468.80737499999987,
+          492.75125000000025
+        ],
+        "importMs": [
+          1041.9102500000008,
+          1082.3619579999995,
+          1061.2401660000005
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 88818576,
+          "rssAfterBytes": 175359032,
+          "maxRssBeforeBytes": 95354880,
+          "maxRssBytes": 265896960,
+          "sampledPeakRssBytes": 265897016,
+          "buildSetNewPeak": true,
+          "retainedBytes": 86540456,
+          "peakBytes": 177078440
+        }
+      }
+    },
+    {
+      "round": 0,
+      "order": 8,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.699554842105264,
+            2.7187281052631564,
+            2.715894736842107
+          ],
+          "chain-64": [
+            0.006352091844512196,
+            0.005941104206273765,
+            0.005690788551268925
+          ],
+          "diamond-32": [
+            0.010599530097498925,
+            0.01051621114616194,
+            0.010595553507098955
+          ],
+          "shared-range-10k": [
+            0.4150874628099176,
+            0.4174628500000002,
+            0.4135213471074377
+          ],
+          "distinct-range-10k": [
+            0.016029674038461523,
+            0.015850660221870042,
+            0.015049942521817655
+          ],
+          "closure-100k": [
+            0.0016900794321446672,
+            0.001737872649542945,
+            0.0017345312727651138
+          ],
+          "sum-100k": [
+            0.06536399738562079,
+            0.06545827879581154,
+            0.06503202210663188
+          ]
+        },
+        "exportMs": [
+          634.3915000000002,
+          587.0147919999999,
+          540.9163329999997
+        ],
+        "importMs": [
+          1017.2296249999999,
+          1065.8812079999998,
+          1032.018
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "order": 9,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 88261544,
+          "rssAfterBytes": 137200720,
+          "maxRssBeforeBytes": 95633408,
+          "maxRssBytes": 245646336,
+          "sampledPeakRssBytes": 245154872,
+          "buildSetNewPeak": true,
+          "retainedBytes": 48939176,
+          "peakBytes": 157384792
+        }
+      }
+    },
+    {
+      "round": 0,
+      "order": 10,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.7131732631578953,
+            2.671833368421053,
+            2.668247842105263
+          ],
+          "chain-64": [
+            0.006367672736533809,
+            0.005786878486286309,
+            0.005864727539291582
+          ],
+          "diamond-32": [
+            0.010513737174095877,
+            0.010202798612528057,
+            0.010194996534148818
+          ],
+          "shared-range-10k": [
+            0.4257605932203386,
+            0.42477188983050806,
+            0.4273612288135594
+          ],
+          "distinct-range-10k": [
+            0.016105260547503997,
+            0.016057228002569042,
+            0.01600414656000001
+          ],
+          "closure-100k": [
+            0.0016748216319421192,
+            0.0017307069920387687,
+            0.0017476305966236786
+          ],
+          "sum-100k": [
+            0.06544335424836616,
+            0.06700719544846043,
+            0.06543148104575189
+          ]
+        },
+        "exportMs": [
+          529.7299579999999,
+          507.7264580000001,
+          522.6749169999998
+        ],
+        "importMs": [
+          1023.3911669999998,
+          1022.4013330000007,
+          1013.3845420000007
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "order": 11,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 93701056,
+          "rssAfterBytes": 137249896,
+          "maxRssBeforeBytes": 100401152,
+          "maxRssBytes": 246744064,
+          "sampledPeakRssBytes": 246744144,
+          "buildSetNewPeak": true,
+          "retainedBytes": 43548840,
+          "peakBytes": 153043088
+        }
+      }
+    },
+    {
+      "round": 1,
+      "order": 0,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.7320197368421058,
+            2.6838070000000016,
+            2.65601752631579
+          ],
+          "chain-64": [
+            0.006465892926419247,
+            0.005759772376454326,
+            0.0058856520715630965
+          ],
+          "diamond-32": [
+            0.010524643864449582,
+            0.010484005870020956,
+            0.010436504278856172
+          ],
+          "shared-range-10k": [
+            0.42979380341880274,
+            0.4306638205128212,
+            0.43029772649572645
+          ],
+          "distinct-range-10k": [
+            0.015778400126222787,
+            0.01577111573636078,
+            0.015825619620253202
+          ],
+          "closure-100k": [
+            0.0017261775529931597,
+            0.001805793817039254,
+            0.0017200482644741787
+          ],
+          "sum-100k": [
+            0.06521995827900935,
+            0.06497732727272718,
+            0.06535220757180145
+          ]
+        },
+        "exportMs": [
+          532.1138340000002,
+          502.29204100000015,
+          514.6115420000001
+        ],
+        "importMs": [
+          1013.223,
+          1027.5069590000003,
+          1015.0935829999999
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "order": 1,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 90227600,
+          "rssAfterBytes": 138921016,
+          "maxRssBeforeBytes": 98795520,
+          "maxRssBytes": 241665024,
+          "sampledPeakRssBytes": 241665056,
+          "buildSetNewPeak": true,
+          "retainedBytes": 48693416,
+          "peakBytes": 151437456
+        }
+      }
+    },
+    {
+      "round": 1,
+      "order": 2,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.655583368421053,
+            2.679164473684209,
+            2.6448355263157914
+          ],
+          "chain-64": [
+            0.006330574629699959,
+            0.005936513118841266,
+            0.005732426802705499
+          ],
+          "diamond-32": [
+            0.010541385750421583,
+            0.01085540112871718,
+            0.010574645802495229
+          ],
+          "shared-range-10k": [
+            0.4159490330578513,
+            0.41293511475409883,
+            0.4193482666666673
+          ],
+          "distinct-range-10k": [
+            0.015094690009055224,
+            0.015273073304825874,
+            0.014892644431209055
+          ],
+          "closure-100k": [
+            0.0016841450705648558,
+            0.001719299463585724,
+            0.0017321105068070788
+          ],
+          "sum-100k": [
+            0.06501244675324656,
+            0.06522658670143396,
+            0.06529852088772853
+          ]
+        },
+        "exportMs": [
+          510.4656249999998,
+          498.98425000000043,
+          509.96012500000006
+        ],
+        "importMs": [
+          1011.484375,
+          1024.442833,
+          1001.5426660000003
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "order": 3,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 89211816,
+          "rssAfterBytes": 143492152,
+          "maxRssBeforeBytes": 95977472,
+          "maxRssBytes": 251134976,
+          "sampledPeakRssBytes": 251135008,
+          "buildSetNewPeak": true,
+          "retainedBytes": 54280336,
+          "peakBytes": 161923192
+        }
+      }
+    },
+    {
+      "round": 1,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.703600000000005,
+            10.838599999999996,
+            10.992266799999992
+          ],
+          "chain-64": [
+            0.012139404709881053,
+            0.011570241323461381,
+            0.011405527600364972
+          ],
+          "diamond-32": [
+            0.016071216259640118,
+            0.016330693337687757,
+            0.015760255909234164
+          ],
+          "shared-range-10k": [
+            1.2245274390243888,
+            1.2131795714285734,
+            1.2126954285714295
+          ],
+          "distinct-range-10k": [
+            0.01565813494051345,
+            0.015423234114743943,
+            0.015380703475853645
+          ],
+          "closure-100k": [
+            0.0019114818028901335,
+            0.0019407361046421363,
+            0.0019201533026113689
+          ],
+          "sum-100k": [
+            0.3628792246376808,
+            0.36288496376811596,
+            0.36366213768115957
+          ]
+        },
+        "exportMs": [
+          473.6244999999999,
+          470.0147499999998,
+          479.99587500000007
+        ],
+        "importMs": [
+          1034.7641250000006,
+          1039.8822500000006,
+          1060.3841660000007
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 88179600,
+          "rssAfterBytes": 175768656,
+          "maxRssBeforeBytes": 94830592,
+          "maxRssBytes": 268682240,
+          "sampledPeakRssBytes": 268485712,
+          "buildSetNewPeak": true,
+          "retainedBytes": 87589056,
+          "peakBytes": 180502640
+        }
+      }
+    },
+    {
+      "round": 1,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            12.228333399999997,
+            11.560299999999994,
+            11.3123918
+          ],
+          "chain-64": [
+            0.012193763716166785,
+            0.011914522277817472,
+            0.011368701068424657
+          ],
+          "diamond-32": [
+            0.015901020031796487,
+            0.016181863754045327,
+            0.01607105559125966
+          ],
+          "shared-range-10k": [
+            1.196617047619048,
+            1.2016428571428557,
+            1.1833662790697688
+          ],
+          "distinct-range-10k": [
+            0.01519946808510639,
+            0.015243218530935666,
+            0.015382613042140876
+          ],
+          "closure-100k": [
+            0.001897876641615424,
+            0.001952763132200746,
+            0.001927772101630871
+          ],
+          "sum-100k": [
+            0.3587023785714288,
+            0.3571476214285716,
+            0.3570369432624123
+          ]
+        },
+        "exportMs": [
+          485.32833299999993,
+          488.9246669999998,
+          475.48120800000015
+        ],
+        "importMs": [
+          1023.630083,
+          1036.9412080000002,
+          1056.401749999999
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 84607912,
+          "rssAfterBytes": 177456184,
+          "maxRssBeforeBytes": 90914816,
+          "maxRssBytes": 270238720,
+          "sampledPeakRssBytes": 270238776,
+          "buildSetNewPeak": true,
+          "retainedBytes": 92848272,
+          "peakBytes": 185630864
+        }
+      }
+    },
+    {
+      "round": 1,
+      "order": 8,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.87604166666667,
+            31.79738866666666,
+            36.16730566666664
+          ],
+          "chain-64": [
+            0.033535714285714294,
+            0.032385902849740925,
+            0.03227370967741939
+          ],
+          "diamond-32": [
+            0.05125397028688522,
+            0.05164736016511867,
+            0.05109456894790599
+          ],
+          "shared-range-10k": [
+            3.286442750000006,
+            3.2865442499999915,
+            3.272640625000008
+          ],
+          "distinct-range-10k": [
+            0.01663793246839648,
+            0.01695360169491531,
+            0.016991505266734576
+          ],
+          "closure-100k": [
+            0.00259423316384766,
+            0.002525589706030929,
+            0.002577294108551098
+          ],
+          "sum-100k": [
+            0.3417361088435378,
+            0.34551264137931115,
+            0.3333516666666643
+          ]
+        },
+        "exportMs": [
+          560.9263329999999,
+          587.123,
+          560.8235000000004
+        ],
+        "importMs": [
+          1145.8865830000004,
+          1098.5573329999997,
+          1142.7297089999993
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "order": 9,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 84607864,
+          "rssAfterBytes": 158483464,
+          "maxRssBeforeBytes": 92225536,
+          "maxRssBytes": 222299136,
+          "sampledPeakRssBytes": 222299144,
+          "buildSetNewPeak": true,
+          "retainedBytes": 73875600,
+          "peakBytes": 137691280
+        }
+      }
+    },
+    {
+      "round": 1,
+      "order": 10,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            32.48734733333333,
+            31.830402666666675,
+            31.702708333333362
+          ],
+          "chain-64": [
+            0.03362673772696707,
+            0.03235554139715393,
+            0.032253626692456516
+          ],
+          "diamond-32": [
+            0.052061524453694163,
+            0.052525341386554666,
+            0.052296716823406475
+          ],
+          "shared-range-10k": [
+            3.277143187500002,
+            3.2640390624999895,
+            3.2912968750000005
+          ],
+          "distinct-range-10k": [
+            0.016785568647197106,
+            0.01662511103723408,
+            0.016957428958969158
+          ],
+          "closure-100k": [
+            0.002599085559829511,
+            0.002649610089555417,
+            0.0025399586000203356
+          ],
+          "sum-100k": [
+            0.3271181895424829,
+            0.3278466797385626,
+            0.3292499999999988
+          ]
+        },
+        "exportMs": [
+          566.5195839999997,
+          570.8840419999997,
+          560.1851670000005
+        ],
+        "importMs": [
+          1121.6069580000003,
+          1090.517749999999,
+          1126.3913749999992
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "order": 11,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 80708520,
+          "rssAfterBytes": 154780752,
+          "maxRssBeforeBytes": 88915968,
+          "maxRssBytes": 227591168,
+          "sampledPeakRssBytes": 227247160,
+          "buildSetNewPeak": true,
+          "retainedBytes": 74072232,
+          "peakBytes": 146882648
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": 0,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.386596999999995,
+            33.81018066666669,
+            32.22037499999999
+          ],
+          "chain-64": [
+            0.03400914887831409,
+            0.03249921442495128,
+            0.032300785668172995
+          ],
+          "diamond-32": [
+            0.05156185567010308,
+            0.051785239130434785,
+            0.051972136033229505
+          ],
+          "shared-range-10k": [
+            3.3245156250000036,
+            3.2602421874999976,
+            3.2625129999999984
+          ],
+          "distinct-range-10k": [
+            0.01651360898282698,
+            0.01649211213720314,
+            0.01665814457028647
+          ],
+          "closure-100k": [
+            0.0026021532656778363,
+            0.0026905469758932536,
+            0.0025609869391518087
+          ],
+          "sum-100k": [
+            0.32743545751633907,
+            0.32832707189542515,
+            0.3284101307189529
+          ]
+        },
+        "exportMs": [
+          561.7252920000001,
+          579.7437919999998,
+          572.1662919999999
+        ],
+        "importMs": [
+          1126.8285839999999,
+          1102.030667000001,
+          1132.7642909999995
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "order": 1,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 79545208,
+          "rssAfterBytes": 160105504,
+          "maxRssBeforeBytes": 86622208,
+          "maxRssBytes": 231883776,
+          "sampledPeakRssBytes": 231883808,
+          "buildSetNewPeak": true,
+          "retainedBytes": 80560296,
+          "peakBytes": 152338600
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": 2,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            41.64727766666666,
+            35.872389,
+            31.483305666666638
+          ],
+          "chain-64": [
+            0.03362029569892468,
+            0.03202688860435336,
+            0.0320559826923077
+          ],
+          "diamond-32": [
+            0.05190162448132785,
+            0.05251281007345227,
+            0.05151707929969097
+          ],
+          "shared-range-10k": [
+            3.37003613333333,
+            3.2869740000000007,
+            3.273317687500011
+          ],
+          "distinct-range-10k": [
+            0.017137265935572337,
+            0.016803315524193584,
+            0.016852347826086942
+          ],
+          "closure-100k": [
+            0.002641644230769224,
+            0.0025619822718655704,
+            0.002648509349012113
+          ],
+          "sum-100k": [
+            0.33288245033112535,
+            0.33232367549668884,
+            0.3319023178807933
+          ]
+        },
+        "exportMs": [
+          560.3668749999997,
+          582.3078750000004,
+          574.171875
+        ],
+        "importMs": [
+          1144.4507910000002,
+          1123.5975830000007,
+          1164.9267920000002
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "order": 3,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 85853072,
+          "rssAfterBytes": 159204408,
+          "maxRssBeforeBytes": 93847552,
+          "maxRssBytes": 227951616,
+          "sampledPeakRssBytes": 227951672,
+          "buildSetNewPeak": true,
+          "retainedBytes": 73351336,
+          "peakBytes": 142098600
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            14.144323,
+            13.380614500000007,
+            13.411052000000012
+          ],
+          "chain-64": [
+            0.012098173239777391,
+            0.01148424827744601,
+            0.01123567737587059
+          ],
+          "diamond-32": [
+            0.015978261341853015,
+            0.016429574572930348,
+            0.016056893705844576
+          ],
+          "shared-range-10k": [
+            1.1911775714285708,
+            1.1803730465116276,
+            1.183322674418605
+          ],
+          "distinct-range-10k": [
+            0.01555876080870919,
+            0.015316105053598764,
+            0.015397141625615757
+          ],
+          "closure-100k": [
+            0.0018592818577324954,
+            0.0019562792754020107,
+            0.0019024582577818092
+          ],
+          "sum-100k": [
+            0.35658953900709234,
+            0.3569382340425534,
+            0.35683687943262465
+          ]
+        },
+        "exportMs": [
+          472.7270000000003,
+          469.73479099999986,
+          490.69337499999983
+        ],
+        "importMs": [
+          1022.7674999999999,
+          1024.8577080000005,
+          1044.273709
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 82772904,
+          "rssAfterBytes": 171164800,
+          "maxRssBeforeBytes": 90718208,
+          "maxRssBytes": 302351360,
+          "sampledPeakRssBytes": 301991040,
+          "buildSetNewPeak": true,
+          "retainedBytes": 88391896,
+          "peakBytes": 219578456
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.669966799999997,
+            11.010116800000002,
+            11.116566599999999
+          ],
+          "chain-64": [
+            0.011981927390366631,
+            0.011687417387240029,
+            0.011139043662285604
+          ],
+          "diamond-32": [
+            0.015940734140898943,
+            0.01607482867245258,
+            0.015956299298021684
+          ],
+          "shared-range-10k": [
+            1.1858449767441845,
+            1.1779515581395354,
+            1.1769350697674417
+          ],
+          "distinct-range-10k": [
+            0.015442969116738718,
+            0.015979153354632566,
+            0.015937805289993626
+          ],
+          "closure-100k": [
+            0.0019168966799570687,
+            0.0018514181508497807,
+            0.002054500349262443
+          ],
+          "sum-100k": [
+            0.3632198043478259,
+            0.3631216811594199,
+            0.3622347122302161
+          ]
+        },
+        "exportMs": [
+          471.71362499999987,
+          458.45949999999993,
+          466.22874999999976
+        ],
+        "importMs": [
+          1021.3499579999998,
+          1034.5107499999995,
+          1055.9115000000002
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 89457600,
+          "rssAfterBytes": 179962984,
+          "maxRssBeforeBytes": 97107968,
+          "maxRssBytes": 270779392,
+          "sampledPeakRssBytes": 270779496,
+          "buildSetNewPeak": true,
+          "retainedBytes": 90505384,
+          "peakBytes": 181321896
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": 8,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.662434210526315,
+            2.672793842105265,
+            2.645813631578948
+          ],
+          "chain-64": [
+            0.00628437225084831,
+            0.005891263195098964,
+            0.005711598172472873
+          ],
+          "diamond-32": [
+            0.010750420984734475,
+            0.010513903490327992,
+            0.010542466160657817
+          ],
+          "shared-range-10k": [
+            0.41193135245901646,
+            0.41332679338842926,
+            0.4091297479674794
+          ],
+          "distinct-range-10k": [
+            0.016037938422065436,
+            0.01636725302782326,
+            0.015813488298545227
+          ],
+          "closure-100k": [
+            0.0017594497149693899,
+            0.0016968085106382972,
+            0.0018055134510526131
+          ],
+          "sum-100k": [
+            0.06536693986928108,
+            0.06518061067708321,
+            0.06676897062750331
+          ]
+        },
+        "exportMs": [
+          512.3823749999997,
+          494.9401250000001,
+          516.6113340000002
+        ],
+        "importMs": [
+          1030.394459,
+          1037.6128750000007,
+          1066.20125
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "order": 9,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 88998800,
+          "rssAfterBytes": 150635528,
+          "maxRssBeforeBytes": 96534528,
+          "maxRssBytes": 249693184,
+          "sampledPeakRssBytes": 249693192,
+          "buildSetNewPeak": true,
+          "retainedBytes": 61636728,
+          "peakBytes": 160694392
+        }
+      }
+    },
+    {
+      "round": 2,
+      "order": 10,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.7507455789473694,
+            2.6966096315789456,
+            2.6792390526315804
+          ],
+          "chain-64": [
+            0.006362942224484602,
+            0.005738127381225616,
+            0.005860896155649324
+          ],
+          "diamond-32": [
+            0.010417152708333315,
+            0.010346282640182067,
+            0.010366466210613599
+          ],
+          "shared-range-10k": [
+            0.4272457627118641,
+            0.42601518644067843,
+            0.42656496610169464
+          ],
+          "distinct-range-10k": [
+            0.015614554167967531,
+            0.01542219148936168,
+            0.015389555555555528
+          ],
+          "closure-100k": [
+            0.0016346909144407775,
+            0.001691250338249223,
+            0.001694666158278258
+          ],
+          "sum-100k": [
+            0.06483338730569949,
+            0.0647126998706339,
+            0.06460077519379842
+          ]
+        },
+        "exportMs": [
+          519.46875,
+          502.9320419999999,
+          523.8734159999999
+        ],
+        "importMs": [
+          1051.542458,
+          1047.2590840000003,
+          1047.9497090000004
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "order": 11,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 91997144,
+          "rssAfterBytes": 138249320,
+          "maxRssBeforeBytes": 101400576,
+          "maxRssBytes": 241943552,
+          "sampledPeakRssBytes": 241943632,
+          "buildSetNewPeak": true,
+          "retainedBytes": 46252176,
+          "peakBytes": 149946488
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": 0,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6873749999999985,
+            2.6580241052631575,
+            2.706050421052632
+          ],
+          "chain-64": [
+            0.0062180635414076126,
+            0.005748663485858816,
+            0.00573293579454254
+          ],
+          "diamond-32": [
+            0.010306540189612535,
+            0.010182167582976975,
+            0.010303961467133737
+          ],
+          "shared-range-10k": [
+            0.43107148275862134,
+            0.43280423275862057,
+            0.4246338305084749
+          ],
+          "distinct-range-10k": [
+            0.01810603729181752,
+            0.017946642267671332,
+            0.017865993926402344
+          ],
+          "closure-100k": [
+            0.0016529035702479325,
+            0.0017146359864202224,
+            0.0017113523975767534
+          ],
+          "sum-100k": [
+            0.06533605221932129,
+            0.0652301173402869,
+            0.06529547519582235
+          ]
+        },
+        "exportMs": [
+          515.5365830000001,
+          500.2229580000003,
+          523.2829579999998
+        ],
+        "importMs": [
+          1050.4547499999999,
+          1067.3020420000003,
+          1061.8060000000005
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "order": 1,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 92980160,
+          "rssAfterBytes": 152978512,
+          "maxRssBeforeBytes": 99614720,
+          "maxRssBytes": 244302848,
+          "sampledPeakRssBytes": 244253752,
+          "buildSetNewPeak": true,
+          "retainedBytes": 59998352,
+          "peakBytes": 151322688
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": 2,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6717258421052628,
+            2.6609802631578923,
+            2.628212500000001
+          ],
+          "chain-64": [
+            0.006583953258722847,
+            0.005849467711745434,
+            0.005964083373091599
+          ],
+          "diamond-32": [
+            0.01053646944795617,
+            0.010449373040752339,
+            0.010492201846412096
+          ],
+          "shared-range-10k": [
+            0.4140833305785129,
+            0.4131120245901641,
+            0.4116031393442626
+          ],
+          "distinct-range-10k": [
+            0.015756038437303065,
+            0.015721038981452353,
+            0.015795746367656373
+          ],
+          "closure-100k": [
+            0.0017061395277417602,
+            0.0017805162737696738,
+            0.0017169748308896718
+          ],
+          "sum-100k": [
+            0.0653242493472586,
+            0.06463075968992253,
+            0.06745653638814024
+          ]
+        },
+        "exportMs": [
+          514.9139579999996,
+          496.94866600000023,
+          519.335583
+        ],
+        "importMs": [
+          1015.1054999999997,
+          1023.0010000000002,
+          1016.5792080000001
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "order": 3,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 86098808,
+          "rssAfterBytes": 137085960,
+          "maxRssBeforeBytes": 93388800,
+          "maxRssBytes": 243384320,
+          "sampledPeakRssBytes": 243385328,
+          "buildSetNewPeak": true,
+          "retainedBytes": 50987152,
+          "peakBytes": 157286520
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.568533400000002,
+            11.339858200000004,
+            11.7918
+          ],
+          "chain-64": [
+            0.012092029504232164,
+            0.011533863929889284,
+            0.011137899109131388
+          ],
+          "diamond-32": [
+            0.016113962294553655,
+            0.016348670480549197,
+            0.015822603606453666
+          ],
+          "shared-range-10k": [
+            1.1876598837209311,
+            1.1760649302325603,
+            1.173024232558141
+          ],
+          "distinct-range-10k": [
+            0.015554121306376349,
+            0.015395615455665056,
+            0.015334061637534493
+          ],
+          "closure-100k": [
+            0.00187913409500902,
+            0.0019177134200130401,
+            0.0019105641740858222
+          ],
+          "sum-100k": [
+            0.36196942446043184,
+            0.36158962589927945,
+            0.3614208633093522
+          ]
+        },
+        "exportMs": [
+          474.7429579999998,
+          465.5266670000001,
+          477.77037500000006
+        ],
+        "importMs": [
+          1030.4795830000003,
+          1044.601208,
+          1041.729958
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 87835512,
+          "rssAfterBytes": 171590712,
+          "maxRssBeforeBytes": 94519296,
+          "maxRssBytes": 261407744,
+          "sampledPeakRssBytes": 261407800,
+          "buildSetNewPeak": true,
+          "retainedBytes": 83755200,
+          "peakBytes": 173572288
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            11.1486582,
+            11.814475000000005,
+            12.076341600000001
+          ],
+          "chain-64": [
+            0.01197321000957855,
+            0.0116677456836211,
+            0.011099889012208656
+          ],
+          "diamond-32": [
+            0.01574030783758264,
+            0.015630561738043135,
+            0.01561932667083071
+          ],
+          "shared-range-10k": [
+            1.191838309523811,
+            1.1833391395348847,
+            1.1828372093023247
+          ],
+          "distinct-range-10k": [
+            0.015469855242808542,
+            0.0154007160455805,
+            0.015527255821173543
+          ],
+          "closure-100k": [
+            0.0019062289657275704,
+            0.0020188370177893315,
+            0.0019000902527075794
+          ],
+          "sum-100k": [
+            0.35784553571428596,
+            0.35831964285714385,
+            0.3584618999999991
+          ]
+        },
+        "exportMs": [
+          477.8115419999999,
+          478.4538339999999,
+          484.09799999999996
+        ],
+        "importMs": [
+          1056.05375,
+          1089.8806670000004,
+          1092.6549169999998
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 80921512,
+          "rssAfterBytes": 183157840,
+          "maxRssBeforeBytes": 88735744,
+          "maxRssBytes": 275842048,
+          "sampledPeakRssBytes": 275612752,
+          "buildSetNewPeak": true,
+          "retainedBytes": 102236328,
+          "peakBytes": 194920536
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": 8,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.780749999999994,
+            36.45184733333332,
+            32.19611133333334
+          ],
+          "chain-64": [
+            0.033503070328198256,
+            0.032212303927881526,
+            0.0321610128617363
+          ],
+          "diamond-32": [
+            0.051558891752577406,
+            0.05190988070539416,
+            0.05192930010384218
+          ],
+          "shared-range-10k": [
+            3.271114562500003,
+            3.264572874999999,
+            3.2660443125
+          ],
+          "distinct-range-10k": [
+            0.016762152195776092,
+            0.01660140006640103,
+            0.016793275688381487
+          ],
+          "closure-100k": [
+            0.002612113833455235,
+            0.0025361949277200157,
+            0.0026234412613463294
+          ],
+          "sum-100k": [
+            0.33326268874172205,
+            0.3313830000000004,
+            0.33183967549668814
+          ]
+        },
+        "exportMs": [
+          573.3152500000001,
+          582.9901670000004,
+          558.4040000000005
+        ],
+        "importMs": [
+          1129.8837089999997,
+          1121.5012920000008,
+          1153.890542000001
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "order": 9,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 83428240,
+          "rssAfterBytes": 158925856,
+          "maxRssBeforeBytes": 89899008,
+          "maxRssBytes": 228836352,
+          "sampledPeakRssBytes": 228836384,
+          "buildSetNewPeak": true,
+          "retainedBytes": 75497616,
+          "peakBytes": 145408144
+        }
+      }
+    },
+    {
+      "round": 3,
+      "order": 10,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.839416666666676,
+            31.673264000000017,
+            31.451222333333323
+          ],
+          "chain-64": [
+            0.033496929671801706,
+            0.032553928385416674,
+            0.03223335502577319
+          ],
+          "diamond-32": [
+            0.051570532989690714,
+            0.051879192946058174,
+            0.051209613101330716
+          ],
+          "shared-range-10k": [
+            3.2531406250000003,
+            3.2513671874999943,
+            3.2440990000000056
+          ],
+          "distinct-range-10k": [
+            0.0164926754617414,
+            0.016674974991663916,
+            0.017078438183060155
+          ],
+          "closure-100k": [
+            0.002610905853480246,
+            0.002676001284452769,
+            0.002535025045629687
+          ],
+          "sum-100k": [
+            0.3356714228187919,
+            0.32803022875817145,
+            0.3321313443708602
+          ]
+        },
+        "exportMs": [
+          554.4862079999998,
+          562.8822909999994,
+          568.7649169999995
+        ],
+        "importMs": [
+          1127.1949169999998,
+          1095.6692089999997,
+          1133.2153749999998
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "order": 11,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 80839520,
+          "rssAfterBytes": 150946872,
+          "maxRssBeforeBytes": 87097344,
+          "maxRssBytes": 228721664,
+          "sampledPeakRssBytes": 228295712,
+          "buildSetNewPeak": true,
+          "retainedBytes": 70107352,
+          "peakBytes": 147882144
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": 0,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.559250000000002,
+            32.91898633333333,
+            31.305652666666674
+          ],
+          "chain-64": [
+            0.03336151901267512,
+            0.03198508056265986,
+            0.032020299615877094
+          ],
+          "diamond-32": [
+            0.0514946786817713,
+            0.05139388489208636,
+            0.05109393156281915
+          ],
+          "shared-range-10k": [
+            3.2480728750000054,
+            3.2596953125,
+            3.247218750000002
+          ],
+          "distinct-range-10k": [
+            0.01681112033613447,
+            0.016446796777375875,
+            0.01672105182213302
+          ],
+          "closure-100k": [
+            0.0027162216427640117,
+            0.002630855624539599,
+            0.0025777847605299572
+          ],
+          "sum-100k": [
+            0.32961677631578823,
+            0.32755746405228864,
+            0.32942818421052406
+          ]
+        },
+        "exportMs": [
+          566.050291,
+          565.1594589999995,
+          570.1682919999994
+        ],
+        "importMs": [
+          1113.0107500000004,
+          1138.240166999999,
+          1131.084499999999
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "order": 1,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 79954808,
+          "rssAfterBytes": 155452448,
+          "maxRssBeforeBytes": 88588288,
+          "maxRssBytes": 224805888,
+          "sampledPeakRssBytes": 224642056,
+          "buildSetNewPeak": true,
+          "retainedBytes": 75497640,
+          "peakBytes": 144851080
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": 2,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.665750000000003,
+            31.65826366666666,
+            31.68631933333336
+          ],
+          "chain-64": [
+            0.033072861111111115,
+            0.03195175718849841,
+            0.03182927562062379
+          ],
+          "diamond-32": [
+            0.05118773490276364,
+            0.05147616563786013,
+            0.05070626545086112
+          ],
+          "shared-range-10k": [
+            3.2522343750000005,
+            3.2528229374999995,
+            3.256093750000005
+          ],
+          "distinct-range-10k": [
+            0.01656051324503307,
+            0.016670861333333353,
+            0.016962177747625512
+          ],
+          "closure-100k": [
+            0.0026887860830286034,
+            0.0025717224708121152,
+            0.002649239694818263
+          ],
+          "sum-100k": [
+            0.333693059999999,
+            0.3408092380952353,
+            0.3346905533333332
+          ]
+        },
+        "exportMs": [
+          566.8160830000002,
+          585.5824159999997,
+          556.137917
+        ],
+        "importMs": [
+          1155.6899160000003,
+          1115.4603749999997,
+          1141.1595830000006
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "order": 3,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 85508984,
+          "rssAfterBytes": 161481760,
+          "maxRssBeforeBytes": 92946432,
+          "maxRssBytes": 233505792,
+          "sampledPeakRssBytes": 227984416,
+          "buildSetNewPeak": true,
+          "retainedBytes": 75972776,
+          "peakBytes": 147996808
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.7521168,
+            10.509308400000009,
+            10.633916800000009
+          ],
+          "chain-64": [
+            0.012063188661037406,
+            0.011867277645942115,
+            0.011295148373983733
+          ],
+          "diamond-32": [
+            0.01577754984227128,
+            0.015783564709595965,
+            0.0156927492940069
+          ],
+          "shared-range-10k": [
+            1.1926845238095243,
+            1.1793091162790694,
+            1.1835590930232567
+          ],
+          "distinct-range-10k": [
+            0.01544226096355774,
+            0.015535971419695538,
+            0.015301675336597256
+          ],
+          "closure-100k": [
+            0.0018652649406849192,
+            0.0019974965435512514,
+            0.0018472955998078814
+          ],
+          "sum-100k": [
+            0.3572631000000001,
+            0.3575392857142853,
+            0.3582821428571427
+          ]
+        },
+        "exportMs": [
+          490.3513750000002,
+          478.1384159999998,
+          498.94391700000006
+        ],
+        "importMs": [
+          1054.4397090000002,
+          1076.287209,
+          1076.2699170000005
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 87180224,
+          "rssAfterBytes": 173999208,
+          "maxRssBeforeBytes": 93667328,
+          "maxRssBytes": 271270912,
+          "sampledPeakRssBytes": 271205480,
+          "buildSetNewPeak": true,
+          "retainedBytes": 86818984,
+          "peakBytes": 184090688
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.482833200000005,
+            11.750791600000003,
+            10.816916800000001
+          ],
+          "chain-64": [
+            0.01203979051288226,
+            0.011716201968134944,
+            0.011294169602529358
+          ],
+          "diamond-32": [
+            0.015881113051762437,
+            0.01586002727561053,
+            0.01589521106166562
+          ],
+          "shared-range-10k": [
+            1.1800542790697681,
+            1.165295534883721,
+            1.1683439999999998
+          ],
+          "distinct-range-10k": [
+            0.015443586781964187,
+            0.01531637304747321,
+            0.015223325722983239
+          ],
+          "closure-100k": [
+            0.0018982994684889952,
+            0.0018256353147363847,
+            0.001979967726606741
+          ],
+          "sum-100k": [
+            0.3607191294964019,
+            0.36091007194244634,
+            0.3615413669064745
+          ]
+        },
+        "exportMs": [
+          477.57699999999977,
+          458.02716699999974,
+          471.55291599999964
+        ],
+        "importMs": [
+          1033.9689169999992,
+          1071.0689160000002,
+          1046.034584
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 88114088,
+          "rssAfterBytes": 178193464,
+          "maxRssBeforeBytes": 97107968,
+          "maxRssBytes": 264635392,
+          "sampledPeakRssBytes": 264635448,
+          "buildSetNewPeak": true,
+          "retainedBytes": 90079376,
+          "peakBytes": 176521360
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": 8,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.64897147368421,
+            2.6480833157894734,
+            2.6296250000000017
+          ],
+          "chain-64": [
+            0.0063721910284185055,
+            0.00595391759942844,
+            0.005993851354591222
+          ],
+          "diamond-32": [
+            0.010547827462560642,
+            0.010460756694560678,
+            0.010741800859291098
+          ],
+          "shared-range-10k": [
+            0.4269410338983053,
+            0.42090686554621803,
+            0.4152544793388434
+          ],
+          "distinct-range-10k": [
+            0.01638508912188729,
+            0.0158540478757134,
+            0.015700052433281052
+          ],
+          "closure-100k": [
+            0.0017709004781299824,
+            0.0016895168102720062,
+            0.0018025703882620166
+          ],
+          "sum-100k": [
+            0.0646574082687339,
+            0.06461046511627926,
+            0.06460470542635632
+          ]
+        },
+        "exportMs": [
+          509.82391700000016,
+          497.742334,
+          514.825167
+        ],
+        "importMs": [
+          1019.6983749999999,
+          1025.6344579999995,
+          1018.042958
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "order": 9,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 87982992,
+          "rssAfterBytes": 146408504,
+          "maxRssBeforeBytes": 95141888,
+          "maxRssBytes": 254346240,
+          "sampledPeakRssBytes": 254346296,
+          "buildSetNewPeak": true,
+          "retainedBytes": 58425512,
+          "peakBytes": 166363304
+        }
+      }
+    },
+    {
+      "round": 4,
+      "order": 10,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6640328947368435,
+            2.665245631578946,
+            2.6544056842105275
+          ],
+          "chain-64": [
+            0.0063011014364919345,
+            0.005717184998856626,
+            0.0057878613265424225
+          ],
+          "diamond-32": [
+            0.010351436969571515,
+            0.010314562706270626,
+            0.010373720539419096
+          ],
+          "shared-range-10k": [
+            0.4257962542372883,
+            0.4238884237288133,
+            0.42533969491525386
+          ],
+          "distinct-range-10k": [
+            0.015146603270744977,
+            0.015106684290030233,
+            0.015380023992617651
+          ],
+          "closure-100k": [
+            0.00169997110121375,
+            0.0017063823971059987,
+            0.0017252906976744195
+          ],
+          "sum-100k": [
+            0.06504643563068907,
+            0.06508067880364128,
+            0.06497342987013001
+          ]
+        },
+        "exportMs": [
+          522.235709,
+          500.8446249999997,
+          511.53345800000034
+        ],
+        "importMs": [
+          1041.075167,
+          1044.7197909999995,
+          1053.6966249999996
+        ]
+      }
+    },
+    {
+      "round": 4,
+      "order": 11,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 91030440,
+          "rssAfterBytes": 139936800,
+          "maxRssBeforeBytes": 98566144,
+          "maxRssBytes": 245548032,
+          "sampledPeakRssBytes": 245449736,
+          "buildSetNewPeak": true,
+          "retainedBytes": 48906360,
+          "peakBytes": 154517592
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": 0,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6444802631578948,
+            2.6611140526315795,
+            2.6363728421052643
+          ],
+          "chain-64": [
+            0.006246060204846368,
+            0.005914818429145966,
+            0.005609224253982494
+          ],
+          "diamond-32": [
+            0.0103322055785124,
+            0.010270837749024455,
+            0.010702901969178084
+          ],
+          "shared-range-10k": [
+            0.4301517094017097,
+            0.4285687264957269,
+            0.42927635042735024
+          ],
+          "distinct-range-10k": [
+            0.016156112116316665,
+            0.015500891196528192,
+            0.01561095067124572
+          ],
+          "closure-100k": [
+            0.0017401046495440914,
+            0.0016698782393801729,
+            0.0017818368910587658
+          ],
+          "sum-100k": [
+            0.06471108279430786,
+            0.06489975097276274,
+            0.06493658051948067
+          ]
+        },
+        "exportMs": [
+          516.893709,
+          494.7973750000001,
+          515.313208
+        ],
+        "importMs": [
+          1019.3108750000001,
+          1034.9658339999996,
+          1039.3947090000001
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "order": 1,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 91800488,
+          "rssAfterBytes": 142754872,
+          "maxRssBeforeBytes": 101007360,
+          "maxRssBytes": 242992128,
+          "sampledPeakRssBytes": 242992184,
+          "buildSetNewPeak": true,
+          "retainedBytes": 50954384,
+          "peakBytes": 151191696
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": 2,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.679414473684212,
+            2.656785105263156,
+            2.6537675263157894
+          ],
+          "chain-64": [
+            0.006293806419131532,
+            0.0058856128766478335,
+            0.0059230583984837635
+          ],
+          "diamond-32": [
+            0.01060488695652173,
+            0.010477652210349875,
+            0.010612576188454998
+          ],
+          "shared-range-10k": [
+            0.4101717868852463,
+            0.41109528688524616,
+            0.4114368196721311
+          ],
+          "distinct-range-10k": [
+            0.015770511510564484,
+            0.01530847627793082,
+            0.015675731347962348
+          ],
+          "closure-100k": [
+            0.0017107939576419004,
+            0.0017719496420724424,
+            0.0016894667860521714
+          ],
+          "sum-100k": [
+            0.06472536610608015,
+            0.06623200927152322,
+            0.06495308441558455
+          ]
+        },
+        "exportMs": [
+          516.2354169999999,
+          496.8325829999999,
+          518.5177910000002
+        ],
+        "importMs": [
+          1016.5885419999995,
+          1030.2312499999998,
+          1029.2025830000002
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "order": 3,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 88916880,
+          "rssAfterBytes": 149341216,
+          "maxRssBeforeBytes": 96829440,
+          "maxRssBytes": 244630528,
+          "sampledPeakRssBytes": 244302856,
+          "buildSetNewPeak": true,
+          "retainedBytes": 60424336,
+          "peakBytes": 155713648
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.560166600000002,
+            11.218716599999993,
+            11.703883199999996
+          ],
+          "chain-64": [
+            0.012130397865114015,
+            0.01170364310788674,
+            0.011462086637634662
+          ],
+          "diamond-32": [
+            0.016038673508659375,
+            0.01598996642149025,
+            0.015888597712106753
+          ],
+          "shared-range-10k": [
+            1.173721906976745,
+            1.1643517441860447,
+            1.1661036744186055
+          ],
+          "distinct-range-10k": [
+            0.015362967127496146,
+            0.015311938456827916,
+            0.01527448564447158
+          ],
+          "closure-100k": [
+            0.0018787652363417733,
+            0.0018548197128760648,
+            0.0019072846734818365
+          ],
+          "sum-100k": [
+            0.36134172661870495,
+            0.36220114388489205,
+            0.3614361510791362
+          ]
+        },
+        "exportMs": [
+          491.507208,
+          473.93504200000007,
+          477.12933299999986
+        ],
+        "importMs": [
+          1053.9024579999996,
+          1045.15625,
+          1088.682416999999
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 88687552,
+          "rssAfterBytes": 177177680,
+          "maxRssBeforeBytes": 95780864,
+          "maxRssBytes": 266060800,
+          "sampledPeakRssBytes": 265700432,
+          "buildSetNewPeak": true,
+          "retainedBytes": 88490128,
+          "peakBytes": 177373248
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            11.077716800000008,
+            11.060366599999998,
+            11.515158400000008
+          ],
+          "chain-64": [
+            0.012078683574879236,
+            0.011735517953532035,
+            0.01140438996579247
+          ],
+          "diamond-32": [
+            0.01592146864056032,
+            0.015972825295432754,
+            0.015797312697410002
+          ],
+          "shared-range-10k": [
+            1.1964960238095241,
+            1.1786007674418613,
+            1.182381790697676
+          ],
+          "distinct-range-10k": [
+            0.01548784453391144,
+            0.015468270027837886,
+            0.015609212546816492
+          ],
+          "closure-100k": [
+            0.0018477519216555855,
+            0.0019275021780193532,
+            0.001999330241113191
+          ],
+          "sum-100k": [
+            0.3582315500000001,
+            0.3627279565217393,
+            0.36196192805755345
+          ]
+        },
+        "exportMs": [
+          478.3011670000001,
+          472.49649999999974,
+          488.62808300000006
+        ],
+        "importMs": [
+          1027.8072089999996,
+          1027.6846249999999,
+          1049.620583
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 84345744,
+          "rssAfterBytes": 169034880,
+          "maxRssBeforeBytes": 91062272,
+          "maxRssBytes": 282297344,
+          "sampledPeakRssBytes": 282297472,
+          "buildSetNewPeak": true,
+          "retainedBytes": 84689136,
+          "peakBytes": 197951728
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": 8,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            33.06486100000001,
+            39.770610999999995,
+            31.95626366666666
+          ],
+          "chain-64": [
+            0.03353996244131459,
+            0.03237977346278324,
+            0.03262483692106979
+          ],
+          "diamond-32": [
+            0.05194604465212878,
+            0.05200415800415802,
+            0.05148503909465031
+          ],
+          "shared-range-10k": [
+            3.2912682500000017,
+            3.284567750000008,
+            3.2702656250000075
+          ],
+          "distinct-range-10k": [
+            0.016573168710639716,
+            0.016632981376787478,
+            0.016788533736153008
+          ],
+          "closure-100k": [
+            0.0026245669518660266,
+            0.002556181074587175,
+            0.002647262812367633
+          ],
+          "sum-100k": [
+            0.3334372199999992,
+            0.331746966887418,
+            0.33563758389261894
+          ]
+        },
+        "exportMs": [
+          565.593292,
+          578.5299580000005,
+          553.7491669999999
+        ],
+        "importMs": [
+          1098.200167,
+          1156.0631670000002,
+          1175.7853340000001
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "order": 9,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 84345696,
+          "rssAfterBytes": 157385736,
+          "maxRssBeforeBytes": 92274688,
+          "maxRssBytes": 229196800,
+          "sampledPeakRssBytes": 229000200,
+          "buildSetNewPeak": true,
+          "retainedBytes": 73040040,
+          "peakBytes": 144851104
+        }
+      }
+    },
+    {
+      "round": 5,
+      "order": 10,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            37.130861,
+            32.287944333333336,
+            36.26156966666664
+          ],
+          "chain-64": [
+            0.033906751864406726,
+            0.03229960167850229,
+            0.03222731378865973
+          ],
+          "diamond-32": [
+            0.05134869096509245,
+            0.05172358634953452,
+            0.051431440904419284
+          ],
+          "shared-range-10k": [
+            3.2388411875000003,
+            3.2532343750000052,
+            3.2430208125000064
+          ],
+          "distinct-range-10k": [
+            0.016447399539625148,
+            0.016475247116968707,
+            0.016726825418060226
+          ],
+          "closure-100k": [
+            0.0025772619452605573,
+            0.002606585257780325,
+            0.0025871600351839432
+          ],
+          "sum-100k": [
+            0.3384346891891894,
+            0.32851334640522833,
+            0.32838861437908445
+          ]
+        },
+        "exportMs": [
+          570.4360419999998,
+          544.5071250000001,
+          576.347334
+        ],
+        "importMs": [
+          1177.2074999999995,
+          1178.3325829999994,
+          1198.827625
+        ]
+      }
+    },
+    {
+      "round": 5,
+      "order": 11,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 79545184,
+          "rssAfterBytes": 153830432,
+          "maxRssBeforeBytes": 88621056,
+          "maxRssBytes": 234423296,
+          "sampledPeakRssBytes": 234423304,
+          "buildSetNewPeak": true,
+          "retainedBytes": 74285248,
+          "peakBytes": 154878120
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": 0,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.46519433333333,
+            31.638722333333344,
+            31.22687499999999
+          ],
+          "chain-64": [
+            0.03368675690235686,
+            0.032232925257731936,
+            0.032354651358344144
+          ],
+          "diamond-32": [
+            0.05111516853932582,
+            0.05141002877697846,
+            0.05086043394308939
+          ],
+          "shared-range-10k": [
+            3.248630187499998,
+            3.2447812500000026,
+            3.2392499999999984
+          ],
+          "distinct-range-10k": [
+            0.01649595976253299,
+            0.01685675766767783,
+            0.016681732154769778
+          ],
+          "closure-100k": [
+            0.0025531237234477163,
+            0.0026726241381153444,
+            0.0025018367357150066
+          ],
+          "sum-100k": [
+            0.3286764705882347,
+            0.32686138562091394,
+            0.3278594771241824
+          ]
+        },
+        "exportMs": [
+          554.269667,
+          561.4892919999998,
+          567.3686660000003
+        ],
+        "importMs": [
+          1129.9391670000005,
+          1146.076000000001,
+          1214.2535000000007
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "order": 1,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 82215824,
+          "rssAfterBytes": 151127120,
+          "maxRssBeforeBytes": 88571904,
+          "maxRssBytes": 232801280,
+          "sampledPeakRssBytes": 232752184,
+          "buildSetNewPeak": true,
+          "retainedBytes": 68911296,
+          "peakBytes": 150585456
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": 2,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.67772233333333,
+            32.56906966666668,
+            32.135041666666666
+          ],
+          "chain-64": [
+            0.03362138776881715,
+            0.032413534024627294,
+            0.03268425947712421
+          ],
+          "diamond-32": [
+            0.05216623149113662,
+            0.05170673940020679,
+            0.05149399279093708
+          ],
+          "shared-range-10k": [
+            3.2536354374999945,
+            3.308434937499996,
+            3.2537448125000026
+          ],
+          "distinct-range-10k": [
+            0.016574591315876734,
+            0.016601247675962827,
+            0.01679562747732617
+          ],
+          "closure-100k": [
+            0.002573321393649317,
+            0.0025182699571896275,
+            0.0026245910450894963
+          ],
+          "sum-100k": [
+            0.35246919014084405,
+            0.3459186758620678,
+            0.34633333103448455
+          ]
+        },
+        "exportMs": [
+          574.9915420000002,
+          579.4106670000006,
+          558.944375
+        ],
+        "importMs": [
+          1118.7848330000006,
+          1103.399708,
+          1137.8621670000011
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "order": 3,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 86918056,
+          "rssAfterBytes": 159745056,
+          "maxRssBeforeBytes": 94224384,
+          "maxRssBytes": 225756160,
+          "sampledPeakRssBytes": 225756192,
+          "buildSetNewPeak": true,
+          "retainedBytes": 72827000,
+          "peakBytes": 138838136
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.846400000000006,
+            10.661433399999998,
+            12.089666800000009
+          ],
+          "chain-64": [
+            0.012019450961538466,
+            0.011501619595216197,
+            0.01124717903733693
+          ],
+          "diamond-32": [
+            0.015881351222610373,
+            0.015503526038437685,
+            0.01549048698884758
+          ],
+          "shared-range-10k": [
+            1.18339341860465,
+            1.1714321627906974,
+            1.1752848837209295
+          ],
+          "distinct-range-10k": [
+            0.01534989502762434,
+            0.015437249150972531,
+            0.015297351177730215
+          ],
+          "closure-100k": [
+            0.0018490856477201287,
+            0.001987146649709885,
+            0.0018421987325915501
+          ],
+          "sum-100k": [
+            0.35672990780141894,
+            0.3564710425531925,
+            0.3570602836879442
+          ]
+        },
+        "exportMs": [
+          481.2657919999997,
+          481.5236249999998,
+          483.6156249999999
+        ],
+        "importMs": [
+          1032.649875,
+          1067.5522499999997,
+          1088.6664999999994
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 84198312,
+          "rssAfterBytes": 175080600,
+          "maxRssBeforeBytes": 90177536,
+          "maxRssBytes": 279708672,
+          "sampledPeakRssBytes": 279708824,
+          "buildSetNewPeak": true,
+          "retainedBytes": 90882288,
+          "peakBytes": 195510512
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.641424999999993,
+            11.369375000000002,
+            11.461866600000008
+          ],
+          "chain-64": [
+            0.011984363767074041,
+            0.011442334096109823,
+            0.011148783054626535
+          ],
+          "diamond-32": [
+            0.016614978073089696,
+            0.01585923437995558,
+            0.016168053992887163
+          ],
+          "shared-range-10k": [
+            1.202625000000001,
+            1.1925902619047595,
+            1.203345238095237
+          ],
+          "distinct-range-10k": [
+            0.015517905057399918,
+            0.015125101028433131,
+            0.015115515417170489
+          ],
+          "closure-100k": [
+            0.0019193345361022567,
+            0.001905745397720771,
+            0.001959064686753121
+          ],
+          "sum-100k": [
+            0.3619058776978412,
+            0.3614532374100717,
+            0.3610647482014396
+          ]
+        },
+        "exportMs": [
+          480.2590409999998,
+          468.8179170000003,
+          485.4581250000001
+        ],
+        "importMs": [
+          1008.3420829999995,
+          1037.158875,
+          1032.2937499999998
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 91095952,
+          "rssAfterBytes": 185254968,
+          "maxRssBeforeBytes": 98385920,
+          "maxRssBytes": 280249344,
+          "sampledPeakRssBytes": 280216632,
+          "buildSetNewPeak": true,
+          "retainedBytes": 94159016,
+          "peakBytes": 189153392
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": 8,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6831315789473686,
+            2.731151315789475,
+            2.6856271578947384
+          ],
+          "chain-64": [
+            0.006196411648079306,
+            0.005816857608189857,
+            0.005808622792750924
+          ],
+          "diamond-32": [
+            0.010538663645943113,
+            0.010452515259197317,
+            0.010730740343347625
+          ],
+          "shared-range-10k": [
+            0.4156466942148765,
+            0.42297653781512595,
+            0.4145030991735542
+          ],
+          "distinct-range-10k": [
+            0.016338124795818386,
+            0.015941796939751385,
+            0.01607283285117324
+          ],
+          "closure-100k": [
+            0.0016714510780544824,
+            0.0017486535636846883,
+            0.0016457551839905147
+          ],
+          "sum-100k": [
+            0.06577863469119566,
+            0.06532120365535242,
+            0.06518711979166684
+          ]
+        },
+        "exportMs": [
+          515.4547080000002,
+          489.49958400000014,
+          509.1279590000004
+        ],
+        "importMs": [
+          1004.7266659999996,
+          1023.5144579999996,
+          1022.5622919999996
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "order": 9,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 87442344,
+          "rssAfterBytes": 142787640,
+          "maxRssBeforeBytes": 95289344,
+          "maxRssBytes": 249512960,
+          "sampledPeakRssBytes": 249512992,
+          "buildSetNewPeak": true,
+          "retainedBytes": 55345296,
+          "peakBytes": 162070648
+        }
+      }
+    },
+    {
+      "round": 6,
+      "order": 10,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.679870578947367,
+            2.6650592105263153,
+            2.6586096315789463
+          ],
+          "chain-64": [
+            0.006226940722291402,
+            0.005884724020242438,
+            0.005801102088167052
+          ],
+          "diamond-32": [
+            0.01142190109639105,
+            0.010746883730926294,
+            0.010354705943259478
+          ],
+          "shared-range-10k": [
+            0.4278771367521372,
+            0.43252586206896554,
+            0.4514162882882884
+          ],
+          "distinct-range-10k": [
+            0.015639714419768542,
+            0.01554949191542288,
+            0.01586412087563454
+          ],
+          "closure-100k": [
+            0.0017078921300724083,
+            0.0017604478400168979,
+            0.0017979399137001049
+          ],
+          "sum-100k": [
+            0.0648749999999999,
+            0.06460841860465093,
+            0.06455016129032276
+          ]
+        },
+        "exportMs": [
+          513.0688749999999,
+          502.38745800000015,
+          516.222417
+        ],
+        "importMs": [
+          1038.9069170000002,
+          1047.191667,
+          1037.8346249999995
+        ]
+      }
+    },
+    {
+      "round": 6,
+      "order": 11,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 92046248,
+          "rssAfterBytes": 141935672,
+          "maxRssBeforeBytes": 97648640,
+          "maxRssBytes": 242172928,
+          "sampledPeakRssBytes": 242172960,
+          "buildSetNewPeak": true,
+          "retainedBytes": 49889424,
+          "peakBytes": 150126712
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": 0,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6733157894736848,
+            2.678274157894736,
+            2.653436368421054
+          ],
+          "chain-64": [
+            0.006369745222929936,
+            0.0058297286930162045,
+            0.0058961992689541285
+          ],
+          "diamond-32": [
+            0.010340260545905703,
+            0.010152952690355328,
+            0.010301581170168932
+          ],
+          "shared-range-10k": [
+            0.4262701271186435,
+            0.4230038571428569,
+            0.4236211512605036
+          ],
+          "distinct-range-10k": [
+            0.015912715876551048,
+            0.015419891766882516,
+            0.01568531744040149
+          ],
+          "closure-100k": [
+            0.001647376317870322,
+            0.0017973357417592258,
+            0.0016311861807979692
+          ],
+          "sum-100k": [
+            0.06603138654353574,
+            0.06518440755208339,
+            0.06520501955671447
+          ]
+        },
+        "exportMs": [
+          515.55125,
+          504.00250000000005,
+          524.7194590000004
+        ],
+        "importMs": [
+          1014.7420419999999,
+          1020.0642079999998,
+          1002.6676670000006
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "order": 1,
+      "version": "0.7.0",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "835895a2e1711699521f326a9ae41033735485f9462ff5ab188630a00a532791",
+        "memory": {
+          "rssBeforeBytes": 92046272,
+          "rssAfterBytes": 139068472,
+          "maxRssBeforeBytes": 99909632,
+          "maxRssBytes": 248431616,
+          "sampledPeakRssBytes": 248431648,
+          "buildSetNewPeak": true,
+          "retainedBytes": 47022200,
+          "peakBytes": 156385376
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": 2,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "recalcMs": {
+          "fan-out-100k": [
+            2.6704517368421072,
+            2.679118421052632,
+            2.658453947368421
+          ],
+          "chain-64": [
+            0.0064831345779852185,
+            0.005866362623181608,
+            0.005894890120254661
+          ],
+          "diamond-32": [
+            0.010406044120707593,
+            0.010239896989555613,
+            0.010330991735537181
+          ],
+          "shared-range-10k": [
+            0.4233963613445373,
+            0.4161212066115697,
+            0.41729270833333393
+          ],
+          "distinct-range-10k": [
+            0.015930538069448857,
+            0.015176681638846766,
+            0.015016879279279284
+          ],
+          "closure-100k": [
+            0.001695115876190801,
+            0.0017802245522839791,
+            0.0016679843546719192
+          ],
+          "sum-100k": [
+            0.0652643415906127,
+            0.06497413506493505,
+            0.06517312239583332
+          ]
+        },
+        "exportMs": [
+          507.50925000000007,
+          490.3204999999998,
+          508.6692499999999
+        ],
+        "importMs": [
+          1015.9752500000004,
+          1048.8959999999997,
+          1026.8916250000002
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "order": 3,
+      "version": "0.7.0",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite({ engine, addons: [xlsxAddon()] })",
+        "engineWasmSha256": "f776d3cf6bd5c0e54b7468519dbdc0c9601d7e68f795083ce98f5953de56db45",
+        "memory": {
+          "rssBeforeBytes": 89736104,
+          "rssAfterBytes": 139723832,
+          "maxRssBeforeBytes": 96288768,
+          "maxRssBytes": 249644032,
+          "sampledPeakRssBytes": 249644064,
+          "buildSetNewPeak": true,
+          "retainedBytes": 49987728,
+          "peakBytes": 159907960
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": 4,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "recalcMs": {
+          "fan-out-100k": [
+            10.815499999999997,
+            11.097308199999997,
+            11.197841800000003
+          ],
+          "chain-64": [
+            0.012042670279383445,
+            0.011378507622298048,
+            0.011162314062499996
+          ],
+          "diamond-32": [
+            0.015863842956852794,
+            0.016191256393654922,
+            0.015635371169480904
+          ],
+          "shared-range-10k": [
+            1.1945416666666666,
+            1.1793168604651174,
+            1.177881790697674
+          ],
+          "distinct-range-10k": [
+            0.015372169074700282,
+            0.01534990791896869,
+            0.01531775130168451
+          ],
+          "closure-100k": [
+            0.0018292587253969446,
+            0.001954715598123529,
+            0.001952772895918763
+          ],
+          "sum-100k": [
+            0.363345108695652,
+            0.3627509057971022,
+            0.36632359854014507
+          ]
+        },
+        "exportMs": [
+          486.6965,
+          473.7135410000001,
+          484.2866670000003
+        ],
+        "importMs": [
+          1043.3184169999995,
+          1078.684875,
+          1071.0832910000008
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "order": 5,
+      "version": "0.6.1",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "219f642faf479e922b9ab6076e997dd97e35bfeb7d3f276d2aa301a7d581eb96",
+        "memory": {
+          "rssBeforeBytes": 88359872,
+          "rssAfterBytes": 176178280,
+          "maxRssBeforeBytes": 95977472,
+          "maxRssBytes": 267158528,
+          "sampledPeakRssBytes": 267142248,
+          "buildSetNewPeak": true,
+          "retainedBytes": 87818408,
+          "peakBytes": 178798656
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": 6,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "recalcMs": {
+          "fan-out-100k": [
+            11.107175000000007,
+            10.979383399999994,
+            11.258416599999999
+          ],
+          "chain-64": [
+            0.012075957739676414,
+            0.011436285158929783,
+            0.011273162759242557
+          ],
+          "diamond-32": [
+            0.016210494327390593,
+            0.01631333605220231,
+            0.015746943324937028
+          ],
+          "shared-range-10k": [
+            1.1973244047619058,
+            1.1857034883720945,
+            1.1827393488372098
+          ],
+          "distinct-range-10k": [
+            0.01545225587144624,
+            0.015404638940234142,
+            0.015373488472179557
+          ],
+          "closure-100k": [
+            0.0018944590611146889,
+            0.0018388251691674037,
+            0.0020005890065755783
+          ],
+          "sum-100k": [
+            0.36380102173913087,
+            0.35625236170212765,
+            0.35691341134751775
+          ]
+        },
+        "exportMs": [
+          483.6334160000001,
+          481.8824169999998,
+          489.1266249999999
+        ],
+        "importMs": [
+          1052.4605000000001,
+          1065.516917,
+          1117.949083999999
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "order": 7,
+      "version": "0.6.1",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.6.1",
+          "wasm": "0.6.1",
+          "formulas": "0.6.1",
+          "xlsx": "0.6.1"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "519b60f9eadf22e8632d606abcfd59e4121a4706391a3fca0f5791b0667a8bc4",
+        "memory": {
+          "rssBeforeBytes": 84378536,
+          "rssAfterBytes": 176555112,
+          "maxRssBeforeBytes": 92291072,
+          "maxRssBytes": 306054144,
+          "sampledPeakRssBytes": 305890408,
+          "buildSetNewPeak": true,
+          "retainedBytes": 92176576,
+          "peakBytes": 221675608
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": 8,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "recalcMs": {
+          "fan-out-100k": [
+            34.759527666666656,
+            32.364444333333346,
+            31.718930666666665
+          ],
+          "chain-64": [
+            0.03369519339622638,
+            0.032264354838709715,
+            0.03237785889967635
+          ],
+          "diamond-32": [
+            0.05167893388429754,
+            0.052577199789695134,
+            0.051354294661190986
+          ],
+          "shared-range-10k": [
+            3.274434937500004,
+            3.27248181249999,
+            3.281708312500001
+          ],
+          "distinct-range-10k": [
+            0.016549773990734578,
+            0.016687437437437436,
+            0.017475235849056577
+          ],
+          "closure-100k": [
+            0.0026140169907988447,
+            0.002572727501929507,
+            0.002643125231273458
+          ],
+          "sum-100k": [
+            0.364494565217393,
+            0.36982475735294096,
+            0.3697680735294117
+          ]
+        },
+        "exportMs": [
+          568.0431250000001,
+          603.4362499999997,
+          558.2313330000006
+        ],
+        "importMs": [
+          1108.5888340000001,
+          1095.1542910000007,
+          1154.5968329999996
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "order": 9,
+      "version": "0.5.4",
+      "engine": "full",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "ddfc6cba44483894e51e300853fa02d175f888ae0470c2edf4f7471b1f35101d",
+        "memory": {
+          "rssBeforeBytes": 83624848,
+          "rssAfterBytes": 158073912,
+          "maxRssBeforeBytes": 90619904,
+          "maxRssBytes": 222839808,
+          "sampledPeakRssBytes": 222839864,
+          "buildSetNewPeak": true,
+          "retainedBytes": 74449064,
+          "peakBytes": 139215016
+        }
+      }
+    },
+    {
+      "round": 7,
+      "order": 10,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "timing",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "recalcMs": {
+          "fan-out-100k": [
+            31.55231966666666,
+            31.758486000000005,
+            31.404152666666658
+          ],
+          "chain-64": [
+            0.033277999334663945,
+            0.031928632418634306,
+            0.03245733290071382
+          ],
+          "diamond-32": [
+            0.05093045621181258,
+            0.05131564102564099,
+            0.05108771705822263
+          ],
+          "shared-range-10k": [
+            3.258979187500003,
+            3.2487370000000055,
+            3.2340703124999948
+          ],
+          "distinct-range-10k": [
+            0.016613634883720953,
+            0.016769142857142857,
+            0.016646873501997336
+          ],
+          "closure-100k": [
+            0.0025789577573756993,
+            0.0026148175400062695,
+            0.0025596822463397183
+          ],
+          "sum-100k": [
+            0.33526028000000224,
+            0.33316363576159047,
+            0.33244950331125994
+          ]
+        },
+        "exportMs": [
+          555.7284579999996,
+          548.9490419999997,
+          581.0583339999994
+        ],
+        "importMs": [
+          1102.8248329999997,
+          1096.3044170000003,
+          1136.3685830000013
+        ]
+      }
+    },
+    {
+      "round": 7,
+      "order": 11,
+      "version": "0.5.4",
+      "engine": "default",
+      "part": "memory",
+      "result": {
+        "packageVersions": {
+          "core": "0.5.4",
+          "wasm": "0.5.4",
+          "formulas": "0.5.4",
+          "xlsx": "0.5.4"
+        },
+        "setupCall": "initSheetwrite(undefined, engine); registerXlsxBackends()",
+        "engineWasmSha256": "940d52f186911ad45f9776a584e14b4121b64b65a2e74ca9fc6c8007985bac40",
+        "memory": {
+          "rssBeforeBytes": 81167248,
+          "rssAfterBytes": 163152976,
+          "maxRssBeforeBytes": 87932928,
+          "maxRssBytes": 231883776,
+          "sampledPeakRssBytes": 231883832,
+          "buildSetNewPeak": true,
+          "retainedBytes": 81985728,
+          "peakBytes": 150716584
+        }
+      }
+    }
+  ]
+}

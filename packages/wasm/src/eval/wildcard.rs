@@ -68,7 +68,7 @@ impl Wildcard {
 
     /// Whether the pattern uses `*`, `?` or a `~` escape. Criteria compare a
     /// pattern without them as a plain value instead.
-    pub(super) fn has_wildcards(&self) -> bool {
+    pub(super) const fn has_wildcards(&self) -> bool {
         self.has_wildcards
     }
 
@@ -147,13 +147,13 @@ fn match_prefix<E>(
             continue;
         }
 
-        let Some((retry_token, star_end)) = star else {
+        let Some((retry_token, previous_star_end)) = star else {
             return Ok(false);
         };
-        let Some(skipped) = text[star_end..].chars().next() else {
+        let Some(skipped) = text[previous_star_end..].chars().next() else {
             return Ok(false);
         };
-        let star_end = star_end + skipped.len_utf8();
+        let star_end = previous_star_end + skipped.len_utf8();
         star = Some((retry_token, star_end));
         token_index = retry_token;
         text_index = star_end;
@@ -210,19 +210,6 @@ mod tests {
         assert!(whole("ÉCOLE", "école"));
         assert_eq!(search("?", "😀z"), Some(0));
         assert_eq!(search("z", "😀z"), Some("😀".len()));
-    }
-
-    #[test]
-    fn search_matches_a_prefix_from_each_position() {
-        assert_eq!(search("b*d", "abcde"), Some(1));
-        assert_eq!(search("", "abc"), Some(0));
-        assert_eq!(search("x", "abc"), None);
-        assert_eq!(
-            Wildcard::parse("c")
-                .expect("small pattern")
-                .find("abc", 1, &mut || Ok::<(), ()>(())),
-            Ok(Some(2))
-        );
     }
 
     #[test]

@@ -5,9 +5,7 @@ import * as Core from "@sheetwrite/core";
 import * as Adapter from "@sheetwrite/core/adapter";
 import * as Shell from "@sheetwrite/core/shell";
 import * as Xlsx from "@sheetwrite/xlsx";
-import "@sheetwrite/xlsx/register";
 import * as Charts from "@sheetwrite/charts";
-import "@sheetwrite/charts/register";
 import * as ReactAdapter from "@sheetwrite/react";
 import * as VueAdapter from "@sheetwrite/vue";
 import { load } from "@sheetwrite/wasm";
@@ -37,19 +35,17 @@ const forbiddenCoreExports = [
   "XlsxImportBackend",
   "setXlsxBackend",
   "setXlsxImportBackend",
+  "setXlsxTableExportBackend",
+  "setXlsxTableImportBackend",
+  "setXlsxWorkbookBackend",
+  "setChartRendererFactory",
+  "setChartViewProviderFactory",
+  "registerQueryCommands",
 ];
 for (const name of forbiddenCoreExports) {
   if (name in Core) throw new Error(`@sheetwrite/core still exports removed ${name}`);
 }
-for (const name of [
-  "toXlsxTable",
-  "fromXlsxTable",
-  "setXlsxTableExportBackend",
-  "setXlsxTableImportBackend",
-  "toXlsxWorkbook",
-  "fromXlsxWorkbook",
-  "setXlsxWorkbookBackend",
-]) {
+for (const name of ["toXlsxTable", "fromXlsxTable", "toXlsxWorkbook", "fromXlsxWorkbook"]) {
   if (typeof Reflect.get(Core, name) !== "function") {
     throw new Error(`@sheetwrite/core is missing canonical runtime export ${name}`);
   }
@@ -70,12 +66,28 @@ if (!String(uninitializedError?.message).includes("does not initialize core")) {
   throw new Error("SheetwriteStore must require initSheetwrite() even after the engine's load()");
 }
 
-await Core.initSheetwrite();
+await Core.initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon()] });
 
+// styles.css imports the parts; each must be an export of the packed package.
 const cssUrl = import.meta.resolve("@sheetwrite/core/styles.css");
 const css = await readFile(fileURLToPath(cssUrl), "utf8");
-if (!css.includes(".sheetwrite")) {
-  throw new Error("The packed core stylesheet is missing Sheetwrite rules");
+const parts = [...css.matchAll(/@import "\.\/styles\/([a-z-]+)\.css";/g)].map((match) => match[1]);
+if (!parts.includes("grid")) {
+  throw new Error("The packed core stylesheet does not import styles/grid.css");
+}
+for (const part of parts) {
+  const partUrl = import.meta.resolve(`@sheetwrite/core/styles/${part}.css`);
+  const partCss = await readFile(fileURLToPath(partUrl), "utf8");
+  if (!partCss.includes(`--sheetwrite-${part}-ready`)) {
+    throw new Error(`The packed stylesheet part ${part}.css is missing its rules`);
+  }
+}
+const iconSheet = await readFile(
+  fileURLToPath(import.meta.resolve("@sheetwrite/core/styles/icons.svg")),
+  "utf8",
+);
+if (!iconSheet.includes('<g id="undo"')) {
+  throw new Error("The packed icon sheet is missing its glyphs");
 }
 
 const shellCssUrl = import.meta.resolve("@sheetwrite/core/shell.css");
@@ -165,7 +177,7 @@ if (tableData.columns.Value?.[0] !== "packed") {
 }
 store.dispose();
 
-// The packed charts register entry must let packed core open live views of a packed store.
+// The packed charts add-on must let packed core open live views of a packed store.
 const chartStore = new Core.SheetwriteStore({
   activeSheet: "chart",
   sheets: [

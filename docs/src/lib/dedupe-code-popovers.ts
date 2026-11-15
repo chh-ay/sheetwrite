@@ -1,11 +1,18 @@
 /**
  * Hover popovers are rendered inline, one panel per hovered token. A page that
  * mentions `Grid` forty times would otherwise ship forty identical panels in
- * its HTML and again in its hydration chunk. This pass keeps one panel per
- * distinct content, moves it into a hidden store at the end of the document,
- * and points every trigger at the shared panel. The runtime already moves an
- * open panel to `document.body`, so its source position does not matter.
+ * its HTML, in its hydration chunk, and in its live DOM. This pass keeps one
+ * panel per distinct content and points every trigger at the shared panel.
+ *
+ * The kept panels leave the page tree: they become the HTML of one inert
+ * `<template class="sw-code-popover-store">` at the end of the document. The
+ * browser parses template content without rendering, styling or hydrating
+ * it, and `code-popovers.ts` clones a panel from the store when it opens.
  */
+
+import { relative } from "node:path";
+
+import { type ElementContent, toHtml } from "@expressive-code/core/hast";
 
 import type { HastNode } from "./build-hast.js";
 import { hashIdentifier } from "./hash-identifier.js";
@@ -14,7 +21,19 @@ interface VFileLike {
   path?: string;
 }
 
+/**
+ * The repository root. Panel ids hash a document's path relative to it, so the
+ * same sources build the same HTML wherever the checkout is.
+ */
+const REPOSITORY_ROOT = new URL("../../../", import.meta.url).pathname;
+
+/** The id prefix of one document's shared panels, from its repository path. */
+export function popoverIdPrefix(path: string | undefined): string {
+  return `sw-popover-${hashIdentifier(path === undefined ? "" : relative(REPOSITORY_ROOT, path))}`;
+}
+
 const PANEL_CLASS = "sw-code-popover__panel";
+const STORE_CLASS = "sw-code-popover-store";
 
 function hasClass(node: HastNode, name: string): boolean {
   const value = node.properties?.className;
@@ -32,14 +51,71 @@ function panelKey(panel: HastNode): string {
   );
 }
 
+/**
+ * Panels are hast elements built by Expressive Code; `HastNode` is the build
+ * plugins' structural view of the same nodes.
+ */
+function panelsHtml(panels: HastNode[]): string {
+  return toHtml({
+    type: "root",
+    children: panels as unknown as ElementContent[],
+  });
+}
+
+/**
+ * `<template className="sw-code-popover-store" dangerouslySetInnerHTML={{ __html }} />`
+ * as an MDX JSX node. React writes the HTML into the template's content on
+ * client renders and leaves the prerendered content alone when it hydrates.
+ */
+function popoverStore(html: string): HastNode & Record<string, unknown> {
+  const innerHtml = {
+    type: "ObjectExpression",
+    properties: [
+      {
+        type: "Property",
+        kind: "init",
+        method: false,
+        shorthand: false,
+        computed: false,
+        key: { type: "Identifier", name: "__html" },
+        value: { type: "Literal", value: html },
+      },
+    ],
+  };
+  return {
+    type: "mdxJsxFlowElement",
+    name: "template",
+    attributes: [
+      { type: "mdxJsxAttribute", name: "className", value: STORE_CLASS },
+      { type: "mdxJsxAttribute", name: "data-pagefind-ignore", value: "" },
+      {
+        type: "mdxJsxAttribute",
+        name: "dangerouslySetInnerHTML",
+        value: {
+          type: "mdxJsxAttributeValueExpression",
+          value: "",
+          data: {
+            estree: {
+              type: "Program",
+              sourceType: "module",
+              body: [{ type: "ExpressionStatement", expression: innerHtml }],
+            },
+          },
+        },
+      },
+    ],
+    children: [],
+  };
+}
+
 export function dedupeCodePopovers() {
   return (tree: HastNode, file: VFileLike): void => {
     const renamed = new Map<string, string>();
     const sharedIdByKey = new Map<string, string>();
     const store: HastNode[] = [];
     // Several documents can share one page (landing snippets, showcase setup),
-    // so shared ids carry a per-document prefix.
-    const prefix = `sw-popover-${hashIdentifier(file.path ?? "")}`;
+    // so shared ids carry a per-document prefix, then the panel's position.
+    const prefix = popoverIdPrefix(file.path);
 
     const collect = (node: HastNode): void => {
       if (!node.children) return;
@@ -51,7 +127,10 @@ export function dedupeCodePopovers() {
         if (sharedId === undefined) {
           sharedId = `${prefix}-${sharedIdByKey.size}`;
           sharedIdByKey.set(key, sharedId);
-          store.push({ ...child, properties: { ...child.properties, id: sharedId } });
+          store.push({
+            ...child,
+            properties: { ...child.properties, id: sharedId },
+          });
         }
         renamed.set(originalId, sharedId);
         return false;
@@ -77,14 +156,6 @@ export function dedupeCodePopovers() {
     collect(tree);
     if (store.length === 0) return;
     retarget(tree);
-    tree.children = [
-      ...(tree.children ?? []),
-      {
-        type: "element",
-        tagName: "div",
-        properties: { className: ["sw-code-popover-store"], hidden: true, dataPagefindIgnore: "" },
-        children: store,
-      },
-    ];
+    tree.children = [...(tree.children ?? []), popoverStore(panelsHtml(store))];
   };
 }

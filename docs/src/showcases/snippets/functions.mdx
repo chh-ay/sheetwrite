@@ -1,0 +1,14 @@
+```ts prelude="core" title="functions.ts"
+import * as formulas from "@sheetwrite/formulas";
+
+// The full engine runs every family on this page
+await initSheetwrite({ engine: formulas });
+const grid = createGrid(host, { workbook });
+
+// A formula is a cell value; the result is read back after the recalculation
+const result = { sheet: "engineering", row: 4, col: 4 };
+grid.applyTransaction({
+  patches: [{ op: "set", addr: result, value: { kind: "formula", src: '=CONVERT(B3,"km","mi")' } }],
+});
+grid.store.getCell(result).resolved;
+```

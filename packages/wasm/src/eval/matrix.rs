@@ -2,6 +2,10 @@
 
 use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
 use crate::types::{CellRange, FormulaError, Value};
+
+use super::{placed_cell, placed_range};
+
+use super::preview_limits;
 use std::cell::Cell;
 use std::mem::size_of;
 
@@ -25,6 +29,11 @@ pub(super) const SPILL_MAX_COLS: usize = SHEET_COLS as usize;
 pub(super) const SPILL_MAX_CELLS: usize = 1_000_000;
 pub(super) const SPILL_MAX_BYTES: usize = 64 * 1024 * 1024;
 pub(super) const SPILL_MAX_RECOMPUTE_CELLS: usize = 2_000_000;
+/// Spill-budget cells charged before evaluating a formula whose size is known
+/// only once it runs: a size read from a cell, a runtime reference. The
+/// pending loop charges whatever the result holds beyond this, so the pass
+/// budget still stops a pass that really produces more than it allows.
+pub(super) const UNKNOWN_SIZE_PRECHARGE: usize = 1;
 
 #[derive(Debug)]
 pub(super) struct EvalMatrix {
@@ -36,10 +45,13 @@ pub(super) struct EvalMatrix {
 
 impl EvalMatrix {
     pub(super) fn new(rows: usize, cols: usize, values: Vec<Value>) -> Self {
+        // A path that skipped the shape check still cannot hand an oversized
+        // array to a preview: the refusal is sticky, so the preview fails.
+        let _refused = preview_limits::array(values.len());
         let bytes = values.capacity().saturating_mul(size_of::<Value>()) as u64;
         MATRIX_RESOURCE_STATS.with(|stats| {
-            let [current, peak, allocations] = stats.get();
-            let current = current.saturating_add(bytes);
+            let [live, peak, allocations] = stats.get();
+            let current = live.saturating_add(bytes);
             stats.set([current, peak.max(current), allocations.saturating_add(1)]);
         });
         Self {
@@ -72,7 +84,31 @@ impl Drop for EvalMatrix {
 }
 
 impl EvalMatrix {
+    /// The cell count of an array of `rows` × `cols` that is about to be
+    /// built, checked against the array shape, cell and byte limits and,
+    /// during a result preview, its smaller array limit.
     pub(super) fn validate_shape(
+        rows: usize,
+        cols: usize,
+        value_buffers: usize,
+        extra_bytes: usize,
+    ) -> Result<usize, crate::types::FormulaError> {
+        let cells = Self::validate_buffers(rows, cols, value_buffers, extra_bytes)?;
+        preview_limits::array(cells)?;
+        Ok(cells)
+    }
+
+    /// The cell count of a reference read in place, checked against the
+    /// array shape limit. Nothing is allocated, so a preview's smaller array
+    /// limit does not apply.
+    pub(super) fn validate_reference_shape(
+        rows: usize,
+        cols: usize,
+    ) -> Result<usize, crate::types::FormulaError> {
+        Self::validate_buffers(rows, cols, 1, 0)
+    }
+
+    fn validate_buffers(
         rows: usize,
         cols: usize,
         value_buffers: usize,
@@ -95,6 +131,9 @@ impl EvalMatrix {
         }
         Ok(cells)
     }
+    /// One copy's [`Self::validate_copies`]: what the full engine's array
+    /// functions check before returning a matrix.
+    #[cfg(feature = "analysis")]
     pub(super) fn validate_bytes(&self) -> Result<(), crate::types::FormulaError> {
         self.validate_copies(1)
     }
@@ -108,13 +147,13 @@ impl EvalMatrix {
         let bytes = self.values.iter().try_fold(base, |total, value| {
             let payload = match value {
                 Value::Text(text) => text.len(),
-                _ => 0,
+                Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => 0,
             };
             total.checked_add(payload)
         });
         if bytes
-            .and_then(|bytes| bytes.checked_mul(copies))
-            .is_none_or(|bytes| bytes > SPILL_MAX_BYTES)
+            .and_then(|total| total.checked_mul(copies))
+            .is_none_or(|needed| needed > SPILL_MAX_BYTES)
         {
             return Err(crate::types::FormulaError::Num);
         }
@@ -139,21 +178,124 @@ pub(super) fn optional_ast(args: &[Ast], index: usize) -> Option<&Ast> {
     }
 }
 
+/// The range of an argument written as a range, such as `A1:B10` or
+/// `Sheet2!$A$1:$A$9`. A single-cell reference, a defined name or a LET value
+/// returns `None`: functions that read a lone cell as a scalar value coerce it
+/// differently from a range.
+pub(super) fn written_range(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
+    match ast {
+        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(ast, formula_sheet),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::SheetRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
+    }
+}
+
+/// The range an argument of an aggregate or statistic names: a written
+/// range, a defined name of one, a table column or an intersection. A lone
+/// cell is a value there, not a range.
+pub(super) fn argument_range(arg: &Ast, formula_sheet: usize) -> Option<CellRange> {
+    match arg {
+        Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(arg, formula_sheet),
+        Ast::NamedRange(named) => Some(CellRange::new(
+            named.sheet,
+            named.row_start,
+            named.col_start,
+            named.row_end,
+            named.col_end,
+        )),
+        Ast::Structured(reference) => Some(CellRange::new(
+            reference.sheet,
+            reference.row_start,
+            reference.col,
+            reference.row_end,
+            reference.col,
+        )),
+        Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::SheetRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
+    }
+}
+
 pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRange> {
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, formula_sheet),
         Ast::NamedFormula(named) => range_from_ast(&named.expression, formula_sheet),
-        Ast::Cell(row, col, _) => {
-            Some(CellRange::new(formula_sheet as u32, *row, *col, *row, *col))
+        Ast::Cell(row, col, flags) => {
+            let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+            Some(CellRange::new(
+                formula_sheet as u32,
+                placed_row,
+                placed_col,
+                placed_row,
+                placed_col,
+            ))
         }
-        Ast::AbsCell(sheet, row, col, _) => {
-            Some(CellRange::new(sheet.handle, *row, *col, *row, *col))
+        Ast::AbsCell(sheet, row, col, flags) => {
+            let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
+            Some(CellRange::new(
+                sheet.handle,
+                placed_row,
+                placed_col,
+                placed_row,
+                placed_col,
+            ))
         }
-        Ast::Range(r0, c0, r1, c1, _) => {
-            Some(CellRange::new(formula_sheet as u32, *r0, *c0, *r1, *c1))
-        }
-        Ast::AbsRange(sheet, r0, c0, r1, c1, _) => {
-            Some(CellRange::new(sheet.handle, *r0, *c0, *r1, *c1))
+        Ast::Range(r0, c0, r1, c1, flags) => Some(placed_range(
+            formula_sheet as u32,
+            (*r0, *c0),
+            (*r1, *c1),
+            *flags,
+        )),
+        Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
+            Some(placed_range(sheet.handle, (*r0, *c0), (*r1, *c1), *flags))
         }
         Ast::NamedRange(named) => Some(CellRange::new(
             named.sheet,
@@ -170,7 +312,27 @@ pub(crate) fn range_from_ast(ast: &Ast, formula_sheet: usize) -> Option<CellRang
             reference.col,
         )),
         Ast::Func(Func::Intersect, operands) => intersection_range(operands, formula_sheet).ok(),
-        _ => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::SheetCell(..)
+        | Ast::SheetRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
     }
 }
 
@@ -191,7 +353,36 @@ pub(crate) fn intersection_range(
         let Some(range) = range_from_ast(operand, formula_sheet) else {
             return Err(match operand {
                 Ast::InvalidRef => FormulaError::Ref,
-                _ => FormulaError::Value,
+                Ast::Num(_)
+                | Ast::Str(_)
+                | Ast::Bool(_)
+                | Ast::Missing
+                | Ast::Name(_)
+                | Ast::NamedRange(_)
+                | Ast::NamedFormula(_)
+                | Ast::UnresolvedStructured(_)
+                | Ast::Structured(_)
+                | Ast::Cell(..)
+                | Ast::SheetCell(..)
+                | Ast::AbsCell(..)
+                | Ast::Range(..)
+                | Ast::SheetRange(..)
+                | Ast::AbsRange(..)
+                | Ast::SheetSpan(_)
+                | Ast::Func(..)
+                | Ast::UnknownFunc(..)
+                | Ast::Bin(..)
+                | Ast::Cmp(..)
+                | Ast::Neg(_)
+                | Ast::Pos(_)
+                | Ast::Percent(_)
+                | Ast::LetSlot { .. }
+                | Ast::LetName { .. }
+                | Ast::Array { .. } => FormulaError::Value,
+                #[cfg(feature = "analysis")]
+                Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+                    FormulaError::Value
+                }
             });
         };
         let Some(current) = common else {

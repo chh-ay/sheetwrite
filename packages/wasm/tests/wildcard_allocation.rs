@@ -16,6 +16,7 @@ struct CappedAllocator;
 
 // SAFETY: every call forwards to `System` unchanged, except that a request
 // above the cap returns null, which `GlobalAlloc` allows for any failure.
+#[allow(unsafe_code, reason = "the test replaces the global allocator")]
 unsafe impl GlobalAlloc for CappedAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         if layout.size() > MAX_ALLOCATION_BYTES {

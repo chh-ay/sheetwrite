@@ -165,11 +165,14 @@ fn fixture(rows: usize) -> (CellStore, usize, usize) {
 /// Installs the fixture pivot at A1 of `output` and requires its output.
 fn install(store: &mut CellStore, source: usize, output: usize, rows: usize, aggregations: &[u32]) {
     let payload = fixture_pivot(source, rows, aggregations).numbers();
-    assert!(store.set_pivots(output, &payload, vec!["pivot".into()]));
+    assert!(
+        store.set_pivots(output, &payload, vec!["pivot".into()]),
+        "the pivot installs"
+    );
     store.recompute(output);
 
     let status = store.pivot_status(output);
-    assert_eq!(status[STATUS_ERROR], 0);
+    assert_eq!(status[STATUS_ERROR], 0, "the pivot computes");
     assert!(status[STATUS_ROWS] > 0, "the pivot installed output");
 }
 
@@ -239,10 +242,10 @@ fn pivot_fields_report_source_headers_and_types() {
     let (mut store, source, output) = fixture(12);
     install(&mut store, source, output, 12, &[SUM]);
 
-    let fields = store.pivot_fields(output, 0);
+    let mut fields = store.pivot_fields(output, 0);
 
-    assert_eq!(fields.names(), ["Region", "Quarter", "Sales"]);
-    assert_eq!(fields.types(), [1, 1, 1]);
+    assert_eq!(fields.take_names(), ["Region", "Quarter", "Sales"]);
+    assert_eq!(fields.take_types(), [1, 1, 1]);
 }
 
 #[test]
@@ -753,6 +756,68 @@ fn pivot_structural_clamp_preserves_both_colliding_anchors_and_recovers() {
     assert_eq!(store.get_cell(output, 8, 1).num(), 18.0);
 }
 
+/// Column of a chart copy's anchor, as core sends it: right of the last column of every sheet.
+const UNPLACED_COL: u32 = 1 << 30;
+
+/// Checks that the copy (pivot 1 on `output`) computes without placing:
+/// both pivots show no error, and each value of the copy, which has no total
+/// row or column, equals the placed pivot's cell for the same region and
+/// quarter.
+fn assert_copy_matches_placed(store: &CellStore, output: usize) {
+    let status = store.pivot_status(output);
+    assert_eq!(status[STATUS_ERROR], 0, "the placed pivot computes");
+    assert_eq!(status[STATUS_STRIDE + STATUS_ERROR], 0, "the copy computes");
+
+    let mut copy = store.pivot_output(output, 1);
+    let layout: Vec<usize> = copy
+        .layout()
+        .into_iter()
+        .map(|count| count as usize)
+        .collect();
+    let (rows, cols, header_rows, label_cols) = (layout[0], layout[1], layout[2], layout[3]);
+    // Two regions by three quarters.
+    assert_eq!(
+        (rows - header_rows, cols - label_cols),
+        (2, 3),
+        "the copy has two regions by three quarters"
+    );
+
+    let numbers = copy.take_numbers();
+    for row in header_rows..rows {
+        for col in label_cols..cols {
+            let placed = store.get_cell(output, row, col).num();
+            assert_eq!(numbers[row * cols + col], placed, "cell ({row}, {col})");
+        }
+    }
+}
+
+#[test]
+fn pivot_anchored_right_of_its_sheet_computes_without_placing() {
+    let (mut store, source, output) = fixture(12);
+    let placed = fixture_pivot(source, 12, &[SUM]);
+    let copy = PivotPayload {
+        id: 1,
+        anchor: (0, UNPLACED_COL),
+        flags: 0,
+        ..fixture_pivot(source, 12, &[SUM])
+    };
+    let mut definitions = placed.numbers();
+    definitions.extend(copy.numbers());
+    assert!(store.set_pivots(output, &definitions, vec!["pivot".into(), "copy".into()]));
+    store.recompute(output);
+    assert_copy_matches_placed(&store, output);
+
+    // A source edit reaches the copy.
+    store.set_number(source, 6, SALES, 106.0, 0);
+    store.recompute(source);
+    assert_copy_matches_placed(&store, output);
+
+    // Deleting a column left of the copy leaves it right of the sheet.
+    store.remove_cols(output, 10, 1);
+    store.recompute(output);
+    assert_copy_matches_placed(&store, output);
+}
+
 /// Source for the multi-level cases: region, city, product, flag (the
 /// filter field), quarter (the column field) and sales.
 const LEVEL_ROWS: [(&str, &str, &str, f64, f64, f64); 12] = [
@@ -999,9 +1064,15 @@ fn assert_matches_fresh_build(
     payload: &[f64],
     context: &str,
 ) {
-    assert!(store.set_pivots(fresh, &[], Vec::new()));
+    assert!(
+        store.set_pivots(fresh, &[], Vec::new()),
+        "the empty pivot list installs"
+    );
     store.recompute(fresh);
-    assert!(store.set_pivots(fresh, payload, vec!["pivot".into()]));
+    assert!(
+        store.set_pivots(fresh, payload, vec!["pivot".into()]),
+        "the pivot installs"
+    );
     store.recompute(fresh);
 
     let status = store.pivot_status(output);
@@ -1123,19 +1194,22 @@ impl RelatedFixture {
             ("customers", customers, 9, vec!["id", "region", "credit"]),
             ("regions", regions, 4, vec!["id", "name"]),
         ] {
-            assert!(store.set_table(
-                table_id,
-                table_id,
-                sheet,
-                0,
-                0,
-                last_row,
-                ids.len() - 1,
-                true,
-                false,
-                ids.iter().map(|id| id.to_string()).collect(),
-                ids.iter().map(|id| id.to_string()).collect(),
-            ));
+            assert!(
+                store.set_table(
+                    table_id,
+                    table_id,
+                    sheet,
+                    0,
+                    0,
+                    last_row,
+                    ids.len() - 1,
+                    true,
+                    false,
+                    ids.iter().map(|id| id.to_string()).collect(),
+                    ids.iter().map(|id| id.to_string()).collect(),
+                ),
+                "the table installs"
+            );
         }
         for (row, key) in keys.iter().enumerate() {
             if let Some(key) = key {
@@ -1154,22 +1228,25 @@ impl RelatedFixture {
             store.set_number(regions, row + 1, 0, row as f64, 0);
             store.set_string(regions, row + 1, 1, &format!("Region {row}"), 0);
         }
-        assert!(store.set_relationships(
-            [
-                "r1",
-                "orders",
-                "customer",
-                "customers",
-                "id",
-                "r2",
-                "customers",
-                "region",
-                "regions",
-                "id"
-            ]
-            .map(String::from)
-            .to_vec(),
-        ));
+        assert!(
+            store.set_relationships(
+                [
+                    "r1",
+                    "orders",
+                    "customer",
+                    "customers",
+                    "id",
+                    "r2",
+                    "customers",
+                    "region",
+                    "regions",
+                    "id"
+                ]
+                .map(String::from)
+                .to_vec(),
+            ),
+            "the relationships install"
+        );
         for (col, header) in ["name", "credit", "amount", "customer"].iter().enumerate() {
             store.set_string(flat, 0, col, header, 0);
         }
@@ -1226,9 +1303,11 @@ impl RelatedFixture {
             ..PivotPayload::default()
         }
         .numbers();
-        assert!(self
-            .store
-            .set_pivots(self.flat_output, &payload, vec!["flat".into()]));
+        assert!(
+            self.store
+                .set_pivots(self.flat_output, &payload, vec!["flat".into()]),
+            "the flat pivot installs"
+        );
 
         // Model source: kind 3, base table, field count, then table/column pairs.
         let mut model = payload;
@@ -1236,29 +1315,35 @@ impl RelatedFixture {
             1..7,
             [3.0, 1.0, 4.0, 2.0, 3.0, 4.0, 5.0, 1.0, 6.0, 1.0, 7.0],
         );
-        assert!(self.store.set_pivots(
-            self.model_output,
-            &model,
-            [
-                "model",
-                "orders",
-                "regions",
-                "name",
-                "customers",
-                "credit",
-                "amount",
-                "customer"
-            ]
-            .map(String::from)
-            .to_vec()
-        ));
+        assert!(
+            self.store.set_pivots(
+                self.model_output,
+                &model,
+                [
+                    "model",
+                    "orders",
+                    "regions",
+                    "name",
+                    "customers",
+                    "credit",
+                    "amount",
+                    "customer"
+                ]
+                .map(String::from)
+                .to_vec()
+            ),
+            "the model pivot installs"
+        );
         self.store.recompute_changed();
     }
 
     fn assert_equal(&self) {
         let actual = self.store.pivot_status(self.model_output);
         let expected = self.store.pivot_status(self.flat_output);
-        assert_eq!(actual, expected);
+        assert_eq!(
+            actual, expected,
+            "the model pivot has the flat pivot's status"
+        );
         for row in 0..actual[STATUS_ROWS] as usize {
             for col in 0..actual[STATUS_COLS] as usize {
                 let actual = self.store.get_cell(self.model_output, row, col);
@@ -1465,6 +1550,7 @@ fn getpivotdata_reads_the_value_cell_of_the_named_items() {
         ("=GETPIVOTDATA(\"Sales\",Output!A1)", 78.0),
         ("=GETPIVOTDATA(\"Sum of Sales\",Output!$C$4)", 78.0),
         ("=GETPIVOTDATA(\"sales\",Output!B2)", 78.0),
+        ("=GETPIVOTDATA(\"sUM oF sALES\",Output!A1)", 78.0),
         // Odd rows: 1 + 3 + 5 + 7 + 9 + 11.
         ("=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)", 36.0),
         // Rows divisible by 3: 3 + 6 + 9 + 12.
@@ -1538,4 +1624,84 @@ fn getpivotdata_follows_source_edits() {
     store.recompute(source);
 
     assert_eq!(store.get_cell(report, 0, 0).num(), 136.0);
+}
+
+/// The fixture's pivot at A1 of `Output`, and a `Report` sheet for
+/// GETPIVOTDATA formulas: `(store, source, output, report)`.
+fn pivot_reader_fixture() -> (CellStore, usize, usize, usize) {
+    let (mut store, source, output) = fixture(12);
+    let report = store.add_sheet(4, 20);
+    store.set_sheet_name(output, "output", "Output");
+    store.set_sheet_name(report, "report", "Report");
+    install(&mut store, source, output, 12, &[SUM]);
+    (store, source, output, report)
+}
+
+/// GETPIVOTDATA depends on its pivot, as in Excel; it is not volatile. An
+/// edit that changes no pivot output does not recalculate it, so it reads
+/// no output cell.
+#[test]
+fn getpivotdata_skips_edits_that_leave_its_pivot_unchanged() {
+    let (mut store, _, output, report) = pivot_reader_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
+    assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
+    let entry = store.sheets[report]
+        .formulas
+        .get((0, 0), &store.formula_slots)
+        .expect("the formula is stored");
+    assert!(!entry.volatile(), "GETPIVOTDATA is not volatile");
+    let reads = store.pivot_output_reads(output, 0);
+
+    store.set_number(report, 5, 3, 1.0, 0);
+    store.recompute(report);
+
+    assert_eq!(store.pivot_output_reads(output, 0), reads);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 36.0);
+}
+
+/// A new definition of its pivot recalculates GETPIVOTDATA: another
+/// aggregation, then no pivot at the reference (`#REF!`), then the pivot
+/// installed again after the formula.
+#[test]
+fn getpivotdata_follows_pivot_definition_changes() {
+    let (mut store, source, output, report) = pivot_reader_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",Output!A1,\"Region\",1)";
+    assert_eq!(report_cell(&mut store, report, formula).num(), 36.0);
+
+    // Six odd rows.
+    let count = fixture_pivot(source, 12, &[COUNT]).numbers();
+    assert!(store.set_pivots(output, &count, vec!["pivot".into()]));
+    store.recompute(output);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 6.0);
+
+    assert!(store.set_pivots(output, &[], Vec::new()));
+    store.recompute(output);
+    assert_eq!(
+        store.get_cell(report, 0, 0).string().as_deref(),
+        Some("#REF!")
+    );
+
+    install(&mut store, source, output, 12, &[SUM]);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 36.0);
+}
+
+/// A source edit recalculates GETPIVOTDATA once, after its pivot updates,
+/// and a reader on the pivot's own sheet follows it too.
+#[test]
+fn getpivotdata_follows_source_edits_on_any_sheet() {
+    let (mut store, source, output, report) = pivot_reader_fixture();
+    let formula = "=GETPIVOTDATA(\"Sales\",$A$1,\"Region\",0)";
+    store.set_formula(output, 0, 20, formula, 0);
+    let across = "=GETPIVOTDATA(\"Sales\",Output!B2)";
+    assert_eq!(report_cell(&mut store, report, across).num(), 78.0);
+    store.recompute(output);
+    // Even rows: 2 + 4 + ... + 12.
+    assert_eq!(store.get_cell(output, 0, 20).num(), 42.0);
+
+    // Row 2 (region 0) sells 102 instead of 2.
+    store.set_number(source, 2, SALES, 102.0, 0);
+    store.recompute(source);
+
+    assert_eq!(store.get_cell(output, 0, 20).num(), 142.0);
+    assert_eq!(store.get_cell(report, 0, 0).num(), 178.0);
 }

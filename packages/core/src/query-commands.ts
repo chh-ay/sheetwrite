@@ -1,21 +1,10 @@
-// The seam between a grid's Data commands and an optional query session
-// (#227). Core never loads the query engine: `@sheetwrite/queries` registers
-// these callbacks when a session is created and removes them on dispose. Only
-// the lazy ribbon, toolbar and panel chunks read them.
+// The seam between a grid's Data commands and an optional query session.
+// Core never loads the query engine: the queries add-on registers these
+// callbacks through its grid context and removes them on dispose. Only the
+// lazy ribbon, toolbar and panel chunks read them.
 
 import type { Grid } from "./types/grid.js";
-import type { SavedQuery } from "./types/query.js";
-
-/** What the Data commands need from a query session. Messages are for the user. */
-export interface QueryCommands {
-  /** Checks the plan in the engine, then saves it; returns why it was not saved, or null. */
-  define(query: SavedQuery): string | null;
-  /**
-   * Refreshes the given queries, or every query with an output table when
-   * `ids` is null. Resolves to why nothing was written, or null when it was.
-   */
-  refresh(ids: readonly string[] | null, signal: AbortSignal): Promise<string | null>;
-}
+import type { QueryCommands } from "./types/query.js";
 
 interface QueryCommandState {
   commands: QueryCommands | undefined;
@@ -42,7 +31,7 @@ function notify(state: QueryCommandState): void {
 /**
  * Shows the grid's Get Data, Refresh All and Queries & Connections commands
  * and connects them to `commands`. Returns the function that removes them.
- * `@sheetwrite/queries` calls this from `createQuerySession`.
+ * The add-on grid context calls this for the queries add-on.
  */
 export function registerQueryCommands(grid: Grid, commands: QueryCommands): () => void {
   const state = stateOf(grid);

@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { relative, resolve } from "node:path";
 
+import { assertIconSheetEmitted } from "../icon-sheet.mjs";
 import { attributeEntry, attributionProvenance } from "../module-attribution.mjs";
 
 const repositoryRoot = resolve("../../..");
@@ -93,6 +94,20 @@ const queryPanelUrl = relative(nextRoot, queryPanelChunks[0]).replaceAll("\\", "
 if (lifecycleInitialUrls.has(queryPanelUrl) || attributionInitialUrls.has(queryPanelUrl)) {
   throw new Error(`The query panel is in the initial Next.js chunk ${queryPanelUrl}`);
 }
+
+await assertIconSheetEmitted({
+  bundler: "Next.js",
+  stylesheets: await Promise.all(
+    selected
+      .filter((path) => path.endsWith(".css"))
+      .map(async (path) => ({ path, text: await readFile(path, "utf8") })),
+  ),
+  resolveUrl: (url, path) =>
+    url.startsWith("/_next/")
+      ? resolve(nextRoot, url.slice("/_next/".length))
+      : resolve(path, "..", url),
+  packagedSheet: resolve("node_modules/@sheetwrite/core/styles/icons.svg"),
+});
 
 const attributionAssetFiles = selected
   .map((path) => relative(nextRoot, path).replaceAll("\\", "/"))

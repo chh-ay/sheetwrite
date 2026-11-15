@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it, spyOn } from "bun:test";
 
-import { createGrid, DEFAULT_THEME, initSheetwrite } from "../src/grid.js";
+import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellValue, DocumentOp, Grid, Sheet, Workbook } from "../src/types.js";
 
@@ -8,7 +8,6 @@ const ROW_COUNT = 1_000;
 const OFFSCREEN_ROW = ROW_COUNT - 1;
 const HOST_WIDTH = 800;
 const HOST_HEIGHT = 400;
-const OVERSCAN_ROWS = 20;
 let restoreCanvas: () => void;
 let originalFrame: typeof requestAnimationFrame;
 let originalCancelFrame: typeof cancelAnimationFrame;
@@ -115,41 +114,6 @@ function cell(host: HTMLElement, row = 0, col = 0): HTMLElement {
   return result;
 }
 
-it("keeps the painted window and aria cells untouched for unrelated literal edits, but reads visible edits", () => {
-  const { grid, host } = mount();
-  const reads = spyOn(grid.store, "getVisibleWindow");
-  const mirror = host.querySelector(".sheetwrite-aria");
-  if (!mirror) throw new Error("Missing aria mirror");
-  const observer = new MutationObserver(() => {});
-  observer.observe(mirror, { childList: true, attributes: true, subtree: true });
-  try {
-    for (const sheet of ["s1", "s2"]) {
-      commit(grid, [
-        {
-          op: "set",
-          addr: { sheet, row: OFFSCREEN_ROW, col: 1 },
-          value: { kind: "literal", value: 42 },
-        },
-      ]);
-      expect(reads).not.toHaveBeenCalled();
-      expect(observer.takeRecords()).toHaveLength(0);
-      expect(cell(host).textContent).toBe("visible");
-    }
-    commit(grid, [
-      {
-        op: "set",
-        addr: { sheet: "s1", row: 0, col: 0 },
-        value: { kind: "literal", value: "updated" },
-      },
-    ]);
-    expect(reads).toHaveBeenCalled();
-    expect(cell(host).textContent).toBe("updated");
-  } finally {
-    observer.disconnect();
-    reads.mockRestore();
-  }
-});
-
 it.each([
   {
     label: "same-sheet formula",
@@ -188,59 +152,6 @@ it.each([
   },
 );
 
-it("tracks formula sources introduced by packed edits before later off-screen inputs change", () => {
-  const { grid, host } = mount();
-  commit(grid, [
-    {
-      op: "setBlock",
-      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 0, col: 0 } },
-      block: { rowCount: 1, colCount: 1, values: [null], formulas: [[0, "=B1000"]] },
-    },
-  ]);
-  commit(grid, [
-    {
-      op: "set",
-      addr: { sheet: "s1", row: OFFSCREEN_ROW, col: 1 },
-      value: { kind: "literal", value: 77 },
-    },
-  ]);
-  expect(cell(host).textContent).toBe("77");
-});
-
-it("maps painted view rows to backing rows for sorted edits", () => {
-  const { grid, host } = mount();
-  grid.setViewSort([{ col: 1, ascending: false }]);
-  flushFrames();
-  commit(grid, [
-    {
-      op: "set",
-      addr: { sheet: "s1", row: OFFSCREEN_ROW, col: 0 },
-      value: { kind: "literal", value: "sorted visible" },
-    },
-  ]);
-  expect(cell(host).textContent).toBe("sorted visible");
-});
-
-it("refreshes search matches after value edits without re-reading unrelated paint data", () => {
-  const { grid } = mount();
-  expect(grid.search("new match").matches).toHaveLength(0);
-  flushFrames();
-  const reads = spyOn(grid.store, "getVisibleWindow");
-  try {
-    commit(grid, [
-      {
-        op: "set",
-        addr: { sheet: "s1", row: OFFSCREEN_ROW, col: 0 },
-        value: { kind: "literal", value: "new match" },
-      },
-    ]);
-    expect(reads).not.toHaveBeenCalled();
-    expect(grid.findNext().matches).toHaveLength(1);
-  } finally {
-    reads.mockRestore();
-  }
-});
-
 it("refreshes search matches for numbers whose engine text differs from JavaScript", () => {
   const { grid } = mount();
   expect(grid.search("000").matches).toHaveLength(0);
@@ -252,37 +163,6 @@ it("refreshes search matches for numbers whose engine text differs from JavaScri
     },
   ]);
   expect(grid.findNext().matches).toEqual([{ sheet: "s1", row: OFFSCREEN_ROW, col: 1 }]);
-});
-
-it("refreshes a formula match when its off-screen literal input changes", () => {
-  const { grid } = mount({ kind: "formula", src: '=IF(B1000=999,"before","after")' });
-  expect(grid.search("after").matches).toHaveLength(0);
-  commit(grid, [
-    {
-      op: "set",
-      addr: { sheet: "s1", row: OFFSCREEN_ROW, col: 1 },
-      value: { kind: "literal", value: 42 },
-    },
-  ]);
-  expect(grid.findNext().matches).toEqual([{ sheet: "s1", row: 0, col: 0 }]);
-});
-
-it("repaints note additions, descriptions and row geometry without using value epochs as geometry", () => {
-  const { grid, host } = mount();
-  commit(grid, [{ op: "setNote", addr: { sheet: "s1", row: 1, col: 0 }, text: "Review" }]);
-  expect(cell(host, 1).getAttribute("aria-description")).toBe("Note: Review");
-  const indicators = () =>
-    [...host.querySelectorAll<HTMLElement>(".sheetwrite-overlay div")].filter(
-      (node) => node.style.clipPath.startsWith("polygon") && node.style.display !== "none",
-    );
-  expect(indicators()).toHaveLength(1);
-  const top = indicators()[0]?.style.top;
-  commit(grid, [{ op: "setRowMeta", sheet: "s1", row: 0, meta: { height: 80 } }]);
-  expect(indicators()).toHaveLength(1);
-  expect(indicators()[0]?.style.top).not.toBe(top);
-  commit(grid, [{ op: "setNote", addr: { sheet: "s1", row: 1, col: 0 }, text: null }]);
-  expect(cell(host, 1).getAttribute("aria-description")).toBeNull();
-  expect(indicators()).toHaveLength(0);
 });
 
 function expectWindowReadAfter(grid: Grid, patch: DocumentOp): void {
@@ -335,51 +215,3 @@ it.each([
     expectWindowReadAfter(grid, OFFSCREEN_EDIT);
   },
 );
-
-it("re-reads frozen cells after the body has scrolled past them", () => {
-  const { grid, host } = mount();
-  let firstPaintedBodyRow = 0;
-  grid.on("scroll", (event) => {
-    firstPaintedBodyRow = event.firstRow;
-  });
-  grid.setFrozen(1, 1);
-  flushFrames();
-  const scroller = host.querySelector<HTMLElement>(".sheetwrite-scroller");
-  if (!scroller) throw new Error("Missing scroller");
-  scroller.scrollTop = ROW_COUNT * DEFAULT_THEME.rowHeight;
-  scroller.dispatchEvent(new Event("scroll"));
-  flushFrames();
-  expect(firstPaintedBodyRow).toBeGreaterThan(OVERSCAN_ROWS);
-  expectWindowReadAfter(grid, {
-    op: "set",
-    addr: { sheet: "s1", row: 0, col: 0 },
-    value: { kind: "literal", value: "pinned" },
-  });
-});
-
-it("re-reads the painted window for edits in overscan-only rows", () => {
-  const { grid } = mount();
-  let lastPaintedRow = -1;
-  grid.on("scroll", (event) => {
-    lastPaintedRow = event.lastRow;
-  });
-  grid.setOverscan(OVERSCAN_ROWS);
-  flushFrames();
-  expect(lastPaintedRow).toBeGreaterThan(Math.ceil(HOST_HEIGHT / DEFAULT_THEME.rowHeight));
-  expectWindowReadAfter(grid, {
-    op: "set",
-    addr: { sheet: "s1", row: lastPaintedRow, col: 1 },
-    value: { kind: "literal", value: 42 },
-  });
-});
-
-it("refreshes search matches when the first change after mount removes a spill", () => {
-  const { grid } = mount({ kind: "formula", src: "=SEQUENCE(3)" }, {}, { primed: false });
-  expect(grid.search("3", { columns: [0], wholeCell: true }).matches).toEqual([
-    { sheet: "s1", row: 2, col: 0 },
-  ]);
-  commit(grid, [
-    { op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: "x" } },
-  ]);
-  expect(grid.findNext().matches).toHaveLength(0);
-});

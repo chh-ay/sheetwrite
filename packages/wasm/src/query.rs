@@ -2,14 +2,17 @@
 
 use std::cell::Cell;
 use std::cmp::Ordering;
-use std::collections::HashSet;
+
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
+use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
 use crate::sort_text::push_collation_key;
+use crate::sorting::{key_index, sort_indices_by, sort_u128, sort_u64};
 use crate::store::CellStore;
 use crate::types::{
     cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
@@ -37,7 +40,7 @@ struct PoolIdStamps {
 }
 
 impl PoolIdStamps {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self { words: Vec::new() }
     }
 
@@ -87,7 +90,7 @@ enum ValueSet<'a> {
         /// stored as `0.0` and NaN picks are dropped — exactly the values `f64`
         /// equality can match.
         numbers: Vec<u64>,
-        texts: HashSet<&'a str>,
+        texts: FxHashSet<&'a str>,
         /// Picked booleans, as the two bits above.
         bools: u8,
     },
@@ -108,7 +111,7 @@ impl<'a> ValueSet<'a> {
         numbers.sort_unstable();
         numbers.dedup();
 
-        let mut texts = HashSet::with_capacity(picked_texts.len());
+        let mut texts = FxHashSet::with_capacity_and_hasher(picked_texts.len(), FxBuildHasher);
         let mut bools = 0u8;
 
         for picked in picked_texts {
@@ -148,7 +151,7 @@ struct NumericAccumulator {
 }
 
 impl NumericAccumulator {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             sum: 0.0,
             count: 0,
@@ -171,11 +174,15 @@ impl NumericAccumulator {
 #[wasm_bindgen]
 impl CellStore {
     /// `[contains cache constructions, owned distinct strings]`.
+    /// @enginePublic Benchmarks check contains-cache construction and owned distinct strings.
     #[wasm_bindgen(js_name = queryResourceStats)]
     pub fn query_resource_stats(&self) -> Vec<f64> {
         QUERY_STATS.with(|stats| stats.get().into_iter().map(|value| value as f64).collect())
     }
 
+    /// Zeroes the counters that `queryResourceStats` reports.
+    ///
+    /// @enginePublic Reset the resource counters before each benchmark probe.
     #[wasm_bindgen(js_name = resetQueryResourceStats)]
     pub fn reset_query_resource_stats(&self) {
         QUERY_STATS.with(|stats| stats.set([0, 0]));
@@ -224,8 +231,8 @@ impl CellStore {
                     }
                     _ => None,
                 };
-                if let Some(value) = value {
-                    acc.add(value, op);
+                if let Some(found) = value {
+                    acc.add(found, op);
                 }
             }
         } else {
@@ -290,7 +297,7 @@ impl CellStore {
         }
 
         let base = col * s.cells.row_count();
-        let needle = needle.to_lowercase();
+        let lower_needle = needle.to_lowercase();
         let mut out: Vec<u32> = Vec::with_capacity(s.cells.row_count().min(1024));
         let mut cache = MatchCache::new();
 
@@ -306,19 +313,19 @@ impl CellStore {
                     KIND_STRING => cache.matches(
                         &self.strings,
                         payload_str_id(payloads[row]),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
                     KIND_NUMBER => number_matches_text(
                         payload_num(payloads[row]),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
                     KIND_BOOL => matches_needle(
                         boolean_text(payload_num(payloads[row]) != 0.0),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     ),
@@ -327,7 +334,7 @@ impl CellStore {
                         s,
                         self,
                         base + row,
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                         &mut cache,
@@ -350,7 +357,7 @@ impl CellStore {
                     cache.matches(
                         &self.strings,
                         payload_str_id(payload),
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                     )
@@ -361,7 +368,7 @@ impl CellStore {
                         s,
                         self,
                         index,
-                        &needle,
+                        &lower_needle,
                         FILTER_CASE_INSENSITIVE,
                         FILTER_WHOLE_CELL,
                         &mut cache,
@@ -420,10 +427,10 @@ impl CellStore {
         if next < 0 || next as usize > last {
             return if step < 0 { 0 } else { last as u32 };
         }
-        let next = next as usize;
+        let next_index = next as usize;
 
-        if occupied(pos) && occupied(next) {
-            let mut p = next;
+        if occupied(pos) && occupied(next_index) {
+            let mut p = next_index;
             loop {
                 let ahead = p as isize + step;
                 if ahead < 0 || ahead as usize > last || !occupied(ahead as usize) {
@@ -433,7 +440,7 @@ impl CellStore {
             }
         }
 
-        let mut p = next as isize;
+        let mut p = next_index as isize;
         while p >= 0 && p as usize <= last {
             if occupied(p as usize) {
                 return p as u32;
@@ -462,7 +469,7 @@ impl CellStore {
         let needle = if case_insensitive {
             query.to_lowercase()
         } else {
-            query.to_string()
+            query.to_owned()
         };
         if needle.is_empty() {
             return Vec::new();
@@ -550,23 +557,128 @@ impl CellStore {
             }
             start = run.end;
         }
-        let keys = keys.rank();
+        let ranked = keys.rank();
 
-        let mut order: Vec<u32> = (0..s.cells.row_count() as u32).collect();
-        order.sort_unstable_by(|&a, &b| {
-            let ord = keys.compare(a as usize, b as usize, ascending);
-            if ord == Ordering::Equal {
-                a.cmp(&b)
-            } else {
-                ord
-            }
-        });
-        order
+        // The row in the low bits breaks ties, so equal rows keep their order.
+        let mut packed: Vec<u128> = (0..s.cells.row_count())
+            .map(|row| ranked.packed(row, ascending) | row as u128)
+            .collect();
+        sort_u128(&mut packed);
+        packed.into_iter().map(key_index).collect()
     }
+
+    /// The ranked sort keys of `rows` in `cols`, key-major: key `k` of the
+    /// row at position `p` is `k * rows.len() + p`.
+    fn ranked_row_keys(&self, data: &SheetData, cols: &[u32], rows: &[u32]) -> SortKeys {
+        let row_count = rows.len();
+        // Decorate-sort-undecorate per key, the same way the one-key path does:
+        // a comparison sort that rebuilt both operands would reconstruct each
+        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
+        // every time. Keys are stored key-major so the first key — the one that
+        // decides nearly every comparison — stays contiguous.
+        let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
+        for &col in cols {
+            let base = col as usize * data.cells.row_count();
+
+            let mut cached_run: Option<CellRun<'_>> = None;
+            for &row in rows {
+                let index = base + row as usize;
+                let run = cached_run
+                    .get_or_insert_with(|| data.cells.run(index, base + data.cells.row_count()));
+                if index < run.start || index >= run.end {
+                    *run = data.cells.run(index, base + data.cells.row_count());
+                }
+                keys.push(ComparableCell::from_run(
+                    data,
+                    &self.strings,
+                    run,
+                    index,
+                    &self.formula_slots,
+                ));
+            }
+        }
+        keys.rank()
+    }
+}
+
+/// Positions `0..rows.len()` sorted by `key_count` keys, then by row.
+///
+/// Starts in row order and sorts by the first key; then each run of
+/// positions that tie on every key so far is sorted by the next key, with
+/// the position's place in its run as the tie-break. That is the order of a
+/// stable sort by all keys, and most rows never compare a second key.
+fn sort_positions_by_keys(
+    ranked: &SortKeys,
+    rows: &[u32],
+    key_count: usize,
+    ascending: &[u8],
+) -> Vec<u32> {
+    let row_count = rows.len();
+    let mut positions: Vec<u32> = if rows.is_sorted() {
+        (0..row_count as u32).collect()
+    } else {
+        let mut by_row: Vec<u64> = rows
+            .iter()
+            .enumerate()
+            .map(|(position, &row)| u64::from(row) << 32 | position as u64)
+            .collect();
+        sort_u64(&mut by_row);
+        by_row.into_iter().map(|key| key as u32).collect()
+    };
+
+    let mut runs = vec![(0, row_count)];
+    let mut next_runs = Vec::new();
+    let mut packed = Vec::new();
+    let mut sorted = Vec::new();
+    for key in 0..key_count {
+        let key_ascending = ascending.get(key).copied().unwrap_or(1) != 0;
+        let last_key = key + 1 == key_count;
+        next_runs.clear();
+        for &(start, end) in &runs {
+            packed.clear();
+            packed.extend(
+                positions[start..end]
+                    .iter()
+                    .enumerate()
+                    .map(|(slot, &position)| {
+                        ranked.packed(key * row_count + position as usize, key_ascending)
+                            | slot as u128
+                    }),
+            );
+            sort_u128(&mut packed);
+            sorted.clear();
+            sorted.extend(
+                packed
+                    .iter()
+                    .map(|&packed_key| positions[start + key_index(packed_key) as usize]),
+            );
+            positions[start..end].copy_from_slice(&sorted);
+            if last_key {
+                continue;
+            }
+            // Runs of equal keys: the packed keys differ only in the slot.
+            let mut run_start = 0;
+            for slot in 1..=packed.len() {
+                if slot == packed.len() || packed[slot] >> 32 != packed[run_start] >> 32 {
+                    if slot - run_start > 1 {
+                        next_runs.push((start + run_start, start + slot));
+                    }
+                    run_start = slot;
+                }
+            }
+        }
+        std::mem::swap(&mut runs, &mut next_runs);
+    }
+    positions
 }
 
 #[wasm_bindgen]
 impl CellStore {
+    /// The rows of `sheet` sorted by the columns `cols`, the first column
+    /// deciding first. Key `i` sorts ascending unless `ascending[i]` is 0; a
+    /// missing entry sorts ascending. When `candidates` is not empty, only
+    /// those rows take part. Equal rows keep their order. Empty when the
+    /// sheet or a column does not exist.
     #[wasm_bindgen(js_name = sortRowsMulti)]
     pub fn sort_rows_multi(
         &self,
@@ -600,56 +712,27 @@ impl CellStore {
                 .filter(|&row| (row as usize) < data.cells.row_count())
                 .collect()
         };
-        let row_count = rows.len();
-        // Decorate-sort-undecorate per key, the same way the one-key path does:
-        // a comparison sort that rebuilt both operands would reconstruct each
-        // key ~2·n·log2(n) times, and a text key costs a scattered pool deref
-        // every time. Keys are stored key-major so the first key — the one that
-        // decides nearly every comparison — stays contiguous.
-        let mut keys = SortKeyBuilder::with_capacity(row_count * cols.len());
-        for &col in cols {
-            let base = col as usize * data.cells.row_count();
+        let ranked = self.ranked_row_keys(data, cols, &rows);
 
-            let mut cached_run: Option<CellRun<'_>> = None;
-            for &row in &rows {
-                let index = base + row as usize;
-                let run = cached_run
-                    .get_or_insert_with(|| data.cells.run(index, base + data.cells.row_count()));
-                if index < run.start || index >= run.end {
-                    *run = data.cells.run(index, base + data.cells.row_count());
-                }
-                keys.push(ComparableCell::from_run(
-                    data,
-                    &self.strings,
-                    run,
-                    index,
-                    &self.formula_slots,
-                ));
-            }
-        }
-        let keys = keys.rank();
-
-        let mut positions: Vec<u32> = (0..row_count as u32).collect();
-        // NaN keys compare equal to other numeric keys; a stable sort preserves ties.
-        positions.sort_by(|&left, &right| {
-            for key in 0..cols.len() {
-                let order = keys.compare(
-                    key * row_count + left as usize,
-                    key * row_count + right as usize,
-                    ascending.get(key).copied().unwrap_or(1) != 0,
-                );
-                if order != Ordering::Equal {
-                    return order;
-                }
-            }
-            rows[left as usize].cmp(&rows[right as usize])
-        });
-        positions
+        sort_positions_by_keys(&ranked, &rows, cols.len(), ascending)
             .into_iter()
             .map(|position| rows[position as usize])
             .collect()
     }
 
+    /// The rows of `sheet` that pass every column filter. Filter `i` reads
+    /// column `cols[i]`, and `kinds[i]` says what it keeps:
+    ///
+    /// - 0, a value list: its next `num_counts[i]` numbers in `value_nums` and
+    ///   next `text_counts[i]` texts in `value_texts` (booleans as `\0TRUE` and
+    ///   `\0FALSE`); bit 1 of `flags[i]` also keeps empty cells.
+    /// - 1, text that contains its one text in `value_texts`; `flags[i]` 1
+    ///   matches case.
+    /// - 2, numbers compared with `nums[i]`; `flags[i]` is 0 `>`, 1 `>=`, 2 `<`,
+    ///   3 `<=`, 4 `=`, anything else `<>`.
+    /// - 3, empty cells; 4, cells that are not empty.
+    ///
+    /// Empty when the sheet or a column does not exist.
     #[wasm_bindgen(js_name = filterRowsMulti)]
     #[expect(
         clippy::too_many_arguments,
@@ -680,8 +763,8 @@ impl CellStore {
         for i in 0..cols.len() {
             num_offsets.push(no);
             text_offsets.push(to);
-            no = no.saturating_add(num_counts.get(i).copied().unwrap_or(0) as usize);
-            to = to.saturating_add(text_counts.get(i).copied().unwrap_or(0) as usize);
+            no = no.saturating_add(num_counts.get(i).copied().unwrap_or_default() as usize);
+            to = to.saturating_add(text_counts.get(i).copied().unwrap_or_default() as usize);
         }
         let mut cache_index = vec![usize::MAX; kinds.len()];
         let mut match_caches = Vec::with_capacity(kinds.iter().filter(|&&kind| kind == 1).count());
@@ -703,8 +786,8 @@ impl CellStore {
                 value_sets.push(ValueSet::Linear);
                 continue;
             }
-            let num_count = num_counts.get(i).copied().unwrap_or(0) as usize;
-            let text_count = text_counts.get(i).copied().unwrap_or(0) as usize;
+            let num_count = num_counts.get(i).copied().unwrap_or_default() as usize;
+            let text_count = text_counts.get(i).copied().unwrap_or_default() as usize;
             let picked_numbers = value_nums
                 .get(num_offsets[i]..num_offsets[i] + num_count)
                 .unwrap_or_default();
@@ -720,9 +803,10 @@ impl CellStore {
                 let kind = resolved_kind(data, index, &self.formula_slots);
                 let matches = match kinds[i] {
                     0 => {
-                        let mut hit = kind == 0 && flags.get(i).copied().unwrap_or(0) & 1 != 0;
-                        let nc = num_counts.get(i).copied().unwrap_or(0) as usize;
-                        let tc = text_counts.get(i).copied().unwrap_or(0) as usize;
+                        let mut hit =
+                            kind == 0 && flags.get(i).copied().unwrap_or_default() & 1 != 0;
+                        let nc = num_counts.get(i).copied().unwrap_or_default() as usize;
+                        let tc = text_counts.get(i).copied().unwrap_or_default() as usize;
                         match &value_sets[i] {
                             ValueSet::Linear => {
                                 if kind == 1 {
@@ -731,7 +815,7 @@ impl CellStore {
                                     {
                                         hit |= value_nums
                                             .get(num_offsets[i]..num_offsets[i] + nc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .contains(&value);
                                     }
                                 } else if kind == 2 {
@@ -743,7 +827,7 @@ impl CellStore {
                                     ) {
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .iter()
                                             .any(|picked| picked == text);
                                     }
@@ -758,7 +842,7 @@ impl CellStore {
                                         };
                                         hit |= value_texts
                                             .get(text_offsets[i]..text_offsets[i] + tc)
-                                            .unwrap_or(&[])
+                                            .unwrap_or_default()
                                             .iter()
                                             .any(|picked| picked == expected);
                                     }
@@ -805,26 +889,26 @@ impl CellStore {
                         let needle = value_texts
                             .get(text_offsets[i])
                             .map(String::as_str)
-                            .unwrap_or("");
+                            .unwrap_or_default();
                         cell_matches_text(
                             data,
                             self,
                             index,
                             needle,
-                            flags.get(i).copied().unwrap_or(0) == 0,
+                            flags.get(i).copied().unwrap_or_default() == 0,
                             false,
                             &mut match_caches[cache_index[i]],
                         )
                     }
                     2 => {
                         numeric_cell_value(data, index, &self.formula_slots).is_some_and(|value| {
-                            match flags.get(i).copied().unwrap_or(0) {
-                                0 => value > nums.get(i).copied().unwrap_or(0.0),
-                                1 => value >= nums.get(i).copied().unwrap_or(0.0),
-                                2 => value < nums.get(i).copied().unwrap_or(0.0),
-                                3 => value <= nums.get(i).copied().unwrap_or(0.0),
-                                4 => value == nums.get(i).copied().unwrap_or(0.0),
-                                _ => value != nums.get(i).copied().unwrap_or(0.0),
+                            match flags.get(i).copied().unwrap_or_default() {
+                                0 => value > nums.get(i).copied().unwrap_or_default(),
+                                1 => value >= nums.get(i).copied().unwrap_or_default(),
+                                2 => value < nums.get(i).copied().unwrap_or_default(),
+                                3 => value <= nums.get(i).copied().unwrap_or_default(),
+                                4 => value == nums.get(i).copied().unwrap_or_default(),
+                                _ => value != nums.get(i).copied().unwrap_or_default(),
                             }
                         })
                     }
@@ -841,8 +925,29 @@ impl CellStore {
         out
     }
 
+    /// Distinct resolved values of a whole column, in first-seen order.
     #[wasm_bindgen(js_name = distinctValues)]
     pub fn distinct_values(&self, sheet: usize, col: usize, limit: usize) -> DistinctColumn {
+        self.distinct_values_in_rows(sheet, col, 0, usize::MAX, limit)
+    }
+
+    /// Distinct resolved values of one column over the canonical data rows
+    /// `start_row..end_row`, in first-seen order. The range is clipped to the
+    /// sheet. A zero `limit` returns every value; otherwise the scan stops at
+    /// `limit` values.
+    #[wasm_bindgen(js_name = distinctValuesInRows)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars"
+    )]
+    pub fn distinct_values_in_rows(
+        &self,
+        sheet: usize,
+        col: usize,
+        start_row: usize,
+        end_row: usize,
+        limit: usize,
+    ) -> DistinctColumn {
         let mut out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
             return out;
@@ -850,8 +955,10 @@ impl CellStore {
         if col >= data.cells.n_cols() {
             return out;
         }
+        let row_count = data.cells.row_count();
+        let rows = start_row.min(row_count)..end_row.min(row_count);
         let text_at = |index: usize| {
-            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or("")
+            resolved_text(data, &self.strings, index, &self.formula_slots).unwrap_or_default()
         };
         // Stored text carries a pool id that stands for its value, so the scan
         // dedupes it through one bit per id instead of hashing the characters.
@@ -863,15 +970,15 @@ impl CellStore {
         loop {
             out = DistinctColumn::default();
             let mut stamps = PoolIdStamps::new();
-            let mut seen: HashSet<DistinctKey<'_>> = HashSet::new();
+            let mut seen: FxHashSet<DistinctKey<'_>> = FxHashSet::default();
             let mut needs_content = false;
-            for row in 0..data.cells.row_count() {
+            for row in rows.clone() {
                 let index = col * data.cells.row_count() + row;
                 let kind = resolved_kind(data, index, &self.formula_slots);
                 let fresh = match kind {
                     1 => seen.insert(DistinctKey::Number(
                         numeric_cell_value(data, index, &self.formula_slots)
-                            .unwrap_or(0.0)
+                            .unwrap_or_default()
                             .to_bits(),
                     )),
                     2 if pooled => match data.cells.str_id_at(index) {
@@ -883,7 +990,7 @@ impl CellStore {
                     },
                     2 => seen.insert(DistinctKey::Text(text_at(index))),
                     3 => seen.insert(DistinctKey::Bool(
-                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false),
+                        boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
                     )),
                     _ => seen.insert(DistinctKey::Blank),
                 };
@@ -892,11 +999,13 @@ impl CellStore {
                 }
                 out.kinds.push(kind);
                 if kind == 1 {
-                    out.numbers
-                        .push(numeric_cell_value(data, index, &self.formula_slots).unwrap_or(0.0));
+                    out.numbers.push(
+                        numeric_cell_value(data, index, &self.formula_slots).unwrap_or_default(),
+                    );
                 } else if kind == 3 {
                     out.numbers.push(
-                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or(false) {
+                        if boolean_cell_value(data, index, &self.formula_slots).unwrap_or_default()
+                        {
                             1.0
                         } else {
                             0.0
@@ -922,6 +1031,11 @@ impl CellStore {
         out
     }
 
+    /// `dataEdge` in a view order, where `order[i]` is the data row shown at
+    /// view position `i` and `row` is a view position. A vertical move scans
+    /// view positions and returns one; a horizontal move returns a column, as
+    /// `dataEdge` does on the data row at `row`. 0 when the sheet, the
+    /// position or the column does not exist.
     #[wasm_bindgen(js_name = dataEdgeOrdered)]
     pub fn data_edge_ordered(
         &self,
@@ -946,10 +1060,10 @@ impl CellStore {
         let column = data.cells.dense_column(col);
         let occupied = |view: usize| {
             order.get(view).is_some_and(|&r| {
-                let r = r as usize;
-                let index = col * data.cells.row_count() + r;
-                r < data.cells.row_count()
-                    && match column.map(|column| column.raw_kind(r)) {
+                let data_row = r as usize;
+                let index = col * data.cells.row_count() + data_row;
+                data_row < data.cells.row_count()
+                    && match column.map(|dense| dense.raw_kind(data_row)) {
                         Some(KIND_NUMBER | KIND_STRING | KIND_BOOL) => true,
                         Some(KIND_EMPTY) => false,
                         _ => resolved_kind(data, index, &self.formula_slots) != 0,
@@ -983,7 +1097,7 @@ fn resolved_kind(sheet: &SheetData, index: usize, slots: &FormulaStore) -> u8 {
     }
 }
 
-fn boolean_text(value: bool) -> &'static str {
+const fn boolean_text(value: bool) -> &'static str {
     if value {
         "TRUE"
     } else {
@@ -1026,7 +1140,7 @@ fn resolved_text<'a>(
 
 /// Distinct-value scan result for one column: parallel kind/number/text
 /// arrays whose buffers are surrendered once through the `take*` accessors.
-#[derive(Default)]
+#[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
     kinds: Vec<u8>,
@@ -1109,12 +1223,12 @@ pub(crate) fn matches_needle(
     }
 
     if hay.is_ascii() && needle.is_ascii() {
-        let hay = hay.as_bytes();
-        let needle = needle.as_bytes();
+        let hay_bytes = hay.as_bytes();
+        let needle_bytes = needle.as_bytes();
         return if whole_cell {
-            hay.eq_ignore_ascii_case(needle)
+            hay_bytes.eq_ignore_ascii_case(needle_bytes)
         } else {
-            ascii_contains_ignore_case(hay, needle)
+            ascii_contains_ignore_case(hay_bytes, needle_bytes)
         };
     }
 
@@ -1144,57 +1258,32 @@ pub(crate) fn ascii_contains_ignore_case(hay: &[u8], needle: &[u8]) -> bool {
     })
 }
 
-/// Match a numeric cell's textual form against `needle` without the per-cell
-/// `f64::to_string` heap allocation. Formatting uses a stack buffer and falls
-/// back to an owned string on overflow so results stay correct.
+/// Match a numeric cell's textual form against `needle`. The text is the
+/// one `f64::to_string` gives, written on the stack so a cell does not
+/// allocate.
 pub(crate) fn number_matches_text(
     value: f64,
     needle: &str,
     case_insensitive: bool,
     whole_cell: bool,
 ) -> bool {
-    use std::fmt::Write as _;
-
-    let mut buf = NumBuf::new();
-    if write!(buf, "{value}").is_ok() {
-        matches_needle(buf.as_str(), needle, case_insensitive, whole_cell)
-    } else {
-        matches_needle(&value.to_string(), needle, case_insensitive, whole_cell)
+    // A finite number's text has only digits, `-` and `.`, none of which
+    // has a case: a needle with any other character cannot match it, so the
+    // number is not written out.
+    if value.is_finite() && !needle.bytes().all(is_number_text_byte) {
+        return false;
     }
+
+    matches_needle(
+        NumberText::of(value).as_str(),
+        needle,
+        case_insensitive,
+        whole_cell,
+    )
 }
 
-/// Fixed stack buffer implementing [`std::fmt::Write`], used to format an `f64`
-/// off the heap. Overflow reports an error so the caller can fall back to an owned string.
-pub(crate) struct NumBuf {
-    buf: [u8; 32],
-    len: usize,
-}
-
-impl NumBuf {
-    pub(crate) fn new() -> Self {
-        Self {
-            buf: [0; 32],
-            len: 0,
-        }
-    }
-
-    pub(crate) fn as_str(&self) -> &str {
-        // `write_str` only appends ASCII float text, so the bytes are valid UTF-8.
-        std::str::from_utf8(&self.buf[..self.len]).unwrap_or("")
-    }
-}
-
-impl std::fmt::Write for NumBuf {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        let bytes = s.as_bytes();
-        let end = self.len + bytes.len();
-        if end > self.buf.len() {
-            return Err(std::fmt::Error);
-        }
-        self.buf[self.len..end].copy_from_slice(bytes);
-        self.len = end;
-        Ok(())
-    }
+const fn is_number_text_byte(byte: u8) -> bool {
+    byte.is_ascii_digit() || byte == b'-' || byte == b'.'
 }
 
 /// Number of direct-mapped slots in [`MatchCache`]. A power of two so the slot
@@ -1214,7 +1303,7 @@ pub(crate) struct MatchCache {
 }
 
 impl MatchCache {
-    pub(crate) fn new() -> Self {
+    pub(crate) const fn new() -> Self {
         // `NO_STRING` (u32::MAX) is the empty sentinel: a real pool id never
         // reaches it, so an untouched slot never spuriously reports a hit.
         Self {
@@ -1320,47 +1409,23 @@ fn sort_finite_number_column_comparison(
     base: usize,
     ascending: bool,
 ) -> Option<Vec<u32>> {
-    let mut order = Vec::with_capacity(sheet.cells.row_count());
+    // Each row's key holds its value's order above the row, so the sort reads
+    // no cells and equal values keep their row order in both directions.
+    let mut packed: Vec<u128> = Vec::with_capacity(sheet.cells.row_count());
     let end = base + sheet.cells.row_count();
     let mut start = base;
     while start < end {
         let run = sheet.cells.run(start, end);
         for index in run.start..run.end {
             let value = source_number_in_run(&run, index, sheet.cells.is_paged())?;
-            if !value.is_finite() {
-                return None;
-            }
-            order.push((index - base) as u32);
+            let key = finite_number_sort_key(value)?;
+            let directed = if ascending { key } else { !key };
+            packed.push(u128::from(directed) << 32 | (index - base) as u128);
         }
         start = run.end;
     }
-
-    order.sort_unstable_by(|&a, &b| {
-        let (left, right) = if sheet.cells.is_paged() {
-            (
-                sheet.cells.num_at(base + a as usize),
-                sheet.cells.num_at(base + b as usize),
-            )
-        } else {
-            // SAFETY: This is dense storage. Every row in `order` is below
-            // row_count, so base + row stays within this column's payload
-            // buffer, whose range is base..base + row_count.
-            unsafe {
-                (
-                    f64::from_bits(sheet.cells.payload_unchecked(base + a as usize)),
-                    f64::from_bits(sheet.cells.payload_unchecked(base + b as usize)),
-                )
-            }
-        };
-        let ord = left.partial_cmp(&right).unwrap_or(Ordering::Equal);
-        let ord = if ascending { ord } else { ord.reverse() };
-        if ord == Ordering::Equal {
-            a.cmp(&b)
-        } else {
-            ord
-        }
-    });
-    Some(order)
+    sort_u128(&mut packed);
+    Some(packed.into_iter().map(key_index).collect())
 }
 
 fn sort_finite_number_column_radix(
@@ -1406,14 +1471,19 @@ fn sort_finite_number_column_radix(
 }
 
 fn finite_number_sort_key(value: f64) -> Option<u64> {
-    if !value.is_finite() {
-        return None;
-    }
+    value.is_finite().then(|| number_order_bits(value))
+}
 
+/// Bits whose unsigned order is the order of `value`s, with -0 equal to 0.
+fn number_order_bits(value: f64) -> u64 {
+    const SIGN: u64 = 1 << 63;
     let normalized = if value == 0.0 { 0.0 } else { value };
     let bits = normalized.to_bits();
-    const SIGN: u64 = 1 << 63;
-    Some(if bits & SIGN == 0 { bits ^ SIGN } else { !bits })
+    if bits & SIGN == 0 {
+        bits ^ SIGN
+    } else {
+        !bits
+    }
 }
 
 fn radix_sort_numeric_pairs(pairs: &mut [NumericSortPair]) {
@@ -1479,9 +1549,9 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
     if next < 0 || next as usize > last {
         return if step < 0 { 0 } else { last };
     }
-    let next = next as usize;
-    if occupied(pos) && occupied(next) {
-        pos = next;
+    let next_index = next as usize;
+    if occupied(pos) && occupied(next_index) {
+        pos = next_index;
         loop {
             let ahead = pos as isize + step;
             if ahead < 0 || ahead as usize > last || !occupied(ahead as usize) {
@@ -1490,7 +1560,7 @@ fn edge_scan(mut pos: usize, limit: usize, step: isize, occupied: impl Fn(usize)
             pos = ahead as usize;
         }
     }
-    let mut candidate = next as isize;
+    let mut candidate = next_index as isize;
     while candidate >= 0 && candidate as usize <= last {
         if occupied(candidate as usize) {
             return candidate as usize;
@@ -1566,13 +1636,13 @@ impl<'a> ComparableCell<'a> {
         if sheet.cells.is_paged() {
             return Self::from_cell(sheet, strings, index, slots);
         }
-        let (kind, payload) = run.source(index);
+        let (source_kind, source_payload) = run.source(index);
         // Spill owners install calculated output in these same dense slots.
         // Read the bounded run directly; ownership needs no per-row hash probe.
-        let (kind, payload) = if kind == KIND_EMPTY {
+        let (kind, payload) = if source_kind == KIND_EMPTY {
             run.resolved(index)
         } else {
-            (kind, payload)
+            (source_kind, source_payload)
         };
         match kind {
             KIND_NUMBER => Self::Number(OrderedNumber(f64::from_bits(payload))),
@@ -1681,27 +1751,12 @@ impl SortKeyBuilder {
         index
     }
 
-    /// Bytes allocated for collation: the arena, the distinct-text spans and
-    /// the pool-id table.
-    #[cfg(test)]
-    pub(crate) fn collation_bytes(&self) -> usize {
-        self.arena.capacity()
-            + self.texts.capacity() * std::mem::size_of::<CollatedText>()
-            + self.text_by_pool_id.capacity() * std::mem::size_of::<u32>()
-    }
-
-    /// Bytes of collation keys in the arena.
-    #[cfg(test)]
-    pub(crate) fn arena_len(&self) -> usize {
-        self.arena.len()
-    }
-
     /// Sort the distinct strings once and give each its rank in collation
     /// order; equal keys get equal ranks. Rows then compare text by rank, so
     /// the row sort makes no byte comparison. The arena is dropped here.
     pub(crate) fn rank(mut self) -> SortKeys {
         let mut order: Vec<u32> = (0..self.texts.len() as u32).collect();
-        order.sort_unstable_by(|&a, &b| self.collation_cmp(a, b));
+        sort_indices_by(&mut order, &mut |a, b| self.collation_cmp(a, b));
 
         let mut ranks = vec![0u32; self.texts.len()];
         let mut rank = 0u32;
@@ -1725,11 +1780,13 @@ impl SortKeyBuilder {
     }
 
     fn collation_cmp(&self, a: u32, b: u32) -> Ordering {
-        let a = self.texts[a as usize];
-        let b = self.texts[b as usize];
-        let a_key = &self.arena[a.start as usize..a.end as usize];
-        let b_key = &self.arena[b.start as usize..b.end as usize];
-        a_key.cmp(b_key).then(a.has_hyphen.cmp(&b.has_hyphen))
+        let a_text = self.texts[a as usize];
+        let b_text = self.texts[b as usize];
+        let a_key = &self.arena[a_text.start as usize..a_text.end as usize];
+        let b_key = &self.arena[b_text.start as usize..b_text.end as usize];
+        a_key
+            .cmp(b_key)
+            .then(a_text.has_hyphen.cmp(&b_text.has_hyphen))
     }
 }
 
@@ -1742,9 +1799,33 @@ pub(crate) struct SortKeys {
 }
 
 impl SortKeys {
+    /// Key `key` as an integer whose unsigned order is [`Self::compare`]'s
+    /// order, shifted left 32 bits to leave room for a tie-break: the class
+    /// above a value (a number's order-preserving bits, a text rank, 0 or 1
+    /// for a logical value, 0 for an error). Descending flips both, except
+    /// for blank cells, which stay last. A NaN number (only `setNumber` can
+    /// store one) sorts after every other number, where `compare` calls it
+    /// equal to all of them.
+    pub(crate) fn packed(&self, key: usize, ascending: bool) -> u128 {
+        let class = self.classes[key];
+        let value = match class {
+            CLASS_NUMBER => number_order_bits(f64::from_bits(self.values[key])),
+            CLASS_ERROR | CLASS_EMPTY => 0,
+            _ => self.values[key],
+        };
+        let (directed_class, directed_value) = if ascending || class == CLASS_EMPTY {
+            (class, value)
+        } else {
+            (CLASS_ERROR - class, !value)
+        };
+        (u128::from(directed_class) << 64 | u128::from(directed_value)) << 32
+    }
+
     /// Excel's sort order of keys `left` and `right`: numbers, text, `FALSE`
     /// before `TRUE`, then errors, which are all equal. A descending sort
     /// reverses this order, but blank cells are last in both directions.
+    /// The sorts use [`Self::packed`]; tests check it against this.
+    #[cfg(test)]
     pub(crate) fn compare(&self, left: usize, right: usize, ascending: bool) -> Ordering {
         let class_left = self.classes[left];
         let class_right = self.classes[right];
@@ -1784,5 +1865,152 @@ impl Ord for OrderedNumber {
 impl PartialOrd for OrderedNumber {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
+    }
+}
+
+#[cfg(test)]
+mod packed_order_tests {
+    use super::*;
+
+    const ROWS: usize = 600;
+    const COLUMNS: usize = 3;
+    const CASES: usize = 40;
+    const TEXTS: [&str; 9] = ["a", "A", "b", "co-op", "coop", "Co-op", "", "ß", "item-2"];
+    const NUMBERS: [f64; 8] = [0.0, -0.0, 1.5, -1.5, 1e300, -1e-300, 2.0, 1.5];
+    const FORMULAS: [&str; 4] = ["=1/0", "=NA()", "=-0", "=\"A\""];
+    const KINDS: usize = 6;
+    const SEED: u64 = 0x5eed;
+    const LCG_MULTIPLIER: u64 = 6_364_136_223_846_793_005;
+
+    struct Random(u64);
+
+    impl Random {
+        fn below(&mut self, bound: usize) -> usize {
+            self.0 = self.0.wrapping_mul(LCG_MULTIPLIER).wrapping_add(1);
+            ((self.0 >> 33) as usize) % bound
+        }
+    }
+
+    /// Numbers, text, logical values, formula results (errors among them)
+    /// and blanks, from few distinct values, so many rows tie on a key.
+    fn mixed_store(random: &mut Random) -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(COLUMNS, ROWS);
+        for col in 0..COLUMNS {
+            for row in 0..ROWS {
+                match random.below(KINDS) {
+                    0 | 1 => {
+                        let number = NUMBERS[random.below(NUMBERS.len())];
+                        store.set_number(sheet, row, col, number, 0);
+                    }
+                    2 => store.set_string(sheet, row, col, TEXTS[random.below(TEXTS.len())], 0),
+                    3 => store.set_bool(sheet, row, col, random.below(2) == 0, 0),
+                    4 => {
+                        let formula = FORMULAS[random.below(FORMULAS.len())];
+                        store.set_formula(sheet, row, col, formula, 0);
+                    }
+                    _ => {}
+                }
+            }
+        }
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    /// A stable sort by [`SortKeys::compare`], key by key, then by row: the
+    /// order the row sorts gave before they packed their keys.
+    fn compared_order(
+        store: &CellStore,
+        sheet: usize,
+        cols: &[u32],
+        ascending: &[u8],
+        rows: &[u32],
+    ) -> Vec<u32> {
+        let ranked = store.ranked_row_keys(&store.sheets[sheet], cols, rows);
+        let mut positions: Vec<usize> = (0..rows.len()).collect();
+        positions.sort_by(|&left, &right| {
+            (0..cols.len())
+                .map(|key| {
+                    ranked.compare(
+                        key * rows.len() + left,
+                        key * rows.len() + right,
+                        ascending[key] != 0,
+                    )
+                })
+                .find(|order| order.is_ne())
+                .unwrap_or_else(|| rows[left].cmp(&rows[right]))
+        });
+        positions
+            .into_iter()
+            .map(|position| rows[position])
+            .collect()
+    }
+
+    #[test]
+    fn packed_keys_sort_rows_in_the_compared_order() {
+        let mut random = Random(SEED);
+        for _ in 0..CASES {
+            let (store, sheet) = mixed_store(&mut random);
+            let key_count = 1 + random.below(COLUMNS);
+            let cols: Vec<u32> = (0..key_count)
+                .map(|_| random.below(COLUMNS) as u32)
+                .collect();
+            let ascending: Vec<u8> = (0..key_count).map(|_| random.below(2) as u8).collect();
+            let all_rows: Vec<u32> = (0..ROWS as u32).collect();
+            let mut candidates: Vec<u32> = all_rows
+                .iter()
+                .copied()
+                .filter(|_| random.below(3) > 0)
+                .collect();
+            for index in (1..candidates.len()).rev() {
+                candidates.swap(index, random.below(index + 1));
+            }
+
+            assert_eq!(
+                store.sort_rows_multi(sheet, &cols, &ascending, &candidates),
+                compared_order(&store, sheet, &cols, &ascending, &candidates),
+                "keys {cols:?}, ascending {ascending:?}, shuffled candidates"
+            );
+            assert_eq!(
+                store.sort_rows_multi(sheet, &cols, &ascending, &[]),
+                compared_order(&store, sheet, &cols, &ascending, &all_rows),
+                "keys {cols:?}, ascending {ascending:?}, all rows"
+            );
+            assert_eq!(
+                store.sort_rows(sheet, cols[0] as usize, ascending[0] != 0),
+                compared_order(&store, sheet, &cols[..1], &ascending[..1], &all_rows),
+                "one key {}, ascending {}",
+                cols[0],
+                ascending[0]
+            );
+        }
+    }
+
+    #[test]
+    fn a_stored_nan_sorts_after_every_other_number() {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, 4);
+        for (row, value) in [f64::NAN, f64::INFINITY, 1.0, f64::NEG_INFINITY]
+            .into_iter()
+            .enumerate()
+        {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        store.set_string(sheet, 3, 0, "text", 0);
+        assert_eq!(store.sort_rows(sheet, 0, true), vec![2, 1, 0, 3]);
+        assert_eq!(store.sort_rows(sheet, 0, false), vec![3, 0, 1, 2]);
+    }
+
+    #[test]
+    fn number_columns_sort_by_value_then_row_in_both_directions() {
+        // Below the radix threshold, so the comparison path sorts.
+        let values = [2.0, -0.0, 0.0, -3.5, 2.0, 1e-300];
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(1, values.len());
+        for (row, &value) in values.iter().enumerate() {
+            store.set_number(sheet, row, 0, value, 0);
+        }
+        assert_eq!(store.sort_rows(sheet, 0, true), vec![3, 1, 2, 5, 0, 4]);
+        assert_eq!(store.sort_rows(sheet, 0, false), vec![0, 4, 5, 1, 2, 3]);
     }
 }

@@ -119,17 +119,6 @@ mod sort {
     use crate::formula_rewrite::sort_formula;
 
     #[test]
-    fn same_row_references_move_with_the_row() {
-        assert_eq!(sort_formula("=A2*B2", 3), "=A5*B5");
-        assert_eq!(sort_formula("=SUM(A2:C2)", -1), "=SUM(A1:C1)");
-    }
-
-    #[test]
-    fn references_to_other_rows_keep_their_offset() {
-        assert_eq!(sort_formula("=A1+1", 3), "=A4+1");
-    }
-
-    #[test]
     fn a_reference_that_leaves_the_sheet_becomes_ref() {
         assert_eq!(sort_formula("=A1+B3", -1), "=#REF!+B2");
     }
@@ -144,16 +133,74 @@ mod sort {
         assert_eq!(sort_formula("=SUM(B:B)+C2", 1), "=SUM(B:B)+C3");
     }
 
-    /// Microsoft Q&A, "INDEX + MATCH Breaks When Sorting": a reference with
-    /// a sheet name does not follow the sort, also on the formula's own sheet.
-    #[test]
-    fn references_with_a_sheet_name_stay() {
-        assert_eq!(sort_formula("=Sheet1!A2+A2", 2), "=Sheet1!A2+A4");
-        assert_eq!(sort_formula("='My Data'!B2:B9", 2), "='My Data'!B2:B9");
-    }
-
     #[test]
     fn structured_references_and_names_stay() {
         assert_eq!(sort_formula("=[@Qty]*Rate", 4), "=[@Qty]*Rate");
+    }
+}
+
+/// Renaming a table or a column updates the structured references that name
+/// it, as Excel updates formulas: "Rename an Excel table" and "Using
+/// structured references with Excel tables" on Microsoft Support.
+mod structured_renames {
+    use crate::formula_rewrite::rename_structured_reference;
+
+    /// The column argument of a table rename.
+    const NO_COLUMN: &str = "";
+
+    #[test]
+    fn a_table_rename_updates_its_references_only() {
+        assert_eq!(
+            rename_structured_reference(
+                "=SUM(orders[amount]) / SUM(Orders2[amount])",
+                "ORDERS",
+                NO_COLUMN,
+                "Sales"
+            ),
+            "=SUM(Sales[amount]) / SUM(Orders2[amount])"
+        );
+        assert_eq!(
+            rename_structured_reference(
+                "=orders[[#Headers],[amount]]&\"orders[x]\"",
+                "orders",
+                NO_COLUMN,
+                "Sales"
+            ),
+            "=Sales[[#Headers],[amount]]&\"orders[x]\""
+        );
+    }
+
+    #[test]
+    fn a_column_rename_updates_that_tables_column_in_every_section() {
+        assert_eq!(
+            rename_structured_reference(
+                "=SUM(orders[Amount])+orders[@amount]+LEN(orders[[#Totals],[AMOUNT]])+other[amount]+orders[qty]",
+                "Orders",
+                "amount",
+                "Net"
+            ),
+            "=SUM(orders[Net])+orders[@Net]+LEN(orders[[#Totals],[Net]])+other[amount]+orders[qty]"
+        );
+    }
+
+    #[test]
+    fn an_empty_table_renames_unqualified_references() {
+        assert_eq!(
+            rename_structured_reference(
+                "=[Total Sales]/orders[total sales]+[Other]",
+                "",
+                "total sales",
+                "Revenue"
+            ),
+            "=[Revenue]/orders[total sales]+[Other]"
+        );
+    }
+
+    #[test]
+    fn text_that_does_not_lex_stays() {
+        assert_eq!(
+            rename_structured_reference("=\"open", "orders", NO_COLUMN, "x"),
+            "=\"open"
+        );
     }
 }

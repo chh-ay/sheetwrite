@@ -279,6 +279,15 @@ export const MOVED_PAGES: Readonly<Record<string, MovedPage>> = {
   },
 };
 
+/**
+ * Showcases that were merged into another showcase. The server answers each
+ * old URL with a permanent redirect to the showcase that holds its story now;
+ * `docs:check` proves each target is a registered showcase.
+ */
+export const MOVED_SHOWCASES: Readonly<Record<string, string>> = {
+  "/showcases/engine/": "/showcases/recalculation/",
+};
+
 /** The URL that replaces an old page and fragment, or undefined for a page that did not move. */
 export function movedPageTarget(
   href: string,

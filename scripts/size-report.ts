@@ -297,6 +297,45 @@ export function addPackageSizeMetrics(
   }
 }
 
+/**
+ * Core's stylesheets as an app loads them: `styles.css` with the parts it
+ * imports (all of them, in order), each part on its own, the icon sheet that
+ * icons.css loads, and shell.css.
+ */
+async function coreStylesheets(): Promise<{ name: string; owner: string; bytes: Uint8Array }[]> {
+  const core = join(repositoryRoot, "packages/core");
+  const index = await readFile(join(core, "styles.css"), "utf8");
+  const parts = [...index.matchAll(/@import "\.\/styles\/([a-z-]+)\.css";/g)].map(
+    (match) => match[1] ?? "",
+  );
+  if (parts.length === 0) throw new Error("packages/core/styles.css imports no style parts");
+  const partSheets = await Promise.all(
+    parts.map(async (part) => ({
+      name: `styles.${metricSegment(part)}`,
+      owner: `@sheetwrite/core/styles/${part}.css`,
+      bytes: await readFile(join(core, "styles", `${part}.css`)),
+    })),
+  );
+  return [
+    {
+      name: "styles",
+      owner: "@sheetwrite/core/styles.css",
+      bytes: Buffer.concat(partSheets.map((sheet) => sheet.bytes)),
+    },
+    ...partSheets,
+    {
+      name: "styles.iconSheet",
+      owner: "@sheetwrite/core/styles/icons.svg",
+      bytes: await readFile(join(core, "styles/icons.svg")),
+    },
+    {
+      name: "shell",
+      owner: "@sheetwrite/core/shell.css",
+      bytes: await readFile(join(core, "shell.css")),
+    },
+  ];
+}
+
 async function buildSizeReport(
   reuseBundlers: boolean,
   artifactDirectory?: string,
@@ -464,19 +503,15 @@ async function buildSizeReport(
         );
       }
     }
-    for (const [name, path] of [
-      ["styles", join(repositoryRoot, "packages/core/styles.css")],
-      ["shell", join(repositoryRoot, "packages/core/shell.css")],
-    ] as const) {
-      const sizes = compressedSizes(await readFile(path));
-      for (const [metric, value] of Object.entries(sizes)) {
+    for (const stylesheet of await coreStylesheets()) {
+      for (const [metric, value] of Object.entries(compressedSizes(stylesheet.bytes))) {
         addMetric(
           metrics,
-          `css.${name}.${metric}`,
+          `css.${stylesheet.name}.${metric}`,
           value,
           "bytes",
           "browser-css",
-          `@sheetwrite/core/${name}.css`,
+          stylesheet.owner,
         );
       }
     }
@@ -568,19 +603,6 @@ export function formatReleaseComparison(
     rows.push(`${key}\t${value}\t${unit}\t${change}\t${percentage}`);
   }
   return rows.join("\n");
-}
-
-export function formatSizeHistory(history: SizeHistory): string {
-  const rows: string[] = [];
-  for (let index = 1; index < history.releases.length; index += 1) {
-    const previous = history.releases[index - 1]!;
-    const current = history.releases[index]!;
-    rows.push(`v${previous.version} → v${current.version}`);
-    rows.push(formatReleaseComparison(current.metrics, previous));
-  }
-  return rows.length === 0
-    ? "No release-to-release size comparison is available."
-    : rows.join("\n\n");
 }
 
 function assertReleaseVersion(version: string): void {
@@ -714,14 +736,10 @@ async function cli(): Promise<void> {
   const reuseBundlers = process.argv.includes("--reuse-bundlers");
   try {
     const artifactDirectory = optionValue(process.argv, "--artifacts");
-    if (mode !== "report" && mode !== "history" && mode !== "record") {
+    if (mode !== "report" && mode !== "record") {
       throw new Error(`Unknown size-report mode: ${mode}`);
     }
     const history = await readSizeHistory();
-    if (mode === "history") {
-      console.log(formatSizeHistory(history));
-      return;
-    }
     if (mode === "record") {
       const version = optionValue(process.argv, "--version");
       if (version === undefined) throw new Error("record mode requires --version");

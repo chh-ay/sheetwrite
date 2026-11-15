@@ -25,6 +25,7 @@ let {
   mutationPolicy,
   transactionResourceLimits,
   hyperlinkActivation,
+  addons,
   renderers,
   editors,
   overscan,
@@ -112,7 +113,7 @@ $effect(() => {
   const input: AdapterGridInput = {
     options: {
       workbook, data, datasource, datasourceStorage, renderer, workerUrl, presentation,
-      protectionResolver, mutationPolicy, transactionResourceLimits, hyperlinkActivation,
+      protectionResolver, mutationPolicy, transactionResourceLimits, hyperlinkActivation, addons,
       renderers, editors, theme, readOnly, overscan, minColumns, config,
     } satisfies Record<keyof GridOptions, unknown>,
     rowBridge,

@@ -1,0 +1,80 @@
+/* Accordion and AccordionGroup (lib/content-components.ts). Loaded only by pages that use it. */
+
+/* ── Accordion: a disclosure; a group shares its borders ───────────────── */
+.sw-accordion {
+  margin: var(--sw-space-4) 0;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-accordion > summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 var(--sw-space-3);
+  align-items: center;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  border-radius: inherit;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sw-accordion > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sw-accordion > summary:hover {
+  background: var(--sw-surface-2);
+}
+
+.sw-accordion__title {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-accordion__description {
+  grid-row: 2;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-accordion > summary > .sw-icon {
+  grid-row: 1 / span 2;
+  grid-column: 2;
+  color: var(--sw-fg-muted);
+  transition: rotate var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+.sw-accordion[open] > summary > .sw-icon {
+  rotate: 180deg;
+}
+
+.sw-accordion__body {
+  padding: var(--sw-space-1) var(--sw-space-4) var(--sw-space-4);
+}
+
+.sw-accordion__body > :first-child {
+  margin-top: 0;
+}
+
+.sw-accordion__body > :last-child {
+  margin-bottom: 0;
+}
+
+.sw-accordion-group {
+  margin: var(--sw-space-5) 0;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-accordion-group > .sw-accordion {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.sw-accordion-group > .sw-accordion + .sw-accordion {
+  border-top: var(--sw-border-width) solid var(--sw-border);
+}

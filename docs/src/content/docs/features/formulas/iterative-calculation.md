@@ -118,21 +118,21 @@ no value changes by more than `maxChange`.
 A running total. Each recalculation adds `maxIterations` times `B1` to the
 value that `A1` shows:
 
-```text partial="formula examples" title="Running total"
+```formula partial="formula examples" title="Running total"
 A1: =A1+B1
 ```
 
 Interest on a balance that includes the interest. With `A1` = 1000 and
 `B1` = 0.1, `C1` settles at 1000 × 0.1 / (1 − 0.1) ≈ 111.11:
 
-```text partial="formula examples" title="Interest on the balance"
+```formula partial="formula examples" title="Interest on the balance"
 C1: =B1*(A1+C1)
 ```
 
 Newton's method for the square root of 2. Each pass moves `A1` closer to
 1.41421356:
 
-```text partial="formula examples" title="Square root of 2"
+```formula partial="formula examples" title="Square root of 2"
 A1: =IF(A1=0,1,A1-(A1^2-2)/(2*A1))
 ```
 

@@ -1,0 +1,10 @@
+```ts prelude="core" title="formatting.ts"
+const revenue = { sheet: "budget", start: { row: 2, col: 1 }, end: { row: 2, col: 2 } };
+
+// Styles and number formats are cell metadata: one undo step each, kept in XLSX
+grid.styleRange(revenue, { bold: true, fontFamily: "Georgia", align: "right" });
+grid.styleRange(revenue, { numberFormat: "0.0%" });
+
+// The display changes; the stored numbers stay the same
+grid.store.getCell({ sheet: "budget", row: 2, col: 1 }).resolved;
+```

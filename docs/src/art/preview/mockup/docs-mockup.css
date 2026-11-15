@@ -1,0 +1,56 @@
+/* Proposed docs placements (mockup). Every picture reserves its box from its
+   viewBox (inline SVG, width 100%, height auto), so it adds no layout shift. */
+
+/* A concept diagram in the reading column, beside the text it explains. */
+.mk-doc-figure {
+  margin: var(--sw-space-6) 0;
+  padding: clamp(var(--sw-space-3), 2vw, var(--sw-space-5));
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+/* Section cards: the illustration takes the card's existing art box
+   (.sw-card__art: edge to edge, 2:1). */
+
+/* A section page's header: the section's illustration beside the title. */
+@media (min-width: 52rem) {
+  .sw-document__header:has(.mk-section-art) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 17rem;
+    column-gap: var(--sw-space-8);
+    align-items: center;
+  }
+
+  .sw-document__header:has(.mk-section-art) > :not(.mk-section-art) {
+    grid-column: 1;
+  }
+
+  .mk-section-art {
+    grid-column: 2;
+    grid-row: 1 / span 4;
+    overflow: clip;
+    border: var(--sw-border-width) solid var(--sw-border);
+    border-radius: var(--sw-radius-lg);
+  }
+
+  .mk-section-art .sw-art {
+    height: auto;
+    aspect-ratio: 2 / 1;
+  }
+}
+
+@media (max-width: 51.999rem) {
+  .mk-section-art {
+    display: none;
+  }
+}
+
+/* The landing page's section mark, before the eyebrow. */
+.sw-section-mark {
+  display: block;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin-bottom: var(--sw-space-2);
+  color: var(--sw-fg);
+}

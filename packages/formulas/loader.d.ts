@@ -5,7 +5,7 @@ export * from "./pkg/sheetwrite_wasm.js";
 /** Sources accepted by asynchronous initialization: a fetchable URL/request/response, raw module bytes, or a precompiled `WebAssembly.Module`. */
 export type { InitInput } from "./pkg/sheetwrite_wasm.js";
 
-/** Result of module initialization: the instantiated exports plus the shared linear memory. */
+/** Raw module output of initialization, used by the loader: the generated wasm-bindgen exports and the linear memory, not API to call. */
 export type { InitOutput } from "./pkg/sheetwrite_wasm.js";
 
 /** Sources accepted by synchronous initialization: raw module bytes or a precompiled `WebAssembly.Module`. */
@@ -23,15 +23,23 @@ export type { SyncInitInput } from "./pkg/sheetwrite_wasm.js";
  * import { initSheetwrite } from "@sheetwrite/core";
  * import * as formulas from "@sheetwrite/formulas";
  *
- * await initSheetwrite(undefined, formulas);
+ * await initSheetwrite({ engine: formulas });
  * ```
  * @see /docs/start/choose-an-engine/
+ *
+ * @param source - Where the WASM comes from: a URL, a `Request`,
+ *   the module's bytes or a compiled `WebAssembly.Module`. Omitted, the
+ *   package's own `pkg/sheetwrite_wasm_bg.wasm` is loaded.
  */
 export declare function load(
  source?: BufferSource | URL | string | Request | WebAssembly.Module,
 ): Promise<void>;
 
-/** Whether the WASM module has finished initializing. */
+/**
+ * Whether the WASM module has finished initializing.
+ *
+ * @returns `true` once a `load` or `createEngine` call has succeeded.
+ */
 export declare function isLoaded(): boolean;
 
 /** Engine objects and caches owned by one independently collectible WASM instance. */
@@ -46,5 +54,11 @@ export type EngineInstance = Omit<typeof WasmExports, "default"> & {
   functionNames?: () => string[];
 };
 
-/** Initialize a fresh engine; a compiled module can be reused without retaining its memory. */
+/**
+ * Initialize a fresh engine; a compiled module can be reused without retaining its memory.
+ *
+ * @param source - Where the engine's WASM comes from, as for `load`; pass a
+ *   compiled `WebAssembly.Module` to reuse it.
+ * @returns The new engine, with its own memory; `retire()` releases it.
+ */
 export declare function createEngine(source?: Parameters<typeof load>[0]): Promise<EngineInstance>;

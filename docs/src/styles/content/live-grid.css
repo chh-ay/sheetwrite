@@ -1,0 +1,32 @@
+/* LiveGrid (components/LiveGrid.tsx). Loaded only by pages that use it. */
+
+/* ── LiveGrid: an editable grid; its space is held before it loads ─────── */
+.sw-live-grid {
+  margin: var(--sw-space-6) 0;
+}
+
+.sw-live-grid__host {
+  position: relative;
+  overflow: hidden;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-live-grid[data-state="loading"] .sw-live-grid__host {
+  background: linear-gradient(var(--sw-surface-2) 0 2rem, var(--sw-surface-1) 2rem);
+}
+
+.sw-live-grid__status {
+  margin: 0;
+  padding: var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-live-grid > figcaption {
+  margin-top: var(--sw-space-2);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  text-align: center;
+}

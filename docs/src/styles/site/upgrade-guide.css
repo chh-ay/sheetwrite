@@ -2,8 +2,8 @@
    must act; the impact chip says how much the step matters. */
 .sw-prose ol.sw-upgrade {
   display: grid;
-  gap: 0.75rem;
-  margin: 1.25rem 0 0;
+  gap: var(--sw-space-3);
+  margin: var(--sw-space-5) 0 0;
   padding: 0;
   list-style: none;
   counter-reset: upgrade-step;
@@ -11,22 +11,22 @@
 .sw-prose .sw-upgrade__step {
   position: relative;
   margin: 0;
-  padding: 1rem 1.25rem 1rem 3.75rem;
+  padding: var(--sw-space-4) var(--sw-space-5) var(--sw-space-4) var(--sw-space-16);
   border: 1px solid var(--sw-border);
-  border-radius: 0.75rem;
+  border-radius: var(--sw-radius-lg);
   background: var(--sw-surface-1);
   counter-increment: upgrade-step;
   --step-hue: var(--sw-accent);
 }
 .sw-prose .sw-upgrade__step[data-impact="api"],
 .sw-prose .sw-upgrade__step[data-impact="breaking"] {
-  --step-hue: var(--sw-type-number);
+  --step-hue: var(--sw-code-number);
 }
 .sw-prose .sw-upgrade__step[data-impact="behavior"] {
-  --step-hue: var(--sw-type-name);
+  --step-hue: var(--sw-code-function);
 }
 .sw-prose .sw-upgrade__step[data-impact="optional"] {
-  --step-hue: var(--sw-fg-dim);
+  --step-hue: var(--sw-fg-muted);
 }
 .sw-prose .sw-upgrade__step::before {
   content: counter(upgrade-step);
@@ -38,10 +38,10 @@
   width: 1.75rem;
   height: 1.75rem;
   border: 1px solid color-mix(in srgb, var(--step-hue) 45%, var(--sw-border));
-  border-radius: 999px;
+  border-radius: var(--sw-radius-pill);
   color: var(--step-hue);
   background: color-mix(in srgb, var(--step-hue) 10%, var(--sw-surface-1));
-  font: 600 0.8rem / 1 var(--sw-font-mono);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / 1 var(--sw-font-mono);
 }
 /* The rail joins each number to the next step. */
 .sw-prose .sw-upgrade__step:not(:last-child)::after {
@@ -58,65 +58,65 @@
 }
 .sw-prose .sw-upgrade__step > p + p,
 .sw-prose .sw-upgrade__step > p + div {
-  margin-top: 0.4rem;
+  margin-top: var(--sw-space-1-5);
 }
 .sw-prose .sw-upgrade__meta {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   color: var(--sw-fg-muted);
-  font-size: 0.8rem;
+  font-size: var(--sw-text-caption);
 }
 .sw-prose .sw-upgrade__impact {
   border: 1px solid color-mix(in srgb, var(--step-hue) 40%, var(--sw-border));
-  border-radius: 999px;
-  padding: 0.05rem 0.55rem;
+  border-radius: var(--sw-radius-pill);
+  padding: var(--sw-space-0-5) var(--sw-space-2);
   color: var(--step-hue);
   background: color-mix(in srgb, var(--step-hue) 8%, transparent);
-  font: 600 0.7rem / 1.6 var(--sw-font-mono);
-  letter-spacing: 0.04em;
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
+  letter-spacing: var(--sw-tracking-eyebrow);
   text-transform: uppercase;
   white-space: nowrap;
 }
 .sw-prose .sw-upgrade__title {
   color: var(--sw-fg-strong);
-  font: 600 1.02rem / 1.35 var(--sw-font-display);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.35 var(--sw-font-display);
 }
 .sw-prose .sw-upgrade__step > p:not(.sw-upgrade__meta, .sw-upgrade__title) {
   color: var(--sw-fg-muted);
-  font-size: 0.92rem;
+  font-size: var(--sw-text-small);
 }
 .sw-prose .sw-upgrade__packages {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: var(--sw-space-1-5);
 }
 .sw-prose .sw-upgrade__compare {
   display: grid;
-  gap: 0.35rem;
-  margin-top: 0.6rem;
-  padding: 0.65rem 0.8rem;
-  border-radius: 0.5rem;
+  gap: var(--sw-space-1-5);
+  margin-top: var(--sw-space-2);
+  padding: var(--sw-space-3) var(--sw-space-3);
+  border-radius: var(--sw-radius-md);
   background: var(--sw-surface-2);
 }
 .sw-prose .sw-upgrade__compare p {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 0.5rem;
+  gap: var(--sw-space-2);
   margin: 0;
-  font-size: 0.88rem;
+  font-size: var(--sw-text-small);
 }
 .sw-prose .sw-upgrade__compare span {
   width: 3.5rem;
-  color: var(--sw-fg-dim);
-  font: 600 0.7rem / 1.6 var(--sw-font-mono);
+  color: var(--sw-fg-muted);
+  font: var(--sw-weight-semibold) var(--sw-text-eyebrow) / 1.6 var(--sw-font-mono);
   text-transform: uppercase;
 }
 @media (max-width: 40rem) {
   .sw-prose .sw-upgrade__step {
-    padding: 0.9rem 1rem 0.9rem 3.25rem;
+    padding: var(--sw-space-4) var(--sw-space-4) var(--sw-space-4) var(--sw-space-12);
   }
   .sw-prose .sw-upgrade__step::before {
     left: 0.8rem;

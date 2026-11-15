@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { For, Index, type JSX } from "solid-js";
 
 import { Packet, px, secs, VersionRoll } from "./storyParts.js";
 
@@ -39,6 +39,7 @@ const MINI_WIDTH = 36;
 const MINI_HEIGHT = 22;
 const MINI_COLUMNS = 4;
 const MINI_CELLS = MINI_COLUMNS * MINI_COLUMNS;
+const MINI_CELL_INDEXES = Array.from({ length: MINI_CELLS }, (_, index) => index);
 
 function miniCell(gridX: number, index: number) {
   return {
@@ -53,26 +54,26 @@ function miniCentre(gridX: number, index: number) {
   return { x: cell.x + MINI_WIDTH / 2, y: cell.y + MINI_HEIGHT / 2 };
 }
 
-function MiniGrid({
-  x,
-  marked,
-}: Readonly<{ x: number; marked: ReadonlyMap<number, CSSProperties> }>) {
-  const cells = [];
-  for (let index = 0; index < MINI_CELLS; index++) {
-    cells.push(
-      <rect
-        className="sr-mini"
-        data-flash={marked.has(index) || undefined}
-        height={MINI_HEIGHT}
-        key={index}
-        rx={2}
-        style={marked.get(index)}
-        width={MINI_WIDTH}
-        {...miniCell(x, index)}
-      />,
-    );
-  }
-  return <>{cells}</>;
+function MiniGrid(props: Readonly<{ x: number; marked: ReadonlyMap<number, JSX.CSSProperties> }>) {
+  return (
+    <For each={MINI_CELL_INDEXES}>
+      {(index) => {
+        const cell = miniCell(props.x, index);
+        return (
+          <rect
+            class="sr-mini"
+            data-flash={props.marked.has(index) ? "true" : undefined}
+            height={MINI_HEIGHT}
+            rx={2}
+            style={props.marked.get(index)}
+            width={MINI_WIDTH}
+            x={cell.x}
+            y={cell.y}
+          />
+        );
+      }}
+    </For>
+  );
 }
 
 /* Bram's outbox: the band under his grid (grid ends at y 224, card at y 290). */
@@ -90,33 +91,43 @@ const ANA_GRID_X = 20;
 const BRAM_GRID_X = 424;
 // Shift the queue near the middle of the 0.6-second chip drain.
 const QUEUE_SHIFT_DELAY = 0.35;
+
+/** A queued chip's style: one shift time per chip ahead of it, as React leaves unset ones out. */
+function queueStyle(shifts: readonly string[]): JSX.CSSProperties {
+  const style: JSX.CSSProperties = { "--pitch": px(OUTBOX_PITCH) };
+  shifts.forEach((shift, ahead) => {
+    style[`--shift-${ahead + 1}`] = shift;
+  });
+  return style;
+}
+
 export function OfflineStory() {
-  const bramCells = new Map(
+  const bramCells = new Map<number, JSX.CSSProperties>(
     OFFLINE_EDITS.map((edit) => [
       edit.cell,
-      { "--edit": secs(edit.edit), "--ack": secs(edit.commit) } as CSSProperties,
+      { "--edit": secs(edit.edit), "--ack": secs(edit.commit) },
     ]),
   );
-  const anaCells = new Map(
-    OFFLINE_EDITS.map((edit) => [edit.cell, { "--apply": secs(edit.apply) } as CSSProperties]),
+  const anaCells = new Map<number, JSX.CSSProperties>(
+    OFFLINE_EDITS.map((edit) => [edit.cell, { "--apply": secs(edit.apply) }]),
   );
   // Every chip drains from the head of the queue (slot 0), after the chips ahead of it left.
   const head = { x: OUTBOX_X + OUTBOX_CHIP_WIDTH / 2, y: OUTBOX_Y + OUTBOX_CHIP_HEIGHT / 2 };
 
   return (
-    <svg aria-hidden="true" className="sr sr-offline" viewBox="0 0 640 330">
-      <g className="sr-device" data-device="ana">
-        <rect className="sr-panel" height={250} rx={12} width={196} x={20} y={40} />
-        <text className="sr-name" x={36} y={70}>
+    <svg aria-hidden="true" class="sr sr-offline" viewBox="0 0 640 330">
+      <g class="sr-device" data-device="ana">
+        <rect class="sr-panel" height={250} rx={12} width={196} x={20} y={40} />
+        <text class="sr-name" x={36} y={70}>
           Ana
         </text>
-        <circle className="sr-dot" cx={196} cy={65} r={6} />
-        <text className="sr-sub" x={36} y={94}>
+        <circle class="sr-dot" cx={196} cy={65} r={6} />
+        <text class="sr-sub" x={36} y={94}>
           version
         </text>
         <VersionRoll
           changes={OFFLINE_EDITS.map((edit) => edit.apply)}
-          className="sr-ver"
+          class="sr-ver"
           clip={{ x: 140, y: 80, width: 60, height: 19 }}
           clipId="sr-clip-ana"
           values={OFFLINE_VERSIONS}
@@ -126,27 +137,28 @@ export function OfflineStory() {
         <MiniGrid marked={anaCells} x={ANA_GRID_X} />
       </g>
 
-      <g className="sr-server">
-        <rect className="sr-panel" height={110} rx={12} width={132} x={254} y={110} />
-        {OFFLINE_EDITS.map((edit) => (
-          <rect
-            className="sr-pulse"
-            height={110}
-            key={edit.cell}
-            rx={12}
-            style={{ "--at": secs(edit.commit) } as CSSProperties}
-            width={132}
-            x={254}
-            y={110}
-          />
-        ))}
-        <text className="sr-name" x={320} y={142} data-center="">
+      <g class="sr-server">
+        <rect class="sr-panel" height={110} rx={12} width={132} x={254} y={110} />
+        <For each={OFFLINE_EDITS}>
+          {(edit) => (
+            <rect
+              class="sr-pulse"
+              height={110}
+              rx={12}
+              style={{ "--at": secs(edit.commit) }}
+              width={132}
+              x={254}
+              y={110}
+            />
+          )}
+        </For>
+        <text class="sr-name" x={320} y={142} data-center="">
           Your server
         </text>
         <VersionRoll
           center
           changes={OFFLINE_EDITS.map((edit) => edit.commit)}
-          className="sr-big"
+          class="sr-big"
           clip={{ x: 262, y: 160, width: 116, height: 34 }}
           clipId="sr-clip-server"
           values={OFFLINE_VERSIONS}
@@ -155,98 +167,86 @@ export function OfflineStory() {
         />
       </g>
 
-      <line className="sr-wire" data-side="ana" x1={216} x2={254} y1={165} y2={165} />
-      <line className="sr-wire" data-side="bram" x1={386} x2={424} y1={165} y2={165} />
+      <line class="sr-wire" data-side="ana" x1={216} x2={254} y1={165} y2={165} />
+      <line class="sr-wire" data-side="bram" x1={386} x2={424} y1={165} y2={165} />
 
-      <g className="sr-device" data-device="bram">
-        <rect className="sr-panel" height={250} rx={12} width={196} x={424} y={40} />
-        <text className="sr-name" x={440} y={70}>
+      <g class="sr-device" data-device="bram">
+        <rect class="sr-panel" height={250} rx={12} width={196} x={424} y={40} />
+        <text class="sr-name" x={440} y={70}>
           Bram
         </text>
-        <circle className="sr-dot sr-dot-bram" cx={600} cy={65} r={6} />
-        <text className="sr-sub sr-state-online" x={440} y={94}>
+        <circle class="sr-dot sr-dot-bram" cx={600} cy={65} r={6} />
+        <text class="sr-sub sr-state-online" x={440} y={94}>
           online
         </text>
-        <text className="sr-sub sr-state-offline" x={440} y={94}>
+        <text class="sr-sub sr-state-offline" x={440} y={94}>
           offline
         </text>
         <MiniGrid marked={bramCells} x={BRAM_GRID_X} />
-        <text className="sr-sub" x={440} y={248}>
+        <text class="sr-sub" x={440} y={248}>
           Outbox
         </text>
       </g>
 
-      {OFFLINE_EDITS.map((edit, index) => {
-        const slotX = OUTBOX_X + index * OUTBOX_PITCH;
-        const slot = { x: slotX + OUTBOX_CHIP_WIDTH / 2, y: head.y };
-        const cell = miniCentre(BRAM_GRID_X, edit.cell);
-        // The queue moves up one slot each time a chip ahead of this one leaves.
-        const shifts = OFFLINE_EDITS.slice(0, index).map((ahead) =>
-          secs(ahead.drain + QUEUE_SHIFT_DELAY),
-        );
-        return (
-          <g
-            className="sr-queue"
-            data-shifts={shifts.length}
-            key={edit.cell}
-            style={
-              {
-                "--pitch": px(OUTBOX_PITCH),
-                "--shift-1": shifts[0],
-                "--shift-2": shifts[1],
-              } as CSSProperties
-            }
-          >
-            <g
-              className="sr-outbox"
-              style={
-                {
-                  "--edit": secs(edit.edit),
-                  "--drain": secs(edit.drain),
+      <Index each={OFFLINE_EDITS}>
+        {(edit, index) => {
+          const slotX = OUTBOX_X + index * OUTBOX_PITCH;
+          const slot = { x: slotX + OUTBOX_CHIP_WIDTH / 2, y: head.y };
+          const cell = miniCentre(BRAM_GRID_X, edit().cell);
+          // The queue moves up one slot each time a chip ahead of this one leaves.
+          const shifts = OFFLINE_EDITS.slice(0, index).map((ahead) =>
+            secs(ahead.drain + QUEUE_SHIFT_DELAY),
+          );
+          return (
+            <g class="sr-queue" data-shifts={shifts.length} style={queueStyle(shifts)}>
+              <g
+                class="sr-outbox"
+                style={{
+                  "--edit": secs(edit().edit),
+                  "--drain": secs(edit().drain),
                   "--from-x": px(cell.x - slot.x),
                   "--from-y": px(cell.y - slot.y),
                   "--exit-x": px(BRAM_EXIT.x - head.x),
                   "--exit-y": px(BRAM_EXIT.y - head.y),
                   "--to-x": px(SERVER_CENTER.x - head.x),
                   "--to-y": px(SERVER_CENTER.y - head.y),
-                } as CSSProperties
-              }
-            >
-              <rect
-                height={OUTBOX_CHIP_HEIGHT}
-                rx={OUTBOX_CHIP_HEIGHT / 2}
-                width={OUTBOX_CHIP_WIDTH}
-                x={slotX}
-                y={OUTBOX_Y}
-              />
-              <text x={slot.x} y={OUTBOX_Y + 14} data-center="">
-                edit {index + 1}
-              </text>
+                }}
+              >
+                <rect
+                  height={OUTBOX_CHIP_HEIGHT}
+                  rx={OUTBOX_CHIP_HEIGHT / 2}
+                  width={OUTBOX_CHIP_WIDTH}
+                  x={slotX}
+                  y={OUTBOX_Y}
+                />
+                <text x={slot.x} y={OUTBOX_Y + 14} data-center="">
+                  edit {index + 1}
+                </text>
+              </g>
             </g>
-          </g>
-        );
-      })}
+          );
+        }}
+      </Index>
 
-      {OFFLINE_EDITS.map((edit, index) => {
-        const cell = miniCentre(ANA_GRID_X, edit.cell);
-        return (
-          <Packet
-            key={edit.cell}
-            label={`v${FIRST_VERSION + index + 1}`}
-            style={
-              {
-                "--send": secs(edit.send),
+      <Index each={OFFLINE_EDITS}>
+        {(edit, index) => {
+          const cell = miniCentre(ANA_GRID_X, edit().cell);
+          return (
+            <Packet
+              label={`v${FIRST_VERSION + index + 1}`}
+              style={{
+                "--send": secs(edit().send),
                 "--wire-x": px(ANA_ENTRY.x - SERVER_CENTER.x),
                 "--to-x": px(cell.x - SERVER_CENTER.x),
                 "--to-y": px(cell.y - SERVER_CENTER.y),
-              } as CSSProperties
-            }
-            tone="committed"
-            x={SERVER_CENTER.x}
-            y={SERVER_CENTER.y}
-          />
-        );
-      })}
+              }}
+              tone="committed"
+              x={SERVER_CENTER.x}
+              y={SERVER_CENTER.y}
+            />
+          );
+        }}
+      </Index>
     </svg>
   );
 }

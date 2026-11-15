@@ -6,7 +6,7 @@
 //! between recomputes.
 
 use super::pivots::SourceRect;
-use super::relationships::{ColumnRef, KeyColumn, RelationshipError};
+use super::relationships::{ColumnRef, KeyColumn, Relationship, RelationshipError};
 use super::CellStore;
 use crate::data_model::{BLANK_KEY, KEY_ERROR, NO_MATCH};
 use crate::types::{FormulaError, Value};
@@ -46,26 +46,7 @@ impl<'a> ModelSource<'a> {
         base: &'a str,
         columns: &'a [ColumnRef],
     ) -> Result<Self, FormulaError> {
-        // Breadth-first over many-to-one relationships. Core admits no cycle,
-        // so each reachable table has exactly one route.
-        let relationships = store
-            .relationships
-            .as_deref()
-            .map_or(&[][..], Vec::as_slice);
-        let mut routes = vec![(base, 0, None)];
-        let mut next = 0;
-        while next < routes.len() {
-            for relationship in relationships {
-                let to = relationship.to.table.as_str();
-                if !relationship.is_measure()
-                    && relationship.from.table == routes[next].0
-                    && !routes.iter().any(|route| route.0 == to)
-                {
-                    routes.push((to, next, Some(relationship)));
-                }
-            }
-            next += 1;
-        }
+        let routes = model_routes(store, base);
 
         let base_table = store.table_by_id(base).ok_or(FormulaError::Ref)?;
         let mut dependencies = vec![SourceRect::table(base_table)];
@@ -112,23 +93,23 @@ impl<'a> ModelSource<'a> {
         })
     }
 
-    pub(super) fn width(&self) -> usize {
+    pub(super) const fn width(&self) -> usize {
         self.fields.len()
     }
 
     pub(super) fn header(&self, field: usize) -> Value {
         self.fields
             .get(field)
-            .map_or(Value::Blank, |field| Value::text(field.name))
+            .map_or(Value::Blank, |found| Value::text(found.name))
     }
 
     pub(super) fn value(&self, row: usize, field: usize) -> Value {
-        let Some(field) = self.fields.get(field) else {
+        let Some(field_info) = self.fields.get(field) else {
             return Value::Error(FormulaError::Ref);
         };
 
-        match self.row_in(field.route, row as u32) {
-            Ok(matched) => self.store.key_value(field.column, matched),
+        match self.row_in(field_info.route, row as u32) {
+            Ok(matched) => self.store.key_value(field_info.column, matched),
             Err(value) => value,
         }
     }
@@ -149,9 +130,37 @@ impl<'a> ModelSource<'a> {
     }
 }
 
-fn model_error(error: RelationshipError) -> FormulaError {
+const fn model_error(error: RelationshipError) -> FormulaError {
     match error {
         RelationshipError::MissingTable | RelationshipError::MissingColumn => FormulaError::Ref,
         RelationshipError::Keys(_) => FormulaError::Value,
     }
+}
+
+/// One table reachable from a base table: its ID, the route it is reached
+/// from, and the relationship of that last hop (`None` for the base).
+pub(super) type Route<'a> = (&'a str, usize, Option<&'a Relationship>);
+
+/// Breadth-first over many-to-one relationships from `base`. Core admits no
+/// cycle, so each reachable table has exactly one route; route 0 is `base`.
+pub(super) fn model_routes<'a>(store: &'a CellStore, base: &'a str) -> Vec<Route<'a>> {
+    let relationships = store
+        .relationships
+        .as_deref()
+        .map_or(&[][..], Vec::as_slice);
+    let mut routes = vec![(base, 0, None)];
+    let mut next = 0;
+    while next < routes.len() {
+        for relationship in relationships {
+            let to = relationship.to.table.as_str();
+            if !relationship.is_measure()
+                && relationship.from.table == routes[next].0
+                && !routes.iter().any(|route| route.0 == to)
+            {
+                routes.push((to, next, Some(relationship)));
+            }
+        }
+        next += 1;
+    }
+    routes
 }

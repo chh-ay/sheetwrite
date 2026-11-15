@@ -13,14 +13,19 @@ export type RowBridgeId = string | number;
 
 /** Semantic column key accepted by the row bridge. */
 export interface RowBridgeColumn<Row extends Record<string, CellScalar>> {
+  /** Property of your row objects shown in this column. */
   readonly key: keyof Row & string;
 }
 
 /** Context supplied when a canonical row insertion needs a host identity. */
 export interface RowBridgeInsertContext {
+  /** Stable ID of the sheet the rows are inserted into. */
   readonly sheet: SheetId;
+  /** Zero-based row where the inserted block starts. */
   readonly at: number;
+  /** Position of this row inside the inserted block, from 0. */
   readonly offset: number;
+  /** ID of the transaction that inserts the rows. */
   readonly transactionId: string;
 }
 
@@ -29,8 +34,11 @@ export interface RowBridgeOptions<
   Row extends Record<string, CellScalar>,
   Id extends RowBridgeId = RowBridgeId,
 > {
+  /** The row properties shown as columns, in column order. */
   readonly columns: readonly RowBridgeColumn<Row>[];
+  /** The rows the grid starts with, in row order; the bridge reads their IDs and never changes them. */
   readonly defaultRows: readonly Row[];
+  /** Returns the stable ID of a row; IDs must be unique. */
   readonly getRowId: (row: Row, index: number) => Id;
   /** Sheet identity used by the simple data-first adapter. Defaults to `sheet1`. */
   readonly sheet?: SheetId;
@@ -42,31 +50,50 @@ export interface RowBridgeOptions<
 
 /** A cell effect with semantic column and host row identity. */
 export interface RowBridgeCell<Id extends RowBridgeId = RowBridgeId> {
+  /** Stable ID of the cell's sheet. */
   readonly sheet: SheetId;
+  /** Zero-based row of the cell in the document. */
   readonly row: number;
+  /** Your ID of the cell's row; `null` for a row the bridge has no ID for. */
   readonly rowId: Id | null;
+  /** Zero-based column of the cell. */
   readonly col: number;
+  /** Row property the column shows; `null` for a column outside `columns`. */
   readonly columnKey: string | null;
+  /** The cell's content before the change, when known. */
   readonly previous: CellValue | undefined;
+  /** The cell's content after the change. */
   readonly next: CellValue | undefined;
 }
 
 /** The canonical transaction identity carried by each projected delta. */
 export interface RowBridgeTransaction {
+  /** Deterministic ID of the transaction, the same for the same patches and epoch. */
   readonly id: string;
+  /** Whether the change was made here (`local`) or came from elsewhere (`remote`). */
   readonly source: OperationSource;
+  /** The user action or API call that produced the change, such as `"paste"`. */
   readonly commitReason: CommitReason;
+  /** Store epoch after the commit, when known. */
   readonly epoch: number | undefined;
+  /** The committed document operations, in order. */
   readonly patches: readonly DocumentOp[];
 }
 
 interface RowBridgeDeltaBase<Id extends RowBridgeId = RowBridgeId> {
+  /** The transaction the delta belongs to. */
   readonly transaction: RowBridgeTransaction;
+  /** Same as `transaction.id`. */
   readonly transactionId: string;
+  /** Same as `transaction.source`. */
   readonly source: OperationSource;
+  /** State before the change: cell values for cell deltas, removed row IDs for row deletes. */
   readonly previous: unknown;
+  /** State after the change: cell values, inserted row IDs, or the operation itself for metadata. */
   readonly next: unknown;
+  /** The one document operation this delta projects. */
   readonly operation: DocumentOp;
+  /** Your IDs of the rows the delta touches, in its own order; `null` where a row has no ID. */
   readonly rowIds: readonly (Id | null)[];
 }
 
@@ -80,8 +107,11 @@ interface RowBridgeCellDelta<Id extends RowBridgeId = RowBridgeId> extends RowBr
 export interface RowBridgeRangeDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"range"`. */
   readonly kind: "range";
+  /** The range the operation wrote. */
   readonly range: Range;
+  /** The cells whose value changed. */
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
@@ -89,8 +119,11 @@ export interface RowBridgeRangeDelta<
 export interface RowBridgeClearDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"clear"`. */
   readonly kind: "clear";
+  /** The range the operation wrote. */
   readonly range: Range;
+  /** The cells whose value changed. */
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
@@ -98,8 +131,11 @@ export interface RowBridgeClearDelta<
 export interface RowBridgePasteDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"paste"`. */
   readonly kind: "paste";
+  /** The range the operation wrote; `null` when the operation has no cell range. */
   readonly range: Range | null;
+  /** The cells whose value changed. */
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
@@ -107,8 +143,11 @@ export interface RowBridgePasteDelta<
 export interface RowBridgeFillDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"fill"`. */
   readonly kind: "fill";
+  /** The range the operation wrote; `null` when the operation has no cell range. */
   readonly range: Range | null;
+  /** The cells whose value changed. */
   readonly cells: readonly RowBridgeCell<Id>[];
 }
 
@@ -116,14 +155,23 @@ export interface RowBridgeFillDelta<
 export interface RowBridgeRowStructureDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"row-structure"`. */
   readonly kind: "row-structure";
+  /** Whether rows were inserted, deleted or moved. */
   readonly action: "insert" | "delete" | "move";
+  /** Stable ID of the sheet whose rows changed. */
   readonly sheet: SheetId;
+  /** Zero-based row where the change starts. */
   readonly at: number;
+  /** Number of rows inserted, deleted or moved. */
   readonly count: number;
+  /** For a move: zero-based first row of the block before the move. */
   readonly from?: number;
+  /** For a move: zero-based first row of the block after the move. */
   readonly to?: number;
+  /** IDs of inserted rows (and moved rows, for a move), in row order. */
   readonly inserted: readonly (Id | null)[];
+  /** IDs of deleted rows, in row order. */
   readonly removed: readonly (Id | null)[];
 }
 
@@ -131,7 +179,9 @@ export interface RowBridgeRowStructureDelta<
 export interface RowBridgeMetadataDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"metadata"`. */
   readonly kind: "metadata";
+  /** What kind of metadata changed, such as `"column"` or `"chart"`. */
   readonly metadata:
     | "column"
     | "row"
@@ -156,7 +206,9 @@ export interface RowBridgeMetadataDelta<
 export interface RowBridgeHostActionDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"host-action"`. */
   readonly kind: "host-action";
+  /** The sheet-level change your app should mirror. */
   readonly action:
     | "add-sheet"
     | "remove-sheet"
@@ -169,7 +221,9 @@ export interface RowBridgeHostActionDelta<
 export interface RowBridgeUnprojectableDelta<
   Id extends RowBridgeId = RowBridgeId,
 > extends RowBridgeDeltaBase<Id> {
+  /** Always `"unprojectable"`. */
   readonly kind: "unprojectable";
+  /** Why the operation has no row-level meaning. */
   readonly reason: string;
 }
 
@@ -196,23 +250,33 @@ export type RowBridgeReconciliationStatus =
 
 /** Input to {@link RowBridge.reconcile}. */
 export interface RowBridgeReconciliationInput<Id extends RowBridgeId = RowBridgeId> {
+  /** What your server did with the transaction, such as `"accepted"` or `"rejected"`. */
   readonly status: RowBridgeReconciliationStatus;
+  /** ID of the transaction the response is for, from `rowBridgeTransactionId`. */
   readonly transactionId?: string;
+  /** Whether the transaction was made here or came from elsewhere. */
   readonly source?: OperationSource;
+  /** Server version of the response; an older version than one already seen is out of order. */
   readonly version?: number;
   /** Canonical operations applied by the document engine. */
   readonly operations?: readonly DocumentOp[];
   /** Original host operations, used to identify a transformed acceptance. */
   readonly requestedOperations?: readonly DocumentOp[];
+  /** The grid's `change` event for the transaction, when you have it. */
   readonly event?: ChangeEvent;
+  /** The user action or API call that produced the transaction. */
   readonly commitReason?: CommitReason;
+  /** Type-only marker that carries the row ID type; leave it unset. */
   readonly _type?: Id;
 }
 
 /** Result of projection or reconciliation. */
 export interface RowBridgeProjection<Id extends RowBridgeId = RowBridgeId> {
+  /** How the transaction was settled, such as `"accepted"` or `"remote"`. */
   readonly status: RowBridgeReconciliationStatus;
+  /** The transaction the deltas come from. */
   readonly transaction: RowBridgeTransaction;
+  /** One delta per document operation, in order. */
   readonly deltas: readonly RowBridgeDelta<Id>[];
 }
 
@@ -410,6 +474,7 @@ export class RowBridge<
   private readonly seenTransactionIds: RecentIdentities;
   private latestVersion = -Infinity;
 
+  /** Creates a bridge over `options.defaultRows`; `maxRecentTransactions` must be a positive safe integer. */
   constructor(options: RowBridgeOptions<Row, Id>) {
     const maxRecentTransactions =
       options.maxRecentTransactions === undefined
@@ -882,6 +947,7 @@ export class RowBridge<
         return this.metadata(transaction, operation, "named-range");
 
       case "setCalculation":
+      case "setExternalLinks":
         return this.metadata(transaction, operation, "calculation");
 
       case "setRelationship":
@@ -1121,6 +1187,8 @@ export class RowBridge<
  *   getRowId: (row) => row.id,
  * });
  * ```
+ * @param options - Your rows, their IDs and the columns they show.
+ * @returns A new bridge; the same as `new RowBridge(options)`.
  * @see RowBridgeOptions
  * @see RowBridge
  */
@@ -1131,7 +1199,12 @@ export function createRowBridge<
   return new RowBridge(options);
 }
 
-/** Compute a deterministic identity for a canonical transaction. */
+/**
+ * Compute a deterministic identity for a canonical transaction.
+ *
+ * @param transaction - The transaction's patches and epoch.
+ * @returns The ID, the same for the same patches and epoch.
+ */
 export function rowBridgeTransactionId(
   transaction: Pick<Transaction, "patches" | "epoch">,
 ): string {

@@ -2,7 +2,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "bundle": "webpack --config webpack.config.js",
+    "bundle": "webpack --config webpack.config.js && webpack --config webpack.styles.config.js",
     "build": "npm ci --ignore-scripts --no-audit --no-fund && npm run bundle && node check.mjs"
   },
   "dependencies": {

@@ -32,8 +32,8 @@ function siteGridTheme(parent: HTMLElement = document.body): Partial<Theme> {
     headerFg: token("--sw-accent-strong"),
     selection: mix("--sw-accent", 14),
     selectionBorder: token("--sw-accent"),
-    searchMatch: mix("--sw-demo-warn", 25),
-    searchActiveMatch: token("--sw-demo-warn"),
+    searchMatch: mix("--sw-warning", 25),
+    searchActiveMatch: token("--sw-warning"),
     highlight: mix("--sw-accent", 20),
     font,
   };

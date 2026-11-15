@@ -15,6 +15,11 @@ const CSV_OPTION_COUNT: usize = 3;
 
 /// A thrown failure carries stable codes and coordinates, never source data.
 #[wasm_bindgen(js_name = QueryFailure)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct QueryFailure {
     code: String,
     column: String,
@@ -38,12 +43,20 @@ impl QueryFailure {
 
     /// Zero-based failed step, if execution had reached a step.
     #[wasm_bindgen(getter, js_name = step)]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "wasm-bindgen cannot export a const fn"
+    )]
     pub fn step(&self) -> Option<u32> {
         self.step
     }
 
     /// Zero-based input row, if the failure belongs to a specific row.
     #[wasm_bindgen(getter, js_name = row)]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "wasm-bindgen cannot export a const fn"
+    )]
     pub fn row(&self) -> Option<u32> {
         self.row
     }
@@ -77,6 +90,11 @@ pub(crate) fn error(issue: Diagnostic) -> JsValue {
 
 /// An output column owns each lane until its matching take method moves it out.
 #[wasm_bindgen(js_name = QueryColumn)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct QueryColumn {
     buffers: ColumnBuffers,
 }
@@ -173,6 +191,11 @@ impl QueryColumn {
 
 /// Packed column types pair with interleaved id/name strings; no row objects are needed.
 #[wasm_bindgen(js_name = QuerySchema)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct QuerySchema {
     columns: Vec<ColumnSpec>,
 }
@@ -182,8 +205,8 @@ impl QuerySchema {
     /// Metadata strings alternate stable column id and source display name.
     #[wasm_bindgen(constructor)]
     pub fn new(types: &[u8], text: &[u8], offsets: &[u32]) -> Result<Self, JsValue> {
-        let names = decode_strings(text, offsets).map_err(error)?;
-        if names.len()
+        let strings = decode_strings(text, offsets).map_err(error)?;
+        if strings.len()
             != types
                 .len()
                 .checked_mul(2)
@@ -192,7 +215,7 @@ impl QuerySchema {
             return Err(error(Diagnostic::new("shape")));
         }
 
-        let mut names = names.into_iter();
+        let mut names = strings.into_iter();
         let mut columns = Vec::with_capacity(types.len());
         for kind in types {
             let id = names
@@ -214,6 +237,11 @@ impl QuerySchema {
 
 /// A batch owns columns until execution consumes it or takeColumn transfers one out.
 #[wasm_bindgen(js_name = QueryBatch)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct QueryBatch {
     columns: Vec<Option<Column>>,
     rows: u32,
@@ -223,6 +251,10 @@ pub struct QueryBatch {
 impl QueryBatch {
     /// Row count is explicitly u32, matching the flat index format.
     #[wasm_bindgen(constructor)]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "wasm-bindgen cannot export a const fn"
+    )]
     pub fn new(rows: u32) -> Self {
         Self {
             columns: Vec::new(),
@@ -236,8 +268,8 @@ impl QueryBatch {
         &mut self,
         column: crate::column_input::ColumnBuilder,
     ) -> Result<(), JsValue> {
-        let column = column.build().map_err(error)?;
-        if column.len() != row_index(self.rows).map_err(error)? {
+        let built = column.build().map_err(error)?;
+        if built.len() != row_index(self.rows).map_err(error)? {
             return Err(error(Diagnostic::new("shape")));
         }
 
@@ -248,12 +280,16 @@ impl QueryBatch {
                 .ok_or_else(|| error(Diagnostic::limit()))?,
         )
         .map_err(error)?;
-        self.columns.push(Some(column));
+        self.columns.push(Some(built));
         Ok(())
     }
 
     /// Scalar row count does not transfer the column buffers.
     #[wasm_bindgen(getter, js_name = rowCount)]
+    #[allow(
+        clippy::missing_const_for_fn,
+        reason = "wasm-bindgen cannot export a const fn"
+    )]
     pub fn row_count(&self) -> u32 {
         self.rows
     }
@@ -267,10 +303,10 @@ impl QueryBatch {
     /// Transfers one column once; taking an absent or consumed column is an error.
     #[wasm_bindgen(js_name = takeColumn)]
     pub fn take_column(&mut self, index: u32) -> Result<QueryColumn, JsValue> {
-        let index = row_index(index).map_err(error)?;
+        let position = row_index(index).map_err(error)?;
         let column = self
             .columns
-            .get_mut(index)
+            .get_mut(position)
             .and_then(Option::take)
             .ok_or_else(|| error(Diagnostic::new("column")))?;
 
@@ -302,6 +338,11 @@ impl QueryBatch {
 
 /// Inputs have one execution lifetime; dropping the runner releases them without a cache.
 #[wasm_bindgen(js_name = QueryRunner)]
+#[derive(Debug)]
+#[allow(
+    unnameable_types,
+    reason = "a wasm-bindgen export that only JavaScript names"
+)]
 pub struct QueryRunner {
     inputs: Vec<(String, Batch)>,
     limits: Limits,
@@ -332,6 +373,10 @@ impl QueryRunner {
 
     /// Host-owned bytes enter a schema; format options never include a URL or credential.
     #[wasm_bindgen(js_name = parseSource)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "a wasm-bindgen export; JavaScript passes each lane as its own argument"
+    )]
     pub fn parse_source(
         &self,
         bytes: &[u8],
@@ -351,7 +396,8 @@ impl QueryRunner {
                     return Err(error(Diagnostic::new("csv-options")));
                 }
                 let delimiter = u8::try_from(*at(options, 0).map_err(error)?)
-                    .map_err(|_| error(Diagnostic::new("csv-options")))?;
+                    .ok()
+                    .ok_or_else(|| error(Diagnostic::new("csv-options")))?;
 
                 SourceSpec::Csv {
                     columns: schema.columns,
@@ -382,6 +428,10 @@ impl QueryRunner {
 
     /// Plans arrive as typed code, literal and string lanes; nothing passes through JSON.
     #[wasm_bindgen(js_name = execute)]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "a wasm-bindgen export; JavaScript passes each lane as its own argument"
+    )]
     pub fn execute(
         &self,
         source: QueryBatch,
@@ -397,9 +447,9 @@ impl QueryRunner {
             offsets,
         };
         let plan = crate::decode_plan(wire, &self.limits).map_err(error)?;
-        let source = source.into_batch(&self.limits).map_err(error)?;
+        let batch = source.into_batch(&self.limits).map_err(error)?;
 
-        crate::execute(source, &plan, &self.inputs, &self.limits)
+        crate::execute(batch, &plan, &self.inputs, &self.limits)
             .and_then(QueryBatch::from_batch)
             .map_err(error)
     }

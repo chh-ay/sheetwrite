@@ -1,4 +1,4 @@
-//! A byte-level RFC 4180 record reader: https://www.rfc-editor.org/rfc/rfc4180
+//! A byte-level RFC 4180 record reader: <https://www.rfc-editor.org/rfc/rfc4180>
 //!
 //! Records end at LF, CRLF or a lone CR. A quoted field may contain delimiters, line breaks
 //! and doubled quotes; after its closing quote only a delimiter or a record end may follow.
@@ -23,7 +23,7 @@ pub(crate) struct Record {
 }
 
 impl Record {
-    pub(crate) fn len(&self) -> usize {
+    pub(crate) const fn len(&self) -> usize {
         self.ends.len()
     }
 
@@ -57,7 +57,7 @@ impl<'a> Reader<'a> {
         }
 
         Ok(Self {
-            text: std::str::from_utf8(bytes).map_err(|_| syntax())?,
+            text: std::str::from_utf8(bytes).ok().ok_or_else(syntax)?,
             offset: 0,
             delimiter,
         })

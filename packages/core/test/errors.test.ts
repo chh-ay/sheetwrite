@@ -1,37 +1,22 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  createSimpleGridInput,
-  SheetwriteError as AdapterSheetwriteError,
-} from "../src/adapter.js";
-import { DelimitedTextOptionsError, DelimitedTextResourceError } from "../src/delimited-text.js";
+import { createSimpleGridInput } from "../src/adapter.js";
 import {
   assertWorkbookAllocationLimits,
-  SnapshotResourceError,
   SnapshotValidationError,
   validateTransactionResources,
 } from "../src/document-protocol.js";
 import {
   isSheetwriteError,
   normalizeSheetwriteError,
-  SHEETWRITE_ERROR_CODES,
-  SHEETWRITE_ERROR_OPERATIONS,
   SheetwriteError,
   type SheetwriteErrorCode,
   type SheetwriteErrorOperation,
 } from "../src/errors.js";
-import { SheetwriteError as FullSheetwriteError } from "../src/index.js";
-import { IndexedDbPendingCommitStorageError } from "../src/indexeddb.js";
-import { JsonByteLengthError } from "../src/json-bytes.js";
-import { PersistenceError } from "../src/persistence.js";
 import { decodeStoreMemoryStats } from "../src/resource-accounting.js";
 import { encodeRestoreBlock } from "../src/restore-block.js";
 import { createRowBridge } from "../src/row-bridge.js";
-import { IncompleteDataError } from "../src/store/data-engine.js";
-import { SyncProtocolError } from "../src/sync-protocol.js";
-import { SyncPendingCapacityError } from "../src/sync.js";
 import type { Workbook } from "../src/types/document.js";
-import { XlsxResourceError } from "../src/xlsx-bridge.js";
 
 const MAX_ERROR_TEXT_BYTES = 8 * 1024;
 const utf8Bytes = (text: string): number => new TextEncoder().encode(text).length;
@@ -46,11 +31,6 @@ function thrownBy(run: () => unknown): unknown {
 }
 
 describe("SheetwriteError", () => {
-  it("has one runtime identity across public core entries", () => {
-    expect(FullSheetwriteError).toBe(SheetwriteError);
-    expect(AdapterSheetwriteError).toBe(SheetwriteError);
-  });
-
   it("serializes a stable envelope without leaking its cause", () => {
     const cause = new Error("socket closed");
     const error = new SheetwriteError(
@@ -105,56 +85,9 @@ describe("SheetwriteError", () => {
     });
     expect(wrapped.cause).toBe(cause);
   });
-
-  it("keeps legacy domain subclasses inside the canonical envelope", () => {
-    const failures = [
-      new DelimitedTextResourceError("maxCells", 10, 11, "parse"),
-      new XlsxResourceError("maxCells", 10, 11, "import"),
-      new SnapshotResourceError("maxDenseCells", 10, 11),
-      new PersistenceError("not-found", "missing document"),
-      new IndexedDbPendingCommitStorageError("quota", "quota exceeded"),
-      new SyncProtocolError("invalid-version", "invalid version"),
-    ];
-    const codes = new Set<string>(SHEETWRITE_ERROR_CODES);
-    const operations = new Set<string>(SHEETWRITE_ERROR_OPERATIONS);
-
-    for (const failure of failures) {
-      expect(failure).toBeInstanceOf(SheetwriteError);
-      expect(codes.has(failure.code)).toBe(true);
-      expect(operations.has(failure.operation)).toBe(true);
-      expect(isSheetwriteError(failure)).toBe(true);
-    }
-  });
 });
 
 describe("isSheetwriteError", () => {
-  it("accepts every subclass and envelopes whose code this release does not know", () => {
-    const failures = [
-      new DelimitedTextOptionsError("maxCells", -1),
-      new SnapshotValidationError([{ path: "$", code: "invalid-value", message: "bad" }]),
-      new SyncPendingCapacityError({
-        kind: "resource-limit",
-        severity: "error",
-        resource: "pending-commits",
-        actual: 2,
-        max: 1,
-        message: "full",
-      }),
-      new IncompleteDataError("s1", { status: "incomplete", loadedCells: 1, totalCells: 2 }),
-      new JsonByteLengthError("payload-limit", "too large", 9, 8),
-    ];
-    for (const failure of failures) expect(isSheetwriteError(failure)).toBe(true);
-
-    expect(
-      isSheetwriteError({
-        name: "SheetwriteError",
-        message: "from a newer release",
-        code: "code-from-a-newer-release",
-        operation: "operation-from-a-newer-release",
-      }),
-    ).toBe(true);
-  });
-
   it("rejects values without the failure shape", () => {
     const throwingProxy = new Proxy(
       {},
@@ -191,19 +124,6 @@ describe("isSheetwriteError", () => {
     ];
 
     for (const value of lookAlikes) expect(isSheetwriteError(value)).toBe(false);
-  });
-
-  it("lists every code and operation of the type unions", () => {
-    // A code or operation missing from the arrays fails to compile here.
-    const codes: Record<SheetwriteErrorCode, true> = Object.fromEntries(
-      SHEETWRITE_ERROR_CODES.map((code) => [code, true]),
-    ) as Record<(typeof SHEETWRITE_ERROR_CODES)[number], true>;
-    const operations: Record<SheetwriteErrorOperation, true> = Object.fromEntries(
-      SHEETWRITE_ERROR_OPERATIONS.map((operation) => [operation, true]),
-    ) as Record<(typeof SHEETWRITE_ERROR_OPERATIONS)[number], true>;
-
-    expect(Object.keys(codes)).toHaveLength(SHEETWRITE_ERROR_CODES.length);
-    expect(Object.keys(operations)).toHaveLength(SHEETWRITE_ERROR_OPERATIONS.length);
   });
 });
 

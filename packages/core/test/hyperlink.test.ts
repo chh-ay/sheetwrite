@@ -16,15 +16,7 @@ import {
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellHyperlink, Workbook } from "../src/types.js";
-import { makeWorkbook } from "./fixtures.js";
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
+import { makeWorkbook, mountHost } from "./fixtures.js";
 
 function externalLink(url = "https://example.com/report?q=1"): CellHyperlink {
   return {

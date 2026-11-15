@@ -6,7 +6,7 @@ use crate::mixed::Mixed;
 use crate::plan::{ColumnSpec, ColumnType, Diagnostic};
 
 /// Owned transfer lanes move out once; row error codes index the packed code pool.
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub(crate) struct ColumnBuffers {
     pub column_type: Option<ColumnType>,
     pub metadata: Vec<u8>,
@@ -27,15 +27,15 @@ pub(crate) struct ColumnBuffers {
 impl Column {
     /// Metadata contains id, name, then interned codes; payload buffers move unchanged.
     pub(crate) fn into_buffers(self) -> Result<ColumnBuffers, Diagnostic> {
-        let mut metadata = Texts::default();
-        metadata.push(&self.spec.id)?;
-        metadata.push(&self.spec.name)?;
+        let mut metadata_texts = Texts::default();
+        metadata_texts.push(&self.spec.id)?;
+        metadata_texts.push(&self.spec.name)?;
 
         for code in self.error_codes {
-            metadata.push(&code)?;
+            metadata_texts.push(&code)?;
         }
 
-        let (metadata, metadata_offsets) = metadata.into_parts();
+        let (metadata, metadata_offsets) = metadata_texts.into_parts();
         let (error_rows, error_codes) = self.error_records.into_iter().unzip();
         let mut buffers = ColumnBuffers {
             column_type: Some(self.spec.column_type),
@@ -159,14 +159,14 @@ fn error_mask(
     }
 
     let mut errors = Bits::default();
-    let mut records = records.iter().peekable();
+    let mut pending = records.iter().peekable();
     for row in 0..rows {
-        let has_error = records
+        let has_error = pending
             .peek()
             .is_some_and(|record| row_index(record.0).ok() == Some(row));
         errors.push(has_error)?;
         if has_error {
-            records.next();
+            pending.next();
         }
     }
 
@@ -222,8 +222,8 @@ fn adopt_payload(
             require_length(indexes.len(), rows)?;
             let logical_rows = tags
                 .iter()
-                .filter(|tag| **tag == crate::mixed::LOGICAL_TAG)
-                .count();
+                .map(|&tag| usize::from(tag == crate::mixed::LOGICAL_TAG))
+                .sum();
             Payload::Mixed(Mixed {
                 tags,
                 indexes,

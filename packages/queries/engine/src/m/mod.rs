@@ -10,8 +10,8 @@ mod import;
 mod parse;
 mod text;
 
-pub use emit::emit_section;
-pub use import::{import_section, Unsupported};
+pub use emit::{emit_section, Loss, Section};
+pub use import::{import_section, SectionImport, Unsupported};
 
 use crate::plan::{ColumnSpec, Diagnostic, Limits, Plan};
 use crate::plan_wire::{definition, Cursor, PlanWire, NO_COLUMN};
@@ -25,33 +25,49 @@ const SOURCE_JSON: u32 = 2;
 const SOURCE_HOST: u32 = 3;
 
 /// How a saved query reads its data; mirrors `SavedQuerySource` in core.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MSourceKind {
+    /// Delimited text, read with these options.
     Csv {
+        /// Field separator byte.
         delimiter: u8,
+        /// Whether the first record names the columns.
         headers: bool,
+        /// Whether an empty field reads as null rather than empty text.
         empty_is_null: bool,
     },
+    /// A JSON document whose rows are the objects of one array.
     Json {
+        /// Member names leading from the root to the row array.
         path: Vec<String>,
     },
+    /// Rows the host supplies, such as a worksheet table.
     Host,
 }
 
+/// Where a saved query reads its rows and the columns it declares.
 #[derive(Clone, Debug)]
 pub struct MSource {
+    /// How the source bytes are parsed.
     pub kind: MSourceKind,
+    /// The host's id for the source.
     pub source_id: String,
+    /// Where the host loads the source from, such as a URL; the engine never fetches it.
     pub locator: Option<String>,
+    /// Declared columns, in source order.
     pub columns: Vec<ColumnSpec>,
 }
 
 /// One saved query as the codec sees it; join inputs name other query IDs.
 #[derive(Clone, Debug)]
 pub struct MQuery {
+    /// Stable id that join steps of other queries refer to.
     pub id: String,
+    /// Display name, written as the M member name.
     pub name: String,
+    /// Where the query reads its rows.
     pub source: MSource,
+    /// Steps applied to the source rows, in order.
     pub steps: Plan,
     /// Output table name, written as the query's `FillTarget`.
     pub output: Option<String>,
@@ -86,17 +102,20 @@ fn query(cursor: &mut Cursor<'_>, limits: &Limits) -> Result<MQuery, Diagnostic>
     for _ in 0..count {
         let id = cursor.string()?;
         let name = cursor.string()?;
-        let code = u8::try_from(cursor.code()?).map_err(|_| definition())?;
+        let column_type = u8::try_from(cursor.code()?)
+            .ok()
+            .and_then(|code| decode_type(code).ok())
+            .ok_or_else(definition)?;
         columns.push(ColumnSpec {
             id,
             name,
-            column_type: decode_type(code).map_err(|_| definition())?,
+            column_type,
         });
     }
 
     let kind = match kind_code {
         SOURCE_CSV => MSourceKind::Csv {
-            delimiter: u8::try_from(cursor.code()?).map_err(|_| definition())?,
+            delimiter: u8::try_from(cursor.code()?).ok().ok_or_else(definition)?,
             headers: flag(cursor)?,
             empty_is_null: flag(cursor)?,
         },

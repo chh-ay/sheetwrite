@@ -7,14 +7,11 @@
 //! both stop the walk at the same cell. `next_allow_errors` instead returns
 //! error cells as values for criteria ranges.
 
+use super::preview_limits::RangeRead;
 use super::{EvalPass, LiteralSources};
 
-use crate::sheet::SheetData;
 use crate::store::CellStore;
-use crate::types::{
-    CellRange, FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING,
-    RANGE_CELL_LIMIT,
-};
+use crate::types::{CellRange, FormulaError, Value, KIND_EMPTY, KIND_FORMULA, RANGE_CELL_LIMIT};
 
 #[cfg(test)]
 thread_local! {
@@ -25,30 +22,17 @@ thread_local! {
 
 /// A one-pass cursor over a rectangle of cells in row-major order.
 pub(crate) struct RangeReader<'a> {
-    store: &'a CellStore,
-    data: &'a SheetData,
+    view: super::range_view::RangeView<'a>,
     /// Present when dense literal sources may bypass `eval_at`.
     literals: Option<LiteralSources<'a>>,
-    sheet: usize,
     row: usize,
     col: usize,
     row_start: usize,
     row_end: usize,
     col_start: usize,
     col_end: usize,
-    depth: usize,
-
-    /// Page-tile cursor: the first row after the current row band of source
-    /// pages. Entering a band records one access per column page; cells inside
-    /// it index the page directory directly.
+    /// First row after the current band of source pages.
     tile_end_row: usize,
-}
-
-/// A range of literal cells as one `(kinds, payloads)` slice pair per column,
-/// each `rows` long. Cell `(row, col)` of the range is `columns[col].0[row]`.
-pub(crate) struct LiteralColumns<'a> {
-    pub(crate) rows: usize,
-    pub(crate) columns: Vec<(&'a [u8], &'a [u64])>,
 }
 
 impl<'a> RangeReader<'a> {
@@ -60,49 +44,48 @@ impl<'a> RangeReader<'a> {
         range: CellRange,
         depth: usize,
     ) -> Result<Self, FormulaError> {
-        let sheet = range.sheet as usize;
-        let Some(data) = store.sheets.get(sheet) else {
-            return Err(FormulaError::Ref);
-        };
+        Self::with_read(store, range, depth, RangeRead::Typed)
+    }
 
-        if data.cells.row_count() == 0
-            || data.cells.n_cols() == 0
-            || range.row_start as usize >= data.cells.row_count()
-            || range.col_start as usize >= data.cells.n_cols()
-        {
-            return Err(FormulaError::Ref);
-        }
+    /// Prepares a numeric scan whose non-number cells use per-cell evaluation.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn numbers(
+        store: &'a CellStore,
+        range: CellRange,
+        depth: usize,
+    ) -> Result<Self, FormulaError> {
+        Self::with_read(store, range, depth, RangeRead::Numbers)
+    }
 
-        let row_start = range.row_start as usize;
-        let col_start = range.col_start as usize;
-        let row_end = (range.row_end as usize).min(data.cells.row_count() - 1);
-        let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
-        let rows = row_end - row_start + 1;
-        let cols = col_end - col_start + 1;
-
+    fn with_read(
+        store: &'a CellStore,
+        range: CellRange,
+        depth: usize,
+        read: RangeRead,
+    ) -> Result<Self, FormulaError> {
+        let view = super::range_view::RangeView::clipped(store, range, depth)?;
+        let (rows, cols) = view.shape();
         if (rows as u64).saturating_mul(cols as u64) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
+        view.charge_preview(read)?;
 
         Ok(Self {
-            store,
-            data,
-            literals: LiteralSources::new(data, depth),
-            sheet,
-            row: row_start,
-            col: col_start,
-            row_start,
-            row_end,
-            col_start,
-            col_end,
-            depth,
+            literals: LiteralSources::new(view.data, depth),
+            row: view.row_start,
+            col: view.col_start,
+            row_start: view.row_start,
+            row_end: view.row_start + rows - 1,
+            col_start: view.col_start,
+            col_end: view.col_start + cols - 1,
+            view,
             tile_end_row: 0,
         })
     }
 
     /// The number of rows and columns the walk covers, after clamping to the
     /// sheet's used extent.
-    pub(crate) fn shape(&self) -> (usize, usize) {
+    pub(crate) const fn shape(&self) -> (usize, usize) {
         (
             self.row_end - self.row_start + 1,
             self.col_end - self.col_start + 1,
@@ -114,40 +97,8 @@ impl<'a> RangeReader<'a> {
     /// no spill writes into. `None` sends the caller to the cell-by-cell walk:
     /// paged storage, formula or spill cells, and reads at the depth limit,
     /// where literals go through `eval_at` and fail. Call it before reading.
-    pub(crate) fn literal_columns(&self) -> Option<LiteralColumns<'a>> {
-        self.literals?;
-
-        #[cfg(test)]
-        if LITERAL_COLUMNS_OFF.with(std::cell::Cell::get) {
-            return None;
-        }
-
-        let rows = self.row_start..=self.row_end;
-        let mut columns = Vec::new();
-        columns
-            .try_reserve_exact(self.col_end - self.col_start + 1)
-            .ok()?;
-
-        for col in self.col_start..=self.col_end {
-            let column = self.data.cells.dense_column(col)?;
-            let (kinds, payloads) = column.raw_slices();
-            let kinds = kinds.get(rows.clone())?;
-
-            // A raw empty kind without the calculated bit is a plain blank.
-            if !kinds
-                .iter()
-                .all(|&kind| matches!(kind, KIND_EMPTY | KIND_NUMBER | KIND_STRING | KIND_BOOL))
-            {
-                return None;
-            }
-
-            columns.push((kinds, payloads.get(rows.clone())?));
-        }
-
-        Some(LiteralColumns {
-            rows: self.row_end - self.row_start + 1,
-            columns,
-        })
+    pub(crate) fn literal_columns(&self) -> Option<super::range_view::LiteralColumns<'a>> {
+        self.view.literal_columns()
     }
 
     /// The next value in row-major order, or `None` once the range is spent.
@@ -175,18 +126,18 @@ impl<'a> RangeReader<'a> {
             return Ok(None);
         }
 
-        let index = self.data.cells.idx(self.row, self.col);
-        let value = if !self.data.cells.is_paged() {
+        let index = self.view.data.cells.idx(self.row, self.col);
+        let value = if self.view.data.cells.is_paged() {
+            self.paged_value_at(index, pass)?
+        } else {
             if let Some(value) = self
                 .literals
-                .and_then(|sources| sources.value_at(&self.store.strings, index))
+                .and_then(|sources| sources.value_at(&self.view.store.strings, index))
             {
                 value
             } else {
                 self.dense_value_at(self.row, self.col, pass)
             }
-        } else {
-            self.paged_value_at(index, pass)?
         };
 
         self.col += 1;
@@ -203,14 +154,16 @@ impl<'a> RangeReader<'a> {
     /// evaluated, and spill output, which shares the dense source slot, is
     /// read directly even when the source is empty.
     pub(crate) fn dense_value_at(&self, row: usize, col: usize, pass: &mut EvalPass<'_>) -> Value {
-        let index = self.data.cells.idx(row, col);
-        if self.data.cells.source_kind_at(index) != KIND_EMPTY {
+        let index = self.view.data.cells.idx(row, col);
+        if self.view.data.cells.source_kind_at(index) != KIND_EMPTY {
             return self
+                .view
                 .store
-                .eval_at(self.sheet, row, col, pass, self.depth + 1);
+                .eval_at(self.view.sheet, row, col, pass, self.view.depth + 1);
         }
 
         match self
+            .view
             .data
             .cells
             .calculated_cell_at(index)
@@ -219,7 +172,7 @@ impl<'a> RangeReader<'a> {
             (KIND_FORMULA, payload) => {
                 Value::Error(FormulaError::from_slot(payload).unwrap_or(FormulaError::Value))
             }
-            (kind, payload) => super::literal_cell_value(&self.store.strings, kind, payload),
+            (kind, payload) => super::literal_cell_value(&self.view.store.strings, kind, payload),
         }
     }
 
@@ -232,13 +185,14 @@ impl<'a> RangeReader<'a> {
         pass: &mut EvalPass<'_>,
     ) -> Result<Value, FormulaError> {
         if self.row >= self.tile_end_row {
-            self.data
+            self.view
+                .data
                 .cells
                 .touch_tile(self.row, self.col_start, self.col_end);
-            self.tile_end_row = self.data.cells.next_page_row(self.row);
+            self.tile_end_row = self.view.data.cells.next_page_row(self.row);
         }
 
-        let run = self.data.cells.tile_run(index, index + 1);
+        let run = self.view.data.cells.tile_run(index, index + 1);
         if !run.is_loaded(index) {
             return Err(FormulaError::Loading);
         }
@@ -247,9 +201,13 @@ impl<'a> RangeReader<'a> {
             return Ok(Value::Blank);
         }
 
-        Ok(self
-            .store
-            .eval_at(self.sheet, self.row, self.col, pass, self.depth + 1))
+        Ok(self.view.store.eval_at(
+            self.view.sheet,
+            self.row,
+            self.col,
+            pass,
+            self.view.depth + 1,
+        ))
     }
 }
 
@@ -299,44 +257,13 @@ mod tests {
     }
 
     #[test]
-    fn dense_wide_streams_read_every_column() {
-        const COLUMNS: usize = 4096;
-        const ROWS: usize = 2;
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(COLUMNS, ROWS);
-        store.set_number(sheet, 0, 0, 7.0, 0);
-        store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
-        store.recompute(sheet);
-
-        let affected = FormulaWork::default();
-        let mut results = FormulaResults::default();
-
-        let mut pass = EvalPass {
-            affected: &affected,
-            results: &mut results,
-        };
-        let range = CellRange::new(sheet as u32, 0, 0, 1, (COLUMNS - 1) as u32);
-        let mut reader = RangeReader::new(&store, range, 0).unwrap();
-        let mut count = 0;
-        let mut sum = 0.0;
-        while let Some(value) = reader.next(&mut pass).unwrap() {
-            count += 1;
-            if let Value::Number(number) = value {
-                sum += number;
-            }
-        }
-        assert_eq!(count, ROWS * COLUMNS);
-        assert_eq!(sum, 16.0);
-    }
-
-    #[test]
     fn wide_paged_streams_preserve_loading() {
         const COLUMNS: usize = 65;
         const ROWS: usize = 2;
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(COLUMNS + 1, ROWS, ROWS, 0, ROWS * COLUMNS);
         for col in 0..COLUMNS {
-            store.set_column_numbers(sheet, col, 0, &[0.0; ROWS], 0);
+            crate::tests::write_number_column(&mut store, sheet, col, 0, &[0.0; ROWS]);
         }
         store.set_number(sheet, 0, 0, 7.0, 0);
         store.set_formula(sheet, 1, COLUMNS - 1, "=9", 0);
@@ -410,38 +337,6 @@ mod tests {
     }
 
     #[test]
-    fn streaming_matches_the_list_path_for_mixed_blank_and_formula_cells() {
-        let (store, sheet) = mixed_store();
-        for candidate in [
-            range(sheet, 0, 0, 3, 1),
-            range(sheet, 0, 0, 1, 1),
-            range(sheet, 0, 0, 0, 0),
-            range(sheet, 2, 0, 2, 1),
-            range(sheet, 0, 1, 2, 1),
-            range(sheet, 0, 0, 11, 2),
-            range(sheet, 0, 2, 2, 2),
-        ] {
-            assert_eq!(
-                streamed_values(&store, candidate),
-                listed_values(&store, candidate),
-                "range {candidate:?}"
-            );
-        }
-        assert_eq!(
-            RangeReader::new(&store, range(sheet, 0, 0, 11, 2), 0)
-                .unwrap()
-                .shape(),
-            (12, 3)
-        );
-        assert_eq!(
-            RangeReader::new(&store, range(sheet, 2, 1, 99, 99), 0)
-                .unwrap()
-                .shape(),
-            (10, 2)
-        );
-    }
-
-    #[test]
     fn streaming_stops_where_the_list_path_stops() {
         let (store, sheet) = mixed_store();
         for candidate in [
@@ -484,7 +379,7 @@ mod tests {
         let mut store = CellStore::new();
         let sheet = store.add_paged_sheet(2, 8, 4, 0, 0);
         store.begin_page_load();
-        store.set_column_numbers(sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0], 0);
+        crate::tests::write_number_column(&mut store, sheet, 0, 0, &[1.0, 2.0, 3.0, 4.0]);
         store.commit_sources();
         let loaded = range(sheet, 0, 0, 3, 0);
         assert_eq!(

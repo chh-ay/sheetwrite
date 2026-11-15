@@ -6,7 +6,8 @@ import {
   type PrefetchBenchmarkReport,
   validateDatasourcePrefetchReport,
 } from "./datasource-prefetch-bench.js";
-import { type FormulaBenchmarkResult, validateFormulaBenchmark } from "./formula-bench.js";
+import { type FormulaBenchmarkResult } from "./formula-artifact.js";
+import { validateFormulaBenchmark } from "./formula-bench.js";
 import { validateInteractionArtifact } from "./interaction-gate.js";
 import { type PagedBenchmarkResult, validatePagedBenchmark } from "./paged-bench.js";
 import { type RangeGateArtifact, validateRangeArtifact } from "./range-gate.js";

@@ -1,524 +1,236 @@
-import { Link } from "@tanstack/react-router";
-import { type ReactNode, type RefObject, useEffect, useRef, useState } from "react";
-
 import {
-  breadcrumbsFor,
-  type Crumb,
-  DOCS_NAVIGATION,
   type DocumentNeighbours,
   documentNeighbours,
-  type NavigationItem,
-  type NavigationLocation,
-  navigationBadge,
   nearestNavigationItem,
-} from "../lib/navigation.js";
-import {
-  LATEST_RELEASE,
-  RELEASES_HREF,
-  type ReleaseContext,
-  releaseContext,
-  releaseDate,
-  releaseHref,
-} from "../lib/releases.js";
-import { ApiSymbolFilter } from "./ApiSymbolFilter.js";
-import { DocsSearch } from "./DocsSearch.js";
-import { PackageCommand } from "./PackageCommand.js";
-import { InlineTableOfContents, TableOfContents, useDocumentOutline } from "./TableOfContents.js";
-import { ThemeToggle } from "./ThemeToggle.js";
+  tabForHref,
+} from "@docs/lib/navigation.js";
+import type { OutlineItem } from "@docs/lib/outline.js";
+import { editUrl, reportProblemUrl } from "@docs/lib/page-links.js";
+import { type JSX, Show } from "solid-js";
 
-/**
- * Keep the sidebar only when it fits beside the reading panel; smaller
- * viewports use the same navigation in a modal drawer.
+import { DOCS_CARD_ART } from "../art/docs-art.js";
+import { SECTION_HEADER_ART, SECTION_MARKS } from "../art/docs-pictures.js";
+import { SectionMark } from "../art/section-marks.js";
+import { Island } from "../islands/Island.js";
+import { revealCurrentNavigation } from "../lib/shell-ids.js";
+import { ApiSymbolFilter, MINIMUM_FILTERABLE_CARDS } from "./ApiSymbolFilter.js";
+import { BrandMark } from "./BrandMark.js";
+import { NavigationSections } from "./DocsNavigation.js";
+import { DocsTopbar } from "./DocsTopbar.js";
+import { Icon } from "./Icon.js";
+import { InlineTableOfContents, TableOfContents } from "./TableOfContents.js";
+
+/*
+ * The documentation page layout, ported from docs/src/components/DocsShell.tsx:
+ * the sidebar, the top bar, the page head, the article with its outline, and
+ * the footer. It is static markup; search and the API filter are islands, and
+ * lib/shell.ts adds the theme toggle, the menu, the outline's current section
+ * and the sidebar's scroll position.
  */
-const RAIL_VIEWPORT_QUERY = "(min-width: 64rem)";
-const NAVIGATION_DIALOG_ID = "sw-docs-navigation";
 
 interface DocsShellProps {
-  activeHref?: string;
-  children: ReactNode;
-  description: string;
+  readonly activeHref?: string;
+  readonly children: JSX.Element;
+  readonly description: string;
+  /** Declaration kind of an API symbol page, shown as a chip beside the title. */
+  readonly kind?: string;
+  /** The page's outline from the build. */
+  readonly outline?: readonly OutlineItem[];
   /**
-   * Include a collapsible outline above the article on narrow screens.
-   * The task-oriented overview omits it.
+   * Include the outline: on the right on wide screens, a collapsible row above
+   * the article on narrow ones. Not-found pages omit it.
    */
-  reserveOutline?: boolean;
-  title: string;
-}
-
-function Brand() {
-  return (
-    <Link aria-label="Sheetwrite home" className="sw-brand" to="/">
-      <svg aria-hidden="true" viewBox="0 0 32 32">
-        <rect height="26" rx="5" width="26" x="3" y="3" />
-        <path d="M3 11h26M11 3v26M20 11v18M11 20h18" />
-      </svg>
-      <span>Sheetwrite</span>
-    </Link>
-  );
-}
-
-function Breadcrumbs({ trail }: Readonly<{ trail: readonly Crumb[] }>) {
-  return (
-    <nav aria-label="Breadcrumb" className="sw-breadcrumb" data-pagefind-ignore>
-      <ol>
-        {trail.map((crumb) => (
-          <li key={`${crumb.href ?? "current"}|${crumb.label}`}>
-            {crumb.href === undefined ? (
-              <span aria-current={crumb === trail.at(-1) ? "page" : undefined}>{crumb.label}</span>
-            ) : (
-              // Ancestors are never the current page; the last crumb owns
-              // aria-current="page".
-              <Link activeOptions={{ exact: true }} to={crumb.href}>
-                {crumb.label}
-              </Link>
-            )}
-          </li>
-        ))}
-      </ol>
-    </nav>
-  );
+  readonly reserveOutline?: boolean;
+  /** An API entry point's exported symbol count, so its filter renders on the server. */
+  readonly symbolCount?: number;
+  /** The page's source file in the repository, for Edit on GitHub; generated pages have none. */
+  readonly sourcePath?: string;
+  readonly title: string;
 }
 
 /**
- * The newest release leads the navigation: a reader who upgrades should not
- * have to open a collapsed group to find what changed.
+ * Holds the sidebar's links out of sight until REVEAL_SCRIPT has scrolled the
+ * current row into view. A browser that paints while the sidebar is still
+ * parsing (Firefox can) then shows its surface for that frame, not the list
+ * at the top jumping to the current row.
  */
-function LatestReleaseCard({
-  activeHref,
-  onNavigate,
-}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
-  const href = releaseHref(LATEST_RELEASE.version);
-
-  return (
-    <Link
-      aria-current={activeHref === href ? "page" : undefined}
-      className="sw-release-card"
-      onClick={onNavigate}
-      to={href}
-    >
-      <span className="sw-release-card__meta">
-        <span className="sw-release-card__badge">New</span>
-        <time dateTime={LATEST_RELEASE.date}>{releaseDate(LATEST_RELEASE)}</time>
-      </span>
-      <strong>Sheetwrite {LATEST_RELEASE.version}</strong>
-      <span className="sw-release-card__summary">{LATEST_RELEASE.summary}</span>
-      <span className="sw-release-card__more">
-        Read the release notes <span aria-hidden="true">→</span>
-      </span>
-    </Link>
-  );
-}
-
-const BADGE_TEXT = { new: "New", updated: "Updated" } as const;
-
-/** New/Updated marker for the latest release; text, so screen readers announce it. */
-function NavigationBadgeLabel({ item }: Readonly<{ item: NavigationItem }>) {
-  const badge = navigationBadge(item, LATEST_RELEASE.version);
-  if (badge === undefined) return null;
-
-  return (
-    <span className="sw-nav-badge" data-badge={badge}>
-      {BADGE_TEXT[badge]}
-    </span>
-  );
-}
-
-interface NavigationEntriesProps {
-  items: readonly NavigationItem[];
-  current: NavigationLocation | undefined;
-  onNavigate?: () => void;
-}
-
-/**
- * One level of the tree. A group is a collapsible block that opens when the
- * current page is inside it; its own page, if any, is the first link inside,
- * because a link in the toggle row would also toggle the group.
- */
-function NavigationEntries({ items, current, onNavigate }: Readonly<NavigationEntriesProps>) {
-  return items.map((item) => {
-    if (item.items === undefined) {
-      return (
-        <Link
-          activeOptions={{ exact: true }}
-          aria-current={current?.href === item.href ? "page" : undefined}
-          key={item.href}
-          onClick={onNavigate}
-          to={item.href}
-        >
-          <span>{item.label}</span>
-          <NavigationBadgeLabel item={item} />
-        </Link>
-      );
-    }
-
-    // A group's own page opens the group too; call its link Overview to avoid repeating the name.
-    const open =
-      (current?.ancestors.includes(item) ?? false) ||
-      (item.href !== undefined && current?.href === item.href);
-    const ownPage =
-      item.href === undefined
-        ? []
-        : [
-            {
-              label: "Overview",
-              href: item.href,
-              added: item.added,
-              updated: item.updated,
-            },
-          ];
-    return (
-      <details className="sw-nav-subgroup" key={`${item.label}:${open}`} open={open}>
-        <summary>
-          <span>{item.label}</span>
-          <NavigationBadgeLabel item={item} />
-        </summary>
-        <div>
-          <NavigationEntries
-            current={current}
-            items={[...ownPage, ...item.items]}
-            onNavigate={onNavigate}
-          />
-        </div>
-      </details>
-    );
-  });
-}
-
-/**
- * The section list itself, shared by the sidebar and the drawer so the two can
- * never advertise different documentation. `onNavigate` lets the drawer close
- * once a reader has picked a destination.
- */
-function NavigationSections({
-  activeHref,
-  onNavigate,
-}: Readonly<{ activeHref?: string; onNavigate?: () => void }>) {
-  const current = nearestNavigationItem(activeHref);
-
-  return (
-    <nav aria-label="Documentation" className="sw-sidebar__nav">
-      <LatestReleaseCard activeHref={activeHref} onNavigate={onNavigate} />
-      {DOCS_NAVIGATION.map((section) => (
-        <details
-          className="sw-nav-group"
-          key={`${section.label}:${current?.section}`}
-          open={section.label === current?.section}
-        >
-          <summary>
-            <span>{section.label}</span>
-            <NavigationBadgeLabel item={section} />
-          </summary>
-          <div>
-            <NavigationEntries
-              current={current}
-              // A section's own page leads its list, named Overview as a group's is.
-              items={
-                section.href === undefined
-                  ? section.items
-                  : [{ label: "Overview", href: section.href }, ...section.items]
-              }
-              onNavigate={onNavigate}
-            />
-          </div>
-        </details>
-      ))}
-      <section>
-        <h2>Explore Sheetwrite</h2>
-        <Link activeOptions={{ exact: true }} onClick={onNavigate} to="/">
-          Home
-        </Link>
-        <Link activeOptions={{ exact: true }} onClick={onNavigate} to="/showcases/">
-          Showcases
-        </Link>
-        <a href="https://github.com/chh-ay/sheetwrite">GitHub</a>
-      </section>
-      <section>
-        <h2>For LLMs</h2>
-        {/* Plain text endpoints, not routes: no client-side navigation. */}
-        <a href="/llms.txt" title="Curated documentation index for AI agents">
-          llms.txt
-        </a>
-        <a href="/llms-full.txt" title="Complete documentation text for AI agents">
-          llms-full.txt
-        </a>
-      </section>
-    </nav>
-  );
-}
-
-interface NavigationDrawerProps {
-  activeHref?: string;
-  dialogRef: RefObject<HTMLDialogElement | null>;
-  /** Asks the modal to close; Escape and the browser's own close report via onClosed. */
-  onDismiss: () => void;
-  onClosed: () => void;
-}
-
-/**
- * The section list for viewports without room for the sidebar. A modal dialog
- * brings the focus trap, Escape handling, backdrop, and focus restore with it;
- * the header button only opens it.
- */
-function NavigationDrawer({
-  activeHref,
-  dialogRef,
-  onDismiss,
-  onClosed,
-}: Readonly<NavigationDrawerProps>) {
-  return (
-    // oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- a modal dialog already closes on Escape, so the backdrop click needs no second key handler.
-    <dialog
-      aria-label="Documentation"
-      className="sw-nav-dialog"
-      id={NAVIGATION_DIALOG_ID}
-      onClick={(event) => {
-        // Only the backdrop targets the dialog itself: its children fill it.
-        if (event.target === event.currentTarget) onDismiss();
-      }}
-      onClose={onClosed}
-      ref={dialogRef}
-    >
-      <div className="sw-nav-dialog__head">
-        <span className="sw-nav-dialog__title">Documentation</span>
-        <button
-          aria-label="Close documentation menu"
-          className="sw-icon-button"
-          onClick={onDismiss}
-          type="button"
-        >
-          <svg aria-hidden="true" viewBox="0 0 24 24">
-            <path d="m6 6 12 12M18 6 6 18" />
-          </svg>
-        </button>
-      </div>
-      <NavigationSections activeHref={activeHref} onNavigate={onDismiss} />
-    </dialog>
-  );
-}
+const HOLD_SCRIPT = 'document.documentElement.dataset.navReveal="pending"';
+/** Places the current page's sidebar row and tab in view while the page parses. */
+const REVEAL_SCRIPT = `(${revealCurrentNavigation.toString()})()`;
 
 /** Reading order: the neighbours of this page, when it sits in one. */
-function DocumentPager({ previous, next }: Readonly<DocumentNeighbours>) {
-  if (previous === undefined && next === undefined) return null;
-
+function DocumentPager(props: DocumentNeighbours) {
   return (
-    <nav aria-label="Documentation pages" className="sw-doc-pager">
-      {previous === undefined ? (
-        // Keeps "Next" in its own column when it is the only neighbour.
-        <span aria-hidden="true" />
-      ) : (
-        <Link
-          className="sw-doc-pager__link sw-doc-pager__link--previous"
-          rel="prev"
-          to={previous.href}
+    <Show when={props.previous !== undefined || props.next !== undefined}>
+      <nav aria-label="Documentation pages" class="sw-doc-pager">
+        <Show
+          // Keeps "Next" in its own column when it is the only neighbour.
+          fallback={<span aria-hidden="true" />}
+          when={props.previous}
         >
-          <span>Previous</span>
-          <strong>{previous.label}</strong>
-        </Link>
-      )}
-      {next === undefined ? null : (
-        <Link className="sw-doc-pager__link sw-doc-pager__link--next" rel="next" to={next.href}>
-          <span>Next</span>
-          <strong>{next.label}</strong>
-        </Link>
-      )}
-    </nav>
+          {(previous) => (
+            <a
+              class="sw-doc-pager__link sw-doc-pager__link--previous"
+              href={previous().href}
+              rel="prev"
+            >
+              <span>Previous</span>
+              <strong>{previous().label}</strong>
+            </a>
+          )}
+        </Show>
+        <Show when={props.next}>
+          {(next) => (
+            <a class="sw-doc-pager__link sw-doc-pager__link--next" href={next().href} rel="next">
+              <span>Next</span>
+              <strong>{next().label}</strong>
+            </a>
+          )}
+        </Show>
+      </nav>
+    </Show>
   );
 }
 
-/** The current version is one click from every page: it opens its release post. */
-function VersionLink() {
-  return (
-    <Link
-      aria-label={`Release notes for Sheetwrite ${LATEST_RELEASE.version}`}
-      className="sw-version-link"
-      to={releaseHref(LATEST_RELEASE.version)}
-    >
-      v{LATEST_RELEASE.version}
-    </Link>
+/**
+ * The page's eyebrow: the group it sits in (the nearest group, else its
+ * section), or the package of a generated symbol page. None where it would
+ * repeat the title: on a tab's landing page, whose section mark and title
+ * already name the section, or when it reads the same as the title.
+ */
+function eyebrowFor(
+  activeHref: string | undefined,
+  title: string,
+  titlePackage: string | undefined,
+): string | undefined {
+  if (titlePackage !== undefined) return titlePackage;
+  if (activeHref !== undefined && activeHref in SECTION_MARKS) return undefined;
+  const location = nearestNavigationItem(activeHref);
+  if (location === undefined) return "Documentation";
+  const group = location.ancestors.at(-1);
+  // A group's own page is the group: the section names its place.
+  const eyebrow = group === undefined || group.href === activeHref ? location.section : group.label;
+  return eyebrow.toLowerCase() === title.toLowerCase() ? undefined : eyebrow;
+}
+
+/** A section page's illustration beside its title (art/docs-pictures.ts); nothing elsewhere. */
+function SectionArt(props: { readonly href: string | undefined }) {
+  const Art = DOCS_CARD_ART[SECTION_HEADER_ART[props.href ?? ""] ?? ""];
+  return Art === undefined ? null : (
+    <div class="sw-section-art">
+      <Art />
+    </div>
   );
 }
 
-/** On a release post: its date and a step to the newer and older posts. */
-function ReleaseStrip({ release, newer, older }: Readonly<ReleaseContext>) {
-  return (
-    <nav aria-label="Release versions" className="sw-release-strip" data-pagefind-ignore>
-      <span>
-        Released <time dateTime={release.date}>{releaseDate(release)}</time>
-      </span>
-      {release === LATEST_RELEASE ? <span className="sw-release-strip__latest">Latest</span> : null}
-      {older === undefined ? null : (
-        <Link rel="prev" to={releaseHref(older.version)}>
-          ← {older.version}
-        </Link>
-      )}
-      {newer === undefined ? null : (
-        <Link rel="next" to={releaseHref(newer.version)}>
-          {newer.version} →
-        </Link>
-      )}
-      <Link to={RELEASES_HREF}>All releases</Link>
-    </nav>
-  );
-}
-
-export function DocsShell({
-  activeHref,
-  children,
-  description,
-  reserveOutline,
-  title,
-}: Readonly<DocsShellProps>) {
+export function DocsShell(props: DocsShellProps) {
   // API page titles arrive as "Symbol | @sheetwrite/pkg"; the package reads
-  // better as a chip than as part of a display-size heading.
-  const [titleMain, titlePackage] = title.split(" | ", 2);
-
-  const outline = useDocumentOutline();
-  const neighbours = documentNeighbours(activeHref);
-
-  const release = releaseContext(activeHref);
-  // Release notes are their own header section; every other page is Docs.
-  const inReleases = activeHref?.startsWith(RELEASES_HREF) ?? false;
-
-  const navigationDialog = useRef<HTMLDialogElement>(null);
-  const [navigationOpen, setNavigationOpen] = useState(false);
-
-  // A drawer left open while the viewport grows would sit on top of the rail.
-  useEffect(() => {
-    const rail = window.matchMedia(RAIL_VIEWPORT_QUERY);
-    const closeWhenRailFits = (event: MediaQueryListEvent) => {
-      if (event.matches) navigationDialog.current?.close();
-    };
-    rail.addEventListener("change", closeWhenRailFits);
-    return () => rail.removeEventListener("change", closeWhenRailFits);
-  }, []);
-
-  const openNavigation = () => {
-    const dialog = navigationDialog.current;
-    if (dialog === null) return;
-
-    dialog.showModal();
-    setNavigationOpen(true);
-    // The current page can sit far down a long section list.
-    requestAnimationFrame(() => {
-      dialog
-        .querySelector<HTMLElement>('a[aria-current="page"]')
-        ?.scrollIntoView({ block: "nearest" });
-    });
-  };
+  // better as the eyebrow than as part of a display-size heading.
+  const [titleMain = props.title, titlePackage] = props.title.split(" | ", 2);
+  const tab = tabForHref(props.activeHref);
+  const outline = props.outline ?? [];
+  const symbolCount = props.symbolCount ?? 0;
 
   return (
-    <div className={`sw-docs${activeHref === "/docs/" ? " sw-docs--overview" : ""}`}>
-      <a className="sw-skip-link" href="#main-content">
+    <div class={`sw-docs${props.kind === undefined ? "" : " sw-docs--api"}`}>
+      <a class="sw-skip-link" href="#main-content">
         Skip to content
       </a>
-      <header className="sw-docs-header">
-        <div className="sw-docs-header__brand">
-          <Brand />
-          <VersionLink />
-        </div>
-        <DocsSearch />
-        <div className="sw-docs-header__actions">
-          <nav aria-label="Product links" className="sw-docs-header__links">
-            <Link className="sw-docs-header__home" to="/">
-              Home
-            </Link>
-            <Link
-              activeOptions={{ exact: true }}
-              aria-current={inReleases ? undefined : "page"}
-              className="sw-docs-header__docs"
-              to="/docs/"
-            >
-              Docs
-            </Link>
-            <Link
-              aria-current={inReleases ? "page" : undefined}
-              className="sw-docs-header__releases"
-              to={RELEASES_HREF}
-            >
-              Releases
-            </Link>
-            <Link className="sw-docs-header__showcases" to="/showcases/">
-              Showcases
-            </Link>
-            <a
-              className="sw-docs-header__ai"
-              href="/llms.txt"
-              title="Curated documentation index for AI agents"
-            >
-              llms.txt
-            </a>
-          </nav>
-          <ThemeToggle />
-          <button
-            aria-controls={NAVIGATION_DIALOG_ID}
-            aria-expanded={navigationOpen}
-            aria-haspopup="dialog"
-            className="sw-icon-button sw-nav-toggle"
-            onClick={openNavigation}
-            type="button"
-          >
-            <svg aria-hidden="true" viewBox="0 0 24 24">
-              <path d="M4 7h16M4 12h16M4 17h16" />
-            </svg>
-            <span className="sw-visually-hidden">Documentation menu</span>
-          </button>
-        </div>
-      </header>
-      <aside className="sw-sidebar">
-        <NavigationSections activeHref={activeHref} />
+      <DocsTopbar activeHref={props.activeHref} activeTab={tab} />
+      <script innerHTML={HOLD_SCRIPT} />
+      <aside class="sw-sidebar">
+        <a aria-label="Sheetwrite home" class="sw-sidebar__brand" href="/">
+          <BrandMark />
+          <span>Sheetwrite</span>
+        </a>
+        <NavigationSections activeHref={props.activeHref} tab={tab} />
       </aside>
+      <script innerHTML={REVEAL_SCRIPT} />
       <main
-        className="sw-document"
+        class="sw-document"
         data-pagefind-body
         // Attribute-value meta works regardless of element nesting; the h1
         // span below captures the clean symbol title.
         data-pagefind-meta={titlePackage ? `package:${titlePackage}` : undefined}
         id="main-content"
       >
-        <header className="sw-document__header">
-          <Breadcrumbs trail={breadcrumbsFor(activeHref, titleMain ?? title)} />
+        <header class="sw-document__header">
+          <Show when={SECTION_MARKS[props.activeHref ?? ""]}>
+            {(mark) => <SectionMark name={mark()} />}
+          </Show>
+          <Show when={eyebrowFor(props.activeHref, titleMain, titlePackage)}>
+            {(eyebrow) => (
+              <p class="sw-document__eyebrow" data-pagefind-ignore>
+                {eyebrow()}
+              </p>
+            )}
+          </Show>
+          <SectionArt href={props.activeHref} />
           <h1>
             <span data-pagefind-meta="title">{titleMain}</span>
-            {titlePackage ? (
-              <code className="sw-title-package" data-pagefind-ignore>
-                {titlePackage}
-              </code>
-            ) : null}
+            <Show when={props.kind}>
+              {(kind) => (
+                <span class="api-status" data-kind={kind()} data-pagefind-ignore>
+                  {kind()}
+                </span>
+              )}
+            </Show>
           </h1>
           {/* Symbol pages repeat this sentence as the body's opening summary. */}
-          {titlePackage === undefined ? <span>{description}</span> : null}
-          {release === undefined ? null : (
-            <>
-              <ReleaseStrip {...release} />
-              <PackageCommand
-                note={`Update each adapter and add-on you use to ${release.release.version} too: all packages release together.`}
-                packages={`@sheetwrite/core@${release.release.version}`}
-              />
-            </>
-          )}
+          <Show when={titlePackage === undefined}>
+            <p class="sw-document__lead">{props.description}</p>
+          </Show>
+          <Show when={props.activeHref}>
+            {(activeHref) => (
+              <p class="sw-page-actions" data-pagefind-ignore>
+                <Show when={props.sourcePath}>
+                  {(sourcePath) => (
+                    <a class="sw-button" data-size="sm" href={editUrl(sourcePath())}>
+                      <Icon name="edit" />
+                      Edit on GitHub
+                    </a>
+                  )}
+                </Show>
+                <a
+                  class="sw-button"
+                  data-size="sm"
+                  href={reportProblemUrl(props.title, activeHref())}
+                >
+                  <Icon name="flag" />
+                  Report a problem
+                </a>
+              </p>
+            )}
+          </Show>
         </header>
-        <ApiSymbolFilter />
-        {reserveOutline === true ? <InlineTableOfContents items={outline} /> : null}
+        <Show when={symbolCount >= MINIMUM_FILTERABLE_CARDS}>
+          <Island
+            component={ApiSymbolFilter}
+            hydrate="interaction"
+            name="api-symbol-filter"
+            props={{ symbolCount }}
+          />
+        </Show>
+        <Show when={props.reserveOutline === true}>
+          <InlineTableOfContents items={outline} />
+        </Show>
         <article
-          className={`sw-prose${activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}
+          class={`sw-prose${props.activeHref === "/docs/reference/compatibility-limits/" ? " sw-prose--resource-limits" : ""}`}
         >
-          {children}
+          {props.children}
         </article>
-        {reserveOutline === true ? <TableOfContents items={outline} /> : null}
-        <footer className="sw-document__footer" data-pagefind-ignore>
-          <DocumentPager {...neighbours} />
-          <div className="sw-document__colophon">
+        <Show when={props.reserveOutline === true}>
+          <TableOfContents items={outline} />
+        </Show>
+        <footer class="sw-document__footer" data-pagefind-ignore>
+          <DocumentPager {...documentNeighbours(props.activeHref)} />
+          <div class="sw-document__colophon">
             <span>Sheetwrite is MIT licensed.</span>
+            <a href="/llms.txt">llms.txt</a>
             <a href="https://github.com/chh-ay/sheetwrite/issues">Report a documentation issue</a>
           </div>
         </footer>
       </main>
-      <NavigationDrawer
-        activeHref={activeHref}
-        dialogRef={navigationDialog}
-        onClosed={() => setNavigationOpen(false)}
-        onDismiss={() => navigationDialog.current?.close()}
-      />
     </div>
   );
 }

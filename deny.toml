@@ -1,0 +1,16 @@
+# cargo-deny settings for the three Rust crates, run by `bun run lint:rust`.
+# Security advisories stay with `cargo audit` in CI.
+
+[licenses]
+version = 2
+# Every dependency must allow use in an MIT-licensed package.
+allow = ["Apache-2.0", "MIT", "Unicode-3.0"]
+confidence-threshold = 0.8
+private = { ignore = true }
+
+[bans]
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

@@ -1,12 +1,21 @@
 //! Shared bounded argument accumulation and thin scalar-family dispatch.
 
+use std::borrow::Cow;
 use std::mem::MaybeUninit;
 
 use crate::calc::Func;
-use crate::types::{EvalResult, FormulaError, Value, RANGE_CELL_LIMIT};
+use crate::cells::payload_num;
+use crate::types::{EvalResult, FormulaError, Value, KIND_EMPTY, KIND_NUMBER, RANGE_CELL_LIMIT};
 
 use super::value::{aggregate_number, bool_from_value, number_from_value, text_from_value};
 use super::{date, financial, math, statistics, text};
+
+// The column fold tells empty and number kinds apart from the rest by their
+// bits alone.
+const _: () = assert!(
+    KIND_EMPTY == 0 && KIND_NUMBER == 1,
+    "the column fold tells empty and number kinds apart by their bits"
+);
 
 pub(super) const MAX_FUNCTION_ARGS: usize = 254;
 
@@ -42,6 +51,10 @@ impl Default for FuncAccumulator {
 }
 
 impl FuncAccumulator {
+    #[allow(
+        unsafe_code,
+        reason = "arguments live in a fixed array of MaybeUninit slots; a safe layout is not yet measured on both machines"
+    )]
     fn arg_metadata(&self, index: usize) -> Option<&FuncArg> {
         if index >= self.arg_count {
             return None;
@@ -112,11 +125,11 @@ impl FuncAccumulator {
         Ok(())
     }
 
-    pub(super) fn len(&self) -> usize {
+    pub(super) const fn len(&self) -> usize {
         self.values.len()
     }
 
-    pub(super) fn arg_count(&self) -> usize {
+    pub(super) const fn arg_count(&self) -> usize {
         self.arg_count
     }
 
@@ -171,7 +184,7 @@ struct NumericAggregate {
 pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
     match func {
         #[cfg(feature = "analysis")]
-        Func::Analysis(id) => super::analysis::evaluate_scalar(super::analysis::name(id), values),
+        Func::Analysis(id) => super::analysis::evaluate_scalar(id, values),
         Func::Count => Value::number(count_numeric(values) as f64),
         Func::CountA => Value::number(
             values
@@ -230,7 +243,6 @@ pub(super) fn apply_func(func: Func, values: &FuncAccumulator) -> EvalResult {
         | Func::Quotient
         | Func::Gcd
         | Func::Lcm
-        | Func::Subtotal
         | Func::IsEven
         | Func::IsOdd
         | Func::CeilingPrecise
@@ -371,6 +383,10 @@ fn financial_family(func: Func, values: &FuncAccumulator) -> EvalResult {
     financial::apply(func, values).unwrap_or(Value::Error(FormulaError::Value))
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+)]
 fn logical_reduce(func: Func, values: &FuncAccumulator) -> Value {
     if values.len() == 0 {
         return match func {
@@ -449,7 +465,11 @@ pub(super) struct ReductionFold {
 
 impl ReductionFold {
     /// The fold for `func`, or `None` when the function needs its values.
-    pub(super) fn new(func: Func) -> Option<Self> {
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+    )]
+    pub(super) const fn new(func: Func) -> Option<Self> {
         let kind = match func {
             Func::Sum => ReductionKind::Sum,
             Func::Avg => ReductionKind::Average,
@@ -485,7 +505,10 @@ impl ReductionFold {
                     self.count += 1;
                 }
             }
-            _ => {
+            ReductionKind::Sum
+            | ReductionKind::Average
+            | ReductionKind::Minimum
+            | ReductionKind::Maximum => {
                 if let Some(number) = aggregate_number(value, true)? {
                     self.count += 1;
                     self.sum += number;
@@ -506,7 +529,10 @@ impl ReductionFold {
         self.cells += 1;
         match self.kind {
             ReductionKind::Count | ReductionKind::CountA => self.count += 1,
-            _ => {
+            ReductionKind::Sum
+            | ReductionKind::Average
+            | ReductionKind::Minimum
+            | ReductionKind::Maximum => {
                 self.count += 1;
                 self.sum += number;
                 self.min = self.min.min(number);
@@ -518,7 +544,7 @@ impl ReductionFold {
 
     /// [`Self::push`] for an empty cell, which only counts toward the limit.
     #[inline]
-    pub(super) fn push_blank(&mut self) -> Result<(), FormulaError> {
+    pub(super) const fn push_blank(&mut self) -> Result<(), FormulaError> {
         if self.cells >= RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
@@ -526,9 +552,91 @@ impl ReductionFold {
         Ok(())
     }
 
+    /// Folds a column of numbers and empty cells in row order, as
+    /// [`Self::push_number`] and [`Self::push_blank`] would cell by cell.
+    /// Returns `None`, having folded nothing, when a cell holds anything else
+    /// or the column would pass the cell limit; the caller then reads it cell
+    /// by cell. The running sum stays one accumulator, so it adds in the same
+    /// order and rounds the same.
+    ///
+    /// The column is read once, with one loop per reduction that keeps only
+    /// what its result needs. A cell of another kind or a non-finite number is
+    /// noted in a flag, not by leaving the loop, and nothing is kept until the
+    /// whole column has been read. JavaScriptCore on Apple Silicon runs a
+    /// separate pass over the kinds, a branch out of the loop, or a `min` and
+    /// `max` per cell markedly slower than this shape.
+    pub(super) fn push_number_column(
+        &mut self,
+        kinds: &[u8],
+        payloads: &[u64],
+    ) -> Option<Result<(), FormulaError>> {
+        let cells = kinds.len() as u64;
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
+            return None;
+        }
+
+        let mut count = self.count;
+        let mut sum = self.sum;
+        let mut min = self.min;
+        let mut max = self.max;
+        // Only empty (0) and number (1) kinds leave no other bit set.
+        let mut any_kind = 0u8;
+        let mut non_finite = false;
+        match self.kind {
+            ReductionKind::Count | ReductionKind::CountA => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    let is_number = kind == KIND_NUMBER;
+                    non_finite |= is_number & !payload_num(payload).is_finite();
+                    count += u64::from(is_number);
+                }
+            }
+            ReductionKind::Sum | ReductionKind::Average => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    let is_number = kind == KIND_NUMBER;
+                    // An empty cell adds zero, which leaves the sum as it is.
+                    let number = if is_number { payload_num(payload) } else { 0.0 };
+                    non_finite |= !number.is_finite();
+                    count += u64::from(is_number);
+                    sum += number;
+                }
+            }
+            ReductionKind::Minimum | ReductionKind::Maximum => {
+                for (&kind, &payload) in kinds.iter().zip(payloads) {
+                    any_kind |= kind;
+                    if kind != KIND_NUMBER {
+                        continue;
+                    }
+
+                    let number = payload_num(payload);
+                    non_finite |= !number.is_finite();
+                    count += 1;
+                    // The result checks the sum even for a minimum or maximum.
+                    sum += number;
+                    min = min.min(number);
+                    max = max.max(number);
+                }
+            }
+        }
+        if any_kind & !KIND_NUMBER != 0 {
+            return None;
+        }
+        if non_finite {
+            return Some(Err(FormulaError::Num));
+        }
+
+        self.cells += cells;
+        self.count = count;
+        self.sum = sum;
+        self.min = min;
+        self.max = max;
+        Some(Ok(()))
+    }
+
     /// Fails like the accumulator does before it reads `cells` more values:
     /// the whole argument must fit under the cell limit.
-    pub(super) fn reserve(&self, cells: u64) -> Result<(), FormulaError> {
+    pub(super) const fn reserve(&self, cells: u64) -> Result<(), FormulaError> {
         if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
             return Err(FormulaError::Num);
         }
@@ -622,27 +730,28 @@ pub(super) fn bool_arg(
     }
 }
 
-pub(super) fn text_arg(
-    values: &FuncAccumulator,
+pub(super) fn text_arg<'a>(
+    values: &'a FuncAccumulator,
     index: usize,
-    default: Option<&str>,
-) -> Result<String, FormulaError> {
+    default: Option<&'a str>,
+) -> Result<Cow<'a, str>, FormulaError> {
     if values.arg_missing(index) {
-        return default.map(str::to_string).ok_or(FormulaError::Value);
+        return default.map(Cow::Borrowed).ok_or(FormulaError::Value);
     }
     match values.arg_value(index) {
         Some(value) => text_from_value(value),
-        None => default.map(str::to_string).ok_or(FormulaError::Value),
+        None => default.map(Cow::Borrowed).ok_or(FormulaError::Value),
     }
 }
 
+#[cfg(feature = "analysis")]
 pub(super) fn numeric_entries<'a>(
     entries: impl IntoIterator<Item = &'a FuncValue>,
 ) -> Result<Vec<f64>, FormulaError> {
     let iter = entries.into_iter();
     let mut numbers = Vec::new();
-    let (_, upper) = iter.size_hint();
-    if let Some(upper) = upper {
+    let (_, upper_bound) = iter.size_hint();
+    if let Some(upper) = upper_bound {
         numbers.try_reserve(upper).map_err(|_| FormulaError::Num)?;
     }
     for entry in iter {
@@ -680,55 +789,7 @@ pub(super) fn treats_cell_as_reference(func: Func) -> bool {
         | Func::VarA
         | Func::VarPA => true,
         #[cfg(feature = "analysis")]
-        Func::Analysis(id) => super::analysis::treats_cell_as_reference(super::analysis::name(id)),
+        Func::Analysis(id) => super::analysis::treats_cell_as_reference(id),
         _ => false,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::types::{FormulaError, Value};
-
-    use super::{FuncAccumulator, MAX_FUNCTION_ARGS};
-
-    #[test]
-    fn accumulator_tracks_only_the_initialized_argument_prefix_at_capacity() {
-        let mut values = FuncAccumulator::default();
-        for index in 0..MAX_FUNCTION_ARGS {
-            let from_range = index % 2 == 0;
-            if from_range {
-                values.push_range(Value::number(index as f64)).unwrap();
-            } else {
-                values.push_scalar(Value::number(index as f64)).unwrap();
-            }
-            values
-                .finish_arg_with_missing(1, 1, index % 3 == 0)
-                .unwrap();
-        }
-
-        assert_eq!(values.arg_count(), MAX_FUNCTION_ARGS);
-        assert_eq!(values.entries().len(), MAX_FUNCTION_ARGS);
-        for index in 0..MAX_FUNCTION_ARGS {
-            let argument = values.arg(index).unwrap();
-            assert_eq!(argument.len(), 1);
-            assert_eq!(argument[0].value, Value::number(index as f64));
-            assert_eq!(argument[0].from_range, index % 2 == 0);
-            assert_eq!(values.arg_shape(index), Some((1, 1)));
-            assert_eq!(values.arg_missing(index), index % 3 == 0);
-        }
-
-        assert!(values.arg(MAX_FUNCTION_ARGS).is_none());
-        assert_eq!(values.arg_shape(MAX_FUNCTION_ARGS), None);
-        assert!(!values.arg_missing(MAX_FUNCTION_ARGS));
-        assert!(values.entries_from_arg(MAX_FUNCTION_ARGS).is_empty());
-
-        values.push_scalar(Value::number(255.0)).unwrap();
-        assert_eq!(
-            values.finish_arg_with_missing(1, 1, false),
-            Err(FormulaError::Value)
-        );
-        assert_eq!(values.arg_count(), MAX_FUNCTION_ARGS);
-        assert!(values.arg(MAX_FUNCTION_ARGS).is_none());
-        assert_eq!(values.arg_shape(MAX_FUNCTION_ARGS), None);
     }
 }

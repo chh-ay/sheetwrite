@@ -1,3 +1,5 @@
+//! Plans run end to end on parsed sources: filters, projections, conversions and folds.
+
 mod support;
 
 use sheetwrite_queries::{
@@ -9,6 +11,10 @@ use support::{
     unpivot,
 };
 
+#[allow(
+    clippy::unwrap_used,
+    reason = "a test fixture; a plan that fails fails the test"
+)]
 fn query(source: &str, steps: &[Step]) -> Batch {
     let batch = json_batch(
         source.as_bytes(),

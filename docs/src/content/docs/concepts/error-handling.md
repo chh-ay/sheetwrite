@@ -33,12 +33,12 @@ declare function showInitializationError(message: string): void;
 
 
 try {
-  await initSheetwrite(wasmUrl);
+  await initSheetwrite({ source: wasmUrl });
 } catch (error) {
   if (!isSheetwriteError(error) || error.code !== "initialization-failed") throw error;
   showInitializationError(error.message);
   // A failed source does not poison readiness. Retry with corrected input.
-  await initSheetwrite(correctedWasmUrl);
+  await initSheetwrite({ source: correctedWasmUrl });
 }
 ```
 

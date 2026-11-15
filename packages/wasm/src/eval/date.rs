@@ -17,19 +17,6 @@ const MAX_DATE_SCAN: usize = MAX_DATE_SERIAL as usize + 1;
 const MAX_TIME_COMPONENT: i64 = 32_767;
 const MILLISECONDS_PER_DAY: f64 = (SECONDS_PER_DAY * 1_000) as f64;
 
-#[cfg(test)]
-thread_local! {
-    /// Tests install a fixed clock here instead of waiting on real time.
-    /// Production builds have no override and no cost.
-    static TEST_CLOCK: std::cell::Cell<Option<fn() -> f64>> = const { std::cell::Cell::new(None) };
-}
-
-/// Replaces the host clock on this thread; `None` restores it.
-#[cfg(test)]
-pub(crate) fn set_test_clock(clock: Option<fn() -> f64>) {
-    TEST_CLOCK.with(|slot| slot.set(clock));
-}
-
 /// The host's current instant as a UTC serial, the conversion the TypeScript
 /// store uses for `recalculateVolatile`, so both clocks agree to the
 /// millisecond in every host timezone.
@@ -40,11 +27,6 @@ pub(super) fn host_clock_serial() -> f64 {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub(super) fn host_clock_serial() -> f64 {
-    #[cfg(test)]
-    if let Some(clock) = TEST_CLOCK.with(std::cell::Cell::get) {
-        return clock();
-    }
-
     // A clock set before 1970 reads as the Unix epoch.
     let milliseconds = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -232,7 +214,9 @@ pub(super) fn parse_time_with_date(text: &str) -> Option<(Option<f64>, f64)> {
 fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
     let serial = match value {
         Value::Text(text) => number_from_text(text)?,
-        _ => number_from_value(value)?,
+        Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            number_from_value(value)?
+        }
     };
     if serial.is_finite() && serial >= 0.0 {
         Ok(serial)
@@ -243,14 +227,16 @@ fn temporal_serial(value: &Value) -> Result<f64, FormulaError> {
 
 fn serial_date_arg(values: &FuncAccumulator, index: usize) -> Result<i64, FormulaError> {
     let value = values.arg_value(index).ok_or(FormulaError::Value)?;
-    let serial = match value {
+    let number = match value {
         Value::Text(text) => number_from_text(text)?,
-        _ => number_from_value(value)?,
+        Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+            number_from_value(value)?
+        }
     };
-    if !serial.is_finite() {
+    if !number.is_finite() {
         return Err(FormulaError::Num);
     }
-    let serial = serial.floor();
+    let serial = number.floor();
     if !(0.0..=MAX_DATE_SERIAL as f64).contains(&serial) {
         return Err(FormulaError::Num);
     }
@@ -293,7 +279,7 @@ fn days_in_month(year: i64, month: i64) -> i64 {
     days_from_civil(next_year, next_month, 1) - days_from_civil(year, month, 1)
 }
 
-fn is_leap_year(year: i64) -> bool {
+const fn is_leap_year(year: i64) -> bool {
     year == 1900 || (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0))
 }
 
@@ -389,17 +375,17 @@ fn holiday_serials(values: &FuncAccumulator, index: usize) -> Result<Vec<i64>, F
         .try_reserve(entries.len())
         .map_err(|_| FormulaError::Num)?;
     for entry in entries {
-        let serial = match &entry.value {
+        let number = match &entry.value {
             Value::Blank => continue,
             Value::Text(text) if text.trim().is_empty() => continue,
             Value::Text(text) => number_from_text(text)?,
             Value::Error(error) => return Err(*error),
-            value => number_from_value(value)?,
+            value @ (Value::Number(_) | Value::Bool(_)) => number_from_value(value)?,
         };
-        if !serial.is_finite() {
+        if !number.is_finite() {
             return Err(FormulaError::Num);
         }
-        let serial = serial.floor();
+        let serial = number.floor();
         if !(0.0..=MAX_DATE_SERIAL as f64).contains(&serial) {
             return Err(FormulaError::Num);
         }
@@ -520,8 +506,8 @@ fn networkdays(values: &FuncAccumulator) -> Result<f64, FormulaError> {
 }
 
 fn interval_has_leap_day(start: i64, end: i64) -> bool {
-    let (start_year, _, _) = date_parts(start as f64).unwrap_or((0, 0, 0));
-    let (end_year, _, _) = date_parts(end as f64).unwrap_or((0, 0, 0));
+    let (start_year, _, _) = date_parts(start as f64).unwrap_or_default();
+    let (end_year, _, _) = date_parts(end as f64).unwrap_or_default();
     (start_year..=end_year).any(|year| {
         is_leap_year(year)
             && exact_date(year, 2, 29)
@@ -624,13 +610,17 @@ fn time_function(values: &FuncAccumulator) -> Result<f64, FormulaError> {
         .and_then(|value| {
             minute
                 .checked_mul(60)
-                .and_then(|minute| value.checked_add(minute))
+                .and_then(|minute_seconds| value.checked_add(minute_seconds))
         })
         .and_then(|value| value.checked_add(second))
         .ok_or(FormulaError::Num)?;
     Ok(total.rem_euclid(SECONDS_PER_DAY) as f64 / SECONDS_PER_DAY as f64)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+)]
 fn time_component(values: &FuncAccumulator, component: Func) -> Result<f64, FormulaError> {
     require_arity(values, 1, 1)?;
     let serial = temporal_serial(values.arg_value(0).ok_or(FormulaError::Value)?)?;
@@ -643,6 +633,10 @@ fn time_component(values: &FuncAccumulator, component: Func) -> Result<f64, Form
     } as f64)
 }
 
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "functions outside this family are left to the caller; listing the 200 other Func variants adds nothing"
+)]
 pub(super) fn apply(func: Func, values: &FuncAccumulator) -> Option<EvalResult> {
     let result = match func {
         Func::Date => {
@@ -758,10 +752,10 @@ mod tests {
     }
 
     fn number(value: Value) -> f64 {
-        let Value::Number(value) = value else {
+        let Value::Number(number) = value else {
             panic!("expected a number, got {value:?}");
         };
-        value
+        number
     }
 
     #[test]

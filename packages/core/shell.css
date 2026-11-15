@@ -70,6 +70,9 @@
 }
 
 .sheetwrite-shell-formula {
+  resize: none;
+  overflow: auto;
+  white-space: pre;
   flex: 1;
   min-width: 0;
   height: 26px;
@@ -79,6 +82,7 @@
   background: var(--sheetwrite-widget-bg, #ffffff);
   color: var(--sheetwrite-widget-fg, #111111);
   font: inherit;
+  line-height: 24px;
   box-sizing: border-box;
 }
 

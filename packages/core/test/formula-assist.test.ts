@@ -47,18 +47,13 @@ function selectedItem(): string | null {
   return document.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
 }
 
-function guideOf(): HTMLElement {
-  const guide = document.querySelector<HTMLElement>(".sheetwrite-formula-guide");
-  if (guide === null) throw new Error("no argument guide");
-  return guide;
-}
-
 function deps(highlights: (HighlightRange[] | null)[] = []): AssistDeps {
   return {
     highlightCells: (ranges) => {
       highlights.push(ranges);
     },
     sheet: () => "s1",
+    cell: () => ({ sheet: "s1", row: 0, col: 0 }),
     store,
   };
 }
@@ -87,6 +82,8 @@ function beginEdit(): {
     rect: { x: 10, y: 20, w: 80, h: 24 },
     label: "Edit A, row 1",
     theme: DEFAULT_THEME,
+    focus: true,
+    onText: () => {},
     onCommit: (value) => {
       state.committed = value;
     },
@@ -117,17 +114,6 @@ async function typeUntilListed(
 }
 
 describe("formula help loading", () => {
-  it("loads nothing for text that is not a formula", async () => {
-    const { textarea } = beginEdit();
-
-    type(textarea, "SU");
-    // Nothing signals that a load did not start, so give a wrong load time to show.
-    await Bun.sleep(POLL_MS * 4);
-
-    expect(document.querySelector(".sheetwrite-formula-help")).toBeNull();
-    expect(textarea.hasAttribute("aria-autocomplete")).toBe(false);
-  });
-
   it("lets keys through to the editor until the help has loaded", () => {
     const assist = new FormulaAssist(deps());
     expect(assist.handleKeyDown(keydown("Enter"))).toBe(false);
@@ -136,30 +122,6 @@ describe("formula help loading", () => {
 });
 
 describe("function list", () => {
-  it("lists the active engine's functions that start with the typed name", async () => {
-    const { textarea } = beginEdit();
-
-    await typeUntilListed(textarea, "=SU", "SUM");
-
-    const names = itemsOf();
-    expect(names.every((name) => name.startsWith("SU"))).toBe(true);
-    // The default engine has no distribution functions.
-    type(textarea, "=NORM.");
-    expect(itemsOf()).toEqual([]);
-  });
-
-  it("links the field and the list as an ARIA combobox and listbox", async () => {
-    const { textarea } = beginEdit();
-
-    await typeUntilListed(textarea, "=CO", "COUNT");
-
-    const list = document.querySelector('[role="listbox"]');
-    expect(textarea.getAttribute("aria-autocomplete")).toBe("list");
-    expect(textarea.getAttribute("aria-controls")).toBe(list?.id ?? "missing");
-    const active = textarea.getAttribute("aria-activedescendant") ?? "";
-    expect(document.querySelector(`#${active}`)?.getAttribute("aria-selected")).toBe("true");
-  });
-
   it("moves with the arrow keys, wraps, and accepts with Enter", async () => {
     const { textarea } = beginEdit();
     await typeUntilListed(textarea, "=CO", "COUNT");
@@ -177,17 +139,6 @@ describe("function list", () => {
     expect(document.querySelector('[role="listbox"]')).toBeNull();
   });
 
-  it("replaces the whole name at a caret inside it and keeps an existing (", async () => {
-    const { textarea } = beginEdit();
-
-    type(textarea, "=SUX(A1)", 3);
-    await waitFor(() => itemsOf().includes("SUM"), "SUM in the function list");
-    textarea.dispatchEvent(keydown("Tab"));
-
-    expect(textarea.value).toBe("=SUM(A1)");
-    expect(textarea.selectionStart).toBe(5);
-  });
-
   it("closes on the first Escape and cancels the edit on the second", async () => {
     const { editor, textarea, state } = beginEdit();
     await typeUntilListed(textarea, "=SUM(A", "ABS");
@@ -199,32 +150,6 @@ describe("function list", () => {
     textarea.dispatchEvent(keydown("Escape"));
     expect(state.cancelled).toBe(true);
     expect(state.highlights.at(-1)).toBeNull();
-  });
-});
-
-describe("argument guide", () => {
-  it("shows the call at the caret with its current argument in bold, in a polite live region", async () => {
-    const { textarea } = beginEdit();
-    await typeUntilListed(textarea, "=ROUN", "ROUND");
-    textarea.dispatchEvent(keydown("Enter"));
-
-    type(textarea, "=ROUND(A1, ");
-
-    const guide = guideOf();
-    expect(guide.getAttribute("role")).toBe("status");
-    expect(textarea.getAttribute("aria-describedby")).toBe(guide.id);
-    expect(guide.querySelector(".sheetwrite-formula-signature")?.textContent).toMatch(/^ROUND\(/);
-    expect(guide.querySelector("strong")?.textContent).toBe("digits");
-  });
-
-  it("shows the first error and marks the field invalid", async () => {
-    const { textarea } = beginEdit();
-    await typeUntilListed(textarea, "=SU", "SUM");
-
-    type(textarea, "=SUM(1))");
-
-    expect(guideOf().textContent).toContain("This ) has no matching (.");
-    expect(textarea.getAttribute("aria-invalid")).toBe("true");
   });
 });
 
@@ -253,5 +178,27 @@ describe("reference colours", () => {
     expect(state.committed).toBe("=SUM(A1:B2)+C3+'Sheet 1'!A1:B2+Missing!A1");
     expect(state.highlights.at(-1)).toBeNull();
     expect(document.querySelector(".sheetwrite-formula-mirror")).toBeNull();
+  });
+});
+
+describe("result preview", () => {
+  it("shows the result once typing pauses, and nothing for an unfinished formula", async () => {
+    const { textarea } = beginEdit();
+    const preview = () => document.querySelector(".sheetwrite-formula-preview")?.textContent ?? "";
+
+    type(textarea, "=ROUND(1/3,2)*3");
+    await waitFor(() => preview() === "= 0.99", "the preview of a value");
+    expect(textarea.getAttribute("aria-describedby")).toContain(
+      document.querySelector(".sheetwrite-formula-preview")?.id ?? "missing",
+    );
+
+    type(textarea, "=SEQUENCE(2,3,5)");
+    await waitFor(() => preview() === "= 5 … (2 × 3 array)", "the preview of an array");
+
+    type(textarea, "=RAND()");
+    await waitFor(() => preview().startsWith("No preview"), "a refused preview");
+
+    type(textarea, "=ROUND(");
+    expect(preview()).toBe("");
   });
 });

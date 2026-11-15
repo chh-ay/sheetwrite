@@ -32,7 +32,7 @@ The inputs are amounts `1234.5` and `99`, UTC date serials `45351` and `45352`, 
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="Column and cell number formats"
+```ts compile runnable title="Column and cell number formats"
 import {
   createGrid,
   formatNumber,

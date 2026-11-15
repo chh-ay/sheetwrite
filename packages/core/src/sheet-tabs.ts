@@ -1,4 +1,5 @@
 import { type PopupPlacement, popupPosition } from "./menu-surface.js";
+import { checkStylePart } from "./style-parts.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { SheetLifecycleResult } from "./types/grid.js";
@@ -312,6 +313,7 @@ export class SheetTabs {
     if (this.feedback) fragment.appendChild(this.createError(this.feedback));
 
     this.host.replaceChildren(fragment);
+    checkStylePart(tabstrip, "tabs", "The sheet tab bar");
     if (renameInput) {
       const placeholder = this.host.querySelector<HTMLElement>(
         `[data-rename-placeholder="${CSS.escape(renameInput.dataset.sheetId ?? "")}"]`,
@@ -520,6 +522,9 @@ export class SheetTabs {
       menu.className = "sheetwrite-tab-menu";
       menu.setAttribute("role", "menu");
       menu.setAttribute("aria-label", `${sheet.name} sheet options`);
+      // WebKit does not focus a pressed button, so a press would move focus out
+      // of the menu and close it before the click; keep focus where it is.
+      menu.addEventListener("mousedown", (event) => event.preventDefault());
 
       if (this.onRename) {
         menu.appendChild(
@@ -620,6 +625,9 @@ export class SheetTabs {
     choices.setAttribute("role", "group");
     choices.setAttribute("aria-label", "Hidden sheets");
     choices.hidden = true;
+    // WebKit does not focus a pressed button, so a press would move focus out
+    // of the menu and close it before the click; keep focus where it is.
+    choices.addEventListener("mousedown", (event) => event.preventDefault());
     const close = (restoreFocus: boolean): void => {
       if (typeof choices.hidePopover === "function") {
         try {

@@ -29,12 +29,23 @@
       "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
-    "./styles.css": "./styles.css"
+    "./styles.css": "./styles.css",
+    "./styles/grid.css": "./styles/grid.css",
+    "./styles/formula-help.css": "./styles/formula-help.css",
+    "./styles/find.css": "./styles/find.css",
+    "./styles/ribbon.css": "./styles/ribbon.css",
+    "./styles/panels.css": "./styles/panels.css",
+    "./styles/context-menu.css": "./styles/context-menu.css",
+    "./styles/tabs.css": "./styles/tabs.css",
+    "./styles/charts.css": "./styles/charts.css",
+    "./styles/icons.css": "./styles/icons.css",
+    "./styles/dashboard.css": "./styles/dashboard.css"
   },
   "files": [
     "src/**/*.ts",
     "src/**/*.svelte",
-    "styles.css"
+    "styles.css",
+    "styles/*.css"
   ],
   "publishConfig": {
     "access": "public",

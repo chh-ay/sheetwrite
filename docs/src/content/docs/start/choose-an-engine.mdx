@@ -1,0 +1,89 @@
+---
+title: Choose an engine
+description: Use the default engine for standard formulas or select the full engine for analysis functions.
+added: "0.6.0"
+---
+
+Sheetwrite ships its formula engine in two builds. The full build adds the analysis functions and
+costs a larger download. Pick one before the first grid is created.
+
+<Diagram
+  name="engines"
+  alt="The default engine has math, lookup, text, logic, date, dynamic array and LET functions. The full engine has every default function plus statistics, finance, regex, database, matrix, LAMBDA helpers, GROUPBY and PIVOTBY. Both share one calculation engine."
+  width="640"
+  height="292"
+  caption="The full build adds function families to everything in the default build."
+/>
+
+## Compare the builds
+
+<CardGroup cols={2}>
+  <Card title="Default engine" icon="package">
+    `@sheetwrite/wasm`. Standard math, lookup, text, logic, dates, dynamic arrays and `LET`, in
+    the smallest download.
+  </Card>
+  <Card title="Full engine" icon="tab-formulas">
+    `@sheetwrite/formulas`. Adds statistics, distributions, regression, finance, regex, database,
+    matrix and reshaping functions, the `LAMBDA` helpers, `GROUPBY` and `PIVOTBY`.
+  </Card>
+</CardGroup>
+
+The [function catalog](/docs/reference/formula-functions/) names the build that provides each
+function, and the [engine measurements](/docs/performance/formula-engine/) compare download
+sizes.
+
+## Initialize the engine
+
+<Tabs label="Engine">
+<Tab title="Default engine">
+
+```ts compile title="Initialize the default engine"
+import { initSheetwrite } from "@sheetwrite/core";
+
+await initSheetwrite();
+```
+
+Framework adapters make this call on mount. No explicit engine selection is
+needed for the default build.
+
+</Tab>
+<Tab title="Full engine">
+
+```sh verify title="Install the full engine"
+npm install @sheetwrite/core @sheetwrite/formulas
+```
+
+```ts compile title="Initialize before creating a grid"
+import { initSheetwrite } from "@sheetwrite/core";
+import * as formulas from "@sheetwrite/formulas";
+
+await initSheetwrite({ engine: formulas });
+```
+
+Run this before creating any grid or store and before mounting a framework
+adapter. Later zero-argument calls keep the selected engine. Importing the
+package alone does not select it.
+
+</Tab>
+</Tabs>
+
+## Selection rules
+
+- An app uses one engine. Once initialization starts, selecting another engine rejects.
+- The default build returns `#NAME?` for full-only functions and does not suggest them in formula assist. Their source remains in the document.
+- Repeated initialization with the selected engine is safe. Concurrent calls share initialization; a failed initialization can be retried.
+- Renderer choice is separate. Both builds work with canvas painting or [worker rendering](/docs/features/worker-rendering/).
+
+## See also
+
+<CardGroup cols={3}>
+  <Card title="Installation" icon="download" href="/docs/start/installation/">
+    WASM sources and framework setup.
+  </Card>
+  <Card title="Calculation engine" icon="memory" href="/docs/concepts/calculation-engine/">
+    Recalculation, spills and limits.
+  </Card>
+  <Card title="Analysis formulas" icon="chart" href="/docs/features/formulas/analysis-formulas/">
+    Full-engine examples.
+  </Card>
+</CardGroup>

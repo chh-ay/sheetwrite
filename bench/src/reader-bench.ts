@@ -22,6 +22,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { validateExactMatrix } from "./gate-protocol.js";
+import { writeNumberColumn, writeStringColumn, type PackedFixtureStore } from "./packed-fixture.js";
 import { now, summarize } from "./stats.js";
 
 const ROWS = 100_000;
@@ -127,6 +128,7 @@ export const READER_CASE_NAMES = [
   "getWindow 1000x8",
   "getWindow 40x8 cond rules",
   "getWindow 1000x8 cond rules",
+  "getWindow 1000x8 formula rule",
   "getWindowRows 40x8 sorted",
   "getWindowRows 1000x8 sorted",
   "aggregate SUM A",
@@ -215,28 +217,14 @@ interface RangeSnapshotHandle {
   kinds(): Uint8Array;
   free(): void;
 }
-/** The `CellStore` surface the readers use; present in 0.5.x and later engines. */
+/** The `CellStore` surface the readers use, including packed fixture writes. */
 interface Engine {
   addSheet(nCols: number, rowCount: number): number;
   setNumber(sheet: number, row: number, col: number, value: number, style: number): void;
   setString(sheet: number, row: number, col: number, value: string, style: number): void;
   setBool(sheet: number, row: number, col: number, value: boolean, style: number): void;
   setFormula(sheet: number, row: number, col: number, src: string, style: number): number;
-  setColumnNumbers(
-    sheet: number,
-    col: number,
-    startRow: number,
-    values: Float64Array,
-    style: number,
-  ): void;
-  setColumnStringsPacked(
-    sheet: number,
-    col: number,
-    startRow: number,
-    buf: string,
-    utf16Lens: Uint32Array,
-    style: number,
-  ): void;
+  setBlockPacked: PackedFixtureStore["setBlockPacked"];
   setConditionalRules(
     sheet: number,
     kinds: Uint8Array,
@@ -486,14 +474,14 @@ class FixtureWriter {
     const store = this.#store;
     const sheet = store.addSheet(columns, ROWS);
     const columnA = this.#randomNumbers(ROWS);
-    store.setColumnNumbers(sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
+    writeNumberColumn(store, sheet, COLUMN_A, 0, columnA, DEFAULT_STYLE);
     this.#writeLabels(sheet, COLUMN_B);
     this.#writeMixed(sheet, COLUMN_C);
     this.#writeDoublingFormulas(sheet, COLUMN_D);
     if (columns === MAIN_COLUMNS) {
       this.#writeNumbersWithGaps(sheet, COLUMN_E);
       for (let col = COLUMN_E + 1; col < MAIN_COLUMNS; col++) {
-        store.setColumnNumbers(sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
+        writeNumberColumn(store, sheet, col, 0, this.#randomNumbers(ROWS), DEFAULT_STYLE);
       }
     }
 
@@ -514,8 +502,7 @@ class FixtureWriter {
       { length: ROWS },
       () => `item-${Math.floor(this.nextUnit() * DISTINCT_LABELS)}`,
     );
-    const lengths = Uint32Array.from(labels, (label) => label.length);
-    this.#store.setColumnStringsPacked(sheet, col, 0, labels.join(""), lengths, DEFAULT_STYLE);
+    writeStringColumn(this.#store, sheet, col, 0, labels, DEFAULT_STYLE);
   }
 
   /** Column C: number, text, boolean and blank cells in turn. */
@@ -555,7 +542,8 @@ class FixtureWriter {
     let start = 0;
     for (const gap of [...EDGE_GAP_ROWS, ROWS]) {
       if (gap > start) {
-        this.#store.setColumnNumbers(
+        writeNumberColumn(
+          this.#store,
           sheet,
           col,
           start,
@@ -571,6 +559,11 @@ class FixtureWriter {
 const MAIN_FIXTURE =
   "100k x 8: A num, B 5k labels, C num/text/bool/blank, D =A*2, E num w/ 3 gaps, F-H num";
 const COND_FIXTURE = `${MAIN_FIXTURE}; 4 conditional rules (A>${COND_A_THRESHOLD}, B="item-17", C contains "x1", =D1>A1*3)`;
+/**
+ * One formula rule over every column, so each visible cell evaluates it. The
+ * other conditional sheet has one formula rule among four, on one column.
+ */
+const FORMULA_RULE_FIXTURE = `${MAIN_FIXTURE}; 1 formula rule over A:H (=$A1>${COND_A_THRESHOLD})`;
 const RANGE_FIXTURE =
   "100k x 6 (A-D as main); 8 formulas over ~100k-row ranges; edit A/B/C last row + recompute";
 
@@ -696,6 +689,16 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     Uint8Array.of(0, 0, 0, 0),
   );
 
+  const formulaRuleSheet = fixtures.dataSheet(MAIN_COLUMNS);
+  store.setConditionalRules(
+    formulaRuleSheet,
+    Uint8Array.of(COND_FORMULA),
+    Uint32Array.of(0, COLUMN_A, lastRow, MAIN_COLUMNS - 1),
+    Float64Array.of(0),
+    [`=$A1>${COND_A_THRESHOLD}`],
+    Uint8Array.of(0),
+  );
+
   // Range scenarios build their sheets last, after the main and conditional sheets.
   const rangeCases = RANGE_FORMULAS.map(({ name, formula }): ReaderCase => ({
     name,
@@ -726,6 +729,7 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     });
   const windowReader = reader("window", MAIN_FIXTURE);
   const conditionalWindowReader = reader("window", COND_FIXTURE);
+  const formulaRuleWindowReader = reader("window", FORMULA_RULE_FIXTURE);
   const queryReader = reader("query", MAIN_FIXTURE);
   const cellsReader = reader("cells", MAIN_FIXTURE);
   const windowOf = (sheet: number, iteration: number, rows: number, sink: ResultSink): void =>
@@ -742,6 +746,9 @@ function buildReaderCases(store: Engine): ReaderCase[] {
     ),
     conditionalWindowReader("getWindow 1000x8 cond rules", (i, sink) =>
       windowOf(conditionalSheet, i, LARGE_WINDOW_ROWS, sink),
+    ),
+    formulaRuleWindowReader("getWindow 1000x8 formula rule", (i, sink) =>
+      windowOf(formulaRuleSheet, i, LARGE_WINDOW_ROWS, sink),
     ),
     windowReader("getWindowRows 40x8 sorted", (_, sink) =>
       consumeWindow(store.getWindowRows(mainSheet, sortedViewportRows, allColumns), sink),

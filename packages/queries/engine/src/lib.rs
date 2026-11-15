@@ -29,7 +29,8 @@ mod wire;
 pub use column::{Batch, Column, Value};
 pub use execute::execute;
 pub use m::{
-    decode_queries, emit_section, import_section, MQuery, MSource, MSourceKind, Unsupported,
+    decode_queries, emit_section, import_section, Loss, MQuery, MSource, MSourceKind, Section,
+    SectionImport, Unsupported,
 };
 pub use plan::{
     Aggregate, AggregateOp, ColumnSpec, ColumnType, CompareOp, Diagnostic, ErrorPolicy, JoinKind,

@@ -89,13 +89,14 @@ pub(crate) fn dense_resolved(kind: u8, payload: u64) -> (u8, u64) {
     }
 }
 
-struct StorageEntry {
-    row: usize,
-    col: usize,
-    kind: u8,
-    payload: u64,
-    style: u32,
-    dirty_revision: Option<u64>,
+/// How an unrevisioned column write treats a paged row that holds an
+/// unacknowledged edit.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DirtyRowWrite {
+    /// A page load leaves the edit alone.
+    Keep,
+    /// Any other write replaces the edit's value in place, as one cell write does.
+    Update,
 }
 
 pub(crate) const DEFAULT_MAX_PAGED_DIRTY_CELLS: usize = 1_000_000;
@@ -125,17 +126,17 @@ fn try_dense_buffers(n_cols: usize, row_count: usize) -> Result<DenseBuffers, St
     })?;
     let mut kind = Vec::new();
     kind.try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell kinds".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell kinds".to_owned())?;
     kind.resize(len, KIND_EMPTY);
     let mut payload = Vec::new();
     payload
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell payloads".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell payloads".to_owned())?;
     payload.resize(len, 0);
     let mut style = Vec::new();
     style
         .try_reserve_exact(len)
-        .map_err(|_| "dense sheet allocation failed for cell styles".to_string())?;
+        .map_err(|_| "dense sheet allocation failed for cell styles".to_owned())?;
     style.resize(len, 0);
     Ok((kind, payload, style))
 }
@@ -308,6 +309,22 @@ impl CellStorage {
             paged.read(row, col).0
         } else {
             self.kind[index] & !CALCULATED
+        }
+    }
+
+    /// The source kind and payload with one paged lookup; `None` while unloaded.
+    #[inline]
+    pub(crate) fn loaded_source_at(&self, row: usize, col: usize) -> Option<(u8, u64)> {
+        if let Some(paged) = &self.paged {
+            let (kind, payload, _, loaded, _) = paged.read(row, col);
+            loaded.then_some((kind, payload))
+        } else {
+            let index = self.idx(row, col);
+            let kind = self.kind[index];
+            Some((
+                kind & !CALCULATED,
+                dense_source(kind, self.payload[index]).1,
+            ))
         }
     }
 
@@ -529,10 +546,12 @@ impl CellStorage {
             .is_none_or(|paged| paged.read(row, col).3)
     }
 
+    /// Whether a paged cell holds an unacknowledged edit. A check, not a read:
+    /// it records no page access.
     pub(crate) fn is_cell_dirty(&self, row: usize, col: usize) -> bool {
         self.paged
             .as_ref()
-            .is_some_and(|paged| paged.read(row, col).4)
+            .is_some_and(|paged| paged.is_dirty(row, col))
     }
 
     pub(crate) fn dirty_coordinates(&self) -> Vec<f64> {
@@ -598,7 +617,7 @@ impl CellStorage {
     pub(crate) fn range_fully_loaded(&self, r0: usize, c0: usize, r1: usize, c1: usize) -> bool {
         self.paged
             .as_ref()
-            .is_none_or(|paged| (c0..=c1).all(|col| (r0..=r1).all(|row| paged.read(row, col).3)))
+            .is_none_or(|paged| paged.range_loaded(r0, c0, r1, c1))
     }
 
     #[inline]
@@ -611,16 +630,6 @@ impl CellStorage {
         payload_str_id(self.resolved_payload_at(i))
     }
 
-    /// Reads the source payload without checking calculated values.
-    /// Literal kinds cannot have a calculated value; formulas must resolve it.
-    ///
-    /// # Safety
-    /// `i` must be in-bounds for the dense cell vectors.
-    #[inline]
-    pub(crate) unsafe fn payload_unchecked(&self, i: usize) -> u64 {
-        unsafe { *self.payload.get_unchecked(i) }
-    }
-
     #[inline]
     pub(crate) fn contains_cell(&self, row: usize, col: usize) -> bool {
         row < self.row_count && col < self.n_cols
@@ -629,44 +638,6 @@ impl CellStorage {
     #[inline]
     pub(crate) fn idx(&self, row: usize, col: usize) -> usize {
         col * self.row_count + row
-    }
-
-    fn remap_paged<F>(&mut self, new_rows: usize, new_cols: usize, mut remap: F)
-    where
-        F: FnMut(usize, usize) -> Option<(usize, usize)>,
-    {
-        let Some(current) = self.paged.take() else {
-            return;
-        };
-
-        let entries = current.entries();
-        let mut next = PagedStorage::new(
-            current.chunk_rows,
-            current.byte_budget,
-            current.max_dirty_cells,
-        )
-        .expect("a live paged sheet already has a valid chunk size");
-
-        for entry in entries {
-            let Some((new_row, new_col)) = remap(entry.row, entry.col) else {
-                continue;
-            };
-
-            if new_row < new_rows && new_col < new_cols {
-                let _ = next.write(
-                    new_row,
-                    new_col,
-                    entry.kind,
-                    entry.payload,
-                    entry.style,
-                    entry.dirty_revision,
-                );
-            }
-        }
-
-        self.row_count = new_rows;
-        self.n_cols = new_cols;
-        self.paged = Some(Box::new(next));
     }
 
     /// Whether the grid can take `rows` rows of `cols` columns. A dense grid
@@ -720,10 +691,10 @@ impl CellStorage {
 
         let rows = self.row_count;
         for new_col in 0..new_cols {
-            let Some(old_col) = old_col(new_col) else {
+            let Some(source_col) = old_col(new_col) else {
                 continue;
             };
-            let old = old_col * rows..(old_col + 1) * rows;
+            let old = source_col * rows..(source_col + 1) * rows;
             let new = new_col * rows..(new_col + 1) * rows;
             kind[new.clone()].copy_from_slice(&self.kind[old.clone()]);
             payload[new.clone()].copy_from_slice(&self.payload[old.clone()]);
@@ -744,16 +715,17 @@ impl CellStorage {
             return Ok(());
         }
 
-        let at = at.min(self.row_count);
+        let clamped_at = at.min(self.row_count);
         let old = self.row_count;
         let new_count = old
             .checked_add(count)
             .ok_or_else(|| format!("{old} rows plus {count} rows overflow the row count"))?;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(new_count, self.n_cols, |row, col| {
-                Some((if row >= at { row + count } else { row }, col))
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.move_rows(clamped_at, clamped_at + count, old);
+            }
+            self.row_count = new_count;
             return Ok(());
         }
 
@@ -763,12 +735,12 @@ impl CellStorage {
                 RowRun {
                     from: 0,
                     to: 0,
-                    len: at,
+                    len: clamped_at,
                 },
                 RowRun {
-                    from: at,
-                    to: at + count,
-                    len: old - at,
+                    from: clamped_at,
+                    to: clamped_at + count,
+                    len: old - clamped_at,
                 },
             ],
         )
@@ -781,22 +753,19 @@ impl CellStorage {
             return Ok(());
         }
 
-        let count = count.min(self.row_count - at);
+        let clamped_count = count.min(self.row_count - at);
         let old = self.row_count;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(old - count, self.n_cols, |row, col| {
-                if row >= at && row < at + count {
-                    None
-                } else {
-                    Some((if row >= at + count { row - count } else { row }, col))
-                }
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.move_rows(at + clamped_count, at, old);
+            }
+            self.row_count = old - clamped_count;
             return Ok(());
         }
 
         self.rebuild_rows(
-            old - count,
+            old - clamped_count,
             &[
                 RowRun {
                     from: 0,
@@ -804,9 +773,9 @@ impl CellStorage {
                     len: at,
                 },
                 RowRun {
-                    from: at + count,
+                    from: at + clamped_count,
                     to: at,
-                    len: old - at - count,
+                    len: old - at - clamped_count,
                 },
             ],
         )
@@ -819,24 +788,25 @@ impl CellStorage {
             return Ok(());
         }
 
-        let at = at.min(self.n_cols);
+        let clamped_at = at.min(self.n_cols);
         let old_cols = self.n_cols;
         let new_cols = old_cols
             .checked_add(count)
             .ok_or_else(|| format!("{old_cols} columns plus {count} columns overflow"))?;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(self.row_count, new_cols, |row, col| {
-                Some((row, if col >= at { col + count } else { col }))
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.insert_cols(clamped_at, count);
+            }
+            self.n_cols = new_cols;
             return Ok(());
         }
 
         self.rebuild_cols(new_cols, |col| {
-            if col < at {
+            if col < clamped_at {
                 Some(col)
             } else {
-                (col >= at + count).then(|| col - count)
+                (col >= clamped_at + count).then(|| col - count)
             }
         })
     }
@@ -848,22 +818,19 @@ impl CellStorage {
             return Ok(());
         }
 
-        let count = count.min(self.n_cols - at);
-        let new_cols = self.n_cols - count;
+        let clamped_count = count.min(self.n_cols - at);
+        let new_cols = self.n_cols - clamped_count;
         if self.is_paged() {
             self.invalidate_derived();
-            self.remap_paged(self.row_count, new_cols, |row, col| {
-                if col >= at && col < at + count {
-                    None
-                } else {
-                    Some((row, if col >= at + count { col - count } else { col }))
-                }
-            });
+            if let Some(paged) = &mut self.paged {
+                paged.delete_cols(at, clamped_count);
+            }
+            self.n_cols = new_cols;
             return Ok(());
         }
 
         self.rebuild_cols(new_cols, |col| {
-            Some(if col < at { col } else { col + count })
+            Some(if col < at { col } else { col + clamped_count })
         })
     }
 
@@ -1048,8 +1015,10 @@ impl CellRun<'_> {
     /// Reads a paged resolved scalar, style and residency.
     #[inline]
     fn paged_cell(&self, index: usize) -> Option<(u8, u64, u32)> {
-        let (kind, payload, style) = self.paged_source(index)?;
-        let (kind, payload) = self.calculated_cell(index).unwrap_or((kind, payload));
+        let (source_kind, source_payload, style) = self.paged_source(index)?;
+        let (kind, payload) = self
+            .calculated_cell(index)
+            .unwrap_or((source_kind, source_payload));
         Some((kind, payload, style))
     }
 
@@ -1111,24 +1080,43 @@ impl CellStorage {
         }
     }
 
-    /// Writes a `rows x cols` block of dense sources at `start`, dropping any
-    /// calculated value each cell held. Returns `false` without writing for
-    /// paged storage, whose writes need per-cell residency and dirty overlays.
+    /// Writes a `rows x cols` block of literal sources at `start`, dropping any
+    /// calculated value each cell held. A paged sheet takes it only without a
+    /// `revision` (a page load): each column goes through the paged column
+    /// writer, and a row with an unacknowledged edit has the edit's value
+    /// replaced, as one unrevisioned cell write does. Returns `false` without
+    /// writing for a revisioned paged write, which needs dirty slots per cell.
     ///
     /// Bulk ingest runs here once per column: one bounds check per column
     /// instead of per-cell sheet lookups, and the calculated-count update is
     /// skipped entirely while the sheet holds no calculated values.
-    pub(crate) fn write_dense_block(
+    pub(crate) fn write_literal_block(
         &mut self,
         start: (usize, usize),
         dimensions: (usize, usize),
+        revision: Option<u64>,
         cell: impl Fn(usize, usize) -> (u8, u64, u32),
     ) -> bool {
-        if self.paged.is_some() {
-            return false;
+        let (rows, cols) = dimensions;
+        if let Some(paged) = &mut self.paged {
+            if revision.is_some() {
+                return false;
+            }
+            for col_offset in 0..cols {
+                let column_cell = |row_offset| {
+                    let (kind, payload, style) = cell(row_offset, col_offset);
+                    (start.0 + row_offset, kind, payload, style)
+                };
+                paged.write_column(
+                    start.1 + col_offset,
+                    rows,
+                    &column_cell,
+                    DirtyRowWrite::Update,
+                );
+            }
+            return true;
         }
 
-        let (rows, cols) = dimensions;
         let has_calculated = self.dense_calculated_cells != 0;
         for col_offset in 0..cols {
             let base = self.idx(start.0, start.1 + col_offset);
@@ -1147,6 +1135,47 @@ impl CellStorage {
             }
         }
         true
+    }
+
+    /// Writes validated rows of one column, leaving unlisted cells alone.
+    /// Like `write_literal_block`, replaces sources and discards calculated slots.
+    /// `cell(entry)` gives `(row, kind, payload, style)` for each of
+    /// `entries`. Paged rows are unrevisioned writes; `dirty` decides rows
+    /// with an edit.
+    ///
+    /// The dense loop walks `entries` directly: indexing them through the
+    /// paged writer's per-index callback cost ~14 instructions per cell.
+    pub(crate) fn write_column_cells(
+        &mut self,
+        col: usize,
+        entries: &[u32],
+        cell: impl Fn(usize) -> (usize, u8, u64, u32),
+        dirty: DirtyRowWrite,
+    ) {
+        debug_assert!(col < self.n_cols, "column writes need an in-bounds column");
+        if let Some(paged) = &mut self.paged {
+            paged.write_column(
+                col,
+                entries.len(),
+                &|index| cell(entries[index] as usize),
+                dirty,
+            );
+            return;
+        }
+        let column = col * self.row_count..(col + 1) * self.row_count;
+        let kinds = &mut self.kind[column.clone()];
+        let payloads = &mut self.payload[column.clone()];
+        let styles = &mut self.style[column];
+        let has_calculated = self.dense_calculated_cells != 0;
+        for &entry in entries {
+            let (row, kind, payload, style) = cell(entry as usize);
+            if has_calculated && kinds[row] & CALCULATED != 0 {
+                self.dense_calculated_cells -= 1;
+            }
+            kinds[row] = kind;
+            payloads[row] = payload;
+            styles[row] = style;
+        }
     }
 
     /// Releases paged calculated pages that hold no result.
@@ -1193,17 +1222,17 @@ impl CellStorage {
         let mut cached: Option<CellRun<'_>> = None;
 
         for (view_row, &row) in rows.iter().enumerate() {
-            let row = row as usize;
-            if row >= self.row_count {
+            let sheet_row = row as usize;
+            if sheet_row >= self.row_count {
                 continue;
             }
 
-            let index = base + row;
+            let index = base + sheet_row;
             let run = cached.get_or_insert_with(|| self.run(index, base + self.row_count));
             if !run.contains(index) {
                 *run = self.run(index, base + self.row_count);
             }
-            visit(view_row, row, run.paged_cell(index));
+            visit(view_row, sheet_row, run.paged_cell(index));
         }
     }
 
@@ -1243,12 +1272,12 @@ impl CellStorage {
         debug_assert!(start < end && end <= self.row_count * self.n_cols);
         let row = start % self.row_count;
         let col = start / self.row_count;
-        let end = end.min(start + self.row_count - row);
+        let run_end = end.min(start + self.row_count - row);
 
         let Some(paged) = &self.paged else {
             return CellRun {
                 start,
-                end,
+                end: run_end,
                 source_base: 0,
                 dirty_base: 0,
                 calculated_base: 0,
@@ -1266,7 +1295,7 @@ impl CellStorage {
         let view = paged.run_view(row, col, touch);
         CellRun {
             start,
-            end: end.min(column_base + view.end_row),
+            end: run_end.min(column_base + view.end_row),
             source_base: column_base + view.clean_first_row,
             dirty_base: column_base + view.dirty_first_row,
             calculated_base: column_base + view.calculated_first_row,

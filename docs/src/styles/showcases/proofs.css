@@ -1,0 +1,774 @@
+/* The protocol showcases (database, collaboration): their live workbooks,
+   side-panel journals and reports, and the sections after the code. */
+
+/* ---------- embedded workbooks ---------- */
+
+/* The grid reads these custom properties at construction and again when the
+   site theme changes. Core declares its light defaults on the grid root
+   itself, so the root rule repeats the canvas palette. */
+.sw-dbx__grid,
+.sw-clb__grid,
+:is(.sw-dbx__grid, .sw-clb__grid) .sheetwrite {
+  --sheetwrite-font: 500 13px / 1.4 var(--sw-font-body);
+  --sheetwrite-bg: var(--sw-surface-1);
+  --sheetwrite-fg: var(--sw-fg);
+  --sheetwrite-grid-line: var(--sw-border);
+  --sheetwrite-header-bg: var(--sw-surface-2);
+  --sheetwrite-header-fg: var(--sw-accent-strong);
+  --sheetwrite-selection: color-mix(
+    in srgb,
+    var(--sw-proofs-grid-accent, var(--sw-accent)) 14%,
+    transparent
+  );
+  --sheetwrite-selection-border: var(--sw-proofs-grid-accent, var(--sw-accent));
+  --sheetwrite-search-match: color-mix(in srgb, var(--sw-warning) 25%, transparent);
+  --sheetwrite-search-active: var(--sw-warning);
+  --sheetwrite-highlight: color-mix(
+    in srgb,
+    var(--sw-proofs-grid-accent, var(--sw-accent)) 20%,
+    transparent
+  );
+}
+
+.sw-dbx__grid,
+.sw-clb__grid {
+  --sheetwrite-widget-font: 500 13px / 1.4 var(--sw-font-body);
+  --sheetwrite-widget-bg: var(--sw-surface-2);
+  --sheetwrite-widget-fg: var(--sw-fg);
+  --sheetwrite-widget-muted: var(--sw-fg-muted);
+  --sheetwrite-widget-border: var(--sw-border);
+  --sheetwrite-widget-accent: var(--sw-accent-strong);
+  --sheetwrite-widget-selection: color-mix(in srgb, var(--sw-accent) 14%, transparent);
+  --sheetwrite-toolbar-bg: var(--sw-surface-1);
+  --sheetwrite-toolbar-fg: var(--sw-fg);
+  --sheetwrite-menu-hover: color-mix(in srgb, var(--sw-accent) 12%, var(--sw-surface-2));
+  --sheetwrite-find-shadow: var(--sw-shadow-lg);
+  --sheetwrite-menu-shadow: var(--sw-shadow-lg);
+  --sheetwrite-assist-bg: var(--sw-surface-2);
+  --sheetwrite-assist-fg: var(--sw-fg);
+  --sheetwrite-assist-border: var(--sw-border-strong);
+  --sheetwrite-assist-selected: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-2));
+  --sheetwrite-tab-font: 600 12px / 1 var(--sw-font-body);
+  --sheetwrite-tab-bg: var(--sw-surface-0);
+  --sheetwrite-tab-fg: var(--sw-fg-muted);
+  --sheetwrite-tab-border: var(--sw-border);
+  --sheetwrite-tab-hover-bg: color-mix(in srgb, var(--sw-accent) 9%, var(--sw-surface-2));
+  --sheetwrite-tab-active-bg: color-mix(in srgb, var(--sw-accent) 14%, var(--sw-surface-0));
+  --sheetwrite-tab-active-fg: var(--sw-accent-strong);
+
+  overflow: hidden;
+  background: var(--sw-surface-1);
+}
+
+/* The database demo is its one Grid, at the stage height. */
+.sw-dbx {
+  display: grid;
+  min-width: 0;
+}
+
+.sw-dbx__grid {
+  height: clamp(24rem, calc(100dvh - 18rem), 36rem);
+}
+
+/* ---------- window bar status ---------- */
+
+.sw-dbx__status,
+.sw-clb__status {
+  display: inline-flex;
+  gap: var(--sw-space-2);
+  align-items: center;
+  min-width: 0;
+}
+
+.sw-dbx__status-detail,
+.sw-clb__status-detail {
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- side-panel journals ---------- */
+
+.sw-dbx__log,
+.sw-clb__log,
+.sw-clb__server-log {
+  max-height: 15rem;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sw-border) transparent;
+}
+
+.sw-dbx__log li,
+.sw-clb__log li,
+.sw-clb__server-log li {
+  position: relative;
+  padding: var(--sw-space-1) 0 var(--sw-space-1) var(--sw-space-4);
+  border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg);
+  overflow-wrap: anywhere;
+}
+
+.sw-dbx__log li:last-child,
+.sw-clb__log li:last-child,
+.sw-clb__server-log li:last-child {
+  border-bottom: 0;
+}
+
+/* Each entry's marker takes the entry's kind color. */
+.sw-dbx__log li::before,
+.sw-clb__log li::before,
+.sw-clb__server-log li::before {
+  position: absolute;
+  top: 0.8rem;
+  left: 0.05rem;
+  width: 0.32rem;
+  height: 0.32rem;
+  border-radius: var(--sw-radius-pill);
+  background: currentcolor;
+  content: "";
+  opacity: 0.75;
+}
+
+/* The hint before the first entry has no marker and no marker gap. */
+:is(.sw-dbx__log, .sw-clb__log, .sw-clb__server-log) li:is(.sw-dbx__log-empty, .sw-clb__log-empty) {
+  padding-left: 0;
+}
+
+:is(.sw-dbx__log, .sw-clb__log, .sw-clb__server-log)
+  li:is(.sw-dbx__log-empty, .sw-clb__log-empty)::before {
+  content: none;
+}
+
+.sw-dbx__log li[data-kind="commit"],
+.sw-clb__log li[data-kind="commit"] {
+  color: var(--sw-accent);
+}
+
+.sw-clb__log li[data-kind="remote"] {
+  color: var(--sw-state-requested);
+}
+
+.sw-dbx__log li[data-kind="pending"],
+.sw-dbx__log li[data-kind="warn"],
+.sw-clb__log li[data-kind="warn"],
+.sw-clb__server-log li[data-ack="conflict"] {
+  color: var(--sw-warning);
+}
+
+.sw-dbx__log li[data-kind="error"],
+.sw-clb__log li[data-kind="error"] {
+  color: var(--sw-danger);
+}
+
+.sw-clb__server-log li[data-ack="duplicate"] {
+  color: var(--sw-fg-strong);
+}
+
+.sw-dbx__log-empty,
+.sw-clb__log-empty,
+.sw-clb__presence-empty {
+  color: var(--sw-fg-muted);
+  font-family: var(--sw-font-body);
+}
+
+/* ---------- side-panel reports ---------- */
+
+.sw-dbx__report,
+.sw-clb__batch {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  padding: var(--sw-space-3);
+  border: 1px solid color-mix(in srgb, var(--sw-accent) 35%, var(--sw-border));
+  border-radius: var(--sw-radius-md);
+  background: color-mix(in srgb, var(--sw-accent) 7%, var(--sw-surface-1));
+  font-size: var(--sw-text-small);
+  line-height: 1.5;
+}
+
+:is(.sw-dbx__report, .sw-clb__batch) strong {
+  color: var(--sw-accent-strong);
+}
+
+:is(.sw-dbx__report, .sw-clb__batch) p {
+  margin: 0;
+  color: var(--sw-fg);
+}
+
+:is(.sw-dbx__report, .sw-clb__batch)[data-state="failed"] {
+  border-color: color-mix(in srgb, var(--sw-danger) 45%, var(--sw-border));
+  background: color-mix(in srgb, var(--sw-danger) 8%, var(--sw-surface-1));
+}
+
+:is(.sw-dbx__report, .sw-clb__batch)[data-state="failed"] strong {
+  color: var(--sw-danger);
+}
+
+.sw-clb__chaos-report {
+  margin: 0;
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  line-height: 1.5;
+}
+
+.sw-clb__chaos-report:empty {
+  display: none;
+}
+
+/* ---------- side-panel controls ---------- */
+
+.sw-clb__chaos {
+  display: grid;
+}
+
+.sw-dbx__controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sw-space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* The autosave switch takes its own row, so its label never clips. */
+.sw-dbx__controls .sw-proofs-switch {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+
+.sw-clb__steps {
+  display: grid;
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-clb__steps .sw-button {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+/* The next step of the offline drill is the one to press. */
+.sw-clb__steps li[data-current="true"] .sw-button {
+  border-color: var(--sw-accent);
+}
+
+/* An on/off switch: the real checkbox covers the control, so it keeps native
+   focus, click and keyboard behaviour; the track and thumb take site colours. */
+.sw-proofs-switch {
+  position: relative;
+  display: inline-flex;
+  gap: var(--sw-space-2);
+  align-items: center;
+  min-height: var(--sw-control-height);
+  padding-inline: var(--sw-space-3);
+  border: 1px solid var(--sw-border-strong);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sw-proofs-switch:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sw-proofs-switch input {
+  position: absolute;
+  inset: calc(-1 * var(--sw-border-width));
+  margin: 0;
+  appearance: none;
+  cursor: inherit;
+  opacity: 0;
+}
+
+.sw-proofs-switch-track {
+  display: inline-block;
+  width: calc(var(--sw-space-4) * 2 + var(--sw-space-1));
+  height: calc(var(--sw-space-4) + var(--sw-space-1));
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-border-strong);
+  transition: background var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-proofs-switch-thumb {
+  display: block;
+  width: calc(var(--sw-space-4) - var(--sw-space-1));
+  height: calc(var(--sw-space-4) - var(--sw-space-1));
+  margin: var(--sw-space-1);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-0);
+  transition: transform var(--sw-motion-fast) var(--sw-motion-decelerate);
+}
+
+.sw-proofs-switch input:checked + .sw-proofs-switch-track {
+  background: var(--sw-accent);
+}
+
+.sw-proofs-switch input:checked + .sw-proofs-switch-track .sw-proofs-switch-thumb {
+  transform: translateX(var(--sw-space-4));
+}
+
+.sw-proofs-switch:not(:has(input:disabled)):hover {
+  border-color: var(--sw-accent);
+}
+
+.sw-proofs-switch:has(input:focus-visible) {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+.sw-proofs-switch-copy {
+  display: flex;
+  gap: var(--sw-space-1);
+  align-items: baseline;
+}
+
+.sw-proofs-switch-state {
+  color: var(--sw-warning);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-proofs-switch[data-state="on"] .sw-proofs-switch-state {
+  color: var(--sw-accent-strong);
+}
+
+/* ---------- collaboration demo: two client panels ---------- */
+
+.sw-clb {
+  display: grid;
+  min-width: 0;
+}
+
+.sw-clb__workbench {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sw-space-3);
+  padding: var(--sw-space-3);
+}
+
+.sw-clb__client {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sw-space-2);
+  min-width: 0;
+  padding: var(--sw-space-3);
+  border: 1px solid var(--sw-border);
+  border-top: 2px solid var(--sw-proofs-grid-accent, var(--sw-border-strong));
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+}
+
+.sw-clb__client[data-client="a"] {
+  --sw-proofs-grid-accent: var(--sw-state-requested);
+}
+
+.sw-clb__client[data-client="b"] {
+  --sw-proofs-grid-accent: var(--sw-accent);
+}
+
+.sw-clb__client[data-connection="offline"] {
+  border-color: color-mix(in srgb, var(--sw-warning) 40%, var(--sw-border));
+}
+
+.sw-clb__client-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-2) var(--sw-space-3);
+  align-items: center;
+}
+
+.sw-clb__actor {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-body) / 1.3 var(--sw-font-display);
+}
+
+.sw-clb__connection {
+  padding: var(--sw-space-0-5) var(--sw-space-2);
+  border-radius: var(--sw-radius-pill);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) / var(--sw-leading-ui) var(--sw-font-body);
+}
+
+.sw-clb__connection[data-connection="online"] {
+  background: color-mix(in srgb, var(--sw-accent) 16%, transparent);
+  color: var(--sw-accent-strong);
+}
+
+.sw-clb__connection[data-connection="offline"] {
+  background: color-mix(in srgb, var(--sw-warning) 16%, transparent);
+  color: var(--sw-warning);
+}
+
+.sw-clb__client-head .sw-proofs-switch {
+  margin-left: auto;
+}
+
+.sw-clb__grid {
+  height: clamp(18rem, calc(100dvh - 30rem), 24rem);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+}
+
+.sw-clb__client-action {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--sw-space-2);
+  align-items: center;
+}
+
+.sw-clb__client-action p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sw-clb__client-action p span {
+  margin-right: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+.sw-clb__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sw-space-2);
+  margin: 0;
+  padding-top: var(--sw-space-2);
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-clb__stats dt {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-clb__stats dd {
+  min-width: 0;
+  margin: var(--sw-space-0-5) 0 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sw-clb__stats dd[data-state="queued"] {
+  color: var(--sw-warning);
+}
+
+.sw-clb__presence ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-clb__presence li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- sections after the code ---------- */
+
+.sw-dbx__diagnostics,
+.sw-clb__advanced {
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-md);
+  background: var(--sw-surface-1);
+}
+
+:is(.sw-dbx__diagnostics, .sw-clb__advanced) > summary {
+  display: flex;
+  gap: var(--sw-space-2);
+  align-items: center;
+  padding: var(--sw-space-3);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: var(--sw-weight-semibold);
+  list-style: none;
+  cursor: pointer;
+}
+
+:is(.sw-dbx__diagnostics, .sw-clb__advanced) > summary::-webkit-details-marker {
+  display: none;
+}
+
+:is(.sw-dbx__diagnostics, .sw-clb__advanced) > summary .sw-icon {
+  transition: rotate var(--sw-motion-fast) var(--sw-motion-standard);
+}
+
+:is(.sw-dbx__diagnostics, .sw-clb__advanced)[open] > summary .sw-icon {
+  rotate: 90deg;
+}
+
+:is(.sw-dbx__diagnostics, .sw-clb__advanced) > summary:hover {
+  background: var(--sw-surface-2);
+}
+
+:is(.sw-dbx__diagnostics, .sw-clb__advanced) > summary:focus-visible {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 2px;
+}
+
+.sw-dbx__diagnostics-body,
+.sw-clb__advanced-body {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sw-space-4);
+  padding: var(--sw-space-3);
+  border-top: 1px solid var(--sw-border);
+}
+
+.sw-dbx__diagnostics-body h3,
+.sw-clb__advanced-body h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.3 var(--sw-font-display);
+}
+
+.sw-dbx__limit-proof,
+.sw-dbx__storage,
+.sw-clb__fault-client,
+.sw-clb__server-tools {
+  display: grid;
+  gap: var(--sw-space-2);
+  align-content: start;
+  min-width: 0;
+}
+
+.sw-dbx__control-group {
+  display: grid;
+  gap: var(--sw-space-2);
+  align-content: start;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.sw-dbx__control-group legend {
+  margin-bottom: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-small) / 1.3 var(--sw-font-display);
+}
+
+.sw-dbx__limit-grid {
+  width: 100%;
+  height: 6rem;
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-xs);
+}
+
+/* The proof Grid mounts only when the drill runs. */
+.sw-dbx__limit-grid:empty {
+  display: none;
+}
+
+.sw-dbx__limit-proof [data-testid="dbx-limit-report"] {
+  margin: 0;
+  padding: var(--sw-space-2) var(--sw-space-3);
+  border: 1px solid color-mix(in srgb, var(--sw-warning) 40%, var(--sw-border));
+  border-radius: var(--sw-radius-xs);
+  background: color-mix(in srgb, var(--sw-warning) 9%, var(--sw-surface-1));
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+
+.sw-dbx__counters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sw-space-2) var(--sw-space-3);
+  margin: 0;
+}
+
+.sw-dbx__counters dt {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.sw-dbx__counters dd {
+  margin: var(--sw-space-0-5) 0 0;
+  color: var(--sw-fg-strong);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-text-small);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.sw-dbx__note,
+.sw-clb__server-note {
+  margin: 0;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+
+.sw-clb__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1);
+}
+
+.sw-clb__held-count {
+  display: inline-grid;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  place-items: center;
+  padding-inline: var(--sw-space-1);
+  border-radius: var(--sw-radius-pill);
+  background: color-mix(in srgb, var(--sw-warning) 22%, transparent);
+  color: var(--sw-warning);
+  font: var(--sw-weight-semibold) var(--sw-text-caption) var(--sw-font-mono);
+}
+
+.sw-clb__server-note-tag {
+  margin-right: var(--sw-space-2);
+  color: var(--sw-accent-strong);
+  font-weight: var(--sw-weight-semibold);
+}
+
+/* The ownership map: the library lane, the seam naming the interfaces
+   between them, then the host lane. */
+.sw-showcase__section.sw-proofs-boundary {
+  max-width: none;
+  gap: var(--sw-space-4);
+}
+
+.sw-proofs-boundary > p {
+  max-width: var(--sw-measure-prose);
+  margin: 0;
+  color: var(--sw-fg-muted);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-proofs-boundary__map {
+  display: grid;
+  gap: var(--sw-space-4);
+  align-items: center;
+}
+
+.sw-proofs-boundary__map > .sw-proofs-boundary__lane {
+  height: 100%;
+}
+
+.sw-proofs-boundary__seam {
+  width: min(100%, 20rem);
+  justify-self: center;
+}
+
+@media (min-width: 72rem) {
+  .sw-proofs-boundary__map {
+    grid-template-columns: minmax(0, 1fr) 18rem minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .sw-proofs-boundary__seam {
+    width: 100%;
+  }
+}
+
+.sw-proofs-boundary__lane {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-proofs-boundary__lane[data-lane="sheetwrite"] {
+  border-color: color-mix(in srgb, var(--sw-accent) 40%, var(--sw-border));
+}
+
+.sw-proofs-boundary__lane header {
+  display: flex;
+  gap: var(--sw-space-2);
+  align-items: baseline;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  border-bottom: 1px solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-proofs-boundary__lane header strong {
+  color: var(--sw-fg-strong);
+}
+
+.sw-proofs-boundary__lane header span {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+}
+
+.sw-prose .sw-proofs-boundary__lane ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .sw-proofs-boundary__lane li {
+  display: grid;
+  gap: var(--sw-space-1);
+  max-width: none;
+  margin: 0;
+  padding: var(--sw-space-3) var(--sw-space-4);
+  border-bottom: 1px solid var(--sw-border);
+  font-size: var(--sw-text-small);
+  line-height: 1.5;
+}
+
+.sw-proofs-boundary__lane li:last-child {
+  border-bottom: 0;
+}
+
+.sw-proofs-boundary__lane li strong {
+  color: var(--sw-fg-strong);
+}
+
+.sw-proofs-boundary__lane li span {
+  color: var(--sw-fg-muted);
+}
+
+/* ---------- narrower widths ---------- */
+
+@media (max-width: 60rem) {
+  .sw-dbx__diagnostics-body,
+  .sw-clb__advanced-body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 44rem) {
+  .sw-clb__workbench {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sw-dbx__status-detail,
+  .sw-clb__status-detail {
+    display: none;
+  }
+}
+
+@media (max-width: 32rem) {
+  .sw-clb__client-action {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Two stats per row keep every value on one line on a phone. */
+  .sw-clb__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

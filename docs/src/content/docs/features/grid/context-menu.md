@@ -87,7 +87,7 @@ The built-in action names are:
 | --- | --- | --- | --- |
 | `cut`, `copy`, `paste`, `clearContents` | `insertRowAbove`, `insertRowBelow`, `deleteRow`, `hideRow`, `showAllRows`, `autoFitRow` | `insertColumnLeft`, `insertColumnRight`, `deleteColumn`, `hideColumn`, `showAllColumns`, `autoFitColumn` | `clearFilter`, `merge`, `unmerge`, `exportCsv`, `exportXlsx` |
 
-The default menu contains copy, cut, paste, clear contents, row insert/delete/hide/show/auto-fit, column insert/delete/hide/show/auto-fit, clear column filter, merge, and unmerge actions, with separators between groups. `exportCsv` and `exportXlsx` are not in the default menu, but you can use them in a custom list. XLSX still requires `@sheetwrite/xlsx/register`.
+The default menu contains copy, cut, paste, clear contents, row insert/delete/hide/show/auto-fit, column insert/delete/hide/show/auto-fit, clear column filter, merge, and unmerge actions, with separators between groups. `exportCsv` and `exportXlsx` are not in the default menu, but you can use them in a custom list. XLSX still requires `xlsxAddon()` from `@sheetwrite/xlsx` in `initSheetwrite({ addons })`.
 
 ## Host-owned menu
 
@@ -125,6 +125,10 @@ grid.highlightCells(null);
 - Use `grid.styleRange` when a fill must be saved and undoable.
 
 The Vanilla workbench offers **Clear highlight** in its context menu. Right-click the highlighted cell to toggle it off, or right-click another cell and choose **Clear highlight**. Both actions write to the host event log.
+
+## Styles
+
+The menu needs `@sheetwrite/core/styles/context-menu.css`, and `@sheetwrite/core/styles/icons.css` for its built-in icons. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
 
 ## Edge cases and limits
 

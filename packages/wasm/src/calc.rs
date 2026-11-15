@@ -8,7 +8,7 @@
 //!   power      := postfix ('^' postfix)*
 //!   postfix    := unary ('%')*
 //!   unary      := ('+' | '-') unary | primary
-//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell | name | structured_ref
+//!   primary    := number | string | array | '(' expr ')' | func '(' args ')' | range | cell | name | `structured_ref`
 //!   range      := cell ':' cell | letters ':' letters | digits ':' digits
 //!   array      := '{' row (';' row)* '}'
 //!   row        := constant (',' constant)*
@@ -28,9 +28,11 @@
 //! The evaluator lives on `CellStore` (it needs cell access); this module is the
 //! pure parse layer plus reference shifting for row/column insert/delete rewriting.
 
+use crate::float_text::NumberText;
 use crate::memory::MemoryOwnerStats;
-use crate::types::{FormulaError, Value};
-use std::{borrow::Cow, cmp::Ordering};
+use crate::tables::{TableSlots, WrittenTableRef};
+use crate::types::{FormulaError, Value, FORMULA_RECURSION_LIMIT};
+use std::{borrow::Cow, cmp::Ordering, rc::Rc};
 
 /// Bounds syntax recursion below the evaluator limit because each parenthesized
 /// expression traverses the complete precedence stack.
@@ -41,8 +43,8 @@ pub(crate) const SHEET_ROWS: u32 = 1_048_576;
 /// The columns of a sheet: the last column is `XFD`.
 pub(crate) const SHEET_COLS: u32 = 16_384;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Op {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Op {
     Add,
     Sub,
     Mul,
@@ -51,8 +53,8 @@ pub enum Op {
     Concat,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum Func {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Func {
     Sum,
     Avg,
     Min,
@@ -582,8 +584,8 @@ define_function_registry! {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum CmpOp {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum CmpOp {
     Eq,
     Ne,
     Lt,
@@ -592,29 +594,76 @@ pub enum CmpOp {
     Ge,
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct RefFlags {
-    pub row_abs: bool,
-    pub col_abs: bool,
+/// The `$` markers of a cell reference, and whether its sheet name is
+/// written quoted: bit 0 absolute row, bit 1 absolute column, bit 2 quoted.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct RefFlags(u8);
+
+impl RefFlags {
+    /// Both axes `$`-fixed.
+    pub(crate) const ABSOLUTE: Self = Self::new(true, true);
+
+    pub(crate) const fn new(row_abs: bool, col_abs: bool) -> Self {
+        Self((row_abs as u8) | ((col_abs as u8) << 1))
+    }
+
+    pub(crate) const fn row_abs(self) -> bool {
+        self.0 & 1 != 0
+    }
+
+    pub(crate) const fn col_abs(self) -> bool {
+        self.0 & 2 != 0
+    }
+
+    pub(crate) const fn quoted(self) -> bool {
+        self.0 & 4 != 0
+    }
+
+    pub(crate) const fn with_quoted(self, quoted: bool) -> Self {
+        Self((self.0 & !4) | ((quoted as u8) << 2))
+    }
+
+    fn set_row_abs(&mut self, absolute: bool) {
+        self.0 = (self.0 & !1) | u8::from(absolute);
+    }
+
+    fn set_col_abs(&mut self, absolute: bool) {
+        self.0 = (self.0 & !2) | (u8::from(absolute) << 1);
+    }
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct SheetRef {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SheetRef {
     pub handle: u32,
+}
+
+/// One end of a 3-D sheet span such as `Jan:Mar!A1`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SheetSpanEndpoint {
+    pub(crate) handle: u32,
+    /// Present only while this endpoint is detached from a workbook.
+    pub(crate) name: Option<Box<str>>,
+    pub(crate) quoted: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct UnresolvedSheetRef {
     pub name: String,
     pub quoted: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct UnresolvedSheetRef {
-    pub name: String,
-    pub quoted: bool,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct RangeFlags {
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct RangeFlags {
     pub start: RefFlags,
     pub end: RefFlags,
+}
+
+impl RangeFlags {
+    /// Every axis of both ends `$`-fixed.
+    pub(crate) const ABSOLUTE: Self = Self {
+        start: RefFlags::ABSOLUTE,
+        end: RefFlags::ABSOLUTE,
+    };
 }
 
 /// The handle of a 3-D reference endpoint before ingest resolves its name.
@@ -622,10 +671,10 @@ pub(crate) const UNRESOLVED_SHEET: u32 = u32::MAX;
 
 /// `Sheet1:Sheet3!A1:B2`: one range on every sheet from `first` to `last` in
 /// tab order.
-#[derive(Clone, Debug, PartialEq)]
-pub struct SheetSpanRef {
-    pub first: SheetRef,
-    pub last: SheetRef,
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SheetSpanRef {
+    pub first: SheetSpanEndpoint,
+    pub last: SheetSpanEndpoint,
     /// The handles from `first` to `last` in tab order when the span was last
     /// placed. Reads and evaluation use them without the tab order, and a
     /// removed endpoint is replaced by its nearest surviving neighbour here.
@@ -640,8 +689,8 @@ pub struct SheetSpanRef {
     pub cell: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct NamedRangeRef {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct NamedRangeRef {
     pub name: String,
     pub scope: Option<u32>,
     pub sheet: u32,
@@ -655,8 +704,8 @@ pub struct NamedRangeRef {
 /// formula back, and the name's formula expanded for the formula that uses
 /// it. Formulas share one expansion when it does not depend on where they
 /// are; see `CellStore::name_target`.
-#[derive(Debug, PartialEq)]
-pub struct NamedFormulaRef {
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct NamedFormulaRef {
     pub name: String,
     pub expression: Ast,
     /// Nodes of `expression`, counting each name in it at its own count:
@@ -666,7 +715,7 @@ pub struct NamedFormulaRef {
 
 /// What a defined name stands for in one formula.
 #[derive(Clone)]
-pub enum NameTarget {
+pub(crate) enum NameTarget {
     Range(NamedRangeRef),
     Formula(std::rc::Rc<NamedFormulaRef>),
     /// A reference with no sheet inside another name's expansion. It is
@@ -675,79 +724,157 @@ pub enum NameTarget {
     Reference(Ast),
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub enum TableSection {
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TableSection {
     Body,
     Headers,
     Totals,
     CurrentRow,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct UnresolvedStructuredRef {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct UnresolvedStructuredRef {
     pub table_name: Option<String>,
     pub column_name: String,
     pub section: TableSection,
 }
 
+impl UnresolvedStructuredRef {
+    /// The reference as it is written, to bind it to a table.
+    pub(crate) fn written(&self) -> WrittenTableRef<'_> {
+        WrittenTableRef {
+            table: self.table_name.as_deref(),
+            column: &self.column_name,
+            section: self.section,
+        }
+    }
+}
+
+/// A table reference bound to a table slot of the store. It holds the cells
+/// it covers, so evaluation reads it like a range; the table's names live
+/// once, in the slot, and an edit of the table refreshes the cells of only
+/// the formulas that use it. The column is the one at `col` in the table.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct StructuredRef {
+    pub(crate) table: u16,
+    pub(crate) section: TableSection,
+    /// Written with its table name (`Sales[Amount]`).
+    pub(crate) qualified: bool,
+    pub(crate) sheet: u32,
+    pub(crate) row_start: u32,
+    pub(crate) row_end: u32,
+    pub(crate) col: u32,
+}
+
+/// A sheet-qualified cell whose sheet is not one of this workbook's: an
+/// external link, a missing sheet, or standalone syntax. It keeps the
+/// written sheet text so the formula writes back exactly.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct DetachedCellRef {
+    pub(crate) sheet: UnresolvedSheetRef,
+    pub(crate) row: u32,
+    pub(crate) col: u32,
+    pub(crate) flags: RefFlags,
+}
+
+/// A sheet-qualified range whose sheet is not one of this workbook's: an
+/// external link, a missing sheet, or standalone syntax. It keeps the
+/// written sheet text so the formula writes back exactly.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct DetachedRangeRef {
+    pub(crate) sheet: UnresolvedSheetRef,
+    pub(crate) row_start: u32,
+    pub(crate) col_start: u32,
+    pub(crate) row_end: u32,
+    pub(crate) col_end: u32,
+    pub(crate) flags: RangeFlags,
+}
+
+/// An uncommon call whose function name is not a built-in.
 #[derive(Clone, Debug, PartialEq)]
-pub struct StructuredRef {
-    pub table_id: String,
-    pub table_name: String,
-    pub column_id: String,
-    pub column_name: String,
-    pub sheet: u32,
-    pub row_start: u32,
-    pub row_end: u32,
-    pub col: u32,
-    pub section: TableSection,
-    pub qualified: bool,
+pub(crate) struct UnknownCall {
+    pub(crate) name: String,
+    pub(crate) args: Box<[Ast]>,
+}
+
+/// The row-major values of an array constant.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ArrayLiteral {
+    pub(crate) cols: u32,
+    /// Shared with the arrays that read the constant, so a read copies none.
+    pub(crate) values: Rc<[Value]>,
+}
+
+/// A well-formed LAMBDA after its parameters are numbered
+/// (`eval::analysis::lambda::resolve_parameters`). It is shared, so a
+/// closure that holds it clones a handle instead of the body.
+#[cfg(feature = "analysis")]
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct LambdaDefinition {
+    /// The parameter declarations as written (`Ast::Name`), for writing
+    /// the formula back.
+    pub(crate) parameters: Box<[Ast]>,
+    pub(crate) body: Ast,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Ast {
+pub(crate) enum Ast {
     Num(f64),
-    Str(String),
+    Str(Rc<str>),
     Bool(bool),
     Missing,
-    /// A helper parameter value. It exists only during full-engine evaluation.
+    /// A use of a LAMBDA parameter, numbered when the formula was entered
+    /// (`eval::analysis::lambda::resolve_parameters`). `depth` counts the
+    /// LAMBDAs between the use and the one that declares the parameter;
+    /// `index` is the parameter's position. A call reads the value from the
+    /// pass's call frame. The name stays for writing the formula back.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Transient values are not part of the public AST API.
-    BoundMatrix {
-        rows: usize,
-        cols: usize,
-        values: std::rc::Rc<Vec<crate::types::Value>>,
+    Parameter {
+        depth: u16,
+        index: u16,
+        name: Box<str>,
     },
+    /// A well-formed LAMBDA whose parameter uses are numbered. Calls and the
+    /// closures they create share its body.
+    #[cfg(feature = "analysis")]
+    #[allow(
+        private_interfaces,
+        reason = "LAMBDA definitions are not part of the public AST API"
+    )]
+    Lambda(std::rc::Rc<LambdaDefinition>),
     /// The literal pattern of a REGEX call, shared by every formula in the
     /// store with the same pattern text. Its compiled programs live as long
     /// as the formulas that hold it.
     #[cfg(feature = "analysis")]
-    #[allow(private_interfaces)] // Shared patterns are not part of the public AST API.
+    #[allow(
+        private_interfaces,
+        reason = "shared patterns are not part of the public AST API"
+    )]
     RegexPattern(std::rc::Rc<crate::eval::regex_patterns::SharedPattern>),
-    Name(String),
-    NamedRange(NamedRangeRef),
+    Name(Box<str>),
+    NamedRange(Box<NamedRangeRef>),
     /// A defined name that holds a formula. Shared, because one name can be
     /// used by many formulas; never mutated in place.
     NamedFormula(std::rc::Rc<NamedFormulaRef>),
-    UnresolvedStructured(UnresolvedStructuredRef),
-    Structured(Box<StructuredRef>),
+    UnresolvedStructured(Box<UnresolvedStructuredRef>),
+    Structured(StructuredRef),
     Cell(u32, u32, RefFlags),
-    SheetCell(UnresolvedSheetRef, u32, u32, RefFlags),
+    SheetCell(Box<DetachedCellRef>),
     AbsCell(SheetRef, u32, u32, RefFlags),
     Range(u32, u32, u32, u32, RangeFlags),
-    SheetRange(UnresolvedSheetRef, u32, u32, u32, u32, RangeFlags),
+    SheetRange(Box<DetachedRangeRef>),
     AbsRange(SheetRef, u32, u32, u32, u32, RangeFlags),
     /// Boxed: a span holds two sheet names and its handles, which would
     /// otherwise grow every node of every formula.
     SheetSpan(Box<SheetSpanRef>),
     InvalidRef,
-    Func(Func, Vec<Ast>),
-    UnknownFunc(String, Vec<Ast>),
-    Bin(Op, Box<Ast>, Box<Ast>),
-    Cmp(CmpOp, Box<Ast>, Box<Ast>),
-    Neg(Box<Ast>),
-    Pos(Box<Ast>),
-    Percent(Box<Ast>),
+    Func(Func, Box<[Self]>),
+    UnknownFunc(Box<UnknownCall>),
+    Bin(Op, Box<Self>, Box<Self>),
+    Cmp(CmpOp, Box<Self>, Box<Self>),
+    Neg(Box<Self>),
+    Pos(Box<Self>),
+    Percent(Box<Self>),
     /// One use of a LET binding in an expanded tree. `slot` identifies the
     /// binding for the evaluation in progress, so its expression is evaluated
     /// at most once however many uses the expansion has; `expression` stays
@@ -755,27 +882,70 @@ pub enum Ast {
     /// expansion still see the reads and the arrays.
     LetSlot {
         slot: u32,
-        expression: Box<Ast>,
+        expression: Box<Self>,
+    },
+    /// A use, or the binding name, of a LET binding resolved when the formula
+    /// was entered. The name stays for writing the formula back; `slot`
+    /// numbers the binding within the outermost resolved LET, and evaluation
+    /// reads the binding's expression from the LET itself instead of a copy
+    /// (`eval::let_slots`).
+    LetName {
+        slot: u32,
+        name: Box<str>,
     },
     /// An array constant such as `{1,2;3,4}`: row-major values with `cols`
     /// values in each row.
-    Array {
-        cols: u32,
-        values: Vec<Value>,
-    },
+    Array(Box<ArrayLiteral>),
 }
+
+// Every node of every parsed formula is an `Ast`; large or rare variants are
+// boxed to keep it at this size on wasm32 and native targets alike.
+const _: () = assert!(
+    std::mem::size_of::<Ast>() == 24,
+    "Ast changed size: measure, then update this number"
+);
+
 impl Ast {
     /// The expression that a LET binding's use or a defined name stands
     /// for, through any number of them: what a function argument such as
     /// `MAP(A1:A3,MYFN)` passes.
     #[cfg(feature = "analysis")]
-    pub(crate) fn bound_value(&self) -> &Ast {
+    pub(crate) fn bound_value(&self) -> &Self {
         let mut expression = self;
         loop {
             expression = match expression {
-                Ast::LetSlot { expression, .. } => expression,
-                Ast::NamedFormula(named) => &named.expression,
-                _ => return expression,
+                Self::LetSlot {
+                    expression: bound, ..
+                } => bound,
+                Self::NamedFormula(named) => &named.expression,
+                Self::Num(_)
+                | Self::Str(_)
+                | Self::Bool(_)
+                | Self::Missing
+                | Self::Parameter { .. }
+                | Self::Lambda(_)
+                | Self::RegexPattern(_)
+                | Self::Name(_)
+                | Self::NamedRange(_)
+                | Self::UnresolvedStructured(_)
+                | Self::Structured(_)
+                | Self::Cell(..)
+                | Self::SheetCell(..)
+                | Self::AbsCell(..)
+                | Self::Range(..)
+                | Self::SheetRange(..)
+                | Self::AbsRange(..)
+                | Self::SheetSpan(_)
+                | Self::InvalidRef
+                | Self::Func(..)
+                | Self::UnknownFunc(..)
+                | Self::Bin(..)
+                | Self::Cmp(..)
+                | Self::Neg(_)
+                | Self::Pos(_)
+                | Self::Percent(_)
+                | Self::LetName { .. }
+                | Self::Array { .. } => return expression,
             };
         }
     }
@@ -785,34 +955,41 @@ impl Ast {
     /// formula's expression is its own definition, not a child; a walker that
     /// follows names matches `Ast::NamedFormula` itself. Every node kind is
     /// listed, so a new kind must say whether it has children.
-    pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Ast) -> bool) -> bool {
+    pub(crate) fn any_child(&self, test: &mut dyn FnMut(&Self) -> bool) -> bool {
         match self {
-            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(test),
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => test(left) || test(right),
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => test(inner),
-            Ast::LetSlot { expression, .. } => test(expression),
+            Self::Func(_, args) => args.iter().any(test),
+            Self::UnknownFunc(call) => {
+                let args = &call.args;
+                args.iter().any(test)
+            }
+            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => test(left) || test(right),
+            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => test(inner),
+            Self::LetSlot { expression, .. } => test(expression),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } => false,
+            Self::Parameter { .. } => false,
             #[cfg(feature = "analysis")]
-            Ast::RegexPattern(_) => false,
-            Ast::Num(_)
-            | Ast::Str(_)
-            | Ast::Bool(_)
-            | Ast::Missing
-            | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
-            | Ast::UnresolvedStructured(_)
-            | Ast::Structured(_)
-            | Ast::Cell(..)
-            | Ast::SheetCell(..)
-            | Ast::AbsCell(..)
-            | Ast::Range(..)
-            | Ast::SheetRange(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_)
-            | Ast::InvalidRef
-            | Ast::Array { .. } => false,
+            Self::Lambda(definition) => test(&definition.body),
+            #[cfg(feature = "analysis")]
+            Self::RegexPattern(_) => false,
+            Self::LetName { .. } => false,
+            Self::Num(_)
+            | Self::Str(_)
+            | Self::Bool(_)
+            | Self::Missing
+            | Self::Name(_)
+            | Self::NamedRange(_)
+            | Self::NamedFormula(_)
+            | Self::UnresolvedStructured(_)
+            | Self::Structured(_)
+            | Self::Cell(..)
+            | Self::SheetCell(..)
+            | Self::AbsCell(..)
+            | Self::Range(..)
+            | Self::SheetRange(..)
+            | Self::AbsRange(..)
+            | Self::SheetSpan(_)
+            | Self::InvalidRef
+            | Self::Array(_) => false,
         }
     }
 
@@ -820,36 +997,46 @@ impl Ast {
     /// finds them, and return whether any visit reported a change. Every
     /// child is visited, so one rewrite does not stop the others. Every node
     /// kind is listed, so a new kind must say whether it has children.
-    pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
+    pub(crate) fn fold_children_mut(&mut self, visit: &mut dyn FnMut(&mut Self) -> bool) -> bool {
         match self {
-            Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args
+            Self::Func(_, args) => args
                 .iter_mut()
                 .fold(false, |changed, arg| visit(arg) | changed),
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => visit(left) | visit(right),
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => visit(inner),
-            Ast::LetSlot { expression, .. } => visit(expression),
+            Self::UnknownFunc(call) => {
+                let args = &mut call.args;
+                args.iter_mut()
+                    .fold(false, |changed, arg| visit(arg) | changed)
+            }
+            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => visit(left) | visit(right),
+            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => visit(inner),
+            Self::LetSlot { expression, .. } => visit(expression),
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { .. } => false,
+            Self::Parameter { .. } => false,
+            // Writing through a shared definition gives this formula its own
+            // copy; outside evaluation no closure shares it.
             #[cfg(feature = "analysis")]
-            Ast::RegexPattern(_) => false,
-            Ast::Num(_)
-            | Ast::Str(_)
-            | Ast::Bool(_)
-            | Ast::Missing
-            | Ast::Name(_)
-            | Ast::NamedRange(_)
-            | Ast::NamedFormula(_)
-            | Ast::UnresolvedStructured(_)
-            | Ast::Structured(_)
-            | Ast::Cell(..)
-            | Ast::SheetCell(..)
-            | Ast::AbsCell(..)
-            | Ast::Range(..)
-            | Ast::SheetRange(..)
-            | Ast::AbsRange(..)
-            | Ast::SheetSpan(_)
-            | Ast::InvalidRef
-            | Ast::Array { .. } => false,
+            Self::Lambda(definition) => visit(&mut std::rc::Rc::make_mut(definition).body),
+            #[cfg(feature = "analysis")]
+            Self::RegexPattern(_) => false,
+            Self::LetName { .. } => false,
+            Self::Num(_)
+            | Self::Str(_)
+            | Self::Bool(_)
+            | Self::Missing
+            | Self::Name(_)
+            | Self::NamedRange(_)
+            | Self::NamedFormula(_)
+            | Self::UnresolvedStructured(_)
+            | Self::Structured(_)
+            | Self::Cell(..)
+            | Self::SheetCell(..)
+            | Self::AbsCell(..)
+            | Self::Range(..)
+            | Self::SheetRange(..)
+            | Self::AbsRange(..)
+            | Self::SheetSpan(_)
+            | Self::InvalidRef
+            | Self::Array(_) => false,
         }
     }
 
@@ -858,81 +1045,108 @@ impl Ast {
     pub(crate) fn heap_memory_stats(&self, out: &mut MemoryOwnerStats) {
         match self {
             #[cfg(feature = "analysis")]
-            Ast::BoundMatrix { values, .. } => {
-                out.add_vec::<crate::types::Value>(values.len(), values.capacity());
+            Self::Parameter { name, .. } => out.add_payload(name.len(), name.len()),
+            #[cfg(feature = "analysis")]
+            Self::Lambda(definition) => {
+                // An `Rc` allocation holds its strong and weak counts first.
+                const RC_COUNT_BYTES: usize = std::mem::size_of::<(usize, usize)>();
+                let bytes = RC_COUNT_BYTES + std::mem::size_of::<LambdaDefinition>();
+                out.add_payload(bytes, bytes);
+                let LambdaDefinition { parameters, body } = &**definition;
+                add_ast_slice_memory(parameters, out);
+                body.heap_memory_stats(out);
             }
             // The store's pattern index counts each shared pattern once.
             #[cfg(feature = "analysis")]
-            Ast::RegexPattern(_) => {}
-            Ast::Str(value) | Ast::Name(value) => add_string_memory(value, out),
-            Ast::NamedRange(value) => add_string_memory(&value.name, out),
+            Self::RegexPattern(_) => {}
+            Self::Str(value) => {
+                // The shared string owns its strong and weak counts as well
+                // as its UTF-8 bytes; the inline Rc handle is in the AST root.
+                let allocated = value.len().saturating_add(2 * std::mem::size_of::<usize>());
+                out.add_payload(value.len(), allocated);
+            }
+            Self::Name(value) => out.add_payload(value.len(), value.len()),
+            Self::LetName { name, .. } => out.add_payload(name.len(), name.len()),
+            Self::NamedRange(value) => {
+                let bytes = std::mem::size_of::<NamedRangeRef>();
+                out.add_payload(bytes, bytes);
+                add_string_memory(&value.name, out);
+            }
             // A shared expansion is counted once, by the store's cache that
             // also holds it; an expansion only this formula holds is its own.
-            Ast::NamedFormula(value) if std::rc::Rc::strong_count(value) == 1 => {
+            Self::NamedFormula(value) if std::rc::Rc::strong_count(value) == 1 => {
                 let bytes = std::mem::size_of::<NamedFormulaRef>();
                 out.add_payload(bytes, bytes);
                 add_string_memory(&value.name, out);
                 value.expression.heap_memory_stats(out);
             }
-            Ast::NamedFormula(_) => {}
-            Ast::UnresolvedStructured(value) => {
+            Self::NamedFormula(_) => {}
+            Self::UnresolvedStructured(value) => {
+                let bytes = std::mem::size_of::<UnresolvedStructuredRef>();
+                out.add_payload(bytes, bytes);
                 if let Some(name) = &value.table_name {
                     add_string_memory(name, out);
                 }
                 add_string_memory(&value.column_name, out);
             }
-            Ast::Structured(value) => {
-                let bytes = std::mem::size_of::<StructuredRef>();
+            Self::Structured(_) | Self::AbsCell(..) | Self::AbsRange(..) => {}
+            Self::SheetCell(reference) => {
+                let bytes = std::mem::size_of::<DetachedCellRef>();
                 out.add_payload(bytes, bytes);
-                add_string_memory(&value.table_id, out);
-                add_string_memory(&value.table_name, out);
-                add_string_memory(&value.column_id, out);
-                add_string_memory(&value.column_name, out);
+                add_string_memory(&reference.sheet.name, out);
             }
-            Ast::SheetCell(sheet, ..) | Ast::SheetRange(sheet, ..) => {
-                add_string_memory(&sheet.name, out);
+            Self::SheetRange(reference) => {
+                let bytes = std::mem::size_of::<DetachedRangeRef>();
+                out.add_payload(bytes, bytes);
+                add_string_memory(&reference.sheet.name, out);
             }
-            Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) => {
-                add_string_memory(&sheet.name, out);
-            }
-            Ast::SheetSpan(span) => {
+            Self::SheetSpan(span) => {
                 let bytes = std::mem::size_of::<SheetSpanRef>();
                 out.add_payload(bytes, bytes);
-                add_string_memory(&span.first.name, out);
-                add_string_memory(&span.last.name, out);
+                for endpoint in [&span.first, &span.last] {
+                    if let Some(name) = &endpoint.name {
+                        out.add_payload(name.len(), name.len());
+                    }
+                }
                 out.add_vec::<u32>(span.sheets.len(), span.sheets.capacity());
             }
-            Ast::Func(_, args) => add_ast_vec_memory(args, out),
-            Ast::UnknownFunc(name, args) => {
+            Self::Func(_, args) => add_ast_slice_memory(args, out),
+            Self::UnknownFunc(call) => {
+                let UnknownCall { name, args } = &**call;
+
+                let bytes = std::mem::size_of::<UnknownCall>();
+                out.add_payload(bytes, bytes);
                 add_string_memory(name, out);
-                add_ast_vec_memory(args, out);
+                add_ast_slice_memory(args, out);
             }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
+            Self::Bin(_, left, right) | Self::Cmp(_, left, right) => {
                 add_boxed_ast_memory(left, out);
                 add_boxed_ast_memory(right, out);
             }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
+            Self::Neg(inner) | Self::Pos(inner) | Self::Percent(inner) => {
                 add_boxed_ast_memory(inner, out);
             }
-            Ast::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
-            Ast::Array { values, .. } => {
+            Self::LetSlot { expression, .. } => add_boxed_ast_memory(expression, out),
+            Self::Array(array) => {
+                let ArrayLiteral { values, .. } = &**array;
+
+                let payload = std::mem::size_of::<ArrayLiteral>();
+                out.add_payload(payload, payload);
                 let bytes = std::mem::size_of::<Value>();
-                out.add_payload(
-                    values.len().saturating_mul(bytes),
-                    values.capacity().saturating_mul(bytes),
-                );
-                for value in values {
+                let values_bytes = values.len().saturating_mul(bytes);
+                out.add_payload(values_bytes, values_bytes);
+                for value in &**values {
                     if let Value::Text(text) = value {
                         out.add_payload(text.len(), text.len());
                     }
                 }
             }
-            Ast::Num(_)
-            | Ast::Bool(_)
-            | Ast::Missing
-            | Ast::Cell(..)
-            | Ast::Range(..)
-            | Ast::InvalidRef => {}
+            Self::Num(_)
+            | Self::Bool(_)
+            | Self::Missing
+            | Self::Cell(..)
+            | Self::Range(..)
+            | Self::InvalidRef => {}
         }
     }
 }
@@ -941,10 +1155,10 @@ fn add_string_memory(value: &String, out: &mut MemoryOwnerStats) {
     out.add_payload(value.len(), value.capacity());
 }
 
-fn add_ast_vec_memory(values: &Vec<Ast>, out: &mut MemoryOwnerStats) {
+fn add_ast_slice_memory(values: &[Ast], out: &mut MemoryOwnerStats) {
     out.add_payload(
         values.len().saturating_mul(std::mem::size_of::<Ast>()),
-        values.capacity().saturating_mul(std::mem::size_of::<Ast>()),
+        values.len().saturating_mul(std::mem::size_of::<Ast>()),
     );
     for value in values {
         value.heap_memory_stats(out);
@@ -980,11 +1194,11 @@ fn parse_col(letters: &str) -> Option<u32> {
 /// Parse an A1 token like `B12` or `$B$12`, preserving absolute markers.
 pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let col_abs = token.starts_with('$');
-    let token = token.strip_prefix('$').unwrap_or(token);
+    let unmarked = token.strip_prefix('$').unwrap_or(token);
 
     let mut letters_end = 0;
 
-    for (idx, ch) in token.char_indices() {
+    for (idx, ch) in unmarked.char_indices() {
         if !ch.is_ascii_alphabetic() {
             break;
         }
@@ -996,8 +1210,8 @@ pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
         return None;
     }
 
-    let letters = &token[..letters_end];
-    let row_token = &token[letters_end..];
+    let letters = &unmarked[..letters_end];
+    let row_token = &unmarked[letters_end..];
     let row_abs = row_token.starts_with('$');
     let digits = row_token.strip_prefix('$').unwrap_or(row_token);
 
@@ -1008,7 +1222,7 @@ pub(crate) fn parse_a1(token: &str) -> Option<(u32, u32, RefFlags)> {
     let col = parse_col(letters)?;
     let row = row_index(digits.parse().ok()?)?;
 
-    (col < SHEET_COLS).then_some((row, col, RefFlags { row_abs, col_abs }))
+    (col < SHEET_COLS).then_some((row, col, RefFlags::new(row_abs, col_abs)))
 }
 
 /// The 0-based index of a 1-based row number inside the sheet.
@@ -1035,7 +1249,23 @@ impl AreaEnd {
             Tok::Num(number) if number.fract() == 0.0 && *number <= f64::from(SHEET_ROWS) => {
                 row_index(*number as u32).map(|row| Self::Row(row, false))
             }
-            _ => None,
+            Tok::Num(_)
+            | Tok::Str(_)
+            | Tok::Structured(_)
+            | Tok::Op(_)
+            | Tok::LParen
+            | Tok::RParen
+            | Tok::Comma
+            | Tok::Semicolon
+            | Tok::LBrace
+            | Tok::RBrace
+            | Tok::Colon
+            | Tok::Bang
+            | Tok::Cmp(_)
+            | Tok::Error(_)
+            | Tok::Hash
+            | Tok::Intersect
+            | Tok::End => None,
         }
     }
 
@@ -1060,7 +1290,7 @@ impl AreaEnd {
 
 /// The range between two ends of one kind; `A:1` and `A1:B` have none.
 pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, RangeFlags)> {
-    let whole_axis = |col_abs, row_abs| RefFlags { row_abs, col_abs };
+    let whole_axis = |col_abs, row_abs| RefFlags::new(row_abs, col_abs);
     Some(match (start, end) {
         (AreaEnd::Cell(row, col, flags), AreaEnd::Cell(end_row, end_col, end_flags)) => {
             normalize_range(row, col, flags, end_row, end_col, end_flags)
@@ -1086,12 +1316,12 @@ pub(crate) fn area(start: AreaEnd, end: AreaEnd) -> Option<(u32, u32, u32, u32, 
 }
 
 /// Whether a range spans every row of the sheet: a whole-column range.
-fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
+const fn spans_all_rows(row_start: u32, row_end: u32) -> bool {
     row_start == 0 && row_end == SHEET_ROWS - 1
 }
 
 /// Whether a range spans every column of the sheet: a whole-row range.
-fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
+const fn spans_all_cols(col_start: u32, col_end: u32) -> bool {
     col_start == 0 && col_end == SHEET_COLS - 1
 }
 
@@ -1103,31 +1333,31 @@ fn normalize_range(
     end_col: u32,
     end_flags: RefFlags,
 ) -> (u32, u32, u32, u32, RangeFlags) {
-    let start_flags = RefFlags {
-        row_abs: if row <= end_row {
-            flags.row_abs
+    let start_flags = RefFlags::new(
+        if row <= end_row {
+            flags.row_abs()
         } else {
-            end_flags.row_abs
+            end_flags.row_abs()
         },
-        col_abs: if col <= end_col {
-            flags.col_abs
+        if col <= end_col {
+            flags.col_abs()
         } else {
-            end_flags.col_abs
+            end_flags.col_abs()
         },
-    };
+    );
 
-    let normalized_end_flags = RefFlags {
-        row_abs: if row <= end_row {
-            end_flags.row_abs
+    let normalized_end_flags = RefFlags::new(
+        if row <= end_row {
+            end_flags.row_abs()
         } else {
-            flags.row_abs
+            flags.row_abs()
         },
-        col_abs: if col <= end_col {
-            end_flags.col_abs
+        if col <= end_col {
+            end_flags.col_abs()
         } else {
-            flags.col_abs
+            flags.col_abs()
         },
-    };
+    );
 
     let mut range_flags = RangeFlags {
         start: start_flags,
@@ -1138,12 +1368,12 @@ fn normalize_range(
     // The rows of a whole column, and the columns of a whole row, are fixed:
     // no edit or copy moves them, so they behave as absolute.
     if spans_all_rows(row_start, row_end) {
-        range_flags.start.row_abs = true;
-        range_flags.end.row_abs = true;
+        range_flags.start.set_row_abs(true);
+        range_flags.end.set_row_abs(true);
     }
     if spans_all_cols(col_start, col_end) {
-        range_flags.start.col_abs = true;
-        range_flags.end.col_abs = true;
+        range_flags.start.set_col_abs(true);
+        range_flags.end.set_col_abs(true);
     }
 
     (row_start, col_start, row_end, col_end, range_flags)
@@ -1221,23 +1451,48 @@ fn quoted_token(
     }
 }
 
-/// Whether spaces between `previous` and `rest` are the intersection operator:
-/// they follow a token that can end a reference and precede one that can start
-/// one. Spaces around other operators, after separators and before `)` stay
-/// insignificant. A name followed by spaces and `(` is a function call, not
-/// an intersection between a named range and a parenthesized reference.
-/// `#REF!` is a reference operand too: a deleted operand serializes as it, and
-/// the formula must parse back to the same intersection.
-fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {
+/// What the last token means for spaces after it: they can be the
+/// intersection operator only after a token that can end a reference.
+#[derive(Clone, Copy)]
+pub(crate) enum ReferenceEdge {
+    /// Not a reference end: a separator, an operator or the start.
+    None,
+    /// A name: a reference end unless `(` follows, which makes it a call.
+    Name,
+    /// `)`, a table reference, a spill `#` or `#REF!`.
+    Reference,
+}
+
+impl ReferenceEdge {
+    /// `#REF!` is a reference operand too: a deleted operand serializes as
+    /// it, and the formula must parse back to the same intersection.
+    pub(crate) const fn after(previous: Option<&Tok<'_>>) -> Self {
+        match previous {
+            Some(Tok::Ident(..)) => Self::Name,
+            Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => {
+                Self::Reference
+            }
+            _ => Self::None,
+        }
+    }
+}
+
+/// Whether spaces between a token with `edge` and `rest` are the
+/// intersection operator: they follow a token that can end a reference and
+/// precede one that can start one. Spaces around other operators, after
+/// separators and before `)` stay insignificant. A name followed by spaces
+/// and `(` is a function call, not an intersection between a named range and
+/// a parenthesized reference.
+fn separates_references(edge: ReferenceEdge, rest: &str) -> bool {
     const DELETED_REFERENCE: &str = "#REF!";
 
     let Some(next) = rest.chars().next() else {
         return false;
     };
-    let ends_reference = match previous {
-        Some(Tok::Ident(..)) => next != '(',
-        Some(Tok::RParen | Tok::Structured(_) | Tok::Hash | Tok::Error(FormulaError::Ref)) => true,
-        _ => false,
+    let ends_reference = match edge {
+        ReferenceEdge::Name => next != '(',
+        ReferenceEdge::Reference => true,
+        ReferenceEdge::None => false,
     };
     let starts_reference = next.is_alphabetic()
         || matches!(next, '$' | '_' | '\\' | '\'' | '(')
@@ -1245,26 +1500,6 @@ fn separates_references(previous: Option<&Tok<'_>>, rest: &str) -> bool {
             .get(..DELETED_REFERENCE.len())
             .is_some_and(|text| text.eq_ignore_ascii_case(DELETED_REFERENCE));
     ends_reference && starts_reference
-}
-
-/// The tokens of one formula and what the parser may need to look for.
-struct Tokens<'a> {
-    toks: Vec<Tok<'a>>,
-    /// At least one intersection operator.
-    intersections: bool,
-    /// At least one `!`, which every 3-D reference has.
-    sheet_qualifiers: bool,
-}
-
-impl<'a> Tokens<'a> {
-    fn push(&mut self, tok: Tok<'a>) {
-        match tok {
-            Tok::Intersect => self.intersections = true,
-            Tok::Bang => self.sheet_qualifiers = true,
-            _ => {}
-        }
-        self.toks.push(tok);
-    }
 }
 
 /// Reads the number at `*index`: digits with one optional decimal point, then
@@ -1302,25 +1537,8 @@ fn number_token(src: &str, index: &mut usize) -> Result<f64, String> {
         .ok_or_else(|| format!("{number} is not a valid number."))
 }
 
-fn tokenize(src: &str) -> Result<Tokens<'_>, String> {
-    let mut tokens = Tokens {
-        toks: Vec::new(),
-        intersections: false,
-        sheet_qualifiers: false,
-    };
-    let mut index = 0;
-
-    while index < src.len() {
-        if let Some(tok) = lex_token(src, &mut index, tokens.toks.last())? {
-            tokens.push(tok);
-        }
-    }
-
-    Ok(tokens)
-}
-
 /// The token of one ASCII punctuation byte, or `None` for any other byte.
-fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
+const fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
     Some(match byte {
         b'+' | b'-' | b'*' | b'/' | b'^' | b'&' | b'%' => Tok::Op(byte as char),
         b'(' => Tok::LParen,
@@ -1338,8 +1556,8 @@ fn punctuation_token(byte: u8) -> Option<Tok<'static>> {
 
 /// Reads the token at `*index` and moves `*index` past it. Whitespace gives
 /// `Ok(None)`, except where it is the intersection operator after `previous`.
-/// The parser's `tokenize` and every other reader of formula text lex with
-/// this one step, so they cannot disagree about where a token ends. After an
+/// The parser's cursor and every other reader of formula text lex with this
+/// one step, so they cannot disagree about where a token ends. After an
 /// error, `*index` is past the bad text when its end is known: an open quote
 /// or bracket runs to the end of `src`; an unknown character is not consumed.
 #[inline(always)]
@@ -1348,6 +1566,16 @@ pub(crate) fn lex_token<'a>(
     index: &mut usize,
     previous: Option<&Tok<'a>>,
 ) -> Result<Option<Tok<'a>>, String> {
+    lex_token_after(src, index, ReferenceEdge::after(previous))
+}
+
+/// [`lex_token`] after a token with `edge`.
+#[inline(always)]
+fn lex_token_after<'a>(
+    src: &'a str,
+    index: &mut usize,
+    edge: ReferenceEdge,
+) -> Result<Option<Tok<'a>>, String> {
     let bytes = src.as_bytes();
     let c = bytes[*index];
 
@@ -1355,7 +1583,7 @@ pub(crate) fn lex_token<'a>(
         while bytes.get(*index).is_some_and(u8::is_ascii_whitespace) {
             *index += 1;
         }
-        if !separates_references(previous, &src[*index..]) {
+        if !separates_references(edge, &src[*index..]) {
             return Ok(None);
         }
         Tok::Intersect
@@ -1375,11 +1603,16 @@ pub(crate) fn lex_token<'a>(
             )?),
             true,
         )
-    } else if let Some((literal, error)) = ERROR_LITERALS.iter().find(|(literal, _)| {
-        bytes[*index..]
-            .get(..literal.len())
-            .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
-    }) {
+    } else if let Some((literal, error)) = (c == b'#')
+        .then(|| {
+            ERROR_LITERALS.iter().find(|(literal, _)| {
+                bytes[*index..]
+                    .get(..literal.len())
+                    .is_some_and(|text| text.eq_ignore_ascii_case(literal.as_bytes()))
+            })
+        })
+        .flatten()
+    {
         *index += literal.len();
         Tok::Error(*error)
     } else if c == b'[' {
@@ -1414,17 +1647,26 @@ pub(crate) fn lex_token<'a>(
     Ok(Some(tok))
 }
 
-/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`.
+/// The name at `*index`: letters, digits, `$`, `_`, `.` and `\`. ASCII
+/// bytes, which most names are, are read without decoding a character.
 fn ident_token<'a>(src: &'a str, index: &mut usize) -> Tok<'a> {
     let start = *index;
+    let bytes = src.as_bytes();
 
-    while *index < src.len() {
+    while let Some(&byte) = bytes.get(*index) {
+        if byte.is_ascii() {
+            if !(byte.is_ascii_alphanumeric() || matches!(byte, b'$' | b'_' | b'.' | b'\\')) {
+                break;
+            }
+            *index += 1;
+            continue;
+        }
+
         let ch = src[*index..].chars().next().expect("valid UTF-8 source");
-        if ch.is_alphanumeric() || matches!(ch, '$' | '_' | '.' | '\\') {
-            *index += ch.len_utf8();
-        } else {
+        if !ch.is_alphanumeric() {
             break;
         }
+        *index += ch.len_utf8();
     }
 
     Tok::Ident(Cow::Borrowed(&src[start..*index]), false)
@@ -1469,7 +1711,11 @@ fn structured_token(src: &str, index: &mut usize) -> Result<String, String> {
     Ok(src[start..*index].to_string())
 }
 
-fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, String> {
+/// The section and column name of a table reference.
+type StructuredParts<'a> = (TableSection, &'a str);
+
+/// The section and column name of a `[...]` table reference token.
+fn structured_parts(raw: &str) -> Result<StructuredParts<'_>, String> {
     if !raw.starts_with('[') || !raw.ends_with(']') {
         return Err("This table reference is not valid.".into());
     }
@@ -1497,26 +1743,235 @@ fn parse_structured_ref(raw: String, table_name: Option<String>) -> Result<Ast, 
     if column_name.is_empty() {
         return Err("Enter a column name in the table reference.".into());
     }
-    Ok(Ast::UnresolvedStructured(UnresolvedStructuredRef {
-        table_name,
-        column_name: column_name.to_string(),
-        section,
-    }))
+    Ok((section, column_name))
 }
 
-struct Parser<'a> {
-    toks: std::vec::IntoIter<Tok<'a>>,
-    intersections: bool,
-    sheet_qualifiers: bool,
+/// Most tokens the parser looks ahead of the next one: `Sheet1:Sheet3!`
+/// is recognized from its first name. A power of two, so the ring wraps
+/// with a mask.
+const LOOKAHEAD: usize = 4;
+
+/// The parser's tokens, lexed on demand from the formula text, or read from
+/// formula help's token list. Lexing stops at the first lex error, which the
+/// parse reports in place of any parse error, as a separate tokenizing step
+/// would.
+struct Cursor<'a> {
+    src: &'a str,
+    index: usize,
+    /// Formula help's tokens; `None` when lexing `src`.
+    tokens: Option<std::vec::IntoIter<Tok<'a>>>,
+    edge: ReferenceEdge,
+    ahead: [Option<Tok<'a>>; LOOKAHEAD],
+    ahead_start: usize,
+    ahead_len: usize,
+    /// Tokens the parser has read.
+    consumed: usize,
+    lex_error: Option<String>,
 }
 
-impl<'a> Parser<'a> {
-    fn peek(&self) -> Option<&Tok<'a>> {
-        self.toks.as_slice().first()
+impl<'a> Cursor<'a> {
+    const fn over_text(src: &'a str) -> Self {
+        Self {
+            src,
+            index: 0,
+            tokens: None,
+            edge: ReferenceEdge::None,
+            ahead: [None, None, None, None],
+            ahead_start: 0,
+            ahead_len: 0,
+            consumed: 0,
+            lex_error: None,
+        }
     }
 
+    fn over_tokens(tokens: Vec<Tok<'a>>) -> Self {
+        Self {
+            tokens: Some(tokens.into_iter()),
+            ..Self::over_text("")
+        }
+    }
+
+    fn lex_next(&mut self) -> Option<Tok<'a>> {
+        if let Some(tokens) = &mut self.tokens {
+            return tokens.next();
+        }
+
+        if self.lex_error.is_some() {
+            return None;
+        }
+
+        while self.index < self.src.len() {
+            match lex_token_after(self.src, &mut self.index, self.edge) {
+                Ok(Some(tok)) => {
+                    self.edge = ReferenceEdge::after(Some(&tok));
+                    return Some(tok);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    self.lex_error = Some(error);
+                    return None;
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Whether `count` tokens are ahead, lexing them when needed. Out of
+    /// line so each peek and read inlines only the buffered case.
+    #[inline(never)]
+    fn fill(&mut self, count: usize) -> bool {
+        while self.ahead_len < count {
+            let Some(tok) = self.lex_next() else {
+                return false;
+            };
+            self.ahead[(self.ahead_start + self.ahead_len) & (LOOKAHEAD - 1)] = Some(tok);
+            self.ahead_len += 1;
+        }
+
+        true
+    }
+
+    #[inline(never)]
+    fn peek_at(&mut self, offset: usize) -> Option<&Tok<'a>> {
+        if self.ahead_len <= offset && !self.fill(offset + 1) {
+            return None;
+        }
+
+        self.ahead[(self.ahead_start + offset) & (LOOKAHEAD - 1)].as_ref()
+    }
+
+    /// Out of line: the parser reads tokens at many sites, and one copy of
+    /// the ring step keeps the parser small.
+    #[inline(never)]
     fn next(&mut self) -> Option<Tok<'a>> {
-        self.toks.next()
+        if self.ahead_len == 0 && !self.fill(1) {
+            return None;
+        }
+
+        let tok = self.ahead[self.ahead_start].take();
+        self.ahead_start = (self.ahead_start + 1) & (LOOKAHEAD - 1);
+        self.ahead_len -= 1;
+        self.consumed += 1;
+        tok
+    }
+
+    /// The first lex error of the text, lexing whatever the parser left.
+    fn lex_error(&mut self) -> Option<String> {
+        while self.lex_error.is_none() && self.lex_next().is_some() {}
+        self.lex_error.take()
+    }
+}
+
+/// A parsed formula and the resolution steps it needs, or the parse error.
+pub(crate) type ParseResult = Result<(Ast, ParseFeatures), String>;
+
+/// Finds the handle of the workbook sheet a formula names.
+pub(crate) type SheetResolver<'a> = dyn Fn(&str) -> Option<u32> + 'a;
+
+/// Gives a 3-D reference with bound endpoints the sheets it spans; fails when
+/// an endpoint is not in the tab order.
+pub(crate) type SpanPlacer<'a> = dyn Fn(&mut SheetSpanRef) -> bool + 'a;
+
+/// Binds a table reference to a table slot while the formula is parsed.
+/// `None` keeps the reference unbound, an error when read, until a table
+/// edit binds it.
+pub(crate) type TableBinder<'a> = dyn Fn(WrittenTableRef<'_>) -> Option<StructuredRef> + 'a;
+
+/// Which resolution steps a parsed formula needs: each is set when the
+/// formula holds a node that the step rewrites, so ingest skips the others.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct ParseFeatures {
+    /// A sheet-qualified cell, range or 3-D reference.
+    pub(crate) sheet_refs: bool,
+    /// A bare name or an unknown function, which may name a defined name.
+    pub(crate) names: bool,
+    /// A table reference, bound or not.
+    pub(crate) table_refs: bool,
+    /// A sheet reference left detached: an external link or a sheet that the
+    /// workbook does not have.
+    pub(crate) detached_sheets: bool,
+    /// A LAMBDA, whose parameter uses are numbered before the formula is
+    /// stored.
+    #[cfg(feature = "analysis")]
+    pub(crate) lambdas: bool,
+}
+
+/// Binary operator levels, loosest first. A comparison does not chain.
+const COMPARISON: u8 = 1;
+const CONCATENATION: u8 = 2;
+const ADDITION: u8 = 3;
+const MULTIPLICATION: u8 = 4;
+const POWER: u8 = 5;
+
+#[derive(Clone, Copy)]
+enum BinaryOperator {
+    Cmp(CmpOp),
+    Op(Op),
+}
+
+/// The level and operator of a binary operator token.
+#[inline]
+const fn binary_operator(tok: &Tok<'_>) -> Option<(u8, BinaryOperator)> {
+    Some(match tok {
+        Tok::Cmp(op) => (COMPARISON, BinaryOperator::Cmp(*op)),
+        Tok::Op('&') => (CONCATENATION, BinaryOperator::Op(Op::Concat)),
+        Tok::Op('+') => (ADDITION, BinaryOperator::Op(Op::Add)),
+        Tok::Op('-') => (ADDITION, BinaryOperator::Op(Op::Sub)),
+        Tok::Op('*') => (MULTIPLICATION, BinaryOperator::Op(Op::Mul)),
+        Tok::Op('/') => (MULTIPLICATION, BinaryOperator::Op(Op::Div)),
+        Tok::Op('^') => (POWER, BinaryOperator::Op(Op::Pow)),
+        Tok::Num(_)
+        | Tok::Str(_)
+        | Tok::Ident(..)
+        | Tok::Structured(_)
+        | Tok::Op(_)
+        | Tok::LParen
+        | Tok::RParen
+        | Tok::Comma
+        | Tok::Semicolon
+        | Tok::LBrace
+        | Tok::RBrace
+        | Tok::Colon
+        | Tok::Bang
+        | Tok::Error(_)
+        | Tok::Hash
+        | Tok::Intersect
+        | Tok::End => return None,
+    })
+}
+
+#[derive(Clone, Copy)]
+struct SheetBinding<'a> {
+    resolve: &'a SheetResolver<'a>,
+    place_span: &'a SpanPlacer<'a>,
+    bind_table: &'a TableBinder<'a>,
+}
+
+struct Parser<'a, 's> {
+    cursor: Cursor<'a>,
+    features: ParseFeatures,
+    sheets: Option<SheetBinding<'s>>,
+    /// The arguments of the calls being parsed, innermost last. Each call
+    /// moves its own into one exact allocation when it closes.
+    args: Vec<Ast>,
+}
+
+thread_local! {
+    /// The argument stack, kept between parses so ingest does not allocate
+    /// it for every formula.
+    static PARSE_ARGS: std::cell::Cell<Vec<Ast>> = const { std::cell::Cell::new(Vec::new()) };
+}
+
+impl<'a> Parser<'a, '_> {
+    #[inline]
+    fn peek(&mut self) -> Option<&Tok<'a>> {
+        self.cursor.peek_at(0)
+    }
+
+    #[inline]
+    fn next(&mut self) -> Option<Tok<'a>> {
+        self.cursor.next()
     }
 
     /// The `)` that closes a call or a group. A missing `)` at the end and a
@@ -1543,70 +1998,37 @@ impl<'a> Parser<'a> {
 
     fn expr_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
-
-        let left = self.concat_at(depth)?;
-        if let Some(Tok::Cmp(op)) = self.peek() {
-            let op = *op;
-            let _ = self.next();
-            let right = self.concat_at(depth)?;
-            return Ok(Ast::Cmp(op, Box::new(left), Box::new(right)));
-        }
-        Ok(left)
+        self.binary_at(COMPARISON, depth)
     }
 
-    fn concat_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut left = self.additive_at(depth)?;
-        while self.peek() == Some(&Tok::Op('&')) {
-            let _ = self.next();
-            let right = self.additive_at(depth)?;
-            left = Ast::Bin(Op::Concat, Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    fn additive_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut left = self.term_at(depth)?;
-        while let Some(Tok::Op(c @ ('+' | '-'))) = self.peek() {
-            let op = if *c == '+' { Op::Add } else { Op::Sub };
-            let _ = self.next();
-            let right = self.term_at(depth)?;
-            left = Ast::Bin(op, Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    fn term_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
-        let mut left = self.power_at(depth)?;
-        while let Some(Tok::Op(c @ ('*' | '/'))) = self.peek() {
-            let op = if *c == '*' { Op::Mul } else { Op::Div };
-            let _ = self.next();
-            let right = self.power_at(depth)?;
-            left = Ast::Bin(op, Box::new(left), Box::new(right));
-        }
-        Ok(left)
-    }
-
-    fn power_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
+    /// Operands joined by binary operators of level `min_level` or tighter.
+    /// Each level is left-associative; a comparison takes one right operand
+    /// and ends the expression.
+    fn binary_at(&mut self, min_level: u8, depth: usize) -> Result<Ast, String> {
         let mut left = self.postfix_at(depth)?;
-        while self.peek() == Some(&Tok::Op('^')) {
+
+        while let Some((level, operator)) = self.peek().and_then(binary_operator) {
+            if level < min_level {
+                break;
+            }
+
             let _ = self.next();
-            let right = self.postfix_at(depth)?;
-            left = Ast::Bin(Op::Pow, Box::new(left), Box::new(right));
+            let right = Box::new(self.binary_at(level + 1, depth)?);
+            let left_operand = Box::new(left);
+            left = match operator {
+                BinaryOperator::Cmp(op) => Ast::Cmp(op, left_operand, right),
+                BinaryOperator::Op(op) => Ast::Bin(op, left_operand, right),
+            };
+
+            if level == COMPARISON {
+                break;
+            }
         }
+
         Ok(left)
     }
 
     fn postfix_at(&mut self, depth: usize) -> Result<Ast, String> {
-        Self::guard_depth(depth)?;
-
         let mut value = self.unary_at(depth)?;
         #[cfg(feature = "analysis")]
         while self.peek() == Some(&Tok::LParen) {
@@ -1626,7 +2048,11 @@ impl<'a> Parser<'a> {
                 }
             }
             self.close_paren()?;
-            value = Ast::UnknownFunc("$LAMBDA_CALL".into(), args);
+            self.features.names = true;
+            value = Ast::UnknownFunc(Box::new(UnknownCall {
+                name: "$LAMBDA_CALL".into(),
+                args: args.into(),
+            }));
         }
         while self.peek() == Some(&Tok::Op('%')) {
             let _ = self.next();
@@ -1638,8 +2064,8 @@ impl<'a> Parser<'a> {
     fn unary_at(&mut self, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
 
-        if let Some(Tok::Op(sign @ ('+' | '-'))) = self.peek() {
-            let sign = *sign;
+        if let Some(Tok::Op(peeked @ ('+' | '-'))) = self.peek() {
+            let sign = *peeked;
             let _ = self.next();
             let inner = Box::new(self.unary_at(depth + 1)?);
             return Ok(if sign == '-' {
@@ -1648,12 +2074,7 @@ impl<'a> Parser<'a> {
                 Ast::Pos(inner)
             });
         }
-        // Intersection binds tighter than every operator except `:`. A
-        // formula without the operator keeps the plain call, which the
-        // plain parse path measures faster than a call plus a peek.
-        if !self.intersections {
-            return self.primary_at(depth);
-        }
+        // Intersection binds tighter than every operator except `:`.
         let value = self.primary_at(depth)?;
         if self.peek() == Some(&Tok::Intersect) {
             return self.intersection_at(value, depth);
@@ -1671,7 +2092,7 @@ impl<'a> Parser<'a> {
             let _ = self.next();
             operands.push(self.primary_at(depth)?);
         }
-        Ok(Ast::Func(Func::Intersect, operands))
+        Ok(Ast::Func(Func::Intersect, operands.into()))
     }
 
     /// A number, or the first row of a whole-row range such as `1:3`.
@@ -1691,7 +2112,7 @@ impl<'a> Parser<'a> {
 
         match self.next() {
             Some(Tok::Num(n)) => self.number_or_rows_at(n),
-            Some(Tok::Str(value)) => Ok(Ast::Str(value)),
+            Some(Tok::Str(value)) => Ok(Ast::Str(value.into())),
             Some(Tok::LParen) => {
                 let first = self.expr_at(depth + 1)?;
                 let value = if self.peek() == Some(&Tok::Comma) {
@@ -1700,7 +2121,7 @@ impl<'a> Parser<'a> {
                         let _ = self.next();
                         areas.push(self.expr_at(depth + 1)?);
                     }
-                    Ast::Func(Func::Union, areas)
+                    Ast::Func(Func::Union, areas.into())
                 } else {
                     first
                 };
@@ -1742,9 +2163,12 @@ impl<'a> Parser<'a> {
                 _ => return Err("Use , ; or } between the values of an array constant.".into()),
             }
         }
-        let cols =
-            u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_string())?;
-        Ok(Ast::Array { cols, values })
+        let width =
+            u32::try_from(cols).map_err(|_| "The array constant is too wide.".to_owned())?;
+        Ok(Ast::Array(Box::new(ArrayLiteral {
+            cols: width,
+            values: values.into(),
+        })))
     }
 
     /// One array-constant element: a number with an optional sign, text, a
@@ -1772,139 +2196,220 @@ impl<'a> Parser<'a> {
         Ok(value)
     }
 
+    fn structured_ref(&mut self, raw: &str, table_name: Option<&str>) -> Result<Ast, String> {
+        self.features.table_refs = true;
+        let (section, column_name) = structured_parts(raw)?;
+        let written = WrittenTableRef {
+            table: table_name,
+            column: column_name,
+            section,
+        };
+        let bound = self
+            .sheets
+            .and_then(|binding| (binding.bind_table)(written));
+        Ok(bound.map_or_else(
+            || {
+                Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {
+                    table_name: table_name.map(str::to_owned),
+                    column_name: column_name.to_owned(),
+                    section,
+                }))
+            },
+            Ast::Structured,
+        ))
+    }
+
     /// A `[...]` that starts an operand. Before `Sheet1!`, it is the workbook
     /// of an external reference (`[Budget.xlsx]Annual!C10`), kept as a sheet
     /// reference whose name holds the workbook. Otherwise it is a table
     /// reference of the current table.
     fn structured_or_external_at(&mut self, raw: String) -> Result<Ast, String> {
-        let names_sheet = self.sheet_qualifiers
-            && matches!(
-                self.toks.as_slice().get(..2),
-                Some([Tok::Ident(_, false), Tok::Bang])
-            );
+        let names_sheet = matches!(self.cursor.peek_at(0), Some(Tok::Ident(_, false)))
+            && matches!(self.cursor.peek_at(1), Some(Tok::Bang));
         if !names_sheet {
-            return parse_structured_ref(raw, None);
+            // `[Budget.xlsx]!Total`: a defined name of the other workbook.
+            let names_name = matches!(self.cursor.peek_at(0), Some(Tok::Bang))
+                && matches!(self.cursor.peek_at(1), Some(Tok::Ident(_, false)));
+            if names_name {
+                let _ = self.next();
+                return self.external_name_at(raw);
+            }
+            return self.structured_ref(&raw, None);
         }
 
         let Some(Tok::Ident(sheet, _)) = self.next() else {
             unreachable!("peeked external sheet name");
         };
         let _ = self.next();
-        self.sheet_ref_at(format!("{raw}{sheet}"), false)
+        self.sheet_ref_at(format!("{raw}{sheet}").into(), false)
     }
 
     fn ident_at(&mut self, name: Cow<'a, str>, quoted: bool, depth: usize) -> Result<Ast, String> {
         Self::guard_depth(depth)?;
-        if let Some(Tok::Structured(_)) = self.peek() {
-            let Some(Tok::Structured(raw)) = self.next() else {
-                unreachable!("peeked structured token");
-            };
-            return parse_structured_ref(raw, Some(name.into_owned()));
-        }
-
-        if self.sheet_qualifiers
-            && self.peek() == Some(&Tok::Colon)
-            && matches!(
-                self.toks.as_slice().get(1..3),
-                Some([Tok::Ident(..), Tok::Bang])
-            )
-        {
-            let _ = self.next();
-            let Some(Tok::Ident(last, last_quoted)) = self.next() else {
-                unreachable!("peeked 3-D reference end");
-            };
-            let _ = self.next();
-            // Excel quotes a span as a whole, so either quoted end quotes both.
-            return self.sheet_span_at(name.into_owned(), last.into_owned(), quoted || last_quoted);
-        }
-
-        if let Some(Tok::Bang) = self.peek() {
-            let _ = self.next();
-            return self.sheet_ref_at(name.into_owned(), quoted);
-        }
-
-        if let Some(Tok::LParen) = self.peek() {
-            let _ = self.next();
-            let func = lookup_func(name.as_ref());
-            let mut args = Vec::new();
-            if self.peek() != Some(&Tok::RParen) {
-                loop {
-                    if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
-                        args.push(Ast::Missing);
-                    } else {
-                        args.push(self.expr_at(depth + 1)?);
-                    }
-                    match self.peek() {
-                        Some(Tok::Comma) => {
-                            let _ = self.next();
-                        }
-                        _ => break,
-                    }
-                }
+        match self.peek() {
+            Some(Tok::Structured(_)) => {
+                let Some(Tok::Structured(raw)) = self.next() else {
+                    unreachable!("peeked structured token");
+                };
+                return self.structured_ref(&raw, Some(&name));
             }
-            self.close_paren()?;
-            Ok(match func {
-                Some(func) => Ast::Func(func, args),
-                None => Ast::UnknownFunc(name.into_owned(), args),
-            })
-        } else {
-            if name.eq_ignore_ascii_case("TRUE") {
-                return Ok(Ast::Bool(true));
-            }
-            if name.eq_ignore_ascii_case("FALSE") {
-                return Ok(Ast::Bool(false));
-            }
-
-            if self.peek() == Some(&Tok::Colon) {
-                if let Some(start) = AreaEnd::of_name(name.as_ref()) {
+            Some(Tok::Colon) => {
+                let spans_sheets = matches!(self.cursor.peek_at(1), Some(Tok::Ident(..)))
+                    && matches!(self.cursor.peek_at(2), Some(Tok::Bang));
+                if spans_sheets {
                     let _ = self.next();
-                    let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
-                    return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
+                    let Some(Tok::Ident(last, last_quoted)) = self.next() else {
+                        unreachable!("peeked 3-D reference end");
+                    };
+                    let _ = self.next();
+                    // Excel quotes a span as a whole, so either quoted end quotes both.
+                    return self.sheet_span_at(
+                        name.into_owned(),
+                        last.into_owned(),
+                        quoted || last_quoted,
+                    );
                 }
             }
-            match parse_a1(name.as_ref()) {
-                Some((row, col, flags)) => Ok(self.spill_suffix(Ast::Cell(row, col, flags))),
-                None => Ok(Ast::Name(name.into_owned())),
+            Some(Tok::Bang) => {
+                let _ = self.next();
+                return self.sheet_ref_at(name, quoted);
             }
+            Some(Tok::LParen) => {
+                let _ = self.next();
+                return self.call_at(name, depth);
+            }
+            _ => {}
+        }
+
+        if name.eq_ignore_ascii_case("TRUE") {
+            return Ok(Ast::Bool(true));
+        }
+        if name.eq_ignore_ascii_case("FALSE") {
+            return Ok(Ast::Bool(false));
+        }
+
+        if self.peek() == Some(&Tok::Colon) {
+            if let Some(start) = AreaEnd::of_name(name.as_ref()) {
+                let _ = self.next();
+                let (r0, c0, r1, c1, range_flags) = self.area_after_colon(start)?;
+                return Ok(Ast::Range(r0, c0, r1, c1, range_flags));
+            }
+        }
+        if let Some((row, col, flags)) = parse_a1(name.as_ref()) {
+            Ok(self.spill_suffix(Ast::Cell(row, col, flags)))
+        } else {
+            self.features.names = true;
+            Ok(Ast::Name((name.into_owned()).into()))
         }
     }
 
-    fn sheet_ref_at(&mut self, sheet_name: String, quoted: bool) -> Result<Ast, String> {
-        // Sheet names cannot contain `:`, so a quoted name with one is the
-        // Excel form of a 3-D reference: `'Sheet 1:Sheet 3'!A1`. The `:` of a
-        // drive in the path of another workbook is not.
-        if quoted && !is_external_sheet(&sheet_name) {
-            if let Some((first, last)) = sheet_name.split_once(':') {
-                return self.sheet_span_at(first.to_string(), last.to_string(), true);
+    /// The arguments of a call to `name` after its `(`.
+    fn call_at(&mut self, name: Cow<'a, str>, depth: usize) -> Result<Ast, String> {
+        let func = lookup_func(name.as_ref());
+        #[cfg(feature = "analysis")]
+        if func == Some(Func::Analysis(crate::eval::analysis::LAMBDA_ID)) {
+            self.features.lambdas = true;
+        }
+        let first = self.args.len();
+        if self.peek() != Some(&Tok::RParen) {
+            loop {
+                let arg = if matches!(self.peek(), Some(Tok::Comma | Tok::RParen)) {
+                    Ast::Missing
+                } else {
+                    self.expr_at(depth + 1)?
+                };
+                self.args.push(arg);
+                match self.peek() {
+                    Some(Tok::Comma) => {
+                        let _ = self.next();
+                    }
+                    _ => break,
+                }
             }
         }
+        self.close_paren()?;
+        let args: Box<[Ast]> = self.args.drain(first..).collect();
+        Ok(if let Some(known) = func {
+            Ast::Func(known, args)
+        } else {
+            self.features.names = true;
+            Ast::UnknownFunc(Box::new(UnknownCall {
+                name: name.into_owned(),
+                args,
+            }))
+        })
+    }
 
+    fn sheet_ref_at(&mut self, sheet_name: Cow<'a, str>, quoted: bool) -> Result<Ast, String> {
+        if quoted && !is_external_sheet(&sheet_name) && !sheet_name.contains(['\\', '/']) {
+            if let Some((first, last)) = sheet_name.split_once(':') {
+                return self.sheet_span_at(first.to_owned(), last.to_owned(), true);
+            }
+        }
+        let names_name = matches!(self.peek(), Some(Tok::Ident(name, false)) if parse_a1(name).is_none())
+            && self.cursor.peek_at(1) != Some(&Tok::Colon)
+            && names_workbook(&sheet_name);
+        if names_name {
+            let qualifier = if quoted {
+                format!("'{}'", sheet_name.replace('\'', "''"))
+            } else {
+                sheet_name.into_owned()
+            };
+            return self.external_name_at(qualifier);
+        }
+        self.features.sheet_refs = true;
         let start = self.area_end("!")?;
-        let qualifier = UnresolvedSheetRef {
-            name: sheet_name.clone(),
-            quoted,
-        };
-
-        if let Some(Tok::Colon) = self.peek() {
+        let bound = self
+            .sheets
+            .and_then(|binding| (binding.resolve)(&sheet_name));
+        self.features.detached_sheets |= bound.is_none();
+        if matches!(self.peek(), Some(Tok::Colon)) {
             let _ = self.next();
             let (end_sheet, end) = self.sheet_range_end(&sheet_name)?;
             if sheet_name_key(&end_sheet) != sheet_name_key(&sheet_name) {
                 return Err("A range must stay on one sheet.".into());
             }
-            let (r0, c0, r1, c1, range_flags) = area(start, end).ok_or(MIXED_AREA)?;
-            return Ok(Ast::SheetRange(qualifier, r0, c0, r1, c1, range_flags));
+            let (r0, c0, r1, c1, mut flags) = area(start, end).ok_or(MIXED_AREA)?;
+            flags.start = flags.start.with_quoted(quoted);
+            return Ok(match bound {
+                Some(handle) => Ast::AbsRange(SheetRef { handle }, r0, c0, r1, c1, flags),
+                None => Ast::SheetRange(Box::new(DetachedRangeRef {
+                    sheet: UnresolvedSheetRef {
+                        name: sheet_name.into_owned(),
+                        quoted,
+                    },
+                    row_start: r0,
+                    col_start: c0,
+                    row_end: r1,
+                    col_end: c1,
+                    flags,
+                })),
+            });
         }
-
-        let AreaEnd::Cell(row, col, flags) = start else {
+        let AreaEnd::Cell(row, col, cell_flags) = start else {
             return Err(LONE_AXIS.into());
         };
-        Ok(self.spill_suffix(Ast::SheetCell(qualifier, row, col, flags)))
+        let flags = cell_flags.with_quoted(quoted);
+        let reference = match bound {
+            Some(handle) => Ast::AbsCell(SheetRef { handle }, row, col, flags),
+            None => Ast::SheetCell(Box::new(DetachedCellRef {
+                sheet: UnresolvedSheetRef {
+                    name: sheet_name.into_owned(),
+                    quoted,
+                },
+                row,
+                col,
+                flags,
+            })),
+        };
+        Ok(self.spill_suffix(reference))
     }
 
     /// The cell or range after the `!` of a 3-D reference from sheet `first`
     /// to sheet `last`.
     #[cold]
     fn sheet_span_at(&mut self, first: String, last: String, quoted: bool) -> Result<Ast, String> {
+        self.features.sheet_refs = true;
         let start = self.area_end("!")?;
         let (cell, (row_start, col_start, row_end, col_end, range_flags)) =
             if self.peek() == Some(&Tok::Colon) {
@@ -1916,12 +2421,20 @@ impl<'a> Parser<'a> {
                 return Err(LONE_AXIS.into());
             };
 
-        let endpoint = |name: String| SheetRef {
-            handle: UNRESOLVED_SHEET,
-            name,
-            quoted,
+        let endpoint = |name: String| match self.sheets.and_then(|binding| (binding.resolve)(&name))
+        {
+            Some(handle) => SheetSpanEndpoint {
+                handle,
+                name: None,
+                quoted,
+            },
+            None => SheetSpanEndpoint {
+                handle: UNRESOLVED_SHEET,
+                name: Some(name.into_boxed_str()),
+                quoted,
+            },
         };
-        Ok(Ast::SheetSpan(Box::new(SheetSpanRef {
+        let mut span = SheetSpanRef {
             first: endpoint(first),
             last: endpoint(last),
             sheets: Vec::new(),
@@ -1931,7 +2444,25 @@ impl<'a> Parser<'a> {
             col_end,
             flags: range_flags,
             cell,
-        })))
+        };
+        if span.first.handle == UNRESOLVED_SHEET || span.last.handle == UNRESOLVED_SHEET {
+            self.features.detached_sheets = true;
+        } else if let Some(binding) = self.sheets {
+            (binding.place_span)(&mut span);
+        }
+        Ok(Ast::SheetSpan(Box::new(span)))
+    }
+
+    /// The defined name after `qualifier!`, where `qualifier` names another
+    /// workbook as the formula writes it. The name keeps that text, which
+    /// `external_name_key` reads to find the name in the link.
+    #[cold]
+    fn external_name_at(&mut self, qualifier: String) -> Result<Ast, String> {
+        let Some(Tok::Ident(name, _)) = self.next() else {
+            return Err(NOT_EXPECTED.into());
+        };
+        self.features.names = true;
+        Ok(Ast::Name((format!("{qualifier}!{name}")).into()))
     }
 
     /// `A1#` refers to the whole spill of the formula in A1. It is stored as
@@ -1939,7 +2470,7 @@ impl<'a> Parser<'a> {
     fn spill_suffix(&mut self, anchor: Ast) -> Ast {
         if self.peek() == Some(&Tok::Hash) {
             let _ = self.next();
-            Ast::Func(Func::AnchorArray, vec![anchor])
+            Ast::Func(Func::AnchorArray, (vec![anchor]).into())
         } else {
             anchor
         }
@@ -1951,9 +2482,9 @@ impl<'a> Parser<'a> {
         let first = self.next();
         if let Some(Tok::Ident(end_sheet, _)) = &first {
             if self.peek() == Some(&Tok::Bang) {
-                let end_sheet = end_sheet.to_string();
+                let end_sheet_name = end_sheet.to_string();
                 let _ = self.next();
-                return Ok((end_sheet, self.area_end("!")?));
+                return Ok((end_sheet_name, self.area_end("!")?));
             }
         }
 
@@ -1961,7 +2492,7 @@ impl<'a> Parser<'a> {
             .as_ref()
             .and_then(AreaEnd::of)
             .ok_or_else(|| missing_area_end(":"))?;
-        Ok((sheet_name.to_string(), end))
+        Ok((sheet_name.to_owned(), end))
     }
 
     /// The cell, column or row in the next token.
@@ -1995,8 +2526,43 @@ fn missing_area_end(after: &str) -> String {
 /// another workbook, the folder before `[` is left out, so
 /// `C:\Reports\[Budget.xlsx]Annual` finds the link `[Budget.xlsx]Annual`.
 pub(crate) fn sheet_name_key(name: &str) -> String {
-    let name = name.rfind('[').map_or(name, |start| &name[start..]);
-    name.chars().flat_map(char::to_lowercase).collect()
+    let book_and_sheet = name.rfind('[').map_or(name, |start| &name[start..]);
+    book_and_sheet
+        .chars()
+        .flat_map(char::to_lowercase)
+        .collect()
+}
+
+/// The lookup key of a defined name of another workbook, from the text a
+/// formula writes: `Budget.xlsx!Total`, `'C:\Reports\Budget.xlsx'!Total`,
+/// `[Budget.xlsx]!Total` and `'C:\Reports\[Budget.xlsx]'!Total` all give
+/// `[BUDGET.XLSX]!TOTAL`; the sheet-scoped `[Budget.xlsx]Annual!Total`
+/// gives `[BUDGET.XLSX]ANNUAL!TOTAL`. The folder and the letter case are
+/// left out, as for link sheets. A quote in a book or sheet name stays
+/// doubled, as a quoted formula writes it. `None` for a name without a
+/// workbook.
+pub(crate) fn external_name_key(text: &str) -> Option<String> {
+    let (quoted_qualifier, name) = text.rsplit_once('!')?;
+    let qualifier = quoted_qualifier
+        .strip_prefix('\'')
+        .and_then(|inner| inner.strip_suffix('\''))
+        .unwrap_or(quoted_qualifier);
+    let key = if let Some(start) = qualifier.rfind('[') {
+        format!("{}!{name}", &qualifier[start..])
+    } else {
+        let folder_end = qualifier.rfind('\\').max(qualifier.rfind('/'));
+        let book = folder_end.map_or(qualifier, |at| &qualifier[at + 1..]);
+        format!("[{book}]!{name}")
+    };
+    Some(key.to_uppercase())
+}
+
+/// Whether the text before `!` names another workbook: a sheet of it
+/// (`[Budget.xlsx]Annual`), or its file (`Budget.xlsx`,
+/// `C:\Reports\Budget.xlsx`). A file name has an extension, and a path
+/// has a folder; Excel sheet names hold neither `\\` nor `/`.
+fn names_workbook(qualifier: &str) -> bool {
+    is_external_sheet(qualifier) || qualifier.contains(['.', '\\', '/'])
 }
 
 /// Whether a sheet reference names a sheet of another workbook:
@@ -2016,19 +2582,56 @@ fn trailing_token_error(tok: &Tok<'_>) -> String {
 }
 
 /// Parse a formula source (with or without a leading `=`) into an AST.
-pub fn parse(src: &str) -> Result<Ast, String> {
+pub(crate) fn parse(src: &str) -> Result<Ast, String> {
+    parse_with_features(src).map(|(ast, _)| ast)
+}
+
+/// [`parse`], with the resolution steps the formula needs.
+pub(crate) fn parse_with_features(src: &str) -> ParseResult {
+    parse_source(src, None)
+}
+
+/// Bind a sheet token to its stable id while constructing its reference node.
+pub(crate) fn parse_bound_with_features(
+    src: &str,
+    resolve: &SheetResolver<'_>,
+    place_span: &SpanPlacer<'_>,
+    bind_table: &TableBinder<'_>,
+) -> ParseResult {
+    parse_source(
+        src,
+        Some(SheetBinding {
+            resolve,
+            place_span,
+            bind_table,
+        }),
+    )
+}
+
+fn parse_source(src: &str, sheets: Option<SheetBinding<'_>>) -> ParseResult {
     let trimmed = src.trim().strip_prefix('=').unwrap_or(src.trim());
-    let tokens = tokenize(trimmed)?;
     let mut parser = Parser {
-        toks: tokens.toks.into_iter(),
-        intersections: tokens.intersections,
-        sheet_qualifiers: tokens.sheet_qualifiers,
+        cursor: Cursor::over_text(trimmed),
+        features: ParseFeatures::default(),
+        sheets,
+        args: PARSE_ARGS.take(),
     };
-    let ast = parser.expr()?;
-    if let Some(tok) = parser.peek() {
-        return Err(trailing_token_error(tok));
+    let parsed = parser.expr();
+    let trailing = match parsed {
+        Ok(_) => parser.peek().map(trailing_token_error),
+        Err(_) => None,
+    };
+    // A failed parse leaves the arguments of its open calls behind.
+    parser.args.clear();
+    PARSE_ARGS.set(std::mem::take(&mut parser.args));
+    if let Some(error) = parser.cursor.lex_error() {
+        return Err(error);
     }
-    Ok(ast)
+    let ast = parsed?;
+    if let Some(error) = trailing {
+        return Err(error);
+    }
+    Ok((ast, parser.features))
 }
 
 /// The first error of the parser in `toks`, which end with [`Tok::End`], and
@@ -2037,15 +2640,15 @@ pub fn parse(src: &str) -> Result<Ast, String> {
 /// formula. This is the parse of `parse` on tokens from formula help's
 /// tolerant lexer, so formula help reports exactly what the parser rejects.
 pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
-    let total = toks.len();
     let mut parser = Parser {
-        intersections: toks.contains(&Tok::Intersect),
-        sheet_qualifiers: toks.contains(&Tok::Bang),
-        toks: toks.into_iter(),
+        cursor: Cursor::over_tokens(toks),
+        features: ParseFeatures::default(),
+        sheets: None,
+        args: Vec::new(),
     };
 
     let result = parser.expr();
-    let read = total - parser.toks.len();
+    let read = parser.cursor.consumed;
     match result {
         Ok(_) => match parser.peek() {
             None | Some(Tok::End) => None,
@@ -2058,94 +2661,101 @@ pub(crate) fn first_parse_error(toks: Vec<Tok<'_>>) -> Option<(String, usize)> {
 /// Resolve sheet-qualified refs to numeric sheet handles once, at formula ingest.
 /// `place_span` gives a resolved 3-D reference the sheets it spans, and fails
 /// when an endpoint is not in the tab order.
-pub fn resolve_sheet_refs<F, S>(ast: Ast, resolve: &F, place_span: &S) -> Result<Ast, String>
-where
-    F: Fn(&str) -> Option<u32>,
-    S: Fn(&mut SheetSpanRef) -> bool,
-{
-    // A sheet of another workbook that the store holds no values for stays
-    // an unresolved sheet reference, which reads as #REF!.
-    if let Ast::SheetCell(sheet_ref, ..) | Ast::SheetRange(sheet_ref, ..) = &ast {
-        if is_external_sheet(&sheet_ref.name) && resolve(&sheet_ref.name).is_none() {
-            return Ok(ast);
-        }
+pub(crate) fn bind_sheet_refs(
+    ast: &mut Ast,
+    resolve: &SheetResolver<'_>,
+    place_span: &SpanPlacer<'_>,
+) -> bool {
+    // Every node other than a sheet reference or a defined name's formula
+    // binds through its children.
+    if let Ast::SheetCell(reference) = ast {
+        let Some(handle) = resolve(&reference.sheet.name) else {
+            return false;
+        };
+        *ast = Ast::AbsCell(
+            SheetRef { handle },
+            reference.row,
+            reference.col,
+            reference.flags,
+        );
+        return true;
     }
+    if let Ast::SheetRange(reference) = ast {
+        let Some(handle) = resolve(&reference.sheet.name) else {
+            return false;
+        };
+        *ast = Ast::AbsRange(
+            SheetRef { handle },
+            reference.row_start,
+            reference.col_start,
+            reference.row_end,
+            reference.col_end,
+            reference.flags,
+        );
+        return true;
+    }
+    if let Ast::SheetSpan(span) = ast {
+        let mut changed = false;
+        for endpoint in [&mut span.first, &mut span.last] {
+            if let Some(name) = endpoint.name.as_deref() {
+                if let Some(handle) = resolve(name) {
+                    endpoint.handle = handle;
+                    endpoint.name = None;
+                    changed = true;
+                }
+            }
+        }
+        if span.first.handle != UNRESOLVED_SHEET && span.last.handle != UNRESOLVED_SHEET {
+            changed |= place_span(span);
+        }
+        return changed;
+    }
+    if let Ast::NamedFormula(named) = ast {
+        return bind_sheet_refs(
+            &mut std::rc::Rc::make_mut(named).expression,
+            resolve,
+            place_span,
+        );
+    }
+    ast.fold_children_mut(&mut |child| bind_sheet_refs(child, resolve, place_span))
+}
 
-    match ast {
-        Ast::SheetSpan(mut span) => {
-            for endpoint in [&mut span.first, &mut span.last] {
-                endpoint.handle = resolve(&endpoint.name)
-                    .ok_or_else(|| format!("unknown sheet: {}", endpoint.name))?;
+pub(crate) fn has_unresolved_local_sheets(ast: &Ast) -> bool {
+    // Other nodes hold sheet references only through their children.
+    if let Ast::SheetCell(reference) = ast {
+        return !is_external_sheet(&reference.sheet.name);
+    }
+    if let Ast::SheetRange(reference) = ast {
+        return !is_external_sheet(&reference.sheet.name);
+    }
+    if let Ast::SheetSpan(span) = ast {
+        return span.first.name.is_some() || span.last.name.is_some();
+    }
+    if let Ast::NamedFormula(named) = ast {
+        return has_unresolved_local_sheets(&named.expression);
+    }
+    ast.any_child(&mut has_unresolved_local_sheets)
+}
+
+pub(crate) fn unresolved_sheet_names(ast: &Ast, out: &mut Vec<String>) {
+    // Other nodes hold sheet references only through their children.
+    if let Ast::SheetCell(reference) = ast {
+        out.push(sheet_name_key(&reference.sheet.name));
+    } else if let Ast::SheetRange(reference) = ast {
+        out.push(sheet_name_key(&reference.sheet.name));
+    } else if let Ast::SheetSpan(span) = ast {
+        for endpoint in [&span.first, &span.last] {
+            if let Some(name) = endpoint.name.as_deref() {
+                out.push(sheet_name_key(name));
             }
-            if !place_span(&mut span) {
-                return Err(format!("unknown sheet: {}", span.first.name));
-            }
-            Ok(Ast::SheetSpan(span))
         }
-        Ast::SheetCell(sheet_ref, row, col, flags) => resolve(&sheet_ref.name)
-            .map(|handle| {
-                Ast::AbsCell(
-                    SheetRef {
-                        handle,
-                        name: sheet_ref.name.clone(),
-                        quoted: sheet_ref.quoted,
-                    },
-                    row,
-                    col,
-                    flags,
-                )
-            })
-            .ok_or_else(|| format!("unknown sheet: {}", sheet_ref.name)),
-        Ast::SheetRange(sheet_ref, r0, c0, r1, c1, flags) => resolve(&sheet_ref.name)
-            .map(|handle| {
-                Ast::AbsRange(
-                    SheetRef {
-                        handle,
-                        name: sheet_ref.name.clone(),
-                        quoted: sheet_ref.quoted,
-                    },
-                    r0,
-                    c0,
-                    r1,
-                    c1,
-                    flags,
-                )
-            })
-            .ok_or_else(|| format!("unknown sheet: {}", sheet_ref.name)),
-        Ast::Func(func, args) => {
-            let resolved = args
-                .into_iter()
-                .map(|arg| resolve_sheet_refs(arg, resolve, place_span))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(Ast::Func(func, resolved))
-        }
-        Ast::UnknownFunc(name, args) => {
-            let resolved = args
-                .into_iter()
-                .map(|arg| resolve_sheet_refs(arg, resolve, place_span))
-                .collect::<Result<Vec<_>, _>>()?;
-            Ok(Ast::UnknownFunc(name, resolved))
-        }
-        Ast::Bin(op, left, right) => Ok(Ast::Bin(
-            op,
-            Box::new(resolve_sheet_refs(*left, resolve, place_span)?),
-            Box::new(resolve_sheet_refs(*right, resolve, place_span)?),
-        )),
-        Ast::Cmp(op, left, right) => Ok(Ast::Cmp(
-            op,
-            Box::new(resolve_sheet_refs(*left, resolve, place_span)?),
-            Box::new(resolve_sheet_refs(*right, resolve, place_span)?),
-        )),
-        Ast::Neg(inner) => Ok(Ast::Neg(Box::new(resolve_sheet_refs(
-            *inner, resolve, place_span,
-        )?))),
-        Ast::Pos(inner) => Ok(Ast::Pos(Box::new(resolve_sheet_refs(
-            *inner, resolve, place_span,
-        )?))),
-        Ast::Percent(inner) => Ok(Ast::Percent(Box::new(resolve_sheet_refs(
-            *inner, resolve, place_span,
-        )?))),
-        other => Ok(other),
+    } else if let Ast::NamedFormula(named) = ast {
+        unresolved_sheet_names(&named.expression, out);
+    } else {
+        ast.any_child(&mut |child| {
+            unresolved_sheet_names(child, out);
+            false
+        });
     }
 }
 
@@ -2187,14 +2797,46 @@ pub(crate) fn ast_contains_sheet_span(ast: &Ast) -> bool {
 /// `#REF!`. `names` holds the sheet name of each handle.
 pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]) -> bool {
     match ast {
-        Ast::SheetSpan(span) => match refresh_span(span, order, names) {
-            Some(changed) => changed,
-            None => {
+        Ast::SheetSpan(span) => {
+            if let Some(changed) = refresh_span(span, order, names) {
+                changed
+            } else {
                 *ast = Ast::InvalidRef;
                 true
             }
-        },
-        _ => ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names)),
+        }
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {
+            ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
+        }
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+            ast.fold_children_mut(&mut |child| refresh_sheet_spans(child, order, names))
+        }
     }
 }
 
@@ -2229,7 +2871,7 @@ fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Opt
         if endpoint.handle != handle {
             let name = names.get(handle as usize).map_or("", String::as_str);
             endpoint.handle = handle;
-            endpoint.name = name.to_string();
+            endpoint.name = None;
             endpoint.quoted = sheet_name_needs_quotes(name);
         }
     }
@@ -2240,7 +2882,7 @@ fn refresh_span(span: &mut SheetSpanRef, order: &[u32], names: &[String]) -> Opt
 
 /// Resolve workbook/sheet-scoped defined names after sheet references have
 /// stable handles. A LET or LAMBDA name shadows a defined name in its scope.
-pub fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
+pub(crate) fn resolve_named_ranges<F>(ast: Ast, formula_sheet: u32, resolve: &F) -> Ast
 where
     F: Fn(&str, u32) -> Option<NameTarget>,
 {
@@ -2261,7 +2903,7 @@ where
             Ast::Name(name)
         }
         Ast::Name(name) => match resolve(&name, formula_sheet) {
-            Some(NameTarget::Range(range)) => Ast::NamedRange(range),
+            Some(NameTarget::Range(range)) => Ast::NamedRange(Box::new(range)),
             Some(NameTarget::Formula(formula)) => Ast::NamedFormula(formula),
             Some(NameTarget::Reference(reference)) => reference,
             None => Ast::Name(name),
@@ -2270,7 +2912,7 @@ where
             let mut scoped = locals.to_vec();
             let mut resolved = Vec::with_capacity(args.len());
             let last = args.len() - 1;
-            for (index, arg) in args.into_iter().enumerate() {
+            for (index, arg) in args.into_vec().into_iter().enumerate() {
                 if index == last {
                     resolved.push(resolve_named_ranges_inner(
                         arg,
@@ -2288,21 +2930,22 @@ where
                         &scoped,
                     ));
                     if let Some(Ast::Name(name)) = resolved.get(index - 1) {
-                        scoped.push(name.clone());
+                        scoped.push(name.to_string());
                     }
                 }
             }
-            Ast::Func(Func::Let, resolved)
+            Ast::Func(Func::Let, resolved.into())
         }
         #[cfg(feature = "analysis")]
-        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), mut args)
-            if !args.is_empty() =>
+        Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), lambda_args)
+            if !lambda_args.is_empty() =>
         {
+            let mut args = lambda_args.into_vec();
             let body = args.pop().expect("nonempty arguments");
             let mut scoped = locals.to_vec();
             scoped.extend(args.iter().filter_map(|parameter| {
                 if let Ast::Name(name) = parameter {
-                    Some(name.clone())
+                    Some(name.to_string())
                 } else {
                     None
                 }
@@ -2313,19 +2956,31 @@ where
                 resolve,
                 &scoped,
             ));
-            Ast::Func(Func::Analysis(crate::eval::analysis::LAMBDA_ID), args)
+            Ast::Func(
+                Func::Analysis(crate::eval::analysis::LAMBDA_ID),
+                args.into(),
+            )
         }
         Ast::Func(func, args) => Ast::Func(
             func,
-            args.into_iter()
-                .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
-                .collect(),
-        ),
-        Ast::UnknownFunc(name, args) => {
-            let args = args
+            (args
+                .into_vec()
                 .into_iter()
                 .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
-                .collect();
+                .collect::<Vec<_>>())
+            .into(),
+        ),
+        Ast::UnknownFunc(call) => {
+            let UnknownCall {
+                name,
+                args: unresolved_args,
+            } = *call;
+
+            let args = unresolved_args
+                .into_vec()
+                .into_iter()
+                .map(|arg| resolve_named_ranges_inner(arg, formula_sheet, resolve, locals))
+                .collect::<Box<[Ast]>>();
             // `MYFN(A1)` calls the LAMBDA that the defined name MYFN holds.
             // LAMBDA needs the full engine; the default engine leaves the call
             // unknown, so it returns #NAME? as LAMBDA itself does there.
@@ -2335,7 +2990,7 @@ where
                     return named_lambda_call(formula, args);
                 }
             }
-            Ast::UnknownFunc(name, args)
+            Ast::UnknownFunc(Box::new(UnknownCall { name, args }))
         }
         Ast::Bin(op, left, right) => Ast::Bin(
             op,
@@ -2392,114 +3047,149 @@ where
 /// A call of the LAMBDA that a defined name holds, in the form an immediate
 /// `LAMBDA(…)(…)` call parses to: the function, then the arguments.
 #[cfg(feature = "analysis")]
-pub(crate) fn named_lambda_call(formula: std::rc::Rc<NamedFormulaRef>, arguments: Vec<Ast>) -> Ast {
+pub(crate) fn named_lambda_call(
+    formula: std::rc::Rc<NamedFormulaRef>,
+    arguments: Box<[Ast]>,
+) -> Ast {
     let mut call = Vec::with_capacity(arguments.len() + 1);
     call.push(Ast::NamedFormula(formula));
     call.extend(arguments);
-    Ast::UnknownFunc(crate::eval::analysis::lambda::CALL.into(), call)
+    Ast::UnknownFunc(Box::new(UnknownCall {
+        name: crate::eval::analysis::lambda::CALL.into(),
+        args: call.into(),
+    }))
 }
 
-pub fn resolve_structured_refs<F>(
-    ast: Ast,
+/// Resolves the table references in `ast` in place, for a formula in the
+/// cell at (`formula_row`, `formula_col`) of `formula_sheet`. A reference
+/// that `resolve` cannot place stays unresolved. Returns whether any
+/// reference was bound.
+pub(crate) fn resolve_structured_refs<F>(
+    ast: &mut Ast,
     formula_sheet: u32,
     formula_row: u32,
     formula_col: u32,
     resolve: &F,
-) -> Ast
+) -> bool
 where
-    F: Fn(&UnresolvedStructuredRef, u32, u32, u32) -> Option<StructuredRef>,
+    F: Fn(&UnresolvedStructuredRef, u32, u32, u32) -> Option<StructuredRef> + ?Sized,
 {
-    match ast {
-        Ast::UnresolvedStructured(reference) => {
-            resolve(&reference, formula_sheet, formula_row, formula_col)
-                .map_or(Ast::UnresolvedStructured(reference), |reference| {
-                    Ast::Structured(Box::new(reference))
-                })
-        }
-        Ast::Func(func, args) => Ast::Func(
-            func,
-            args.into_iter()
-                .map(|arg| {
-                    resolve_structured_refs(arg, formula_sheet, formula_row, formula_col, resolve)
-                })
-                .collect(),
-        ),
-        Ast::UnknownFunc(name, args) => Ast::UnknownFunc(
-            name,
-            args.into_iter()
-                .map(|arg| {
-                    resolve_structured_refs(arg, formula_sheet, formula_row, formula_col, resolve)
-                })
-                .collect(),
-        ),
-        Ast::Bin(op, left, right) => Ast::Bin(
-            op,
-            Box::new(resolve_structured_refs(
-                *left,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-            Box::new(resolve_structured_refs(
-                *right,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-        ),
-        Ast::Cmp(op, left, right) => Ast::Cmp(
-            op,
-            Box::new(resolve_structured_refs(
-                *left,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-            Box::new(resolve_structured_refs(
-                *right,
-                formula_sheet,
-                formula_row,
-                formula_col,
-                resolve,
-            )),
-        ),
-        Ast::Neg(inner) => Ast::Neg(Box::new(resolve_structured_refs(
-            *inner,
-            formula_sheet,
-            formula_row,
-            formula_col,
-            resolve,
-        ))),
-        Ast::Pos(inner) => Ast::Pos(Box::new(resolve_structured_refs(
-            *inner,
-            formula_sheet,
-            formula_row,
-            formula_col,
-            resolve,
-        ))),
-        Ast::Percent(inner) => Ast::Percent(Box::new(resolve_structured_refs(
-            *inner,
-            formula_sheet,
-            formula_row,
-            formula_col,
-            resolve,
-        ))),
-        other => other,
+    // Every other node holds table references only through its children.
+    if let Ast::UnresolvedStructured(reference) = ast {
+        let Some(resolved) = resolve(reference, formula_sheet, formula_row, formula_col) else {
+            return false;
+        };
+        *ast = Ast::Structured(resolved);
+        return true;
     }
+    ast.fold_children_mut(&mut |child| {
+        resolve_structured_refs(child, formula_sheet, formula_row, formula_col, resolve)
+    })
 }
 
 /// Translate relative A1 references from one formula origin to another.
 ///
 /// Conditional-format expressions store one parsed AST at the rule range's
-/// top-left. Window evaluation clones that bounded AST and applies the target
-/// cell delta here; absolute row/column markers remain fixed.
-pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
+/// top-left. A window read evaluates it in place with a reference shift; it
+/// translates a copy here only at a cell where [`relative_reach`] says the
+/// shift could not keep every reference in the sheet. Absolute row/column
+/// markers remain fixed.
+pub(crate) fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
     if !translate_relative_refs_inner(ast, row_delta, col_delta, false) {
         *ast = Ast::InvalidRef;
     }
+}
+
+/// One past the largest row and column that a relative axis of a reference
+/// in `ast` names, or 0 for an axis no reference leaves relative. Moving the
+/// references by a shift keeps them in the sheet, exactly as
+/// [`translate_relative_refs`] would, while `shift + reach` stays within the
+/// sheet's rows and columns. A defined name's expansion is placed for its
+/// formula and translation leaves it, so a relative reference inside one
+/// reports a reach past the sheet: no shift reproduces it.
+pub(crate) fn relative_reach(ast: &Ast) -> (u32, u32) {
+    let mut reach = (0, 0);
+    add_relative_reach(ast, 0, &mut reach);
+    reach
+}
+
+/// Raise `reach` to cover the references in `ast`; see [`relative_reach`].
+fn add_relative_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
+    const PAST_SHEET: (u32, u32) = (SHEET_ROWS + 1, SHEET_COLS + 1);
+    if depth > FORMULA_RECURSION_LIMIT {
+        *reach = PAST_SHEET;
+        return;
+    }
+    match ast {
+        Ast::Cell(row, col, flags) | Ast::AbsCell(_, row, col, flags) => {
+            add_end_reach(reach, (*row, *col), *flags);
+        }
+        Ast::SheetCell(reference) => {
+            add_end_reach(reach, (reference.row, reference.col), reference.flags);
+        }
+        Ast::Range(r0, c0, r1, c1, flags) | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
+            add_end_reach(reach, (*r0, *c0), flags.start);
+            add_end_reach(reach, (*r1, *c1), flags.end);
+        }
+        Ast::SheetRange(reference) => {
+            let (start, end) = (reference.flags.start, reference.flags.end);
+            add_end_reach(reach, (reference.row_start, reference.col_start), start);
+            add_end_reach(reach, (reference.row_end, reference.col_end), end);
+        }
+        Ast::SheetSpan(span) => {
+            add_end_reach(reach, (span.row_start, span.col_start), span.flags.start);
+            add_end_reach(reach, (span.row_end, span.col_end), span.flags.end);
+        }
+        Ast::NamedFormula(named) => {
+            let mut inside = (0, 0);
+            add_relative_reach(&named.expression, depth + 1, &mut inside);
+            if inside != (0, 0) {
+                *reach = PAST_SHEET;
+            }
+        }
+        // These hold no reference of their own; `any_child` visits the
+        // children of those that have some.
+        Ast::Func(..)
+        | Ast::UnknownFunc(_)
+        | Ast::LetSlot { .. }
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::LetName { .. }
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::InvalidRef
+        | Ast::Array(_) => add_children_reach(ast, depth, reach),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(_) | Ast::Parameter { .. } | Ast::RegexPattern(_) => {
+            add_children_reach(ast, depth, reach);
+        }
+    }
+}
+
+/// Raise `reach` to cover one reference end at (`row`, `col`).
+fn add_end_reach(reach: &mut (u32, u32), (row, col): (u32, u32), flags: RefFlags) {
+    if !flags.row_abs() {
+        reach.0 = reach.0.max(row + 1);
+    }
+    if !flags.col_abs() {
+        reach.1 = reach.1.max(col + 1);
+    }
+}
+
+fn add_children_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
+    ast.any_child(&mut |child| {
+        add_relative_reach(child, depth + 1, reach);
+        false
+    });
 }
 
 /// Move the relative references of a defined name's formula from cell A1,
@@ -2507,7 +3197,7 @@ pub fn translate_relative_refs(ast: &mut Ast, row_delta: i64, col_delta: i64) {
 /// formula uses the name. As in Excel, a reference that passes the last row
 /// or column wraps around to the first, so a name can refer to cells above
 /// or left of the cell that uses it.
-pub fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
+pub(crate) fn translate_name_refs(ast: &mut Ast, row: u32, col: u32) {
     translate_relative_refs_inner(ast, i64::from(row), i64::from(col), true);
 }
 
@@ -2523,11 +3213,11 @@ fn translated_coordinate(
     if absolute {
         return Some(value);
     }
-    let translated = i64::from(value).checked_add(delta)?;
+    let shifted = i64::from(value).checked_add(delta)?;
     let translated = if wrap {
-        translated.rem_euclid(i64::from(axis.len()))
+        shifted.rem_euclid(i64::from(axis.len()))
     } else {
-        translated
+        shifted
     };
     u32::try_from(translated)
         .ok()
@@ -2536,10 +3226,13 @@ fn translated_coordinate(
 
 /// Put one axis of a range back in order after a wrapping translation moved
 /// one edge past the other; each edge keeps its `$` marker.
-fn order_wrapped_edges(start: &mut u32, end: &mut u32, start_abs: &mut bool, end_abs: &mut bool) {
+const fn order_wrapped_edges(start: &mut u32, end: &mut u32, flags: &mut RangeFlags, row: bool) {
     if *start > *end {
         std::mem::swap(start, end);
-        std::mem::swap(start_abs, end_abs);
+        let axis_mask = if row { 1 } else { 2 };
+        let difference = (flags.start.0 ^ flags.end.0) & axis_mask;
+        flags.start.0 ^= difference;
+        flags.end.0 ^= difference;
     }
 }
 
@@ -2551,14 +3244,17 @@ fn translate_relative_refs_inner(
 ) -> bool {
     let row = |value, absolute| translated_coordinate(value, row_delta, absolute, Axis::Row, wrap);
     let col = |value, absolute| translated_coordinate(value, col_delta, absolute, Axis::Col, wrap);
-    let inner = |ast: &mut Ast| {
-        if !translate_relative_refs_inner(ast, row_delta, col_delta, wrap) {
-            *ast = Ast::InvalidRef;
+    // A child that leaves the sheet becomes `#REF!`; its parent stays.
+    let mut translate_child = |child: &mut Ast| {
+        if !translate_relative_refs_inner(child, row_delta, col_delta, wrap) {
+            *child = Ast::InvalidRef;
         }
+        false
     };
     match ast {
-        Ast::Cell(r, c, flags) | Ast::SheetCell(_, r, c, flags) | Ast::AbsCell(_, r, c, flags) => {
-            let (Some(next_row), Some(next_col)) = (row(*r, flags.row_abs), col(*c, flags.col_abs))
+        Ast::Cell(r, c, flags) | Ast::AbsCell(_, r, c, flags) => {
+            let (Some(next_row), Some(next_col)) =
+                (row(*r, flags.row_abs()), col(*c, flags.col_abs()))
             else {
                 return false;
             };
@@ -2566,67 +3262,102 @@ fn translate_relative_refs_inner(
             *c = next_col;
             true
         }
-        Ast::Range(r0, c0, r1, c1, flags)
-        | Ast::SheetRange(_, r0, c0, r1, c1, flags)
-        | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
+        Ast::SheetCell(reference) => {
+            let DetachedCellRef {
+                sheet: _,
+                row: r,
+                col: c,
+                flags,
+            } = &mut **reference;
+
+            let (Some(next_row), Some(next_col)) =
+                (row(*r, flags.row_abs()), col(*c, flags.col_abs()))
+            else {
+                return false;
+            };
+            *r = next_row;
+            *c = next_col;
+            true
+        }
+        Ast::Range(r0, c0, r1, c1, flags) | Ast::AbsRange(_, r0, c0, r1, c1, flags) => {
             let (Some(next_r0), Some(next_c0), Some(next_r1), Some(next_c1)) = (
-                row(*r0, flags.start.row_abs),
-                col(*c0, flags.start.col_abs),
-                row(*r1, flags.end.row_abs),
-                col(*c1, flags.end.col_abs),
+                row(*r0, flags.start.row_abs()),
+                col(*c0, flags.start.col_abs()),
+                row(*r1, flags.end.row_abs()),
+                col(*c1, flags.end.col_abs()),
             ) else {
                 return false;
             };
             (*r0, *c0, *r1, *c1) = (next_r0, next_c0, next_r1, next_c1);
             if wrap {
-                let RangeFlags { start, end } = flags;
-                order_wrapped_edges(r0, r1, &mut start.row_abs, &mut end.row_abs);
-                order_wrapped_edges(c0, c1, &mut start.col_abs, &mut end.col_abs);
+                order_wrapped_edges(r0, r1, flags, true);
+                order_wrapped_edges(c0, c1, flags, false);
+            }
+            true
+        }
+        Ast::SheetRange(reference) => {
+            let DetachedRangeRef {
+                sheet: _,
+                row_start: r0,
+                col_start: c0,
+                row_end: r1,
+                col_end: c1,
+                flags,
+            } = &mut **reference;
+
+            let (Some(next_r0), Some(next_c0), Some(next_r1), Some(next_c1)) = (
+                row(*r0, flags.start.row_abs()),
+                col(*c0, flags.start.col_abs()),
+                row(*r1, flags.end.row_abs()),
+                col(*c1, flags.end.col_abs()),
+            ) else {
+                return false;
+            };
+            (*r0, *c0, *r1, *c1) = (next_r0, next_c0, next_r1, next_c1);
+            if wrap {
+                order_wrapped_edges(r0, r1, flags, true);
+                order_wrapped_edges(c0, c1, flags, false);
             }
             true
         }
         Ast::SheetSpan(span) => {
             let (Some(row_start), Some(col_start), Some(row_end), Some(col_end)) = (
-                row(span.row_start, span.flags.start.row_abs),
-                col(span.col_start, span.flags.start.col_abs),
-                row(span.row_end, span.flags.end.row_abs),
-                col(span.col_end, span.flags.end.col_abs),
+                row(span.row_start, span.flags.start.row_abs()),
+                col(span.col_start, span.flags.start.col_abs()),
+                row(span.row_end, span.flags.end.row_abs()),
+                col(span.col_end, span.flags.end.col_abs()),
             ) else {
                 return false;
             };
             (span.row_start, span.col_start) = (row_start, col_start);
             (span.row_end, span.col_end) = (row_end, col_end);
             if wrap {
-                let RangeFlags { start, end } = &mut span.flags;
                 order_wrapped_edges(
                     &mut span.row_start,
                     &mut span.row_end,
-                    &mut start.row_abs,
-                    &mut end.row_abs,
+                    &mut span.flags,
+                    true,
                 );
                 order_wrapped_edges(
                     &mut span.col_start,
                     &mut span.col_end,
-                    &mut start.col_abs,
-                    &mut end.col_abs,
+                    &mut span.flags,
+                    false,
                 );
             }
-            true
-        }
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => {
-            args.iter_mut().for_each(inner);
             true
         }
         Ast::LetSlot { expression, .. } => {
             translate_relative_refs_inner(expression, row_delta, col_delta, wrap)
         }
-        Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            inner(left);
-            inner(right);
-            true
-        }
-        Ast::Neg(operand) | Ast::Pos(operand) | Ast::Percent(operand) => {
-            inner(operand);
+        Ast::Func(..)
+        | Ast::UnknownFunc(_)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_) => {
+            ast.fold_children_mut(&mut translate_child);
             true
         }
         // A defined name's expansion is already placed for its formula.
@@ -2635,16 +3366,20 @@ fn translate_relative_refs_inner(
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
+        | Ast::LetName { .. }
         | Ast::NamedRange(_)
         | Ast::NamedFormula(_)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::InvalidRef
-        | Ast::Array { .. } => true,
+        | Ast::Array(_) => true,
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } => true,
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => true,
         #[cfg(feature = "analysis")]
-        Ast::RegexPattern(_) => true,
+        Ast::Lambda(_) => {
+            ast.fold_children_mut(&mut translate_child);
+            true
+        }
     }
 }
 
@@ -2656,14 +3391,14 @@ pub(crate) enum Axis {
 
 impl Axis {
     /// The rows or columns of a sheet.
-    fn len(self) -> u32 {
+    const fn len(self) -> u32 {
         match self {
             Self::Row => SHEET_ROWS,
             Self::Col => SHEET_COLS,
         }
     }
 
-    fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
+    const fn pick<'a>(self, row: &'a mut u32, col: &'a mut u32) -> &'a mut u32 {
         match self {
             Self::Row => row,
             Self::Col => col,
@@ -2725,17 +3460,11 @@ impl AxisEdit {
 
         let span = match self.change {
             AxisChange::Shift { at, delta } => shift_range(*start, *end, at, delta),
-            // A move deletes nothing. When the block moves past one end, the
-            // ends can swap, and the range keeps the cells between them.
-            AxisChange::Move { from, count, to } => {
-                let first = moved_index(*start, from, count, to);
-                let second = moved_index(*end, from, count, to);
-                Some((first.min(second), first.max(second)))
-            }
+            AxisChange::Move { from, count, to } => moved_span(*start, *end, from, count, to),
         };
         match span {
-            Some((shifted_start, shifted_end)) if shifted_start <= last => {
-                let shifted_end = shifted_end.min(last);
+            Some((shifted_start, unclamped_end)) if shifted_start <= last => {
+                let shifted_end = unclamped_end.min(last);
                 if (shifted_start, shifted_end) == (*start, *end) {
                     return Moved::Unchanged;
                 }
@@ -2750,7 +3479,7 @@ impl AxisEdit {
 
 /// Rewrite row references affected by an edit on `edited_sheet`. Returns
 /// whether any reference changed.
-pub fn shift_rows(
+pub(crate) fn shift_rows(
     ast: &mut Ast,
     at: u32,
     delta: i64,
@@ -2770,7 +3499,7 @@ pub fn shift_rows(
 
 /// Rewrite column references affected by an edit on `edited_sheet`. Returns
 /// whether any reference changed.
-pub fn shift_cols(
+pub(crate) fn shift_cols(
     ast: &mut Ast,
     at: u32,
     delta: i64,
@@ -2802,22 +3531,24 @@ pub(crate) fn rewrite_own_sheet_axis(ast: &mut Ast, axis: Axis, change: AxisChan
     )
 }
 
-/// A moved block must not first delete a defined name's references: rewrite
-/// the saved definition once, after the store's remove/add move completes.
-pub(crate) fn move_named_formula_refs(
+/// Follow `count` rows or columns of `edited_sheet` moved from `from` to
+/// `to`, in a formula on `formula_sheet`: references to moved cells and to
+/// the cells the block passes over follow those cells. A defined name's
+/// formula has no sheet: pass `u32::MAX`, so only the references that name
+/// `edited_sheet` move. Returns whether any reference changed.
+pub(crate) fn move_refs(
     ast: &mut Ast,
     edited_sheet: u32,
+    formula_sheet: u32,
     columns: bool,
-    from: u32,
-    count: u32,
-    to: u32,
+    (from, count, to): (u32, u32, u32),
 ) -> bool {
     rewrite_axis(
         ast,
         AxisEdit {
             axis: if columns { Axis::Col } else { Axis::Row },
             change: AxisChange::Move { from, count, to },
-            formula_sheet: u32::MAX,
+            formula_sheet,
             edited_sheet,
         },
     )
@@ -2840,7 +3571,39 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
             Axis::Row => edit.move_span(&mut reference.row_start, &mut reference.row_end),
             Axis::Col => edit.move_index(&mut reference.col),
         },
-        _ => return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {
+            return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
+        }
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+            return ast.fold_children_mut(&mut |child| rewrite_axis(child, edit))
+        }
     };
 
     if moved == Moved::Deleted {
@@ -2861,8 +3624,9 @@ fn shift_index(index: u32, at: u32, delta: i64) -> Option<u32> {
 }
 
 /// Where `index` is after `count` indices move from `from` to `to`; `to` is
-/// the first index of the moved block after the move.
-fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
+/// the first index of the moved block after the move. A moved cell takes its
+/// references along, so a reference to one cell follows it.
+pub(crate) fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
     let block_end = from.saturating_add(count);
     if (from..block_end).contains(&index) {
         return to + (index - from);
@@ -2876,20 +3640,44 @@ fn moved_index(index: u32, from: u32, count: u32, to: u32) -> u32 {
     }
 }
 
+/// The inclusive span `start..=end` after `count` indices move from `from`
+/// to `to`, as Excel's Insert Cut Cells changes a range. A span inside the
+/// moved block moves with it. Any other span changes as if the block were
+/// deleted where it was and inserted where it lands: it loses the moved
+/// indices it held, a cut corner included, and grows by the block when the
+/// block lands after its first index and at or before its last.
+pub(crate) fn moved_span(
+    start: u32,
+    end: u32,
+    from: u32,
+    count: u32,
+    to: u32,
+) -> Option<(u32, u32)> {
+    if from <= start && end < from.saturating_add(count) {
+        return Some((
+            moved_index(start, from, count, to),
+            moved_index(end, from, count, to),
+        ));
+    }
+
+    let (closed_start, closed_end) = shift_range(start, end, from, -i64::from(count))?;
+    shift_range(closed_start, closed_end, to, i64::from(count))
+}
+
 /// Shift or contract an inclusive range; deleting every target invalidates it.
 pub(crate) fn shift_range(start: u32, end: u32, at: u32, delta: i64) -> Option<(u32, u32)> {
     if delta >= 0 {
-        let start = if start >= at {
+        let shifted_start = if start >= at {
             clamp_index(i64::from(start) + delta)
         } else {
             start
         };
-        let end = if end >= at {
+        let shifted_end = if end >= at {
             clamp_index(i64::from(end) + delta)
         } else {
             end
         };
-        return Some((start, end));
+        return Some((shifted_start, shifted_end));
     }
 
     let count = (-delta) as u32;
@@ -2920,7 +3708,8 @@ fn clamp_index(shifted: i64) -> u32 {
 }
 
 /// Serialize the authoritative AST into parseable formula source.
-pub fn serialize(ast: &Ast) -> String {
+#[cfg(test)]
+pub(crate) fn serialize(ast: &Ast) -> String {
     let mut out = String::from("=");
     write_ast(ast, &mut out);
     out
@@ -2943,44 +3732,172 @@ fn sheet_name_needs_quotes(name: &str) -> bool {
 /// Rewrite resolved references by stable numeric handle and regenerate quoting metadata.
 pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool {
     match ast {
-        Ast::AbsCell(sheet, ..) | Ast::AbsRange(sheet, ..) if sheet.handle == handle => {
-            sheet.name = name.to_string();
-            sheet.quoted = sheet_name_needs_quotes(name);
+        Ast::AbsCell(sheet, _, _, flags) if sheet.handle == handle => {
+            *flags = flags.with_quoted(sheet_name_needs_quotes(name));
+            true
+        }
+        Ast::AbsRange(sheet, _, _, _, _, flags) if sheet.handle == handle => {
+            flags.start = flags.start.with_quoted(sheet_name_needs_quotes(name));
             true
         }
         Ast::SheetSpan(span) => {
             let mut changed = false;
             for endpoint in [&mut span.first, &mut span.last] {
                 if endpoint.handle == handle {
-                    endpoint.name = name.to_string();
                     endpoint.quoted = sheet_name_needs_quotes(name);
                     changed = true;
                 }
             }
             changed
         }
-        _ => ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name)),
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => {
+            ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
+        }
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+            ast.fold_children_mut(&mut |child| rename_sheet_refs(child, handle, name))
+        }
     }
 }
 
-pub(crate) fn update_structured_refs<F>(ast: &mut Ast, table_id: &str, resolve: &F) -> bool
-where
-    F: Fn(&StructuredRef) -> Option<StructuredRef>,
-{
+/// The cells of a table reference after an edit of its table; `None` when
+/// the reference no longer reads anything.
+pub(crate) type TableRefresh<'a> = dyn Fn(&StructuredRef) -> Option<StructuredRef> + 'a;
+
+/// Refresh each reference to table slot `table` with `refresh`; a reference
+/// it drops becomes `#REF!`. Returns whether the tree names the table.
+pub(crate) fn refresh_table_refs(ast: &mut Ast, table: u16, refresh: &TableRefresh<'_>) -> bool {
     if let Ast::Structured(reference) = ast {
-        if reference.table_id == table_id {
-            *ast = resolve(reference).map_or(Ast::InvalidRef, |reference| {
-                Ast::Structured(Box::new(reference))
-            });
-            return true;
+        if reference.table != table {
+            return false;
         }
+        *ast = refresh(reference).map_or(Ast::InvalidRef, Ast::Structured);
+        return true;
     }
-    ast.fold_children_mut(&mut |child| update_structured_refs(child, table_id, resolve))
+    ast.fold_children_mut(&mut |child| refresh_table_refs(child, table, refresh))
+}
+
+/// The slot and section of a bound table reference; `None` for one that no
+/// table binds.
+pub(crate) type TableUse = Option<(u16, TableSection)>;
+
+/// Visit each table reference of `ast`: see [`TableUse`].
+pub(crate) fn for_each_table_ref(ast: &Ast, visit: &mut dyn FnMut(TableUse)) {
+    // Every other node holds table references only through its children.
+    if let Ast::Structured(reference) = ast {
+        visit(Some((reference.table, reference.section)));
+    } else if let Ast::UnresolvedStructured(_) = ast {
+        visit(None);
+    } else {
+        ast.any_child(&mut |child| {
+            for_each_table_ref(child, visit);
+            false
+        });
+    }
 }
 
 /// Replace every resolved cell/range reference to a removed stable handle with `#REF!`.
 /// 3-D references are left to [`refresh_sheet_spans`]: removing one of their
 /// sheets shrinks the span instead.
+/// Point the references whose sheet name has the lookup `key` at `handle`,
+/// or back to unresolved sheet references when `handle` is `None`. Only the
+/// sheets of linked workbooks come and go this way; the text stays the same.
+pub(crate) fn relink_sheet_refs(
+    ast: &mut Ast,
+    key: &str,
+    handle: Option<u32>,
+    names: &[String],
+) -> bool {
+    let relinked = match (&*ast, handle) {
+        (Ast::SheetCell(reference), Some(linked))
+            if sheet_name_key(&reference.sheet.name) == key =>
+        {
+            Some(Ast::AbsCell(
+                SheetRef { handle: linked },
+                reference.row,
+                reference.col,
+                reference.flags,
+            ))
+        }
+        (Ast::SheetRange(reference), Some(linked))
+            if sheet_name_key(&reference.sheet.name) == key =>
+        {
+            Some(Ast::AbsRange(
+                SheetRef { handle: linked },
+                reference.row_start,
+                reference.col_start,
+                reference.row_end,
+                reference.col_end,
+                reference.flags,
+            ))
+        }
+        (Ast::AbsCell(sheet, row, col, flags), None)
+            if names
+                .get(sheet.handle as usize)
+                .is_some_and(|name| sheet_name_key(name) == key) =>
+        {
+            Some(Ast::SheetCell(Box::new(DetachedCellRef {
+                sheet: UnresolvedSheetRef {
+                    name: names[sheet.handle as usize].clone(),
+                    quoted: flags.quoted(),
+                },
+                row: *row,
+                col: *col,
+                flags: *flags,
+            })))
+        }
+        (Ast::AbsRange(sheet, r0, c0, r1, c1, flags), None)
+            if names
+                .get(sheet.handle as usize)
+                .is_some_and(|name| sheet_name_key(name) == key) =>
+        {
+            Some(Ast::SheetRange(Box::new(DetachedRangeRef {
+                sheet: UnresolvedSheetRef {
+                    name: names[sheet.handle as usize].clone(),
+                    quoted: flags.start.quoted(),
+                },
+                row_start: *r0,
+                col_start: *c0,
+                row_end: *r1,
+                col_end: *c1,
+                flags: *flags,
+            })))
+        }
+        _ => None,
+    };
+    if let Some(replacement) = relinked {
+        *ast = replacement;
+        true
+    } else {
+        ast.fold_children_mut(&mut |child| relink_sheet_refs(child, key, handle, names))
+    }
+}
+
 pub(crate) fn invalidate_sheet_refs(ast: &mut Ast, handle: u32) -> bool {
     let invalid = matches!(
         ast,
@@ -3028,12 +3945,43 @@ fn write_structured_ref(
     }
 }
 
+/// The written name of a 3-D endpoint: its own text while detached, else the
+/// workbook's current name for its sheet.
+fn span_endpoint_name<'a>(endpoint: &'a SheetSpanEndpoint, names: &'a [String]) -> Option<&'a str> {
+    endpoint
+        .name
+        .as_deref()
+        .or_else(|| names.get(endpoint.handle as usize).map(String::as_str))
+}
+
+/// What bound references write: the current name of each sheet handle, and
+/// the table and column names of each table slot. Without tables, a bound
+/// table reference writes `#REF!`.
+#[derive(Clone, Copy)]
+pub(crate) struct WrittenNames<'a> {
+    pub(crate) sheets: &'a [String],
+    pub(crate) tables: Option<&'a TableSlots>,
+}
+
+impl WrittenNames<'_> {
+    /// For text written with no workbook: every bound reference is `#REF!`.
+    pub(crate) const NONE: WrittenNames<'static> = WrittenNames {
+        sheets: &[],
+        tables: None,
+    };
+}
+
 pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
+    write_ast_with_names(ast, out, &WrittenNames::NONE);
+}
+
+pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenNames<'_>) {
     match ast {
-        Ast::Num(value) => out.push_str(&value.to_string()),
+        Ast::Num(value) => out.push_str(NumberText::of(*value).as_str()),
         Ast::Str(value) => write_text(value, out),
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
+        Ast::LetName { name, .. } => out.push_str(name),
         Ast::NamedRange(named) => out.push_str(&named.name),
         Ast::NamedFormula(named) => out.push_str(&named.name),
         Ast::UnresolvedStructured(reference) => write_structured_ref(
@@ -3042,46 +3990,87 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
             reference.section,
             out,
         ),
-        Ast::Structured(reference) => write_structured_ref(
-            reference.qualified.then_some(reference.table_name.as_str()),
-            &reference.column_name,
-            reference.section,
-            out,
-        ),
+        Ast::Structured(reference) => {
+            let bound = names.tables.and_then(|tables| {
+                let table = tables.get(reference.table)?;
+                Some((table.name.as_str(), table.column_at(reference.col)?))
+            });
+            let Some((table_name, column)) = bound else {
+                out.push_str("#REF!");
+                return;
+            };
+            write_structured_ref(
+                reference.qualified.then_some(table_name),
+                &column.name,
+                reference.section,
+                out,
+            );
+        }
         Ast::Cell(row, col, flags) => write_a1(*row, *col, *flags, out),
-        Ast::SheetCell(sheet, row, col, flags) => {
+        Ast::SheetCell(reference) => {
+            let DetachedCellRef {
+                sheet,
+                row,
+                col,
+                flags,
+            } = &**reference;
+
             write_sheet_name(&sheet.name, sheet.quoted, out);
             out.push('!');
             write_a1(*row, *col, *flags, out);
         }
         Ast::AbsCell(sheet, row, col, flags) => {
-            write_sheet_name(&sheet.name, sheet.quoted, out);
+            let Some(name) = names.sheets.get(sheet.handle as usize) else {
+                out.push_str("#REF!");
+                return;
+            };
+            write_sheet_name(name, flags.quoted(), out);
             out.push('!');
             write_a1(*row, *col, *flags, out);
         }
         Ast::Range(r0, c0, r1, c1, flags) => write_area(*r0, *c0, *r1, *c1, flags, out),
-        Ast::SheetRange(sheet, r0, c0, r1, c1, flags) => {
+        Ast::SheetRange(reference) => {
+            let DetachedRangeRef {
+                sheet,
+                row_start: r0,
+                col_start: c0,
+                row_end: r1,
+                col_end: c1,
+                flags,
+            } = &**reference;
+
             write_sheet_name(&sheet.name, sheet.quoted, out);
             out.push('!');
             write_area(*r0, *c0, *r1, *c1, flags, out);
         }
         Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
-            write_sheet_name(&sheet.name, sheet.quoted, out);
+            let Some(name) = names.sheets.get(sheet.handle as usize) else {
+                out.push_str("#REF!");
+                return;
+            };
+            write_sheet_name(name, flags.start.quoted(), out);
             out.push('!');
             write_area(*r0, *c0, *r1, *c1, flags, out);
         }
         Ast::SheetSpan(span) => {
+            let (Some(first), Some(last)) = (
+                span_endpoint_name(&span.first, names.sheets),
+                span_endpoint_name(&span.last, names.sheets),
+            ) else {
+                out.push_str("#REF!");
+                return;
+            };
             // Excel quotes the whole span once: `'Sheet 1:Sheet 3'!A1`.
             if span.first.quoted || span.last.quoted {
                 out.push('\'');
-                out.push_str(&span.first.name.replace('\'', "''"));
+                out.push_str(&first.replace('\'', "''"));
                 out.push(':');
-                out.push_str(&span.last.name.replace('\'', "''"));
+                out.push_str(&last.replace('\'', "''"));
                 out.push('\'');
             } else {
-                out.push_str(&span.first.name);
+                out.push_str(first);
                 out.push(':');
-                out.push_str(&span.last.name);
+                out.push_str(last);
             }
             out.push('!');
             if span.cell {
@@ -3099,11 +4088,24 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
         }
         Ast::Missing => {}
         #[cfg(feature = "analysis")]
-        Ast::BoundMatrix { .. } => out.push_str("#CALC!"),
+        Ast::Parameter { name, .. } => out.push_str(name),
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => {
+            out.push_str(func_name(Func::Analysis(crate::eval::analysis::LAMBDA_ID)));
+            out.push('(');
+            for parameter in &definition.parameters {
+                write_ast_with_names(parameter, out, names);
+                out.push(',');
+            }
+            write_ast_with_names(&definition.body, out, names);
+            out.push(')');
+        }
         #[cfg(feature = "analysis")]
         Ast::RegexPattern(pattern) => write_text(pattern.text(), out),
         Ast::InvalidRef => out.push_str("#REF!"),
-        Ast::Array { cols, values } => {
+        Ast::Array(array) => {
+            let ArrayLiteral { cols, values } = &**array;
+
             out.push('{');
             for (index, value) in values.iter().enumerate() {
                 if index > 0 {
@@ -3114,18 +4116,18 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                     });
                 }
                 match value {
-                    Value::Number(number) => out.push_str(&number.to_string()),
+                    Value::Number(number) => out.push_str(NumberText::of(*number).as_str()),
                     Value::Text(text) => write_text(text, out),
-                    Value::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+                    Value::Bool(flag) => out.push_str(if *flag { "TRUE" } else { "FALSE" }),
                     Value::Error(error) => out.push_str(error.sentinel()),
                     Value::Blank => {}
                 }
             }
             out.push('}');
         }
-        Ast::LetSlot { expression, .. } => write_ast(expression, out),
+        Ast::LetSlot { expression, .. } => write_ast_with_names(expression, out, names),
         Ast::Func(Func::AnchorArray, args) if args.len() == 1 => {
-            write_ast(&args[0], out);
+            write_ast_with_names(&args[0], out, names);
             // A deleted anchor writes as #REF!, which has no spill suffix.
             if !matches!(args[0], Ast::InvalidRef) {
                 out.push('#');
@@ -3137,7 +4139,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast(area, out);
+                write_ast_with_names(area, out, names);
             }
             out.push(')');
         }
@@ -3152,7 +4154,7 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                 if signed {
                     out.push('(');
                 }
-                write_ast(operand, out);
+                write_ast_with_names(operand, out, names);
                 if signed {
                     out.push(')');
                 }
@@ -3165,38 +4167,42 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast(arg, out);
+                write_ast_with_names(arg, out, names);
             }
             out.push(')');
         }
         #[cfg(feature = "analysis")]
-        Ast::UnknownFunc(name, args) if name == crate::eval::analysis::lambda::CALL => {
+        Ast::UnknownFunc(call) if call.name == crate::eval::analysis::lambda::CALL => {
+            let UnknownCall { args, .. } = &**call;
+
             if let Some(callee) = args.first() {
-                write_ast(callee, out);
+                write_ast_with_names(callee, out, names);
             }
             out.push('(');
             for (index, argument) in args.iter().skip(1).enumerate() {
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast(argument, out);
+                write_ast_with_names(argument, out, names);
             }
             out.push(')');
         }
-        Ast::UnknownFunc(name, args) => {
+        Ast::UnknownFunc(call) => {
+            let UnknownCall { name, args } = &**call;
+
             out.push_str(name);
             out.push('(');
             for (index, arg) in args.iter().enumerate() {
                 if index > 0 {
                     out.push(',');
                 }
-                write_ast(arg, out);
+                write_ast_with_names(arg, out, names);
             }
             out.push(')');
         }
         Ast::Bin(op, left, right) => {
             out.push('(');
-            write_ast(left, out);
+            write_ast_with_names(left, out, names);
             out.push(match op {
                 Op::Add => '+',
                 Op::Sub => '-',
@@ -3205,12 +4211,12 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                 Op::Pow => '^',
                 Op::Concat => '&',
             });
-            write_ast(right, out);
+            write_ast_with_names(right, out, names);
             out.push(')');
         }
         Ast::Cmp(op, left, right) => {
             out.push('(');
-            write_ast(left, out);
+            write_ast_with_names(left, out, names);
             out.push_str(match op {
                 CmpOp::Eq => "=",
                 CmpOp::Ne => "<>",
@@ -3219,22 +4225,22 @@ pub(crate) fn write_ast(ast: &Ast, out: &mut String) {
                 CmpOp::Gt => ">",
                 CmpOp::Ge => ">=",
             });
-            write_ast(right, out);
+            write_ast_with_names(right, out, names);
             out.push(')');
         }
         Ast::Neg(inner) => {
             out.push_str("-(");
-            write_ast(inner, out);
+            write_ast_with_names(inner, out, names);
             out.push(')');
         }
         Ast::Pos(inner) => {
             out.push_str("+(");
-            write_ast(inner, out);
+            write_ast_with_names(inner, out, names);
             out.push(')');
         }
         Ast::Percent(inner) => {
             out.push('(');
-            write_ast(inner, out);
+            write_ast_with_names(inner, out, names);
             out.push_str(")%");
         }
     }
@@ -3261,16 +4267,16 @@ fn write_sheet_name(name: &str, quoted: bool, out: &mut String) {
 /// Excel writes `1:1048576`.
 fn write_area(r0: u32, c0: u32, r1: u32, c1: u32, flags: &RangeFlags, out: &mut String) {
     if spans_all_cols(c0, c1) {
-        write_absolute_marker(flags.start.row_abs, out);
+        write_absolute_marker(flags.start.row_abs(), out);
         out.push_str(&(u64::from(r0) + 1).to_string());
         out.push(':');
-        write_absolute_marker(flags.end.row_abs, out);
+        write_absolute_marker(flags.end.row_abs(), out);
         out.push_str(&(u64::from(r1) + 1).to_string());
     } else if spans_all_rows(r0, r1) {
-        write_absolute_marker(flags.start.col_abs, out);
+        write_absolute_marker(flags.start.col_abs(), out);
         write_col(c0, out);
         out.push(':');
-        write_absolute_marker(flags.end.col_abs, out);
+        write_absolute_marker(flags.end.col_abs(), out);
         write_col(c1, out);
     } else {
         write_a1(r0, c0, flags.start, out);
@@ -3286,11 +4292,11 @@ fn write_absolute_marker(absolute: bool, out: &mut String) {
 }
 
 fn write_a1(row: u32, col: u32, flags: RefFlags, out: &mut String) {
-    if flags.col_abs {
+    if flags.col_abs() {
         out.push('$');
     }
     write_col(col, out);
-    if flags.row_abs {
+    if flags.row_abs() {
         out.push('$');
     }
     out.push_str(&(u64::from(row) + 1).to_string());
@@ -3344,87 +4350,8 @@ mod tests {
         assert!(matches!(parse("=SUM (A1)"), Ok(Ast::Func(Func::Sum, _))));
         assert!(matches!(
             parse("=Sheet1:Sheet3!A1"),
-            Ok(Ast::SheetSpan(span)) if span.cell && span.first.name == "Sheet1"
+            Ok(Ast::SheetSpan(span)) if span.cell && span.first.name.as_deref() == Some("Sheet1")
         ));
-    }
-
-    #[test]
-    fn spill_references_parse_and_serialize_with_a_hash_suffix() {
-        for (source, expected) in [
-            ("=A1#", "=A1#"),
-            ("=sum($b$2#)", "=SUM($B$2#)"),
-            ("=ROWS('My Sheet'!C3#)", "=ROWS('My Sheet'!C3#)"),
-        ] {
-            assert_eq!(serialize(&parse(source).unwrap()), expected, "{source}");
-        }
-        assert_eq!(
-            parse("=A1#").unwrap(),
-            Ast::Func(
-                Func::AnchorArray,
-                vec![Ast::Cell(0, 0, RefFlags::default())]
-            )
-        );
-        // `#` only follows a cell, and the function name cannot be typed.
-        for source in ["=A1:B2#", "=#", "=1#"] {
-            assert!(parse(source).is_err(), "{source}");
-        }
-        assert!(matches!(
-            parse("=ANCHORARRAY(A1)"),
-            Ok(Ast::UnknownFunc(..))
-        ));
-    }
-
-    #[test]
-    fn parse_a1_accepts_absolute_markers() {
-        assert_eq!(parse_a1("A1"), Some((0, 0, RefFlags::default())));
-        assert_eq!(
-            parse_a1("$A1"),
-            Some((
-                0,
-                0,
-                RefFlags {
-                    row_abs: false,
-                    col_abs: true
-                }
-            ))
-        );
-        assert_eq!(
-            parse_a1("A$1"),
-            Some((
-                0,
-                0,
-                RefFlags {
-                    row_abs: true,
-                    col_abs: false
-                }
-            ))
-        );
-        assert_eq!(
-            parse_a1("$A$1"),
-            Some((
-                0,
-                0,
-                RefFlags {
-                    row_abs: true,
-                    col_abs: true
-                }
-            ))
-        );
-        assert_eq!(
-            parse_a1("aa$10"),
-            Some((
-                9,
-                26,
-                RefFlags {
-                    row_abs: true,
-                    col_abs: false
-                }
-            ))
-        );
-
-        assert_eq!(parse_a1("A0"), None);
-        assert_eq!(parse_a1("$1"), None);
-        assert_eq!(parse_a1("A$"), None);
     }
 
     #[test]
@@ -3454,9 +4381,10 @@ mod tests {
         ];
         for (source, expected_cols, expected_len, expected_text) in shapes {
             let ast = parse(source).unwrap_or_else(|error| panic!("{source}: {error}"));
-            let Ast::Array { cols, values } = &ast else {
+            let Ast::Array(array) = &ast else {
                 panic!("{source} did not parse as an array constant");
             };
+            let ArrayLiteral { cols, values } = &**array;
             assert_eq!(
                 (*cols, values.len()),
                 (expected_cols, expected_len),
@@ -3468,14 +4396,15 @@ mod tests {
 
         assert_eq!(
             parse("={\"x\",FALSE,#NAME?}"),
-            Ok(Ast::Array {
+            Ok(Ast::Array(Box::new(ArrayLiteral {
                 cols: 3,
                 values: vec![
                     Value::text("x"),
                     Value::Bool(false),
                     Value::Error(FormulaError::Name),
-                ],
-            })
+                ]
+                .into(),
+            })))
         );
         assert_eq!(
             serialize(&parse("=SUM({1,2},A1)").unwrap()),
@@ -3560,11 +4489,11 @@ mod tests {
     fn names_sheet_refs_and_unknown_calls_preserve_source_case() {
         assert_eq!(
             parse("=Revenue_Q1"),
-            Ok(Ast::Name("Revenue_Q1".to_string()))
+            Ok(Ast::Name("Revenue_Q1".to_owned().into()))
         );
         assert_eq!(
             parse("=Sales.Data"),
-            Ok(Ast::Name("Sales.Data".to_string()))
+            Ok(Ast::Name("Sales.Data".to_owned().into()))
         );
 
         let sheet_ref = parse("='North East'!a1").expect("quoted sheet ref should parse");
@@ -3575,7 +4504,7 @@ mod tests {
             parse("='München Süd'!b2").expect("UTF-8 quoted sheet ref should parse");
         assert_eq!(serialize(&unicode_sheet), "='München Süd'!B2");
         assert_eq!(parse(&serialize(&unicode_sheet)), Ok(unicode_sheet));
-        assert_eq!(parse("=\"café\""), Ok(Ast::Str("café".to_string())));
+        assert_eq!(parse("=\"café\""), Ok(Ast::Str("café".to_owned().into())));
         assert_eq!(
             serialize(&parse("=1\u{2003}+2").expect("Unicode whitespace should parse")),
             "=(1+2)"
@@ -3585,134 +4514,125 @@ mod tests {
             parse("=MiXeD.Call(Revenue_Q1)").expect("unknown call should remain parseable");
         assert_eq!(
             unknown,
-            Ast::UnknownFunc(
-                "MiXeD.Call".to_string(),
-                vec![Ast::Name("Revenue_Q1".to_string())]
-            )
+            Ast::UnknownFunc(Box::new(UnknownCall {
+                name: "MiXeD.Call".to_owned(),
+                args: (vec![Ast::Name("Revenue_Q1".to_owned().into())]).into()
+            }))
         );
         assert_eq!(serialize(&unknown), "=MiXeD.Call(Revenue_Q1)");
+    }
+
+    #[test]
+    fn text_literal_memory_counts_reference_counts() {
+        let literal = parse("=\"abc\"").unwrap();
+        let mut stats = MemoryOwnerStats::default();
+        literal.heap_memory_stats(&mut stats);
+        assert_eq!(stats.logical_bytes, 3);
+        assert_eq!(stats.allocated_bytes, 3 + 2 * std::mem::size_of::<usize>());
+        // A cloned tree shares the literal and writes it back unchanged.
+        assert_eq!(serialize(&literal.clone()), "=\"abc\"");
     }
 
     #[test]
     fn heap_memory_stats_accounts_owning_ast_shapes() {
         let boxed = std::mem::size_of::<Ast>();
         let cases: Vec<(&str, Ast, usize)> = vec![
-            ("string", Ast::Str("abc".to_string()), 3),
-            ("name", Ast::Name("Total".to_string()), 5),
+            ("string", Ast::Str("abc".to_owned().into()), 3),
+            ("name", Ast::Name("Total".to_owned().into()), 5),
             (
                 "named range",
-                Ast::NamedRange(NamedRangeRef {
-                    name: "Band".to_string(),
+                Ast::NamedRange(Box::new(NamedRangeRef {
+                    name: "Band".to_owned(),
                     scope: None,
                     sheet: 1,
                     row_start: 0,
                     col_start: 0,
                     row_end: 4,
                     col_end: 0,
-                }),
-                4,
+                })),
+                std::mem::size_of::<NamedRangeRef>() + 4,
             ),
             (
                 "unqualified structured ref",
-                Ast::UnresolvedStructured(UnresolvedStructuredRef {
+                Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {
                     table_name: None,
-                    column_name: "Amount".to_string(),
+                    column_name: "Amount".to_owned(),
                     section: TableSection::Body,
-                }),
-                6,
+                })),
+                std::mem::size_of::<UnresolvedStructuredRef>() + 6,
             ),
             (
                 "qualified structured ref",
-                Ast::UnresolvedStructured(UnresolvedStructuredRef {
-                    table_name: Some("Table1".to_string()),
-                    column_name: "Amount".to_string(),
+                Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {
+                    table_name: Some("Table1".to_owned()),
+                    column_name: "Amount".to_owned(),
                     section: TableSection::Body,
-                }),
-                12,
+                })),
+                std::mem::size_of::<UnresolvedStructuredRef>() + 12,
             ),
             (
-                "resolved structured ref",
-                Ast::Structured(Box::new(StructuredRef {
-                    table_id: "t1".to_string(),
-                    table_name: "Table1".to_string(),
-                    column_id: "c1".to_string(),
-                    column_name: "Amount".to_string(),
+                "bound structured ref, inline",
+                Ast::Structured(StructuredRef {
+                    table: 0,
+                    section: TableSection::Body,
+                    qualified: true,
                     sheet: 1,
                     row_start: 0,
                     row_end: 3,
                     col: 0,
-                    section: TableSection::Body,
-                    qualified: true,
-                })),
-                std::mem::size_of::<StructuredRef>() + 16,
+                }),
+                0,
             ),
             (
                 "sheet cell",
-                Ast::SheetCell(
-                    UnresolvedSheetRef {
-                        name: "Data".to_string(),
+                Ast::SheetCell(Box::new(DetachedCellRef {
+                    sheet: UnresolvedSheetRef {
+                        name: "Data".to_owned(),
                         quoted: false,
                     },
-                    0,
-                    0,
-                    RefFlags::default(),
-                ),
-                4,
+                    row: 0,
+                    col: 0,
+                    flags: RefFlags::default(),
+                })),
+                std::mem::size_of::<DetachedCellRef>() + 4,
             ),
             (
                 "sheet range",
-                Ast::SheetRange(
-                    UnresolvedSheetRef {
-                        name: "Data".to_string(),
+                Ast::SheetRange(Box::new(DetachedRangeRef {
+                    sheet: UnresolvedSheetRef {
+                        name: "Data".to_owned(),
                         quoted: false,
                     },
-                    0,
-                    0,
-                    1,
-                    1,
-                    RangeFlags::default(),
-                ),
-                4,
+                    row_start: 0,
+                    col_start: 0,
+                    row_end: 1,
+                    col_end: 1,
+                    flags: RangeFlags::default(),
+                })),
+                std::mem::size_of::<DetachedRangeRef>() + 4,
             ),
             (
                 "absolute cell",
-                Ast::AbsCell(
-                    SheetRef {
-                        handle: 1,
-                        name: "Wide".to_string(),
-                        quoted: false,
-                    },
-                    0,
-                    0,
-                    RefFlags::default(),
-                ),
-                4,
+                Ast::AbsCell(SheetRef { handle: 1 }, 0, 0, RefFlags::default()),
+                0,
             ),
             (
                 "absolute range",
-                Ast::AbsRange(
-                    SheetRef {
-                        handle: 1,
-                        name: "Wide".to_string(),
-                        quoted: false,
-                    },
-                    0,
-                    0,
-                    1,
-                    1,
-                    RangeFlags::default(),
-                ),
-                4,
+                Ast::AbsRange(SheetRef { handle: 1 }, 0, 0, 1, 1, RangeFlags::default()),
+                0,
             ),
             (
                 "function arguments",
-                Ast::Func(Func::Rept, vec![Ast::Num(1.0)]),
+                Ast::Func(Func::Rept, (vec![Ast::Num(1.0)]).into()),
                 boxed,
             ),
             (
                 "unknown function",
-                Ast::UnknownFunc("Foo".to_string(), vec![Ast::Num(1.0), Ast::Num(2.0)]),
-                3 + boxed * 2,
+                Ast::UnknownFunc(Box::new(UnknownCall {
+                    name: "Foo".to_owned(),
+                    args: (vec![Ast::Num(1.0), Ast::Num(2.0)]).into(),
+                })),
+                std::mem::size_of::<UnknownCall>() + 3 + boxed * 2,
             ),
             (
                 "binary",
@@ -3738,32 +4658,5 @@ mod tests {
         }
         assert_eq!(parse_col(""), None);
         assert_eq!(parse_col("A1"), None);
-    }
-
-    #[cfg(feature = "analysis")]
-    #[test]
-    fn analysis_names_resolve_to_their_family_without_shadowing_built_ins() {
-        let names: Vec<&str> = crate::eval::analysis::names().collect();
-        for name in &names {
-            assert!(
-                name.bytes().all(|byte| !byte.is_ascii_lowercase()),
-                "{name} must be uppercase"
-            );
-            // A built-in or alias with the same spelling would win the lookup.
-            let id = crate::eval::analysis::lookup(name).expect("registered analysis name");
-            assert_eq!(lookup_func(name), Some(Func::Analysis(id)), "{name}");
-            assert_eq!(
-                lookup_func(&name.to_ascii_lowercase()),
-                Some(Func::Analysis(id))
-            );
-            assert_eq!(func_name(Func::Analysis(id)), *name);
-        }
-        let listed = function_names();
-        assert_eq!(
-            listed.len(),
-            FUNCTION_NAMES.len() + FUNCTION_ALIASES.len() + names.len(),
-            "every spelling is listed once"
-        );
-        assert!(listed.windows(2).all(|pair| pair[0] < pair[1]));
     }
 }

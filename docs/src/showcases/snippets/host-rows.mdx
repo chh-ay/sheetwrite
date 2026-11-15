@@ -1,0 +1,28 @@
+```ts prelude="core" title="host-rows.ts"
+import { createRowBridge, initSheetwrite } from "@sheetwrite/core";
+import { createGridController, createSimpleGridInput } from "@sheetwrite/core/adapter";
+
+declare const host: HTMLElement;
+declare const columns: { key: "name" | "amount"; title: string }[];
+declare const rows: { id: string; name: string; amount: number }[];
+declare function saveDelta(delta: unknown): void;
+
+// Your app owns the rows; the bridge gives each one a stable ID
+const input = createSimpleGridInput({ columns, defaultRows: rows, sheetName: "Accounts" });
+const bridge = createRowBridge({
+  columns,
+  defaultRows: rows,
+  getRowId: (row) => row.id,
+  createRowId: () => crypto.randomUUID(),
+});
+
+// Every edit, insert and delete arrives as deltas that name row IDs, whatever
+// the view's sort or filter
+await initSheetwrite();
+const { grid } = createGridController(
+  host,
+  input,
+  { onRowDelta: (projection) => projection.deltas.forEach(saveDelta) },
+  bridge,
+);
+```

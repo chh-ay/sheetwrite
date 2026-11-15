@@ -6,6 +6,7 @@ import type { IconName } from "../icons/icon-names.js";
 import { iconContentNode, iconNode } from "../icons/resolve.js";
 import { onQueryCommandsChange } from "../query-commands.js";
 import { Scope } from "../scope.js";
+import { checkIconStyles, checkStylePart } from "../style-parts.js";
 import type {
   CommandFlags,
   Grid,
@@ -272,6 +273,8 @@ export class CommandToolbar {
     this.element.append(this.row, this.more);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
+    checkStylePart(this.element, "ribbon", "The toolbar");
+    checkIconStyles(this.element, "The toolbar");
     this.lifetime.add(() => this.element.remove());
     this.lifetime.add(() => this.popup.destroy());
 
@@ -284,6 +287,10 @@ export class CommandToolbar {
     // A query session connects after the grid exists, and its commands appear then.
     this.lifetime.add(
       onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
+    );
+    // Some commands depend on the document, such as Edit Links on its links.
+    this.lifetime.add(
+      grid.on("change", () => this.refresh((command) => grid.getCommandState(command))),
     );
     // Absent in some test environments; every command then stays on the row.
     if (typeof ResizeObserver === "function") {

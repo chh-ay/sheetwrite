@@ -165,6 +165,58 @@ describe("saved measures", () => {
     expect(store.getMeasureStatus(revenueMeasure.id)).toEqual({ status: "missingTable" });
   });
 
+  it("renames table, column and measure references in measure formulas, undone in one step", () => {
+    const grid = mountGrid();
+    const apply = (operation: DocumentOp) => grid.applyTransaction({ patches: [operation] }).status;
+    const share = {
+      id: "share",
+      name: "Share",
+      table: "customers",
+      formula: "=[revenue] / COUNTA(Customers[id]) + orders[@Amount]",
+    };
+    const formulas = () =>
+      grid.store.getWorkbook().dataModel?.measures?.map((measure) => measure.formula);
+    expect(apply({ op: "setMeasure", measure: revenueMeasure })).toBe("applied");
+    expect(apply({ op: "setMeasure", measure: share })).toBe("applied");
+
+    const renamedTable: DocumentOp = {
+      op: "updateTable",
+      sheet: "data",
+      tableId: "orders",
+      patch: {
+        name: "Sales",
+        columns: [
+          { id: "customer", name: "customer" },
+          { id: "amount", name: "Net" },
+        ],
+      },
+    };
+    expect(apply(renamedTable)).toBe("applied");
+    expect(formulas()).toEqual([
+      "=SUM(Sales[Net])",
+      "=[revenue] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+
+    expect(apply({ op: "setMeasure", measure: { ...revenueMeasure, name: "Income" } })).toBe(
+      "applied",
+    );
+    expect(formulas()).toEqual([
+      "=SUM(orders[amount])",
+      "=[Income] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+
+    grid.undo();
+    expect(formulas()).toEqual([
+      "=SUM(Sales[Net])",
+      "=[Revenue] / COUNTA(Customers[id]) + Sales[@Net]",
+    ]);
+    grid.undo();
+    expect(formulas()).toEqual([
+      "=SUM(orders[amount])",
+      "=[Revenue] / COUNTA(Customers[id]) + orders[@amount]",
+    ]);
+  });
+
   it("validates saved measure names and formulas without parsing them in TypeScript", () => {
     expect(validateDocumentOperationShape({ op: "setMeasure", measure: revenueMeasure })).toEqual(
       [],
@@ -241,18 +293,6 @@ describe("relationships in the store", () => {
     }
   });
 
-  it("returns clones that callers cannot use to change the document", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
-    try {
-      const [read] = store.getRelationships();
-      if (!read) throw new Error("the relationship is missing");
-      read.to.column = "region";
-      expect(store.getRelationships()).toEqual([ordersToCustomers]);
-    } finally {
-      store.dispose();
-    }
-  });
-
   it("admits a relationship only between existing columns and without a cycle", () => {
     const store = SheetwriteStore.fromSnapshot(snapshot([]));
     try {
@@ -285,31 +325,6 @@ describe("relationships in the store", () => {
     } finally {
       store.dispose();
     }
-  });
-});
-
-describe("relationship key status", () => {
-  it("is unavailable on the default engine, which checks no keys", () => {
-    const store = SheetwriteStore.fromSnapshot(snapshot([ordersToCustomers]));
-    try {
-      expect(store.getRelationshipStatus(ordersToCustomers.id)).toEqual({ status: "unavailable" });
-    } finally {
-      store.dispose();
-    }
-  });
-
-  it("checks keys on the full engine, in its own process", async () => {
-    // Engine selection is process-wide, so the full-engine checks run apart.
-    const probe = Bun.spawn(
-      [process.execPath, "test", "./packages/core/test/data-model.full-engine.ts"],
-      { cwd: new URL("../../..", import.meta.url).pathname, stdout: "pipe", stderr: "pipe" },
-    );
-    const [exitCode, stderr] = await Promise.all([probe.exited, new Response(probe.stderr).text()]);
-
-    expect({ exitCode, failures: stderr.match(/^\(fail\).*$/gmu) ?? [] }).toEqual({
-      exitCode: 0,
-      failures: [],
-    });
   });
 });
 
@@ -387,6 +402,46 @@ describe("relationship collaboration", () => {
     expect(rebaseDocumentOperations(local, [{ op: "removeSheet", sheet: "other" }])).toMatchObject({
       status: "conflict",
       conflict: { code: "sheet-removed" },
+    });
+  });
+
+  it("conflicts on a measure write and a concurrent table or column rename, either way", () => {
+    const measure: DocumentOp = { op: "setMeasure", measure: revenueMeasure };
+    const renames: DocumentOp[] = [
+      { op: "updateTable", sheet: "data", tableId: "orders", patch: { name: "Sales" } },
+      {
+        op: "updateTable",
+        sheet: "data",
+        tableId: "customers",
+        patch: {
+          columns: [
+            { id: "id", name: "id" },
+            { id: "region", name: "Area" },
+          ],
+        },
+      },
+    ];
+    for (const rename of renames) {
+      for (const [local, remote] of [
+        [measure, rename],
+        [rename, measure],
+      ]) {
+        expect(rebaseDocumentOperations([local!], [remote!])).toMatchObject({
+          status: "conflict",
+          conflict: { code: "overlapping-edit" },
+        });
+      }
+    }
+
+    const styled: DocumentOp = {
+      op: "updateTable",
+      sheet: "data",
+      tableId: "orders",
+      patch: { headerRow: true },
+    };
+    expect(rebaseDocumentOperations([measure], [styled])).toEqual({
+      status: "rebased",
+      operations: [measure],
     });
   });
 

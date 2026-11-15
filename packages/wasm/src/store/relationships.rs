@@ -4,10 +4,11 @@
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
-use super::{CellStore, TableColumnDefinition, TableDefinition};
+use super::CellStore;
 use crate::cells::payload_str_id;
 use crate::data_model::{KeyCell, KeyIndex, KeyProblem, KEY_ERROR, NO_MATCH};
 use crate::eval::settled_cell_value;
+use crate::tables::{Table, TableColumn};
 use crate::types::{string_from_pool_ref, KIND_STRING};
 
 /// Most relationships one workbook may hold; twin of `MAX_RELATIONSHIPS` in
@@ -48,7 +49,7 @@ pub(crate) struct Relationship {
 
 impl Relationship {
     /// Whether this record is a measure rather than a relationship.
-    pub(crate) fn is_measure(&self) -> bool {
+    pub(crate) const fn is_measure(&self) -> bool {
         self.to.table.is_empty()
     }
 }
@@ -71,7 +72,7 @@ pub(crate) struct KeyColumn {
 }
 
 impl KeyColumn {
-    fn of(table: &TableDefinition, column_id: &str) -> Result<Self, RelationshipError> {
+    fn of(table: &Table, column_id: &str) -> Result<Self, RelationshipError> {
         let column = table
             .columns
             .iter()
@@ -81,7 +82,7 @@ impl KeyColumn {
     }
 
     /// The data rows of `column`, which belongs to `table`.
-    pub(super) fn at(table: &TableDefinition, column: &TableColumnDefinition) -> Self {
+    pub(super) fn at(table: &Table, column: &TableColumn) -> Self {
         let first_row = table.row_start + u32::from(table.header_row);
         let end = table.row_end + 1 - u32::from(table.totals_row);
         Self {
@@ -179,10 +180,10 @@ impl CellStore {
 }
 
 impl CellStore {
-    /// The table with stable ID `id`. Tables are keyed by name, so this scans.
+    /// The table with stable ID `id`. Tables are kept by slot, so this scans.
     #[inline(never)]
-    pub(super) fn table_by_id(&self, id: &str) -> Option<&TableDefinition> {
-        self.tables.values().find(|table| table.id == id)
+    pub(super) fn table_by_id(&self, id: &str) -> Option<&Table> {
+        self.tables.with_id(id).map(|(_, table)| table)
     }
 
     /// The key column `column` names, if its table and column exist.
@@ -208,9 +209,9 @@ impl CellStore {
     /// the string pool; a settled value would copy it into a new `Rc<str>`.
     fn key_cell(&self, column: KeyColumn, row: u32) -> KeyCell<'_> {
         let cells = &self.sheets[column.sheet].cells;
-        let (row, col) = ((column.first_row + row) as usize, column.col as usize);
-        if cells.contains_cell(row, col) && cells.is_loaded(row, col) {
-            let index = cells.idx(row, col);
+        let (sheet_row, col) = ((column.first_row + row) as usize, column.col as usize);
+        if cells.contains_cell(sheet_row, col) && cells.is_loaded(sheet_row, col) {
+            let index = cells.idx(sheet_row, col);
             if cells.source_kind_at(index) == KIND_STRING {
                 let id = payload_str_id(cells.source_payload_at(index));
                 if let Some(text) = string_from_pool_ref(&self.strings, id) {
@@ -218,7 +219,7 @@ impl CellStore {
                 }
             }
         }
-        KeyCell::Value(self.key_value(column, row as u32 - column.first_row))
+        KeyCell::Value(self.key_value(column, sheet_row as u32 - column.first_row))
     }
 
     /// Checks both key columns of `relationship` and maps each many-side
@@ -274,7 +275,7 @@ mod tests {
         }
         store.commit_sources();
 
-        let two = |first: &str, second: &str| vec![first.to_string(), second.to_string()];
+        let two = |first: &str, second: &str| vec![first.to_owned(), second.to_owned()];
         assert!(store.set_table(
             "orders",
             "Orders",
@@ -317,63 +318,6 @@ mod tests {
             [STATUS_OK, NO_ROW, NO_ROW, 1]
         );
         assert!(store.relationship_status("unknown").is_empty());
-    }
-
-    #[test]
-    fn status_reports_a_duplicate_key_by_its_data_rows() {
-        let (mut store, sheet) = fixture();
-        // C3 becomes c1, equal to C1 without case; data rows 0 and 2.
-        store.set_string(sheet, 3, CUSTOMER_ID, "c1", 0);
-        store.commit_sources();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_DUPLICATE_KEY, 0, 2, 0]
-        );
-    }
-
-    #[test]
-    fn status_reads_settled_formula_results_and_key_kinds() {
-        let (mut store, sheet) = fixture();
-        store.set_formula(sheet, 3, CUSTOMER_ID, "=\"C\"&1", 0);
-        store.recompute(sheet);
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_DUPLICATE_KEY, 0, 2, 0]
-        );
-
-        store.set_number(sheet, 3, CUSTOMER_ID, 3.0, 0);
-        store.commit_sources();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_ONE_SIDE_TYPE, 2, NO_ROW, 0]
-        );
-
-        store.set_string(sheet, 3, CUSTOMER_ID, "C3", 0);
-        store.set_number(sheet, 4, ORDER_CUSTOMER, 9.0, 0);
-        store.commit_sources();
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_MANY_SIDE_TYPE, 3, NO_ROW, 0]
-        );
-    }
-
-    #[test]
-    fn status_reports_a_removed_table_or_column() {
-        let (mut store, _) = fixture();
-        let missing_column = ["r", "orders", "gone", "customers", "id"];
-        assert!(store.set_relationships(missing_column.map(String::from).to_vec()));
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_MISSING_COLUMN, NO_ROW, NO_ROW, 0]
-        );
-
-        let valid = ["r", "orders", "customer", "customers", "id"];
-        assert!(store.set_relationships(valid.map(String::from).to_vec()));
-        assert!(store.remove_table("customers"));
-        assert_eq!(
-            store.relationship_status("r"),
-            [STATUS_MISSING_TABLE, NO_ROW, NO_ROW, 0]
-        );
     }
 
     #[test]

@@ -31,6 +31,7 @@ export type HistoryRestoreScope =
 export interface HistoryRestoreOptions {
   /** The grid's coordinator in a shared document; the restore then needs an idle queue. */
   sync?: SyncCoordinator;
+  /** Stops the restore before it changes the grid; the call then rejects. */
   signal?: AbortSignal;
 }
 
@@ -727,6 +728,11 @@ function planWorkbook(
     if (!same(currentMeasures.get(measure.id), measure)) {
       plan.additions.push({ op: "setMeasure", measure });
     }
+  }
+
+  const links = historical.workbook.externalLinks ?? [];
+  if (!same(current.externalLinks ?? [], links)) {
+    plan.additions.push({ op: "setExternalLinks", links: structuredClone(links) });
   }
 
   const calculation = historical.workbook.calculation ?? DEFAULT_CALCULATION_SETTINGS;

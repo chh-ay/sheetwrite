@@ -29,6 +29,8 @@ mod derived;
 #[cfg(feature = "formula-engine")]
 mod eval;
 #[cfg(feature = "formula-engine")]
+mod float_text;
+#[cfg(feature = "formula-engine")]
 mod formula_reads;
 #[cfg(feature = "formula-engine")]
 mod formula_rewrite;
@@ -57,9 +59,13 @@ mod sheet;
 #[cfg(feature = "formula-engine")]
 mod sort_text;
 #[cfg(feature = "formula-engine")]
+mod sorting;
+#[cfg(feature = "formula-engine")]
 mod spill;
 #[cfg(feature = "formula-engine")]
 mod store;
+#[cfg(feature = "formula-engine")]
+mod tables;
 #[cfg(feature = "formula-engine")]
 mod transfer;
 #[cfg(feature = "formula-engine")]
@@ -74,9 +80,15 @@ mod formula_rewrite_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_syntax_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod formula_text_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod formula_tokens_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod move_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod named_formula_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod number_search_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod permute_tests;
 #[cfg(all(test, feature = "formula-engine"))]
@@ -89,7 +101,9 @@ mod tests;
 #[cfg(feature = "formula-engine")]
 pub use formula_tokens::{check_formula_syntax, formula_tokens, FormulaSyntaxError};
 #[cfg(feature = "formula-engine")]
-pub use formula_xlsx::{formula_from_xlsx, formula_to_xlsx};
+pub use formula_xlsx::convert_xlsx_formulas;
+#[cfg(feature = "formula-engine")]
+pub use query::DistinctColumn;
 #[cfg(feature = "formula-engine")]
 pub use store::{CellOut, CellStore};
 #[cfg(feature = "formula-engine")]
@@ -97,7 +111,11 @@ pub use window::WindowView;
 
 /// Names accepted by the full engine, including aliases.
 #[cfg(feature = "analysis")]
-#[wasm_bindgen::prelude::wasm_bindgen(js_name = functionNames)]
+#[wasm_bindgen::prelude::wasm_bindgen(
+    js_name = functionNames,
+    return_description = "Every name once, sorted."
+)]
+#[must_use]
 pub fn function_names() -> Vec<String> {
     calc::function_names()
 }

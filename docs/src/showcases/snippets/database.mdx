@@ -1,0 +1,18 @@
+```ts prelude="collaboration" title="database.ts"
+import { createGridFromSnapshot, SyncCoordinator } from "@sheetwrite/core";
+import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+
+// Load the stored snapshot, then mount the Grid at its version
+const stored = await adapter.load(documentId, signal);
+const grid = createGridFromSnapshot(host, stored);
+
+// Each local transaction becomes a commit against the adapter. Commits that
+// are not acknowledged yet stay in IndexedDB and replay after a reload.
+const pendingStorage = new IndexedDbPendingCommitStorage({ databaseName: "revenue-queue" });
+const sync = new SyncCoordinator(grid, adapter, {
+  documentId,
+  serverVersion: stored.version ?? 0,
+  pendingStorage,
+});
+await sync.ready();
+```

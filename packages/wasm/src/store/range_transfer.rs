@@ -23,7 +23,8 @@ impl RangeSnapshot {
         for (row, col, entry) in &self.formulas {
             out.u32(*row);
             out.u32(*col);
-            super::transfer::write_formula(&mut out, entry, sheet);
+            // Captured entries hold written text, so no names are needed.
+            super::transfer::write_formula(&mut out, entry, sheet, &WrittenNames::NONE);
         }
 
         out.0
@@ -34,9 +35,9 @@ impl RangeSnapshot {
 /// string of the range's own pool, before any cell reaches the store.
 #[cfg(any(target_arch = "wasm32", test))]
 fn check_range_cells(kind: &[u8], payload: &[u64], strings: usize) -> TransferResult<()> {
-    let kinds_valid = kind.iter().all(|&kind| kind <= KIND_FORMULA);
-    let strings_valid = payload.iter().all(|&payload| {
-        let id = payload_str_id(payload);
+    let kinds_valid = kind.iter().all(|&cell_kind| cell_kind <= KIND_FORMULA);
+    let strings_valid = payload.iter().all(|&cell_payload| {
+        let id = payload_str_id(cell_payload);
         id == NO_STRING || (id as usize) < strings
     });
     if !kinds_valid || !strings_valid {
@@ -108,6 +109,9 @@ impl CellStore {
 
 #[wasm_bindgen]
 impl CellStore {
+    /// Rebuilds a range snapshot from the bytes `exportMemoryState` wrote, for
+    /// the range that starts at row `row_start`, column `col_start` of `sheet`.
+    /// Throws when the bytes are not a valid range transfer.
     #[cfg(target_arch = "wasm32")]
     #[wasm_bindgen(js_name = importRangeMemoryState)]
     pub fn import_range_memory_state(
@@ -125,7 +129,6 @@ impl CellStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cells::encode_str_id;
 
     /// A one-cell range transfer with no formulas.
     fn one_cell_range(kind: u8, payload: u64) -> Vec<u8> {

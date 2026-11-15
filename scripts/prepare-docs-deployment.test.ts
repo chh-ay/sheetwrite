@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { MOVED_PAGES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
 import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 
 const fixtureRoots: string[] = [];
@@ -205,6 +205,20 @@ describe("prebuilt docs deployment", () => {
   });
 });
 
+describe("feed type", () => {
+  it("serves the changelog feed as RSS", async () => {
+    const root = await fixture();
+    await put(root, "docs/dist/client/changelog/rss.xml", '<rss version="2.0" />');
+    await prepareDocsDeployment(root);
+    const response = await requestPackagedFile(root, "/changelog/rss.xml");
+    expect(response?.body).toEqual(Buffer.from('<rss version="2.0" />'));
+    expect(response?.headers["content-type"]).toBe("application/rss+xml; charset=utf-8");
+    expect(
+      (await requestPackagedFile(root, "/sitemap.xml"))?.headers["content-type"],
+    ).toBeUndefined();
+  });
+});
+
 describe("moved docs pages", () => {
   it("redirects every old address, with or without its trailing slash, to its new page", async () => {
     const root = await fixture();
@@ -216,6 +230,18 @@ describe("moved docs pages", () => {
         const response = await requestPackagedFile(root, pathname);
         expect(response?.status).toBe(308);
         expect(response?.headers.Location).toBe(page.to);
+      }
+    }
+  });
+
+  it("redirects every merged showcase to the showcase that holds its story now", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
+      for (const pathname of [from, from.slice(0, -1)]) {
+        const response = await requestPackagedFile(root, pathname);
+        expect(response?.status).toBe(308);
+        expect(response?.headers.Location).toBe(to);
       }
     }
   });

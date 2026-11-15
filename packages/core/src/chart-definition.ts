@@ -19,6 +19,11 @@ import type { Range, SheetId } from "./types/coordinates.js";
 export const MAX_CHARTS_PER_SHEET = 100;
 /** Series one chart may plot. */
 export const MAX_CHART_SERIES = 32;
+/**
+ * Most points resolved per series range. Cells are read in row-major order and
+ * cells past this count are dropped; the series view reports `truncated`.
+ */
+export const MAX_CHART_POINTS = 10_000;
 /** Stable chart identifier ceiling. */
 const MAX_CHART_ID_LENGTH = 128;
 /** Title, axis-title, and series-name ceiling; Excel's chart text limit. */
@@ -38,8 +43,18 @@ export const CHART_KIND_LABELS: Readonly<Record<ChartKind, string>> = {
 };
 
 const LEGEND_POSITIONS: ReadonlySet<unknown> = new Set(["none", "top", "right", "bottom", "left"]);
-const CHART_KEYS = new Set(["id", "kind", "title", "axes", "legend", "anchor", "series"]);
-const AXES_KEYS = new Set(["xTitle", "yTitle"]);
+const CHART_KEYS = new Set([
+  "id",
+  "kind",
+  "title",
+  "axes",
+  "legend",
+  "anchor",
+  "series",
+  "pivot",
+  "pivotValues",
+]);
+const AXES_KEYS = new Set(["xTitle", "yTitle", "multiLevelLabels"]);
 const ANCHOR_KEYS = new Set(["row", "col", "offsetX", "offsetY", "width", "height"]);
 const SERIES_KEYS = new Set(["name", "nameRange", "values", "categories"]);
 
@@ -148,7 +163,8 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
   if (
     !axes ||
     (axes.xTitle !== undefined && !validChartText(axes.xTitle)) ||
-    (axes.yTitle !== undefined && !validChartText(axes.yTitle))
+    (axes.yTitle !== undefined && !validChartText(axes.yTitle)) ||
+    (axes.multiLevelLabels !== undefined && typeof axes.multiLevelLabels !== "boolean")
   ) {
     return null;
   }
@@ -156,7 +172,30 @@ function sanitizeAxes(value: unknown): ChartDefinition["axes"] | null {
   return {
     ...(axes.xTitle !== undefined ? { xTitle: axes.xTitle } : {}),
     ...(axes.yTitle !== undefined ? { yTitle: axes.yTitle } : {}),
+    ...(axes.multiLevelLabels !== undefined ? { multiLevelLabels: axes.multiLevelLabels } : {}),
   };
+}
+
+/**
+ * A copy of the value-field positions a chart over a pivot plots: one to
+ * `MAX_CHART_SERIES` distinct whole numbers below `MAX_CHART_SERIES`, or
+ * null when `value` is not one.
+ */
+function sanitizePivotValues(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_CHART_SERIES) return null;
+  const positions: number[] = [];
+  for (const position of value) {
+    if (
+      !Number.isInteger(position) ||
+      position < 0 ||
+      position >= MAX_CHART_SERIES ||
+      positions.includes(position)
+    ) {
+      return null;
+    }
+    positions.push(position);
+  }
+  return positions;
 }
 
 /**
@@ -173,6 +212,7 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       !isChartKind(chart.kind) ||
       (chart.title !== undefined && !validChartText(chart.title)) ||
       (chart.legend !== undefined && !isLegendPosition(chart.legend)) ||
+      (chart.pivot !== undefined && !validChartText(chart.pivot)) ||
       !Array.isArray(chart.series) ||
       chart.series.length > MAX_CHART_SERIES
     ) {
@@ -181,7 +221,13 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
 
     const anchor = sanitizeAnchor(chart.anchor);
     const axes = chart.axes === undefined ? undefined : sanitizeAxes(chart.axes);
-    if (!anchor || axes === null) return null;
+    // Value positions only mean something for a chart over a pivot.
+    const pivotValues =
+      chart.pivotValues === undefined || chart.pivot === undefined
+        ? undefined
+        : sanitizePivotValues(chart.pivotValues);
+    if (!anchor || axes === null || pivotValues === null) return null;
+    if (chart.pivotValues !== undefined && chart.pivot === undefined) return null;
 
     const series: ChartSeries[] = [];
     for (const entry of chart.series) {
@@ -196,6 +242,8 @@ export function sanitizeChartDefinition(value: unknown): ChartDefinition | null 
       ...(chart.title !== undefined ? { title: chart.title } : {}),
       ...(axes !== undefined ? { axes } : {}),
       ...(chart.legend !== undefined ? { legend: chart.legend } : {}),
+      ...(chart.pivot !== undefined ? { pivot: chart.pivot } : {}),
+      ...(pivotValues !== undefined ? { pivotValues } : {}),
       anchor,
       series,
     };

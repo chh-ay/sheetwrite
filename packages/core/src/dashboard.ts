@@ -30,6 +30,8 @@ const DASHBOARD_OPERATIONS: readonly DocumentOp["op"][] = [
   "setSheetVisibility",
   "setPivot",
   "removePivot",
+  "setChart",
+  "removeChart",
   "setDashboardItem",
   "removeDashboardItem",
 ];
@@ -88,11 +90,23 @@ function isColumnRef(value: unknown): boolean {
 function isItemBody(item: PlainRecord): boolean {
   const kind = ownValue(item, "kind");
   if (kind === "pivot") return isText(ownValue(item, "pivot"));
+  if (kind === "chart") return isText(ownValue(item, "chart"));
+  if (kind === "kpi") {
+    const title = ownValue(item, "title");
+    const numberFormat = ownValue(item, "numberFormat");
+    return (
+      isText(ownValue(item, "measure")) &&
+      (title === undefined || isText(title)) &&
+      (numberFormat === undefined || isText(numberFormat))
+    );
+  }
   if (kind !== "slicer") return false;
 
   const title = ownValue(item, "title");
   const selected = ownValue(item, "selected");
+  const noData = ownValue(item, "itemsWithNoData");
   return (
+    (noData === undefined || noData === "dim" || noData === "hide" || noData === "show") &&
     isColumnRef(ownValue(item, "field")) &&
     (title === undefined || isText(title)) &&
     (selected === undefined ||

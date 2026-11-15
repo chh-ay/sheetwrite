@@ -68,6 +68,8 @@ Use `WorkbookSnapshot` plus `validateWorkbookSnapshot()` at persistence boundari
 | `sync.sendNext()` / `sync.retry(id)` | Host-controlled sends. Retries keep the original ID. |
 | `sync.subscribe(source)` | Accepts a transport-neutral callback source and validates strict version order. |
 
+Loading a snapshot, pasting or writing a block of cells, and loading pages from a datasource with the default dense storage write plain values (numbers, text, `TRUE`/`FALSE` and blanks) one column at a time. A page of 100,000 × 10 such cells writes in about a third of the time it took before 0.7.0. Snapshot loads and pastes gain less, because most of their time goes to encoding text in JavaScript. Writes that include formulas or cell references, sheets that show spilled formula results, and datasources with `datasourceStorage.mode: "paged"` still write one cell at a time. On a paged datasource, a page that arrives later never overwrites cells you edited, and an edit that would go over `dirtyCellLimit` is rejected without writing any of its cells.
+
 Use `MemoryPersistenceAdapter` as an executable, server-sequenced reference, not as durable storage. Adapter methods accept `AbortSignal`. Transport failures use `PersistenceError`, while version conflicts are typed commit responses that keep local work.
 
 ### Document state and session state
@@ -235,19 +237,24 @@ head is leased for the call, so a concurrent prune cannot remove its records.
 
 ### Version history panel
 
-Pass `createHistoryCommands` from `@sheetwrite/core/history` as `GridConfig.history`
+Install `historyAddon()` from `@sheetwrite/core/history` and give a grid its
+archive and author in `createGrid(host, { addons: { history: { archive, authorId } } })`
 to show Review › **Version History** and **Save Version** in the full ribbon, the
-compact ribbon and the toolbar. The grid's first paint does not change: the panel
-loads as a separate chunk on the first command.
+compact ribbon and the toolbar. Options given to `historyAddon({ ... })` apply to
+every grid, and a grid's settings replace them field by field. The grid's first
+paint does not change: the panel loads as a separate chunk on the first command.
 
 ```ts compile title="Opt in to the version history commands"
-import { createGrid } from "@sheetwrite/core";
-import { createHistoryCommands, type HistoryArchive } from "@sheetwrite/core/history";
+import { createGrid, initSheetwrite } from "@sheetwrite/core";
+import { historyAddon, type HistoryArchive } from "@sheetwrite/core/history";
+
+await initSheetwrite({ addons: [historyAddon()] });
 
 function mount(host: HTMLElement, archive: HistoryArchive, authorId: string) {
   return createGrid(host, {
     workbook: { activeSheet: "s1", sheets: [{ id: "s1", name: "Sheet1", rowCount: 10, columns: [] }] },
-    config: { ribbon: true, history: createHistoryCommands({ archive, authorId }) },
+    config: { ribbon: true },
+    addons: { history: { archive, authorId } },
   });
 }
 ```

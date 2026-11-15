@@ -35,26 +35,13 @@ beforeEach(() => {
 });
 afterEach(() => restoreStubs());
 
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve(value: T): void;
-}
-
-function deferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((onResolve) => {
-    resolve = onResolve;
-  });
-  return { promise, resolve };
-}
-
 class FakePendingStorage implements PendingCommitStorage {
   readonly records = new Map<string, PendingCommit>();
   readonly removals: string[] = [];
   failNextPut: unknown;
   failNextRemove: unknown;
   failNextReplace: unknown;
-  removeGate?: Deferred<void>;
+  removeGate?: PromiseWithResolvers<void>;
 
   async load(
     documentId: string,
@@ -755,7 +742,7 @@ describe("durable offline sync", () => {
 
   it("finishes an acknowledged durable removal after destroy without publishing", async () => {
     const storage = new FakePendingStorage();
-    storage.removeGate = deferred<void>();
+    storage.removeGate = Promise.withResolvers<void>();
     const adapter = new ControlledAdapter(snapshot());
     const grid = mountGrid();
     const coordinator = new SyncCoordinator(grid, adapter, {
@@ -887,9 +874,9 @@ describe("durable offline sync", () => {
 
   it("applies asynchronous intake in order behind durable echo removal", async () => {
     const storage = new FakePendingStorage();
-    storage.removeGate = deferred<void>();
+    storage.removeGate = Promise.withResolvers<void>();
     const adapter = new ControlledAdapter(snapshot());
-    const sendGate = deferred<PersistenceCommitResponse>();
+    const sendGate = Promise.withResolvers<PersistenceCommitResponse>();
     adapter.responders.push(() => sendGate.promise);
     const grid = mountGrid();
     const coordinator = new SyncCoordinator(grid, adapter, {
@@ -924,7 +911,7 @@ describe("durable offline sync", () => {
     expect(coordinator.serverVersion).toBe(4);
     expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe(3);
 
-    const applied = deferred<void>();
+    const applied = Promise.withResolvers<void>();
     const disposeApplied = coordinator.on((event) => {
       if (event.type === "remote-applied" && event.operation.version === 6) {
         applied.resolve(undefined);

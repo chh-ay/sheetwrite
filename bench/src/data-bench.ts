@@ -1,3 +1,4 @@
+import { mkdirSync, readFileSync } from "node:fs";
 /**
  * Headless data-layer benchmark: Sheetwrite vs Handsontable.
  *
@@ -37,8 +38,6 @@
  * All ingest iterations close and replace their global happy-dom Window outside
  * timing; this releases document-owned selector caches without private symbols.
  */
-
-import { mkdirSync, readFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
@@ -74,6 +73,7 @@ import {
   validateRawStat,
 } from "./gate-protocol.js";
 import { createHandsontable } from "./handsontable-runtime.js";
+import { writeStringColumn } from "./packed-fixture.js";
 import { packageVersion, protocolCaptureMeta } from "./protocol-meta.js";
 import {
   collect,
@@ -785,14 +785,7 @@ function probeQueryResources(ds: ColumnarDataset): QueryResourceMetrics {
   try {
     const sheet = store.addSheet(2, ds.rowCount);
     for (const [col, values] of [ds.city, ds.customer].entries()) {
-      store.setColumnStringsPacked(
-        sheet,
-        col,
-        0,
-        values.join(""),
-        Uint32Array.from(values, (value) => value.length),
-        0,
-      );
+      writeStringColumn(store, sheet, col, 0, values, 0);
     }
 
     store.resetQueryResourceStats();
@@ -1528,7 +1521,7 @@ async function runMemMode(): Promise<void> {
   const engine = process.argv[3];
   const rows = Number(process.argv[4]);
   if (engine === "sheetwrite") {
-    await initSheetwrite(readFileSync(WASM_PATH));
+    await initSheetwrite({ source: readFileSync(WASM_PATH) });
     console.log(JSON.stringify(probeSheetwriteMemory(rows)));
   } else {
     console.log(JSON.stringify(probeHandsontableMemory(rows)));
@@ -1712,7 +1705,7 @@ export async function runSheetwriteDataBench(
   rowsList: readonly number[] = SHEETWRITE_ROWS,
   mode: BenchmarkMode = "full",
 ): Promise<Map<number, TimedEngineResult>> {
-  await initSheetwrite(readFileSync(WASM_PATH));
+  await initSheetwrite({ source: readFileSync(WASM_PATH) });
   warmSheetwriteDataPath();
 
   const results = new Map<number, TimedEngineResult>();

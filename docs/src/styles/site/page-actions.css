@@ -1,0 +1,9 @@
+/* The page head's links (components/DocsShell.tsx): Edit on GitHub and
+   Report a problem. Plain links, built by lib/page-links.ts. */
+.sw-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-2);
+  margin: var(--sw-space-5) 0 0;
+}

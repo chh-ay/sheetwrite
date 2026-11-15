@@ -1,0 +1,643 @@
+/* Performance bars (docs/src/lib/perf-bars.ts): the one figure for measured
+   and compared performance on every page. Each machine group draws its own
+   axis; a comparison row puts the base bar above the measured bar and names
+   the verdict in words, with an arrow, never by colour alone. */
+
+.perf-bars {
+  --perf-series: 8.5rem;
+  --perf-value: 7.5rem;
+  --perf-gap: var(--sw-space-4);
+  --perf-track: 0.875rem;
+  --perf-base: var(--sw-fg-muted);
+  --perf-measured: var(--sw-icon-accent);
+  --perf-gridline: var(--sw-border);
+
+  container: perf-bars / inline-size;
+  margin: var(--sw-space-8) 0;
+  padding: var(--sw-space-5) var(--sw-space-6) var(--sw-space-4);
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  color: var(--sw-fg);
+  font-size: var(--sw-text-small);
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-bars__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sw-space-2) var(--sw-space-6);
+  margin-bottom: var(--sw-space-4);
+}
+
+.sw-prose .perf-bars p {
+  margin: 0;
+}
+
+.perf-bars__title {
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-body);
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.perf-bars__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1) var(--sw-space-4);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.perf-bars__key {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+}
+
+.perf-bars__key i {
+  display: inline-block;
+  width: 1.25rem;
+  height: 0.625rem;
+  border-radius: 2px;
+}
+
+.perf-bars__key[data-key="base"] i {
+  background: var(--perf-base);
+}
+
+.perf-bars__key[data-key="measured"] i {
+  background: var(--perf-measured);
+}
+
+/* The band swatch draws it as it appears on a bar: a tint with the median tick. */
+.perf-bars__key[data-key="spread"] i {
+  background:
+    linear-gradient(var(--sw-fg-strong), var(--sw-fg-strong)) 70% 50% / 2px 100% no-repeat,
+    color-mix(in srgb, var(--perf-measured) 32%, transparent);
+}
+
+/* ---- Machine switch: one machine or all, shared by the bars, the speed story and the engine change ---- */
+
+.machine-switch {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--sw-border);
+  border-radius: var(--sw-radius-pill);
+  background: var(--sw-surface-2);
+}
+
+.machine-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+}
+
+.machine-switch label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  padding: var(--sw-space-1-5) var(--sw-space-4);
+  border-radius: var(--sw-radius-pill);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--sw-motion-fast, 120ms) ease,
+    color var(--sw-motion-fast, 120ms) ease;
+}
+
+.machine-switch label:hover {
+  color: var(--sw-fg-strong);
+}
+
+.machine-switch input:checked + label {
+  background: var(--sw-surface-1);
+  color: var(--sw-fg-strong);
+  box-shadow: var(--sw-shadow-sm);
+}
+
+.machine-switch input:checked + label .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+/* The site's focus ring, on the label the hidden radio stands behind. */
+.machine-switch input:focus-visible + label {
+  outline: var(--sw-focus-ring-width) solid var(--sw-focus-ring);
+  outline-offset: var(--sw-focus-ring-offset);
+}
+
+/* ---- Machine groups ---- */
+
+.perf-bars__group + .perf-bars__group {
+  margin-top: var(--sw-space-3);
+  padding-top: var(--sw-space-4);
+  border-top: 1px solid var(--sw-border-strong);
+}
+
+.perf-bars[data-switched] .machine-switch {
+  margin-bottom: var(--sw-space-4);
+}
+
+/* With a switch, only the chosen machine's group shows, in the same place. */
+.perf-bars[data-switched] .perf-bars__group + .perf-bars__group {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.perf-bars[data-switched]:has(input[value="linux"]:checked)
+  .perf-bars__group[data-machine]:not([data-machine="linux"]),
+.perf-bars[data-switched]:has(input[value="mac"]:checked)
+  .perf-bars__group[data-machine]:not([data-machine="mac"]),
+.perf-bars[data-switched]:not(:has(input[value="all"]:checked)) .perf-bars__all,
+.perf-bars[data-switched]:has(input[value="all"]:checked):has(.perf-bars__all)
+  .perf-bars__group[data-machine] {
+  display: none;
+}
+
+/* "All" without a comparison shows every machine's group in turn, each on its own axis. */
+.perf-bars[data-switched]:has(input[value="all"]:checked) .perf-bars__group + .perf-bars__group {
+  margin-top: var(--sw-space-3);
+  padding-top: var(--sw-space-4);
+  border-top: 1px solid var(--sw-border-strong);
+}
+
+/* The machine leads its group; the capture line and the axis caption share its left edge. */
+.perf-bars__group-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sw-space-0-5) var(--sw-space-2);
+  margin-bottom: var(--sw-space-2);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+}
+
+.perf-bars__group-title .sw-icon {
+  color: var(--sw-icon-accent);
+}
+
+.perf-bars__group-title strong {
+  font-weight: 650;
+}
+
+.perf-bars__group-note {
+  flex-basis: 100%;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+/* ---- Axis: the same three columns as a bar, ticks over the track column ---- */
+
+.perf-bars__axis,
+.perf-bars__bar {
+  display: grid;
+  grid-template-columns: var(--perf-series) minmax(0, 1fr) var(--perf-value);
+  grid-template-areas: "series track value";
+  align-items: center;
+  column-gap: var(--perf-gap);
+}
+
+.perf-bars__axis {
+  grid-template-areas:
+    "title title title"
+    ". scale .";
+  row-gap: var(--sw-space-1);
+  padding-bottom: var(--sw-space-2);
+  border-bottom: 1px solid var(--sw-border-strong);
+}
+
+.perf-bars__axis-title {
+  grid-area: title;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+}
+
+.perf-bars__scale {
+  position: relative;
+  grid-area: scale;
+  height: 1.25rem;
+}
+
+.perf-bars__tick {
+  position: absolute;
+  bottom: 0;
+  color: var(--sw-fg-muted);
+  font: 500 var(--sw-text-eyebrow) / 1.4 var(--sw-font-mono);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+/* The end labels stay inside the track; the others centre on their gridline. */
+.perf-bars__tick:first-child {
+  transform: none;
+}
+
+.perf-bars__tick:last-child {
+  transform: translateX(-100%);
+}
+
+@container perf-bars (max-width: 36rem) {
+  .perf-bars__tick[data-narrow="hidden"] {
+    visibility: hidden;
+  }
+}
+
+/* ---- Rows ---- */
+
+.sw-prose .perf-bars__rows,
+.perf-bars__rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-prose .perf-bars__row,
+.perf-bars__row {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  margin: 0 calc(var(--sw-space-2) * -1);
+  padding: var(--sw-space-3) var(--sw-space-2);
+  transition: background-color var(--sw-motion-fast, 120ms) ease;
+}
+
+.perf-bars__row + .perf-bars__row {
+  border-top: 1px solid var(--sw-border);
+}
+
+/* The row under the pointer lifts slightly, so its label, bars and values read as one line. */
+.perf-bars__row:hover {
+  border-radius: var(--sw-radius-md);
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.perf-bars__row:hover + .perf-bars__row,
+.perf-bars__row:hover {
+  border-top-color: transparent;
+}
+
+.perf-bars__row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sw-space-1) var(--sw-space-3);
+}
+
+.perf-bars__label {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.perf-bars__detail {
+  display: block;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  font-weight: 400;
+}
+
+/* The verdict names the direction in words and with an arrow; colour repeats it. */
+.perf-bars__verdict {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--sw-space-1-5);
+  padding: 0.125rem var(--sw-space-3) 0.125rem var(--sw-space-2);
+  border: 1px solid currentcolor;
+  border-radius: var(--sw-radius-pill);
+  font-size: var(--sw-text-caption);
+  line-height: 1.4;
+}
+
+.perf-bars__verdict strong {
+  font-weight: 650;
+}
+
+.perf-bars__verdict[data-verdict="better"] {
+  border-color: color-mix(in srgb, var(--sw-success) 45%, transparent);
+  background: var(--sw-success-soft);
+  color: var(--sw-success);
+}
+
+.perf-bars__verdict[data-verdict="worse"] {
+  border-color: color-mix(in srgb, var(--sw-danger) 45%, transparent);
+  background: var(--sw-danger-soft);
+  color: var(--sw-danger);
+}
+
+.perf-bars__verdict[data-verdict="noise"],
+.perf-bars__verdict[data-verdict="missing"] {
+  border-color: var(--sw-border-strong);
+  background: var(--sw-surface-2);
+  color: var(--sw-fg-muted);
+}
+
+/* ---- Bars ---- */
+
+.perf-bars__series {
+  grid-area: series;
+  overflow: hidden;
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.perf-bars__bar[data-role="measured"] .perf-bars__series {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.perf-bars__track {
+  position: relative;
+  grid-area: track;
+  height: var(--perf-track);
+  border-radius: var(--sw-radius-xs);
+  background:
+    repeating-linear-gradient(
+      to right,
+      transparent 0 calc(100% / var(--perf-steps, 4) - 1px),
+      var(--perf-gridline) calc(100% / var(--perf-steps, 4) - 1px) calc(100% / var(--perf-steps, 4))
+    ),
+    var(--sw-surface-2);
+}
+
+.perf-bars__fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--sw-radius-xs);
+  background: var(--perf-base);
+  transform-origin: left;
+  animation: perf-bars-grow 480ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.perf-bars__bar[data-role="measured"] .perf-bars__fill {
+  background: var(--perf-measured);
+}
+
+/* With a band, the fill narrows so the band shows around it across its whole range. */
+.perf-bars__track:has(.perf-bars__spread) .perf-bars__fill {
+  inset-block: 3px;
+}
+
+/* The spread band: a quiet tint behind the fill, from the low to the high end. */
+.perf-bars__spread {
+  position: absolute;
+  inset-block: 0;
+  min-width: 2px;
+  border-radius: var(--sw-radius-xs);
+  background: color-mix(in srgb, var(--perf-base) 28%, transparent);
+}
+
+.perf-bars__bar[data-role="measured"] .perf-bars__spread {
+  background: color-mix(in srgb, var(--perf-measured) 32%, transparent);
+}
+
+/* One tick marks the median, where the fill ends. */
+.perf-bars__median {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--sw-fg-strong);
+}
+
+@keyframes perf-bars-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .perf-bars__fill {
+    animation: none;
+  }
+}
+
+/* Single-series figures need no series column: the track starts under the label. */
+.perf-bars[data-series="none"] .perf-bars__bar {
+  grid-template-columns: minmax(0, 1fr) var(--perf-value);
+  grid-template-areas: "track value";
+}
+
+.perf-bars[data-series="none"] .perf-bars__axis {
+  grid-template-columns: minmax(0, 1fr) var(--perf-value);
+  grid-template-areas:
+    "title title"
+    "scale .";
+}
+
+.perf-bars[data-series="none"] .perf-bars__series {
+  display: none;
+}
+
+.perf-bars__value {
+  grid-area: value;
+  color: var(--sw-fg-muted);
+  font-family: var(--sw-font-mono);
+  font-size: var(--sw-text-caption);
+  line-height: 1.3;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.perf-bars__value b {
+  display: block;
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.perf-bars__value small {
+  font-size: var(--sw-text-eyebrow);
+}
+
+.perf-bars__missing {
+  grid-column: track / value;
+  color: var(--sw-warning);
+  font-size: var(--sw-text-caption);
+  font-weight: 600;
+}
+
+/* ---- Table view ---- */
+
+.perf-bars__table {
+  margin-top: var(--sw-space-3);
+  padding-top: var(--sw-space-3);
+  border-top: 1px solid var(--sw-border);
+}
+
+.perf-bars__table > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sw-space-1);
+  border-radius: var(--sw-radius-sm);
+  color: var(--sw-accent);
+  font-size: var(--sw-text-caption);
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.perf-bars__table > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* The site's chevron mask turns to point down while the table is open. */
+.perf-bars__table > summary::before {
+  width: var(--sw-icon-sm);
+  height: var(--sw-icon-sm);
+  background: currentcolor;
+  content: "";
+  mask: var(--sw-icon-mask-chevron-right) center / contain no-repeat;
+  transition: rotate var(--sw-motion-fast, 120ms) ease;
+}
+
+.perf-bars__table[open] > summary::before {
+  rotate: 90deg;
+}
+
+.perf-bars__table > summary:hover {
+  color: var(--sw-accent-strong);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.perf-bars__table tbody tr:hover :is(td, th[scope="row"]) {
+  background: color-mix(in srgb, var(--sw-fg) 4%, transparent);
+}
+
+.perf-bars__table-frame {
+  margin-top: var(--sw-space-3);
+  overflow-x: auto;
+}
+
+.sw-prose .perf-bars__table table,
+.perf-bars__table table {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: var(--sw-text-caption);
+}
+
+.perf-bars__table caption {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* The prose table style sets eyebrow headers; data headers read as plain labels here. */
+.sw-prose .perf-bars__table :is(th, td),
+.perf-bars__table :is(th, td) {
+  padding: var(--sw-space-1-5) var(--sw-space-3);
+  border-bottom: 1px solid var(--sw-border);
+  color: var(--sw-fg);
+  font: 400 var(--sw-text-caption) / 1.45 var(--sw-font-body, inherit);
+  letter-spacing: normal;
+  text-align: left;
+  text-transform: none;
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.sw-prose .perf-bars__table thead th,
+.perf-bars__table thead th {
+  color: var(--sw-fg-muted);
+  font-weight: 600;
+}
+
+/* Headings and names wrap, so the numbers fit the figure at desktop and tablet widths. */
+.sw-prose .perf-bars__table :is(thead th, tbody th),
+.perf-bars__table :is(thead th, tbody th) {
+  min-width: 8rem;
+  white-space: normal;
+}
+
+.sw-prose .perf-bars__table tbody th,
+.perf-bars__table tbody th {
+  color: var(--sw-fg-strong);
+  font-weight: 600;
+}
+
+.sw-prose .perf-bars__table td,
+.perf-bars__table td {
+  font-family: var(--sw-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.perf-bars__caption {
+  margin-top: var(--sw-space-3);
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: 1.5;
+}
+
+/* ---- Narrow: the series and value share a line above a full-width track ---- */
+
+@container perf-bars (max-width: 36rem) {
+  .perf-bars__bar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "series value"
+      "track track";
+    row-gap: var(--sw-space-1);
+  }
+
+  .perf-bars__axis {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "scale";
+  }
+
+  .perf-bars__value b,
+  .perf-bars__value small {
+    display: inline;
+  }
+
+  .perf-bars__value small {
+    margin-left: var(--sw-space-1-5);
+  }
+
+  .perf-bars__missing {
+    grid-column: 1 / -1;
+  }
+
+  /* Without a series name, the value takes the series line above the track. */
+  .perf-bars[data-series="none"] .perf-bars__bar {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "value"
+      "track";
+  }
+
+  .perf-bars[data-series="none"] .perf-bars__axis {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "title"
+      "scale";
+  }
+
+  .perf-bars[data-series="none"] .perf-bars__value {
+    text-align: left;
+  }
+}
+
+@media (max-width: 40rem) {
+  .perf-bars {
+    margin-inline: calc(var(--sw-space-2) * -1);
+    padding: var(--sw-space-4);
+  }
+}

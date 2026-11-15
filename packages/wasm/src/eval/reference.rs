@@ -22,6 +22,7 @@
 //! (ROWS, SUMIF, INDEX, ...) see one.
 
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::calc::{sheet_name_key, write_col, Ast, Func, RangeFlags, RefFlags, SheetRef};
 use crate::store::CellStore;
@@ -29,7 +30,7 @@ use crate::types::{CellRange, FormulaError, Value};
 
 use super::matrix::{range_from_ast, EvalMatrix, SPILL_MAX_COLS, SPILL_MAX_ROWS};
 use super::value::{bool_from_value, number_from_value, text_from_value};
-use super::{current_formula_origin, sheet_envelopes, EvalPass};
+use super::{current_formula_origin, read_shifted, sheet_envelopes, EvalPass};
 
 const OFFSET_MIN_ARGS: usize = 3;
 const OFFSET_MAX_ARGS: usize = 5;
@@ -49,10 +50,36 @@ pub(super) enum RewriteScope {
 }
 
 impl RewriteScope {
-    fn child(self) -> Self {
+    const fn child(self) -> Self {
         match self {
             Self::Deferred => Self::Deferred,
             Self::Root | Self::Nested => Self::Nested,
+        }
+    }
+
+    /// What replaces an OFFSET or INDIRECT call at this position whose range
+    /// resolved to `resolved`; `None` keeps the call. A #REF! becomes the node
+    /// consumers already know. Other errors keep the call below the root, so
+    /// evaluation reports them where they occur. At the root the error is the
+    /// result; keeping the call there would charge the spill budget for an
+    /// unknown shape on every recalculation.
+    fn resolved_node(self, resolved: Result<CellRange, FormulaError>) -> Option<Ast> {
+        match resolved {
+            Ok(range) if self == Self::Nested && is_single_cell(range) => Some(Ast::AbsCell(
+                sheet_ref(range.sheet),
+                range.row_start,
+                range.col_start,
+                RefFlags::ABSOLUTE,
+            )),
+            Ok(range) => Some(range_ast(range)),
+            Err(FormulaError::Ref) => Some(Ast::InvalidRef),
+            Err(error) if self == Self::Root => {
+                Some(Ast::Array(Box::new(crate::calc::ArrayLiteral {
+                    cols: 1,
+                    values: Rc::from([Value::Error(error)]),
+                })))
+            }
+            Err(_) => None,
         }
     }
 }
@@ -60,37 +87,60 @@ impl RewriteScope {
 pub(super) fn ast_contains_runtime_ref(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Offset | Func::Indirect, _) => true,
-        Ast::Func(_, args) | Ast::UnknownFunc(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::Func(_, args) => args.iter().any(ast_contains_runtime_ref),
+        Ast::UnknownFunc(call) => {
+            let args = &call.args;
+            args.iter().any(ast_contains_runtime_ref)
+        }
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
             ast_contains_runtime_ref(left) || ast_contains_runtime_ref(right)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => ast_contains_runtime_ref(inner),
         Ast::LetSlot { expression, .. } => ast_contains_runtime_ref(expression),
         Ast::NamedFormula(named) => ast_contains_runtime_ref(&named.expression),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => ast_contains_runtime_ref(&definition.body),
     }
 }
 
-fn sheet_ref(handle: u32) -> SheetRef {
-    SheetRef {
-        handle,
-        name: String::new(),
-        quoted: false,
-    }
+const fn sheet_ref(handle: u32) -> SheetRef {
+    SheetRef { handle }
 }
 
-fn range_ast(range: CellRange) -> Ast {
+/// A reference this evaluation computed. It names the cells it was computed
+/// for, so it is `$`-fixed and a reference shift does not move it again.
+const fn range_ast(range: CellRange) -> Ast {
     Ast::AbsRange(
         sheet_ref(range.sheet),
         range.row_start,
         range.col_start,
         range.row_end,
         range.col_end,
-        RangeFlags::default(),
+        RangeFlags::ABSOLUTE,
     )
 }
 
-fn is_single_cell(range: CellRange) -> bool {
+const fn is_single_cell(range: CellRange) -> bool {
     range.row_start == range.row_end && range.col_start == range.col_end
 }
 
@@ -109,6 +159,22 @@ thread_local! {
     /// evaluation. The spill loop uses them to find anchors that read a spill
     /// installed after them.
     static RUNTIME_READS: RefCell<Option<RuntimeReads>> = const { RefCell::new(None) };
+}
+
+/// Suspends dependency recording while a read-only preview runs, including
+/// a preview requested from inside an enclosing evaluation.
+pub(super) struct RuntimeReadPause(Option<RuntimeReads>);
+
+impl RuntimeReadPause {
+    pub(super) fn enter() -> Self {
+        Self(RUNTIME_READS.with(|reads| reads.replace(None)))
+    }
+}
+
+impl Drop for RuntimeReadPause {
+    fn drop(&mut self) {
+        _ = RUNTIME_READS.with(|reads| reads.replace(self.0.take()));
+    }
 }
 
 /// Starts recording runtime reads and returns the enclosing recording, which
@@ -142,6 +208,10 @@ fn record_runtime_read(reads: &mut RuntimeReads, range: CellRange) {
 
 impl CellStore {
     /// The range an OFFSET or INDIRECT call refers to now.
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     pub(super) fn runtime_range(
         &self,
         func: Func,
@@ -160,8 +230,8 @@ impl CellStore {
             return Err(FormulaError::Ref);
         }
 
-        RUNTIME_READS.with(|reads| {
-            if let Some(reads) = reads.borrow_mut().as_mut() {
+        RUNTIME_READS.with(|slot| {
+            if let Some(reads) = slot.borrow_mut().as_mut() {
                 record_runtime_read(reads, range);
             }
         });
@@ -260,56 +330,20 @@ impl CellStore {
                     return;
                 }
 
-                // A #REF! becomes the node consumers already know. Other
-                // errors keep the call below the root, so evaluation reports
-                // them where they occur. At the root the error is the result;
-                // keeping the call there would charge the spill budget for an
-                // unknown shape on every recalculation.
-                match self.runtime_range(*func, args, sheet, pass, depth + 1) {
-                    Ok(range) if scope == RewriteScope::Nested && is_single_cell(range) => {
-                        *ast = Ast::AbsCell(
-                            sheet_ref(range.sheet),
-                            range.row_start,
-                            range.col_start,
-                            RefFlags::default(),
-                        );
-                    }
-                    Ok(range) => *ast = range_ast(range),
-                    Err(FormulaError::Ref) => *ast = Ast::InvalidRef,
-                    Err(error) if scope == RewriteScope::Root => {
-                        *ast = Ast::Array {
-                            cols: 1,
-                            values: vec![Value::Error(error)],
-                        };
-                    }
-                    Err(_) => {}
+                if let Some(node) =
+                    scope.resolved_node(self.runtime_range(*func, args, sheet, pass, depth + 1))
+                {
+                    *ast = node;
                 }
             }
-            Ast::Func(Func::Let, args) | Ast::UnknownFunc(_, args) => {
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
-                }
-            }
+            Ast::Func(Func::Let, args) => self.rewrite_deferred(args, sheet, pass, depth),
+            Ast::UnknownFunc(call) => self.rewrite_deferred(&mut call.args, sheet, pass, depth),
             #[cfg(feature = "analysis")]
-            Ast::Func(Func::Analysis(_), args) => {
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
-                }
-            }
-            Ast::Func(_, args) => {
-                for arg in args {
-                    self.rewrite_references(arg, sheet, pass, depth + 1, child);
-                }
-            }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.rewrite_references(left, sheet, pass, depth + 1, child);
-                self.rewrite_references(right, sheet, pass, depth + 1, child);
-            }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-                self.rewrite_references(inner, sheet, pass, depth + 1, child);
-            }
-            Ast::LetSlot { expression, .. } => {
-                self.rewrite_references(expression, sheet, pass, depth + 1, child);
+            Ast::Func(Func::Analysis(_), args) => self.rewrite_deferred(args, sheet, pass, depth),
+            #[cfg(feature = "analysis")]
+            Ast::Lambda(definition) => {
+                let body = &mut std::rc::Rc::make_mut(definition).body;
+                self.rewrite_deferred(std::slice::from_mut(body), sheet, pass, depth);
             }
             // The copy is only evaluated, never written back, so the name's
             // expansion takes the node's place.
@@ -318,7 +352,52 @@ impl CellStore {
                 self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
                 *ast = expression;
             }
-            _ => {}
+            Ast::Func(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedRange(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Structured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::LetName { .. }
+            | Ast::Array(_) => {
+                ast.fold_children_mut(&mut |node| {
+                    self.rewrite_references(node, sheet, pass, depth + 1, child);
+                    false
+                });
+            }
+            #[cfg(feature = "analysis")]
+            Ast::Parameter { .. } | Ast::RegexPattern(_) => {}
+        }
+    }
+
+    /// Rewrites `args` as arguments whose runtime references are resolved
+    /// only when the call that holds them is evaluated.
+    fn rewrite_deferred(
+        &self,
+        args: &mut [Ast],
+        sheet: usize,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) {
+        for arg in args {
+            self.rewrite_references(arg, sheet, pass, depth + 1, RewriteScope::Deferred);
         }
     }
 
@@ -338,7 +417,9 @@ impl CellStore {
             None => {
                 return Err(match self.eval_ast(&args[0], sheet, pass, depth + 1) {
                     Value::Error(error) => error,
-                    _ => FormulaError::Value,
+                    Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                        FormulaError::Value
+                    }
                 });
             }
         };
@@ -419,25 +500,25 @@ impl CellStore {
 
         let converted;
         let source = if a1 {
-            text.as_str()
+            text.as_ref()
         } else {
-            converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or((0, 0))) {
+            converted = match r1c1_to_a1(&text, current_formula_origin().unwrap_or_default()) {
                 Ok(converted) => converted,
                 Err(error) => return self.indirect_named_reference(&text, sheet).ok_or(error),
             };
             &converted
         };
-        let (row, col) = current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(source, sheet as u32, row, col);
         entry
             .ast
             .as_ref()
-            .and_then(|ast| range_from_ast(ast, sheet))
+            .and_then(|ast| read_shifted((0, 0), || range_from_ast(ast, sheet)))
             .or_else(|| self.indirect_named_reference(source, sheet))
             .ok_or(FormulaError::Ref)
     }
 
-    fn indirect_named_reference(&self, text: &str, sheet: usize) -> Option<CellRange> {
+    fn indirect_named_reference(&self, text: &str, formula_sheet: usize) -> Option<CellRange> {
         let (sheet, name) = match text.rsplit_once('!') {
             Some((qualifier, name)) => {
                 let unquoted = qualifier
@@ -450,13 +531,39 @@ impl CellStore {
                     .or_else(|| self.sheet_lookup.get(&sheet_name_key(&title)))?;
                 (*sheet, name)
             }
-            None => (sheet, text),
+            None => (formula_sheet, text),
         };
-        let (row, col) = current_formula_origin().unwrap_or((0, 0));
+        let (row, col) = current_formula_origin().unwrap_or_default();
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             ast @ (Ast::NamedRange(_) | Ast::Structured(_)) => range_from_ast(ast, sheet),
-            _ => None,
+            Ast::Num(_)
+            | Ast::Str(_)
+            | Ast::Bool(_)
+            | Ast::Missing
+            | Ast::Name(_)
+            | Ast::NamedFormula(_)
+            | Ast::UnresolvedStructured(_)
+            | Ast::Cell(..)
+            | Ast::SheetCell(..)
+            | Ast::AbsCell(..)
+            | Ast::Range(..)
+            | Ast::SheetRange(..)
+            | Ast::AbsRange(..)
+            | Ast::SheetSpan(_)
+            | Ast::InvalidRef
+            | Ast::Func(..)
+            | Ast::UnknownFunc(..)
+            | Ast::Bin(..)
+            | Ast::Cmp(..)
+            | Ast::Neg(_)
+            | Ast::Pos(_)
+            | Ast::Percent(_)
+            | Ast::LetSlot { .. }
+            | Ast::LetName { .. }
+            | Ast::Array { .. } => None,
+            #[cfg(feature = "analysis")]
+            Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => None,
         }
     }
 }
@@ -468,14 +575,14 @@ fn r1c1_to_a1(text: &str, origin: (u32, u32)) -> Result<String, FormulaError> {
             (&text[..sheet.len() + 1], reference)
         });
     let mut output = String::from(prefix);
-    for (index, endpoint) in reference.split(':').enumerate() {
+    for (index, part) in reference.split(':').enumerate() {
         if index > 1 {
             return Err(FormulaError::Ref);
         }
         if index != 0 {
             output.push(':');
         }
-        let endpoint = endpoint.to_ascii_uppercase();
+        let endpoint = part.to_ascii_uppercase();
         let remainder = endpoint.strip_prefix('R').ok_or(FormulaError::Ref)?;
         let separator = remainder.find('C').ok_or(FormulaError::Ref)?;
         let row = r1c1_axis(&remainder[..separator], origin.0, SPILL_MAX_ROWS)?;

@@ -26,7 +26,7 @@ grid.store.applyTransaction({
 <details>
 <summary>Full setup</summary>
 
-```ts compile title="Create a sequence in a grid"
+```ts compile runnable title="Create a sequence in a grid"
 import { createGrid, initSheetwrite } from "@sheetwrite/core";
 import "@sheetwrite/core/styles.css";
 

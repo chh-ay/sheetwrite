@@ -31,6 +31,7 @@ import {
   validateMeasureAdmission,
   withMeasure,
   withoutMeasure,
+  cloneRelationships,
   validateRelationshipAdmission,
   withoutRelationship,
   withRelationship,
@@ -44,6 +45,7 @@ import {
   type SheetwriteErrorCode,
   type SheetwriteErrorContext,
 } from "../errors.js";
+import { installExternalLinks, removeExternalLinks } from "../external-link.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "../grid-constants.js";
 import {
@@ -166,6 +168,7 @@ import {
   validWorkbookTable,
   workbookTableNameKey,
 } from "../workbook-table.js";
+import { decodePreview, type FormulaPreview, PREVIEW_FIELDS } from "./formula-preview-result.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   MERGED_CELLS_SORT_MESSAGE,
@@ -193,11 +196,13 @@ import {
   positiveCount,
   rangesIntersect,
   rebaseRangeAxis,
+  rebaseMovedRange,
   rebaseRangeItems,
   rebaseRangeSpan,
   remapSpan,
   type SheetAxis,
   sameMerge,
+  staysWholeAfterMove,
   uniqueColumnKeys,
   validMerge,
   validProtectedRanges,
@@ -220,6 +225,9 @@ import {
   CELL_STATE_LOADED_EMPTY,
   CELL_STATE_LOCAL_EDIT,
 } from "./wire-tags.js";
+
+/** Shared report of a commit that recalculated nothing; never written. */
+const EMPTY_RECALCULATION = new Uint32Array(0);
 
 const AGG_OP: Record<AggregateOp, number> = { sum: 0, avg: 1, min: 2, max: 3, count: 4 };
 
@@ -331,7 +339,9 @@ export interface SheetwriteStoreOptions {
   dirtyCellLimit?: number;
   /** Maximum clean references retained for exact multi-operation remove-sheet simulation. */
   referenceSimulationLimit?: number;
+  /** Decides which protected cells a local edit may change; servers must still check every edit. */
   protectionResolver?: ProtectionResolver;
+  /** What happens to a transaction with denied operations: `atomic` (default) rejects it, `partial` skips them. */
   mutationPolicy?: MutationPolicyMode;
 }
 
@@ -409,49 +419,28 @@ interface MovedItems {
   readonly charts: ReadonlyMap<Sheet, readonly ChartDefinition[]> | null;
 }
 
-type RowMetaPatch = Extract<DocumentOp, { op: "setRowMeta" }>["meta"];
-
-/** Height and hidden state of each moved row; null for a row with neither. */
-function movedRowMeta(sheet: Sheet, from: number, count: number): Array<RowMetaPatch | null> {
-  return Array.from({ length: count }, (_, offset) => {
-    const row = from + offset;
-    const height = sheet.rowHeights?.get(row);
-    const hidden = sheet.hiddenRows?.has(row) ?? false;
-    return height === undefined && !hidden ? null : { height, hidden };
-  });
-}
-
-/** One `setRange` that writes the moved cells at their target rows or columns. */
-function movedCellsPatch(
+/**
+ * The rows or columns a move changes: the moved block and the indexes it
+ * passes over, across the whole sheet.
+ */
+function movedSpanRange(
   sheet: Sheet,
   patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
   axis: SheetAxis,
-  cells: readonly Extract<DocumentOp, { op: "set" }>[],
-): DocumentOp {
-  const last = patch.to + patch.count - 1;
-  const range: Range =
-    axis === "row"
-      ? {
-          sheet: patch.sheet,
-          start: { row: patch.to, col: 0 },
-          end: { row: last, col: sheet.columns.length - 1 },
-        }
-      : {
-          sheet: patch.sheet,
-          start: { row: 0, col: patch.to },
-          end: { row: sheet.rowCount - 1, col: last },
-        };
-
-  return {
-    op: "setRange",
-    range,
-    cells: cells.map((cell) => ({
-      rowOffset: axis === "row" ? cell.addr.row - patch.from : cell.addr.row,
-      colOffset: axis === "row" ? cell.addr.col : cell.addr.col - patch.from,
-      value: cell.value,
-      style: cell.style,
-    })),
-  };
+): Range {
+  const first = Math.min(patch.from, patch.to);
+  const last = Math.max(patch.from, patch.to) + patch.count - 1;
+  return axis === "row"
+    ? {
+        sheet: patch.sheet,
+        start: { row: first, col: 0 },
+        end: { row: last, col: sheet.columns.length - 1 },
+      }
+    : {
+        sheet: patch.sheet,
+        start: { row: 0, col: first },
+        end: { row: sheet.rowCount - 1, col: last },
+      };
 }
 
 /** Row heights, hidden rows and row groups after a row insert or delete. */
@@ -579,10 +568,14 @@ function storeFailure(
 
 /** Error thrown when an operation requires datasource cells that are not loaded. */
 export class IncompleteDataError extends SheetwriteError {
+  /** Always `"IncompleteDataError"`. */
   override readonly name = "IncompleteDataError";
+  /** Always `"incomplete-data"`. */
   declare readonly code: "incomplete-data";
+  /** How many of the sheet's cells are loaded, out of the total. */
   readonly capability: Extract<QueryCapability, { status: "incomplete" }>;
 
+  /** Creates the error for a query on `sheet`, which has unloaded cells. */
   constructor(sheet: SheetId, capability: Extract<QueryCapability, { status: "incomplete" }>) {
     super("incomplete-data", "query", `Sheetwrite: ${sheet} has unloaded datasource cells`, {
       context: {
@@ -608,54 +601,55 @@ function literalOf(value: CellScalar): CellValue {
 /** Shared empty style; keeps change capture from allocating a style per cell. */
 const EMPTY_STYLE: CellStyle = {};
 const TEXT_ENCODER = new TextEncoder();
-/** Worst-case UTF-8 bytes of one UTF-16 code unit, used to size a retry. */
+/** Worst-case UTF-8 bytes of one UTF-16 code unit. */
 const MAX_UTF8_BYTES_PER_CODE_UNIT = 3;
+/** Strings joined per `encodeInto` call, which bounds the temporary joined string. */
+const TEXT_PACK_CHUNK = 65_536;
+const NON_ASCII = /[^\0-\x7f]/;
 
 /**
  * Cell strings of one block packed into a single UTF-8 buffer.
  *
- * Text crosses into WASM once per block instead of once per cell: `add` appends
- * each string after the previous one and `offsets` records the byte boundary of
- * every string, so the native side slices the buffer and never re-encodes.
- * Strings must be added in the flat input order of their cells: row-major for
- * document blocks and column-major for columnar imports.
+ * Text crosses into WASM once per block instead of once per cell: `bytes`
+ * holds every string after the previous one and `offsets` records the byte
+ * boundary of every string, so the native side slices the buffer and never
+ * re-encodes. `texts` must be in the flat input order of their cells:
+ * row-major for document blocks and column-major for columnar imports.
  */
-class PackedTextBuffer {
-  private written = 0;
-  private count = 0;
-  private bytes: Uint8Array;
-  /** Start of each string, plus the packed length as the final entry. */
-  readonly offsets: Uint32Array;
-
-  constructor(byteCapacity: number, textCount: number) {
-    this.bytes = new Uint8Array(Math.max(byteCapacity, 1));
-    this.offsets = new Uint32Array(textCount + 1);
-  }
-
-  add(value: string): void {
-    this.offsets[this.count] = this.written;
-    let encoded = TEXT_ENCODER.encodeInto(value, this.bytes.subarray(this.written));
-    if (encoded.read < value.length) {
-      // The initial capacity assumes ASCII text; non-ASCII needs more bytes.
-      this.grow(this.written + value.length * MAX_UTF8_BYTES_PER_CODE_UNIT);
-      encoded = TEXT_ENCODER.encodeInto(value, this.bytes.subarray(this.written));
+function packTexts(texts: readonly string[]): { bytes: Uint8Array; offsets: Uint32Array } {
+  // Start of each string, plus the packed length as the final entry.
+  const offsets = new Uint32Array(texts.length + 1);
+  let bytes = new Uint8Array(0);
+  let written = 0;
+  for (let start = 0; start < texts.length; start += TEXT_PACK_CHUNK) {
+    const end = Math.min(texts.length, start + TEXT_PACK_CHUNK);
+    // One encode per chunk: ASCII strings take one byte per code unit, so the
+    // offsets follow from their lengths.
+    const joined = texts.slice(start, end).join("");
+    const ascii = !NON_ASCII.test(joined);
+    const required = written + joined.length * (ascii ? 1 : MAX_UTF8_BYTES_PER_CODE_UNIT);
+    if (required > bytes.length) {
+      const grown = new Uint8Array(Math.max(required, bytes.length * 2));
+      grown.set(bytes.subarray(0, written));
+      bytes = grown;
     }
-    this.written += encoded.written;
-    this.count += 1;
-    this.offsets[this.count] = this.written;
-  }
 
-  packedBytes(): Uint8Array {
-    return this.written === this.bytes.length ? this.bytes : this.bytes.subarray(0, this.written);
-  }
+    if (ascii) {
+      for (let index = start; index < end; index++) {
+        offsets[index] = written;
+        written += (texts[index] ?? "").length;
+      }
+      TEXT_ENCODER.encodeInto(joined, bytes.subarray(offsets[start] ?? 0, written));
+      continue;
+    }
 
-  private grow(requiredBytes: number): void {
-    let capacity = this.bytes.length;
-    while (capacity < requiredBytes) capacity *= 2;
-    const grown = new Uint8Array(capacity);
-    grown.set(this.bytes.subarray(0, this.written));
-    this.bytes = grown;
+    for (let index = start; index < end; index++) {
+      offsets[index] = written;
+      written += TEXT_ENCODER.encodeInto(texts[index] ?? "", bytes.subarray(written)).written;
+    }
   }
+  offsets[texts.length] = written;
+  return { bytes: bytes.subarray(0, written), offsets };
 }
 
 /** What `@sheetwrite/core/functions` installs on an engine; core only calls it. */
@@ -693,6 +687,12 @@ export class StoreDataEngine {
   private readonly spillBlockersDirty = new Set<SheetId>();
   /** Sheets whose pivots must be sent to the engine before the mutation commits. */
   private readonly pivotSheetsDirty = new Set<SheetId>();
+  /**
+   * The definitions the engine computes for a sheet's pivots, when they
+   * differ from the saved ones. The dashboard chunk sets it to add slicer
+   * filters, so first paint carries only this slot.
+   */
+  private pivotView: ((sheet: Sheet) => PivotDefinition[] | undefined) | null = null;
 
   private readonly rangeHistory = new Map<
     CompactRangeHistory,
@@ -704,6 +704,13 @@ export class StoreDataEngine {
   private pageIdleWaiters: Array<() => void> | undefined;
 
   private readonly memoryReleaseListeners = new Set<() => void>();
+  private chartRecalculationTracked = false;
+  /** Rectangles the last engine commit reported; -1 asks for a conservative refresh. */
+  private recalculatedRectCount = -1;
+  /** Epoch of the commit whose report {@link chartRecalculation} holds. */
+  private chartRecalculationEpoch: number | undefined;
+  /** That commit's rectangles; null when it must refresh conservatively. */
+  private chartRecalculation: Uint32Array | null = null;
 
   /** Hooks of `@sheetwrite/core/functions`; `undefined` until a host function is registered. */
   hostFunctions: HostFunctionHooks | undefined;
@@ -786,11 +793,23 @@ export class StoreDataEngine {
         (sheet.id.length + sheet.name.length) * 2,
         "scalar",
       );
-      this.wasm.setSheetName(handle, sheet.id, sheet.name);
+      if (!this.wasm.setSheetName(handle, sheet.id, sheet.name)) {
+        this.wasm.free();
+        throw storeFailure("invalid-snapshot", `invalid sheet name: ${sheet.name}`, {
+          sheet: sheet.id,
+        });
+      }
+
       this.sheets.handles.set(sheet.id, handle);
       this.sheetIdsByHandle[handle] = sheet.id;
       this.syncSpillBlockers(sheet);
       this.view.queueHiddenRows(sheet.id);
+    }
+
+    // Before any formula is loaded, so formulas find the links they read.
+    if (!installExternalLinks(this.wasm, workbook.externalLinks ?? [])) {
+      this.wasm.free();
+      throw storeFailure("invalid-snapshot", "invalid external link values");
     }
 
     // Before any formula is loaded, so SUBTOTAL computes once with the saved hidden rows.
@@ -835,7 +854,7 @@ export class StoreDataEngine {
     if (data) {
       this.withResourceOperation("ingest", () => this.loadColumnar(workbook.activeSheet, data));
     } else if (workbook.sheets.some((sheet) => sheet.pivots?.length)) {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
 
     // After the cells, because filters and sort keys read cell values.
@@ -1079,7 +1098,9 @@ export class StoreDataEngine {
       return;
     }
 
-    const payload = encodePivotPayload(pivots, (id) => this.sheets.handles.get(id));
+    const payload = encodePivotPayload(this.pivotView?.(sheet) ?? pivots, (id) =>
+      this.sheets.handles.get(id),
+    );
     this.boundaryAccounting.record(
       this.resourceOperation ?? "edit",
       "js-to-wasm",
@@ -1090,6 +1111,30 @@ export class StoreDataEngine {
       throw storeFailure("resource-limit", `pivot payload rejected for sheet: ${sheet.id}`, {
         sheet: sheet.id,
       });
+    }
+  }
+
+  /** Whether `dispose` freed the WASM store; a lazy load that finishes later must not call it. */
+  get isDisposed(): boolean {
+    return this.disposed;
+  }
+
+  /**
+   * Compute pivots from `view` instead of the saved definitions, and send
+   * `sheets` again. A view changes inputs that are not in the document, such
+   * as a read-only viewer's slicer selection, so it needs no transaction.
+   */
+  setPivotView(
+    view: (sheet: Sheet) => PivotDefinition[] | undefined,
+    sheets: readonly SheetId[],
+  ): void {
+    this.pivotView = view;
+    this.wasm.beginMutation();
+    try {
+      for (const id of sheets) this.pivotSheetsDirty.add(id);
+      this.flushPivots();
+    } finally {
+      this.commitEngineSources();
     }
   }
 
@@ -1158,6 +1203,29 @@ export class StoreDataEngine {
       strings.push(measure.id, measure.table, measure.formula, "", measure.name);
     }
     return wasm.setRelationships(strings);
+  }
+
+  /**
+   * `model` with each `[table, column, to]` rename applied to every measure
+   * formula, as Excel updates the formulas that name a renamed table,
+   * column or measure; see `renameStructuredReference`. A rename to the same
+   * name is skipped. Returns `model` itself when no formula changes.
+   */
+  private withRenames(
+    model: DataModel | undefined,
+    renames: [table: string, column: string, to: string][],
+  ): DataModel | undefined {
+    let changed = false;
+    const measures = (model?.measures ?? []).map((measure) => {
+      let formula = measure.formula;
+      for (const [table, column, to] of renames) {
+        if ((column || table) === to) continue;
+        formula = getEngine().renameStructuredReference(formula, table, column, to);
+      }
+      changed ||= formula !== measure.formula;
+      return { ...measure, formula };
+    });
+    return changed ? { relationships: cloneRelationships(model), measures } : model;
   }
 
   private syncTable(table: WorkbookTable): boolean {
@@ -1293,35 +1361,12 @@ export class StoreDataEngine {
     });
   }
 
-  /** Plan every name rewrite before the move can change cells or metadata. */
-  private prepareMovedNamedFormulas(
-    patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
-  ): Extract<NamedRangeSnapshot, { formula: string }>[] | null {
-    const rewritten: Extract<NamedRangeSnapshot, { formula: string }>[] = [];
-    const sheet = this.sheets.handleOf(patch.sheet);
-    for (const original of this.workbook.namedRanges ?? []) {
-      if (original.formula === undefined) continue;
-      const formula = this.wasm.moveNamedFormulaSource(
-        original.formula,
-        sheet,
-        patch.op === "moveColumns",
-        patch.from,
-        patch.count,
-        patch.to,
-      );
-      if (formula === undefined) return null;
-      rewritten.push({ ...original, formula });
-    }
-    return rewritten;
-  }
-
-  private restoreMovedNamedFormulas(
-    definitions: readonly Extract<NamedRangeSnapshot, { formula: string }>[],
-  ): boolean {
-    for (const namedRange of definitions) {
-      if (!this.applyPatch({ op: "setNamedRange", namedRange }, null)) return false;
-    }
-    return true;
+  /** The result `text` would have in `cell`, read without changing the store (#221). */
+  previewFormula(cell: CellAddress, text: string): FormulaPreview {
+    const fields = new Float64Array(PREVIEW_FIELDS);
+    const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
+    const result = this.wasm.previewFormula(target, text, fields);
+    return decodePreview(fields, result);
   }
 
   private sameNamedRange(
@@ -1418,6 +1463,11 @@ export class StoreDataEngine {
    */
   loadedSpans(sheet: SheetId, startRow: number, endRow: number, column: number): Uint32Array {
     return this.wasm.loadedSpans(this.sheets.handleOf(sheet), startRow, endRow, column);
+  }
+
+  /** Clean-chunk cache budget of each paged sheet, in bytes. */
+  pagedCacheBytes(): number {
+    return this.storageOptions.cacheBytes ?? DEFAULT_PAGED_CACHE_BYTES;
   }
 
   /**
@@ -1807,7 +1857,7 @@ export class StoreDataEngine {
     }
 
     const owner = this.workbook.sheets.find((candidate) => candidate.id === sheet);
-    // A dashboard has no cells: its view reads the output with `dashboardPivotOutput`.
+    // A dashboard has no cells: its view reads the output with `pivotOutputCells`.
     const cells = isDashboard(owner) ? [] : this.pivotWindowCells(sheet, record);
     return {
       status: "ok",
@@ -1832,14 +1882,12 @@ export class StoreDataEngine {
   }
 
   /**
-   * The engine output of a pivot on a dashboard, which places none in cells;
-   * the caller frees it. Null on the default engine or for an unknown pivot.
+   * The engine output of the pivot at `index` in a sheet's payload; the
+   * caller frees it. It serves the pivots that place no output: those of a
+   * dashboard and the chart copies of a worksheet pivot. Null on the default
+   * engine. Indices past the sheet's pivots read hidden pivots of a pivot view.
    */
-  dashboardPivotOutput(sheet: SheetId, id: string): PivotOutputCells | null {
-    const index =
-      this.workbook.sheets
-        .find((candidate) => candidate.id === sheet)
-        ?.pivots?.findIndex((pivot) => pivot.id === id) ?? -1;
+  pivotOutputCells(sheet: SheetId, index: number): PivotOutputCells | null {
     if (index < 0 || !this.wasm.pivotOutput) return null;
     return this.wasm.pivotOutput(this.sheets.handleOf(sheet), index);
   }
@@ -1863,8 +1911,8 @@ export class StoreDataEngine {
 
     const list = this.wasm.pivotFields(this.sheets.handleOf(sheet), index);
     try {
-      const names = list.names();
-      const types = list.types();
+      const names = list.takeNames();
+      const types = list.takeTypes();
       return names.map((header, field) => ({
         index: field,
         header,
@@ -1912,6 +1960,8 @@ export class StoreDataEngine {
       throw storeFailure("invalid-argument", "invalid volatile recalculation date");
     }
     this.wasm.recomputeVolatile(dateToSerial(now));
+    if (this.chartRecalculationTracked)
+      this.recalculatedRectCount = this.wasm.recalculatedRectCount();
   }
 
   /**
@@ -2021,44 +2071,52 @@ export class StoreDataEngine {
   }
 
   /**
-   * Whether any cell in the rectangle takes its value from elsewhere: a formula,
-   * a cross-reference, a spill child or pivot output. Chart tracking calls it
-   * once per series range when its index is rebuilt, never per edit: the source
-   * capture walks every formula on the sheet. Callers clip the range to the
-   * sheet first.
+   * Close the engine mutation. The engine returns the size of its chart
+   * recalculation report with it, so a commit costs no extra boundary call.
    */
-  chartSourcesComputed(range: Range): boolean {
-    const bounds = normalizedRange(range);
+  private commitEngineSources(): void {
+    this.recalculatedRectCount = this.wasm.commitSources();
+  }
 
-    // The engine writes pivot output with no document op on its cells. The output
-    // grows down and right from the anchor like a spill, so a pivot anchored at or
-    // above-left of the range end can reach it. This model test is cheap, so do it first.
-    const pivots = this.workbook.sheets.find((sheet) => sheet.id === bounds.sheet)?.pivots ?? [];
-    const pivotReaches = pivots.some(
-      (pivot) => pivot.anchor.row <= bounds.end.row && pivot.anchor.col <= bounds.end.col,
-    );
-    if (pivotReaches) return true;
+  /** Keep one bounded engine report per commit only while charts are observed. */
+  trackChartRecalculation(enabled: boolean): void {
+    this.chartRecalculationTracked = enabled;
+    this.chartRecalculationEpoch = undefined;
+    this.chartRecalculation = null;
+    this.wasm.setRecalculationTracking(enabled);
+  }
 
-    // Spill children carry no source of their own, so the source capture cannot see them.
-    if (this.hasSpillChildren(range)) return true;
+  /**
+   * Take the engine report of the commit `epoch` before any change listener runs, so a
+   * listener that commits again replaces it with its own commit's report.
+   */
+  captureChartRecalculation(epoch: number | undefined): void {
+    if (!this.chartRecalculationTracked) return;
+    const count = this.recalculatedRectCount;
+    this.chartRecalculationEpoch = epoch;
+    // An event without an epoch cannot be matched to its report later.
+    this.chartRecalculation =
+      epoch === undefined || count < 0
+        ? null
+        : count === 0
+          ? EMPTY_RECALCULATION
+          : this.wasm.recalculatedRects();
+  }
 
-    // Include anchors above and left: an existing spill may grow into this range
-    // after a precedent changes. This conservatively follows those formulas too.
-    // Not `captureSourceProjection`: that one counts toward range-mutation statistics.
-    const snapshot = this.wasm.captureSources(
-      this.sheets.handleOf(bounds.sheet),
-      0,
-      0,
-      bounds.end.row + 1,
-      bounds.end.col + 1,
-    );
-    if (!snapshot) return false;
+  /**
+   * The half-open `[sheet handle, row start, row end, col start, col end)`
+   * rectangles the commit `epoch` recalculated, or null to refresh
+   * conservatively: tracking off, an overflowing report, or a listener that
+   * committed again before this one ran. Read-only; resolve handles with
+   * {@link sheetIdOfHandle}.
+   */
+  recalculatedRects(epoch: number | undefined): Uint32Array | null {
+    return epoch === this.chartRecalculationEpoch ? this.chartRecalculation : null;
+  }
 
-    try {
-      return snapshot.formulaOffsets().length > 0 || snapshot.referenceOffsets().length > 0;
-    } finally {
-      snapshot.free();
-    }
+  /** The sheet an engine handle names, or undefined for a removed sheet. */
+  sheetIdOfHandle(handle: number): SheetId | undefined {
+    return this.sheetIdsByHandle[handle];
   }
 
   aggregate(sheet: SheetId, col: number, op: AggregateOp): number {
@@ -2074,10 +2132,17 @@ export class StoreDataEngine {
   /**
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
+   * `rows`, end-exclusive canonical data rows, limits the scan to a source
+   * range; without it the whole column is read.
    */
-  distinctValues(sheet: SheetId, col: number, limit = DEFAULT_DISTINCT_VALUES_LIMIT): CellScalar[] {
+  distinctValues(
+    sheet: SheetId,
+    col: number,
+    limit = DEFAULT_DISTINCT_VALUES_LIMIT,
+    rows?: { start: number; end: number },
+  ): CellScalar[] {
     this.requireCompleteQuery(sheet);
-    return this.view.distinctValues(sheet, col, limit);
+    return this.view.distinctValues(sheet, col, limit, rows);
   }
 
   /** The sheet's explicitly hidden data rows, ascending. */
@@ -2257,6 +2322,34 @@ export class StoreDataEngine {
       row: bounds.start.row + Math.floor(offset / cols),
       col: bounds.start.col + (offset % cols),
     }));
+  }
+
+  /**
+   * Cells, at their address before the move, whose formula a move back
+   * cannot restore: a range that lost a moved row or column at its edge.
+   * History captures them before the move applies.
+   */
+  moveLosses(patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>): CellAddress[] {
+    const handle = this.sheets.handles.get(patch.sheet);
+    if (handle === undefined) return [];
+
+    const triples = this.wasm.moveLosses(
+      handle,
+      patch.op === "moveColumns",
+      patch.from,
+      patch.count,
+      patch.to,
+    );
+    const losses: CellAddress[] = [];
+    for (let index = 0; index + 2 < triples.length; index += 3) {
+      const sheet = this.sheetIdsByHandle[triples[index] ?? -1];
+      const row = triples[index + 1];
+      const col = triples[index + 2];
+      if (sheet !== undefined && row !== undefined && col !== undefined) {
+        losses.push({ sheet, row, col });
+      }
+    }
+    return losses;
   }
 
   /** The operation that moves every row of `patch` back, or `null` for an invalid order. */
@@ -2601,25 +2694,11 @@ export class StoreDataEngine {
     const wasmStyles = new Uint32Array(cellCount);
     const styleTable = block.styleTable ?? [];
 
-    // Sizing the text buffer up front costs one extra pass over `values` and
-    // keeps the packing pass free of reallocations for ASCII text.
-    let textCount = 0;
-    let textBytes = 0;
-
-    for (let offset = 0; offset < cellCount; offset += 1) {
-      const value = values[offset];
-      if (typeof value !== "string") continue;
-
-      textCount += 1;
-      textBytes += value.length;
-    }
-
-    const texts = new PackedTextBuffer(textBytes, textCount);
-
+    const texts: string[] = [];
     for (let offset = 0; offset < cellCount; offset++) {
       const value = values[offset];
       writeScalarWire(kinds, numbers, offset, value);
-      if (typeof value === "string") texts.add(value);
+      if (typeof value === "string") texts.push(value);
 
       const styleId = styleIds === undefined ? undefined : styleIds[offset];
       wasmStyles[offset] = this.styles.intern(
@@ -2642,6 +2721,7 @@ export class StoreDataEngine {
       referenceTargets[packed + 2] = target.col;
     }
 
+    const packedText = packTexts(texts);
     this.noteRangeMutationFfi(cellCount);
 
     return (
@@ -2653,8 +2733,8 @@ export class StoreDataEngine {
         cols,
         kinds,
         numbers,
-        texts.packedBytes(),
-        texts.offsets,
+        packedText.bytes,
+        packedText.offsets,
         wasmStyles,
         Uint32Array.from(formulas, ([offset]) => offset),
         formulas.map(([, source]) => source),
@@ -2671,7 +2751,7 @@ export class StoreDataEngine {
     const offsets = new Uint32Array(cells.length);
     const kinds = new Uint8Array(cells.length);
     const numbers = new Float64Array(cells.length);
-    const texts: string[] = new Array(cells.length);
+    const literalTexts: string[] = [];
     const styles = new Uint32Array(cells.length);
     const formulaOffsets: number[] = [];
     const formulaSources: string[] = [];
@@ -2686,20 +2766,22 @@ export class StoreDataEngine {
       if (cell.value.kind === "formula") {
         formulaOffsets.push(cell.offset);
         formulaSources.push(cell.value.src);
-        texts[index] = "";
       } else if (cell.value.kind === "ref") {
         const targetHandle = this.sheets.handles.get(cell.value.target.sheet);
         if (targetHandle === undefined || !this.isCellInBounds(cell.value.target)) return false;
 
         referenceOffsets.push(cell.offset);
         referenceTargets.push(targetHandle, cell.value.target.row, cell.value.target.col);
-        texts[index] = "";
       } else {
         const value = cell.value.value;
         writeScalarWire(kinds, numbers, index, value);
-        texts[index] = typeof value === "string" ? value : "";
+        if (typeof value === "string") literalTexts.push(value);
       }
     }
+
+    // One UTF-8 buffer for the text cells, so a block does not cross the
+    // boundary as one JS string per cell.
+    const packedText = packTexts(literalTexts);
 
     this.noteRangeMutationFfi(cells.length);
 
@@ -2713,7 +2795,8 @@ export class StoreDataEngine {
         offsets,
         kinds,
         numbers,
-        texts,
+        packedText.bytes,
+        packedText.offsets,
         styles,
         Uint32Array.from(formulaOffsets),
         formulaSources,
@@ -2839,7 +2922,7 @@ export class StoreDataEngine {
       // try on every edit, JavaScriptCore optimized one-cell edits later, and
       // the engine memory probe measured a 27% slower edit median.
       if (this.view.hasQueuedHiddenRows()) this.flushHiddenRowsAndCommit();
-      else this.wasm.commitSources();
+      else this.commitEngineSources();
     }
   }
 
@@ -2848,7 +2931,7 @@ export class StoreDataEngine {
     try {
       this.view.flushHiddenRows();
     } finally {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
   }
 
@@ -3169,7 +3252,7 @@ export class StoreDataEngine {
       }
 
       case "moveRows":
-        return this.moveAxis(patch, changes);
+        return this.moveAxis(patch, changes, captureDetailedChanges);
 
       case "permuteRows":
         return this.permuteRows(patch, changes, captureDetailedChanges);
@@ -3239,7 +3322,7 @@ export class StoreDataEngine {
       }
 
       case "moveColumns":
-        return this.moveAxis(patch, changes);
+        return this.moveAxis(patch, changes, captureDetailedChanges);
 
       case "setColumn": {
         const meta = this.sheets.sheetMeta(patch.sheet);
@@ -3326,11 +3409,16 @@ export class StoreDataEngine {
         const sheet = this.sheets.sheetMeta(patch.sheet);
         const chart = sanitizeChartDefinition(patch.chart);
         if (!chart || !chartFitsSheets(chart, sheet, this.workbook.sheets)) return false;
+        const previous = sheet.charts?.find((candidate) => candidate.id === chart.id);
 
         // Chart lists are replaced, never mutated, so captured definitions stay exact for undo.
         const charts = upsertById(sheet.charts ?? [], chart, MAX_CHARTS_PER_SHEET);
         if (!charts) return false;
         sheet.charts = charts;
+        // A chart over a pivot reads a copy of it that the pivot view adds.
+        if (chart.pivot !== undefined || previous?.pivot !== undefined) {
+          this.pivotSheetsDirty.add(patch.sheet);
+        }
 
         return true;
       }
@@ -3338,8 +3426,10 @@ export class StoreDataEngine {
       case "removeChart": {
         const sheet = this.sheets.sheetMeta(patch.sheet);
         const charts = sheet.charts ?? [];
-        if (!charts.some((chart) => chart.id === patch.id)) return false;
-        sheet.charts = charts.filter((chart) => chart.id !== patch.id);
+        const removed = charts.find((chart) => chart.id === patch.id);
+        if (removed === undefined) return false;
+        sheet.charts = charts.filter((chart) => chart !== removed);
+        if (removed.pivot !== undefined) this.pivotSheetsDirty.add(patch.sheet);
         return true;
       }
 
@@ -3574,6 +3664,16 @@ export class StoreDataEngine {
         const nextTables = [...tables];
         nextTables[index] = next;
         sheet.tables = nextTables;
+
+        const renames: [string, string, string][] = [[current.name, "", next.name]];
+        for (const column of next.columns) {
+          const previous = current.columns.find((candidate) => candidate.id === column.id);
+          if (previous) renames.push([next.name, previous.name, column.name]);
+        }
+        const model = this.withRenames(this.workbook.dataModel, renames);
+        if (model === this.workbook.dataModel) return true;
+        if (!this.syncRelationships(model)) return false;
+        this.workbook.dataModel = model;
         return true;
       }
 
@@ -3726,6 +3826,22 @@ export class StoreDataEngine {
         return true;
       }
 
+      case "setExternalLinks": {
+        // The engine turns references to a removed link sheet back into
+        // unresolved references and re-resolves them when it is added, so
+        // replacing the links never changes formula text.
+        const previous = this.workbook.externalLinks ?? [];
+        removeExternalLinks(this.wasm, previous);
+        if (!installExternalLinks(this.wasm, patch.links)) {
+          removeExternalLinks(this.wasm, patch.links);
+          installExternalLinks(this.wasm, previous);
+          return false;
+        }
+        this.workbook.externalLinks =
+          patch.links.length > 0 ? cloneJsonValue(patch.links) : undefined;
+        return true;
+      }
+
       case "setCalculation": {
         if (!this.syncCalculation(patch.calculation)) return false;
         this.workbook.calculation = storedCalculationSettings(patch.calculation);
@@ -3743,9 +3859,12 @@ export class StoreDataEngine {
           return false;
         }
 
+        const previous = findMeasure(current, patch.op === "setMeasure" ? patch.measure.id : "");
         const model =
           patch.op === "setMeasure"
-            ? withMeasure(current, patch.measure)
+            ? this.withRenames(withMeasure(current, patch.measure), [
+                ["", previous?.name ?? "", patch.measure.name],
+              ])
             : withoutMeasure(current, patch.id);
         if (!this.syncRelationships(model)) return false;
         this.workbook.dataModel = model;
@@ -3759,6 +3878,8 @@ export class StoreDataEngine {
         validateDashboardItemAdmission(patch.item, sheet, issues);
         if (issues.length > 0) return false;
         sheet.dashboard = withDashboardItem(sheet.dashboard, patch.item);
+        // A slicer filters the dashboard's pivots.
+        this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
 
@@ -3766,6 +3887,7 @@ export class StoreDataEngine {
         const sheet = this.workbook.sheets.find((candidate) => candidate.id === patch.sheet);
         if (!sheet || !findDashboardItem(sheet, patch.id)) return false;
         sheet.dashboard = withoutDashboardItem(sheet.dashboard, patch.id);
+        this.pivotSheetsDirty.add(sheet.id);
         return true;
       }
 
@@ -3810,89 +3932,17 @@ export class StoreDataEngine {
     }
   }
 
-  private snapshotCells(
-    sheet: SheetId,
-    rowStart: number,
-    rowEnd: number,
-    colStart: number,
-    colEnd: number,
-  ): Array<Extract<DocumentOp, { op: "set" }>> {
-    const rows = rowEnd - rowStart;
-    const cols = colEnd - colStart;
-
-    this.noteRangeMutationFfi();
-    const snapshot = this.wasm.captureSources(
-      this.sheets.handleOf(sheet),
-      rowStart,
-      colStart,
-      rows,
-      cols,
-    );
-    const derived = snapshot?.spillDerived();
-    const sources = snapshot ? consumeSourceSnapshot(snapshot, this.sheetIdsByHandle) : null;
-
-    // Only outputs crossing the moved rectangle need a per-cell ownership check.
-    const outputs = this.pivotOutputs(sheet).filter(
-      ({ range }) =>
-        range.start.row < rowEnd &&
-        range.end.row >= rowStart &&
-        range.start.col < colEnd &&
-        range.end.col >= colStart,
-    );
-
-    const columns = Array.from({ length: cols }, (_, offset) => colStart + offset);
-    const window = this.windowReader.read(
-      sheet,
-      { start: rowStart, end: rowEnd },
-      columns,
-      undefined,
-      false,
-    );
-
-    const patches: Array<Extract<DocumentOp, { op: "set" }>> = [];
-    for (let row = rowStart; row < rowEnd; row++) {
-      for (let col = colStart; col < colEnd; col++) {
-        const addr = { sheet, row, col };
-        const offset = (row - rowStart) * cols + col - colStart;
-        const style = window.styles[window.styleIds[offset] ?? 0] ?? {};
-        const formula = sources?.formulaAt(offset);
-        const target = sources?.referenceAt(offset);
-        const pivotDerived = outputs.some(
-          ({ range }) =>
-            row >= range.start.row &&
-            row <= range.end.row &&
-            col >= range.start.col &&
-            col <= range.end.col,
-        );
-        const value: CellValue = formula
-          ? { kind: "formula", src: formula }
-          : target
-            ? { kind: "ref", target }
-            : {
-                kind: "literal",
-                value: derived?.[offset] || pivotDerived ? null : (window.values[offset] ?? null),
-              };
-
-        if (value.kind === "literal" && value.value === null && Object.keys(style).length === 0) {
-          continue;
-        }
-
-        patches.push({ op: "set", addr, value, style });
-      }
-    }
-
-    return patches;
-  }
-
   /**
-   * Move whole rows or columns. The engine removes and re-adds them; this
-   * puts back their cells, row metadata and tables, and carries every
-   * range-keyed item (rules, notes, hyperlinks, charts, names) to the moved
-   * positions from a copy taken before the remove.
+   * Move whole rows or columns, as Excel's Cut and Insert Cut Cells does.
+   * The engine moves the cells and makes every formula and defined name
+   * follow the cells it names; this moves the row heights, column
+   * definitions, merges and tables with them and carries every range-keyed
+   * item (rules, notes, hyperlinks, charts, names) to the moved positions.
    */
   private moveAxis(
     patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
     changes: ChangeEvent["changes"] | null,
+    captureDetailedChanges: boolean,
   ): boolean {
     const sheet = this.sheets.sheetMeta(patch.sheet);
     const axis: SheetAxis = patch.op === "moveRows" ? "row" : "column";
@@ -3909,60 +3959,70 @@ export class StoreDataEngine {
 
     if (patch.from === patch.to) return true;
 
-    const movedNamedFormulas = this.prepareMovedNamedFormulas(patch);
-    if (movedNamedFormulas === null) return false;
-
-    const moved = this.captureMovedItems(sheet, axis);
-    const end = patch.from + patch.count;
-    const cells =
-      axis === "row"
-        ? this.snapshotCells(patch.sheet, patch.from, end, 0, sheet.columns.length)
-        : this.snapshotCells(patch.sheet, 0, sheet.rowCount, patch.from, end);
-    const rowMeta = axis === "row" ? movedRowMeta(sheet, patch.from, patch.count) : [];
-    const columns = axis === "column" ? sheet.columns.slice(patch.from, end) : [];
-
-    const reinserted =
-      this.applyPatch(
-        {
-          op: axis === "row" ? "removeRows" : "removeColumns",
-          sheet: patch.sheet,
-          at: patch.from,
-          count: patch.count,
-        },
-        changes,
-      ) &&
-      this.applyPatch(
-        axis === "row"
-          ? { op: "addRows", sheet: patch.sheet, at: patch.to, count: patch.count }
-          : { op: "addColumns", sheet: patch.sheet, at: patch.to, columns },
-        changes,
-      );
-    if (!reinserted) return false;
-
-    if (cells.length > 0 && !this.applyPatch(movedCellsPatch(sheet, patch, axis, cells), changes)) {
+    if (!(sheet.tables ?? []).every((table) => staysWholeAfterMove(table.range, axis, patch))) {
       return false;
     }
 
-    for (let offset = 0; offset < rowMeta.length; offset++) {
-      const meta = rowMeta[offset];
-      if (meta) {
-        this.applyPatch(
-          { op: "setRowMeta", sheet: patch.sheet, row: patch.to + offset, meta },
-          changes,
-        );
-      }
+    const moveAt = moveRemap(patch.from, patch.count, patch.to);
+    const merges = sheet.merges
+      ?.map((merge) => rebaseMergeAxis(merge, axis, moveAt))
+      .filter((merge): merge is MergeRange => merge !== null);
+    if (merges?.some((merge) => mergeCrossesFreeze(sheet, merge))) return false;
+
+    const moved = this.captureMovedItems(sheet, axis);
+    const span = movedSpanRange(sheet, patch, axis);
+    const rows = span.end.row - span.start.row + 1;
+    const cols = span.end.col - span.start.col + 1;
+    const beforeCells =
+      changes && captureDetailedChanges ? this.captureBlockBeforeCells(span, rows, cols) : null;
+
+    this.noteRangeMutationFfi(rows);
+    const handle = this.sheets.handleOf(patch.sheet);
+    const status =
+      axis === "row"
+        ? this.wasm.moveRows(handle, patch.from, patch.count, patch.to)
+        : this.wasm.moveCols(handle, patch.from, patch.count, patch.to);
+    if (status !== 0) return false;
+
+    if (axis === "row") {
+      rebaseRowMeta(sheet, moveAt);
+      this.moveTableRows(sheet, patch);
+    } else {
+      const columns = sheet.columns.splice(patch.from, patch.count);
+      sheet.columns.splice(patch.to, 0, ...columns);
+    }
+    if (merges) {
+      sheet.merges = merges;
+      this.spillBlockersDirty.add(patch.sheet);
     }
 
-    return (
-      this.restoreMovedItems(sheet, moved, patch, axis) &&
-      this.restoreMovedNamedFormulas(movedNamedFormulas)
-    );
+    const restored = this.restoreMovedItems(sheet, moved, patch, axis);
+    this.refreshNamedFormulas();
+    if (axis === "row") this.view.rowsChanged(patch.sheet);
+    else this.view.columnsChanged(patch.sheet);
+    if (beforeCells && changes) this.pushPermutedChanges(span, beforeCells, changes);
+    return restored;
+  }
+
+  /** A row move changes each table's rows as it changes a range; see `rebaseMovedRange`. */
+  private moveTableRows(
+    sheet: Sheet,
+    patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
+  ): void {
+    if (!sheet.tables) return;
+
+    sheet.tables = sheet.tables.map((table) => {
+      const range = rebaseMovedRange(table.range, "row", patch);
+      if (range === table.range) return table;
+      const next = { ...table, range };
+      this.syncTable(next);
+      return next;
+    });
   }
 
   /**
-   * Copies of the range-keyed items a move carries. The move runs as remove
-   * then add, which would drop or shrink items inside the moved block, so
-   * they are put back from these copies.
+   * Copies of the range-keyed items a move carries, taken before the move
+   * and put back at the moved positions.
    */
   private captureMovedItems(sheet: Sheet, axis: SheetAxis): MovedItems {
     return {
@@ -4017,10 +4077,14 @@ export class StoreDataEngine {
     if (axis === "column") this.restoreMovedTables(sheet, moved.tables, moveAt);
     this.restoreMovedCharts(moved.charts, { ...formulaEdit, sheet: sheet.id, axis });
     this.windowReader.conditionalRulesChanged(sheet.id);
-    return moved.namedRanges.every((original) => {
-      const namedRange = rebaseRangeAxis(original, sheet.id, axis, moveAt);
-      return namedRange === null || this.upsertMovedNamedRange(namedRange);
-    });
+    // A named range changes as a formula's range does, so formulas that use
+    // the name and formulas that use the range read the same cells.
+    return moved.namedRanges.every((original) =>
+      this.upsertMovedNamedRange({
+        ...original,
+        range: rebaseMovedRange(original.range, axis, patch),
+      }),
+    );
   }
 
   private upsertMovedNamedRange(namedRange: NamedRangeSnapshot): boolean {
@@ -4299,7 +4363,11 @@ export class StoreDataEngine {
     }
 
     const handle = this.allocateSheet(snapshot.columns.length, snapshot.rowCount);
-    this.wasm.setSheetName(handle, snapshot.id, name.name);
+    if (!this.wasm.setSheetName(handle, snapshot.id, name.name)) {
+      this.wasm.removeSheet(handle);
+      return false;
+    }
+
     this.sheets.handles.set(snapshot.id, handle);
     this.sheetIdsByHandle[handle] = snapshot.id;
     for (const [row, meta] of snapshot.rowMeta ?? []) {
@@ -4308,7 +4376,7 @@ export class StoreDataEngine {
     }
 
     this.view.queueHiddenRows(snapshot.id);
-    this.workbook.sheets.splice(snapshot.order, 0, sheet);
+    this.sheets.insertSheet(sheet, snapshot.order);
     this.syncSheetOrder();
     for (const table of sheet.tables ?? []) {
       if (!this.syncTable(table)) return false;
@@ -4364,7 +4432,7 @@ export class StoreDataEngine {
     this.authoritativeSnapshotSheets.delete(sheetId);
     this.view.removeSheet(sheetId);
     this.windowReader.removeSheet(sheetId);
-    this.workbook.sheets.splice(index, 1);
+    this.sheets.removeSheetAt(index);
     if (fallback) this.workbook.activeSheet = fallback;
     this.workbook.namedRanges = this.workbook.namedRanges?.filter(
       (range) => range.range?.sheet !== sheetId && range.scope !== sheetId,
@@ -4750,7 +4818,7 @@ export class StoreDataEngine {
       accepted = this.writeSparseBlock(bounds, cells);
     } finally {
       this.boundaryAccounting.record(this.resourceOperation ?? "ingest", "js-to-wasm", 0, "scalar");
-      this.wasm.commitSources();
+      this.commitEngineSources();
       this.resourceOperation = previousOperation;
     }
 
@@ -4788,7 +4856,7 @@ export class StoreDataEngine {
         this.windowReader.conditionalRulesChanged(sourceSheet.id);
       }
     } finally {
-      this.wasm.commitSources();
+      this.commitEngineSources();
     }
 
     if (!accepted) throw new Error("snapshot hydration contains invalid persisted sources");
@@ -4893,6 +4961,7 @@ export class StoreDataEngine {
       commit: () => {
         const previous = this.wasm;
         this.wasm = replacement;
+        if (this.chartRecalculationTracked) replacement.setRecalculationTracking(true);
         this.hostFunctions?.adopt(replacement);
         this.view.replaceEngine(replacement);
         this.windowReader.replaceEngine(replacement);
@@ -4975,10 +5044,7 @@ export class StoreDataEngine {
       referenceTargets[packed + 2] = target.col;
     }
 
-    let textBytes = 0;
-    for (const text of texts) textBytes += text.length;
-    const packedText = new PackedTextBuffer(textBytes, texts.length);
-    for (const text of texts) packedText.add(text);
+    const packedText = packTexts(texts);
 
     this.noteRangeMutationFfi(cellCount);
     const applied = this.wasm.setColumnBlockPacked(
@@ -4989,7 +5055,7 @@ export class StoreDataEngine {
       colCount,
       kinds,
       numbers,
-      packedText.packedBytes(),
+      packedText.bytes,
       packedText.offsets,
       wasmStyles,
       Uint32Array.from(formulas, ([offset]) => offset),
@@ -5002,7 +5068,7 @@ export class StoreDataEngine {
     }
 
     this.noteRangeMutationFfi();
-    this.wasm.commitSources();
+    this.commitEngineSources();
     this.noteRangeMutationFfi();
     this.wasm.compactStringStorage();
   }

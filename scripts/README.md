@@ -30,7 +30,8 @@ It is composed as `VERIFY_CI_NODES` in `scripts/workspace-tooling.ts` and runs, 
 order:
 
 1. Tooling contract tests, JavaScript dependency audit, `cargo test` for the default and `analysis` features, `cargo audit`
-2. Package builds
+2. Package builds. The four release cargo builds (`build:rust`) run at once first, so their
+   single-threaded link-time optimization overlaps; each package build then reuses its output
 3. Clean-export check, typechecks, lint, unit tests, example builds, Node ESM resolution
 4. Packed-consumer and bundler-consumer installs
 5. Public API check and benchmark smoke
@@ -42,14 +43,23 @@ timing comparisons run deliberately through the local protocol in
 `bench/README.md`, not as a required CI job. A green `verify:ci` is strong
 evidence, not a guarantee.
 
-CI starts preflight and the canonical artifact build independently. Package
-consumers still verify the same canonical tarballs. Rust build caches are
+CI starts preflight, the canonical artifact build and the Rust tests
+independently. The Rust job runs the default-feature engine tests, then the
+analysis, history and queries tests once, under coverage. After the artifact
+build, separate jobs run the package suites under coverage
+(`test:coverage:ts`), the other unit suites (`test:unit:uncovered`), the type,
+public API and generated-docs checks, and the benchmark smoke, so each unit
+suite runs once. Package consumers still verify the same canonical tarballs. Rust build caches are
 separate for release and coverage profiles; tool versions and build inputs
 identify their keys. Bun caches contain downloads, not `node_modules`, and
 every job still installs with the frozen lockfile. Browser caches contain
-engines, not system libraries; installation still checks host dependencies.
+engines, not system libraries. Jobs outside the Playwright image install
+Chromium without apt and start it once; only if it cannot start do they
+install its system packages.
 The production browser suite runs in three shards with two workers each.
-Required CI waits for every shard. Pull requests do not deploy docs.
+Required CI waits for every shard. The production docs job also checks that
+the examples load the XLSX backend only through lazy imports
+(`verify-example-xlsx-isolation.ts`). Pull requests do not deploy docs.
 
 When it fails, it prints `::workspace-node::<id>` before each step. Node ids are
 not always script names — `audit:javascript` is `bun scripts/dependency-audit.ts`,
@@ -104,15 +114,17 @@ a script nobody will run.
   inputs continue to consume and verify those canonical tarballs.
 
 - **`docs:generate` owns `docs/src/generated/*`, the API, formula-function,
-  Performance and generated reference pages, and `docs/public/llms*.txt`**.
+  Performance and generated reference pages, `docs/public/llms*.txt` and the
+  changelog feed (`docs/public/changelog/rss.xml`)**.
   None of it is committed: `.gitignore` lists it, and the docs dev server,
   typecheck and site build generate it first, after the packages are built.
   `GENERATED_CONTENT_DIRECTORIES` and `GENERATED_CONTENT_PAGES` in
-  `docs-shared.ts` name the owned pages. `docs:check` renders them in memory
-  and checks them with the authored pages, so a hand-written link to a page
-  or heading that no longer exists fails without a generated copy on disk.
-  The agent-readable files contain authored guides and API declarations from
-  the same inputs as the site.
+  `docs/src/lib/generated-content.ts` name the owned pages. `docs:check`
+  renders them in memory and checks them with the authored pages, so a
+  hand-written link to a page or heading that no longer exists fails without a
+  generated copy on disk. The agent-readable files contain authored guides and
+  API declarations from the same inputs as the site. `docs-feed.ts` writes the
+  feed from the release registry in `docs/src/lib/releases.ts`.
 - **`function-metadata.ts` writes the core function table**
   (`packages/core/src/generated/function-metadata.ts`, not committed). The
   core build and typecheck run it first; `test:unit` runs it and

@@ -5,15 +5,23 @@ use crate::calc::Ast;
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
 
-use super::super::matrix::{EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS};
+use super::super::matrix::{
+    EvalMatrix, SPILL_MAX_CELLS, SPILL_MAX_RECOMPUTE_CELLS, UNKNOWN_SIZE_PRECHARGE,
+};
 use super::super::value::number_from_value;
 use super::super::EvalPass;
+use super::super::Shapes;
 
-pub(crate) const NAMES: &[&str] = &["MDETERM", "MINVERSE", "MMULT", "MUNIT"];
+family_functions! {
+    MDETERM,
+    MINVERSE,
+    MMULT,
+    MUNIT,
+}
 
 /// MDETERM returns one number. The other functions return arrays.
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
-    name != "MDETERM"
+pub(crate) fn produces_array(function: Function, _: &[Ast], _: Shapes<'_>) -> bool {
+    function != Function::MDETERM
 }
 
 struct Context<'a, 'p> {
@@ -46,7 +54,7 @@ impl Context<'_, '_> {
             numbers.push(match value {
                 Value::Number(number) => *number,
                 Value::Error(error) => return Err(*error),
-                _ => return Err(FormulaError::Value),
+                Value::Text(_) | Value::Bool(_) | Value::Blank => return Err(FormulaError::Value),
             });
         }
         Ok((matrix.rows, matrix.cols, numbers))
@@ -55,7 +63,7 @@ impl Context<'_, '_> {
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -81,22 +89,22 @@ pub(crate) fn evaluate_ast(
 
 pub(crate) fn shape(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
-    let (rows, cols) = match (name, args) {
-        ("MUNIT", [dimension]) => {
-            let dimension = literal_dimension(dimension).ok_or(FormulaError::Value)??;
+    let (rows, cols) = match (function, args) {
+        (Function::MUNIT, [dimension_ast]) => {
+            let dimension = literal_dimension(dimension_ast).ok_or(FormulaError::Value)??;
             (dimension, dimension)
         }
-        ("MINVERSE", [argument]) => {
+        (Function::MINVERSE, [argument]) => {
             let (rows, cols, _) = store.matrix_shape(argument, sheet, pass)?;
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension)
         }
-        ("MMULT", [left, right]) => {
+        (Function::MMULT, [left, right]) => {
             let (rows, inner, _) = store.matrix_shape(left, sheet, pass)?;
             let (right_rows, cols, _) = store.matrix_shape(right, sheet, pass)?;
             if inner != right_rows {
@@ -111,26 +119,26 @@ pub(crate) fn shape(
     Ok((rows, cols, cells))
 }
 
-/// An MUNIT size that is known only after evaluation can use the largest
-/// spill, like SEQUENCE.
+/// An MUNIT size that is known only after evaluation is charged once it is
+/// known, like SEQUENCE.
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    if let ("MUNIT", [dimension]) = (name, args) {
+    if let (Function::MUNIT, [dimension]) = (function, args) {
         if literal_dimension(dimension).is_none() {
-            return Ok(SPILL_MAX_CELLS);
+            return Ok(UNKNOWN_SIZE_PRECHARGE);
         }
     }
-    shape(store, name, args, sheet, pass).map(|(_, _, cells)| cells)
+    shape(store, function, args, sheet, pass).map(|(_, _, cells)| cells)
 }
 
 pub(crate) fn evaluate_matrix(
     store: &CellStore,
-    name: &str,
+    function: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -142,9 +150,9 @@ pub(crate) fn evaluate_matrix(
         pass,
         depth,
     };
-    let (rows, cols, numbers) = match (name, args) {
-        ("MUNIT", [dimension]) => {
-            let dimension = dimension_from_number(context.number(dimension)?)?;
+    let (rows, cols, numbers) = match (function, args) {
+        (Function::MUNIT, [dimension_ast]) => {
+            let dimension = dimension_from_number(context.number(dimension_ast)?)?;
             EvalMatrix::validate_shape(dimension, dimension, 1, 0)?;
             let mut identity = zeros(dimension * dimension)?;
             for index in 0..dimension {
@@ -152,14 +160,14 @@ pub(crate) fn evaluate_matrix(
             }
             (dimension, dimension, identity)
         }
-        ("MINVERSE", [argument]) => {
+        (Function::MINVERSE, [argument]) => {
             let (rows, cols, numbers) = context.numbers(argument)?;
             let dimension = square_dimension(rows, cols)?;
             (dimension, dimension, inverse(dimension, numbers)?)
         }
-        ("MMULT", [left, right]) => {
-            let (rows, inner, left) = context.numbers(left)?;
-            let (right_rows, cols, right) = context.numbers(right)?;
+        (Function::MMULT, [left_ast, right_ast]) => {
+            let (rows, inner, left) = context.numbers(left_ast)?;
+            let (right_rows, cols, right) = context.numbers(right_ast)?;
             if inner != right_rows {
                 return Err(FormulaError::Value);
             }
@@ -195,17 +203,73 @@ pub(crate) fn evaluate_matrix(
 fn literal_dimension(ast: &Ast) -> Option<Result<usize, FormulaError>> {
     let number = match ast {
         Ast::Num(number) => *number,
-        Ast::Pos(inner) => match inner.as_ref() {
-            Ast::Num(number) => *number,
-            _ => return None,
-        },
-        Ast::Neg(inner) => match inner.as_ref() {
-            Ast::Num(number) => -number,
-            _ => return None,
-        },
-        _ => return None,
+        Ast::Pos(inner) => number_literal(inner)?,
+        Ast::Neg(inner) => -number_literal(inner)?,
+        Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => return None,
     };
     Some(dimension_from_number(number))
+}
+
+/// The value of a number literal, `None` for any other node.
+const fn number_literal(ast: &Ast) -> Option<f64> {
+    match ast {
+        Ast::Num(number) => Some(*number),
+        Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Parameter { .. }
+        | Ast::Lambda(_)
+        | Ast::RegexPattern(_)
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => None,
+    }
 }
 
 fn dimension_from_number(number: f64) -> Result<usize, FormulaError> {

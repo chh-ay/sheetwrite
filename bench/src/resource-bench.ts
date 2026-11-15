@@ -451,7 +451,7 @@ async function runScenario(
   mode: BenchmarkMode,
 ): Promise<ResourceScenarioResult> {
   const bytes = readFileSync(WASM_PATH);
-  await initSheetwrite(bytes);
+  await initSheetwrite({ source: bytes });
   const restoreCanvas = installCanvasTestStubs();
   const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
   const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;

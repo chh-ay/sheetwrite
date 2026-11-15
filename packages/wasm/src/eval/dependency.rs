@@ -9,8 +9,9 @@ use rustc_hash::FxHashSet;
 use crate::graph::{offset_or_search, DirtyRect, DirtySeeds, FORMULA_INDEX_PAGE_ROWS};
 use crate::memory::MemoryOwnerStats;
 use crate::sheet::SheetData;
+use crate::sorting::{key96, sort_by_key96, sort_cell_formulas_column_major, sort_cells_row_major};
 use crate::types::{
-    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, Value, FORMULA_RECURSION_LIMIT,
+    AbsCellKey, CellRange, FormulaEntry, FormulaError, ReadSet, FORMULA_RECURSION_LIMIT,
 };
 
 /// Queued formula changes always patch the index below this count. Above it, a
@@ -101,7 +102,7 @@ impl ExactBand {
             .sources
             .get(source)
             .map_or(start, |&(_, end)| end as usize);
-        self.readers.get(start..end).unwrap_or(&[])
+        self.readers.get(start..end).unwrap_or_default()
     }
 
     fn edges(&self) -> impl Iterator<Item = (u32, &[FormulaId])> + '_ {
@@ -110,7 +111,10 @@ impl ExactBand {
 
     /// Drops every `reader` edge of source `row` in place.
     fn remove_edge(&mut self, row: u32, reader: FormulaId) {
-        let Ok(source) = self.sources.binary_search_by_key(&row, |&(row, _)| row) else {
+        let Ok(source) = self
+            .sources
+            .binary_search_by_key(&row, |&(source_row, _)| source_row)
+        else {
             return;
         };
         let start = source
@@ -133,7 +137,10 @@ impl ExactBand {
 
     /// Adds one `reader` edge to source `row` in place.
     fn add_edge(&mut self, row: u32, reader: FormulaId) {
-        let source = match self.sources.binary_search_by_key(&row, |&(row, _)| row) {
+        let source = match self
+            .sources
+            .binary_search_by_key(&row, |&(source_row, _)| source_row)
+        {
             Ok(source) => source,
             Err(source) => {
                 let start = source
@@ -176,16 +183,16 @@ fn trim_spare<T>(items: &mut Vec<T>) {
 
 /// Removes every `reader` in `readers[start..end]` and returns how many.
 fn remove_reader(readers: &mut Vec<FormulaId>, start: u32, end: u32, reader: FormulaId) -> u32 {
-    let (start, end) = (start as usize, end as usize);
-    let mut write = start;
-    for read in start..end {
+    let (from, to) = (start as usize, end as usize);
+    let mut write = from;
+    for read in from..to {
         if readers[read] != reader {
             readers[write] = readers[read];
             write += 1;
         }
     }
-    readers.drain(write..end);
-    (end - write) as u32
+    readers.drain(write..to);
+    (to - write) as u32
 }
 
 struct RangeGroup {
@@ -242,14 +249,17 @@ impl DepIndex {
             return &[];
         };
         let bands = &self.exact[column].bands;
-        let band = cell.row / FORMULA_INDEX_PAGE_ROWS;
+        let band_index = cell.row / FORMULA_INDEX_PAGE_ROWS;
         let Some(first) = bands.first() else {
             return &[];
         };
-        let Some(band) =
-            offset_or_search(bands, band, band.wrapping_sub(first.band), |band| band.band)
-                .and_then(|band| bands.get(band))
-        else {
+        let Some(band) = offset_or_search(
+            bands,
+            band_index,
+            band_index.wrapping_sub(first.band),
+            |stored| stored.band,
+        )
+        .and_then(|position| bands.get(position)) else {
             return &[];
         };
         offset_or_search(
@@ -283,12 +293,12 @@ impl DepIndex {
         let start = group
             .checked_sub(1)
             .and_then(|previous| self.range_groups.get(previous))
-            .map_or(0, |group| group.end as usize);
+            .map_or(0, |previous_group| previous_group.end as usize);
         let end = self
             .range_groups
             .get(group)
-            .map_or(start, |group| group.end as usize);
-        self.range_readers.get(start..end).unwrap_or(&[])
+            .map_or(start, |stored| stored.end as usize);
+        self.range_readers.get(start..end).unwrap_or_default()
     }
 
     pub(crate) fn memory_stats(&self) -> (MemoryOwnerStats, MemoryOwnerStats) {
@@ -328,7 +338,12 @@ impl DepIndex {
         (nodes, edges)
     }
 
-    pub(super) fn has_dynamic_arrays(&self) -> bool {
+    /// Whether any formula reads another formula through its static reads.
+    pub(super) const fn has_formula_dependencies(&self) -> bool {
+        self.has_formula_dependencies
+    }
+
+    pub(super) const fn has_dynamic_arrays(&self) -> bool {
         self.dynamic_array_formulas > 0
     }
 
@@ -342,13 +357,13 @@ impl DepIndex {
         previous: Option<FormulaEntry>,
         next: Option<&FormulaEntry>,
     ) {
-        if let Some(previous) = &previous {
+        if let Some(removed) = &previous {
             self.formulas -= 1;
-            self.dynamic_array_formulas -= usize::from(previous.produces_array());
+            self.dynamic_array_formulas -= usize::from(removed.produces_array());
         }
-        if let Some(next) = next {
+        if let Some(added) = next {
             self.formulas += 1;
-            self.dynamic_array_formulas += usize::from(next.produces_array());
+            self.dynamic_array_formulas += usize::from(added.produces_array());
         }
 
         if self.pending_ids.insert(formula) {
@@ -413,9 +428,12 @@ impl DepIndex {
 
     /// Rewrites each band touched by `changes` once: `(source, reader, added)`.
     fn patch_exact(&mut self, changes: &mut [(AbsCellKey, FormulaId, bool)]) {
-        changes.sort_unstable_by_key(|&(cell, reader, added)| {
-            (cell.sheet, cell.col, cell.row, added, reader)
+        // (sheet, col, row, added, reader) order: by the last two, then
+        // stably by the cell.
+        sort_by_key96(changes, |&(_, reader, added)| {
+            u128::from(added) << 32 | u128::from(reader.raw())
         });
+        sort_by_key96(changes, |&(cell, ..)| key96(cell.sheet, cell.col, cell.row));
         let mut edges = Vec::new();
         for run in changes.chunk_by(|a, b| {
             (a.0.sheet, a.0.col, a.0.row / FORMULA_INDEX_PAGE_ROWS)
@@ -442,8 +460,8 @@ impl DepIndex {
                 }
             };
             let bands = &mut self.exact[column].bands;
-            let position = bands.binary_search_by_key(&band, |band| band.band);
-            if let (Ok(position), true) = (position, run.len() <= IN_PLACE_EDGES) {
+            let search = bands.binary_search_by_key(&band, |stored| stored.band);
+            if let (Ok(position), true) = (search, run.len() <= IN_PLACE_EDGES) {
                 let stored = &mut bands[position];
                 self.exact_sources -= stored.sources.len();
 
@@ -465,15 +483,16 @@ impl DepIndex {
                 continue;
             }
 
-            // The removals of a run sort before its additions.
+            // The run is sorted by row, then removals before additions, then
+            // reader: search in that order.
             let removed = |row: u32, reader: FormulaId| {
                 run.binary_search_by(|&(cell, removed, added)| {
-                    (added, cell.row, removed).cmp(&(false, row, reader))
+                    (cell.row, added, removed).cmp(&(row, false, reader))
                 })
                 .is_ok()
             };
             edges.clear();
-            if let Ok(position) = position {
+            if let Ok(position) = search {
                 for (row, readers) in bands[position].edges() {
                     edges.extend(
                         readers
@@ -491,7 +510,7 @@ impl DepIndex {
             );
             edges.sort_unstable();
 
-            match (position, edges.is_empty()) {
+            match (search, edges.is_empty()) {
                 (Ok(position), true) => {
                     bands.remove(position);
                 }
@@ -501,7 +520,7 @@ impl DepIndex {
                     bands.insert(position, ExactBand::from_edges(band, &edges));
                 }
             }
-            let (Ok(position) | Err(position)) = position;
+            let (Ok(position) | Err(position)) = search;
             if let Some(stored) = bands.get(position).filter(|stored| stored.band == band) {
                 self.exact_sources += stored.sources.len();
             }
@@ -566,8 +585,10 @@ impl DepIndex {
             while removed.next_if(|run| run[0].0 < group.range).is_some() {}
             let removed_run = removed
                 .next_if(|run| run[0].0 == group.range)
-                .unwrap_or(&[]);
-            let added_run = added.next_if(|run| run[0].0 == group.range).unwrap_or(&[]);
+                .unwrap_or_default();
+            let added_run = added
+                .next_if(|run| run[0].0 == group.range)
+                .unwrap_or_default();
 
             let end = group.end as usize;
             let kept = readers.len();
@@ -792,7 +813,7 @@ struct RangeInterval {
 }
 
 impl RangeInterval {
-    fn new(start: u32, end: u32, group: usize) -> Self {
+    const fn new(start: u32, end: u32, group: usize) -> Self {
         Self {
             start,
             end,
@@ -837,7 +858,7 @@ pub(crate) fn build_dep_index(sheets: &[SheetData], slots: &FormulaStore) -> Dep
         }
     }
 
-    exact_edges.sort_unstable_by_key(|&(cell, reader)| (cell.sheet, cell.col, cell.row, reader));
+    sort_cell_formulas_column_major(&mut exact_edges);
     let mut exact = Vec::new();
     let mut exact_sources = 0;
     let mut band_edges = Vec::new();
@@ -1111,10 +1132,13 @@ impl DirtyWalk<'_> {
         let mut offset = 0;
         while let Some(&group) = self.range_matches.get(offset) {
             offset += 1;
-            debug_assert!(index
-                .range_groups
-                .get(group)
-                .is_some_and(|group| group.range.contains(cell)));
+            debug_assert!(
+                index
+                    .range_groups
+                    .get(group)
+                    .is_some_and(|stored| stored.range.contains(cell)),
+                "each range match is a stored range group that contains the cell"
+            );
             self.fire_group(group);
         }
     }
@@ -1244,8 +1268,8 @@ pub(super) fn direct_readers(
         let mut add = |ids: &[FormulaId]| {
             readers.extend(ids.iter().filter_map(|&id| slots.location(id)));
         };
-        for &cell in cells {
-            let cell = AbsCellKey::from_local(sheet, cell);
+        for &local in cells {
+            let cell = AbsCellKey::from_local(sheet, local);
             add(index.exact_readers(cell));
             index.collect_matching_range_groups(cell, &mut range_matches, &mut row_matches);
             for &group in &range_matches {
@@ -1303,16 +1327,24 @@ fn seed_depth_errors(
 
     with_group_marks(index, |ranges| {
         let mut walk = DependencyDepthWalk::new(sheets, slots, index, affected, ranges);
+        // The pass evaluates formulas as the walk finishes them, after
+        // every formula they read.
+        walk.order = std::mem::take(&mut results.order);
+        walk.order.clear();
         let mut found_cycle = false;
+        // Roots in column-major order: the walk finishes each formula after
+        // the formulas it reads, which is the order the pass evaluates.
         for node in 0..walk.formulas.len() {
             let id = walk.formulas[node].1;
             if let Err(error) = walk.depth(node) {
                 found_cycle |= error == FormulaError::Cycle;
-                if !preserve_results || results.get(id).is_none() {
-                    results.insert(id, Value::Error(error));
+                if !preserve_results || !results.has(id) {
+                    results.seeded.push((id, error));
                 }
             }
         }
+        results.order = std::mem::take(&mut walk.order);
+        results.ordered = true;
         found_cycle
     })
 }
@@ -1345,17 +1377,17 @@ struct WalkFormulas(Vec<(AbsCellKey, FormulaId)>);
 
 impl WalkFormulas {
     fn new(mut formulas: Vec<(AbsCellKey, FormulaId)>) -> Self {
-        formulas.sort_unstable_by_key(|&(key, _)| column_major(key));
+        sort_cell_formulas_column_major(&mut formulas);
         Self(formulas)
     }
 
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         self.0.len()
     }
 
     fn node(&self, key: AbsCellKey) -> Option<usize> {
         self.0
-            .binary_search_by_key(&column_major(key), |&(key, _)| column_major(key))
+            .binary_search_by_key(&column_major(key), |&(node_key, _)| column_major(node_key))
             .ok()
     }
 }
@@ -1404,9 +1436,9 @@ impl<'a> EdgeCursor<'a> {
                 }
             }
             DependencyNode::Range(group) => {
-                let range = index.range_groups.get(group).map(|group| group.range);
-                let next = range.map_or(formulas.len(), |range| {
-                    let first = (range.sheet, range.col_start, range.row_start);
+                let range = index.range_groups.get(group).map(|stored| stored.range);
+                let next = range.map_or(formulas.len(), |bounds| {
+                    let first = (bounds.sheet, bounds.col_start, bounds.row_start);
                     formulas
                         .0
                         .partition_point(|&(key, _)| column_major(key) < first)
@@ -1499,7 +1531,7 @@ impl DependencyFrame<'_> {
     }
 }
 
-fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
+const fn column_major(key: AbsCellKey) -> (u32, u32, u32) {
     (key.sheet, key.col, key.row)
 }
 
@@ -1516,6 +1548,8 @@ struct DependencyDepthWalk<'a> {
     /// Parallel to `ranges.members`.
     range_states: Vec<NodeDepth>,
     stack: Vec<DependencyFrame<'a>>,
+    /// Formulas that finished without an error, each after the formulas it reads.
+    order: Vec<FormulaId>,
 }
 
 impl<'a> DependencyDepthWalk<'a> {
@@ -1526,14 +1560,23 @@ impl<'a> DependencyDepthWalk<'a> {
         affected: &FormulaWork,
         ranges: &'a mut GroupMarks,
     ) -> Self {
-        // Selected ids are already indexed; do not search their addresses again.
+        // Selected ids are indexed at their locations: every path that fills a
+        // formula slot indexes it there or retires it (`SheetFormulas`), so the
+        // walk does not search the addresses again.
         let formulas = WalkFormulas::new(
             affected
                 .ids()
                 .filter_map(|id| {
                     slots.get(id)?;
                     let key = slots.location(id)?;
-                    formula_exists(sheets, key).then_some((key, id))
+                    debug_assert_eq!(
+                        sheets
+                            .get(key.sheet as usize)
+                            .and_then(|sheet| sheet.formulas.id(key.local())),
+                        Some(id),
+                        "an occupied formula slot is indexed at its location"
+                    );
+                    Some((key, id))
                 })
                 .collect(),
         );
@@ -1546,6 +1589,7 @@ impl<'a> DependencyDepthWalk<'a> {
             ranges,
             range_states: Vec::new(),
             stack: Vec::new(),
+            order: Vec::new(),
         }
     }
 
@@ -1592,12 +1636,12 @@ impl<'a> DependencyDepthWalk<'a> {
         // The root is the last node to finish.
         let mut finished = Ok(0);
         while let Some(frame) = self.stack.last_mut() {
-            let dependency = if frame.deepest.is_ok() {
+            let pending = if frame.deepest.is_ok() {
                 frame.edges.next_dependency(self.index, &self.formulas)
             } else {
                 None
             };
-            if let Some(dependency) = dependency {
+            if let Some(dependency) = pending {
                 match self.state(dependency) {
                     Some(NodeDepth::Done(result)) => {
                         if let Some(frame) = self.stack.last_mut() {
@@ -1617,6 +1661,9 @@ impl<'a> DependencyDepthWalk<'a> {
             finished = frame.finish();
             let node = frame.edges.node;
             self.stack.pop();
+            if let (DependencyNode::Formula(position), Ok(_)) = (node, finished) {
+                self.order.push(self.formulas[position].1);
+            }
             self.set_state(node, NodeDepth::Done(finished));
             if let Some(parent) = self.stack.last_mut() {
                 parent.include(finished);
@@ -1788,7 +1835,7 @@ impl<'a> ComponentWalk<'a> {
         }
 
         // Row-major member order is the order Excel calculates a sheet in.
-        output.formulas[start..].sort_unstable_by_key(|key| (key.sheet, key.row, key.col));
+        sort_cells_row_major(&mut output.formulas[start..]);
         output
             .ends
             .push((output.formulas.len(), size > 1 || frame.reads_itself));
@@ -1842,37 +1889,7 @@ pub(super) fn circular_components(
 mod tests {
     use super::*;
     use crate::store::CellStore;
-
-    #[test]
-    fn duplicate_direct_and_range_edges_preserve_cycle_error_propagation() {
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(4, 4);
-        store.set_formula(sheet, 0, 0, "=B1+B1+SUM(B1:B1)", 0);
-        store.set_formula(sheet, 0, 1, "=A1+SUM(A1:A1)", 0);
-        let left = AbsCellKey::new(sheet, 0, 0);
-        let right = AbsCellKey::new(sheet, 0, 1);
-        let mut affected = FormulaWork::default();
-        affected.select(&store.sheets, left);
-        affected.select(&store.sheets, right);
-        let index = build_dep_index(&store.sheets, &store.formula_slots);
-
-        let mut memo = FormulaResults::default();
-        seed_dependency_depth_errors(
-            &store.sheets,
-            &store.formula_slots,
-            &affected,
-            &index,
-            &mut memo,
-        );
-        assert!(matches!(
-            memo.get(store.formula_id(left).expect("left formula")),
-            Some(Value::Error(FormulaError::Cycle))
-        ));
-        assert!(matches!(
-            memo.get(store.formula_id(right).expect("right formula")),
-            Some(Value::Error(FormulaError::Cycle))
-        ));
-    }
+    use crate::types::Value;
 
     type IntervalRow = (u32, u32, usize, u32);
 
@@ -1889,9 +1906,9 @@ mod tests {
     }
 
     fn sorted_readers(readers: &[FormulaId]) -> Vec<FormulaId> {
-        let mut readers = readers.to_vec();
-        readers.sort_unstable();
-        readers
+        let mut sorted = readers.to_vec();
+        sorted.sort_unstable();
+        sorted
     }
 
     fn interval_rows(intervals: &[RangeInterval]) -> Vec<IntervalRow> {
@@ -1963,57 +1980,44 @@ mod tests {
         assert!(patched.has_formula_dependencies || !rebuilt.has_formula_dependencies);
     }
 
-    #[test]
-    fn one_transaction_of_mixed_rewrites_patches_the_index_to_a_rebuild() {
+    /// Sets B1 to read A10, then in one batch makes B1 read nothing and
+    /// twenty formulas in C read A1: more changes in A's first band than an
+    /// in-place patch takes, with the removal at a later row than the
+    /// additions.
+    fn store_with_rebuilt_band() -> (CellStore, usize) {
+        const ADDED_READERS: usize = 20;
+
         let mut store = CellStore::new();
-        let data = store.add_sheet(1, 4);
-        let report = store.add_sheet(5, 3);
-        store.set_sheet_name(data, "data", "Data");
-        for row in 0..4 {
-            store.set_number(data, row, 0, row as f64 + 1.0, 0);
+        let sheet = store.add_sheet(3, 64);
+        store.set_number(sheet, 9, 0, 5.0, 0);
+        store.set_formula(sheet, 0, 1, "=A10", 0);
+        store.recompute(sheet);
+
+        store.set_formula(sheet, 0, 1, "=1", 0);
+        for row in 0..ADDED_READERS {
+            store.set_formula(sheet, row, 2, "=A1", 0);
         }
-        store.set_formula(report, 0, 0, "=SUM(Data!A1:A4)", 0);
-        store.set_formula(report, 1, 0, "=SUM(Data!A1:A4)*2", 0);
-        store.set_formula(report, 2, 0, "=Data!A1", 0);
-        store.set_formula(report, 0, 2, "=Data!A1:A2", 0);
-        store.set_formula(report, 0, 3, "=MAX(Data!A3:A4)", 0);
-        store.set_formula(report, 0, 4, "=E2", 0);
-        store.recompute(report);
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    #[test]
+    fn a_rebuilt_band_drops_a_removal_below_its_additions() {
+        let (mut store, _) = store_with_rebuilt_band();
         assert_patch_matches_rebuild(&mut store);
-        let epoch = store.graph.epoch();
+    }
 
-        // A2 leaves the shared Data!A1:A4 group for a new range; A3 swaps its
-        // exact read for that group plus another cell; clearing C1:D1 removes
-        // the only array formula and empties the Data!A3:A4 group; E2 becomes
-        // a formula at a cell E1 already read as a literal, closing a cycle.
-        store.set_formula(report, 1, 0, "=SUM(Data!A2:A4)", 0);
-        store.set_formula(report, 2, 0, "=SUM(Data!A1:A4)+Data!A2", 0);
-        assert!(store.clear_range(report, 0, 2, 0, 3, true, false));
-        store.set_formula(report, 1, 4, "=E1", 0);
-        store.recompute(report);
+    #[test]
+    fn a_removed_edge_no_longer_recalculates_its_old_reader() {
+        let (mut store, sheet) = store_with_rebuilt_band();
+        store.set_number(sheet, 9, 0, 6.0, 0);
 
+        super::super::FORMULA_EVALUATIONS.with(|count| count.set(0));
+        store.recompute(sheet);
         assert_eq!(
-            store.graph.epoch(),
-            epoch,
-            "a local rewrite must not rebuild"
+            super::super::FORMULA_EVALUATIONS.with(std::cell::Cell::get),
+            0
         );
-        assert_patch_matches_rebuild(&mut store);
-        assert!(store
-            .graph
-            .index()
-            .is_some_and(|index| !index.has_dynamic_arrays()));
-        assert_eq!(store.get_cell(report, 1, 0).num(), 9.0);
-        assert_eq!(store.get_cell(report, 2, 0).num(), 12.0);
-        assert_eq!(
-            store.get_cell(report, 0, 4).string().as_deref(),
-            Some("#CYCLE!")
-        );
-
-        store.set_number(data, 1, 0, 20.0, 0);
-        store.recompute(data);
-        assert_eq!(store.get_cell(report, 0, 0).num(), 28.0);
-        assert_eq!(store.get_cell(report, 1, 0).num(), 27.0);
-        assert_eq!(store.get_cell(report, 2, 0).num(), 48.0);
     }
 
     #[test]
@@ -2121,75 +2125,6 @@ mod tests {
     }
 
     #[test]
-    fn dense_overlapping_ranges_share_one_node_per_range() {
-        const ROWS: usize = 256;
-        let mut store = CellStore::new();
-        let sheet = store.add_sheet(2, ROWS);
-        let reader = format!("=SUM(A1:A{ROWS})+SUM(A2:A{ROWS})");
-        let mut affected = FormulaWork::default();
-        for row in 0..ROWS {
-            store.set_formula(sheet, row, 0, "=1", 0);
-            store.set_formula(sheet, row, 1, &reader, 0);
-            affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 0));
-            affected.select(&store.sheets, AbsCellKey::new(sheet, row as u32, 1));
-        }
-
-        let index = build_dep_index(&store.sheets, &store.formula_slots);
-        let mut ranges = GroupMarks::default();
-        ranges.reset(index.range_groups.len());
-        let mut walk = DependencyDepthWalk::new(
-            &store.sheets,
-            &store.formula_slots,
-            &index,
-            &affected,
-            &mut ranges,
-        );
-        for row in 0..ROWS {
-            let node = walk
-                .formulas
-                .node(AbsCellKey::new(sheet, row as u32, 1))
-                .expect("walked formula");
-            assert_eq!(walk.depth(node), Ok(2));
-        }
-        // Every formula plus the two distinct ranges. Expanding the ranges into
-        // reader-to-member edges would instead retain ROWS * (2 * ROWS - 1).
-        assert_eq!(
-            walk.formula_states.len() + walk.range_states.len(),
-            2 * ROWS + 2
-        );
-
-        store.set_formula(sheet, 0, 0, "=B1", 0);
-        let index = build_dep_index(&store.sheets, &store.formula_slots);
-        let mut memo = FormulaResults::default();
-        seed_dependency_depth_errors(
-            &store.sheets,
-            &store.formula_slots,
-            &affected,
-            &index,
-            &mut memo,
-        );
-        assert_eq!(memo.len(), ROWS + 1);
-        assert!(matches!(
-            memo.get(
-                store
-                    .formula_id(AbsCellKey::new(sheet, 0, 0))
-                    .expect("formula")
-            ),
-            Some(Value::Error(FormulaError::Cycle))
-        ));
-        for row in 0..ROWS {
-            assert!(matches!(
-                memo.get(
-                    store
-                        .formula_id(AbsCellKey::new(sheet, row as u32, 1))
-                        .expect("formula")
-                ),
-                Some(Value::Error(FormulaError::Cycle))
-            ));
-        }
-    }
-
-    #[test]
     fn long_dependency_chains_preserve_depth_boundary_and_distant_cycles() {
         const CHAIN_ROWS: usize = 16_384;
         // Far below what a native recursion over CHAIN_ROWS formulas needs.
@@ -2223,14 +2158,17 @@ mod tests {
                         &index,
                         &mut memo,
                     );
-                    assert_eq!(memo.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
+                    assert_eq!(memo.seeded.len(), CHAIN_ROWS - FORMULA_RECURSION_LIMIT);
                     for row in 0..CHAIN_ROWS {
                         let key = AbsCellKey::new(sheet, row as u32, 0);
                         if row < FORMULA_RECURSION_LIMIT {
-                            assert!(memo.get(store.formula_id(key).expect("formula")).is_none());
+                            assert!(memo
+                                .seeded_result(store.formula_id(key).expect("formula"))
+                                .is_none());
                         } else {
                             assert!(matches!(
-                                memo.get(store.formula_id(key).expect("formula")),
+                                memo.seeded_result(store.formula_id(key).expect("formula"))
+                                    .as_ref(),
                                 Some(Value::Error(FormulaError::Num))
                             ));
                         }
@@ -2246,9 +2184,10 @@ mod tests {
                         &index,
                         &mut memo,
                     );
-                    assert_eq!(memo.len(), CHAIN_ROWS);
+                    assert_eq!(memo.seeded.len(), CHAIN_ROWS);
                     assert!(affected.keys(&store.formula_slots).all(|key| matches!(
-                        memo.get(store.formula_id(key).expect("formula")),
+                        memo.seeded_result(store.formula_id(key).expect("formula"))
+                            .as_ref(),
                         Some(Value::Error(FormulaError::Cycle))
                     )));
                 }

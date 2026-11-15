@@ -1,0 +1,139 @@
+/*
+ * What a scenario proves, as cards (ProofCards in layout/ProofPage.tsx): each
+ * claim with its picture above the title and detail. Five cards run three
+ * then two, and five across from 110rem; four run two by two, then four
+ * across; phones show one column.
+ */
+.sw-proof-cards {
+  display: grid;
+  gap: var(--sw-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-proof-cards > li {
+  margin: 0;
+  padding: 0;
+}
+
+.sw-proof-cards > li::marker,
+.sw-proof-cards > li::before {
+  content: none;
+}
+
+.sw-proof-card {
+  display: grid;
+  height: 100%;
+  grid-template-rows: auto 1fr;
+  overflow: clip;
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+}
+
+.sw-proof-card__art {
+  display: block;
+  height: 10rem;
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-proof-card__art > svg {
+  width: 100%;
+  height: 100%;
+}
+
+.sw-proof-card__body {
+  display: grid;
+  gap: var(--sw-space-1-5);
+  align-content: start;
+  padding: var(--sw-space-4) var(--sw-space-5) var(--sw-space-5);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-proof-card__body strong {
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / 1.3 var(--sw-font-display);
+}
+
+.sw-proof-card__body p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+}
+
+@media (min-width: 40rem) {
+  .sw-proof-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* An odd last card takes the row, its picture beside its text. */
+  .sw-proof-cards > li:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+  }
+
+  .sw-proof-cards > li:last-child:nth-child(odd) .sw-proof-card {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .sw-proof-cards > li:last-child:nth-child(odd) .sw-proof-card__art {
+    border-right: var(--sw-border-width) solid var(--sw-border);
+    border-bottom: 0;
+  }
+}
+
+@media (min-width: 72rem) {
+  .sw-proof-cards {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .sw-proof-cards > li,
+  .sw-proof-cards > li:last-child:nth-child(odd) {
+    grid-column: span 2;
+  }
+
+  .sw-proof-cards > li:last-child:nth-child(odd) .sw-proof-card {
+    grid-template-columns: none;
+    grid-template-rows: auto 1fr;
+  }
+
+  .sw-proof-cards > li:last-child:nth-child(odd) .sw-proof-card__art {
+    border-right: 0;
+    border-bottom: var(--sw-border-width) solid var(--sw-border);
+  }
+
+  /* Five cards: three, then two wider; four: two by two. */
+  .sw-proof-cards:has(> li:nth-child(5):last-child) > li:nth-child(n + 4),
+  .sw-proof-cards:has(> li:nth-child(4):last-child) > li {
+    grid-column: span 3;
+  }
+}
+
+@media (min-width: 110rem) {
+  .sw-proof-cards:has(> li:nth-child(5):last-child) {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .sw-proof-cards:has(> li:nth-child(4):last-child) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .sw-proof-cards:has(> li:nth-child(5):last-child) > li,
+  .sw-proof-cards:has(> li:nth-child(4):last-child) > li {
+    grid-column: auto;
+  }
+}
+
+/* The framework pages' proof section: the cards take its full width, and
+   the section's numbered-list rules (showcase.css) don't reach them. */
+.sw-showcase-page__proof .sw-proof-cards {
+  grid-column: 1 / -1;
+}
+
+.sw-showcase-page__proof .sw-proof-cards > li {
+  display: block;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}

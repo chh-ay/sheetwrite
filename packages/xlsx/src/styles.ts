@@ -164,10 +164,9 @@ function sheetwriteColor(value: string | undefined): string | undefined {
 }
 
 function tintColor(value: string, tint: number): string {
-  const channels = [0, 2, 4].map(
-    (offset) => Number.parseInt(value.slice(offset, offset + 2), 16) / 255,
-  );
-  const [red, green, blue] = channels as [number, number, number];
+  const red = Number.parseInt(value.slice(0, 2), 16) / 255;
+  const green = Number.parseInt(value.slice(2, 4), 16) / 255;
+  const blue = Number.parseInt(value.slice(4, 6), 16) / 255;
   const maximum = Math.max(red, green, blue);
   const minimum = Math.min(red, green, blue);
   let hue = 0;
@@ -243,8 +242,8 @@ function parsedThemeColors(
     "hlink",
     "folHlink",
   ] as const;
-  for (let index = 0; index < names.length; index++) {
-    const item = xmlChild(scheme, names[index]!);
+  for (const [index, name] of names.entries()) {
+    const item = xmlChild(scheme, name);
     const source = item?.children[0];
     const raw =
       source &&
@@ -415,6 +414,7 @@ function importedAlignment(alignment: XmlElement | undefined, differential = fal
   if (xmlBoolean(xmlAttribute(alignment, "wrapText"))) style.wrap = true;
   return style;
 }
+
 // Column widths use the seven-pixel maximum digit width of Calibri 11pt.
 // An unnamed font lets producers choose a different metric and resize columns.
 const DEFAULT_CELL_FONT: FontRecord = {
@@ -446,6 +446,7 @@ function borderSideXml(name: string, border: CellBorder | undefined): string {
 }
 
 function styleFont(style: CellStyle | undefined): FontRecord {
+  const color = style?.color;
   return {
     ...(style?.bold ? { bold: true } : {}),
     ...(style?.italic ? { italic: true } : {}),
@@ -453,7 +454,7 @@ function styleFont(style: CellStyle | undefined): FontRecord {
     ...(style?.strikethrough ? { strikethrough: true } : {}),
     ...(style?.fontSize !== undefined ? { fontSize: style.fontSize } : {}),
     ...(style?.fontFamily !== undefined ? { fontFamily: style.fontFamily } : {}),
-    ...(argb(style?.color) ? { color: style!.color } : {}),
+    ...(color !== undefined && argb(color) ? { color } : {}),
   };
 }
 
@@ -573,9 +574,9 @@ export class StylesRegistry {
     for (const record of this.#styles) {
       const style = record.style;
       const font = styleFont(style);
-      const fill: FillRecord = argb(style?.backgroundColor)
-        ? { backgroundColor: style!.backgroundColor }
-        : {};
+      const backgroundColor = style?.backgroundColor;
+      const fill: FillRecord =
+        backgroundColor !== undefined && argb(backgroundColor) ? { backgroundColor } : {};
       const border = styleBorder(style);
       const fontKey = JSON.stringify(font);
       const fillKey = JSON.stringify(fill);
@@ -608,10 +609,8 @@ export class StylesRegistry {
     const customFormats = this.#customFormats;
     if (customFormats.length > 0) {
       xml.append(`<numFmts count="${customFormats.length}">`);
-      for (let index = 0; index < customFormats.length; index++) {
-        xml.append(
-          `<numFmt numFmtId="${164 + index}" formatCode="${escapeXml(customFormats[index]!)}"/>`,
-        );
+      for (const [index, format] of customFormats.entries()) {
+        xml.append(`<numFmt numFmtId="${164 + index}" formatCode="${escapeXml(format)}"/>`);
       }
       xml.append("</numFmts>");
     }
@@ -621,8 +620,10 @@ export class StylesRegistry {
     xml.append(
       `<fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>`,
     );
-    for (let index = 2; index < fills.length; index++) {
-      const color = argb(fills[index]!.backgroundColor)!;
+    for (const [index, fill] of fills.entries()) {
+      if (index < 2) continue;
+      const color = argb(fill.backgroundColor);
+      if (color === undefined) throw new TypeError("Sheetwrite: XLSX fill has no valid color");
       xml.append(
         `<fill><patternFill patternType="solid"><fgColor rgb="${color}"/><bgColor indexed="64"/></patternFill></fill>`,
       );
@@ -837,7 +838,8 @@ export class ParsedStyles {
     );
     const colorWarnings = new Set<string>();
     for (const [index, expected] of ["none", "gray125"].entries()) {
-      const pattern = fills[index] ? xmlChild(fills[index]!, "patternFill") : undefined;
+      const fill = fills[index];
+      const pattern = fill ? xmlChild(fill, "patternFill") : undefined;
       const actual = pattern ? (xmlAttribute(pattern, "patternType") ?? "none") : undefined;
       if (actual !== undefined && actual !== expected) {
         emitWarning(context, {
@@ -852,13 +854,15 @@ export class ParsedStyles {
       const fillId = integerAttribute(xf, "fillId");
       const borderId = integerAttribute(xf, "borderId");
       const numFmtId = integerAttribute(xf, "numFmtId");
-      if (fontId >= fonts.length || fillId >= fills.length || borderId >= borders.length) {
+      const font = fonts[fontId];
+      const fill = fills[fillId];
+      const border = borders[borderId];
+      if (!font || !fill || !border) {
         throw new TypeError(
           `Sheetwrite: invalid XLSX style ${styleIndex} references font ${fontId}, fill ${fillId}, or border ${borderId}`,
         );
       }
       const style: CellStyle = {};
-      const font = fonts[fontId]!;
       if (fontPropertyEnabled(xmlChild(font, "b"))) style.bold = true;
       if (fontPropertyEnabled(xmlChild(font, "i"))) style.italic = true;
       const underline = xmlChild(font, "u");
@@ -911,12 +915,11 @@ export class ParsedStyles {
       }
 
       if (fillId > 1) {
-        const fill = fills[fillId]!;
         const pattern = xmlChild(fill, "patternFill");
         const patternType = pattern ? (xmlAttribute(pattern, "patternType") ?? "none") : undefined;
-        if (patternType === "solid") {
+        if (pattern && patternType === "solid") {
           const color = resolvedColor(
-            xmlChild(pattern!, "fgColor"),
+            xmlChild(pattern, "fgColor"),
             theme,
             context,
             colorWarnings,
@@ -942,7 +945,6 @@ export class ParsedStyles {
         }
       }
 
-      const border = borders[borderId]!;
       if (
         (xmlBoolean(xmlAttribute(border, "diagonalUp")) ||
           xmlBoolean(xmlAttribute(border, "diagonalDown")) ||

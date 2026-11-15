@@ -54,7 +54,7 @@ impl Basis {
         match self {
             Self::UsThirty => days_360_us(start, end, false),
             Self::EuropeanThirty => days_360_european(start, end),
-            _ => actual_days(start, end),
+            Self::ActualActual | Self::Actual360 | Self::Actual365 => actual_days(start, end),
         }
     }
 
@@ -63,7 +63,7 @@ impl Basis {
         match self {
             Self::Actual365 => DAYS_PER_YEAR,
             Self::ActualActual => actual_year_days(start, end),
-            _ => DAYS_PER_30_360_YEAR,
+            Self::UsThirty | Self::Actual360 | Self::EuropeanThirty => DAYS_PER_30_360_YEAR,
         }
     }
 
@@ -72,7 +72,9 @@ impl Basis {
         match self {
             Self::ActualActual => actual_days(previous, next),
             Self::Actual365 => DAYS_PER_YEAR / frequency,
-            _ => DAYS_PER_30_360_YEAR / frequency,
+            Self::UsThirty | Self::Actual360 | Self::EuropeanThirty => {
+                DAYS_PER_30_360_YEAR / frequency
+            }
         }
     }
 
@@ -90,7 +92,9 @@ impl Basis {
                 days_360_us(coupons.previous, coupons.next, true)
                     - days_360_us(coupons.previous, coupons.settlement, false)
             }
-            _ => self.days(coupons.settlement, coupons.next),
+            Self::ActualActual | Self::Actual360 | Self::Actual365 | Self::EuropeanThirty => {
+                self.days(coupons.settlement, coupons.next)
+            }
         }
     }
 }
@@ -109,13 +113,13 @@ impl Date {
     /// is not a date is `#VALUE!`, as the function pages say.
     #[inline(never)]
     pub(crate) fn from_serial(serial: f64) -> Result<Self, FormulaError> {
-        let serial = serial.trunc();
+        let whole = serial.trunc();
 
-        if serial < 1.0 {
+        if whole < 1.0 {
             return Err(FormulaError::Value);
         }
 
-        let (year, month, day) = date_parts(serial).ok_or(FormulaError::Value)?;
+        let (year, month, day) = date_parts(whole).ok_or(FormulaError::Value)?;
 
         Ok(Self { year, month, day })
     }
@@ -126,11 +130,11 @@ impl Date {
         date_serial(self.year, self.month, self.day).unwrap_or(f64::NAN)
     }
 
-    pub(crate) fn month(self) -> i64 {
+    pub(crate) const fn month(self) -> i64 {
         self.month
     }
 
-    pub(crate) fn day(self) -> i64 {
+    pub(crate) const fn day(self) -> i64 {
         self.day
     }
 
@@ -164,7 +168,7 @@ impl Date {
     }
 
     /// The same date with another day of the month.
-    pub(crate) fn with_day(self, day: i64) -> Self {
+    pub(crate) const fn with_day(self, day: i64) -> Self {
         Self { day, ..self }
     }
 
@@ -212,7 +216,7 @@ impl Coupons {
 }
 
 /// The months in one coupon period.
-pub(crate) fn period_months(frequency: f64) -> i64 {
+pub(crate) const fn period_months(frequency: f64) -> i64 {
     MONTHS_PER_YEAR / frequency as i64
 }
 
@@ -253,7 +257,7 @@ fn days_360_european(start: Date, end: Date) -> f64 {
     )
 }
 
-fn days_360(start: Date, start_day: i64, end: Date, end_day: i64) -> f64 {
+const fn days_360(start: Date, start_day: i64, end: Date, end_day: i64) -> f64 {
     let years = end.year - start.year;
     let months = end.month - start.month;
 
@@ -306,7 +310,7 @@ fn holds_leap_day(start: Date, end: Date) -> bool {
     }
 }
 
-fn is_leap_year(year: i64) -> bool {
+const fn is_leap_year(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
 

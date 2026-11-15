@@ -1,12 +1,11 @@
+import { observeSiteTheme } from "@docs/lib/site-theme.js";
+import { siteGridTheme } from "@docs/showcases/site-grid-theme.js";
 import {
   createGrid,
   initSheetwrite,
   type ApplyTransactionResult,
   type Grid,
 } from "@sheetwrite/core";
-
-import { observeSiteTheme } from "../../lib/site-theme.js";
-import { siteGridTheme } from "../site-grid-theme.js";
 
 export const DATA_ROWS = 4800;
 export const DATA_SHEET = "operations";
@@ -97,7 +96,7 @@ export function buildOperationsData() {
   return { rowCount: DATA_ROWS, columns };
 }
 
-export type DataAction = "sort" | "clear" | "group" | "rows" | "columns" | "operator" | "manager";
+export type DataAction = "clear" | "group" | "rows" | "columns" | "operator" | "manager";
 export interface DataSnapshot {
   ready: boolean;
   error: string | null;
@@ -268,6 +267,8 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
           ],
         },
         data: buildOperationsData(),
+        // The column names in the headers, so filters and rules name what they guard.
+        presentation: "data-grid",
         theme: siteGridTheme(host),
         config: { toolbar: false, tabs: false },
       });
@@ -366,16 +367,9 @@ export function createDataToolsScenario(host: HTMLElement): DataToolsScenario {
     run(action: DataAction) {
       if (!grid) return;
       switch (action) {
-        case "sort":
-          grid.setViewSort([
-            { col: COLUMN.region, ascending: true },
-            { col: COLUMN.units, ascending: false },
-          ]);
-          record("Sorted by region, then by units, largest first.", "sortByMulti");
-          break;
         case "clear":
           grid.clearView();
-          record("Cleared sort and filters. Hidden rows and groups stay as they are.", "clearView");
+          record("Cleared the filters. Hidden rows and groups stay as they are.", "clearView");
           break;
         case "operator":
         case "manager":

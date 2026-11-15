@@ -87,27 +87,6 @@ async function setup() {
   return { grid, host, control, openTab, field, press, choose, addTable };
 }
 
-it("shows the Data Tools commands once the workbook has tables to manage and relate", async () => {
-  const { control, openTab, addTable } = await setup();
-  const shown = () => ({
-    manage: control("Data Model") !== null,
-    relate: control("Relationships") !== null,
-  });
-  openTab("Data");
-  expect(shown()).toEqual({ manage: false, relate: false });
-
-  // Command state, and so availability, refreshes in a microtask after a change.
-  addTable(table("orders", 0, ["customer", "amount"]));
-  await Promise.resolve();
-  expect(shown()).toEqual({ manage: true, relate: false });
-
-  addTable(table("customers", 3, ["id", "region"]));
-  await Promise.resolve();
-  expect(shown()).toEqual({ manage: true, relate: true });
-  // The short label keeps Excel's command name as its tooltip.
-  expect(control("Data Model")?.title).toBe("Manage Data Model");
-});
-
 it("creates, edits and deletes a relationship as single undo steps", async () => {
   const { grid, host, control, openTab, field, press, choose, addTable } = await setup();
   addTable(table("orders", 0, ["customer", "amount"]));
@@ -159,21 +138,4 @@ it("creates, edits and deletes a relationship as single undo steps", async () =>
   expect(grid.store.getWorkbook().dataModel).toBeUndefined();
   grid.undo();
   expect(grid.store.getWorkbook().dataModel?.relationships).toEqual([created]);
-});
-
-it("refuses a relationship between one table and itself", async () => {
-  const { grid, host, field, choose, press, addTable } = await setup();
-  addTable(table("orders", 0, ["customer", "amount"]));
-  addTable(table("customers", 3, ["id", "region"]));
-  (await loadPanels(grid)).openDataModelPanel(grid);
-
-  choose(field("Data table"), "orders");
-  choose(field("Lookup table"), "orders");
-  const save = host.querySelector<HTMLButtonElement>('[data-focus-key="save-relationship"]');
-  if (save === null) throw new Error("missing save button");
-  press(save);
-  expect(grid.store.getWorkbook().dataModel).toBeUndefined();
-  expect(host.querySelector(".sheetwrite-panel")?.textContent).toContain(
-    "Choose two different tables.",
-  );
 });

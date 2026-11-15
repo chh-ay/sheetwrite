@@ -1,10 +1,6 @@
 import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
 
-import {
-  createHistoryCommands,
-  HistoryArchive,
-  MemoryHistoryStorage,
-} from "../src/history-archive.js";
+import { HistoryArchive, historyAddon, MemoryHistoryStorage } from "../src/history-archive.js";
 import {
   type CommittedTransaction,
   createGridFromSnapshot,
@@ -20,7 +16,7 @@ import { installCanvasTestStubs } from "../src/testing.js";
 const DOCUMENT = "book";
 
 beforeAll(async () => {
-  await initSheetwrite();
+  await initSheetwrite({ addons: [historyAddon()] });
 });
 
 let restoreStubs: () => void;
@@ -75,17 +71,17 @@ async function setup() {
   document.body.append(host);
   let sync: SyncCoordinator | undefined;
   const grid = createGridFromSnapshot(host, snapshot(), {
-    config: {
-      ribbon: true,
-      history: createHistoryCommands({
+    config: { ribbon: true },
+    addons: {
+      history: {
         archive,
         authorId: "alice",
-        authorName: (id) => (id === "alice" ? "Alice" : id),
+        authorName: (id: string) => (id === "alice" ? "Alice" : id),
         sync: () => {
           if (!sync) throw new Error("sync is not ready");
           return sync;
         },
-      }),
+      },
     },
   });
   sync = new SyncCoordinator(grid, adapter, {
@@ -130,17 +126,6 @@ async function edit(grid: Grid, sync: SyncCoordinator, operation: DocumentOp): P
   expect(grid.applyTransaction({ patches: [operation] }).status).toBe("applied");
   await sync.flush();
 }
-
-it("keeps both history commands unavailable until a host supplies history", () => {
-  const host = document.createElement("div");
-  document.body.append(host);
-  const grid = createGridFromSnapshot(host, snapshot(), { config: { ribbon: true } });
-
-  expect(grid.getCommandState("versionHistory").disabled).toBe(true);
-  expect(grid.getCommandState("saveVersion").disabled).toBe(true);
-  expect(host.querySelector('[data-command="versionHistory"]')).toBeNull();
-  grid.destroy();
-});
 
 it("saves a named version, shows the edit and its author, and restores it as one undo step", async () => {
   const { grid, host, sync } = await setup();

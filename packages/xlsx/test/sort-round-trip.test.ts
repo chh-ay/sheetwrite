@@ -67,9 +67,7 @@ describe("sort and XLSX round trips", () => {
       [{ col: 0, ascending: true }],
       { hasHeader: true },
     );
-
     const { xml } = await worksheetXml(store.exportSnapshot());
-
     expect(inlineTexts(xml)).toEqual(["Name", "Qty", "apple", "fig", "pear"]);
     expect(xml).not.toContain("<sortState");
     store.dispose();

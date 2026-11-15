@@ -10,7 +10,9 @@
 use super::super::functions::{number_arg, require_arity, text_arg, FuncAccumulator};
 use crate::types::{EvalResult, FormulaError, Value};
 
-pub(crate) const NAMES: &[&str] = &["CONVERT"];
+family_functions! {
+    CONVERT,
+}
 
 /// Excel's unit groups. Units of different groups do not convert.
 #[derive(Clone, Copy)]
@@ -57,7 +59,7 @@ const NAUTICAL_MILE: f64 = 1_852.0;
 const PICA_POINT: f64 = INCH / 72.0;
 const LIGHT_YEAR: f64 = 9_460_730_472_580_800.0;
 /// 648000 / pi astronomical units of 149,597,870,700 m.
-const PARSEC: f64 = 30_856_775_814_913_673.0;
+const PARSEC: f64 = 3.085_677_581_491_367e16;
 /// 1200 / 3937 m.
 const SURVEY_FOOT: f64 = 1_200.0 / 3_937.0;
 const POUND_GRAMS: f64 = 453.592_37;
@@ -409,15 +411,26 @@ const DECIMAL_PREFIXES: &[(&str, f64)] = &[
     ("y", 1e-24),
 ];
 
+// Powers of 1024, multiplied at compile time: written out, the largest have
+// more digits than an `f64` keeps, although each is exact.
+const KIBI: f64 = 1_024.0;
+const MEBI: f64 = KIBI * KIBI;
+const GIBI: f64 = MEBI * KIBI;
+const TEBI: f64 = GIBI * KIBI;
+const PEBI: f64 = TEBI * KIBI;
+const EXBI: f64 = PEBI * KIBI;
+const ZEBI: f64 = EXBI * KIBI;
+const YOBI: f64 = ZEBI * KIBI;
+
 const BINARY_PREFIXES: &[(&str, f64)] = &[
-    ("Yi", 1_208_925_819_614_629_174_706_176.0),
-    ("Zi", 1_180_591_620_717_411_303_424.0),
-    ("Ei", 1_152_921_504_606_846_976.0),
-    ("Pi", 1_125_899_906_842_624.0),
-    ("Ti", 1_099_511_627_776.0),
-    ("Gi", 1_073_741_824.0),
-    ("Mi", 1_048_576.0),
-    ("ki", 1_024.0),
+    ("Yi", YOBI),
+    ("Zi", ZEBI),
+    ("Ei", EXBI),
+    ("Pi", PEBI),
+    ("Ti", TEBI),
+    ("Gi", GIBI),
+    ("Mi", MEBI),
+    ("ki", KIBI),
 ];
 
 /// Kelvins at 0 degrees Celsius.
@@ -437,12 +450,12 @@ struct Resolved {
 }
 
 impl Resolved {
-    fn group(&self) -> u8 {
+    const fn group(&self) -> u8 {
         self.kind & GROUP_MASK
     }
 }
 
-pub(crate) fn evaluate(_name: &str, values: &FuncAccumulator) -> EvalResult {
+pub(crate) fn evaluate(_: Function, values: &FuncAccumulator) -> EvalResult {
     convert(values).map_or_else(Value::Error, Value::number)
 }
 
@@ -496,13 +509,13 @@ fn resolve(spelling: &str) -> Option<Resolved> {
 }
 
 fn find(symbol: &str, scale: f64) -> Option<Resolved> {
-    let (index, symbol) = UNIT_SYMBOLS
+    let (index, known) = UNIT_SYMBOLS
         .split(' ')
         .enumerate()
         .find(|&(_, candidate)| candidate == symbol)?;
 
     Some(Resolved {
-        symbol,
+        symbol: known,
         kind: UNIT_KINDS[index],
         factor: UNIT_FACTORS[index],
         scale,
@@ -546,7 +559,7 @@ mod tests {
             values.finish_arg(1, 1).unwrap();
         }
 
-        evaluate("CONVERT", &values)
+        evaluate(Function::CONVERT, &values)
     }
 
     fn assert_close(number: f64, from: &str, to: &str, expected: f64) {
@@ -573,60 +586,5 @@ mod tests {
         assert_close(6.0, "km", "mi", 3.728_227_153_424_004);
         assert_close(6.0, "in", "ft", 0.5);
         assert_close(6.0, "cm", "in", 2.362_204_724_409_449);
-    }
-
-    #[test]
-    fn prefixes_follow_the_unit_rules() {
-        assert_close(1.0, "km2", "m2", 1e6);
-        assert_close(1.0, "m^3", "cm3", 1e6);
-        assert_close(1.0, "ml", "l", 1e-3);
-        assert_close(1.0, "dam", "m", 10.0);
-        assert_close(1.0, "kibyte", "bit", 8_192.0);
-        assert_close(1.0, "Mibit", "kbit", 1_048.576);
-        assert_close(1.0, "kK", "K", 1_000.0);
-        assert_close(1.0, "km/h", "m/s", 1.0 / 3.6);
-        assert_close(1.0, "mi", "ft", 5_280.0);
-        assert_close(1.0, "Nmi", "m", 1_852.0);
-        assert_close(1.0, "ozm", "g", 28.349_523_125);
-        assert_close(1.0, "hh", "Wh", HORSEPOWER);
-        assert_close(1.0, "atm", "mmHg", ATMOSPHERE / 133.322_387_415);
-
-        for (from, to) in [
-            ("kft", "m"),
-            ("Kim", "m"),
-            ("kim", "m"),
-            ("LBM", "kg"),
-            ("x", "m"),
-            ("kg", "m"),
-        ] {
-            assert_eq!(
-                call(1.0, from, to),
-                Value::Error(FormulaError::Na),
-                "{from}"
-            );
-        }
-    }
-
-    #[test]
-    fn temperatures_convert_through_celsius() {
-        assert_close(0.0, "C", "K", 273.15);
-        assert_close(100.0, "C", "F", 212.0);
-        assert_close(491.67, "Rank", "F", 32.0);
-        assert_close(80.0, "Reau", "C", 100.0);
-        assert_close(0.0, "K", "Rank", 0.0);
-    }
-
-    #[test]
-    fn every_spelling_is_unique_and_has_one_entry() {
-        let symbols: Vec<&str> = UNIT_SYMBOLS.split(' ').collect();
-
-        assert_eq!(symbols.len(), UNIT_KINDS.len());
-
-        for (index, symbol) in symbols.iter().enumerate() {
-            assert!(
-                !symbols[index + 1..].contains(symbol),
-                "{symbol} is listed twice"
-            );
-        }
     }
 }

@@ -7,6 +7,7 @@
 import { iconNode } from "../icons/resolve.js";
 import { onQueryCommandsChange } from "../query-commands.js";
 import { Scope } from "../scope.js";
+import { checkIconStyles, checkStylePart } from "../style-parts.js";
 import type { CommandFlags, Grid, IconOverrides, RibbonConfig, RibbonMode } from "../types/grid.js";
 import {
   commandAvailable,
@@ -32,9 +33,9 @@ import {
 import {
   assertRibbonConfig,
   RIBBON_COMPACT_PANEL_HEIGHT,
-  RIBBON_COMPACT_WIDTH,
   RIBBON_PANEL_HEIGHT,
   RIBBON_TAB_ROW_HEIGHT,
+  ribbonIsCompact,
 } from "./ribbon-metrics.js";
 import { RIBBON_TABS } from "./ribbon-model.js";
 import { RibbonPopup } from "./ribbon-popup.js";
@@ -125,6 +126,7 @@ export class Ribbon {
     this.tabList.setAttribute("role", "tablist");
     this.tabList.setAttribute("aria-label", "Ribbon tabs");
     this.tabSpecs.forEach((tab, index) => this.tabList.appendChild(this.createTab(tab, index)));
+    this.tabList.addEventListener("scroll", this.updateTabOverflow, { passive: true });
 
     this.modeButton = document.createElement("button");
     this.modeButton.type = "button";
@@ -148,6 +150,7 @@ export class Ribbon {
     this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
+    checkStylePart(this.element, "ribbon", "The ribbon");
     this.lifetime.add(() => this.element.remove());
     this.lifetime.add(() => this.popup.destroy());
 
@@ -158,6 +161,8 @@ export class Ribbon {
     this.lifetime.add(
       onQueryCommandsChange(grid, () => this.refresh((command) => grid.getCommandState(command))),
     );
+    // Some commands depend on the document, such as Edit Links on its links.
+    this.lifetime.add(grid.on("change", () => this.updateAvailability()));
     // Absent in some test environments; the ribbon then never shrinks groups.
     if (typeof ResizeObserver === "function") {
       const resizeObserver = new ResizeObserver(() => this.scheduleFit());
@@ -253,6 +258,7 @@ export class Ribbon {
     const panel = { element, groups, controls, fitSteps: ribbonFitSteps(reduceOrder) };
     this.panels[index] = panel;
     this.element.appendChild(element);
+    checkIconStyles(element, "The ribbon");
     return panel;
   }
 
@@ -417,15 +423,27 @@ export class Ribbon {
     if (this.fitFrame !== 0 || this.lifetime.closed) return;
     this.fitFrame = requestAnimationFrame(() => {
       this.fitFrame = 0;
+      this.updateTabOverflow();
       this.fit();
     });
   }
 
+  /**
+   * Mark which ends of the tab list hide tabs, so the stylesheet fades those
+   * edges instead of cutting a tab label off beside the layout buttons.
+   */
+  private readonly updateTabOverflow = (): void => {
+    const list = this.tabList;
+    const hiddenBefore = list.scrollLeft > 0;
+    const hiddenAfter = list.scrollLeft + list.clientWidth < list.scrollWidth - 1;
+    if (hiddenBefore && hiddenAfter) list.dataset.overflow = "both";
+    else if (hiddenBefore) list.dataset.overflow = "start";
+    else if (hiddenAfter) list.dataset.overflow = "end";
+    else delete list.dataset.overflow;
+  };
+
   private updateLayout(): void {
-    const compact =
-      this.mode === "compact" ||
-      (this.mode === "auto" &&
-        this.element.clientWidth < (this.options.compactWidth ?? RIBBON_COMPACT_WIDTH));
+    const compact = ribbonIsCompact(this.element.clientWidth, this.mode, this.options.compactWidth);
     this.modeButton.setAttribute("aria-pressed", String(compact));
     this.element.dataset.mode = compact ? "compact" : "full";
     if (compact === this.compact) return;

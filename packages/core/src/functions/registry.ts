@@ -132,7 +132,7 @@ function setterOf(wasm: RecomputingCellStore): HostFunctionSetter {
     throw new SheetwriteError(
       "optional-backend-unavailable",
       "host-function",
-      "Host functions need the full engine: call initSheetwrite(undefined, formulas) with @sheetwrite/formulas",
+      "Host functions need the full engine: call initSheetwrite({ engine: formulas }) with @sheetwrite/formulas",
     );
   }
 

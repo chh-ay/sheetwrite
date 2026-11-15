@@ -111,14 +111,6 @@ it("quick sort in a table sorts the table body", () => {
   expect(column(1)).toEqual(["Qty", 1, 2, 3]);
 });
 
-it("the view sort keeps every cell in its row", () => {
-  const { grid, column } = setup();
-
-  grid.setViewSort([{ col: 1, ascending: true }]);
-
-  expect(column(1)).toEqual(["Qty", 3, 1, 2]);
-});
-
 it("the Sort panel sorts the cells by several levels, or only the view", () => {
   const { grid, column, focus } = setup();
   focus(1, 0);

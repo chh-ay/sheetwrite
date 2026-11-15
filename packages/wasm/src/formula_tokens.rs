@@ -49,9 +49,11 @@ pub(crate) enum TokenKind {
 /// One token of [`lex_tolerant`] and its byte span in the source.
 pub(crate) struct Spanned<'a> {
     /// The token, or the lexer's message for text it cannot read.
-    pub tok: Result<Tok<'a>, String>,
-    pub start: usize,
-    pub end: usize,
+    pub(crate) tok: Result<Tok<'a>, String>,
+    /// Inclusive byte offset into the original formula text.
+    pub(crate) start: usize,
+    /// Exclusive byte offset into the original formula text.
+    pub(crate) end: usize,
 }
 
 /// Where the formula starts in editor text: after leading whitespace and one
@@ -100,11 +102,11 @@ pub(crate) fn lex_tolerant(src: &str) -> Vec<Spanned<'_>> {
 }
 
 fn token_kind(tok: &Result<Tok<'_>, String>, next: Option<&Spanned<'_>>) -> TokenKind {
-    let Ok(tok) = tok else {
+    let Ok(parsed) = tok else {
         return TokenKind::Bad;
     };
 
-    match tok {
+    match parsed {
         Tok::Num(_) => TokenKind::Number,
         Tok::Str(_) => TokenKind::String,
         Tok::Ident(_, true) => TokenKind::QuotedSheet,
@@ -147,7 +149,7 @@ struct Utf16Offsets<'a> {
 }
 
 impl<'a> Utf16Offsets<'a> {
-    fn new(src: &'a str) -> Self {
+    const fn new(src: &'a str) -> Self {
         Self {
             src,
             byte: 0,
@@ -173,8 +175,14 @@ impl<'a> Utf16Offsets<'a> {
 /// constant, 4 name (a function, reference, defined name, table or sheet),
 /// 5 quoted sheet name, 6 table reference in brackets, 7 operator, 8 `:`,
 /// 9 `!`, 10 `#`, 11 `,`, 12 `;`, 13 `(`, 14 `)`, 15 `{`, 16 `}`, 17 bad text.
-#[wasm_bindgen(js_name = formulaTokens)]
-pub fn formula_tokens(src: &str) -> Vec<u32> {
+#[wasm_bindgen(
+    js_name = formulaTokens,
+    return_description = "Four numbers per token, in text order: kind, start, end and space."
+)]
+#[must_use]
+pub fn formula_tokens(
+    #[wasm_bindgen(param_description = "Formula text, with or without the leading `=`.")] src: &str,
+) -> Vec<u32> {
     let tokens = lex_tolerant(src);
     let mut offsets = Utf16Offsets::new(src);
     let mut packed = Vec::with_capacity(tokens.len() * TOKEN_FIELDS);
@@ -201,6 +209,7 @@ pub fn formula_tokens(src: &str) -> Vec<u32> {
 }
 
 /// The first syntax error of a formula, as the engine's parser finds it.
+#[derive(Debug)]
 #[wasm_bindgen]
 pub struct FormulaSyntaxError {
     from: u32,
@@ -212,25 +221,30 @@ pub struct FormulaSyntaxError {
 #[wasm_bindgen]
 impl FormulaSyntaxError {
     /// The UTF-16 offset where the marked text starts.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = from)]
+    #[must_use]
     pub fn from(&self) -> u32 {
         self.from
     }
 
     /// The UTF-16 offset where the marked text ends.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = to)]
+    #[must_use]
     pub fn to(&self) -> u32 {
         self.to
     }
 
     /// The text ends before the formula is complete: a value, a `)` or a
     /// closing quote is missing at the end. Typing on usually completes it.
-    #[wasm_bindgen(getter)]
+    #[wasm_bindgen(getter, js_name = incomplete)]
+    #[must_use]
     pub fn incomplete(&self) -> bool {
         self.incomplete
     }
 
-    #[wasm_bindgen(getter)]
+    /// The parser or lexer's explanation of the marked syntax error.
+    #[wasm_bindgen(getter, js_name = message)]
+    #[must_use]
     pub fn message(&self) -> String {
         self.message.clone()
     }
@@ -265,8 +279,14 @@ fn first_error(src: &str) -> Option<(usize, usize, bool, String)> {
 
 /// The first syntax error in formula text, or `undefined` when the engine's
 /// parser reads the whole formula. A leading `=` is optional, as for a cell.
-#[wasm_bindgen(js_name = checkFormulaSyntax)]
-pub fn check_formula_syntax(src: &str) -> Option<FormulaSyntaxError> {
+#[wasm_bindgen(
+    js_name = checkFormulaSyntax,
+    return_description = "The first syntax error, with its UTF-16 span and message; `undefined` when the formula parses."
+)]
+#[must_use]
+pub fn check_formula_syntax(
+    #[wasm_bindgen(param_description = "Formula text, with or without the leading `=`.")] src: &str,
+) -> Option<FormulaSyntaxError> {
     let (start, end, incomplete, message) = first_error(src)?;
     let mut offsets = Utf16Offsets::new(src);
 

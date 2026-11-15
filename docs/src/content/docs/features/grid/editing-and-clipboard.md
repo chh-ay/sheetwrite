@@ -89,6 +89,10 @@ While the IME is composing, keystrokes belong to the composition. The grid does 
 
 Successful completion emits `change`, then `edit-commit`, then the navigation's `selection` event. Rejected completion does not emit `edit-commit` or navigate. Event addresses remain view coordinates.
 
+### Formula bar
+
+During an edit the cell editor and the shell's formula bar ([`createFormulaBar`](/docs/api/core-shell/create-formula-bar/)) share one draft, as in Excel. Every keystroke, paste, IME step, undo or picked reference in the cell editor shows in the bar, and typing in the bar shows in the cell, which opens its editor without taking focus. Escape in either cancels the edit and both show the stored value again; Enter in either commits. Moving focus between the two keeps the edit open.
+
 To supply your own editor, see [Host-supplied editors](/docs/features/grid/custom-editors/).
 
 ## Clipboard interoperability

@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import type * as WasmModule from "@sheetwrite/wasm";
 import type { CellStore as WasmCellStore } from "@sheetwrite/wasm";
 
+import { writeStringColumn } from "./packed-fixture.js";
 import { median } from "./stats.js";
 
 const wasmRoot =
@@ -25,7 +26,8 @@ function measure(operation: () => void): number {
 
 function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
   for (let start = 0; start < ROWS; start += BATCH) {
-    store.setColumnStrings(
+    writeStringColumn(
+      store,
       sheet,
       0,
       start,
@@ -35,6 +37,15 @@ function ingest(store: WasmCellStore, sheet: number, distinct: boolean): void {
       0,
     );
   }
+}
+
+// The read row timed the JS heap the write fixture left behind, not the
+// stored strings: on Linux, develop's setSparseBlock read ×1.22 slower than
+// 0.6.1's with identical engine state, and ×0.989 after one full collection
+// (#651). Collect before each read row so every writer starts from the same heap.
+function settledMeasure(operation: () => void): number {
+  Bun.gc(true);
+  return measure(operation);
 }
 
 function controls() {
@@ -54,7 +65,7 @@ function controls() {
             store.commitSources();
           }
         }),
-        read: measure(() => {
+        read: settledMeasure(() => {
           for (let read = 0; read < 10_000; read++) {
             const start = (read * 64) % (ROWS - 64);
             const window = store.getWindow(sheet, start, start + 64, new Uint32Array([0]));

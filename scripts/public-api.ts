@@ -115,6 +115,20 @@ const FORBIDDEN_EXPORTS = new Set([
   "XlsxImportBackend",
   "setXlsxBackend",
   "setXlsxImportBackend",
+  "setXlsxTableExportBackend",
+  "setXlsxTableImportBackend",
+  "setXlsxWorkbookBackend",
+  "setXlsxSourceVerifier",
+  "setChartRendererFactory",
+  "setChartViewProviderFactory",
+  "registerChartsBackend",
+  "registerXlsxBackends",
+  "registerFunction",
+  "unregisterFunction",
+  "registerQueryCommands",
+  "createQuerySession",
+  "createHistoryCommands",
+  "connectExternalLinks",
 ]);
 
 const REQUIRED_CORE_EXPORTS = new Set([
@@ -126,12 +140,11 @@ const REQUIRED_CORE_EXPORTS = new Set([
   "fromXlsxTable",
   "XlsxTableExportBackend",
   "XlsxTableImportBackend",
-  "setXlsxTableExportBackend",
-  "setXlsxTableImportBackend",
   "toXlsxWorkbook",
   "fromXlsxWorkbook",
   "XlsxWorkbookBackend",
-  "setXlsxWorkbookBackend",
+  "initSheetwrite",
+  "SheetwriteAddon",
 ]);
 
 const SUPPORTED_PACKAGES: Readonly<Record<string, true>> = {
@@ -669,23 +682,11 @@ function formatIssues(issues: readonly ApiIssue[]): string {
 if (import.meta.main) {
   const mode = process.argv[2];
   const repositoryRoot = resolve(process.argv[3] ?? join(import.meta.dir, ".."));
-  if (mode !== "report" && mode !== "check" && mode !== "baseline") {
-    throw new Error("Usage: bun scripts/public-api.ts <report|check|baseline> [repository-root]");
+  if (mode !== "check" && mode !== "baseline") {
+    throw new Error("Usage: bun scripts/public-api.ts <check|baseline> [repository-root]");
   }
   const result = await analyzePublicApi(repositoryRoot);
-  if (mode === "report") {
-    if (
-      result.issues.some(
-        (issue) =>
-          issue.code === "malformed-report" ||
-          issue.code === "parse-error" ||
-          issue.code === "unresolved-entry",
-      )
-    ) {
-      throw new Error(formatIssues(result.issues));
-    }
-    process.stdout.write(`${JSON.stringify(result.manifest, null, 2)}\n`);
-  } else if (mode === "baseline") {
+  if (mode === "baseline") {
     if (result.issues.length > 0) throw new Error(formatIssues(result.issues));
     const baseline = await writePublicApiBaseline(repositoryRoot, result.manifest);
     const exportCount = Object.keys(baseline.exports).length;

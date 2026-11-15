@@ -1,12 +1,16 @@
 //! Workbook-owned formula entries. Cell addresses locate slots; graph walks use ids.
 
+use rustc_hash::FxHashMap;
+
+use crate::calc::{for_each_table_ref, unresolved_sheet_names, Ast, TableSection};
 use crate::memory::{StoreMemoryStats, FORMULAS};
 use crate::types::{AbsCellKey, CellKey, CellRange, EvalResult, FormulaEntry, FormulaError};
 
 const NO_FREE_SLOT: u32 = u32::MAX;
 const BITS_PER_WORD: usize = u64::BITS as usize;
-const NO_RESULT_POSITION: u32 = u32::MAX;
-const SLOT_CAPACITY_SLACK: usize = 4096;
+/// Pass order entries kept between passes: 16 KB, enough for the formulas
+/// a typical edit reaches, so those passes allocate no order list.
+const RETAINED_ORDER_CAPACITY: usize = 4096;
 const SLOT_GROWTH_DIVISOR: usize = 8;
 const MIN_SLOT_GROWTH: usize = 1;
 
@@ -44,6 +48,11 @@ impl FormulaId {
     pub(crate) fn index(self) -> usize {
         self.0 as usize
     }
+
+    /// The id as a 32-bit integer, for packed sort keys.
+    pub(crate) const fn raw(self) -> u32 {
+        self.0
+    }
 }
 
 /// Primary membership bits shared by dirty work and active evaluation state.
@@ -64,28 +73,39 @@ impl FormulaBits {
     }
 
     /// Return whether this id is new, so a worklist can reject duplicates.
+    /// Every pass step calls this per formula, so the common case is inline
+    /// and only growing the words is out of line.
+    #[inline]
     pub(crate) fn insert(&mut self, id: FormulaId) -> bool {
         let index = id.index();
         let word = index / BITS_PER_WORD;
         if self.words.len() <= word {
-            if self.words.capacity() == 0 {
-                self.words.reserve_exact(word + 1);
-            }
-            self.words.resize(word + 1, 0);
+            self.grow_to(word);
         }
         let mask = 1u64 << (index % BITS_PER_WORD);
-        let Some(word) = self.words.get_mut(word) else {
+        let Some(bits) = self.words.get_mut(word) else {
             return false;
         };
-        if *word & mask != 0 {
+        if *bits & mask != 0 {
             return false;
         }
-        *word |= mask;
+        *bits |= mask;
         self.count += 1;
         true
     }
 
+    /// Adds words up to and including `word`.
+    #[cold]
+    #[inline(never)]
+    fn grow_to(&mut self, word: usize) {
+        if self.words.capacity() == 0 {
+            self.words.reserve_exact(word + 1);
+        }
+        self.words.resize(word + 1, 0);
+    }
+
     /// Remove membership while keeping the empty check constant-time.
+    #[inline]
     pub(crate) fn remove(&mut self, id: FormulaId) -> bool {
         let index = id.index();
         let Some(word) = self.words.get_mut(index / BITS_PER_WORD) else {
@@ -98,6 +118,14 @@ impl FormulaBits {
         *word &= !mask;
         self.count -= 1;
         true
+    }
+
+    /// Clears every bit in one pass over the words, keeping their storage.
+    pub(crate) fn clear_all(&mut self) {
+        if self.count != 0 {
+            self.words.fill(0);
+            self.count = 0;
+        }
     }
 
     /// Empty membership permits flag storage to be released.
@@ -197,19 +225,134 @@ pub(crate) struct FormulaStore {
     retired_tail: Option<FormulaId>,
     volatile: FormulaBits,
     subtotals: FormulaBits,
+    /// The formulas that name a sheet the workbook does not have, use a
+    /// table or call GETPIVOTDATA. Absent in the usual workbook, so it adds
+    /// one word.
+    references: Option<Box<ReferenceUsers>>,
+}
+
+/// How one formula uses tables: the table slot it reads and how, or
+/// [`TableUses::SEVERAL`] when it reads more than one table.
+#[derive(Clone, Copy)]
+struct TableUses {
+    slot: u16,
+    kinds: u8,
+}
+
+impl TableUses {
+    /// Reads rows of the table: a whole column, its header or its totals.
+    const SPANNING: u8 = 1;
+    /// Reads only its own row of the table (`[@Column]`).
+    const ROW: u8 = 2;
+    /// Holds a table reference no table binds yet.
+    const UNBOUND: u8 = 4;
+    /// Reads more than one table; every table edit lists it.
+    const SEVERAL: u8 = 8;
+
+    /// Whether an edit of table `slot` changes the formula's cells. With
+    /// `own_rows` the edit also moves or shrinks the rows a `[@Column]` reads.
+    const fn uses(self, slot: u16, own_rows: bool) -> bool {
+        let kinds = if own_rows {
+            Self::SPANNING | Self::ROW
+        } else {
+            Self::SPANNING
+        };
+        self.kinds & Self::SEVERAL != 0 || (self.slot == slot && self.kinds & kinds != 0)
+    }
+}
+
+/// The formulas that use tables, with how they use them. A table edit
+/// changes the cells of the formulas that read its rows, and of its
+/// `[@Column]` formulas only when the rows of the table move or shrink, so
+/// appending a row touches no `[@Column]` formula.
+#[derive(Default)]
+struct TableUsers {
+    by_formula: FxHashMap<FormulaId, TableUses>,
+}
+
+impl TableUsers {
+    fn record(&mut self, id: FormulaId, ast: &Ast) {
+        let mut uses = TableUses { slot: 0, kinds: 0 };
+        for_each_table_ref(ast, &mut |reference| {
+            let Some((slot, section)) = reference else {
+                uses.kinds |= TableUses::UNBOUND;
+                return;
+            };
+            if uses.kinds & (TableUses::SPANNING | TableUses::ROW) != 0 && uses.slot != slot {
+                uses.kinds |= TableUses::SEVERAL;
+            }
+            uses.slot = slot;
+            uses.kinds |= if section == TableSection::CurrentRow {
+                TableUses::ROW
+            } else {
+                TableUses::SPANNING
+            };
+        });
+        if uses.kinds != 0 {
+            self.by_formula.insert(id, uses);
+        }
+    }
+
+    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
+        formulas.add_hash_table::<FormulaId, TableUses>(
+            self.by_formula.len(),
+            self.by_formula.capacity(),
+        );
+    }
+}
+
+/// The formulas an edit elsewhere has to find: those that name a sheet the
+/// workbook does not have, and those that use a table. A sheet that
+/// appears finds its formulas by a scan, since few formulas name a missing
+/// sheet.
+#[derive(Default)]
+struct ReferenceUsers {
+    /// The missing sheet names each formula holds, each once.
+    missing_sheets: FxHashMap<FormulaId, Vec<String>>,
+    tables: TableUsers,
+    /// The formulas that call GETPIVOTDATA.
+    #[cfg(feature = "analysis")]
+    pivot_readers: FormulaBits,
+}
+
+impl ReferenceUsers {
+    fn add_memory_stats(&self, formulas: &mut crate::memory::MemoryOwnerStats) {
+        formulas.add_payload(std::mem::size_of::<Self>(), std::mem::size_of::<Self>());
+        formulas.add_hash_table::<FormulaId, Vec<String>>(
+            self.missing_sheets.len(),
+            self.missing_sheets.capacity(),
+        );
+        for names in self.missing_sheets.values() {
+            formulas.add_vec::<String>(names.len(), names.capacity());
+            for name in names {
+                formulas.add_payload(name.len(), name.capacity());
+            }
+        }
+        self.tables.add_memory_stats(formulas);
+        #[cfg(feature = "analysis")]
+        self.pivot_readers.add_memory_stats(formulas);
+    }
+
+    fn is_empty(&self) -> bool {
+        #[cfg(feature = "analysis")]
+        if !self.pivot_readers.is_empty() {
+            return false;
+        }
+        self.missing_sheets.is_empty() && self.tables.by_formula.is_empty()
+    }
+}
+
+/// The slot of `id` in the entry pages, borrowing only the pages.
+fn slot_in(entries: &[Vec<FormulaSlot>], id: FormulaId) -> Option<&FormulaSlot> {
+    let index = id.index();
+    entries
+        .get(index / SLOT_PAGE_LEN)?
+        .get(index % SLOT_PAGE_LEN)
 }
 
 impl FormulaStore {
-    /// Include vacant slots because dense pass state uses the same id span.
-    pub(crate) fn slots(&self) -> usize {
-        self.locations.len()
-    }
-
     fn slot(&self, id: FormulaId) -> Option<&FormulaSlot> {
-        let index = id.index();
-        self.entries
-            .get(index / SLOT_PAGE_LEN)?
-            .get(index % SLOT_PAGE_LEN)
+        slot_in(&self.entries, id)
     }
 
     fn slot_mut(&mut self, id: FormulaId) -> Option<&mut FormulaSlot> {
@@ -228,6 +371,14 @@ impl FormulaStore {
             }
             None => self.locations.len() < NO_FREE_SLOT as usize,
         }
+    }
+
+    /// Every occupied slot with its location, for invariant checks.
+    #[cfg(test)]
+    pub(crate) fn occupied(&self) -> impl Iterator<Item = (FormulaId, AbsCellKey)> + '_ {
+        (0..self.locations.len() as u32)
+            .map(FormulaId)
+            .filter_map(|id| Some((id, self.location(id).filter(|_| self.get(id).is_some())?)))
     }
 
     /// Resolve moved cells without keeping pointers in a pass worklist.
@@ -254,6 +405,7 @@ impl FormulaStore {
     }
 
     fn track(&mut self, id: FormulaId) {
+        self.track_references(id);
         let (volatile, subtotal) = self.get(id).map_or((false, false), |entry| {
             (entry.volatile(), entry.calls_subtotal())
         });
@@ -269,6 +421,99 @@ impl FormulaStore {
             self.subtotals.remove(id);
             self.subtotals.release_if_empty();
         }
+    }
+
+    fn track_references(&mut self, id: FormulaId) {
+        let stored = match slot_in(&self.entries, id) {
+            Some(FormulaSlot::Occupied(entry)) => Some(entry),
+            Some(FormulaSlot::Vacant(_)) | None => None,
+        };
+        // Only a formula that names a missing local sheet has a #REF! source
+        // error with a tree, and only one with a table reference has the
+        // table flag; every other formula skips the walks.
+        let missing = stored.is_some_and(|entry| {
+            entry.ast.is_some() && entry.source_error() == Some(FormulaError::Ref)
+        });
+        let table_tree = stored
+            .filter(|entry| entry.uses_tables())
+            .and_then(|entry| entry.ast.as_ref());
+        #[cfg(feature = "analysis")]
+        let pivot_reader = stored.is_some_and(FormulaEntry::calls_pivot_data);
+        #[cfg(not(feature = "analysis"))]
+        let pivot_reader = false;
+        if !missing && table_tree.is_none() && !pivot_reader && self.references.is_none() {
+            return;
+        }
+        let mut names = Vec::new();
+        if missing {
+            if let Some(ast) = stored.and_then(|entry| entry.ast.as_ref()) {
+                unresolved_sheet_names(ast, &mut names);
+            }
+        }
+        let index = self.references.get_or_insert_with(Box::default);
+        index.missing_sheets.remove(&id);
+        if !names.is_empty() {
+            // A formula names few sheets, so a scan drops repeats; sorting
+            // strings would add a sort to the engine for this alone.
+            let mut unique: Vec<String> = Vec::with_capacity(names.len());
+            for name in names {
+                if !unique.contains(&name) {
+                    unique.push(name);
+                }
+            }
+            index.missing_sheets.insert(id, unique);
+        }
+        index.tables.by_formula.remove(&id);
+        if let Some(ast) = table_tree {
+            index.tables.record(id, ast);
+        }
+        #[cfg(feature = "analysis")]
+        // A workbook without GETPIVOTDATA readers keeps an empty set, so
+        // `remove` stops at its bounds check and nothing is released.
+        if pivot_reader {
+            index.pivot_readers.insert(id);
+        } else if index.pivot_readers.remove(id) {
+            index.pivot_readers.release_if_empty();
+        }
+        if index.is_empty() {
+            self.references = None;
+        }
+    }
+
+    /// The formulas that name one of the missing sheets `keys` (normalized),
+    /// each once.
+    pub(crate) fn unresolved_sheet_users(&self, keys: &[String]) -> Vec<FormulaId> {
+        let Some(index) = &self.references else {
+            return Vec::new();
+        };
+        index
+            .missing_sheets
+            .iter()
+            .filter_map(|(&id, names)| names.iter().any(|held| keys.contains(held)).then_some(id))
+            .collect()
+    }
+
+    /// The formulas whose cells an edit of table slot `table` changes: those
+    /// that read its rows, and with `own_rows` also its `[@Column]` formulas.
+    pub(crate) fn table_users(&self, table: u16, own_rows: bool) -> Vec<FormulaId> {
+        self.table_users_where(|uses| uses.uses(table, own_rows))
+    }
+
+    /// The formulas that hold a table reference no table binds yet.
+    pub(crate) fn unbound_table_users(&self) -> Vec<FormulaId> {
+        self.table_users_where(|uses| uses.kinds & TableUses::UNBOUND != 0)
+    }
+
+    fn table_users_where(&self, keep: impl Fn(TableUses) -> bool) -> Vec<FormulaId> {
+        let Some(index) = &self.references else {
+            return Vec::new();
+        };
+        index
+            .tables
+            .by_formula
+            .iter()
+            .filter_map(|(&id, &uses)| keep(uses).then_some(id))
+            .collect()
     }
 
     /// Reuse a free slot or grow one page; source writes preflight id capacity.
@@ -294,6 +539,7 @@ impl FormulaStore {
                 self.subtotals.insert(id);
             }
         }
+        self.track_references(id);
         Some(id)
     }
 
@@ -407,6 +653,12 @@ impl FormulaStore {
         self.track(id);
     }
 
+    /// Whether any formula calls a volatile function, including the runtime
+    /// references `OFFSET` and `INDIRECT`.
+    pub(crate) fn has_volatile(&self) -> bool {
+        !self.volatile.is_empty()
+    }
+
     /// Select edit-barrier seeds without walking the formula syntax tree.
     pub(crate) fn is_volatile(&self, id: FormulaId) -> bool {
         self.volatile.contains(id)
@@ -435,6 +687,15 @@ impl FormulaStore {
         }
     }
 
+    /// The formulas that call GETPIVOTDATA, with their cells.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn pivot_readers(&self) -> impl Iterator<Item = (AbsCellKey, &FormulaEntry)> + '_ {
+        self.references
+            .iter()
+            .flat_map(|index| index.pivot_readers.ids())
+            .filter_map(|id| Some((self.location(id)?, self.get(id)?)))
+    }
+
     /// Include page tables and vacant capacity in the formula owner's bytes.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
@@ -442,6 +703,9 @@ impl FormulaStore {
         formulas.add_vec::<Vec<FormulaSlot>>(self.entries.len(), self.entries.capacity());
         self.volatile.add_memory_stats(formulas);
         self.subtotals.add_memory_stats(formulas);
+        if let Some(index) = &self.references {
+            index.add_memory_stats(formulas);
+        }
         for page in &self.entries {
             formulas.add_vec::<FormulaSlot>(page.len(), page.capacity());
             for slot in page {
@@ -557,23 +821,48 @@ impl IntoIterator for FormulaWork {
     }
 }
 
-/// Results exist only during a pass. The retained id-to-position array lets a
-/// small edit clear only its own slots instead of initializing the whole sheet.
+/// Pass-scoped evaluation state. Results are not kept here: the pass writes
+/// each formula's result to its cell and marks it settled, and readers read
+/// it from storage. A formula that a runtime reference (`OFFSET`,
+/// `INDIRECT`) or a runtime cycle pulls in the middle of another formula's
+/// evaluation cannot be written from there, so its result waits in `pulled`
+/// until the pass writes it after that formula.
 #[derive(Default)]
 pub(crate) struct FormulaResults {
-    positions: Vec<u32>,
-    values: Vec<Option<EvalResult>>,
-    used: Vec<FormulaId>,
+    /// Formulas whose result this pass has written to storage.
+    settled: FormulaBits,
+    /// Results not yet written, at most the formulas pulled during one
+    /// top-level evaluation plus the errors the depth walk seeded.
+    pulled: Vec<(FormulaId, EvalResult)>,
+    pulled_bits: FormulaBits,
+    /// Formulas in dependency order, from the depth walk.
+    pub(crate) order: Vec<FormulaId>,
+    /// Depth and cycle errors the walk found, written before evaluation.
+    pub(crate) seeded: Vec<(FormulaId, FormulaError)>,
+    /// Whether the depth walk ran and `order` lists the pass.
+    pub(crate) ordered: bool,
     work: FormulaWork,
-    count: usize,
     /// Active calls are separate from results so back edges do not recurse.
     pub(crate) visiting: FormulaBits,
     range_sums: RangeSums,
     lookups: crate::eval::LookupStates,
-    /// Boxed, so the pass workspace the store keeps between passes grows by
-    /// one pointer, not by the whole table.
+    /// Pass state most passes never use. Boxed and created on first use, so
+    /// the workspace the store keeps between passes grows by one pointer, and
+    /// dropped with the pass.
+    scratch: Option<Box<PassScratch>>,
+}
+
+/// The pass state [`FormulaResults`] keeps behind one pointer.
+#[derive(Default)]
+struct PassScratch {
+    /// LET slot values and resolved bindings.
+    let_frame: crate::eval::LetFrame,
+    /// The regex programs this pass compiled.
     #[cfg(feature = "analysis")]
-    regexes: Option<Box<PassRegexes>>,
+    regexes: PassRegexes,
+    /// LAMBDA parameter values of the calls in progress.
+    #[cfg(feature = "analysis")]
+    call_frame: crate::eval::analysis::lambda::CallFrame,
 }
 
 /// Compiled regex programs one pass keeps at once. Formulas that alternate
@@ -644,73 +933,93 @@ impl FormulaResults {
         std::mem::take(&mut self.work)
     }
 
-    /// Reserve values for selected ids, not for every formula in the workbook.
-    pub(crate) fn prepare(&mut self, slots: usize, selected: usize) {
-        self.clear();
-        let retained = slots.saturating_add(slots / SLOT_GROWTH_DIVISOR);
-        if self.positions.capacity() < slots {
-            self.positions
-                .reserve_exact(retained.saturating_sub(self.positions.len()));
-        }
-        self.positions.resize(slots, NO_RESULT_POSITION);
-        if self.positions.capacity() > retained.saturating_add(SLOT_CAPACITY_SLACK) {
-            self.positions.shrink_to(retained);
-        }
-        self.values.reserve_exact(selected);
-        self.used.reserve_exact(selected);
-    }
-
+    /// Whether this pass has a result for `id`, stored or pulled.
     #[inline]
-    fn position(&self, id: FormulaId) -> Option<usize> {
-        let position = *self.positions.get(id.index())?;
-        (position != NO_RESULT_POSITION).then_some(position as usize)
+    pub(crate) fn has(&self, id: FormulaId) -> bool {
+        self.settled.contains(id) || self.pulled_bits.contains(id)
     }
 
-    /// Read only values calculated or seeded during the current pass.
+    /// Whether `id`'s result for this pass is in storage.
     #[inline]
-    pub(crate) fn get(&self, id: FormulaId) -> Option<&EvalResult> {
-        self.values.get(self.position(id)?).and_then(Option::as_ref)
+    pub(crate) fn is_settled(&self, id: FormulaId) -> bool {
+        self.settled.contains(id)
     }
 
-    /// Iterative calculation updates a result without another allocation.
-    pub(crate) fn get_mut(&mut self, id: FormulaId) -> Option<&mut EvalResult> {
-        let position = self.position(id)?;
-        self.values.get_mut(position).and_then(Option::as_mut)
+    /// Records that `id`'s result for this pass is in storage.
+    #[inline]
+    pub(crate) fn settle(&mut self, id: FormulaId) {
+        self.settled.insert(id);
     }
 
-    /// A re-evaluated spill keeps its existing indexed result position.
-    pub(crate) fn insert(&mut self, id: FormulaId, value: EvalResult) {
-        if self.positions.len() <= id.index() {
-            self.positions.resize(id.index() + 1, NO_RESULT_POSITION);
-        }
-        if let Some(position) = self.position(id) {
-            let Some(slot) = self.values.get_mut(position) else {
-                return;
-            };
-            self.count += usize::from(slot.replace(value).is_none());
-        } else {
-            let Some(position) = self.positions.get_mut(id.index()) else {
-                return;
-            };
-            // There is at most one position per allocated FormulaId.
-            *position = self.values.len() as u32;
-            self.used.push(id);
-            self.values.push(Some(value));
-            self.count += 1;
+    /// Forgets `id`'s result for this pass, so it is evaluated again.
+    pub(crate) fn unsettle(&mut self, id: FormulaId) {
+        self.settled.remove(id);
+        if self.pulled_bits.remove(id) {
+            self.pulled.retain(|&(pulled, _)| pulled != id);
         }
     }
 
-    /// Consume write-back output without losing the id's pass position.
-    pub(crate) fn remove(&mut self, id: FormulaId) -> Option<EvalResult> {
-        let position = self.position(id)?;
-        let value = self.values.get_mut(position)?.take()?;
-        self.count -= 1;
-        Some(value)
+    /// A result waiting to be written. The list is short, so it is searched
+    /// from its newest entry.
+    #[inline]
+    pub(crate) fn pulled(&self, id: FormulaId) -> Option<&EvalResult> {
+        if !self.pulled_bits.contains(id) {
+            return None;
+        }
+        self.pulled
+            .iter()
+            .rev()
+            .find(|&&(pulled, _)| pulled == id)
+            .map(|(_, value)| value)
     }
 
-    /// A fully seeded error pass can skip evaluator dispatch.
-    pub(crate) fn len(&self) -> usize {
-        self.count
+    /// Iterative calculation updates a pulled result in place.
+    pub(crate) fn pulled_mut(&mut self, id: FormulaId) -> Option<&mut EvalResult> {
+        if !self.pulled_bits.contains(id) {
+            return None;
+        }
+        self.pulled
+            .iter_mut()
+            .rev()
+            .find(|(pulled, _)| *pulled == id)
+            .map(|(_, value)| value)
+    }
+
+    /// Keeps `id`'s result until the pass writes it to storage. Only runtime
+    /// pulls, iteration and spill anchors use it, so it stays out of line.
+    #[inline(never)]
+    pub(crate) fn pull(&mut self, id: FormulaId, value: EvalResult) {
+        self.settled.remove(id);
+        if self.pulled_bits.insert(id) {
+            self.pulled.push((id, value));
+        } else if let Some(current) = self.pulled_mut(id) {
+            *current = value;
+        }
+    }
+
+    /// The oldest waiting result, which the pass writes next.
+    pub(crate) fn pop_pulled(&mut self) -> Option<(FormulaId, EvalResult)> {
+        if self.pulled.is_empty() {
+            return None;
+        }
+        let (id, value) = self.pulled.swap_remove(0);
+        self.pulled_bits.remove(id);
+        Some((id, value))
+    }
+
+    /// Whether any result waits to be written.
+    #[inline]
+    pub(crate) fn has_pulled(&self) -> bool {
+        !self.pulled.is_empty()
+    }
+
+    /// The error the depth walk seeded for `id`, as its pass result.
+    #[cfg(test)]
+    pub(crate) fn seeded_result(&self, id: FormulaId) -> Option<EvalResult> {
+        self.seeded
+            .iter()
+            .find(|&&(seeded, _)| seeded == id)
+            .map(|&(_, error)| crate::types::Value::Error(error))
     }
 
     /// The shared sum of `range` when it was the last range shared.
@@ -759,8 +1068,9 @@ impl FormulaResults {
         pattern: &str,
         insensitive: bool,
     ) -> Option<std::rc::Rc<regex_lite::Regex>> {
-        self.regexes
+        self.scratch
             .as_ref()?
+            .regexes
             .entries
             .iter()
             .flatten()
@@ -777,7 +1087,7 @@ impl FormulaResults {
         insensitive: bool,
         regex: std::rc::Rc<regex_lite::Regex>,
     ) {
-        let table = self.regexes.get_or_insert_with(Box::default);
+        let table = &mut self.scratch.get_or_insert_with(Box::default).regexes;
         table.entries[table.next] = Some(PassRegex {
             pattern: pattern.to_owned(),
             insensitive,
@@ -786,44 +1096,85 @@ impl FormulaResults {
         table.next = (table.next + 1) % PASS_REGEX_CAPACITY;
     }
 
-    /// Exchanges this workspace's regex programs with `other`'s. A nested
-    /// evaluation with its own workspace borrows the pass programs this way
-    /// and gives them back when it ends.
+    /// Exchanges this workspace's pass scratch with `other`'s. A nested
+    /// evaluation with its own workspace borrows the pass's regex programs and
+    /// LET frame this way and gives them back when it ends. Its LETs use slots
+    /// above those in use and drop them before it returns, so the frame comes
+    /// back as it was lent.
     #[cfg(feature = "analysis")]
-    pub(crate) fn swap_regexes(&mut self, other: &mut FormulaResults) {
-        std::mem::swap(&mut self.regexes, &mut other.regexes);
+    pub(crate) fn swap_scratch(&mut self, other: &mut Self) {
+        std::mem::swap(&mut self.scratch, &mut other.scratch);
     }
 
-    /// Clear touched positions so a small edit does not scan all slots.
+    /// The LET slot frame of this pass, once a LET has created it.
+    pub(crate) fn let_frame(&self) -> Option<&crate::eval::LetFrame> {
+        self.scratch.as_deref().map(|scratch| &scratch.let_frame)
+    }
+
+    /// The LET slot frame of this pass to update, once a LET has created it.
+    pub(crate) fn existing_let_frame_mut(&mut self) -> Option<&mut crate::eval::LetFrame> {
+        self.scratch
+            .as_deref_mut()
+            .map(|scratch| &mut scratch.let_frame)
+    }
+
+    /// The LET slot frame of this pass, created on first use.
+    pub(crate) fn let_frame_mut(&mut self) -> &mut crate::eval::LetFrame {
+        &mut self.scratch.get_or_insert_with(Box::default).let_frame
+    }
+
+    /// The LAMBDA call frame of this pass, once a call has created it.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn call_frame(&self) -> Option<&crate::eval::analysis::lambda::CallFrame> {
+        self.scratch.as_deref().map(|scratch| &scratch.call_frame)
+    }
+
+    /// The LAMBDA call frame of this pass, created on first use.
+    #[cfg(feature = "analysis")]
+    pub(crate) fn call_frame_mut(&mut self) -> &mut crate::eval::analysis::lambda::CallFrame {
+        &mut self.scratch.get_or_insert_with(Box::default).call_frame
+    }
+
+    /// Clears this pass's pulled results and any bits left set. A finished
+    /// pass has already cleared its own settled bits, so a small edit does
+    /// not touch every word.
+    #[inline(never)]
     pub(crate) fn clear(&mut self) {
-        for id in self.used.drain(..) {
-            if let Some(position) = self.positions.get_mut(id.index()) {
-                *position = NO_RESULT_POSITION;
-            }
-            self.visiting.remove(id);
+        for &(id, _) in &self.pulled {
+            self.pulled_bits.remove(id);
         }
-        self.values.clear();
+        self.pulled.clear();
+        self.settled.clear_all();
+        self.visiting.clear_all();
+        self.pulled_bits.clear_all();
+        self.order.clear();
+        self.seeded.clear();
+        self.ordered = false;
         self.range_sums.sums.clear();
         self.range_sums.last = None;
         self.lookups.clear();
-        #[cfg(feature = "analysis")]
-        {
-            self.regexes = None;
-        }
-        self.count = 0;
+        self.scratch = None;
     }
 
     /// Release wide result buffers before saving the cleared primary work space.
     pub(crate) fn finish(&mut self, mut work: FormulaWork) {
+        // Settled formulas are selected ones, so the selection clears them.
+        for id in work.ids() {
+            self.settled.remove(id);
+        }
         self.clear();
 
         // Small edits reuse one page of empty buffers instead of two
         // allocations per pass; wide passes must not pin their size.
-        if self.values.capacity() > SLOT_PAGE_LEN {
-            self.values = Vec::new();
+        if self.pulled.capacity() > SLOT_PAGE_LEN {
+            self.pulled = Vec::new();
         }
-        if self.used.capacity() > SLOT_PAGE_LEN {
-            self.used = Vec::new();
+        // A medium pass reuses its order list; a wide one must not pin it.
+        if self.order.capacity() > RETAINED_ORDER_CAPACITY {
+            self.order = Vec::new();
+        }
+        if self.seeded.capacity() > SLOT_PAGE_LEN {
+            self.seeded = Vec::new();
         }
         if self.range_sums.sums.capacity() > SLOT_PAGE_LEN {
             self.range_sums.sums = Vec::new();
@@ -838,12 +1189,21 @@ impl FormulaResults {
     /// Count buffers here; the store accounts for this workspace's boxed header.
     pub(crate) fn add_memory_stats(&self, stats: &mut StoreMemoryStats) {
         let formulas = stats.owner_mut(FORMULAS);
-        formulas.add_vec::<u32>(self.positions.len(), self.positions.capacity());
-        formulas.add_vec::<Option<EvalResult>>(self.values.len(), self.values.capacity());
-        formulas.add_vec::<FormulaId>(self.used.len(), self.used.capacity());
+        self.settled.add_memory_stats(formulas);
+        self.pulled_bits.add_memory_stats(formulas);
+        formulas.add_vec::<(FormulaId, EvalResult)>(self.pulled.len(), self.pulled.capacity());
+        formulas.add_vec::<FormulaId>(self.order.len(), self.order.capacity());
+        formulas.add_vec::<(FormulaId, FormulaError)>(self.seeded.len(), self.seeded.capacity());
         self.visiting.add_memory_stats(formulas);
         self.work.add_memory_stats(formulas);
         self.lookups.add_memory_stats(formulas);
+        if let Some(frame) = self.let_frame() {
+            frame.add_memory_stats(formulas);
+        }
+        #[cfg(feature = "analysis")]
+        if let Some(frame) = self.call_frame() {
+            frame.add_memory_stats(formulas);
+        }
         formulas.add_vec::<u32>(
             self.range_sums.slots.len(),
             self.range_sums.slots.capacity(),

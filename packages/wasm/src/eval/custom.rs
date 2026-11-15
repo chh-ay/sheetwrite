@@ -6,7 +6,7 @@ use super::matrix::EvalMatrix;
 use super::{ast_produces_array, range_from_ast, CellStore, EvalPass};
 use crate::calc::{parse, Ast};
 use crate::types::{FormulaError, Value};
-use std::collections::HashMap;
+use rustc_hash::FxHashMap;
 use std::rc::Rc;
 
 /// One evaluated argument: a scalar is a 1 x 1 block. Values are row-major.
@@ -18,13 +18,19 @@ pub(crate) struct CustomArgument {
 
 // The native build has no JavaScript adapter, so only the engine tests read
 // the shape; the WASM adapter reads it to build nested arrays.
-#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+#[cfg_attr(
+    not(target_arch = "wasm32"),
+    allow(
+        dead_code,
+        reason = "only the WASM adapter calls this outside the engine tests"
+    )
+)]
 impl CustomArgument {
-    pub(crate) fn rows(&self) -> usize {
+    pub(crate) const fn rows(&self) -> usize {
         self.block.rows
     }
 
-    pub(crate) fn cols(&self) -> usize {
+    pub(crate) const fn cols(&self) -> usize {
         self.block.cols
     }
 
@@ -42,12 +48,18 @@ pub(crate) struct CustomFunction {
     pub(crate) volatile: bool,
 }
 
-pub(crate) type CustomFunctions = HashMap<String, CustomFunction>;
+pub(crate) type CustomFunctions = FxHashMap<String, CustomFunction>;
 
 impl CellStore {
     /// Adds or replaces a host function and recalculates the workbook.
     // Only the WASM adapter calls this outside the engine tests.
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        allow(
+            dead_code,
+            reason = "only the WASM adapter calls this outside the engine tests"
+        )
+    )]
     pub(crate) fn install_custom_function(&mut self, name: &str, function: CustomFunction) -> bool {
         let installed = self.insert_custom_function(name, function);
         if installed {
@@ -66,12 +78,22 @@ impl CellStore {
     /// function. A name that is also a cell reference (`A1`, `R1C1`) is refused
     /// as in Excel, because a sheet with more columns would read it as a
     /// reference.
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    pub(crate) fn insert_custom_function(&mut self, name: &str, function: CustomFunction) -> bool {
-        let name = name.to_ascii_uppercase();
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        allow(
+            dead_code,
+            reason = "only the WASM adapter calls this outside the engine tests"
+        )
+    )]
+    pub(crate) fn insert_custom_function(
+        &mut self,
+        raw_name: &str,
+        function: CustomFunction,
+    ) -> bool {
+        let name = raw_name.to_ascii_uppercase();
         let is_call = matches!(
             parse(&format!("={name}()")),
-            Ok(Ast::UnknownFunc(parsed, arguments)) if parsed == name && arguments.is_empty()
+            Ok(Ast::UnknownFunc(call)) if call.name == name && call.args.is_empty()
         );
         if !is_call || is_reference_like(&name) {
             return false;
@@ -84,7 +106,13 @@ impl CellStore {
     }
 
     /// Removes a host function. Its callers then show `#NAME?`.
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
+    #[cfg_attr(
+        not(target_arch = "wasm32"),
+        allow(
+            dead_code,
+            reason = "only the WASM adapter calls this outside the engine tests"
+        )
+    )]
     pub(crate) fn remove_custom_function(&mut self, name: &str) -> bool {
         let removed = self
             .custom_functions
@@ -165,7 +193,8 @@ impl CellStore {
 
         let mut evaluated = Vec::with_capacity(arguments.len());
         for argument in arguments {
-            let block = if range_from_ast(argument, sheet).is_some() || ast_produces_array(argument)
+            let block = if range_from_ast(argument, sheet).is_some()
+                || ast_produces_array(argument, pass.shapes())
             {
                 match self.eval_matrix_arg(argument, sheet, pass, depth + 1) {
                     Ok(matrix) => matrix,
@@ -205,8 +234,8 @@ impl CellStore {
         let mut call = Vec::with_capacity(arguments.len() + 1);
         call.push(Ast::NamedFormula(lambda));
         call.extend_from_slice(arguments);
-        let call_name = super::analysis::lambda::CALL;
-        super::analysis::lambda::evaluate(self, call_name, &call, sheet, pass, depth)
+        let invocation = super::analysis::lambda::Invocation::Call;
+        super::analysis::lambda::evaluate(self, invocation, &call, sheet, pass, depth)
     }
 
     #[cfg(not(feature = "analysis"))]
@@ -234,10 +263,11 @@ fn is_reference_like(name: &str) -> bool {
         && bytes.len() > letters
         && bytes[letters..].iter().all(u8::is_ascii_digit);
 
-    let r1c1 = name.strip_prefix('R').is_some_and(|rest| {
-        let rest = rest.trim_start_matches(|character: char| character.is_ascii_digit());
-        rest.strip_prefix('C')
-            .is_some_and(|rest| rest.bytes().all(|byte| byte.is_ascii_digit()))
+    let r1c1 = name.strip_prefix('R').is_some_and(|after_r| {
+        let after_row = after_r.trim_start_matches(|character: char| character.is_ascii_digit());
+        after_row
+            .strip_prefix('C')
+            .is_some_and(|col_digits| col_digits.bytes().all(|byte| byte.is_ascii_digit()))
     });
 
     a1 || r1c1
@@ -250,7 +280,12 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
             .any(|argument| calls_volatile_custom(argument, functions))
     };
     match ast {
-        Ast::UnknownFunc(name, arguments) => {
+        Ast::UnknownFunc(call) => {
+            let crate::calc::UnknownCall {
+                name,
+                args: arguments,
+            } = &**call;
+
             functions
                 .get(&name.to_ascii_uppercase())
                 .is_some_and(|function| function.volatile)
@@ -265,7 +300,28 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions) -> bool {
         }
         Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions),
         Ast::NamedFormula(named) => calls_volatile_custom(&named.expression, functions),
-        _ => false,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Missing
+        | Ast::Name(_)
+        | Ast::NamedRange(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::Structured(_)
+        | Ast::Cell(..)
+        | Ast::SheetCell(..)
+        | Ast::AbsCell(..)
+        | Ast::Range(..)
+        | Ast::SheetRange(..)
+        | Ast::AbsRange(..)
+        | Ast::SheetSpan(_)
+        | Ast::InvalidRef
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => false,
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::RegexPattern(_) => false,
+        #[cfg(feature = "analysis")]
+        Ast::Lambda(definition) => calls_volatile_custom(&definition.body, functions),
     }
 }
 
@@ -277,7 +333,6 @@ mod javascript {
     use super::{CellStore, CustomArgument, CustomFunction, FormulaError, Value};
     use std::rc::Rc;
     use wasm_bindgen::prelude::*;
-    use wasm_bindgen::JsCast;
 
     /// Cell kinds in the flat argument buffers; `@sheetwrite/core/functions`
     /// reads the same codes.
@@ -363,8 +418,8 @@ mod javascript {
         fn push_text(&mut self, text: &str) {
             self.text.push_str(text);
             // UTF-16 offsets, because the wrapper slices a JavaScript string.
-            let end =
-                self.text_ends.last().copied().unwrap_or(0) + text.encode_utf16().count() as u32;
+            let end = self.text_ends.last().copied().unwrap_or_default()
+                + text.encode_utf16().count() as u32;
             self.text_ends.push(end);
         }
     }
@@ -372,11 +427,11 @@ mod javascript {
     /// A tag the wrapper did not write is `#VALUE!`, so no result can stop
     /// recalculation.
     fn value_from_tagged(result: Option<String>) -> Value {
-        let Some(result) = result else {
+        let Some(tagged) = result else {
             return Value::Blank;
         };
 
-        let (tag, body) = result.split_at(result.chars().next().map_or(0, char::len_utf8));
+        let (tag, body) = tagged.split_at(tagged.chars().next().map_or(0, char::len_utf8));
         match (tag, body) {
             ("n", number) => number
                 .parse()
@@ -421,11 +476,11 @@ mod javascript {
             volatile: bool,
             recalculate: bool,
         ) -> bool {
-            let Some(callback) = callback else {
+            let Some(host_callback) = callback else {
                 return self.remove_custom_function(name);
             };
 
-            let function = host_function(callback.unchecked_into(), volatile);
+            let function = host_function(host_callback.unchecked_into(), volatile);
             if recalculate {
                 self.install_custom_function(name, function)
             } else {
@@ -468,7 +523,8 @@ mod tests {
             "TaxRate",
             function(|arguments| match arguments[0].values()[0] {
                 Value::Number(number) => Value::Number(number / 10.0),
-                _ => Value::Error(FormulaError::Value),
+                Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) =>
+                    Value::Error(FormulaError::Value),
             }),
         ));
         assert!((store.get_cell(sheet, 0, 1).num() - 0.6).abs() < 1e-12);

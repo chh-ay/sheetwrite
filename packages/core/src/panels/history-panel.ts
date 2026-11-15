@@ -8,7 +8,7 @@ import {
   HistoryDiffFlag,
   type HistoryDiffPage,
 } from "../version-history/diff.js";
-import type { HistoryCommandsOptions } from "../version-history/panel-contract.js";
+import type { HistoryAddonOptions } from "../version-history/panel-contract.js";
 import type { HistoryRestoreScope } from "../version-history/restore.js";
 import type { HistoryVersion } from "../version-history/types.js";
 import { panelField, selectOf, rejectionMessage } from "./panel-dom.js";
@@ -37,7 +37,7 @@ class HistoryPanel {
 
   constructor(
     private readonly grid: Grid,
-    private readonly options: HistoryCommandsOptions,
+    private readonly options: HistoryAddonOptions,
     private readonly body: HTMLElement,
     save: boolean,
   ) {
@@ -490,7 +490,7 @@ class HistoryPanel {
 }
 
 /** Build the lazy Review › Version History panel for one live grid. */
-export function historyPanel(grid: Grid, options: HistoryCommandsOptions, save = false): GridPanel {
+export function historyPanel(grid: Grid, options: HistoryAddonOptions, save = false): GridPanel {
   return {
     title: "Version History",
     render(body) {

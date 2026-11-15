@@ -69,11 +69,11 @@ fn apply_step(
 }
 
 fn filter(mut batch: Batch, predicate: &Predicate) -> Result<Batch, Diagnostic> {
-    let predicate = compile_predicate(&batch, predicate, 0)?;
+    let compiled = compile_predicate(&batch, predicate, 0)?;
     let mut selected = Vec::new();
 
     for row in 0..batch.row_count() {
-        if test_predicate(&batch, row, &predicate)? == Some(true) {
+        if test_predicate(&batch, row, &compiled)? == Some(true) {
             let physical = if let Some(rows) = &batch.selection {
                 *at(rows, row)?
             } else {
@@ -132,20 +132,20 @@ fn change_type(
         return Ok(batch);
     }
 
-    let mut batch = batch.materialize(limits)?;
-    let source = at(&batch.columns, index)?;
+    let mut materialized = batch.materialize(limits)?;
+    let source = at(&materialized.columns, index)?;
     let mut converted = Column::new(ColumnSpec {
         column_type,
         ..source.spec.clone()
     });
 
     let mut budget = OutputBudget::new(limits);
-    for row in 0..batch.rows {
+    for row in 0..materialized.rows {
         push_converted(&mut converted, source.value(row)?, policy, &mut budget)?;
     }
 
-    *at_mut(&mut batch.columns, index)? = converted;
-    Ok(batch)
+    *at_mut(&mut materialized.columns, index)? = converted;
+    Ok(materialized)
 }
 
 /// Conversion keeps existing errors and uses an explicit policy for new failures.
@@ -169,26 +169,22 @@ pub(crate) fn push_converted(
     }
 
     let converted = match (value, column.column_type()) {
-        (Value::Text(value), ColumnType::Number) => value
+        (Value::Text(text), ColumnType::Number) => text
             .parse::<f64>()
             .ok()
             .filter(|number| number.is_finite())
             .map(Value::Number),
         (Value::Text("true"), ColumnType::Logical) => Some(Value::Logical(true)),
         (Value::Text("false"), ColumnType::Logical) => Some(Value::Logical(false)),
-        (Value::Text(value), ColumnType::Date) => date_from_text(value).map(Value::Date),
-        (Value::Text(value), ColumnType::DateTime) => {
-            datetime_from_text(value).map(Value::DateTime)
-        }
+        (Value::Text(text), ColumnType::Date) => date_from_text(text).map(Value::Date),
+        (Value::Text(text), ColumnType::DateTime) => datetime_from_text(text).map(Value::DateTime),
         _ => None,
     };
 
-    budget.push(
-        column,
-        converted.unwrap_or(if policy == ErrorPolicy::Null {
-            Value::Null
-        } else {
-            Value::Error("conversion")
-        }),
-    )
+    let stored = match converted {
+        Some(admitted) => admitted,
+        None if policy == ErrorPolicy::Null => Value::Null,
+        None => Value::Error("conversion"),
+    };
+    budget.push(column, stored)
 }

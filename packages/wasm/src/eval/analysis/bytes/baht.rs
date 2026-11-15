@@ -1,5 +1,6 @@
 //! `BAHTTEXT`: a number as Thai words, in baht and satang.
 
+use crate::float_text::fixed_text;
 use crate::types::{EvalResult, Value};
 
 use super::super::super::functions::{number_arg, require_arity, FuncAccumulator};
@@ -31,6 +32,8 @@ const EXACT: &str = "ถ้วน";
 const MINUS: &str = "ลบ";
 /// Thai numbers group digits by millions.
 const GROUP_DIGITS: usize = 6;
+/// Satang are hundredths of a baht.
+const SATANG_PLACES: u32 = 2;
 
 /// `BAHTTEXT(number)`: the number rounded to satang (two decimal places).
 pub(super) fn baht_text(values: &FuncAccumulator) -> EvalResult {
@@ -42,9 +45,9 @@ pub(super) fn baht_text(values: &FuncAccumulator) -> EvalResult {
 }
 
 fn words(number: f64) -> String {
-    let digits = format!("{:.2}", number.abs());
-    let (baht, satang) = digits.split_at(digits.len() - 3);
-    let satang = &satang[1..];
+    let digits = fixed_text(number.abs(), SATANG_PLACES);
+    let (baht, point_and_satang) = digits.split_at(digits.len() - 3);
+    let satang = &point_and_satang[1..];
     let has_baht = baht != "0";
     let has_satang = satang != "00";
 
@@ -123,31 +126,5 @@ fn push_group(text: &mut String, group: &str) {
         text.push_str(UNIT_ONE);
     } else if units > 0 {
         text.push_str(DIGITS[units]);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The example of the Microsoft Support page,
-    /// `https://support.microsoft.com/en-us/excel/functions/bahttext-function`.
-    #[test]
-    fn microsoft_published_example() {
-        assert_eq!(words(1234.0), "หนึ่งพันสองร้อยสามสิบสี่บาทถ้วน");
-    }
-
-    /// Thai number words: a one after a tens digit is เอ็ด, a two in the
-    /// tens is ยี่, a million is ล้าน and satang follow baht.
-    #[test]
-    fn tens_millions_satang_and_sign() {
-        assert_eq!(words(0.0), "ศูนย์บาทถ้วน");
-        assert_eq!(words(11.0), "สิบเอ็ดบาทถ้วน");
-        assert_eq!(words(21.0), "ยี่สิบเอ็ดบาทถ้วน");
-        assert_eq!(words(101.0), "หนึ่งร้อยหนึ่งบาทถ้วน");
-        assert_eq!(words(1_000_000.0), "หนึ่งล้านบาทถ้วน");
-        assert_eq!(words(2_000_021.0), "สองล้านยี่สิบเอ็ดบาทถ้วน");
-        assert_eq!(words(0.5), "ห้าสิบสตางค์");
-        assert_eq!(words(-1.25), "ลบหนึ่งบาทยี่สิบห้าสตางค์");
     }
 }

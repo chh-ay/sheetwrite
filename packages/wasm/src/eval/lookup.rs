@@ -10,8 +10,7 @@ use std::cmp::Ordering;
 
 use crate::cells::payload_num;
 use crate::types::{
-    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_EMPTY, KIND_NUMBER,
-    KIND_STRING,
+    string_from_pool_ref, FormulaError, StringStorage, Value, KIND_BOOL, KIND_NUMBER, KIND_STRING,
 };
 
 use super::criteria::WildcardPattern;
@@ -76,7 +75,7 @@ impl<'a> Entry<'a> {
             Value::Blank => Self::Blank,
             Value::Number(number) => Self::Number(*number),
             Value::Text(text) => Self::Text(text),
-            Value::Bool(value) => Self::Bool(*value),
+            Value::Bool(flag) => Self::Bool(*flag),
             Value::Error(error) => Self::Error(*error),
         }
     }
@@ -100,7 +99,7 @@ impl<'a> Entry<'a> {
         }
     }
 
-    fn rank(self) -> u8 {
+    const fn rank(self) -> u8 {
         match self {
             Self::Blank => 0,
             Self::Number(_) => 1,
@@ -124,8 +123,8 @@ impl<'a> Entry<'a> {
 
 /// The lookup order of two entries: text without case, an error on either
 /// side fails, and otherwise the order of `compare_values`.
-fn compare(left: Entry<'_>, right: Entry<'_>) -> Result<Ordering, FormulaError> {
-    match (left, right) {
+fn compare(left_entry: Entry<'_>, right_entry: Entry<'_>) -> Result<Ordering, FormulaError> {
+    match (left_entry, right_entry) {
         (Entry::Text(left), Entry::Text(right)) => Ok(compare_text_case_insensitive(left, right)),
         (Entry::Error(error), _) | (_, Entry::Error(error)) => Err(error),
         (Entry::Blank, Entry::Blank) => Ok(Ordering::Equal),
@@ -139,7 +138,7 @@ fn compare(left: Entry<'_>, right: Entry<'_>) -> Result<Ordering, FormulaError> 
             left.partial_cmp(&right).ok_or(FormulaError::Num)
         }
         (Entry::Bool(left), Entry::Bool(right)) => Ok(left.cmp(&right)),
-        _ => Ok(left.rank().cmp(&right.rank())),
+        _ => Ok(left_entry.rank().cmp(&right_entry.rank())),
     }
 }
 
@@ -159,7 +158,7 @@ pub(super) enum ListView<'a> {
 }
 
 impl ListView<'_> {
-    fn len(&self) -> usize {
+    const fn len(&self) -> usize {
         match self {
             Self::Storage { len, .. } => *len,
             Self::Values(values) => values.len(),
@@ -236,14 +235,14 @@ impl SearchState {
     }
 }
 
-/// Searches `list` with the plain scan's rules. With `state`, the search uses
-/// the pass's index where it proves the same answer.
+/// Searches `list` with the plain scan's rules. With `shared_state`, the
+/// search uses the pass's index where it proves the same answer.
 pub(super) fn find_match(
     list: &ListView<'_>,
-    key: &Value,
+    key_value: &Value,
     match_mode: i32,
     search_mode: i32,
-    state: Option<&mut SearchState>,
+    shared_state: Option<&mut SearchState>,
 ) -> Result<Option<usize>, FormulaError> {
     if list.len() == 0 {
         return Ok(None);
@@ -251,14 +250,14 @@ pub(super) fn find_match(
 
     // Only a list several formulas read has a state, so its index pays off
     // from the first search; a list read once keeps the plain scan.
-    let use_index = state.is_some();
+    let use_index = shared_state.is_some();
     let mut single = SearchState::default();
-    let state = state.unwrap_or(&mut single);
+    let state = shared_state.unwrap_or(&mut single);
     if search_mode.abs() == 2 && !state.sorted_ok(list, search_mode)? {
         return Ok(None);
     }
 
-    let key = Entry::of(key);
+    let key = Entry::of(key_value);
     let search_reverse = search_mode < 0;
     if match_mode == 2 {
         return wildcard_scan(list, key, search_reverse);
@@ -303,6 +302,12 @@ fn exact_match(
         }
     }
 
+    if let (ListView::Storage { .. }, Entry::Number(number)) = (list, key) {
+        if number.is_finite() {
+            return storage_number_scan(list, number, search_reverse);
+        }
+    }
+
     let equal = |position: usize| -> Result<bool, FormulaError> {
         Ok(compare(list.entry(position), key)? == Ordering::Equal)
     };
@@ -314,6 +319,69 @@ fn exact_match(
         }
     } else {
         for position in 0..list.len() {
+            if equal(position)? {
+                return Ok(Some(position));
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// [`exact_match`]'s plain scan for a finite number key over storage, read
+/// from the kind bytes without building an entry per cell. It gives the
+/// plain scan's answers and errors in the same order: a non-finite number is
+/// `#NUM!` and text missing from the pool `#REF!` where the scan reaches
+/// them, other text and logical values never equal a number, and a blank
+/// equals zero.
+#[inline(never)]
+fn storage_number_scan(
+    list: &ListView<'_>,
+    key: f64,
+    search_reverse: bool,
+) -> Result<Option<usize>, FormulaError> {
+    let &ListView::Storage {
+        kinds,
+        payloads,
+        strings,
+        first,
+        step,
+        len,
+    } = list
+    else {
+        return Ok(None);
+    };
+    let blank_matches = key == 0.0;
+    let equal = |position: usize| -> Result<bool, FormulaError> {
+        let index = first + position * step;
+        let payload = payloads[index];
+        match kinds[index] {
+            KIND_NUMBER => {
+                let number = payload_num(payload);
+                if !number.is_finite() {
+                    return Err(FormulaError::Num);
+                }
+                Ok(number == key)
+            }
+            KIND_STRING => {
+                let id = crate::cells::payload_str_id(payload);
+                match string_from_pool_ref(strings, id) {
+                    Some(_) => Ok(false),
+                    None => Err(FormulaError::Ref),
+                }
+            }
+            KIND_BOOL => Ok(false),
+            _ => Ok(blank_matches),
+        }
+    };
+
+    if search_reverse {
+        for position in (0..len).rev() {
+            if equal(position)? {
+                return Ok(Some(position));
+            }
+        }
+    } else {
+        for position in 0..len {
             if equal(position)? {
                 return Ok(Some(position));
             }
@@ -382,10 +450,10 @@ fn wildcard_scan(
     key: Entry<'_>,
     search_reverse: bool,
 ) -> Result<Option<usize>, FormulaError> {
-    let Entry::Text(pattern) = key else {
+    let Entry::Text(pattern_text) = key else {
         return Ok(None);
     };
-    let pattern = WildcardPattern::new(pattern)?;
+    let pattern = WildcardPattern::new(pattern_text)?;
     let matches = |position: usize| {
         list.entry(position)
             .wildcard_text()
@@ -472,7 +540,7 @@ fn classify(list: &ListView<'_>) -> Option<UniformKind> {
             Entry::Number(number) if !number.is_nan() => UniformKind::Numeric,
             Entry::Text(_) => UniformKind::Text,
             Entry::Bool(_) => UniformKind::Logical,
-            _ => return None,
+            Entry::Number(_) | Entry::Error(_) => return None,
         };
         match found {
             None => found = Some(kind),
@@ -543,13 +611,13 @@ impl ExactIndex {
             });
         }
 
-        let folded = folded.into_bytes();
-        let text = |slot: u32| {
-            let slot = slot as usize;
+        let folded_bytes = folded.into_bytes();
+        let text = |slot_id: u32| {
+            let slot = slot_id as usize;
             let start = slot
                 .checked_sub(1)
                 .map_or(0, |previous| folded_ends[previous]);
-            &folded[start as usize..folded_ends[slot] as usize]
+            &folded_bytes[start as usize..folded_ends[slot] as usize]
         };
         let mut order: Vec<u32> = (0..text_positions.len() as u32).collect();
         merge_sort(&mut order, &mut |left, right| text(left).cmp(text(right)));
@@ -572,13 +640,13 @@ impl ExactIndex {
         drop((order, text_positions, folded_ends));
 
         let mut order: Vec<u32> = (0..entries.len() as u32).collect();
-        merge_sort(&mut order, &mut |left, right| {
-            let (left, right) = (entries[left as usize], entries[right as usize]);
+        merge_sort(&mut order, &mut |left_index, right_index| {
+            let (left, right) = (entries[left_index as usize], entries[right_index as usize]);
             (left.class, left.value).cmp(&(right.class, right.value))
         });
-        let entries = order.iter().map(|&index| entries[index as usize]).collect();
+        let sorted_entries = order.iter().map(|&index| entries[index as usize]).collect();
         Some(Self {
-            entries,
+            entries: sorted_entries,
             text_bytes,
             text_ends,
         })
@@ -659,7 +727,7 @@ impl ExactIndex {
                     consider(CLASS_BLANK, 0);
                 }
             }
-            _ => return None,
+            Entry::Number(_) | Entry::Error(_) => return None,
         }
         Some(found)
     }
@@ -807,7 +875,7 @@ use super::matrix::{optional_ast, range_from_ast, EvalMatrix, SPILL_MAX_BYTES};
 use super::{bool_from_value, lookup_modes, EvalPass};
 use crate::calc::{Ast, Func};
 use crate::store::CellStore;
-use crate::types::{CellRange, EvalResult, FORMULA_RECURSION_LIMIT};
+use crate::types::{CellRange, EvalResult, FORMULA_RECURSION_LIMIT, LITERAL_KIND_BITS};
 
 /// A lookup argument: a range read in place, or the values of anything else.
 enum LookupArg {
@@ -824,7 +892,7 @@ enum LookupArg {
 }
 
 impl LookupArg {
-    fn shape(&self) -> (usize, usize) {
+    const fn shape(&self) -> (usize, usize) {
         match self {
             Self::Storage { range, .. } => (range.rows, range.cols),
             Self::Values { rows, cols, .. } => (*rows, *cols),
@@ -881,6 +949,10 @@ impl CellStore {
             .unwrap_or_else(Value::Error)
     }
 
+    #[allow(
+        clippy::wildcard_enum_match_arm,
+        reason = "callers pass only the functions matched here; listing the 200 other Func variants adds nothing"
+    )]
     fn eval_lookup(
         &self,
         func: Func,
@@ -981,8 +1053,8 @@ impl CellStore {
                 };
                 let (match_mode, search_mode) = if sorted { (-1, 2) } else { (0, 1) };
                 self.search_lookup_arg(&table, part, &key, match_mode, search_mode, pass)
-                    .map(|found| {
-                        let Some(found) = found else {
+                    .map(|outcome| {
+                        let Some(found) = outcome else {
                             return Value::Error(FormulaError::Na);
                         };
                         let cell = if func == Func::VLookup {
@@ -1115,10 +1187,9 @@ impl CellStore {
             }
         }
 
-        let matrix: EvalMatrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
+        let mut matrix: EvalMatrix = self.eval_matrix_arg(ast, sheet, pass, depth)?;
         let rows = matrix.rows;
         let cols = matrix.cols;
-        let mut matrix = matrix;
         let values = std::mem::take(&mut matrix.values);
         Ok(LookupArg::Values { rows, cols, values })
     }
@@ -1150,7 +1221,7 @@ impl CellStore {
         let col_end = (range.col_end as usize).min(data.cells.n_cols() - 1);
         let rows = row_end - row_start + 1;
         let cols = col_end - col_start + 1;
-        let total = EvalMatrix::validate_shape(rows, cols, 1, 0)?;
+        let total = EvalMatrix::validate_reference_shape(rows, cols)?;
         let (Some(sources), true) = (data.cells.dense_sources(), depth < FORMULA_RECURSION_LIMIT)
         else {
             return Ok(None);
@@ -1162,24 +1233,43 @@ impl CellStore {
             .ok_or(FormulaError::Num)?;
         for col in col_start..=col_end {
             let column = data.cells.idx(row_start, col);
+            let Some(column_kinds) = kinds.get(column..column + rows) else {
+                return Ok(None);
+            };
+
+            // One pass without a branch per cell: the literal kinds only use
+            // the low two bits, and text sets bit 1 without bit 0.
+            let (any_kind, any_text) = column_kinds.iter().fold((0, 0), |(any, text), &kind| {
+                (any | kind, text | u8::from(kind == KIND_STRING))
+            });
+            if any_kind & !LITERAL_KIND_BITS != 0 {
+                return Ok(None);
+            }
+            if any_text == 0 {
+                continue;
+            }
+
             for index in column..column + rows {
-                match kinds[index] {
-                    KIND_EMPTY | KIND_NUMBER | KIND_BOOL => {}
-                    KIND_STRING => {
-                        let id = crate::cells::payload_str_id(payloads[index]);
-                        if let Some(text) = string_from_pool_ref(&self.strings, id) {
-                            payload_bytes = payload_bytes
-                                .checked_add(text.len())
-                                .ok_or(FormulaError::Num)?;
-                        }
-                    }
-                    _ => return Ok(None),
+                if kinds[index] != KIND_STRING {
+                    continue;
+                }
+                let id = crate::cells::payload_str_id(payloads[index]);
+                if let Some(text) = string_from_pool_ref(&self.strings, id) {
+                    payload_bytes = payload_bytes
+                        .checked_add(text.len())
+                        .ok_or(FormulaError::Num)?;
                 }
             }
         }
         if payload_bytes > SPILL_MAX_BYTES {
             return Err(FormulaError::Num);
         }
+        super::preview_limits::range(
+            data,
+            (row_start, col_start),
+            (rows, cols),
+            super::preview_limits::RangeRead::Typed,
+        )?;
 
         Ok(Some(StorageRange {
             sheet,
@@ -1197,8 +1287,8 @@ const NEXT_SMALLER: i32 = -1;
 const BINARY_ASCENDING: i32 = 2;
 
 impl CellStore {
-    /// LOOKUP(lookup_value, lookup_vector, [result_vector]) and
-    /// LOOKUP(lookup_value, array). The search finds the largest value at
+    /// `LOOKUP(lookup_value`, `lookup_vector`, [`result_vector`]) and
+    /// `LOOKUP(lookup_value`, array). The search finds the largest value at
     /// or below `lookup_value` in an ascending list. The array form
     /// searches the first row of an array wider than it is tall, and the
     /// first column otherwise, and returns the value at the same position
@@ -1228,7 +1318,7 @@ impl CellStore {
 
         let key = match self.eval_ast(&args[0], sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
-            key => key,
+            key @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => key,
         };
         let list = self.lookup_arg(&args[1], sheet, ListPart::Whole, pass, depth + 1)?;
         let (rows, cols) = list.shape();
@@ -1269,7 +1359,7 @@ impl CellStore {
             .ok_or(FormulaError::Na)?;
         let value = match part {
             ListPart::FirstRow => table.cell(self, rows - 1, found),
-            _ => table.cell(self, found, cols - 1),
+            ListPart::Whole | ListPart::FirstColumn => table.cell(self, found, cols - 1),
         };
 
         value.ok_or(FormulaError::Na)

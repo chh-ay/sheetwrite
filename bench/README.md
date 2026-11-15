@@ -242,6 +242,204 @@ removed-sheet `#REF!`, and error propagation. Gates are deliberately broad:
 100K parse/load and recompute p95 must stay below 5 seconds and 100K formulas
 below 256 MiB; timer-floor workloads are recorded but never ratio-gated.
 
+`let-many` (10K and 100K) puts a LET in every row, the way modern workbooks
+write them: even rows bind one name (`=LET(x,A1*$C$1,x+x+x)`), odd rows bind
+three that build on each other. The timed edit changes `$C$1`, so every LET
+recalculates. The other LET rows hold one LET over a 100K range, where LET
+itself is under 0.1% of the time. Here each LET evaluation's own cost
+shows: a LET formula took 2–5× the instructions of the same formula written
+without LET, with 18–34 heap allocations per evaluation. Its ratio limit is
+the 1.2 default until same-engine pairs calibrate it.
+
+`round-many`, `concat-many`, `offset-many` and `indirect-many` (10K and 100K)
+exist because the other rows did not exercise these shapes, so the gate could
+not see their cost. Each puts one formula per row, and every formula reads
+`$C$1`, which the timed edit changes. The shapes are
+`=ROUND(A1*$C$1,2)`, `=A1&" "&$C$1` over text cells, `=OFFSET(A1,$C$1,0)` and
+`=INDIRECT("A"&(ROW()+$C$1))`. Measured on develop before these rows existed
+(10K formulas, first recalculation, against a plain formula of the same
+shape), they took 3.3–11× the instructions, with 4–19 heap allocations per
+formula: ROUND 4,512 against 1,083, concatenation 4,596 against 1,405, OFFSET
+5,193 against 917, INDIRECT 10,137 against 917. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
+`let-calls` (10K and 100K) is `let-many` with function calls as bindings:
+even rows `=LET(x,ROUND(A1*$C$1,2),x+x+x)`, odd rows
+`=LET(x,SUM(A2*$C$1,1),y,ROUND(x/3,2),z,y*x,x+y+z)`. The other LET rows bind
+a function call in one formula only, where LET's own cost does not show.
+Measured natively before LETs resolved function-call bindings to slots, a
+100K recalculation of these formulas ran 1,398 M instructions, against 489 M
+once they did. Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
+Eight rows (10K and 100K formulas each) time how formulas bind to sheets,
+defined names and tables, which the other rows never change after load:
+
+- `name-define`: one formula per row, `=A1*2` in nine rows of ten and
+  `=A1*Scale_k` in the tenth. The timed run defines the ten names
+  `Scale_0`…`Scale_9` one at a time, as an edit session or a remote change
+  does; a workbook load defines its names before its formulas.
+- `name-define-unused`: the same run over `=A1*2` in every row, so no
+  formula uses a name; defining names should cost only the names.
+- `row-insert-names`: the same sheet with the names defined; the timed run
+  inserts one row above everything, so every formula and name moves.
+- `table-append-row`: table `Sales` with `=[@Amount]*2` in every body row and
+  `=SUM(Sales[Amount])` beside it. The timed run appends a row: a value, the
+  table grown by one row, and the column's formula in the new row.
+- `sort-formula-column`: `=A1*2` in every row; the timed run sorts A:B by a
+  fixed shuffle with `permuteRows`.
+- `parse-load-qualified` and `parse-load-table`: `independent-parse-load` with
+  `=Data!A1+Data!B1` on a second sheet, and with `=[@Amount]*2` in a table.
+- `memory-import`: `importMemoryState` of a released engine whose formulas
+  read another sheet, every tenth also through a defined name.
+
+When these rows were added, each name or table change resolved every
+formula of the workbook again and recalculated all of them, and a sort or a
+memory import parsed every moved formula again; no other row times this.
+Measured natively then (Mac), per timed run at 100K: `name-define` made
+5.8 M heap allocations, `table-append-row` 3.4 M, `row-insert-names` 1.0 M,
+`sort-formula-column` 0.9 M and `memory-import` 1.1 M. A table change now
+binds only the formulas that use the table, and a name change only the
+formulas whose text names a changed name. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
+Four rows time paged storage (#325, R5). Each paged sheet loads its values as
+clean pages inside a page load, the way datasource pages arrive:
+
+- `paged-cell-reads` (100,000 rows): `=A{r}+B{r}*$C$1` in every row of a paged
+  sheet; the timed edit changes `$C$1`, so every formula reads two loaded
+  cells again, one at a time.
+- `paged-insert-row` (1,000,000 rows, two loaded columns, 1,000 local edits):
+  inserts one row at row 11; the untimed restore removes it again.
+- `paged-range-loaded` (the same sheet): `rangeFullyLoaded` over both
+  columns.
+- `paged-eviction` (8,192 pages of 4 rows): one page load of the whole column
+  through a cache that holds 512 pages, with the top 16 pinned by a viewport
+  band, so every page it writes evicts the oldest one.
+
+Measured natively on develop (Linux, instructions per timed run, perf
+samples): `paged-cell-reads` ran 251 M, 41% of it in paged cell lookups, three
+per cell read; `paged-insert-row` 1,905 M, 99% rebuilding the whole storage
+cell by cell; `paged-range-loaded` 343 M, one full cell read per cell; and
+`paged-eviction` 14.7 M, about 10% keeping the eviction order and most of the
+rest writing the page one cell at a time. Their ratio limits are the 1.2
+default until same-engine pairs calibrate them.
+
+Five rows measure how functions read ranges (#325, R1). The shares below
+come from a native replay of the timed runs on develop `d9827e1f`, perf
+samples with inlined frames, at the sizes the rows first had (1,000 lookups,
+10,000 ranks):
+
+- `index-match-many` (200 lookups):
+  `=INDEX($B$1:$B$100000,MATCH($C$1+r,$A$1:$A$100000,0))`. Each match lands
+  near the top of the table. INDEX copied its whole area into values to
+  return one cell: 99.8% of the run, a 2.4 MB allocation per formula.
+- `rank-many` (4,000 rows): `=RANK.EQ(A{r},$A$1:$A$N)` in even rows and
+  `=LARGE($A$1:$A$N,ROW())` in odd rows; the edit changes A1. Turning the
+  column into values per formula was 94% of the run.
+- `sort-unique-filter` (100,000 rows): one
+  `=SORT(UNIQUE(FILTER(A1:A100000,B1:B100000<$D$1)))` over text keys; the
+  edit narrows the filter to 500 rows. Converting ranges was 47%, the array
+  steps 38%.
+- `subtotal-filtered` (100,000 rows): `=SUBTOTAL(109,A1:A100000)` with every
+  other block of 10 rows hidden by a filter. The per-row hidden check was 53%.
+- `sparse-page-write` (100,000 × 10): one `setSparseBlock` inside a page
+  load, 10% blank cells, half text. Per-cell writes were 90% (#572).
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
+`sort-mixed-blanks` (10,000 and 100,000 rows) is `=SORT(A1:An)` over a
+number, a text, a logical value and a blank cell in turn; the edit changes
+A1. A blank compares equal to 0, "" and FALSE at once, so only a comparison
+sort gives this order: no sort key can. The row checks the spilled text count
+and value sum, which don't depend on the order. Its limit is the 1.2 default.
+
+`take-sort-filter` (100,000 rows) times a chain of three row steps over a
+three-column range,
+`=TAKE(SORT(FILTER(A1:C100000,C1:C100000>$E$1),2,-1),1000)`, where the timed
+run edits the threshold in E1. Each step picks rows of the range it read
+instead of copying them, so the chain copies only the 1,000 rows it spills
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
+`sort-rows-labels` (100,000 rows) and `sort-rows-numbers` (4,000 rows) sort
+one column through `sortRowsMulti`, ascending then descending, as the sort
+command does: labels like `L00042`, and numbers with many ties, below the
+4,096 rows where a number column switches to a radix sort. Each run sorts the
+same column again. The rows check a digest of both orders. Their limits are
+the 1.2 default.
+
+`spill-filter-same-range` (100,000 rows) is the `spill-filter-resize` spill,
+`=FILTER(A1:A100000,B1:B100000)` with every row kept, where the timed run
+edits A1 instead of the filter. The spill comes back over the same range and
+only its anchor changes, so the row times a recalculation that compares the
+reinstalled values with the old ones and wakes no reader of the other cells
+(#325, R4). Its ratio limit is the 1.2 default until same-engine pairs
+calibrate it.
+
+`conditional-format-window` (10,000 and 100,000 visible cells) times one
+render-window read, 100 columns wide, under three formula rules and one value
+rule that cover the whole window: `=A1>$A$2`, `=AND(A1>B1,MOD(ROW(),2)=1)`
+and `=SUM($A1:$C1)>12`. Nothing changes between reads, so the row times only
+conditional-format evaluation and packing the window's cells. The
+check counts the matched rule bits, which the harness also counts from the
+same rules (#250). Its ratio limits are the 1.2 default until same-engine
+pairs calibrate them.
+
+Six rows time grouping, pivots, analysis functions and the version-history
+diff, which no other row reaches. The first five run on the full engine only,
+since the default engine has none of these functions; the default engine's
+matrix leaves them out.
+
+- `groupby-sum` (100K source rows): `=GROUPBY(A1:B…,C1:C…,SUM,0,2)` over
+  region text (10 values) and product text (100 values, each in one region),
+  with subtotals. The timed run edits the first amount.
+- `pivotby-percentof` (50K source rows): `=PIVOTBY(…,PERCENTOF,0,2,,1,,,2)`
+  over the same keys by quarter, as shares of the grand total. 70K rows
+  already pass PIVOTBY's work budget and give `#NUM!`.
+- `pivot-rebuild` (100K source rows): the pivot benchmark's pivot (three row
+  fields, one column field, SUM and AVERAGE) installed with `setPivots` and
+  recalculated; restoring removes it.
+- `getpivotdata-many` (1K cells): `GETPIVOTDATA` cells that each name one of
+  the 100 groups of a pivot over 10K rows. The timed edit changes a cell
+  nothing reads. GETPIVOTDATA depends on its pivot, so none of them
+  recalculates; before 0.7.0 it was volatile and all of them did.
+- `getpivotdata-source-edit` (1K cells): the same cells, but the timed edit
+  changes one source value. The pivot updates its output, then every
+  `GETPIVOTDATA` cell recalculates once.
+- `analysis-calls` (10K formulas): SUMSQ, AGGREGATE, FORECAST.LINEAR and
+  TEXTBEFORE in one formula per row, all reading the edited `$C$1`.
+- `history-diff` (100K cells, both engines): the version-history diff kernel
+  from the engine's checkout, on the version-history benchmark's 5,000 × 20
+  sheet with 12,000 logged writes. The timed run creates a kernel, logs the
+  writes and compares both versions until its page of 1,000 changes is full.
+  The engine's window bytes are captured at setup, so it times the kernel.
+
+Their ratio limits are the 1.2 default until same-engine pairs calibrate them.
+
+Six rows (10K and 100K each) time closures. Only the full engine has LAMBDA,
+its helpers and data-model measures, so these rows are in the matrix only when
+`SHEETWRITE_BENCH_ENGINE=full`; the default engine's matrix is unchanged.
+
+- `map-lambda`, `reduce-lambda` and `byrow-lambda`: one formula over A1:A_n
+  (A1:B_n for BYROW): `=MAP(A1:A_n,LAMBDA(x,x*$C$1+1))`,
+  `=REDUCE(0,A1:A_n,LAMBDA(a,x,a+x*$C$1))` and
+  `=BYROW(A1:B_n,LAMBDA(r,SUM(r)*$C$1))`. The timed run changes `$C$1`.
+- `lambda-call` and `named-lambda`: one call per row,
+  `=LAMBDA(x,s,x*s+1)(A1,$C$1)`, and the same LAMBDA through the defined name
+  `Affine`, `=Affine(A1,$C$1)`. The timed run changes `$C$1`.
+- `measure-pivot`: table `orders` with n rows (25 regions, 4 quarters) and a
+  data-model pivot over it, regions down and quarters across, with two
+  measures: `=SUM(orders[amount])/SUM(orders[qty])` and a region's share of
+  its quarter through `CALCULATE(…,ALL(orders[region]))`. The timed run
+  changes one order's amount, so every pivot cell updates.
+
+On develop, every LAMBDA call copies the LAMBDA's formula tree with its
+arguments put in, once per element for the helpers, and a pivot update
+copies, for every cell, each measure's tree and the values of the columns it
+reads. Their ratio limits are the 1.2 default until same-engine pairs
+calibrate them.
+
 A release capture, `bench:formula`, compares one fresh capture with the
 committed `results/formula-results.json` on a quiet, pinned machine. It keeps
 that absolute baseline for release evidence and writes the tracked file when
@@ -289,6 +487,13 @@ before its timed runs. On Linux, Bun's JavaScriptCore is still optimising its
 engine code after the three warm-up fixtures: in a fresh process a run takes
 4.5–4.8 ms for the first 50 ms and 1.6 ms after one second, so a 50 ms sample
 measured how fast that code was compiled, not the engine.
+
+`independent-first-recompute` at 10,000 formulas warms up the same way, for at
+least 500 ms. It follows the 10,000-formula parse/load row, whose engine code is
+still being compiled in the background on the pinned core; its runs take 7–10
+ms until that finishes and 1.7–1.9 ms after, so a 50 ms sample measured when the
+compiler finished. With synchronous compilation, or an idle pause before the
+row, both engines start at steady speed and no wasm memory grows during it.
 
 The gate runs 7 pairs (`--pairs <n>` may add more, never fewer: the limits below
 were measured at 7) in AB, BA, AB order, so machine drift affects both sides.
@@ -422,11 +627,18 @@ conditional rules), column queries (aggregate, sort, filter, search, distinct
 values, data edges), batched cell reads (`getCell`, `cellSnapshots`,
 `captureRange`, `persistedCellData`, `rangeStyleIds`) and formula range
 readers (ten families of eight formulas over ~100k-row ranges, recomputed after
-an edit). `src/reader-bench.ts` holds the 39 readers and their deterministic
+an edit). `src/reader-bench.ts` holds the 40 readers and their deterministic
 100,000-row fixtures. As with the formula gate, the harness always comes from
 the checkout that runs the gate; `--base` and `--candidate` (default: this
 checkout) only supply a built `packages/wasm/pkg`, so a 0.5.x base works
 without this benchmark code.
+
+`getWindow 1000x8 formula rule` exists because the other conditional window
+readers apply one formula rule to one column, so the gate barely exercised
+formula rules. Here one formula rule covers all eight columns, so every visible
+cell evaluates it. Measured on develop before this reader existed, a formula
+rule added 778 instructions and 2 heap allocations per visible cell to a
+window read that otherwise took 373 instructions per cell.
 
 Build a 0.5.x base once, in its own worktree (48b137c8 is the v0.5.4 release
 commit):
@@ -611,6 +823,9 @@ bun run bench:render
 bun run bench:render:smoke -- --engine sheetwrite
 bun run bench:render:smoke -- --engine handsontable
 
+# Only some scenarios of a set, for example the wrapped Unicode paint rows:
+bun run bench:render:diagnostic -- --scenarios wrap-unicode.paint.200,wrap-unicode.paint.20000
+
 # Fail-closed schema, completeness, and byte-stable Markdown validation:
 bun run bench:render:validate
 
@@ -618,6 +833,25 @@ bun run bench:render:validate
 # paged residency); writes results/core-paths-results.json
 bun run bench:core-paths
 ```
+
+Other entries in `bench/package.json`, run from `bench/` with `bun run <entry>`:
+
+| Entry | What it runs |
+| --- | --- |
+| `bench:range`, `bench:range:smoke` | Range operations (such as exact auto-fit) at 10k–1M rows (`src/range-bench.ts`) |
+| `bench:paged:smoke` | Smoke matrix of the paged capture (`src/paged-bench.ts`) |
+| `bench:paged-storage` | Paged storage: local edits, their acknowledgement, clean-page eviction and range reads through formulas (`src/paged-storage-bench.ts`) |
+| `bench:windows` | Window ownership: scroll and off-screen edits against the painted window (`src/window-ownership-bench.ts`) |
+| `bench:epochs` | Edit-to-paint cost for changes that may or may not reach the painted window (`src/epoch-split-bench.ts`) |
+| `bench:sync-queue-depth` | Offline sync queue depth through a mounted grid and a sync coordinator, and acknowledgement drain of a queue that deep, in order and pair-swapped (`src/sync-queue-depth-bench.ts`) |
+| `bench:prefetch` | Data-source prefetch bands and their memory (`src/datasource-prefetch-bench.ts`) |
+| `bench:billion-cell` | Billion-cell workbook startup metadata (`src/billion-cell-bench.ts`) |
+| `bench:panel-read` | Panel reads of a large range: pivot field list, slicer values and Insert › Chart inference; cell edits with the pivot field list closed and open (`src/panel-read-bench.ts`) |
+| `bench:view-index` | Packed view-row index against a map baseline (`src/view-index-bench.ts`) |
+| `bench:resource`, `bench:resource:smoke` | Ingest memory and string-pool resources at 1M rows (`src/resource-bench.ts`) |
+| `bench:streaming-memory` | XLSX buffered and streaming memory, baseline and candidate interleaved in fresh processes (`src/streaming-memory-bench.ts`) |
+| `bench:data:smoke`, `bench:core-paths:smoke`, `bench:xlsx:smoke` | Smoke matrices of `bench:data`, `bench:core-paths` and `bench:xlsx` |
+| `test:gates` | The bench package tests (`bun test test`) |
 
 The Performance pages in `docs/src/content/docs/performance/` publish every
 artifact above. `bench:release` captures render-scale, the interaction
@@ -710,6 +944,83 @@ from this artifact: the captured release from the capture metadata protocol and
 the baseline from the suites' comparison labels. It rejects an artifact whose
 labels name more than one baseline or another release line.
 
+### Results on another machine
+
+The Linux release machine's captures in `results/` are the published evidence.
+The Performance pages also show a Mac section, captured from the same release:
+
+```sh
+# A clean checkout of the release, and of the XLSX baseline, each with packages built:
+git worktree add ../sheetwrite-v0.6.0 v0.6.0
+(cd ../sheetwrite-v0.6.0 && bun install --frozen-lockfile && bun run build:packages)
+
+# From bench/ of this tree, on an otherwise idle Mac:
+bun run bench:release:machine -- --machine mac --release 0.6.0 \
+  --checkout ../../sheetwrite-v0.6.0 \
+  --xlsx-baseline-root ../../sheetwrite-xlsx-baseline
+```
+
+Each suite runs that release's own benchmark script inside the checkout, so the
+timings measure what the release shipped. The formula suite runs in output
+mode, because `bench:formula` holds a capture to the release machine's
+baseline. Artifacts that stamp the release commit are copied to
+`results/machines/mac/`, beside `capture.json`, which records the release,
+commit, command, machine and each artifact's capture time, and names any suite
+that did not complete. `--suites core-paths,formula` reruns only those suites.
+The pages give each machine its own group and axis and never compare them.
+
+### The next engine against the last release
+
+The Formula engine page compares the formula engine on develop with the last
+release, per machine:
+
+```sh
+# Clean checkouts of the release and of develop, each with packages built.
+# From bench/ of this tree, on an otherwise idle machine, on every CPU:
+bun run bench:engine-comparison -- --base 0.6.0 \
+  --base-checkout <v0.6.0 checkout> --candidate-checkout <develop checkout>
+```
+
+The base and candidate captures run develop's formula benchmark, one after the
+other, so both engines share the harness and the CPUs. A third, control capture
+runs the release's own benchmark on its own engine in the same window; the page
+sets it beside the release capture, to say how much of any difference in
+absolute time is the machine on the day. The captures and `capture.json`, which
+records both commits, the command, the CPUs, the power profile and the times,
+go to `results/engine-comparison/<linux|darwin>/`. A machine without that
+directory reads "pending" on the page.
+
+### Releases against each other
+
+The upgrade guide's table "How 0.7.0 compares with 0.5.4 and 0.6.1" comes from
+`src/version-comparison.ts`. It runs one workload against each release's
+published packages, so every version is measured the way an app installs it:
+
+```sh
+# One empty folder per version with @sheetwrite/core, wasm, formulas and xlsx:
+mkdir v0.5.4 && (cd v0.5.4 && echo '{"type":"module"}' > package.json && \
+  npm install @sheetwrite/core@0.5.4 @sheetwrite/wasm@0.5.4 \
+  @sheetwrite/formulas@0.5.4 @sheetwrite/xlsx@0.5.4)
+# The same for 0.6.1. For an unpublished commit, build its packages, run
+# `bun pm pack` in packages/{wasm,formulas,core,xlsx} and install the tarballs.
+
+# On an otherwise idle machine (Linux: `<bench-run> --exclusive taskset -c 0-19`;
+# Mac: `<mac-quiet> <name>`, the Mac timing lock):
+bun run bench:version-comparison -- run --machine Linux --rounds 8 \
+  --version 0.5.4=v0.5.4 --version 0.6.1=v0.6.1 --version 0.7.0=v0.7.0 \
+  --commit 0.7.0=<sha> --output linux.json
+bun run bench:version-comparison -- report --input linux.json --input mac.json \
+  --output table.md
+```
+
+The script imports nothing from this repository, so it can be copied next to
+the version folders. The only per-version code is the setup call:
+`initSheetwrite(undefined, engine)` plus `registerXlsxBackends()` before 0.7.0,
+`initSheetwrite({ engine, addons: [xlsxAddon()] })` from 0.7.0. Each round runs
+every version and engine in a fresh process, ABC in even rounds and CBA in odd
+ones; the tables use medians over rounds, and the artifact states the A/A
+spread (median of the ABC rounds against median of the CBA rounds). Results go
+to `results/version-comparison/`.
 
 ### Chart tracking and pivot evidence
 
@@ -717,24 +1028,50 @@ labels name more than one baseline or another release line.
 uses 200, 2,000, and 20,000 charts, at most 100 per owner sheet, sourcing
 distinct two-cell rows in one contiguous region of the data sheet. The no-chart
 control has the same sheets and data as its corresponding literal-source
-workbook. Each measured operation is one committed cell edit, not an
-amortized batch. Median and p95 summarize 101 samples after 20 warmups.
+workbook. All no-chart controls run first, then every literal-source row,
+then every formula-source row: formula rows resolve hundreds of charts per
+commit and leave that path warmed up for whatever runs after them, so the
+literal rows (the control for chart work) never follow them. `--source
+literal` or `--source formula` runs one source in its own process. Each
+measured operation is one committed cell edit, not an amortized batch. Median and p95 summarize 101 samples after up to 7,000 warmup commits per
+row, capped at 5 seconds of warm-up (rows record `warmupCommits`). On develop a
+literal commit is still 1.3-1.7 times its later time after 1,000 commits and
+stays within 5% of it from 3,800-6,800 commits, depending on the row, on both
+machines; a row whose commit resolves thousands of charts warms its paths far
+sooner and stops at the time cap.
 Initial index construction and correctness assertions are untimed.
 
 Literal-source outside edits must emit no event and perform no view
 resolution; inside edits must name exactly the one matching chart.
 The listener records chart identities and event time only. View resolution
-runs after the commit timer stops. Inside edits change the literal second
+runs after the commit timer stops and is timed on its own as `resolveMs`: one
+`resolveChartView` per chart the commit named, as a consumer refreshing every
+named chart would. Commit plus resolution is the cost an edit has for a
+consumer that redraws each named chart. Inside edits change the literal second
 cell of chart 0's source. In the formula case, its first cell reads that
 second cell, so the formula stays in place and the index is not rebuilt.
 Outside edits change a literal after the source region. A formula-replacement
 edit, which rebuilds the chart index, is not measured in 0.6. The formula rows
-are named `literal-dependency-edit`. The conservative policy reports every
-computed chart on both inside
-and outside value commits. Their cost can grow with chart count. Outside
-literal edits still query the source index; a silent event stream is not a
-claim of constant time. Every sample checks event count, exact identities,
-and resolution count.
+are named `literal-dependency-edit`. The engine reports half-open rectangles of
+formulas selected by the recompute pass and of changed spill and pivot cells;
+the tracker queries the same source index with them. An outside edit therefore
+names no formula chart, and an inside edit names chart 0. A recomputed formula
+whose value stayed equal can still name its chart. Custom stores, disabled
+tracking and a full 4,096-rectangle engine report keep the conservative
+all-chart refresh. `requiredCharts` is the minimum correct set; for paired
+comparisons with a conservative base, `expectedCharts` and
+`resolutionsPerCommit` are the median charts actually named. Every sample
+checks event count, required and permitted identities, duplicates and
+resolution count.
+
+Cold rows time the first commit after load plus resolving the charts it
+names, for inside and outside edits at 2,000 and 20,000 charts and each
+selected source. Every sample is a fresh process (`--cold-sample`), 21 per
+row, so a first-use cost that warm rows amortize away stays visible. A cold
+sample waits one second after load, because the engine's WebAssembly is still
+compiling on background threads right after load and a commit inside that
+window measured the race with the compiler. Every row (warm or cold) starts
+after a full garbage collection of its fixture's setup.
 
 Smoke admits both full-size 20,000-chart fixtures before it records the
 200-chart timing rows, with five samples and two warmups. Setup transactions
@@ -758,6 +1095,17 @@ The core-paths cold Node metric imports core before timing and measures
 published WASM singleton's `load()`. Core-backed memory probes observe core's
 own engine instance; raw formula-engine probes continue to observe their own
 published singleton.
+
+The core-paths rows `row-resize-100`, `row-resize-100k` and `row-resize-1m`
+drag the first row's border down twenty pixels through pointer events on a
+mounted grid of 100, 100,000 and 1,000,000 rows. The timed run is the whole
+drag: twenty previews and the commit on release. Variants time the undo of
+that commit and the same drag ended by `pointercancel`. Garbage is collected
+before each of the three, so each pays only for its own allocations. Each
+commit is the sheet's first height override. The
+`rowIndexBytesAfterFirstResize` counter is the backing store of a row index
+of that size after one resized row. Smoke runs use the same sheets with fewer
+samples.
 
 The performance showcase reads `results/paged-results.json` and
 `results/interaction-results.json`. `bench:paged` writes the paged capture;
@@ -791,6 +1139,29 @@ locked commands so other checkouts can acquire the shared lock.
 
 ```sh
 taskset -c <idle-core> bun run bench:interaction-sessions
+```
+
+`bench:forced-layout` counts forced style and layout in Chromium, which happy-dom
+cannot. A forced recalculation is an `UpdateLayoutTree` or `Layout` trace event
+that runs inside script: script read a style or a geometry while the DOM had
+writes the browser had not applied yet. The browser's own update before it
+paints a frame is not forced. Each action runs on a 100,000-row grid in a fresh
+page. Five are input followed by the two frames that paint it: a scroll step of
+three rows (the painted window moves), an arrow key, opening the cell editor,
+an edit commit (open, type, Enter), and a scroll step while the editor is open.
+Three repeat the render benchmark's timed loop, where `grid.refresh()` paints
+and the steps run back to back with no frame between them: scroll, arrow key
+and edit commit. Two User Timing marks bracket each step; ten warm-up steps run
+first. The table gives, per action, the median forced styles and layouts per
+step, the nodes they touched (elements restyled plus layout objects laid out,
+as the trace reports them), the most nodes in any step, the median forced time,
+the frame's own style and layout time, and the script time. The run fails when
+the forced recalculations of one step touch more nodes than the action's
+ceiling in `src/forced-layout-bench.ts`; node counts do not depend on the
+machine's speed.
+
+```sh
+bun run bench:forced-layout -- --runs 3 --steps 40 --output forced-layout.json
 ```
 
 A change to a harness source file, to the sampling flags, or to the protocol
@@ -1000,6 +1371,11 @@ the cold sweep and seven additional sweeps; its maximum includes the cold
 sample. `src/string-pool-read-bench.ts` independently measures 1M distinct-row
 ingest and the public cached `getVisibleWindow` path.
 
+Both harnesses run `Bun.gc(true)` before each timed read, outside the timed
+span. Without it the read row timed the JS heap the write fixture left behind:
+on Linux, develop's `setSparseBlock` read 1.22× slower than 0.6.1's with
+identical engine state, and 0.989× after one collection (#651).
+
 Run each sample in a fresh process. To select a built baseline without changing
 its checkout, set `STRING_POOL_WASM_ROOT` to its `packages/wasm` directory for
 the first harness, and `STRING_POOL_CHECKOUT` to its checkout for the public
@@ -1042,14 +1418,17 @@ bench/
     render-protocol.ts     # result schema, completeness, Markdown generator
     render-driver.ts       # fresh-process Playwright runner and persistence
     render-bench.html      # render benchmark page shell
+    forced-layout-bench.ts # forced style and layout per input step (Chromium trace)
+    forced-layout-page.ts  # its page: one grid, one action per page load
     check.ts               # regression checks against captured results
     controlled-baseline.ts # reviewed baseline schema and raw-round reduction
     gate-protocol.ts       # exact matrices, resource/stat checks, fingerprints
     generate-baseline.ts   # non-overwriting controlled candidate generation
     render-gate.ts         # exact full/smoke renderer gate policies
-    reader-bench.ts        # one-engine CellStore reader timing (39 readers)
+    reader-bench.ts        # one-engine CellStore reader timing (40 readers)
     reader-gate.ts         # paired ABBA reader gate and noise-floor writer
     verify.ts              # deterministic CI smoke orchestration and artifacts
+    version-comparison.ts  # published releases against each other (upgrade guide table)
   results/
     data-results.{md,json} # generated by bench:data
     formula-results.{md,json} # generated by bench:formula[:smoke]
@@ -1057,4 +1436,5 @@ bench/
     render-results.{md,json} # generated by bench:render
     reader-noise-floor.json # per-reader limits, written by reader-gate --write-floor
     reader-baseline-0.5.x.json # 0.5.x-vs-tip reader summary (documentation only)
+    version-comparison/    # bench:version-comparison per machine, and the table
 ```

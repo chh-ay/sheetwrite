@@ -105,7 +105,7 @@ async function paths(): Promise<PathCapture> {
   const provider: typeof Wasm = await import(
     pathToFileURL(resolve(root, `packages/${engineName}/loader-node.mjs`)).href
   );
-  await core.initSheetwrite(undefined, provider);
+  await core.initSheetwrite({ engine: provider });
 
   const source = columnar(PATH_ROWS);
   const editStore = new core.SheetwriteStore(workbook(PATH_ROWS), source);
@@ -299,7 +299,7 @@ async function memory() {
   );
   const testing = await import(pathToFileURL(resolve(root, "packages/core/src/testing.ts")).href);
   const engine = await import(pathToFileURL(resolve(root, "packages/core/src/engine.ts")).href);
-  await core.initSheetwrite(undefined, provider);
+  await core.initSheetwrite({ engine: provider });
 
   const restoreCanvas = testing.installCanvasTestStubs();
   const observations: Array<{

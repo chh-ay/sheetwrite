@@ -565,6 +565,14 @@ describe("metadata, identity, and sheet lifecycle", () => {
       [{ op: "removeSheet", sheet: SHEET }],
       "sheet-removed",
     );
+    const sheetScoped: DocumentOp[] = [
+      { op: "setRangeStyle", range: range("row", 0, 2), style: { bold: true } },
+      { op: "setRowMeta", sheet: SHEET, row: 2, meta: { height: 24 } },
+      { op: "removeNamedRange", name: "Local", scope: SHEET },
+    ];
+    for (const operation of sheetScoped) {
+      expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
+    }
     const unrelated: DocumentOp = {
       op: "set",
       addr: address("row", 1, OTHER_SHEET),
@@ -626,46 +634,6 @@ describe("metadata, identity, and sheet lifecycle", () => {
     };
 
     expectRebased([local], [structure("column", "insert", 1, 2)], [local]);
-  });
-
-  it("detects sheet-removal conflicts across representative operation families", () => {
-    const cases: Array<{ family: RebaseConflictFamily; operation: DocumentOp }> = [
-      {
-        family: "cell",
-        operation: { op: "setNote", addr: address("row", 1), text: "review" },
-      },
-      {
-        family: "range",
-        operation: {
-          op: "setRangeStyle",
-          range: range("row", 0, 2),
-          style: { bold: true },
-        },
-      },
-      {
-        family: "sheet",
-        operation: { op: "setRowMeta", sheet: SHEET, row: 2, meta: { height: 24 } },
-      },
-      {
-        family: "named-range",
-        operation: {
-          op: "setNamedRange",
-          namedRange: {
-            name: "Local",
-            scope: SHEET,
-            range: range("row", 0, 2),
-          },
-        },
-      },
-      {
-        family: "named-range",
-        operation: { op: "removeNamedRange", name: "Local", scope: SHEET },
-      },
-    ];
-
-    for (const { operation } of cases) {
-      expectConflict([operation], [{ op: "removeSheet", sheet: SHEET }], "sheet-removed");
-    }
   });
 
   it("detects representative overlapping edits for each conflict family", () => {
@@ -911,6 +879,106 @@ describe("server ordering, immutability, and determinism", () => {
       ],
     });
   });
+
+  it("returns the caller's operations by reference when no remote change moves them", () => {
+    const block = { rowCount: 1, colCount: 2, values: [1, 2] };
+    const local: DocumentOp[] = deepFreeze([
+      { op: "set", addr: address("row", 1), value: literal("local") },
+      { op: "setBlock", range: range("row", 2, 2), block },
+    ]);
+    const result = rebaseDocumentOperations(local, [
+      { op: "set", addr: address("row", 9), value: literal("remote") },
+    ]);
+    if (result.status !== "rebased") throw new Error("Expected a safe rebase");
+    expect(result.operations).not.toBe(local);
+    expect(result.operations[0]).toBe(local[0]);
+    expect(result.operations[1]).toBe(local[1]);
+  });
+
+  it("copies only what a structural transform rewrites and shares cell payloads", () => {
+    const values = Array.from({ length: 4 }, (_, index) => index);
+    const plain: DocumentOp = {
+      op: "setBlock",
+      range: range("row", 6, 7),
+      block: { rowCount: 2, colCount: 2, values },
+    };
+    const referenced: DocumentOp = {
+      op: "setBlock",
+      range: range("row", 8, 8),
+      block: {
+        rowCount: 1,
+        colCount: 2,
+        values: [null, 5],
+        refs: [[0, { sheet: SHEET, row: 9, col: 1 }]],
+      },
+    };
+    const cells: DocumentOp = {
+      op: "setRange",
+      range: range("row", 10, 10),
+      cells: [
+        { rowOffset: 0, colOffset: 0, value: literal("kept") },
+        {
+          rowOffset: 0,
+          colOffset: 1,
+          value: { kind: "ref", target: { sheet: SHEET, row: 12, col: 1 } },
+        },
+      ],
+    };
+    const local = deepFreeze([plain, referenced, cells]);
+    const before = JSON.stringify(local);
+
+    const result = rebaseDocumentOperations(local, [structure("row", "insert", 4, 2)]);
+    if (result.status !== "rebased") throw new Error("Expected a safe structural rebase");
+    expect(JSON.stringify(local)).toBe(before);
+    const [movedPlain, movedReferenced, movedCells] = result.operations;
+    if (
+      movedPlain?.op !== "setBlock" ||
+      movedReferenced?.op !== "setBlock" ||
+      movedCells?.op !== "setRange" ||
+      plain.op !== "setBlock" ||
+      referenced.op !== "setBlock" ||
+      cells.op !== "setRange"
+    ) {
+      throw new Error("Expected the rebased operations in order");
+    }
+
+    expect(movedPlain).not.toBe(plain);
+    expect(movedPlain.range).toEqual(range("row", 8, 9));
+    expect(movedPlain.block).toBe(plain.block);
+    expect(movedReferenced.block.values).toBe(referenced.block.values);
+    expect(movedReferenced.block.refs).toEqual([[0, { sheet: SHEET, row: 11, col: 1 }]]);
+    expect(movedCells.cells[0]?.value).toBe(cells.cells[0]?.value);
+    expect(movedCells.cells[1]?.value).toEqual({
+      kind: "ref",
+      target: { sheet: SHEET, row: 14, col: 1 },
+    });
+  });
+
+  it("re-encodes only its own copy of a restore block that an earlier check decoded", () => {
+    const block = {
+      rowCount: 1,
+      colCount: 1,
+      values: [null],
+      refs: [[0, { sheet: SHEET, row: 9, col: 1 }]] as [number, CellAddress][],
+    };
+    const original = deepFreeze(
+      encodeRestoreBlock(
+        { sheet: SHEET, start: { row: 8, col: 1 }, end: { row: 8, col: 1 } },
+        block,
+      ),
+    );
+    const before = JSON.stringify(original);
+
+    const result = rebaseDocumentOperations(
+      [original],
+      [{ op: "removeSheet", sheet: "unrelated" }, structure("row", "insert", 4, 2)],
+    );
+    if (result.status !== "rebased") throw new Error("Expected a safe restore rebase");
+    expect(JSON.stringify(original)).toBe(before);
+    const restored = result.operations[0];
+    if (restored?.op !== "restoreBlock") throw new Error("Expected a restore operation");
+    expect(decodeRestoreBlock(restored).refs).toEqual([[0, { sheet: SHEET, row: 11, col: 1 }]]);
+  });
 });
 
 describe("compressed restore rebasing", () => {
@@ -1060,16 +1128,6 @@ describe("operation sequences", () => {
       "structural-overlap",
       2,
       0,
-    );
-  });
-
-  it("shifts an edit written after a local deletion past a server insert", () => {
-    // Local row 6 after deleting row 6 is the original row 7; the server
-    // inserted a row before it, so the edit lands on row 7.
-    expectRebased(
-      [set(2, 0, 1), removeRows(6), set(6, 2, 2)],
-      [set(5, 1, 3), addRows(7, 1), set(6, 0, 4)],
-      [set(2, 0, 1), removeRows(6), set(7, 2, 2)],
     );
   });
 

@@ -16,7 +16,8 @@ Bun.plugin({
     build.onLoad({ filter: /\.svelte$/ }, async ({ path }) => {
       let source = await Bun.file(path).text();
       source = source.replace(
-        /<script([^>]*\blang=["']ts["'][^>]*)>([\s\S]*?)<\/script>/g,
+        // Quoted attribute values may hold `>`, as in `generics="Row extends Record<K, V>"`.
+        /<script((?:"[^"]*"|'[^']*'|[^>"'])*?\blang=["']ts["'](?:"[^"]*"|'[^']*'|[^>"'])*)>([\s\S]*?)<\/script>/g,
         (_match, attributes: string, script: string) =>
           `<script${attributes.replace(/\s*lang=["']ts["']/, "")}>${typescript.transformSync(script)}</script>`,
       );

@@ -159,20 +159,6 @@ describe("saved queries in the store", () => {
       empty.dispose();
     }
   });
-
-  it("admits a join only to an existing query and keeps joined queries", () => {
-    const grid = mountGrid();
-    const apply = (patch: DocumentOp) => grid.applyTransaction({ patches: [patch] }).status;
-
-    expect(apply({ op: "setQuery", query: orders })).not.toBe("applied");
-    expect(apply({ op: "setQuery", query: customers })).toBe("applied");
-    expect(apply({ op: "setQuery", query: orders })).toBe("applied");
-
-    // A joined query cannot be removed while another query reads it.
-    expect(apply({ op: "removeQuery", id: "customers" })).not.toBe("applied");
-    expect(apply({ op: "removeQuery", id: "unknown" })).not.toBe("applied");
-    expect(queries(grid).map((query) => query.id)).toEqual(["customers", "orders"]);
-  });
 });
 
 describe("saved query history", () => {

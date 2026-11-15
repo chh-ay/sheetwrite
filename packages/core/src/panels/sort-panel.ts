@@ -3,6 +3,7 @@
 // press runs one grid operation, so history and sync see one change.
 
 import { colToA1 } from "../a1.js";
+import { readRowValues } from "../data-window-reads.js";
 import { currentRegion, looksLikeHeader } from "../sort-target.js";
 import type { Range } from "../types/coordinates.js";
 import type { SortKey } from "../types/document.js";
@@ -65,11 +66,17 @@ function initialRange(grid: Grid): Range | null {
 /** Column choices of a range: the header text when it has one, else the column letter. */
 function columnOptions(grid: Grid, range: Range, hasHeader: boolean): [string, string][] {
   const options: [string, string][] = [];
+  const headers = hasHeader
+    ? readRowValues(grid.store, {
+        sheet: range.sheet,
+        row: range.start.row,
+        startCol: range.start.col,
+        endCol: range.end.col,
+      })
+    : [];
   for (let col = range.start.col; col <= range.end.col; col++) {
     const letter = `Column ${colToA1(col)}`;
-    const header = hasHeader
-      ? grid.store.getCell({ sheet: range.sheet, row: range.start.row, col }).resolved
-      : null;
+    const header = headers[col - range.start.col] ?? null;
     options.push([String(col), header === null ? letter : `${String(header)} (${letter})`]);
   }
   return options;

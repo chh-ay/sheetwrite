@@ -1,0 +1,39 @@
+/* The formatting showcase: its formula bar and budget grid in the demo, the
+   control rows and round-trip report in the panel, and the re-imported grid. */
+.sw-formatting-formula {
+  --sheetwrite-widget-bg: var(--sw-surface-2);
+  --sheetwrite-widget-fg: var(--sw-fg);
+  --sheetwrite-widget-border: var(--sw-border);
+  display: flex;
+  min-height: var(--sw-control-height);
+  border-bottom: var(--sw-border-width) solid var(--sw-border);
+}
+
+.sw-formatting-grid {
+  height: clamp(22rem, 72vh, 40rem);
+}
+
+.sw-formatting-imported {
+  height: 25rem;
+}
+
+.sw-formatting-caption {
+  margin: 0;
+  padding: var(--sw-space-2) var(--sw-space-4);
+  border-top: var(--sw-border-width) solid var(--sw-border);
+  background: var(--sw-surface-2);
+}
+
+.sw-formatting-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sw-space-1-5);
+}
+
+.sw-formatting-caption,
+.sw-formatting-status,
+.sw-formatting-report {
+  color: var(--sw-fg-muted);
+  font-size: var(--sw-text-caption);
+  line-height: var(--sw-leading-ui);
+}

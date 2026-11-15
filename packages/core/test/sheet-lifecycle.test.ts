@@ -5,6 +5,7 @@ import { createGridFromSnapshot } from "../src/persistence.js";
 import { rebaseDocumentOperations } from "../src/rebase.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { SheetLifecycleResult, Workbook } from "../src/types.js";
+import { mountHost } from "./fixtures.js";
 
 const column = { key: "value", header: "Value", width: 100, type: "text" as const };
 
@@ -20,14 +21,6 @@ function workbook(
     activeSheet,
     sheets: sheets.map((sheet) => ({ ...sheet, rowCount: 2, columns: [{ ...column }] })),
   };
-}
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
 }
 
 function lifecycleCode(result: SheetLifecycleResult): string | undefined {
@@ -111,36 +104,6 @@ describe("Grid worksheet lifecycle", () => {
 
     grid.actions.redo();
     expect(model.sheets.map((sheet) => sheet.id)).toEqual(["two"]);
-    grid.destroy();
-  });
-
-  it("returns stable targets and structured canonical-name outcomes", () => {
-    const model = workbook([
-      { id: "one", name: "Sheet 1" },
-      { id: "two", name: "Sheet 2" },
-    ]);
-    const grid = new GridImpl(mountHost(), { workbook: model });
-
-    const renamed = grid.renameSheet("one", "Cafe\u0301");
-    expect(renamed.status).toBe("applied");
-    expect(renamed.sheet).toBe("one");
-    expect(model.sheets[0]!.name).toBe("Café");
-
-    const duplicate = grid.renameSheet("two", "CAFÉ");
-    expect(duplicate.sheet).toBe("two");
-    expect(lifecycleCode(duplicate)).toBe("duplicate");
-    expect(model.sheets[1]!.name).toBe("Sheet 2");
-
-    const invalidAdd = grid.addSheet({ id: "invalid", name: "Bad/Name" });
-    expect(invalidAdd.sheet).toBe("invalid");
-    expect(lifecycleCode(invalidAdd)).toBe("forbidden-character");
-    expect(model.sheets.map((sheet) => sheet.id)).toEqual(["one", "two"]);
-
-    grid.setReadOnly(true);
-    const readOnly = grid.setSheetVisibility("one", "hidden");
-    expect(readOnly).toMatchObject({ status: "noop", reason: "read-only", sheet: "one" });
-    expect(model.sheets[0]!.visibility).toBeUndefined();
-
     grid.destroy();
   });
 

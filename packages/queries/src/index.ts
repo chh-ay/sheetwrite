@@ -1,9 +1,9 @@
-import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
+import type { PowerQueryCodec, SheetwriteAddon } from "@sheetwrite/core";
 
-import type { SyncInitInput } from "../pkg/sheetwrite_queries.js";
-import { connect } from "./connect.js";
-import type { QuerySession, QuerySessionOptions } from "./session.js";
+import { createQueriesAddon, type QueriesAddonOptions, type QueryEngineOptions } from "./addon.js";
 import type { QueryEngine } from "./types.js";
+
+export { type QueriesAddonOptions, type QueryEngineOptions, querySessionOf } from "./addon.js";
 
 export { QueryError } from "./errors.js";
 export type {
@@ -35,12 +35,6 @@ export type {
   QueryStep,
 } from "./types.js";
 
-/** Hosts can provide the compiled artifact instead of using browser artifact loading. */
-export interface QueryEngineOptions {
-  /** Compiled module or artifact bytes, as accepted by the generated bindings. */
-  readonly wasm?: SyncInitInput;
-}
-
 /**
  * Importing this package loads no WASM; only this explicit call loads query execution.
  *
@@ -60,6 +54,8 @@ export interface QueryEngineOptions {
  *   ]);
  * }
  * ```
+ *
+ * @returns The engine, once its WASM is loaded.
  */
 export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise<QueryEngine> {
   // The bridge also stays lazy: unused queries must not allocate text codecs.
@@ -73,32 +69,36 @@ export async function loadQueryEngine(options: QueryEngineOptions = {}): Promise
 }
 
 /**
- * The one registration call for workbook queries: loads the engine and binds
- * saved queries of `grid` to the host's `fetchSource`. Workbooks that never
- * call it load no query code or WASM.
+ * The queries add-on. Each grid with a `fetchSource`, from `options` or from
+ * `createGrid(host, { addons: { queries: { ... } } })`, gets a query session:
+ * its Get Data, Refresh All and Queries & Connections commands, bound to the
+ * host's `fetchSource`. The engine and its WASM load in the background when
+ * such a grid is created; pages without the add-on load no query code. Get
+ * the session with `querySessionOf(grid)`.
  *
  * @example
  * ```ts
- * import type { Grid, PowerQueryCodec } from "@sheetwrite/core";
- * import { createQuerySession } from "@sheetwrite/queries";
+ * import { initSheetwrite } from "@sheetwrite/core";
+ * import { queriesAddon } from "@sheetwrite/queries";
  *
- * async function refreshSales(grid: Grid) {
- *   const session = await createQuerySession(grid, {
- *     fetchSource: async (request, { signal }) => {
- *       const response = await fetch(`/sources/${request.sourceId}`, { signal });
- *       return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
- *     },
- *   });
- *
- *   return session.refreshAll();
- * }
+ * await initSheetwrite({
+ *   addons: [
+ *     queriesAddon({
+ *       fetchSource: async (request, { signal }) => {
+ *         const response = await fetch(`/sources/${request.sourceId}`, { signal });
+ *         return { kind: "bytes", bytes: new Uint8Array(await response.arrayBuffer()) };
+ *       },
+ *     }),
+ *   ],
+ * });
  * ```
+ *
+ * @returns The add-on, for the `addons` list of `initSheetwrite`.
  */
-export async function createQuerySession(
-  grid: Grid,
-  options: QuerySessionOptions & QueryEngineOptions,
-): Promise<QuerySession> {
-  return connect(grid, options, await loadQueryEngine(options));
+export function queriesAddon(
+  options: QueriesAddonOptions = {},
+): SheetwriteAddon<QueriesAddonOptions> {
+  return createQueriesAddon(loadQueryEngine, options);
 }
 
 /**
@@ -115,6 +115,8 @@ export async function createQuerySession(
  *   return codec.encode(snapshot.workbook.queries ?? []).section;
  * }
  * ```
+ *
+ * @returns The codec, once the queries WASM is loaded.
  */
 export async function loadPowerQueryCodec(
   options: QueryEngineOptions = {},

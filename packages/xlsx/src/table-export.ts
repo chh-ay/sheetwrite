@@ -12,22 +12,39 @@ import { projectedRows, projectTable, streamTable, writeTable } from "./table-st
 
 /** Implementation-neutral cell in the first-sheet table export model. */
 export interface XlsxModelCell {
+  /** The cell's value; `null` for a cell that only carries a style or anchors a merge. */
   value: CellScalar;
+  /** Header cells carry the column's header style; other cells their column's cell style under their own. */
   style?: CellStyle;
+  /** Excel number-format code, from the cell's style or else its column; never set on header cells. */
   numberFormat?: string;
+  /** Columns a merge anchored at this cell spans, this one included; absent outside merges. */
   columnSpan?: number;
+  /** Rows a merge anchored at this cell spans, this one included; absent outside merges. */
   rowSpan?: number;
 }
 
 /** Implementation-neutral first-sheet table export model. */
 export interface XlsxModel {
+  /** Name of the exported sheet: the active one, or else the first. */
   sheetName: string;
+  /** Width of each visible column in unzoomed CSS pixels, left to right; `0` when the column has none. */
   columnWidths: number[];
+  /** Height of each output row in unzoomed CSS pixels, header row first; `undefined` keeps the default height. */
   rowHeights: (number | undefined)[];
+  /**
+   * Cells by output row, then by visible column: the header row first, then one
+   * row per sheet row. `null` marks an empty cell or one a merge covers.
+   */
   rows: (XlsxModelCell | null)[][];
 }
 
-/** Materialize the active-sheet table model from the projection the bounded writer streams. */
+/**
+ * Materialize the active-sheet table model from the projection the bounded writer streams.
+ *
+ * @throws {@link XlsxResourceError} when the table exceeds a row, column, cell or merge limit.
+ * @returns The table, or `null` for a workbook with no sheets.
+ */
 export function buildXlsxModel(
   workbook: Workbook,
   store: Store,
@@ -84,7 +101,8 @@ export function buildXlsxModel(
 }
 
 /** Default bounded first-sheet table export backend. */
-export const sheetwriteTableExportBackend: XlsxTableExportBackend = {
+export const sheetwriteTableExportBackend: XlsxTableExportBackend &
+  Required<Pick<XlsxTableExportBackend, "toXlsxTableStream">> = {
   name: "sheetwrite-ooxml-table",
   async toXlsxTable(workbook, store, options) {
     try {

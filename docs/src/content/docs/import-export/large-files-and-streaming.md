@@ -4,8 +4,10 @@ description: Read seekable files and write bounded chunks while retaining explic
 ---
 
 ```ts prelude="core" partial="requires an initialized store and a host-owned WritableStream<Uint8Array> named destination" title="Stream a workbook to a destination"
-import { toXlsxWorkbookStream } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { toXlsxWorkbookStream, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const destination: WritableStream<Uint8Array>;
 const controller = new AbortController();
@@ -32,8 +34,10 @@ The output contains the same XLSX parts as buffered export. ZIP entry order and 
 This browser example reads a selected `File` without calling `arrayBuffer()` on the whole compressed input. Its writable consumer counts bytes instead of collecting them:
 
 ```ts compile title="Seekable import and bounded output consumption"
-import { fromXlsxWorkbookFile, toXlsxWorkbookStream } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbookFile, toXlsxWorkbookStream, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 const input = document.querySelector<HTMLInputElement>('input[type="file"]');
 const file = input?.files?.[0];
@@ -108,8 +112,10 @@ Hard resource bounds are checked before unsafe decompression or allocation. Exce
 An abort is not a failure. After `signal` fires, every import and export call rejects (and every stream errors) with `signal.reason` itself, not with a `SheetwriteError`. CSV and TSV parsing and export do the same with `DelimitedTextOptions.signal`, checked once per 1,024 records and once per store window. An aborted import keeps no partial snapshot, and an aborted export does not change the store. Compare the rejection with the reason to tell an abort from a failure:
 
 ```ts compile title="Tell an abort from a failure"
-import { fromXlsxWorkbook, isSheetwriteError } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { fromXlsxWorkbook, isSheetwriteError, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 declare const bytes: Uint8Array;
 const controller = new AbortController();
@@ -124,18 +130,18 @@ try {
 
 An XLSX error message keeps at most 8 KiB of text from the file, so a hostile part name or attribute cannot make a large error.
 
-## Memory evidence and limits
+## Memory use
 
-[PR #186](https://github.com/chh-ay/sheetwrite/pull/186) measured seven interleaved fresh-process rounds per side with one CPU slot:
+Importing an XLSX workbook holds the whole result in memory. On a Linux machine with an Intel Core i9-12900H, generated workbooks of 8 columns peak at about this much process memory (median of seven runs, with the largest run in brackets):
 
-| Generated workbook | Import path | Peak RSS median before → after | Candidate maximum |
-| --- | --- | --- | --- |
-| 200,000 × 8 | Buffered | 1,095 → 800 MiB | 814 MiB |
-| 200,000 × 8 | Blob | 1,112 → 779 MiB | 791 MiB |
-| 1,000,000 × 8 | Buffered | 5,061 → 3,352 MiB | 3,512 MiB |
-| 1,000,000 × 8 | Blob | 4,475 → 3,336 MiB | 3,504 MiB |
+| Generated workbook | Import path | Peak memory |
+| --- | --- | --- |
+| 200,000 × 8 | Buffered | 800 MiB (814 MiB) |
+| 200,000 × 8 | Blob | 779 MiB (791 MiB) |
+| 1,000,000 × 8 | Buffered | 3,352 MiB (3,512 MiB) |
+| 1,000,000 × 8 | Blob | 3,336 MiB (3,504 MiB) |
 
-These are measured workloads with adjusted budgets, not default-limit promises. The later results supersede the earlier #179 import peak-risk observation; they do not establish a universal memory ceiling.
+These runs raised the resource budgets above their defaults. Other workbooks use more or less memory, so these numbers are not a memory ceiling.
 
 ## See also
 

@@ -2,7 +2,7 @@
 import { initSheetwrite, SheetwriteStore } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 
 const rows = 3;
 const store = new SheetwriteStore(

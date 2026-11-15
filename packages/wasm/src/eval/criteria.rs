@@ -28,7 +28,7 @@ impl Criterion {
             });
         };
         let raw = text.trim();
-        let (op, operand) = if let Some(rest) = raw.strip_prefix("<>") {
+        let (op, untrimmed) = if let Some(rest) = raw.strip_prefix("<>") {
             (CmpOp::Ne, rest)
         } else if let Some(rest) = raw.strip_prefix("<=") {
             (CmpOp::Le, rest)
@@ -43,7 +43,7 @@ impl Criterion {
         } else {
             (CmpOp::Eq, raw)
         };
-        let operand = operand.trim();
+        let operand = untrimmed.trim();
         let parsed_operand = if operand.eq_ignore_ascii_case("TRUE") {
             Value::Bool(true)
         } else if operand.eq_ignore_ascii_case("FALSE") {
@@ -79,7 +79,7 @@ impl Criterion {
         // Values of different types are never equal, so `<>` matches them
         // and every ordering operator rejects them.
         match ordering {
-            Some(ordering) => ordering_matches(ordering, self.op),
+            Some(order) => ordering_matches(order, self.op),
             None => self.op == CmpOp::Ne,
         }
     }
@@ -87,10 +87,12 @@ impl Criterion {
     /// The operator and number a finite number cell is compared with, or
     /// `None` when the criterion is text, a boolean or a pattern: then every
     /// finite number gets the same answer, [`Self::matches_number`]'s.
-    pub(super) fn number_comparison(&self) -> Option<(CmpOp, f64)> {
+    pub(super) const fn number_comparison(&self) -> Option<(CmpOp, f64)> {
         match self.operand {
             Value::Number(operand) if self.wildcard.is_none() => Some((self.op, operand)),
-            _ => None,
+            Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+                None
+            }
         }
     }
 
@@ -107,7 +109,9 @@ impl Criterion {
                 .map_or(self.op == CmpOp::Ne, |ordering| {
                     ordering_matches(ordering, self.op)
                 }),
-            _ => self.op == CmpOp::Ne,
+            Value::Text(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => {
+                self.op == CmpOp::Ne
+            }
         }
     }
 
@@ -120,11 +124,11 @@ impl Criterion {
         let ordering = match &self.operand {
             Value::Text(operand) => Some(compare_text_case_insensitive(text, operand)),
             Value::Blank if text.is_empty() => Some(Ordering::Equal),
-            _ => None,
+            Value::Number(_) | Value::Bool(_) | Value::Blank | Value::Error(_) => None,
         };
 
         match ordering {
-            Some(ordering) => ordering_matches(ordering, self.op),
+            Some(order) => ordering_matches(order, self.op),
             None => self.op == CmpOp::Ne,
         }
     }
@@ -206,8 +210,8 @@ fn criterion_text(value: &Value) -> Option<&str> {
     }
 }
 
-fn criterion_compare(left: &Value, right: &Value) -> Option<Ordering> {
-    match (left, right) {
+fn criterion_compare(left_value: &Value, right_value: &Value) -> Option<Ordering> {
+    match (left_value, right_value) {
         (Value::Number(left), Value::Number(right)) => left.partial_cmp(right),
         (Value::Bool(left), Value::Bool(right)) => Some(left.cmp(right)),
         (Value::Text(left), Value::Text(right)) => Some(compare_text_case_insensitive(left, right)),
@@ -240,7 +244,7 @@ pub(super) struct IfSum {
 }
 
 impl IfSum {
-    pub(super) fn new() -> Self {
+    pub(super) const fn new() -> Self {
         Self { sum: 0.0, count: 0 }
     }
 
@@ -248,14 +252,21 @@ impl IfSum {
     /// numeric values sum.
     pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
         match value {
-            Value::Number(value) => {
-                self.sum += value;
+            Value::Number(number) => {
+                self.sum += number;
                 self.count += 1;
             }
             Value::Error(error) => return Err(*error),
             Value::Text(_) | Value::Bool(_) | Value::Blank => {}
         }
         Ok(())
+    }
+
+    /// [`Self::add`] for a matched finite number, without building a value.
+    #[inline]
+    pub(super) fn add_number(&mut self, value: f64) {
+        self.sum += value;
+        self.count += 1;
     }
 
     /// The `SUMIF` result, or `AVERAGEIF`'s when `average` is set.
@@ -280,7 +291,7 @@ pub(super) struct IfExtreme {
 }
 
 impl IfExtreme {
-    pub(super) fn new(maximum: bool) -> Self {
+    pub(super) const fn new(maximum: bool) -> Self {
         Self {
             found: None,
             maximum,
@@ -290,12 +301,12 @@ impl IfExtreme {
     /// Folds one matched row.
     pub(super) fn add(&mut self, value: &Value) -> Result<(), FormulaError> {
         match value {
-            Value::Number(value) if value.is_finite() => {
-                self.found = Some(self.found.map_or(*value, |current| {
+            Value::Number(number) if number.is_finite() => {
+                self.found = Some(self.found.map_or(*number, |current| {
                     if self.maximum {
-                        current.max(*value)
+                        current.max(*number)
                     } else {
-                        current.min(*value)
+                        current.min(*number)
                     }
                 }));
             }
@@ -307,7 +318,7 @@ impl IfExtreme {
     }
 
     pub(super) fn finish(self) -> Value {
-        Value::number(self.found.unwrap_or(0.0))
+        Value::number(self.found.unwrap_or_default())
     }
 }
 

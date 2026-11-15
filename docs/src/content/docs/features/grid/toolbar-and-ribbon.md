@@ -94,40 +94,41 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 
 Every control reads the same `getCommandState` contract as host chrome. It disables while the grid is read-only.
 
-**Insert Function** lists the functions registered with `registerFunction`, with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. Insert Function, in the ribbon and in the toolbar, appears when the first function is registered and goes away when the last one is removed. Built-in functions are offered by [formula autocomplete](/docs/features/formulas/formula-help/) as you type.
+**Insert Function** lists the grid's host functions from the [functions add-on](/docs/features/formulas/custom-functions/), with each signature and description as the tooltip. Pick one to start `=NAME(` in the focus cell's editor, then type the arguments. Insert Function, in the ribbon and in the toolbar, appears only in a grid with host functions. Built-in functions are offered by [formula autocomplete](/docs/features/formulas/formula-help/) as you type.
 
 **Explain Formula** opens a side panel that describes the formula in the focus cell: its functions, their arguments, its references and its problems. See [Formula help](/docs/features/formulas/formula-help/#explain-formula).
 
 **Data Model** and **Relationships** (Data › Data Tools) open the [data model](/docs/features/analysis/data-model/) panel. Data Model appears when the workbook has a table, and Relationships when it has two.
 
-**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place. Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
+**New Dashboard** (Insert › Dashboard) adds a [dashboard](/docs/features/analysis/dashboards/) sheet and shows it. On a dashboard, **PivotTable** asks for the table to analyze and adds the pivot to the first free place, **PivotChart** (Insert › Charts) charts a pivot of the dashboard, and **KPI Card** (Insert › Dashboard) shows a measure. On a worksheet, **PivotChart** shows while the active cell is in a pivot and [charts that pivot](/docs/features/analysis/charts/#charts-over-pivots). Hosts can run New Dashboard with `grid.actions.newDashboard()`; its command state is `newDashboard`.
 
-**Version History** and **Save Version** (Review › Version History) appear when the host opts in with `GridConfig.history`; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
+**Version History** and **Save Version** (Review › Version History) appear in a grid that the history add-on applies to; see [Version history panel](/docs/features/data/persistence/#version-history-panel). The panel is a separate chunk that loads on the first command.
 
 ### Layout for the 0.7 features
 
-The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships, New Dashboard and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
+The 0.7 features get their commands in the places below. Insert Function, Explain Formula, the Defined Names commands, Data Model, Relationships, New Dashboard, KPI Card, PivotChart, Slicer and the Version History commands are in the ribbon now; each other command appears in the full ribbon, the compact ribbon and the toolbar when its feature ships. The glyphs are on the icon sheet now, so `IconOverrides` and replacement sheets can use their names.
 
 Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review** goes after Data. Groups fold in the order of the last column, first group first.
 
 | Tab | Group | Command | Glyph | Feature |
 | --- | --- | --- | --- | --- |
-| Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards ([#231](https://github.com/chh-ay/sheetwrite/issues/231)) |
-| Formulas | Function Library | Insert Function | <span class="sheetwrite-icon" data-icon="insertFunction" aria-hidden="true"></span> `insertFunction` | Custom functions ([#220](https://github.com/chh-ay/sheetwrite/issues/220)) |
-| Formulas | Defined Names | Name Manager | <span class="sheetwrite-icon" data-icon="nameManager" aria-hidden="true"></span> `nameManager` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
-| Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs ([#224](https://github.com/chh-ay/sheetwrite/issues/224)) |
-| Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) |
-| Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)); also refreshes external links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
-| Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer ([#227](https://github.com/chh-ay/sheetwrite/issues/227)) |
-| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links ([#226](https://github.com/chh-ay/sheetwrite/issues/226)) |
-| Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
-| Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model ([#229](https://github.com/chh-ay/sheetwrite/issues/229)) |
-| Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures ([#230](https://github.com/chh-ay/sheetwrite/issues/230)) |
-| Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
-| Review | Version History | Save Version | <span class="sheetwrite-icon" data-icon="saveVersion" aria-hidden="true"></span> `saveVersion` | Version history ([#228](https://github.com/chh-ay/sheetwrite/issues/228)) |
+| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="chart" aria-hidden="true"></span> `chart` | Dashboards |
+| Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards |
+| Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards |
+| Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards |
+| Formulas | Function Library | Insert Function | <span class="sheetwrite-icon" data-icon="insertFunction" aria-hidden="true"></span> `insertFunction` | Custom functions |
+| Formulas | Defined Names | Name Manager | <span class="sheetwrite-icon" data-icon="nameManager" aria-hidden="true"></span> `nameManager` | Named LAMBDAs |
+| Formulas | Defined Names | Define Name | <span class="sheetwrite-icon" data-icon="defineName" aria-hidden="true"></span> `defineName` | Named LAMBDAs |
+| Formulas | Formula Auditing | Explain Formula | <span class="sheetwrite-icon" data-icon="explainFormula" aria-hidden="true"></span> `explainFormula` | Formula help |
+| Data | Get & Transform Data | Get Data | <span class="sheetwrite-icon" data-icon="getData" aria-hidden="true"></span> `getData` | Query layer |
+| Data | Queries & Connections | Refresh All | <span class="sheetwrite-icon" data-icon="refreshAll" aria-hidden="true"></span> `refreshAll` | Query layer |
+| Data | Queries & Connections | Queries & Connections | <span class="sheetwrite-icon" data-icon="queries" aria-hidden="true"></span> `queries` | Query layer |
+| Data | Queries & Connections | Edit Links | <span class="sheetwrite-icon" data-icon="editLinks" aria-hidden="true"></span> `editLinks` | External workbook links; shows only for a workbook with links |
+| Data | Data Tools | Data Model | <span class="sheetwrite-icon" data-icon="dataModel" aria-hidden="true"></span> `dataModel` | Data model |
+| Data | Data Tools | Relationships | <span class="sheetwrite-icon" data-icon="relationships" aria-hidden="true"></span> `relationships` | Data model |
+| Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures |
+| Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history |
+| Review | Version History | Save Version | <span class="sheetwrite-icon" data-icon="saveVersion" aria-hidden="true"></span> `saveVersion` | Version history |
 
 | Tab | Group order, left to right | Folds first to last |
 | --- | --- | --- |
@@ -138,9 +139,9 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 
 Three 0.7 features add no ribbon command, because the user reaches them in cells or files that the ribbon already covers:
 
-- Formula autocomplete and the argument guide ([#221](https://github.com/chh-ay/sheetwrite/issues/221)) work in the cell and formula bar editors.
-- Array formula editing ([#225](https://github.com/chh-ay/sheetwrite/issues/225)) changes how edits inside a spill behave.
-- XLSX chart import and export ([#215](https://github.com/chh-ay/sheetwrite/issues/215)) use Insert › Charts and Export XLSX.
+- Formula autocomplete and the argument guide work in the cell and formula bar editors.
+- Array formula editing changes how edits inside a spill behave.
+- XLSX chart import and export use Insert › Charts and Export XLSX.
 
 ### Narrow widths
 
@@ -187,7 +188,7 @@ const grid = createGrid(host, {
 
 The ribbon and the toolbar load with `import()` as their own chunk, only when a grid asks for one. A grid without chrome does not download it.
 
-- The grid reserves the chrome's height while the chunk loads, so nothing moves when it arrives.
+- The grid reserves the chrome's height while the chunk loads, so nothing moves when it arrives. For the ribbon that is the compact or the full height its `mode` and the host's width choose.
 - A chunk that arrives after the chrome was rebuilt, or after the grid was destroyed, is dropped.
 - If the chunk fails to load, the grid gives the space back and shows no chrome. The load error is still reported as an unhandled promise rejection; the host cannot catch it.
 
@@ -303,7 +304,7 @@ Every toolbar option keeps working. These parts render differently because the t
 
 ### Export buttons
 
-- The export flag always enables CSV. The XLSX button requires an explicit optional installation and `import "@sheetwrite/xlsx/register"` before use. The framework packages do not install an XLSX backend.
+- The export flag always enables CSV. The XLSX button requires an explicit optional installation and `initSheetwrite({ addons: [xlsxAddon()] })` before use. The framework packages do not install an XLSX backend.
 - Direct `grid.exportXlsx(...)` calls reject on failure.
 - Built-in toolbar and context-menu actions show an alert and emit one `export-error` event for CSV or XLSX failures.
 - `grid.actions.exportXlsx()` returns a promise that does not reject.
@@ -355,6 +356,10 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | `keyboard` | `boolean \| KeyboardOptions \| function` | `true` | Built-in key bindings. See [Interaction → Keyboard navigation](/docs/features/grid/selection-and-keyboard/#keyboard-navigation). |
 
 Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z** undoes the last edit, **Ctrl+Shift+Z** redoes it, and **Ctrl+F** opens the find widget (unless `find: false`).
+
+## Styles
+
+The toolbar and the ribbon need `@sheetwrite/core/styles/ribbon.css`, and `@sheetwrite/core/styles/icons.css` for their built-in icons. `@sheetwrite/core/styles.css` includes every part; see [Stylesheet parts](/docs/features/formatting/styles/#stylesheet-parts).
 
 ## Edge cases and limits
 

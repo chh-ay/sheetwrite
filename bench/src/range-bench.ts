@@ -379,7 +379,7 @@ async function autoFitWorkload(
 }
 
 const bytes = readFileSync(WASM_PATH);
-await initSheetwrite(bytes);
+await initSheetwrite({ source: bytes });
 const memory = getEngine().getMemory();
 const restoreCanvas = installCanvasTestStubs();
 const originalRequestAnimationFrame = globalThis.requestAnimationFrame;

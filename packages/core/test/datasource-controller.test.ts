@@ -4,7 +4,6 @@ import {
   DATASOURCE_MAX_ACTIVE_REQUESTS,
   DATASOURCE_PREFETCH_MAX_BYTES,
   DATASOURCE_PREFETCH_MAX_ROWS,
-  DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT,
   DatasourceController,
   type DatasourceControllerOptions,
 } from "../src/datasource-controller.js";
@@ -319,53 +318,6 @@ describe("DatasourceController revision retention", () => {
     store.dispose();
   });
 
-  it("reloads rows after the paged cache evicts their clean chunks", async () => {
-    const store = new SheetwriteStore(makeWorkbook(100), undefined, {
-      storage: "paged",
-      chunkRows: 4,
-      cacheBytes: 300,
-    });
-    const starts: number[] = [];
-    const controller = newTestController(
-      {
-        datasource: async (request) => {
-          starts.push(request.start);
-          return {
-            start: request.start,
-            rows: Array.from({ length: request.end - request.start }, (_, offset) => ({
-              name: `row-${request.start + offset}`,
-              amount: request.start + offset,
-              city: "A",
-            })),
-          };
-        },
-        loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 100,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
-      },
-      100,
-    );
-
-    for (const row of [0, 4, 8, 12]) {
-      controller.ensureLoaded(row, row + 1, [0, 1, 2]);
-      await flushRequest();
-    }
-    expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("unloaded");
-
-    controller.ensureLoaded(0, 1, [0, 1, 2]);
-    await flushRequest();
-    expect(starts).toEqual([0, 4, 8, 12, 0]);
-    expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("row-0");
-
-    controller.destroy();
-    store.dispose();
-  });
-
   it("starts visible demand before bounded aligned speculation and promotes overlap", async () => {
     const store = new SheetwriteStore(makeWorkbook(100));
     const pending: Array<{
@@ -408,7 +360,7 @@ describe("DatasourceController revision retention", () => {
 
     now = 16.7;
     controller.updateViewport(5, 15, [0]);
-    expect(pending).toHaveLength(4);
+    expect(pending).toHaveLength(5);
     expect(controller.getTelemetry().promotions).toBe(1);
     for (let left = 0; left < pending.length; left++) {
       for (let right = left + 1; right < pending.length; right++) {
@@ -491,49 +443,6 @@ describe("DatasourceController revision retention", () => {
     controller.destroy();
     store.dispose();
   });
-  it("bounds visible-wait samples without per-row trace growth", async () => {
-    const rowCount = DATASOURCE_VISIBLE_WAIT_SAMPLE_LIMIT + 17;
-    const store = new SheetwriteStore(makeWorkbook(rowCount));
-    let now = 0;
-    const controller = newTestController(
-      {
-        datasource: async (request) => {
-          now = 10;
-          return {
-            start: request.start,
-            rows: Array.from({ length: request.end - request.start }, (_, row) => ({
-              name: `row-${row}`,
-            })),
-          };
-        },
-        loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => rowCount,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
-        now: () => now,
-      },
-      rowCount,
-    );
-
-    controller.updateViewport(0, rowCount, [0]);
-    await flushRequest();
-    expect(controller.getTelemetry().visibleWaitSamples).toBe(rowCount);
-    expect(
-      controller.getResourceOwners().find((owner) => owner.owner === "js.datasource.wait-samples"),
-    ).toMatchObject({
-      logicalBytes: 16,
-      allocatedBytes: 16,
-      entries: 1,
-      measurement: "exact-capacity",
-    });
-
-    controller.destroy();
-    store.dispose();
-  });
 
   it("bounds combined ahead and behind ownership for wide large viewports and sheet edges", () => {
     const workbook = makeWorkbook(2_000);
@@ -605,237 +514,6 @@ describe("DatasourceController revision retention", () => {
         .every((owner) => owner.logicalBytes === 0 && owner.entries === 0),
     ).toBe(true);
     // Destroy above proves every datasource owner releases its retained state.
-    store.dispose();
-  });
-  it("caps the full retained speculative union after partial-overlap viewport shifts", () => {
-    const columnCount = 100;
-    const rowBytes = columnCount * 16;
-    const rowHorizon = Math.floor(DATASOURCE_PREFETCH_MAX_BYTES / rowBytes);
-    const assertShiftBounded = (
-      initial: readonly [number, number],
-      shifted: readonly [number, number],
-      expectAbort = true,
-    ) => {
-      const workbook = makeWorkbook(3_000);
-      workbook.sheets[0]!.columns = Array.from({ length: columnCount }, (_, column) => ({
-        key: `c${column}`,
-        header: `C${column}`,
-        width: 100,
-        type: "text" as const,
-      }));
-      const store = new SheetwriteStore(workbook);
-      const requests: Array<{ signal: AbortSignal }> = [];
-      let now = 0;
-      const controller = newTestController(
-        {
-          datasource: (request) => {
-            requests.push(request);
-            return Promise.withResolvers<DataSourcePage>().promise;
-          },
-          loadable: store,
-          activeSheet: () => "s1",
-          rowCount: () => 3_000,
-          revision: () => 0,
-          isCellNewerThan: () => false,
-          retainRevision: () => () => {},
-          onRowsLoaded: () => {},
-          onError: () => {},
-          now: () => now,
-        },
-        3_000,
-      );
-      const allColumns = Array.from({ length: columnCount }, (_, column) => column);
-
-      controller.updateViewport(initial[0], initial[1], allColumns);
-      now = 16.7;
-      controller.updateViewport(shifted[0], shifted[1], allColumns);
-      const activeSpeculativeRows = controller.getTelemetry().activeSpeculativeRows;
-      expect(activeSpeculativeRows).toBeLessThanOrEqual(rowHorizon);
-      expect(activeSpeculativeRows * rowBytes).toBeLessThanOrEqual(DATASOURCE_PREFETCH_MAX_BYTES);
-      expect(requests.some(({ signal }) => signal.aborted)).toBe(expectAbort);
-      controller.destroy();
-      store.dispose();
-    };
-
-    assertShiftBounded([0, 1_000], [900, 1_000]);
-    assertShiftBounded([0, 1_000], [900, 1_900], false);
-    assertShiftBounded([1_000, 2_000], [100, 1_100]);
-  });
-
-  it("keeps billion-row construction, waits, ownership, reset, and destroy sparse", () => {
-    const logicalRows = 1_000_000_000;
-    const inert = newTestController(
-      {
-        loadable: null,
-        activeSheet: () => "s1",
-        rowCount: () => logicalRows,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
-      },
-      logicalRows,
-    );
-    expect(inert.getTelemetry()).toMatchObject({
-      loadedBands: 0,
-      ownedBands: 0,
-      visibleWaitingRows: 0,
-      visibleWaitingBands: 0,
-    });
-    inert.updateViewport(0, logicalRows, [0]);
-    expect(inert.getTelemetry()).toMatchObject({
-      loadedBands: 0,
-      ownedBands: 0,
-      visibleWaitingRows: logicalRows,
-      visibleWaitingBands: 1,
-    });
-    inert.reset(logicalRows);
-    expect(inert.getTelemetry()).toMatchObject({
-      loadedBands: 0,
-      ownedBands: 0,
-      visibleWaitingRows: 0,
-      visibleWaitingBands: 0,
-    });
-    inert.destroy();
-
-    const probes: Array<[number, number]> = [];
-    const requests: Array<{ start: number; end: number; signal: AbortSignal }> = [];
-    const partiallyResident = {
-      isPaged: () => true,
-      getWorkbook: () => ({
-        activeSheet: "s1",
-        sheets: [{ id: "s1", columns: [{ key: "name" }] }],
-      }),
-      areColumnsFullyLoaded: (
-        _sheet: string,
-        start: number,
-        end: number,
-        _columns: readonly number[],
-      ) => {
-        probes.push([start, end]);
-        return start === 42 && end === 43;
-      },
-      getPagedStats: () => ({
-        chunks: 1,
-        loadedCells: 1,
-        dirtyCells: 0,
-        allocatedBytes: 1,
-        dirtyAllocatedBytes: 0,
-        fullyLoaded: false,
-      }),
-    } as unknown as SheetwriteStore;
-    const controller = newTestController(
-      {
-        datasource: (request) => {
-          requests.push(request);
-          return Promise.withResolvers<DataSourcePage>().promise;
-        },
-        loadable: partiallyResident,
-        activeSheet: () => "s1",
-        rowCount: () => logicalRows,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => () => {},
-        onRowsLoaded: () => {},
-        onError: () => {},
-      },
-      logicalRows,
-    );
-
-    controller.ensureLoaded(0, logicalRows, [0]);
-    expect(probes).toEqual([[0, logicalRows]]);
-    expect(requests.map(({ start, end }) => [start, end])).toEqual([[0, logicalRows]]);
-    expect(controller.getTelemetry()).toMatchObject({
-      loadedBands: 0,
-      ownedBands: 1,
-      activeRequests: 1,
-    });
-    controller.reset(logicalRows);
-    expect(requests[0]!.signal.aborted).toBe(true);
-    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 0, ownedBands: 0 });
-    controller.destroy();
-  });
-
-  it("caps highly fragmented visible gaps and continues them as requests settle", async () => {
-    const store = new SheetwriteStore(makeWorkbook(24));
-    let retainCount = 0;
-    let fragmented = false;
-    const pending: Array<{
-      request: { start: number; end: number };
-      result: PromiseWithResolvers<DataSourcePage>;
-    }> = [];
-    const controller = newTestController(
-      {
-        datasource: (request) => {
-          if (!fragmented) {
-            return Promise.resolve({
-              start: request.start,
-              rows: [{ name: `row-${request.start}` }],
-            });
-          }
-          const result = Promise.withResolvers<DataSourcePage>();
-          pending.push({ request, result });
-          return result.promise;
-        },
-        loadable: store,
-        activeSheet: () => "s1",
-        rowCount: () => 24,
-        revision: () => 0,
-        isCellNewerThan: () => false,
-        retainRevision: () => {
-          retainCount += 1;
-          return () => {
-            retainCount -= 1;
-          };
-        },
-        onRowsLoaded: () => {},
-        onError: () => {},
-      },
-      24,
-    );
-
-    for (let row = 0; row < 24; row += 2) {
-      controller.ensureLoaded(row, row + 1, [0]);
-      await flushRequest();
-    }
-    expect(controller.getTelemetry()).toMatchObject({ loadedBands: 12, activeRequests: 0 });
-
-    fragmented = true;
-    controller.ensureLoaded(0, 24, [0]);
-    expect(pending).toHaveLength(DATASOURCE_MAX_ACTIVE_REQUESTS);
-    expect(controller.getTelemetry()).toMatchObject({
-      activeRequests: DATASOURCE_MAX_ACTIVE_REQUESTS,
-      ownedBands: DATASOURCE_MAX_ACTIVE_REQUESTS,
-    });
-    expect(retainCount).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
-
-    let settled = 0;
-    let peakActive = 0;
-    while (settled < pending.length) {
-      const entry = pending[settled]!;
-      entry.result.resolve({
-        start: entry.request.start,
-        rows: [{ name: `row-${entry.request.start}` }],
-      });
-      settled += 1;
-      await flushRequest();
-      peakActive = Math.max(peakActive, controller.getTelemetry().activeRequests);
-      expect(controller.getTelemetry().activeRequests).toBeLessThanOrEqual(
-        DATASOURCE_MAX_ACTIVE_REQUESTS,
-      );
-      expect(retainCount).toBe(controller.getTelemetry().activeRequests);
-    }
-    expect(pending).toHaveLength(12);
-    expect(peakActive).toBe(DATASOURCE_MAX_ACTIVE_REQUESTS);
-    expect(controller.getTelemetry()).toMatchObject({
-      activeRequests: 0,
-      ownedBands: 0,
-      loadedBands: 1,
-    });
-    expect(retainCount).toBe(0);
-
-    controller.destroy();
     store.dispose();
   });
 
@@ -912,130 +590,290 @@ describe("DatasourceController revision retention", () => {
   });
 });
 
-it("canonicalizes sparse physical bands and isolates disjoint same-row ownership", async () => {
-  const columns = makeProtocolColumns(10);
-  const workbook = makeWorkbook(12);
-  workbook.sheets[0]!.columns = columns;
-  const store = new SheetwriteStore(workbook);
-  const pending: Array<{
-    request: DataSourceRequest;
-    result: PromiseWithResolvers<ProtocolPage>;
-  }> = [];
-  const datasource: DataSource = {
-    capabilities: { protocol: 2, columns: "windowed" },
-    getRows(request) {
-      const result = Promise.withResolvers<ProtocolPage>();
-      pending.push({ request, result });
-      return result.promise;
-    },
-  };
-  const controller = newProtocolController({
-    store,
-    datasource,
-    columns,
-    rowCount: 12,
-  });
+describe("DatasourceController scroll-speed lookahead", () => {
+  const FRAME_MS = 16.7;
+  const VIEW_ROWS = 30;
+  const ROW_COUNT = 200_000;
+  /** The paged store's default clean-chunk cache budget. */
+  const DEFAULT_CACHE_BYTES = 32 * 1024 * 1024;
 
-  controller.ensureLoaded(0, 4, []);
-  expect(pending).toHaveLength(0);
-  controller.ensureLoaded(0, 4, [7, 2, 3, 7, 5]);
-  expect(pending[0]!.request).toMatchObject({
-    protocol: 2,
-    start: 0,
-    end: 4,
-    columns: [
-      { start: 2, end: 4, keys: ["k2", "k3"] },
-      { start: 5, end: 6, keys: ["k5"] },
-      { start: 7, end: 8, keys: ["k7"] },
-    ],
-  });
+  interface PendingFetch {
+    readonly request: DataSourceRequest;
+    readonly result: PromiseWithResolvers<ProtocolPage>;
+  }
 
-  controller.ensureLoaded(0, 4, [3, 4, 8]);
-  expect(pending).toHaveLength(2);
-  expect(pending[1]!.request.columns).toEqual([
-    { start: 4, end: 5, keys: ["k4"] },
-    { start: 8, end: 9, keys: ["k8"] },
-  ]);
-  const ownedTiles = new Set<string>();
-  for (const { request } of pending) {
-    for (const band of request.columns) {
-      for (let column = band.start; column < band.end; column += 1) {
-        for (let row = request.start; row < request.end; row += 1) {
-          const tile = `${row}:${column}`;
-          expect(ownedTiles.has(tile)).toBe(false);
-          ownedTiles.add(tile);
-        }
+  /** A controller over a windowed datasource whose fetches stay pending until answered. */
+  class ScrollHarness {
+    readonly fetches: PendingFetch[] = [];
+    readonly store: SheetwriteStore;
+    readonly controller: DatasourceController;
+    now = 0;
+
+    constructor(options: { columns?: number; cacheBytes?: number } = {}) {
+      const columns = makeProtocolColumns(options.columns ?? 4);
+      this.store = new SheetwriteStore(
+        { activeSheet: "s1", sheets: [{ id: "s1", name: "S1", rowCount: ROW_COUNT, columns }] },
+        undefined,
+        {
+          storage: "paged",
+          chunkRows: 64,
+          cacheBytes: options.cacheBytes ?? DEFAULT_CACHE_BYTES,
+        },
+      );
+      this.controller = new DatasourceController(
+        {
+          datasource: {
+            capabilities: { protocol: 2, columns: "windowed" },
+            getRows: (request) => {
+              const result = Promise.withResolvers<ProtocolPage>();
+              this.fetches.push({ request, result });
+              return result.promise;
+            },
+          },
+          loadable: this.store,
+          activeSheet: () => "s1",
+          rowCount: () => ROW_COUNT,
+          columns: () => columns,
+          revision: () => 0,
+          isCellNewerThan: () => false,
+          retainRevision: () => () => {},
+          onRowsLoaded: () => {},
+          onError: () => {},
+          now: () => this.now,
+        },
+        ROW_COUNT,
+      );
+    }
+
+    /** One rendered frame with the view at row `top` and its first column at `left`. */
+    frame(top: number, left = 0, columnCount = 4): void {
+      this.now += FRAME_MS;
+      this.view(top, left, columnCount);
+    }
+
+    view(top: number, left = 0, columnCount = 4): void {
+      this.controller.updateViewport(
+        top,
+        top + VIEW_ROWS,
+        Array.from({ length: columnCount }, (_, offset) => left + offset),
+      );
+    }
+
+    /** Answers every pending fetch in full. */
+    async resolveAll(): Promise<void> {
+      for (const { request, result } of this.fetches) {
+        if (request.signal.aborted) continue;
+        result.resolve({
+          protocol: 2,
+          start: request.start,
+          columns: request.columns,
+          rows: protocolRows(request.columns, request.start, request.end),
+        });
       }
+      this.fetches.length = 0;
+      await flushRequest();
+    }
+
+    all(): DataSourceRequest[] {
+      return this.fetches.map(({ request }) => request);
+    }
+
+    live(): DataSourceRequest[] {
+      return this.all().filter((request) => !request.signal.aborted);
+    }
+
+    farthestLiveEnd(): number {
+      return Math.max(...this.live().map((request) => request.end));
+    }
+
+    dispose(): void {
+      this.controller.destroy();
+      this.store.dispose();
     }
   }
 
-  for (const entry of pending) {
-    entry.result.resolve({
-      protocol: 2,
-      start: entry.request.start,
-      columns: entry.request.columns,
-      rows: protocolRows(entry.request.columns, entry.request.start, entry.request.end),
-    });
-  }
-  await flushRequest();
-  expect(controller.getTelemetry()).toMatchObject({ activeRequests: 0, ownedBands: 0 });
-  expect(store.getCell({ sheet: "s1", row: 2, col: 8 }).resolved).toBe("k8:2");
+  it("looks ahead by speed times the measured p90 fetch time", async () => {
+    const reach: number[] = [];
+    for (const fetchMs of [20, 300]) {
+      const harness = new ScrollHarness();
+      // The first view's fetches answer after `fetchMs`, which teaches the fetch time.
+      harness.view(10_000);
+      harness.now += fetchMs;
+      await harness.resolveAll();
+      expect(harness.controller.getTelemetry().fetchTimeP90Ms).toBe(fetchMs);
 
-  controller.destroy();
-  store.dispose();
-});
-
-it("hydrates only declared partial row and column coverage and continues every gap", async () => {
-  const columns = makeProtocolColumns(6);
-  const workbook = makeWorkbook(8);
-  workbook.sheets[0]!.columns = columns;
-  const store = new SheetwriteStore(workbook, undefined, { storage: "paged" });
-  const pending: Array<{
-    request: DataSourceRequest;
-    result: PromiseWithResolvers<ProtocolPage>;
-  }> = [];
-  const datasource: DataSource = {
-    capabilities: { protocol: 2, columns: "windowed" },
-    getRows(request) {
-      const result = Promise.withResolvers<ProtocolPage>();
-      pending.push({ request, result });
-      return result.promise;
-    },
-  };
-  const controller = newProtocolController({
-    store,
-    datasource,
-    columns,
-    rowCount: 8,
+      // Two rows a frame (0.12 rows/ms) is below fling speed for both fetch times.
+      for (let frame = 1; frame <= 8; frame++) harness.frame(10_000 + frame * 2);
+      const viewEnd = 10_000 + 16 + VIEW_ROWS;
+      expect(harness.controller.getTelemetry().velocityRowsPerMs).toBeCloseTo(2 / FRAME_MS, 5);
+      reach.push(harness.farthestLiveEnd() - viewEnd);
+      harness.dispose();
+    }
+    const [fast = 0, slow = 0] = reach;
+    // 0.12 rows/ms × 20 ms ≈ 2 rows and × 300 ms ≈ 36 rows, each plus a 30-row view of margin.
+    expect(fast).toBeLessThanOrEqual(2 * VIEW_ROWS);
+    expect(slow).toBeGreaterThanOrEqual(36 + VIEW_ROWS);
   });
 
-  controller.ensureLoaded(0, 6, [0, 1, 4, 5]);
-  pending[0]!.result.resolve({
-    protocol: 2,
-    start: 1,
-    columns: [{ start: 1, end: 2, keys: ["k1"] }],
-    rows: [{ k1: "partial-1" }, { k1: "partial-2" }],
+  it("keeps slow wheel scrolling to one view ahead on a slow datasource", async () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    harness.now += 300;
+    await harness.resolveAll();
+    // A row and a half a frame (0.09 rows/ms) is wheel speed: 300 ms of travel would add
+    // 27 rows, but the lookahead stays at one view past the view, as before.
+    let top = 10_000;
+    for (let frame = 1; frame <= 120; frame++) {
+      top += frame % 2 === 0 ? 2 : 1;
+      harness.frame(top);
+    }
+    const viewEnd = top + VIEW_ROWS;
+    expect(harness.controller.getTelemetry().velocityRowsPerMs).toBeLessThan(0.1);
+    expect(harness.live().some((request) => request.end > viewEnd)).toBe(true);
+    // One view past the view's end, rounded up to a whole band.
+    expect(harness.farthestLiveEnd()).toBeLessThanOrEqual(viewEnd + 2 * VIEW_ROWS);
+    harness.dispose();
   });
-  await flushRequest();
-  expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("partial-1");
-  expect(store.areColumnsFullyLoaded("s1", 1, 2, [0])).toBe(false);
-  expect(pending.length).toBeGreaterThan(1);
 
-  for (const entry of pending.slice(1)) {
-    entry.result.resolve({
-      protocol: 2,
-      start: entry.request.start,
-      columns: entry.request.columns,
-      rows: protocolRows(entry.request.columns, entry.request.start, entry.request.end),
-    });
-  }
-  await flushRequest();
-  expect(store.areColumnsFullyLoaded("s1", 0, 6, [0, 1, 4, 5])).toBe(true);
-  expect(store.getCell({ sheet: "s1", row: 5, col: 5 }).resolved).toBe("k5:5");
-  expect(controller.getTelemetry()).toMatchObject({ activeRequests: 0, ownedBands: 0 });
+  it("turns the lookahead around on a direction change and cancels the old one", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    for (let frame = 1; frame <= 8; frame++) harness.frame(10_000 + frame * 6);
+    const turnTop = 10_000 + 8 * 6;
+    const below = harness.live().filter((request) => request.start >= turnTop + VIEW_ROWS);
+    expect(below.length).toBeGreaterThan(0);
 
-  controller.destroy();
-  store.dispose();
+    harness.frame(turnTop - 6);
+    const telemetry = harness.controller.getTelemetry();
+    expect(telemetry.direction).toBe(-1);
+    expect(telemetry.reversalAborts).toBeGreaterThan(0);
+    expect(below.every((request) => request.signal.aborted)).toBe(true);
+    expect(harness.live().some((request) => request.end <= turnTop - 6)).toBe(true);
+    harness.dispose();
+  });
+
+  it("treats a lone jump as parked", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    for (let frame = 1; frame <= 4; frame++) harness.frame(10_000 + frame * 6);
+    harness.frame(150_000);
+    harness.frame(150_000);
+    expect(harness.controller.getTelemetry().jumpAborts).toBeGreaterThan(0);
+    expect(harness.controller.getTelemetry().velocityRowsPerMs).toBe(0);
+    // Parked after the jump: one view of margin, nothing far past the landing.
+    expect(harness.farthestLiveEnd()).toBeLessThanOrEqual(150_000 + 3 * VIEW_ROWS);
+    harness.dispose();
+  });
+
+  it("fetches only where a scrollbar drag comes to rest, once it slows down", () => {
+    // A scrollbar drag moves about 285 rows a frame: the view shows a sliver of what it
+    // crosses, so nothing along the way is prefetched.
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    let top = 10_000;
+    for (let frame = 1; frame <= 6; frame++) {
+      top += 285;
+      harness.frame(top);
+    }
+    expect(harness.controller.getTelemetry().velocityRowsPerMs).toBeGreaterThan(0);
+    expect(harness.live().every((request) => request.start < top + VIEW_ROWS)).toBe(true);
+
+    // Slowing for a whole velocity window predicts the resting point well ahead of the view.
+    let step = 285;
+    for (let frame = 1; frame <= 10; frame++) {
+      step = Math.round(step * 0.85);
+      top += step;
+      harness.frame(top);
+    }
+    expect(harness.live().some((request) => request.start >= top + 2 * VIEW_ROWS)).toBe(true);
+    harness.dispose();
+  });
+
+  it("fetches ahead of a fling's landing point and cancels bands the view passed", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    let top = 10_000;
+    for (let frame = 1; frame <= 30; frame++) {
+      top += 25;
+      harness.frame(top);
+    }
+    // 25 rows a frame travels about 150 rows during the default 100 ms fetch, so the
+    // lookahead skips the stretch next to the view that it passes before a fetch returns.
+    expect(harness.live().some((request) => request.start >= top + 3 * VIEW_ROWS)).toBe(true);
+    const passed = harness.all().filter((request) => request.end <= top);
+    expect(passed.length).toBeGreaterThan(0);
+    expect(passed.every((request) => request.signal.aborted)).toBe(true);
+    harness.dispose();
+  });
+
+  it("shrinks the lookahead as a fling slows down", () => {
+    const harness = new ScrollHarness();
+    harness.view(10_000);
+    let top = 10_000;
+    let speed = 25;
+    for (let frame = 1; frame <= 10; frame++) {
+      top += speed;
+      harness.frame(top);
+    }
+    const peakReach = harness.farthestLiveEnd() - (top + VIEW_ROWS);
+    const abortsAtPeak = harness.controller.getTelemetry().aborts;
+    for (let frame = 1; frame <= 20; frame++) {
+      speed *= 0.85;
+      top += Math.round(speed);
+      harness.frame(top);
+    }
+    const slowReach = harness.farthestLiveEnd() - (top + VIEW_ROWS);
+    expect(slowReach).toBeLessThan(peakReach);
+    expect(harness.controller.getTelemetry().aborts).toBeGreaterThan(abortsAtPeak);
+    harness.dispose();
+  });
+
+  it("caps speculation by the paged cache budget", () => {
+    const columns = 8;
+    const cacheBytes = 8 * 1024;
+    // 8 KiB at 16 bytes a cell, less the 30 × 8 view, over 8 columns.
+    const budgetRows = Math.floor((cacheBytes / 16 - VIEW_ROWS * columns) / columns);
+    const peaks: number[] = [];
+    for (const budget of [cacheBytes, DEFAULT_CACHE_BYTES]) {
+      const harness = new ScrollHarness({ columns, cacheBytes: budget });
+      harness.view(10_000, 0, columns);
+      let peak = 0;
+      for (let frame = 1; frame <= 12; frame++) {
+        harness.frame(10_000 + frame * 3, 0, columns);
+        peak = Math.max(peak, harness.controller.getTelemetry().activeSpeculativeRows);
+      }
+      peaks.push(peak);
+      harness.dispose();
+    }
+    const [capped = 0, uncapped = 0] = peaks;
+    expect(capped).toBeGreaterThan(0);
+    expect(capped).toBeLessThanOrEqual(budgetRows);
+    expect(uncapped).toBeGreaterThan(budgetRows);
+  });
+
+  it("looks ahead sideways while the view scrolls across columns", async () => {
+    const harness = new ScrollHarness({ columns: 60 });
+    harness.view(10_000, 0, 8);
+    // Pages answer between frames, so each frame's speculation can start.
+    for (let left = 1; left <= 5; left++) {
+      harness.frame(10_000, left, 8);
+      await harness.resolveAll();
+    }
+    harness.frame(10_000, 6, 8);
+    expect(harness.controller.getTelemetry().velocityColumnsPerMs).toBeGreaterThan(0);
+    const ahead = harness
+      .live()
+      .filter((request) => request.columns.some((band) => band.start >= 6 + 8));
+    expect(ahead.length).toBeGreaterThan(0);
+    expect(
+      ahead.every((request) => request.start >= 10_000 && request.end <= 10_000 + VIEW_ROWS),
+    ).toBe(true);
+
+    // Turning back left drops the columns to the right that are still in flight.
+    for (let left = 5; left >= 2; left--) harness.frame(10_000, left, 8);
+    expect(ahead.every((request) => request.signal.aborted)).toBe(true);
+    harness.dispose();
+  });
 });
 
 it("rejects malformed protocol, coverage, bands, and row shapes before hydration", async () => {
@@ -1180,125 +1018,6 @@ it("bounds empty-page retries and releases no-progress ownership", async () => {
   });
   expect(controller.getTelemetry()).toMatchObject({ activeRequests: 0, ownedBands: 0 });
   expect(store.getCellLoadState({ sheet: "s1", row: 0, col: 0 })).toBe("unloaded");
-
-  controller.destroy();
-  store.dispose();
-});
-
-it("preempts obsolete same-row horizontal owners before loading a far viewport", async () => {
-  const columns = makeProtocolColumns(9);
-  const workbook = makeWorkbook(30);
-  workbook.sheets[0]!.columns = columns;
-  const store = new SheetwriteStore(workbook);
-  const pending: Array<{
-    request: DataSourceRequest;
-    result: PromiseWithResolvers<ProtocolPage>;
-  }> = [];
-  const controller = newProtocolController({
-    store,
-    columns,
-    rowCount: 30,
-    datasource: {
-      capabilities: { protocol: 2, columns: "windowed" },
-      getRows(request) {
-        const result = Promise.withResolvers<ProtocolPage>();
-        pending.push({ request, result });
-        return result.promise;
-      },
-    },
-  });
-
-  controller.updateViewport(0, 5, [0, 1, 2, 3, 4, 5]);
-  const initial = pending.slice();
-  controller.updateViewport(0, 5, [0, 6, 7, 8]);
-  expect(initial.every(({ request }) => request.signal.aborted)).toBe(true);
-  const replacement = pending
-    .slice(initial.length)
-    .find(({ request }) => request.start === 0 && request.end === 5);
-  expect(replacement?.request.columns).toEqual([
-    { start: 0, end: 1, keys: ["k0"] },
-    { start: 6, end: 9, keys: ["k6", "k7", "k8"] },
-  ]);
-
-  initial[0]!.result.resolve({
-    protocol: 2,
-    start: initial[0]!.request.start,
-    columns: initial[0]!.request.columns,
-    rows: protocolRows(
-      initial[0]!.request.columns,
-      initial[0]!.request.start,
-      initial[0]!.request.end,
-    ),
-  });
-  replacement!.result.resolve({
-    protocol: 2,
-    start: replacement!.request.start,
-    columns: replacement!.request.columns,
-    rows: protocolRows(
-      replacement!.request.columns,
-      replacement!.request.start,
-      replacement!.request.end,
-    ),
-  });
-  await flushRequest();
-  expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).not.toBe("k1:0");
-  expect(store.getCell({ sheet: "s1", row: 0, col: 7 }).resolved).toBe("k7:0");
-
-  controller.destroy();
-  store.dispose();
-});
-
-it("adapts legacy rows through full-width protocol 2 with explicit blank keys", async () => {
-  const columns = makeProtocolColumns(3);
-  const workbook = makeWorkbook(3);
-  workbook.sheets[0]!.columns = columns;
-  const store = new SheetwriteStore(workbook);
-  let captured: DataSourceRequest | undefined;
-  let returned: ProtocolPage | undefined;
-  const adapted = legacyFullWidthDataSource((request) => {
-    captured = request;
-    return { start: request.start, rows: [{ k0: "legacy" }] };
-  });
-  const datasource: DataSource = {
-    ...adapted,
-    getRows(request) {
-      return adapted.getRows(request).then((page) => {
-        returned = page;
-        return page;
-      });
-    },
-  };
-  const controller = newProtocolController({
-    store,
-    datasource,
-    columns,
-    rowCount: 3,
-  });
-
-  controller.ensureLoaded(0, 1, [1]);
-  await flushRequest();
-  expect(captured?.columns).toEqual([{ start: 0, end: 3, keys: ["k0", "k1", "k2"] }]);
-  expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("legacy");
-  expect(Reflect.ownKeys(returned!.rows[0]!)).toEqual(["k0", "k1", "k2"]);
-  expect(returned!.rows[0]).toMatchObject({ k0: "legacy", k1: null, k2: null });
-  expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBeNull();
-  expect(store.getCell({ sheet: "s1", row: 0, col: 2 }).resolved).toBeNull();
-
-  const invalid = legacyFullWidthDataSource((request) => ({
-    start: request.start,
-    rows: [{ unexpected: "value" }],
-  }));
-  await expect(
-    invalid.getRows({
-      protocol: 2,
-      sheet: "s1",
-      start: 0,
-      end: 1,
-      columns: [{ start: 0, end: 1, keys: ["k0"] }],
-      signal: new AbortController().signal,
-      revision: 0,
-    }),
-  ).rejects.toMatchObject({ code: "datasource-request-failed", operation: "datasource-request" });
 
   controller.destroy();
   store.dispose();

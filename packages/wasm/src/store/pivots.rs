@@ -20,7 +20,7 @@ use wasm_bindgen::prelude::*;
 use super::model_source::ModelSource;
 use super::pivot_output::{attempt_cut, shift_anchor, ShiftAxis};
 use super::relationships::ColumnRef;
-use super::{CellStore, TableColumnDefinition, TableDefinition};
+use super::CellStore;
 use crate::calc::shift_range;
 use crate::eval::{calculated_slot, settled_cell_value};
 use crate::formula_slots::{FormulaStore, FormulaWork};
@@ -31,7 +31,8 @@ use crate::pivot::{
 };
 use crate::sheet::SheetData;
 use crate::spill::SpillRange;
-use crate::types::{CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
+use crate::tables::{Table, TableColumn};
+use crate::types::{AbsCellKey, CellKey, FormulaError, StringStorage, Value, KIND_EMPTY};
 /// Value field whose field slot names a measure ID in the string payload.
 const MEASURE_VALUE_CODE: u32 = 7;
 
@@ -357,7 +358,7 @@ pub(super) struct SourceRect {
 }
 
 impl SourceRect {
-    pub(super) fn table(table: &TableDefinition) -> Self {
+    pub(super) fn table(table: &Table) -> Self {
         let first = table.row_start + u32::from(table.header_row);
         let end = table.row_end + 1 - u32::from(table.totals_row);
         Self {
@@ -438,7 +439,7 @@ struct StoreSource<'a> {
     slots: &'a FormulaStore,
     rect: SourceRect,
     /// A table's column names, which are its field names.
-    names: Option<&'a [TableColumnDefinition]>,
+    names: Option<&'a [TableColumn]>,
     model: Option<ModelSource<'a>>,
 }
 
@@ -685,14 +686,18 @@ pub struct PivotFields {
 
 #[wasm_bindgen]
 impl PivotFields {
-    /// Field names: header text, or `ColumnN` for a blank header.
-    pub fn names(&self) -> Vec<String> {
-        self.names.clone()
+    /// Surrenders the field names: header text, or `ColumnN` for a blank
+    /// header. The list keeps an empty buffer afterwards.
+    #[wasm_bindgen(js_name = takeNames)]
+    pub fn take_names(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.names)
     }
 
-    /// Field types: 0 blank, 1 number, 2 text, 3 boolean, 4 mixed.
-    pub fn types(&self) -> Vec<u8> {
-        self.types.clone()
+    /// Surrenders the field types: 0 blank, 1 number, 2 text, 3 boolean,
+    /// 4 mixed.
+    #[wasm_bindgen(js_name = takeTypes)]
+    pub fn take_types(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.types)
     }
 }
 
@@ -819,8 +824,9 @@ impl CellStore {
         PivotFields { names, types }
     }
 
-    /// The output cells of pivot `index` on a sheet without cells (a
-    /// dashboard), in row-major order; empty while the pivot has no layout.
+    /// The output cells of pivot `index` on `sheet`, in row-major order; empty
+    /// while the pivot has no layout. It serves the pivots that place no
+    /// output: those of a dashboard and the chart copies of a worksheet pivot.
     #[wasm_bindgen(js_name = pivotOutput)]
     pub fn pivot_output(&self, sheet: usize, index: usize) -> PivotOutput {
         let mut output = PivotOutput::default();
@@ -834,13 +840,20 @@ impl CellStore {
         let (Some(layout), Some(cache)) = (pivot.layout.as_ref(), pivot.cache.as_ref()) else {
             return output;
         };
+        output.layout = [
+            layout.rows,
+            layout.cols,
+            layout.header_rows,
+            layout.label_cols,
+        ]
+        .map(|count| u32::try_from(count).unwrap_or(u32::MAX));
         let mut cells: Vec<Value> = (0..layout.rows * layout.cols)
             .map(|offset| cache.cell(layout, offset))
             .collect();
         // Measure slots are blank in the cache; their values are computed
         // here, as `update_pivot` computes them for placed output.
-        if let SourceRef::Model { table, .. } = &pivot.saved.source {
-            for (offset, value) in self.pivot_measure_cells(cache, layout, table) {
+        if let SourceRef::Model { table, fields } = &pivot.saved.source {
+            for (offset, value) in self.pivot_measure_cells(cache, layout, table, fields) {
                 if let Some(cell) = cells.get_mut(offset) {
                     *cell = value;
                 }
@@ -853,13 +866,14 @@ impl CellStore {
     }
 }
 
-/// The output cells of a dashboard pivot, in row-major order.
+/// The output cells of a pivot that places none in cells, in row-major order.
 #[wasm_bindgen]
 #[derive(Default)]
 pub struct PivotOutput {
     kinds: Vec<u8>,
     numbers: Vec<f64>,
     texts: Vec<String>,
+    layout: [u32; 4],
 }
 
 impl PivotOutput {
@@ -881,19 +895,30 @@ impl PivotOutput {
 
 #[wasm_bindgen]
 impl PivotOutput {
-    /// Cell kinds: 0 blank, 1 number, 2 text, 3 boolean, 4 error.
-    pub fn kinds(&self) -> Vec<u8> {
-        self.kinds.clone()
+    /// Surrenders the cell kinds: 0 blank, 1 number, 2 text, 3 boolean,
+    /// 4 error. The output keeps an empty buffer afterwards.
+    #[wasm_bindgen(js_name = takeKinds)]
+    pub fn take_kinds(&mut self) -> Vec<u8> {
+        std::mem::take(&mut self.kinds)
     }
 
-    /// Per cell: the number, the boolean as 0 or 1, or the error slot.
-    pub fn numbers(&self) -> Vec<f64> {
-        self.numbers.clone()
+    /// Surrenders, per cell, the number, the boolean as 0 or 1, or the error
+    /// slot.
+    #[wasm_bindgen(js_name = takeNumbers)]
+    pub fn take_numbers(&mut self) -> Vec<f64> {
+        std::mem::take(&mut self.numbers)
     }
 
-    /// The text cells, in order.
-    pub fn texts(&self) -> Vec<String> {
-        self.texts.clone()
+    /// Surrenders the text cells, in order.
+    #[wasm_bindgen(js_name = takeTexts)]
+    pub fn take_texts(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.texts)
+    }
+
+    /// `[rows, cols, headerRows, labelCols]` of the output; zeros without a layout.
+    #[wasm_bindgen(js_name = layout)]
+    pub fn layout(&self) -> Vec<u32> {
+        self.layout.to_vec()
     }
 }
 
@@ -920,7 +945,7 @@ impl CellStore {
     fn resolve_pivot_source(
         &self,
         source: &SourceRef,
-    ) -> Result<(SourceRect, Option<&[TableColumnDefinition]>), FormulaError> {
+    ) -> Result<(SourceRect, Option<&[TableColumn]>), FormulaError> {
         match source {
             SourceRef::Range { sheet, rows, cols } => {
                 let data = self
@@ -1011,9 +1036,9 @@ impl CellStore {
             if changed.is_empty() {
                 return;
             }
-            // GETPIVOTDATA reads pivot output without a reference to the
-            // cell it reads, so it is volatile: changed output recomputes
-            // the volatile formulas of every sheet.
+            self.mark_pivot_data_readers_dirty(&mut changed);
+            // A volatile formula can reach changed output through OFFSET or
+            // INDIRECT, so it recalculates too.
             for (sheet, data) in self.sheets.iter().enumerate() {
                 if data.formulas.has_volatile() && !changed.contains(&sheet) {
                     changed.push(sheet);
@@ -1049,6 +1074,39 @@ impl CellStore {
                     pivot.pending.clear();
                     pivot.cache = None;
                 }
+            }
+        }
+    }
+
+    /// Marks dirty the GETPIVOTDATA formulas that read a sheet in `changed`,
+    /// whose pivot output changed, and adds their sheets to `changed`.
+    /// GETPIVOTDATA reads output cells that no reference names, but its
+    /// pivot reference is one of its reads, as in Excel, where it depends on
+    /// its pivot instead of being volatile.
+    fn mark_pivot_data_readers_dirty(&mut self, changed: &mut Vec<usize>) {
+        let reads_changed = |sheet: u32| changed.contains(&(sheet as usize));
+        let readers: Vec<AbsCellKey> = self
+            .formula_slots
+            .pivot_readers()
+            .filter(|(_, entry)| {
+                entry
+                    .reads
+                    .cells
+                    .iter()
+                    .any(|cell| reads_changed(cell.sheet))
+                    || entry
+                        .reads
+                        .ranges
+                        .iter()
+                        .any(|range| reads_changed(range.sheet))
+            })
+            .map(|(key, _)| key)
+            .collect();
+        for key in readers {
+            let sheet = key.sheet as usize;
+            self.sheets[sheet].formulas.mark_cell_dirty(key.local());
+            if !changed.contains(&sheet) {
+                changed.push(sheet);
             }
         }
     }
@@ -1151,10 +1209,12 @@ impl CellStore {
             Ok(layout) => layout,
             Err(error) => return self.show_pivot_error(owner, pivot, error, None),
         };
-        // A sheet without columns is a dashboard: it has no cells to hold
-        // output, so the pivot keeps its layout and `pivotOutput` reads the
-        // cells from the cache. No cell changes, so no sheet is dirty.
-        if self.sheets[owner].cells.n_cols() == 0 {
+        // A pivot anchored right of the last column of its sheet has no cells
+        // to hold output: a dashboard has no columns, and core anchors a
+        // chart's copy of a worksheet pivot right of the last column. The
+        // pivot keeps its layout and `pivotOutput` reads the cells from the
+        // cache. No cell changes, so no sheet is dirty.
+        if anchor.1 as usize >= self.sheets[owner].cells.n_cols() {
             footprints[index].attempt = None;
             pivot.attempt = None;
             pivot.error = None;
@@ -1177,7 +1237,9 @@ impl CellStore {
         }
 
         let measure_cells = match &pivot.saved.source {
-            SourceRef::Model { table, .. } => self.pivot_measure_cells(cache, &layout, table),
+            SourceRef::Model { table, fields } => {
+                self.pivot_measure_cells(cache, &layout, table, fields)
+            }
             _ => Vec::new(),
         };
         let (changed, placed) =
@@ -1218,8 +1280,12 @@ impl CellStore {
                 pivot.source = None;
                 // A failed model still reads its tables, so fixing a key or
                 // a missing table must wake it.
-                pivot.related = matches!(pivot.saved.source, SourceRef::Model { .. })
-                    .then(|| self.tables.values().map(SourceRect::table).collect());
+                pivot.related = matches!(pivot.saved.source, SourceRef::Model { .. }).then(|| {
+                    self.tables
+                        .iter()
+                        .map(|(_, table)| SourceRect::table(table))
+                        .collect()
+                });
                 return Err(error);
             }
         };
@@ -1228,6 +1294,28 @@ impl CellStore {
             .model
             .as_mut()
             .map(|model| std::mem::take(&mut model.dependencies));
+        // A measure may read any model table, so a change in any of them
+        // recalculates the pivot.
+        if let Some(related) = pivot.related.as_mut().filter(|_| {
+            pivot
+                .saved
+                .definition
+                .values
+                .iter()
+                .any(|value| value.measure.is_some())
+        }) {
+            let mut rects = related.to_vec();
+            for rect in self
+                .tables
+                .iter()
+                .map(|(_, table)| SourceRect::table(table))
+            {
+                if !rects.contains(&rect) {
+                    rects.push(rect);
+                }
+            }
+            *related = rects.into_boxed_slice();
+        }
 
         let pending = &mut pivot.pending;
         match pivot.cache.as_mut() {
@@ -1443,10 +1531,21 @@ impl CellStore {
                 })
             })
             .ok_or(FormulaError::Ref)?;
-        let (Some(cache), Some(layout)) = (&pivot.cache, &pivot.layout) else {
+        let (Some(cache), Some(layout), Some(attempt)) =
+            (&pivot.cache, &pivot.layout, pivot.attempt)
+        else {
             return Err(FormulaError::Ref);
         };
-        cache.data_value(layout, data_field, items)
+        let measure_value = |offset: usize| {
+            settled_cell_value(
+                &self.sheets[sheet],
+                &self.strings,
+                attempt.anchor.0 as usize + offset / layout.cols,
+                attempt.anchor.1 as usize + offset % layout.cols,
+                &self.formula_slots,
+            )
+        };
+        cache.data_value(layout, data_field, items, &measure_value)
     }
 
     /// Aggregate updates of pivot `index` on `sheet` since its cache was

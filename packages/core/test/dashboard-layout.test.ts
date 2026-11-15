@@ -1,11 +1,6 @@
 import { expect, it } from "bun:test";
 
-import {
-  boxIsFree,
-  firstFreeBox,
-  movedBox,
-  resizedBox,
-} from "../src/dashboard/dashboard-layout.js";
+import { boxIsFree, firstFreeBox } from "../src/dashboard/dashboard-layout.js";
 import type { DashboardItem } from "../src/types.js";
 
 const item = (id: string, x: number, y: number, w: number, h: number): DashboardItem => ({
@@ -13,15 +8,6 @@ const item = (id: string, x: number, y: number, w: number, h: number): Dashboard
   box: { x, y, w, h },
   kind: "pivot",
   pivot: id,
-});
-
-it("keeps moved and resized boxes inside the 12 columns and below the first row", () => {
-  const box = { x: 8, y: 1, w: 4, h: 2 };
-
-  expect(movedBox(box, 3, -5)).toEqual({ x: 8, y: 0, w: 4, h: 2 });
-  expect(movedBox(box, -10, 2)).toEqual({ x: 0, y: 3, w: 4, h: 2 });
-  expect(resizedBox(box, 2, -4)).toEqual({ x: 8, y: 1, w: 4, h: 1 });
-  expect(resizedBox({ ...box, x: 0 }, 20, 100)).toEqual({ x: 0, y: 1, w: 12, h: 64 });
 });
 
 it("finds the first free box in reading order, or the row below the last item", () => {

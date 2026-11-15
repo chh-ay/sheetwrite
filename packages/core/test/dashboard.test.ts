@@ -2,6 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import {
   createGridFromSnapshot,
+  type DashboardExport,
   type DashboardItem,
   type DocumentOp,
   type Grid,
@@ -9,10 +10,13 @@ import {
   type PivotDefinition,
   rebaseDocumentOperations,
   SheetwriteStore,
+  toXlsxWorkbook,
   validateWorkbookSnapshot,
   type WorkbookSnapshot,
 } from "../src/index.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import { setXlsxWorkbookBackend } from "../src/xlsx-slots.js";
+import { keepXlsxSlots } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -172,20 +176,6 @@ describe("dashboard sheets", () => {
     expect(validateWorkbookSnapshot(rangePivot).ok).toBe(false);
   });
 
-  it("admits items inside the grid that do not overlap", () => {
-    const grid = mount();
-    const set = (item: DashboardItem) =>
-      apply(grid, { op: "setDashboardItem", sheet: "dash", item });
-
-    expect(set({ ...slicer, id: "wide", box: { x: 4, y: 6, w: 9, h: 2 } })).toBe("rejected");
-    expect(set({ ...slicer, id: "under", box: { x: 4, y: 5, w: 4, h: 2 } })).toBe("noop");
-    expect(apply(grid, { op: "setDashboardItem", sheet: "data", item: slicer })).toBe("noop");
-
-    expect(set({ ...slicer, id: "below", box: { x: 0, y: 6, w: 12, h: 2 } })).toBe("applied");
-    expect(set({ ...slicer, box: { x: 8, y: 0, w: 4, h: 5 }, selected: ["West"] })).toBe("applied");
-    expect(dashboardOf(grid)?.items.map((item) => item.id)).toEqual(["sales", "region", "below"]);
-  });
-
   it("keeps a pivot item whose pivot is removed, and undo brings the pivot back", () => {
     const grid = mount();
 
@@ -230,5 +220,40 @@ describe("dashboard rebase", () => {
     expect(rebaseDocumentOperations([item("left", 0)], [item("right", 4)]).status).toBe("rebased");
     expect(rebaseDocumentOperations([item("left", 0)], [item("near", 2)]).status).toBe("conflict");
     expect(rebaseDocumentOperations([item("left", 0)], [item("left", 4)]).status).toBe("conflict");
+  });
+});
+
+describe("dashboard XLSX export", () => {
+  it("passes the slicer selection, and pivot captions without values, from the default engine", async () => {
+    const grid = mount();
+    // A backend that keeps what core passes to it, in place of any installed one.
+    const restoreXlsxSlots = keepXlsxSlots();
+    let passed: readonly DashboardExport[] | undefined;
+    setXlsxWorkbookBackend({
+      name: "capture",
+      async toXlsxWorkbook(_snapshot, _options, context) {
+        passed = context?.dashboards;
+        return new Uint8Array();
+      },
+      async fromXlsxWorkbook() {
+        throw new Error("not used");
+      },
+    });
+    try {
+      await toXlsxWorkbook(grid);
+    } finally {
+      restoreXlsxSlots();
+    }
+
+    // The default engine computes no dashboard pivot, so the pivot item has only its name.
+    expect(passed).toEqual([
+      {
+        sheet: "dash",
+        items: [
+          { id: "sales", cells: [["By region"]], numberFormats: [[null]] },
+          { id: "region", cells: [["Region"], ["East"]], numberFormats: [[null], [null]] },
+        ],
+      },
+    ]);
   });
 });

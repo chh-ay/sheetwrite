@@ -1,0 +1,4 @@
+/* Every docs page's last site stylesheet: content blocks, the last of
+   site.css, then the shell's refinements, which layer over everything before. */
+@import "@docs/styles/site/content-blocks.css";
+@import "@docs/styles/site-shell.css";

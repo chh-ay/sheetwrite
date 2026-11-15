@@ -36,7 +36,7 @@ fn shown(store: &CellStore, sheet: usize, row: usize, col: usize) -> String {
     match cell.string() {
         Some(text) => text,
         None if cell.kind() == KIND_EMPTY => String::new(),
-        None if cell.kind() == KIND_BOOL => if cell.num() != 0.0 { "TRUE" } else { "FALSE" }.into(),
+        None if cell.kind() == KIND_BOOL => if cell.num() == 0.0 { "FALSE" } else { "TRUE" }.into(),
         None => cell.num().to_string(),
     }
 }
@@ -71,6 +71,11 @@ fn issue_reproduction_formulas_give_the_excel_result() {
         ("=CHOOSE(1.5,\"a\",\"b\")", "a"),
         ("=TEXT(0.5,\"0%\")", "50%"),
         ("=REPLACE(\"abc\",5,1,\"X\")", "abcX"),
+        // A percent code that takes the number past the largest double
+        // overflows: #NUM!, as for Excel's numeric functions (#433).
+        ("=TEXT(9.99999999999999E+307,\"0%\")", "#NUM!"),
+        ("=TEXT(-9.99999999999999E+307,\"0.0%;(0.0%)\")", "#NUM!"),
+        ("=TEXT(1E+305,\"0%%\")", "#NUM!"),
     ]);
 }
 

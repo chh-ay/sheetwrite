@@ -539,7 +539,7 @@ async function runProbe(
   admissionOnly: boolean,
 ): Promise<ProbeResult> {
   const bytes = readFileSync(WASM_PATH);
-  await initSheetwrite(bytes);
+  await initSheetwrite({ source: bytes });
   const memory = getEngine().getMemory();
 
   Bun.gc(true);

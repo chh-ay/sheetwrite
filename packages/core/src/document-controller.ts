@@ -4,6 +4,7 @@ import {
   markAtomicBatch,
   splitOversizedBlocks,
 } from "./atomic-batch.js";
+import { readBlockArraysOnce } from "./block-ingress.js";
 import { chartTouchesSheet, cloneChartDefinition } from "./chart-definition.js";
 import { findDashboardItem } from "./dashboard.js";
 import { cloneMeasure, cloneRelationship, findMeasure, findRelationship } from "./data-model.js";
@@ -28,6 +29,7 @@ import {
 import { cloneCellHyperlink } from "./hyperlink.js";
 import { formulaNameKey, sheetNameKey } from "./name-key.js";
 import { clonePivot, planPivotEdit, pivotRewrites } from "./pivot.js";
+import { cloneJsonValue } from "./plain-data.js";
 import {
   encodeRestoreBlock,
   encodeMeasuredRestoreBlock,
@@ -103,7 +105,11 @@ export class DocumentController {
     const limits = atomic
       ? atomicBatchLimits(this.transactionResourceLimits)
       : this.transactionResourceLimits;
-    const resourceValidation = validateTransactionResources(operations, limits);
+    // Each setBlock's `values` and `styleIds` are read once into private
+    // copies, which the measurement, the store and the change event all use.
+    const owned =
+      (Array.isArray(operations) ? readBlockArraysOnce(operations) : undefined) ?? operations;
+    const resourceValidation = validateTransactionResources(owned, limits);
 
     if (!resourceValidation.ok) {
       return {
@@ -115,9 +121,9 @@ export class DocumentController {
 
     // The store receives a private copy of the caller's operations; the copy is
     // verified to hold the measured operations before its record is handed over.
-    const patches = operations.slice();
+    const patches = owned.slice();
     if (atomic) markAtomicBatch(patches);
-    const admitted = admitTransactionResources(patches, limits, resourceValidation, operations);
+    const admitted = admitTransactionResources(patches, limits, resourceValidation, owned);
 
     const captureReplay = takeTransactionReplayRollbackRequest(operations);
     const captured = captureReplay ? this.captureInverses(patches) : undefined;
@@ -560,6 +566,7 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          ...this.moveLosses(patch),
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
@@ -623,6 +630,7 @@ export class DocumentController {
             count: patch.count,
             to: patch.from,
           },
+          ...this.moveLosses(patch),
           // A partly moved source range does not map back exactly.
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
@@ -898,6 +906,14 @@ export class DocumentController {
         );
       }
 
+      case "setExternalLinks":
+        return [
+          {
+            op: "setExternalLinks",
+            links: cloneJsonValue(this.options.store.getWorkbook().externalLinks ?? []),
+          },
+        ];
+
       case "setCalculation": {
         // Absent settings are the defaults, which undo must restore explicitly.
         const previous =
@@ -1105,6 +1121,18 @@ export class DocumentController {
 
     const losses = engine.permuteRowsLosses(patch);
     return [reverse, ...losses.map((addr) => this.snapshotCell(addr))];
+  }
+
+  /**
+   * A formula whose range lost a moved row or column at its edge does not
+   * get it back from the move back, so its cell is captured before the move
+   * and restored after the move back.
+   */
+  private moveLosses(
+    patch: Extract<DocumentOp, { op: "moveRows" | "moveColumns" }>,
+  ): Extract<DocumentOp, { op: "set" }>[] {
+    const engine = storeEngine(this.options.store);
+    return engine ? engine.moveLosses(patch).map((addr) => this.snapshotCell(addr)) : [];
   }
 
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {

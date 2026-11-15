@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 export const BUN_VERSION = "1.4.4";
@@ -54,6 +54,44 @@ export const PACKAGE_BUILD_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_O
   packageNode(name, "build"),
 );
 
+/** Builds a Rust crate the way `wasm-pack build` does. */
+const cargoReleaseNode = (id: string, cwd: string, ...extra: string[]): CommandNode => ({
+  id,
+  command: ["cargo", "build", "--lib", "--release", "--target", WASM_TARGET, ...extra],
+  cwd,
+});
+
+/**
+ * The cargo builds inside the wasm-pack package builds. `build` runs them all
+ * at once first, so their single-threaded link-time optimization stages
+ * overlap; each wasm-pack build then finds its cargo output up to date. Each
+ * command must stay equal to the one its wasm-pack build runs, or that build
+ * compiles again (slower, but the output is the same). The full engine
+ * (`@sheetwrite/formulas`) builds into its own target directory, so it does not
+ * wait for the lock of the default engine's.
+ */
+export const RUST_BUILD_NODES: readonly CommandNode[] = [
+  cargoReleaseNode("cargo:@sheetwrite/wasm", "packages/wasm"),
+  cargoReleaseNode("cargo:@sheetwrite/wasm/history", "packages/wasm/history"),
+  cargoReleaseNode(
+    "cargo:@sheetwrite/formulas",
+    "packages/wasm",
+    "--features",
+    "analysis",
+    "--target-dir",
+    "target/analysis",
+  ),
+  cargoReleaseNode("cargo:@sheetwrite/queries", "packages/queries/engine"),
+];
+
+const RUST_BUILD_NODE: CommandNode = {
+  id: "build:rust",
+  command: ["bun", "scripts/workspace-tooling.ts", "build-rust"],
+};
+
+/** Every package build: the Rust builds together, then each package in order. */
+export const BUILD_NODES: readonly CommandNode[] = [RUST_BUILD_NODE, ...PACKAGE_BUILD_NODES];
+
 export const PACKAGE_TYPECHECK_NODES: readonly CommandNode[] = PUBLISHABLE_PACKAGE_ORDER.map(
   (name) => packageNode(name, "typecheck"),
 );
@@ -77,8 +115,8 @@ const GENERATED_SOURCE_NODES: readonly CommandNode[] = [
 /** The docs build checks the docs, then generates them and builds the site. */
 export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
   {
-    id: "build:@sheetwrite/docs-start",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "build"],
+    id: "build:@sheetwrite/docs",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs", "build"],
   },
   {
     id: "verify:example-xlsx-isolation",
@@ -88,8 +126,8 @@ export const EXAMPLE_BUILD_NODES: readonly CommandNode[] = [
 
 export const EXAMPLE_TYPECHECK_NODES: readonly CommandNode[] = [
   {
-    id: "typecheck:@sheetwrite/docs-start",
-    command: ["bun", "run", "--filter", "@sheetwrite/docs-start", "typecheck"],
+    id: "typecheck:@sheetwrite/docs",
+    command: ["bun", "run", "--filter", "@sheetwrite/docs", "typecheck"],
   },
 ];
 
@@ -120,8 +158,9 @@ export const TYPECHECK_NODES: readonly CommandNode[] = [
 
 /**
  * The test lists below own every repository test path. `test:tooling` (CI
- * preflight), `test:unit` (CI unit job) and `verify-ci` all run these nodes, so
- * a suite added here runs everywhere. Tooling suites run before any package is
+ * preflight), `test:unit` and `verify-ci` run these nodes, so a suite added
+ * here runs everywhere. CI runs `test:unit:uncovered` and `test:coverage:ts`
+ * in separate jobs, which together run every unit suite once. Tooling suites run before any package is
  * built; unit suites run against built package outputs and generated files, so
  * a suite that loads the engine or generated docs data (directly or through
  * `docs/src/lib`) belongs there.
@@ -142,20 +181,19 @@ export const TOOLING_TEST_PATHS = [
   "scripts/changeset-ci.test.ts",
   "scripts/workflow-contract.test.ts",
   "scripts/formula-docs.test.ts",
-  "scripts/release-performance-docs.test.ts",
   "scripts/coverage-check.test.ts",
-  "scripts/sheetwrite-code-hovers.test.ts",
   "scripts/normalize-sitemap.test.ts",
   "scripts/prepare-docs-deployment.test.ts",
   "scripts/check-import-cycles.test.ts",
+  "scripts/check-engine-exports.test.ts",
   "scripts/check-local-paths.test.ts",
+  "scripts/check-path-case.test.ts",
   "scripts/verify-example-xlsx-isolation.test.ts",
   "scripts/wasm-function-sizes.test.ts",
 ] as const;
 
 export const UNIT_TEST_PATHS = [
   "packages",
-  "test/browser/canvas-assertions.test.ts",
   "scripts/public-api.test.ts",
   "scripts/conformance.test.ts",
   "scripts/conformance-excel-runner.test.ts",
@@ -167,8 +205,25 @@ export const UNIT_TEST_PATHS = [
   "scripts/release-github.test.ts",
   "scripts/docs.test.ts",
   "scripts/docs-llms.test.ts",
+  "scripts/docs-feed.test.ts",
+  // The hover engine reads the built @sheetwrite package declarations, as the site does.
+  "scripts/sheetwrite-code-hovers.test.ts",
   "bench/test",
   "docs/test",
+] as const;
+
+/**
+ * Package test directories that `test:coverage:ts` runs under coverage. CI
+ * runs them only there, so no CI job runs them twice.
+ */
+export const COVERED_PACKAGE_TEST_ROOTS = [
+  "packages/core/test",
+  "packages/react/test",
+  "packages/vue/test",
+  "packages/svelte/test",
+  "packages/xlsx/test",
+  "packages/charts/test",
+  "packages/queries/test",
 ] as const;
 
 const TOOLING_TESTS: CommandNode = {
@@ -184,6 +239,26 @@ const UNIT_TEST_NODES: readonly CommandNode[] = [
     command: ["bun", "test", ...UNIT_TEST_PATHS],
   },
 ];
+
+/**
+ * The unit suites outside the coverage run: `UNIT_TEST_PATHS` with `packages`
+ * narrowed to the package test directories that coverage does not run.
+ */
+function uncoveredUnitTestNodes(root: string): readonly CommandNode[] {
+  const uncoveredPackageTests = readdirSync(resolve(root, "packages"), { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => `packages/${entry.name}/test`)
+    .filter((path) => existsSync(resolve(root, path)))
+    .filter((path) => !(COVERED_PACKAGE_TEST_ROOTS as readonly string[]).includes(path))
+    .sort();
+  const paths = UNIT_TEST_PATHS.flatMap((path) =>
+    path === "packages" ? uncoveredPackageTests : [path],
+  );
+  return [
+    ...GENERATED_SOURCE_NODES,
+    { id: "test:unit:uncovered", command: ["bun", "test", ...paths] },
+  ];
+}
 
 const PRE_BUILD_VERIFICATION_NODES: readonly CommandNode[] = [
   TOOLING_TESTS,
@@ -267,7 +342,7 @@ export const RELEASE_QUALITY_NODES: readonly CommandNode[] = [
 
 export const VERIFY_CI_NODES: readonly CommandNode[] = [
   ...PRE_BUILD_VERIFICATION_NODES,
-  ...PACKAGE_BUILD_NODES,
+  ...BUILD_NODES,
   ...POST_BUILD_QUALITY_NODES,
   {
     id: "verify:packed",
@@ -389,22 +464,33 @@ export async function runNodes(root: string, nodes: readonly CommandNode[]): Pro
   for (const node of nodes) await executeNode(root, node);
 }
 
-function nodesForMode(mode: string): readonly CommandNode[] {
+/** Runs independent nodes at once and fails after all of them finish. */
+async function runConcurrentNodes(root: string, nodes: readonly CommandNode[]): Promise<void> {
+  const results = await Promise.allSettled(nodes.map((node) => executeNode(root, node)));
+  const failures = results.flatMap((result) =>
+    result.status === "rejected" ? [String(result.reason)] : [],
+  );
+  if (failures.length > 0) throw new Error(failures.join("\n"));
+}
+
+function nodesForMode(mode: string, root: string): readonly CommandNode[] {
   switch (mode) {
     case "build":
-      return PACKAGE_BUILD_NODES;
+      return BUILD_NODES;
+    case "build-rust":
+      return RUST_BUILD_NODES;
     case "build-examples":
       return EXAMPLE_BUILD_NODES;
     case "test-tooling":
       return [TOOLING_TESTS];
     case "test-unit":
       return UNIT_TEST_NODES;
+    case "test-unit-uncovered":
+      return uncoveredUnitTestNodes(root);
+    case "generate":
+      return GENERATED_SOURCE_NODES;
     case "typecheck-packages":
       return PACKAGE_TYPECHECK_NODES;
-    case "typecheck-examples":
-      return EXAMPLE_TYPECHECK_NODES;
-    case "typecheck-bench":
-      return BENCH_TYPECHECK_NODES;
     case "typecheck":
       return TYPECHECK_NODES;
     case "verify-ci":
@@ -423,7 +509,7 @@ export async function main(
   const mode = args.find((argument) => !argument.startsWith("--"));
   if (!mode) throw new Error("A workspace tooling mode is required");
   validateWorkspaceGraph(root);
-  const nodes = nodesForMode(mode);
+  const nodes = nodesForMode(mode, root);
   if (args.includes("--dry-run")) {
     for (const node of nodes) {
       console.log(
@@ -432,7 +518,8 @@ export async function main(
     }
     return;
   }
-  await runNodes(root, nodes);
+  if (mode === "build-rust") await runConcurrentNodes(root, nodes);
+  else await runNodes(root, nodes);
 }
 
 if (import.meta.main) {

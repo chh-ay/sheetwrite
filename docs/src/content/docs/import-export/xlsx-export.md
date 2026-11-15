@@ -4,7 +4,10 @@ description: Download an active-sheet table or save a workbook with formulas and
 ---
 
 ```ts prelude="core" partial="requires an initialized grid" title="Download the active table"
-import "@sheetwrite/xlsx/register";
+import { initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 await grid.exportXlsx("sales.xlsx");
 ```
@@ -33,8 +36,10 @@ npm install @sheetwrite/xlsx
 Use the workbook API to save an existing store without adding a header row:
 
 ```ts prelude="core" partial="requires an initialized store" title="Save all sheets and observe warnings"
-import { downloadBytes, toXlsxWorkbook } from "@sheetwrite/core";
-import "@sheetwrite/xlsx/register";
+import { downloadBytes, toXlsxWorkbook, initSheetwrite } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 
 const bytes = await toXlsxWorkbook(store.exportSnapshot(), {
   maxCells: 250_000,
@@ -95,28 +100,23 @@ grid.on("export-error", ({ format, error }) => {
 
 ## XLSX backends
 
-Core and framework entry points do not resolve the optional codec. Register it before invoking XLSX functions or framework toolbar actions. A missing backend error names both remedies: install `@sheetwrite/xlsx`, then import `@sheetwrite/xlsx/register`.
+Core and framework entry points do not resolve the optional codec. Install the XLSX add-on before invoking XLSX functions or framework toolbar actions. A missing backend error names both steps: install `@sheetwrite/xlsx`, then call `initSheetwrite({ addons: [xlsxAddon()] })`.
 
-The root `@sheetwrite/xlsx` entry is side-effect free. Its `./register` entry registers idempotently. Explicit registration and individual backend composition are also public:
+The root `@sheetwrite/xlsx` entry is side-effect free. Installing the add-on again is a no-op. A host can also give core its own backend for one role through its own add-on:
 
-```ts compile title="Explicit backend registration"
-import {
-  registerXlsxBackends,
-  sheetwriteTableExportBackend,
-  sheetwriteTableImportBackend,
-  sheetwriteWorkbookBackend,
-} from "@sheetwrite/xlsx";
-import {
-  setXlsxTableExportBackend,
-  setXlsxTableImportBackend,
-  setXlsxWorkbookBackend,
-} from "@sheetwrite/core";
+```ts compile title="Install the XLSX add-on or a custom table exporter"
+import { initSheetwrite, type SheetwriteAddon } from "@sheetwrite/core";
+import { sheetwriteTableExportBackend, xlsxAddon } from "@sheetwrite/xlsx";
 
-registerXlsxBackends();
-// Or register the roles individually when composing backends.
-setXlsxTableExportBackend(sheetwriteTableExportBackend);
-setXlsxTableImportBackend(sheetwriteTableImportBackend);
-setXlsxWorkbookBackend(sheetwriteWorkbookBackend);
+const auditedExport: SheetwriteAddon = {
+  name: "audited-export",
+  setup(context) {
+    context.xlsx({ tableExport: sheetwriteTableExportBackend });
+  },
+};
+
+// Later add-ons in the list replace the roles that earlier ones set.
+await initSheetwrite({ addons: [xlsxAddon(), auditedExport] });
 ```
 
 Hosts can implement `XlsxWorkbookBackend`, `XlsxTableExportBackend`, or `XlsxTableImportBackend` to replace a role. `@sheetwrite/xlsx` is the only concrete implementation package. Its bounded OOXML codec owns OPC part resolution, XML tokenization, styles and worksheet mapping over the audited compression primitive `fflate`.
@@ -131,5 +131,4 @@ All XLSX paths share `XlsxWorkbookOptions`: `maxCells`, `resourceLimits`, `signa
 - [CSV and TSV](/docs/import-export/csv-and-tsv/)
 - [Detailed compatibility evidence](/docs/reference/compatibility-results/)
 - [`@sheetwrite/xlsx` API](/docs/api/xlsx/)
-- [`@sheetwrite/xlsx/register` API](/docs/api/xlsx-register/)
 - [`toXlsxWorkbook`](/docs/api/core/to-xlsx-workbook/)

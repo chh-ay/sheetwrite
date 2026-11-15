@@ -1,5 +1,5 @@
 //! M lexical forms for generated text, from the Power Query M lexical structure:
-//! https://learn.microsoft.com/powerquery-m/m-spec-lexical-structure
+//! <https://learn.microsoft.com/powerquery-m/m-spec-lexical-structure>
 
 use std::fmt::Write;
 
@@ -24,11 +24,12 @@ fn escaped(out: &mut String, value: &str) {
             control if control.is_control() => {
                 // Short escapes take four hex digits; longer code points take eight.
                 let code = u32::from(control);
-                if code <= 0xffff {
-                    let _ = write!(out, "#({code:04X})");
+                // Writing to a String cannot fail.
+                _ = if code <= 0xffff {
+                    write!(out, "#({code:04X})")
                 } else {
-                    let _ = write!(out, "#({code:08X})");
-                }
+                    write!(out, "#({code:08X})")
+                };
             }
             other => out.push(other),
         }

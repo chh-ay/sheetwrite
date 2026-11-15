@@ -11,7 +11,7 @@ use crate::types::{CellRange, ReadSet};
 
 const STORE_TAG: u32 = 0x32524d53;
 
-fn write_names(out: &mut Writer, names: &HashMap<String, usize>) {
+fn write_names(out: &mut Writer, names: &FxHashMap<String, usize>) {
     out.usize(names.len());
     for (name, &handle) in names {
         out.text(name);
@@ -35,14 +35,19 @@ fn sheet_handle(input: &mut Reader<'_>, sheets: usize) -> TransferResult<u32> {
 }
 
 #[cfg(any(target_arch = "wasm32", test))]
-fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<HashMap<String, usize>> {
+fn read_names(input: &mut Reader<'_>, sheets: usize) -> TransferResult<FxHashMap<String, usize>> {
     (0..input.count()?)
         .map(|_| Ok((input.text()?, sheet_handle(input, sheets)? as usize)))
         .collect()
 }
 
-pub(super) fn write_formula(out: &mut Writer, entry: &FormulaEntry, sheet: u32) {
-    out.text(&entry.source);
+pub(super) fn write_formula(
+    out: &mut Writer,
+    entry: &FormulaEntry,
+    sheet: u32,
+    names: &WrittenNames<'_>,
+) {
+    out.text(&entry.source(names));
     out.bool(entry.is_reference());
 
     if entry.is_reference() {
@@ -99,8 +104,6 @@ impl CellStore {
             Some(Ast::AbsCell(
                 SheetRef {
                     handle: target.sheet,
-                    name: self.sheet_names[target.sheet as usize].clone(),
-                    quoted: false,
                 },
                 target.row,
                 target.col,
@@ -110,17 +113,17 @@ impl CellStore {
             None
         };
 
-        let ast = if input.bool()? {
+        let (ast, features) = if input.bool()? {
             if is_reference {
-                reference_ast
+                (reference_ast, ParseFeatures::default())
             } else {
-                Some(
-                    self.resolve_formula_ast(&source, sheet, row, col)
-                        .map_err(|_| "invalid transferred formula".to_string())?,
-                )
+                let (tree, features) = self
+                    .resolve_formula_ast(&source, sheet, row, col)
+                    .map_err(|_| "invalid transferred formula".to_owned())?;
+                (Some(tree), features)
             }
         } else {
-            None
+            (None, ParseFeatures::default())
         };
         let source_error = input.error()?;
         let volatile = input.bool()?;
@@ -149,8 +152,13 @@ impl CellStore {
             })
             .collect::<TransferResult<Vec<_>>>()?;
 
-        let mut entry =
-            FormulaEntry::transferred_source(ast, source, ReadSet { cells, ranges }, is_reference);
+        let mut entry = FormulaEntry::transferred_source(
+            ast,
+            source,
+            ReadSet { cells, ranges },
+            is_reference,
+            features,
+        );
         entry.set_source_error(source_error);
         entry.set_volatile(volatile);
         entry.set_has_spill_refs(has_spill_refs);
@@ -159,7 +167,7 @@ impl CellStore {
         Ok(entry)
     }
 
-    fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
+    pub(crate) fn read_memory_state(bytes: TransferInput<'_>) -> TransferResult<Self> {
         let mut input = Reader::new(bytes, STORE_TAG)?;
 
         let mut store = Self::new();
@@ -181,7 +189,7 @@ impl CellStore {
                 let handle = sheet_handle(&mut input, sheets)?;
                 let index = handle as usize;
                 if !store.sheet_alive[index] || std::mem::replace(&mut placed[index], true) {
-                    return Err("invalid transferred tab order".to_string());
+                    return Err("invalid transferred tab order".to_owned());
                 }
                 Ok(handle)
             })
@@ -238,8 +246,7 @@ impl CellStore {
         }
 
         for _ in 0..input.count()? {
-            let key = input.text()?;
-            let mut table = TableDefinition {
+            let mut table = Table {
                 id: input.text()?,
                 name: input.text()?,
                 sheet: sheet_handle(&mut input, sheets)?,
@@ -253,14 +260,14 @@ impl CellStore {
             };
 
             for _ in 0..input.count()? {
-                table.columns.push(TableColumnDefinition {
+                table.columns.push(TableColumn {
                     id: input.text()?,
                     name: input.text()?,
                     col: input.u32()?,
                 });
             }
 
-            store.tables.insert(key, table);
+            store.tables.insert(table);
         }
 
         // The formulas below bind to the names, so resolve them first.
@@ -343,8 +350,8 @@ impl CellStore {
                 continue;
             };
             out.bool(scope.is_some());
-            if let Some(scope) = scope {
-                out.u32(*scope);
+            if let Some(scope_sheet) = scope {
+                out.u32(*scope_sheet);
             }
 
             out.text(key);
@@ -364,8 +371,8 @@ impl CellStore {
         );
         for (scope, name, source) in self.named_formula_sources() {
             out.bool(scope.is_some());
-            if let Some(scope) = scope {
-                out.u32(scope);
+            if let Some(scope_sheet) = scope {
+                out.u32(scope_sheet);
             }
             out.text(name);
             out.text(source);
@@ -373,8 +380,7 @@ impl CellStore {
 
         out.usize(self.tables.len());
 
-        for (key, table) in &self.tables {
-            out.text(key);
+        for (_, table) in self.tables.iter() {
             out.text(&table.id);
             out.text(&table.name);
             out.u32(table.sheet);
@@ -409,7 +415,7 @@ impl CellStore {
             for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
                 out.u32(row);
                 out.u32(col);
-                write_formula(&mut out, entry, sheet as u32);
+                write_formula(&mut out, entry, sheet as u32, &self.written_names());
             }
         }
 
@@ -419,7 +425,8 @@ impl CellStore {
     /// Import into a fresh instance; failure never mutates the source store.
     #[cfg(target_arch = "wasm32")]
     #[wasm_bindgen(js_name = importMemoryState)]
-    pub fn import_memory_state(bytes: js_sys::Uint8Array) -> CellStore {
+    #[must_use]
+    pub fn import_memory_state(bytes: js_sys::Uint8Array) -> Self {
         Self::read_memory_state(bytes).unwrap_or_else(|error| wasm_bindgen::throw_str(&error))
     }
 }
@@ -590,7 +597,7 @@ mod tests {
         original.set_formula(0, 0, 1, "=SUM(A1:A5000)", 0);
         original.set_formula(0, 0, 2, "=\"survivor\"", 0);
         original.recompute_changed();
-        original.set_column_numbers(0, 0, 0, &vec![1.0; EDIT_ROWS], 0);
+        crate::tests::write_number_column(&mut original, 0, 0, 0, &vec![1.0; EDIT_ROWS]);
 
         let mut replacement =
             CellStore::read_memory_state(&original.export_memory_state()).unwrap();

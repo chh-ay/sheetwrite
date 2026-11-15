@@ -9,9 +9,9 @@
 const RANGE_TAG: u32 = 0x3248_4d53;
 
 /// Source kinds, as the engine stores them.
-pub const KIND_EMPTY: u8 = 0;
-pub const KIND_STRING: u8 = 2;
-pub const KIND_FORMULA: u8 = 4;
+pub(crate) const KIND_EMPTY: u8 = 0;
+pub(crate) const KIND_STRING: u8 = 2;
+pub(crate) const KIND_FORMULA: u8 = 4;
 
 /// High word of a payload that holds a block-local string ID.
 const STRING_TAG_HIGH: u64 = 0xFFFC_0000;
@@ -19,10 +19,13 @@ const STRING_TAG_HIGH: u64 = 0xFFFC_0000;
 /// Error slot of a formula entry without a source error.
 const NO_ERROR: u32 = u32::MAX;
 
+/// A `[start, end)` byte range in a block's `text`.
+pub(crate) type TextRange = (u32, u32);
+
 /// One decoded block. Cells are column-major: cell `(row, col)` is at
 /// `col * rows + row`, as the engine captures them.
-#[derive(Default)]
-pub struct Block {
+#[derive(Debug, Default)]
+pub(crate) struct Block {
     pub rows: usize,
     pub cols: usize,
     pub kinds: Vec<u8>,
@@ -31,15 +34,15 @@ pub struct Block {
     /// UTF-8 bytes of the block's strings and formula sources, back to back.
     pub text: Vec<u8>,
     /// `[start, end)` byte ranges in `text`, one per block-local string ID.
-    pub strings: Vec<(u32, u32)>,
+    pub strings: Vec<TextRange>,
     /// Formula source per cell index, as a `[start, end)` range in `text`;
     /// `(0, 0)` for cells without a formula entry.
-    pub formulas: Vec<(u32, u32)>,
+    pub formulas: Vec<TextRange>,
 }
 
 impl Block {
     /// Text of a string payload, or `None` when the payload is not a string.
-    pub fn string(&self, payload: u64) -> Option<&[u8]> {
+    pub(crate) fn string(&self, payload: u64) -> Option<&[u8]> {
         if payload >> 32 != STRING_TAG_HIGH {
             return None;
         }
@@ -50,7 +53,7 @@ impl Block {
     }
 
     /// Formula source of a cell; empty when the cell has no formula entry.
-    pub fn formula(&self, cell: usize) -> &[u8] {
+    pub(crate) fn formula(&self, cell: usize) -> &[u8] {
         let (start, end) = self.formulas[cell];
 
         &self.text[start as usize..end as usize]
@@ -59,7 +62,14 @@ impl Block {
 
 /// A transfer that does not match the engine's range layout.
 #[derive(Debug, PartialEq, Eq)]
-pub struct InvalidTransfer;
+pub(crate) struct InvalidTransfer;
+
+/// A length or offset that does not fit the `u32` of a text range.
+impl From<std::num::TryFromIntError> for InvalidTransfer {
+    fn from(_overflow: std::num::TryFromIntError) -> Self {
+        Self
+    }
+}
 
 struct Reader<'a> {
     bytes: &'a [u8],
@@ -120,18 +130,15 @@ impl<'a> Reader<'a> {
     }
 
     /// Append one text to `text` and return its byte range.
-    fn text(&mut self, text: &mut Vec<u8>) -> Result<(u32, u32), InvalidTransfer> {
-        let start = text.len();
+    fn text(&mut self, text: &mut Vec<u8>) -> Result<TextRange, InvalidTransfer> {
+        let first = text.len();
         self.runs(text)?;
 
-        if std::str::from_utf8(&text[start..]).is_err() {
+        if std::str::from_utf8(&text[first..]).is_err() {
             return Err(InvalidTransfer);
         }
 
-        let start = u32::try_from(start).map_err(|_| InvalidTransfer)?;
-        let end = u32::try_from(text.len()).map_err(|_| InvalidTransfer)?;
-
-        Ok((start, end))
+        Ok((u32::try_from(first)?, u32::try_from(text.len())?))
     }
 
     fn skip_words(&mut self, count: usize) -> Result<(), InvalidTransfer> {
@@ -142,7 +149,7 @@ impl<'a> Reader<'a> {
 }
 
 /// Decode `bytes` into `block`, reusing its buffers.
-pub fn read_block(bytes: &[u8], block: &mut Block) -> Result<(), InvalidTransfer> {
+pub(crate) fn read_block(bytes: &[u8], block: &mut Block) -> Result<(), InvalidTransfer> {
     let mut input = Reader { bytes, at: 0 };
     if input.u32()? != RANGE_TAG {
         return Err(InvalidTransfer);
@@ -251,14 +258,14 @@ pub(crate) mod tests {
 
     /// Writer for the engine layout, used to build test blocks.
     #[derive(Default)]
-    pub struct Writer(pub Vec<u8>);
+    pub(crate) struct Writer(pub(crate) Vec<u8>);
 
     impl Writer {
-        pub fn u32(&mut self, value: u32) {
+        pub(crate) fn u32(&mut self, value: u32) {
             self.0.extend_from_slice(&value.to_le_bytes());
         }
 
-        pub fn runs(&mut self, value: &[u8]) {
+        pub(crate) fn runs(&mut self, value: &[u8]) {
             self.u32(value.len() as u32);
             if !value.is_empty() {
                 self.u32((value.len() as u32) << 1 | 1);
@@ -269,7 +276,7 @@ pub(crate) mod tests {
 
     /// One test cell: kind, payload and style.
     #[derive(Clone)]
-    pub enum Cell {
+    pub(crate) enum Cell {
         Empty,
         Number(f64),
         Text(&'static str),
@@ -277,7 +284,7 @@ pub(crate) mod tests {
     }
 
     /// Engine bytes of a block given row-major `cells` and `styles`.
-    pub fn block_bytes(rows: usize, cols: usize, cells: &[Cell], styles: &[u32]) -> Vec<u8> {
+    pub(crate) fn block_bytes(rows: usize, cols: usize, cells: &[Cell], styles: &[u32]) -> Vec<u8> {
         let mut kinds = vec![0u8; rows * cols];
         let mut payloads = vec![0u64; rows * cols];
         let mut style_ids = vec![0u32; rows * cols];
@@ -288,7 +295,7 @@ pub(crate) mod tests {
             for col in 0..cols {
                 let at = col * rows + row;
                 let input = row * cols + col;
-                style_ids[at] = styles.get(input).copied().unwrap_or(0);
+                style_ids[at] = styles.get(input).copied().unwrap_or_default();
 
                 match cells[input] {
                     Cell::Empty => {}

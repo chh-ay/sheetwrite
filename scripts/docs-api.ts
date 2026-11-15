@@ -24,6 +24,7 @@ import { contentPathForRoute } from "./docs-content-checks.js";
 import { entryLabel, entrySlug } from "./docs-paths.js";
 import {
   exists,
+  frontmatter,
   type MarkdownDocument,
   MIGRATION_ROUTES,
   PACKAGE_DIRECTORIES,
@@ -34,6 +35,7 @@ import {
 import { html, readableId } from "./evidence-format.js";
 import { headingAnchors } from "./markdown-anchors.js";
 import type { ApiEntryPoint, ApiExport, ApiPackage, PublicApiManifest } from "./public-api.js";
+import { PUBLISHABLE_PACKAGE_ORDER } from "./workspace-tooling.js";
 
 function packageSourcePath(packageName: string, source: string): string {
   const separator = source.indexOf("#");
@@ -45,10 +47,6 @@ function packageSourcePath(packageName: string, source: string): string {
   return fragment === undefined ? normalized : `${normalized}#${fragment}`;
 }
 
-export function frontmatter(title: string, description: string): string {
-  return `---\ntitle: ${JSON.stringify(title)}\ndescription: ${JSON.stringify(description)}\n---\n\n`;
-}
-
 interface DeclarationMember {
   name: string;
   signature: string;
@@ -58,6 +56,36 @@ interface DeclarationShape {
   formatted: string;
   members: DeclarationMember[];
   variants: string[];
+}
+
+/**
+ * Exports shown as one card with no member list. `InitOutput` is the raw module
+ * output wasm-bindgen generates for the loader: its members are ABI glue with no
+ * doc source, not API to call (#504).
+ */
+const OPAQUE_EXPORTS: ReadonlySet<string> = new Set(["InitOutput"]);
+
+/** The members an export's reference page lists. */
+function renderedMembers(item: Pick<ApiExport, "name" | "signature">): DeclarationMember[] {
+  return OPAQUE_EXPORTS.has(item.name) ? [] : declarationShape(parseableDeclaration(item)).members;
+}
+
+/**
+ * wasm-bindgen gives every class it generates a `free()` method with no doc
+ * source, so the reference describes it the same way on each of them.
+ */
+const WASM_BINDGEN_FREE =
+  "Releases the object's WASM memory now instead of at garbage collection; the object can't be used afterwards.";
+
+/** An export's member doc comments, with wasm-bindgen's `free()` described for generated classes. */
+function renderedMemberDocs(item: ApiExport): ApiExport["memberDocs"] {
+  const generated =
+    item.kind === "class" &&
+    /^pkg[^/]*\//.test(item.source) &&
+    !item.memberDocs.some((member) => member.name === "free" && member.documentation.trim() !== "");
+  return generated
+    ? [...item.memberDocs, { name: "free", documentation: WASM_BINDGEN_FREE }]
+    : item.memberDocs;
 }
 
 interface DocumentationLinkCandidate {
@@ -114,9 +142,7 @@ function closestCandidate<
 }
 
 function hasRenderedMember(item: ApiExport, memberName: string): boolean {
-  return declarationShape(parseableDeclaration(item)).members.some(
-    (member) => member.name === memberName,
-  );
+  return renderedMembers(item).some((member) => member.name === memberName);
 }
 
 function documentationLinkRoute(
@@ -179,25 +205,35 @@ export function unresolvedDocumentationLinks(manifest: PublicApiManifest): strin
   return issues;
 }
 
-/**
- * JSDoc body, examples and related links. `headingLevel` places the Examples
- * and See also headings one level below whatever holds the text: 2 for a
- * symbol page's opening summary (under the page title), 3 for a member's
- * documentation (under Members), so heading levels never skip.
- */
-function documentationSections(
+/** A doc comment split into its body and the tags the reference renders. */
+interface DocumentationParts {
+  readonly body: string;
+  readonly examples: readonly string[];
+  /** `@see` targets as Markdown list items. */
+  readonly related: readonly string[];
+  /** `@param` descriptions by parameter name. */
+  readonly parameters: ReadonlyMap<string, string>;
+  readonly returns?: string;
+  /** `@throws` texts: the error, then when it is thrown. */
+  readonly throws: readonly string[];
+}
+
+/** The tags a doc comment is split on; everything else stays in the body. */
+const DOCUMENTATION_TAG = /(?:^|\n)@(example|see|param|returns?|throws)\b\s*/;
+
+function documentationParts(
   documentation: string,
   pkg: ApiPackage,
   entry: ApiEntryPoint,
   item: ApiExport,
   routes: DocumentationLinkRoutes,
-  headingLevel: 2 | 3,
-): string {
-  const heading = "#".repeat(headingLevel);
-  const sections = documentation.split(/(?:^|\n)@(example|see)\b\s*\n?/);
-  const body = [sections[0]?.trim() ?? ""];
+): DocumentationParts {
+  const sections = documentation.split(new RegExp(DOCUMENTATION_TAG, "g"));
   const examples: string[] = [];
   const related: string[] = [];
+  const parameters = new Map<string, string>();
+  const throws: string[] = [];
+  let returns: string | undefined;
   for (let index = 1; index < sections.length; index += 2) {
     const tag = sections[index];
     const value = sections[index + 1]?.trim() ?? "";
@@ -209,11 +245,59 @@ function documentationSections(
       const label = link?.[2]?.trim() || target;
       const route = documentationLinkRoute(pkg, entry, item, target, routes);
       related.push(route === undefined ? `- ${value}` : `- [${label}](${route})`);
+    } else if (tag === "param") {
+      const parameter = /^([\w$.]+)\s*(?:-\s*)?([\s\S]*)$/.exec(value);
+      if (parameter?.[1] !== undefined) {
+        parameters.set(parameter[1], (parameter[2] ?? "").replace(/\s+/g, " ").trim());
+      }
+    } else if (tag === "throws") {
+      throws.push(value.replace(/\s+/g, " ").trim());
+    } else {
+      returns = value.replace(/\s+/g, " ").trim();
     }
   }
-  if (examples.length > 0) body.push(`${heading} Examples`, ...examples);
-  if (related.length > 0) body.push(`${heading} See also`, related.join("\n"));
-  return body.join("\n\n");
+  return { body: sections[0]?.trim() ?? "", examples, related, parameters, returns, throws };
+}
+
+/**
+ * JSDoc body, examples and related links. `headingLevel` places the Examples
+ * and See also headings one level below whatever holds the text: 2 for a
+ * symbol page's opening summary (under the page title), 4 for a member's
+ * documentation (under its group heading in Members), so heading levels never
+ * skip.
+ */
+function documentationSections(
+  documentation: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+  headingLevel: 2 | 3 | 4,
+): string {
+  const heading = "#".repeat(headingLevel);
+  const { body, examples, related } = documentationParts(documentation, pkg, entry, item, routes);
+  const blocks = [body];
+  if (examples.length > 0) blocks.push(`${heading} Examples`, ...examples);
+  if (related.length > 0) blocks.push(`${heading} See also`, related.join("\n"));
+  return blocks.join("\n\n");
+}
+
+/** Replaces `{@link …}` with a Markdown link to the target's page, or inline code. */
+function resolveDocumentationLinks(
+  markdown: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  return markdown.replace(
+    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
+    (_match, target: string, label: string | undefined) => {
+      const text = label?.trim() || target;
+      const route = documentationLinkRoute(pkg, entry, item, target, routes);
+      return route === undefined ? `\`${text}\`` : `[\`${text}\`](${route})`;
+    },
+  );
 }
 
 function documentationMarkdown(
@@ -222,17 +306,16 @@ function documentationMarkdown(
   item: ApiExport,
   routes: DocumentationLinkRoutes = new Map(),
   source = item.documentation,
-  headingLevel: 2 | 3 = 3,
+  headingLevel: 2 | 3 | 4 = 3,
 ): string {
   const documentation =
     source.trim() || "Source summary unavailable; docs:check rejects this omission.";
-  return documentationSections(documentation, pkg, entry, item, routes, headingLevel).replace(
-    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
-    (_match, target: string, label: string | undefined) => {
-      const text = label?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
-      return route === undefined ? `\`${text}\`` : `[\`${text}\`](${route})`;
-    },
+  return resolveDocumentationLinks(
+    documentationSections(documentation, pkg, entry, item, routes, headingLevel),
+    pkg,
+    entry,
+    item,
+    routes,
   );
 }
 
@@ -243,22 +326,60 @@ function memberDocumentationHtml(
   documentation: string,
   routes: DocumentationLinkRoutes,
 ): string {
-  return html(documentation).replace(
-    /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
-    (_match, target: string, label: string | undefined) => {
-      const text = label?.trim() || target;
-      const route = documentationLinkRoute(pkg, entry, item, target, routes);
-      return route === undefined
-        ? `<code>${text}</code>`
-        : `<a href="${route}"><code>${text}</code></a>`;
-    },
-  );
+  return html(documentation)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(
+      /\{@link\s+([^\s|}]+)(?:\s*\|\s*([^}]+))?\}/g,
+      (_match, target: string, label: string | undefined) => {
+        const text = label?.trim() || target;
+        const route = documentationLinkRoute(pkg, entry, item, target, routes);
+        return route === undefined
+          ? `<code>${text}</code>`
+          : `<a href="${route}"><code>${text}</code></a>`;
+      },
+    );
 }
 
-function compactSummary(markdown: string): string {
+/**
+ * A member card's `@param`, `@returns` and `@throws` as labelled lines, so they
+ * read as a compact list instead of raw tags inside the description.
+ */
+function memberTagsHtml(
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  parts: DocumentationParts,
+  routes: DocumentationLinkRoutes,
+): string | undefined {
+  const describe = (text: string): string =>
+    memberDocumentationHtml(pkg, entry, item, text, routes);
+  const rows = [
+    ...[...parts.parameters].map(
+      ([name, text]) =>
+        `<div><dt>Parameter</dt><dd><code>${html(name)}</code> ${describe(text)}</dd></div>`,
+    ),
+    ...(parts.returns === undefined
+      ? []
+      : [`<div><dt>Returns</dt><dd>${describe(parts.returns)}</dd></div>`]),
+    ...parts.throws.map((text) => `<div><dt>Throws</dt><dd>${describe(text)}</dd></div>`),
+  ];
+  return rows.length === 0 ? undefined : `<dl class="api-card__tags">${rows.join("")}</dl>`;
+}
+
+/** One card per `@throws`: the error, then when it is thrown. */
+function throwsCardHtml(descriptionHtml: string): string {
+  return `<div class="api-card api-field"><p class="api-card__doc">${descriptionHtml}</p></div>`;
+}
+
+/**
+ * The first sentence of a doc comment as one line. Inline code keeps its
+ * backticks when the summary is rendered as HTML (member rows); search and
+ * social descriptions are plain text.
+ */
+function compactSummary(markdown: string, keepInlineCode = false): string {
   const plain = markdown
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/[`*_~]/g, "")
+    .replace(keepInlineCode ? /[*_~]/g : /[`*_~]/g, "")
     .replace(/\s+/g, " ")
     .trim();
   const firstSentence = /^.{24,240}?[.!?](?=\s|$)/.exec(plain)?.[0];
@@ -667,45 +788,271 @@ export async function consumerIndex(manifest: PublicApiManifest): Promise<Consum
   return { dependents, references };
 }
 
+/** Published packages: the only dependents a public API page lists. */
+const PUBLISHED_PACKAGES: ReadonlySet<string> = new Set(PUBLISHABLE_PACKAGE_ORDER);
+
+/**
+ * "Referenced by": the published packages that depend on the symbol's package,
+ * and the public exports whose declarations name it. An empty list is left
+ * out, and so is the section when both are empty.
+ */
 function renderReferencedBy(pkg: ApiPackage, item: ApiExport, consumers: ConsumerIndex): string {
-  const dependents = consumers.dependents.get(pkg.name) ?? [];
+  const dependents = (consumers.dependents.get(pkg.name) ?? []).filter((dependent) =>
+    PUBLISHED_PACKAGES.has(dependent.name),
+  );
   const references = (consumers.references.get(item.name) ?? []).filter(
     (reference) => !(reference.packageName === pkg.name && reference.name === item.name),
   );
-  const body = [
-    "## Referenced by",
-    "",
-    '<div class="api-consumers" data-pagefind-ignore>',
-    `<p class="api-consumers-label">Workspace packages depending on <code>${html(pkg.name)}</code></p>`,
-    "",
-    '<ul class="api-consumer-list">',
-  ];
-  for (const dependent of dependents) {
+  if (dependents.length === 0 && references.length === 0) return "";
+  const body = ["## Referenced by", "", '<div class="api-consumers" data-pagefind-ignore>'];
+  if (dependents.length > 0) {
     body.push(
-      `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+      `<p class="api-consumers-label">Packages that depend on <code>${html(pkg.name)}</code></p>`,
+      "",
+      '<ul class="api-consumer-list">',
+      ...dependents.map(
+        (dependent) =>
+          `<li><code>${html(dependent.name)}</code><span class="api-consumer-kind">${dependent.kind}</span></li>`,
+      ),
+      "</ul>",
+      "",
     );
   }
-  if (dependents.length === 0) body.push("<li>None.</li>");
-  body.push(
-    "</ul>",
-    "",
-    `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
-    "",
-    '<ul class="api-consumer-list">',
-  );
-  for (const reference of references.slice(0, REFERENCE_DISPLAY_LIMIT)) {
+  if (references.length > 0) {
     body.push(
-      `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+      `<p class="api-consumers-label">Public exports naming <code>${html(item.name)}</code></p>`,
+      "",
+      '<ul class="api-consumer-list">',
+      ...references
+        .slice(0, REFERENCE_DISPLAY_LIMIT)
+        .map(
+          (reference) =>
+            `<li><a href="${reference.route}"><code>${html(reference.name)}</code></a><span class="api-consumer-kind">${html(reference.packageName)}</span></li>`,
+        ),
     );
+    if (references.length > REFERENCE_DISPLAY_LIMIT) {
+      body.push(
+        `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
+      );
+    }
+    body.push("</ul>");
   }
-  if (references.length === 0) body.push("<li>None.</li>");
-  if (references.length > REFERENCE_DISPLAY_LIMIT) {
-    body.push(
-      `<li class="api-consumer-more">and ${references.length - REFERENCE_DISPLAY_LIMIT} more</li>`,
-    );
-  }
-  body.push("</ul>", "</div>", "");
+  body.push("</div>", "");
   return body.join("\n");
+}
+
+/** One parameter of a function's first call signature. */
+interface ParameterField {
+  readonly name: string;
+  readonly type: string;
+  readonly optional: boolean;
+}
+
+/** A function's first call signature, as reference fields. */
+interface FunctionFields {
+  readonly parameters: readonly ParameterField[];
+  readonly returns: string;
+}
+
+/**
+ * Splits `text` on top-level commas: not inside brackets, braces, parentheses,
+ * type arguments or string literals. An arrow's `=>` is not a closing bracket.
+ */
+function splitTopLevelCommas(text: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let quote: string | undefined;
+  let start = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index] ?? "";
+    if (quote !== undefined) {
+      if (character === quote && text[index - 1] !== "\\") quote = undefined;
+    } else if (character === '"' || character === "'" || character === "`") {
+      quote = character;
+    } else if ("([{<".includes(character)) {
+      depth += 1;
+    } else if (")]}".includes(character) || (character === ">" && text[index - 1] !== "=")) {
+      depth -= 1;
+    } else if (character === "," && depth === 0) {
+      parts.push(text.slice(start, index));
+      start = index + 1;
+    }
+  }
+  parts.push(text.slice(start));
+  return parts.map((part) => part.trim()).filter((part) => part.length > 0);
+}
+
+/** The index of the bracket that closes the one at `open`. */
+function closingIndex(text: string, open: number): number {
+  const pairs: Record<string, string> = { "(": ")", "<": ">" };
+  const opener = text[open] ?? "";
+  const closer = pairs[opener];
+  let depth = 0;
+  for (let index = open; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === opener) depth += 1;
+    else if (character === closer && !(closer === ">" && text[index - 1] === "=")) {
+      depth -= 1;
+      if (depth === 0) return index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * The parameters and return type of a function's first call signature, given
+ * as the manifest records it (`<T>(a: A, b?: B): R`) or as a declaration
+ * (`function name(…): R`); undefined when neither shape matches.
+ */
+export function functionFields(signature: string, name: string): FunctionFields | undefined {
+  const declared = signature.indexOf(`function ${name}`);
+  let open = declared === -1 ? 0 : declared + `function ${name}`.length;
+  if (signature[open] === "<") open = closingIndex(signature, open) + 1;
+  if (signature[open] !== "(") return undefined;
+  const close = closingIndex(signature, open);
+  if (close === -1) return undefined;
+  const parameters = splitTopLevelCommas(signature.slice(open + 1, close)).map((parameter) => {
+    const colon = parameter.indexOf(":");
+    const head = (colon === -1 ? parameter : parameter.slice(0, colon)).trim();
+    const optional = head.endsWith("?");
+    return {
+      name: head.replace(/\?$/, ""),
+      type: colon === -1 ? "unknown" : parameter.slice(colon + 1).trim(),
+      optional,
+    };
+  });
+  const returns =
+    /^\s*:\s*([\s\S]*?)\s*;?\s*(?:\n|$)/.exec(signature.slice(close + 1))?.[1] ?? "void";
+  return { parameters, returns };
+}
+
+/** A type in a field, with each documented type name linked to its page. */
+function linkedTypeHtml(
+  type: string,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  return html(type).replace(/\b[A-Z][A-Za-z0-9_]*\b/g, (name) => {
+    const route = documentationLinkRoute(pkg, entry, item, name, routes);
+    return route === undefined ? name : `<a href="${route}">${name}</a>`;
+  });
+}
+
+/**
+ * One field card: its signature line (name, type and a required or optional
+ * marker; no name for a return value) over its description.
+ */
+function fieldHtml(
+  id: string,
+  name: string | undefined,
+  typeHtml: string,
+  marker: "required" | "optional" | undefined,
+  descriptionHtml: string | undefined,
+): string {
+  const label =
+    name === undefined
+      ? ""
+      : `<span class="api-sig__name">${html(name)}</span><span class="api-sig__punct">${marker === "optional" ? "?" : ""}: </span>`;
+  return [
+    `<div class="api-card api-field" id="${id}">`,
+    '<div class="api-card__head">',
+    `<code class="api-sig">${label}<span class="api-sig__type">${typeHtml}</span></code>`,
+    marker === undefined ? "" : `<span class="api-card__flags"><span>${marker}</span></span>`,
+    "</div>",
+    descriptionHtml === undefined || descriptionHtml === ""
+      ? ""
+      : `<p class="api-card__doc">${descriptionHtml}</p>`,
+    "</div>",
+  ]
+    .filter((line) => line !== "")
+    .join("");
+}
+
+/**
+ * Without its own description, a field named by one documented type reads
+ * that type's summary.
+ */
+function fieldTypeSummary(
+  type: string,
+  pkg: ApiPackage,
+  routes: DocumentationLinkRoutes,
+): string | undefined {
+  if (!/^[A-Z][A-Za-z0-9_]*$/.test(type)) return undefined;
+  const target = uniqueDocumentationCandidate(routes, pkg.name, type)?.item.documentation;
+  return target === undefined || target.trim() === ""
+    ? undefined
+    : compactSummary(target.split(/\n@/)[0] ?? "", true);
+}
+
+/** `void` and `Promise<void>`: a return value with nothing to describe. */
+function returnsNothing(type: string): boolean {
+  return /^(?:void|Promise<void>)$/.test(type.replace(/\s+/g, ""));
+}
+
+/** A function's Parameters and Returns sections as fields; no Returns for `void`. */
+function renderFunctionFields(
+  fields: FunctionFields,
+  parts: DocumentationParts,
+  pkg: ApiPackage,
+  entry: ApiEntryPoint,
+  item: ApiExport,
+  routes: DocumentationLinkRoutes,
+): string {
+  const describe = (text: string | undefined): string | undefined =>
+    text === undefined ? undefined : memberDocumentationHtml(pkg, entry, item, text, routes);
+  const typeSummary = (type: string): string | undefined => fieldTypeSummary(type, pkg, routes);
+  const blocks: string[] = [];
+  if (fields.parameters.length > 0) {
+    blocks.push(
+      "## Parameters",
+      "",
+      '<div class="api-cards">',
+      ...fields.parameters.map((parameter) =>
+        fieldHtml(
+          `parameter-${anchor(parameter.name.replace(/^\.\.\./, ""))}`,
+          parameter.name,
+          linkedTypeHtml(parameter.type, pkg, entry, item, routes),
+          parameter.optional ? "optional" : "required",
+          describe(
+            parts.parameters.get(parameter.name.replace(/^\.\.\./, "")) ??
+              typeSummary(parameter.type),
+          ),
+        ),
+      ),
+      "</div>",
+      "",
+    );
+  }
+  // A function that returns nothing has no Returns card.
+  if (!returnsNothing(fields.returns)) {
+    blocks.push(
+      "## Returns",
+      "",
+      '<div class="api-cards">',
+      fieldHtml(
+        "returns",
+        undefined,
+        linkedTypeHtml(fields.returns, pkg, entry, item, routes),
+        undefined,
+        describe(parts.returns ?? typeSummary(fields.returns)),
+      ),
+      "</div>",
+      "",
+    );
+  }
+  if (parts.throws.length > 0) {
+    blocks.push(
+      "## Throws",
+      "",
+      '<div class="api-cards">',
+      ...parts.throws.map((text) => throwsCardHtml(describe(text) ?? "")),
+      "</div>",
+      "",
+    );
+  }
+  return blocks.join("\n");
 }
 
 async function renderDeclaration(signature: string, expanded: boolean): Promise<string> {
@@ -735,9 +1082,41 @@ async function renderDeclaration(signature: string, expanded: boolean): Promise<
   ].join("\n");
 }
 
+/** The groups a symbol's members are listed in, in page order. */
+const MEMBER_GROUPS = ["Properties", "Methods", "Events"] as const;
+type MemberGroup = (typeof MEMBER_GROUPS)[number];
+
+const MEMBER_MODIFIER =
+  /^(?:readonly|static|abstract|public|protected|private|declare|get|set|async)\s+/;
+
+/** A member's declaration without its leading modifiers (`readonly`, `static`, …). */
+function memberHead(signature: string): string {
+  let head = signature.trimStart();
+  while (MEMBER_MODIFIER.test(head)) head = head.replace(MEMBER_MODIFIER, "");
+  return head;
+}
+
 /**
- * Member rows plus an anchor index for long lists. Members start collapsed;
- * explicit fragment navigation reveals its target through the docs shell.
+ * Callbacks named `on…` are events. Methods are members declared with a call
+ * signature, or as a property whose type is a function (`run: () => void`).
+ */
+function memberGroup(member: DeclarationMember): MemberGroup {
+  if (/^on[A-Z]/.test(member.name)) return "Events";
+  const head = memberHead(member.signature);
+  if (head.startsWith(member.name) && /^\??\s*[<(]/.test(head.slice(member.name.length))) {
+    return "Methods";
+  }
+  const type = memberTypeParts(head)?.type ?? "";
+  return /^(?:<[^>]*>\s*)?\([^]*\)\s*=>/.test(type) && splitTopLevel(type, "|").length === 1
+    ? "Methods"
+    : "Properties";
+}
+
+/**
+ * The Members section: an index of member names for long lists, then the
+ * members as signature cards grouped into Properties, Methods and Events. A
+ * card's header is the member's highlighted declaration; its documentation
+ * follows, always visible.
  */
 function renderMembers(
   pkg: ApiPackage,
@@ -746,7 +1125,7 @@ function renderMembers(
   members: readonly DeclarationMember[],
   routes: DocumentationLinkRoutes,
   aliases: ReadonlyMap<string, UnionAlias>,
-): { index: string; list: string } {
+): string {
   const searchTargets = new Set<string>(
     REQUIRED_SEARCH_TARGETS.filter(
       (target) =>
@@ -755,11 +1134,13 @@ function renderMembers(
         target.owner === item.name,
     ).map(({ term }) => term),
   );
-  const memberDocs = new Map(item.memberDocs.map((member) => [member.name, member.documentation]));
+  const memberDocs = new Map(
+    renderedMemberDocs(item).map((member) => [member.name, member.documentation]),
+  );
   const documented = new Set<string>();
   const indexLinks: string[] = [];
   const usedIds = new Set<string>();
-  const rows = members.map((member, index) => {
+  const cards = members.map((member, index) => {
     // Overload rows repeat a member name. The first row keeps the member ID
     // that the index and other pages link to; each later row gets a suffix,
     // so no two elements share an ID.
@@ -771,18 +1152,12 @@ function renderMembers(
     if (firstRow) indexLinks.push(`<a href="#${id}"><code>${html(member.name)}</code></a>`);
     const searchAnchor =
       firstRow && searchTargets.has(member.name)
-        ? `<h3 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h3>`
+        ? `<h4 id="${member.name.toLowerCase()}" class="api-search-anchor">${html(member.name)}</h4>`
         : "";
     // Overload rows repeat a member name; the merged documentation renders once,
     // on the first row.
     const documentation = documented.has(member.name) ? undefined : memberDocs.get(member.name);
     if (documentation !== undefined) documented.add(member.name);
-    const summary =
-      documentation === undefined ? "" : compactSummary(documentation.split(/\n@/)[0] ?? "");
-    const summaryDoc =
-      documentation === undefined
-        ? ""
-        : ` <span class="api-member-summary">${memberDocumentationHtml(pkg, entry, item, summary, routes)}</span>`;
     const parts = memberTypeParts(member.signature);
     const variants = parts === undefined ? undefined : stringLiteralUnionVariants(parts.type);
     const alias = variants === undefined ? undefined : aliases.get(literalUnionKey(variants));
@@ -791,49 +1166,73 @@ function renderMembers(
       alias === undefined || parts === undefined
         ? member.signature
         : `${parts.prefix} ${alias.name}${parts.terminated ? ";" : ""}`;
-    const aliasChip =
+    const head = memberHead(member.signature);
+    const flags = [
+      /^\s*readonly\s/.test(member.signature) ? "<span>read-only</span>" : "",
+      head.startsWith(`${member.name}?`) ? "<span>optional</span>" : "",
       alias === undefined
         ? ""
-        : ` <span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`;
-    return [
-      searchAnchor,
-      `<details class="api-member" id="${id}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
-      `<summary><code>${html(member.name)}</code>${aliasChip}${summaryDoc}</summary>`,
-      "",
-      // A fenced block so member signatures get real syntax highlighting.
-      "```ts generated",
-      signature,
-      "```",
-      "",
-      // Skip the body paragraph when it would only restate the summary line.
-      ...(documentation === undefined ||
-      documentation.replace(/`/g, "").replace(/\s+/g, " ").trim() === summary
+        : `<span class="api-member-alias"><a href="${alias.route}"><code>${html(alias.name)}</code></a></span>`,
+    ].join("");
+    const docParts =
+      documentation === undefined
+        ? undefined
+        : documentationParts(documentation, pkg, entry, item, routes);
+    const tags =
+      docParts === undefined ? undefined : memberTagsHtml(pkg, entry, item, docParts, routes);
+    const body =
+      documentation === undefined || docParts === undefined
         ? []
         : [
             /(?:^|\n)@(example|see)\b/.test(documentation)
-              ? `${documentationMarkdown(pkg, entry, item, routes, documentation)}\n`
-              : `<p class="api-member-doc">${memberDocumentationHtml(pkg, entry, item, documentation, routes)}</p>`,
-          ]),
-      "</details>",
-    ].join("\n");
-  });
-  return {
-    index:
-      members.length <= MEMBER_INDEX_MINIMUM
-        ? ""
-        : [
-            '<nav class="api-member-index" aria-label="Member index" data-pagefind-ignore>',
-            ...indexLinks,
-            "</nav>",
-          ].join("\n"),
-    list: [
-      `## Members <span class="api-count" data-pagefind-ignore>${members.length}</span>`,
+              ? `${documentationMarkdown(pkg, entry, item, routes, documentation, 4)}\n`
+              : docParts.body === ""
+                ? ""
+                : `<p class="api-card__doc">${memberDocumentationHtml(pkg, entry, item, docParts.body, routes)}</p>`,
+            ...(tags === undefined ? [] : [tags]),
+          ].filter((block) => block !== "");
+    const card = [
+      searchAnchor,
+      `<article class="api-card api-member" id="${id}" data-member="${html(member.name)}" data-pagefind-weight="${searchTargets.has(member.name) ? "10" : "1"}">`,
+      '<div class="api-card__head">',
       "",
-      '<div class="api-member-list">',
-      ...rows,
+      // A fenced block so member signatures get real syntax highlighting; the
+      // member grammar reads a lone `readonly name: Type;` as a class member.
+      "```ts-member generated",
+      signature,
+      "```",
+      "",
+      ...(flags === "" ? [] : [`<span class="api-card__flags">${flags}</span>`, ""]),
       "</div>",
-    ].join("\n"),
-  };
+      "",
+      ...body,
+      "</article>",
+    ].join("\n");
+    return { group: memberGroup(member), card };
+  });
+  // Overloads share one entry in the index.
+  const memberCount = new Set(members.map((member) => member.name)).size;
+  const index =
+    memberCount <= MEMBER_INDEX_MINIMUM
+      ? []
+      : [
+          `<nav class="api-member-index" aria-label="Members" data-pagefind-ignore>${indexLinks.join("")}</nav>`,
+          "",
+        ];
+  const groups = MEMBER_GROUPS.flatMap((group) => {
+    const grouped = cards.filter((card) => card.group === group);
+    return grouped.length === 0
+      ? []
+      : [
+          `<h3 class="api-member-group">${group}</h3>`,
+          "",
+          '<div class="api-cards">',
+          ...grouped.map(({ card }) => card),
+          "</div>",
+          "",
+        ];
+  });
+  return ["## Members", "", ...index, ...groups].join("\n");
 }
 
 function symbolRoute(pkg: ApiPackage, entry: ApiEntryPoint, item: ApiExport): string {
@@ -849,28 +1248,67 @@ export async function renderSymbolPage(
 ): Promise<string> {
   const label = entryLabel(pkg, entry);
   const source = packageSourcePath(pkg.name, item.source);
-  const summary = documentationMarkdown(pkg, entry, item, routes, item.documentation, 2);
+  const parts = documentationParts(
+    item.documentation.trim() || "Source summary unavailable; docs:check rejects this omission.",
+    pkg,
+    entry,
+    item,
+    routes,
+  );
+  const summary = resolveDocumentationLinks(parts.body, pkg, entry, item, routes);
   const declaration = parseableDeclaration(item);
   await prepareDeclarationShapes([declaration]);
   const shape = declarationShape(declaration);
   const description = symbolDescription(item.name, item.kind, label, compactSummary(summary));
   const aliases = await unionAliasIndex(pkg, entry, routes);
+  const fields = item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
+  // The examples follow the summary; at desktop width they sit in an aside
+  // beside the summary and the rest of the reference.
+  const hasAside = parts.examples.length > 0;
   const body = [
-    frontmatter(`${item.name} | ${label}`, description).trimEnd(),
+    frontmatter(`${item.name} | ${label}`, description, item.kind).trimEnd(),
     `<!-- api-export:${pkg.name}|${entry.subpath}|${item.name} -->`,
-    `<div class="api-pagehead"><a class="api-backlink" href="/docs/api/${entrySlug(pkg.name, entry.subpath)}/">${html(label)}</a><span class="api-status" data-kind="${item.kind}">${item.kind}</span></div>`,
     "",
+    ...(hasAside ? ['<div class="api-layout">', "", '<div class="api-layout__summary">', ""] : []),
     summary,
     "",
     '<dl class="api-metadata" data-pagefind-ignore>',
-    `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`,
+    sourceRow(source),
     "</dl>",
     "",
   ];
-  if (shape.members.length > 0) {
-    const members = renderMembers(pkg, entry, item, shape.members, routes, aliases);
-    if (members.index.length > 0) body.push(members.index, "");
-    body.push(members.list, "");
+  if (hasAside) {
+    body.push(
+      "</div>",
+      "",
+      '<aside class="api-layout__aside" aria-label="Examples">',
+      "",
+      "## Examples",
+      "",
+      ...parts.examples.map((example) =>
+        resolveDocumentationLinks(example, pkg, entry, item, routes),
+      ),
+      "",
+      "</aside>",
+      "",
+      '<div class="api-layout__body">',
+      "",
+    );
+  }
+  if (fields !== undefined) {
+    body.push(renderFunctionFields(fields, parts, pkg, entry, item, routes));
+  }
+  if (parts.related.length > 0) {
+    body.push(
+      "## See also",
+      "",
+      resolveDocumentationLinks(parts.related.join("\n"), pkg, entry, item, routes),
+      "",
+    );
+  }
+  const members = renderedMembers(item);
+  if (members.length > 0) {
+    body.push(renderMembers(pkg, entry, item, members, routes, aliases), "");
   }
 
   // A variants section earns its space only for structured unions; scalar
@@ -906,7 +1344,31 @@ export async function renderSymbolPage(
     "",
     renderReferencedBy(pkg, item, consumers),
   );
+  if (hasAside) body.push("</div>", "", "</div>");
   return `${body.join("\n").trimEnd()}\n`;
+}
+
+/** The metadata row linking a page's source file in the repository. */
+function sourceRow(source: string): string {
+  return `<div><dt>Source</dt><dd><a href="${html(repositorySourceUrl(source))}"><code>${html(source)}</code></a></dd></div>`;
+}
+
+const EXPORT_COUNT_LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * An entry page's lead: what the entry point holds, by kind, so it says more
+ * than the title.
+ */
+function entryLead(label: string, entry: ApiEntryPoint): string {
+  if (entry.kind === "asset") return `${label} is a CSS or binary asset entry point.`;
+  if (entry.exports.length === 0) return `${label} exports no named symbols.`;
+  const counts = [...Map.groupBy(entry.exports, (item) => item.kind)]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([kind, items]) => {
+      const plural = (KIND_LABELS[kind] ?? `${kind}s`).toLowerCase();
+      return `${items.length} ${items.length === 1 ? kind : plural}`;
+    });
+  return `The ${entry.exports.length} exports of ${label}, by kind: ${EXPORT_COUNT_LIST.format(counts)}.`;
 }
 
 export function renderEntryPage(
@@ -924,7 +1386,12 @@ export function renderEntryPage(
           ? "Testing-only public entry point"
           : "CSS or binary asset entry point";
   const body = [
-    frontmatter(label, `API reference for ${label}.`).trimEnd(),
+    frontmatter(
+      label,
+      entryLead(label, entry),
+      undefined,
+      entry.kind === "asset" ? undefined : entry.exports.length,
+    ).trimEnd(),
     `<span class="api-status" data-status="${entry.classification}">${entry.classification}</span>`,
     "",
     `**${status}.** Import this entry point as \`${label}\`.`,
@@ -932,12 +1399,10 @@ export function renderEntryPage(
     '<dl class="api-metadata" data-pagefind-ignore>',
     `<div><dt>Declaration target</dt><dd><code>${html(entry.target)}</code></dd></div>`,
     `<div><dt>Exports</dt><dd>${entry.exports.length}</dd></div>`,
+    ...(entry.source === undefined ? [] : [sourceRow(packageSourcePath(pkg.name, entry.source))]),
     "</dl>",
     "",
   ];
-  if (entry.source !== undefined) {
-    body.push(`Source entry: \`${packageSourcePath(pkg.name, entry.source)}\``, "");
-  }
   if (entry.kind === "asset") {
     body.push(
       "This package export is an asset rather than a TypeScript module. It is tracked here so package drift cannot bypass documentation review.",
@@ -1039,7 +1504,7 @@ export function renderMovedGuides(): string {
     "",
     "Each guide that was a file in the repository has a page in the docs site.",
     "",
-    '<div class="sw-next-links sw-moved-guides">',
+    '<div class="sw-card-group sw-moved-guides" data-cols="2">',
   ];
   const guides = new Map<string, string[]>();
   for (const [oldPath, route] of Object.entries(MIGRATION_ROUTES)) {
@@ -1048,7 +1513,7 @@ export function renderMovedGuides(): string {
   for (const [route, oldPaths] of guides) {
     const title = readableId(route.split("/").filter(Boolean).at(-1) ?? route);
     lines.push(
-      `<a href="${html(route)}"><strong>${html(title)}</strong>${oldPaths.map((path) => `<code>${html(path)}</code>`).join("")}</a>`,
+      `<a class="sw-doc-card" href="${html(route)}"><span class="sw-card__title">${html(title)}</span><span class="sw-card__body">${oldPaths.map((path) => `<code>${html(path)}</code>`).join(" ")}</span></a>`,
     );
   }
   lines.push("</div>");
@@ -1104,4 +1569,66 @@ export function movedPageIssues(
     }
   }
   return failures;
+}
+
+/** What a package's reference pages show without a description. */
+export interface UndocumentedApi {
+  readonly packageName: string;
+  /** Members of interfaces and classes with no doc comment (`Owner.member`; overloads once). */
+  readonly members: readonly string[];
+  /** Function parameters with neither an `@param` nor a documented type to fall back on (`fn(name)`). */
+  readonly parameters: readonly string[];
+  /**
+   * Functions whose return value has neither `@returns` nor a documented type;
+   * `void` and `Promise<void>` return nothing to describe.
+   */
+  readonly returns: readonly string[];
+}
+
+/**
+ * The members, parameters and return values each package's reference shows
+ * without a description, by the rules the pages render with.
+ * A symbol re-exported from several entry points counts once. Declaration
+ * shapes must be prepared ({@link prepareDeclarationShapes}).
+ */
+export function undocumentedApi(
+  manifest: PublicApiManifest,
+  routes: DocumentationLinkRoutes = documentationLinkRoutes(manifest),
+): UndocumentedApi[] {
+  return manifest.packages.map((pkg) => {
+    const members = new Set<string>();
+    const parameters = new Set<string>();
+    const returns = new Set<string>();
+    for (const entry of pkg.entryPoints) {
+      for (const item of entry.exports) {
+        const memberDocs = new Set(
+          renderedMemberDocs(item)
+            .filter((member) => member.documentation.trim() !== "")
+            .map((member) => member.name),
+        );
+        for (const member of renderedMembers(item)) {
+          if (!memberDocs.has(member.name)) members.add(`${item.name}.${member.name}`);
+        }
+        const fields =
+          item.kind === "function" ? functionFields(item.signature, item.name) : undefined;
+        if (fields === undefined) continue;
+        const parts = documentationParts(item.documentation, pkg, entry, item, routes);
+        for (const parameter of fields.parameters) {
+          const name = parameter.name.replace(/^\.\.\./, "");
+          const described =
+            parts.parameters.get(name) ?? fieldTypeSummary(parameter.type, pkg, routes);
+          if (described === undefined || described === "") parameters.add(`${item.name}(${name})`);
+        }
+        if (returnsNothing(fields.returns)) continue;
+        const described = parts.returns ?? fieldTypeSummary(fields.returns, pkg, routes);
+        if (described === undefined || described === "") returns.add(item.name);
+      }
+    }
+    return {
+      packageName: pkg.name,
+      members: [...members].sort(),
+      parameters: [...parameters].sort(),
+      returns: [...returns].sort(),
+    };
+  });
 }

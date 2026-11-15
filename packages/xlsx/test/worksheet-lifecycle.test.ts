@@ -1,114 +1,66 @@
 import { describe, expect, it } from "bun:test";
 
-import type {
-  SheetSnapshot,
-  SheetVisibility,
-  WorkbookSnapshot,
-  XlsxWorkbookWarning,
-} from "@sheetwrite/core";
-import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
+import type { SheetVisibility } from "@sheetwrite/core";
 
-import { sheetwriteWorkbookBackend } from "../src/workbook.js";
+import { sheetwriteWorkbookBackend as backend } from "../src/workbook.js";
 import { rawXlsx, TRANSITIONAL_REL, worksheet } from "./raw-opc.js";
+import { book, collectWarnings, editParts, partText, sheet, sheetAt } from "./workbook-fixtures.js";
 
-function sheet(
-  id: string,
-  name: string,
-  order: number,
-  visibility?: SheetVisibility,
-): SheetSnapshot {
-  return {
-    id,
-    name,
-    order,
-    ...(visibility ? { visibility } : {}),
-    rowCount: 1,
-    columns: [{ key: "a", header: "A", width: 80, type: "text" }],
-    cells: [],
-  };
-}
-
-function snapshot(sheets: SheetSnapshot[], activeSheet = sheets[0]!.id): WorkbookSnapshot {
-  return { schemaVersion: 1, workbook: { activeSheet }, sheets };
-}
-
-async function workbookXml(source: WorkbookSnapshot, warnings?: XlsxWorkbookWarning[]) {
-  const bytes = await sheetwriteWorkbookBackend.toXlsxWorkbook(source, {
-    ...(warnings ? { onWarning: (warning) => warnings.push(warning) } : {}),
-  });
-  const parts = unzipSync(bytes);
-  return { bytes, xml: strFromU8(parts["xl/workbook.xml"]!) };
-}
+const named = (id: string, name: string, visibility?: SheetVisibility) =>
+  sheet(id, name, [], visibility ? { visibility } : {});
+const rawNamed = (...names: string[]) =>
+  rawXlsx({ sheets: names.map((name) => ({ name, xml: worksheet("<sheetData/>") })) });
 
 describe("XLSX worksheet lifecycle fidelity", () => {
-  it("rejects NFC and case-insensitive worksheet-name collisions on import and export", async () => {
-    for (const names of [
+  it("rejects colliding, blank, forbidden-character, apostrophe-edge and over-long worksheet names", async () => {
+    const invalid = [
       ["Café", "Cafe\u0301"],
       ["Data", "data"],
-    ] as const) {
+      [""],
+      ["Bad/Name"],
+      ["'Edge"],
+      ["Edge'"],
+      [`${"😀".repeat(15)}AB`],
+    ];
+    for (const names of invalid) {
+      await expect(backend.fromXlsxWorkbook(rawNamed(...names)), names.join()).rejects.toThrow();
       await expect(
-        sheetwriteWorkbookBackend.fromXlsxWorkbook(
-          rawXlsx({
-            sheets: names.map((name) => ({ name, xml: worksheet("<sheetData/>") })),
-          }),
-        ),
-      ).rejects.toThrow();
-
-      await expect(
-        sheetwriteWorkbookBackend.toXlsxWorkbook(
-          snapshot(names.map((name, order) => sheet(`s${order}`, name, order))),
-        ),
+        backend.toXlsxWorkbook(book(names.map((name, index) => named(`s${index}`, name)))),
+        names.join(),
       ).rejects.toThrow();
     }
-  });
-
-  it("applies canonical blank, forbidden-character, apostrophe-edge, and UTF-16 length rules", async () => {
-    const invalidNames = ["", "Bad/Name", "'Edge", "Edge'", `${"😀".repeat(15)}AB`];
-    for (const name of invalidNames) {
-      await expect(
-        sheetwriteWorkbookBackend.fromXlsxWorkbook(
-          rawXlsx({ sheets: [{ name, xml: worksheet("<sheetData/>") }] }),
-        ),
-      ).rejects.toThrow();
-      await expect(
-        sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot([sheet("s", name, 0)])),
-      ).rejects.toThrow();
-    }
-
+    // The 31-character limit counts UTF-16 code units.
     const boundaryName = `${"😀".repeat(15)}A`;
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
-      rawXlsx({ sheets: [{ name: boundaryName, xml: worksheet("<sheetData/>") }] }),
-    );
-    expect(imported.sheets[0]!.name).toBe(boundaryName);
-    await expect(sheetwriteWorkbookBackend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(
-      Uint8Array,
-    );
+    const imported = await backend.fromXlsxWorkbook(rawNamed(boundaryName));
+    expect(imported.sheets[0]?.name).toBe(boundaryName);
+    await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
   });
 
   it("round-trips visible, hidden, and veryHidden states with a visible activeTab fallback", async () => {
-    const warnings: XlsxWorkbookWarning[] = [];
-    const source = snapshot(
-      [
-        sheet("hidden", "Hidden", 0, "hidden"),
-        sheet("visible", "Visible", 1),
-        sheet("very-hidden", "VeryHidden", 2, "veryHidden"),
-      ],
-      "hidden",
+    const { warnings, onWarning } = collectWarnings();
+    const bytes = await backend.toXlsxWorkbook(
+      book(
+        [
+          named("hidden", "Hidden", "hidden"),
+          named("visible", "Visible"),
+          named("very-hidden", "VeryHidden", "veryHidden"),
+        ],
+        {
+          activeSheet: "hidden",
+        },
+      ),
+      { onWarning },
     );
-    const { bytes, xml } = await workbookXml(source, warnings);
-
+    const xml = partText(bytes, "xl/workbook.xml");
     expect(xml).toContain('<workbookView activeTab="1"/>');
     expect(xml).toContain('name="Hidden" sheetId="1" state="hidden"');
     expect(xml).toContain('name="Visible" sheetId="2"');
     expect(xml).toContain('name="VeryHidden" sheetId="3" state="veryHidden"');
     expect(warnings).toEqual([
-      expect.objectContaining({
-        code: "unsupported-feature",
-        sheet: "Hidden",
-      }),
+      expect.objectContaining({ code: "unsupported-feature", sheet: "Hidden" }),
     ]);
 
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(bytes);
+    const imported = await backend.fromXlsxWorkbook(bytes);
     expect(imported.workbook.activeSheet).toBe("visible");
     expect(imported.sheets.map(({ id, visibility }) => [id, visibility])).toEqual([
       ["hidden", "hidden"],
@@ -116,7 +68,7 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       ["very-hidden", "veryHidden"],
     ]);
 
-    const hiddenActiveImport = await sheetwriteWorkbookBackend.fromXlsxWorkbook(
+    const hiddenActive = await backend.fromXlsxWorkbook(
       rawXlsx({
         sheets: [
           { name: "Hidden", state: "hidden", xml: worksheet("<sheetData/>") },
@@ -125,41 +77,30 @@ describe("XLSX worksheet lifecycle fidelity", () => {
         workbookExtra: '<bookViews><workbookView activeTab="0"/></bookViews>',
       }),
     );
-    expect(hiddenActiveImport.workbook.activeSheet).toBe(hiddenActiveImport.sheets[1]!.id);
+    expect(hiddenActive.workbook.activeSheet).toBe(sheetAt(hiddenActive, 1).id);
   });
 
   it("gives a sheet inserted before a known sheet its own identity", async () => {
-    const known: SheetSnapshot = {
-      ...sheet("data", "Report", 0),
+    const known = sheet("data", "Report", [], {
       columns: [{ key: "amount", header: "Amount", width: 80, type: "number" }],
-    };
-    const parts = unzipSync(await sheetwriteWorkbookBackend.toXlsxWorkbook(snapshot([known])));
-    const text = (name: string) => strFromU8(parts[name] ?? new Uint8Array());
-    const resaved = {
-      ...parts,
-      "xl/workbook.xml": strToU8(
-        text("xl/workbook.xml").replace(
-          "<sheets>",
-          '<sheets><sheet name="Data" sheetId="9" r:id="rId9"/>',
-        ),
-      ),
-      "xl/_rels/workbook.xml.rels": strToU8(
-        text("xl/_rels/workbook.xml.rels").replace(
+    });
+    const resaved = editParts(await backend.toXlsxWorkbook(book([known])), {
+      "xl/workbook.xml": (xml) =>
+        xml.replace("<sheets>", '<sheets><sheet name="Data" sheetId="9" r:id="rId9"/>'),
+      "xl/_rels/workbook.xml.rels": (xml) =>
+        xml.replace(
           "</Relationships>",
           `<Relationship Id="rId9" Type="${TRANSITIONAL_REL}/worksheet" Target="worksheets/sheet9.xml"/></Relationships>`,
         ),
-      ),
-      "[Content_Types].xml": strToU8(
-        text("[Content_Types].xml").replace(
+      "[Content_Types].xml": (xml) =>
+        xml.replace(
           "</Types>",
           '<Override PartName="/xl/worksheets/sheet9.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>',
         ),
-      ),
-      "xl/worksheets/sheet9.xml": strToU8(worksheet("<sheetData/>")),
-    };
+      "xl/worksheets/sheet9.xml": worksheet("<sheetData/>"),
+    });
 
-    const imported = await sheetwriteWorkbookBackend.fromXlsxWorkbook(zipSync(resaved));
-    const [inserted, report] = imported.sheets;
+    const [inserted, report] = (await backend.fromXlsxWorkbook(resaved)).sheets;
     expect(report).toMatchObject({ id: "data", name: "Report" });
     expect(report?.columns[0]?.key).toBe("amount");
     expect(inserted?.name).toBe("Data");

@@ -46,6 +46,8 @@ const grid = createGrid(document.querySelector("#grid")!, {
 
 Framework users should normally install only `@sheetwrite/react`, `@sheetwrite/vue`, or `@sheetwrite/svelte` and import that package's `styles.css`; the adapters initialize WASM automatically.
 
+`styles.css` imports every part of the stylesheet. To ship less CSS, import only the parts your grid uses from `@sheetwrite/core/styles/` (`grid.css` first); see [Stylesheet parts](https://www.sheetwrite.dev/docs/features/formatting/styles/#stylesheet-parts).
+
 ## New in 0.6.0
 
 - **Ribbon.** Set `config.ribbon: true`, or `ribbon: true` in the shell, to get an Excel-style ribbon with Home, Insert, Data and View tabs. Groups shrink, then fold into dropdowns, as the grid narrows. The ribbon loads as its own chunk, so grids without a ribbon do not download it. New `GridActions` include `setBorders`, `setFontFamily`, `setNumberFormat`, `mergeAndCenter`, `autoSum` and `freezePanes`. See [Toolbar and ribbon](https://www.sheetwrite.dev/docs/features/grid/toolbar-and-ribbon/).
@@ -62,7 +64,7 @@ The default engine, `@sheetwrite/wasm`, has the standard functions and the small
 import { initSheetwrite } from "@sheetwrite/core";
 import * as formulas from "@sheetwrite/formulas";
 
-await initSheetwrite(undefined, formulas);
+await initSheetwrite({ engine: formulas });
 ```
 
 See [Choose an engine](https://www.sheetwrite.dev/docs/start/choose-an-engine/) and the [function reference](https://www.sheetwrite.dev/docs/reference/formula-functions/) for the functions in each engine.
@@ -79,20 +81,23 @@ npm install @sheetwrite/xlsx
 ```
 
 ```ts
-import "@sheetwrite/xlsx/register";
 import {
   fromXlsxTable,
   fromXlsxWorkbook,
+  initSheetwrite,
   toXlsxTable,
   toXlsxWorkbook,
 } from "@sheetwrite/core";
+import { xlsxAddon } from "@sheetwrite/xlsx";
+
+await initSheetwrite({ addons: [xlsxAddon()] });
 ```
 
 The table APIs exchange the first sheet with a synthesized header row. The
 workbook APIs preserve multi-sheet `WorkbookSnapshot` semantics and use an
 in-memory backend with a default 1,000,000-populated-cell limit. Without
-registration, each core XLSX function throws an error telling the caller to
-install `@sheetwrite/xlsx` and import `@sheetwrite/xlsx/register`.
+the add-on, each core XLSX function throws an error telling the caller to
+install `@sheetwrite/xlsx` and call `initSheetwrite({ addons: [xlsxAddon()] })`.
 
 Workbook import and export also keep unmodeled XLSX parts within resource limits.
 Cell edits drop kept charts and pivot tables with a warning. Structural edits

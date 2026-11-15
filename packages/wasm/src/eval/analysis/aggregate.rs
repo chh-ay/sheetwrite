@@ -12,7 +12,9 @@ use super::super::subtotal::SkippedCells;
 use super::super::value::number_from_value;
 use super::super::EvalPass;
 
-pub(crate) const NAMES: &[&str] = &["AGGREGATE"];
+family_functions! {
+    AGGREGATE,
+}
 
 const FUNCTION_ARGUMENT: usize = 0;
 const OPTIONS_ARGUMENT: usize = 1;
@@ -43,7 +45,7 @@ impl Options {
     }
 }
 
-fn operation(function_number: i64) -> Option<Func> {
+const fn operation(function_number: i64) -> Option<Func> {
     Some(match function_number {
         1 => Func::Avg,
         2 => Func::Count,
@@ -70,7 +72,7 @@ fn operation(function_number: i64) -> Option<Func> {
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -104,7 +106,7 @@ impl Context<'_, '_> {
 
     fn code(&mut self, ast: Option<&Ast>, default: i64) -> Result<i64, FormulaError> {
         match ast {
-            Some(ast) => Ok(number_from_value(&self.scalar(ast))?.trunc() as i64),
+            Some(code_ast) => Ok(number_from_value(&self.scalar(code_ast))?.trunc() as i64),
             None => Ok(default),
         }
     }
@@ -152,18 +154,19 @@ fn push_data(
     values: &mut FuncAccumulator,
 ) -> Result<(), FormulaError> {
     let range = range_from_ast(ast, context.sheet);
-    if range.is_none() && !super::super::array::ast_produces_array(ast) {
+    if range.is_none() && !super::super::array::ast_produces_array(ast, context.pass.shapes()) {
         return Err(FormulaError::Value);
     }
     let matrix = context.matrix(ast)?;
     let source =
-        range.and_then(|range| Some((range, context.store.sheets.get(range.sheet as usize)?)));
+        range.and_then(|area| Some((area, context.store.sheets.get(area.sheet as usize)?)));
     values.reserve(matrix.values.len())?;
+    let mut hidden = source.map(|(_, sheet)| options.skipped.hidden_rows(sheet));
     for (index, value) in matrix.values.iter().enumerate() {
         let is_skipped = source.is_some_and(|(range, sheet)| {
             let row = range.row_start + (index / matrix.cols) as u32;
             let col = range.col_start + (index % matrix.cols) as u32;
-            options.skipped.skips_row(sheet, row)
+            hidden.as_mut().is_some_and(|rows| rows.skips(row))
                 || options
                     .skipped
                     .skips_cell(sheet, row, col, &context.store.formula_slots)
@@ -206,7 +209,7 @@ mod tests {
         ];
         for (row, (number, other)) in first.iter().zip(second).enumerate() {
             match number {
-                Some(number) => store.set_number(sheet, row, 0, *number, 0),
+                Some(first_number) => store.set_number(sheet, row, 0, *first_number, 0),
                 None if row == 0 => {
                     store.set_formula(sheet, row, 0, "=1/0", 0);
                 }

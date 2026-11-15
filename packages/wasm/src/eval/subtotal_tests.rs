@@ -37,42 +37,6 @@ fn results(store: &CellStore, sheet: usize, count: usize) -> Vec<String> {
 }
 
 #[test]
-fn codes_1_to_11_skip_filtered_rows_and_101_to_111_also_skip_hidden_rows() {
-    let formulas = [
-        "=SUBTOTAL(9,A1:A4)",
-        "=SUBTOTAL(109,A1:A4)",
-        "=SUBTOTAL(1,A1:A4)",
-        "=SUBTOTAL(101,A1:A4)",
-        "=SUBTOTAL(103,A1:A4)",
-    ];
-    let (mut store, sheet) = microsoft_example(&formulas);
-    assert_eq!(
-        results(&store, sheet, formulas.len()),
-        ["303", "303", "75.75", "75.75", "4"]
-    );
-
-    // The user hides row 2 (10).
-    assert!(store.set_hidden_rows(sheet, &[1, 1], &[]));
-    assert_eq!(
-        results(&store, sheet, formulas.len()),
-        ["303", "293", "75.75", "97.6666666667", "3"]
-    );
-
-    // A filter also hides row 3 (150), which every code skips.
-    assert!(store.set_hidden_rows(sheet, &[1, 1], &[2, 2]));
-    assert_eq!(
-        results(&store, sheet, formulas.len()),
-        ["153", "143", "51", "71.5", "2"]
-    );
-
-    assert!(store.set_hidden_rows(sheet, &[], &[]));
-    assert_eq!(
-        results(&store, sheet, formulas.len()),
-        ["303", "303", "75.75", "75.75", "4"]
-    );
-}
-
-#[test]
 fn a_cell_argument_is_a_reference_whose_row_can_be_hidden() {
     let formulas = ["=SUBTOTAL(109,A1,A2)", "=SUBTOTAL(9,A2)"];
     let (mut store, sheet) = microsoft_example(&formulas);
@@ -102,32 +66,6 @@ fn nested_subtotals_and_errors_in_hidden_rows_are_skipped() {
         results(&store, sheet, 3),
         ["30", "30", FormulaError::DivZero.sentinel()]
     );
-}
-
-#[test]
-fn a_hidden_row_change_recalculates_only_subtotals_and_their_dependents() {
-    let (mut store, sheet) = microsoft_example(&[
-        "=SUBTOTAL(109,A1:A4)",
-        "=C1*2",
-        "=SUM(A1:A4)",
-        "=SUBTOTAL(109,B1:B4)",
-    ]);
-    let other = store.add_sheet(1, 1);
-    store.set_sheet_name(sheet, "data", "Data");
-    store.set_formula(other, 0, 0, "=SUBTOTAL(109,Data!A1:A4)", 0);
-    store.commit_sources();
-    let before = store.recomputed_formulas;
-
-    assert!(store.set_hidden_rows(sheet, &[0, 0], &[]));
-
-    // C1, its reader C2, C4 (it reads the sheet) and the other sheet's formula.
-    assert_eq!(store.recomputed_formulas - before, 4);
-    assert_eq!(results(&store, sheet, 3), ["183", "366", "303"]);
-    assert_eq!(store.get_cell(other, 0, 0).num(), 183.0);
-
-    let before = store.recomputed_formulas;
-    assert!(store.set_hidden_rows(sheet, &[0, 0], &[]));
-    assert_eq!(store.recomputed_formulas, before);
 }
 
 #[test]

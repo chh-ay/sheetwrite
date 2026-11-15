@@ -36,7 +36,7 @@ pub(crate) struct SharedPattern {
 }
 
 impl SharedPattern {
-    fn new(text: Rc<str>) -> Self {
+    const fn new(text: Rc<str>) -> Self {
         Self {
             text,
             programs: [OnceCell::new(), OnceCell::new()],
@@ -121,30 +121,15 @@ impl PatternIndex {
     /// Replaces the literal pattern arguments of the REGEX calls in `ast`
     /// with shared pattern nodes.
     pub(crate) fn bind(&mut self, ast: &mut Ast) {
-        match ast {
-            Ast::Func(func, args) => {
-                if let Func::Analysis(id) = func {
-                    if is_regex_function(*id) {
-                        self.bind_pattern(args);
-                    }
-                }
-                for arg in args {
-                    self.bind(arg);
-                }
+        if let Ast::Func(Func::Analysis(id), args) = ast {
+            if is_regex_function(*id) {
+                self.bind_pattern(args);
             }
-            Ast::UnknownFunc(_, args) => {
-                for arg in args {
-                    self.bind(arg);
-                }
-            }
-            Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-                self.bind(left);
-                self.bind(right);
-            }
-            Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => self.bind(inner),
-            Ast::LetSlot { expression, .. } => self.bind(expression),
-            _ => {}
         }
+        ast.fold_children_mut(&mut |child| {
+            self.bind(child);
+            false
+        });
     }
 
     /// Counts the index and each pattern text once. Compiled programs are not
@@ -170,11 +155,10 @@ impl PatternIndex {
     }
 }
 
-fn is_regex_function(id: u16) -> bool {
-    matches!(
-        super::analysis::name(id),
-        "REGEXTEST" | "REGEXREPLACE" | "REGEXEXTRACT"
-    )
+const fn is_regex_function(id: u16) -> bool {
+    use super::analysis::{REGEXEXTRACT_ID, REGEXREPLACE_ID, REGEXTEST_ID};
+
+    matches!(id, REGEXTEST_ID | REGEXREPLACE_ID | REGEXEXTRACT_ID)
 }
 
 /// Whether formula source text may call a REGEX function, so installing other

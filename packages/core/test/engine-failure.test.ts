@@ -7,7 +7,7 @@ import { SheetwriteStore } from "../src/store.js";
 import { StoreDataEngine } from "../src/store/data-engine.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { DocumentOp, GridEvents } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -24,14 +24,6 @@ afterEach(async () => {
   // Every test leaves a running engine behind, whether or not it stopped one.
   await initSheetwrite();
 });
-
-function mountHost(): HTMLDivElement {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
-  return host;
-}
 
 function mountGrid(store?: SheetwriteStore): GridImpl {
   return new GridImpl(mountHost(), { workbook: makeWorkbook(5), data: makeColumnarData(5) }, store);
@@ -241,26 +233,6 @@ describe("engine failure", () => {
 
     stale.destroy();
     healthy.destroy();
-  });
-
-  it("does not notify a destroyed grid", () => {
-    const destroyed = mountGrid();
-    destroyed.destroy();
-
-    const notified: unknown[] = [];
-    const prototype: { onEngineFailed(): void } = Object.getPrototypeOf(destroyed);
-    const onEngineFailed = spyOn(prototype, "onEngineFailed").mockImplementation(function (
-      this: unknown,
-    ) {
-      notified.push(this);
-    });
-    try {
-      expectEngineFailed(stopThrough(new SheetwriteStore(makeWorkbook(5), makeColumnarData(5))));
-    } finally {
-      onEngineFailed.mockRestore();
-    }
-
-    expect(notified).not.toContain(destroyed);
   });
 
   it("migrates only the running engine's stores after a restart", async () => {

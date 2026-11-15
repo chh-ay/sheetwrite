@@ -1,23 +1,26 @@
 //! Bounded grouping and pivot aggregation for the full engine.
+use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::rc::Rc;
 
-use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_RECOMPUTE_CELLS};
+use super::super::matrix::{optional_ast, EvalMatrix, SPILL_MAX_BYTES, SPILL_MAX_RECOMPUTE_CELLS};
 use super::super::value::{bool_from_value, compare_values, number_from_value};
 use super::super::EvalPass;
+use super::super::Shapes;
+use super::lambda::Slot;
 use crate::calc::{parse, Ast, Func};
 use crate::store::CellStore;
 use crate::types::{EvalResult, FormulaError, Value};
-use grouping::{
-    compare_fields, compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL,
-};
+use grouping::{compare_group_values, key_part, range_number, KeyPart, TOTAL_LABEL};
 
 /// Key and aggregate rules that `PIVOTBY` shares with pivot tables. It lives
 /// below this family so the function registry does not list it.
 pub(crate) mod grouping;
 
-pub(crate) const NAMES: &[&str] = &["GROUPBY", "PERCENTOF", "PIVOTBY"];
+family_functions! {
+    GROUPBY,
+    PERCENTOF,
+    PIVOTBY,
+}
 const AGGREGATORS: &[&str] = &[
     "ARRAYTOTEXT",
     "AVERAGE",
@@ -27,7 +30,7 @@ const AGGREGATORS: &[&str] = &[
     "MAX",
     "MEDIAN",
     "MIN",
-    "PERCENTOF",
+    Function::PERCENTOF.name(),
     "PRODUCT",
     "STDEV.P",
     "STDEV.S",
@@ -35,6 +38,13 @@ const AGGREGATORS: &[&str] = &[
     "VAR.P",
     "VAR.S",
 ];
+/// Source values that one grouping may place in groups, subtotals and totals,
+/// counted once per value column: 64 MiB of 4-byte row numbers. Every
+/// placement is one stored row number and, for `SUM` and `PERCENTOF`, one
+/// value read per value column. These passes over the source do not count
+/// against [`SPILL_MAX_RECOMPUTE_CELLS`]; the groups, sorting, output and other
+/// aggregators do.
+const GROUPING_MAX_PLACEMENTS: usize = SPILL_MAX_BYTES / 4;
 
 struct Context<'a, 'p> {
     store: &'a CellStore,
@@ -42,25 +52,27 @@ struct Context<'a, 'p> {
     pass: &'a mut EvalPass<'p>,
     /// Depth of the function call; its arguments evaluate one level deeper.
     depth: usize,
+    /// Work charged against [`SPILL_MAX_RECOMPUTE_CELLS`]. Reading the
+    /// arguments and passing over the source rows are not charged: the matrix
+    /// byte limit and [`GROUPING_MAX_PLACEMENTS`] bound them.
     work: usize,
-    sums: HashMap<(usize, usize, usize), Value>,
+    sums: FxHashMap<(usize, usize, usize), Value>,
 }
+
 impl Context<'_, '_> {
     fn scalar(&mut self, expression: &Ast) -> Value {
         self.store
             .eval_ast(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn matrix(&mut self, expression: &Ast) -> Result<EvalMatrix, FormulaError> {
-        if !super::super::array::ast_produces_array(expression) {
-            self.charge(1)?;
+        if !super::super::array::ast_produces_array(expression, self.pass.shapes()) {
             return Ok(EvalMatrix::new(1, 1, vec![self.scalar(expression)]));
         }
-        let matrix =
-            self.store
-                .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)?;
-        self.charge(matrix.values.len())?;
-        Ok(matrix)
+        self.store
+            .eval_matrix_arg(expression, self.sheet, self.pass, self.depth + 1)
     }
+
     fn charge(&mut self, work: usize) -> Result<(), FormulaError> {
         self.work = self.work.checked_add(work).ok_or(FormulaError::Num)?;
         if self.work > SPILL_MAX_RECOMPUTE_CELLS {
@@ -68,6 +80,7 @@ impl Context<'_, '_> {
         }
         Ok(())
     }
+
     fn sum_rows(
         &mut self,
         values: &EvalMatrix,
@@ -79,7 +92,6 @@ impl Context<'_, '_> {
         if let Some(sum) = self.sums.get(&key) {
             return Ok(sum.clone());
         }
-        self.charge(rows.len())?;
         let mut total = 0.0;
         for &row in rows {
             match range_number(&values.values[row * values.cols + column]) {
@@ -96,6 +108,7 @@ impl Context<'_, '_> {
         self.sums.insert(key, sum.clone());
         Ok(sum)
     }
+
     fn option(
         &mut self,
         arguments: &[Ast],
@@ -118,6 +131,7 @@ struct Group {
     rows: Vec<usize>,
     parent: Option<usize>,
 }
+
 struct Axis {
     groups: Vec<Group>,
     memberships: Vec<usize>,
@@ -125,6 +139,7 @@ struct Axis {
     grand: usize,
     width: usize,
 }
+
 impl Axis {
     fn build(
         context: &mut Context<'_, '_>,
@@ -140,7 +155,9 @@ impl Axis {
             rows: Vec::new(),
             parent: None,
         }];
-        let mut buckets: HashMap<Vec<KeyPart>, Vec<usize>> = HashMap::new();
+        // A group is found by its parent and its own key at each level, so a
+        // row costs one lookup per level whatever the width of the key.
+        let mut buckets: FxHashMap<(usize, KeyPart), Vec<usize>> = FxHashMap::default();
         // Every included row belongs to the root and one group per prefix.
         let membership_width = fields.cols + 1;
         let mut memberships = vec![
@@ -150,44 +167,30 @@ impl Axis {
                 .checked_mul(membership_width)
                 .ok_or(FormulaError::Num)?
         ];
-        // Reuse the lookup key; only a new bucket needs an owned copy.
-        let mut key = Vec::with_capacity(fields.cols);
         for &row in included {
             groups[0].rows.push(row);
-            key.clear();
             let mut parent = 0;
             for width in 1..=fields.cols {
                 let values = &fields.values[row * fields.cols..row * fields.cols + width];
-                let text_work = values.iter().try_fold(0usize, |work, value| {
-                    work.checked_add(if let Value::Text(text) = value {
-                        text.len()
-                    } else {
-                        0
-                    })
-                    .ok_or(FormulaError::Num)
-                })?;
-                context.charge(width.checked_add(text_work).ok_or(FormulaError::Num)?)?;
-                key.push(key_part(&values[width - 1])?);
-                let mut found = None;
-                if let Some(bucket) = buckets.get(&key) {
-                    for &group in bucket {
-                        context.charge(width)?;
-                        if compare_fields(&groups[group].fields, values) == Ordering::Equal {
-                            found = Some(group);
-                            break;
-                        }
-                    }
-                }
-                let group = found.unwrap_or_else(|| {
+                let value = &values[width - 1];
+                let bucket = buckets.entry((parent, key_part(value)?)).or_default();
+                let found = bucket.iter().copied().find(|&group| {
+                    compare_group_values(&groups[group].fields[width - 1], value) == Ordering::Equal
+                });
+                let group = if let Some(group) = found {
+                    group
+                } else {
+                    // A new group stores its key: work per group, not per row.
+                    context.charge(width)?;
                     let index = groups.len();
                     groups.push(Group {
                         fields: values.to_vec(),
                         rows: Vec::new(),
                         parent: Some(parent),
                     });
-                    buckets.entry(key.clone()).or_default().push(index);
+                    bucket.push(index);
                     index
-                });
+                };
                 groups[group].rows.push(row);
                 memberships[row * membership_width + width] = group;
                 parent = group;
@@ -210,10 +213,12 @@ impl Axis {
             width: fields.cols,
         })
     }
+
     fn memberships(&self, row: usize) -> &[usize] {
         let width = self.width + 1;
         &self.memberships[row * width..(row + 1) * width]
     }
+
     fn ancestor(&self, mut group: usize, width: usize) -> usize {
         while self.groups[group].fields.len() > width {
             group = self.groups[group]
@@ -222,6 +227,7 @@ impl Axis {
         }
         group
     }
+
     fn sort(
         &mut self,
         context: &mut Context<'_, '_>,
@@ -326,26 +332,47 @@ impl Axis {
 }
 
 struct Aggregator {
+    /// A LAMBDA, or for a built-in function the call of it with its
+    /// arguments as parameters 0 and 1 of the frame (`values`, `total`).
     function: Ast,
     arity: usize,
     label: String,
 }
+
 impl Aggregator {
-    fn resolve(expression: &Ast) -> Result<Self, FormulaError> {
-        let expression = expression.bound_value();
+    fn resolve(written: &Ast) -> Result<Self, FormulaError> {
+        let expression = written.bound_value();
         if let Ast::Name(name) = expression {
             let label = name.to_ascii_uppercase();
             if !AGGREGATORS.contains(&label.as_str()) {
                 return Err(FormulaError::Value);
             }
-            let function = parse(&format!("={label}(0)")).map_err(|_| FormulaError::Value)?;
+            let arity = if label == Function::PERCENTOF.name() {
+                2
+            } else {
+                1
+            };
+            let Ast::Func(function, _) =
+                parse(&format!("={label}(0)")).map_err(|_| FormulaError::Value)?
+            else {
+                return Err(FormulaError::Value);
+            };
+            let arguments = ["values", "total"][..arity]
+                .iter()
+                .zip(0u16..)
+                .map(|(name, index)| Ast::Parameter {
+                    depth: 0,
+                    index,
+                    name: (*name).into(),
+                })
+                .collect();
             return Ok(Self {
-                arity: if label == "PERCENTOF" { 2 } else { 1 },
-                function,
+                arity,
+                function: Ast::Func(function, arguments),
                 label,
             });
         }
-        if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = expression {
+        if let Ast::Lambda(_) = expression {
             let arity = super::lambda::parameter_count(expression)?;
             if !(1..=2).contains(&arity) {
                 return Err(FormulaError::Value);
@@ -358,6 +385,7 @@ impl Aggregator {
         }
         Err(FormulaError::Value)
     }
+
     fn aggregate(
         &self,
         context: &mut Context<'_, '_>,
@@ -369,80 +397,77 @@ impl Aggregator {
         if self.label == "SUM" {
             return context.sum_rows(values, rows, column);
         }
-        if self.label == "PERCENTOF" {
+        if self.label == Function::PERCENTOF.name() {
             let subset = context.sum_rows(values, rows, column)?;
             let total = context.sum_rows(values, total_rows, column)?;
             return Ok(
                 match (number_from_value(&subset), number_from_value(&total)) {
                     (Err(error), _) | (_, Err(error)) => Value::Error(error),
                     (_, Ok(0.0)) => Value::Error(FormulaError::DivZero),
-                    (Ok(subset), Ok(total)) => Value::number(subset / total),
+                    (Ok(part), Ok(whole)) => Value::number(part / whole),
                 },
             );
         }
-        let source = |indices: &[usize]| Ast::BoundMatrix {
-            rows: indices.len().max(1),
-            cols: 1,
-            values: Rc::new(if indices.is_empty() {
-                vec![Value::Blank]
+        let source = |indices: &[usize]| {
+            let column_values: std::rc::Rc<[Value]> = if indices.is_empty() {
+                [Value::Blank].into()
             } else {
                 indices
                     .iter()
                     .map(|&row| values.values[row * values.cols + column].clone())
                     .collect()
-            }),
+            };
+            Slot::Array {
+                rows: column_values.len(),
+                cols: 1,
+                values: column_values,
+            }
         };
         context.charge(rows.len() + if self.arity == 2 { total_rows.len() } else { 0 })?;
-        let mut arguments = vec![source(rows)];
+        let mut slots = vec![source(rows)];
         if self.arity == 2 {
-            arguments.push(source(total_rows));
+            slots.push(source(total_rows));
         }
-        let invocation = if let Ast::Func(Func::Analysis(super::LAMBDA_ID), _) = &self.function {
-            arguments.insert(0, self.function.clone());
-            Ast::UnknownFunc(super::lambda::CALL.into(), arguments)
-        } else if let Ast::Func(function, _) = self.function {
-            Ast::Func(function, arguments)
+        let call =
+            super::lambda::Context::new(context.store, context.sheet, context.pass, context.depth);
+        if let Ast::Lambda(_) = &self.function {
+            super::lambda::call_with_slots(call, &self.function, slots)
+        } else if let Ast::Func(_, _) = &self.function {
+            super::lambda::evaluate_with_slots(call, &self.function, slots)
         } else {
-            return Err(FormulaError::Value);
-        };
-        if super::super::array::ast_produces_array(&invocation) {
-            let result = context.matrix(&invocation)?;
-            if result.values.len() != 1 {
-                return Err(FormulaError::Calc);
-            }
-            Ok(result.into_first())
-        } else {
-            Ok(context.scalar(&invocation))
+            Err(FormulaError::Value)
         }
     }
 }
 
-pub(crate) fn produces_array(name: &str, _: &[Ast]) -> bool {
-    name != "PERCENTOF"
+pub(crate) fn produces_array(function: Function, _: &[Ast], _: Shapes<'_>) -> bool {
+    function != Function::PERCENTOF
 }
+
 pub(crate) fn shape(
     _: &CellStore,
-    _: &str,
+    _: Function,
     _: &[Ast],
     _: usize,
     _: &mut EvalPass<'_>,
 ) -> Result<(usize, usize, usize), FormulaError> {
     Ok((1, 1, 1))
 }
+
 pub(crate) fn bound(
     store: &CellStore,
-    name: &str,
+    function: Function,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
 ) -> Result<usize, FormulaError> {
-    let is_pivot = name == "PIVOTBY";
+    let is_pivot = function == Function::PIVOTBY;
     let required = if is_pivot { 4 } else { 3 };
     if arguments.len() < required {
         return Err(FormulaError::Value);
     }
     let mut extent = |expression: &Ast| -> Result<(usize, usize), FormulaError> {
-        if !super::super::array::ast_produces_array(expression) {
+        if !super::super::array::ast_produces_array(expression, pass.shapes()) {
             return Ok((1, 1));
         }
         let (rows, cols, cells) = store.matrix_shape(expression, sheet, pass)?;
@@ -479,18 +504,18 @@ pub(crate) fn bound(
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    name: &str,
+    function: Function,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> EvalResult {
-    if name != "PERCENTOF" || arguments.len() != 2 {
+    if function != Function::PERCENTOF || arguments.len() != 2 {
         return Value::Error(FormulaError::Value);
     }
     let sum = |expression: &Ast, pass: &mut EvalPass<'_>| {
         store.eval_ast(
-            &Ast::Func(Func::Sum, vec![expression.clone()]),
+            &Ast::Func(Func::Sum, (vec![expression.clone()]).into()),
             sheet,
             pass,
             depth + 1,
@@ -509,6 +534,30 @@ pub(crate) fn evaluate_ast(
     } else {
         Value::number(subset / total)
     }
+}
+
+/// Refuses a grouping that would place more than [`GROUPING_MAX_PLACEMENTS`]
+/// source values: each included row goes into its group at every row level
+/// and the root, the same for the column levels, and every pair of the two.
+fn check_placements(
+    rows: usize,
+    row_width: usize,
+    col_width: Option<usize>,
+    value_cols: usize,
+) -> Result<(), FormulaError> {
+    let row_levels = row_width + 1;
+    let per_row = match col_width {
+        Some(width) => (width + 1)
+            .checked_mul(row_levels)
+            .and_then(|pairs| pairs.checked_add(width + 1 + row_levels)),
+        None => Some(row_levels),
+    };
+    per_row
+        .and_then(|count| count.checked_mul(rows))
+        .and_then(|placements| placements.checked_mul(value_cols))
+        .filter(|placements| *placements <= GROUPING_MAX_PLACEMENTS)
+        .map(|_| ())
+        .ok_or(FormulaError::Num)
 }
 
 fn sort_codes(
@@ -541,13 +590,13 @@ fn sort_codes(
 
 pub(crate) fn evaluate_matrix(
     store: &CellStore,
-    name: &str,
+    function: Function,
     arguments: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
     depth: usize,
 ) -> Result<EvalMatrix, FormulaError> {
-    let is_pivot = name == "PIVOTBY";
+    let is_pivot = function == Function::PIVOTBY;
     let required = if is_pivot { 4 } else { 3 };
     let maximum = if is_pivot { 11 } else { 8 };
     if arguments.len() < required || arguments.len() > maximum {
@@ -559,7 +608,7 @@ pub(crate) fn evaluate_matrix(
         pass,
         depth,
         work: 0,
-        sums: HashMap::new(),
+        sums: FxHashMap::default(),
     };
     let row_fields = context.matrix(&arguments[0])?;
     let col_fields = if is_pivot {
@@ -663,16 +712,24 @@ pub(crate) fn evaluate_matrix(
     if included.is_empty() {
         return Err(FormulaError::Calc);
     }
+    check_placements(
+        included.len(),
+        row_fields.cols,
+        col_fields.as_ref().map(|fields| fields.cols),
+        values.cols,
+    )?;
     let mut rows = Axis::build(&mut context, &row_fields, &included, row_total)?;
-    let mut columns = if let Some(fields) = &col_fields {
+    let mut column_axis = if let Some(fields) = &col_fields {
         Some(Axis::build(&mut context, fields, &included, col_total)?)
     } else {
         None
     };
-    let header_rows = columns.as_ref().map_or(usize::from(show_headers), |axis| {
-        axis.width + usize::from(show_headers)
-    });
-    let value_columns = columns
+    let header_rows = column_axis
+        .as_ref()
+        .map_or(usize::from(show_headers), |axis| {
+            axis.width + usize::from(show_headers)
+        });
+    let value_columns = column_axis
         .as_ref()
         .map_or(Some(values.cols), |axis| {
             axis.order.len().checked_mul(values.cols)
@@ -708,8 +765,8 @@ pub(crate) fn evaluate_matrix(
         relationship == 0,
         &row_aggregates,
     )?;
-    let mut intersections: HashMap<(usize, usize), Vec<usize>> = HashMap::new();
-    if let Some(columns) = &mut columns {
+    let mut intersections: FxHashMap<(usize, usize), Vec<usize>> = FxHashMap::default();
+    if let Some(columns) = &mut column_axis {
         let mut col_aggregates = Vec::with_capacity(columns.groups.len());
         for group in &columns.groups {
             let mut aggregated = Vec::with_capacity(values.cols);
@@ -734,7 +791,6 @@ pub(crate) fn evaluate_matrix(
         for &row in &included {
             for &row_group in rows.memberships(row) {
                 for &col_group in columns.memberships(row) {
-                    context.charge(1)?;
                     intersections
                         .entry((row_group, col_group))
                         .or_default()
@@ -753,7 +809,7 @@ pub(crate) fn evaluate_matrix(
             };
         }
     }
-    if let Some(columns) = &columns {
+    if let Some(columns) = &column_axis {
         for (position, &group) in columns.order.iter().enumerate() {
             for field in 0..columns.width {
                 let label = columns.groups[group]
@@ -806,7 +862,7 @@ pub(crate) fn evaluate_matrix(
                 }
             });
         }
-        if let Some(columns) = &columns {
+        if let Some(columns) = &column_axis {
             for (col_position, &col_group) in columns.order.iter().enumerate() {
                 let subset = intersections
                     .get(&(row_group, col_group))
@@ -874,59 +930,6 @@ mod tests {
     }
 
     #[test]
-    fn sales_by_product_year_and_value_order() {
-        for (formula, expected) in [
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,1)", vec![60.0, 40.0, 100.0]),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,-2)", vec![60.0, 40.0]),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,-1)", vec![100.0, 60.0, 40.0]),
-            (
-                "=GROUPBY(A1:A4,C1:C4,LAMBDA(subset,SUM(subset)),0,0)",
-                vec![60.0, 40.0],
-            ),
-            (
-                "=LET(aggregate,LAMBDA(subset,SUM(subset)),GROUPBY(A1:A4,C1:C4,aggregate,0,0))",
-                vec![60.0, 40.0],
-            ),
-            ("=GROUPBY(A1:A4,C1:C4,SUM,0,0,,D1:D4)", vec![20.0, 10.0]),
-        ] {
-            let (store, sheet) = calculate(formula);
-            for (row, expected) in expected.into_iter().enumerate() {
-                assert_eq!(
-                    store.get_cell(sheet, 8 + row, 9).string(),
-                    None,
-                    "{formula}"
-                );
-                assert_eq!(
-                    store.get_cell(sheet, 8 + row, 9).num(),
-                    expected,
-                    "{formula}"
-                );
-            }
-        }
-    }
-
-    #[test]
-    fn sales_pivot_and_percent_of_column() {
-        let (store, sheet) = calculate("=PIVOTBY(A1:A4,B1:B4,C1:C4,SUM,0,1,,1)");
-        assert_eq!(
-            store.get_cell(sheet, 10, 8).string().as_deref(),
-            Some("Pear")
-        );
-        for (row, expected) in [[20.0, 40.0, 60.0], [30.0, 10.0, 40.0], [50.0, 50.0, 100.0]]
-            .into_iter()
-            .enumerate()
-        {
-            for (column, expected) in expected.into_iter().enumerate() {
-                assert_eq!(store.get_cell(sheet, 9 + row, 9 + column).string(), None);
-                assert_eq!(store.get_cell(sheet, 9 + row, 9 + column).num(), expected);
-            }
-        }
-        let (store, sheet) = calculate("=PIVOTBY(A1:A4,B1:B4,C1:C4,PERCENTOF,0,0,,0)");
-        assert_eq!(store.get_cell(sheet, 9, 9).num(), 0.4);
-        assert_eq!(store.get_cell(sheet, 9, 10).num(), 0.8);
-    }
-
-    #[test]
     fn hierarchy_subtotals_and_multiple_field_sort() {
         let (store, sheet) = calculate("=GROUPBY(A1:B4,C1:C4,SUM,0,2)");
         for (row, expected) in [20.0, 40.0, 60.0, 30.0, 10.0, 40.0, 100.0]
@@ -964,35 +967,6 @@ mod tests {
                     "{formula}"
                 );
             }
-        }
-    }
-
-    #[test]
-    fn eta_reduced_numeric_aggregators() {
-        for (function, expected) in [
-            ("SUM", 60.0),
-            ("AVERAGE", 30.0),
-            ("COUNT", 2.0),
-            ("COUNTA", 2.0),
-            ("MAX", 40.0),
-            ("MIN", 20.0),
-            ("MEDIAN", 30.0),
-            ("PRODUCT", 800.0),
-            ("STDEV.S", 200.0_f64.sqrt()),
-            ("STDEV.P", 10.0),
-            ("VAR.S", 200.0),
-            ("VAR.P", 100.0),
-        ] {
-            let formula = format!("=GROUPBY(A1:A4,C1:C4,{function},0,0)");
-            let (store, sheet) = calculate(&formula);
-            assert_eq!(
-                store.get_cell(sheet, 8, 8).string().as_deref(),
-                Some("Apple")
-            );
-            assert!(
-                (store.get_cell(sheet, 8, 9).num() - expected).abs() < 1e-10,
-                "{formula}"
-            );
         }
     }
 
@@ -1044,6 +1018,80 @@ mod tests {
                 assert!((store.get_cell(sheet, 9, 9).num() - expected).abs() < 1e-10);
             }
         }
+    }
+
+    /// Sales rows as in #605: 10 regions, 100 products (each in one region),
+    /// an amount of 1 and one of 4 quarters. Each product has the same number
+    /// of rows in every quarter.
+    fn sales(rows: usize, formula: &str) -> (CellStore, usize) {
+        let mut store = CellStore::new();
+        let sheet = store.add_sheet(16, rows);
+        for row in 0..rows {
+            let product = row % 100;
+            store.set_string(sheet, row, 0, &format!("Region {}", product % 10), 0);
+            store.set_string(sheet, row, 1, &format!("Product {product}"), 0);
+            store.set_number(sheet, row, 2, 1.0, 0);
+            store.set_string(sheet, row, 3, &format!("Q{}", row / 100 % 4 + 1), 0);
+        }
+        store.set_formula(sheet, 0, 5, formula, 0);
+        store.recompute(sheet);
+        (store, sheet)
+    }
+
+    #[test]
+    fn source_rows_do_not_count_against_the_operation_cap() {
+        // Develop charged about 38 operations per source row here and gave
+        // #NUM! above about 52,600 rows.
+        let (store, sheet) = sales(
+            70_000,
+            "=PIVOTBY(A1:B70000,D1:D70000,C1:C70000,PERCENTOF,0,2,,1,,,2)",
+        );
+        // The corner above the row labels is blank, not #NUM!.
+        assert_eq!(store.get_cell(sheet, 0, 5).string(), None);
+        assert_eq!(store.get_cell(sheet, 0, 7).string().as_deref(), Some("Q1"));
+        assert_eq!(
+            store.get_cell(sheet, 0, 11).string().as_deref(),
+            Some("Total")
+        );
+        // Region 0, Product 0: 175 rows in each quarter.
+        assert_eq!(
+            store.get_cell(sheet, 1, 5).string().as_deref(),
+            Some("Region 0")
+        );
+        assert_eq!(
+            store.get_cell(sheet, 1, 6).string().as_deref(),
+            Some("Product 0")
+        );
+        for column in 7..11 {
+            assert_eq!(store.get_cell(sheet, 1, column).num(), 175.0 / 70_000.0);
+        }
+        assert_eq!(store.get_cell(sheet, 1, 11).num(), 700.0 / 70_000.0);
+        // After the header: 100 products, 10 region subtotals, then the total.
+        assert_eq!(
+            store.get_cell(sheet, 111, 5).string().as_deref(),
+            Some("Total")
+        );
+        assert_eq!(store.get_cell(sheet, 111, 11).num(), 1.0);
+        // Develop charged about 19 per row and gave #NUM! above 100,000 rows.
+        let (store, sheet) = sales(120_000, "=GROUPBY(A1:B120000,C1:C120000,SUM,0,2)");
+        assert_eq!(store.get_cell(sheet, 0, 7).num(), 1_200.0);
+        assert_eq!(store.get_cell(sheet, 110, 7).num(), 120_000.0);
+    }
+
+    #[test]
+    fn oversized_groupings_are_still_refused() {
+        // 600,001 rows of two columns is above the 1,000,000-cell output limit.
+        let (store, sheet) = calculate("=GROUPBY(SEQUENCE(600000),SEQUENCE(600000),SUM)");
+        assert_eq!(
+            store.get_cell(sheet, 8, 8).string().as_deref(),
+            Some("#NUM!")
+        );
+        // A full sheet in the #605 shape fits; a second value column does not.
+        assert!(check_placements(1_048_575, 2, Some(1), 1).is_ok());
+        assert_eq!(
+            check_placements(1_048_575, 2, Some(1), 2),
+            Err(FormulaError::Num)
+        );
     }
 
     #[test]

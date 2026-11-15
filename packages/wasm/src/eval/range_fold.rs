@@ -4,7 +4,7 @@
 use super::functions::{treats_cell_as_reference, ReductionFold, MAX_FUNCTION_ARGS};
 use super::range_reader::RangeReader;
 use super::value::aggregate_number;
-use super::{ast_produces_array, literal_cell_value, EvalPass};
+use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
 
 use crate::calc::{Ast, Func};
 use crate::cells::payload_num;
@@ -67,7 +67,7 @@ impl CellStore {
                 .all(|arg| super::matrix::range_from_ast(arg, sheet).is_some())
             || !args
                 .iter()
-                .all(|arg| sum_scalar_or_range(arg, sheet).is_some())
+                .all(|arg| sum_scalar_or_range(arg, sheet, pass.shapes()).is_some())
         {
             return None;
         }
@@ -75,7 +75,7 @@ impl CellStore {
         let mut fold = ReductionFold::new(Func::Sum)?;
         let mut deferred = None;
         for arg in args {
-            let result = match sum_scalar_or_range(arg, sheet)? {
+            let result = match sum_scalar_or_range(arg, sheet, pass.shapes())? {
                 SumArg::Range(range) => self
                     .fold_range(range, &mut fold, true, pass, depth)
                     .map(|_| ()),
@@ -130,29 +130,30 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> EvalResult {
-        let group = self
+        let shared_group = self
             .graph
             .index()
             .and_then(|index| index.shared_range_group(range));
-        if let Some(sum) = group.and_then(|(group, _)| pass.results.range_sum(range, group)) {
+        if let Some(sum) = shared_group.and_then(|(group, _)| pass.results.range_sum(range, group))
+        {
             return sum_value(sum);
         }
 
         let Some(mut fold) = ReductionFold::new(Func::Sum) else {
             return Value::Error(FormulaError::Value);
         };
-        let sum = self
+        let folded = self
             .fold_range(range, &mut fold, false, pass, depth)
             .and_then(|literal_only| match fold.finish() {
                 Value::Number(sum) => Ok((sum, literal_only)),
                 Value::Error(error) => Err(error),
-                _ => Err(FormulaError::Value),
+                Value::Text(_) | Value::Bool(_) | Value::Blank => Err(FormulaError::Value),
             });
-        let (sum, literal_only) = match sum {
+        let (sum, literal_only) = match folded {
             Ok((sum, literal_only)) => (Ok(sum), literal_only),
             Err(error) => (Err(error), false),
         };
-        if let (Some((group, groups)), true) = (group, literal_only) {
+        if let (Some((group, groups)), true) = (shared_group, literal_only) {
             pass.results.share_range_sum(range, group, groups, sum);
         }
         sum_value(sum)
@@ -191,6 +192,21 @@ impl CellStore {
         let (kinds, payloads) = sources.raw();
         let row_start = range.row_start as usize;
         let col_start = range.col_start as usize;
+
+        // A single column is one contiguous run of storage: fold it as a
+        // slice when it holds only numbers and empty cells.
+        if cols == 1 {
+            let start = data.cells.idx(row_start, col_start);
+            let column = kinds
+                .get(start..start + rows)
+                .zip(payloads.get(start..start + rows));
+            if let Some(result) =
+                column.and_then(|(kinds, payloads)| fold.push_number_column(kinds, payloads))
+            {
+                return result.map(|()| true);
+            }
+        }
+
         let mut literal_only = true;
         for row in row_start..row_start + rows {
             for col in col_start..col_start + cols {
@@ -239,7 +255,7 @@ enum SumArg {
 /// The accumulator's reading of `arg`, or `None` for arguments the mixed
 /// path leaves to it: arrays, unions, sheet spans, intersections and
 /// missing arguments.
-fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
+fn sum_scalar_or_range(arg: &Ast, sheet: usize, shapes: Shapes<'_>) -> Option<SumArg> {
     match arg {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::NamedRange(_) | Ast::Structured(_) => {
             super::matrix::range_from_ast(arg, sheet).map(SumArg::Range)
@@ -248,14 +264,36 @@ fn sum_scalar_or_range(arg: &Ast, sheet: usize) -> Option<SumArg> {
             reference: treats_cell_as_reference(Func::Sum),
         }),
         Ast::Missing | Ast::Func(Func::Union | Func::Intersect, _) | Ast::SheetSpan(_) => None,
-        _ if ast_produces_array(arg) => None,
-        _ => Some(SumArg::Scalar { reference: false }),
+        _ if ast_produces_array(arg, shapes) => None,
+        Ast::Num(_)
+        | Ast::Str(_)
+        | Ast::Bool(_)
+        | Ast::Name(_)
+        | Ast::NamedFormula(_)
+        | Ast::UnresolvedStructured(_)
+        | Ast::SheetCell(..)
+        | Ast::SheetRange(..)
+        | Ast::InvalidRef
+        | Ast::Func(..)
+        | Ast::UnknownFunc(..)
+        | Ast::Bin(..)
+        | Ast::Cmp(..)
+        | Ast::Neg(_)
+        | Ast::Pos(_)
+        | Ast::Percent(_)
+        | Ast::LetSlot { .. }
+        | Ast::LetName { .. }
+        | Ast::Array { .. } => Some(SumArg::Scalar { reference: false }),
+        #[cfg(feature = "analysis")]
+        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
+            Some(SumArg::Scalar { reference: false })
+        }
     }
 }
 
-fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
+const fn sum_value(sum: Result<f64, FormulaError>) -> EvalResult {
     match sum {
-        Ok(sum) => Value::Number(sum),
+        Ok(total) => Value::Number(total),
         Err(error) => Value::Error(error),
     }
 }
@@ -290,21 +328,6 @@ mod tests {
     }
 
     #[test]
-    fn mixed_sum_arguments_follow_the_accumulator_rules() {
-        // Range text and logical values are skipped; direct ones count.
-        assert_eq!(sum("=SUM(A1:A5,\"7\",TRUE)").0, 0.1 + 0.2 + 7.0 + 1.0);
-        // A one-cell reference reads like a range.
-        assert_eq!(sum("=SUM(A1:A1,A2,A3)").0, 0.1);
-        // The running sum keeps argument order: 1e16 + 1 + 1 drops both ones
-        // only when they are added one at a time.
-        let expected = ((1e16_f64 + 1.0) + 1.0) + 0.1;
-        assert_eq!(sum("=SUM(B1:B3,A1)").0, expected);
-        assert_eq!(sum("=SUM(B1:B3,0.1)").0, expected);
-        // Formula cells are evaluated inside the fold.
-        assert_eq!(sum("=SUM(A5:A6,1)").0, 0.2 + 0.1 * 3.0 + 1.0);
-    }
-
-    #[test]
     fn mixed_sum_errors_keep_their_order() {
         // A range error returns at once, before a later scalar error.
         assert_eq!(sum("=SUM(A1:A7,\"x\")").1.as_deref(), Some("#DIV/0!"));
@@ -317,26 +340,42 @@ mod tests {
         assert_eq!(sum("=SUM(A1:A2,1E308,1E308)").1.as_deref(), Some("#NUM!"));
     }
 
+    /// A column with a cell of another kind is read cell by cell, and a
+    /// non-finite number fails every reduction, wherever it sits in the
+    /// column, as it does cell by cell.
     #[test]
-    fn ranges_over_the_same_literals_share_one_sum_per_pass() {
+    fn number_columns_with_other_kinds_or_infinity_match_the_cell_path() {
         let mut store = CellStore::new();
-        let sheet = store.add_sheet(3, 100);
-        for row in 0..100 {
-            store.set_number(sheet, row, 0, 0.1, 0);
-            store.set_formula(sheet, row, 1, "=SUM($A$1:$A$100)", 0);
+        let sheet = store.add_sheet(5, 50);
+        for row in 0..50 {
+            store.set_number(sheet, row, 0, row as f64, 0);
+            store.set_number(sheet, row, 1, row as f64, 0);
         }
-        store.set_formula(sheet, 0, 2, "=SUM($A$1:$A$99,A100)", 0);
+        store.set_string(sheet, 10, 0, "text", 0);
+        store.set_number(sheet, 40, 1, f64::NEG_INFINITY, 0);
+        let sources = [
+            "=SUM(A1:A50)",
+            "=COUNT(A1:A50)",
+            "=COUNTA(A1:A50)",
+            "=MIN(A1:A50)",
+            "=SUM(B1:B50)",
+            "=AVERAGE(B1:B50)",
+            "=MAX(B1:B50)",
+            "=COUNT(B1:B50)",
+        ];
+        for (row, source) in sources.iter().enumerate() {
+            store.set_formula(sheet, row, 3, source, 0);
+        }
         store.recompute(sheet);
-        let expected = (0..100).fold(0.0, |sum, _| sum + 0.1);
-        for row in 0..100 {
-            assert_eq!(store.get_cell(sheet, row, 1).num(), expected);
-        }
-        assert_eq!(store.get_cell(sheet, 0, 2).num(), expected);
 
-        // An edit inside the range changes every reader in the next pass.
-        store.set_number(sheet, 50, 0, 1.0, 0);
-        store.recompute(sheet);
-        let expected = (0..100).fold(0.0, |sum, row| sum + if row == 50 { 1.0 } else { 0.1 });
-        assert_eq!(store.get_cell(sheet, 99, 1).num(), expected);
+        let number = |row| store.get_cell(sheet, row, 3).num();
+        assert_eq!(number(0), (0..50).sum::<i32>() as f64 - 10.0);
+        assert_eq!(number(1), 49.0);
+        assert_eq!(number(2), 50.0);
+        assert_eq!(number(3), 0.0);
+        for (row, source) in sources.iter().enumerate().skip(4) {
+            let error = store.get_cell(sheet, row, 3).string();
+            assert_eq!(error.as_deref(), Some("#NUM!"), "{source}");
+        }
     }
 }

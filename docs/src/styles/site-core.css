@@ -1,0 +1,9 @@
+/* Every docs page's first stylesheet: reset and tokens, then the components,
+   prose and code hovers every page uses. Feature sheets, site-mid.css and
+   site-tail.css follow it in the head (routes/__root.tsx), in site.css's
+   cascade order. */
+@import "@docs/styles/tokens.css";
+@import "@docs/styles/components.css";
+@import "@docs/styles/site/base.css";
+@import "@docs/styles/site/code-hovers.css";
+@import "./islands.css";

@@ -8,6 +8,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { loadPanels } from "../src/panels/panel-loader.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid } from "../src/types/grid.js";
+import { installCoreStyles } from "./fixtures.js";
 
 let evaluations = 0;
 let insertions = 0;
@@ -26,6 +27,7 @@ mock.module("../src/panels/panel-controller.js", () => {
 
 await initSheetwrite();
 const restore = installCanvasTestStubs();
+const removeStyles = installCoreStyles();
 const host = document.createElement("div");
 Object.defineProperties(host, {
   clientWidth: { value: 900 },
@@ -98,5 +100,6 @@ try {
   assert.equal(insertedInto, grid);
 } finally {
   grid.destroy();
+  removeStyles();
   restore();
 }

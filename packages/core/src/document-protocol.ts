@@ -22,6 +22,7 @@ import {
   validateRelationshipShape,
 } from "./data-model.js";
 import { SheetwriteError } from "./errors.js";
+import { validateExternalLinksShape } from "./external-link.js";
 import {
   cloneCellHyperlink,
   isSafeExternalHyperlink,
@@ -145,6 +146,10 @@ const TRANSACTION_RESOURCE_KEYS = [
 /**
  * Validate and merge transaction ceiling overrides without retaining the
  * caller-owned object. Every ceiling is an inclusive non-negative safe integer.
+ *
+ * @param overrides - Limits to change; the others keep their defaults.
+ * @returns A frozen copy of the full set of limits.
+ * @throws SheetwriteError with code `invalid-limits` when a value is not a non-negative safe integer.
  */
 export function resolveTransactionResourceLimits(
   overrides: Partial<TransactionResourceLimits> = {},
@@ -170,6 +175,10 @@ export function resolveTransactionResourceLimits(
  * Incrementally validate the operation count and exact encoded payload size
  * without constructing a JSON string. Compact operation ranges are measured by
  * their serialized fields; their logical cell area is deliberately irrelevant.
+ *
+ * @param operations - The transaction's operations.
+ * @param limits - The limits to check against; defaults to the built-in limits.
+ * @throws SheetwriteError with code `invalid-operations` when `operations` is not an array.
  */
 export function validateTransactionResources(
   operations: readonly DocumentOp[],
@@ -303,6 +312,8 @@ export function resolveTransactionResourceValidation(
 }
 
 const admittedResourcesByTransaction = new WeakMap<object, AdmittedTransactionResources>();
+/** Transactions an engine layer built from operations it already took in. */
+const engineBuiltTransactions = new WeakSet<object>();
 
 /**
  * Attach one measurement to the engine-built transaction that is about to be
@@ -313,8 +324,18 @@ export function withAdmittedTransactionResources<T extends object>(
   transaction: T,
   admitted: AdmittedTransactionResources | undefined,
 ): T {
+  engineBuiltTransactions.add(transaction);
   if (admitted !== undefined) admittedResourcesByTransaction.set(transaction, admitted);
   return transaction;
+}
+
+/**
+ * Whether an engine layer built `transaction` through
+ * `withAdmittedTransactionResources`. Its operations already passed that
+ * layer's ingress, and the layer matches results to them by identity.
+ */
+export function isEngineBuiltTransaction(transaction: object): boolean {
+  return engineBuiltTransactions.has(transaction);
 }
 
 /**
@@ -411,12 +432,18 @@ export interface SnapshotValidationOptions {
 
 /** Stable resource failure raised by direct workbook construction paths. */
 export class SnapshotResourceError extends SheetwriteError {
+  /** Always `"SnapshotResourceError"`. */
   override readonly name = "SnapshotResourceError";
+  /** Always `"resource-limit"`. */
   declare readonly code: "resource-limit";
 
+  /** Creates the error for one limit; `options.cause` keeps the underlying error. */
   constructor(
+    /** The limit that was reached, such as `maxSheets`. */
     readonly resource: keyof SnapshotResourceLimits,
+    /** The limit's value. */
     readonly limit: number,
+    /** The amount the workbook needed, in the limit's unit. */
     readonly actual: number,
     options?: ErrorOptions,
   ) {
@@ -433,7 +460,9 @@ export class SnapshotResourceError extends SheetwriteError {
 
 /** Path-qualified validation failure for a document operation. */
 export interface DocumentValidationError {
+  /** JSON path of the bad value, such as `$.sheets[0].name`. */
   path: string;
+  /** What kind of problem it is. */
   code:
     | "unsupported-schema"
     | "invalid-value"
@@ -443,6 +472,7 @@ export interface DocumentValidationError {
     | "overlapping-merge"
     | "non-serializable"
     | "resource-limit";
+  /** A readable explanation of the problem. */
   message: string;
 }
 
@@ -456,12 +486,15 @@ const MAX_REPORTED_VALIDATION_ISSUES = 64;
 
 /** Path-qualified schema failure found while validating an untrusted snapshot. */
 export class SnapshotValidationError extends SheetwriteError {
+  /** Always `"SnapshotValidationError"`. */
   override readonly name = "SnapshotValidationError";
+  /** Always `"invalid-snapshot"`. */
   declare readonly code: "invalid-snapshot";
 
   /** The first 64 issues; `context.issueCount` counts all of them. */
   readonly errors: readonly DocumentValidationError[];
 
+  /** Creates the error; its message is the first issue's message. */
   constructor(errors: readonly DocumentValidationError[], options?: ErrorOptions) {
     super(
       "invalid-snapshot",
@@ -2391,6 +2424,10 @@ export function validateDocumentOperationShape(
       validateCalculationShape(ownValue(operation, "calculation"), `${path}.calculation`, errors);
       break;
 
+    case "setExternalLinks":
+      validateExternalLinksShape(ownValue(operation, "links"), `${path}.links`, errors);
+      break;
+
     case "setMeasure":
       validateMeasureShape(ownValue(operation, "measure"), `${path}.measure`, errors);
       break;
@@ -2773,9 +2810,11 @@ function validateXlsxSource(value: unknown, errors: DocumentValidationError[]): 
       invalid(errors, `${graphPath}.cacheId`, "cacheId must be an unsigned integer string");
     }
 
-    const queries = ownValue(graph, "queries");
-    if (queries !== undefined && (typeof queries !== "string" || !/^[0-9a-f]{16}$/.test(queries))) {
-      invalid(errors, `${graphPath}.queries`, "queries must be a 64-bit hex digest");
+    for (const key of ["queries", "externalLink"]) {
+      const digest = ownValue(graph, key);
+      if (digest !== undefined && (typeof digest !== "string" || !/^[0-9a-f]{16}$/.test(digest))) {
+        invalid(errors, `${graphPath}.${key}`, `${key} must be a 64-bit hex digest`);
+      }
     }
 
     const unsupportedPath = `${graphPath}.unsupportedQueries`;
@@ -2969,6 +3008,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     const queries = ownValue(workbook, "queries");
     if (queries !== undefined) {
       validateSavedQueriesShape(queries, "workbook.queries", errors);
+    }
+
+    const externalLinks = ownValue(workbook, "externalLinks");
+    if (externalLinks !== undefined) {
+      validateExternalLinksShape(externalLinks, "workbook.externalLinks", errors);
     }
   }
 
@@ -3457,7 +3501,11 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
   };
 }
 
-/** Validate and canonically order a schema-1 snapshot without hydrating runtime state. */
+/**
+ * Validate and canonically order a schema-1 snapshot without hydrating runtime state.
+ *
+ * @param input - A snapshot from outside your code, such as parsed JSON.
+ */
 export function validateWorkbookSnapshot(
   input: unknown,
   options: SnapshotValidationOptions = {},
@@ -3488,7 +3536,12 @@ export function validateWorkbookSnapshot(
   }
 }
 
-/** Exhaustive stable target identity used by persistence/logging layers. */
+/**
+ * Exhaustive stable target identity used by persistence/logging layers.
+ *
+ * @returns The stable ID of the sheet the operation changes; for workbook-level
+ *   operations, a key such as a defined name, `query:<id>` or `calculation`.
+ */
 export function documentOpTarget(operation: DocumentOp): string {
   switch (operation.op) {
     case "set":
@@ -3550,6 +3603,9 @@ export function documentOpTarget(operation: DocumentOp): string {
 
     case "setCalculation":
       return "calculation";
+
+    case "setExternalLinks":
+      return "external-links";
 
     case "setMeasure":
       return `measure:${operation.measure.id}`;

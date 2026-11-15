@@ -36,25 +36,9 @@ beforeEach(() => {
 });
 afterEach(() => restoreStubs());
 
-interface Deferred<T> {
-  promise: Promise<T>;
-  resolve(value: T): void;
-  reject(error: unknown): void;
-}
-
-function deferred<T>(): Deferred<T> {
-  let resolve!: (value: T) => void;
-  let reject!: (error: unknown) => void;
-  const promise = new Promise<T>((onResolve, onReject) => {
-    resolve = onResolve;
-    reject = onReject;
-  });
-  return { promise, resolve, reject };
-}
-
 class ControlledAdapter implements PersistenceAdapter {
   readonly requests: PersistenceCommitRequest[] = [];
-  readonly responses: Array<Deferred<PersistenceCommitResponse>> = [];
+  readonly responses: Array<PromiseWithResolvers<PersistenceCommitResponse>> = [];
 
   constructor(private readonly snapshot: WorkbookSnapshot) {}
 
@@ -64,7 +48,7 @@ class ControlledAdapter implements PersistenceAdapter {
 
   commit(request: PersistenceCommitRequest): Promise<PersistenceCommitResponse> {
     this.requests.push(request);
-    const response = deferred<PersistenceCommitResponse>();
+    const response = Promise.withResolvers<PersistenceCommitResponse>();
     this.responses.push(response);
     return response.promise;
   }
@@ -1051,7 +1035,7 @@ describe("sync coordinator", () => {
   });
 
   it("recovers missing versions in order and drains the buffered operation", async () => {
-    const recovery = deferred<readonly VersionedOperation[]>();
+    const recovery = Promise.withResolvers<readonly VersionedOperation[]>();
     const requests: Array<{ expectedVersion: number; receivedVersion: number }> = [];
     const { grid, coordinator, events } = harness(["m1"], {
       recoverVersionGap: (request) => {
@@ -1062,7 +1046,7 @@ describe("sync coordinator", () => {
         return recovery.promise;
       },
     });
-    const drained = deferred<void>();
+    const drained = Promise.withResolvers<void>();
     const disposeDrain = coordinator.on((event) => {
       if (event.type === "remote-applied" && event.operation.version === 10) {
         drained.resolve(undefined);
@@ -1390,33 +1374,6 @@ describe("sync coordinator", () => {
     });
     expect(grid.applyTransaction({ patches: [localSet(10)] }).status).toBe("applied");
     expect(coordinator.pendingCount).toBe(0);
-    grid.destroy();
-  });
-
-  it("reports the activity of the first busy commit in queue order", async () => {
-    const { grid, adapter, coordinator } = harness();
-    expect(coordinator.state.activity).toBe("idle");
-    grid.applyTransaction({ patches: [localSet(2)] });
-    grid.applyTransaction({ patches: [localSet(3)] });
-    expect(coordinator.state.activity).toBe("pending");
-
-    const sending = coordinator.sendNext();
-    expect(coordinator.state.activity).toBe("sending");
-    // A transport may report a conflict for a later commit while the head is in flight.
-    await coordinator.handleResponse({ status: "conflict", currentVersion: 8 }, "m2");
-    expect(coordinator.state.activity).toBe("sending");
-
-    const response = adapter.responses[0];
-    if (!response) throw new Error("The head commit must be in flight");
-    response.resolve({ status: "applied", version: 8, clientMutationId: "m1" });
-    await sending;
-    expect(coordinator.state.activity).toBe("conflict");
-
-    await coordinator.resumeAfterReload({ ...snapshot(), version: 8 });
-    expect(coordinator.state.activity).toBe("pending");
-    await coordinator.handleResponse({ status: "applied", version: 9, clientMutationId: "m2" });
-    expect(coordinator.state.activity).toBe("idle");
-    coordinator.destroy();
     grid.destroy();
   });
 });

@@ -1,7 +1,7 @@
 //! A bounded lexer and parser for the M expression subset that saved queries use,
 //! following the M language specification:
-//! https://learn.microsoft.com/powerquery-m/m-spec-lexical-structure
-//! https://learn.microsoft.com/powerquery-m/m-spec-consolidated-grammar
+//! <https://learn.microsoft.com/powerquery-m/m-spec-lexical-structure>
+//! <https://learn.microsoft.com/powerquery-m/m-spec-consolidated-grammar>
 //!
 //! The parser builds a syntax tree and nothing else. Forms outside the subset
 //! (functions, `if`, `try`, `meta`, and others) are syntax the importer reports
@@ -25,6 +25,9 @@ enum Token {
     Symbol(&'static str),
 }
 
+/// A token and its byte range in the section text.
+type Spanned = (Token, Range<usize>);
+
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Expr {
     Null,
@@ -32,21 +35,21 @@ pub(crate) enum Expr {
     Number(f64),
     Text(String),
     Identifier(String),
-    List(Vec<Expr>),
-    Record(Vec<(String, Expr)>),
+    List(Vec<Self>),
+    Record(Vec<(String, Self)>),
     /// `target[name]`; an implicit `[name]` inside `each` has no target.
-    Field(Option<Box<Expr>>, String),
+    Field(Option<Box<Self>>, String),
     /// `target{selector}`
-    Item(Box<Expr>, Box<Expr>),
-    Call(Box<Expr>, Vec<Expr>),
-    Each(Box<Expr>),
-    Let(Vec<(String, Expr)>, Box<Expr>),
-    Not(Box<Expr>),
-    Negate(Box<Expr>),
-    Binary(&'static str, Box<Expr>, Box<Expr>),
+    Item(Box<Self>, Box<Self>),
+    Call(Box<Self>, Vec<Self>),
+    Each(Box<Self>),
+    Let(Vec<(String, Self)>, Box<Self>),
+    Not(Box<Self>),
+    Negate(Box<Self>),
+    Binary(&'static str, Box<Self>, Box<Self>),
     /// A primitive type such as `type text`, with `nullable` folded in.
     Type(String),
-    Error(Box<Expr>),
+    Error(Box<Self>),
 }
 
 /// One section member with the byte range of its text.
@@ -142,7 +145,7 @@ impl Lexer<'_> {
                 "tab" => value.push('\t'),
                 "#" => value.push('#'),
                 hex if hex.len() == SHORT_ESCAPE_DIGITS || hex.len() == LONG_ESCAPE_DIGITS => {
-                    let code = u32::from_str_radix(hex, HEX_RADIX).map_err(|_| "syntax")?;
+                    let code = u32::from_str_radix(hex, HEX_RADIX).ok().ok_or("syntax")?;
                     value.push(char::from_u32(code).ok_or("syntax")?);
                 }
                 _ => return Err("syntax"),
@@ -168,7 +171,8 @@ impl Lexer<'_> {
             let hex = self.text.get(digits..self.offset).ok_or("syntax")?;
             return u64::from_str_radix(hex, HEX_RADIX)
                 .map(|value| value as f64)
-                .map_err(|_| "syntax");
+                .ok()
+                .ok_or("syntax");
         }
 
         while self
@@ -208,17 +212,12 @@ impl Lexer<'_> {
         let token = self.text.get(start..self.offset).ok_or("syntax")?;
         token
             .parse::<f64>()
-            .map_err(|_| "syntax")
-            .and_then(|value| {
-                if value.is_finite() {
-                    Ok(value)
-                } else {
-                    Err("syntax")
-                }
-            })
+            .ok()
+            .filter(|value| value.is_finite())
+            .ok_or("syntax")
     }
 
-    fn next(&mut self) -> Result<Option<(Token, Range<usize>)>, &'static str> {
+    fn next(&mut self) -> Result<Option<Spanned>, &'static str> {
         self.skip_trivia()?;
         let start = self.offset;
         let Some(character) = self.peek() else {
@@ -276,7 +275,7 @@ impl Lexer<'_> {
     }
 }
 
-fn tokenize(text: &str) -> Result<Vec<(Token, Range<usize>)>, &'static str> {
+fn tokenize(text: &str) -> Result<Vec<Spanned>, &'static str> {
     let mut lexer = Lexer { text, offset: 0 };
     let mut tokens = Vec::new();
 
@@ -293,7 +292,7 @@ fn tokenize(text: &str) -> Result<Vec<(Token, Range<usize>)>, &'static str> {
 
 struct Parser<'a> {
     text: &'a str,
-    tokens: &'a [(Token, Range<usize>)],
+    tokens: &'a [Spanned],
     position: usize,
     depth: usize,
 }
@@ -333,7 +332,7 @@ impl Parser<'_> {
         }
     }
 
-    fn enter(&mut self) -> Result<(), &'static str> {
+    const fn enter(&mut self) -> Result<(), &'static str> {
         self.depth += 1;
         if self.depth > MAX_DEPTH {
             Err("limit")
@@ -344,8 +343,8 @@ impl Parser<'_> {
 
     fn identifier(&mut self) -> Result<String, &'static str> {
         match self.peek() {
-            Some(Token::Identifier(name)) => {
-                let name = name.clone();
+            Some(Token::Identifier(found)) => {
+                let name = found.clone();
                 self.position += 1;
                 Ok(name)
             }
@@ -356,10 +355,10 @@ impl Parser<'_> {
     /// A generalized identifier: the source text up to `]`, `=` or `,`, with
     /// blanks between parts kept, as in `[First Name]`.
     fn generalized(&mut self) -> Result<String, &'static str> {
-        if let (Some(Token::Identifier(name)), Some(Token::Symbol("]" | "=" | ","))) =
+        if let (Some(Token::Identifier(found)), Some(Token::Symbol("]" | "=" | ","))) =
             (self.peek(), self.peek_at(1))
         {
-            let name = name.clone();
+            let name = found.clone();
             self.position += 1;
             return Ok(name);
         }
@@ -443,7 +442,7 @@ impl Parser<'_> {
 
         let mut left = self.binary(level + 1)?;
         loop {
-            let operator = match self.peek() {
+            let matched = match self.peek() {
                 Some(Token::Symbol(symbol)) => {
                     operators.iter().find(|candidate| **candidate == *symbol)
                 }
@@ -452,7 +451,7 @@ impl Parser<'_> {
                 }
                 _ => None,
             };
-            let Some(operator) = operator.copied() else {
+            let Some(operator) = matched.copied() else {
                 return Ok(left);
             };
 
@@ -470,7 +469,7 @@ impl Parser<'_> {
             self.enter()?;
             let operand = self.unary();
             self.depth -= 1;
-            return operand.map(|operand| Expr::Not(Box::new(operand)));
+            return operand.map(|inner| Expr::Not(Box::new(inner)));
         }
 
         if self.is_symbol("-") {
@@ -478,7 +477,7 @@ impl Parser<'_> {
             self.enter()?;
             let operand = self.unary();
             self.depth -= 1;
-            return operand.map(|operand| Expr::Negate(Box::new(operand)));
+            return operand.map(|inner| Expr::Negate(Box::new(inner)));
         }
 
         self.postfix()
@@ -580,9 +579,9 @@ impl Parser<'_> {
             },
             Token::Symbol("(") => {
                 self.enter()?;
-                let inner = self.expression();
+                let parsed = self.expression();
                 self.depth -= 1;
-                let inner = inner?;
+                let inner = parsed?;
                 self.expect(")")?;
                 Ok(inner)
             }
@@ -659,7 +658,8 @@ pub(crate) fn parse_section(text: &str) -> Result<Vec<Member>, &'static str> {
                     Token::Symbol("(" | "[" | "{") => nesting += 1,
                     Token::Symbol(")" | "]" | "}") => nesting = nesting.saturating_sub(1),
                     Token::Symbol(";") if nesting == 0 => break,
-                    _ => {}
+                    Token::Symbol(_) | Token::Identifier(_) | Token::Text(_) | Token::Number(_) => {
+                    }
                 }
                 parser.position += 1;
             }

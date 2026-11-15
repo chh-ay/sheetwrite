@@ -1,7 +1,9 @@
 //! `GETPIVOTDATA(data_field, pivot_table, [field1, item1, ...])`: a value
 //! cell of a pivot table, named by its data field and row and column items.
 
-use crate::calc::Ast;
+use std::borrow::Cow;
+
+use crate::calc::{Ast, Func};
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -9,7 +11,22 @@ use super::super::matrix::range_from_ast;
 use super::super::value::text_from_value;
 use super::super::{EvalPass, EvalResult};
 
-pub(crate) const NAMES: &[&str] = &["GETPIVOTDATA"];
+family_functions! {
+    GETPIVOTDATA,
+}
+
+/// Whether `ast` calls GETPIVOTDATA anywhere.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
+pub(crate) fn ast_calls_pivot_data(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
+        Ast::NamedFormula(named) => ast_calls_pivot_data(&named.expression),
+        _ => ast.any_child(&mut ast_calls_pivot_data),
+    }
+}
 
 /// The data field and the pivot reference come before the pairs.
 const FIXED_ARGUMENTS: usize = 2;
@@ -18,7 +35,7 @@ const MAX_PAIRS: usize = 126;
 
 pub(crate) fn evaluate_ast(
     store: &CellStore,
-    _name: &str,
+    _: Function,
     args: &[Ast],
     sheet: usize,
     pass: &mut EvalPass<'_>,
@@ -43,7 +60,7 @@ fn pivot_data(
     }
 
     let text = |ast: &Ast, pass: &mut EvalPass<'_>| {
-        text_from_value(&store.eval_ast(ast, sheet, pass, depth + 1))
+        text_from_value(&store.eval_ast(ast, sheet, pass, depth + 1)).map(Cow::into_owned)
     };
     let data_field = text(&args[0], pass)?;
 
@@ -54,18 +71,20 @@ fn pivot_data(
         None => {
             return match store.eval_ast(&args[1], sheet, pass, depth + 1) {
                 Value::Error(error) => Err(error),
-                _ => Err(FormulaError::Ref),
+                Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank => {
+                    Err(FormulaError::Ref)
+                }
             }
         }
     };
 
     let mut items = Vec::with_capacity(pair_arguments / 2);
     let (pairs, _) = args[FIXED_ARGUMENTS..].as_chunks::<2>();
-    for [field, item] in pairs {
-        let field = text(field, pass)?;
-        let item = match store.eval_ast(item, sheet, pass, depth + 1) {
+    for [field_ast, item_ast] in pairs {
+        let field = text(field_ast, pass)?;
+        let item = match store.eval_ast(item_ast, sheet, pass, depth + 1) {
             Value::Error(error) => return Err(error),
-            item => item,
+            item @ (Value::Number(_) | Value::Text(_) | Value::Bool(_) | Value::Blank) => item,
         };
         items.push((field, item));
     }

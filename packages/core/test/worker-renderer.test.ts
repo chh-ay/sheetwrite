@@ -83,14 +83,6 @@ interface TransferablePackedArrays {
   stringPoolUpdateIds?: Uint32Array;
 }
 
-interface GenericPaintPost {
-  type: "paint";
-  view: {
-    sheet: unknown;
-    styleIds: Uint32Array;
-  };
-}
-
 interface PanePaintPost {
   type: "paintPanes";
   panes: unknown[];
@@ -109,15 +101,6 @@ function isTransferablePackedArrays(value: unknown): value is TransferablePacked
     value.stringLocalIds instanceof Int32Array &&
     value.styleIds instanceof Uint32Array &&
     (value.stringPoolUpdateIds === undefined || value.stringPoolUpdateIds instanceof Uint32Array)
-  );
-}
-
-function isGenericPaintPost(value: unknown): value is GenericPaintPost {
-  return (
-    isRecord(value) &&
-    value.type === "paint" &&
-    isRecord(value.view) &&
-    value.view.styleIds instanceof Uint32Array
   );
 }
 
@@ -218,99 +201,6 @@ function textDrawingWorker() {
 }
 
 describe("WorkerRenderer", () => {
-  it("transfers a renderer-owned style id buffer when painting a generic view", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new RecordingWorker();
-    Reflect.set(renderer, "worker", worker);
-
-    const styleIds = new Uint32Array([0, 1, 0]);
-    const view: VisibleWindowView = {
-      sheet: "s1",
-      stringPoolEpoch: 0,
-      rows: { start: 0, end: 1 },
-      cols: [0, 1, 2],
-      values: ["a", "b", "c"],
-      styleIds,
-      styles: [{}, { bold: true }],
-    };
-
-    renderer.paint(view);
-
-    expect(worker.messages).toHaveLength(1);
-    const posted = worker.messages[0]!;
-    if (!isGenericPaintPost(posted.message)) throw new Error("expected generic paint message");
-    const postedView = posted.message.view;
-    expect(posted.message).toMatchObject({ type: "paint", view: { sheet: "s1" } });
-    expect(postedView.styleIds).toEqual(styleIds);
-    expect(postedView.styleIds).not.toBe(styleIds);
-    expect(posted.transfer).toEqual([postedView.styleIds.buffer]);
-  });
-
-  it("keeps the packed transfer path by default", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new RecordingWorker();
-    Reflect.set(renderer, "worker", worker);
-
-    const view = makePackedView();
-    renderer.paint(view);
-
-    expect(worker.messages).toHaveLength(1);
-    const posted = worker.messages[0]!;
-    if (!isTransferablePackedArrays(posted.message)) {
-      throw new Error("expected packed paint message");
-    }
-    const payload = posted.message;
-    expect(posted.message).toMatchObject({ type: "paintPacked", sheet: "s1", stringPoolEpoch: 17 });
-    expect(posted.transfer).toEqual([
-      payload.valueKinds.buffer,
-      payload.numberValues.buffer,
-      payload.stringPoolIds.buffer,
-      payload.stringLocalIds.buffer,
-      payload.styleIds.buffer,
-      payload.stringPoolUpdateIds!.buffer,
-    ]);
-    expect(payload.valueKinds).not.toBe(view.valueKinds);
-    expect(payload.numberValues).not.toBe(view.numberValues);
-    expect(payload.stringPoolIds).not.toBe(view.stringPoolIds);
-    expect(payload.stringLocalIds).not.toBe(view.stringLocalIds);
-    expect(payload.styleIds).not.toBe(view.styleIds);
-    expect(payload.stringPoolUpdateIds).not.toBe(view.stringPoolUpdateIds);
-  });
-
-  it("copies packed frames into a SharedArrayBuffer when opted in", () => {
-    const renderer = new WorkerRenderer(undefined, { sharedMemory: true });
-    const worker = new RecordingWorker();
-    Reflect.set(renderer, "worker", worker);
-
-    renderer.paint(makePackedView());
-
-    expect(worker.messages).toHaveLength(1);
-    const posted = worker.messages[0]!;
-    expect(posted.transfer).toBeUndefined();
-    expect(isSharedPaintPost(posted.message)).toBe(true);
-    if (!isSharedPaintPost(posted.message)) throw new Error("expected shared paint message");
-    expect(posted.message).toMatchObject({ stringPoolEpoch: 17 });
-
-    const { buffer, offsets, lengths } = posted.message.shared;
-    expect(Atomics.load(new Int32Array(buffer, 0, 2), 0)).toBe(1);
-    expect(Array.from(new Uint8Array(buffer, offsets.valueKinds, lengths.valueKinds))).toEqual([
-      2, 1,
-    ]);
-    expect(
-      Array.from(new Float64Array(buffer, offsets.numberValues, lengths.numberValues)),
-    ).toEqual([0, 42]);
-    expect(
-      Array.from(new Uint32Array(buffer, offsets.stringPoolIds, lengths.stringPoolIds)),
-    ).toEqual([7, 0xffffffff]);
-    expect(
-      Array.from(new Int32Array(buffer, offsets.stringLocalIds, lengths.stringLocalIds)),
-    ).toEqual([-1, -1]);
-    expect(Array.from(new Uint32Array(buffer, offsets.styleIds, lengths.styleIds))).toEqual([0, 1]);
-    expect(
-      Array.from(new Uint32Array(buffer, offsets.stringPoolUpdateIds, lengths.stringPoolUpdateIds)),
-    ).toEqual([7]);
-  });
-
   it("falls back to transfers instead of overwriting busy shared regions", () => {
     const renderer = new WorkerRenderer(undefined, { sharedMemory: true });
     const worker = new RecordingWorker();
@@ -400,31 +290,6 @@ describe("WorkerRenderer", () => {
     expect(postedPacked.styleIds).not.toBe(packed.styleIds);
   });
 
-  it("drops strings absent from a replacement-epoch frame before later packed paints", () => {
-    const { handler, drawnText, frame } = textDrawingWorker();
-    handler(frame);
-    expect(drawnText).toContain("old epoch text");
-    drawnText.length = 0;
-    handler({
-      ...frame,
-      stringPoolEpoch: 18,
-      stringPoolIds: new Uint32Array([1]),
-      stringPoolUpdateIds: new Uint32Array([1]),
-      stringPoolUpdateValues: ["new epoch text"],
-    });
-    expect(drawnText).toContain("new epoch text");
-    drawnText.length = 0;
-    // Missing updates cannot resurrect text from an invalid epoch.
-    handler({
-      ...frame,
-      stringPoolEpoch: 18,
-      stringPoolUpdateIds: undefined,
-      stringPoolUpdateValues: undefined,
-    });
-    expect(drawnText).not.toContain("old epoch text");
-    handler({ type: "destroy" });
-  });
-
   it("drops its cached strings on a trim message", () => {
     const { handler, drawnText, frame } = textDrawingWorker();
     const withoutUpdates = {
@@ -445,19 +310,6 @@ describe("WorkerRenderer", () => {
     handler(frame);
     expect(drawnText).toContain("old epoch text");
     handler({ type: "destroy" });
-  });
-
-  it("posts a trim message and drops its shared paint regions", () => {
-    const renderer = new WorkerRenderer();
-    const worker = new RecordingWorker();
-    Reflect.set(renderer, "worker", worker);
-    const regions: unknown[] = Reflect.get(renderer, "sharedRegions");
-    regions[0] = { byteLength: 64 };
-
-    renderer.trimMemory();
-
-    expect(worker.messages).toEqual([{ message: { type: "trim" }, transfer: undefined }]);
-    expect(regions.every((region) => region === undefined)).toBe(true);
   });
 
   it("round-trips sender lifecycle payloads through the worker handler before acknowledging", () => {

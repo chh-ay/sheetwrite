@@ -1,11 +1,13 @@
 import {
+  type CellFormat,
+  type CellScalar,
   type CellStyle,
   type Column,
   createGrid,
   type DocumentOp,
   type Grid,
   initSheetwrite,
-  parseDateInput,
+  parseCellLiteralInput,
   type Workbook,
 } from "@sheetwrite/core";
 
@@ -29,6 +31,7 @@ import type { PanePaint } from "../../packages/core/src/types/render.js";
 import "handsontable/styles/handsontable.css";
 import "handsontable/styles/ht-theme-main.css";
 import {
+  type BenchColumn,
   COL,
   COLUMNS,
   type ColumnarDataset,
@@ -72,6 +75,7 @@ import {
   type WindowTransferCounters,
   WRAP_HEAVY_TEXT_LENGTH,
   WRAP_HEAVY_TEXT_PREFIX,
+  WRAP_UNICODE_CELL,
 } from "./render-scenarios.js";
 
 const SHEET = "bench";
@@ -121,12 +125,17 @@ function dispatchKey(element: Element, key: string): void {
   element.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
 
+/** The date column is typed in Sheetwrite, so its ISO text ingests as date serials. */
+function sheetwriteColumnType(column: BenchColumn): CellFormat {
+  return column.key === "date" ? "date" : column.type;
+}
+
 function makeWorkbook(rowCount: number): Workbook {
   const columns: Column[] = COLUMNS.map((column) => ({
     key: column.key,
     header: column.header,
     width: column.width,
-    type: column.key === "date" ? "date" : column.type,
+    type: sheetwriteColumnType(column),
     numberFormat:
       column.key === "amount"
         ? AMOUNT_NUMBER_FORMAT
@@ -143,6 +152,20 @@ function datasetValueAt(dataset: ColumnarDataset, row: number, col: number): str
   if (col === 2) return dataset.customer[row]!;
   if (col === 3) return dataset.city[row]!;
   return dataset.amount[row]!;
+}
+
+/**
+ * The value Sheetwrite's column-aware ingest holds for a dataset cell. Restores
+ * write this rather than the dataset text, so a restored cell matches a freshly
+ * loaded one and no scenario depends on which scenarios ran before it.
+ */
+function ingestedValueAt(dataset: ColumnarDataset, row: number, col: number): CellScalar {
+  const column = COLUMNS[col];
+  if (!column) throw new RangeError(`benchmark column ${col} is missing`);
+  const value = datasetValueAt(dataset, row, col);
+  return typeof value === "string"
+    ? parseCellLiteralInput(value, sheetwriteColumnType(column))
+    : value;
 }
 
 /** Signature of the built-in renderer's frozen-pane paint hook. */
@@ -176,7 +199,6 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   private textHeavyRows = 0;
   private wrapHeavyRows = 0;
   private searchMatchRows = 0;
-  private dateSerialRows = 0;
   private conditionalFormatRows = 0;
   private frozenPaneProbeArmed = false;
   private frozenPaneProbeState: FrozenPaneProbe = emptyFrozenPaneProbe();
@@ -189,6 +211,9 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     copiedBytes: 0,
     outputAllocationEvents: 0,
   };
+  /** Canvas frames the renderer has drawn; `repaint()` fails when one call draws none. */
+  private canvasFrames = 0;
+  private readWindows!: { invalidateData(): void };
   constructor(
     dataset: ColumnarDataset,
     private readonly windowTransferDiagnostic: boolean,
@@ -213,7 +238,46 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
       workbook: makeWorkbook(this.initialRowCount),
       data: this.data,
     });
+    this.installFrameCounter();
     if (this.windowTransferDiagnostic) this.installWindowTransferDiagnostic();
+  }
+
+  /**
+   * Resolve the internals `repaint()` drives and count every canvas frame. An
+   * internal that was renamed or removed fails the mount instead of turning a
+   * timed repaint into a no-op.
+   */
+  private installFrameCounter(): void {
+    const readWindows: unknown = Reflect.get(this.grid, "readWindows");
+    if (
+      typeof readWindows !== "object" ||
+      readWindows === null ||
+      typeof Reflect.get(readWindows, "invalidateData") !== "function"
+    ) {
+      throw new Error("repaint requires the grid's read-window controller");
+    }
+    this.readWindows = readWindows as { invalidateData(): void };
+    const renderer = Reflect.get(this.grid, "renderer") as
+      | {
+          paint?: (view: InstrumentedVisibleWindowView) => void;
+          paintPanes?: PanePaintFn;
+        }
+      | undefined;
+    if (!renderer || typeof renderer.paint !== "function") {
+      throw new Error("repaint requires a canvas renderer");
+    }
+    const paint = renderer.paint.bind(renderer);
+    renderer.paint = (view) => {
+      this.canvasFrames++;
+      paint(view);
+    };
+    if (typeof renderer.paintPanes === "function") {
+      const paintPanes = renderer.paintPanes.bind(renderer);
+      renderer.paintPanes = (panes, divider) => {
+        this.canvasFrames++;
+        paintPanes(panes, divider);
+      };
+    }
   }
 
   private installWindowTransferDiagnostic(): void {
@@ -360,12 +424,25 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
   }
 
   insertRows(at: number, count: number): void {
-    this.grid.store.applyTransaction({ patches: [{ op: "addRows", sheet: SHEET, at, count }] });
-    this.grid.refresh();
+    this.applyRowEdit({ op: "addRows", sheet: SHEET, at, count });
   }
 
   removeRows(at: number, count: number): void {
-    this.grid.store.applyTransaction({ patches: [{ op: "removeRows", sheet: SHEET, at, count }] });
+    this.applyRowEdit({ op: "removeRows", sheet: SHEET, at, count });
+  }
+
+  /** A row edit the store refuses fails the scenario instead of timing a no-op. */
+  private applyRowEdit(patch: DocumentOp): void {
+    const result = this.grid.store.applyTransaction({ patches: [patch] });
+    if (result.status !== "applied") {
+      const detail =
+        result.status === "rejected"
+          ? result.issues.map((issue) => issue.message).join("; ")
+          : result.status === "noop"
+            ? result.reason
+            : "conflict";
+      throw new Error(`${patch.op} was ${result.status}: ${detail}`);
+    }
     this.grid.refresh();
   }
 
@@ -373,13 +450,16 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
     resetNumberFormatResourcesForTest();
   }
 
+  /**
+   * One full frame, as `hot.render()` re-renders every visible cell from its
+   * data: the visible window is read again and the canvas painted. Fails when
+   * the call draws no canvas frame, so a timed repaint can never be a no-op.
+   */
   repaint(): void {
+    const before = this.canvasFrames;
+    this.readWindows.invalidateData();
     this.grid.refresh();
-    const coordinator = Reflect.get(this.grid, "renderCoordinator") as
-      | { invalidate(): void; renderNow(): void }
-      | undefined;
-    coordinator?.invalidate();
-    coordinator?.renderNow();
+    if (this.canvasFrames === before) throw new Error("repaint drew no canvas frame");
   }
 
   formattedSentinels(): readonly [string, string] {
@@ -426,7 +506,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
         });
       }
     }
@@ -456,7 +536,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
         });
       }
     }
@@ -495,12 +575,35 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
         patches.push({
           op: "set",
           addr: { sheet: SHEET, row, col },
-          value: { kind: "literal", value: datasetValueAt(this.dataset, row, col) },
+          value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
         });
       }
     }
     this.wrapHeavyRows = 0;
     this.applyPatches(patches);
+  }
+
+  installWrapUnicode(text: string): void {
+    const { row, col } = WRAP_UNICODE_CELL;
+    this.applyPatches([
+      {
+        op: "set",
+        addr: { sheet: SHEET, row, col },
+        value: { kind: "literal", value: text },
+        style: { wrap: true },
+      },
+    ]);
+  }
+
+  clearWrapUnicode(): void {
+    const { row, col } = WRAP_UNICODE_CELL;
+    this.applyPatches([
+      {
+        op: "set",
+        addr: { sheet: SHEET, row, col },
+        value: { kind: "literal", value: ingestedValueAt(this.dataset, row, col) },
+      },
+    ]);
   }
 
   installSearchMatches(rowCount: number): void {
@@ -664,43 +767,6 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
       { type: "number", numberFormat: AMOUNT_NUMBER_FORMAT, numberLocale: NUMBER_LOCALE },
       column.width,
     );
-  }
-
-  /**
-   * Write the date column back as UTC serials. Earlier fixture restores leave the
-   * ingested ISO text in those cells, which the paint path prints verbatim; the
-   * serial is what the store's own column-aware ingest produces.
-   */
-  installDateSerials(rowCount: number): void {
-    this.dateSerialRows = Math.min(rowCount, this.initialRowCount - 1);
-    const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.dateSerialRows; row++) {
-      const text = this.dataset.date[row];
-      const serial = typeof text === "string" ? parseDateInput(text) : null;
-      if (serial === null) continue;
-      patches.push({
-        op: "set",
-        addr: { sheet: SHEET, row, col: COL.date },
-        value: { kind: "literal", value: serial },
-      });
-    }
-    this.applyPatches(patches);
-  }
-
-  clearDateSerials(): void {
-    if (this.dateSerialRows === 0) return;
-    const patches: DocumentOp[] = [];
-    for (let row = 1; row <= this.dateSerialRows; row++) {
-      const text = this.dataset.date[row];
-      if (text === undefined) continue;
-      patches.push({
-        op: "set",
-        addr: { sheet: SHEET, row, col: COL.date },
-        value: { kind: "literal", value: text },
-      });
-    }
-    this.dateSerialRows = 0;
-    this.applyPatches(patches);
   }
 
   /**

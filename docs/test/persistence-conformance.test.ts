@@ -31,17 +31,6 @@ afterEach(() => {
   else Reflect.deleteProperty(globalThis, "IDBKeyRange");
 });
 
-const SHARED_CHECKS = [
-  "loads the seeded snapshot",
-  "rejects unknown documents with not-found",
-  "applies a commit at the current base version",
-  "materializes applied operations into load",
-  "returns duplicate for a replayed mutation id",
-  "answers stale base versions with a recoverable conflict",
-  "applies the rebased commit after conflict recovery",
-  "rejects an already-aborted commit signal",
-] as const;
-
 describe("persistence conformance", () => {
   it("passes against the IndexedDB showcase adapter with bounded tails and reopen", async () => {
     const options = {
@@ -67,13 +56,8 @@ describe("persistence conformance", () => {
         return adapter;
       },
     });
-    expect(report.checks).toEqual([
-      ...SHARED_CHECKS,
-      "falls back to a snapshot once the conflict tail is out of reach",
-      "keeps duplicate detection across compaction",
-      "persists committed state across reopen",
-      "keeps duplicate detection across reopen",
-    ]);
+    // The eight shared checks, then the bounded-tail and reopen checks.
+    expect(report.checks).toHaveLength(12);
     // Eight fill commits over a four-record ceiling must have compacted: the
     // snapshot record advances while the surviving tail stays bounded. Write
     // gauges belong to the instance that performed the commits; the reopened

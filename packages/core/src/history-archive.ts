@@ -78,11 +78,8 @@ export type {
   HistoryDiffSheet,
 } from "./version-history/diff.js";
 export type { HistoryRestoreOptions, HistoryRestoreScope } from "./version-history/restore.js";
-export { createHistoryCommands } from "./version-history/history-ui.js";
-export type {
-  HistoryCommandsOptions,
-  HistoryPanelArchive,
-} from "./version-history/panel-contract.js";
+export { historyAddon } from "./version-history/history-ui.js";
+export type { HistoryAddonOptions, HistoryPanelArchive } from "./version-history/panel-contract.js";
 export { MemoryHistoryStorage } from "./version-history/storage.js";
 export type {
   HistoryArchiveOptions,
@@ -524,6 +521,7 @@ export class HistoryArchive {
   private manifest: HistoryManifest;
   private lock = Promise.resolve();
 
+  /** Private: use `HistoryArchive.open`. */
   private constructor(
     options: HistoryArchiveOptions,
     limits: Readonly<HistoryLimits>,

@@ -45,10 +45,11 @@ export const sheetwriteTableImportBackend: XlsxTableImportBackend = {
       const keys = headerKeys(header);
       const rowCount = Math.max(0, sheet.rowCount - 1);
       assertResource(context, "maxCells", rowCount * keys.length);
-      for (const key of keys) columns[key] = new Array<CellScalar>(rowCount).fill(null);
-      for (let row = 0; row < rowCount; row++) {
-        for (let col = 0; col < keys.length; col++) {
-          columns[keys[col]!]![row] = values.get((row + 1) * sheet.columns.length + col) ?? null;
+      for (const [col, key] of keys.entries()) {
+        const output = new Array<CellScalar>(rowCount).fill(null);
+        columns[key] = output;
+        for (let row = 0; row < rowCount; row++) {
+          output[row] = values.get((row + 1) * sheet.columns.length + col) ?? null;
         }
       }
       return { rowCount, columns };

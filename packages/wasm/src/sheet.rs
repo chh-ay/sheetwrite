@@ -107,8 +107,10 @@ impl SheetData {
             return;
         }
 
-        if let (Ok(row), Ok(col)) = (u32::try_from(row), u32::try_from(col)) {
-            let dirty = self.spill.detach_source((row, col), &mut self.cells);
+        if let (Ok(cell_row), Ok(cell_col)) = (u32::try_from(row), u32::try_from(col)) {
+            let dirty = self
+                .spill
+                .detach_source((cell_row, cell_col), &mut self.cells);
             self.formulas.mark_cells_dirty(dirty);
         }
     }
@@ -133,12 +135,12 @@ impl SheetData {
         count: usize,
         slots: &mut FormulaStore,
     ) -> Result<(), String> {
-        let at = at.min(self.cells.row_count());
-        self.cells.insert_rows(at, count)?;
+        let clamped_at = at.min(self.cells.row_count());
+        self.cells.insert_rows(clamped_at, count)?;
         if count != 0 {
             self.formulas
-                .insert_rows(sheet, at as u32, count as u32, slots);
-            self.visibility.insert_rows(at as u32, count as u32);
+                .insert_rows(sheet, clamped_at as u32, count as u32, slots);
+            self.visibility.insert_rows(clamped_at as u32, count as u32);
         }
         Ok(())
     }
@@ -156,11 +158,11 @@ impl SheetData {
             return Ok(());
         }
 
-        let count = count.min(extent - at);
-        self.cells.delete_rows(at, count)?;
+        let clamped_count = count.min(extent - at);
+        self.cells.delete_rows(at, clamped_count)?;
         self.formulas
-            .delete_rows(sheet, at as u32, count as u32, slots);
-        self.visibility.delete_rows(at as u32, count as u32);
+            .delete_rows(sheet, at as u32, clamped_count as u32, slots);
+        self.visibility.delete_rows(at as u32, clamped_count as u32);
         Ok(())
     }
 
@@ -172,11 +174,11 @@ impl SheetData {
         count: usize,
         slots: &mut FormulaStore,
     ) -> Result<(), String> {
-        let at = at.min(self.cells.n_cols());
-        self.cells.insert_cols(at, count)?;
+        let clamped_at = at.min(self.cells.n_cols());
+        self.cells.insert_cols(clamped_at, count)?;
         if count != 0 {
             self.formulas
-                .insert_cols(sheet, at as u32, count as u32, slots);
+                .insert_cols(sheet, clamped_at as u32, count as u32, slots);
         }
         Ok(())
     }
@@ -194,10 +196,10 @@ impl SheetData {
             return Ok(());
         }
 
-        let count = count.min(extent - at);
-        self.cells.delete_cols(at, count)?;
+        let clamped_count = count.min(extent - at);
+        self.cells.delete_cols(at, clamped_count)?;
         self.formulas
-            .delete_cols(sheet, at as u32, count as u32, slots);
+            .delete_cols(sheet, at as u32, clamped_count as u32, slots);
         Ok(())
     }
 

@@ -10,13 +10,10 @@ if (
 ) {
   throw new Error(`Invalid SHEETWRITE_TEST_PORT: ${process.env.SHEETWRITE_TEST_PORT ?? ""}`);
 }
-export const SITE_PORT = requestedSitePort;
-export const SITE_BASE = "";
+const SITE_PORT = requestedSitePort;
 export function siteUrl(path = "/"): string {
-  const suffix = path.startsWith("/") ? path : `/${path}`;
-  return `http://localhost:${SITE_PORT}${SITE_BASE}${suffix}`;
+  return `http://localhost:${SITE_PORT}${path.startsWith("/") ? path : `/${path}`}`;
 }
-export const examplePages = ["vanilla", "react", "vue", "svelte"] as const;
 
 export default defineConfig({
   testDir: import.meta.dirname,

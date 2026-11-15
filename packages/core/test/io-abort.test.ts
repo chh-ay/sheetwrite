@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
 import {
   DelimitedTextOptionsError,
@@ -11,11 +11,23 @@ import { initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { Column, Workbook, WorkbookSnapshot } from "../src/types.js";
 import {
-  fromXlsxTable,
-  fromXlsxWorkbook,
   setXlsxTableExportBackend,
   setXlsxTableImportBackend,
   setXlsxWorkbookBackend,
+} from "../src/xlsx-slots.js";
+import { keepXlsxSlots } from "./fixtures.js";
+
+/** Another file's `xlsxAddon()` may have installed backends; each test puts them back. */
+let restoreXlsxSlots = keepXlsxSlots();
+beforeEach(() => {
+  restoreXlsxSlots = keepXlsxSlots();
+});
+afterEach(() => {
+  restoreXlsxSlots();
+});
+import {
+  fromXlsxTable,
+  fromXlsxWorkbook,
   toXlsxTable,
   toXlsxWorkbook,
 } from "../src/xlsx-bridge.js";
@@ -102,12 +114,6 @@ async function expectAbortAtEveryCheck(
 
 async function drain(stream: ReadableStream<Uint8Array>): Promise<void> {
   for await (const _chunk of stream);
-}
-
-function resetXlsxBackends(): void {
-  setXlsxTableExportBackend(null as never);
-  setXlsxTableImportBackend(null as never);
-  setXlsxWorkbookBackend(null as never);
 }
 
 describe("delimited-text abort", () => {
@@ -232,7 +238,6 @@ describe("XLSX call abort", () => {
       }
       expect(calls).toBe(xlsxCalls.length);
     } finally {
-      resetXlsxBackends();
       source.dispose();
     }
   });
@@ -248,20 +253,14 @@ describe("XLSX call abort", () => {
       },
     });
 
-    try {
-      const failure = await toXlsxWorkbook(snapshot).then(
-        () => undefined,
-        (error: unknown) => error,
-      );
-      if (!(failure instanceof SheetwriteError)) throw new Error("expected a SheetwriteError");
-      expect(failure.code).toBe("export-failed");
-      const backend = failure.context?.backend;
-      if (typeof backend !== "string") throw new Error("expected a backend name in the context");
-      expect(new TextEncoder().encode(backend).byteLength).toBeLessThanOrEqual(
-        MAX_ERROR_TEXT_BYTES,
-      );
-    } finally {
-      resetXlsxBackends();
-    }
+    const failure = await toXlsxWorkbook(snapshot).then(
+      () => undefined,
+      (error: unknown) => error,
+    );
+    if (!(failure instanceof SheetwriteError)) throw new Error("expected a SheetwriteError");
+    expect(failure.code).toBe("export-failed");
+    const backend = failure.context?.backend;
+    if (typeof backend !== "string") throw new Error("expected a backend name in the context");
+    expect(new TextEncoder().encode(backend).byteLength).toBeLessThanOrEqual(MAX_ERROR_TEXT_BYTES);
   });
 });
