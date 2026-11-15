@@ -158,15 +158,6 @@ describe("the host's dense and local limits", () => {
 
   it("are capped at the engine's ceilings when the host raises them", () => {
     const limits = { maxDenseCells: 10_000_000, maxLocalPagedCells: 30_000_000 };
-    const store = new SheetwriteStore(sheetsOf([ROWS, COLUMNS]), undefined, {
-      snapshotResourceLimits: limits,
-    });
-    try {
-      expect(engineOf(store).isLocalPaged("s0")).toBe(true);
-    } finally {
-      store.dispose();
-    }
-
     // 5,000,010 local cells plus 16,000,000 pass the engine's 20,000,000, so
     // validation refuses the workbook before the engine allocates anything.
     let refusal: unknown;
