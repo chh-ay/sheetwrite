@@ -16,7 +16,8 @@
  * viewport and follows its line once per frame while the page scrolls.
  *
  * Pointer hover and keyboard focus open the same panel, which is the trigger's
- * accessible description (`aria-describedby`).
+ * accessible description (`aria-describedby`). On a touch screen a tap opens
+ * it (`code-enhancements.ts`), and a tap elsewhere closes it.
  */
 import {
   type Box,
@@ -341,6 +342,8 @@ function handlePointerOver(event: PointerEvent): void {
     cancelScheduledClose();
     return;
   }
+  // A touch opens the panel on its tap, so a tap can tell a first touch from a second.
+  if (event.pointerType === "touch") return;
   const trigger = closestElement(event.target, TRIGGER_SELECTOR);
   if (trigger !== null) openCodePopover(trigger);
 }
@@ -373,12 +376,10 @@ function handleKeyDown(event: KeyboardEvent): void {
   }
 }
 
-/** Touch screens have no hover: a tap opens a panel, a tap elsewhere closes it. */
+/** A tap or click outside the open trigger and its panel closes the panel. */
 function handleClick(event: MouseEvent): void {
-  if (!window.matchMedia("(hover: none)").matches) return;
-  const trigger = closestElement(event.target, TRIGGER_SELECTOR);
-  if (trigger !== null) openCodePopover(trigger);
-  else if (!isInsideActivePopover(event.target)) closePopover();
+  if (closestElement(event.target, TRIGGER_SELECTOR) !== null) return;
+  if (!isInsideActivePopover(event.target)) closePopover();
 }
 
 /**

@@ -294,3 +294,31 @@ test("leaving and revisiting a page leaves one copy of each code popover", async
   await (await popoverWithLink(page)).trigger.focus();
   await expect(page.locator(`[id="${panelId}"]`)).toHaveCount(1);
 });
+
+test.describe("on a touch screen", () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test("the first tap on a linked code name opens its panel, which links to the API page", async ({
+    page,
+  }) => {
+    await page.goto(FIRST_GRID_URL);
+    await waitForHydration(page);
+    const trigger = page
+      .getByRole("figure", { name: "Complete first grid", exact: true })
+      .locator("a[data-sw-code-popover-trigger][href]")
+      .first();
+    await expect(trigger).toBeVisible();
+    const panel = page.locator(
+      `[id="${await trigger.getAttribute("data-sw-code-popover-trigger")}"]`,
+    );
+
+    await trigger.tap();
+
+    await expect(panel).toBeVisible();
+    await expect(page).toHaveURL(FIRST_GRID_URL);
+    await expect(panel.getByRole("link", { name: "API reference" })).toHaveAttribute(
+      "href",
+      (await trigger.getAttribute("href")) ?? "",
+    );
+  });
+});
