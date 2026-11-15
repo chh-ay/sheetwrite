@@ -183,7 +183,7 @@ pub(crate) fn reference_shift() -> (u32, u32) {
 /// The cell at (`row`, `col`) with its relative axes moved by `shift` and
 /// its `$` axes as written. The caller keeps every moved axis in the sheet.
 #[inline]
-pub(crate) fn shifted_cell(
+pub(crate) const fn shifted_cell(
     (row_shift, col_shift): (u32, u32),
     row: u32,
     col: u32,
@@ -206,7 +206,7 @@ pub(crate) fn shifted_cell(
 /// The range from `start` to `end` on `sheet` with its relative axes moved
 /// by `shift`; see [`shifted_cell`].
 #[inline]
-pub(crate) fn shifted_range(
+pub(crate) const fn shifted_range(
     shift: (u32, u32),
     sheet: u32,
     (row_start, col_start): (u32, u32),
