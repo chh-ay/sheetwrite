@@ -1,10 +1,10 @@
-import { conditionCriterion, keepOutsideAutoFilter } from "../autofilter.js";
 import { SheetwriteError } from "../errors.js";
 import { cloneJsonValue } from "../plain-data.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
+import { conditionCriterion, keepOutsideAutoFilter } from "./autofilter.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";

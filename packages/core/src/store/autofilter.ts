@@ -1,7 +1,7 @@
 // Excel's AutoFilter: the filtered range of a sheet and how its custom
 // conditions read as COUNTIF criteria.
 
-import type { AutoFilter, CustomColumnFilter, FilterCondition } from "./types/document.js";
+import type { AutoFilter, CustomColumnFilter, FilterCondition } from "../types/document.js";
 
 const COMPARISON_PREFIX = {
   eq: "=",

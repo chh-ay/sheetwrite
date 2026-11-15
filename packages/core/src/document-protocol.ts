@@ -1,4 +1,3 @@
-import { validFilterCondition } from "./autofilter.js";
 import {
   isCellFontFamily,
   isCellNumberFormat,
@@ -43,6 +42,7 @@ import {
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
+import { validFilterCondition } from "./store/autofilter.js";
 import { normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
