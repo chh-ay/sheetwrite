@@ -6,7 +6,7 @@ use crate::types::{
     CellKey, FormulaError, KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
-use paged::{bit, DirtyView, PagedStorage};
+use paged::{all_bits, bit, DirtyView, PagedStorage};
 
 mod paged;
 
@@ -309,6 +309,18 @@ impl CellStorage {
             paged.read(row, col).0
         } else {
             self.kind[index] & !CALCULATED
+        }
+    }
+
+    /// A cell's source kind and payload with one paged lookup.
+    #[inline]
+    pub(crate) fn source_at(&self, index: usize) -> (u8, u64) {
+        if let Some(paged) = &self.paged {
+            let (row, col) = self.coordinates(index);
+            let (kind, payload, _, _, _) = paged.read(row, col);
+            (kind, payload)
+        } else {
+            dense_source(self.kind[index], self.payload[index])
         }
     }
 
@@ -936,6 +948,9 @@ pub(crate) fn source_kind(raw: u8) -> u8 {
     raw & !CALCULATED
 }
 
+/// A run's source kinds and payloads, one entry per cell.
+pub(crate) type SourceSlices<'a> = (&'a [u8], &'a [u64]);
+
 /// A borrowed column segment bounded by its source page or column, and for
 /// paged storage also by its dirty and calculated blocks. Indices are absolute
 /// and valid only inside `start..end`. Creating a run allocates nothing and
@@ -1020,6 +1035,32 @@ impl CellRun<'_> {
             .calculated_cell(index)
             .unwrap_or((source_kind, source_payload));
         Some((kind, payload, style))
+    }
+
+    /// A paged run's clean kinds and payloads, when every cell is loaded and
+    /// none holds an edit or a calculated value.
+    pub(crate) fn clean_sources(&self) -> Option<SourceSlices<'_>> {
+        if self.is_dense {
+            return None;
+        }
+        // A formula cell's result or one edit only overlays its own row.
+        let mut cells = self.start..self.end;
+        if self.dirty.is_some() && cells.any(|index| self.dirty_cell(index).is_some()) {
+            return None;
+        }
+        let mut cells = self.start..self.end;
+        if !self.calculated.is_empty() && cells.any(|index| self.calculated_cell(index).is_some()) {
+            return None;
+        }
+        let offset = self.start - self.source_base;
+        let len = self.end - self.start;
+        if !self.loaded.is_some_and(|bits| all_bits(bits, offset, len)) {
+            return None;
+        }
+        Some((
+            &self.kinds[offset..offset + len],
+            &self.payloads[offset..offset + len],
+        ))
     }
 
     /// Visits every cell of a paged run; `None` marks an unloaded cell. Dense
