@@ -20,7 +20,7 @@ import { type XmlElement, xmlAttribute, xmlChild, xmlChildren, xmlLocalName } fr
  * One filtered column. A value list holds the cells' display text, as the
  * file does; the assembly turns it into the cells' values.
  */
-export type ParsedFilterColumn =
+type ParsedFilterColumn =
   | {
       readonly col: number;
       readonly kind: "values";
@@ -57,7 +57,7 @@ function conditionValue(text: string): number | string {
  * `equal ab*`, "contains ab" as `equal *ab*` and "does not contain ab" as
  * `notEqual *ab*`; those read back as the named conditions.
  */
-export function customFilterCondition(operator: string, val: string): FilterCondition | null {
+function customFilterCondition(operator: string, val: string): FilterCondition | null {
   // An own key only: "constructor" and the like are not operators.
   const op = Object.hasOwn(OPERATORS, operator) ? OPERATORS[operator] : undefined;
   if (op === undefined) return null;
