@@ -7052,7 +7052,10 @@
       },
       "evidence": {
         "status": "source-linked",
-        "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+        "paths": [
+          "packages/wasm/src/tests/functions.rs",
+          "packages/core/test/formula-assist.test.ts"
+        ]
       }
     },
     "parser-assisted-evaluator-declared": {
@@ -7293,7 +7296,10 @@
       },
       "evidence": {
         "status": "source-linked",
-        "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+        "paths": [
+          "packages/wasm/src/tests/recalculation.rs",
+          "packages/core/test/formula-assist.test.ts"
+        ]
       }
     },
     "implemented-dynamic-reference": {
@@ -7311,7 +7317,7 @@
       },
       "evidence": {
         "status": "source-linked",
-        "paths": ["packages/wasm/src/tests.rs", "scripts/conformance/formula-evidence.ts"]
+        "paths": ["packages/wasm/src/tests/indirect.rs", "scripts/conformance/formula-evidence.ts"]
       }
     },
     "implemented-reference-operators": {
@@ -7334,7 +7340,7 @@
       "evidence": {
         "status": "source-linked",
         "paths": [
-          "packages/wasm/src/tests.rs",
+          "packages/wasm/src/tests/reference_operators.rs",
           "packages/xlsx/test/formula-source-preservation.test.ts",
           "scripts/conformance/formula-evidence.ts"
         ]
@@ -7355,7 +7361,10 @@
       },
       "evidence": {
         "status": "source-linked",
-        "paths": ["packages/wasm/src/tests.rs", "packages/core/test/formula-assist.test.ts"]
+        "paths": [
+          "packages/wasm/src/tests/functions.rs",
+          "packages/core/test/formula-assist.test.ts"
+        ]
       }
     },
     "analysis-compatibility": {
@@ -7520,7 +7529,7 @@
       },
       "evidence": {
         "status": "source-linked",
-        "paths": ["packages/wasm/src/store/tests.rs"]
+        "paths": ["packages/wasm/src/store/pivot_tests.rs"]
       }
     }
   },

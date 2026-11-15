@@ -65,7 +65,7 @@ export const COMPATIBILITY_FIXTURES: readonly CompatibilityFixture[] = [
   {
     id: "formula-engine-vectors",
     kind: "original-test",
-    path: "packages/wasm/src/tests.rs",
+    path: "packages/wasm/src/tests/formulas_e2e.rs",
     producer: "Sheetwrite",
     producerVersion: "v0.3 protocol 3",
     license: "MIT",
@@ -260,7 +260,10 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
       "This is a declared portable subset, not every Excel, Sheets, or OpenFormula coercion edge.",
     source:
       "https://docs.oasis-open.org/office/OpenDocument/v1.3/os/part4-formula/OpenDocument-v1.3-os-part4-formula.html",
-    evidence: ["packages/wasm/src/tests.rs", "packages/core/test/formula-matrix.test.ts"],
+    evidence: [
+      "packages/wasm/src/tests/formulas_e2e.rs",
+      "packages/core/test/formula-matrix.test.ts",
+    ],
     fixtureIds: ["formula-engine-vectors", "formula-document-vectors"],
     importBehavior:
       "Formula source is preserved and evaluated when every token is in the portable subset.",
@@ -282,7 +285,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     source:
       "https://support.microsoft.com/en-us/office/dynamic-array-formulas-and-spilled-array-behavior-205c6b06-03ba-4151-89a1-87a7eb36e531",
     evidence: [
-      "packages/wasm/src/tests.rs",
+      "packages/wasm/src/tests/spill.rs",
       "packages/core/test/formula-matrix.test.ts",
       "test/browser/examples.spec.ts",
     ],
@@ -308,7 +311,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     source:
       "https://support.microsoft.com/en-us/office/let-function-34842dd8-b92b-4d3f-b325-b8b8f9908999",
     evidence: [
-      "packages/wasm/src/tests.rs",
+      "packages/wasm/src/tests/formulas_e2e.rs",
       "docs/src/content/docs/features/formulas/authoring-and-references.md",
     ],
     fixtureIds: ["formula-engine-vectors"],
@@ -360,7 +363,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
       "External workbook links are unsupported. 3-D references are accepted only by SUM, AVERAGE, COUNT, COUNTA, MAX, MIN, PRODUCT, STDEV.S, STDEV.P, VAR.S and VAR.P; other positions return #VALUE!. Excel also accepts them in the A-suffixed aggregate functions.",
     source: "https://learn.microsoft.com/en-us/openspecs/office_standards/ms-xlsx/",
     evidence: [
-      "packages/wasm/src/tests.rs",
+      "packages/wasm/src/tests/reference_operators.rs",
       "packages/xlsx/test/worksheet-lifecycle.test.ts",
       "packages/xlsx/test/formula-source-preservation.test.ts",
     ],
@@ -519,7 +522,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     source: "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
     evidence: [
       "packages/core/test/workbook-table.test.ts",
-      "packages/wasm/src/tests.rs",
+      "packages/wasm/src/tests/tables.rs",
       "packages/xlsx/test/workbook-table.test.ts",
     ],
     fixtureIds: ["workbook-table-vectors"],
@@ -569,7 +572,7 @@ export const COMPATIBILITY_INVENTORY: readonly CompatibilityRecord[] = [
     source: "https://ecma-international.org/publications-and-standards/standards/ecma-376/",
     evidence: [
       "packages/core/test/conditional-format.test.ts",
-      "packages/wasm/src/tests.rs",
+      "packages/wasm/src/tests/window.rs",
       "packages/xlsx/test/hyperlink-conditional.test.ts",
     ],
     fixtureIds: ["hyperlink-conditional-vectors"],
