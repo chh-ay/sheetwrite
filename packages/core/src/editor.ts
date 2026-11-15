@@ -6,6 +6,7 @@ import {
   readEditorFieldMetrics,
   sizeEditorTextarea,
 } from "./editor-textarea.js";
+import { toggleReferenceAnchors } from "./formula-analysis.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
 import type { CellFormat } from "./types/cell.js";
@@ -13,7 +14,33 @@ import type { Theme } from "./types/render.js";
 
 export type { AssistDeps };
 
-export type EditNavigate = "down" | "right" | "left" | "none";
+/**
+ * Where the active cell goes after a commit. Enter (`down`, `up`) and Tab
+ * (`right`, `left`) move within a selection of several cells; an arrow key
+ * (`arrow-*`) leaves it; `stay` is Ctrl+Enter, which also fills the selection.
+ */
+export type EditNavigate =
+  | "down"
+  | "up"
+  | "right"
+  | "left"
+  | "arrow-down"
+  | "arrow-up"
+  | "arrow-right"
+  | "arrow-left"
+  | "stay"
+  | "none";
+
+/** Row step, column step and commit direction of each arrow key. */
+const ARROW_STEPS: Readonly<Record<string, readonly [number, number, EditNavigate]>> = {
+  ArrowDown: [1, 0, "arrow-down"],
+  ArrowUp: [-1, 0, "arrow-up"],
+  ArrowRight: [0, 1, "arrow-right"],
+  ArrowLeft: [0, -1, "arrow-left"],
+};
+
+/** Text before the caret after which an arrow key points at a cell, as in Excel. */
+const POINTABLE = /[=(,;+\-*/^&<>:]$/;
 
 export interface EditRect {
   x: number;
@@ -27,8 +54,14 @@ export interface BeginEditOptions {
   col: number;
   type: CellFormat;
   initial: string;
-  /** select all text (F2/double-click) vs place caret at end (typed char) */
+  /** Select the whole text when the editor opens; otherwise the caret goes to the end. */
   selectAll: boolean;
+  /**
+   * Excel's Enter mode: typing opened the editor, so arrow keys commit and
+   * move, or point at cells in a formula. False is Edit mode (F2, double-click),
+   * where arrows move the caret. F2 switches between the two.
+   */
+  entering: boolean;
   rect: EditRect;
   /** Accessible name derived from the semantic or positional column header. */
   label: string;
@@ -45,6 +78,8 @@ export interface BeginEditOptions {
   onText: (value: string) => void;
   /** Runs a host command bound to this key combination; true when one ran. */
   onShortcut?: (event: KeyboardEvent) => boolean;
+  /** An arrow key in Enter mode points from the last pointed cell by (`dRow`, `dCol`); Shift extends. */
+  onPoint?: (dRow: number, dCol: number, extend: boolean) => void;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -79,6 +114,8 @@ export class EditController {
   private metrics: EditorFieldMetrics | null = null;
   private metricsLineHeight = "";
   private sizing: EditorSizing | null = null;
+  /** Excel's Enter mode; see {@link BeginEditOptions.entering}. */
+  private entering = false;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -118,6 +155,7 @@ export class EditController {
     this.host.appendChild(ta);
     this.textarea = ta;
     this.opts = opts;
+    this.entering = opts.entering;
     this.position(opts.rect);
 
     ta.addEventListener("compositionstart", this.onCompositionStart);
@@ -210,6 +248,34 @@ export class EditController {
     this.refEnd = -1;
   }
 
+  /** Whether the last change was a picked reference, which the next pick or arrow replaces. */
+  get isPointing(): boolean {
+    return this.refStart >= 0;
+  }
+
+  /** Whether an arrow key would point at a cell: in a formula, after an operator or a picked reference. */
+  private canPoint(): boolean {
+    const ta = this.textarea;
+    if (!ta?.value.startsWith("=")) return false;
+    if (this.refStart >= 0) return true;
+    if (ta.selectionStart !== ta.selectionEnd) return false;
+    return POINTABLE.test(ta.value.slice(0, ta.selectionStart));
+  }
+
+  /** F4: cycle the reference at the caret through A1, $A$1, A$1 and $A1. */
+  private toggleAnchors(): void {
+    const ta = this.textarea;
+    if (!ta?.value.startsWith("=")) return;
+    const toggled = toggleReferenceAnchors(ta.value, ta.selectionStart);
+    if (toggled === null) return;
+    ta.value = toggled.text;
+    ta.setSelectionRange(toggled.caret, toggled.caret);
+    this.refStart = -1;
+    this.resize();
+    if (this.assistAttached) this.assist?.update();
+    this.opts?.onText(ta.value);
+  }
+
   private readonly onInput = (): void => {
     const ta = this.textarea;
     if (!ta) return;
@@ -293,15 +359,33 @@ export class EditController {
       e.stopPropagation();
       return;
     }
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter") {
       e.preventDefault();
-      this.commit("down");
+      // Excel: Enter moves down, Shift+Enter up, and Ctrl+Enter stays (filling a selection).
+      this.commit(e.ctrlKey || e.metaKey ? "stay" : e.shiftKey ? "up" : "down");
     } else if (e.key === "Tab") {
       e.preventDefault();
       this.commit(e.shiftKey ? "left" : "right");
     } else if (e.key === "Escape") {
       e.preventDefault();
       this.cancel();
+    } else if (e.key === "F2" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // F2 switches between Enter mode (arrows leave the cell) and Edit mode (arrows move the caret).
+      e.preventDefault();
+      this.entering = !this.entering;
+    } else if (e.key === "F4" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      this.toggleAnchors();
+    } else if (this.entering && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // Enter mode: an arrow points at a cell in a formula, or commits and moves.
+      const step = ARROW_STEPS[e.key];
+      if (step && this.canPoint()) {
+        e.preventDefault();
+        this.opts?.onPoint?.(step[0], step[1], e.shiftKey);
+      } else if (step && !e.shiftKey) {
+        e.preventDefault();
+        this.commit(step[2]);
+      }
     }
     // Keep arrows/typing inside the textarea, never bubbling to grid nav.
     e.stopPropagation();
@@ -337,6 +421,7 @@ export class EditController {
     this.metrics = null;
     this.metricsLineHeight = "";
     this.sizing = null;
+    this.entering = false;
     this.tearingDown = false;
   }
 }

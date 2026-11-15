@@ -2,9 +2,10 @@ import type { CellAddress, Range, Selection, SheetId } from "./types/coordinates
 
 /**
  * The cell that cell-level commands (formula bar, link, note, pivot fields)
- * act on: the selected cell, or the top-left cell of a range. With several
- * ranges it is the top-left cell of the last one, which holds Excel's active
- * cell. Whole rows and columns give null.
+ * act on: Excel's active cell. That is the selection's `active` cell when it
+ * has one, else the selected cell, or the top-left cell of a range. With
+ * several ranges it is the top-left cell of the last one. Whole rows and
+ * columns without an `active` cell give null.
  */
 export function selectionCell(selection: Selection | null): CellAddress | null {
   if (selection === null) return null;
@@ -13,14 +14,15 @@ export function selectionCell(selection: Selection | null): CellAddress | null {
     case "cell":
       return selection.addr;
     case "range":
-      return rangeTopLeft(selection.range);
+      return selection.active ?? rangeTopLeft(selection.range);
     case "multi": {
+      if (selection.active) return selection.active;
       const last = selection.ranges.at(-1);
       return last === undefined ? null : rangeTopLeft(last);
     }
     case "row":
     case "column":
-      return null;
+      return selection.active ?? null;
   }
 }
 
@@ -99,8 +101,28 @@ export class SelectionModel {
     return this.regions.length === 0;
   }
 
+  /**
+   * The active cell: where typing, the formula bar and cell commands act. It
+   * is the cell a selection started from, so extending a selection keeps it,
+   * as in Excel.
+   */
   get focusCell(): CellRef | null {
+    return this.anchor;
+  }
+
+  /** The moving corner of the active region, which Shift+Arrow and Shift+click extend. */
+  get extentCell(): CellRef | null {
     return this.focus;
+  }
+
+  /**
+   * Move the active cell to (row, col) and keep the selected cells, as Enter
+   * and Tab do inside a selection in Excel. Extending afterwards starts here.
+   */
+  setActiveCell(row: number, col: number): void {
+    this.anchor = { row, col };
+    this.focus = { row, col };
+    this.revision += 1;
   }
 
   /** Whether the complete selection is exactly this cell, without a snapshot allocation. */
@@ -118,6 +140,22 @@ export class SelectionModel {
     else this.regions = [region];
     this.anchor = { row, col };
     this.focus = { row, col };
+    this.revision += 1;
+  }
+
+  /**
+   * Select one rectangle and keep `active` as the active cell when it lies
+   * inside, as Ctrl+A does in Excel. The moving corner is the far corner.
+   */
+  selectRect(rect: SelRect, active: CellRef): void {
+    this.regions = [{ rect: { ...rect }, type: "range" }];
+    const inside =
+      rect.r0 <= active.row &&
+      active.row <= rect.r1 &&
+      rect.c0 <= active.col &&
+      active.col <= rect.c1;
+    this.anchor = inside ? { ...active } : { row: rect.r0, col: rect.c0 };
+    this.focus = { row: rect.r1, col: rect.c1 };
     this.revision += 1;
   }
 
@@ -151,27 +189,27 @@ export class SelectionModel {
     this.revision += 1;
   }
 
-  selectColumn(col: number, additive = false): void {
+  selectColumn(col: number, additive = false, activeRow = 0): void {
     const region: Region = {
       rect: { r0: 0, c0: col, r1: Math.max(0, this.rowCount - 1), c1: col },
       type: "column",
     };
     if (additive) this.regions.push(region);
     else this.regions = [region];
-    this.anchor = { row: 0, col };
-    this.focus = { row: 0, col };
+    this.anchor = { row: activeRow, col };
+    this.focus = { row: activeRow, col };
     this.revision += 1;
   }
 
-  selectRow(row: number, additive = false): void {
+  selectRow(row: number, additive = false, activeCol = this.firstCol): void {
     const region: Region = {
       rect: { r0: row, c0: this.firstCol, r1: row, c1: this.lastCol },
       type: "row",
     };
     if (additive) this.regions.push(region);
     else this.regions = [region];
-    this.anchor = { row, col: this.firstCol };
-    this.focus = { row, col: this.firstCol };
+    this.anchor = { row, col: activeCol };
+    this.focus = { row, col: activeCol };
     this.revision += 1;
   }
 
@@ -202,27 +240,46 @@ export class SelectionModel {
         }
         break;
     }
+    if (
+      selection.kind !== "cell" &&
+      selection.active &&
+      this.contains(selection.active.row, selection.active.col)
+    ) {
+      this.setActiveCell(selection.active.row, selection.active.col);
+    }
   }
 
   toSelection(sheet: SheetId): Selection | null {
-    if (this.regions.length === 0) return null;
+    const region = this.regions.at(-1);
+    if (region === undefined) return null;
     const toRange = (rect: SelRect): Range => ({
       sheet,
       start: { row: rect.r0, col: rect.c0 },
       end: { row: rect.r1, col: rect.c1 },
     });
-    if (this.regions.length > 1) {
-      return { kind: "multi", ranges: this.regions.map((r) => toRange(r.rect)) };
-    }
-    const region = this.regions[0]!;
     const { rect } = region;
+    // The active cell is reported only where it differs from the cell a reader would assume.
+    const active = (row: number, col: number): { active?: CellAddress } => {
+      const cell = this.anchor;
+      return cell === null || (cell.row === row && cell.col === col)
+        ? {}
+        : { active: { sheet, row: cell.row, col: cell.col } };
+    };
+    if (this.regions.length > 1) {
+      return {
+        kind: "multi",
+        ranges: this.regions.map((r) => toRange(r.rect)),
+        ...active(rect.r0, rect.c0),
+      };
+    }
     if (region.type === "column" && rect.c0 === rect.c1)
-      return { kind: "column", sheet, col: rect.c0 };
-    if (region.type === "row" && rect.r0 === rect.r1) return { kind: "row", sheet, row: rect.r0 };
+      return { kind: "column", sheet, col: rect.c0, ...active(0, rect.c0) };
+    if (region.type === "row" && rect.r0 === rect.r1)
+      return { kind: "row", sheet, row: rect.r0, ...active(rect.r0, this.firstCol) };
     if (rect.r0 === rect.r1 && rect.c0 === rect.c1) {
       return { kind: "cell", addr: { sheet, row: rect.r0, col: rect.c0 } };
     }
-    return { kind: "range", range: toRange(rect) };
+    return { kind: "range", range: toRange(rect), ...active(rect.r0, rect.c0) };
   }
 
   forEachRect(cb: (rect: SelRect) => void): void {

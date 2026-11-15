@@ -46,8 +46,8 @@ function requiredElement(host: HTMLElement, selector: string): HTMLElement {
 
 describe("declarative keyboard bindings", () => {
   for (const [platform, copyLabel, undoLabel, explicitLabel, pasteLabel] of [
-    ["MacIntel", "⌘⇧K", "⌘U", "⌘⇧⌥L", "⌘V"],
-    ["Linux x86_64", "Ctrl+Shift+K", "Ctrl+U", "Ctrl+Shift+Alt+L", "Ctrl+V"],
+    ["MacIntel", "⌘⇧K", "⌘J", "⌘⇧⌥L", "⌘V"],
+    ["Linux x86_64", "Ctrl+Shift+K", "Ctrl+J", "Ctrl+Shift+Alt+L", "Ctrl+V"],
   ] as const) {
     it(`uses the same ${platform} binding in keys, menu hints, and toolbar titles`, async () => {
       Object.defineProperty(navigator, "platform", { configurable: true, value: platform });
@@ -69,7 +69,7 @@ describe("declarative keyboard bindings", () => {
           keyboard: {
             bindings: {
               copy: { key: "k", mod: true, shift: true },
-              undo: { key: "u", mod: true },
+              undo: { key: "j", mod: true },
             },
           },
           contextMenu: [
@@ -149,7 +149,7 @@ describe("declarative keyboard bindings", () => {
         grid.applyTransaction({
           patches: [{ op: "set", addr, value: { kind: "literal", value: "Changed" } }],
         });
-        press("u");
+        press("j");
         expect(grid.store.getCell(addr).resolved).toBe("Customer 0");
         grid.setConfig({
           keyboard: { bindings: { copy: null } },

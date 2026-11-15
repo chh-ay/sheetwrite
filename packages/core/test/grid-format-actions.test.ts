@@ -131,7 +131,8 @@ it("steps the focus font and number format over the selection and restores colum
     { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
     { fontSize: 20, numberFormat: "0.0000" },
   );
-  select(0, 0, 1, 1);
+  // B2 is the active cell, as when the user selects from B2 back to A1.
+  select(1, 1, 0, 0);
   grid.actions.stepFontSize(1);
   expect(cell(0, 0).style.fontSize).toBeCloseTo(64 / 3);
   expect(cell(1, 1).style.fontSize).toBeCloseTo(64 / 3);

@@ -512,7 +512,14 @@ export type KeyboardAction =
   | "find"
   | "replace"
   | "clearContents"
-  | "editNote";
+  | "editNote"
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "insertDate"
+  | "insertTime"
+  | "selectAll";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {

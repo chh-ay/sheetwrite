@@ -99,7 +99,7 @@ function expectEditor(host: HTMLElement): HTMLTextAreaElement {
   return node;
 }
 
-function typeIntoFocusedCell(host: HTMLElement, value: string, key = "Enter"): void {
+function typeIntoFocusedCell(host: HTMLElement, value: string, key = "F2"): void {
   host.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 
   const editor = expectEditor(host);

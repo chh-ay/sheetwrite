@@ -72,6 +72,8 @@ export type Selection =
       kind: "range";
       /** Data-space bounds of the selected rectangle. */
       range: Range;
+      /** The active cell, where typing edits, when it is not the range's start cell. */
+      active?: CellAddress;
     }
   | {
       /** Selects an entire data row. */
@@ -80,6 +82,8 @@ export type Selection =
       sheet: SheetId;
       /** Zero-based data-row index. */
       row: number;
+      /** The active cell, where typing edits, when it is not the row's first cell. */
+      active?: CellAddress;
     }
   | {
       /** Selects an entire column. */
@@ -88,10 +92,14 @@ export type Selection =
       sheet: SheetId;
       /** Zero-based column index. */
       col: number;
+      /** The active cell, where typing edits, when it is not the column's first cell. */
+      active?: CellAddress;
     }
   | {
       /** Selects multiple, potentially disjoint rectangles. */
       kind: "multi";
       /** Data-space rectangles comprising the selection. */
       ranges: Range[];
+      /** The active cell, where typing edits, when it is not the last range's start cell. */
+      active?: CellAddress;
     };
