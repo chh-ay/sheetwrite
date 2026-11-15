@@ -1456,7 +1456,7 @@ export function renderApiIndex(manifest: PublicApiManifest): string {
       "API reference",
       "Every public function, class, type and constant in the Sheetwrite packages.",
     ).trimEnd(),
-    "Every public function, class, type and constant in the Sheetwrite packages. Each package lists the paths you import from and how many names each one exports.",
+    "Each package below says what it is for, then lists the paths you import from and how many names each one exports.",
     "",
   ];
   for (const pkg of manifest.packages) {
