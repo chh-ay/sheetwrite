@@ -15,3 +15,16 @@ Single-context: one root `GLOSSARY.md`. Design decisions are tracked as GitHub i
 ### Rust code
 
 Before changing any Rust crate (`packages/wasm`, `packages/wasm/history`, `packages/queries/engine`), read `docs/contributing/rust.md`: the lint policy and the performance conventions. Check with `bun run lint:rust`.
+
+### Tests
+
+Do not add a unit test the change does not need.
+
+- Add a unit test only when it fails before your change and passes after it.
+- When you add that test, write it first and watch it fail. Then change the code until it passes.
+- Do not add a test that already passes on the old code.
+- Do not add a test that mocks the function you changed and then asserts on that mock.
+- Do not add a snapshot or a large fixture for a one-line fix.
+- A change that no unit test can reach (canvas paint, real keyboard or clipboard input, browser layout) needs steps in the PR body under "Test plan". Do not add a test file that cannot run the changed code.
+
+Test layout: TypeScript unit tests are in `packages/*/test` and run with `bun run test:unit` (`bun test`, no Jest). Rust tests are `#[test]` functions in the crates. Browser tests are in `test/browser` and run with `bun run test:browser` (Playwright).
