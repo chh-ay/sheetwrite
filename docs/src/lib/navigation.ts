@@ -287,6 +287,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
         icon: "database",
         items: [
           { label: "Data operations", href: "/docs/features/data/data-operations/", icon: "sort" },
+          { label: "AutoFilter", href: "/docs/features/data/autofilter/", icon: "filter" },
           { label: "Datasources", href: "/docs/features/data/datasources/", icon: "server" },
           { label: "Host-owned rows", href: "/docs/features/data/host-owned-rows/", icon: "link" },
           {
