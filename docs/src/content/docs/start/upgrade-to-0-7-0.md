@@ -7,9 +7,9 @@ description: Replace the removed sort, revision and add-on registration APIs, up
 > 0.7.0 is the next release and is not published yet. This guide tracks the
 > changes already merged for it, so an upgrade can be planned ahead.
 
-Each section lists what changed in 0.7.0, what replaces it, and the pull
-request that made the change. The "before" code is 0.6 code; the "after" code is
-compiled against the 0.7.0 packages when the docs are built.
+Each section lists what changed in 0.7.0 and what replaces it. The "before"
+code is 0.6 code; the "after" code is compiled against the 0.7.0 packages when
+the docs are built.
 
 ## Update packages together
 
@@ -142,6 +142,7 @@ restore endpoint. A server that records history attaches a `CommitJournal`, as
 | Comment calls (`load`, `create`, `reply`, `resolve`, `mutate`) accept a final `AbortSignal`. An abort or `destroy()` rejects with the signal's reason and emits no `error` event. A sync send aborted by `setOnline(false)` or `destroy()` rejects with an `AbortError` instead of `sync-failed`, and the commit stays pending. | Treat these `AbortError` rejections as cancellation. Do not compare them with the old string messages. |
 | Coordinator teardown and sync disconnection pass an `AbortError` reason to transport adapters. | Check `signal.aborted` in your adapter instead of matching a string reason. |
 | Unmounting a React, Vue or Svelte grid destroys it and aborts its pending work. | Destroy host-created sync and collaboration coordinators yourself when the view is removed. |
+| `rebaseDocumentOperations` copies a local operation only when a remote row or column change rewrites it, so its result can hold your own operation objects. | Treat the result as read-only. Your operations are still never modified. |
 
 ```ts compile title="Record the author of each change"
 import { SyncCoordinator, type Grid, type PersistenceAdapter } from "@sheetwrite/core";
@@ -333,6 +334,32 @@ export function safeStyle(untrusted: unknown) {
 }
 ```
 
+## Chart views are read-only
+
+`ChartView.chart` is now the store's own chart definition instead of a deep
+copy. Its type is `ReadonlyChartDefinition`, read-only all the way down, and
+development builds freeze it, so a write throws. To change a chart, edit a copy
+and commit it with `grid.setChart`. `grid.getCharts(sheet)` returns copies.
+
+Before:
+
+```js partial="0.6 code"
+view.chart.title = "Revenue";
+grid.setChart(view.chart, sheet);
+```
+
+After:
+
+```ts compile title="Edit a chart from its view"
+import type { ChartView, Grid, SheetId } from "@sheetwrite/core";
+
+export function retitleChart(grid: Grid, sheet: SheetId, view: ChartView, title: string) {
+  const chart = grid.getCharts(sheet).find((candidate) => candidate.id === view.chart.id);
+  if (chart === undefined) return undefined;
+  return grid.setChart({ ...chart, title }, sheet);
+}
+```
+
 ## Stylesheet parts
 
 `@sheetwrite/core/styles.css` now imports the stylesheet in parts, and the command icon sheet is its own file, `styles/icons.svg`, instead of a `data:` URL. An app that imports `styles.css` looks the same.
@@ -353,6 +380,9 @@ Most apps never call the engine directly. If you call `CellStore` from
 | `setSparseBlock(..., numbers, texts, styles, ...)` with one string per entry | `setSparseBlock(..., numbers, textBuf, textOffsets, styles, ...)`: the UTF-8 bytes of the string entries only, in entry order. The n-th string entry owns bytes `textOffsets[n]` to `textOffsets[n + 1]`; a block without text passes an empty buffer and `[0]`. |
 | `convertXlsxFormulas(sources, exporting)`; scalar `formulaToXlsx` / `formulaFromXlsx` | `convertXlsxFormulas(sources.join(""), ends, exporting, changedIndices)`: `ends` are cumulative UTF-16 lengths (JavaScript `length`), `changedIndices` is a `Uint32Array` with one slot per source. It returns only the changed formulas and writes their input positions to the front of `changedIndices`; keep every other source. For one source use one end, `source.length`. Core's `XlsxFormulaEngine.convert` is unchanged. |
 | `PivotFields.names()`, `PivotFields.types()` | `takeNames()`, `takeTypes()`. Each hands the buffer over once and leaves it empty. |
+| `CellStore.setColumnNumbers`, `setColumnStrings`, `setColumnStringsPacked` | Removed: use `setBlockPacked`, `setSparseBlock` or `setColumnBlockPacked`. |
+| `DiffKernel.clearPage`, `DiffKernel.pageLength` | Removed: consume the page arrays, then call `compare` to start the next page; read the length of a returned page array. |
+| `setSheetName(sheet, id, name)` returned nothing and accepted any name | Returns whether it named the sheet. Like `renameSheet`, it refuses an empty name, a name another sheet holds in any case, and another sheet's id, and then changes nothing. |
 
 Before:
 
@@ -380,6 +410,28 @@ cells.setSparseBlock(sheet, row, col, rows, cols, offsets, kinds, numbers,
 const names = fields.takeNames();
 const types = fields.takeTypes();
 fields.free();
+```
+
+XLSX formula conversion takes one joined string and returns only the changed
+formulas.
+
+Before:
+
+```js partial="0.6 code"
+const converted = engine.convertXlsxFormulas(sources, true);
+```
+
+After:
+
+```js partial="requires an engine module and an array of formula sources"
+let end = 0;
+const ends = Uint32Array.from(sources, (source) => (end += source.length));
+const changedIndices = new Uint32Array(sources.length);
+const changed = engine.convertXlsxFormulas(sources.join(""), ends, true, changedIndices);
+const converted = sources.slice();
+changed.forEach((formula, position) => {
+  converted[changedIndices[position]] = formula;
+});
 ```
 
 ## Behavior changes you will notice
@@ -426,12 +478,14 @@ the sort on the table's header buttons.
 | `SUBTOTAL` accepts codes 101 to 111 and skips hidden rows; `AGGREGATE` options 1, 3, 5 and 7 skip hidden rows; a subtotal does not count another subtotal. |
 | Paste, fill and conditional-format rules rewrite references with the engine's rules: `=SUM(A:A)` pasted one column right is `=SUM(B:B)`, and a reference that leaves the sheet becomes `#REF!`. `shiftA1Refs` needs `initSheetwrite()` first. |
 | XLSX import expands shared formulas with the same rule, so a shared whole-column reference moves with each cell. |
-| A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. |
+| A row or column insert that a sheet cannot hold changes nothing; `addRows`, `removeRows`, `insertCols` and `removeCols` return `false`. A transaction whose `addRows` or `addColumns` would pass `maxRowsPerSheet`, `maxColumnsPerSheet`, `maxLogicalCellsPerSheet` or, for a dense sheet, `maxDenseCells` is rejected with a `resource-limit` issue that names the limit. Insert Row and Insert Column show the limit in an alert. |
 | A reference to another workbook, such as `[Budget.xlsx]Annual!C10`, keeps its text and shows `#REF!` until the workbook has values for the link. Before, the unquoted form was a syntax error and a quoted form made the whole formula `#REF!`. |
 | A sheet rename or delete, a row or column insert or delete, a tab move and a table change keep the formula text as written and change only its references: renaming `Sales` to `Sales Data` turns `=Sales!A1+1` into `='Sales Data'!A1+1`, not `=('Sales Data'!A1+1)`. |
 | Moving rows or columns (`moveRows`, `moveColumns`) moves the cells, as Excel's Cut and Insert Cut Cells does: references follow the moved cells instead of becoming `#REF!`, a range loses a moved row at its edge and grows by one that lands inside it, and a move that would split a table is refused. |
 | Array formulas whose size comes from a cell, such as `=SEQUENCE($C$1)`, spill in every formula of a recalculation; the third and later ones no longer show `#NUM!`. |
 | On paged data, `INDEX` that returns one cell shows `#LOADING!` only until that cell loads, and a short text result no longer shows `#NUM!` when other cells of its area hold a lot of text. |
+| `GROUPBY` and `PIVOTBY` compute large sources that Excel computes: their source rows no longer count against the 2,000,000-operation limit. A call that places more than 16,777,216 rows into groups returns `#NUM!`. |
+| `GETPIVOTDATA` is no longer volatile. It recalculates when its pivot's output changes, as in Excel, not on every edit. |
 
 ### Grid markup and loading
 
@@ -442,6 +496,8 @@ the sort on the table's header buttons.
 | The find bar loads on first open. | Open it with `grid.actions.find()` or Ctrl+F before looking for `.sheetwrite-find`. Expect one more lazy chunk. |
 | Typing, fill, paste or a remote edit inside a spill keeps the value and shows `#SPILL!` on the anchor. | Nothing; clearing the value restores the array. |
 | Saved hidden rows, collapsed groups and filters apply at load. | Nothing; `SUBTOTAL` no longer counts rows that a saved filter hides. |
+| The number-format box and `grid.getFocusCellStyle()` show the column's `numberFormat` when the cell's style sets none. | Nothing; a cell in a percentage column no longer shows "General". |
+| Each paint writes the screen-reader mirror as its last step. A `scroll` listener runs before that write. | A `scroll` listener that reads the mirror sees the previous paint's rows. |
 
 ### setBlock cell arrays
 
