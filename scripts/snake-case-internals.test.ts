@@ -50,6 +50,7 @@ describe("snake-case-internals", () => {
 
     expect(plan.mentions.map((mention) => `${mention.line} ${mention.oldName}`)).toEqual([
       "6 localTotal",
+      "89 currentCount",
     ]);
 
     expect(plan.conflicts.map((conflict) => `${conflict.oldName} -> ${conflict.newName}`)).toEqual([

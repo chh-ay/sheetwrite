@@ -80,3 +80,12 @@ export function sumPairs(pairs: readonly [pairLeft: number, pairRight: number][]
   for (const [pair_left, pair_right] of pairs) pair_total += pair_product(pair_left, pair_right);
   return pair_total;
 }
+
+/** Reads private state by name, as a test does. */
+export function peekCount(counter: Counter): number {
+  const shown: { publicTotal: number } = counter;
+  const loose = JSON.parse("{}");
+  const typed = Reflect.get(counter, "current_count") + counter["current_count"];
+  const named = Reflect.get(shown, "current_count");
+  return typed + named + loose.currentCount + loose["currentCount"];
+}

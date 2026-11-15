@@ -21,6 +21,15 @@
  * an unresolved use of the old name no longer blocks it: picking a name records that the
  * use was checked.
  *
+ * A `private` member is also renamed where it is named by text: `target["name"]`, a
+ * reflective call such as `Reflect.get(target, "name")` or `spyOn(target, "name")`. When
+ * a reflective call's target does not have the member (it is untyped, or typed as a
+ * public interface), the use is renamed only if exactly one private member has that
+ * name, and reported for review; when several do, it is a conflict. `target["name"]`
+ * and `target.name` on a value without the member are data keys and stay. Uses through
+ * an instantiated type, which the checker gives their own symbol, are matched by the
+ * member's declaration.
+ *
  * Every run plans from the type checker's view of the current files, so it can be
  * re-run at any time: output is sorted, and a second `apply` changes nothing.
  *
@@ -40,17 +49,22 @@ import {
   SyntaxKind,
   isArrowFunction,
   isBindingElement,
+  isCallExpression,
   isClassDeclaration,
   isClassExpression,
+  isElementAccessExpression,
   isExportAssignment,
   isExportSpecifier,
   isFunctionDeclaration,
   isFunctionExpression,
   isIdentifier,
+  isNoSubstitutionTemplateLiteral,
   isObjectBindingPattern,
   isParameterDeclaration,
   isPrivateIdentifier,
+  isPropertyAccessExpression,
   isShorthandPropertyAssignment,
+  isStringLiteral,
   isVariableDeclaration,
   isVariableDeclarationList,
   isVariableStatement,
@@ -60,6 +74,7 @@ import {
 import {
   API,
   SymbolFlags,
+  TypeFlags,
   type Checker,
   type Project,
   type Symbol,
@@ -85,12 +100,16 @@ export interface RenameConflict {
   readonly reason: string;
 }
 
-/** A bare comment mention of a renamed name, left unchanged for a reviewer to judge. */
+/**
+ * A line for a reviewer: a bare comment mention of a renamed name, left unchanged, or a
+ * use matched by name only, renamed.
+ */
 export interface CommentMention {
   readonly file: string;
   readonly line: number;
   readonly oldName: string;
   readonly newName: string;
+  readonly source: "comment" | "name only";
 }
 
 export interface RenamePlan {
@@ -114,6 +133,10 @@ interface Occurrence {
   readonly name: Node;
   /** The occurrence is a key-less shorthand or binding, so the key must be spelled out. */
   readonly keeps_key: boolean;
+  /** The occurrence is a string literal; only the text inside its quotes changes. */
+  readonly is_string: boolean;
+  /** The target's type does not have the member, so the occurrence matched by name only. */
+  readonly name_only: boolean;
 }
 
 interface Candidate {
@@ -128,6 +151,8 @@ interface Candidate {
   readonly is_private_name: boolean;
   /** The same file uses the old name somewhere the checker resolved to no symbol. */
   unresolved_use: boolean;
+  /** Where a name-only use names this member when other private members share the name. */
+  ambiguous_use: string | undefined;
   readonly occurrences: Occurrence[];
 }
 
@@ -293,10 +318,62 @@ function is_key_position(name: Node): boolean {
   return parent.name === name;
 }
 
-function names_in(node: Node, collect: (name: Node) => void): void {
+/** A member named by text: `target["name"]` or `Reflect.get(target, "name")`. */
+interface MemberReference {
+  readonly file: SourceFile;
+  readonly name: Node;
+  readonly target: Node;
+}
+
+/** Calls whose second argument names a member of their first. */
+const REFLECTIVE_CALLS = new Set([
+  "Reflect.defineProperty",
+  "Reflect.deleteProperty",
+  "Reflect.get",
+  "Reflect.getOwnPropertyDescriptor",
+  "Reflect.has",
+  "Reflect.set",
+  "Object.defineProperty",
+  "Object.getOwnPropertyDescriptor",
+  "Object.hasOwn",
+  "spyOn",
+  "jest.spyOn",
+  "vi.spyOn",
+]);
+
+function callee_name(callee: Node): string | undefined {
+  if (isIdentifier(callee)) return callee.text;
+  if (isPropertyAccessExpression(callee) && isIdentifier(callee.expression)) {
+    return `${callee.expression.text}.${text_of(callee.name)}`;
+  }
+
+  return undefined;
+}
+
+/**
+ * The value a string literal names a member of: `target["name"]`, or the second argument
+ * of a reflective call. Other strings are data (keys, ids, wire names) and stay.
+ */
+function string_member_target(literal: Node): Node | undefined {
+  const parent = literal.parent;
+  if (isElementAccessExpression(parent)) {
+    return parent.argumentExpression === literal ? parent.expression : undefined;
+  }
+  if (!isCallExpression(parent)) return undefined;
+  if (!REFLECTIVE_CALLS.has(callee_name(parent.expression) ?? "")) return undefined;
+
+  return parent.arguments[1] === literal ? parent.arguments[0] : undefined;
+}
+
+function names_in(
+  node: Node,
+  collect: (name: Node) => void,
+  collect_string: (literal: Node) => void,
+): void {
   if (isIdentifier(node) || isPrivateIdentifier(node)) collect(node);
+  else if (isStringLiteral(node) || isNoSubstitutionTemplateLiteral(node)) collect_string(node);
   node.forEachChild((child) => {
-    names_in(child, collect);
+    names_in(child, collect, collect_string);
   });
 }
 
@@ -306,6 +383,7 @@ function line_of(file: SourceFile, node: Node): number {
 
 function text_of(name: Node): string {
   if (isIdentifier(name) || isPrivateIdentifier(name)) return name.text;
+  if (isStringLiteral(name) || isNoSubstitutionTemplateLiteral(name)) return name.text;
   throw new Error(`expected an identifier, found ${SyntaxKind[name.kind]}`);
 }
 
@@ -450,6 +528,7 @@ function comment_edits(candidate: Candidate): { edits: TextEdit[]; mentions: Com
         line: candidate.file.getLineAndCharacterOfPosition(name_start).line + 1,
         oldName: candidate.oldName,
         newName: candidate.newName,
+        source: "comment",
       });
     }
   }
@@ -464,6 +543,10 @@ async function find_conflict(
 ): Promise<string | undefined> {
   if (candidate.unresolved_use && !candidate.picked) {
     return `the checker resolves some \`${candidate.oldName}\` in this file to no symbol`;
+  }
+
+  if (candidate.ambiguous_use !== undefined) {
+    return `\`${candidate.oldName}\` at ${candidate.ambiguous_use} is on a value whose type lacks the member, and more than one private member has that name`;
   }
 
   const other_old_name = symbol_names.get(`${candidate.file.fileName}\0${candidate.newName}`);
@@ -491,6 +574,71 @@ async function find_conflict(
   return undefined;
 }
 
+/** A symbol's declaration; an instantiated (transient) symbol shares its original's. */
+function declaration_key(symbol: Symbol): string | undefined {
+  const declaration = symbol.valueDeclaration;
+  return declaration && `${declaration.path}\0${declaration.index}`;
+}
+
+/**
+ * Add the uses of `private` members named by text. When the target's type has a member
+ * of that name, it must be the renamed one; otherwise the use matches by name when exactly
+ * one private member has it.
+ */
+async function add_member_references(
+  checker: Checker,
+  candidates: ReadonlyMap<number, Candidate>,
+  by_declaration: ReadonlyMap<string, Candidate>,
+  references: readonly MemberReference[],
+): Promise<void> {
+  const members = new Map<string, Candidate[]>();
+  for (const candidate of candidates.values()) {
+    if (candidate.kind !== "private member" || candidate.is_private_name) continue;
+
+    const listed = members.get(candidate.oldName);
+    if (listed) listed.push(candidate);
+    else members.set(candidate.oldName, [candidate]);
+  }
+
+  const named = references.filter((reference) => members.has(text_of(reference.name)));
+  if (named.length === 0) return;
+
+  const types = await checker.getTypeAtLocation(named.map((reference) => reference.target));
+  for (const [index, reference] of named.entries()) {
+    const name = text_of(reference.name);
+    const type = types[index];
+    const typed = type !== undefined && (type.flags & (TypeFlags.Any | TypeFlags.Unknown)) === 0;
+    const property =
+      type !== undefined && typed ? await checker.getPropertyOfType(type, name) : undefined;
+    let owner: Candidate | undefined;
+    if (property) {
+      const key = declaration_key(property);
+      owner = key === undefined ? undefined : by_declaration.get(key);
+      // The type has its own member of that name.
+      if (owner === undefined) continue;
+    } else {
+      // `target["name"]` on a value without the member reads data.
+      if (isElementAccessExpression(reference.name.parent)) continue;
+
+      const owners = members.get(name) ?? [];
+      if (owners.length !== 1) {
+        const where = `${reference.file.fileName}:${line_of(reference.file, reference.name)}`;
+        for (const other of owners) other.ambiguous_use ??= where;
+        continue;
+      }
+      owner = owners[0];
+    }
+
+    owner?.occurrences.push({
+      file: reference.file,
+      name: reference.name,
+      keeps_key: false,
+      is_string: !isIdentifier(reference.name),
+      name_only: property === undefined,
+    });
+  }
+}
+
 async function collect_candidates(
   project: Project,
   files: readonly SourceFile[],
@@ -500,13 +648,24 @@ async function collect_candidates(
   const exported = new Set<number>();
   const uses = new Map<number, Occurrence[]>();
   const declaration_counts = new Map<number, number>();
+  const use_symbols = new Map<number, Symbol>();
   /** `file\0name` for names the checker resolved to no symbol. */
   const unresolved = new Set<string>();
   const private_names = new Map<SourceFile, Node[]>();
+  const references: MemberReference[] = [];
 
   for (const file of files) {
     const names: Node[] = [];
-    names_in(file, (name) => names.push(name));
+    names_in(
+      file,
+      (name) => names.push(name),
+      (literal) => {
+        const target = string_member_target(literal);
+        if (target && is_camel_case(text_of(literal))) {
+          references.push({ file, name: literal, target });
+        }
+      },
+    );
     const symbols = await project.checker.getSymbolAtLocation(names);
 
     for (const [index, name] of names.entries()) {
@@ -547,7 +706,8 @@ async function collect_candidates(
         continue;
       }
 
-      const occurrence = { file, name, keeps_key };
+      const occurrence = { file, name, keeps_key, is_string: false, name_only: false };
+      use_symbols.set(symbol.id, symbol);
       const listed = uses.get(symbol.id);
       if (listed) listed.push(occurrence);
       else uses.set(symbol.id, [occurrence]);
@@ -570,6 +730,7 @@ async function collect_candidates(
           picked: picked !== undefined,
           is_private_name: isPrivateIdentifier(name),
           unresolved_use: false,
+          ambiguous_use: undefined,
           occurrences: [],
         });
       }
@@ -591,7 +752,13 @@ async function collect_candidates(
           text_of(name) === candidate.oldName && name.pos >= owner.pos && name.end <= owner.end,
       );
       candidate.occurrences.push(
-        ...same_class.map((name) => ({ file: candidate.file, name, keeps_key: false })),
+        ...same_class.map((name) => ({
+          file: candidate.file,
+          name,
+          keeps_key: false,
+          is_string: false,
+          name_only: false,
+        })),
       );
       continue;
     }
@@ -599,6 +766,24 @@ async function collect_candidates(
     candidate.unresolved_use = unresolved.has(`${candidate.file.fileName}\0${candidate.oldName}`);
     candidate.occurrences.push(...(uses.get(symbol_id) ?? []));
   }
+
+  // A member reached through an instantiated type has a transient symbol of its own that
+  // shares the member's declaration.
+  const by_declaration = new Map<string, Candidate>();
+  for (const [symbol_id, candidate] of candidates) {
+    const symbol = use_symbols.get(symbol_id);
+    const key = symbol && declaration_key(symbol);
+    if (key !== undefined && !candidate.is_private_name) by_declaration.set(key, candidate);
+  }
+  for (const [symbol_id, symbol] of use_symbols) {
+    if (candidates.has(symbol_id)) continue;
+
+    const key = declaration_key(symbol);
+    const candidate = key === undefined ? undefined : by_declaration.get(key);
+    candidate?.occurrences.push(...(uses.get(symbol_id) ?? []));
+  }
+
+  await add_member_references(project.checker, candidates, by_declaration, references);
 
   return candidates;
 }
@@ -660,13 +845,25 @@ export async function planRenames(
 
       renames.push({ kind: candidate.kind, ...summary });
       for (const occurrence of candidate.occurrences) {
-        const start = occurrence.name.getStart(occurrence.file);
+        // A string keeps its quotes; only the name between them changes.
+        const quote = occurrence.is_string ? 1 : 0;
+        const start = occurrence.name.getStart(occurrence.file) + quote;
         const text = occurrence.keeps_key
           ? `${candidate.oldName}: ${candidate.newName}`
           : candidate.newName;
         const file_edits = edits.get(occurrence.file.fileName) ?? [];
-        file_edits.push({ start, end: occurrence.name.end, text });
+        file_edits.push({ start, end: occurrence.name.end - quote, text });
         edits.set(occurrence.file.fileName, file_edits);
+        if (occurrence.name_only) {
+          const mention: CommentMention = {
+            file: occurrence.file.fileName,
+            line: line_of(occurrence.file, occurrence.name),
+            oldName: candidate.oldName,
+            newName: candidate.newName,
+            source: "name only",
+          };
+          mentions.set(`${mention.file}\0${mention.line}\0${mention.oldName}`, mention);
+        }
       }
 
       const comments = comment_edits(candidate);
@@ -678,7 +875,10 @@ export async function planRenames(
       }
     }
 
-    const by_position = (left: CommentMention, right: CommentMention): number =>
+    const by_position = (
+      left: { readonly file: string; readonly line: number; readonly oldName: string },
+      right: { readonly file: string; readonly line: number; readonly oldName: string },
+    ): number =>
       left.file.localeCompare(right.file) ||
       left.line - right.line ||
       left.oldName.localeCompare(right.oldName);
@@ -722,12 +922,14 @@ function report(plan: RenamePlan, root: string): string {
     );
   }
   for (const mention of plan.mentions) {
-    lines.push(
-      `${relative(root, mention.file)}:${mention.line} review comment mentions ${mention.oldName} (now ${mention.newName})`,
-    );
+    const what =
+      mention.source === "comment"
+        ? `comment mentions ${mention.oldName} (now ${mention.newName})`
+        : `${mention.oldName} matched by name only, renamed to ${mention.newName}`;
+    lines.push(`${relative(root, mention.file)}:${mention.line} review ${what}`);
   }
   lines.push(
-    `${plan.renames.length} renames, ${plan.conflicts.length} conflicts, ${plan.mentions.length} comments to review`,
+    `${plan.renames.length} renames, ${plan.conflicts.length} conflicts, ${plan.mentions.length} lines to review`,
   );
 
   return `${lines.join("\n")}\n`;
