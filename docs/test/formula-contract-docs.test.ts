@@ -31,7 +31,9 @@ describe("generated formula documentation contract", () => {
     const { inventory, families, overview } = await generated();
     for (const formula of inventory.functions) {
       const holders = families.filter((page) =>
-        page.table?.html.includes(`<span class="sw-code-function">${formula.canonical}</span>`),
+        page.table?.html.includes(
+          `<span class="sw-code-function" data-pagefind-weight="10">${formula.canonical}</span>`,
+        ),
       );
       expect(holders.map((page) => page.route)).toHaveLength(1);
     }
@@ -71,7 +73,7 @@ describe("generated formula documentation contract", () => {
     const { families } = await generated();
     const math = families.find((page) => page.table?.family === "math")?.table?.html ?? "";
     expect(math).toContain(
-      '<span class="sw-code-function">SUM</span>(<span class="sw-formula-arg"><var>number1</var></span>, <span class="sw-formula-arg" data-optional>[<var>number2</var>]</span>, <span class="sw-formula-arg" data-optional>…</span>)',
+      '<span class="sw-code-function" data-pagefind-weight="10">SUM</span>(<span class="sw-formula-arg"><var>number1</var></span>, <span class="sw-formula-arg" data-optional>[<var>number2</var>]</span>, <span class="sw-formula-arg" data-optional>…</span>)',
     );
   });
 
