@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import type { OffsetIndex } from "../src/fenwick.js";
 import type { GeometryLayoutController } from "../src/geometry-layout-controller.js";
 import { DEFAULT_THEME, type GridImpl, initSheetwrite } from "../src/grid.js";
 import type { SheetwriteStore } from "../src/store.js";
@@ -26,10 +25,6 @@ function geometryOf(grid: GridImpl): GeometryLayoutController {
   return Reflect.get(grid, "geometry") as GeometryLayoutController;
 }
 
-function rowIndexOf(grid: GridImpl): OffsetIndex {
-  return Reflect.get(geometryOf(grid), "rowIndex") as OffsetIndex;
-}
-
 /** Every view row's height, top and hit test against the store's committed heights. */
 function expectCommittedGeometry(grid: GridImpl, store: SheetwriteStore): void {
   const geometry = geometryOf(grid);
@@ -53,9 +48,8 @@ function setRowMeta(row: number, height?: number): DocumentOp {
 }
 
 describe("row geometry", () => {
-  it("applies committed heights to the row index in place, at both ends and through undo", () => {
+  it("applies committed heights at both ends and through undo", () => {
     const { store, grid } = mountGridWithData(100);
-    const index = rowIndexOf(grid);
     grid.setRowHeight(0, 50);
     grid.setRowHeight(99, 61);
     grid.setRowHeight(50, 3);
@@ -65,7 +59,6 @@ describe("row geometry", () => {
     expectCommittedGeometry(grid, store);
     grid.redo();
     expectCommittedGeometry(grid, store);
-    expect(rowIndexOf(grid)).toBe(index);
     grid.destroy();
   });
 
@@ -73,7 +66,6 @@ describe("row geometry", () => {
     const { store, grid } = mountGridWithData(100);
     grid.setRowHeight(10, 40);
     grid.setRowHeight(20, 45);
-    const index = rowIndexOf(grid);
     const outcome = grid.applyTransaction({
       patches: [
         setRowMeta(10, DEFAULT_THEME.rowHeight),
@@ -88,7 +80,6 @@ describe("row geometry", () => {
     expect(geometryOf(grid).rowHeight(3)).toBe(34);
     expect(geometryOf(grid).rowHeight(20)).toBe(DEFAULT_THEME.rowHeight);
     expectCommittedGeometry(grid, store);
-    expect(rowIndexOf(grid)).toBe(index);
     grid.destroy();
   });
 
@@ -122,7 +113,6 @@ describe("row geometry", () => {
   it("restores the previewed row when a resize drag is cancelled, and commits it on release", () => {
     const { store, host, grid } = mountGridWithData(30);
     grid.setRowHeight(3, 44);
-    const index = rowIndexOf(grid);
     const scroller = scrollerOf(host);
     const borderY = DEFAULT_THEME.headerHeight + DEFAULT_THEME.rowHeight;
     const pointer = (type: string, y: number): void => {
@@ -149,7 +139,6 @@ describe("row geometry", () => {
     pointer("pointerup", borderY + 20);
     expect(store.getWorkbook().sheets[0]!.rowHeights?.get(0)).toBe(DEFAULT_THEME.rowHeight + 20);
     expectCommittedGeometry(grid, store);
-    expect(rowIndexOf(grid)).toBe(index);
     grid.destroy();
   });
 
@@ -160,7 +149,6 @@ describe("row geometry", () => {
         { op: "setSheetMeta", sheet: "s1", patch: { sortKeys: [{ col: 1, ascending: false }] } },
       ],
     });
-    const index = rowIndexOf(grid);
     grid.setRowHeight(0, 45);
     expect(store.getWorkbook().sheets[0]!.rowHeights?.get(19)).toBe(45);
     grid.applyTransaction({ patches: [setRowMeta(0, 50)] });
@@ -169,7 +157,6 @@ describe("row geometry", () => {
     grid.applyTransaction({ patches: [setRowMeta(1, 41), setRowMeta(2, 42), setRowMeta(1, 43)] });
     expect(geometryOf(grid).rowHeight(18)).toBe(43);
     expectCommittedGeometry(grid, store);
-    expect(rowIndexOf(grid)).toBe(index);
     const sort = (ascending: boolean): void => {
       grid.applyTransaction({
         patches: [

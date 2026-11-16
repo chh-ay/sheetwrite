@@ -108,6 +108,8 @@ Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then p
 
 `paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose. Cut clears its source only after the system clipboard accepts the payload.
 
+Paste lands on the top-left cell of the selection. When the selection is a whole multiple of the copied block, the block repeats to fill it and each copy's relative references shift to its own place, as in Excel.
+
 ### Report the clipboard outcome
 
 `grid.actions.copy/cut/paste/pasteValues` return `Promise<ClipboardOutcome>` and never reject:

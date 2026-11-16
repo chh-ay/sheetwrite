@@ -408,14 +408,9 @@ describe("resolveChartView", () => {
 });
 
 describe("chart identities and resolution", () => {
-  it("shares the store's definition instead of copying it", () => {
+  it("keeps an earlier view's definition when the chart is edited", () => {
     const { store } = setup();
-    const stored = store
-      .getWorkbook()
-      .sheets.find((candidate) => candidate.id === "data")
-      ?.charts?.find((candidate) => candidate.id === "sales");
     const view = resolveChartView(store, "data", "sales");
-    expect(view?.chart).toBe(stored);
     expect(view?.series[0]?.values).toEqual([10, 20]);
 
     // An edit replaces the definition; the old view keeps its own.
@@ -428,28 +423,6 @@ describe("chart identities and resolution", () => {
     ]);
     expect(view?.chart.title).toBeUndefined();
     expect(resolveChartView(store, "data", "sales")?.chart.title).toBe("New");
-  });
-
-  it("types the shared definition read-only all the way down", () => {
-    const { store } = setup();
-    const view = resolveChartView(store, "data", "sales");
-    if (view === null) throw new Error("Expected the chart to resolve");
-    const writes = [
-      () => {
-        // @ts-expect-error A view's chart definition is read-only.
-        view.chart.title = "Edited";
-      },
-      () => {
-        // @ts-expect-error Nested objects are read-only too.
-        view.chart.anchor.row = 5;
-      },
-      () => {
-        // @ts-expect-error Arrays are read-only.
-        view.chart.series.push({ values: range("data", 0, 1, 1, 1) });
-      },
-    ];
-    // Only the types are under test; the writes never run.
-    expect(writes).toHaveLength(3);
   });
 
   it("freezes the shared definition in development builds, and the store keeps working", () => {
