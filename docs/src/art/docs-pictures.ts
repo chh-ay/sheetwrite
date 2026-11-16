@@ -334,6 +334,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/data/autofilter/": [{ after: AFTER_LEAD, picture: "autofilter" }],
   "/docs/features/data/validation-protection-and-notes/": [
     {
       after: AFTER_LEAD,
