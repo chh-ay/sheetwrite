@@ -32,4 +32,11 @@ describe("worksheet name contract", () => {
       });
     }
   });
+
+  it("refuses History, which Excel reserves, in any case", () => {
+    for (const candidate of ["History", "HISTORY", "history"]) {
+      expect(validateSheetName(candidate)).toMatchObject({ ok: false, code: "reserved" });
+    }
+    expect(validateSheetName("History 2024")).toMatchObject({ ok: true });
+  });
 });

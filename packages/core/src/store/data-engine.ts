@@ -103,7 +103,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { validateSheetName } from "../sheet-name.js";
+import { canAddSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -4308,7 +4308,7 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!name.ok) return false;
+    if (!canAddSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,
