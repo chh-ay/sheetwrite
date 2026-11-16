@@ -263,6 +263,26 @@ export interface GridActions {
   autoFitColumns(cols?: readonly number[]): void;
   /** Remove the filter on the given column, or on the focus cell's column. */
   clearFilter(col?: number): void;
+  /**
+   * Data › Filter (Ctrl+Shift+L): turn the AutoFilter on for the table, the
+   * selected range or the current region around the focus cell, whose first
+   * row becomes the header; or off when the sheet has one.
+   * Its code loads on first use, so the change lands a moment after the call.
+   */
+  toggleAutoFilter(): void;
+  /**
+   * Data › Clear: remove every column filter of the sheet; the filter buttons stay.
+   * Its code loads on first use, so the change lands a moment after the call.
+   */
+  clearFilters(): void;
+  /** Data › Reapply: filter again, after edits changed which rows match. */
+  reapplyFilter(): void;
+  /**
+   * Filter the focus cell's column to the focus cell's value, as Excel's
+   * "Filter by Selected Cell's Value"; turns the AutoFilter on first if needed.
+   * Its code loads on first use, so the change lands a moment after the call.
+   */
+  filterBySelection(): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
   copy(): Promise<ClipboardOutcome>;
   /** Copy + clear the source (after the clipboard accepted). Never rejects. */
@@ -326,6 +346,7 @@ export type ToolbarActionName =
   | "unmerge"
   | "sortAsc"
   | "sortDesc"
+  | "filter"
   | "exportCsv"
   | "exportXlsx"
   | "importXlsx"
@@ -464,6 +485,8 @@ export type ContextMenuActionName =
   | "showAllColumns"
   | "autoFitColumn"
   | "clearFilter"
+  | "filterBySelection"
+  | "reapplyFilter"
   | "sortAscending"
   | "sortDescending"
   | "sortViewAscending"
@@ -522,7 +545,8 @@ export type KeyboardAction =
   | "insertTime"
   | "selectAll"
   | "fillDown"
-  | "fillRight";
+  | "fillRight"
+  | "toggleFilter";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {

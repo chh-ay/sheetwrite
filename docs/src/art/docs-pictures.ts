@@ -256,6 +256,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/releases/0.5.4/": [{ after: AFTER_LEAD, picture: "release-0.5.4" }],
   "/docs/releases/0.6.0/": [{ after: AFTER_LEAD, picture: "release-0.6.0" }],
   "/docs/releases/0.6.1/": [{ after: AFTER_LEAD, picture: "release-0.6.1" }],
+  "/docs/releases/0.7.0/": [{ after: "highlights", picture: "release-0.7.0" }],
   "/docs/features/formatting/": [
     {
       after: AT_START,
@@ -333,6 +334,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
+  "/docs/features/data/autofilter/": [{ after: AFTER_LEAD, picture: "autofilter" }],
   "/docs/features/data/validation-protection-and-notes/": [
     {
       after: AFTER_LEAD,
