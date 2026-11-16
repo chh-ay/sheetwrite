@@ -50,7 +50,7 @@ function SiteNotFound() {
             </p>
           </header>
           <div class="sw-not-found__search">
-            <Island component={DocsSearch} hydrate="interaction" name="search" props={{}} />
+            <Island component={DocsSearch} hydrate="use" name="search" props={{}} />
           </div>
           <nav aria-label="Where to go" class="sw-not-found__links">
             <For each={DESTINATIONS}>

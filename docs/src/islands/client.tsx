@@ -368,7 +368,8 @@ if (forwarded === undefined) {
   const islands = Array.from(document.querySelectorAll<HTMLElement>("[data-island]"));
   const onLoad = islands.filter((island) => island.dataset.islandHydrate === undefined);
   for (const island of islands) {
-    if (island.dataset.islandHydrate === "interaction") hydrateOnInteraction(island);
+    const hydration = island.dataset.islandHydrate;
+    if (hydration === "interaction" || hydration === "use") hydrateOnInteraction(island);
     else if (island.dataset.islandHydrate === "visible") hydrateWhenVisible(island);
   }
   // After the first frame: the small bundle can arrive before the stylesheets

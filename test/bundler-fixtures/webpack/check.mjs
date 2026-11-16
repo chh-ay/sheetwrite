@@ -50,6 +50,9 @@ const EDIT_LINKS_PANEL_MARKER = "This workbook has no links to other workbooks."
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
+// The AutoFilter's commands and dropdown load on first use, together; the
+// message Data › Filter shows outside a range of data survives minifiers.
+const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -70,6 +73,7 @@ const queryPanelChunks = [];
 const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
+const autoFilterChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -92,6 +96,7 @@ for (const file of lazyChunks) {
     chromeChunks.push(file);
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
+  else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
@@ -118,6 +123,8 @@ if (editLinksPanelChunks.length !== 1) {
 }
 if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
+if (autoFilterChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
 if (addonRegistryChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
@@ -151,6 +158,9 @@ if (mainCode.includes(ADDON_REGISTRY_MARKER)) {
 }
 if (mainCode.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(AUTOFILTER_MARKER)) {
+  throw new Error("The AutoFilter commands are in webpack's main.js; they must load lazily");
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
@@ -200,6 +210,7 @@ const assets = publicFiles.map((file) => {
       editLinksPanelChunks,
       functionTableChunks,
       findChunks,
+      autoFilterChunks,
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,

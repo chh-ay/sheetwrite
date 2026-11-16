@@ -80,7 +80,7 @@ export function DocsTopbar(props: { readonly activeTab: DocsTabId; readonly acti
         </For>
       </nav>
       <div class="sw-docs-bar__actions">
-        <Island component={DocsSearch} hydrate="interaction" name="search" props={{}} />
+        <Island component={DocsSearch} hydrate="use" name="search" props={{}} />
         <a class="sw-docs-bar__link" href={REPOSITORY_URL}>
           GitHub
         </a>

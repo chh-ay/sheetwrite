@@ -4,7 +4,7 @@ import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";
-import type { CellNote, Sheet } from "./types/document.js";
+import type { AutoFilter, CellNote, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
 
 const PRESENCE_LABEL_HEIGHT = 18;
@@ -13,6 +13,23 @@ const PRESENCE_LABEL_MAX_CHARS = 80;
 const PRESENCE_MARKER_SIZE = 8;
 const NOTE_INDICATOR_SIZE = 8;
 const NOTE_INDICATOR_COLOR = "#f59e0b";
+
+/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
+const FILTER_BUTTON_SIZE = 16;
+
+/**
+ * Where an AutoFilter header cell's filter button sits: a square at the
+ * cell's right edge, as in Excel. `cell` and the result share a coordinate space.
+ */
+export function filterButtonRect(cell: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
+  return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+}
 
 const EMPTY_VIEW_ROWS = new Int32Array(0);
 const EMPTY_VIEW_ITEMS = new Uint32Array(0);
@@ -311,6 +328,8 @@ export class OverlayPainter {
   private lastSearchVersion = -1;
   private lastGeometryVersion = -1;
   private lastPaintNotes: readonly CellNote[] | undefined;
+  private lastAutoFilter: AutoFilter | undefined;
+  private lastFilters: Sheet["filters"];
   private lastSearchActive = -1;
   private lastEditing = false;
   private lastFillPresent = false;
@@ -404,6 +423,7 @@ export class OverlayPainter {
       this.paintFillHandle(theme, contentTop, scrollLeft);
     }
 
+    this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
     this.hideSurplus();
     this.hideSurplusPresenceLabels();
   }
@@ -447,7 +467,10 @@ export class OverlayPainter {
     const selVersion = selection.version;
     const searchVersion = this.deps.searchVersion();
     const geometryVersion = this.deps.geometryVersion();
-    const notes = this.deps.sheet().notes;
+    const sheet = this.deps.sheet();
+    const notes = sheet.notes;
+    const autoFilter = sheet.autoFilter;
+    const filters = sheet.filters;
     const searchActive = this.deps.searchActive();
     const editing = this.deps.isEditing();
     const fillPresent = fill !== null;
@@ -469,6 +492,8 @@ export class OverlayPainter {
       searchVersion === this.lastSearchVersion &&
       geometryVersion === this.lastGeometryVersion &&
       notes === this.lastPaintNotes &&
+      autoFilter === this.lastAutoFilter &&
+      filters === this.lastFilters &&
       searchActive === this.lastSearchActive &&
       editing === this.lastEditing &&
       fillPresent === this.lastFillPresent &&
@@ -492,6 +517,8 @@ export class OverlayPainter {
     this.lastSearchVersion = searchVersion;
     this.lastGeometryVersion = geometryVersion;
     this.lastPaintNotes = notes;
+    this.lastAutoFilter = autoFilter;
+    this.lastFilters = filters;
     this.lastSearchActive = searchActive;
     this.lastEditing = editing;
     this.lastFillPresent = fillPresent;
@@ -1244,6 +1271,36 @@ export class OverlayPainter {
   }
 
   /**
+   * The filter button of each AutoFilter header cell in view, at the cell's
+   * right edge: an arrow, or a funnel when its column is filtered.
+   */
+  private paintFilterButtons(
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const range = sheet.autoFilter?.range;
+    if (!range) return;
+    const row = this.deps.toViewRow(range.start.row);
+    if (row === null) return;
+
+    const filtered = new Set(sheet.filters?.map(([col]) => col));
+    for (let col = range.start.col; col <= range.end.col; col++) {
+      const cell = this.deps.screenRect(row, col, contentTop, scrollLeft);
+      if (cell.w <= 0 || cell.x >= clientW || cell.y >= clientH) continue;
+      // A header row scrolled under the column headers shows no button.
+      if (cell.x + cell.w <= 0 || cell.y < this.deps.theme().headerHeight) continue;
+      const button = filterButtonRect(cell);
+      const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      el.className = "sheetwrite-autofilter-button";
+      el.style.outlineStyle = "none";
+      el.dataset.filtered = String(filtered.has(col));
+    }
+  }
+
+  /**
    * Hand out the next pooled rect div, applying the mutable style fields. Static
    * setup (position, pointer-events, outline-offset, box-sizing) is written once
    * at creation. Outline width/style are rewritten to their defaults each time
@@ -1273,6 +1330,8 @@ export class OverlayPainter {
     this.cursor++;
 
     el.style.clipPath = "";
+    if (el.className) el.className = "";
+    el.removeAttribute("data-filtered");
     el.textContent = "";
     el.removeAttribute("data-sheetwrite-presence");
     el.removeAttribute("data-sheetwrite-presence-range");
@@ -1299,6 +1358,9 @@ export class OverlayPainter {
     for (let i = this.cursor; i < this.pool.length; i++) {
       const el = this.pool[i]!;
       el.removeAttribute("data-sheetwrite-presence");
+      // A hidden filter button must not stay one, for queries and styles alike.
+      if (el.className) el.className = "";
+      el.removeAttribute("data-filtered");
       el.removeAttribute("data-sheetwrite-presence-range");
       el.removeAttribute("aria-hidden");
       el.removeAttribute("title");
