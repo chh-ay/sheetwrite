@@ -71,7 +71,10 @@ export class HistoryError extends SheetwriteError {
   }
 }
 
-/** Default byte, count, cadence, and retention bounds (decision recorded in #228). */
+/**
+ * Default history limits. A host can lower any of them, or raise the storage
+ * and retention limits to what its own backend allows.
+ */
 export const DEFAULT_HISTORY_LIMITS: Readonly<HistoryLimits> = Object.freeze({
   maxSnapshotBytes: 64 * MIB,
   maxSegmentBytes: MIB,

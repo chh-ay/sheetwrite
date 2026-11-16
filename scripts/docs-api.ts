@@ -1435,21 +1435,42 @@ export function renderEntryPage(
   return `${body.join("\n").trimEnd()}\n`;
 }
 
+/** What each package is for, in one line, at the top of its section on the API index. */
+const PACKAGE_PURPOSES: Readonly<Record<string, string>> = {
+  "@sheetwrite/core": "The grid and the workbook: create a grid, edit, format and listen to it.",
+  "@sheetwrite/wasm":
+    "The default formula engine and cell store. `initSheetwrite` loads it; most apps never import it.",
+  "@sheetwrite/formulas":
+    "The full formula engine: the default engine plus pivots, the data model and the analysis functions.",
+  "@sheetwrite/xlsx": "Read and write Excel files.",
+  "@sheetwrite/charts": "Draw charts over cell ranges.",
+  "@sheetwrite/queries": "Saved queries that load CSV, JSON or your own data into tables.",
+  "@sheetwrite/react": "The grid as a React component.",
+  "@sheetwrite/vue": "The grid as a Vue component.",
+  "@sheetwrite/svelte": "The grid as a Svelte component.",
+};
+
 export function renderApiIndex(manifest: PublicApiManifest): string {
   const lines = [
     frontmatter(
       "API reference",
-      "Generated reference for every classified Sheetwrite package entry point.",
+      "Every public function, class, type and constant in the Sheetwrite packages.",
     ).trimEnd(),
-    "The package `exports` maps define this inventory. Supported, internal, asset, and testing-only entry points are classified explicitly; generated pages use declaration signatures and source JSDoc.",
+    "Each package below says what it is for, then lists the paths you import from and how many names each one exports.",
     "",
   ];
   for (const pkg of manifest.packages) {
+    const purpose = PACKAGE_PURPOSES[pkg.name];
+    if (purpose === undefined) {
+      throw new Error(`${pkg.name} has no line in PACKAGE_PURPOSES for the API index`);
+    }
     lines.push(
       `## ${pkg.name}`,
       "",
+      purpose,
+      "",
       '<table class="api-entry-table">',
-      "<thead><tr><th>Entry point</th><th>Classification</th><th>Symbols</th></tr></thead>",
+      "<thead><tr><th>Import path</th><th>Status</th><th>Names</th></tr></thead>",
       "<tbody>",
       ...pkg.entryPoints.map(
         (entry) =>
