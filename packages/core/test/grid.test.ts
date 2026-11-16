@@ -839,7 +839,7 @@ describe("setBlock arrays at every entry point", () => {
     sheet.protectedRanges = [{ id: "locked", range }];
     const grid = limitedGrid(workbook);
     let installed = false;
-    grid.store.setProtectionResolver(({ operation }) => {
+    grid.setProtectionResolver(({ operation }) => {
       if (!installed) smallThenOverLimit(operation);
       installed = true;
       return "allow";
