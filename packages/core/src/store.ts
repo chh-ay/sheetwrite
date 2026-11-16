@@ -120,7 +120,8 @@ export interface SheetwriteStoreOptions extends StoreDataEngineOptions {
 }
 
 type ChangeListener = (event: ChangeEvent) => void;
-const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
+/** The message of each sheet lifecycle issue code. */
+export const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
   blank: "Sheet name cannot be blank",
   "too-long": "Sheet name exceeds 31 UTF-16 code units",
   "forbidden-character": "Sheet name contains a forbidden character",
