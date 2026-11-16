@@ -29,6 +29,7 @@
     "compatibility:roundtrip:libreoffice": "bun scripts/conformance.ts roundtrip-libreoffice",
     "docs:generate": "bun scripts/docs-cli.ts generate",
     "docs:check": "bun scripts/docs-cli.ts check",
+    "docs:check-site": "bun scripts/docs-site-check.ts",
     "docs:prepare-deployment": "bun scripts/prepare-docs-deployment.ts",
     "check:cycles": "bun scripts/check-import-cycles.ts",
     "naming:check": "bun scripts/snake-case-internals.ts check",

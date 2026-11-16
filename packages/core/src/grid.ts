@@ -892,6 +892,7 @@ export class GridImpl implements Grid {
           this.scroller.scrollLeft,
         ),
       scrollToCell: (addr) => this.scrollToCell(addr),
+      selectCell: (addr) => this.setSelection({ kind: "cell", addr }),
       scheduleRender: () => this.scheduleRender(),
       emit: (result) => {
         for (const fn of this.listeners.search) fn(result);
