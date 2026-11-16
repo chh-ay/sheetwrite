@@ -92,6 +92,15 @@ const autoFilterSnapshot: WorkbookSnapshot = {
   ],
 };
 
+/** JSON with every object's keys sorted, so equal values compare equal whatever their key order. */
+function sortedJson(value: unknown): string {
+  return JSON.stringify(value, (_key, field: unknown) =>
+    field !== null && typeof field === "object" && !Array.isArray(field)
+      ? Object.fromEntries(Object.entries(field).sort(([a], [b]) => (a < b ? -1 : 1)))
+      : field,
+  );
+}
+
 /**
  * Write a filtered store to XLSX and read it back: the AutoFilter and its
  * condition must survive, and the read store must show the same rows.
@@ -102,11 +111,15 @@ async function autoFilterRoundTrip(): Promise<number> {
     const imported = await fromXlsxWorkbook(await toXlsxWorkbook(store));
     const sheet = imported.sheets[0];
     if (
-      JSON.stringify(sheet?.autoFilter) !==
-        JSON.stringify(autoFilterSnapshot.sheets[0]?.autoFilter) ||
-      JSON.stringify(sheet?.filters) !== JSON.stringify(autoFilterSnapshot.sheets[0]?.filters)
+      sortedJson(sheet?.autoFilter) !== sortedJson(autoFilterSnapshot.sheets[0]?.autoFilter) ||
+      sortedJson(sheet?.filters) !== sortedJson(autoFilterSnapshot.sheets[0]?.filters)
     ) {
-      throw new Error("The AutoFilter changed in an XLSX round trip");
+      throw new Error(
+        `The AutoFilter changed in an XLSX round trip: ${JSON.stringify({
+          autoFilter: sheet?.autoFilter,
+          filters: sheet?.filters,
+        })}`,
+      );
     }
     const reloaded = SheetwriteStore.fromSnapshot(imported);
     try {

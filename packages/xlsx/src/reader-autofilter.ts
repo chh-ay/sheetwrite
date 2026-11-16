@@ -98,10 +98,12 @@ function parseCustomFilters(element: XmlElement): ColumnFilter | null {
     return { kind: "nonEmpty" };
   }
 
+  // The join matters only between two conditions; one condition reads as
+  // "and", the join Sheetwrite and Excel's dialog start with.
   const and = xmlAttribute(element, "and");
   return {
     kind: "custom",
-    join: and === "1" || and === "true" ? "and" : "or",
+    join: conditions.length === 1 || and === "1" || and === "true" ? "and" : "or",
     conditions: conditions.length === 1 ? [conditions[0]!] : [conditions[0]!, conditions[1]!],
   };
 }

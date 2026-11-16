@@ -6,7 +6,12 @@ import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
 import type { EditDraftSink } from "./edit-draft.js";
 import { EditController, type EditNavigate } from "./editor.js";
-import { detectFillSeries, type FillSeries, type FillSourceCell } from "./fill-series.js";
+import {
+  detectFillSeries,
+  type FillOptions,
+  type FillSeries,
+  type FillSourceCell,
+} from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
@@ -32,6 +37,13 @@ import type { ApplyTransactionResult } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
 
 const PRINTABLE = /^.$/u;
+
+/** Whether a number format shows a date (day or year parts), so one cell fills by days. */
+function showsDate(format: string | undefined): boolean {
+  if (format === undefined) return false;
+  const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
+  return /[dy]/i.test(visible) && !/[#0?]/.test(visible);
+}
 
 interface InteractionDependencies {
   host: HTMLElement;
@@ -587,18 +599,10 @@ export class InteractionSessions {
     if (!isTouch && !this.isEditing) this.deps.host.focus({ preventScroll: true });
 
     const viewportRect = this.deps.viewportEl.getBoundingClientRect();
-    const fillHandle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
-    if (fillHandle && !this.isEditing) {
-      const hx = e.clientX - viewportRect.left;
-      const hy = e.clientY - viewportRect.top;
-      if (
-        Math.abs(hx - fillHandle.x) <= FILL_HANDLE_HIT_RADIUS &&
-        Math.abs(hy - fillHandle.y) <= FILL_HANDLE_HIT_RADIUS
-      ) {
-        e.preventDefault();
-        this.startFillDrag(e);
-        return;
-      }
+    if (!this.isEditing && this.hitsFillHandle(e.clientX, e.clientY)) {
+      e.preventDefault();
+      this.startFillDrag(e);
+      return;
     }
 
     // Resize gesture: near a column boundary in the top header, or a row boundary
@@ -741,10 +745,61 @@ export class InteractionSessions {
       this.deps.autoFitColumns([resize.index]);
       return;
     }
+    if (!this.deps.readOnly() && this.hitsFillHandle(e.clientX, e.clientY)) {
+      e.preventDefault();
+      this.fillToAdjacentData();
+      return;
+    }
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
     this.beginEdit(cell.row, cell.col, undefined, true);
   };
+
+  /** Whether a pointer at (clientX, clientY) is on the selection's fill handle. */
+  private hitsFillHandle(clientX: number, clientY: number): boolean {
+    const handle = this.fillHandleScreen(this.deps.contentTop(), this.deps.scroller.scrollLeft);
+    if (!handle) return false;
+    const viewport = this.deps.viewportEl.getBoundingClientRect();
+    return (
+      Math.abs(clientX - viewport.left - handle.x) <= FILL_HANDLE_HIT_RADIUS &&
+      Math.abs(clientY - viewport.top - handle.y) <= FILL_HANDLE_HIT_RADIUS
+    );
+  }
+
+  /**
+   * Double-click on the fill handle: fill down as far as the data in the
+   * column next to the selection reaches, left column first, as in Excel.
+   */
+  private fillToAdjacentData(): void {
+    const source = this.fillSourceRect();
+    if (!source) return;
+    const below = source.r1 + 1;
+    if (below >= this.deps.rowCount()) return;
+    const sheet = this.deps.activeSheet();
+    const filled = (col: number): boolean => {
+      const value = this.deps.store.getCell({
+        sheet,
+        row: this.deps.toDataRow(below),
+        col,
+      }).resolved;
+      return value !== null && value !== "";
+    };
+    const columns = this.deps.colIndices();
+    for (const col of [source.c0 - 1, source.c1 + 1]) {
+      if (!columns.includes(col) || !filled(col)) continue;
+      const end = this.deps.dataEdge(below, col, 1, 0);
+      if (end === null || end < below) return;
+      const target = { ...source, r1: end };
+      if (this.commitFill(source, target)) {
+        const selection = this.deps.selection();
+        selection.selectCell(target.r0, target.c0);
+        selection.extendTo(target.r1, target.c1);
+        this.deps.emitSelection();
+      }
+      this.deps.scheduleRender();
+      return;
+    }
+  }
 
   private readonly onHover = (e: PointerEvent): void => {
     if (e.pointerType === "touch") return; // no hover cursors for touch
@@ -938,6 +993,14 @@ export class InteractionSessions {
 
         case "editNote":
           this.deps.grid.actions.editNote();
+          break;
+
+        case "fillDown":
+          this.fillFromEdge(true);
+          break;
+
+        case "fillRight":
+          this.fillFromEdge(false);
           break;
 
         case "toggleFilter":
@@ -1163,11 +1226,12 @@ export class InteractionSessions {
       this.fillTarget = this.extendFill(source, c);
       this.deps.scheduleRender();
     };
-    const up = (): void => {
+    const up = (ev: PointerEvent): void => {
       this.detachDrag();
       const target = this.fillTarget;
       this.fillTarget = null;
-      if (target && this.commitFill(source, target)) {
+      // Ctrl (Option on a Mac) swaps counting and copying, as in Excel.
+      if (target && this.commitFill(source, target, { swap: ev.ctrlKey || ev.altKey })) {
         const selection = this.deps.selection();
         selection.selectCell(target.r0, target.c0);
         selection.extendTo(target.r1, target.c1);
@@ -1200,7 +1264,27 @@ export class InteractionSessions {
     return { r0: source.r0, c0: c.col, r1: source.r1, c1: source.c1 };
   }
 
-  private commitFill(source: SelRect, target: SelRect): boolean {
+  /**
+   * Ctrl+D and Ctrl+R: copy the top row (or left column) of the selection,
+   * with its formats, into the rest of it. With one cell selected, copy the
+   * cell above (or to the left) into it, as Excel's Fill Down and Fill Right do.
+   */
+  private fillFromEdge(down: boolean): void {
+    const rect = this.fillSourceRect();
+    if (!rect) return;
+    const single = down ? rect.r0 === rect.r1 : rect.c0 === rect.c1;
+    if (single && (down ? rect.r0 === 0 : rect.c0 === this.deps.firstCol())) return;
+    const target = single
+      ? down
+        ? { ...rect, r0: rect.r0 - 1 }
+        : { ...rect, c0: this.deps.nextVisibleCol(rect.c0, -1) }
+      : rect;
+    const source = down ? { ...target, r1: target.r0 } : { ...target, c1: target.c0 };
+    this.commitFill(source, target, { copy: true });
+    this.deps.scheduleRender();
+  }
+
+  private commitFill(source: SelRect, target: SelRect, options: FillOptions = {}): boolean {
     if (this.deps.readOnly()) return false;
 
     const sheet = this.deps.activeSheet();
@@ -1212,13 +1296,17 @@ export class InteractionSessions {
       }
     }
 
+    const columns = this.deps.sheet().columns;
     const captured = storeEngine(this.deps.store)?.captureCells(sheet, coordinates);
     // Custom stores without an engine retain their scalar read contract.
     const sources = coordinates.map((coordinate, index) => {
       const cell = captured?.[index];
       const addr = { sheet, ...coordinate };
+      const read = cell ?? this.deps.store.getCell(addr);
       return {
-        resolved: cell ? cell.resolved : this.deps.store.getCell(addr).resolved,
+        resolved: read.resolved,
+        style: read.style,
+        isDate: showsDate(read.style.numberFormat) || columns[coordinate.col]?.type === "date",
         formula: cell
           ? cell.value.kind === "formula"
             ? cell.value.src
@@ -1226,19 +1314,11 @@ export class InteractionSessions {
           : (this.deps.loadable?.getFormula(addr) ?? null),
       };
     });
-
-    const series = new Map<number, FillSeries>();
-    for (let col = source.c0; col <= source.c1; col++) {
-      const cells: FillSourceCell[] = [];
-      for (let row = source.r0; row <= source.r1; row++) {
-        const cell = sources[(row - source.r0) * srcCols + col - source.c0];
-        if (!cell) throw new Error("Missing captured fill source");
-
-        cells.push({ value: cell.resolved, isFormula: cell.formula !== null });
-      }
-
-      series.set(col, detectFillSeries(cells));
-    }
+    const sourceAt = (row: number, col: number) => {
+      const cell = sources[(row - source.r0) * srcCols + col - source.c0];
+      if (!cell) throw new Error("Missing captured fill source");
+      return cell;
+    };
 
     const output = { ...target };
     if (target.r0 < source.r0) output.r1 = source.r0 - 1;
@@ -1246,6 +1326,21 @@ export class InteractionSessions {
     else if (target.c0 < source.c0) output.c1 = source.c0 - 1;
     else if (target.c1 > source.c1) output.c0 = source.c1 + 1;
     else return false;
+    // A fill runs along the axis it extends: each source column for an up or
+    // down fill, each source row for a left or right fill.
+    const vertical = output.c0 === source.c0 && output.c1 === source.c1;
+
+    const series = new Map<number, FillSeries>();
+    const lines = vertical ? [source.c0, source.c1] : [source.r0, source.r1];
+    for (let line = lines[0] ?? 0; line <= (lines[1] ?? -1); line++) {
+      const cells: FillSourceCell[] = [];
+      const [from, to] = vertical ? [source.r0, source.r1] : [source.c0, source.c1];
+      for (let along = from; along <= to; along++) {
+        const cell = vertical ? sourceAt(along, line) : sourceAt(line, along);
+        cells.push({ value: cell.resolved, isFormula: cell.formula !== null, isDate: cell.isDate });
+      }
+      series.set(line, detectFillSeries(cells, options));
+    }
 
     const dataRows: number[] = [];
     for (let row = output.r0; row <= output.r1; row++) dataRows.push(this.deps.toDataRow(row));
@@ -1266,37 +1361,49 @@ export class InteractionSessions {
     );
     const patches: DocumentOp[] = [];
     const cells: SnapshotCell[] = [];
+    const srcRows = source.r1 - source.r0 + 1;
+    const wrap = (offset: number, size: number): number => ((offset % size) + size) % size;
 
     for (let r = output.r0; r <= output.r1; r++) {
       for (let c = output.c0; c <= output.c1; c++) {
-        const sc = source.c0 + ((((c - source.c0) % srcCols) + srcCols) % srcCols);
-        const columnSeries = series.get(sc);
-        if (!columnSeries) throw new Error(`Missing fill series for column ${sc}`);
+        // The source cell this target repeats; series steps count along the fill axis.
+        const sr = source.r0 + wrap(r - source.r0, srcRows);
+        const sc = source.c0 + wrap(c - source.c0, srcCols);
+        const lineSeries = series.get(vertical ? sc : sr);
+        if (!lineSeries) throw new Error(`Missing fill series for ${vertical ? "column" : "row"}`);
 
-        const step = columnSeries.stepAt(r - source.r0);
+        const step = lineSeries.stepAt(vertical ? r - source.r0 : c - source.c0);
+        const sourceRow = vertical && step.kind === "tile" ? source.r0 + step.sourceIndex : sr;
+        const sourceCol = !vertical && step.kind === "tile" ? source.c0 + step.sourceIndex : sc;
+        const cell = sourceAt(sourceRow, sourceCol);
         const targetDataRow = this.deps.toDataRow(r);
         let value: CellValue;
         if (step.kind === "value") value = { kind: "literal", value: step.value };
         else {
-          const sourceRow = source.r0 + step.sourceIndex;
-          const cell = sources[step.sourceIndex * srcCols + sc - source.c0];
-          if (!cell) throw new Error("Missing captured fill source");
-
           value = cell.formula
             ? {
                 kind: "formula",
                 src: shiftA1Refs(
                   cell.formula,
                   targetDataRow - this.deps.toDataRow(sourceRow),
-                  c - sc,
+                  c - sourceCol,
                 ),
               }
             : { kind: "literal", value: cell.resolved };
         }
 
+        // Fill copies the source cell's format along with its value, as in Excel.
+        const style = cell.style;
         if (scalarWrites) {
-          patches.push({ op: "set", addr: { sheet, row: targetDataRow, col: c }, value });
-        } else cells.push({ rowOffset: targetDataRow - startRow, colOffset: c - output.c0, value });
+          patches.push({ op: "set", addr: { sheet, row: targetDataRow, col: c }, value, style });
+        } else {
+          cells.push({
+            rowOffset: targetDataRow - startRow,
+            colOffset: c - output.c0,
+            value,
+            style,
+          });
+        }
       }
     }
 

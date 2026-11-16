@@ -190,4 +190,17 @@ describe("AutoFilter XLSX interchange", () => {
       expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
     ]);
   });
+
+  it("reads Excel's one-condition custom filter, which has no join, as an and", async () => {
+    const imported = sheetAt(
+      await backend.fromXlsxWorkbook(
+        oneSheet(
+          '<dimension ref="A1:C6"/><sheetData/><autoFilter ref="A1:C6"><filterColumn colId="1"><customFilters><customFilter operator="greaterThan" val="5"/></customFilters></filterColumn></autoFilter>',
+        ),
+      ),
+    );
+    expect(imported.filters).toEqual([
+      [1, { kind: "custom", join: "and", conditions: [{ op: "gt", value: 5 }] }],
+    ]);
+  });
 });

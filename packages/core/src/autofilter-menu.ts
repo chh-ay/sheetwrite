@@ -266,7 +266,9 @@ export class AutoFilterMenu {
     });
     list.addEventListener("keydown", this.onListKey);
     list.addEventListener("scroll", () => this.renderRows());
-    list.addEventListener("focus", () => this.renderRows());
+    // Focus only marks the active row: redrawing the rows here would replace
+    // the row under a pointer that is pressing it, and its click would be lost.
+    list.addEventListener("focus", () => this.markActive());
     list.addEventListener("click", this.onListClick);
     root.addEventListener("keydown", this.onRootKey);
     document.addEventListener("pointerdown", this.onOutsidePointer, true);
@@ -551,6 +553,21 @@ export class AutoFilterMenu {
         : this.label(item.value);
     option.append(box, text);
     return option;
+  }
+
+  private markActive(): void {
+    const session = this.session;
+    if (!session) return;
+    session.list.setAttribute(
+      "aria-activedescendant",
+      `${session.idPrefix}-option-${session.active}`,
+    );
+    for (const option of session.list.querySelectorAll<HTMLElement>('[role="option"]')) {
+      option.classList.toggle(
+        "sheetwrite-autofilter-active",
+        Number(option.dataset.index) === session.active,
+      );
+    }
   }
 
   private toggle(index: number): void {

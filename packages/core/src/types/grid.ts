@@ -532,6 +532,8 @@ export type KeyboardAction =
   | "replace"
   | "clearContents"
   | "editNote"
+  | "fillDown"
+  | "fillRight"
   | "toggleFilter";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */

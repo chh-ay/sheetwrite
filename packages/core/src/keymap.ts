@@ -21,6 +21,9 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   clearContents: [{ key: "Delete" }, { key: "Backspace" }],
   // Excel opens the note editor with Shift+F2.
   editNote: ["Shift+F2"],
+  // Excel's Fill Down and Fill Right.
+  fillDown: ["Mod+D"],
+  fillRight: ["Mod+R"],
   // Excel turns filters on and off with Ctrl+Shift+L.
   toggleFilter: ["Mod+Shift+L"],
 };
