@@ -32,6 +32,9 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   insertTime: ["Mod+Shift+;"],
   // Ctrl+A selects the current region, and the whole sheet when pressed again.
   selectAll: ["Mod+A"],
+  // Excel's Fill Down and Fill Right.
+  fillDown: ["Mod+D"],
+  fillRight: ["Mod+R"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;

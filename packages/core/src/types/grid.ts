@@ -519,7 +519,9 @@ export type KeyboardAction =
   | "strikethrough"
   | "insertDate"
   | "insertTime"
-  | "selectAll";
+  | "selectAll"
+  | "fillDown"
+  | "fillRight";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
