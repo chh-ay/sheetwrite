@@ -1,6 +1,6 @@
 import { validConditionalRules } from "./conditional-format.js";
 import { overlappingMergeIndices } from "./document-protocol.js";
-import { validateSheetName } from "./sheet-name.js";
+import { canAddSheetName, validateSheetName } from "./sheet-name.js";
 import {
   integerAt,
   mergeCrossesFreeze,
@@ -56,7 +56,7 @@ function addSheetSnapshotIssue(
     snapshot.name,
     existing.map((sheet) => sheet.name),
   );
-  if (!name.ok) return name.code;
+  if (!name.ok && !canAddSheetName(name)) return name.code;
   if (!integerAt(snapshot.order) || snapshot.order > existing.length) return "invalid-position";
   if (
     !integerAt(snapshot.rowCount) ||
@@ -150,7 +150,7 @@ export function applySheetLifecycleOperation(
       operation.sheet.name,
       state.sheets.map((sheet) => sheet.name),
     );
-    if (!name.ok) return { ok: false, code: name.code };
+    if (!name.ok && !canAddSheetName(name)) return { ok: false, code: name.code };
     state.sheets.splice(operation.sheet.order, 0, {
       id: operation.sheet.id,
       name: name.name,

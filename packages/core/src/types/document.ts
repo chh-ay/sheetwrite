@@ -24,6 +24,7 @@ export type SheetNameIssueCode =
   | "too-long"
   | "forbidden-character"
   | "edge-apostrophe"
+  | "reserved"
   | "duplicate";
 
 /** Successful canonical name or an actionable validation failure. */
