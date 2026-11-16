@@ -1,5 +1,5 @@
 /* @sheetwrite/core/styles/grid.css: the grid host, cell editor, data validation
-   lists, notes, action status and the theme variables. Every grid needs it. */
+   lists, notes, action status, dialogs and the theme variables. Every grid needs it. */
 
 /* Development builds read this to warn once when this part is missing. */
 .sheetwrite {
@@ -185,4 +185,75 @@
   .sheetwrite-note-editor:focus-visible {
     outline: 2px solid Highlight;
   }
+}
+
+/* Modal dialogs over the grid (src/dialog.ts): the merge warning and Format
+   Cells. The backdrop covers the grid root; the dialog sits in its middle. */
+.sheetwrite-dialog-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sheetwrite-dialog-backdrop, rgba(0, 0, 0, 0.2));
+}
+
+.sheetwrite-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: min(480px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 16px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 8px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  box-shadow: var(--sheetwrite-dialog-shadow, 0 4px 16px rgba(60, 64, 67, 0.3));
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+.sheetwrite-dialog :focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.sheetwrite-dialog-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sheetwrite-dialog-message {
+  margin: 0;
+}
+
+.sheetwrite-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.sheetwrite-dialog-button {
+  min-width: 72px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-dialog-button:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-dialog-default {
+  border-color: var(--sheetwrite-widget-accent, #2563eb);
+  font-weight: 600;
 }

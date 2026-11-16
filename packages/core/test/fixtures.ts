@@ -160,6 +160,21 @@ export function elementAdded<T extends Element>(
   });
 }
 
+/**
+ * Wait for the grid's dialog under `host`, which loads its own chunk, choose
+ * the button labelled `label`, and let the action that asked finish.
+ */
+export async function answerDialog(host: HTMLElement, label: string): Promise<void> {
+  const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+  const button = [...dialog.querySelectorAll("button")].find(
+    (candidate) => candidate.textContent === label,
+  );
+  if (button === undefined) throw new Error(`expected a ${label} button`);
+  button.click();
+  // The action continues once the dialog's answer settles.
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 /** Fill each requested column of `values`, with `null` for keys it lacks. */
 function coveredRow(request: DataSourceRequest, values: RowData): RowData {
   const row: RowData = {};

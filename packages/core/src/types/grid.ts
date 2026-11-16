@@ -206,7 +206,11 @@ export interface GridActions {
   setNumberFormat(code: string | null): void;
   /** Show one more (1) or one fewer (-1) decimal place than the focus cell does. */
   stepDecimals(direction: 1 | -1): void;
-  /** Merge the selection and center its text, as one undoable step. */
+  /**
+   * Merge the selection and center its text, as one undoable step. Like
+   * {@link GridActions.merge}, it asks first when more than one cell holds a
+   * value.
+   */
   mergeAndCenter(): void;
   /** Clear the selection's contents and formatting, as one undoable step. */
   clearAll(): void;
@@ -227,7 +231,13 @@ export interface GridActions {
   freezePanes(): void;
   /** Remove the selection's cell formatting, keeping the contents. */
   clearFormat(): void;
-  /** Merge the selected range into one cell; does nothing unless a range is selected. */
+  /**
+   * Merge the selected range into one cell; does nothing unless a range is
+   * selected. As in Excel, when more than one of its cells holds a value, a
+   * dialog warns that only the upper-left value stays. The merge happens after
+   * OK, and Cancel or Escape leaves the cells as they were. The dialog is in
+   * its own chunk, which the first warning loads.
+   */
   merge(): void;
   /** Split merged cells in the selection back into single cells. */
   unmerge(): void;

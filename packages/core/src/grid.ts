@@ -583,6 +583,8 @@ export class GridImpl implements Grid {
   private autoFilterHost: AutoFilterHost | null = null;
   /** The AutoFilter chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
+  /** The open dialog; opening another or destroying the grid closes it. */
+  private readonly dialogs = new ScopeSlot(this.lifetime);
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -926,6 +928,7 @@ export class GridImpl implements Grid {
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches) => this.document.commit(patches, "style"),
+      confirm: (request) => this.confirm(request),
     });
 
     this.actions = this.buildActions();
@@ -2818,6 +2821,32 @@ export class GridImpl implements Grid {
         if (build.closed) return;
         // Tell the user; the load error still reaches the host.
         this.actionFeedback.show(`The filter could not load: ${errorDetail(error)}`);
+        throw error;
+      },
+    );
+  }
+
+  /**
+   * Ask the user to confirm in a modal dialog, which loads on first use like
+   * the find bar. Resolves `false` on Cancel or Escape, and when another
+   * dialog opens or the grid is destroyed first.
+   */
+  private confirm(request: { readonly title: string; readonly message: string }): Promise<boolean> {
+    if (this.lifetime.closed) return Promise.resolve(false);
+    const scope = this.dialogs.next();
+    return import("./dialog.js").then(
+      ({ confirmDialog }) => {
+        if (scope.closed) return false;
+        const dialog = confirmDialog(this.host, this.baseTheme, request, () => {
+          if (!this.lifetime.closed) this.host.focus();
+        });
+        scope.add(() => dialog.close());
+        return dialog.result;
+      },
+      (error: unknown) => {
+        if (scope.closed) return false;
+        // Tell the user; the load error still reaches the host.
+        this.actionFeedback.show(`The dialog could not load: ${errorDetail(error)}`);
         throw error;
       },
     );
