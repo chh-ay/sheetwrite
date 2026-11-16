@@ -39,6 +39,7 @@ import type {
 } from "./data.js";
 import type {
   AddSheetInput,
+  AutoFilter,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -513,6 +514,13 @@ export type KeyboardAction =
   | "replace"
   | "clearContents"
   | "editNote"
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "insertDate"
+  | "insertTime"
+  | "selectAll"
   | "fillDown"
   | "fillRight";
 
@@ -1081,6 +1089,36 @@ export interface Grid {
   ): ApplyTransactionResult;
   /** Active column filters on the active sheet, keyed by column index. */
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
+  /**
+   * Turn Excel's AutoFilter on for `range`, whose first row is the header, or
+   * off with `null`. The header row shows filter buttons and is never
+   * filtered; column filters then hide only the range's rows below it. Either
+   * way the column filters are cleared, as Excel's Data › Filter does. One
+   * undo step, saved with the sheet and exported to XLSX as `autoFilter`.
+   *
+   * @example
+   * ```ts
+   * import type { Grid } from "@sheetwrite/core";
+   *
+   * function filterOrders(grid: Grid) {
+   *   grid.setAutoFilter({ sheet: "orders", start: { row: 0, col: 0 }, end: { row: 99, col: 3 } });
+   *   grid.setColumnFilter(2, {
+   *     kind: "custom",
+   *     join: "and",
+   *     conditions: [{ op: "gt", value: 100 }],
+   *   });
+   * }
+   * ```
+   */
+  setAutoFilter(range: Range | null): ApplyTransactionResult;
+  /** The active sheet's AutoFilter, or `null` when it has none. */
+  getAutoFilter(): AutoFilter | null;
+  /**
+   * Filter again with the current column filters, as Excel's Reapply: rows
+   * whose values changed since the filter was set show or hide. Edits do not
+   * re-filter on their own, as in Excel. One undo step; a no-op without filters.
+   */
+  reapplyFilter(): ApplyTransactionResult;
   /**
    * Distinct resolved values of a column in first-seen order. Defaults to
    * 1,000 values for bounded filter menus; pass 0 to request an uncapped scan.

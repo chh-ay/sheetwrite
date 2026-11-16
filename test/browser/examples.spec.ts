@@ -59,7 +59,7 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     .toBe(true);
 
   // The rule is host configuration (public API); the editor itself must open
-  // through user input: select the cell, then press Enter on the grid host.
+  // through user input: select the cell, then press F2 on the grid host.
   await page.evaluate(() => {
     const grid = window.__sheetwriteVueWorkbench?.grid;
     if (!grid) throw new Error("Vue grid is unavailable");
@@ -72,7 +72,7 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     });
     grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 0 } });
   });
-  await page.locator(".sw-demo-grid .sheetwrite").press("Enter");
+  await page.locator(".sw-demo-grid .sheetwrite").press("F2");
 
   const list = page.getByRole("listbox", { name: "Choose an order ID" });
   await expect(list).toBeVisible();
@@ -99,7 +99,7 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
     });
     grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
   });
-  await page.locator(".sw-demo-grid .sheetwrite").press("Enter");
+  await page.locator(".sw-demo-grid .sheetwrite").press("F2");
 
   const checkbox = page.getByRole("checkbox", { name: "Toggle checkbox" });
   await expect(checkbox).toBeVisible();
