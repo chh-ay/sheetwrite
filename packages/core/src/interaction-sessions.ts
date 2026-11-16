@@ -75,11 +75,8 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
-  /**
-   * Hold a key while an AutoFilter command's code loads, to run once the
-   * command has; false when nothing loads.
-   */
-  deferKey: (key: () => void) => boolean;
+  /** Hold a key pressed while a command's code loads; false when none loads. */
+  holdKey: (e: KeyboardEvent) => boolean;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -1064,6 +1061,29 @@ export class InteractionSessions {
     );
   }
 
+  /**
+   * Act on a key that waited while a command's code loaded, where the focus
+   * is now: on the grid as usual, as text in a field the command focused, or
+   * at the element that has the focus.
+   */
+  replayKey(e: KeyboardEvent): void {
+    const target = document.activeElement;
+    if (target === this.deps.host || !(target instanceof HTMLElement)) {
+      this.onKeyDown(e);
+    } else if (
+      (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) &&
+      e.key.length === 1 &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      target.setRangeText(e.key, target.selectionStart ?? 0, target.selectionEnd ?? 0, "end");
+      target.dispatchEvent(new Event("input", { bubbles: true }));
+    } else {
+      target.dispatchEvent(new KeyboardEvent("keydown", e));
+    }
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // The inline editor keeps its keys and forwards host shortcuts itself.
     if (this.isEditing) return;
@@ -1078,8 +1098,8 @@ export class InteractionSessions {
         target instanceof HTMLTextAreaElement ||
         (target instanceof HTMLElement && target.isContentEditable));
     if (inEditableWidget) return;
-    // A key pressed while an AutoFilter command's code loads acts after that command.
-    if (this.deps.deferKey(() => this.onKeyDown(e))) {
+    // A key pressed while a command loads its code acts after that command.
+    if (this.deps.holdKey(e)) {
       e.preventDefault();
       return;
     }

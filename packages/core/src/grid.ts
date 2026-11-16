@@ -583,10 +583,10 @@ export class GridImpl implements Grid {
   private autoFilterHost: AutoFilterHost | null = null;
   /** The AutoFilter chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
-  /** AutoFilter commands whose code is still loading. */
-  private autoFilterLoads = 0;
-  /** Keys pressed while they load, run in order once none is left. */
-  private readonly autoFilterKeys: (() => void)[] = [];
+  /** Commands whose code is loading on first use. */
+  private commandLoads = 0;
+  /** Keys pressed on the grid while they load, in order. */
+  private readonly heldKeys: KeyboardEvent[] = [];
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -989,7 +989,7 @@ export class GridImpl implements Grid {
       openFind: (options) => this.openFindBar(options),
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
-      deferKey: (key) => this.autoFilterLoads > 0 && this.autoFilterKeys.push(key) > 0,
+      holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -2732,7 +2732,8 @@ export class GridImpl implements Grid {
 
     // Opens during the load share one build, so the bar is made once.
     const build = this.findBarBuilds.current();
-    void import("./find-bar.js").then(
+    this.loadCommand(
+      import("./find-bar.js"),
       ({ FindBar: FindBarClass }) => {
         if (build.closed) return;
         if (!this.findBar) {
@@ -2794,8 +2795,8 @@ export class GridImpl implements Grid {
   ): void {
     if (this.lifetime.closed) return;
     const build = this.autoFilterBuilds.current();
-    this.autoFilterLoads++;
-    void import("./autofilter-actions.js").then(
+    this.loadCommand(
+      import("./autofilter-actions.js"),
       (filters) => {
         if (build.closed) return;
         this.autoFilterHost ??= {
@@ -2819,25 +2820,48 @@ export class GridImpl implements Grid {
           adopt: (dispose) => this.autoFilterBuilds.current().add(dispose),
         };
         run(filters, this.autoFilterHost);
-        this.runDeferredKeys();
       },
       (error: unknown) => {
         if (build.closed) return;
         // Tell the user; the load error still reaches the host.
         this.actionFeedback.show(`The filter could not load: ${errorDetail(error)}`);
-        this.runDeferredKeys();
         throw error;
       },
     );
   }
 
   /**
-   * After an AutoFilter command, the keys pressed while its code loaded, as
-   * they would have acted had it been there; they wait for every load.
+   * Run a command whose code loads on first use. Keys pressed on the grid
+   * while any such load is pending wait, then act in order where the
+   * commands left the focus, as they would have had the code been there.
    */
-  private runDeferredKeys(): void {
-    if (--this.autoFilterLoads > 0) return;
-    for (const key of this.autoFilterKeys.splice(0)) key();
+  private loadCommand<T>(
+    load: Promise<T>,
+    run: (module: T) => void,
+    failed: (error: unknown) => void = (error) => {
+      throw error;
+    },
+  ): void {
+    this.commandLoads++;
+    void load.then(
+      (module) => {
+        try {
+          run(module);
+        } finally {
+          this.releaseKeys();
+        }
+      },
+      (error: unknown) => {
+        this.releaseKeys();
+        failed(error);
+      },
+    );
+  }
+
+  /** Once no command's code is loading, the keys pressed meanwhile act, in order. */
+  private releaseKeys(): void {
+    if (--this.commandLoads > 0) return;
+    for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
@@ -3791,7 +3815,7 @@ export class GridImpl implements Grid {
       versionHistory: () => this.historyCommand?.("open"),
       // The dashboard chunk names and adds the sheet; first paint carries only this call.
       newDashboard: () =>
-        void import("./dashboard/dashboard-layout.js").then((m) => {
+        this.loadCommand(import("./dashboard/dashboard-layout.js"), (m) => {
           if (!this.lifetime.closed) m.newDashboard(this);
         }),
       saveVersion: () => {
