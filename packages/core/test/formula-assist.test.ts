@@ -79,6 +79,7 @@ function beginEdit(): {
     type: "text",
     initial: "",
     selectAll: false,
+    entering: false,
     rect: { x: 10, y: 20, w: 80, h: 24 },
     label: "Edit A, row 1",
     theme: DEFAULT_THEME,

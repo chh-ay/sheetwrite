@@ -99,7 +99,7 @@ function expectEditor(host: HTMLElement): HTMLTextAreaElement {
   return node;
 }
 
-function typeIntoFocusedCell(host: HTMLElement, value: string, key = "Enter"): void {
+function typeIntoFocusedCell(host: HTMLElement, value: string, key = "F2"): void {
   host.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
 
   const editor = expectEditor(host);
@@ -1741,5 +1741,36 @@ describe("element height cap measurement", () => {
     expect(fallback).toBeLessThan(26_843_545);
     expect(measureMaxElementHeight(stubDocument(0, 0))).toBe(fallback);
     expect(measureMaxElementHeight(stubDocument(Number.NaN, Number.NaN))).toBe(fallback);
+  });
+});
+
+describe("undo and redo selection", () => {
+  it("selects the cells undo and redo change, as Excel does", () => {
+    const workbook = makeWorkbook(20);
+    const store = new SheetwriteStore(workbook, makeColumnarData(20));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const changed = {
+      kind: "range" as const,
+      range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 4, col: 2 } },
+    };
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet: "s1", row: 2, col: 1 }, value: { kind: "literal", value: 1 } },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 4, col: 2 },
+          value: { kind: "literal", value: "x" },
+        },
+      ],
+    });
+
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 15, col: 0 } });
+    grid.undo();
+    expect(grid.getSelection()).toEqual(changed);
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 15, col: 0 } });
+    grid.redo();
+    expect(grid.getSelection()).toEqual(changed);
+
+    grid.destroy();
   });
 });
