@@ -1750,13 +1750,17 @@ describe("undo and redo selection", () => {
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
     const grid = new GridImpl(mountHost(), { workbook }, store);
     const changed = {
-      kind: "range",
+      kind: "range" as const,
       range: { sheet: "s1", start: { row: 2, col: 1 }, end: { row: 4, col: 2 } },
     };
     grid.applyTransaction({
       patches: [
         { op: "set", addr: { sheet: "s1", row: 2, col: 1 }, value: { kind: "literal", value: 1 } },
-        { op: "set", addr: { sheet: "s1", row: 4, col: 2 }, value: { kind: "literal", value: "x" } },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 4, col: 2 },
+          value: { kind: "literal", value: "x" },
+        },
       ],
     });
 
