@@ -38,31 +38,31 @@ before you upgrade.
     Pivots, slicers, PivotCharts and KPI cards on a 12-column dashboard sheet. Slicers filter
     every pivot they reach through relationships.
   </Card>
-  <Card title="Data model and measures" screenshot="data-model" alt="The Data Model panel lists the Orders and Regions tables and their relationship." href="/docs/features/analysis/data-model/">
+  <Card title="Data model and measures" screenshot="card-data-model" size="highlight" alt="The Data Model panel: the Orders and Regions tables, and the relationship from Orders[Region] to Regions[Region]." href="/docs/features/analysis/data-model/">
     Relate tables one-to-many, pivot over related tables, and write measures with `CALCULATE`
     and `ALL`.
   </Card>
-  <Card title="Sort in place" screenshot="sort" alt="The Sort panel with a sort level, a header row option and Sort view only." href="/docs/features/data/data-operations/#sort-cells-in-place">
+  <Card title="Sort in place" screenshot="card-sort" size="highlight" alt="The Sort panel: the range A1:E12, My data has headers checked, and a sort level by Month." href="/docs/features/data/data-operations/#sort-cells-in-place">
     Sort commands move the cells in Excel's sort order, as one undoable, synced change. The
     display-only sort is now the view sort.
   </Card>
-  <Card title="Linked workbooks" screenshot="edit-links" alt="The Edit Links panel lists a linked workbook with Update Values, Change Source and Break Link." href="/docs/features/formulas/">
+  <Card title="Linked workbooks" screenshot="card-edit-links" size="highlight" alt="The Edit Links panel: Update All, and the linked Budget 2027.xlsx with its location and status." href="/docs/features/formulas/">
     Formulas such as `[Budget.xlsx]Annual!C10` read the values a link saved. Update, change or
     break links from Edit Links.
   </Card>
-  <Card title="Saved queries" screenshot="queries" alt="The Queries and Connections panel lists the saved queries of the workbook." href="/docs/features/data/">
+  <Card title="Saved queries" screenshot="card-queries" size="highlight" alt="The Queries and Connections panel: Refresh All, and the saved Regional targets query from a CSV source." href="/docs/features/data/">
     The optional `@sheetwrite/queries` engine refreshes tables from CSV, JSON or host data, and
     XLSX keeps queries as Power Query M.
   </Card>
-  <Card title="Version history" screenshot="version-history" alt="The Version History panel lists saved versions with their authors." href="/docs/features/data/persistence/#opt-in-version-archives">
+  <Card title="Version history" screenshot="card-version-history" size="highlight" alt="The Version History panel: Save a version, and the saved Quarter plan by Avery Brooks." href="/docs/features/data/persistence/#opt-in-version-archives">
     Save named versions, compare two versions cell by cell with authors, and restore a
     workbook, sheet or range.
   </Card>
-  <Card title="Formula help" screenshot="formula-help" alt="The cell editor shows the SUMIFS argument guide while a formula is typed." href="/docs/features/formulas/">
+  <Card title="Formula help" screenshot="card-formula-help" size="highlight" alt="A SUMIFS formula typed in the formula bar, and the argument guide under it with the current argument in bold." href="/docs/features/formulas/">
     Autocomplete, an argument guide, live syntax errors, reference colours and Explain Formula
     in the cell editor and the formula bar.
   </Card>
-  <Card title="Compact ribbon" screenshot="compact-ribbon" alt="The compact ribbon folds its groups into menus at a narrow width." href="/docs/features/grid/">
+  <Card title="Compact ribbon" screenshot="card-compact-ribbon" size="highlight" alt="The compact ribbon: each group is a menu, and the Number menu is open under it." href="/docs/features/grid/">
     One command model drives the toolbar, the full ribbon and a new compact ribbon for narrow
     layouts.
   </Card>
@@ -178,60 +178,80 @@ before you upgrade.
 
 ## Performance
 
-Each group starts with its largest gain. "0.25 of the time" means four times faster. Mac is an
-M5 Pro, Linux an i9-12900H, and "both engines" means the default and the full engine.
+0.7.0 is faster than 0.6.1 in every group below. Recalculation takes 0.835–0.912 of the time on
+average, and large `INDEX`/`MATCH` lookups as little as 0.008 of the time.
+
+Each lane compares 0.7.0 with 0.6.1 on the same machine: the further right the mark, the larger
+the gain. "0.25 of the time" means four times faster. A range covers both machines, or the
+default and the full engine.
 
 ### Formulas and recalculation
 
 `INDEX`/`MATCH` lookups read only the cell they return: 200 lookups over 100,000 rows take
 0.008 of the time on the Mac and 0.011 on Linux.
 
-- Recalculation takes 0.837–0.861 of the time on average across the 53 formula workloads with
-  dense formula IDs, and 0.835–0.912 of that with flat dependency arrays, on Linux and Mac with
-  both engines. The dependency index for 100k formulas shrinks from 7.67 MB to 1.21 MB.
-- Redefining a name that 100,000 formulas use takes 19 ms instead of 491 ms on Linux, and
-  appending a table row is about 60 times faster.
-- `COUNTIF` with a number criterion over 100k cells is 11.5–18× faster, and `SUM` over two 100k
-  ranges 2.15–6.62×.
-- A `LET` in every row recalculates in 0.17–0.22 of the time, and `MAP`, `REDUCE`, `BYROW` and
-  named `LAMBDA` calls in 0.41–0.64.
+```perf-lanes diagram title="Formulas and recalculation, 0.7.0 against 0.6.1" base="0.6.1"
+200 `INDEX`/`MATCH` lookups over 100,000 rows | Linux: 0.011 of the time | Mac: 0.008 of the time
+Append a table row | Range: about 60× faster
+Redefine a name 100,000 formulas use | Linux: 19 ms instead of 491 ms
+`COUNTIF` with a number criterion, 100k cells | Range: 11.5–18× faster
+`SUM` over two 100k ranges | Range: 2.15–6.62× faster
+A `LET` in every row | Range: 0.17–0.22 of the time
+`MAP`, `REDUCE`, `BYROW` and named `LAMBDA` calls | Range: 0.41–0.64 of the time
+Recalculation, average of 53 workloads | Range: 0.837–0.861 of the time
+The same, with flat dependency arrays | Range: 0.835–0.912 of the time
+```
+
+- The dependency index for 100k formulas shrinks from 7.67 MB to 1.21 MB.
 
 ### Charts and pivots
 
 With 20,000 formula-backed charts, an unrelated edit and the chart refresh take 0.006 ms instead
 of 20.2 ms on the Mac and 0.016 ms instead of 47.3 ms on Linux.
 
+```perf-lanes diagram title="Charts and pivots, 0.7.0 against 0.6.1" base="0.6.1"
+Unrelated edit with 20,000 formula-backed charts | Linux: 0.016 ms instead of 47.3 ms | Mac: 0.006 ms instead of 20.2 ms
+Edit on another sheet, PivotTable field list open | Mac: 12.95 µs instead of 1.629 ms
+Pivot of measures over 100,000 rows | Range: 0.66–0.71 of the time
+```
+
 - `GETPIVOTDATA` recalculates only when its pivot changes, as in Excel.
-- A pivot of measures over 100,000 rows recalculates in 0.66–0.71 of the time.
-- With the PivotTable field list open, an edit on another sheet takes 12.95 µs instead of
-  1.629 ms on the Mac.
 
 ### Paged and large data
 
 A row insert in a 1,000,000-row paged sheet takes 0.0136–0.0221 of the time.
 
-- A 1,000,000-cell `setBlock` is admitted in 17 ms instead of 212 ms on the Mac and 65 ms
-  instead of 617 ms on Linux.
-- Range formulas over loaded pages are 3.0–3.1× faster, and after a fast fling cells show
-  "loading" up to 74% less.
-- Draining 10,000 acknowledged edits takes 0.246 ms instead of 4.004 ms on the Mac.
+```perf-lanes diagram title="Paged and large data, 0.7.0 against 0.6.1" base="0.6.1"
+Row insert, 1,000,000-row paged sheet | Range: 0.0136–0.0221 of the time
+Drain 10,000 acknowledged edits | Mac: 0.246 ms instead of 4.004 ms
+Admit a 1,000,000-cell `setBlock` | Linux: 65 ms instead of 617 ms | Mac: 17 ms instead of 212 ms
+Range formulas over loaded pages | Range: 3.0–3.1× faster
+```
+
+- After a fast fling, cells show "loading" up to 74% less.
 
 ### Grid and editing
 
 Setting 100,000 row heights one at a time takes 0.49 s instead of 151.8 s on the Mac and
 2.05 s instead of 340.8 s on Linux.
 
-- A wrapped cell of 20,000 characters paints in 0.175 ms instead of 0.887 ms on the Mac.
+```perf-lanes diagram title="Grid and editing, 0.7.0 against 0.6.1" base="0.6.1"
+Set 100,000 row heights one at a time | Linux: 2.05 s instead of 340.8 s | Mac: 0.49 s instead of 151.8 s
+Paint a wrapped cell of 20,000 characters | Mac: 0.175 ms instead of 0.887 ms
+Sort command on 1,000–4,000 numbers | Range: 0.329–0.509 of the work
+```
+
 - Scrolling with the cell editor open forces no style or layout work.
-- The sort command on 1,000–4,000 numbers does 0.329–0.509 of the work.
 
 ### Import and export
 
-XLSX export of 100,000 formulas takes 481 ms on the Mac (0.6.1: 491 ms) and 1,030 ms on Linux
-(0.6.1: 1,053 ms).
+CSV import takes 7.3% less time on the Mac and 11.0% less on Linux.
 
-- CSV import takes 7.3% less time on the Mac and 11.0% less on Linux.
-- Formulas load 1.21–1.46× faster.
+```perf-lanes diagram title="Import and export, 0.7.0 against 0.6.1" base="0.6.1"
+Load formulas | Range: 1.21–1.46× faster
+CSV import | Linux: 11.0% less time | Mac: 7.3% less time
+XLSX export of 100,000 formulas | Linux: 1,030 ms instead of 1,053 ms | Mac: 481 ms instead of 491 ms
+```
 
 ### Download size
 

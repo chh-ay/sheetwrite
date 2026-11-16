@@ -475,6 +475,27 @@ describe("metadata, identity, and sheet lifecycle", () => {
     );
   });
 
+  it("moves an AutoFilter and its column filters past a concurrent row or column edit", () => {
+    const meta = (r0: number, r1: number, c0: number, c1: number, col: number): DocumentOp => ({
+      op: "setSheetMeta",
+      sheet: SHEET,
+      patch: {
+        autoFilter: {
+          range: { sheet: SHEET, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } },
+        },
+        filters: [[col, { kind: "nonEmpty" }]],
+      },
+    });
+
+    expectRebased([meta(1, 3, 1, 3, 2)], [structure("row", "insert", 0, 2)], [meta(3, 5, 1, 3, 2)]);
+    expectRebased(
+      [meta(1, 3, 1, 3, 2)],
+      [structure("column", "insert", 0, 1)],
+      [meta(1, 3, 2, 4, 3)],
+    );
+    expectConflict([meta(1, 3, 1, 3, 2)], [structure("row", "insert", 2, 1)], "structural-overlap");
+  });
+
   it("keeps sheet lifecycle and stable remove-by-ID operations across structural edits", () => {
     const local: DocumentOp[] = [
       { op: "addSheet", sheet: snapshot("new") },

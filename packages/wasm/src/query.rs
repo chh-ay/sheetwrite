@@ -8,6 +8,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
+use crate::eval::Criterion;
 use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
@@ -15,7 +16,7 @@ use crate::sort_text::push_collation_key;
 use crate::sorting::{key_index, sort_indices_by, sort_u128, sort_u64};
 use crate::store::CellStore;
 use crate::types::{
-    cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage,
+    cell_key, string_from_pool_ref, CellKey, FormulaError, FormulaValueKind, StringStorage, Value,
     KIND_BOOL, KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
 };
 
@@ -731,6 +732,9 @@ impl CellStore {
     /// - 2, numbers compared with `nums[i]`; `flags[i]` is 0 `>`, 1 `>=`, 2 `<`,
     ///   3 `<=`, 4 `=`, anything else `<>`.
     /// - 3, empty cells; 4, cells that are not empty.
+    /// - 5, Excel's custom filter: its next `text_counts[i]` texts in
+    ///   `value_texts` are COUNTIF criteria (`">5"`, `"=ab*"`); bit 1 of
+    ///   `flags[i]` keeps a row that meets any of them, else it must meet all.
     ///
     /// Empty when the sheet or a column does not exist.
     #[wasm_bindgen(js_name = filterRowsMulti)]
@@ -795,6 +799,25 @@ impl CellStore {
                 .get(text_offsets[i]..text_offsets[i] + text_count)
                 .unwrap_or_default();
             value_sets.push(ValueSet::build(picked_numbers, picked_texts));
+        }
+        // Custom filters (kind 5) match as COUNTIF criteria do: one or two per filter.
+        let mut custom: Vec<Vec<Criterion>> = Vec::with_capacity(kinds.len());
+        for (i, &kind) in kinds.iter().enumerate() {
+            if kind != 5 {
+                custom.push(Vec::new());
+                continue;
+            }
+            let count = text_counts.get(i).copied().unwrap_or_default() as usize;
+            let start = text_offsets.get(i).copied().unwrap_or_default();
+            let texts = value_texts.get(start..start + count).unwrap_or_default();
+            let mut parsed = Vec::with_capacity(texts.len());
+            for text in texts {
+                let Ok(criterion) = Criterion::parse(Value::text(text.as_str())) else {
+                    return Vec::new();
+                };
+                parsed.push(criterion);
+            }
+            custom.push(parsed);
         }
         let mut out = Vec::new();
         'rows: for row in 0..data.cells.row_count() {
@@ -911,6 +934,17 @@ impl CellStore {
                                 _ => value != nums.get(i).copied().unwrap_or_default(),
                             }
                         })
+                    }
+                    5 => {
+                        let test = |criterion: &Criterion| {
+                            criterion_matches_cell(data, self, index, kind, criterion)
+                        };
+                        let conditions = custom.get(i).map(Vec::as_slice).unwrap_or_default();
+                        if flags.get(i).copied().unwrap_or_default() & 1 != 0 {
+                            conditions.iter().any(test)
+                        } else {
+                            conditions.iter().all(test)
+                        }
                     }
                     3 => kind == 0,
                     4 => kind != 0,
@@ -1071,6 +1105,36 @@ impl CellStore {
             })
         };
         edge_scan(row, order.len(), d_row.signum() as isize, occupied) as u32
+    }
+}
+
+/// Whether the cell at `index`, of resolved `kind`, meets a COUNTIF criterion.
+/// Error cells meet it as their error value, as in COUNTIF.
+fn criterion_matches_cell(
+    sheet: &SheetData,
+    store: &CellStore,
+    index: usize,
+    kind: u8,
+    criterion: &Criterion,
+) -> bool {
+    let slots = &store.formula_slots;
+    match kind {
+        1 => numeric_cell_value(sheet, index, slots)
+            .is_some_and(|value| criterion.matches_number(value)),
+        3 => boolean_cell_value(sheet, index, slots)
+            .is_some_and(|value| criterion.matches(&Value::Bool(value))),
+        2 => {
+            let formula_error = (sheet.cells.kind_at(index) == KIND_FORMULA)
+                .then(|| key_for_index(sheet, index))
+                .flatten()
+                .and_then(|key| formula_error_at(sheet, key, slots));
+            match formula_error {
+                Some(error) => criterion.matches(&Value::Error(error)),
+                None => resolved_text(sheet, &store.strings, index, slots)
+                    .is_some_and(|text| criterion.matches_text(text)),
+            }
+        }
+        _ => criterion.matches(&Value::Blank),
     }
 }
 

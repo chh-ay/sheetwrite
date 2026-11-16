@@ -67,7 +67,7 @@ const MAX_DOUBLINGS = 6;
 const PHONE_ROWS = 10;
 
 /** A ratio axis: its ends and the values its gridlines and labels sit on. */
-interface RatioAxis {
+export interface RatioAxis {
   readonly domain: readonly [low: number, high: number];
   readonly ticks: readonly number[];
 }
@@ -89,11 +89,8 @@ function resultText(
   return "pending" in result ? result.pending : describe(result);
 }
 
-/** From the slowest mark (or 1×) to the fastest, in powers of two or, when that spans many doublings, of ten. */
-function axisOf(rows: readonly MachineRow[]): RatioAxis {
-  const ratios = rows.flatMap((row) =>
-    Object.values(row.results).flatMap((result) => (measured(result) ? [result.ratio] : [])),
-  );
+/** The axis for these ratios: from the lowest (or 1×) to the highest, in powers of two or, past MAX_DOUBLINGS, of ten. */
+export function ratioAxis(ratios: readonly number[]): RatioAxis {
   const wide = Math.log2(Math.max(1, ...ratios)) > MAX_DOUBLINGS;
   const base = wide ? 10 : 2;
   const log = (value: number) => Math.log(value) / Math.log(base);
@@ -113,7 +110,8 @@ function ratioLabel(ratio: number): string {
 /** An axis with more steps than this labels every other one (and 1×), so labels never touch. */
 const MAX_AXIS_LABELS = 4;
 
-function ticks(axis: RatioAxis): string {
+/** The axis's labels, placed along it: "1×" is marked as parity. */
+export function ratioTicks(axis: RatioAxis): string {
   const scale = { kind: "log", domain: axis.domain } as const;
   return axis.ticks
     .filter(
@@ -228,12 +226,16 @@ export function renderMachineComparison(
   comparison: MachineComparison,
   icon: PerfIconMarkup,
 ): string {
-  const axis = axisOf(comparison.rows);
+  const axis = ratioAxis(
+    comparison.rows.flatMap((row) =>
+      Object.values(row.results).flatMap((result) => (measured(result) ? [result.ratio] : [])),
+    ),
+  );
   return [
     `<div class="machines">`,
     legend(comparison, icon),
     `<p class="machines__axis-title">${escapeHtml(comparison.measure)} on each machine, against its own baseline; log scale, 1× is ${escapeHtml(comparison.parity)}. Machines are never compared with each other.</p>`,
-    `<div class="machines__axis" aria-hidden="true"><span class="machines__ticks">${ticks(axis)}</span></div>`,
+    `<div class="machines__axis" aria-hidden="true"><span class="machines__ticks">${ratioTicks(axis)}</span></div>`,
     ...phoneRows(comparison, axis),
     comparison.quiet === undefined || comparison.quiet.rows.length === 0
       ? ""
