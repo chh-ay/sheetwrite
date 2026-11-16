@@ -133,7 +133,9 @@ function discoverWorksheets(
       return readerFailure("worksheet declaration is incomplete");
     }
     const validatedName = validateSheetName(decodeXstring(rawName), sheetNames);
-    if (!validatedName.ok) {
+    // Excel refuses to rename a sheet to History, but a file from another
+    // program can hold one, and it opens.
+    if (!validatedName.ok && validatedName.code !== "reserved") {
       return readerFailure(
         `worksheet name ${JSON.stringify(validatedName.name)} is unsafe or duplicated (${validatedName.code})`,
       );
