@@ -283,7 +283,7 @@
     "@sheetwrite/core#.#SheetKind": "0565e013737f",
     "@sheetwrite/core#.#SheetLifecycleIssueCode": "f0f899876b3b",
     "@sheetwrite/core#.#SheetLifecycleResult": "54051b5b47cf",
-    "@sheetwrite/core#.#SheetNameIssueCode": "20eac506c5a9",
+    "@sheetwrite/core#.#SheetNameIssueCode": "a950ff302e4e",
     "@sheetwrite/core#.#SheetNameValidationResult": "29713040076b",
     "@sheetwrite/core#.#SheetSnapshot": "8c6c86573bdd",
     "@sheetwrite/core#.#SheetVisibility": "4461e8e55bdd",
