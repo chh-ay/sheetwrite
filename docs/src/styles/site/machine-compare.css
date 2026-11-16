@@ -309,3 +309,37 @@
     transition: none;
   }
 }
+
+/* ---- Release notes (docs/src/lib/release-lanes.ts) ---- */
+
+/* Release notes give each result in the words of the text, so the values
+   column is wider and its lines wrap. */
+.sw-prose .machines--words,
+.machines--words {
+  margin: var(--sw-space-5) 0 var(--sw-space-6);
+}
+
+/* Past `.sw-prose .machines :is(p, ul)`, which clears the margins. */
+.sw-prose .machines .machines__title,
+.machines .machines__title {
+  margin-bottom: var(--sw-space-3);
+  color: var(--sw-fg-strong);
+  font-size: var(--sw-text-small);
+  font-weight: 600;
+}
+
+.machines--words .machines__values span {
+  white-space: normal;
+}
+
+/* Words, not figures: the body face, right after the machine's name. */
+.machines--words .machines__values b {
+  margin-left: 0;
+  font-family: var(--sw-font-body);
+}
+
+@container machines (min-width: 40.0625rem) {
+  .machines--words :is(.machines__axis, .machines__row) {
+    grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr) minmax(12rem, 15rem);
+  }
+}
