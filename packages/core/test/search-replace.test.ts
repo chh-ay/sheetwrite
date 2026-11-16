@@ -171,3 +171,22 @@ describe("replaceAll", () => {
     grid.destroy();
   });
 });
+
+describe("find", () => {
+  it("selects the match it shows, as Excel's Find Next does", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.setSelection({ kind: "cell", addr: A(0, 0) });
+
+    // makeColumnarData puts Tokyo in column 2 of rows 1, 4 and 7.
+    grid.search("Tokyo");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: A(1, 2) });
+    grid.findNext();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: A(4, 2) });
+    grid.findPrev();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: A(1, 2) });
+
+    grid.destroy();
+  });
+});
