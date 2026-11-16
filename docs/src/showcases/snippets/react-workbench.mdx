@@ -1,0 +1,30 @@
+```tsx prelude="react" partial="excerpt of the React workbench; the full source is linked below" title="Pipeline.tsx"
+const MARKET = 2;
+const ARR = 5;
+
+// React state owns the query. Each change reaches the grid through its API.
+function applyQuery(grid: Grid, market: string, ranked: boolean, search: string) {
+  grid.setColumnFilter(MARKET, market === "all" ? null : { kind: "values", values: [market] });
+  grid.setViewSort(ranked ? [{ col: ARR, ascending: false }] : []);
+  if (search !== "" && grid.search(search).matches.length > 0) grid.findNext();
+}
+
+// "Apply change" writes one cell: one undoable transaction.
+function applyChange(grid: Grid, addr: CellAddress, src: string) {
+  grid.applyTransaction({ patches: [{ op: "set", addr, value: { kind: "formula", src } }] });
+}
+
+export function Pipeline({ readOnly }: { readOnly: boolean }) {
+  return (
+    <SheetwriteGrid
+      workbook={workbook}
+      data={data}
+      presentation="data-grid"
+      readOnly={readOnly}
+      renderer="canvas"
+      onReady={(event) => applyQuery(event.grid, "all", false, "")}
+      onGridChange={(event) => persist(event.transaction)}
+    />
+  );
+}
+```

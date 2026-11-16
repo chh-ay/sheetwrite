@@ -1,0 +1,26 @@
+```svelte prelude="svelte" partial="excerpt of the Svelte workbench; the full source is linked below" title="Dispatch.svelte"
+<script lang="ts">
+  import { SyncCoordinator } from "@sheetwrite/core";
+  import { IndexedDbPendingCommitStorage } from "@sheetwrite/core/browser";
+  import { server } from "./dispatch-server";
+
+  let sync: SyncCoordinator | undefined;
+
+  // Each edit waits in IndexedDB until the server acknowledges it.
+  const pendingStorage = new IndexedDbPendingCommitStorage({ databaseName: "dispatch-outbox" });
+
+  function connect(grid: Grid) {
+    sync = new SyncCoordinator(grid, server, { documentId: "dispatch", serverVersion: 0, pendingStorage });
+    sync.subscribe(server);
+  }
+
+  // Offline, edits queue on the device; back online, they drain in order.
+  async function setOnline(online: boolean) {
+    sync?.setOnline(online);
+    if (online) await sync?.flush();
+  }
+</script>
+
+<button type="button" onclick={() => setOnline(false)}>Go offline</button>
+<SheetwriteGrid {workbook} {data} presentation="data-grid" fill onReady={(event) => connect(event.grid)} />
+```

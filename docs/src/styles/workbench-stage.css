@@ -104,3 +104,60 @@
     transition-duration: 0s;
   }
 }
+
+/* The panels of a workbench that renders in the browser, described in the
+   page's static HTML (FrameworkPage.tsx): a card per panel, two across from
+   48rem. */
+.sw-workbench-panels {
+  display: grid;
+  gap: var(--sw-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-workbench-panels > li {
+  display: grid;
+  gap: var(--sw-space-2);
+  align-content: start;
+  margin: 0;
+  padding: var(--sw-space-5);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-workbench-panels > li::marker,
+.sw-workbench-panels > li::before {
+  content: none;
+}
+
+.sw-workbench-panels h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / 1.3 var(--sw-font-display);
+}
+
+.sw-workbench-panels p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+}
+
+.sw-workbench-panels__controls > span {
+  margin-right: var(--sw-space-1);
+  color: var(--sw-fg);
+  font-weight: var(--sw-weight-semibold);
+}
+
+@media (min-width: 48rem) {
+  .sw-workbench-panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The code behind the workbench, between its panels and its proof. */
+.sw-showcase-page > .sw-showcase__code-row {
+  padding-top: clamp(var(--sw-space-8), 3vw, var(--sw-space-10));
+}
