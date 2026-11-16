@@ -4,9 +4,10 @@ import { isServer } from "solid-js/web";
 import { Icon } from "./Icon.js";
 
 /*
- * Documentation search. An island that hydrates on first use; lib/shell.ts
- * opens its dialog and focuses the field from the button, ⌘K, Ctrl K and "/"
- * before then, so nothing typed is lost while the island's code loads.
+ * Documentation search. An island whose code loads on first use;
+ * lib/search-opener.ts opens its dialog and focuses the field from the
+ * button, ⌘K, Ctrl K and "/" before then, so nothing typed is lost while the
+ * island's code loads.
  */
 
 interface PagefindSubResult {
@@ -166,7 +167,7 @@ function loadPagefind(): Promise<PagefindModule> {
   return pagefindModule;
 }
 
-/** The key cap: lib/shell.ts writes the platform's shortcut into the page before this hydrates. */
+/** The key cap: lib/search-opener.ts writes the platform's shortcut into the page. */
 function shortcutLabel(): string {
   if (isServer) return "⌘K";
   return document.querySelector(".sw-search-button kbd")?.textContent ?? "⌘K";
@@ -174,6 +175,7 @@ function shortcutLabel(): string {
 
 export function DocsSearch() {
   let dialog: HTMLDialogElement | undefined;
+  let field: HTMLInputElement | undefined;
   let list: HTMLDivElement | undefined;
   const listId = createUniqueId();
   const optionId = (index: number): string => `${listId}-${index}`;
@@ -254,7 +256,18 @@ export function DocsSearch() {
 
   return (
     <>
-      <button class="sw-search-button" data-search-open="" type="button">
+      {/* lib/search-opener.ts opens the dialog from the page's markup; this opens
+          it when a click came before that module loaded and was held until the
+          island hydrated. */}
+      <button
+        class="sw-search-button"
+        data-search-open=""
+        onClick={() => {
+          if (dialog !== undefined && !dialog.open) dialog.showModal();
+          field?.focus();
+        }}
+        type="button"
+      >
         <Icon name="search" />
         <span>Search docs</span>
         <kbd>{shortcutLabel()}</kbd>
@@ -289,8 +302,9 @@ export function DocsSearch() {
               onKeyDown={onFieldKeyDown}
               placeholder="Search APIs, guides, and examples"
               ref={(element) => {
-                // Text typed before the island hydrated: lib/shell.ts opened
-                // the dialog and focused this field at once.
+                field = element;
+                // Text typed before the island hydrated: lib/search-opener.ts
+                // opened the dialog and focused this field at once.
                 if (element.value !== "") setQuery(element.value);
               }}
               role="combobox"

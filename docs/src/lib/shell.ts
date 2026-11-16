@@ -1,9 +1,10 @@
 /**
  * The docs shell's behaviour that needs no component (components/DocsShell.tsx
  * renders it all as static markup): the theme toggle, the documentation menu,
- * the search shortcut and the outline's current section. The islands client
- * runs it on every page; the sidebar's scroll position is set by an inline
- * script before first paint (lib/shell-ids.ts).
+ * the search opener (lib/search-opener.ts, loaded on pages with search) and
+ * the outline's current section. The islands client runs it on every page; the
+ * sidebar's scroll position is set by an inline script before first paint
+ * (lib/shell-ids.ts).
  */
 import { iconHref } from "@docs/icons/icon-href.js";
 import { writePreference } from "@docs/lib/preference-storage.js";
@@ -80,65 +81,6 @@ function installNavigationMenu(): void {
   });
 }
 
-/** Apple platforms name the Command key; others use Ctrl. */
-function isApplePlatform(): boolean {
-  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-}
-
-/** The search dialog that `button` opens: the one in the same search island. */
-function searchDialogOf(button: Element): HTMLDialogElement | null {
-  return button.closest("[data-island]")?.querySelector("dialog.sw-search-dialog") ?? null;
-}
-
-/**
- * Opens a search dialog with its field focused, in the same task as the
- * click or key press. The dialog is in the page's markup, so this works
- * before the search island hydrates: what the reader types goes straight
- * into the field, and the island reads the field when it hydrates.
- */
-function openSearch(dialog: HTMLDialogElement): void {
-  if (!dialog.open) dialog.showModal();
-  dialog.querySelector("input")?.focus();
-}
-
-/**
- * Search opens from its button, from ⌘K or Ctrl K anywhere, and from "/"
- * outside text fields.
- */
-function installSearch(): void {
-  const button = document.querySelector<HTMLElement>("[data-search-open]");
-  if (button === null) return;
-  const keyCap = button.querySelector("kbd");
-  if (keyCap !== null && !isApplePlatform()) keyCap.textContent = "Ctrl K";
-  // On the window, in the capture phase: the islands client holds a click on
-  // the island's markup until the island hydrates. A held click comes back
-  // untrusted once it has; the dialog is open by then, or closed on purpose.
-  window.addEventListener(
-    "click",
-    (event) => {
-      const opener =
-        event.target instanceof Element ? event.target.closest("[data-search-open]") : null;
-      const dialog = opener === null ? null : searchDialogOf(opener);
-      if (dialog !== null && event.isTrusted) openSearch(dialog);
-    },
-    true,
-  );
-  window.addEventListener("keydown", (event) => {
-    const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
-    const slash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
-    if (!commandK && !slash) return;
-    const target = event.target;
-    // "/" keeps typing semantics inside fields; Ctrl+K may not.
-    if (slash && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
-      return;
-    }
-    const dialog = searchDialogOf(button);
-    if (dialog === null) return;
-    event.preventDefault();
-    openSearch(dialog);
-  });
-}
-
 /**
  * The outline marks the section being read (the last heading above the
  * reading line, or at the page's end the last on screen), and lists only
@@ -207,8 +149,8 @@ function installOutline(): void {
 
 export function installDocsShell(): void {
   installThemeToggle();
-  // Every page with the search control (docs pages and the 404 page).
-  installSearch();
+  // Only pages with the search control (docs pages and the 404 page) load its opener.
+  if (document.querySelector("[data-search-open]") !== null) void import("./search-opener.js");
   if (document.querySelector(".sw-docs") === null) return;
   installNavigationMenu();
   installOutline();
