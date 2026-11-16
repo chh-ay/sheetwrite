@@ -1,7 +1,7 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import { mergeCrossesFreeze, mergesOverlap } from "./store/ranges.js";
+import { mergesOverlap } from "./store/ranges.js";
 import { selectionBorderPatches } from "./style-borders.js";
 import type { CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
@@ -9,20 +9,6 @@ import type { DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { BorderPreset } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
-
-/** Excel's warning before a merge that drops values. */
-const MERGE_WARNING = "Merging cells only keeps the upper-left value and discards other values.";
-
-/** Cells read at once while counting the values a merge would cover. */
-const MERGE_SCAN_CELLS = 65_536;
-
-/** A merge's inclusive bounds, in rows and columns of the active sheet. */
-interface MergeBounds {
-  r0: number;
-  c0: number;
-  r1: number;
-  c1: number;
-}
 
 export interface StyleActionsDeps {
   store: Store;
@@ -36,8 +22,6 @@ export interface StyleActionsDeps {
   anchorCell: (row: number, col: number) => { row: number; col: number };
   toDataRow: (viewRow: number) => number;
   commit: (patches: DocumentOp[]) => void;
-  /** Ask the user to confirm in a dialog; resolves `true` for OK. */
-  confirm: (request: { readonly title: string; readonly message: string }) => Promise<boolean>;
 }
 
 /**
@@ -240,128 +224,6 @@ export class StyleActions {
         op: "setRange",
         range: { sheet: activeSheet, start: { row: 0, col: 0 }, end: { row: endRow, col: endCol } },
         cells,
-      });
-
-    this.deps.commit(patches);
-  }
-
-  /**
-   * Merge the selected range. As in Excel, when more than one of its cells
-   * holds a value, a warning that only the upper-left value stays opens
-   * first, and the merge happens only after OK.
-   */
-  mergeSelection(center = false): void {
-    const merge = this.mergeBounds();
-    if (merge === null) return;
-    if (this.countValues(merge, 2) < 2) {
-      this.commitMerge(merge, center);
-      return;
-    }
-
-    void this.deps.confirm({ title: "Merge Cells", message: MERGE_WARNING }).then((ok) => {
-      // The selection or the sheet may have changed while the warning was open.
-      const now = this.mergeBounds();
-      if (
-        ok &&
-        now !== null &&
-        now.r0 === merge.r0 &&
-        now.c0 === merge.c0 &&
-        now.r1 === merge.r1 &&
-        now.c1 === merge.c1
-      ) {
-        this.commitMerge(merge, center);
-      }
-    });
-  }
-
-  /** The selected range as a merge, or null when it cannot merge. */
-  private mergeBounds(): MergeBounds | null {
-    if (this.deps.readOnly()) return null;
-    const activeSheet = this.deps.activeSheet();
-    if (this.deps.loadable?.hasView(activeSheet)) return null;
-
-    const sel = this.deps.selection().toSelection(activeSheet);
-    if (sel?.kind !== "range") return null;
-    const { start, end } = sel.range;
-    const merge = {
-      r0: Math.min(start.row, end.row),
-      c0: Math.min(start.col, end.col),
-      r1: Math.max(start.row, end.row),
-      c1: Math.max(start.col, end.col),
-    };
-    if (merge.r0 === merge.r1 && merge.c0 === merge.c1) return null;
-    const sheet = this.deps.sheet();
-    if (
-      mergeCrossesFreeze(sheet, merge) ||
-      this.deps.merges().some((candidate) => mergesOverlap(merge, candidate))
-    ) {
-      return null;
-    }
-    return merge;
-  }
-
-  /** How many cells of `merge` hold a value, counted up to `limit`. */
-  private countValues(merge: MergeBounds, limit: number): number {
-    const sheet = this.deps.activeSheet();
-    const cols = Array.from({ length: merge.c1 - merge.c0 + 1 }, (_, index) => merge.c0 + index);
-    const band = Math.max(1, Math.floor(MERGE_SCAN_CELLS / cols.length));
-    let count = 0;
-    for (let start = merge.r0; start <= merge.r1; start += band) {
-      const rows = { start, end: Math.min(merge.r1 + 1, start + band) };
-      const { values } = this.deps.store.getVisibleWindow(sheet, rows, cols);
-      for (let index = 0; index < values.length; index++) {
-        const value = values[index];
-        if (value !== null && value !== undefined && value !== "" && ++count >= limit) {
-          return count;
-        }
-      }
-    }
-    return count;
-  }
-
-  private commitMerge(merge: MergeBounds, center: boolean): void {
-    const activeSheet = this.deps.activeSheet();
-    const sheet = this.deps.sheet();
-    const range = {
-      sheet: activeSheet,
-      start: { row: merge.r0, col: merge.c0 },
-      end: { row: merge.r1, col: merge.c1 },
-    };
-    const engine = storeEngine(this.deps.store);
-    // Per-cell operations preserve policy issue indices and partial spill rejection.
-    const scalarWrites =
-      !engine ||
-      Boolean(
-        sheet.validationRules?.length ||
-        sheet.protectedRanges?.length ||
-        engine.hasSpillChildren(range),
-      );
-    const cells: SnapshotCell[] = [];
-    const patches: DocumentOp[] = [{ op: "addMerge", sheet: activeSheet, merge }];
-    for (let row = merge.r0; row <= merge.r1; row++) {
-      for (let col = merge.c0; col <= merge.c1; col++) {
-        if (row === merge.r0 && col === merge.c0) continue;
-        const value: CellValue = { kind: "literal", value: null };
-        if (scalarWrites) {
-          patches.push({
-            op: "set",
-            addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
-            value,
-          });
-        } else cells.push({ rowOffset: row - merge.r0, colOffset: col - merge.c0, value });
-      }
-    }
-
-    if (cells.length > 0) patches.push({ op: "setRange", range, cells });
-    if (center)
-      patches.push({
-        op: "setRangeStyle",
-        range: {
-          sheet: activeSheet,
-          start: { row: merge.r0, col: merge.c0 },
-          end: { row: merge.r0, col: merge.c0 },
-        },
-        style: { align: "center" },
       });
 
     this.deps.commit(patches);

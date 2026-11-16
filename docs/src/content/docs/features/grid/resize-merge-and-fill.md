@@ -123,7 +123,7 @@ See [Formulas → Point mode and reference rewriting](/docs/features/formulas/au
 | --- | --- |
 | `grid.setColumnWidth(col, width)` | Set one column's width with an undoable `setColumn` patch. |
 | `grid.setRowHeight(row, height)` | Set one row's persistent display height through document history. |
-| `grid.actions.merge()` / `grid.actions.unmerge()` | Merge or unmerge the selection. Merge asks first when more than one cell holds a value. |
+| `grid.actions.merge()` / `grid.actions.unmerge()` | Merge or unmerge the selection. Merge asks first when more than one cell holds a value. Its code loads on first use, so the merge lands a moment after the call. |
 | `grid.actions.mergeAndCenter()` | Merge the selection and center its text, as one undoable step. It asks first like `merge()`. |
 | `readOnly: true` | Turns off drag-to-fill and resizing, including double-click autofit. Turning it on ends an active resize without committing. |
 

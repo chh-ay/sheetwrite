@@ -235,8 +235,9 @@ export interface GridActions {
    * Merge the selected range into one cell; does nothing unless a range is
    * selected. As in Excel, when more than one of its cells holds a value, a
    * dialog warns that only the upper-left value stays. The merge happens after
-   * OK, and Cancel or Escape leaves the cells as they were. The dialog is in
-   * its own chunk, which the first warning loads.
+   * OK, and Cancel or Escape leaves the cells as they were. The command and
+   * its dialog load on first use, so the merge lands a moment after the
+   * call, as `toggleAutoFilter()`'s change does.
    */
   merge(): void;
   /** Split merged cells in the selection back into single cells. */

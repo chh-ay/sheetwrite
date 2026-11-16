@@ -99,7 +99,7 @@ import {
   rowVisibilityPatches,
   viewSortPatch,
 } from "./store/view-patches.js";
-import { StyleActions } from "./style-actions.js";
+import { StyleActions, type StyleActionsDeps } from "./style-actions.js";
 import { checkStylePart } from "./style-parts.js";
 import {
   beginGridTransactionAdmission,
@@ -547,6 +547,8 @@ export class GridImpl implements Grid {
   private readonly searchController: SearchController;
   private readonly clipboard: ClipboardController;
   private readonly styleActions: StyleActions;
+  /** What the style actions and the lazily loaded merge command read and write. */
+  private readonly styleDeps: StyleActionsDeps;
   private readonly document: DocumentController;
   private readonly datasourceController: DatasourceController;
   private readonly geometry: GeometryLayoutController;
@@ -585,6 +587,8 @@ export class GridImpl implements Grid {
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
   /** The open dialog; opening another or destroying the grid closes it. */
   private readonly dialogs = new ScopeSlot(this.lifetime);
+  /** The merge command's build; a destroy closes it, so a chunk that loads late is dropped. */
+  private readonly mergeBuilds = new ScopeSlot(this.lifetime);
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -916,7 +920,7 @@ export class GridImpl implements Grid {
       commit: (patches, reason) => this.document.commit(patches, reason),
     });
 
-    this.styleActions = new StyleActions({
+    this.styleDeps = {
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -928,8 +932,8 @@ export class GridImpl implements Grid {
       anchorCell: (row, col) => this.anchorCell(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches) => this.document.commit(patches, "style"),
-      confirm: (request) => this.confirm(request),
-    });
+    };
+    this.styleActions = new StyleActions(this.styleDeps);
 
     this.actions = this.buildActions();
 
@@ -2827,6 +2831,27 @@ export class GridImpl implements Grid {
   }
 
   /**
+   * Merge or Merge & Center. The command loads on first use, with the
+   * warning it may show, so the merge lands a moment after the call.
+   */
+  private mergeCells(center: boolean): void {
+    if (this.lifetime.closed) return;
+    const build = this.mergeBuilds.current();
+    void import("./merge-command.js").then(
+      ({ mergeSelection }) => {
+        if (build.closed) return;
+        mergeSelection(this.styleDeps, center, (request) => this.confirm(request));
+      },
+      (error: unknown) => {
+        if (build.closed) return;
+        // Tell the user; the load error still reaches the host.
+        this.actionFeedback.show(`Merge could not load: ${errorDetail(error)}`);
+        throw error;
+      },
+    );
+  }
+
+  /**
    * Ask the user to confirm in a modal dialog, which loads on first use like
    * the find bar. Resolves `false` on Cancel or Escape, and when another
    * dialog opens or the grid is destroyed first.
@@ -3676,7 +3701,7 @@ export class GridImpl implements Grid {
         this.styleActions.applyStyle({ numberFormat });
       },
       setBorders: (preset) => this.styleActions.setBorders(preset),
-      mergeAndCenter: () => this.styleActions.mergeSelection(true),
+      mergeAndCenter: () => this.mergeCells(true),
       clearAll: () => this.styleActions.clearAll(),
       autoSum: () => this.autoSum(),
       find: () => this.openFindBar(),
@@ -3686,7 +3711,7 @@ export class GridImpl implements Grid {
       },
       toggleBorder: () => this.styleActions.toggleBorder(),
       clearFormat: () => this.styleActions.applyStyle(null),
-      merge: () => this.styleActions.mergeSelection(),
+      merge: () => this.mergeCells(false),
       unmerge: () => this.styleActions.unmergeSelection(),
       sort: (ascending) => {
         const f = this.selection.focusCell;
