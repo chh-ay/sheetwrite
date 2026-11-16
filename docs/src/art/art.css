@@ -434,3 +434,22 @@
 .sw-blueprint .bp-sheet__range[data-tone="danger"] {
   fill: var(--sw-danger-soft);
 }
+
+/* A card's blueprint picture (BlueprintCard): the card has no figure frame, so
+   the picture draws the canvas and its dots itself. */
+.sw-blueprint.sw-blueprint--card {
+  --bp-canvas: var(--sw-surface-0);
+  overflow: hidden;
+  background: var(--bp-canvas);
+}
+.sw-blueprint .bp-dot {
+  fill: var(--sw-border);
+}
+/* Hub previews of any shape: the picture fills the box, its dots past the canvas. */
+.sw-hub-preview > .sw-blueprint--card {
+  height: 100%;
+}
+/* A docs section card's picture spans the card's top edge to edge, as its art box does. */
+.sw-blueprint--card.sw-card__art {
+  width: calc(100% + 2 * var(--sw-space-5));
+}
