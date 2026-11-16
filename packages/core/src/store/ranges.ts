@@ -1,6 +1,7 @@
 import type { Column } from "../types/cell.js";
 import type { CellAddress, MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type {
+  AutoFilter,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -10,6 +11,7 @@ import type {
   SheetVisibility,
   SortKey,
 } from "../types/document.js";
+import { validCustomFilter } from "./autofilter.js";
 
 export function integerAt(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
@@ -288,20 +290,45 @@ export function validSortAndFilters(
   for (const [col, filter] of filters) {
     if (!integerAt(col) || col >= sheet.columns.length || filtered.has(col)) return false;
     filtered.add(col);
-    if (
-      filter.kind === "values"
-        ? !Array.isArray(filter.values)
-        : filter.kind === "contains"
-          ? typeof filter.text !== "string"
-          : filter.kind === "compare"
-            ? !["gt", "gte", "lt", "lte", "eq", "neq"].includes(filter.op) ||
-              !Number.isFinite(filter.value)
-            : filter.kind !== "empty" && filter.kind !== "nonEmpty"
-    ) {
-      return false;
-    }
+    if (!validColumnFilter(filter)) return false;
   }
   return true;
+}
+
+function validColumnFilter(filter: ColumnFilter): boolean {
+  switch (filter.kind) {
+    case "values":
+      return Array.isArray(filter.values);
+    case "contains":
+      return typeof filter.text === "string";
+    case "compare":
+      return (
+        ["gt", "gte", "lt", "lte", "eq", "neq"].includes(filter.op) && Number.isFinite(filter.value)
+      );
+    case "custom":
+      return validCustomFilter(filter);
+    case "empty":
+    case "nonEmpty":
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Whether `autoFilter` is a range of at least its header row on `sheet`. */
+export function validAutoFilter(sheet: Sheet, autoFilter: AutoFilter): boolean {
+  const { range } = autoFilter;
+  return (
+    range.sheet === sheet.id &&
+    integerAt(range.start.row) &&
+    integerAt(range.start.col) &&
+    integerAt(range.end.row) &&
+    integerAt(range.end.col) &&
+    range.start.row <= range.end.row &&
+    range.start.col <= range.end.col &&
+    range.end.row < sheet.rowCount &&
+    range.end.col < sheet.columns.length
+  );
 }
 
 export function patchSheetId(patch: DocumentOp): SheetId | null {
@@ -413,6 +440,26 @@ export function rebaseRangeSpan(
     start: { ...range.start, [key]: span[0] },
     end: { ...range.end, [key]: span[1] },
   };
+}
+
+/**
+ * The sheet's AutoFilter after an axis edit: its range follows the rows and
+ * columns. It goes when the edit removes its header row or all its columns.
+ */
+export function rebaseSheetAutoFilter(
+  sheet: Sheet,
+  axis: SheetAxis,
+  remap: (index: number) => number | null,
+): void {
+  const autoFilter = sheet.autoFilter;
+  if (!autoFilter) return;
+
+  const range =
+    axis === "row" && remap(autoFilter.range.start.row) === null
+      ? null
+      : rebaseRangeSpan(autoFilter.range, axis, remap);
+  if (range) sheet.autoFilter = { range };
+  else delete sheet.autoFilter;
 }
 
 /** `item` with its range rebased along `axis` when it lies on `sheet`; null when the remap removes it. */
