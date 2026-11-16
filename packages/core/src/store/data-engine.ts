@@ -1363,7 +1363,7 @@ export class StoreDataEngine {
     });
   }
 
-  /** The result `text` would have in `cell`, read without changing the store (#221). */
+  /** The result `text` would have in `cell`, read without changing the store. */
   previewFormula(cell: CellAddress, text: string): FormulaPreview {
     const fields = new Float64Array(PREVIEW_FIELDS);
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
