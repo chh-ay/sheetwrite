@@ -93,6 +93,25 @@ describe("SheetTabs", () => {
     document.body.replaceChildren();
   });
 
+  it("opens a sheet's menu on a right-click on its tab, as Excel does", () => {
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: (id) => {
+        activated.push(id);
+        tabs.update(SHEETS, id);
+      },
+      onRename: (id) => applied(id),
+    });
+    tabs.update(SHEETS, "b");
+
+    const menuEvent = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    tabButtons(host)[2]!.dispatchEvent(menuEvent);
+    expect(menuEvent.defaultPrevented).toBe(true);
+    expect(activated).toEqual(["c"]);
+    const menu = host.querySelector('[role="menu"]');
+    expect(menu?.getAttribute("aria-label")).toBe("Summary sheet options");
+  });
+
   it("does not remove the last visible sheet or remove a tab with Backspace", () => {
     tabs.destroy();
     const removed: string[] = [];
