@@ -514,6 +514,13 @@ export type KeyboardAction =
   | "replace"
   | "clearContents"
   | "editNote"
+  | "bold"
+  | "italic"
+  | "underline"
+  | "strikethrough"
+  | "insertDate"
+  | "insertTime"
+  | "selectAll"
   | "fillDown"
   | "fillRight";
 
