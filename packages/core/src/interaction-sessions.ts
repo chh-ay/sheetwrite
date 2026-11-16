@@ -1068,7 +1068,8 @@ export class InteractionSessions {
    */
   replayKey(e: KeyboardEvent): void {
     const target = document.activeElement;
-    if (target === this.deps.host || !(target instanceof HTMLElement)) {
+    // Nothing focused, or the grid: the key acts on the grid, which it was pressed on.
+    if (!target || target === this.deps.host || target === document.body) {
       this.onKeyDown(e);
     } else if (
       (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) &&
