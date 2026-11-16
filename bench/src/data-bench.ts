@@ -43,6 +43,7 @@ import { dirname } from "node:path";
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 
+import { autoFilterValues } from "../../packages/core/src/autofilter-actions.js";
 import { getEngine } from "../../packages/core/src/engine.js";
 import { initSheetwrite, SheetwriteStore } from "../../packages/core/src/index.js";
 import { storeEngine } from "../../packages/core/src/store/engine-registry.js";
@@ -730,10 +731,13 @@ function measureAutoFilter(
   }
 
   if (measures("autofilter-dropdown")) {
-    let listed: ReturnType<typeof engine.autoFilterValues> | undefined;
+    // What a dropdown lists, from the sheet as the grid holds it.
+    const sheet = queryStore.getWorkbook().sheets.find((candidate) => candidate.id === SHEET);
+    if (!sheet) throw new Error(`autofilter ${rows}: no ${SHEET} sheet`);
+    let listed: ReturnType<typeof autoFilterValues> | undefined;
     queries["autofilter-dropdown"] = measure(
       () => {
-        listed = engine.autoFilterValues(SHEET, COL.city, AUTO_FILTER_LIST_LIMIT);
+        listed = autoFilterValues(engine, sheet, COL.city, AUTO_FILTER_LIST_LIMIT);
       },
       plan("autofilter-dropdown", rows),
     );

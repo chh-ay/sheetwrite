@@ -2,8 +2,7 @@ import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
-import type { AutoFilterMenu, AutoFilterMenuRequest } from "./autofilter-menu.js";
-import { AUTO_FILTER_VALUE_LIMIT, autoFilterColumnKind } from "./autofilter.js";
+import type { AutoFilterHost } from "./autofilter-actions.js";
 import { readBlockArraysOnce } from "./block-ingress.js";
 import {
   fontFor,
@@ -13,7 +12,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import { cellDisplayText, cellScalarToText, parseCellInput } from "./cell-input.js";
+import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
 import { isDashboard } from "./dashboard.js";
@@ -60,7 +59,7 @@ import { Keymap } from "./keymap.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { sheetNameKey } from "./name-key.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
-import { formatNumber, trimNumberFormatCaches } from "./number-format.js";
+import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
@@ -580,10 +579,10 @@ export class GridImpl implements Grid {
   private findBar: FindBar | null = null;
   /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
   private readonly findBarBuilds = new ScopeSlot(this.lifetime);
-  /** The loaded AutoFilter dropdown; `null` until a header button first opens it. */
-  private autoFilterMenu: AutoFilterMenu | null = null;
-  /** The dropdown build; a destroy closes it, so a chunk that loads late is dropped. */
-  private readonly autoFilterMenuBuilds = new ScopeSlot(this.lifetime);
+  /** What the lazily loaded AutoFilter commands use; built on their first use. */
+  private autoFilterHost: AutoFilterHost | null = null;
+  /** The AutoFilter chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
+  private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -774,7 +773,8 @@ export class GridImpl implements Grid {
       onMutationRejected: (issues) => {
         for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
       },
-      onHistoryApplied: () => {
+      onHistoryApplied: (patches) => {
+        this.selectChangedCells(patches);
         this.emitSelection();
         this.render();
       },
@@ -982,7 +982,8 @@ export class GridImpl implements Grid {
         },
       },
       openFind: (options) => this.openFindBar(options),
-      openAutoFilter: (col) => this.openAutoFilterMenu(col),
+      openAutoFilter: (col) =>
+        this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -1066,18 +1067,7 @@ export class GridImpl implements Grid {
         return cell ? this.noteCell(cell.row, cell.col) : null;
       },
       noteAt: (address) => this.getNote(address),
-      cellRect: (cell) => {
-        const viewport = this.viewportEl.getBoundingClientRect();
-        const rect = this.screenRect(
-          cell.row,
-          cell.col,
-          this.geometry.toContent(this.scroller.scrollTop),
-          this.scroller.scrollLeft,
-        );
-        const left = viewport.left + rect.x;
-        const top = viewport.top + rect.y;
-        return { left, top, right: left + rect.w, bottom: top + rect.h };
-      },
+      cellRect: (cell) => this.cellClientRect(cell.row, cell.col),
       editorLabel: (cell) => `Note for ${this.columnHeader(cell.col)}, row ${cell.row + 1}`,
       commit: (address, text) => this.setNote(address, text),
       returnFocus: () => this.host.focus(),
@@ -1735,6 +1725,23 @@ export class GridImpl implements Grid {
     return this.geometry.frozenWidth();
   }
 
+  /** View `row`, `col` in client coordinates, a merge's whole area for its cells. */
+  private cellClientRect(
+    row: number,
+    col: number,
+  ): { left: number; top: number; right: number; bottom: number } {
+    const viewport = this.viewportEl.getBoundingClientRect();
+    const rect = this.screenRect(
+      row,
+      col,
+      this.geometry.toContent(this.scroller.scrollTop),
+      this.scroller.scrollLeft,
+    );
+    const left = viewport.left + rect.x;
+    const top = viewport.top + rect.y;
+    return { left, top, right: left + rect.w, bottom: top + rect.h };
+  }
+
   private firstBodyCol(): number {
     return this.geometry.firstBodyColumn();
   }
@@ -1870,6 +1877,49 @@ export class GridImpl implements Grid {
 
   private toViewRow(dataRow: number): number | null {
     return this.geometry.toViewRow(dataRow);
+  }
+
+  /**
+   * Select the cells that `patches` change on the active sheet and scroll to
+   * them, as Excel's undo and redo do. Row, column and object edits leave the
+   * selection alone.
+   */
+  private selectChangedCells(patches: readonly DocumentOp[]): void {
+    let top = Number.POSITIVE_INFINITY;
+    let left = Number.POSITIVE_INFINITY;
+    let bottom = -1;
+    let right = -1;
+    for (const patch of patches) {
+      const range =
+        patch.op === "set" || patch.op === "setNote"
+          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
+          : patch.op === "setRange" ||
+              patch.op === "setBlock" ||
+              patch.op === "restoreBlock" ||
+              patch.op === "setRangeStyle" ||
+              patch.op === "clearRange" ||
+              patch.op === "permuteRows"
+            ? patch.range
+            : null;
+      if (range?.sheet !== this.activeSheet) continue;
+      const first = this.toViewRow(range.start.row);
+      const last = this.toViewRow(range.end.row);
+      if (first === null || last === null) continue;
+      top = Math.min(top, first, last);
+      bottom = Math.max(bottom, first, last);
+      left = Math.min(left, range.start.col, range.end.col);
+      right = Math.max(right, range.start.col, range.end.col);
+    }
+    if (bottom < 0) return;
+
+    const sheet = this.activeSheet;
+    const start = { row: top, col: left };
+    this.selection.set(
+      top === bottom && left === right
+        ? { kind: "cell", addr: { sheet, ...start } }
+        : { kind: "range", range: { sheet, start, end: { row: bottom, col: right } } },
+    );
+    this.scrollToCell({ sheet, ...start });
   }
 
   private mergeAnchorAt(row: number, col: number): SelRect | null {
@@ -2699,56 +2749,6 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * The range Data › Filter turns filters on for, as Excel picks it: the table
-   * at the focus cell without its totals row, else the selected range, else
-   * the current region around the focus cell. `null` on an empty cell.
-   */
-  private autoFilterTarget(): Range | null {
-    const focus = this.selection.focusCell;
-    if (!focus) return null;
-    const addr = { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col };
-    const table = this.sheet().tables?.find((candidate) => rangeHolds(candidate.range, addr));
-    if (table) {
-      const { range } = table;
-      const end = { row: range.end.row - (table.totalsRow ? 1 : 0), col: range.end.col };
-      return { sheet: range.sheet, start: { ...range.start }, end };
-    }
-
-    const range = this.selectedSortRange() ?? currentRegion(this.store, addr);
-    return range && rangeHolds(range, addr) ? range : null;
-  }
-
-  /** Filter the focus cell's column to its value, turning the AutoFilter on if needed. */
-  private filterBySelection(): void {
-    const focus = this.selection.focusCell;
-    if (!focus) return;
-    const value = this.store.getCell({
-      sheet: this.activeSheet,
-      row: this.toDataRow(focus.row),
-      col: focus.col,
-    }).resolved;
-    const filter: ColumnFilter = { kind: "values", values: [value] };
-    const current = this.sheet().autoFilter?.range;
-    if (current && focus.col >= current.start.col && focus.col <= current.end.col) {
-      this.setColumnFilter(focus.col, filter);
-      return;
-    }
-
-    const range = this.autoFilterTarget();
-    if (!range) return;
-    this.document.commit(
-      [
-        {
-          op: "setSheetMeta",
-          sheet: this.activeSheet,
-          patch: { autoFilter: { range }, filters: [[focus.col, filter]] },
-        },
-      ],
-      "structure",
-    );
-  }
-
-  /**
    * Whether the selection can stay after `patches`, which changed the view:
    * they change only the AutoFilter or column filters of the active sheet,
    * and either no row was or is hidden (view rows are data rows on both
@@ -2780,94 +2780,47 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * Open the AutoFilter dropdown of `col`'s header cell, as its button does.
-   * The dropdown is its own chunk, loaded on the first open.
+   * Run an AutoFilter command once its chunk has loaded: the commands and
+   * the dropdown load on first use, as the find bar does.
    */
-  private openAutoFilterMenu(col: number): void {
-    const autoFilter = this.sheet().autoFilter;
-    if (!autoFilter || col < autoFilter.range.start.col || col > autoFilter.range.end.col) return;
+  private withAutoFilter(
+    run: (filters: typeof import("./autofilter-actions.js"), host: AutoFilterHost) => void,
+  ): void {
     if (this.lifetime.closed) return;
-
-    const build = this.autoFilterMenuBuilds.current();
-    void import("./autofilter-menu.js").then(
-      ({ AutoFilterMenu: MenuClass }) => {
+    const build = this.autoFilterBuilds.current();
+    void import("./autofilter-actions.js").then(
+      (filters) => {
         if (build.closed) return;
-        if (!this.autoFilterMenu) {
-          const menu = new MenuClass(this.host, this.baseTheme);
-          this.autoFilterMenu = menu;
-          build.add(() => {
-            menu.destroy();
-            this.autoFilterMenu = null;
-          });
-        }
-        const request = this.autoFilterRequest(col);
-        if (request) this.autoFilterMenu.open(request);
+        this.autoFilterHost ??= {
+          grid: this,
+          host: this.host,
+          theme: this.baseTheme,
+          sheet: () => this.sheet(),
+          readOnly: () => this.readOnly,
+          focus: () => {
+            const focus = this.selection.focusCell;
+            return focus
+              ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
+              : null;
+          },
+          selectedRange: () => this.selectedSortRange(),
+          commit: (op) => this.document.commit([op], "structure"),
+          feedback: (message) => this.actionFeedback.show(message),
+          anchor: (row, col) => {
+            const viewRow = this.toViewRow(row);
+            return viewRow === null ? null : this.cellClientRect(viewRow, col);
+          },
+          adopt: (dispose) => this.autoFilterBuilds.current().add(dispose),
+        };
+        run(filters, this.autoFilterHost);
       },
       (error: unknown) => {
         if (build.closed) return;
+        // Tell the user; the load error still reaches the host.
         this.actionFeedback.show(`The filter could not load: ${errorDetail(error)}`);
         throw error;
       },
     );
-  }
-
-  /** What the dropdown of `col` shows and does; `null` without an AutoFilter there. */
-  private autoFilterRequest(col: number): AutoFilterMenuRequest | null {
-    const sheet = this.sheet();
-    const range = sheet.autoFilter?.range;
-    const engine = storeEngine(this.store);
-    const viewRow = range ? this.toViewRow(range.start.row) : null;
-    if (!range || !engine || viewRow === null) return null;
-
-    const column = sheet.columns[col];
-    const format = (value: CellScalar): string =>
-      typeof value === "number"
-        ? formatNumber(value, column?.numberFormat, column?.numberLocale)
-        : typeof value === "boolean"
-          ? value
-            ? "TRUE"
-            : "FALSE"
-          : (value ?? "");
-    const headerValue = this.store.getCell({
-      sheet: this.activeSheet,
-      row: range.start.row,
-      col,
-    }).resolved;
-    const { values, kept } = engine.autoFilterValues(
-      this.activeSheet,
-      col,
-      AUTO_FILTER_VALUE_LIMIT,
-    );
-    const kind = autoFilterColumnKind(column, values);
-    const cell = this.screenRect(
-      viewRow,
-      col,
-      this.geometry.toContent(this.scroller.scrollTop),
-      this.scroller.scrollLeft,
-    );
-    const viewport = this.viewportEl.getBoundingClientRect();
-    const top = viewport.top + cell.y;
-    return {
-      anchor: { left: viewport.left + cell.x, top, bottom: top + cell.h },
-      header:
-        headerValue === null || headerValue === "" ? `Column ${colToA1(col)}` : format(headerValue),
-      kind,
-      values,
-      kept,
-      filter: this.getColumnFilters().get(col),
-      format,
-      parse: (text) => {
-        const value = parseCellInput(text, kind === "date" ? "date" : "number");
-        return value.kind === "literal" && typeof value.value === "number" ? value.value : text;
-      },
-      canSort: !this.readOnly,
-      sort: (ascending) => {
-        const current = this.sheet().autoFilter?.range;
-        if (current) this.sortRange(current, [{ col, ascending }], { hasHeader: true });
-      },
-      apply: (filter) => this.setColumnFilter(col, filter),
-      closed: () => this.host.focus({ preventScroll: true }),
-    };
   }
 
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
@@ -3787,26 +3740,14 @@ export class GridImpl implements Grid {
         const target = col ?? this.selection.focusCell?.col;
         if (target !== undefined) this.setColumnFilter(target, null);
       },
-      toggleAutoFilter: () => {
-        if (this.sheet().autoFilter) {
-          this.setAutoFilter(null);
-          return;
-        }
-        const range = this.autoFilterTarget();
-        if (range) this.setAutoFilter(range);
-        else this.actionFeedback.show("Select a cell in a range of data to filter.");
-      },
-      clearFilters: () => {
-        if ((this.sheet().filters?.length ?? 0) === 0) return;
-        this.document.commit(
-          [{ op: "setSheetMeta", sheet: this.activeSheet, patch: { filters: [] } }],
-          "structure",
-        );
-      },
+      toggleAutoFilter: () =>
+        this.withAutoFilter((filters, host) => filters.toggleAutoFilter(host)),
+      clearFilters: () => this.withAutoFilter((filters, host) => filters.clearFilters(host)),
       reapplyFilter: () => {
         this.reapplyFilter();
       },
-      filterBySelection: () => this.filterBySelection(),
+      filterBySelection: () =>
+        this.withAutoFilter((filters, host) => filters.filterBySelection(host)),
       copy: () => this.clipboard.copy(),
       cut: () => this.clipboard.cut(),
       paste: () => this.clipboard.paste(),

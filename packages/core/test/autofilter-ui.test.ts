@@ -5,7 +5,7 @@ import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, WorkbookSnapshot } from "../src/types.js";
 
-const MENU_MODULE = "../src/autofilter-menu.js";
+const ACTIONS_MODULE = "../src/autofilter-actions.js";
 let restoreStubs: () => void;
 const disposers: (() => void)[] = [];
 
@@ -80,20 +80,25 @@ const press = (target: HTMLElement, key: string, init: KeyboardEventInit = {}) =
     new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }),
   );
 
-/** The grid imports the dropdown lazily; awaiting the same module runs its open callback first. */
-async function dropdown(): Promise<HTMLElement> {
-  await import(MENU_MODULE);
+/** The grid imports the AutoFilter commands lazily; awaiting the same module runs its callback first. */
+async function loaded(): Promise<void> {
+  await import(ACTIONS_MODULE);
   await Promise.resolve();
+}
+
+async function dropdown(): Promise<HTMLElement> {
+  await loaded();
   const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
   if (!dialog) throw new Error("the dropdown did not open");
   return dialog;
 }
 
 describe("AutoFilter in the grid", () => {
-  it("turns on for the current region with Ctrl+Shift+L and off again", () => {
+  it("turns on for the current region with Ctrl+Shift+L and off again", async () => {
     const { grid, host } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
     press(host, "L", { ctrlKey: true, shiftKey: true });
+    await loaded();
     expect(grid.getAutoFilter()?.range).toEqual({
       sheet: "s1",
       start: { row: 0, col: 0 },
@@ -102,6 +107,7 @@ describe("AutoFilter in the grid", () => {
     expect(grid.getCommandState("filter").activity).toBe("active");
 
     press(host, "L", { ctrlKey: true, shiftKey: true });
+    await loaded();
     expect(grid.getAutoFilter()).toBeNull();
   });
 
@@ -109,6 +115,7 @@ describe("AutoFilter in the grid", () => {
     const { grid, host, store } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
     grid.actions.toggleAutoFilter();
+    await loaded();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     press(host, "ArrowDown", { altKey: true });
 
@@ -127,10 +134,11 @@ describe("AutoFilter in the grid", () => {
     expect(document.activeElement).toBe(host);
   });
 
-  it("filters by the selected cell's value, turning the AutoFilter on", () => {
+  it("filters by the selected cell's value, turning the AutoFilter on", async () => {
     const { grid } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 0 } });
     grid.actions.filterBySelection();
+    await loaded();
     expect(grid.getAutoFilter()?.range.start).toEqual({ row: 0, col: 0 });
     expect(grid.getColumnFilters().get(0)).toEqual({ kind: "values", values: ["fig"] });
     grid.undo();

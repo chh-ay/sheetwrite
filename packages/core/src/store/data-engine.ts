@@ -103,7 +103,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { validateSheetName } from "../sheet-name.js";
+import { canAddSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -2137,26 +2137,24 @@ export class StoreDataEngine {
    * Distinct resolved values of a column in first-seen order, capped at `limit`
    * distinct values (`0` = uncapped). Blanks collapse to a single `null` entry.
    * `rows`, end-exclusive canonical data rows, limits the scan to a source
-   * range; without it the whole column is read.
+   * range; without it the whole column is read. `only`, with `rows`, reads
+   * just those data rows of the range, in their order.
    */
   distinctValues(
     sheet: SheetId,
     col: number,
     limit = DEFAULT_DISTINCT_VALUES_LIMIT,
     rows?: { start: number; end: number },
+    only?: Uint32Array,
   ): CellScalar[] {
     this.requireCompleteQuery(sheet);
-    return this.view.distinctValues(sheet, col, limit, rows);
+    return this.view.distinctValues(sheet, col, limit, rows, only);
   }
 
-  /** What an AutoFilter dropdown lists for `col`; see `StoreViewState.autoFilterValues`. */
-  autoFilterValues(
-    sheet: SheetId,
-    col: number,
-    limit: number,
-  ): { values: CellScalar[]; kept: CellScalar[] | null } {
+  /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
+  filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
     this.requireCompleteQuery(sheet);
-    return this.view.autoFilterValues(sheet, col, limit);
+    return this.view.filteredRows(sheet, filters);
   }
 
   /** The sheet's explicitly hidden data rows, ascending. */
@@ -4318,7 +4316,7 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!name.ok) return false;
+    if (!canAddSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,

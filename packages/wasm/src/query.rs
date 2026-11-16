@@ -962,13 +962,15 @@ impl CellStore {
     /// Distinct resolved values of a whole column, in first-seen order.
     #[wasm_bindgen(js_name = distinctValues)]
     pub fn distinct_values(&self, sheet: usize, col: usize, limit: usize) -> DistinctColumn {
-        self.distinct_values_in_rows(sheet, col, 0, usize::MAX, limit)
+        self.distinct_values_in_rows(sheet, col, 0, usize::MAX, limit, None)
     }
 
     /// Distinct resolved values of one column over the canonical data rows
     /// `start_row..end_row`, in first-seen order. The range is clipped to the
-    /// sheet. A zero `limit` returns every value; otherwise the scan stops at
-    /// `limit` values.
+    /// sheet. With `rows`, only those rows are read, in the order given, and
+    /// those outside the range are skipped: an `AutoFilter` lists the rows the
+    /// other column filters keep. A zero `limit` returns every value;
+    /// otherwise the scan stops at `limit` values.
     #[wasm_bindgen(js_name = distinctValuesInRows)]
     #[expect(
         clippy::too_many_arguments,
@@ -981,6 +983,7 @@ impl CellStore {
         start_row: usize,
         end_row: usize,
         limit: usize,
+        rows: Option<Vec<u32>>,
     ) -> DistinctColumn {
         let out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
@@ -990,33 +993,17 @@ impl CellStore {
             return out;
         }
         let row_count = data.cells.row_count();
-        let rows = start_row.min(row_count)..end_row.min(row_count);
-        distinct_over(self, data, col, rows, limit)
-    }
-
-    /// Distinct resolved values of one column over `rows`, canonical data rows
-    /// in the order given, such as the rows the other column filters keep.
-    /// Rows past the sheet are skipped; `limit` as in `distinctValuesInRows`.
-    #[wasm_bindgen(js_name = distinctValuesOfRows)]
-    pub fn distinct_values_of_rows(
-        &self,
-        sheet: usize,
-        col: usize,
-        rows: &[u32],
-        limit: usize,
-    ) -> DistinctColumn {
-        let Some(data) = self.sheets.get(sheet) else {
-            return DistinctColumn::default();
-        };
-        if col >= data.cells.n_cols() {
-            return DistinctColumn::default();
+        let range = start_row.min(row_count)..end_row.min(row_count);
+        match rows {
+            Some(rows) => {
+                let in_range = rows
+                    .iter()
+                    .map(|&row| row as usize)
+                    .filter(|row| range.contains(row));
+                distinct_over(self, data, col, in_range, limit)
+            }
+            None => distinct_over(self, data, col, range, limit),
         }
-        let row_count = data.cells.row_count();
-        let in_sheet = rows
-            .iter()
-            .map(|&row| row as usize)
-            .filter(move |&row| row < row_count);
-        distinct_over(self, data, col, in_sheet, limit)
     }
 
     /// `dataEdge` in a view order, where `order[i]` is the data row shown at
