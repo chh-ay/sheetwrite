@@ -690,6 +690,25 @@ const TEXT_LOOKUP_APPROXIMATE_ROW = 36;
 function lookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
   const store = new CellStore();
   const sheet = store.addSheet(4, tableRows);
+  writeLookupTable(store, sheet, tableRows);
+  return { store, sheet };
+}
+
+/**
+ * The lookup table in a datasource-backed paged sheet: every page loaded
+ * from the host and none evicted, so lookups read clean pages.
+ */
+function pagedLookupTableStore(tableRows: number): { store: CellStore; sheet: number } {
+  const store = new CellStore();
+  const sheet = store.addPagedSheet(4, tableRows, PAGED_CHUNK_ROWS, 0, 0);
+  store.beginPageLoad();
+  writeLookupTable(store, sheet, tableRows);
+  store.commitSources();
+  return { store, sheet };
+}
+
+/** Keys `1..=tableRows` in A, results in B. */
+function writeLookupTable(store: CellStore, sheet: number, tableRows: number): void {
   writeNumberColumn(
     store,
     sheet,
@@ -706,7 +725,6 @@ function lookupTableStore(tableRows: number): { store: CellStore; sheet: number 
     numericColumn(tableRows, (row) => (row + 1) * LOOKUP_RESULT_FACTOR),
     0,
   );
-  return { store, sheet };
 }
 
 /** Zero-padded text keys stay ascending under the case-insensitive lookup comparison. */
@@ -783,6 +801,24 @@ const LOOKUP_VARIANTS: readonly LookupVariant[] = [
   {
     id: "xlookup-many",
     table: lookupTableStore,
+    formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
+    initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_EDITED_KEY,
+    initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
+    editedValue: NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "paged-vlookup-many",
+    table: pagedLookupTableStore,
+    formula: (tableRows) => `=VLOOKUP($C$1,A1:B${tableRows},2,FALSE)`,
+    initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
+    editedKey: NUMERIC_LOOKUP_EDITED_KEY,
+    initialValue: NUMERIC_LOOKUP_INITIAL_KEY * LOOKUP_RESULT_FACTOR,
+    editedValue: NUMERIC_LOOKUP_EDITED_KEY * LOOKUP_RESULT_FACTOR,
+  },
+  {
+    id: "paged-xlookup-many",
+    table: pagedLookupTableStore,
     formula: (tableRows) => `=XLOOKUP($C$1,A1:A${tableRows},B1:B${tableRows})`,
     initialKey: NUMERIC_LOOKUP_INITIAL_KEY,
     editedKey: NUMERIC_LOOKUP_EDITED_KEY,
