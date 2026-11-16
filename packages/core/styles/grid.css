@@ -187,8 +187,8 @@
   }
 }
 
-/* Modal dialogs over the grid (src/dialog.ts): the merge warning and Format
-   Cells. The backdrop covers the grid root; the dialog sits in its middle. */
+/* Modal dialogs over the grid (src/dialog.ts), such as the merge warning. The
+   backdrop covers the grid root; the dialog sits in its middle. */
 .sheetwrite-dialog-backdrop {
   position: absolute;
   inset: 0;

@@ -1,7 +1,7 @@
 /**
- * Modal dialogs over the grid: the merge warning and Format Cells share this
- * shell. The module loads on first use, like the find bar, so a grid that
- * never opens a dialog pays nothing for it.
+ * Modal dialogs over the grid, such as the merge warning. The module loads on
+ * first use, like the find bar, so a grid that never opens a dialog pays
+ * nothing for it.
  */
 
 import { checkStylePart } from "./style-parts.js";
