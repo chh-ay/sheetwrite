@@ -922,7 +922,8 @@ interface MachineArtifact {
   host: { cpuModel: string; logicalCpus: number; bun: string; platform: string };
   rounds: number;
   commits: Record<string, string>;
-  aaSpreadPercent: Record<string, number>;
+  /** Null when the run has no CBA round (one round) to compare the ABC rounds with. */
+  aaSpreadPercent: Record<string, number | null>;
   versions: Record<
     string,
     {
@@ -1004,7 +1005,7 @@ function report(inputs: string[], output: string) {
   }
   const machines = artifacts.map(
     (artifact) =>
-      `- ${artifact.machine}: ${artifact.host.cpuModel}, ${artifact.host.logicalCpus} logical CPUs, ${artifact.host.platform}, Bun ${artifact.host.bun}; ${artifact.rounds} rounds, measured ${artifact.measuredAt}; commits ${JSON.stringify(artifact.commits)}; A/A spread (%) ${JSON.stringify(Object.fromEntries(Object.entries(artifact.aaSpreadPercent).map(([metric, value]) => [metric, Number(value.toFixed(1))])))}`,
+      `- ${artifact.machine}: ${artifact.host.cpuModel}, ${artifact.host.logicalCpus} logical CPUs, ${artifact.host.platform}, Bun ${artifact.host.bun}; ${artifact.rounds} rounds, measured ${artifact.measuredAt}; commits ${JSON.stringify(artifact.commits)}; A/A spread (%) ${JSON.stringify(Object.fromEntries(Object.entries(artifact.aaSpreadPercent).map(([metric, value]) => [metric, value === null ? "n/a" : Number(value.toFixed(1))])))}`,
   );
   writeFileSync(output, `${lines.join("\n")}\n\n${machines.join("\n")}\n`);
 }
