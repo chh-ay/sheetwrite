@@ -75,6 +75,11 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
+  /**
+   * Hold a key while an AutoFilter command's code loads, to run once the
+   * command has; false when nothing loads.
+   */
+  deferKey: (key: () => void) => boolean;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -1073,6 +1078,11 @@ export class InteractionSessions {
         target instanceof HTMLTextAreaElement ||
         (target instanceof HTMLElement && target.isContentEditable));
     if (inEditableWidget) return;
+    // A key pressed while an AutoFilter command's code loads acts after that command.
+    if (this.deps.deferKey(() => this.onKeyDown(e))) {
+      e.preventDefault();
+      return;
+    }
 
     // Headless hosts own the keymap: a handler intercepts first and consumes
     // by returning true; `false` drops every stock binding but keeps the

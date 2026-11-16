@@ -583,6 +583,10 @@ export class GridImpl implements Grid {
   private autoFilterHost: AutoFilterHost | null = null;
   /** The AutoFilter chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
+  /** AutoFilter commands whose code is still loading. */
+  private autoFilterLoads = 0;
+  /** Keys pressed while they load, run in order once none is left. */
+  private readonly autoFilterKeys: (() => void)[] = [];
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -985,6 +989,7 @@ export class GridImpl implements Grid {
       openFind: (options) => this.openFindBar(options),
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
+      deferKey: (key) => this.autoFilterLoads > 0 && this.autoFilterKeys.push(key) > 0,
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -2789,6 +2794,7 @@ export class GridImpl implements Grid {
   ): void {
     if (this.lifetime.closed) return;
     const build = this.autoFilterBuilds.current();
+    this.autoFilterLoads++;
     void import("./autofilter-actions.js").then(
       (filters) => {
         if (build.closed) return;
@@ -2813,14 +2819,25 @@ export class GridImpl implements Grid {
           adopt: (dispose) => this.autoFilterBuilds.current().add(dispose),
         };
         run(filters, this.autoFilterHost);
+        this.runDeferredKeys();
       },
       (error: unknown) => {
         if (build.closed) return;
         // Tell the user; the load error still reaches the host.
         this.actionFeedback.show(`The filter could not load: ${errorDetail(error)}`);
+        this.runDeferredKeys();
         throw error;
       },
     );
+  }
+
+  /**
+   * After an AutoFilter command, the keys pressed while its code loaded, as
+   * they would have acted had it been there; they wait for every load.
+   */
+  private runDeferredKeys(): void {
+    if (--this.autoFilterLoads > 0) return;
+    for (const key of this.autoFilterKeys.splice(0)) key();
   }
 
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
