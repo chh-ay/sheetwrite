@@ -423,7 +423,8 @@ export type MutationIssue =
        * Resource dimension exceeded by the transaction, its server versions,
        * or the durable pending queue; or the document limit a row or column
        * insert would pass (`sheet-rows`, `sheet-columns` and `sheet-cells`
-       * per sheet, `dense-cells` across the workbook's dense sheets).
+       * per sheet, `local-paged-cells` across the workbook's local sheets,
+       * which dense sheets past `maxDenseCells` continue in).
        */
       resource:
         | "operations"
@@ -437,7 +438,7 @@ export type MutationIssue =
         | "sheet-rows"
         | "sheet-columns"
         | "sheet-cells"
-        | "dense-cells";
+        | "local-paged-cells";
       /** Count or incrementally observed encoded bytes at rejection. */
       actual: number;
       /** Configured inclusive ceiling for the resource. */

@@ -66,6 +66,8 @@ export const ICON_NAMES = [
   "clearFilter",
   "sortCustom",
   "sortView",
+  "filter",
+  "reapplyFilter",
   "chart",
   "chartColumn",
   "chartBar",

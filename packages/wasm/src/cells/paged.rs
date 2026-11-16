@@ -204,7 +204,9 @@ impl Directory {
 }
 
 /// Clean, reloadable source values of one page. Eviction frees the entry and
-/// the next loaded page reuses its arrays.
+/// the next loaded page reuses its arrays. A free page that came through a
+/// transfer has empty arrays until reuse allocates them.
+#[derive(Default)]
 pub(super) struct CleanPage {
     pub(super) kind: Vec<u8>,
     pub(super) payload: Vec<u64>,
@@ -223,6 +225,13 @@ impl CleanPage {
             payload: vec![0; rows],
             style: vec![0; rows],
             loaded: vec![0; rows.div_ceil(BITS_PER_WORD)],
+        }
+    }
+
+    /// Allocates the arrays of a free page whose rows a transfer dropped.
+    fn restore(&mut self, rows: usize) {
+        if self.kind.is_empty() {
+            *self = Self::new(rows);
         }
     }
 
@@ -534,6 +543,10 @@ pub(super) struct PagedStorage {
     clock: Cell<u64>,
     eviction_candidate_checks: u64,
     evictions: u64,
+    /// A local sheet: a dense sheet that grew past the dense cap. It has no
+    /// datasource, so it never evicts, keeps no dirty overlay and counts
+    /// every cell as loaded.
+    pub(super) local: bool,
 }
 
 impl PagedStorage {
@@ -582,7 +595,16 @@ impl PagedStorage {
             clock: Cell::new(0),
             eviction_candidate_checks: 0,
             evictions: 0,
+            local: false,
         })
+    }
+
+    /// Local storage for a sheet without a datasource: chunks of
+    /// `chunk_rows`, no eviction and no dirty overlay.
+    pub(super) fn new_local(chunk_rows: usize) -> Result<Self, String> {
+        let mut storage = Self::new(chunk_rows, 0, 0)?;
+        storage.local = true;
+        Ok(storage)
     }
 
     /// The page index and the row offset inside it.
@@ -812,6 +834,7 @@ impl PagedStorage {
         self.evict_for_chunk();
 
         let clean = if let Some(reused) = self.free_clean.pop() {
+            self.clean[reused as usize].restore(self.chunk_rows);
             self.clean[reused as usize].reset();
             reused
         } else {
@@ -824,7 +847,7 @@ impl PagedStorage {
 
     pub(super) fn clean_loaded(&self, row: usize, col: usize) -> bool {
         let (clean, offset) = self.clean_page(row, col);
-        clean.is_some_and(|page| bit(&page.loaded, offset))
+        self.local || clean.is_some_and(|page| bit(&page.loaded, offset))
     }
 
     #[inline]
@@ -858,19 +881,19 @@ impl PagedStorage {
         let (page, offset) = self.split(row);
         let id = self.page_id(col, page);
         if id == NONE {
-            return (KIND_EMPTY, 0, 0, false, false);
+            return (KIND_EMPTY, 0, 0, self.local, false);
         }
 
         let clean = self.records[id as usize].clean;
         if clean == NONE {
-            return (KIND_EMPTY, 0, 0, false, false);
+            return (KIND_EMPTY, 0, 0, self.local, false);
         }
 
         self.touch(id);
         let clean_page = &self.clean[clean as usize];
 
         if !bit(&clean_page.loaded, offset) {
-            return (KIND_EMPTY, 0, 0, false, false);
+            return (KIND_EMPTY, 0, 0, self.local, false);
         }
 
         (
@@ -995,10 +1018,14 @@ impl PagedStorage {
     }
 
     pub(super) fn can_dirty_cell(&self, row: usize, col: usize) -> bool {
-        self.is_dirty(row, col) || self.dirty_cells() < self.max_dirty_cells
+        self.local || self.is_dirty(row, col) || self.dirty_cells() < self.max_dirty_cells
     }
 
     pub(super) fn can_dirty_rect(&self, r0: usize, c0: usize, rows: usize, cols: usize) -> bool {
+        if self.local {
+            return true;
+        }
+
         let mut additional = 0usize;
 
         for col in c0..c0 + cols {
@@ -1042,6 +1069,10 @@ impl PagedStorage {
         cols: usize,
         revision: u64,
     ) -> bool {
+        if self.local {
+            return true;
+        }
+
         let additional = (c0..c0 + cols)
             .flat_map(|col| (r0..r0 + rows).map(move |row| (row, col)))
             .filter(|&(row, col)| !self.is_dirty(row, col))
@@ -1050,6 +1081,10 @@ impl PagedStorage {
     }
 
     pub(super) fn prepare_dirty_cells(&mut self, cells: &[(usize, usize)], revision: u64) -> bool {
+        if self.local {
+            return true;
+        }
+
         let additional = cells
             .iter()
             .filter(|&&(row, col)| !self.is_dirty(row, col))
@@ -1214,7 +1249,8 @@ impl PagedStorage {
         style: u32,
         dirty_revision: Option<u64>,
     ) -> bool {
-        if let Some(revision) = dirty_revision {
+        // A local sheet has no datasource to acknowledge an edit against.
+        if let Some(revision) = dirty_revision.filter(|_| !self.local) {
             return self.write_dirty(row, col, kind, payload, style, revision);
         }
 
@@ -1794,12 +1830,8 @@ impl PagedStorage {
         }
     }
 
-    pub(super) fn write_transfer(&self, out: &mut Writer) {
-        out.usize(self.chunk_rows);
-        out.usize(self.byte_budget);
-        out.usize(self.max_dirty_cells);
-
-        self.pages.write_transfer(out);
+    /// Writes the page records.
+    fn write_record_transfer(&self, out: &mut Writer) {
         out.usize(self.records.len());
         for record in &self.records {
             for value in [
@@ -1816,15 +1848,37 @@ impl PagedStorage {
             out.u64(record.last_access.get());
         }
         out.ints(&self.free_records);
+    }
 
+    /// Writes the clean pages. A free page is reset before reuse, so a
+    /// transfer drops its rows: releasing memory then also returns the pages
+    /// that evictions, row deletes and shrinking local sheets left free.
+    fn write_clean_transfer(&self, out: &mut Writer) {
+        let mut free = vec![false; self.clean.len()];
+        for &id in &self.free_clean {
+            free[id as usize] = true;
+        }
         out.usize(self.clean.len());
-        for clean in &self.clean {
+        for (page, is_free) in self.clean.iter().zip(free) {
+            let empty = CleanPage::default();
+            let clean = if is_free { &empty } else { page };
             out.bytes(&clean.kind);
             out.words(&clean.payload);
             out.ints(&clean.style);
             out.words(&clean.loaded);
         }
         out.ints(&self.free_clean);
+    }
+
+    pub(super) fn write_transfer(&self, out: &mut Writer) {
+        out.usize(self.chunk_rows);
+        out.usize(self.byte_budget);
+        out.usize(self.max_dirty_cells);
+
+        self.pages.write_transfer(out);
+        self.write_record_transfer(out);
+
+        self.write_clean_transfer(out);
 
         self.dirty.write_transfer(out);
         out.usize(self.dirty_blocks.len());
@@ -1876,6 +1930,7 @@ impl PagedStorage {
         out.u64(self.clock.get());
         out.u64(self.eviction_candidate_checks);
         out.u64(self.evictions);
+        out.u32(u32::from(self.local));
     }
 
     #[cfg(any(target_arch = "wasm32", test))]
@@ -1910,11 +1965,15 @@ impl PagedStorage {
                 style: input.ints()?,
                 loaded: input.words()?,
             };
-            if clean.kind.len() != rows
-                || clean.payload.len() != rows
-                || clean.style.len() != rows
-                || clean.loaded.len() != rows.div_ceil(BITS_PER_WORD)
-            {
+            let empty = clean.kind.is_empty()
+                && clean.payload.is_empty()
+                && clean.style.is_empty()
+                && clean.loaded.is_empty();
+            let full = clean.kind.len() == rows
+                && clean.payload.len() == rows
+                && clean.style.len() == rows
+                && clean.loaded.len() == rows.div_ceil(BITS_PER_WORD);
+            if !empty && !full {
                 return Err("invalid transferred page chunk".into());
             }
             if !all_source_kinds(&clean.kind) {
@@ -1923,6 +1982,21 @@ impl PagedStorage {
             paged.clean.push(clean);
         }
         paged.free_clean = input.ints()?;
+        let mut free = vec![false; paged.clean.len()];
+        for &id in &paged.free_clean {
+            *free
+                .get_mut(id as usize)
+                .ok_or("invalid transferred free page")? = true;
+        }
+        // Only a free page may arrive without its rows.
+        if paged
+            .clean
+            .iter()
+            .zip(&free)
+            .any(|(clean, &is_free)| clean.kind.is_empty() && !is_free)
+        {
+            return Err("invalid transferred page chunk".into());
+        }
 
         paged.dirty = Directory::read_transfer(input)?;
         for _ in 0..input.count()? {
@@ -1993,6 +2067,11 @@ impl PagedStorage {
         paged.clock.set(input.u64()?);
         paged.eviction_candidate_checks = input.u64()?;
         paged.evictions = input.u64()?;
+        paged.local = match input.u32()? {
+            0 => false,
+            1 => true,
+            _ => return Err("invalid transferred page storage mode".into()),
+        };
 
         Ok(paged)
     }

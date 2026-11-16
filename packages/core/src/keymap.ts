@@ -40,6 +40,8 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   // and Ctrl+Alt+PageUp work too.
   nextSheet: ["Ctrl+PageDown", "Ctrl+Alt+PageDown"],
   previousSheet: ["Ctrl+PageUp", "Ctrl+Alt+PageUp"],
+  // Excel turns filters on and off with Ctrl+Shift+L.
+  toggleFilter: ["Mod+Shift+L"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;

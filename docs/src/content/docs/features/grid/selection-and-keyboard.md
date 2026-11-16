@@ -110,7 +110,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Space / Shift + Space | Select the active cell's column / row. |
 | Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
 | F2 | Edit the active cell, with the caret at the end. |
-| Alt + Down | Open the list of a cell with a list validation rule. |
+| Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule. |
 | Delete | Clear the selected cells. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
 | A printable character | Start editing the active cell, replacing its content. |
@@ -119,6 +119,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 | Ctrl + Page Down / Ctrl + Page Up | Move to the next / previous visible sheet. Browsers keep these keys for their own tabs, so Ctrl + Alt + Page Down / Page Up, Excel for the web's keys, do the same. |
+| Ctrl/Cmd + Shift + L | Turn the AutoFilter on for the current range, or off. |
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 

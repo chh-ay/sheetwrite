@@ -115,26 +115,52 @@ describe("row and column inserts are held to the document limits", () => {
     }
   });
 
-  it("rejects an insert past the dense cell limit with a reason instead of a no-op", () => {
+  it("continues a dense sheet past the dense cell limit in local pages", () => {
     const maxDense = DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells;
     // Ten columns reach the dense limit at 500,000 rows, well below the row limit.
-    const rows = maxDense / 10 - 1;
+    const rows = maxDense / 10;
     const store = new SheetwriteStore(workbook(rows, 10));
     try {
-      const fits = store.applyTransaction({
+      const last = { sheet: SHEET, row: rows - 1, col: 9 };
+      store.applyTransaction({
+        patches: [{ op: "set", addr: last, value: { kind: "literal", value: 7 } }],
+      });
+      expect(store.isPaged(SHEET)).toBe(false);
+      const grown = store.applyTransaction({
         patches: [{ op: "addRows", sheet: SHEET, at: 0, count: 1 }],
+      });
+      expect(grown.status).toBe("applied");
+      expect(rowCountOf(store)).toBe(rows + 1);
+      // A local sheet is still not datasource-backed, and keeps its cells.
+      expect(store.isPaged(SHEET)).toBe(false);
+      expect(store.getCell({ ...last, row: rows }).resolved).toBe(7);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it("rejects an insert past the local cell limit with a reason instead of a no-op", () => {
+    const maxDense = DEFAULT_SNAPSHOT_RESOURCE_LIMITS.maxDenseCells;
+    const maxLocal = maxDense + 1_000_000;
+    const rows = maxDense / 10;
+    const store = new SheetwriteStore(workbook(rows, 10), undefined, {
+      snapshotResourceLimits: { maxLocalPagedCells: maxLocal },
+    });
+    try {
+      const fits = store.applyTransaction({
+        patches: [{ op: "addRows", sheet: SHEET, at: 0, count: 100_000 }],
       });
       expect(fits.status).toBe("applied");
       const issue = limitIssue(
         store.applyTransaction({ patches: [{ op: "addRows", sheet: SHEET, at: 0, count: 1 }] }),
       );
       expect(issue).toMatchObject({
-        resource: "dense-cells",
-        max: maxDense,
-        actual: maxDense + 10,
+        resource: "local-paged-cells",
+        max: maxLocal,
+        actual: maxLocal + 10,
       });
-      expect(issue.message).toContain("5,000,000");
-      expect(rowCountOf(store)).toBe(rows + 1);
+      expect(issue.message).toContain("6,000,000");
+      expect(rowCountOf(store)).toBe(rows + 100_000);
     } finally {
       store.dispose();
     }

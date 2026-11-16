@@ -7,6 +7,7 @@ import { type FormulaBenchmarkResult } from "../src/formula-artifact.js";
 import { expectedFormulaMemoryKeys, expectedFormulaWorkloadKeys } from "../src/formula-bench.js";
 import { MATRIX_IDS, PERFORMANCE_GATE_PROTOCOL_VERSION } from "../src/gate-protocol.js";
 import { summarize } from "../src/stats.js";
+import { commandArtifact } from "../src/verify.js";
 
 function incompleteFormulaFixture(): FormulaBenchmarkResult {
   const workloads = expectedFormulaWorkloadKeys("smoke")
@@ -109,5 +110,22 @@ describe("CI-facing deterministic verifier", () => {
       baseline: { lookupP95Ns: 100 },
       packed: { lookupP95Ns: 125 },
     });
+  });
+
+  test("names how a smoke without a JSON artifact ended", () => {
+    const stderr = "sample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable\n";
+    expect(() =>
+      commandArtifact({ stdout: "", stderr, exitCode: 1, signalCode: null }, "interaction"),
+    ).toThrow(
+      "interaction smoke exited 1 without a JSON artifact; its stderr ends:\nsample 1/3: lookup 20.1 ns\nerror: the showcase grid did not become usable",
+    );
+    expect(() =>
+      commandArtifact(
+        { stdout: "", stderr: "", exitCode: null, signalCode: "SIGKILL" },
+        "interaction",
+      ),
+    ).toThrow(
+      "interaction smoke was killed by SIGKILL without a JSON artifact; its stderr is empty",
+    );
   });
 });
