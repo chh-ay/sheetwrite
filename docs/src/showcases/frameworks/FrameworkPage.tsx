@@ -146,7 +146,7 @@ export function FrameworkPage(props: FrameworkPageProps) {
                       <h3>{panel.title}</h3>
                       <p>{panel.detail}</p>
                       <p class="sw-workbench-panels__controls">
-                        <span>Controls</span> {panel.controls.join(" · ")}
+                        <span>Controls</span> {panel.controls.join(", ")}
                       </p>
                       <Show when={panel.link}>
                         {(link) => (

@@ -26,7 +26,7 @@ const panels: readonly FrameworkPanel[] = [
     title: "No signal. No lost field work.",
     detail:
       "The header holds the connection switch, the count of edits waiting for HQ, the grid's command toolbar, and who is working on the board.",
-    controls: ["Connected · Go offline", "durable edits waiting for HQ", "Working here"],
+    controls: ["Go offline or Reconnect", "durable edits waiting for HQ", "Working here"],
   },
   {
     title: "Dispatch Grid",
