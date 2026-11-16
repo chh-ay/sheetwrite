@@ -147,8 +147,8 @@ describe("AutoFilter in the grid", () => {
 
   it("acts on keys pressed while its code loads, after the command, in order", async () => {
     const { grid, host } = mount();
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
-    // All three keys arrive before the AutoFilter's chunk has loaded.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    // All three keys arrive before the AutoFilter's chunk has loaded; ArrowUp reaches B1.
     press(host, "L", { ctrlKey: true, shiftKey: true });
     press(host, "ArrowUp");
     press(host, "ArrowDown", { altKey: true });
