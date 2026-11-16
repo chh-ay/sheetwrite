@@ -197,7 +197,7 @@ function installPopoversOnDemand(): () => void {
 
   function handleApproach(event: Event): void {
     // A touch opens its panel on the tap (handleTap), not on the way in.
-    if (event instanceof PointerEvent && event.pointerType === "touch") return;
+    if ((event as PointerEvent).pointerType === "touch") return;
     if (!(event.target instanceof Element) || event.target.closest(CODE_FRAME_SELECTOR) === null) {
       return;
     }
@@ -206,24 +206,14 @@ function installPopoversOnDemand(): () => void {
     else replay(trigger);
   }
 
-  // The name a touch pressed while its panel was closed. Focus may open the
-  // panel before the click, so the click reads this instead.
-  let tapped: HTMLElement | null = null;
-
-  // Pointer and mouse events on page content target elements.
-  function handleTapStart(event: PointerEvent): void {
-    const trigger =
-      event.pointerType === "touch"
-        ? (event.target as Element).closest<HTMLElement>(TRIGGER_SELECTOR)
-        : null;
-    tapped = trigger?.hasAttribute(OPEN_ATTRIBUTE) ? null : trigger;
-  }
-
-  /** Touch has no hover: the first tap on a name opens its panel instead of its link. */
-  function handleTap(event: MouseEvent): void {
-    const trigger = tapped;
-    tapped = null;
-    if (trigger === null || !trigger.contains(event.target as Node)) return;
+  /**
+   * Touch has no hover: the first tap on a name opens its panel instead of
+   * its link. Cancelling the touch's end cancels its click and the focus the
+   * click would give the name. A touch that scrolled can't be cancelled.
+   */
+  function handleTap(event: TouchEvent): void {
+    const trigger = (event.target as Element).closest<HTMLElement>(TRIGGER_SELECTOR);
+    if (trigger === null || trigger.hasAttribute(OPEN_ATTRIBUTE) || !event.cancelable) return;
     event.preventDefault();
     void load().then((popovers) => {
       if (!isStopped) popovers.openCodePopover(trigger);
@@ -232,15 +222,13 @@ function installPopoversOnDemand(): () => void {
 
   document.addEventListener("pointerover", handleApproach);
   document.addEventListener("focusin", handleApproach);
-  document.addEventListener("pointerdown", handleTapStart, { passive: true });
-  document.addEventListener("click", handleTap);
+  document.addEventListener("touchend", handleTap);
   cancelIdleLoad = whenHydratedAndIdle(() => void load());
 
   return () => {
     isStopped = true;
     stopWaiting();
-    document.removeEventListener("pointerdown", handleTapStart);
-    document.removeEventListener("click", handleTap);
+    document.removeEventListener("touchend", handleTap);
     uninstallPopovers?.();
   };
 }
