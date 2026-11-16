@@ -704,13 +704,15 @@ describe("workbook document protocol", () => {
       { maxMetadataEntries: 8 },
       { maxSerializedBytes: serializedBytes },
       { maxLogicalCellsPerSheet: 8 },
-      { maxDenseCells: 10 },
+      { maxDenseCells: 10, maxLocalPagedCells: 0 },
+      // Past the dense cells, a sheet loads in local pages up to their own limit.
+      { maxLocalPagedCells: 10, maxDenseCells: 0 },
     ] as const;
     for (const resourceLimits of acceptedLimits) {
       expect(validateWorkbookSnapshot(snapshot, { resourceLimits }).ok).toBe(true);
       const [resource, limit] = Object.entries(resourceLimits)[0]!;
       const rejected = validateWorkbookSnapshot(snapshot, {
-        resourceLimits: { [resource]: limit - 1 },
+        resourceLimits: { ...resourceLimits, [resource]: limit - 1 },
       });
       expect(rejected.ok).toBe(false);
       if (rejected.ok) throw new Error(`${resource} limit unexpectedly accepted`);
@@ -739,10 +741,14 @@ describe("workbook document protocol", () => {
     };
     const paged = validateWorkbookSnapshot(millionRowSnapshot, { storage: "paged" });
     expect(paged.ok).toBe(true);
-    const dense = validateWorkbookSnapshot(millionRowSnapshot, { storage: "dense" });
-    expect(dense.ok).toBe(false);
-    if (dense.ok) throw new Error("oversized dense capacity unexpectedly accepted");
-    expect(dense.errors[0]).toMatchObject({ code: "resource-limit" });
+    // Six million cells pass the dense cell limit and load in local pages.
+    expect(validateWorkbookSnapshot(millionRowSnapshot, { storage: "dense" }).ok).toBe(true);
+    const local = validateWorkbookSnapshot(millionRowSnapshot, {
+      resourceLimits: { maxLocalPagedCells: 5_999_999 },
+    });
+    expect(local.ok).toBe(false);
+    if (local.ok) throw new Error("oversized local capacity unexpectedly accepted");
+    expect(local.errors[0]).toMatchObject({ code: "resource-limit" });
 
     millionRowSnapshot.sheets[0]!.rowCount += 1;
     const excessiveRows = validateWorkbookSnapshot(millionRowSnapshot, { storage: "paged" });

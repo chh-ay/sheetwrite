@@ -279,8 +279,11 @@ fn fold_paged_number_column(
     let mut start = column.start;
     while start < column.end {
         let run = cells.run(start, column.end);
-        let (kinds, payloads) = run.clean_sources()?;
-        match fold.push_number_column(kinds, payloads) {
+        let folded = match run.clean_sources()? {
+            ([], _) => Some(fold.push_blanks((run.end - run.start) as u64)),
+            (kinds, payloads) => fold.push_number_column(kinds, payloads),
+        };
+        match folded {
             Some(Ok(())) => {}
             Some(Err(error)) => return Some(Err(error)),
             // Only the cell limit is left to refuse a checked column.
