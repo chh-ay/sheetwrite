@@ -63,15 +63,15 @@ export async function discoverRuntimePaths(
   language: CoverageLanguage,
 ): Promise<readonly string[]> {
   if (language === "rust") {
-    // `tests.rs` and `*_tests.rs` hold only #[cfg(test)] modules. cargo-llvm-cov
-    // leaves such files out of its report, so they are not runtime sources.
+    // `tests.rs`, `*_tests.rs` and files under a `tests/` directory hold only
+    // #[cfg(test)] modules, so they are not runtime sources.
     const paths: string[] = [];
     for (const crate of RUST_CRATES) {
       paths.push(...(await filesRecursively(resolve(root, crate.directory, "src"))));
     }
 
     return paths
-      .filter((path) => extname(path) === ".rs" && !/(?:\/|_)tests\.rs$/u.test(path))
+      .filter((path) => extname(path) === ".rs" && !/(?:\/|_)tests(?:\.rs$|\/)/u.test(path))
       .map((path) => path.slice(resolve(root).length + 1).replaceAll("\\", "/"))
       .sort();
   }

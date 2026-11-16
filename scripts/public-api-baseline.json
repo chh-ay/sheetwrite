@@ -157,7 +157,7 @@
     "@sheetwrite/core#.#IncompleteDataError": "a932d2a1a46a",
     "@sheetwrite/core#.#InitSheetwriteOptions": "d40e10a693f1",
     "@sheetwrite/core#.#KeyShortcut": "ecc13904c9a1",
-    "@sheetwrite/core#.#KeyboardAction": "f956bf89d995",
+    "@sheetwrite/core#.#KeyboardAction": "e29f26cd69cf",
     "@sheetwrite/core#.#KeyboardOptions": "ff830be273fc",
     "@sheetwrite/core#.#LegacyRowLoader": "f6e1bb972ef5",
     "@sheetwrite/core#.#LegacyRowPage": "e6345bab982c",
