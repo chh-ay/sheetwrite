@@ -261,6 +261,14 @@
       "column": 5,
       "row": 6
     },
+    "filter": {
+      "column": 6,
+      "row": 6
+    },
+    "reapplyFilter": {
+      "column": 7,
+      "row": 6
+    },
     "chart": {
       "column": 0,
       "row": 7
