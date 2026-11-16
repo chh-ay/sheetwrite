@@ -608,16 +608,32 @@ function transformDirectTarget(
     case "setChart":
       return transformChart(operation.chart, operation.sheet, change, operation.op);
 
-    case "setSheetMeta":
+    case "setSheetMeta": {
       if (operation.sheet !== change.sheet) return null;
-      if (
-        Object.keys(operation.patch).length !== 1 ||
-        !Object.hasOwn(operation.patch, "conditionalFormats")
-      ) {
+      const keys = Object.keys(operation.patch).filter(
+        (key) => operation.patch[key as keyof typeof operation.patch] !== undefined,
+      );
+      if (keys.length === 0 || !keys.every((key) => STRUCTURE_AWARE_META.has(key))) {
         return {
           code: "unsupported-structural",
-          message: "Only conditional formats support metadata-aware structural rebase",
+          message:
+            "Only conditional formats, column filters and the AutoFilter support metadata-aware structural rebase",
         };
+      }
+
+      const { autoFilter, filters } = operation.patch;
+      if (autoFilter) {
+        const mapped = transformRange(autoFilter.range, change);
+        if (!mapped) return overlappingStructure(operation.op);
+        autoFilter.range = mapped;
+      }
+
+      if (filters !== undefined && change.axis === "column") {
+        for (const entry of filters) {
+          const col = transformIndex(entry[0], change);
+          if (col === null) return overlappingStructure(operation.op);
+          entry[0] = col;
+        }
       }
 
       if (operation.patch.conditionalFormats !== undefined) {
@@ -637,6 +653,7 @@ function transformDirectTarget(
       }
 
       return null;
+    }
 
     case "setPivot":
       return transformPivot(operation.pivot, operation.sheet, change, operation.op);
@@ -1297,6 +1314,13 @@ function deletedReference(): TransformFailure {
     message: "Pending reference targets a row or column deleted by the server-ordered operation",
   };
 }
+
+/** `setSheetMeta` fields whose coordinates follow a concurrent row or column edit. */
+const STRUCTURE_AWARE_META: ReadonlySet<string> = new Set([
+  "conditionalFormats",
+  "filters",
+  "autoFilter",
+]);
 
 function overlappingStructure(operation: string): TransformFailure {
   return {
