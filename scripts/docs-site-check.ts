@@ -4,9 +4,10 @@
  * engine sees it, through the same routes the host serves:
  *
  * - every indexable page has a title, a description and a self-referencing
- *   canonical URL, one h1, a language and a social image that answers 200,
- *   and no other indexable page shares its title or description; test
- *   fixtures and the proof page carry `noindex`;
+ *   canonical URL, one h1, a language, Open Graph and Twitter card tags with
+ *   its own URL and a social image that answers 200, and no other indexable
+ *   page shares its title or description; test fixtures and the proof page
+ *   carry `noindex`;
  * - every docs page has a BreadcrumbList with Google's required fields, and
  *   each crumb links an indexable page that answers 200;
  * - internal links answer 200 without a redirect;
@@ -29,6 +30,10 @@ const NOINDEX_ROUTES = [/^\/test\//, /^\/docs\/proof\//, /^\/404\/$/];
 const MIN_MAIN_TEXT = 200;
 const PERMANENT = new Set([301, 308]);
 const MAX_REDIRECTS = 2;
+/** Social card tags every indexable page needs, besides `og:url` and `og:image`. */
+const SOCIAL_TAGS = ["og:title", "og:description", "og:type", "twitter:card"];
+/** More sitemap URLs than this cannot all have changed on one day: the dates are build dates. */
+const ONE_DATE_LIMIT = 50;
 
 /**
  * One page of each kind, with what its static HTML must hold inside `<main>`:
@@ -114,8 +119,8 @@ interface Page {
   description: string;
   robots: string;
   canonical: string;
-  ogUrl: string;
-  ogImage: string;
+  /** `og:*` and `twitter:*` meta tags by name. */
+  social: Map<string, string>;
   lang: string;
   h1: number;
   jsonLd: string[];
@@ -135,8 +140,7 @@ async function readPage(path: string, html: string): Promise<Page> {
     description: "",
     robots: "",
     canonical: "",
-    ogUrl: "",
-    ogImage: "",
+    social: new Map(),
     lang: "",
     h1: 0,
     jsonLd: [],
@@ -155,8 +159,7 @@ async function readPage(path: string, html: string): Promise<Page> {
   const meta = (name: string | null, content: string): void => {
     if (name === "description") page.description = content;
     if (name === "robots") page.robots = content;
-    if (name === "og:url") page.ogUrl = content;
-    if (name === "og:image") page.ogImage = content;
+    if (name !== null && /^(?:og|twitter):/.test(name)) page.social.set(name, content);
   };
   await new HTMLRewriter()
     .on("html", { element: (element) => void (page.lang = element.getAttribute("lang") ?? "") })
@@ -306,11 +309,16 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
     if (page.description.trim() === "") issues.push(`${where}: no meta description`);
     if (page.canonical !== url)
       issues.push(`${where}: canonical is "${page.canonical}", not ${url}`);
-    if (page.ogUrl !== url) issues.push(`${where}: og:url is "${page.ogUrl}", not ${url}`);
-    if (!page.ogImage.startsWith(`${SITE_URL}/`))
-      issues.push(`${where}: og:image "${page.ogImage}" is not an absolute site URL`);
-    else if (answer(new URL(page.ogImage).pathname).status !== 200)
-      issues.push(`${where}: og:image ${page.ogImage} does not answer 200`);
+    for (const tag of SOCIAL_TAGS) {
+      if ((page.social.get(tag) ?? "").trim() === "") issues.push(`${where}: no ${tag}`);
+    }
+    const ogUrl = page.social.get("og:url") ?? "";
+    if (ogUrl !== url) issues.push(`${where}: og:url is "${ogUrl}", not ${url}`);
+    const ogImage = page.social.get("og:image") ?? "";
+    if (!ogImage.startsWith(`${SITE_URL}/`))
+      issues.push(`${where}: og:image "${ogImage}" is not an absolute site URL`);
+    else if (answer(new URL(ogImage).pathname).status !== 200)
+      issues.push(`${where}: og:image ${ogImage} does not answer 200`);
     if (page.lang === "") issues.push(`${where}: <html> has no lang`);
     if (page.h1 !== 1) issues.push(`${where}: ${page.h1} h1 headings, not 1`);
     if (!page.hasMain || page.mainText < MIN_MAIN_TEXT) {
@@ -400,6 +408,7 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
 
   const sitemap = readFileSync(join(staticRoot, "sitemap.xml"), "utf8");
   const listed = new Set<string>();
+  const lastmods = new Set<string>();
   for (const entry of sitemap.match(/<url>[\s\S]*?<\/url>/g) ?? []) {
     const loc = entry.match(/<loc>([^<]+)<\/loc>/)?.[1] ?? "";
     if (!loc.startsWith(`${SITE_URL}/`)) {
@@ -410,9 +419,14 @@ async function siteIssues(outputRoot: string, publishedUrls: readonly string[]):
     listed.add(path);
     if (!opens(path)) issues.push(`sitemap lists ${path}, which answers ${answer(path).status}`);
     else if (!indexable(path)) issues.push(`sitemap lists ${path}, which is noindex`);
-    if (!/<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/.test(entry))
-      issues.push(`sitemap entry ${path} has no lastmod`);
+    const lastmod = entry.match(/<lastmod>(\d{4}-\d{2}-\d{2})<\/lastmod>/)?.[1];
+    if (lastmod === undefined) issues.push(`sitemap entry ${path} has no lastmod`);
+    else lastmods.add(lastmod);
   }
+  if (listed.size > ONE_DATE_LIMIT && lastmods.size === 1)
+    issues.push(
+      `all ${listed.size} sitemap entries have lastmod ${[...lastmods].join("")}; build from a full clone so each page gets its last source commit`,
+    );
   for (const path of pages.keys()) {
     if (indexable(path) && !listed.has(path))
       issues.push(`sitemap omits the indexable page ${path}`);
