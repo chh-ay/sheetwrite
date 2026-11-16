@@ -42,6 +42,7 @@ import {
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
+import { validFilterCondition } from "./store/autofilter.js";
 import { normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
@@ -877,6 +878,7 @@ export function assertWorkbookAllocationLimits(
       (sheet.notes?.length ?? 0) +
       (sheet.sortKeys?.length ?? 0) +
       (sheet.filters?.length ?? 0) +
+      (sheet.autoFilter ? 1 : 0) +
       (sheet.rowGroups?.length ?? 0) +
       (sheet.tables?.length ?? 0) +
       (sheet.tables?.reduce((count, table) => count + table.columns.length, 0) ?? 0) +
@@ -1464,9 +1466,40 @@ function validateFilterShape(
     if (!finiteNumber(ownValue(filter, "value"))) {
       invalid(errors, `${path}.value`, "Filter comparison value must be finite");
     }
+  } else if (kind === "custom") {
+    const join = ownValue(filter, "join");
+    if (join !== "and" && join !== "or") {
+      invalid(errors, `${path}.join`, "Custom filter join must be and or or");
+    }
+    const conditions = arrayAt(ownValue(filter, "conditions"), `${path}.conditions`, errors);
+    if (conditions && (conditions.length < 1 || conditions.length > 2)) {
+      invalid(errors, `${path}.conditions`, "Custom filters have one or two conditions");
+    }
+    conditions?.forEach((entry, index) => {
+      const conditionPath = `${path}.conditions[${index}]`;
+      const condition = recordAt(entry, conditionPath, errors);
+      if (
+        condition &&
+        !validFilterCondition({
+          op: ownValue(condition, "op"),
+          value: ownValue(condition, "value"),
+        })
+      ) {
+        invalid(errors, conditionPath, "Filter condition operation or value is invalid");
+      }
+    });
   } else if (kind !== "empty" && kind !== "nonEmpty") {
     invalid(errors, `${path}.kind`, "Filter kind is invalid");
   }
+}
+
+function validateAutoFilterShape(
+  value: unknown,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const autoFilter = recordAt(value, path, errors);
+  if (autoFilter) validateRangeShape(ownValue(autoFilter, "range"), `${path}.range`, errors);
 }
 
 const TABLE_UNSUPPORTED_FEATURES = [
@@ -1719,6 +1752,9 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     }
     validateFilterShape(entry[1], `${filterPath}[1]`, errors);
   });
+
+  const autoFilter = ownValue(sheet, "autoFilter");
+  if (autoFilter !== undefined) validateAutoFilterShape(autoFilter, `${path}.autoFilter`, errors);
 
   const rowGroups = optionalArray(sheet, "rowGroups", path, errors);
   rowGroups?.forEach((entry, index) => {
@@ -2366,6 +2402,11 @@ export function validateDocumentOperationShape(
         entries?.forEach((entry, index) => {
           validateOperationFilterTuple(entry, `${patchPath}.filters[${index}]`, errors);
         });
+      }
+
+      const autoFilter = ownValue(patch, "autoFilter");
+      if (autoFilter !== undefined && autoFilter !== null) {
+        validateAutoFilterShape(autoFilter, `${patchPath}.autoFilter`, errors);
       }
 
       break;
@@ -3314,6 +3355,22 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
       filterColumns.add(column);
     }
 
+    const autoFilterRange = sheet.autoFilter?.range;
+    if (
+      autoFilterRange &&
+      (autoFilterRange.sheet !== sheet.id ||
+        autoFilterRange.start.row > autoFilterRange.end.row ||
+        autoFilterRange.start.col > autoFilterRange.end.col ||
+        !rangeInSheet(autoFilterRange, sheet))
+    ) {
+      invalid(
+        errors,
+        `${path}.autoFilter.range`,
+        "AutoFilter range must start at its top-left cell and lie inside its sheet",
+        "out-of-bounds",
+      );
+    }
+
     for (const [index, table] of (sheet.tables ?? []).entries()) {
       if (!validWorkbookTable(table, sheet, acceptedTables)) {
         invalid(
@@ -3347,6 +3404,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
         ? [...sheet.notes].sort((a, b) => a.addr.row - b.addr.row || a.addr.col - b.addr.col)
         : undefined,
       filters: sheet.filters ? [...sheet.filters].sort((a, b) => a[0] - b[0]) : undefined,
+      autoFilter: sheet.autoFilter ? structuredClone(sheet.autoFilter) : undefined,
       rowMeta: sheet.rowMeta ? [...sheet.rowMeta].sort((a, b) => a[0] - b[0]) : undefined,
       tables: sheet.tables
         ? [...sheet.tables]
@@ -3373,6 +3431,7 @@ function validateJsonSafeSnapshot(input: unknown): DocumentValidationResult {
     if (normalizedSheet.protectedRanges === undefined) delete normalizedSheet.protectedRanges;
     if (normalizedSheet.notes === undefined) delete normalizedSheet.notes;
     if (normalizedSheet.filters === undefined) delete normalizedSheet.filters;
+    if (normalizedSheet.autoFilter === undefined) delete normalizedSheet.autoFilter;
     if (normalizedSheet.rowMeta === undefined) delete normalizedSheet.rowMeta;
     if (normalizedSheet.tables === undefined) delete normalizedSheet.tables;
     if (normalizedSheet.charts === undefined) delete normalizedSheet.charts;

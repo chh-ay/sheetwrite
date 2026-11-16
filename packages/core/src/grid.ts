@@ -91,8 +91,10 @@ import {
   visibleSheetNeighbor,
 } from "./store/ranges.js";
 import {
+  autoFilterPatch,
   clearViewPatch,
   columnFilterPatch,
+  reapplyFilterPatch,
   rowVisibilityPatches,
   viewSortPatch,
 } from "./store/view-patches.js";
@@ -123,6 +125,7 @@ import type {
 import type { AggregateOp } from "./types/data.js";
 import type {
   AddSheetInput,
+  AutoFilter,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -1349,6 +1352,7 @@ export class GridImpl implements Grid {
         patch.op === "setSheetMeta" &&
         (patch.patch.sortKeys !== undefined ||
           patch.patch.filters !== undefined ||
+          patch.patch.autoFilter !== undefined ||
           patch.patch.rowGroups !== undefined)
       ) {
         effects |= RECONCILE_VIEW;
@@ -4002,6 +4006,23 @@ export class GridImpl implements Grid {
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
     const patch = columnFilterPatch(this.sheet(), col, filter);
     if (patch) this.document.commit([patch], "structure");
+  }
+
+  setAutoFilter(range: Range | null): ApplyTransactionResult {
+    const patch = autoFilterPatch(this.sheet(), range);
+    if (!patch) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    return this.document.commit([patch], "structure");
+  }
+
+  getAutoFilter(): AutoFilter | null {
+    const autoFilter = this.sheet().autoFilter;
+    return autoFilter ? structuredClone(autoFilter) : null;
+  }
+
+  reapplyFilter(): ApplyTransactionResult {
+    const patch = reapplyFilterPatch(this.sheet());
+    if (!patch) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    return this.document.commit([patch], "structure");
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
