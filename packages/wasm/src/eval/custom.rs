@@ -150,11 +150,7 @@ impl CellStore {
         }
 
         for (index, sheet) in self.sheets.iter_mut().enumerate() {
-            let names = NameScope {
-                table: &self.names,
-                tables: &self.tables,
-                sheet: index as u32,
-            };
+            let names = NameScope::new(&self.bindings, index as u32);
             let keys: Vec<_> = sheet
                 .formulas
                 .iter(&self.formula_slots)
@@ -235,7 +231,7 @@ impl CellStore {
         pass: &mut EvalPass<'_>,
         depth: usize,
     ) -> Value {
-        let Some(id) = self.names.formula_id(name, sheet as u32) else {
+        let Some(id) = self.bindings.names.formula_id(name, sheet as u32) else {
             return Value::Error(FormulaError::Name);
         };
         let mut call = Vec::with_capacity(arguments.len() + 1);

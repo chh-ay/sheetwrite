@@ -484,7 +484,12 @@ impl CellStore {
             })
             .collect();
         for (column, context) in read {
-            let table_id = &self.tables.get(column.table).ok_or(FormulaError::Ref)?.id;
+            let table_id = &self
+                .bindings
+                .tables
+                .get(column.table)
+                .ok_or(FormulaError::Ref)?
+                .id;
             let slot = slots
                 .iter()
                 .position(|slot| slot.0 == *table_id && slot.1 == context)
@@ -769,7 +774,11 @@ struct ContextEdit {
 impl CellStore {
     /// The stable table and column ids of a bound model column.
     fn column_ref(&self, column: &StructuredRef) -> Result<ColumnRef, FormulaError> {
-        let table = self.tables.get(column.table).ok_or(FormulaError::Ref)?;
+        let table = self
+            .bindings
+            .tables
+            .get(column.table)
+            .ok_or(FormulaError::Ref)?;
         let id = &table.column_at(column.col).ok_or(FormulaError::Ref)?.id;
         Ok(ColumnRef {
             table: table.id.clone(),

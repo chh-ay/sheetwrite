@@ -351,7 +351,12 @@ impl SafetyWalk<'_> {
         }
 
         #[cfg(feature = "analysis")]
-        if let Some(id) = self.store.names.formula_id(name, self.sheet as u32) {
+        if let Some(id) = self
+            .store
+            .bindings
+            .names
+            .formula_id(name, self.sheet as u32)
+        {
             return self.visit(&Ast::DefinedName(id), depth + 1);
         }
 

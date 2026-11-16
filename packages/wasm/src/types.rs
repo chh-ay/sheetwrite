@@ -869,7 +869,7 @@ impl FormulaEntry {
     /// [`Self::bind_sheets`], the text stays as typed.
     pub(crate) fn bind_tables(&mut self, at: AbsCellKey, names: NameScope<'_>) -> Option<Self> {
         let ast = self.ast.as_mut()?;
-        let tables = names.tables;
+        let tables = names.tables();
         let bind = |reference: &UnresolvedStructuredRef, sheet: u32, row: u32, col: u32| {
             tables.bind(reference.written(), AbsCellKey { sheet, row, col })
         };

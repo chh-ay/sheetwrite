@@ -234,6 +234,7 @@ impl CellStore {
 
             let spelling = range.name.clone();
             store
+                .bindings
                 .names
                 .insert(scope, key, &spelling, names::DefinedName::Range(range));
         }
@@ -271,7 +272,7 @@ impl CellStore {
                 });
             }
 
-            store.tables.insert(table);
+            store.bindings.tables.insert(table);
         }
 
         // The formulas below read the names' formulas, so bind them first.
@@ -343,6 +344,7 @@ impl CellStore {
         write_names(&mut out, &self.sheet_lookup);
         write_names(&mut out, &self.sheet_ids);
         let ranges: Vec<(Option<u32>, &str, &NamedRangeRef)> = self
+            .bindings
             .names
             .definitions()
             .filter_map(|(scope, key, definition)| match definition {
@@ -378,9 +380,9 @@ impl CellStore {
             out.text(source);
         }
 
-        out.usize(self.tables.len());
+        out.usize(self.bindings.tables.len());
 
-        for (_, table) in self.tables.iter() {
+        for (_, table) in self.bindings.tables.iter() {
             out.text(&table.id);
             out.text(&table.name);
             out.u32(table.sheet);

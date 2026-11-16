@@ -283,8 +283,25 @@ fn name_reference_family(id: NameId, names: NameScope<'_>) -> Option<CellRange> 
 }
 
 /// The cells a reference argument covers, reading defined names through
-/// `names`; `None` when `ast` is not one reference.
+/// `names`; `None` when `ast` is not one reference. A written range, the
+/// argument most callers meet, is read inline; every other node takes
+/// [`node_range`].
+#[inline]
 pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
+    match ast {
+        Ast::Range(r0, c0, r1, c1, flags) => {
+            Some(placed_range(names.sheet, (*r0, *c0), (*r1, *c1), *flags))
+        }
+        Ast::AbsRange(sheet, r0, c0, r1, c1, flags) => {
+            Some(placed_range(sheet.handle, (*r0, *c0), (*r1, *c1), *flags))
+        }
+        _ => node_range(ast, names),
+    }
+}
+
+/// [`range_from_ast`] of any node; out of line, so its callers stay small.
+#[inline(never)]
+fn node_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     let formula_sheet = names.sheet;
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, names),

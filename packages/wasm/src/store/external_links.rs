@@ -76,7 +76,7 @@ impl CellStore {
             }
 
             let mut changed = false;
-            let names = NameScope::new(&self.names, &self.tables, formula_sheet as u32);
+            let names = NameScope::new(&self.bindings, formula_sheet as u32);
             data.formulas
                 .rewrite_entries(&mut self.formula_slots, |entry| {
                     changed |= entry.relink_sheet(key, handle, names, &self.sheet_names);

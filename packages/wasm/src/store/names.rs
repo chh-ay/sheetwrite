@@ -304,27 +304,44 @@ impl Drop for NameRead<'_> {
     }
 }
 
+/// What formulas bind defined names and table references to: the name
+/// table, and the table slots, which also place a name's table references.
+/// One part of the store, so a [`NameScope`] borrows it as one word.
+#[derive(Default)]
+pub(crate) struct Bindings {
+    pub(crate) names: NameTable,
+    pub(crate) tables: TableSlots,
+}
+
+/// A walk over a name's formula, read through the scope of the formula that
+/// uses the name; see [`NameScope::formula_satisfies_family`].
+pub(crate) type FormulaTest = fn(&Ast, NameScope<'_>) -> bool;
+
 /// The formula a walk is in, for reading the defined names of its tree: the
-/// store's name table and table slots, which place a name's table
-/// references, and the formula's sheet, which picks each name's scope. It
-/// borrows only those two parts of the store, so an edit can walk the
-/// formulas of its sheets while it holds them.
+/// store's [`Bindings`] and the formula's sheet, which picks each name's
+/// scope. It borrows only that part of the store, so an edit can walk the
+/// formulas of its sheets while it holds it. Two words, so WebAssembly
+/// passes it in registers, not in memory.
 #[derive(Clone, Copy)]
 pub(crate) struct NameScope<'a> {
-    pub(crate) table: &'a NameTable,
-    pub(crate) tables: &'a TableSlots,
+    bindings: &'a Bindings,
     pub(crate) sheet: u32,
 }
 
 impl<'a> NameScope<'a> {
-    /// The names of a formula on `sheet`, read from `table` and placed with
-    /// `tables`.
-    pub(crate) const fn new(table: &'a NameTable, tables: &'a TableSlots, sheet: u32) -> Self {
-        Self {
-            table,
-            tables,
-            sheet,
-        }
+    /// The names of a formula on `sheet`, read from `bindings`.
+    pub(crate) const fn new(bindings: &'a Bindings, sheet: u32) -> Self {
+        Self { bindings, sheet }
+    }
+
+    /// The name table.
+    pub(crate) const fn table(self) -> &'a NameTable {
+        &self.bindings.names
+    }
+
+    /// The table slots, which place a name's table references.
+    pub(crate) const fn tables(self) -> &'a TableSlots {
+        &self.bindings.tables
     }
 
     /// What `id` stands for when it can be read with no cycle guard and no
@@ -335,7 +352,7 @@ impl<'a> NameScope<'a> {
     /// since they meet it at every use of a name.
     #[inline]
     pub(crate) fn in_place(self, id: NameId) -> Option<InPlace<'a>> {
-        match NameTable::definition_for(self.table.entry(id)?, self.sheet)? {
+        match NameTable::definition_for(self.table().entry(id)?, self.sheet)? {
             DefinedName::Range(range) => Some(InPlace::Range(range_cells(range))),
             DefinedName::Formula(formula) if formula.plain => {
                 if !formula.positional {
@@ -367,11 +384,7 @@ impl<'a> NameScope<'a> {
     /// is, for the walks that look through a name's formula. `test` is a
     /// function, not a closure, so the walk keeps nothing in memory for it.
     #[inline(never)]
-    pub(crate) fn formula_satisfies_family(
-        self,
-        id: NameId,
-        test: fn(&Ast, NameScope<'_>) -> bool,
-    ) -> bool {
+    pub(crate) fn formula_satisfies_family(self, id: NameId, test: FormulaTest) -> bool {
         self.read(id)
             .formula()
             .is_some_and(|expression| test(expression, self))
@@ -384,8 +397,8 @@ impl<'a> NameScope<'a> {
     /// [`Self::guarded_read`].
     #[inline(never)]
     pub(crate) fn read(self, id: NameId) -> NameRead<'a> {
-        let Some(entry) = self.table.entry(id) else {
-            return NameRead::unguarded(if self.table.unsettled_is_linked(id) {
+        let Some(entry) = self.table().entry(id) else {
+            return NameRead::unguarded(if self.table().unsettled_is_linked(id) {
                 NameView::Linked
             } else {
                 NameView::Undefined
@@ -440,7 +453,7 @@ impl<'a> NameScope<'a> {
             return NameRead::unguarded(NameView::Undefined);
         }
         let view = self.view_in_place(formula).unwrap_or_else(|| {
-            let placed = formula.placed(self.sheet, row, col, self.tables);
+            let placed = formula.placed(self.sheet, row, col, self.tables());
             reference_target(&placed, self.sheet, (0, 0))
                 .map_or(NameView::Placed(placed), NameView::Range)
         });
@@ -453,14 +466,14 @@ impl<'a> NameScope<'a> {
     #[cfg(feature = "analysis")]
     pub(crate) fn spelling(self, id: NameId) -> String {
         let mut out = String::new();
-        self.table.write_spelling(id, &mut out);
+        self.table().write_spelling(id, &mut out);
         out
     }
 
     /// The formula the name `id` holds for this sheet, as it is defined.
     #[cfg(feature = "analysis")]
     fn formula(self, id: NameId) -> Option<&'a Ast> {
-        let entry = self.table.entry(id)?;
+        let entry = self.table().entry(id)?;
         match NameTable::definition_for(entry, self.sheet)? {
             DefinedName::Formula(formula) => Some(&formula.expression),
             DefinedName::Range(_) => None,
@@ -895,7 +908,7 @@ impl CellStore {
             plain: false,
             reach: NEVER_IN_PLACE,
         };
-        self.names.insert(
+        self.bindings.names.insert(
             name_scope,
             key.clone(),
             name,
@@ -912,7 +925,11 @@ impl CellStore {
     #[wasm_bindgen(js_name = namedFormulaSource)]
     pub fn named_formula_source(&self, name: &str, scope: i32) -> Option<String> {
         let name_scope = u32::try_from(scope).ok();
-        match self.names.get(name_scope, &workbook_name_key(name))? {
+        match self
+            .bindings
+            .names
+            .get(name_scope, &workbook_name_key(name))?
+        {
             DefinedName::Formula(definition) => Some(definition.source.clone()),
             DefinedName::Range(_) => None,
         }
@@ -924,7 +941,7 @@ impl CellStore {
     /// becomes its table id, and a call of a name that holds a formula
     /// becomes a call of that formula's value. LET and LAMBDA names stay.
     pub(super) fn bind_formula_names(&self, ast: Ast, formula_sheet: u32) -> Ast {
-        let table = &self.names;
+        let table = &self.bindings.names;
         bind_defined_names(ast, &mut |name, call| {
             let key = workbook_name_key(name);
             if call {
@@ -940,17 +957,13 @@ impl CellStore {
     /// The defined names of a formula on `sheet`, for its walks and its
     /// evaluation.
     pub(crate) const fn name_scope(&self, sheet: usize) -> NameScope<'_> {
-        NameScope {
-            table: &self.names,
-            tables: &self.tables,
-            sheet: sheet as u32,
-        }
+        NameScope::new(&self.bindings, sheet as u32)
     }
 
     /// Add to `changed` the names whose formula has a table reference: a
     /// table edit changes how the formulas that use them read.
     pub(super) fn add_names_over_tables(&self, changed: &mut Vec<String>) {
-        for (_, spelling, definition) in self.names.definitions() {
+        for (_, spelling, definition) in self.bindings.names.definitions() {
             let DefinedName::Formula(formula) = definition else {
                 continue;
             };
@@ -965,7 +978,7 @@ impl CellStore {
     /// Add to `changed` every name whose formula uses a name in it, directly
     /// or through other names.
     fn add_names_using(&self, changed: &mut Vec<String>) {
-        let table = &self.names;
+        let table = &self.bindings.names;
         loop {
             let before = changed.len();
             for (_, spelling, definition) in table.definitions() {
@@ -1005,7 +1018,7 @@ impl CellStore {
         }
         self.bind_name_definitions();
         self.add_names_using(&mut changed);
-        let table = self.names.settled();
+        let table = self.bindings.names.settled();
         let ids: Vec<NameId> = changed.iter().filter_map(|key| table.id(key)).collect();
         let mut users = Vec::new();
         for (sheet, data) in self.sheets.iter().enumerate() {
@@ -1020,7 +1033,7 @@ impl CellStore {
                 else {
                     continue;
                 };
-                let callable = |id: NameId| self.names.holds_formula(id, sheet as u32);
+                let callable = |id: NameId| self.bindings.names.holds_formula(id, sheet as u32);
                 match name_use(ast, &ids, &changed, &callable) {
                     NameUse::None => {}
                     NameUse::Read => users.push((formula, false)),
@@ -1042,7 +1055,7 @@ impl CellStore {
                 };
                 Some(self.parse_formula_entry(&source, at.sheet, at.row, at.col))
             } else {
-                let names = NameScope::new(&self.names, &self.tables, at.sheet);
+                let names = NameScope::new(&self.bindings, at.sheet);
                 self.formula_slots.get_mut(formula).and_then(|entry| {
                     crate::eval::with_formula_origin((at.row, at.col), || entry.rebound(names))
                 })
@@ -1058,7 +1071,7 @@ impl CellStore {
     /// reads would pass [`EXPANSION_NODE_LIMIT`] nodes, counting each name
     /// it uses at that name's size, becomes `#NUM!`.
     pub(super) fn bind_name_definitions(&mut self) {
-        let table = self.names.settled();
+        let table = self.bindings.names.settled();
         let mut written = Vec::new();
         for (entry_index, entry) in table.entries().iter().enumerate() {
             for (definition_index, (scope, definition)) in entry.definitions.iter().enumerate() {
@@ -1084,7 +1097,7 @@ impl CellStore {
             crate::eval::analysis::lambda::resolve_parameters(&mut expression);
             bound.push((at, expression));
         }
-        let table = &mut self.names;
+        let table = &mut self.bindings.names;
         for (at, expression) in &mut bound {
             if let Some(formula) = table.formula_at_position(*at) {
                 formula.expression = std::mem::replace(expression, Ast::Missing);
@@ -1130,7 +1143,7 @@ impl CellStore {
         changed: &mut Vec<String>,
     ) {
         let sheets = &self.sheet_names;
-        for entry in self.names.entries_mut() {
+        for entry in self.bindings.names.entries_mut() {
             let mut moved = false;
             for (_, definition) in &mut entry.definitions {
                 let DefinedName::Formula(formula) = definition else {
@@ -1163,7 +1176,7 @@ impl CellStore {
         changed: &mut Vec<String>,
     ) {
         let sheets = &self.sheet_names;
-        for entry in self.names.entries_mut() {
+        for entry in self.bindings.names.entries_mut() {
             let mut moved = false;
             for (_, definition) in &mut entry.definitions {
                 moved |= match definition {
@@ -1198,7 +1211,7 @@ impl CellStore {
     /// Follow a sheet rename in every name's formula.
     pub(super) fn rename_sheet_in_named_formulas(&mut self, handle: u32, name: &str) {
         let sheets = &self.sheet_names;
-        for entry in self.names.entries_mut() {
+        for entry in self.bindings.names.entries_mut() {
             for (_, definition) in &mut entry.definitions {
                 if let DefinedName::Formula(formula) = definition {
                     formula.rewrite(sheets, |ast| rename_sheet_refs(ast, handle, name));
@@ -1216,7 +1229,7 @@ impl CellStore {
         changed: &mut Vec<String>,
     ) {
         let sheets = &self.sheet_names;
-        for entry in self.names.entries_mut() {
+        for entry in self.bindings.names.entries_mut() {
             let mut invalidated = false;
             for (_, definition) in &mut entry.definitions {
                 if let DefinedName::Formula(formula) = definition {
@@ -1231,13 +1244,14 @@ impl CellStore {
     }
 
     pub(super) fn add_defined_name_memory(&self, metadata: &mut MemoryOwnerStats) {
-        self.names.add_memory(metadata);
+        self.bindings.names.add_memory(metadata);
     }
 
     /// Every named formula's scope, name and formula, for a same-build
     /// transfer.
     pub(super) fn named_formula_sources(&self) -> impl Iterator<Item = FormulaSource<'_>> + '_ {
-        self.names
+        self.bindings
+            .names
             .definitions()
             .filter_map(|(scope, _, definition)| match definition {
                 DefinedName::Formula(formula) => {
@@ -1272,7 +1286,7 @@ impl CellStore {
             plain: false,
             reach: NEVER_IN_PLACE,
         };
-        self.names.insert(
+        self.bindings.names.insert(
             scope,
             key,
             &name,

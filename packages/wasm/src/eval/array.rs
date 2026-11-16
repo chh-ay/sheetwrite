@@ -104,8 +104,20 @@ fn name_produces_array_family(id: NameId, shapes: Shapes<'_>) -> bool {
 }
 
 /// Whether `ast` evaluates to an array. A LAMBDA parameter's shape comes
-/// from `shapes`: [`Shapes::top`] outside every call.
+/// from `shapes`: [`Shapes::top`] outside every call. A value, a cell or a
+/// written range, what most arguments are, is decided inline; every other
+/// node takes [`node_produces_array`].
+#[inline]
 pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
+    match ast {
+        Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Cell(..) | Ast::AbsCell(..) => false,
+        Ast::Range(..) | Ast::AbsRange(..) => true,
+        _ => node_produces_array(ast, shapes),
+    }
+}
+
+/// [`ast_produces_array`] of any node.
+fn node_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, _) => true,
         #[cfg(feature = "analysis")]

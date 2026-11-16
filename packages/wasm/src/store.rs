@@ -25,7 +25,7 @@ use crate::memory::{
 use crate::sheet::{formula_error_at, SheetData};
 use crate::sorting::sort_by_key96;
 use crate::spill::{SpillBlocker, MAX_SPILL_OWNER_CELLS};
-use crate::tables::{Table, TableColumn, TableSlots};
+use crate::tables::{Table, TableColumn};
 use crate::types::{
     cell_key, string_from_pool, AbsCellKey, FormulaEntry, FormulaError, StringStorage, KIND_BOOL,
     KIND_EMPTY, KIND_FORMULA, KIND_NUMBER, KIND_STRING, NO_STRING,
@@ -412,9 +412,8 @@ pub struct CellStore {
     #[cfg(feature = "analysis")]
     regex_patterns: std::cell::Cell<Option<Box<crate::eval::regex_patterns::PatternIndex>>>,
     loading_page: usize,
-    /// The defined names, by the id formulas hold.
-    pub(crate) names: names::NameTable,
-    pub(crate) tables: TableSlots,
+    /// The defined names, by the id formulas hold, and the tables.
+    pub(crate) bindings: names::Bindings,
     mutation_revision: u64,
     active_mutation_revision: Option<u64>,
     pub(crate) volatile_serial: f64,
@@ -519,7 +518,7 @@ impl CellStore {
             loading_page: 0,
             mutation_revision: 0,
             active_mutation_revision: None,
-            names: names::NameTable::default(),
+            bindings: names::Bindings::default(),
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
@@ -527,7 +526,6 @@ impl CellStore {
             pivots: None,
             #[cfg(feature = "analysis")]
             relationships: None,
-            tables: TableSlots::default(),
         }
     }
 
@@ -936,7 +934,7 @@ impl CellStore {
             }
 
             let mut changed = false;
-            let names = NameScope::new(&self.names, &self.tables, formula_sheet as u32);
+            let names = NameScope::new(&self.bindings, formula_sheet as u32);
             data.formulas
                 .rewrite_entries(&mut self.formula_slots, |entry| {
                     changed |= entry.rename_sheet(sheet as u32, name, names);
@@ -979,7 +977,7 @@ impl CellStore {
             }
 
             let mut changed = false;
-            let names = NameScope::new(&self.names, &self.tables, formula_sheet as u32);
+            let names = NameScope::new(&self.bindings, formula_sheet as u32);
             data.formulas
                 .rewrite_entries(&mut self.formula_slots, |entry| {
                     changed |= entry.invalidate_sheet(sheet as u32, names);
@@ -992,7 +990,7 @@ impl CellStore {
         }
 
         let mut changed_names = Vec::new();
-        self.names.settled().retain(&mut |scope, spelling, definition| {
+        self.bindings.names.settled().retain(&mut |scope, spelling, definition| {
             let removed = scope == Some(sheet as u32)
                 || matches!(definition, names::DefinedName::Range(range) if range.sheet == sheet as u32);
             if removed {
@@ -1004,9 +1002,11 @@ impl CellStore {
 
         // The references to these tables are on the removed sheet, so the
         // walk above already made them `#REF!`.
-        let tables_before = self.tables.len();
-        self.tables.retain_mut(|table| table.sheet != sheet as u32);
-        if self.tables.len() != tables_before {
+        let tables_before = self.bindings.tables.len();
+        self.bindings
+            .tables
+            .retain_mut(|table| table.sheet != sheet as u32);
+        if self.bindings.tables.len() != tables_before {
             self.add_names_over_tables(&mut changed_names);
         }
 
@@ -2239,11 +2239,7 @@ impl CellStore {
         sheet: usize,
         edit: impl FnOnce(&mut SheetData, &mut FormulaStore, NameScope<'_>) -> Result<(), String>,
     ) -> bool {
-        let names = NameScope {
-            table: &self.names,
-            tables: &self.tables,
-            sheet: sheet as u32,
-        };
+        let names = NameScope::new(&self.bindings, sheet as u32);
         let data = &mut self.sheets[sheet];
         if edit(data, &mut self.formula_slots, names).is_err() {
             data.formulas.mark_all_dirty();
@@ -2364,7 +2360,8 @@ impl CellStore {
             col_end: col_end as u32,
         };
         let changed = vec![key.clone()];
-        self.names
+        self.bindings
+            .names
             .insert(name_scope, key, name, names::DefinedName::Range(definition));
         self.rebind_name_users(changed);
         self.recompute_all_sheets();
@@ -2376,7 +2373,12 @@ impl CellStore {
     #[wasm_bindgen(js_name = removeNamedRange)]
     pub fn remove_named_range(&mut self, name: &str, scope: i32) -> bool {
         let key = workbook_name_key(name);
-        if !self.names.settled().remove(u32::try_from(scope).ok(), &key) {
+        if !self
+            .bindings
+            .names
+            .settled()
+            .remove(u32::try_from(scope).ok(), &key)
+        {
             return false;
         }
         self.rebind_name_users(vec![key]);
@@ -2443,8 +2445,8 @@ impl CellStore {
         column_ids: Vec<String>,
         column_names: Vec<String>,
     ) -> bool {
-        let existing = self.tables.with_id(id).map(|(slot, _)| slot);
-        if (existing.is_none() && self.tables.len() >= MAX_TABLES)
+        let existing = self.bindings.tables.with_id(id).map(|(slot, _)| slot);
+        if (existing.is_none() && self.bindings.tables.len() >= MAX_TABLES)
             || id.is_empty()
             || id.encode_utf16().count() > MAX_TABLE_ID_BYTES
             || name.is_empty()
@@ -2464,10 +2466,11 @@ impl CellStore {
             return false;
         }
         let name_key = workbook_name_key(name);
-        if self.names.defines(&name_key) {
+        if self.bindings.names.defines(&name_key) {
             return false;
         }
         if self
+            .bindings
             .tables
             .named(name)
             .is_some_and(|(_, table)| table.id != id)
@@ -2510,7 +2513,7 @@ impl CellStore {
             totals_row,
             columns,
         };
-        if self.tables.iter().any(|(_, other)| {
+        if self.bindings.tables.iter().any(|(_, other)| {
             other.id != id
                 && other.sheet == definition.sheet
                 && definition.row_start <= other.row_end
@@ -2521,8 +2524,8 @@ impl CellStore {
             return false;
         }
         let (slot, previous) = match existing {
-            Some(slot) => (slot, self.tables.replace(slot, definition)),
-            None => (self.tables.insert(definition), None),
+            Some(slot) => (slot, self.bindings.tables.replace(slot, definition)),
+            None => (self.bindings.tables.insert(definition), None),
         };
         self.after_table_edit(slot, previous.as_ref());
         #[cfg(feature = "analysis")]
@@ -2535,10 +2538,10 @@ impl CellStore {
     /// Returns whether the table existed.
     #[wasm_bindgen(js_name = removeTable)]
     pub fn remove_table(&mut self, id: &str) -> bool {
-        let Some(slot) = self.tables.with_id(id).map(|(slot, _)| slot) else {
+        let Some(slot) = self.bindings.tables.with_id(id).map(|(slot, _)| slot) else {
             return false;
         };
-        let removed = self.tables.remove(slot);
+        let removed = self.bindings.tables.remove(slot);
         self.after_table_edit(slot, removed.as_ref());
         #[cfg(feature = "analysis")]
         self.invalidate_table_pivots();
@@ -3580,7 +3583,7 @@ impl CellStore {
     fn rewrite_formula_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
         for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
             if formula_sheet as u32 != edited_sheet {
-                let names = NameScope::new(&self.names, &self.tables, formula_sheet as u32);
+                let names = NameScope::new(&self.bindings, formula_sheet as u32);
                 sheet
                     .formulas
                     .rewrite_entries(&mut self.formula_slots, |entry| {
@@ -3600,7 +3603,7 @@ impl CellStore {
     fn rewrite_formula_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
         for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
             if formula_sheet as u32 != edited_sheet {
-                let names = NameScope::new(&self.names, &self.tables, formula_sheet as u32);
+                let names = NameScope::new(&self.bindings, formula_sheet as u32);
                 sheet
                     .formulas
                     .rewrite_entries(&mut self.formula_slots, |entry| {
@@ -3627,7 +3630,7 @@ impl CellStore {
         block: (u32, u32, u32),
     ) {
         for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
-            let names = NameScope::new(&self.names, &self.tables, formula_sheet as u32);
+            let names = NameScope::new(&self.bindings, formula_sheet as u32);
             sheet
                 .formulas
                 .rewrite_entries(&mut self.formula_slots, |entry| {
@@ -3638,6 +3641,7 @@ impl CellStore {
 
         let (from, count, to) = block;
         for (_, table) in self
+            .bindings
             .tables
             .iter_mut()
             .filter(|(_, table)| table.sheet == edited_sheet)
@@ -3740,7 +3744,7 @@ impl CellStore {
     fn defined_name_scope(&self, name: &str, scope: i32) -> Option<Option<u32>> {
         if name.is_empty()
             || !matches!(parse(name), Ok(Ast::Name(_)))
-            || self.tables.named(name).is_some()
+            || self.bindings.tables.named(name).is_some()
         {
             return None;
         }
@@ -3762,7 +3766,7 @@ impl CellStore {
         formula_row: u32,
         formula_col: u32,
     ) -> Option<StructuredRef> {
-        self.tables.bind(
+        self.bindings.tables.bind(
             reference.written(),
             AbsCellKey {
                 sheet: formula_sheet,
@@ -3782,13 +3786,14 @@ impl CellStore {
     fn after_table_edit(&mut self, slot: u16, replaced: Option<&Table>) {
         if let Some(previous) = replaced {
             let own_rows = !self
+                .bindings
                 .tables
                 .get(slot)
                 .is_some_and(|table| rows_only_grew(previous, table));
             let users = self.formula_slots.table_users(slot, own_rows);
             self.rebind_table_users(users, &|entry, _, names| {
                 let refresh = |reference: &StructuredRef| {
-                    let table = names.tables.get(slot)?;
+                    let table = names.tables().get(slot)?;
                     let column_id = &previous.column_at(reference.col)?.id;
                     let column = table
                         .columns
@@ -3824,7 +3829,7 @@ impl CellStore {
             let Some(location) = self.formula_slots.location(formula) else {
                 continue;
             };
-            let names = NameScope::new(&self.names, &self.tables, location.sheet);
+            let names = NameScope::new(&self.bindings, location.sheet);
             if let Some(entry) = self.formula_slots.get_mut(formula).and_then(|entry| {
                 crate::eval::with_formula_origin((location.row, location.col), || {
                     rebind(entry, location, names)
@@ -3929,7 +3934,7 @@ impl CellStore {
             source,
             &|name| self.sheet_handle(name),
             &|span| place_span(span, &self.tab_order()),
-            &|written| self.tables.bind(written, at),
+            &|written| self.bindings.tables.bind(written, at),
         )
         .map_err(|_| FormulaError::Value)?;
 
@@ -4035,7 +4040,7 @@ impl CellStore {
                 };
                 let ids = &self.sheet_ids;
                 let lookup = &self.sheet_lookup;
-                let names = NameScope::new(&self.names, &self.tables, location.sheet);
+                let names = NameScope::new(&self.bindings, location.sheet);
                 crate::eval::with_formula_origin((location.row, location.col), || {
                     entry.bind_sheets(
                         names,
@@ -4080,8 +4085,8 @@ impl CellStore {
     pub(crate) fn written_names(&self) -> WrittenNames<'_> {
         WrittenNames {
             sheets: &self.sheet_names,
-            tables: Some(&self.tables),
-            names: Some(&self.names),
+            tables: Some(&self.bindings.tables),
+            names: Some(&self.bindings.names),
         }
     }
 
@@ -4108,35 +4113,38 @@ impl CellStore {
         columns: bool,
         changed: &mut Vec<String>,
     ) {
-        self.names.settled().retain(&mut |_, spelling, definition| {
-            let names::DefinedName::Range(range) = definition else {
-                return true;
-            };
-            if range.sheet != edited_sheet {
-                return true;
-            }
-            let (start, end) = if columns {
-                (&mut range.col_start, &mut range.col_end)
-            } else {
-                (&mut range.row_start, &mut range.row_end)
-            };
-            let shifted = shift_range(*start, *end, at, delta);
-            if shifted == Some((*start, *end)) {
-                return true;
-            }
-            changed.push(workbook_name_key(spelling));
-            let Some(span) = shifted else {
-                return false;
-            };
-            (*start, *end) = span;
-            true
-        });
+        self.bindings
+            .names
+            .settled()
+            .retain(&mut |_, spelling, definition| {
+                let names::DefinedName::Range(range) = definition else {
+                    return true;
+                };
+                if range.sheet != edited_sheet {
+                    return true;
+                }
+                let (start, end) = if columns {
+                    (&mut range.col_start, &mut range.col_end)
+                } else {
+                    (&mut range.row_start, &mut range.row_end)
+                };
+                let shifted = shift_range(*start, *end, at, delta);
+                if shifted == Some((*start, *end)) {
+                    return true;
+                }
+                changed.push(workbook_name_key(spelling));
+                let Some(span) = shifted else {
+                    return false;
+                };
+                (*start, *end) = span;
+                true
+            });
     }
 
     // A table's references follow the edit in each formula tree, so moving
     // or removing the table here leaves no formula naming a removed slot.
     fn rebase_table_rows(&mut self, edited_sheet: u32, at: u32, delta: i64) {
-        self.tables.retain_mut(|table| {
+        self.bindings.tables.retain_mut(|table| {
             if table.sheet != edited_sheet {
                 return true;
             }
@@ -4150,7 +4158,7 @@ impl CellStore {
     }
 
     fn rebase_table_cols(&mut self, edited_sheet: u32, at: u32, delta: i64) {
-        self.tables.retain_mut(|table| {
+        self.bindings.tables.retain_mut(|table| {
             if table.sheet != edited_sheet {
                 return true;
             }
@@ -4230,7 +4238,7 @@ impl CellStore {
                 let Some(mut entry) = data.formulas.get(key, &self.formula_slots).cloned() else {
                     continue;
                 };
-                let names = NameScope::new(&self.names, &self.tables, sheet as u32);
+                let names = NameScope::new(&self.bindings, sheet as u32);
                 let refreshed = crate::eval::with_formula_origin(key, || {
                     entry.refresh_sheet_spans(&order, &self.sheet_names, names)
                 });
