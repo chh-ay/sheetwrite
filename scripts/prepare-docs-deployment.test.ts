@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 
 const fixtureRoots: string[] = [];
@@ -251,6 +251,18 @@ describe("moved docs pages", () => {
     const root = await fixture();
     await prepareDocsDeployment(root);
     for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
+      for (const pathname of [from, from.slice(0, -1)]) {
+        const response = await requestPackagedFile(root, pathname);
+        expect(response?.status).toBe(308);
+        expect(response?.headers.Location).toBe(to);
+      }
+    }
+  });
+
+  it("redirects each API page of a removed export to the page of what replaces it", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    for (const [from, to] of Object.entries(REMOVED_API_PAGES)) {
       for (const pathname of [from, from.slice(0, -1)]) {
         const response = await requestPackagedFile(root, pathname);
         expect(response?.status).toBe(308);

@@ -1,7 +1,7 @@
 import { copyFile, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const requiredFiles = [
@@ -140,12 +140,13 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
             headers: { "content-type": type },
             continue: true,
           })),
-          // Moved docs pages and merged showcases answer with a permanent
-          // redirect; a new docs page forwards an old #fragment itself,
-          // because a server never sees it.
+          // Moved docs pages, merged showcases and removed API pages answer
+          // with a permanent redirect; a new docs page forwards an old
+          // #fragment itself, because a server never sees it.
           ...[
             ...Object.entries(MOVED_PAGES).map(([from, page]) => [from, page.to] as const),
             ...Object.entries(MOVED_SHOWCASES),
+            ...Object.entries(REMOVED_API_PAGES),
           ].map(([from, to]) => ({
             src: `^${escapeRegExp(from).replace(/\/$/, "")}/?$`,
             status: 308,
