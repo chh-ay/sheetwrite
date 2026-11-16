@@ -773,7 +773,8 @@ export class GridImpl implements Grid {
       onMutationRejected: (issues) => {
         for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
       },
-      onHistoryApplied: () => {
+      onHistoryApplied: (patches) => {
+        this.selectChangedCells(patches);
         this.emitSelection();
         this.render();
       },
@@ -1876,6 +1877,49 @@ export class GridImpl implements Grid {
 
   private toViewRow(dataRow: number): number | null {
     return this.geometry.toViewRow(dataRow);
+  }
+
+  /**
+   * Select the cells that `patches` change on the active sheet and scroll to
+   * them, as Excel's undo and redo do. Row, column and object edits leave the
+   * selection alone.
+   */
+  private selectChangedCells(patches: readonly DocumentOp[]): void {
+    let top = Number.POSITIVE_INFINITY;
+    let left = Number.POSITIVE_INFINITY;
+    let bottom = -1;
+    let right = -1;
+    for (const patch of patches) {
+      const range =
+        patch.op === "set" || patch.op === "setNote"
+          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
+          : patch.op === "setRange" ||
+              patch.op === "setBlock" ||
+              patch.op === "restoreBlock" ||
+              patch.op === "setRangeStyle" ||
+              patch.op === "clearRange" ||
+              patch.op === "permuteRows"
+            ? patch.range
+            : null;
+      if (range?.sheet !== this.activeSheet) continue;
+      const first = this.toViewRow(range.start.row);
+      const last = this.toViewRow(range.end.row);
+      if (first === null || last === null) continue;
+      top = Math.min(top, first, last);
+      bottom = Math.max(bottom, first, last);
+      left = Math.min(left, range.start.col, range.end.col);
+      right = Math.max(right, range.start.col, range.end.col);
+    }
+    if (bottom < 0) return;
+
+    const sheet = this.activeSheet;
+    const start = { row: top, col: left };
+    this.selection.set(
+      top === bottom && left === right
+        ? { kind: "cell", addr: { sheet, ...start } }
+        : { kind: "range", range: { sheet, start, end: { row: bottom, col: right } } },
+    );
+    this.scrollToCell({ sheet, ...start });
   }
 
   private mergeAnchorAt(row: number, col: number): SelRect | null {
