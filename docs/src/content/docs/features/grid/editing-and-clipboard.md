@@ -110,9 +110,24 @@ Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then p
 - TSV handles quoted, multi-line fields, the same as Excel and Google Sheets.
 - External text that begins with `=`, `+`, `-`, `@`, tab, or CR gets a single-quote prefix, so it cannot become an executable formula.
 
-`paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose. Cut clears its source only after the system clipboard accepts the payload.
+`paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose.
 
 Paste lands on the top-left cell of the selection. When the selection is a whole multiple of the copied block, the block repeats to fill it and each copy's relative references shift to its own place, as in Excel.
+
+### Cut and paste moves cells
+
+Cut and paste works as in Excel ([Move or copy cells and cell contents](https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e)):
+
+- Cut changes nothing. It writes the cells to the system clipboard and marks them with a moving dashed border (still dashes when the user asks for reduced motion).
+- Paste moves the cells to the top-left cell of the selection, on this sheet or another one: values, formulas, formats, notes, hyperlinks and merged cells. The cells it leaves are emptied, and the cells it lands on are replaced.
+- Every formula, defined name and chart that refers to a moved cell now refers to its new place. A reference to a cell that the paste replaced becomes `#REF!`.
+- A formula inside the moved block keeps pointing at the same cells: its relative references do not shift as they do after a copy.
+- A range that the block covers only in part changes only when the block holds a whole edge of it and moves along it, as in Excel: with `=SUM(A1:A10)`, moving A10 to A15 gives `=SUM(A1:A15)`.
+- The move is one `moveCells` operation, so it is one undo step and reaches collaborators as one change.
+
+The cut ends without a move when the user presses Esc, starts an edit, makes any other change, copies or cuts again, or when a change moves rows or cells on its sheet. A cut that was pasted or ended does not paste again; `paste()` resolves `"empty"`. When the clipboard holds something else by the time of the paste, for example text copied in another app, the paste is a plain paste and the cut ends. Pasting the cut in another app gives its values and leaves the cells in place.
+
+As in Excel, where Paste Special is not available after a cut, `pasteValues()` does nothing while a cut waits; it resolves `"empty"` and the cut stays. A move that would cut through a merged cell, a table, a pivot table or a spill range changes nothing, and so does a paste whose rows a sorted view splits.
 
 ### Report the clipboard outcome
 
@@ -169,6 +184,7 @@ grid.on("mutation-rejected", ({ issues }) => {
 - Stock, validation, and custom editors keep the underlying document cell while sorting or filtering changes its visible position. Completion writes that same cell, not the row that now occupies the old position.
 - If the edited cell leaves the view, or the sheet structure changes, the grid cancels the editor.
 - Paste does nothing when `readOnly` is on; it resolves `"empty"`.
+- Cut on a read-only grid copies: nothing is marked or moved.
 - An undo that is too large to send changes nothing and leaves the history; see [Undo a large clear](#undo-a-large-clear).
 
 ## See also

@@ -342,6 +342,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setRangeStyle":
     case "clearRange":
     case "permuteRows":
+    case "moveCells":
       return patch.range.sheet;
     case "addTable":
       return patch.table.range.sheet;

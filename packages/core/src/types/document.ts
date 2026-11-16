@@ -344,6 +344,7 @@ export type CommitReason =
   | "edit-tab"
   | "edit-programmatic"
   | "paste"
+  /** No longer emitted: a cut changes nothing, and its paste commits as `"paste"`. */
   | "cut"
   | "clear"
   | "fill"
@@ -705,6 +706,13 @@ export type DocumentOp =
   | { op: "addColumns"; sheet: SheetId; at: number; columns: Column[] }
   | { op: "removeColumns"; sheet: SheetId; at: number; count: number }
   | { op: "moveColumns"; sheet: SheetId; from: number; count: number; to: number }
+  /**
+   * Move the cells of `range` so that its top-left cell lands on `to`, which
+   * may be on another sheet, as Excel's Cut and Paste does. The cells it
+   * lands on are replaced, the cells it leaves are emptied, and every
+   * reference to a moved cell follows it.
+   */
+  | { op: "moveCells"; range: Range; to: CellAddress }
   | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> }
   | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null }
   | { op: "addMerge"; sheet: SheetId; merge: MergeRange }

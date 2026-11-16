@@ -3,6 +3,7 @@ import { chartTouchesSheet } from "./chart-definition.js";
 import { boxesOverlap } from "./dashboard.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
+import { movedBlock } from "./store/move-cells.js";
 import { cellRange, rangesIntersect } from "./store/ranges.js";
 import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
@@ -44,7 +45,8 @@ type RestoreBlockReader = (operation: RestoreOperation) => PackedCellBlock;
 type AxisChange =
   | { kind: "insert"; axis: Axis; sheet: string; at: number; count: number }
   | { kind: "delete"; axis: Axis; sheet: string; at: number; count: number }
-  | { kind: "move"; axis: Axis; sheet: string };
+  /** Rows, columns or a block of cells that move on, or between, `sheets`. */
+  | { kind: "move"; sheets: readonly string[] };
 
 interface TransformFailure {
   code: RebaseConflictCode;
@@ -121,7 +123,7 @@ export function rebaseDocumentOperations(
         }
         if (
           axisChange.kind === "move" &&
-          operationTouchesSheet(local, axisChange.sheet, restoreBlock)
+          axisChange.sheets.some((sheet) => operationTouchesSheet(local, sheet, restoreBlock))
         ) {
           return conflict(
             "unsupported-structural",
@@ -202,7 +204,7 @@ function conflict(
   };
 }
 
-/** Whether an operation inserts, deletes, or moves rows or columns. */
+/** Whether an operation inserts, deletes, or moves rows or columns, or moves a block of cells. */
 export function changesStructure(operation: DocumentOp): boolean {
   switch (operation.op) {
     case "addRows":
@@ -211,6 +213,7 @@ export function changesStructure(operation: DocumentOp): boolean {
     case "addColumns":
     case "removeColumns":
     case "moveColumns":
+    case "moveCells":
       return true;
     default:
       return false;
@@ -238,7 +241,7 @@ function structuralChange(operation: DocumentOp): AxisChange | null {
       };
 
     case "moveRows":
-      return { kind: "move", axis: "row", sheet: operation.sheet };
+      return { kind: "move", sheets: [operation.sheet] };
 
     case "addColumns":
       return {
@@ -259,7 +262,10 @@ function structuralChange(operation: DocumentOp): AxisChange | null {
       };
 
     case "moveColumns":
-      return { kind: "move", axis: "column", sheet: operation.sheet };
+      return { kind: "move", sheets: [operation.sheet] };
+
+    case "moveCells":
+      return { kind: "move", sheets: [operation.range.sheet, operation.to.sheet] };
 
     default:
       return null;
@@ -353,10 +359,12 @@ function carryPastLocal(
 ): { operation: DocumentOp } | TransformFailure | null {
   if (!local) return { operation: remote };
   if (local.kind === "move") {
-    if (!operationTouchesSheet(remote, local.sheet, restoreBlock)) return { operation: remote };
+    if (!local.sheets.some((sheet) => operationTouchesSheet(remote, sheet, restoreBlock))) {
+      return { operation: remote };
+    }
     return {
       code: "unsupported-structural",
-      message: "A pending row/column move reorders cells a concurrent operation targets",
+      message: "A pending move reorders cells a concurrent operation targets",
     };
   }
 
@@ -465,6 +473,11 @@ function transformDirectTarget(
       }
 
       return null;
+
+    case "moveCells":
+      return operation.range.sheet === change.sheet || operation.to.sheet === change.sheet
+        ? overlappingStructure(operation.op)
+        : null;
 
     case "addColumns":
       if (change.axis === "column" && operation.sheet === change.sheet) {
@@ -950,6 +963,8 @@ function operationContainsFormula(
       return (operation.block.formulas?.length ?? 0) > 0;
     // A sort adjusts the formulas of moved rows, so it carries formula text.
     case "permuteRows":
+    // A block move rewrites every formula that refers to the moved cells.
+    case "moveCells":
       return true;
     case "restoreBlock":
       return (restoreBlock(operation).formulas?.length ?? 0) > 0;
@@ -1152,6 +1167,9 @@ function operationTouchesSheet(
     case "setPivot":
       return operation.sheet === sheet || pivotReadsSheet(operation.pivot, sheet);
 
+    case "moveCells":
+      return operation.range.sheet === sheet || operation.to.sheet === sheet;
+
     default:
       return "sheet" in operation && operation.sheet === sheet;
   }
@@ -1181,6 +1199,9 @@ function mutationRanges(operation: DocumentOp): Range[] {
     case "clearRange":
     case "permuteRows":
       return [operation.range];
+
+    case "moveCells":
+      return [operation.range, movedBlock(operation)];
 
     case "addMerge":
     case "removeMerge":

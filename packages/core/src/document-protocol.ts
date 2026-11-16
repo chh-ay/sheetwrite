@@ -2221,6 +2221,11 @@ export function validateDocumentOperationShape(
       }
       break;
 
+    case "moveCells":
+      validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
+      validateAddress(ownValue(operation, "to"), `${path}.to`, errors);
+      break;
+
     case "addRows":
     case "removeRows":
       validateOperationSheetId(operation, path, errors);
@@ -3599,7 +3604,8 @@ export function validateWorkbookSnapshot(
  * Exhaustive stable target identity used by persistence/logging layers.
  *
  * @returns The stable ID of the sheet the operation changes; for workbook-level
- *   operations, a key such as a defined name, `query:<id>` or `calculation`.
+ *   operations, a key such as a defined name, `query:<id>` or `calculation`. A
+ *   `moveCells` operation gives the sheet its cells leave.
  */
 export function documentOpTarget(operation: DocumentOp): string {
   switch (operation.op) {
@@ -3615,6 +3621,7 @@ export function documentOpTarget(operation: DocumentOp): string {
     case "setRangeStyle":
     case "clearRange":
     case "permuteRows":
+    case "moveCells":
       return operation.range.sheet;
 
     case "addTable":

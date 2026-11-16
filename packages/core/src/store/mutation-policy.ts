@@ -14,6 +14,7 @@ import type {
   Workbook,
 } from "../types/document.js";
 import type { PivotDefinition } from "../types/pivot.js";
+import { movedBlock } from "./move-cells.js";
 import {
   cellRange,
   fullSheetRange,
@@ -275,6 +276,9 @@ export class StoreMutationPolicy {
       case "clearRange":
       case "permuteRows":
         return [normalizedRange(patch.range)];
+
+      case "moveCells":
+        return [normalizedRange(patch.range), movedBlock(patch)];
 
       case "addMerge":
       case "removeMerge":

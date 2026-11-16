@@ -7,6 +7,7 @@ import {
   type ChartAxisEdit,
   chartFitsSheets,
   invalidateChartSheet,
+  mapChartSources,
   MAX_CHARTS_PER_SHEET,
   rebaseChartAxis,
   sanitizeChartDefinition,
@@ -169,6 +170,16 @@ import {
   workbookTableNameKey,
 } from "../workbook-table.js";
 import { decodePreview, type FormulaPreview, PREVIEW_FIELDS } from "./formula-preview-result.js";
+import {
+  cellBlockMove,
+  type CellBlockMove,
+  moveCellRange,
+  type MoveCellsOperation,
+  movedBlock,
+  movedHyperlinks,
+  movedMerges,
+  movedNotes,
+} from "./move-cells.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   MERGED_CELLS_SORT_MESSAGE,
@@ -1502,6 +1513,9 @@ export class StoreDataEngine {
   }
 
   canApplyLocally(patch: DocumentOp): boolean {
+    if (patch.op === "moveCells") {
+      return this.blockLoaded(patch.range) && this.blockLoaded(movedBlock(patch));
+    }
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.sheets.handles.has(sheet) || !this.isPaged(sheet)) return true;
     if (
@@ -2343,6 +2357,39 @@ export class StoreDataEngine {
       patch.from,
       patch.count,
       patch.to,
+    );
+    const losses: CellAddress[] = [];
+    for (let index = 0; index + 2 < triples.length; index += 3) {
+      const sheet = this.sheetIdsByHandle[triples[index] ?? -1];
+      const row = triples[index + 1];
+      const col = triples[index + 2];
+      if (sheet !== undefined && row !== undefined && col !== undefined) {
+        losses.push({ sheet, row, col });
+      }
+    }
+    return losses;
+  }
+
+  /**
+   * Cells outside both blocks, at their address before the move, whose
+   * formula a move back cannot restore: a reference that became `#REF!` or a
+   * range whose edge moved. History captures them before the move applies.
+   */
+  moveCellsLosses(patch: MoveCellsOperation): CellAddress[] {
+    const { from, to } = cellBlockMove(patch);
+    const handle = this.sheets.handles.get(from.sheet);
+    const toHandle = this.sheets.handles.get(to.sheet);
+    if (handle === undefined || toHandle === undefined) return [];
+
+    const triples = this.wasm.moveCellsLosses(
+      handle,
+      from.start.row,
+      from.start.col,
+      from.end.row - from.start.row + 1,
+      from.end.col - from.start.col + 1,
+      toHandle,
+      to.start.row,
+      to.start.col,
     );
     const losses: CellAddress[] = [];
     for (let index = 0; index + 2 < triples.length; index += 3) {
@@ -3261,6 +3308,9 @@ export class StoreDataEngine {
       case "permuteRows":
         return this.permuteRows(patch, changes, captureDetailedChanges);
 
+      case "moveCells":
+        return this.moveCells(patch, changes, captureDetailedChanges);
+
       case "addColumns": {
         const meta = this.sheets.sheetMeta(patch.sheet);
         if (
@@ -4170,6 +4220,121 @@ export class StoreDataEngine {
 
     if (beforeCells && changes) this.pushPermutedChanges(bounds, beforeCells, changes);
     return true;
+  }
+
+  /**
+   * Move a block of cells, as Excel's Cut and Paste does. The engine moves
+   * the cells and makes every formula and defined name follow them; this
+   * carries the block's notes, hyperlinks and merged cells, which replace
+   * those of the cells it lands on, and moves named ranges and chart sources
+   * by the engine's rule. A block that would cut through a table, pivot
+   * output or merged cell does not move.
+   */
+  private moveCells(
+    patch: MoveCellsOperation,
+    changes: ChangeEvent["changes"] | null,
+    captureDetailedChanges: boolean,
+  ): boolean {
+    const move = cellBlockMove(patch);
+    const { from, to } = move;
+    const fromSheet = this.workbook.sheets.find((sheet) => sheet.id === from.sheet);
+    const toSheet = this.workbook.sheets.find((sheet) => sheet.id === to.sheet);
+    if (
+      !fromSheet ||
+      !toSheet ||
+      isDashboard(toSheet) ||
+      ![from.start.row, from.start.col, to.start.row, to.start.col].every(integerAt) ||
+      from.end.row >= fromSheet.rowCount ||
+      from.end.col >= fromSheet.columns.length ||
+      to.end.row >= toSheet.rowCount ||
+      to.end.col >= toSheet.columns.length
+    ) {
+      return false;
+    }
+
+    if (
+      from.sheet === to.sheet &&
+      from.start.row === to.start.row &&
+      from.start.col === to.start.col
+    ) {
+      return true;
+    }
+
+    if (this.blockMeetsOwnedCells(fromSheet, from) || this.blockMeetsOwnedCells(toSheet, to)) {
+      return false;
+    }
+
+    const merges = movedMerges(fromSheet, toSheet, move);
+    if (!merges || merges.to.some((merge) => mergeCrossesFreeze(toSheet, merge))) return false;
+
+    const rows = from.end.row - from.start.row + 1;
+    const cols = from.end.col - from.start.col + 1;
+    const before =
+      changes && captureDetailedChanges
+        ? [from, to].map((bounds) => ({
+            bounds,
+            cells: this.captureBlockBeforeCells(bounds, rows, cols),
+          }))
+        : null;
+
+    this.noteRangeMutationFfi(rows);
+    const status = this.wasm.moveCells(
+      this.sheets.handleOf(from.sheet),
+      from.start.row,
+      from.start.col,
+      rows,
+      cols,
+      this.sheets.handleOf(to.sheet),
+      to.start.row,
+      to.start.col,
+    );
+    if (status !== 0) return false;
+
+    if (fromSheet.merges || merges.from.length > 0) fromSheet.merges = merges.from;
+    if (toSheet.merges || merges.to.length > 0) toSheet.merges = merges.to;
+    this.spillBlockersDirty.add(from.sheet);
+    this.spillBlockersDirty.add(to.sheet);
+    this.moveBlockItems(fromSheet, toSheet, move);
+    if (before && changes) {
+      for (const block of before) this.pushPermutedChanges(block.bounds, block.cells, changes);
+    }
+    return true;
+  }
+
+  /** Whether a table or pivot output meets the block: a cut moves neither in part. */
+  private blockMeetsOwnedCells(sheet: Sheet, block: Range): boolean {
+    return (
+      (sheet.tables ?? []).some((table) => rangesIntersect(table.range, block)) ||
+      this.pivotOutputs(sheet.id).some((output) => rangesIntersect(output.range, block))
+    );
+  }
+
+  /** Carry the notes, hyperlinks, named ranges and chart sources that a block move takes along. */
+  private moveBlockItems(fromSheet: Sheet, toSheet: Sheet, move: CellBlockMove): void {
+    const notes = movedNotes(fromSheet.notes ?? [], toSheet.notes ?? [], move);
+    if (fromSheet.notes || notes.from.length > 0) fromSheet.notes = notes.from;
+    if (toSheet.notes || notes.to.length > 0) toSheet.notes = notes.to;
+    const links = movedHyperlinks(fromSheet.hyperlinks ?? [], toSheet.hyperlinks ?? [], move);
+    if (fromSheet.hyperlinks || links.from.length > 0) fromSheet.hyperlinks = links.from;
+    if (toSheet.hyperlinks || links.to.length > 0) toSheet.hyperlinks = links.to;
+
+    const last = { row: fromSheet.rowCount - 1, col: fromSheet.columns.length - 1 };
+    this.rewriteCharts((chart) =>
+      mapChartSources(chart, (range) => moveCellRange(range, move, last) ?? "#REF!"),
+    );
+    // A named range follows as a formula's range does; the engine moved its own copy.
+    for (const namedRange of [...(this.workbook.namedRanges ?? [])]) {
+      if (!namedRange.range) continue;
+      const range = moveCellRange(namedRange.range, move, last);
+      if (range && range !== namedRange.range) this.upsertMovedNamedRange({ ...namedRange, range });
+    }
+    this.refreshNamedFormulas();
+  }
+
+  /** Whether every cell of the block is loaded, so a move can read and write it. */
+  private blockLoaded(range: Range): boolean {
+    if (!this.sheets.handles.has(range.sheet) || !this.isPaged(range.sheet)) return true;
+    return this.isRangeFullyLoaded(range);
   }
 
   /**

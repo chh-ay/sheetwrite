@@ -109,6 +109,8 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=table-append-row;size=100000": 1.2,
   "workload=sort-formula-column;size=10000": 1.2,
   "workload=sort-formula-column;size=100000": 1.2,
+  "workload=cell-move-refs;size=10000": 1.2,
+  "workload=cell-move-refs;size=100000": 1.2,
   "workload=parse-load-qualified;size=10000": 1.2,
   "workload=parse-load-qualified;size=100000": 1.2,
   "workload=parse-load-table;size=10000": 1.2,

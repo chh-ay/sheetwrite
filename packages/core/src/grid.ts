@@ -84,6 +84,7 @@ import { mountSidePanel } from "./side-panel.js";
 import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
+import { movedBlock } from "./store/move-cells.js";
 import {
   addRowGroup,
   collapseRowGroup,
@@ -906,6 +907,7 @@ export class GridImpl implements Grid {
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
+      onCutChange: (range) => this.overlayPainter.setCutMark(range),
     });
 
     this.styleActions = new StyleActions({
@@ -1042,7 +1044,12 @@ export class GridImpl implements Grid {
       pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
-      onEditStart: () => this.notes.hideCard(),
+      onEditStart: () => {
+        this.notes.hideCard();
+        // As in Excel, a new edit ends the cut that waits for a paste.
+        this.clipboard.cancelCut();
+      },
+      cancelCut: () => this.clipboard.cancelCut(),
     });
 
     this.interactions.configureMenu(config, this.theme);
@@ -1272,6 +1279,7 @@ export class GridImpl implements Grid {
     this.cancelAutoFit();
     this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
     this.activeSheetCache = null;
+    this.clipboard.storeChanged(event);
 
     // Presence learned during this change describes the state after it, which
     // cannot vouch for cells it just stopped computing (e.g. a removed spill).
@@ -1346,6 +1354,13 @@ export class GridImpl implements Grid {
 
     for (const patch of patches) {
       if (changesSheetTabs(patch)) effects |= SHEETS_CHANGED;
+      // A block move carries merged cells along.
+      if (
+        patch.op === "moveCells" &&
+        (patch.range.sheet === this.activeSheet || patch.to.sheet === this.activeSheet)
+      ) {
+        effects |= APPLY_LAYOUT;
+      }
       if (!("sheet" in patch) || patch.sheet !== this.activeSheet) continue;
 
       if (!annotatesSheet(patch)) effects |= GEOMETRY_CHANGED;
@@ -1869,7 +1884,9 @@ export class GridImpl implements Grid {
               patch.op === "clearRange" ||
               patch.op === "permuteRows"
             ? patch.range
-            : null;
+            : patch.op === "moveCells"
+              ? movedBlock(patch)
+              : null;
       if (range?.sheet !== this.activeSheet) continue;
       const first = this.toViewRow(range.start.row);
       const last = this.toViewRow(range.end.row);
