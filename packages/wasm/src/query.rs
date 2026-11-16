@@ -8,7 +8,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
-use crate::eval::Criterion;
+use crate::eval::{Criterion, Wildcard};
 use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
@@ -455,10 +455,17 @@ impl CellStore {
         }
     }
 
-    /// Cell coordinates whose text matches `query`, as a flat `[row, col, ...]`
-    /// list. Scans the requested columns column-major (cache-local), then sorts
+    /// Cell coordinates that Find's `query` matches, as a flat
+    /// `[row, col, ...]` list. `query` takes Excel's wildcards: `*`, `?` and
+    /// `~`. With `formulas`, a formula cell matches by its formula text, as in
+    /// Excel's "Look in: Formulas"; otherwise every cell matches by its value.
+    /// Scans the requested columns column-major (cache-local), then sorts
     /// row-major so search navigation runs top-to-bottom, left-to-right.
     #[wasm_bindgen(js_name = search)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars; separate flags keep older five-argument callers reading values"
+    )]
     pub fn search(
         &self,
         sheet: usize,
@@ -466,15 +473,11 @@ impl CellStore {
         query: &str,
         case_insensitive: bool,
         whole_cell: bool,
+        formulas: bool,
     ) -> Vec<u32> {
-        let needle = if case_insensitive {
-            query.to_lowercase()
-        } else {
-            query.to_owned()
-        };
-        if needle.is_empty() {
+        let Some(find) = FindQuery::new(query, case_insensitive, whole_cell) else {
             return Vec::new();
-        }
+        };
 
         let Some(s) = self.sheets.get(sheet) else {
             return Vec::new();
@@ -490,16 +493,7 @@ impl CellStore {
 
             let base = col * s.cells.row_count();
             for row in 0..s.cells.row_count() {
-                let i = base + row;
-                if cell_matches_text(
-                    s,
-                    self,
-                    i,
-                    &needle,
-                    case_insensitive,
-                    whole_cell,
-                    &mut cache,
-                ) {
+                if find.cell_matches(s, self, base + row, formulas, &mut cache) {
                     pairs.push((row as u32, col_u));
                 }
             }
@@ -1395,6 +1389,141 @@ impl MatchCache {
         self.tag[slot] = id;
         self.hit[slot] = matched;
         matched
+    }
+}
+
+/// What a Find query compares: plain text, or an Excel wildcard pattern.
+enum FindText {
+    /// Text without wildcards, lowercased when the search ignores case.
+    Plain(String),
+    /// A pattern with `*`, `?` or a `~` escape. A search within cell text
+    /// has extended it with `*` at both ends.
+    Pattern(Wildcard),
+}
+
+/// A Find query, parsed once per scan.
+struct FindQuery {
+    text: FindText,
+    case_insensitive: bool,
+    whole_cell: bool,
+}
+
+impl FindQuery {
+    /// `None` for an empty query, or a pattern that cannot be allocated.
+    fn new(query: &str, case_insensitive: bool, whole_cell: bool) -> Option<Self> {
+        if query.is_empty() {
+            return None;
+        }
+        let pattern = Wildcard::parse(query).ok()?;
+        let text = if !pattern.has_wildcards() {
+            FindText::Plain(if case_insensitive {
+                query.to_lowercase()
+            } else {
+                query.to_owned()
+            })
+        } else if whole_cell {
+            FindText::Pattern(pattern)
+        } else {
+            FindText::Pattern(pattern.within_text()?)
+        };
+        Some(Self {
+            text,
+            case_insensitive,
+            whole_cell,
+        })
+    }
+
+    fn matches_text(&self, text: &str) -> bool {
+        match &self.text {
+            FindText::Plain(needle) => {
+                matches_needle(text, needle, self.case_insensitive, self.whole_cell)
+            }
+            FindText::Pattern(pattern) => pattern.matches_with_case(text, !self.case_insensitive),
+        }
+    }
+
+    /// Whether the cell at `index` matches: by its formula text when
+    /// `formulas` is set and it holds a formula, otherwise by its value.
+    fn cell_matches(
+        &self,
+        sheet: &SheetData,
+        store: &CellStore,
+        index: usize,
+        formulas: bool,
+        cache: &mut MatchCache,
+    ) -> bool {
+        if formulas {
+            if let Some(matched) =
+                with_formula_source(sheet, store, index, |source| self.matches_text(source))
+            {
+                return matched;
+            }
+        }
+        match &self.text {
+            FindText::Plain(needle) => cell_matches_text(
+                sheet,
+                store,
+                index,
+                needle,
+                self.case_insensitive,
+                self.whole_cell,
+                cache,
+            ),
+            FindText::Pattern(_) => {
+                with_value_text(sheet, store, index, |text| self.matches_text(text))
+                    .unwrap_or_default()
+            }
+        }
+    }
+}
+
+/// Calls `visit` with the formula text of the cell at `index`, or returns
+/// `None` when the cell holds no formula (a value, a reference or a spill).
+fn with_formula_source<R>(
+    sheet: &SheetData,
+    store: &CellStore,
+    index: usize,
+    visit: impl FnOnce(&str) -> R,
+) -> Option<R> {
+    if sheet.cells.kind_at(index) != KIND_FORMULA {
+        return None;
+    }
+    let key = key_for_index(sheet, index)?;
+    let entry = sheet.formulas.get(key, &store.formula_slots)?;
+    entry
+        .is_formula()
+        .then(|| visit(&entry.source(&store.written_names())))
+}
+
+/// Calls `visit` with the text a value search compares for the cell at
+/// `index`, the same text [`cell_matches_text`] reads, or returns `None`
+/// when the cell is empty.
+fn with_value_text<R>(
+    sheet: &SheetData,
+    store: &CellStore,
+    index: usize,
+    visit: impl FnOnce(&str) -> R,
+) -> Option<R> {
+    let slots = &store.formula_slots;
+    if let Some(value) = boolean_cell_value(sheet, index, slots) {
+        return Some(visit(boolean_text(value)));
+    }
+    match sheet.cells.kind_at(index) {
+        KIND_NUMBER => Some(visit(NumberText::of(sheet.cells.num_at(index)).as_str())),
+        KIND_FORMULA => {
+            let key = key_for_index(sheet, index)?;
+            if let Some(error) = formula_error_at(sheet, key, slots) {
+                Some(visit(error.sentinel()))
+            } else if sheet.cells.str_id_at(index) != NO_STRING {
+                string_from_pool_ref(&store.strings, sheet.cells.str_id_at(index)).map(visit)
+            } else {
+                Some(visit(NumberText::of(sheet.cells.num_at(index)).as_str()))
+            }
+        }
+        KIND_STRING => {
+            string_from_pool_ref(&store.strings, sheet.cells.str_id_at(index)).map(visit)
+        }
+        _ => None,
     }
 }
 

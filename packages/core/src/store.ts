@@ -799,11 +799,20 @@ export class SheetwriteStore implements Store {
     return this.engine.dataEdge(sheet, row, col, dRow, dCol);
   }
 
-  /** Cells whose text matches `query`, in row order. */
+  /**
+   * Cells that Find's `query` matches, in row order. `query` takes Excel's
+   * wildcards (`*`, `?`, `~`); formula cells match by their formula text
+   * unless `lookIn` is `"values"`.
+   */
   searchCells(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): CellAddress[] {
     return this.engine.searchCells(sheet, query, opts);
   }
@@ -812,7 +821,12 @@ export class SheetwriteStore implements Store {
   searchCellsFlat(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): Uint32Array {
     return this.engine.searchCellsFlat(sheet, query, opts);
   }

@@ -90,14 +90,17 @@ fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     assert_close(store.aggregate(sheet, 1, 1), 6.0);
     assert_close(store.aggregate(sheet, 1, 2), 5.0);
     assert_eq!(
-        store.search(sheet, &[0], "#DIV/0!", false, true),
+        store.search(sheet, &[0], "#DIV/0!", false, true, false),
         vec![0, 0]
     );
-    assert_eq!(store.search(sheet, &[0], "beta", false, true), vec![1, 0]);
+    assert_eq!(
+        store.search(sheet, &[0], "beta", false, true, false),
+        vec![1, 0]
+    );
     assert!(store
-        .search(sheet, &[u32::MAX], "x", true, false)
+        .search(sheet, &[u32::MAX], "x", true, false, false)
         .is_empty());
-    assert!(store.search(sheet, &[0], "", true, false).is_empty());
+    assert!(store.search(sheet, &[0], "", true, false, false).is_empty());
     assert_close(store.aggregate(sheet, 1, 3), 7.0);
     assert_close(store.aggregate(sheet, 1, 4), 2.0);
 
@@ -107,6 +110,37 @@ fn mixed_formula_queries_order_errors_text_booleans_and_empty_aggregates() {
     for op in 0..=4 {
         assert_close(store.aggregate(sheet, 2, op), 0.0);
     }
+}
+
+#[test]
+fn find_takes_excel_wildcards_and_looks_in_formulas() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 4);
+    store.set_string(sheet, 0, 0, "apple", 0);
+    store.set_string(sheet, 1, 0, "Apple pie", 0);
+    store.set_formula(sheet, 2, 0, "=A1&\"*\"", 0);
+    store.set_string(sheet, 3, 0, "a*e", 0);
+    store.recompute(sheet);
+    let find = |query: &str, case_insensitive: bool, whole_cell: bool, formulas: bool| {
+        store.search(sheet, &[0], query, case_insensitive, whole_cell, formulas)
+    };
+
+    // `*` stands for any run of characters, anywhere in the cell's text.
+    assert_eq!(
+        find("A*e", true, false, false),
+        vec![0, 0, 1, 0, 2, 0, 3, 0]
+    );
+    // Looking in formulas, A3 shows its formula, `=A1&"*"`, which has no `e`.
+    assert_eq!(find("A*e", true, false, true), vec![0, 0, 1, 0, 3, 0]);
+    // `?` stands for one character; the whole cell must match.
+    assert_eq!(find("a?ple", true, true, true), vec![0, 0]);
+    // `~` makes the next `*` literal.
+    assert_eq!(find("a~*e", true, false, true), vec![3, 0]);
+    // A reference in a formula is found in formulas, not in values.
+    assert_eq!(find("A1", true, false, true), vec![2, 0]);
+    assert!(find("A1", true, false, false).is_empty());
+    // Match case compares a pattern's letters as written.
+    assert_eq!(find("A*e", false, false, false), vec![1, 0]);
 }
 
 #[test]
