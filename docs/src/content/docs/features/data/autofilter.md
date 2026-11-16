@@ -3,13 +3,15 @@ title: AutoFilter
 description: "Filter rows from buttons on a header row, as with Excel's AutoFilter: value lists, number, text and date conditions, sorting, undo and XLSX."
 ---
 
-An AutoFilter puts a filter button on each cell of a range's first row, the header. The rows below it are the ones its filters hide; the header row, and rows above or below the range, always show. A sheet has one AutoFilter, as in Excel.
+An AutoFilter puts a filter button on each cell of a range's first row, the header. Its filters hide only the rows below the header. The header row, and any rows above or below the range, always show. A sheet has one AutoFilter, as in Excel.
+
+For example, Item and Qty are in A1:B5, with the Qty values 3, 7, 1 and 12. Turn the AutoFilter on, open the Qty dropdown and choose **Number Filters › Greater Than…** with 5. The rows of 3 and 1 hide. The rows of 7 and 12 and the header row stay.
 
 ## Turn it on and off
 
-Select a cell in your data and choose **Data › Filter**, or press **Ctrl+Shift+L** (**Cmd+Shift+L** on a Mac). The filter covers the table the cell is in, the selected range, or the current region around the cell, and its first row becomes the header. The same command turns the AutoFilter off and shows every row again.
+Select a cell in your data and choose **Data › Filter**, or press **Ctrl+Shift+L** (**Cmd+Shift+L** on a Mac). The filter covers the table the cell is in, the selected range, or the current region around the cell. Its first row becomes the header. The same command turns the AutoFilter off and shows every row again.
 
-From code, `grid.setAutoFilter(range)` turns it on for a range and `grid.setAutoFilter(null)` turns it off; `grid.actions.toggleAutoFilter()` does what the command does.
+From code, `grid.setAutoFilter(range)` turns it on for a range, and `grid.setAutoFilter(null)` turns it off. `grid.actions.toggleAutoFilter()` does what the command does.
 
 ```ts prelude="core" partial="requires an initialized grid with an orders table in A1:E200" title="Filter buttons on the orders table"
 grid.setAutoFilter({ sheet: "orders", start: { row: 0, col: 0 }, end: { row: 199, col: 4 } });
@@ -17,23 +19,23 @@ grid.setAutoFilter({ sheet: "orders", start: { row: 0, col: 0 }, end: { row: 199
 
 ## The dropdown
 
-Each header button, or **Alt+Down** on a header cell, opens the column's dropdown:
+Click a header button, or press **Alt+Down** on a header cell, to open the column's dropdown:
 
-- **Sort A to Z** and **Sort Z to A** sort the range below its header in place. Number columns say Smallest to Largest, date columns Oldest to Newest.
+- **Sort A to Z** and **Sort Z to A** sort the range below its header in place. Number columns say Smallest to Largest, and date columns Oldest to Newest.
 - **Clear Filter From "Region"** removes the column's filter.
-- **Number Filters**, **Text Filters** or **Date Filters**, by what the column holds, open the Custom AutoFilter form: one or two conditions joined by **And** or **Or**.
+- **Number Filters**, **Text Filters** or **Date Filters**, by what the column holds, open the Custom AutoFilter form. It takes one or two conditions, joined by **And** or **Or**.
 - A search box narrows the value list. With a search, **OK** keeps only the ticked results.
-- The value list ticks the values to show, with **(Select All)** and **(Blanks)**. It lists the values of the rows the other columns' filters keep, as Excel does, at most 10,000 of them.
+- The value list ticks the values to show, with **(Select All)** and **(Blanks)**. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
 
 A filtered column's button shows a funnel. While rows are hidden, the row headers show each row's number in the sheet.
 
-The dropdown is a dialog named for its column. Tab moves between its parts and stays inside it; in the value list the arrow keys, Home, End and Page Up and Down move, Space ticks or unticks, and Enter applies. Escape closes the dropdown and gives the cell back its focus.
+The dropdown is a dialog named for its column. Tab moves between its parts and stays inside it. In the value list, the arrow keys, Home, End, Page Up and Page Down move, Space ticks or unticks, and Enter applies. Escape closes the dropdown and gives the focus back to the cell.
 
-## Conditions from code
+## Custom conditions
 
-A column filter is set with `grid.setColumnFilter(col, filter)`. The AutoFilter's own kinds are a value list and Excel's custom filter:
+`grid.setColumnFilter(col, filter)` sets a column's filter from code. An AutoFilter column takes a value list or Excel's custom filter of one or two conditions:
 
-```ts prelude="core" partial="requires an initialized grid with an AutoFilter over the orders table" title="A value list and a custom filter"
+```ts prelude="core" partial="requires an initialized grid with an AutoFilter over the orders table" title="A value list and two custom filters"
 grid.setColumnFilter(1, { kind: "values", values: ["EMEA", "APAC", null] }); // null keeps blanks
 grid.setColumnFilter(4, {
   kind: "custom",
@@ -55,19 +57,19 @@ grid.setColumnFilter(2, {
 
 | Condition | `op` | Matches |
 | --- | --- | --- |
-| equals, does not equal | `eq`, `neq` | A number, a date's serial, or text, without case. |
-| greater or less than | `gt`, `gte`, `lt`, `lte` | Numbers and dates by value, text in sort order. |
+| equals, does not equal | `eq`, `neq` | A number, a date's serial, or text, ignoring case. |
+| greater or less than | `gt`, `gte`, `lt`, `lte` | Numbers and dates by value, and text in sort order. |
 | begins with, ends with | `beginsWith`, `endsWith` | Text at the start or end of the cell's text. |
 | contains, does not contain | `contains`, `notContains` | Text anywhere in the cell's text. |
 
-Conditions match as `COUNTIF` criteria do: `*` and `?` in text are wildcards and `~` escapes them, and "does not equal" also keeps blank cells.
+Conditions match as `COUNTIF` criteria do. In text, `*` and `?` are wildcards, and `~` before one makes it a plain character. "Does not equal" also keeps blank cells.
 
-Edits do not filter again by themselves, as in Excel: a row whose value no longer matches stays until you choose **Data › Reapply** or call `grid.reapplyFilter()`. **Data › Clear** (`grid.actions.clearFilters()`) removes every column filter and keeps the buttons. The cell menu's **Filter** submenu filters by the selected cell's value, reapplies, or clears the column's filter.
+As in Excel, edits don't filter again on their own. A row whose value no longer matches stays until you choose **Data › Reapply** or call `grid.reapplyFilter()`. **Data › Clear** (`grid.actions.clearFilters()`) removes every column filter and keeps the buttons. The cell menu's **Filter** submenu filters by the selected cell's value, reapplies the filter, or clears the column's filter.
 
-## Undo, collaboration and files
+## Undo, collaboration and XLSX files
 
-Turning the AutoFilter on or off, and each filter change, is one undo step that collaborators receive. The range follows inserted and deleted rows and columns, and the AutoFilter goes when its header row is deleted. It saves with the sheet's snapshot.
+Turning the AutoFilter on or off is one undo step, and so is each filter change. Collaborators receive each step. The range follows inserted and deleted rows and columns. Deleting the header row removes the AutoFilter. It saves with the sheet's snapshot.
 
-XLSX export writes the worksheet `autoFilter` and the `_xlnm._FilterDatabase` name, and, from a grid or store, writes the hidden rows too, so Excel opens the file filtered. Import reads an Excel AutoFilter's value lists, custom and non-blank filters. Colour, icon, top 10 and dynamic date filters have no Sheetwrite equivalent: import drops them with a warning.
+An AutoFilter round-trips through XLSX. Export writes the worksheet's `autoFilter` with each column's conditions, and the `_xlnm._FilterDatabase` name Excel expects. From a grid or store, it also marks the hidden rows, so Excel opens the file filtered. Import reads an Excel AutoFilter back: its range, value lists, custom filters and non-blank filters. Colour, icon, top 10 and dynamic date filters have no Sheetwrite equivalent, so import drops them with a warning.
 
 See [Data operations](/docs/features/data/data-operations/) for view sorts, hidden rows and filters without an AutoFilter.

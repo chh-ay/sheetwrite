@@ -351,23 +351,6 @@ const SHOTS: readonly Shot[] = [
   // The data-grid presentation names the columns in their headers, so a column
   // filter leaves the column names in view.
   {
-    // The Orders table with its filter buttons on and the Region dropdown open,
-    // as Data › Filter and Alt+Down on the header leave it.
-    name: "autofilter",
-    size: "app",
-    query: { sheet: "orders" },
-    steps: async (page) => {
-      await select(page, { kind: "cell", addr: { sheet: "orders", row: 1, col: 1 } });
-      await ribbon("Data", "Filter")(page);
-      await select(page, { kind: "cell", addr: { sheet: "orders", row: 0, col: 1 } });
-      await page.locator(".sheetwrite-shell-grid .sheetwrite").first().focus();
-      await page.keyboard.press("Alt+ArrowDown");
-      const list = page.getByRole("listbox", { name: "Values of Region" });
-      await list.getByRole("option", { name: "APAC" }).click();
-      await settle(page);
-    },
-  },
-  {
     name: "filter",
     size: "panel",
     query: { sheet: "orders", ribbon: "compact", presentation: "data-grid" },

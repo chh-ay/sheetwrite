@@ -333,18 +333,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
       },
     },
   ],
-  "/docs/features/data/autofilter/": [
-    {
-      after: AFTER_LEAD,
-      shot: {
-        name: "autofilter",
-        size: "app",
-        alt: "The Orders table with a filter button on each header cell and the Region dropdown open: sort commands, Clear Filter From Region, Text Filters, a search box and the region list with APAC unticked.",
-        caption:
-          "Data › Filter puts a button on each header; its dropdown sorts, filters by condition, or by the values ticked.",
-      },
-    },
-  ],
+  "/docs/features/data/autofilter/": [{ after: AFTER_LEAD, picture: "autofilter" }],
   "/docs/features/data/validation-protection-and-notes/": [
     {
       after: AFTER_LEAD,
