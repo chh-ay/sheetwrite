@@ -7,6 +7,7 @@ import {
   normalizeMerge,
   positiveCount,
   uniqueColumnKeys,
+  validAutoFilter,
   validMerge,
   validNotes,
   validProtectedRanges,
@@ -82,6 +83,7 @@ function addSheetSnapshotIssue(
     sortKeys: snapshot.sortKeys,
     sortState: snapshot.sortState,
     filters: snapshot.filters,
+    autoFilter: snapshot.autoFilter,
     tables: snapshot.tables,
   };
 
@@ -95,6 +97,7 @@ function addSheetSnapshotIssue(
     !validProtectedRanges(candidate, snapshot.protectedRanges ?? []) ||
     !validNotes(candidate) ||
     !validSortAndFilters(candidate, snapshot.sortKeys ?? [], snapshot.filters ?? []) ||
+    (snapshot.autoFilter !== undefined && !validAutoFilter(candidate, snapshot.autoFilter)) ||
     (snapshot.rowMeta ?? []).some(
       ([row, meta]) =>
         !integerAt(row) ||
