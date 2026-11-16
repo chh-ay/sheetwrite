@@ -288,6 +288,37 @@ export const MOVED_SHOWCASES: Readonly<Record<string, string>> = {
   "/showcases/engine/": "/showcases/recalculation/",
 };
 
+/**
+ * API pages of exports that 0.7.0 removed. The server answers each old URL
+ * with a permanent redirect to the page of what replaces the export; the 0.7.0
+ * upgrade guide maps old calls to new ones. The map stays apart from
+ * `MOVED_PAGES` so the page script, which forwards old headings, does not
+ * carry it; `docs:check` proves each target page exists.
+ */
+export const REMOVED_API_PAGES: Readonly<Record<string, string>> = {
+  "/docs/api/charts-register/": "/docs/api/charts/charts-addon/",
+  "/docs/api/charts-register/register-charts-backend/": "/docs/api/charts/charts-addon/",
+  "/docs/api/charts/register-charts-backend/": "/docs/api/charts/charts-addon/",
+  "/docs/api/core-functions/register-function/": "/docs/api/core-functions/functions-addon/",
+  "/docs/api/core-functions/unregister-function/": "/docs/api/core-functions/functions-addon/",
+  "/docs/api/core/revision-adapter/": "/docs/api/core-history/history-storage-adapter/",
+  "/docs/api/core/revision-coordinator-event/": "/docs/api/core-history/history-archive/",
+  "/docs/api/core/revision-coordinator-options/": "/docs/api/core-history/history-archive-options/",
+  "/docs/api/core/revision-coordinator/": "/docs/api/core-history/history-archive/",
+  "/docs/api/core/revision-restore-request/": "/docs/api/core-history/history-archive/",
+  "/docs/api/core/revision-restore-response/": "/docs/api/core-history/history-archive/",
+  "/docs/api/core/revision-summary/": "/docs/api/core-history/history-version/",
+  "/docs/api/core/sanitize-hyperlink-style/": "/docs/api/core/sanitize-cell-style/",
+  "/docs/api/core/set-chart-renderer-factory/": "/docs/api/core/sheetwrite-addon-context/",
+  "/docs/api/core/set-chart-view-provider-factory/": "/docs/api/core/sheetwrite-addon-context/",
+  "/docs/api/core/set-xlsx-table-export-backend/": "/docs/api/core/sheetwrite-addon-context/",
+  "/docs/api/core/set-xlsx-table-import-backend/": "/docs/api/core/sheetwrite-addon-context/",
+  "/docs/api/core/set-xlsx-workbook-backend/": "/docs/api/core/sheetwrite-addon-context/",
+  "/docs/api/xlsx-register/": "/docs/api/xlsx/xlsx-addon/",
+  "/docs/api/xlsx-register/register-xlsx-backends/": "/docs/api/xlsx/xlsx-addon/",
+  "/docs/api/xlsx/register-xlsx-backends/": "/docs/api/xlsx/xlsx-addon/",
+};
+
 /** The URL that replaces an old page and fragment, or undefined for a page that did not move. */
 export function movedPageTarget(
   href: string,

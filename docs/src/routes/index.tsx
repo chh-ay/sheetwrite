@@ -527,6 +527,7 @@ function Landing() {
               <p class="sw-landing-footer__title">Explore</p>
               <a href="/showcases/">Showcases</a>
               <a href="/docs/reference/formula-functions/">Formula functions</a>
+              <a href="/docs/api/">API reference</a>
               <a href="/docs/performance/">Benchmarks</a>
             </div>
             <div>
