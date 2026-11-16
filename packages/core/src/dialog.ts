@@ -9,7 +9,7 @@ import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
 /** One button in a dialog's button row. */
-export interface DialogButton {
+interface DialogButton {
   readonly label: string;
   /** What {@link Dialog.result} resolves to when this button is chosen. */
   readonly value: string;
@@ -18,7 +18,7 @@ export interface DialogButton {
 }
 
 /** What a dialog shows and how it answers. */
-export interface DialogOptions {
+interface DialogOptions {
   /** The dialog's name, shown as its heading. */
   readonly title: string;
   /** `alertdialog` for a warning the user must answer; `dialog` otherwise. */
@@ -33,7 +33,7 @@ export interface DialogOptions {
 }
 
 /** An open dialog. */
-export interface Dialog {
+interface Dialog {
   readonly element: HTMLElement;
   /** Resolves once the dialog closes, with the chosen button's value or `cancel`. */
   readonly result: Promise<string>;
@@ -52,7 +52,7 @@ let dialogCount = 0;
  * while the dialog has focus. On close the dialog is removed and
  * `returnFocus` gives the grid its focus back.
  */
-export function openDialog(
+function openDialog(
   host: HTMLElement,
   theme: Theme,
   options: DialogOptions,
