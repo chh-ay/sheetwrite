@@ -1,5 +1,5 @@
-// The shared frame and shapes of the showcase illustrations (art.css): the
-// hub cards' decorative pictures and the labelled in-page diagrams.
+// The shared frame and shapes of the older card pictures (art.css): the
+// framework workbenches' proof pictures.
 import { createUniqueId, type JSX, Show } from "solid-js";
 
 /** What every illustration component accepts: an extra class for the box it sits in. */
@@ -23,10 +23,9 @@ export type ArtHue =
 /** The second hue: any palette hue except the framework colours. */
 export type ArtAlt = Exclude<ArtHue, "react" | "vue" | "svelte">;
 
-/** Card canvas width; capability cards are 8:5 and framework cards 2:1. */
+/** Card canvas width and height: 8:5 unless a picture sets its own height. */
 export const CARD_WIDTH = 320;
 export const CARD_HEIGHT = 200;
-export const FRAMEWORK_CARD_HEIGHT = 160;
 /** The background cell grid's step, in canvas units. */
 const GRID_STEP = 20;
 
@@ -78,32 +77,6 @@ export function head(x: number, y: number, angle: number): string {
   const point = (spread: number) =>
     `${round(x - 6 * Math.cos(radians + spread))} ${round(y - 6 * Math.sin(radians + spread))}`;
   return `M${point(0.5)}L${x} ${y}L${point(-0.5)}`;
-}
-
-/** A raised rounded panel: the offset shade, then the surface. */
-export function Panel(
-  props: Readonly<{ x: number; y: number; w: number; h: number; class?: string; r?: number }>,
-) {
-  return (
-    <>
-      <rect
-        class="shade"
-        height={props.h}
-        rx={props.r ?? 6}
-        width={props.w}
-        x={props.x + 2}
-        y={props.y + 3}
-      />
-      <rect
-        class={props.class ?? "panel"}
-        height={props.h}
-        rx={props.r ?? 6}
-        width={props.w}
-        x={props.x}
-        y={props.y}
-      />
-    </>
-  );
 }
 
 /**
