@@ -1745,6 +1745,10 @@ describe("element height cap measurement", () => {
 });
 
 describe("undo and redo selection", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
   it("selects the cells undo and redo change, as Excel does", () => {
     const workbook = makeWorkbook(20);
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
@@ -1776,6 +1780,10 @@ describe("undo and redo selection", () => {
 });
 
 describe("a sheet named History", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
   it("is refused only to a user's rename, so undo gives the name back", () => {
     const workbook = makeWorkbook(5);
     const first = workbook.sheets[0]!;
