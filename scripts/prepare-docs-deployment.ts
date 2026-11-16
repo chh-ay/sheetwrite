@@ -1,7 +1,7 @@
 import { copyFile, lstat, mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 
 const repositoryRoot = resolve(import.meta.dir, "..");
 const requiredFiles = [
@@ -34,6 +34,14 @@ const IMMUTABLE_PATHS = [
   "^/pagefind/(?:fragment|index)/.+$",
   "^/pagefind/pagefind\\.[^/]+\\.pf_meta$",
 ];
+/**
+ * Longest `src` pattern of one trailing-slash redirect route. Vercel allows
+ * 2,048 routes per deployment and the site has about 1,000 pages, so one
+ * route per page and form would not fit; each route names many pages.
+ */
+const REDIRECT_PATTERN_LENGTH = 4000;
+
+const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 async function requireDirectory(path: string): Promise<void> {
   if (!(await lstat(path)).isDirectory()) {
@@ -60,6 +68,34 @@ async function collectFiles(sourceRoot: string, directory = ""): Promise<Map<str
   return files;
 }
 
+/**
+ * Permanent redirects from each page's address without its trailing slash to
+ * the canonical address with it, so a page has one URL.
+ */
+function trailingSlashRedirects(pages: readonly string[]): object[] {
+  const routes: object[] = [];
+  let alternatives: string[] = [];
+  let length = 0;
+  const flush = (): void => {
+    if (alternatives.length === 0) return;
+    routes.push({
+      src: `^(/(?:${alternatives.join("|")}))$`,
+      status: 308,
+      headers: { Location: "$1/" },
+    });
+    alternatives = [];
+    length = 0;
+  };
+  for (const page of pages) {
+    const pattern = escapeRegExp(page);
+    if (length + pattern.length + 1 > REDIRECT_PATTERN_LENGTH) flush();
+    alternatives.push(pattern);
+    length += pattern.length + 1;
+  }
+  flush();
+  return routes;
+}
+
 export async function prepareDocsDeployment(root = repositoryRoot): Promise<void> {
   const sourceRoot = join(root, "docs/dist/client");
   for (const directory of ["docs", "docs/dist", "docs/dist/client"]) {
@@ -71,6 +107,9 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
       throw new Error(`Docs build is incomplete: missing or empty ${join(sourceRoot, required)}`);
     }
   }
+  const pages = [...files.keys()]
+    .filter((path) => path.endsWith("/index.html"))
+    .map((path) => path.slice(0, -"/index.html".length));
 
   const vercelRoot = join(root, ".vercel");
   await mkdir(vercelRoot, { recursive: true });
@@ -101,24 +140,24 @@ export async function prepareDocsDeployment(root = repositoryRoot): Promise<void
             headers: { "content-type": type },
             continue: true,
           })),
-          // Moved docs pages and merged showcases answer with a permanent
-          // redirect; a new docs page forwards an old #fragment itself,
-          // because a server never sees it.
+          // Moved docs pages, merged showcases and removed API pages answer
+          // with a permanent redirect; a new docs page forwards an old
+          // #fragment itself, because a server never sees it.
           ...[
             ...Object.entries(MOVED_PAGES).map(([from, page]) => [from, page.to] as const),
             ...Object.entries(MOVED_SHOWCASES),
+            ...Object.entries(REMOVED_API_PAGES),
           ].map(([from, to]) => ({
-            src: `^${from.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\/$/, "")}/?$`,
+            src: `^${escapeRegExp(from).replace(/\/$/, "")}/?$`,
             status: 308,
             headers: { Location: to },
           })),
+          ...trailingSlashRedirects(pages),
           { src: "^/$", dest: "/index.html" },
-          ...[...files.keys()]
-            .filter((path) => path.endsWith("/index.html"))
-            .map((path) => ({
-              src: `^/${path.slice(0, -"/index.html".length).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/?$`,
-              dest: `/${path}`,
-            })),
+          ...pages.map((page) => ({
+            src: `^/${escapeRegExp(page)}/$`,
+            dest: `/${page}/index.html`,
+          })),
           { handle: "filesystem" },
           { src: "^/.*$", dest: "/404.html", status: 404 },
         ],
