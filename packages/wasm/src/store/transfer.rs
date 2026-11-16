@@ -441,7 +441,7 @@ mod tests {
     #[cfg(feature = "analysis")]
     #[test]
     fn pivot_memory_transfer_rebuilds_from_resent_definition_without_formula_sources() {
-        use crate::store::tests::{PivotPayload, SUM};
+        use crate::store::pivot_tests::{PivotPayload, SUM};
 
         const KEY: usize = 0;
         const VALUE: usize = 1;
@@ -619,7 +619,7 @@ mod tests {
         original.set_formula(0, 0, 1, "=SUM(A1:A5000)", 0);
         original.set_formula(0, 0, 2, "=\"survivor\"", 0);
         original.recompute_changed();
-        crate::tests::write_number_column(&mut original, 0, 0, 0, &vec![1.0; EDIT_ROWS]);
+        crate::tests::support::write_number_column(&mut original, 0, 0, 0, &vec![1.0; EDIT_ROWS]);
 
         let mut replacement =
             CellStore::read_memory_state(&original.export_memory_state()).unwrap();
