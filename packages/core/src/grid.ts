@@ -2797,7 +2797,6 @@ export class GridImpl implements Grid {
           host: this.host,
           theme: this.baseTheme,
           sheet: () => this.sheet(),
-          readOnly: () => this.readOnly,
           focus: () => {
             const focus = this.selection.focusCell;
             return focus

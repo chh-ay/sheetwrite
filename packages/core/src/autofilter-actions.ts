@@ -24,7 +24,6 @@ export interface AutoFilterHost {
   readonly host: HTMLElement;
   readonly theme: Theme;
   readonly sheet: () => Sheet;
-  readonly readOnly: () => boolean;
   /** The focus cell in sheet rows, or `null` without a selection. */
   readonly focus: () => CellAddress | null;
   /** The one selected rectangle of several cells in sheet rows, as sorting reads it. */
@@ -179,7 +178,8 @@ function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuReq
       const value = parseCellInput(text, kind === "date" ? "date" : "number");
       return value.kind === "literal" && typeof value.value === "number" ? value.value : text;
     },
-    canSort: !host.readOnly(),
+    // The header cell is selected, so this is off only while the grid is read-only.
+    canSort: !grid.getCommandState("sortAsc").disabled,
     sort: (ascending) => {
       const current = host.sheet().autoFilter?.range;
       if (current) grid.sortRange(current, [{ col, ascending }], { hasHeader: true });

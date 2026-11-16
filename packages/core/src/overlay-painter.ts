@@ -1296,7 +1296,6 @@ export class OverlayPainter {
       const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-autofilter-button";
       el.style.outlineStyle = "none";
-      el.style.background = "";
       el.dataset.filtered = String(filtered.has(col));
     }
   }
