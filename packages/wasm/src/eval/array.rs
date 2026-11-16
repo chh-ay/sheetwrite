@@ -108,6 +108,10 @@ fn name_produces_array_family(id: NameId, shapes: Shapes<'_>) -> bool {
 /// written range, what most arguments are, is decided inline; every other
 /// node takes [`node_produces_array`].
 #[inline]
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "every other node takes the full walk; listing them here would only repeat it"
+)]
 pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
     match ast {
         Ast::Num(_) | Ast::Str(_) | Ast::Bool(_) | Ast::Cell(..) | Ast::AbsCell(..) => false,
