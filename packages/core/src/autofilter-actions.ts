@@ -10,6 +10,7 @@ import { currentRegion } from "./sort-target.js";
 import { autoFilterBody } from "./store/autofilter.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
+import { rangeContains } from "./store/ranges.js";
 import type { CellScalar, Column } from "./types/cell.js";
 import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp, Sheet } from "./types/document.js";
@@ -132,7 +133,7 @@ function autoFilterColumnKind(
 function autoFilterTarget(host: AutoFilterHost): Range | null {
   const addr = host.focus();
   if (!addr) return null;
-  const table = host.sheet().tables?.find((candidate) => rangeHolds(candidate.range, addr));
+  const table = host.sheet().tables?.find((candidate) => rangeContains(candidate.range, addr));
   if (table) {
     const { range } = table;
     const end = { row: range.end.row - (table.totalsRow ? 1 : 0), col: range.end.col };
@@ -140,7 +141,7 @@ function autoFilterTarget(host: AutoFilterHost): Range | null {
   }
 
   const range = host.selectedRange() ?? currentRegion(host.grid.store, addr);
-  return range && rangeHolds(range, addr) ? range : null;
+  return range && rangeContains(range, addr) ? range : null;
 }
 
 /** What the dropdown of `col` shows and does; `null` without an AutoFilter there. */
@@ -225,15 +226,4 @@ export function autoFilterValues(
     engine.filteredRows(sheet.id, filters),
   );
   return { values, kept };
-}
-
-/** Whether `range` holds `addr`; ranges here are normalized. */
-function rangeHolds(range: Range, addr: CellAddress): boolean {
-  return (
-    range.sheet === addr.sheet &&
-    addr.row >= range.start.row &&
-    addr.row <= range.end.row &&
-    addr.col >= range.start.col &&
-    addr.col <= range.end.col
-  );
 }
