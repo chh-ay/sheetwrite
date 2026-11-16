@@ -649,6 +649,51 @@ a {
   }
 }
 
+/* On a phone, a two-column table stacks each row: the first cell, then the
+   second, each under its column's heading. Side by side, the second column
+   (the replacement, the step to take) would scroll out of view. */
+@media (max-width: 36rem) {
+  .sw-prose .sw-table-frame--pairs > table,
+  .sw-prose .sw-table-frame--pairs tbody,
+  .sw-prose .sw-table-frame--pairs tr,
+  .sw-prose .sw-table-frame--pairs td {
+    display: block;
+  }
+
+  .sw-prose .sw-table-frame--pairs thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .sw-prose .sw-table-frame--pairs tr {
+    padding-block: var(--sw-space-3);
+    border-bottom: 1px solid var(--sw-border);
+  }
+
+  .sw-prose .sw-table-frame--pairs td {
+    padding: 0 var(--sw-space-3);
+    border-bottom: 0;
+  }
+
+  .sw-prose .sw-table-frame--pairs td + td {
+    margin-top: var(--sw-space-2);
+  }
+
+  .sw-prose .sw-table-frame--pairs td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--sw-fg-muted);
+    font-size: var(--sw-text-eyebrow);
+    font-weight: var(--sw-weight-semibold);
+    letter-spacing: var(--sw-tracking-eyebrow);
+    text-transform: uppercase;
+  }
+}
+
 @media (max-width: 48rem) {
   .sw-architecture__step > div {
     grid-template-columns: 2rem 1fr;
