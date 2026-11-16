@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The 0.7.0 release notes show performance as lanes against 0.6.1, one row per workload with each machine's result in the words of the text, from a new `perf-lanes` fence. They open their highlights with a blueprint summary, and the highlight cards show each panel cropped from its capture (`card-*` shots, the new `highlight` size) instead of the whole app shrunk to a sliver.
+- The 0.7.0 upgrade guide no longer says how its code is built.
 - The API index says in one line what each package is for, and drops the build-system words. The performance overview says what its pages show, and its results heading names 0.7.0.
 - `docs:check` also rejects a bare issue number such as "#228" in a docs page or a doc comment, not only tracker links and "PR #N".
 - Keep every 0.6.1 URL working for readers and search engines. The 21 API pages of exports that 0.7.0 removed redirect (308) to the page of what replaces each one, and a page's address without its trailing slash redirects to the address with it instead of serving a second copy. Each sitemap `<lastmod>` is the date of the last commit to the page's sources, not the build date. `bun run docs:check-site`, run in CI after the docs build and before each deployment, reads the packaged site through its own routes and fails on an indexable page without a title, description, self-referencing canonical or Open Graph tags, a shared title or description, a BreadcrumbList without Google's required fields or with a crumb that is not a live page, a broken internal link, a sitemap entry that is noindex, redirected or missing, sitemap dates that are all one build date, a 0.6.1 URL (`docs/published-urls.txt`) that no longer opens a page, or main content that is missing from the static HTML.
