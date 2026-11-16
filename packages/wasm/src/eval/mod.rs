@@ -72,8 +72,8 @@ use crate::types::{
 
 use array::dynamic_recompute_within_limit;
 pub(crate) use array::{ast_produces_array, Shapes};
-pub(crate) use criteria::sum_range_extent;
-use criteria::{aggregate_if, extreme_if, Criterion};
+use criteria::{aggregate_if, extreme_if};
+pub(crate) use criteria::{sum_range_extent, Criterion};
 use date::host_clock_serial;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{

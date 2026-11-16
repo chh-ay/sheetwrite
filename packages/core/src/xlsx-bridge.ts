@@ -2,9 +2,11 @@ import { isDashboard } from "./dashboard.js";
 import { normalizeSheetwriteError, SheetwriteError } from "./errors.js";
 import { readableBytes } from "./export-stream.js";
 import { SheetwriteStore } from "./store.js";
+import { autoFilterBody } from "./store/autofilter.js";
 import { storeEngine } from "./store/engine-registry.js";
+import type { SheetId } from "./types/coordinates.js";
 import type { ColumnarData } from "./types/data.js";
-import type { Workbook, WorkbookSnapshot } from "./types/document.js";
+import type { SheetSnapshot, Workbook, WorkbookSnapshot } from "./types/document.js";
 import type { Grid } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type {
@@ -271,9 +273,11 @@ async function withEngineContent(
   const store = source.store;
   if (store === undefined) return source.context;
   const sheets = source.snapshot.sheets;
+  const filteredRows = autoFilteredRows(store, sheets);
+  const context = filteredRows.size > 0 ? { ...source.context, filteredRows } : source.context;
   const pivots = sheets.some((sheet) => !isDashboard(sheet) && (sheet.pivots?.length ?? 0) > 0);
   const dashboards = sheets.some(isDashboard);
-  if (!pivots && !dashboards) return source.context;
+  if (!pivots && !dashboards) return context;
   const charts = sheets.some((sheet) => sheet.charts?.some((chart) => chart.pivot !== undefined));
   const { pivotViewExports, worksheetPivotExports } =
     await import("./dashboard/dashboard-export.js");
@@ -282,10 +286,28 @@ async function withEngineContent(
     throw new SheetwriteError("aborted", "xlsx-export", "The store was disposed during the export");
   }
   return {
-    ...source.context,
+    ...context,
     ...(pivots ? { pivotOutputs: worksheetPivotExports(store) } : {}),
     ...(dashboards || charts ? pivotViewExports(store) : {}),
   };
+}
+
+/** The rows each sheet's AutoFilter hides now, which Excel stores as hidden rows. */
+function autoFilteredRows(
+  store: SheetwriteStore,
+  sheets: readonly SheetSnapshot[],
+): Map<SheetId, number[]> {
+  const hidden = new Map<SheetId, number[]>();
+  for (const sheet of sheets) {
+    if (!sheet.autoFilter || (sheet.filters?.length ?? 0) === 0) continue;
+    const { start, end } = autoFilterBody(sheet.autoFilter);
+    const rows: number[] = [];
+    for (let row = start; row <= end; row++) {
+      if (store.viewRowOf(sheet.id, row) === null) rows.push(row);
+    }
+    if (rows.length > 0) hidden.set(sheet.id, rows);
+  }
+  return hidden;
 }
 
 /**
