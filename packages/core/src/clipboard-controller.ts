@@ -42,6 +42,12 @@ interface CellWrite {
   style?: CellStyle;
 }
 
+/** The top-left cell a paste lands on, and the size of the selection it may repeat to fill. */
+interface PasteTarget extends CellRef {
+  rows: number;
+  cols: number;
+}
+
 interface CapturedClipboard extends ClipboardSnapshot {
   /** Exact source addresses captured before an asynchronous cut writes the clipboard. */
   clearPatches: DocumentOp[];
@@ -516,22 +522,49 @@ export class ClipboardController {
 
   private async pasteFrom(valuesOnly: boolean): Promise<ClipboardOutcome> {
     if (this.deps.readOnly()) return "empty";
-    const focus = this.deps.selection().focusCell;
-    if (!focus) return "empty";
+    const target = this.pasteTarget();
+    if (!target) return "empty";
     if (typeof navigator === "undefined" || !navigator.clipboard) return "unsupported";
     const read = this.reads.next();
     try {
-      return await this.readAndPaste(read, navigator.clipboard, focus, valuesOnly);
+      return await this.readAndPaste(read, navigator.clipboard, target, valuesOnly);
     } finally {
       read.close();
     }
+  }
+
+  /**
+   * Where a paste lands: the top-left cell of the selected rectangle that
+   * holds the active cell, and that rectangle's size, which a smaller copy
+   * repeats to fill as in Excel.
+   */
+  private pasteTarget(): PasteTarget | null {
+    const focus = this.deps.selection().focusCell;
+    if (!focus) return null;
+    let target: PasteTarget = { ...focus, rows: 1, cols: 1 };
+    this.deps.selection().forEachRect((rect) => {
+      if (
+        rect.r0 <= focus.row &&
+        focus.row <= rect.r1 &&
+        rect.c0 <= focus.col &&
+        focus.col <= rect.c1
+      ) {
+        target = {
+          row: rect.r0,
+          col: rect.c0,
+          rows: rect.r1 - rect.r0 + 1,
+          cols: rect.c1 - rect.c0 + 1,
+        };
+      }
+    });
+    return target;
   }
 
   /** Every clipboard read awaits; a paste whose scope closed meanwhile writes nothing. */
   private async readAndPaste(
     read: Scope,
     clipboard: Clipboard,
-    focus: CellRef,
+    focus: PasteTarget,
     valuesOnly: boolean,
   ): Promise<ClipboardOutcome> {
     let richReadFailed = false;
@@ -596,7 +629,11 @@ export class ClipboardController {
     }
   }
 
-  private pasteInternal(snapshot: ClipboardSnapshot, focus: CellRef, valuesOnly: boolean): void {
+  private pasteInternal(
+    snapshot: ClipboardSnapshot,
+    focus: PasteTarget,
+    valuesOnly: boolean,
+  ): void {
     // Copy shifts every relative formula ref by the block's rigid displacement;
     // cut keeps formula source verbatim. Hyperlink source ranges always move to
     // the paste destination, while stable internal targets remain unchanged.
@@ -630,12 +667,18 @@ export class ClipboardController {
     this.commitBlock(
       focus,
       snapshot.cells.length,
-      (r) => snapshot.cells[r]!.length,
-      (r, c): CellWrite => {
-        const cell = snapshot.cells[r]![c]!;
+      (r) => snapshot.cells[r]?.length ?? 0,
+      (r, c, _targetCol, repeat): CellWrite | null => {
+        const cell = snapshot.cells[r]?.[c];
+        if (cell === undefined) return null;
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
+        // Each repeated copy of a copied block shifts by its own offset, as in Excel.
         return {
-          value: shiftValue(cell.value, formulaRowDelta, formulaColDelta),
+          value: shiftValue(
+            cell.value,
+            formulaRowDelta + (snapshot.cut ? 0 : repeat.row),
+            formulaColDelta + (snapshot.cut ? 0 : repeat.col),
+          ),
           style: cell.style,
         };
       },
@@ -645,7 +688,7 @@ export class ClipboardController {
 
   private pasteExternalSnapshot(
     snapshot: ClipboardSnapshot,
-    focus: CellRef,
+    focus: PasteTarget,
     valuesOnly: boolean,
   ): void {
     const sheet = this.deps.sheet();
@@ -661,7 +704,7 @@ export class ClipboardController {
     );
   }
 
-  private pasteExternalHtml(grid: CellWrite[][], focus: CellRef): void {
+  private pasteExternalHtml(grid: CellWrite[][], focus: PasteTarget): void {
     const sheet = this.deps.sheet();
     this.commitBlock(
       focus,
@@ -672,7 +715,7 @@ export class ClipboardController {
     );
   }
 
-  private pasteExternal(text: string, focus: CellRef): void {
+  private pasteExternal(text: string, focus: PasteTarget): void {
     const grid = parseTsv(text);
     if (grid.length === 0) return;
     const sheet = this.deps.sheet();
@@ -688,11 +731,50 @@ export class ClipboardController {
   }
 
   /**
+   * Paste a `height`×`widthAt(r)` block at `target`. When the selection is a
+   * whole multiple of a rectangular block, the block repeats to fill it, as
+   * in Excel; `cellAt` then also gets the repeat's offset from the first copy.
+   */
+  private commitBlock(
+    target: PasteTarget,
+    height: number,
+    widthAt: (r: number) => number,
+    cellAt: (r: number, c: number, targetCol: number, repeat: CellRef) => CellWrite | null,
+    extraPatches: DocumentOp[] = [],
+  ): void {
+    const width = height > 0 ? widthAt(0) : 0;
+    let rectangular = width > 0;
+    for (let r = 1; r < height && rectangular; r++) rectangular = widthAt(r) === width;
+    const repeats =
+      rectangular && target.rows % height === 0 && target.cols % width === 0
+        ? { rows: target.rows / height, cols: target.cols / width }
+        : { rows: 1, cols: 1 };
+    if (repeats.rows === 1 && repeats.cols === 1) {
+      this.writeBlock(
+        target,
+        height,
+        widthAt,
+        (r, c, targetCol) => cellAt(r, c, targetCol, { row: 0, col: 0 }),
+        extraPatches,
+      );
+      return;
+    }
+    this.writeBlock(
+      target,
+      height * repeats.rows,
+      () => width * repeats.cols,
+      (r, c, targetCol) =>
+        cellAt(r % height, c % width, targetCol, { row: r - (r % height), col: c - (c % width) }),
+      extraPatches,
+    );
+  }
+
+  /**
    * Walk a `height`×`widthAt(r)` block anchored at `focus`, resolving each cell to
    * a `set` patch via `cellAt`. Honors the view-row mapping, the visible-column
    * order, the row limit, and merge-anchor skipping, then commits one transaction.
    */
-  private commitBlock(
+  private writeBlock(
     focus: CellRef,
     height: number,
     widthAt: (r: number) => number,

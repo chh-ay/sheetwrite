@@ -18,9 +18,23 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   redo: ["Mod+Shift+Z", "Mod+Y"],
   find: ["Mod+F"],
   replace: ["Mod+H"],
-  clearContents: [{ key: "Delete" }, { key: "Backspace" }],
+  // Backspace is not a binding: as in Excel it clears only the active cell and opens it.
+  clearContents: [{ key: "Delete" }],
   // Excel opens the note editor with Shift+F2.
   editNote: ["Shift+F2"],
+  // Excel's formatting keys; Ctrl+2, Ctrl+3 and Ctrl+4 are its second keys for the first three.
+  bold: ["Mod+B", "Mod+2"],
+  italic: ["Mod+I", "Mod+3"],
+  underline: ["Mod+U", "Mod+4"],
+  strikethrough: ["Mod+5"],
+  // Ctrl+; enters today's date and Ctrl+Shift+; (Ctrl+:) the current time.
+  insertDate: ["Mod+;"],
+  insertTime: ["Mod+Shift+;"],
+  // Ctrl+A selects the current region, and the whole sheet when pressed again.
+  selectAll: ["Mod+A"],
+  // Excel's Fill Down and Fill Right.
+  fillDown: ["Mod+D"],
+  fillRight: ["Mod+R"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;

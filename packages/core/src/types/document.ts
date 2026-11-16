@@ -24,6 +24,7 @@ export type SheetNameIssueCode =
   | "too-long"
   | "forbidden-character"
   | "edge-apostrophe"
+  | "reserved"
   | "duplicate";
 
 /** Successful canonical name or an actionable validation failure. */
@@ -86,6 +87,11 @@ export interface Sheet {
   sortState?: WorkbookTableXmlElement;
   /** Persisted column filters as JSON-safe index/value tuples. */
   filters?: Array<[col: number, filter: ColumnFilter]>;
+  /**
+   * Excel's AutoFilter: the range whose header row shows filter buttons. With
+   * it, `filters` hide only the range's rows below its header.
+   */
+  autoFilter?: AutoFilter;
   /** Persisted merged-cell regions; covered cells render/export from the anchor. */
   merges?: MergeRange[];
   /** Leading view rows pinned above the scrolling body (0/undefined = none). */
@@ -118,7 +124,49 @@ export type ColumnFilter =
   | { kind: "contains"; text: string; matchCase?: boolean }
   | { kind: "compare"; op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq"; value: number }
   | { kind: "empty" }
-  | { kind: "nonEmpty" };
+  | { kind: "nonEmpty" }
+  | CustomColumnFilter;
+
+/**
+ * Excel's custom AutoFilter: one or two conditions joined by AND or OR. A
+ * condition matches as a COUNTIF criterion does: text compares without case,
+ * and `*` and `?` in text are wildcards (`~` escapes them).
+ */
+export interface CustomColumnFilter {
+  kind: "custom";
+  /** How the two conditions combine; ignored with one condition. */
+  join: "and" | "or";
+  conditions: readonly [FilterCondition] | readonly [FilterCondition, FilterCondition];
+}
+
+/** One condition of a {@link CustomColumnFilter}. */
+export interface FilterCondition {
+  /**
+   * The comparison. `beginsWith`, `endsWith`, `contains` and `notContains`
+   * take text; the others take a number (a date is its serial) or text.
+   */
+  op:
+    | "eq"
+    | "neq"
+    | "gt"
+    | "gte"
+    | "lt"
+    | "lte"
+    | "beginsWith"
+    | "endsWith"
+    | "contains"
+    | "notContains";
+  value: number | string;
+}
+
+/** Excel's AutoFilter on a sheet: filter buttons on the first row of `range`. */
+export interface AutoFilter {
+  /**
+   * The filtered range, on the sheet that holds it. Its first row is the
+   * header: it shows the buttons and is never filtered.
+   */
+  range: Range;
+}
 
 /** A collapsible row group (data-row range, end-inclusive), Sheets-style. */
 export interface RowGroup {
@@ -504,6 +552,8 @@ export interface SheetSnapshot {
   sortState?: WorkbookTableXmlElement;
   /** Column filters of the sheet's view, as `[column index, filter]` pairs. */
   filters?: Array<[col: number, filter: ColumnFilter]>;
+  /** See `Sheet.autoFilter`. */
+  autoFilter?: AutoFilter;
   /** Collapsible row groups. */
   rowGroups?: RowGroup[];
   /** Workbook tables anchored on this sheet. */
@@ -677,6 +727,8 @@ export type DocumentOp =
         rowGroups?: RowGroup[];
         sortKeys?: SortKey[];
         filters?: Array<[col: number, filter: ColumnFilter]>;
+        /** Turn the sheet's AutoFilter on for a range, or off with `null`. */
+        autoFilter?: AutoFilter | null;
       };
     }
   | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule }

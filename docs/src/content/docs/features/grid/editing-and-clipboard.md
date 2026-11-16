@@ -68,16 +68,20 @@ grid.beginEdit(0, 0, "42");
 
 ## Inline editing
 
-Editing happens in a single real `<textarea>` on top of the active cell. The grid never recycles it across cells, so **IME composition and focus survive scrolling**. Composing CJK text or other input methods is safe. Begin editing by double-clicking, pressing Enter or F2, or just typing.
+Editing happens in a single real `<textarea>` on top of the active cell. The grid never recycles it across cells, so **IME composition and focus survive scrolling**. Composing CJK text or other input methods is safe. Begin editing by double-clicking, pressing F2, or just typing. F2 and double-click put the caret at the end of the text; Backspace clears the active cell and opens it.
+
+As in Excel, typing opens the editor in **Enter mode** and F2 or double-click opens it in **Edit mode**. F2 switches between the two.
 
 Commit and navigation keys:
 
 | Key | Result |
 | --- | --- |
-| Enter | Commit, move **down**. |
-| Tab | Commit, move **right**. |
-| Shift + Tab | Commit, move **left**. |
-| Shift + Enter | Insert a newline (does not commit). |
+| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. |
+| Tab / Shift + Tab | Commit, move **right** / **left**, within a selected range. |
+| Ctrl/Cmd + Enter | Commit and stay. With a range selected, write the entry into every selected cell; relative references shift. |
+| Alt + Enter | Insert a line break. |
+| Arrow keys | Enter mode: commit and move, or in a formula after an operator, point at a cell (Shift extends the reference). Edit mode: move the caret. |
+| F4 | Cycle the reference at the caret through `A1`, `$A$1`, `A$1` and `$A1`. |
 | Escape | Cancel the edit. |
 | Blur (click away) | Commit in place. |
 
@@ -85,7 +89,7 @@ While the IME is composing, keystrokes belong to the composition. The grid does 
 
 ### Event order
 
-`beginEdit` closes the previous editor and selects the requested cell. It emits `selection` when that changes the selection, then emits `edit-begin` before it opens the editor. A synchronous handler can replace or cancel the request without the old editor reopening.
+`beginEdit` closes the previous editor. It selects the requested cell, or keeps the selection when the cell is inside it and makes the cell active. It emits `selection` when that changes the selection, then emits `edit-begin` before it opens the editor. A synchronous handler can replace or cancel the request without the old editor reopening.
 
 Successful completion emits `change`, then `edit-commit`, then the navigation's `selection` event. Rejected completion does not emit `edit-commit` or navigate. Event addresses remain view coordinates.
 
@@ -108,6 +112,8 @@ Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then p
 
 `paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose. Cut clears its source only after the system clipboard accepts the payload.
 
+Paste lands on the top-left cell of the selection. When the selection is a whole multiple of the copied block, the block repeats to fill it and each copy's relative references shift to its own place, as in Excel.
+
 ### Report the clipboard outcome
 
 `grid.actions.copy/cut/paste/pasteValues` return `Promise<ClipboardOutcome>` and never reject:
@@ -128,7 +134,7 @@ Custom UI can show the outcome without tripping global error monitoring.
 
 ## Undo and redo
 
-`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step through the recorded transactions. Remote operations from a `SyncCoordinator` do not create undo entries.
+`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step through the recorded transactions. As in Excel, each step selects the cells it changes on the active sheet and scrolls to them; undoing a row, column or object edit keeps the selection. Remote operations from a `SyncCoordinator` do not create undo entries.
 
 History keeps at most 200 entries and 256 MiB of retained range snapshots, about twenty million-cell clears. When it passes either limit, it drops its oldest entries. The newest entry always stays undoable. The 256 MiB limit counts the snapshot bytes that the engine reports. It is not a limit on total process memory: it excludes cloned formula ASTs and JavaScript patch and redo payloads, which only the 200-entry limit bounds.
 

@@ -10,6 +10,7 @@ import type {
 import { sheetNameKey } from "@sheetwrite/core";
 
 import { columnWidthCharacters, columnWidthPixels } from "./format.js";
+import { snapshotAutoFilter } from "./reader-autofilter.js";
 import { columnFromParsed, cellNumberFormatOverride } from "./reader-columns.js";
 import {
   claimSidecarSheets,
@@ -310,14 +311,6 @@ export function buildWorkbookSheets(
         sheet: source.name,
       });
     }
-    if (source.hasAutoFilter) {
-      emitWarning(context, {
-        code: "unsupported-feature",
-        message:
-          "Excel autoFilter excludes its header row, while Sheetwrite filters every data row; native filter semantics were not broadened or shifted",
-        sheet: source.name,
-      });
-    }
     sheets.push({
       id,
       name: source.name,
@@ -345,7 +338,7 @@ export function buildWorkbookSheets(
       ...(notes.length > 0 ? { notes } : {}),
       ...(sortKeys.length > 0 ? { sortKeys } : {}),
       ...(sortState ? { sortState: structuredClone(sortState) } : {}),
-      ...(!source.hasAutoFilter && meta?.filters ? { filters: structuredClone(meta.filters) } : {}),
+      ...snapshotAutoFilter(source.autoFilter, meta, id, snapshotCells, columns, rowCount, context),
       ...(tables.length > 0 ? { tables } : {}),
       cells:
         snapshotCells.length > 0
