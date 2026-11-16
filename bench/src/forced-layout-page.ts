@@ -94,7 +94,7 @@ function editor(): HTMLTextAreaElement {
 
 function openEditor(): void {
   host.focus();
-  dispatchKey(host, "Enter");
+  dispatchKey(host, "F2");
   editor();
 }
 

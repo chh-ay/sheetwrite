@@ -518,7 +518,7 @@ describe("raw spec-authored OOXML fidelity", () => {
     });
   });
 
-  it("warns rather than changing header-filter or authorization semantics", async () => {
+  it("reads the AutoFilter and warns rather than changing authorization semantics", async () => {
     const { warnings, onWarning } = collectWarnings();
     const imported = sheetAt(
       await backend.fromXlsxWorkbook(
@@ -528,14 +528,13 @@ describe("raw spec-authored OOXML fidelity", () => {
         { onWarning },
       ),
     );
-    expect([imported.filters, imported.protectedRanges, imported.sortKeys]).toEqual([
-      undefined,
-      undefined,
-      undefined,
-    ]);
+    expect(imported.autoFilter).toEqual({
+      range: { sheet: imported.id, start: { row: 0, col: 0 }, end: { row: 1, col: 0 } },
+    });
+    expect(imported.filters).toEqual([[0, { kind: "values", values: [1] }]]);
+    expect([imported.protectedRanges, imported.sortKeys]).toEqual([undefined, undefined]);
     expect(imported.sortState?.attributes.ref).toBe("A1:A2");
     expect(warnings).toEqual([
-      expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
       expect.objectContaining({ code: "unsupported-feature", sheet: "Raw" }),
     ]);
   });

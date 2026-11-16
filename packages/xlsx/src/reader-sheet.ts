@@ -3,6 +3,7 @@ import { MAX_HYPERLINK_DISPLAY_LENGTH } from "@sheetwrite/core";
 
 import { OpcPackage, relationshipTypeMatches } from "./opc.js";
 import { isRetainedRelationship } from "./preservation.js";
+import { parseAutoFilter, rowMetaShownByFilter } from "./reader-autofilter.js";
 import { parseColumns } from "./reader-columns.js";
 import { parseComments } from "./reader-comments.js";
 import { parseHyperlinks } from "./reader-hyperlinks.js";
@@ -125,8 +126,13 @@ export async function parseSheet(
   assertResource(context, "maxRowsPerSheet", maxRow + 1);
   assertResource(context, "maxColumnsPerSheet", maxCol + 1);
 
+  const autoFilter = parseAutoFilter(root, context, reference.name);
+  const shownRowMeta =
+    autoFilter && autoFilter.columns.length > 0
+      ? rowMetaShownByFilter(rowMeta, autoFilter.range)
+      : rowMeta;
   const hiddenOutlineRows = new Set(
-    rowMeta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
+    shownRowMeta.filter(([, metadata]) => metadata.hidden).map(([row]) => row),
   );
   const rowGroups = outlineRowGroups(outlineLevels, collapsedRows, hiddenOutlineRows);
 
@@ -257,7 +263,7 @@ export async function parseSheet(
     rowCount: Math.max(0, maxRow + 1),
     columnCount: Math.max(1, maxCol + 1),
     columns,
-    rowMeta,
+    rowMeta: shownRowMeta,
     merges,
     rowGroups,
     ...(Number.isInteger(frozenRows) && frozenRows > 0 ? { frozenRows } : {}),
@@ -265,6 +271,7 @@ export async function parseSheet(
     validations,
     conditionalFormats,
     ...(sortState ? { sortState } : {}),
+    ...(autoFilter ? { autoFilter } : {}),
     notes: comments.comments,
     hyperlinks,
     hasUnsupportedValidation: Boolean(validationCollection && validations.length === 0),
@@ -274,7 +281,6 @@ export async function parseSheet(
     ),
     hasRowOutlines: outlineLevels.size > 0,
     hasProtection: Boolean(xmlChild(root, "sheetProtection")),
-    hasAutoFilter: Boolean(xmlChild(root, "autoFilter")),
     hasValidationCollection: Boolean(validationCollection),
     hasComments: comments.present,
     hasHyperlinks: hyperlinkCollection !== undefined,

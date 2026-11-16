@@ -5,7 +5,7 @@ import { join, relative, sep } from "node:path";
 
 import { GENERATED_CONTENT_DIRECTORIES } from "../docs/src/lib/generated-content.js";
 import { MOVED_HEADINGS } from "../docs/src/lib/moved-headings.js";
-import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 import { CAPABILITY_INVENTORY, CAPABILITY_OWNERS } from "../docs/src/showcases/capabilities.js";
 import {
   collectCapabilityIssues,
@@ -534,6 +534,14 @@ async function checkDocs(
     }
   }
   failures.push(...movedPageIssues(MOVED_PAGES, documents, MOVED_HEADINGS));
+  failures.push(
+    ...movedPageIssues(
+      Object.fromEntries(
+        Object.entries(REMOVED_API_PAGES).map(([from, to]) => [from, { to, anchors: {} }]),
+      ),
+      documents,
+    ),
+  );
   failures.push(...(await siteLinkIssues(documents)));
   failures.push(...trackerReferenceIssues(documents));
   const publicRoot = join(repositoryRoot, "docs/public");

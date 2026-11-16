@@ -16,6 +16,8 @@ export interface SearchControllerDeps {
   toViewRow: (dataRow: number) => number | null;
   viewportAnchor: () => { row: number; col: number };
   scrollToCell: (addr: CellAddress) => void;
+  /** Select one cell, in view rows. */
+  selectCell: (addr: CellAddress) => void;
   scheduleRender: () => void;
   emit: (result: SearchResult) => void;
   /** Whether writes are disabled; replace becomes a no-op. */
@@ -468,6 +470,7 @@ export class SearchController {
       : new FlatSearchMatchSet(sheetId, Uint32Array.from(pairs));
   }
 
+  /** Select the active match and scroll to it, as Excel's Find Next does. */
   private revealActiveMatch(): void {
     const m = this.searchMatches.at(this.searchActive);
     if (!m || m.sheet !== this.deps.activeSheet()) return;
@@ -475,7 +478,9 @@ export class SearchController {
     const viewRow = this.deps.toViewRow(m.row);
     if (viewRow === null) return;
 
-    this.deps.scrollToCell({ ...m, row: viewRow });
+    const cell = { ...m, row: viewRow };
+    this.deps.selectCell(cell);
+    this.deps.scrollToCell(cell);
   }
 
   private emitSearch(): SearchResult {
