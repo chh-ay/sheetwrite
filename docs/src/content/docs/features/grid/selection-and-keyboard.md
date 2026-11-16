@@ -118,6 +118,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
+| Ctrl + Page Down / Ctrl + Page Up | Move to the next / previous visible sheet. Browsers keep these keys for their own tabs, so Ctrl + Alt + Page Down / Page Up, Excel for the web's keys, do the same. |
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 
@@ -183,7 +184,7 @@ Pressing Mod+Shift+O logs the focused cell's row.
 | `false` | Turn off all built-in keys. The host handles every key. |
 | `(e, grid) => boolean` | Intercept each keydown before the defaults. Return `true` to consume the key, or `false` to let the built-in handler continue. |
 
-The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;) and `selectAll` (Ctrl/Cmd + A). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
+The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;), `selectAll` (Ctrl/Cmd + A), `nextSheet` (Ctrl + Page Down, or with Alt) and `previousSheet` (Ctrl + Page Up, or with Alt). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
 
 ## Edge cases and limits
 

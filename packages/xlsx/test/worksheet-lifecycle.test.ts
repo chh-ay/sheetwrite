@@ -80,6 +80,16 @@ describe("XLSX worksheet lifecycle fidelity", () => {
     expect(hiddenActive.workbook.activeSheet).toBe(sheetAt(hiddenActive, 1).id);
   });
 
+  it("reads and writes Excel's tab colors", async () => {
+    const bytes = await backend.toXlsxWorkbook(
+      book([sheet("s0", "Sales", [], { tabColor: "#C00000" }), named("s1", "Costs")]),
+    );
+    expect(partText(bytes, "xl/worksheets/sheet1.xml")).toContain('<tabColor rgb="FFC00000"/>');
+    expect(partText(bytes, "xl/worksheets/sheet2.xml")).not.toContain("tabColor");
+    const imported = await backend.fromXlsxWorkbook(bytes);
+    expect(imported.sheets.map((entry) => entry.tabColor)).toEqual(["#C00000", undefined]);
+  });
+
   it("gives a sheet inserted before a known sheet its own identity", async () => {
     const known = sheet("data", "Report", [], {
       columns: [{ key: "amount", header: "Amount", width: 80, type: "number" }],

@@ -112,6 +112,75 @@ describe("SheetTabs", () => {
     expect(menu?.getAttribute("aria-label")).toBe("Summary sheet options");
   });
 
+  it("offers Insert, Tab Color and Move or Copy in a sheet's menu, as Excel does", () => {
+    const calls: string[] = [];
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onInsert: (id) => {
+        calls.push(`insert:${id}`);
+        return applied("new");
+      },
+      onTabColor: (id, color) => {
+        calls.push(`color:${id}:${color}`);
+        return applied(id);
+      },
+      onMove: (id, to) => {
+        calls.push(`move:${id}:${to}`);
+        return applied(id);
+      },
+      onCopy: (id, index) => {
+        calls.push(`copy:${id}:${index}`);
+        return applied("copy");
+      },
+    });
+    tabs.update(SHEETS, "b");
+    const openMenu = (): HTMLElement => {
+      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+      return host.querySelector<HTMLElement>('[role="menu"]')!;
+    };
+    const choose = (label: string): void => {
+      openMenu().querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
+    };
+
+    choose("Insert a sheet before Sales");
+    choose("Dark Red");
+    choose("No Color");
+    const swatches = openMenu().querySelectorAll('[role="menuitemradio"]');
+    expect(swatches.length).toBe(11);
+    key(swatches[0]!, "Escape");
+
+    const moveOrCopy = (before: string, copy: boolean): void => {
+      choose("Move or copy Sales sheet");
+      const dialog = host.querySelector<HTMLElement>('[role="dialog"]')!;
+      expect(dialog.getAttribute("aria-label")).toBe("Move or copy Sales sheet");
+      const list = dialog.querySelector<HTMLSelectElement>('select[aria-label="Before sheet"]')!;
+      list.value = [...list.options].find((option) => option.text === before)!.value;
+      dialog.querySelector<HTMLInputElement>('input[aria-label="Create a copy"]')!.checked = copy;
+      [...dialog.querySelectorAll("button")].find((button) => button.textContent === "OK")!.click();
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+    };
+    moveOrCopy("Summary", true);
+    moveOrCopy("(move to end)", false);
+    moveOrCopy("Sales", false);
+
+    expect(calls).toEqual([
+      "insert:b",
+      "color:b:#C00000",
+      "color:b:null",
+      "copy:b:2",
+      "move:b:2",
+      "move:b:0",
+    ]);
+  });
+
+  it("shows a sheet's tab color", () => {
+    tabs.update([{ ...SHEETS[0]!, tabColor: "#C00000" }, SHEETS[1]!, SHEETS[2]!], "b");
+    const colored = tabButtons(host)[0]!;
+    expect(colored.style.getPropertyValue("--sheetwrite-tab-color")).toBe("#C00000");
+    expect(tabButtons(host)[1]!.style.getPropertyValue("--sheetwrite-tab-color")).toBe("");
+  });
+
   it("does not remove the last visible sheet or remove a tab with Backspace", () => {
     tabs.destroy();
     const removed: string[] = [];

@@ -273,9 +273,21 @@ export function createSpreadsheetShell(
         if (result.status === "applied") grid.setActiveSheet(result.sheet);
         return result;
       },
+      onInsert: (id) => {
+        const index = grid.store.getWorkbook().sheets.findIndex((sheet) => sheet.id === id);
+        const result = grid.addSheet({ name: nextSheetName(), index: Math.max(index, 0) });
+        if (result.status === "applied") grid.setActiveSheet(result.sheet);
+        return result;
+      },
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),
       onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
+      onCopy: (id, index) => {
+        const result = grid.copySheet(id, { index });
+        if (result.status === "applied") grid.setActiveSheet(result.sheet);
+        return result;
+      },
+      onTabColor: (id, color) => grid.setSheetTabColor(id, color),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
     });

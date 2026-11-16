@@ -78,6 +78,7 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
+import { copySheet as copySheetSnapshot, copySheetName } from "./sheet-copy.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
@@ -1647,9 +1648,24 @@ export class GridImpl implements Grid {
         if (result.status === "applied") this.setActiveSheet(result.sheet);
         return result;
       },
+      onInsert: (id) => {
+        const index = this.store.getWorkbook().sheets.findIndex((sheet) => sheet.id === id);
+        const result = this.addSheet({
+          name: this.nextDefaultSheetName(),
+          index: Math.max(index, 0),
+        });
+        if (result.status === "applied") this.setActiveSheet(result.sheet);
+        return result;
+      },
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
+      onCopy: (id, index) => {
+        const result = this.copySheet(id, { index });
+        if (result.status === "applied") this.setActiveSheet(result.sheet);
+        return result;
+      },
+      onTabColor: (id, color) => this.setSheetTabColor(id, color),
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
       readOnly: this.readOnly,
@@ -3108,7 +3124,7 @@ export class GridImpl implements Grid {
     const snapshot: SheetSnapshot = {
       id,
       name: name.name,
-      order: this.store.getWorkbook().sheets.length,
+      order: input.index ?? this.store.getWorkbook().sheets.length,
       ...(dashboard ? { kind: "dashboard", dashboard: { items: [] } } : {}),
       rowCount: dashboard ? 0 : (input.rowCount ?? 100),
       columns: dashboard ? [] : columns,
@@ -3140,6 +3156,55 @@ export class GridImpl implements Grid {
 
   moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult {
     const result = this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+    return { ...result, sheet: id };
+  }
+
+  copySheet(id: SheetId, options: { index?: number; name?: string } = {}): SheetLifecycleResult {
+    const workbook = this.store.getWorkbook();
+    const from = workbook.sheets.findIndex((sheet) => sheet.id === id);
+    const source = from < 0 ? null : this.document.snapshotSheet(id);
+    if (!source) {
+      const issue: MutationIssue = {
+        kind: "sheet-lifecycle",
+        severity: "error",
+        code: "sheet-not-found",
+        sheet: id,
+        operationIndex: 0,
+        message: "Sheet does not exist",
+      };
+      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+      return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
+    }
+
+    const used = new Set(workbook.sheets.map((sheet) => sheet.id));
+    let copyId = `${id}-copy`;
+    for (let suffix = 2; used.has(copyId); suffix++) copyId = `${id}-copy-${suffix}`;
+    const name =
+      options.name ??
+      copySheetName(
+        source.name,
+        workbook.sheets.map((sheet) => sheet.name),
+      );
+    const copy = copySheetSnapshot(
+      source,
+      { id: copyId, name, order: options.index ?? from + 1 },
+      workbook,
+    );
+    const result = this.document.commit(
+      [
+        { op: "addSheet", sheet: copy.sheet },
+        ...copy.names.map((namedRange) => ({ op: "setNamedRange" as const, namedRange })),
+      ],
+      "structure",
+    );
+    return { ...result, sheet: copyId };
+  }
+
+  setSheetTabColor(id: SheetId, color: string | null): SheetLifecycleResult {
+    const result = this.document.commit(
+      [{ op: "setSheetMeta", sheet: id, patch: { tabColor: color } }],
+      "structure",
+    );
     return { ...result, sheet: id };
   }
 

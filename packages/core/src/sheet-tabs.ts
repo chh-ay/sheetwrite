@@ -9,6 +9,8 @@ export interface SheetTabRecord {
   id: SheetId;
   name: string;
   visibility?: "visible" | "hidden" | "veryHidden";
+  /** The tab's color as `#RRGGBB`; absent shows the default tab. */
+  tabColor?: string;
 }
 
 /**
@@ -22,16 +24,23 @@ export function changesSheetTabs(operation: DocumentOp): boolean {
     operation.op === "removeSheet" ||
     operation.op === "renameSheet" ||
     operation.op === "moveSheet" ||
-    operation.op === "setSheetVisibility"
+    operation.op === "setSheetVisibility" ||
+    (operation.op === "setSheetMeta" && operation.patch.tabColor !== undefined)
   );
 }
 
 export interface SheetTabsOptions {
   onActivate: (id: SheetId) => void;
   onAdd?: () => SheetLifecycleResult;
+  /** Excel's Insert: add a sheet before sheet `id`. */
+  onInsert?: (id: SheetId) => SheetLifecycleResult;
   onRemove?: (id: SheetId) => SheetLifecycleResult;
   onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
+  /** Excel's Move or Copy with "Create a copy": copy sheet `id` to workbook position `index`. */
+  onCopy?: (id: SheetId, index: number) => SheetLifecycleResult;
+  /** Excel's Tab Color: `#RRGGBB`, or `null` for No Color. */
+  onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
   onHide?: (id: SheetId) => SheetLifecycleResult;
   onUnhide?: (id: SheetId) => SheetLifecycleResult;
   /** Accessible tablist label (default "Sheets"). */
@@ -67,6 +76,28 @@ const TAB_MENU_SELECTOR = ".sheetwrite-tab-menu";
 const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
 /** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
 const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
+/** Excel's standard tab colors, in the order of its Tab Color palette. */
+const TAB_COLORS: ReadonlyArray<readonly [name: string, color: string]> = [
+  ["Dark Red", "#C00000"],
+  ["Red", "#FF0000"],
+  ["Orange", "#FFC000"],
+  ["Yellow", "#FFFF00"],
+  ["Light Green", "#92D050"],
+  ["Green", "#00B050"],
+  ["Light Blue", "#00B0F0"],
+  ["Blue", "#0070C0"],
+  ["Dark Blue", "#002060"],
+  ["Purple", "#7030A0"],
+];
+/** Menu entries, the tab color swatches included. */
+const MENU_ITEMS = '[role="menuitem"], [role="menuitemradio"]';
+
+function createOption(text: string, value: string): HTMLOptionElement {
+  const option = document.createElement("option");
+  option.textContent = text;
+  option.value = value;
+  return option;
+}
 
 function createTabIcon(pathData: string): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -108,9 +139,12 @@ export class SheetTabs {
   private readonly host: HTMLElement;
   private readonly onActivate: (id: SheetId) => void;
   private readonly onAdd?: () => SheetLifecycleResult;
+  private readonly onInsert?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRemove?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
+  private readonly onCopy?: (id: SheetId, index: number) => SheetLifecycleResult;
+  private readonly onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
   private readonly onHide?: (id: SheetId) => SheetLifecycleResult;
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
   private readonly label: string;
@@ -122,6 +156,8 @@ export class SheetTabs {
   private focusedId: SheetId | null = null;
   private editing: RenameState | null = null;
   private menuSheetId: SheetId | null = null;
+  /** The sheet whose Move or Copy dialog is open. */
+  private moveCopyId: SheetId | null = null;
   /** Viewport position of the options trigger when the open menu was placed. */
   private menuAnchor: { left: number; top: number } | null = null;
   private feedback: LifecycleFeedback | null = null;
@@ -138,9 +174,12 @@ export class SheetTabs {
     this.host = host;
     this.onActivate = options.onActivate;
     this.onAdd = options.onAdd;
+    this.onInsert = options.onInsert;
     this.onRemove = options.onRemove;
     this.onRename = options.onRename;
     this.onMove = options.onMove;
+    this.onCopy = options.onCopy;
+    this.onTabColor = options.onTabColor;
     this.onHide = options.onHide;
     this.onUnhide = options.onUnhide;
     this.readOnly = options.readOnly ?? false;
@@ -375,6 +414,10 @@ export class SheetTabs {
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-label", `${sheet.name} sheet`);
     tab.setAttribute("aria-selected", active ? "true" : "false");
+    if (sheet.tabColor !== undefined) {
+      tab.classList.add("sheetwrite-tab-colored");
+      tab.style.setProperty("--sheetwrite-tab-color", sheet.tabColor);
+    }
     if (this.feedback?.sheet === sheet.id) tab.setAttribute("aria-describedby", this.errorId);
     tab.tabIndex = sheet.id === this.focusedId ? 0 : -1;
     tab.draggable = !this.readOnly && this.onMove !== undefined;
@@ -494,7 +537,10 @@ export class SheetTabs {
 
   private hasSheetOptions(visibleCount: number): boolean {
     return (
+      this.onInsert !== undefined ||
       this.onRename !== undefined ||
+      this.onTabColor !== undefined ||
+      (this.onMove !== undefined && this.onCopy !== undefined) ||
       this.onHide !== undefined ||
       (this.onRemove !== undefined && visibleCount > 1)
     );
@@ -538,6 +584,16 @@ export class SheetTabs {
       // of the menu and close it before the click; keep focus where it is.
       menu.addEventListener("mousedown", (event) => event.preventDefault());
 
+      const onInsert = this.onInsert;
+      if (onInsert) {
+        menu.appendChild(
+          this.createMenuItem("Insert", `Insert a sheet before ${sheet.name}`, "", () => {
+            this.clearMenuState();
+            this.performLifecycle(sheet.id, () => onInsert(sheet.id));
+          }),
+        );
+      }
+
       if (this.onRename) {
         menu.appendChild(
           this.createMenuItem("Rename", `Rename ${sheet.name} sheet`, "F2", () => {
@@ -546,6 +602,17 @@ export class SheetTabs {
           }),
         );
       }
+
+      if (this.onMove && this.onCopy) {
+        menu.appendChild(
+          this.createMenuItem("Move or Copy…", `Move or copy ${sheet.name} sheet`, "", () => {
+            this.openMoveCopy(sheet.id);
+          }),
+        );
+      }
+
+      const onTabColor = this.onTabColor;
+      if (onTabColor) menu.appendChild(this.createTabColors(sheet, onTabColor));
 
       const onHide = this.onHide;
       if (onHide) {
@@ -576,6 +643,8 @@ export class SheetTabs {
       }
 
       options.appendChild(menu);
+    } else if (this.moveCopyId === sheet.id && this.onMove && this.onCopy) {
+      options.appendChild(this.createMoveCopyDialog(sheet, this.onMove, this.onCopy));
     }
 
     return options;
@@ -597,9 +666,144 @@ export class SheetTabs {
     button.tabIndex = -1;
     button.setAttribute("role", "menuitem");
     button.setAttribute("aria-label", label);
-    button.setAttribute("aria-keyshortcuts", shortcut);
+    if (shortcut) button.setAttribute("aria-keyshortcuts", shortcut);
     button.addEventListener("click", action);
     return button;
+  }
+
+  /** Excel's Tab Color palette: the standard colors, then No Color. */
+  private createTabColors(
+    sheet: SheetTabRecord,
+    onTabColor: (id: SheetId, color: string | null) => SheetLifecycleResult,
+  ): HTMLElement {
+    const group = document.createElement("div");
+    group.className = "sheetwrite-tab-colors";
+    group.setAttribute("role", "group");
+    group.setAttribute("aria-label", "Tab color");
+    const title = document.createElement("span");
+    title.className = "sheetwrite-tab-colors-title";
+    title.textContent = "Tab color";
+    title.setAttribute("aria-hidden", "true");
+    group.appendChild(title);
+
+    const choices: ReadonlyArray<readonly [name: string, color: string | null]> = [
+      ...TAB_COLORS,
+      ["No Color", null],
+    ];
+    for (const [name, color] of choices) {
+      const swatch = document.createElement("button");
+      swatch.type = "button";
+      swatch.className =
+        color === null
+          ? "sheetwrite-tab-swatch sheetwrite-tab-swatch-none"
+          : "sheetwrite-tab-swatch";
+      swatch.tabIndex = -1;
+      swatch.title = name;
+      swatch.setAttribute("role", "menuitemradio");
+      swatch.setAttribute("aria-label", name);
+      swatch.setAttribute(
+        "aria-checked",
+        String((sheet.tabColor ?? null)?.toUpperCase() === color?.toUpperCase()),
+      );
+      if (color !== null) swatch.style.backgroundColor = color;
+      swatch.addEventListener("click", () => {
+        this.clearMenuState();
+        this.focusedId = sheet.id;
+        this.performLifecycle(sheet.id, () => onTabColor(sheet.id, color), true);
+      });
+      group.appendChild(swatch);
+    }
+    return group;
+  }
+
+  private openMoveCopy(id: SheetId): void {
+    this.clearMenuState();
+    this.moveCopyId = id;
+    this.render();
+    this.host.querySelector<HTMLSelectElement>(".sheetwrite-tab-dialog select")?.focus();
+  }
+
+  private closeMoveCopy(): void {
+    const id = this.moveCopyId;
+    this.moveCopyId = null;
+    this.render(true);
+    const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
+    if (trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) trigger.focus();
+  }
+
+  /**
+   * Excel's Move or Copy dialog: the sheet to put the tab before, or the end,
+   * and whether to create a copy instead of moving the sheet.
+   */
+  private createMoveCopyDialog(
+    sheet: SheetTabRecord,
+    onMove: (id: SheetId, toIndex: number) => SheetLifecycleResult,
+    onCopy: (id: SheetId, index: number) => SheetLifecycleResult,
+  ): HTMLElement {
+    const dialog = document.createElement("div");
+    dialog.className = "sheetwrite-tab-menu sheetwrite-tab-dialog";
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-label", `Move or copy ${sheet.name} sheet`);
+
+    const listLabel = document.createElement("span");
+    listLabel.className = "sheetwrite-tab-dialog-label";
+    listLabel.textContent = "Before sheet:";
+    listLabel.setAttribute("aria-hidden", "true");
+    const list = document.createElement("select");
+    list.size = 6;
+    list.setAttribute("aria-label", "Before sheet");
+    for (const { sheet: candidate, workbookIndex } of this.visibleSheets()) {
+      list.appendChild(createOption(candidate.name, String(workbookIndex)));
+    }
+    list.appendChild(createOption("(move to end)", String(this.sheets.length)));
+    list.selectedIndex = 0;
+
+    const copyLabel = document.createElement("label");
+    copyLabel.className = "sheetwrite-tab-dialog-check";
+    const copy = document.createElement("input");
+    copy.type = "checkbox";
+    copy.setAttribute("aria-label", "Create a copy");
+    copyLabel.append(copy, " Create a copy");
+
+    const ok = (): void => {
+      const before = Number(list.value);
+      const from = this.sheets.findIndex((candidate) => candidate.id === sheet.id);
+      this.moveCopyId = null;
+      if (copy.checked) {
+        this.performLifecycle(sheet.id, () => onCopy(sheet.id, before));
+        return;
+      }
+      const to = from < before ? before - 1 : before;
+      if (to === from) this.closeMoveCopy();
+      else this.performLifecycle(sheet.id, () => onMove(sheet.id, to), true);
+    };
+    const buttons = document.createElement("div");
+    buttons.className = "sheetwrite-tab-dialog-buttons";
+    const okButton = document.createElement("button");
+    okButton.type = "button";
+    okButton.className = "sheetwrite-tab-dialog-button";
+    okButton.textContent = "OK";
+    okButton.addEventListener("click", ok);
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "sheetwrite-tab-dialog-button";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", () => this.closeMoveCopy());
+    buttons.append(okButton, cancel);
+
+    dialog.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        this.closeMoveCopy();
+      } else if (event.key === "Enter" && event.target === list) {
+        event.preventDefault();
+        event.stopPropagation();
+        ok();
+      }
+    });
+    dialog.append(listLabel, list, copyLabel, buttons);
+    return dialog;
   }
 
   private createAddButton(onAdd: () => SheetLifecycleResult): HTMLButtonElement {
@@ -776,6 +980,7 @@ export class SheetTabs {
   private clearMenuState(): SheetId | null {
     const id = this.menuSheetId;
     this.menuSheetId = null;
+    this.moveCopyId = null;
     this.menuAnchor = null;
     this.removeMenuDismissListeners();
     return id;
@@ -795,7 +1000,7 @@ export class SheetTabs {
   private focusMenuItem(index: number): void {
     const menu = this.host.querySelector<HTMLElement>(TAB_MENU_SELECTOR);
     if (!menu) return;
-    const items = [...menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')];
+    const items = [...menu.querySelectorAll<HTMLButtonElement>(MENU_ITEMS)];
     if (items.length === 0) return;
     const targetIndex = (index + items.length) % items.length;
     for (let current = 0; current < items.length; current++) {
@@ -909,10 +1114,13 @@ export class SheetTabs {
         return;
       }
 
-      if (active instanceof HTMLButtonElement && active.getAttribute("role") === "menuitem") {
+      if (
+        active instanceof HTMLButtonElement &&
+        active.getAttribute("role")?.startsWith("menuitem")
+      ) {
         const items = [
           ...this.host.querySelectorAll<HTMLButtonElement>(
-            `${TAB_MENU_SELECTOR} [role="menuitem"]`,
+            `${TAB_MENU_SELECTOR} [role="menuitem"], ${TAB_MENU_SELECTOR} [role="menuitemradio"]`,
           ),
         ];
         const current = items.indexOf(active);
