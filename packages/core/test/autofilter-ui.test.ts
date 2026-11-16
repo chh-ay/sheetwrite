@@ -144,4 +144,22 @@ describe("AutoFilter in the grid", () => {
     grid.undo();
     expect(grid.getAutoFilter()).toBeNull();
   });
+
+  it("acts on keys pressed while its code loads, after the command, in order", async () => {
+    const { grid, host } = mount();
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    // All three keys arrive before the AutoFilter's chunk has loaded.
+    press(host, "L", { ctrlKey: true, shiftKey: true });
+    press(host, "ArrowUp");
+    press(host, "ArrowDown", { altKey: true });
+
+    // Ctrl+Shift+L acts first, so Alt+Down on B1 opens the Qty header's dropdown.
+    for (let tick = 0; tick < 10 && !document.querySelector('[role="dialog"]'); tick++) {
+      await loaded();
+    }
+    expect(grid.getAutoFilter()?.range.start).toEqual({ row: 0, col: 0 });
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+    const dialog = await dropdown();
+    expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
+  });
 });
