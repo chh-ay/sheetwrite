@@ -391,6 +391,18 @@ export class SheetTabs {
       this.onActivate(sheet.id);
     });
 
+    if (!this.readOnly) {
+      // As in Excel, a right-click on a tab activates its sheet and opens the sheet's menu.
+      tab.addEventListener("contextmenu", (event) => {
+        if (!this.hasSheetOptions(this.visibleSheets().length)) return;
+        event.preventDefault();
+        this.focusedId = sheet.id;
+        this.feedback = null;
+        if (sheet.id !== this.activeId) this.onActivate(sheet.id);
+        this.openMenu(sheet.id);
+      });
+    }
+
     if (!this.readOnly && this.onRename) {
       tab.addEventListener("dblclick", (event) => {
         event.preventDefault();

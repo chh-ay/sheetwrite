@@ -125,6 +125,7 @@ const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>
   "too-long": "Sheet name exceeds 31 UTF-16 code units",
   "forbidden-character": "Sheet name contains a forbidden character",
   "edge-apostrophe": "Sheet name cannot begin or end with an apostrophe",
+  reserved: "History is a reserved sheet name",
   duplicate: "Sheet name duplicates another sheet case-insensitively",
   "duplicate-sheet-id": "Sheet ID already exists",
   "sheet-not-found": "Sheet does not exist",

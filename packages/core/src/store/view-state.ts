@@ -4,6 +4,7 @@ import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
+import { conditionCriterion, keepOutsideAutoFilter } from "./autofilter.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
@@ -208,15 +209,17 @@ export class StoreViewState {
     if (state && (state.filters.size > 0 || state.sortKeys.length > 0)) this.recompute(sheet);
   }
 
-  /** Row structures already rebased workbook metadata; invalidate query and rebuild from it. */
+  /**
+   * Row structures already rebased workbook metadata; invalidate the sort and
+   * rebuild from it. Column filters keep: they name columns, not rows, as an
+   * AutoFilter's do in Excel when rows are inserted or deleted.
+   */
   rowsChanged(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
     if (state) {
       const meta = this.sheets.sheetMeta(sheet);
       meta.sortKeys = [];
-      meta.filters = [];
       state.sortKeys = [];
-      state.filters.clear();
       state.hiddenRows = new Set(meta.hiddenRows ?? []);
       state.groups = meta.rowGroups?.map((group) => ({ ...group })) ?? [];
     }
@@ -224,15 +227,23 @@ export class StoreViewState {
     this.recompute(sheet);
   }
 
-  /** Column shifts invalidate column-indexed query state but preserve row visibility. */
-  columnsChanged(sheet: SheetId): void {
+  /**
+   * Column shifts invalidate the sort but preserve row visibility. Column
+   * filters move with their columns; a removed column's filter goes.
+   */
+  columnsChanged(sheet: SheetId, remap: (col: number) => number | null): void {
     const state = this.stateBySheet.get(sheet);
     if (state) {
       const meta = this.sheets.sheetMeta(sheet);
+      const filters: Array<[number, ColumnFilter]> = [];
+      for (const [col, filter] of meta.filters ?? []) {
+        const moved = remap(col);
+        if (moved !== null) filters.push([moved, filter]);
+      }
       meta.sortKeys = [];
-      meta.filters = [];
+      meta.filters = filters;
       state.sortKeys = [];
-      state.filters.clear();
+      state.filters = new Map(filters);
     }
 
     this.recompute(sheet);
@@ -333,7 +344,8 @@ export class StoreViewState {
   private recompute(sheet: SheetId): void {
     const state = this.stateBySheet.get(sheet);
     const hidden = state ? this.hiddenRowSet(state) : null;
-    const rowCount = this.sheets.sheetMeta(sheet).rowCount;
+    const meta = this.sheets.sheetMeta(sheet);
+    const rowCount = meta.rowCount;
 
     if (
       state === undefined ||
@@ -347,7 +359,9 @@ export class StoreViewState {
     const hasSort = state.sortKeys.length > 0;
     const handle = this.sheets.handleOf(sheet);
     let survivors: Uint32Array | null =
-      state.filters.size > 0 ? this.runFilters(handle, state.filters) : null;
+      state.filters.size > 0
+        ? keepOutsideAutoFilter(this.runFilters(handle, state.filters), meta.autoFilter, rowCount)
+        : null;
     this.engineHiddenRows.viewChanged(sheet, survivors, rowCount);
 
     if (hidden) {
@@ -444,6 +458,12 @@ export class StoreViewState {
           break;
         case "nonEmpty":
           kinds[i] = 4;
+          break;
+        case "custom":
+          kinds[i] = 5;
+          flags[i] = filter.join === "or" ? 1 : 0;
+          textCounts[i] = filter.conditions.length;
+          for (const condition of filter.conditions) valueTexts.push(conditionCriterion(condition));
           break;
       }
 

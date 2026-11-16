@@ -91,8 +91,10 @@ import {
   visibleSheetNeighbor,
 } from "./store/ranges.js";
 import {
+  autoFilterPatch,
   clearViewPatch,
   columnFilterPatch,
+  reapplyFilterPatch,
   rowVisibilityPatches,
   viewSortPatch,
 } from "./store/view-patches.js";
@@ -123,6 +125,7 @@ import type {
 import type { AggregateOp } from "./types/data.js";
 import type {
   AddSheetInput,
+  AutoFilter,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -764,7 +767,8 @@ export class GridImpl implements Grid {
       onMutationRejected: (issues) => {
         for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
       },
-      onHistoryApplied: () => {
+      onHistoryApplied: (patches) => {
+        this.selectChangedCells(patches);
         this.emitSelection();
         this.render();
       },
@@ -882,6 +886,7 @@ export class GridImpl implements Grid {
           this.scroller.scrollLeft,
         ),
       scrollToCell: (addr) => this.scrollToCell(addr),
+      selectCell: (addr) => this.setSelection({ kind: "cell", addr }),
       scheduleRender: () => this.scheduleRender(),
       emit: (result) => {
         for (const fn of this.listeners.search) fn(result);
@@ -1349,6 +1354,7 @@ export class GridImpl implements Grid {
         patch.op === "setSheetMeta" &&
         (patch.patch.sortKeys !== undefined ||
           patch.patch.filters !== undefined ||
+          patch.patch.autoFilter !== undefined ||
           patch.patch.rowGroups !== undefined)
       ) {
         effects |= RECONCILE_VIEW;
@@ -1840,6 +1846,49 @@ export class GridImpl implements Grid {
 
   private toViewRow(dataRow: number): number | null {
     return this.geometry.toViewRow(dataRow);
+  }
+
+  /**
+   * Select the cells that `patches` change on the active sheet and scroll to
+   * them, as Excel's undo and redo do. Row, column and object edits leave the
+   * selection alone.
+   */
+  private selectChangedCells(patches: readonly DocumentOp[]): void {
+    let top = Number.POSITIVE_INFINITY;
+    let left = Number.POSITIVE_INFINITY;
+    let bottom = -1;
+    let right = -1;
+    for (const patch of patches) {
+      const range =
+        patch.op === "set" || patch.op === "setNote"
+          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
+          : patch.op === "setRange" ||
+              patch.op === "setBlock" ||
+              patch.op === "restoreBlock" ||
+              patch.op === "setRangeStyle" ||
+              patch.op === "clearRange" ||
+              patch.op === "permuteRows"
+            ? patch.range
+            : null;
+      if (range?.sheet !== this.activeSheet) continue;
+      const first = this.toViewRow(range.start.row);
+      const last = this.toViewRow(range.end.row);
+      if (first === null || last === null) continue;
+      top = Math.min(top, first, last);
+      bottom = Math.max(bottom, first, last);
+      left = Math.min(left, range.start.col, range.end.col);
+      right = Math.max(right, range.start.col, range.end.col);
+    }
+    if (bottom < 0) return;
+
+    const sheet = this.activeSheet;
+    const start = { row: top, col: left };
+    this.selection.set(
+      top === bottom && left === right
+        ? { kind: "cell", addr: { sheet, ...start } }
+        : { kind: "range", range: { sheet, start, end: { row: bottom, col: right } } },
+    );
+    this.scrollToCell({ sheet, ...start });
   }
 
   private mergeAnchorAt(row: number, col: number): SelRect | null {
@@ -4002,6 +4051,23 @@ export class GridImpl implements Grid {
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
     const patch = columnFilterPatch(this.sheet(), col, filter);
     if (patch) this.document.commit([patch], "structure");
+  }
+
+  setAutoFilter(range: Range | null): ApplyTransactionResult {
+    const patch = autoFilterPatch(this.sheet(), range);
+    if (!patch) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    return this.document.commit([patch], "structure");
+  }
+
+  getAutoFilter(): AutoFilter | null {
+    const autoFilter = this.sheet().autoFilter;
+    return autoFilter ? structuredClone(autoFilter) : null;
+  }
+
+  reapplyFilter(): ApplyTransactionResult {
+    const patch = reapplyFilterPatch(this.sheet());
+    if (!patch) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    return this.document.commit([patch], "structure");
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {
