@@ -1,5 +1,5 @@
-//! Pivot table tests for the store, through the `setPivots` wire format. The
-//! file is named `tests.rs` so coverage leaves it out like the crate's other tests.
+//! Pivot table tests for the store, through the `setPivots` wire format. Like
+//! the store's other `*_tests.rs` files, coverage leaves this file out.
 
 use super::pivots::STATUS_STRIDE;
 use super::*;
