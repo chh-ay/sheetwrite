@@ -3,7 +3,8 @@ import { expect, test } from "./fixtures.js";
 // Browser builds of the package backends and the plain vanilla example.
 
 for (const [route, outcome] of [
-  ["/test/xlsx/", {}],
+  // The header and the two rows the AutoFilter keeps, after an XLSX round trip.
+  ["/test/xlsx/", { shownRows: 3 }],
   // The harness checks itself before it reports ready; assert the durable
   // outcomes, not incidental counters like presence node counts.
   [

@@ -14,6 +14,7 @@ import {
 } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
+import { filterButtonRect } from "./overlay-painter.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
@@ -72,6 +73,8 @@ interface InteractionDependencies {
   editDraft: EditDraftSink;
   /** Open the find bar; it may load first. `replace: true` focuses the replace field. */
   openFind: (options?: { replace?: boolean }) => void;
+  /** Open the AutoFilter dropdown of a header cell in `col`. */
+  openAutoFilter: (col: number) => void;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -778,6 +781,31 @@ export class InteractionSessions {
 
     const cell = this.cellAtPointer(e.clientX, e.clientY);
     if (!cell) return;
+    if (this.isAutoFilterHeader(cell.row, cell.col)) {
+      const button = filterButtonRect(
+        this.deps.screenRect(
+          cell.row,
+          cell.col,
+          this.deps.contentTop(),
+          this.deps.scroller.scrollLeft,
+        ),
+      );
+      const x = e.clientX - viewportRect.left;
+      if (
+        x >= button.x &&
+        x <= button.x + button.w &&
+        py >= button.y &&
+        py <= button.y + button.h
+      ) {
+        e.preventDefault();
+        const selection = this.deps.selection();
+        selection.selectCell(cell.row, cell.col);
+        this.deps.emitSelection();
+        this.deps.scheduleRender();
+        this.deps.openAutoFilter(cell.col);
+        return;
+      }
+    }
     if (
       !isTouch &&
       additive &&
@@ -1148,6 +1176,10 @@ export class InteractionSessions {
         case "fillRight":
           this.fillFromEdge(false);
           break;
+
+        case "toggleFilter":
+          this.deps.grid.actions.toggleAutoFilter();
+          break;
       }
 
       return;
@@ -1182,7 +1214,12 @@ export class InteractionSessions {
 
     switch (e.key) {
       case "ArrowDown":
-        // Alt+Down opens a list rule's list, as in Excel and as on a combobox.
+        // Alt+Down opens a header's AutoFilter dropdown, or a list rule's list,
+        // as in Excel and as on a combobox.
+        if (e.altKey && !mod && focus && this.isAutoFilterHeader(focus.row, focus.col)) {
+          this.deps.openAutoFilter(focus.col);
+          break;
+        }
         if (e.altKey && !mod && focus && this.hasListRule(focus.row, focus.col)) {
           this.beginEdit(focus.row, focus.col);
           break;
@@ -1468,6 +1505,17 @@ export class InteractionSessions {
       "edit-enter",
     );
     this.deps.scheduleRender();
+  }
+
+  /** Whether view `row`, `col` is a header cell of the sheet's AutoFilter. */
+  private isAutoFilterHeader(row: number, col: number): boolean {
+    const range = this.deps.sheet().autoFilter?.range;
+    return (
+      range !== undefined &&
+      this.deps.toDataRow(row) === range.start.row &&
+      col >= range.start.col &&
+      col <= range.end.col
+    );
   }
 
   /** Whether a list validation rule covers the cell at view `row`, `col`. */
