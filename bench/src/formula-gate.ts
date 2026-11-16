@@ -70,6 +70,11 @@ const MEASURED_RATIO_LIMITS: Readonly<Record<string, number>> = {
   "workload=text-lookup-many-edit;size=1000": 1.15,
   "workload=text-lookup-many-sorted;size=1000": 1.2,
   "workload=text-lookup-many-sorted-edit;size=1000": 1.2,
+  // New rows: the 1.2 default until resampling sets their limits.
+  "workload=paged-vlookup-many;size=1000": 1.2,
+  "workload=paged-vlookup-many-edit;size=1000": 1.2,
+  "workload=paged-xlookup-many;size=1000": 1.2,
+  "workload=paged-xlookup-many-edit;size=1000": 1.2,
   "workload=spill-filter-resize;size=100000": 1.15,
   "workload=sumproduct-vector-edit;size=100000": 1.15,
   "workload=sumproduct-matrix-edit;size=100000": 1.15,
