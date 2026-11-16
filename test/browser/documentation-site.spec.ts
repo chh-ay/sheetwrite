@@ -211,6 +211,56 @@ test("documentation search resolves symbols to their anchors and leaves out test
   await expect(dialog.locator("a[href^='/test/']")).toHaveCount(0);
 });
 
+test("search keeps what is typed as it opens and ranks the exact name first", async ({ page }) => {
+  // No wait for hydration: a reader types as soon as the dialog opens.
+  await page.goto("/docs/start/installation/");
+  await page
+    .getByRole("button", { name: /search/i })
+    .first()
+    .click();
+  await page.keyboard.type("XLOOKUP");
+  const field = page.getByRole("combobox", { name: "Search documentation" });
+  const results = page.getByRole("listbox", { name: "Search results" }).getByRole("option");
+
+  await expect(field).toHaveValue("XLOOKUP");
+  await expect(results.first()).toHaveAttribute(
+    "href",
+    "/docs/reference/formula-functions/lookup-reference/#fn-xlookup",
+    { timeout: 15_000 },
+  );
+
+  await field.fill("createGrid");
+  await expect(results.first()).toHaveAttribute("href", "/docs/api/core/create-grid/");
+});
+
+test("arrow keys move through search results and Enter opens one", async ({ page }) => {
+  const { dialog, input } = await openSearch(page);
+  await input.pressSequentially("createGrid", { delay: 20 });
+  const results = dialog.getByRole("option");
+  await expect(results.first()).toHaveAttribute("href", "/docs/api/core/create-grid/", {
+    timeout: 15_000,
+  });
+  await expect(results.first()).toHaveAttribute("aria-selected", "true");
+
+  await page.keyboard.press("ArrowDown");
+  await expect(results.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(results.first()).toHaveAttribute("aria-selected", "false");
+  const href = await results.nth(1).getAttribute("href");
+  await page.keyboard.press("Enter");
+
+  await expect(page).toHaveURL(siteUrl(href ?? ""));
+});
+
+test("a search with no match says so", async ({ page }) => {
+  const { dialog, input } = await openSearch(page);
+  await input.fill("qqzzxx");
+
+  await expect(dialog.getByRole("status")).toHaveText("No results for “qqzzxx”.", {
+    timeout: 15_000,
+  });
+  await expect(dialog.getByRole("option")).toHaveCount(0);
+});
+
 test.describe(() => {
   // A missing page or index logs its failed request to the console.
   test.use({ allowErrors: true });

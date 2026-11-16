@@ -331,6 +331,17 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "M19.5 13v8m-2.5-2.5 2.5 2.5 2.5-2.5",
       ],
     ],
+    // Data › Filter turns the header buttons on and off.
+    ["filter", [FUNNEL]],
+    // Reapply: the funnel with a turning arrow beside it.
+    [
+      "reapplyFilter",
+      [
+        "M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z",
+        "M21 16.5a3.5 3.5 0 1 1-1.03-2.47",
+        "M20.5 11.5v2.6h-2.6",
+      ],
+    ],
   ],
   // Charts, one glyph per chart kind, and pivot tables.
   [

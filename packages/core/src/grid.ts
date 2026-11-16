@@ -2,6 +2,7 @@ import { colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
+import type { AutoFilterHost } from "./autofilter-actions.js";
 import { readBlockArraysOnce } from "./block-ingress.js";
 import {
   fontFor,
@@ -234,6 +235,7 @@ const GRID_COMMANDS: readonly GridCommandName[] = [
   "unmerge",
   "sortAsc",
   "sortDesc",
+  "filter",
   "exportCsv",
   "exportXlsx",
   "importXlsx",
@@ -577,6 +579,10 @@ export class GridImpl implements Grid {
   private findBar: FindBar | null = null;
   /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
   private readonly findBarBuilds = new ScopeSlot(this.lifetime);
+  /** What the lazily loaded AutoFilter commands use; built on their first use. */
+  private autoFilterHost: AutoFilterHost | null = null;
+  /** The AutoFilter chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
+  private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -977,6 +983,8 @@ export class GridImpl implements Grid {
         },
       },
       openFind: (options) => this.openFindBar(options),
+      openAutoFilter: (col) =>
+        this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -1060,18 +1068,7 @@ export class GridImpl implements Grid {
         return cell ? this.noteCell(cell.row, cell.col) : null;
       },
       noteAt: (address) => this.getNote(address),
-      cellRect: (cell) => {
-        const viewport = this.viewportEl.getBoundingClientRect();
-        const rect = this.screenRect(
-          cell.row,
-          cell.col,
-          this.geometry.toContent(this.scroller.scrollTop),
-          this.scroller.scrollLeft,
-        );
-        const left = viewport.left + rect.x;
-        const top = viewport.top + rect.y;
-        return { left, top, right: left + rect.w, bottom: top + rect.h };
-      },
+      cellRect: (cell) => this.cellClientRect(cell.row, cell.col),
       editorLabel: (cell) => `Note for ${this.columnHeader(cell.col)}, row ${cell.row + 1}`,
       commit: (address, text) => this.setNote(address, text),
       returnFocus: () => this.host.focus(),
@@ -1166,6 +1163,16 @@ export class GridImpl implements Grid {
     });
 
     this.readWindows = new ReadWindowController({
+      // Under a filter or hidden rows the headers show sheet row numbers, as in
+      // Excel; a view sort keeps view positions, as rows have no order to keep.
+      rowNumbers: (rows) => {
+        if (!this.displayedHasView || (this.sheet().sortKeys?.length ?? 0) > 0) return undefined;
+        const numbers = new Uint32Array(Math.max(0, rows.end - rows.start));
+        for (let index = 0; index < numbers.length; index++) {
+          numbers[index] = this.toDataRow(rows.start + index) + 1;
+        }
+        return numbers;
+      },
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,
       overlayPainter: this.overlayPainter,
@@ -1283,6 +1290,7 @@ export class GridImpl implements Grid {
     const viewChanged = (effects & VIEW_EFFECTS) !== 0;
     this.followSessionSheets(event.transaction.patches);
 
+    const hadView = this.displayedHasView;
     this.displayedHasView = this.loadable?.hasView(this.activeSheet) ?? false;
     if (effects & RESET_DATASOURCE) {
       this.datasourceController.reset(this.sheet().rowCount);
@@ -1310,13 +1318,20 @@ export class GridImpl implements Grid {
     );
 
     if (effects & RECONCILE_VIEW) {
-      // Selection uses view-row positions: remote/history permutations must reset
-      // it and scroll just like named actions, before change listeners run.
-      this.selection.clear();
       this.selection.setBounds(this.geometry.rowCount, this.firstCol(), this.lastCol());
-      this.emitSelection();
-      this.scroller.scrollTop = 0;
-      this.readWindows.invalidateData();
+      if (this.selectionKeepsThroughFilter(event.transaction.patches, hadView)) {
+        // An AutoFilter hides only rows below its header, so a selection on
+        // the header (where its button was pressed) or above stays, as in Excel;
+        // so does any selection while no row was or is hidden.
+        this.readWindows.invalidateData();
+      } else {
+        // Selection uses view-row positions: remote/history permutations must reset
+        // it and scroll just like named actions, before change listeners run.
+        this.selection.clear();
+        this.emitSelection();
+        this.scroller.scrollTop = 0;
+        this.readWindows.invalidateData();
+      }
     }
 
     if (effects & SHEETS_CHANGED) this.renderTabs();
@@ -1709,6 +1724,23 @@ export class GridImpl implements Grid {
 
   private frozenWidth(): number {
     return this.geometry.frozenWidth();
+  }
+
+  /** View `row`, `col` in client coordinates, a merge's whole area for its cells. */
+  private cellClientRect(
+    row: number,
+    col: number,
+  ): { left: number; top: number; right: number; bottom: number } {
+    const viewport = this.viewportEl.getBoundingClientRect();
+    const rect = this.screenRect(
+      row,
+      col,
+      this.geometry.toContent(this.scroller.scrollTop),
+      this.scroller.scrollLeft,
+    );
+    const left = viewport.left + rect.x;
+    const top = viewport.top + rect.y;
+    return { left, top, right: left + rect.w, bottom: top + rect.h };
   }
 
   private firstBodyCol(): number {
@@ -2717,6 +2749,80 @@ export class GridImpl implements Grid {
     );
   }
 
+  /**
+   * Whether the selection can stay after `patches`, which changed the view:
+   * they change only the AutoFilter or column filters of the active sheet,
+   * and either no row was or is hidden (view rows are data rows on both
+   * sides), or the selection lies on or above the AutoFilter's header row,
+   * whose rows keep their view positions.
+   */
+  private selectionKeepsThroughFilter(patches: readonly DocumentOp[], hadView: boolean): boolean {
+    if (this.selection.isEmpty) return false;
+    const filtersOnly = patches.every(
+      (patch) =>
+        patch.op === "setSheetMeta" &&
+        patch.sheet === this.activeSheet &&
+        Object.entries(patch.patch).every(
+          ([key, value]) => value === undefined || key === "filters" || key === "autoFilter",
+        ),
+    );
+    if (!filtersOnly) return false;
+    if (!hadView && !this.displayedHasView) return true;
+
+    const range = this.sheet().autoFilter?.range;
+    const header = range ? this.toViewRow(range.start.row) : null;
+    // A view sort moves every row, those above the header too.
+    if (header === null || (this.sheet().sortKeys?.length ?? 0) > 0) return false;
+    let above = true;
+    this.selection.forEachRect((rect) => {
+      if (rect.r1 > header) above = false;
+    });
+    return above;
+  }
+
+  /**
+   * Run an AutoFilter command once its chunk has loaded: the commands and
+   * the dropdown load on first use, as the find bar does.
+   */
+  private withAutoFilter(
+    run: (filters: typeof import("./autofilter-actions.js"), host: AutoFilterHost) => void,
+  ): void {
+    if (this.lifetime.closed) return;
+    const build = this.autoFilterBuilds.current();
+    void import("./autofilter-actions.js").then(
+      (filters) => {
+        if (build.closed) return;
+        this.autoFilterHost ??= {
+          grid: this,
+          host: this.host,
+          theme: this.baseTheme,
+          sheet: () => this.sheet(),
+          focus: () => {
+            const focus = this.selection.focusCell;
+            return focus
+              ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
+              : null;
+          },
+          selectedRange: () => this.selectedSortRange(),
+          commit: (op) => this.document.commit([op], "structure"),
+          feedback: (message) => this.actionFeedback.show(message),
+          anchor: (row, col) => {
+            const viewRow = this.toViewRow(row);
+            return viewRow === null ? null : this.cellClientRect(viewRow, col);
+          },
+          adopt: (dispose) => this.autoFilterBuilds.current().add(dispose),
+        };
+        run(filters, this.autoFilterHost);
+      },
+      (error: unknown) => {
+        if (build.closed) return;
+        // Tell the user; the load error still reaches the host.
+        this.actionFeedback.show(`The filter could not load: ${errorDetail(error)}`);
+        throw error;
+      },
+    );
+  }
+
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
   private resetFindBar(): void {
     this.findBarBuilds.close();
@@ -3634,6 +3740,14 @@ export class GridImpl implements Grid {
         const target = col ?? this.selection.focusCell?.col;
         if (target !== undefined) this.setColumnFilter(target, null);
       },
+      toggleAutoFilter: () =>
+        this.withAutoFilter((filters, host) => filters.toggleAutoFilter(host)),
+      clearFilters: () => this.withAutoFilter((filters, host) => filters.clearFilters(host)),
+      reapplyFilter: () => {
+        this.reapplyFilter();
+      },
+      filterBySelection: () =>
+        this.withAutoFilter((filters, host) => filters.filterBySelection(host)),
       copy: () => this.clipboard.copy(),
       cut: () => this.clipboard.cut(),
       paste: () => this.clipboard.paste(),
@@ -3829,6 +3943,12 @@ export class GridImpl implements Grid {
       return {
         disabled: !this.historyCommand || (command === "saveVersion" && this.readOnly),
         activity: "inactive",
+      };
+    }
+    if (command === "filter") {
+      return {
+        disabled: this.readOnly || isDashboard(this.sheet()),
+        activity: this.sheet().autoFilter ? "active" : "inactive",
       };
     }
     if (command === "importXlsx") {

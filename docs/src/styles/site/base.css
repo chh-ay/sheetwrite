@@ -247,8 +247,8 @@ a {
   padding: var(--sw-space-3);
 }
 
-.sw-search-results > p {
-  margin: var(--sw-space-4);
+.sw-search-status {
+  margin: var(--sw-space-4) var(--sw-space-6) 0;
   color: var(--sw-fg-muted);
 }
 
@@ -261,7 +261,9 @@ a {
   text-decoration: none;
 }
 
-.sw-search-results a:hover {
+/* The result Enter opens: the one the arrow keys or the pointer reached. */
+.sw-search-results a:hover,
+.sw-search-results a[aria-selected="true"] {
   background: var(--sw-surface-2);
 }
 
