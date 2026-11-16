@@ -112,6 +112,8 @@ export const SHOT_SIZES = {
   sectionTablet: { width: 560, height: 360 },
   /** A section page's opening capture, cropped for phones: shown near its own width. */
   sectionPhone: { width: 320, height: 320 },
+  /** A card's crop of one panel or control, 2:1 like the card's frame: shown near its own width. */
+  highlight: { width: 400, height: 200 },
 } as const;
 
 export type ShotSize = keyof typeof SHOT_SIZES;

@@ -41,10 +41,11 @@ interface Shot {
   size: ShotSize;
   /**
    * `items`: keep only the dashboard's items, with the dashboard's 12 px margin.
+   * `panel`: the shot's size from the side panel's top-right corner, with the grid beside it.
    * `{ x, y }`: the shot's size from that point of the stage.
    */
-  crop?: "items" | { readonly x: number; readonly y: number };
-  /** The size of the stage an `{ x, y }` crop is taken from. */
+  crop?: "items" | "panel" | { readonly x: number; readonly y: number };
+  /** The size of the stage a `panel` or `{ x, y }` crop is taken from. */
   stage?: ShotSize;
   /** With `crop: "items"`, the titles of the items to keep; every item by default. */
   cropItems?: readonly string[];
@@ -402,6 +403,22 @@ const SECTION_CROPS: Readonly<
   "formula-bar": { tablet: { x: 0, y: 0 }, phone: { x: 100, y: 66 } },
 };
 
+/**
+ * The 0.7.0 highlight cards: a shot's view, cropped to the panel or control
+ * the card is about, so it reads at a card's width on any screen.
+ */
+const CARD_CROPS: Readonly<Record<string, NonNullable<Shot["crop"]>>> = {
+  "data-model": "panel",
+  sort: "panel",
+  "edit-links": "panel",
+  queries: "panel",
+  "version-history": "panel",
+  // The formula bar and the argument guide under it.
+  "formula-help": { x: 30, y: 100 },
+  // The compact ribbon's group menus and the open Number menu.
+  "compact-ribbon": { x: 160, y: 0 },
+};
+
 const SHOTS: readonly Shot[] = [
   ...PAGE_SHOTS,
   ...PAGE_SHOTS.flatMap((shot) => {
@@ -422,6 +439,20 @@ const SHOTS: readonly Shot[] = [
             size: "sectionPhone" as const,
             stage: shot.size,
             crop: crops.phone,
+          },
+        ];
+  }),
+  ...PAGE_SHOTS.flatMap((shot) => {
+    const crop = CARD_CROPS[shot.name];
+    return crop === undefined
+      ? []
+      : [
+          {
+            ...shot,
+            name: `card-${shot.name}`,
+            size: "highlight" as const,
+            stage: shot.size,
+            crop,
           },
         ];
   }),
@@ -477,12 +508,31 @@ async function settle(page: Page) {
   await page.waitForTimeout(300);
 }
 
+/** The clip of a `panel` or `{ x, y }` crop: the shot's size, from the panel's top-right corner or the point. */
+async function cropBox(
+  page: Page,
+  crop: "panel" | { readonly x: number; readonly y: number },
+  size: ShotSize,
+) {
+  const { width, height } = SHOT_SIZES[size];
+  const box = await page
+    .locator(crop === "panel" ? ".sheetwrite-panel-host" : "#stage")
+    .boundingBox();
+  if (box === null)
+    throw new Error(
+      crop === "panel" ? "No side panel is open to crop to" : "The stage is not on the page",
+    );
+  return crop === "panel"
+    ? { x: box.x + box.width - width, y: box.y, width, height }
+    : { x: box.x + crop.x, y: box.y + crop.y, width, height };
+}
+
 async function capture(shot: Shot, origin: string, scratch: string) {
   // An items crop renders on a tall stage of the capture's width, then keeps the
-  // items; an `{ x, y }` crop renders on its stage, then keeps the shot's size.
-  const stage = SHOT_SIZES[shot.stage ?? shot.size];
-  const { width } = stage;
-  const height = shot.crop === "items" ? STAGE_HEIGHT_FOR_CROP : stage.height;
+  // items; other crops render on their own stage size, then keep the shot's size.
+  const { width } = SHOT_SIZES[shot.stage ?? shot.size];
+  const height =
+    shot.crop === "items" ? STAGE_HEIGHT_FOR_CROP : SHOT_SIZES[shot.stage ?? shot.size].height;
   const browser = await chromium.launch();
   try {
     for (const theme of THEMES)
@@ -529,15 +579,7 @@ async function capture(shot: Shot, origin: string, scratch: string) {
           }
           await page.screenshot({ path: png, clip, animations: "disabled" });
         } else if (shot.crop !== undefined) {
-          const box = await page.locator("#stage").boundingBox();
-          if (box === null) throw new Error("The stage is not on the page");
-          const { width: cropWidth, height: cropHeight } = SHOT_SIZES[shot.size];
-          const clip = {
-            x: box.x + shot.crop.x,
-            y: box.y + shot.crop.y,
-            width: cropWidth,
-            height: cropHeight,
-          };
+          const clip = await cropBox(page, shot.crop, shot.size);
           await page.screenshot({ path: png, clip, animations: "disabled" });
         } else {
           await page.locator("#stage").screenshot({ path: png, animations: "disabled" });
