@@ -47,7 +47,7 @@ The setup has ten columns and at least 100 rows; A1:C3 contain the invoice data 
 
 `DataValidationRule` covers list, numeric range, date range, text-length, and checkbox conditions. A rule has a stable ID, a range, a `reject` / `warn` / `allow` policy, optional blank handling, and help text.
 
-List rules open a keyboard-operable `listbox` on Enter, F2, Alt+Down or a double-click. Checkbox rules open a real ARIA `checkbox`. Arrow keys and typeahead change a list choice, Space toggles a checkbox, Enter commits, Tab commits and moves, and Escape cancels.
+List rules open a keyboard-operable `listbox` on F2, Alt+Down or a double-click. Checkbox rules open a real ARIA `checkbox`. Arrow keys and typeahead change a list choice, Space toggles a checkbox, Enter commits, Tab commits and moves, and Escape cancels.
 
 Every mutation path passes through the same validation boundary, including paste, fill, clear, and host transactions.
 

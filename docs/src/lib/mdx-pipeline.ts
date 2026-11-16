@@ -25,6 +25,7 @@ import { SHORT_CODE_CLASS, SHORT_CODE_LENGTH } from "./inline-code.ts";
 import { exportOutline } from "./outline.ts";
 import { renderPerfBars } from "./perf-bars.ts";
 import { isPerfCompare, parsePerfCompare } from "./perf-compare.ts";
+import { parseReleaseLanes, renderReleaseLanes } from "./release-lanes.ts";
 import { rovingCodeFocus } from "./roving-code-focus.ts";
 import { runnableCodeBlocks } from "./runnable-code.ts";
 import { renderSectionCards } from "./section-cards.ts";
@@ -39,6 +40,8 @@ interface HastNode {
   children?: HastNode[];
   name?: string;
   attributes?: Array<{ type: string; name: string; value: string }>;
+  /** A fence's info string after its language, on its `code` element. */
+  data?: { meta?: string | null };
 }
 
 /** One install command on one line, in any package manager's spelling. */
@@ -72,6 +75,36 @@ function installCommandsAsTerminals() {
           attributes: [{ type: "mdxJsxAttribute", name: "packages", value: match[1].trim() }],
           children: [],
         };
+      });
+    };
+    visit(tree);
+  };
+}
+
+/**
+ * A `perf-lanes` fence becomes its performance lanes (release-lanes.ts) as
+ * static HTML, before Expressive Code would render it as plain code. The raw
+ * HTML is parsed with the page's other raw HTML.
+ */
+function releaseLaneFences() {
+  return (tree: HastNode): void => {
+    let figures = 0;
+    const visit = (node: HastNode): void => {
+      if (node.children === undefined) return;
+      node.children = node.children.map((child) => {
+        const code = child.tagName === "pre" ? child.children?.[0] : undefined;
+        const language = [code?.properties?.className ?? []].flat().map(String);
+        if (code?.tagName !== "code" || !language.includes("language-perf-lanes")) {
+          visit(child);
+          return child;
+        }
+        figures += 1;
+        const figure = parseReleaseLanes(
+          code.data?.meta ?? "",
+          textOf(code),
+          `perf-lanes-${figures}`,
+        );
+        return { type: "raw", value: renderReleaseLanes(figure, (name) => inlineIcon(name)) };
       });
     };
     visit(tree);
@@ -494,6 +527,7 @@ export const DOCS_MDX_OPTIONS = {
     // CodeGroup becomes Tabs, before fences are highlighted.
     contentComponents,
     installCommandsAsTerminals,
+    releaseLaneFences,
     markdownAlertsAsCallouts,
     runnableCodeBlocks,
     [

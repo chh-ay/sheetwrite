@@ -215,6 +215,79 @@ fn multi_filter_kinds_match_resolved_cell_values() {
     assert_eq!(store.data_edge_ordered(sheet, &[0, 1], 0, 0, 0, 1), 0);
 }
 
+/// A COUNTIF criterion and the rows a custom filter with it keeps.
+type CriterionCase = (&'static str, &'static [u32]);
+
+/// Excel's custom `AutoFilter` matches as COUNTIF criteria do: each row of the
+/// table is a condition, as the filter dialog writes it, and the rows it keeps.
+#[test]
+fn custom_filters_match_as_countif_criteria() {
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(1, 10);
+    store.set_number(sheet, 0, 0, 5.0, 0);
+    store.set_number(sheet, 1, 0, 10.0, 0);
+    store.set_string(sheet, 2, 0, "apple", 0);
+    store.set_string(sheet, 3, 0, "Apricot", 0);
+    store.set_string(sheet, 4, 0, "banana", 0);
+    // Row 5 stays blank.
+    store.set_bool(sheet, 6, 0, true, 0);
+    store.set_string(sheet, 7, 0, "a*b", 0);
+    store.set_string(sheet, 8, 0, "grape", 0);
+    store.set_formula(sheet, 9, 0, "=1/0", 0);
+    store.recompute(sheet);
+
+    let custom = |criteria: &[&str], any: bool| {
+        store.filter_rows_multi(
+            sheet,
+            &[0],
+            &[5],
+            &[u8::from(any)],
+            &[],
+            &[0],
+            &[criteria.len() as u32],
+            &[],
+            criteria.iter().map(|text| (*text).to_owned()).collect(),
+        )
+    };
+
+    let table: &[CriterionCase] = &[
+        // Numbers compare with numbers only.
+        ("=5", &[0]),
+        (">5", &[1]),
+        (">=5", &[0, 1]),
+        ("<10", &[0]),
+        ("<=10", &[0, 1]),
+        // Does not equal keeps every other cell, blanks and errors included.
+        ("<>5", &[1, 2, 3, 4, 5, 6, 7, 8, 9]),
+        // Text compares without case.
+        ("=APPLE", &[2]),
+        (">b", &[4, 8]),
+        // Begins with, ends with, contains and does not contain are wildcards.
+        ("=a*", &[2, 3, 7]),
+        ("=*na", &[4]),
+        ("=*an*", &[4]),
+        ("<>*an*", &[0, 1, 2, 3, 5, 6, 7, 8, 9]),
+        ("=?pple", &[2]),
+        // `~` escapes a wildcard.
+        ("=a~*b", &[7]),
+        // Equals nothing keeps blanks; does not equal nothing keeps the rest.
+        ("=", &[5]),
+        ("<>", &[0, 1, 2, 3, 4, 6, 7, 8, 9]),
+        ("=TRUE", &[6]),
+        ("=#DIV/0!", &[9]),
+    ];
+    for (criterion, expected) in table {
+        assert_eq!(
+            custom(&[criterion], false),
+            expected.to_vec(),
+            "{criterion}"
+        );
+    }
+
+    assert_eq!(custom(&[">=5", "<10"], false), vec![0]);
+    assert_eq!(custom(&[">=10", "=apple"], true), vec![1, 2]);
+}
+
 /// Column 0 of 16 rows covering every kind the distinct scan distinguishes:
 /// numbers (`-0.0`, `0.0` and NaN included), pooled text with repeats, a blank,
 /// booleans, an error formula whose text carries no pool id, and a text formula
