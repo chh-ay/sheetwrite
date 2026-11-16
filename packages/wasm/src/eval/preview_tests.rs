@@ -189,7 +189,13 @@ fn a_refused_preview_scans_no_more_cells() {
 
     let mut store = CellStore::new();
     let sheet = store.add_sheet(3, PREVIEW_TYPED_CELLS);
-    crate::tests::write_number_column(&mut store, sheet, 0, 0, &vec![1.0; PREVIEW_TYPED_CELLS]);
+    crate::tests::support::write_number_column(
+        &mut store,
+        sheet,
+        0,
+        0,
+        &vec![1.0; PREVIEW_TYPED_CELLS],
+    );
     store.commit_sources();
 
     // The first whole-column read spends the typed budget; IFERROR catches
