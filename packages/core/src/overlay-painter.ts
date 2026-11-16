@@ -1,4 +1,3 @@
-import { filterButtonRect } from "./autofilter.js";
 import { intersectingMerges, prepareMergeIndex } from "./canvas-paint.js";
 import { contrastRatio, relativeLuminance } from "./color-contrast.js";
 import type { EditRect } from "./editor.js";
@@ -14,6 +13,23 @@ const PRESENCE_LABEL_MAX_CHARS = 80;
 const PRESENCE_MARKER_SIZE = 8;
 const NOTE_INDICATOR_SIZE = 8;
 const NOTE_INDICATOR_COLOR = "#f59e0b";
+
+/** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
+const FILTER_BUTTON_SIZE = 16;
+
+/**
+ * Where an AutoFilter header cell's filter button sits: a square at the
+ * cell's right edge, as in Excel. `cell` and the result share a coordinate space.
+ */
+export function filterButtonRect(cell: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
+  return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+}
 
 const EMPTY_VIEW_ROWS = new Int32Array(0);
 const EMPTY_VIEW_ITEMS = new Uint32Array(0);
@@ -1255,13 +1271,6 @@ export class OverlayPainter {
   }
 
   /**
-   * Hand out the next pooled rect div, applying the mutable style fields. Static
-   * setup (position, pointer-events, outline-offset, box-sizing) is written once
-   * at creation. Outline width/style are rewritten to their defaults each time
-   * so a div previously used as a focus ring (2px) or fill preview (dashed)
-   * comes back clean; a hidden div is re-shown and any leftover cursor cleared.
-   */
-  /**
    * The filter button of each AutoFilter header cell in view, at the cell's
    * right edge: an arrow, or a funnel when its column is filtered.
    */
@@ -1287,11 +1296,17 @@ export class OverlayPainter {
       const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-autofilter-button";
       el.style.outlineStyle = "none";
-      el.style.background = "";
       el.dataset.filtered = String(filtered.has(col));
     }
   }
 
+  /**
+   * Hand out the next pooled rect div, applying the mutable style fields. Static
+   * setup (position, pointer-events, outline-offset, box-sizing) is written once
+   * at creation. Outline width/style are rewritten to their defaults each time
+   * so a div previously used as a focus ring (2px) or fill preview (dashed)
+   * comes back clean; a hidden div is re-shown and any leftover cursor cleared.
+   */
   private acquireRect(
     left: number,
     top: number,

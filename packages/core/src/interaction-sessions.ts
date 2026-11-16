@@ -1,5 +1,4 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
-import { filterButtonRect } from "./autofilter.js";
 import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
@@ -15,6 +14,7 @@ import {
 } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
+import { filterButtonRect } from "./overlay-painter.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";

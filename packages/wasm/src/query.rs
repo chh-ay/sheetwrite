@@ -995,8 +995,8 @@ impl CellStore {
         let row_count = data.cells.row_count();
         let range = start_row.min(row_count)..end_row.min(row_count);
         match rows {
-            Some(rows) => {
-                let in_range = rows
+            Some(listed) => {
+                let in_range = listed
                     .iter()
                     .map(|&row| row as usize)
                     .filter(|row| range.contains(row));
