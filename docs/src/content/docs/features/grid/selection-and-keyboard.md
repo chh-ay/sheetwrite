@@ -72,10 +72,10 @@ A `Selection` is one of five shapes:
 ```ts prelude="core" partial="type shape only" title="Selection shapes"
 type Selection =
   | { kind: "cell"; addr: CellAddress }
-  | { kind: "range"; range: Range }
-  | { kind: "row"; sheet: SheetId; row: number }
-  | { kind: "column"; sheet: SheetId; col: number }
-  | { kind: "multi"; ranges: Range[] };
+  | { kind: "range"; range: Range; active?: CellAddress }
+  | { kind: "row"; sheet: SheetId; row: number; active?: CellAddress }
+  | { kind: "column"; sheet: SheetId; col: number; active?: CellAddress }
+  | { kind: "multi"; ranges: Range[]; active?: CellAddress };
 ```
 
 How the primary mouse button makes a selection:
@@ -83,31 +83,37 @@ How the primary mouse button makes a selection:
 | Gesture | Result |
 | --- | --- |
 | Click a cell | Select that cell. |
-| Drag across cells | Extend to a **range**. |
+| Drag across cells | Extend to a **range**. The cell where the drag started stays active. |
 | Shift-click | Extend the range from the current anchor. |
 | Ctrl/Cmd-click | Add a region. This makes a **multi** selection. |
-| Click a column letter (top header) | Select that **column** (Shift extends; Ctrl/Cmd adds). |
-
-Row and full-column selections are part of the model. The top header selects columns. **Row selection is programmatic only**: there is no row-header click gesture. Set it with `setSelection({ kind: "row", sheet, row })`.
+| Click a column letter (top header) | Select that **column** (Shift extends; Ctrl/Cmd adds; a drag across letters extends). |
+| Click a row number (left header) | Select that **row** (Shift extends; Ctrl/Cmd adds; a drag across numbers extends). |
 
 For touch gestures, see [Touch](/docs/features/grid/touch/).
 
 ## Keyboard navigation
 
-When the grid has focus and is not editing:
+When the grid has focus and is not editing, the keys follow Excel's defaults. The **active cell** is where typing edits; extending a selection keeps it, and `getSelection()` reports it as `active` when it is not the range's first cell.
 
 | Key | Action |
 | --- | --- |
-| Arrow keys | Move the focus one cell. |
-| Ctrl/Cmd + Arrow | Jump to the first/last row or column. |
+| Arrow keys | Move the active cell one cell. |
+| Ctrl/Cmd + Arrow | Jump to the edge of the data region, or to the sheet edge. |
+| End, then an arrow key | Jump like Ctrl/Cmd + Arrow (End mode). |
 | Page Up / Page Down | Move by a viewport of rows. |
-| Home / End | Move to the first / last column of the row. |
-| Ctrl/Cmd + Home / End | Move to the sheet's first / last cell. |
-| Shift + any of the above | Extend the selection instead of moving. |
-| Enter or F2 | Edit the focused cell (F2 selects the existing text). |
-| Alt + Down | Open the list of a cell with a list validation rule, as Enter does. |
-| Delete / Backspace | Clear the selected cells. |
-| A printable character | Start editing, replacing the cell's content. |
+| Home | Move to the first column of the row. |
+| Ctrl/Cmd + Home | Move to A1. |
+| Ctrl/Cmd + End | Move to the last used cell: the lowest used row of the rightmost used column. |
+| Shift + any of the above | Extend the selection from its moving corner; the active cell stays. |
+| Enter / Shift + Enter | Move the active cell down / up. Inside a selected range it moves within the range. |
+| Tab / Shift + Tab | Move the active cell right / left, within a selected range. |
+| Ctrl/Cmd + Space / Shift + Space | Select the active cell's column / row. |
+| Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
+| F2 | Edit the active cell, with the caret at the end. |
+| Alt + Down | Open the list of a cell with a list validation rule. |
+| Delete | Clear the selected cells. |
+| Backspace | Clear the active cell and start editing it; Escape restores it. |
+| A printable character | Start editing the active cell, replacing its content. |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
@@ -177,7 +183,7 @@ Pressing Mod+Shift+O logs the focused cell's row.
 | `false` | Turn off all built-in keys. The host handles every key. |
 | `(e, grid) => boolean` | Intercept each keydown before the defaults. Return `true` to consume the key, or `false` to let the built-in handler continue. |
 
-The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace` and `clearContents`. See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
+The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;) and `selectAll` (Ctrl/Cmd + A). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
 
 ## Edge cases and limits
 

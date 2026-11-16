@@ -103,7 +103,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { validateSheetName } from "../sheet-name.js";
+import { canAddSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -1363,7 +1363,7 @@ export class StoreDataEngine {
     });
   }
 
-  /** The result `text` would have in `cell`, read without changing the store (#221). */
+  /** The result `text` would have in `cell`, read without changing the store. */
   previewFormula(cell: CellAddress, text: string): FormulaPreview {
     const fields = new Float64Array(PREVIEW_FIELDS);
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
@@ -4308,7 +4308,7 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!name.ok) return false;
+    if (!canAddSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,
