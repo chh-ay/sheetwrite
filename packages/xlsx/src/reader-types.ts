@@ -12,6 +12,7 @@ import type {
 } from "@sheetwrite/core";
 
 import { type OpcRelationship } from "./opc.js";
+import type { ParsedAutoFilter } from "./reader-autofilter.js";
 import { type SharedFormulaGroup } from "./shared-formula.js";
 
 /** Columns' style records and numeric literals, gathered as rows stream past. */
@@ -99,6 +100,8 @@ export interface ParsedSheet {
   readonly conditionalFormats: ConditionalFormatRule[];
   /** The worksheet `sortState`, kept unapplied for export. */
   readonly sortState?: WorkbookTableXmlElement;
+  /** The worksheet `autoFilter`, its value lists still in display text. */
+  readonly autoFilter?: ParsedAutoFilter;
   readonly columns: Map<number, Partial<Column>>;
   readonly rowMeta: NonNullable<SheetSnapshot["rowMeta"]>;
   readonly merges: MergeRange[];
@@ -115,7 +118,6 @@ export interface ParsedSheet {
   readonly hasUnsupportedValidation: boolean;
   readonly hasConditionalFormatting: boolean;
   readonly hasProtection: boolean;
-  readonly hasAutoFilter: boolean;
   readonly hasValidationCollection: boolean;
   readonly hasComments: boolean;
   readonly hasHyperlinks: boolean;
