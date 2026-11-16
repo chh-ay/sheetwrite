@@ -11,8 +11,8 @@ import {
 } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
-  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   isEngineBuiltTransaction,
+  resolveSnapshotResourceLimits,
   resolveTransactionResourceLimits,
   resolveTransactionResourceValidation,
   SnapshotResourceError,
@@ -233,13 +233,10 @@ export class SheetwriteStore implements Store {
       resourceLimits: options.snapshotResourceLimits,
     });
     // The assertion above has validated every override.
-    this.snapshotResourceLimits = {
-      ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
-      ...options.snapshotResourceLimits,
-    };
+    this.snapshotResourceLimits = resolveSnapshotResourceLimits(options.snapshotResourceLimits);
 
     try {
-      this.dataEngine = new StoreDataEngine(workbook, data, options);
+      this.dataEngine = new StoreDataEngine(workbook, data, options, this.snapshotResourceLimits);
     } catch (error) {
       if (!isSnapshotAllocationFailure(error)) throw error;
       const resource = storage === "dense" ? "maxDenseCells" : "maxLogicalCellsPerSheet";
@@ -249,12 +246,9 @@ export class SheetwriteStore implements Store {
         actual = storage === "dense" ? actual + cells : Math.max(actual, cells);
       }
 
-      throw new SnapshotResourceError(
-        resource,
-        options.snapshotResourceLimits?.[resource] ?? DEFAULT_SNAPSHOT_RESOURCE_LIMITS[resource],
-        actual,
-        { cause: error },
-      );
+      throw new SnapshotResourceError(resource, this.snapshotResourceLimits[resource], actual, {
+        cause: error,
+      });
     }
 
     this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
@@ -1207,7 +1201,7 @@ export class SheetwriteStore implements Store {
     return undefined;
   }
 
-  /** Every sheet's dimensions now, and which hold dense storage, for {@link SheetGrowth}. */
+  /** Every sheet's dimensions now, and where its cells live, for {@link SheetGrowth}. */
   private sheetGrowth(): SheetGrowth {
     const sheets = new Map<SheetId, SheetDimensions>();
     for (const sheet of this.engine.getWorkbook().sheets) {
@@ -1215,7 +1209,11 @@ export class SheetwriteStore implements Store {
         name: sheet.name,
         rows: sheet.rowCount,
         columns: sheet.columns.length,
-        dense: !this.engine.isPaged(sheet.id),
+        storage: this.engine.isPaged(sheet.id)
+          ? "paged"
+          : this.engine.isLocalPaged(sheet.id)
+            ? "local"
+            : "dense",
       });
     }
     return new SheetGrowth(sheets, this.snapshotResourceLimits);

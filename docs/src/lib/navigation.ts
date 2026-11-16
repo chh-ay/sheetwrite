@@ -53,7 +53,7 @@ export const DOCS_TABS: readonly DocsTab[] = [
     href: "/docs/reference/formula-functions/",
     icon: "tab-formulas",
   },
-  { id: "changelog", label: "Changelog", href: releaseFacts.releasesHref, icon: "tab-changelog" },
+  { id: "changelog", label: "Releases", href: releaseFacts.releasesHref, icon: "tab-changelog" },
   { id: "showcases", label: "Showcases", href: "/showcases/", icon: "tab-showcases" },
 ];
 
@@ -490,6 +490,8 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
   {
     label: "Reference",
     tab: "api",
+    href: "/docs/reference/",
+    icon: "book",
     items: [
       { label: "API contract", href: "/docs/reference/api-contract/", icon: "book" },
       { label: "Document operations", href: "/docs/reference/document-operations/", icon: "file" },
@@ -535,7 +537,7 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
     ],
   },
   {
-    label: "Release notes",
+    label: "Releases",
     tab: "changelog",
     // "All releases" leads; each release has the release glyph.
     items: releaseFacts.links.map((link, index) => ({
