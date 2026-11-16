@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 use std::rc::Rc;
 
-use crate::calc::{Ast, Func, RangeFlags, SheetRef};
+use crate::calc::{Ast, Func, NameId, RangeFlags, SheetRef};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
@@ -88,6 +88,21 @@ impl<'a> Shapes<'a> {
     }
 }
 
+/// Whether the defined name `id` evaluates to an array: a range of more
+/// than one cell, or a formula that does. Out of line, so
+/// [`ast_produces_array`] keeps no name read in its own frame; see
+/// [`NameScope::range_family`].
+#[inline(never)]
+fn name_produces_array_family(id: NameId, shapes: Shapes<'_>) -> bool {
+    let read = shapes.names().read(id);
+    match read.range() {
+        Some(range) => range.row_start != range.row_end || range.col_start != range.col_end,
+        None => read
+            .formula()
+            .is_some_and(|expression| ast_produces_array(expression, shapes)),
+    }
+}
+
 /// Whether `ast` evaluates to an array. A LAMBDA parameter's shape comes
 /// from `shapes`: [`Shapes::top`] outside every call.
 pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
@@ -104,15 +119,7 @@ pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
                 shapes,
             )
         }
-        Ast::DefinedName(id) => {
-            let read = shapes.names().read(*id);
-            match read.range() {
-                Some(range) => range.row_start != range.row_end || range.col_start != range.col_end,
-                None => read
-                    .formula()
-                    .is_some_and(|expression| ast_produces_array(expression, shapes)),
-            }
-        }
+        Ast::DefinedName(id) => name_produces_array_family(*id, shapes),
         Ast::Structured(reference) => reference.row_start != reference.row_end,
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Array(_) => true,
         Ast::LetSlot { expression, .. } => ast_produces_array(expression, shapes),

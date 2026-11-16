@@ -125,14 +125,14 @@ thread_local! {
     pub(crate) static FORMULA_EVALUATIONS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
-/// Sets the formula origin for one evaluation and restores the enclosing
-/// origin when dropped.
-struct FormulaOriginGuard {
+/// Sets the formula origin for one evaluation or binding and restores the
+/// enclosing origin when dropped.
+pub(crate) struct FormulaOriginGuard {
     enclosing: Option<(u32, u32)>,
 }
 
 impl FormulaOriginGuard {
-    fn push(origin: (u32, u32)) -> Self {
+    pub(crate) fn push(origin: (u32, u32)) -> Self {
         let enclosing = FORMULA_ORIGIN.with(|current| current.replace(Some(origin)));
         Self { enclosing }
     }
@@ -1740,7 +1740,10 @@ impl CellStore {
                         // has computed it, reads its own references where
                         // they are written. Top-level evaluations start
                         // unshifted.
-                        return read_shifted((0, 0), || self.eval_formula_id(id, pass, depth + 1));
+                        if reference_shift() != (0, 0) {
+                            return self.eval_unshifted_family(id, pass, depth + 1);
+                        }
+                        return self.eval_formula_id(id, pass, depth + 1);
                     }
                     if self.iteration.is_some() {
                         iteration::record_iteration_read(AbsCellKey::from_local(sheet, key));
@@ -1770,6 +1773,20 @@ impl CellStore {
 
         // A `KIND_FORMULA` cell without a formula entry keeps its last number.
         Value::number(s.cells.num_at(i))
+    }
+
+    /// [`Self::eval_formula_id`] under no reference shift. Cold and out of
+    /// line: only a dependency met inside a shifted read needs it, and
+    /// `eval_at` keeps its plain call.
+    #[cold]
+    #[inline(never)]
+    fn eval_unshifted_family(
+        &self,
+        id: FormulaId,
+        pass: &mut EvalPass<'_>,
+        depth: usize,
+    ) -> EvalResult {
+        read_shifted((0, 0), || self.eval_formula_id(id, pass, depth))
     }
 
     /// Evaluate a selected id without repeating its address-index lookup.

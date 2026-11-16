@@ -88,7 +88,7 @@ impl RewriteScope {
 /// Whether `ast` resolves a reference at run time (`OFFSET`, `INDIRECT`),
 /// through the defined names it reads too.
 pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool {
-    let contains = |child: &Ast| ast_contains_runtime_ref(child, names);
+    let contains = move |child: &Ast| ast_contains_runtime_ref(child, names);
     match ast {
         Ast::Func(Func::Offset | Func::Indirect, _) => true,
         Ast::Func(_, args) => args.iter().any(contains),
@@ -99,7 +99,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool 
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => contains(left) || contains(right),
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => contains(inner),
         Ast::LetSlot { expression, .. } => contains(expression),
-        Ast::DefinedName(id) => names.read(*id).formula().is_some_and(contains),
+        Ast::DefinedName(id) => names.formula_satisfies_family(*id, ast_contains_runtime_ref),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)

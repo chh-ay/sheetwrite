@@ -1,6 +1,6 @@
 //! Matrix values and AST-to-range conversion helpers.
 
-use crate::calc::{Ast, Func, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{Ast, Func, NameId, SHEET_COLS, SHEET_ROWS};
 use crate::store::names::NameScope;
 use crate::types::{CellRange, FormulaError, Value};
 
@@ -224,7 +224,7 @@ pub(super) fn written_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange
 pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
     match argument {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(..) => true,
-        Ast::DefinedName(id) => names.read(*id).range().is_some(),
+        Ast::DefinedName(id) => names.range_family(*id).is_some(),
         _ => false,
     }
 }
@@ -235,7 +235,7 @@ pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
 pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     match arg {
         Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(arg, names),
-        Ast::DefinedName(id) => names.read(*id).range(),
+        Ast::DefinedName(id) => names.range_family(*id),
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,
             reference.row_start,
@@ -271,19 +271,24 @@ pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRang
     }
 }
 
+/// The cells the defined name `id` covers: its range, or its formula's when
+/// that is one reference. Out of line, as [`NameScope::range_family`] is.
+#[inline(never)]
+fn name_reference_family(id: NameId, names: NameScope<'_>) -> Option<CellRange> {
+    let read = names.read(id);
+    read.range().or_else(|| {
+        read.with_formula(|expression| range_from_ast(expression, names))
+            .flatten()
+    })
+}
+
 /// The cells a reference argument covers, reading defined names through
 /// `names`; `None` when `ast` is not one reference.
 pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     let formula_sheet = names.sheet;
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, names),
-        Ast::DefinedName(id) => {
-            let read = names.read(*id);
-            read.range().or_else(|| {
-                read.with_formula(|expression| range_from_ast(expression, names))
-                    .flatten()
-            })
-        }
+        Ast::DefinedName(id) => name_reference_family(*id, names),
         Ast::Cell(row, col, flags) => {
             let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
             Some(CellRange::new(

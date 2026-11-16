@@ -36,6 +36,8 @@ use crate::calc::{
 };
 use crate::eval::{current_formula_origin, read_shifted, shifted_cell, shifted_range};
 use crate::formula_rewrite::write_references;
+use crate::formula_slots::{FormulaId, FormulaStore};
+use crate::graph::SheetFormulas;
 use crate::memory::MemoryOwnerStats;
 use crate::tables::TableSlots;
 use crate::types::{AbsCellKey, CellRange, FormulaError, Value, FORMULA_RECURSION_LIMIT};
@@ -344,6 +346,33 @@ impl<'a> NameScope<'a> {
             }
             DefinedName::Formula(_) => None,
         }
+    }
+
+    /// The cells `id` names for the cell being read, when it names a range
+    /// or a formula that is one reference. Out of line, so a walk that only
+    /// asks for a range keeps no [`NameRead`] in its own frame: on
+    /// WebAssembly a local held in memory gives the whole function a stack
+    /// frame, on every path. The `_family` suffix keeps wasm-opt from
+    /// inlining it back.
+    #[inline(never)]
+    pub(crate) fn range_family(self, id: NameId) -> Option<CellRange> {
+        self.read(id).range()
+    }
+
+    /// Whether `test` holds for the formula `id` holds, as
+    /// [`NameRead::formula`] gives it, read through this scope; `false` for
+    /// a range or an undefined name. Out of line, as [`Self::range_family`]
+    /// is, for the walks that look through a name's formula. `test` is a
+    /// function, not a closure, so the walk keeps nothing in memory for it.
+    #[inline(never)]
+    pub(crate) fn formula_satisfies_family(
+        self,
+        id: NameId,
+        test: fn(&Ast, NameScope<'_>) -> bool,
+    ) -> bool {
+        self.read(id)
+            .formula()
+            .is_some_and(|expression| test(expression, self))
     }
 
     /// Read the name `id` for the formula on [`Self::sheet`] at the cell that
@@ -981,22 +1010,14 @@ impl CellStore {
             if self.sheet_alive.get(sheet) != Some(&true) {
                 continue;
             }
-            for formula in data.formulas.ids() {
-                let Some(ast) = self
-                    .formula_slots
-                    .get(formula)
-                    .filter(|entry| entry.uses_names())
-                    .and_then(|entry| entry.ast.as_ref())
-                else {
-                    continue;
-                };
-                let callable = |id: NameId| self.names.holds_formula(id, sheet as u32);
+            let callable = |id: NameId| self.names.holds_formula(id, sheet as u32);
+            for_each_name_user_family(&data.formulas, &self.formula_slots, &mut |formula, ast| {
                 match name_use(ast, &ids, &changed, &callable) {
                     NameUse::None => {}
                     NameUse::Read => users.push((formula, false)),
                     NameUse::Bound => users.push((formula, true)),
                 }
-            }
+            });
         }
         for (formula, parse_again) in users {
             let Some(at) = self.formula_slots.location(formula) else {
@@ -1302,6 +1323,27 @@ enum NameUse {
     /// unbound; or it reads one and has a LET, whose tree is resolved in
     /// place.
     Bound,
+}
+
+/// Calls `user` with each formula of a sheet whose tree uses a defined name.
+/// A name change scans every formula for them and usually finds few, so the
+/// scan has a loop of its own, out of line; the `_family` suffix keeps
+/// wasm-opt from inlining it back.
+#[inline(never)]
+fn for_each_name_user_family(
+    formulas: &SheetFormulas,
+    slots: &FormulaStore,
+    user: &mut dyn FnMut(FormulaId, &Ast),
+) {
+    for formula in formulas.ids() {
+        if let Some(ast) = slots
+            .get(formula)
+            .filter(|entry| entry.uses_names())
+            .and_then(|entry| entry.ast.as_ref())
+        {
+            user(formula, ast);
+        }
+    }
 }
 
 /// How `ast` uses the names `ids` (or the folded names `keys`, for names it

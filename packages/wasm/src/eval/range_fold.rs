@@ -260,7 +260,7 @@ fn sum_scalar_or_range(arg: &Ast, shapes: Shapes<'_>) -> Option<SumArg> {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(_) => {
             super::matrix::range_from_ast(arg, names).map(SumArg::Range)
         }
-        Ast::DefinedName(id) => match names.read(*id).range() {
+        Ast::DefinedName(id) => match names.range_family(*id) {
             Some(range) => Some(SumArg::Range(range)),
             None if ast_produces_array(arg, shapes) => None,
             None => Some(SumArg::Scalar { reference: false }),

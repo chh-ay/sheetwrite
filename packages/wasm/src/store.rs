@@ -3860,14 +3860,17 @@ impl CellStore {
     ) -> FormulaEntry {
         match self.resolve_formula_ast(source, formula_sheet, formula_row, formula_col) {
             Ok((ast, features)) => {
-                crate::eval::with_formula_origin((formula_row, formula_col), || {
-                    FormulaEntry::parsed_source(
-                        ast,
-                        self.name_scope(formula_sheet as usize),
-                        source.to_owned(),
-                        features,
-                    )
-                })
+                // Only a formula that uses a defined name reads its origin,
+                // to place a name relative to the cell.
+                let _origin = features.names.then(|| {
+                    crate::eval::FormulaOriginGuard::push((formula_row, formula_col))
+                });
+                FormulaEntry::parsed_source(
+                    ast,
+                    self.name_scope(formula_sheet as usize),
+                    source.to_owned(),
+                    features,
+                )
             }
             Err(error) => FormulaEntry::error(source, error),
         }

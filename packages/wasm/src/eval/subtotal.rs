@@ -23,7 +23,7 @@ use crate::sheet::SheetData;
 /// Whether `ast` calls SUBTOTAL or AGGREGATE anywhere, through the defined
 /// names it reads too.
 pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
-    let calls = |child: &Ast| ast_calls_subtotal(child, names);
+    let calls = move |child: &Ast| ast_calls_subtotal(child, names);
     match ast {
         Ast::Func(Func::Subtotal, _) => true,
         #[cfg(feature = "analysis")]
@@ -38,7 +38,7 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => calls(left) || calls(right),
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => calls(inner),
         Ast::LetSlot { expression, .. } => calls(expression),
-        Ast::DefinedName(id) => names.read(*id).formula().is_some_and(calls),
+        Ast::DefinedName(id) => names.formula_satisfies_family(*id, ast_calls_subtotal),
         _ => false,
     }
 }
