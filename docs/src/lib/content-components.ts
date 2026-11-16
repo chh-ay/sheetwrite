@@ -108,6 +108,8 @@ export const SHOT_SIZES = {
   tablet: { width: 560, height: 632 },
   /** The phone layout of a dashboard, cropped to its items: shown near its own width. */
   phone: { width: 320, height: 800 },
+  /** A card's crop of one panel or control, 2:1 like the card's frame: shown near its own width. */
+  highlight: { width: 400, height: 200 },
 } as const;
 
 export type ShotSize = keyof typeof SHOT_SIZES;
