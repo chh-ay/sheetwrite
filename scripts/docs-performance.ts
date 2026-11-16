@@ -1724,7 +1724,7 @@ export const PERFORMANCE_PAGES: readonly PerformancePage[] = [
 ];
 
 const PERFORMANCE_INTRO =
-  "Every number in this section comes from a validated local protocol artifact captured on a clean tree; nothing is published from an unvalidated or protocol-mismatched artifact. Every expected cell carries either a validated timing or its recorded failure - a run that did not complete is shown as a failure, never converted into a timing.";
+  "These pages show measured results for each release, and how to repeat them. A run that did not finish shows as a failure, not as a time.";
 
 /** A Markdown code fence line: up to 3 spaces, then 3 or more backticks or tildes. */
 const CODE_FENCE = /^ {0,3}(`{3,}|~{3,})/;
@@ -1802,15 +1802,15 @@ export function splitPerformancePages(
   const overview = [
     frontmatter(
       "Performance",
-      "Benchmark and package-size evidence for Sheetwrite, one page per area.",
+      "Measured speed, memory and download size of Sheetwrite, one page per area.",
     ).trimEnd(),
     PERFORMANCE_INTRO,
     "",
     "Each page shows the results first, then the method and the command that reproduces them.",
     "",
-    "## Sheetwrite 0.6.0 evidence",
+    "## Results for 0.7.0",
     "",
-    "The render page includes chart-source tracking; the data-engine page includes incremental pivots. The [release comparison](/docs/performance/release-comparison/) shows fresh 0.5.4 and 0.6.0 measurements, recorded thresholds, every flagged row, and the conditions both sides were captured under. The original committed 0.5.x files remain under `bench/results/releases/0.5.0/` as history only.",
+    "The pages below measure the code that ships as 0.7.0. The Render page includes charts that follow their source cells, and the Data engine page includes pivots that recalculate only what changed. The [0.7.0 release notes](/docs/releases/0.7.0/#performance) compare 0.7.0 with 0.6.1. The [release comparison](/docs/performance/release-comparison/) still compares 0.6.0 with 0.5.4.",
     "",
     ...PERFORMANCE_PAGES.map(
       (page) => `- [${page.title}](/docs/performance/${page.slug}/): ${page.description}`,
