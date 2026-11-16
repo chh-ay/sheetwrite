@@ -170,41 +170,28 @@ fn moved_edge((start, end): (u32, u32), (from, count, to): (u32, u32, u32)) -> O
     (span.0 <= span.1).then_some(span)
 }
 
+/// A visit of one cell or range reference; returns whether it changed it.
+type RefVisit<'a> = dyn FnMut(&mut Ast) -> bool + 'a;
+
+/// Whether the formula cell at `[sheet, row, col]` stays out of a losses walk.
+type CellFilter<'a> = dyn Fn(u32, u32, u32) -> bool + 'a;
+
+/// A change of a formula's tree on its sheet and its inverse; returns whether
+/// the change touched the tree.
+type RoundTrip<'a> = dyn Fn(&mut Ast, u32) -> bool + 'a;
+
 /// Run `visit` on every cell and range reference of `ast`, and return whether
 /// any visit changed one. Every other node kind is walked through its
 /// children; one walk serves the moves of references and their rewrite for
 /// another sheet.
-fn rewrite_cell_refs(ast: &mut Ast, visit: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
-    match ast {
-        Ast::Cell(..) | Ast::AbsCell(..) | Ast::Range(..) | Ast::AbsRange(..) => visit(ast),
-        Ast::Num(_)
-        | Ast::Str(_)
-        | Ast::Bool(_)
-        | Ast::Missing
-        | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
-        | Ast::UnresolvedStructured(_)
-        | Ast::Structured(_)
-        | Ast::SheetCell(..)
-        | Ast::SheetRange(..)
-        | Ast::SheetSpan(_)
-        | Ast::InvalidRef
-        | Ast::Func(..)
-        | Ast::UnknownFunc(..)
-        | Ast::Bin(..)
-        | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
-        | Ast::LetSlot { .. }
-        | Ast::LetName { .. }
-        | Ast::Array { .. } => ast.fold_children_mut(&mut |child| rewrite_cell_refs(child, visit)),
-        #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
-            ast.fold_children_mut(&mut |child| rewrite_cell_refs(child, visit))
-        }
+fn rewrite_cell_refs(ast: &mut Ast, visit: &mut RefVisit<'_>) -> bool {
+    if matches!(
+        ast,
+        Ast::Cell(..) | Ast::AbsCell(..) | Ast::Range(..) | Ast::AbsRange(..)
+    ) {
+        return visit(ast);
     }
+    ast.fold_children_mut(&mut |child| rewrite_cell_refs(child, visit))
 }
 
 /// Follow `edit` in the references of a formula on `formula_sheet`. A defined
@@ -216,6 +203,7 @@ pub(crate) fn move_cell_refs(ast: &mut Ast, formula_sheet: u32, edit: &CellMove)
 }
 
 /// Follow `edit` in one cell or range reference.
+#[inline(never)]
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "rewrite_cell_refs passes only cell and range references"
@@ -272,6 +260,7 @@ pub(crate) fn rehome_refs(ast: &mut Ast, edit: &CellMove) -> bool {
 }
 
 /// Rewrite one cell or range reference for [`rehome_refs`].
+#[inline(never)]
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "rewrite_cell_refs passes only cell and range references"
@@ -417,10 +406,11 @@ impl CellStore {
     /// putting it back: undo restores these cells from a capture. Shared by
     /// row, column and cell moves; it runs once per edit, so it takes trait
     /// objects to keep one copy of the walk.
+    #[inline(never)]
     pub(crate) fn formula_losses(
         &self,
-        skip: &dyn Fn(u32, u32, u32) -> bool,
-        round_trip: &dyn Fn(&mut Ast, u32) -> bool,
+        skip: &CellFilter<'_>,
+        round_trip: &RoundTrip<'_>,
     ) -> Vec<u32> {
         let mut losses = Vec::new();
         for (formula_sheet, data) in self.sheets.iter().enumerate() {
@@ -445,6 +435,7 @@ impl CellStore {
     }
 
     /// The move of a block, when both blocks lie on live sheets.
+    #[inline(never)]
     fn cell_move(&self, at: [usize; 8]) -> Option<CellMove> {
         let [sheet, row, col, rows, cols, to_sheet, to_row, to_col] = at;
         let from_last = self.block_fits(sheet, (row, col), (rows, cols))?;
@@ -529,34 +520,38 @@ impl CellStore {
         inside
     }
 
-    /// Read every cell of the source block, then empty the source block and
-    /// write the cells at the target, so blocks that overlap move whole.
+    /// Read every column of the source block, then empty the source block and
+    /// write the target column by column through the writer that row and
+    /// column moves use, so blocks that overlap move whole and the block
+    /// writer is compiled once.
     fn move_block_cells(&mut self, edit: &CellMove, revision: Option<u64>) -> bool {
-        let (rows, cols) = (edit.rows as usize, edit.cols as usize);
-        let mut slots: MovedSlots = Vec::with_capacity(rows * cols);
-        let mut sources = FxHashMap::default();
-        for row in 0..edit.rows {
-            for col in 0..edit.cols {
+        let mut columns = Vec::with_capacity(edit.cols as usize);
+        for col in 0..edit.cols {
+            let mut slots: MovedSlots = Vec::with_capacity(edit.rows as usize);
+            let mut sources = MovedSources::default();
+            for row in 0..edit.rows {
                 self.read_cell_to_move(edit, (row, col), &mut slots, &mut sources);
             }
+            columns.push((slots, sources));
         }
 
         let (from, to) = (edit.from, edit.to);
-        self.replace_range_sources(
-            from.sheet as usize,
-            (from.row as usize, from.col as usize),
-            (rows, cols),
-            revision,
-            FxHashMap::default(),
-            |_, _| (KIND_EMPTY, 0, 0),
-        ) && self.replace_range_sources(
-            to.sheet as usize,
-            (to.row as usize, to.col as usize),
-            (rows, cols),
-            revision,
-            sources,
-            |row, col| slots[row * cols + col],
-        )
+        let empty: MovedSlots = vec![(KIND_EMPTY, 0, 0); edit.rows as usize];
+        let cleared = (from.col..from.col + edit.cols).all(|col| {
+            let top = (from.row as usize, col as usize);
+            self.write_moved_column(
+                from.sheet as usize,
+                top,
+                revision,
+                MovedSources::default(),
+                &empty,
+            )
+        });
+        cleared
+            && (to.col..).zip(columns).all(|(col, (slots, sources))| {
+                let top = (to.row as usize, col as usize);
+                self.write_moved_column(to.sheet as usize, top, revision, sources, &slots)
+            })
     }
 
     /// Read the cell at `offset` in the source block: its storage goes to

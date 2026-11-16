@@ -352,9 +352,9 @@ impl CellStore {
     }
 
     /// Write the moved cells of one column from `top`: `slots` holds their
-    /// storage and `sources` their formulas. One writer serves row and column
-    /// moves, so the block writer is compiled once for them.
-    fn write_moved_column(
+    /// storage and `sources` their formulas. One writer serves row, column and
+    /// cell moves, so the block writer is compiled once for them.
+    pub(crate) fn write_moved_column(
         &mut self,
         sheet: usize,
         top: (usize, usize),

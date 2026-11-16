@@ -39,7 +39,8 @@ fn after_move(formula: &str, from: [usize; 4], to: (usize, usize)) -> String {
     let [row, col, rows, cols] = from;
     assert_eq!(
         store.move_cells(data, row, col, rows, cols, data, to.0, to.1),
-        BLOCK_OK
+        BLOCK_OK,
+        "the move succeeds"
     );
     text(&store, summary, 0, 0)
 }
