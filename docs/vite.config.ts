@@ -202,6 +202,12 @@ export default defineConfig({
   // page script (src/islands/page-scripts.ts) drops those a page does not use.
   build: { cssCodeSplit: false, cssMinify: "lightningcss" },
   worker: { format: "es" },
+  // Dev pages load only the islands client, not Vite's HMR client
+  // (routes/__root.tsx). So when Vite finds a dependency after a page has
+  // started loading, the page misses the reload Vite sends, and its imports of
+  // the replaced pre-bundles fail. Scanning the islands client at startup finds
+  // every client dependency before the first request.
+  optimizeDeps: { entries: ["src/islands/client.tsx"] },
   plugins: [
     snippetSources(),
     docsPages(),
