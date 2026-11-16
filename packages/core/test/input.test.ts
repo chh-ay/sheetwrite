@@ -536,6 +536,28 @@ describe("validation through input mutation paths", () => {
   });
 });
 
+describe("pointer input: headers", () => {
+  it("selects rows by clicking and dragging the row numbers, as in Excel", () => {
+    const { grid, scroller, store } = makeGrid();
+    const rowPoint = (row: number) => ({
+      clientX: DEFAULT_THEME.rowHeaderWidth / 2,
+      clientY: DEFAULT_THEME.headerHeight + (row + 0.5) * DEFAULT_THEME.rowHeight,
+    });
+
+    scroller.dispatchEvent(pointer("pointerdown", rowPoint(2)));
+    expect(grid.getSelection()).toEqual({ kind: "row", sheet: "s1", row: 2 });
+    scroller.dispatchEvent(pointer("pointermove", rowPoint(4)));
+    scroller.dispatchEvent(pointer("pointerup", rowPoint(4)));
+    expect(grid.getSelection()).toEqual({
+      kind: "range",
+      // Whole rows run to the grid's last column, which includes empty display columns.
+      range: { sheet: "s1", start: { row: 2, col: 0 }, end: { row: 4, col: expect.any(Number) } },
+    });
+    grid.destroy();
+    store.dispose();
+  });
+});
+
 describe("keyboard whole-axis selection", () => {
   it("selects the focused column with Ctrl+Space", () => {
     const { grid, host } = makeGrid();
@@ -550,7 +572,13 @@ describe("keyboard whole-axis selection", () => {
     host.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
-    expect(grid.getSelection()).toEqual({ kind: "column", sheet: "s1", col: 1 });
+    // As in Excel, the active cell stays where it was.
+    expect(grid.getSelection()).toEqual({
+      kind: "column",
+      sheet: "s1",
+      col: 1,
+      active: { sheet: "s1", row: 3, col: 1 },
+    });
     grid.destroy();
   });
 });
