@@ -317,10 +317,11 @@ export class StoreViewState {
     col: number,
     limit: number,
     rows?: { start: number; end: number },
+    only?: Uint32Array,
   ): CellScalar[] {
     const handle = this.sheets.handleOf(sheet);
     const column = rows
-      ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit)
+      ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit, only)
       : this.wasm.distinctValues(handle, col, limit);
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
@@ -339,6 +340,11 @@ export class StoreViewState {
     }
 
     return out;
+  }
+
+  /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
+  filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
+    return this.runFilters(this.sheets.handleOf(sheet), filters);
   }
 
   private recompute(sheet: SheetId): void {
