@@ -3,7 +3,7 @@ title: Search
 description: Find matching cells, step through matches, and replace text from code or with Ctrl+F.
 ---
 
-`grid.search(query, opts?)` scans cells, highlights every match, scrolls the first match into view, and emits a [`search`](/docs/reference/events/#grid-events) event.
+`grid.search(query, opts?)` scans cells, highlights every match, selects the first match and scrolls it into view, and emits a [`search`](/docs/reference/events/#grid-events) event.
 
 ```ts prelude="core" partial="requires an initialized grid with the log cells shown below" title="Find matching cells"
 const result = grid.search("error");
@@ -48,7 +48,7 @@ This API excerpt needs an initialized grid. Populate its first seven rows with t
 ```ts prelude="core" partial="requires surrounding host state" title="Find, step, and clear"
 const result = grid.search("error");
 console.log(`${result.matches.length} match(es)`);
-grid.findNext();    // advance the active match and scroll to it
+grid.findNext();    // select the next match and scroll to it
 grid.clearSearch(); // remove the highlights when done
 ```
 
@@ -56,7 +56,7 @@ grid.clearSearch(); // remove the highlights when done
 
 If cells B2 and D7 contain "error", the log shows `2 match(es)`. `result.matches` is `[B2, D7]` as zero-based addresses, and `result.active` is `0`.
 
-`findNext()` and `findPrev()` move the active match. `clearSearch()` clears the highlights. The built-in **Ctrl+F** find widget, gated by `config.find` (on by default), drives this same API.
+`findNext()` and `findPrev()` move the active match and select it, as Excel's Find Next does, so typing then edits the found cell. `clearSearch()` clears the highlights. The built-in **Ctrl+F** find widget, gated by `config.find` (on by default), drives this same API.
 
 ## Options and result
 
@@ -78,7 +78,7 @@ interface SearchResult {
 | Method | Purpose |
 | --- | --- |
 | `search(query, opts?)` | Find matching cells; highlights them, emits `search`, returns a `SearchResult`. |
-| `findNext()` / `findPrev()` | Step the active match forward / backward and scroll it into view. |
+| `findNext()` / `findPrev()` | Step the active match forward / backward, select it and scroll it into view. |
 | `clearSearch()` | Drop the current search and clear its highlights. |
 | `replaceCurrent(replacement)` / `replaceAll(replacement)` | Replace literal text/number matches through undoable transactions. |
 
