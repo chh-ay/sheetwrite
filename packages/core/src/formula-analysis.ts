@@ -268,6 +268,58 @@ function findReferences(tokens: readonly RawToken[]): FormulaReference[] {
   return references;
 }
 
+/** One cell of a written reference: optional `$`, column letters, optional `$`, row digits. */
+const CELL_PART = /(\$?)([A-Za-z]{1,3})(\$?)(\d+)/g;
+/** F4's order of absolute column and row markers: A1, $A$1, A$1, $A1. */
+const ANCHOR_STATES: ReadonlyArray<readonly [column: boolean, row: boolean]> = [
+  [false, false],
+  [true, true],
+  [false, true],
+  [true, false],
+];
+
+/**
+ * Excel's F4 while editing: give the cell reference at or just before
+ * `caret` the next `$` markers in the order A1, $A$1, A$1, $A1. Both corners
+ * of a range take the first corner's next markers. Null when no cell
+ * reference touches the caret.
+ *
+ * @param text - The formula text, starting with `=`.
+ * @param caret - UTF-16 offset of the caret in `text`.
+ * @returns The new text, and the caret after the changed reference.
+ */
+export function toggleReferenceAnchors(
+  text: string,
+  caret: number,
+): { text: string; caret: number } | null {
+  const reference = findReferences(formulaTokens(text)).find(
+    (candidate) => candidate.from <= caret && caret <= candidate.to,
+  );
+  if (reference === undefined) return null;
+
+  const written = text.slice(reference.from, reference.to);
+  const qualifier = written.slice(0, written.lastIndexOf("!") + 1);
+  const cells = written.slice(qualifier.length);
+  const first = /^(\$?)[A-Za-z]{1,3}(\$?)\d/.exec(cells);
+  if (first === null) return null;
+
+  const current = ANCHOR_STATES.findIndex(
+    ([column, row]) => column === (first[1] === "$") && row === (first[2] === "$"),
+  );
+  const [column, row] = ANCHOR_STATES[(current + 1) % ANCHOR_STATES.length] ?? [false, false];
+  const toggled =
+    qualifier +
+    cells.replace(
+      CELL_PART,
+      (_match, _column, letters: string, _row, digits: string) =>
+        `${column ? "$" : ""}${letters}${row ? "$" : ""}${digits}`,
+    );
+  return {
+    text: text.slice(0, reference.from) + toggled + text.slice(reference.to),
+    caret: reference.from + toggled.length,
+  };
+}
+
 function publicKind(tokens: readonly RawToken[], index: number): FormulaTokenKind {
   const token = tokens[index];
   if (token === undefined) return "invalid";

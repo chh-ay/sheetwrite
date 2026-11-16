@@ -23,6 +23,8 @@ describe("SelectionModel", () => {
         expected: {
           kind: "range",
           range: { sheet: "s", start: { row: 2, col: 0 }, end: { row: 5, col: 2 } },
+          // The range started at its bottom-right cell, which stays active.
+          active: { sheet: "s", row: 5, col: 2 },
         },
       },
       {
