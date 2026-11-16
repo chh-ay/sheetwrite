@@ -81,6 +81,15 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
         { action: "sortDescending" },
         { action: "sortViewAscending" },
         { action: "sortViewDescending" },
+      ],
+    },
+    {
+      id: "filterMenu",
+      label: "Filter",
+      icon: "filter",
+      items: [
+        { action: "filterBySelection" },
+        { action: "reapplyFilter" },
         { action: "separator" },
         { action: "clearFilter", label: "Clear filter" },
       ],
@@ -126,6 +135,8 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   showAllColumns: "unhideColumns",
   autoFitColumn: "format",
   clearFilter: "clearFilter",
+  filterBySelection: "filter",
+  reapplyFilter: "reapplyFilter",
   sortAscending: "sortAsc",
   sortDescending: "sortDesc",
   sortViewAscending: "sortView",
@@ -176,6 +187,8 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   showAllColumns: "Show all columns",
   autoFitColumn: "Auto-fit column",
   clearFilter: "Clear column filter",
+  filterBySelection: "Filter by selected cell's value",
+  reapplyFilter: "Reapply filter",
   sortAscending: "Sort A to Z",
   sortDescending: "Sort Z to A",
   sortViewAscending: "Sort view A to Z",
@@ -248,6 +261,12 @@ function actionHandler(
 
     case "clearFilter":
       return () => actions.clearFilter();
+
+    case "filterBySelection":
+      return () => actions.filterBySelection();
+
+    case "reapplyFilter":
+      return () => actions.reapplyFilter();
 
     case "sortAscending":
       return () => actions.sort(true);
