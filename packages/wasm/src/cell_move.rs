@@ -170,16 +170,13 @@ fn moved_edge((start, end): (u32, u32), (from, count, to): (u32, u32, u32)) -> O
     (span.0 <= span.1).then_some(span)
 }
 
-/// Follow `edit` in the references of a formula on `formula_sheet`. A defined
-/// name's formula has no sheet: pass `u32::MAX`, so only references that name
-/// a sheet move. Returns whether any reference changed.
-#[inline(never)]
-pub(crate) fn move_cell_refs(ast: &mut Ast, formula_sheet: u32, edit: &CellMove) -> bool {
-    let (sheet, start, end) = match ast {
-        Ast::Cell(row, col, _) => (formula_sheet, (*row, *col), (*row, *col)),
-        Ast::AbsCell(sheet, row, col, _) => (sheet.handle, (*row, *col), (*row, *col)),
-        Ast::Range(r0, c0, r1, c1, _) => (formula_sheet, (*r0, *c0), (*r1, *c1)),
-        Ast::AbsRange(sheet, r0, c0, r1, c1, _) => (sheet.handle, (*r0, *c0), (*r1, *c1)),
+/// Run `visit` on every cell and range reference of `ast`, and return whether
+/// any visit changed one. Every other node kind is walked through its
+/// children; one walk serves the moves of references and their rewrite for
+/// another sheet.
+fn rewrite_cell_refs(ast: &mut Ast, visit: &mut dyn FnMut(&mut Ast) -> bool) -> bool {
+    match ast {
+        Ast::Cell(..) | Ast::AbsCell(..) | Ast::Range(..) | Ast::AbsRange(..) => visit(ast),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -202,86 +199,96 @@ pub(crate) fn move_cell_refs(ast: &mut Ast, formula_sheet: u32, edit: &CellMove)
         | Ast::Percent(_)
         | Ast::LetSlot { .. }
         | Ast::LetName { .. }
-        | Ast::Array { .. } => {
-            return ast.fold_children_mut(&mut |child| move_cell_refs(child, formula_sheet, edit))
-        }
+        | Ast::Array { .. } => ast.fold_children_mut(&mut |child| rewrite_cell_refs(child, visit)),
         #[cfg(feature = "analysis")]
         Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
-            return ast.fold_children_mut(&mut |child| move_cell_refs(child, formula_sheet, edit))
-        }
-    };
-
-    match edit.fate(sheet, start, end) {
-        Fate::Kept => false,
-        Fate::Lost => {
-            *ast = Ast::InvalidRef;
-            true
-        }
-        Fate::Moved(to_sheet, r0, c0, r1, c1) => {
-            place_ref(
-                ast,
-                formula_sheet,
-                to_sheet,
-                [r0, c0, r1, c1],
-                edit.quoted(to_sheet),
-            );
-            true
+            ast.fold_children_mut(&mut |child| rewrite_cell_refs(child, visit))
         }
     }
 }
 
-/// Point a cell or range node at `[r0, c0, r1, c1]` of `to_sheet`. A node
-/// without a sheet name gains one when the sheet is not the formula's own.
+/// Follow `edit` in the references of a formula on `formula_sheet`. A defined
+/// name's formula has no sheet: pass `u32::MAX`, so only references that name
+/// a sheet move. Returns whether any reference changed.
+#[inline(never)]
+pub(crate) fn move_cell_refs(ast: &mut Ast, formula_sheet: u32, edit: &CellMove) -> bool {
+    rewrite_cell_refs(ast, &mut |node| move_ref(node, formula_sheet, edit))
+}
+
+/// Follow `edit` in one cell or range reference.
 #[allow(
     clippy::wildcard_enum_match_arm,
-    reason = "only reference nodes reach here; every other node is left as it is"
+    reason = "rewrite_cell_refs passes only cell and range references"
 )]
-fn place_ref(ast: &mut Ast, formula_sheet: u32, to_sheet: u32, at: [u32; 4], quoted: bool) {
-    let [r0, c0, r1, c1] = at;
-    let sheet = SheetRef { handle: to_sheet };
-    let own = to_sheet == formula_sheet;
-    let placed = match &*ast {
-        Ast::Cell(_, _, flags) if own => Ast::Cell(r0, c0, *flags),
-        Ast::Cell(_, _, flags) | Ast::AbsCell(_, _, _, flags) => {
-            Ast::AbsCell(sheet, r0, c0, flags.with_quoted(quoted))
+fn move_ref(node: &mut Ast, formula_sheet: u32, edit: &CellMove) -> bool {
+    let (sheet, start, end) = match &*node {
+        Ast::Cell(row, col, _) => (formula_sheet, (*row, *col), (*row, *col)),
+        Ast::AbsCell(sheet, row, col, _) => (sheet.handle, (*row, *col), (*row, *col)),
+        Ast::Range(r0, c0, r1, c1, _) => (formula_sheet, (*r0, *c0), (*r1, *c1)),
+        Ast::AbsRange(sheet, r0, c0, r1, c1, _) => (sheet.handle, (*r0, *c0), (*r1, *c1)),
+        _ => return false,
+    };
+    let (to_sheet, r0, c0, r1, c1) = match edit.fate(sheet, start, end) {
+        Fate::Kept => return false,
+        Fate::Lost => {
+            *node = Ast::InvalidRef;
+            return true;
         }
-        Ast::Range(.., flags) if own => Ast::Range(r0, c0, r1, c1, *flags),
-        Ast::Range(.., flags) | Ast::AbsRange(.., flags) => Ast::AbsRange(
-            sheet,
+        Fate::Moved(to_sheet, r0, c0, r1, c1) => (to_sheet, r0, c0, r1, c1),
+    };
+    let named = to_sheet != formula_sheet;
+    let quoted = edit.quoted(to_sheet);
+    let placed = match &*node {
+        Ast::Cell(_, _, flags) if !named => Ast::Cell(r0, c0, *flags),
+        Ast::Cell(_, _, flags) | Ast::AbsCell(_, _, _, flags) => Ast::AbsCell(
+            SheetRef { handle: to_sheet },
+            r0,
+            c0,
+            flags.with_quoted(quoted),
+        ),
+        Ast::Range(.., range) if !named => Ast::Range(r0, c0, r1, c1, *range),
+        Ast::Range(.., range) | Ast::AbsRange(.., range) => Ast::AbsRange(
+            SheetRef { handle: to_sheet },
             r0,
             c0,
             r1,
             c1,
             RangeFlags {
-                start: flags.start.with_quoted(quoted),
-                end: flags.end,
+                start: range.start.with_quoted(quoted),
+                end: range.end,
             },
         ),
-        _ => return,
+        _ => return false,
     };
-    *ast = placed;
+    *node = placed;
+    true
 }
 
 /// Write the references of a formula that moves from `edit.from.sheet` to
 /// `edit.to.sheet` as that sheet reads them: a reference without a sheet
 /// name gains the source sheet's name, and one to the target sheet drops it.
 pub(crate) fn rehome_refs(ast: &mut Ast, edit: &CellMove) -> bool {
-    let placed = match &*ast {
-        Ast::Cell(row, col, flags) => Ast::AbsCell(
-            SheetRef {
-                handle: edit.from.sheet,
-            },
-            *row,
-            *col,
-            flags.with_quoted(edit.from_quoted),
-        ),
+    rewrite_cell_refs(ast, &mut |node| rehome_ref(node, edit))
+}
+
+/// Rewrite one cell or range reference for [`rehome_refs`].
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "rewrite_cell_refs passes only cell and range references"
+)]
+fn rehome_ref(node: &mut Ast, edit: &CellMove) -> bool {
+    let source = SheetRef {
+        handle: edit.from.sheet,
+    };
+    let placed = match &*node {
+        Ast::Cell(row, col, flags) => {
+            Ast::AbsCell(source, *row, *col, flags.with_quoted(edit.from_quoted))
+        }
         Ast::AbsCell(sheet, row, col, flags) if sheet.handle == edit.to.sheet => {
             Ast::Cell(*row, *col, flags.with_quoted(false))
         }
         Ast::Range(r0, c0, r1, c1, flags) => Ast::AbsRange(
-            SheetRef {
-                handle: edit.from.sheet,
-            },
+            source,
             *r0,
             *c0,
             *r1,
@@ -301,37 +308,9 @@ pub(crate) fn rehome_refs(ast: &mut Ast, edit: &CellMove) -> bool {
                 end: flags.end,
             },
         ),
-        Ast::AbsCell(..)
-        | Ast::AbsRange(..)
-        | Ast::Num(_)
-        | Ast::Str(_)
-        | Ast::Bool(_)
-        | Ast::Missing
-        | Ast::Name(_)
-        | Ast::NamedRange(_)
-        | Ast::NamedFormula(_)
-        | Ast::UnresolvedStructured(_)
-        | Ast::Structured(_)
-        | Ast::SheetCell(..)
-        | Ast::SheetRange(..)
-        | Ast::SheetSpan(_)
-        | Ast::InvalidRef
-        | Ast::Func(..)
-        | Ast::UnknownFunc(..)
-        | Ast::Bin(..)
-        | Ast::Cmp(..)
-        | Ast::Neg(_)
-        | Ast::Pos(_)
-        | Ast::Percent(_)
-        | Ast::LetSlot { .. }
-        | Ast::LetName { .. }
-        | Ast::Array { .. } => return ast.fold_children_mut(&mut |child| rehome_refs(child, edit)),
-        #[cfg(feature = "analysis")]
-        Ast::Parameter { .. } | Ast::Lambda(_) | Ast::RegexPattern(_) => {
-            return ast.fold_children_mut(&mut |child| rehome_refs(child, edit))
-        }
+        _ => return false,
     };
-    *ast = placed;
+    *node = placed;
     true
 }
 
