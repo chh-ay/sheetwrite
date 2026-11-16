@@ -12,7 +12,7 @@ const WILDCARD = /[*?]/u;
 const REGEX_SYNTAX = /[\\^$.*+?()[\]{}|/]/gu;
 
 /** Whether `query` uses Excel's wildcards, as the engine's Find reads them. */
-export function hasWildcards(query: string): boolean {
+function hasWildcards(query: string): boolean {
   return WILDCARD.test(query) || query.includes("~~");
 }
 
