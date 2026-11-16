@@ -182,6 +182,7 @@ impl PagedStorage {
         let clean = existing.unwrap_or_else(|| {
             let id = self.record_or_insert(col, page);
             let allocated = if let Some(reused) = self.free_clean.pop() {
+                self.clean[reused as usize].restore(self.chunk_rows);
                 reused
             } else {
                 self.clean.push(CleanPage::new(self.chunk_rows));
@@ -249,7 +250,7 @@ impl PagedStorage {
         r1: usize,
         c1: usize,
     ) -> bool {
-        (c0..=c1).all(|col| self.column_loaded(col, r0, r1))
+        self.local || (c0..=c1).all(|col| self.column_loaded(col, r0, r1))
     }
 
     fn column_loaded(&self, col: usize, start: usize, end: usize) -> bool {

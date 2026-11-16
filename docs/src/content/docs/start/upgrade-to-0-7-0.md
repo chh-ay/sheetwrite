@@ -504,6 +504,14 @@ the sort on the table's header buttons.
 | --- | --- |
 | An accessor entry in setBlock arrays is now read once instead of rejected. `grid.applyTransaction`, `grid.applyRemoteOperations` and `SheetwriteStore.applyTransaction` read each entry of a `setBlock`'s `block.values` and `block.styleIds` once, by index, into a private copy; validation, the store, history, sync and the `change` event use that copy. A getter that throws gives a `SheetwriteError` with code `invalid-argument` and operation `transaction`. Only those two arrays change: every other `setBlock` field (`range`, `formulas`, `refs`, `styleTable`), every other operation type, holes, non-finite numbers and byte limits keep the same validation, and getters there are still rejected without running. store.applyTransaction returns and emits a copy of a transaction that contains setBlock. | Nothing, unless you relied on the rejection or on getting your own `patches` array back. Changing your arrays after the call no longer reaches the document. |
 
+### Dense workbooks past maxDenseCells
+
+| Change | What to do |
+| --- | --- |
+| A dense-storage workbook no longer stops at `maxDenseCells` (5,000,000 cells). In 0.6.1 a snapshot past it failed with `SnapshotResourceError("maxDenseCells")`. Now the sheets past it load in local pages, which are never evicted and always loaded, so they still behave as dense sheets (`isPaged` is false), and a row or column insert that would pass it moves the sheet into local pages instead of being refused. | Nothing, unless you load untrusted snapshots: see the next row. |
+| With the default limits, the most cells an untrusted dense-storage snapshot can make the engine hold rises from 5,000,000 to 25,000,000: 5,000,000 dense and 20,000,000 in local pages. A sheet filled to the full local budget held 625 MB of WASM memory in our measurement. | To keep 0.6.1's ceiling, pass `snapshotResourceLimits: { maxLocalPagedCells: 0 }`; any lower value bounds local pages. Lowering `maxDenseCells` also lowers what the engine allocates densely: the store gives both limits to the engine. |
+| Local sheets share a new limit, `maxLocalPagedCells` in `SnapshotResourceLimits` (20,000,000 cells by default, also the engine's ceiling). A snapshot past it fails with `SnapshotResourceError("maxLocalPagedCells")`, and an `addRows` or `addColumns` that would pass it is rejected with a `resource-limit` issue whose resource is `local-paged-cells`. That code replaces `dense-cells`, which pre-release builds of 0.7.0 reported for an insert past `maxDenseCells`. `maxDenseCells` and `maxLocalPagedCells` are capped at the engine's ceilings (5,000,000 and 20,000,000); a larger value acts as the ceiling. | Match `local-paged-cells` where you matched `dense-cells`. |
+
 ## How 0.7.0 compares with 0.5.4 and 0.6.1
 
 The same workloads ran against the published 0.5.4 and 0.6.1 packages and
