@@ -206,26 +206,24 @@ function installPopoversOnDemand(): () => void {
     else replay(trigger);
   }
 
-  // Whether the panel was open when the tap began: by the click, focus may
-  // have opened it.
-  let tappedTrigger: HTMLElement | null = null;
-  let wasOpenAtTap = false;
+  // The name a touch pressed while its panel was closed. Focus may open the
+  // panel before the click, so the click reads this instead.
+  let tapped: HTMLElement | null = null;
 
+  // Pointer and mouse events on page content target elements.
   function handleTapStart(event: PointerEvent): void {
-    tappedTrigger =
-      event.pointerType === "touch" && event.target instanceof Element
-        ? event.target.closest<HTMLElement>(TRIGGER_SELECTOR)
+    const trigger =
+      event.pointerType === "touch"
+        ? (event.target as Element).closest<HTMLElement>(TRIGGER_SELECTOR)
         : null;
-    wasOpenAtTap = tappedTrigger?.hasAttribute(OPEN_ATTRIBUTE) ?? false;
-    if (tappedTrigger !== null) void load();
+    tapped = trigger?.hasAttribute(OPEN_ATTRIBUTE) ? null : trigger;
   }
 
   /** Touch has no hover: the first tap on a name opens its panel instead of its link. */
   function handleTap(event: MouseEvent): void {
-    const trigger = tappedTrigger;
-    tappedTrigger = null;
-    if (trigger === null || wasOpenAtTap) return;
-    if (!(event.target instanceof Node) || !trigger.contains(event.target)) return;
+    const trigger = tapped;
+    tapped = null;
+    if (trigger === null || !trigger.contains(event.target as Node)) return;
     event.preventDefault();
     void load().then((popovers) => {
       if (!isStopped) popovers.openCodePopover(trigger);
