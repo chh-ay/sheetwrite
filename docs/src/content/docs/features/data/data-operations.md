@@ -106,6 +106,8 @@ grid.filterBy(3, "Tokyo"); // keep rows whose column-3 text contains "Tokyo"
 grid.clearView();          // clear sort/filter state only
 ```
 
+For filter buttons on a header row, as in Excel, see [AutoFilter](/docs/features/data/autofilter/).
+
 For custom UI, use the composable primitives. All active column filters are ANDed
 together, hidden rows and collapsed groups are subtracted, and the remaining rows
 are sorted by the active multi-key sort.
