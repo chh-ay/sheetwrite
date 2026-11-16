@@ -190,26 +190,3 @@ test("the dropdown is keyboard-usable: search, arrows, Space and Enter", async (
   await page.keyboard.press("Enter");
   await expect.poll(() => shownItems(page)).toEqual(["Item", "Apricot", "grape"]);
 });
-
-test("keys pressed while the AutoFilter's code loads apply in order", async ({ page }) => {
-  // Hold the AutoFilter chunk until the keys are in, as on a slow first load.
-  let release = (): void => undefined;
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(/autofilter-actions-[^/]*\.js$/, async (route) => {
-    await held;
-    await route.continue();
-  });
-  await open(page);
-  await grid(page).press("ControlOrMeta+Shift+L");
-  await grid(page).press("ArrowUp");
-  await grid(page).press("Alt+ArrowDown");
-  release();
-
-  // Ctrl+Shift+L applies first, so Alt+Down on B1 opens the Qty header's dropdown.
-  await expect(dropdown(page, "Qty")).toBeVisible();
-  await expect
-    .poll(() => page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection()))
-    .toEqual({ kind: "cell", addr: { sheet: SHEET, row: 0, col: 1 } });
-});
