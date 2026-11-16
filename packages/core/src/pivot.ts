@@ -1061,7 +1061,7 @@ export interface PivotPayload {
 }
 
 /**
- * Encode the pivots of one sheet in the `setPivots` wire format (issue #194).
+ * Encode the pivots of one sheet in the wire format `setPivots` reads.
  * Defaults are resolved here so the engine never guesses. A range source on a
  * sheet without an engine handle is sent as invalid. The full engine computes
  * the output, so saved output is not sent.

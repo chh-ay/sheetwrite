@@ -697,6 +697,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        # Each sitemap <lastmod> is the date of the last commit to the page's
+        # sources, so the build needs the history, as the deployment has.
+        with:
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -732,6 +736,11 @@ jobs:
         run: bun scripts/verify-example-xlsx-isolation.ts
       - name: Package prebuilt deployment
         run: bun run docs:prepare-deployment
+      - name: Check the site as search engines see it
+        # Titles, descriptions, canonicals, breadcrumbs, links, the sitemap,
+        # static main content, and every published 0.6.1 URL, through the
+        # deployment's own routes.
+        run: bun run docs:check-site
       - name: Upload production docs
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

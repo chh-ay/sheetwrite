@@ -4,6 +4,9 @@
 
 - The 0.7.0 release notes show performance as lanes against 0.6.1, one row per workload with each machine's result in the words of the text, from a new `perf-lanes` fence. They open their highlights with a blueprint summary, and the highlight cards show each panel cropped from its capture (`card-*` shots, the new `highlight` size) instead of the whole app shrunk to a sliver.
 - The 0.7.0 upgrade guide no longer says how its code is built.
+- The API index says in one line what each package is for, and drops the build-system words. The performance overview says what its pages show, and its results heading names 0.7.0.
+- `docs:check` also rejects a bare issue number such as "#228" in a docs page or a doc comment, not only tracker links and "PR #N".
+- Keep every 0.6.1 URL working for readers and search engines. The 21 API pages of exports that 0.7.0 removed redirect (308) to the page of what replaces each one, and a page's address without its trailing slash redirects to the address with it instead of serving a second copy. Each sitemap `<lastmod>` is the date of the last commit to the page's sources, not the build date. `bun run docs:check-site`, run in CI after the docs build and before each deployment, reads the packaged site through its own routes and fails on an indexable page without a title, description, self-referencing canonical or Open Graph tags, a shared title or description, a BreadcrumbList without Google's required fields or with a crumb that is not a live page, a broken internal link, a sitemap entry that is noindex, redirected or missing, sitemap dates that are all one build date, a 0.6.1 URL (`docs/published-urls.txt`) that no longer opens a page, or main content that is missing from the static HTML.
 - The API reference shows `@throws`: a function page lists each under "Throws" (the error and when it is thrown), and a member card shows its parameters, return value and throws as labelled lines instead of raw `@param` and `@returns` text. The API manifest kept no `@throws` before.
 - Code-sample hover popovers show a symbol's summary, with its parameters, return value and throws as tag lines; the doc text from the API manifest no longer shows raw `@param` and `@returns` inline.
 - The API reference shows `InitOutput` (`@sheetwrite/wasm`, `@sheetwrite/formulas`) as one card with no member list: its members are the raw module exports wasm-bindgen generates for the loader, not API to call. `docs:generate` no longer counts them as undescribed. The `free()` method wasm-bindgen adds to each engine class, which has no doc source, gets one shared description.
@@ -36,6 +39,7 @@
 - Add a filter for large API indexes; start API members collapsed, preserve deep-link expansion, remove signature copy controls, and link source locations.
 - Publish generated `/llms.txt` and `/llms-full.txt` endpoints with stale-output checks for AI-assisted development.
 - Run the production Vite build under Node to avoid a Bun server-compilation crash.
+- The landing footer links the API reference under Explore, so every API page is at most three links from the home page (82 were four).
 
 ## 0.0.2
 

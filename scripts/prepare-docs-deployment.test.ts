@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { MOVED_PAGES, MOVED_SHOWCASES } from "../docs/src/lib/moved-pages.js";
+import { MOVED_PAGES, MOVED_SHOWCASES, REMOVED_API_PAGES } from "../docs/src/lib/moved-pages.js";
 import { prepareDocsDeployment } from "./prepare-docs-deployment.js";
 
 const fixtureRoots: string[] = [];
@@ -71,10 +71,15 @@ async function requestPackagedFile(
       const contents = await readStatic(pathname);
       if (contents !== null) return { body: contents, headers, status: 200 };
     } else if ("headers" in route && !("continue" in route)) {
-      if (new RegExp(route.src).test(pathname)) {
+      const match = new RegExp(route.src).exec(pathname);
+      if (match !== null) {
+        const location = route.headers.Location.replace(
+          /\$(\d)/g,
+          (_, group: string) => match[Number(group)] ?? "",
+        );
         return {
           body: Buffer.alloc(0),
-          headers: { ...headers, ...route.headers },
+          headers: { ...headers, Location: location },
           status: route.status,
         };
       }
@@ -162,9 +167,7 @@ describe("prebuilt docs deployment", () => {
     for (const [url, contents] of [
       ["/", builtFiles["index.html"]],
       ["/docs/", builtFiles["docs/index.html"]],
-      ["/docs", builtFiles["docs/index.html"]],
       ["/docs/start/installation/", builtFiles["docs/start/installation/index.html"]],
-      ["/docs/start/installation", builtFiles["docs/start/installation/index.html"]],
       ["/docs/index.html", builtFiles["docs/index.html"]],
       ["/assets/client.wasm", builtFiles["assets/client.wasm"]],
       ["/sitemap.xml", builtFiles["sitemap.xml"]],
@@ -176,6 +179,16 @@ describe("prebuilt docs deployment", () => {
       const response = await requestPackagedFile(root, url);
       expect(response?.body).toEqual(Buffer.from(builtFiles["404.html"]));
       expect(response?.status).toBe(404);
+    }
+  });
+
+  it("redirects each page's address without its trailing slash to the address with it", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    for (const url of ["/docs", "/docs/start/installation"]) {
+      const response = await requestPackagedFile(root, url);
+      expect(response?.status).toBe(308);
+      expect(response?.headers.Location).toBe(`${url}/`);
     }
   });
 
@@ -238,6 +251,18 @@ describe("moved docs pages", () => {
     const root = await fixture();
     await prepareDocsDeployment(root);
     for (const [from, to] of Object.entries(MOVED_SHOWCASES)) {
+      for (const pathname of [from, from.slice(0, -1)]) {
+        const response = await requestPackagedFile(root, pathname);
+        expect(response?.status).toBe(308);
+        expect(response?.headers.Location).toBe(to);
+      }
+    }
+  });
+
+  it("redirects each API page of a removed export to the page of what replaces it", async () => {
+    const root = await fixture();
+    await prepareDocsDeployment(root);
+    for (const [from, to] of Object.entries(REMOVED_API_PAGES)) {
       for (const pathname of [from, from.slice(0, -1)]) {
         const response = await requestPackagedFile(root, pathname);
         expect(response?.status).toBe(308);
