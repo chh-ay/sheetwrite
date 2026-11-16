@@ -43,6 +43,8 @@ mod measures;
 mod model_source;
 pub(crate) mod names;
 pub(crate) mod pivot_output;
+#[cfg(all(test, feature = "analysis"))]
+mod pivot_tests;
 #[cfg(feature = "analysis")]
 mod pivots;
 mod range_transfer;
@@ -53,8 +55,6 @@ mod related_measure_tests;
 mod relationships;
 #[cfg(test)]
 mod sparse_tests;
-#[cfg(all(test, feature = "analysis"))]
-mod tests;
 mod transfer;
 
 #[cfg(not(feature = "analysis"))]

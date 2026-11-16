@@ -1,13 +1,15 @@
 //! Typed range folds: reductions read a range's kind and payload arrays in
 //! place instead of building a value per cell.
 
+use std::ops::Range;
+
 use super::functions::{treats_cell_as_reference, ReductionFold, MAX_FUNCTION_ARGS};
 use super::range_reader::RangeReader;
 use super::value::aggregate_number;
 use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
 
 use crate::calc::{Ast, Func};
-use crate::cells::payload_num;
+use crate::cells::{payload_num, CellStorage};
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
@@ -181,6 +183,14 @@ impl CellStore {
 
         let data = &self.sheets[range.sheet as usize];
         let dense = data.cells.dense_sources();
+        if cols == 1 && dense.is_none() && depth < FORMULA_RECURSION_LIMIT {
+            let start = data
+                .cells
+                .idx(range.row_start as usize, range.col_start as usize);
+            if let Some(result) = fold_paged_number_column(&data.cells, start..start + rows, fold) {
+                return result.map(|()| true);
+            }
+        }
         let (Some(sources), true) = (dense, depth < FORMULA_RECURSION_LIMIT) else {
             while let Some(value) = reader.next(pass)? {
                 fold.push(&value)?;
@@ -239,6 +249,45 @@ impl CellStore {
         }
         Ok(literal_only)
     }
+}
+
+/// Folds one paged column of numbers and empty cells from its clean pages, as
+/// the dense column fold does. `None`, having folded nothing, when a run has
+/// an edit or calculated overlay, an unloaded cell or a cell of another kind:
+/// the caller then reads it cell by cell. The first pass checks every run, so
+/// a column is folded whole or not at all.
+#[inline(never)]
+fn fold_paged_number_column(
+    cells: &CellStorage,
+    column: Range<usize>,
+    fold: &mut ReductionFold,
+) -> Option<Result<(), FormulaError>> {
+    let mut start = column.start;
+    while start < column.end {
+        let run = cells.run(start, column.end);
+        let (kinds, _) = run.clean_sources()?;
+        if kinds
+            .iter()
+            .any(|&kind| kind != KIND_EMPTY && kind != KIND_NUMBER)
+        {
+            return None;
+        }
+        start = run.end;
+    }
+
+    let mut start = column.start;
+    while start < column.end {
+        let run = cells.run(start, column.end);
+        let (kinds, payloads) = run.clean_sources()?;
+        match fold.push_number_column(kinds, payloads) {
+            Some(Ok(())) => {}
+            Some(Err(error)) => return Some(Err(error)),
+            // Only the cell limit is left to refuse a checked column.
+            None => return Some(Err(FormulaError::Num)),
+        }
+        start = run.end;
+    }
+    Some(Ok(()))
 }
 
 /// How the accumulator reads one `SUM` argument.

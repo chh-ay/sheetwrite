@@ -399,7 +399,7 @@ class SheetwriteAdapter implements RenderBenchDiagnosticAdapter {
 
   openEditor(): void {
     this.host.focus();
-    dispatchKey(this.host, "Enter");
+    dispatchKey(this.host, "F2");
     if (!this.editorOpen()) throw new Error("Sheetwrite editor did not open");
   }
 

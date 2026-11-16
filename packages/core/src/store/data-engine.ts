@@ -103,7 +103,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { validateSheetName } from "../sheet-name.js";
+import { canAddSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -199,11 +199,13 @@ import {
   rebaseMovedRange,
   rebaseRangeItems,
   rebaseRangeSpan,
+  rebaseSheetAutoFilter,
   remapSpan,
   type SheetAxis,
   sameMerge,
   staysWholeAfterMove,
   uniqueColumnKeys,
+  validAutoFilter,
   validMerge,
   validProtectedRanges,
   validSortAndFilters,
@@ -1504,7 +1506,9 @@ export class StoreDataEngine {
     if (sheet === null || !this.sheets.handles.has(sheet) || !this.isPaged(sheet)) return true;
     if (
       patch.op === "setSheetMeta" &&
-      ((patch.patch.sortKeys?.length ?? 0) > 0 || (patch.patch.filters?.length ?? 0) > 0)
+      ((patch.patch.sortKeys?.length ?? 0) > 0 ||
+        (patch.patch.filters?.length ?? 0) > 0 ||
+        patch.patch.autoFilter != null)
     ) {
       return this.queryCapability(sheet).status === "complete";
     }
@@ -3745,7 +3749,8 @@ export class StoreDataEngine {
           (patch.patch.sortKeys !== undefined &&
             !validSortAndFilters(sheet, patch.patch.sortKeys, patch.patch.filters ?? [])) ||
           (patch.patch.filters !== undefined &&
-            !validSortAndFilters(sheet, patch.patch.sortKeys ?? [], patch.patch.filters))
+            !validSortAndFilters(sheet, patch.patch.sortKeys ?? [], patch.patch.filters)) ||
+          (patch.patch.autoFilter != null && !validAutoFilter(sheet, patch.patch.autoFilter))
         ) {
           return false;
         }
@@ -3763,7 +3768,12 @@ export class StoreDataEngine {
           this.view.metadataChanged(patch.sheet);
         }
 
-        if (patch.patch.sortKeys !== undefined || patch.patch.filters !== undefined) {
+        const { autoFilter } = patch.patch;
+        if (
+          patch.patch.sortKeys !== undefined ||
+          patch.patch.filters !== undefined ||
+          autoFilter !== undefined
+        ) {
           if (patch.patch.sortKeys !== undefined) {
             sheet.sortKeys = patch.patch.sortKeys.map((key) => ({ ...key }));
           }
@@ -3774,6 +3784,9 @@ export class StoreDataEngine {
               cloneJsonValue(filter),
             ]);
           }
+
+          if (autoFilter === null) delete sheet.autoFilter;
+          else if (autoFilter !== undefined) sheet.autoFilter = cloneJsonValue(autoFilter);
 
           this.view.metadataChanged(patch.sheet);
         }
@@ -3998,8 +4011,11 @@ export class StoreDataEngine {
 
     const restored = this.restoreMovedItems(sheet, moved, patch, axis);
     this.refreshNamedFormulas();
+    if (sheet.autoFilter) {
+      sheet.autoFilter = { range: rebaseMovedRange(sheet.autoFilter.range, axis, patch) };
+    }
     if (axis === "row") this.view.rowsChanged(patch.sheet);
-    else this.view.columnsChanged(patch.sheet);
+    else this.view.columnsChanged(patch.sheet, moveAt);
     if (beforeCells && changes) this.pushPermutedChanges(span, beforeCells, changes);
     return restored;
   }
@@ -4292,7 +4308,7 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!name.ok) return false;
+    if (!canAddSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,
@@ -4312,6 +4328,7 @@ export class StoreDataEngine {
       sortKeys: cloneJsonValue(snapshot.sortKeys),
       sortState: cloneJsonValue(snapshot.sortState),
       filters: cloneJsonValue(snapshot.filters),
+      autoFilter: cloneJsonValue(snapshot.autoFilter),
       rowGroups: snapshot.rowGroups?.map((group) => ({ ...group })),
       tables: structuredClone(snapshot.tables),
       rowHeights: new Map(),
@@ -4497,8 +4514,9 @@ export class StoreDataEngine {
       )
       .filter((range): range is NonNullable<Workbook["namedRanges"]>[number] => range !== null);
     this.refreshNamedFormulas();
+    rebaseSheetAutoFilter(meta, axis, remap);
     if (axis === "row") this.view.rowsChanged(sheet);
-    else this.view.columnsChanged(sheet);
+    else this.view.columnsChanged(sheet, remap);
   }
 
   /**

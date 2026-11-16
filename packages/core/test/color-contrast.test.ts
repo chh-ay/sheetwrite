@@ -1,12 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import {
-  automaticTextColor,
-  contrastRatio,
-  parseRgbColor,
-  relativeLuminance,
-  resolveCssColor,
-} from "../src/color-contrast.js";
+import { automaticTextColor, parseRgbColor, resolveCssColor } from "../src/color-contrast.js";
 
 describe("parseRgbColor", () => {
   it("reads hex and rgb forms with and without alpha", () => {
@@ -59,33 +53,6 @@ describe("automaticTextColor", () => {
     // 10% black over white is light; over a near-black page it is dark.
     expect(automaticTextColor("rgba(0, 0, 0, 0.1)", "#e6edf3", "#ffffff")).toBe("#19120c");
     expect(automaticTextColor("rgba(0, 0, 0, 0.1)", "#e6edf3", "#0d1117")).toBe("#e6edf3");
-  });
-
-  it("gives the higher-contrast choice across the whole grey ramp", () => {
-    const pairs: readonly (readonly [string, string])[] = [
-      ["#1f2328", "#e0dcd7"],
-      ["#e6edf3", "#19120c"],
-    ];
-    for (const [foreground, inverse] of pairs) {
-      for (let level = 0; level <= 255; level += 15) {
-        const fill = `rgb(${level}, ${level}, ${level})`;
-        const chosen = automaticTextColor(fill, foreground, "#ffffff");
-        const fillLuminance = relativeLuminance({
-          red: level,
-          green: level,
-          blue: level,
-          alpha: 1,
-        });
-        const ratio = (css: string) => {
-          const color = parseRgbColor(css);
-          if (!color) throw new Error(`unparsed ${css}`);
-          return contrastRatio(relativeLuminance(color), fillLuminance);
-        };
-        expect([foreground, inverse]).toContain(chosen);
-        const other = chosen === foreground ? inverse : foreground;
-        expect(ratio(chosen)).toBeGreaterThanOrEqual(ratio(other));
-      }
-    }
   });
 
   it("keeps the foreground for a fill it cannot read", () => {

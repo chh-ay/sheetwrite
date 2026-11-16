@@ -91,8 +91,10 @@ import {
   visibleSheetNeighbor,
 } from "./store/ranges.js";
 import {
+  autoFilterPatch,
   clearViewPatch,
   columnFilterPatch,
+  reapplyFilterPatch,
   rowVisibilityPatches,
   viewSortPatch,
 } from "./store/view-patches.js";
@@ -123,6 +125,7 @@ import type {
 import type { AggregateOp } from "./types/data.js";
 import type {
   AddSheetInput,
+  AutoFilter,
   ColumnFilter,
   DataValidationRule,
   DocumentOp,
@@ -764,7 +767,8 @@ export class GridImpl implements Grid {
       onMutationRejected: (issues) => {
         for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
       },
-      onHistoryApplied: () => {
+      onHistoryApplied: (patches) => {
+        this.selectChangedCells(patches);
         this.emitSelection();
         this.render();
       },
@@ -1349,6 +1353,7 @@ export class GridImpl implements Grid {
         patch.op === "setSheetMeta" &&
         (patch.patch.sortKeys !== undefined ||
           patch.patch.filters !== undefined ||
+          patch.patch.autoFilter !== undefined ||
           patch.patch.rowGroups !== undefined)
       ) {
         effects |= RECONCILE_VIEW;
@@ -1840,6 +1845,49 @@ export class GridImpl implements Grid {
 
   private toViewRow(dataRow: number): number | null {
     return this.geometry.toViewRow(dataRow);
+  }
+
+  /**
+   * Select the cells that `patches` change on the active sheet and scroll to
+   * them, as Excel's undo and redo do. Row, column and object edits leave the
+   * selection alone.
+   */
+  private selectChangedCells(patches: readonly DocumentOp[]): void {
+    let top = Number.POSITIVE_INFINITY;
+    let left = Number.POSITIVE_INFINITY;
+    let bottom = -1;
+    let right = -1;
+    for (const patch of patches) {
+      const range =
+        patch.op === "set" || patch.op === "setNote"
+          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
+          : patch.op === "setRange" ||
+              patch.op === "setBlock" ||
+              patch.op === "restoreBlock" ||
+              patch.op === "setRangeStyle" ||
+              patch.op === "clearRange" ||
+              patch.op === "permuteRows"
+            ? patch.range
+            : null;
+      if (range?.sheet !== this.activeSheet) continue;
+      const first = this.toViewRow(range.start.row);
+      const last = this.toViewRow(range.end.row);
+      if (first === null || last === null) continue;
+      top = Math.min(top, first, last);
+      bottom = Math.max(bottom, first, last);
+      left = Math.min(left, range.start.col, range.end.col);
+      right = Math.max(right, range.start.col, range.end.col);
+    }
+    if (bottom < 0) return;
+
+    const sheet = this.activeSheet;
+    const start = { row: top, col: left };
+    this.selection.set(
+      top === bottom && left === right
+        ? { kind: "cell", addr: { sheet, ...start } }
+        : { kind: "range", range: { sheet, start, end: { row: bottom, col: right } } },
+    );
+    this.scrollToCell({ sheet, ...start });
   }
 
   private mergeAnchorAt(row: number, col: number): SelRect | null {
@@ -3407,6 +3455,46 @@ export class GridImpl implements Grid {
     return additions.length > 0 ? [...additions, ...patches] : patches;
   }
 
+  /**
+   * The view rows of the selected rectangle that holds the active cell. A
+   * whole-column selection gives only the active cell's row, so a row command
+   * never runs over the entire sheet.
+   */
+  private selectedRows(): { first: number; count: number } | null {
+    const rect = this.activeSelectionRect();
+    const focus = this.selection.focusCell;
+    if (!rect || !focus) return null;
+    const count = rect.r1 - rect.r0 + 1;
+    if (count === this.sheet().rowCount && count > 1) return { first: focus.row, count: 1 };
+    return { first: rect.r0, count };
+  }
+
+  /** The columns of the selected rectangle that holds the active cell; a whole row gives the active column. */
+  private selectedColumns(): { first: number; count: number } | null {
+    const rect = this.activeSelectionRect();
+    const focus = this.selection.focusCell;
+    if (!rect || !focus) return null;
+    const count = rect.c1 - rect.c0 + 1;
+    if (count === this.sheet().columns.length && count > 1) return { first: focus.col, count: 1 };
+    return { first: rect.c0, count };
+  }
+
+  private activeSelectionRect(): SelRect | null {
+    const focus = this.selection.focusCell;
+    if (!focus) return null;
+    let found: SelRect | null = null;
+    this.selection.forEachRect((rect) => {
+      if (
+        rect.r0 <= focus.row &&
+        focus.row <= rect.r1 &&
+        rect.c0 <= focus.col &&
+        focus.col <= rect.c1
+      )
+        found = rect;
+    });
+    return found;
+  }
+
   private buildActions(): GridActions {
     return {
       toggleBold: () => this.styleActions.toggleStyle("bold"),
@@ -3473,48 +3561,72 @@ export class GridImpl implements Grid {
         if (f) this.setViewSort([{ col: f.col, ascending }]);
       },
       customSort: () => showSortPanel(this),
+      // As in Excel, row and column commands act on every row or column of the
+      // selection, not only the active cell's.
       insertRowAbove: () => {
-        const f = this.selection.focusCell;
-        if (f) this.insertRows(this.toDataRow(f.row));
+        const rows = this.selectedRows();
+        if (rows) this.insertRows(this.toDataRow(rows.first), rows.count);
       },
       insertRowBelow: () => {
-        const f = this.selection.focusCell;
-        if (f) this.insertRows(this.toDataRow(f.row) + 1);
+        const rows = this.selectedRows();
+        if (rows) this.insertRows(this.toDataRow(rows.first + rows.count - 1) + 1, rows.count);
       },
       deleteRow: () => {
-        const f = this.selection.focusCell;
-        if (f) this.removeRows(this.toDataRow(f.row));
+        const rows = this.selectedRows();
+        if (!rows) return;
+        const dataRows = Array.from({ length: rows.count }, (_, index) =>
+          this.toDataRow(rows.first + index),
+        );
+        const first = dataRows[0] ?? 0;
+        if (dataRows.every((row, index) => row === first + index)) {
+          this.removeRows(first, rows.count);
+        } else {
+          // A sorted view can scatter the selected rows; remove the lowest first.
+          for (const row of dataRows.sort((left, right) => right - left)) this.removeRows(row);
+        }
       },
       insertColumnLeft: () => {
-        const f = this.selection.focusCell;
-        if (f) this.insertColumns(f.col);
+        const cols = this.selectedColumns();
+        if (cols) this.insertColumns(cols.first, cols.count);
       },
       insertColumnRight: () => {
-        const f = this.selection.focusCell;
-        if (f) this.insertColumns(f.col + 1);
+        const cols = this.selectedColumns();
+        if (cols) this.insertColumns(cols.first + cols.count, cols.count);
       },
       deleteColumn: () => {
-        const f = this.selection.focusCell;
-        if (f) this.removeColumns(f.col);
+        const cols = this.selectedColumns();
+        if (cols) this.removeColumns(cols.first, cols.count);
       },
       hideRows: (rows) => {
-        const focus = this.selection.focusCell;
-        const targets = rows ?? (focus ? [this.toDataRow(focus.row)] : []);
+        const span = this.selectedRows();
+        const targets =
+          rows ??
+          (span
+            ? Array.from({ length: span.count }, (_, index) => this.toDataRow(span.first + index))
+            : []);
         this.hideRows(targets);
       },
       showRows: (rows) => this.showRows(rows),
       autoFitRows: () => {
-        const focus = this.selection.focusCell;
-        if (!focus) return;
-        // `autoFitRows` takes view rows, the same space as the focus cell.
-        const row = focus.row;
+        const rows = this.selectedRows();
+        if (!rows) return;
+        // `autoFitRows` takes view rows, the same space as the selection.
         this.autoFitRows({
           sheet: this.activeSheet,
-          start: { row, col: 0 },
-          end: { row, col: Math.max(0, this.sheet().columns.length - 1) },
+          start: { row: rows.first, col: 0 },
+          end: {
+            row: rows.first + rows.count - 1,
+            col: Math.max(0, this.sheet().columns.length - 1),
+          },
         });
       },
-      hideColumns: (cols) => this.hideColumns(cols),
+      hideColumns: (cols) => {
+        const span = this.selectedColumns();
+        this.hideColumns(
+          cols ??
+            (span ? Array.from({ length: span.count }, (_, index) => span.first + index) : []),
+        );
+      },
       showColumns: (cols) => this.showColumns(cols),
       autoFitColumns: (cols) => this.autoFitColumns(cols),
       clearFilter: (col) => {
@@ -3938,6 +4050,23 @@ export class GridImpl implements Grid {
   setColumnFilter(col: number, filter: ColumnFilter | null): void {
     const patch = columnFilterPatch(this.sheet(), col, filter);
     if (patch) this.document.commit([patch], "structure");
+  }
+
+  setAutoFilter(range: Range | null): ApplyTransactionResult {
+    const patch = autoFilterPatch(this.sheet(), range);
+    if (!patch) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    return this.document.commit([patch], "structure");
+  }
+
+  getAutoFilter(): AutoFilter | null {
+    const autoFilter = this.sheet().autoFilter;
+    return autoFilter ? structuredClone(autoFilter) : null;
+  }
+
+  reapplyFilter(): ApplyTransactionResult {
+    const patch = reapplyFilterPatch(this.sheet());
+    if (!patch) return { status: "noop", epoch: this.storeEpoch, reason: "empty" };
+    return this.document.commit([patch], "structure");
   }
 
   getColumnFilters(): ReadonlyMap<number, ColumnFilter> {

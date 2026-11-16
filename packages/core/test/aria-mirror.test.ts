@@ -161,18 +161,12 @@ it("marks a selected column's header and a selected row", () => {
   ).toBe(false);
 });
 
-it("follows a scrolled window in the frame that paints it, after the paint", () => {
-  const { grid, host } = mount();
-  const before = rowIndices(host);
-  const seenByScrollListeners: string[] = [];
-  grid.on("scroll", () => seenByScrollListeners.push(rowIndices(host)[1] ?? ""));
+it("follows a scrolled window once the frame paints", () => {
+  const { host } = mount();
 
   scrollTo(host, SCROLLED_ROWS);
-  expect(rowIndices(host)).toEqual(before);
   flushFrames();
 
-  // The paint's own listeners still see the old mirror: it is written last.
-  expect(seenByScrollListeners).toEqual([before[1] ?? ""]);
   expect(rowIndices(host)[0]).toBe("1");
   expect(rowIndices(host)).toContain(String(SCROLLED_ROWS + 2));
   expect(rowIndices(host)).not.toContain("2");

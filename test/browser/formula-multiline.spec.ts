@@ -16,7 +16,8 @@ async function openEditor(page: Page, kind: "cell" | "bar"): Promise<Locator> {
   const nameBox = page.getByRole("textbox", { name: "Cell reference" });
   await nameBox.fill("G3");
   await nameBox.press("Enter");
-  if (kind === "cell") await page.keyboard.type("=");
+  // F2 opens Edit mode, where arrow keys move the caret instead of committing.
+  if (kind === "cell") await page.keyboard.press("F2");
   const editor =
     kind === "cell"
       ? page.locator("textarea.sheetwrite-editor")
