@@ -55,6 +55,8 @@ export class PaintedCells {
 
 export interface ReadWindowControllerOptions {
   renderer: () => Renderer;
+  /** Row header labels for view rows `rows`, or undefined when they are the view positions. */
+  rowNumbers: (rows: { start: number; end: number }) => Uint32Array | undefined;
   domOverlay: DomOverlay;
   overlayPainter: OverlayPainter;
   ariaMirror: AriaMirror;
@@ -382,6 +384,8 @@ export class ReadWindowController {
       viewport.rowTops = rowGeometry.rowTops;
       viewport.rowHeights = rowGeometry.rowHeights;
     }
+    const rowNumbers = this.options.rowNumbers(rows);
+    if (rowNumbers) viewport.rowNumbers = rowNumbers;
 
     this.options.renderer().setViewport(viewport);
 
@@ -518,6 +522,8 @@ export class ReadWindowController {
     const frozenGeometry =
       frozenRows > 0 ? this.options.geometry.frozenRowGeometry(frozenRows) : null;
     const panes: PanePaint[] = [];
+    const frozenNumbers = frozenRows > 0 ? this.options.rowNumbers(frozenRowWindow) : undefined;
+    const bodyNumbers = this.options.rowNumbers(bodyRows);
 
     const paneView = (
       rows: { start: number; end: number },
@@ -544,6 +550,7 @@ export class ReadWindowController {
         scrollLeft: 0,
         rowTops: frozenGeometry?.rowTops,
         rowHeights: frozenGeometry?.rowHeights,
+        rowNumbers: frozenNumbers,
       });
     }
 
@@ -555,6 +562,7 @@ export class ReadWindowController {
         scrollLeft,
         rowTops: frozenGeometry?.rowTops,
         rowHeights: frozenGeometry?.rowHeights,
+        rowNumbers: frozenNumbers,
       });
     }
 
@@ -566,6 +574,7 @@ export class ReadWindowController {
         scrollLeft: 0,
         rowTops: bodyGeometry?.rowTops,
         rowHeights: bodyGeometry?.rowHeights,
+        rowNumbers: bodyNumbers,
       });
     }
 
@@ -582,6 +591,7 @@ export class ReadWindowController {
       scrollLeft,
       rowTops: bodyGeometry?.rowTops,
       rowHeights: bodyGeometry?.rowHeights,
+      rowNumbers: bodyNumbers,
     });
     this.cachedPaneViews.length = panes.length;
 

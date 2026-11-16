@@ -586,7 +586,7 @@ export function paintFrame(
   damage?: PaintDamage,
   pane?: PaintDamage,
 ): void {
-  const { width, height, scrollTop, scrollLeft, rowTops, rowHeights } = viewport;
+  const { width, height, scrollTop, scrollLeft, rowTops, rowHeights, rowNumbers } = viewport;
   const { rowHeight, headerHeight } = theme;
   const colX = columnEdges(layout);
   const g = theme.rowHeaderWidth;
@@ -858,7 +858,7 @@ export function paintFrame(
       // the strip's background erase that half and slice the digits.
       if (bandTop + bandHeight < paintTop || bandTop > paintBottom) continue;
       const cy = bandTop + bandHeight / 2;
-      ctx.fillText(String(row + 1), g / 2, cy);
+      ctx.fillText(String(rowNumbers?.[ri] ?? row + 1), g / 2, cy);
     }
 
     ctx.restore();
