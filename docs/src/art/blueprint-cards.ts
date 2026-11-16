@@ -36,11 +36,19 @@ const PADDING = 14 + 10;
 /** Arrows that fan into one box land at least this far apart, clear of the geometry check's 8. */
 const FAN_ARROW_SPACING = 12;
 
-/** About how wide a box must be: the title is 13 px, captions 12 px, code 11 px mono. */
+/**
+ * About how wide a box must be: the title is 13 px, captions 12 px, code 11 px
+ * mono. A capital in the title is wider than the average letter, so a title
+ * such as "=SUM" or "KPI" keeps its room on the right.
+ */
 function boxWidth(box: CardBox): number {
+  const title = [...box.title].reduce(
+    (width, char) => width + (/\p{Lu}/u.test(char) ? 8.8 : 7.2),
+    0,
+  );
   return (
     Math.max(
-      box.title.length * 7.2,
+      title,
       ...(box.lines ?? []).map((line) => line.length * 6.2),
       ...(box.code ?? []).map((line) => line.length * 6.7),
     ) + PADDING
