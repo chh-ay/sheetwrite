@@ -290,6 +290,20 @@ describe("ClipboardController", () => {
     expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A3+B$2");
   });
 
+  it("repeats a copied cell over a larger selection, shifting each copy, as Excel does", async () => {
+    h.store.seed(1, 1, { kind: "formula", src: "=A2" }, 0);
+    h.select(1, 1);
+    await h.controller.copy();
+
+    h.selection.selectCell(3, 1);
+    h.selection.extendTo(5, 2);
+    await h.controller.paste();
+
+    expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A4");
+    expect(h.store.getFormula({ sheet: "s1", row: 5, col: 1 })).toBe("=A6");
+    expect(h.store.getFormula({ sheet: "s1", row: 4, col: 2 })).toBe("=B5");
+  });
+
   it("cut + paste preserves the formula verbatim and clears the source", async () => {
     h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
     h.select(1, 1);

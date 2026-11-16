@@ -65,6 +65,9 @@ interface Grid {
   filterBy(col: number, needle: string): void;
   setColumnFilter(col: number, filter: ColumnFilter | null): void;
   getColumnFilters(): ReadonlyMap<number, ColumnFilter>;
+  setAutoFilter(range: Range | null): ApplyTransactionResult;
+  getAutoFilter(): AutoFilter | null;
+  reapplyFilter(): ApplyTransactionResult;
   distinctValues(col: number, limit?: number): CellScalar[];
   hideRows(rows: readonly number[]): void;
   showRows(rows?: readonly number[]): void;
@@ -161,6 +164,7 @@ interface Grid {
 | [`sortBy(col, ascending?)`](/docs/api/core/grid/#grid-sort-by) / `sortRange(range, keys, options?)` | Sort cells in place, as Excel does; see [Data operations](/docs/features/data/data-operations/#sort-cells-in-place). |
 | `setViewSort(keys)` | Display-only sort; see [Data operations](/docs/features/data/data-operations/#display-views). |
 | [`filterBy(col, needle)`](/docs/api/core/grid/#grid-filter-by) / `setColumnFilter(col, filter)` / `getColumnFilters()` | Column filters that compose with sort, hidden rows, and row groups. `setColumnFilter(col, null)` removes one. |
+| [`setAutoFilter(range)`](/docs/api/core/grid/#grid-set-auto-filter) / `getAutoFilter()` / `reapplyFilter()` | Excel's AutoFilter: filter buttons on the first row of a range, whose rows below are the only ones column filters hide. `setAutoFilter(null)` turns it off; `reapplyFilter()` filters again after edits. |
 | [`distinctValues(col, limit?)`](/docs/api/core/grid/#grid-distinct-values) | First-seen distinct values for building filter menus. |
 | [`hideRows(rows)`](/docs/api/core/grid/#grid-hide-rows) / `showRows(rows?)` / `hiddenRows()` | Explicit row visibility separate from sort/filter state. |
 | [`hideColumns(cols?)`](/docs/api/core/grid/#grid-hide-columns) / `showColumns(cols?)` / `hiddenColumns()` | Bulk-safe persisted column visibility; omitted arguments target the focused column for hide and every column for show. |
