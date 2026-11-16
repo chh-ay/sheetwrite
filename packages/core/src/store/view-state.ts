@@ -1,18 +1,10 @@
-import type { DistinctColumn } from "@sheetwrite/wasm";
-
 import { SheetwriteError } from "../errors.js";
 import { cloneJsonValue } from "../plain-data.js";
 import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
-import {
-  autoFilterBody,
-  conditionCriterion,
-  intersectSortedRows,
-  keepOutsideAutoFilter,
-  rowsWithin,
-} from "./autofilter.js";
+import { conditionCriterion, keepOutsideAutoFilter } from "./autofilter.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
@@ -325,48 +317,34 @@ export class StoreViewState {
     col: number,
     limit: number,
     rows?: { start: number; end: number },
+    only?: Uint32Array,
   ): CellScalar[] {
     const handle = this.sheets.handleOf(sheet);
-    return decodeDistinct(
-      rows
-        ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit)
-        : this.wasm.distinctValues(handle, col, limit),
-    );
+    const column = rows
+      ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit, only)
+      : this.wasm.distinctValues(handle, col, limit);
+    const kinds = column.takeKinds();
+    const numbers = column.takeNumbers();
+    const texts = column.takeTexts();
+    column.free();
+
+    const out: CellScalar[] = new Array(kinds.length);
+    let numberAt = 0;
+    let textAt = 0;
+
+    for (let i = 0; i < kinds.length; i++) {
+      if (kinds[i] === KIND_NUMBER) out[i] = numbers[numberAt++] ?? null;
+      else if (kinds[i] === KIND_STRING) out[i] = texts[textAt++] ?? null;
+      else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
+      else out[i] = null;
+    }
+
+    return out;
   }
 
-  /**
-   * What an AutoFilter dropdown lists for `col`: the distinct values of the
-   * range's body rows that the other columns' filters keep, as Excel lists
-   * them, and of those, the values the column's own filter keeps (`null`
-   * when it has none, so every listed value is kept).
-   */
-  autoFilterValues(
-    sheet: SheetId,
-    col: number,
-    limit: number,
-  ): { values: CellScalar[]; kept: CellScalar[] | null } {
-    const meta = this.sheets.sheetMeta(sheet);
-    if (!meta.autoFilter) return { values: [], kept: null };
-
-    const handle = this.sheets.handleOf(sheet);
-    const body = autoFilterBody(meta.autoFilter);
-    const end = Math.min(body.end, meta.rowCount - 1);
-    const filters = new Map(meta.filters ?? []);
-    const own = filters.get(col);
-    filters.delete(col);
-    const candidates =
-      filters.size > 0 ? rowsWithin(this.runFilters(handle, filters), body.start, end) : null;
-    const values = candidates
-      ? decodeDistinct(this.wasm.distinctValuesOfRows(handle, col, candidates, limit))
-      : this.distinctValues(sheet, col, limit, { start: body.start, end: end + 1 });
-    if (!own) return { values, kept: null };
-
-    const passing = rowsWithin(this.runFilters(handle, new Map([[col, own]])), body.start, end);
-    const kept = candidates ? intersectSortedRows(passing, candidates) : passing;
-    return {
-      values,
-      kept: decodeDistinct(this.wasm.distinctValuesOfRows(handle, col, kept, limit)),
-    };
+  /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
+  filteredRows(sheet: SheetId, filters: ReadonlyMap<number, ColumnFilter>): Uint32Array {
+    return this.runFilters(this.sheets.handleOf(sheet), filters);
   }
 
   private recompute(sheet: SheetId): void {
@@ -652,25 +630,4 @@ export class StoreViewState {
     this.orderBySheet.delete(sheet);
     this.rowIndexBySheet.delete(sheet);
   }
-}
-
-/** A distinct-values result as scalars; the engine's buffers are freed. */
-function decodeDistinct(column: DistinctColumn): CellScalar[] {
-  const kinds = column.takeKinds();
-  const numbers = column.takeNumbers();
-  const texts = column.takeTexts();
-  column.free();
-
-  const out: CellScalar[] = new Array(kinds.length);
-  let numberAt = 0;
-  let textAt = 0;
-
-  for (let i = 0; i < kinds.length; i++) {
-    if (kinds[i] === KIND_NUMBER) out[i] = numbers[numberAt++] ?? null;
-    else if (kinds[i] === KIND_STRING) out[i] = texts[textAt++] ?? null;
-    else if (kinds[i] === KIND_BOOL) out[i] = (numbers[numberAt++] ?? 0) !== 0;
-    else out[i] = null;
-  }
-
-  return out;
 }

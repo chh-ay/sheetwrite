@@ -121,27 +121,3 @@ export function keepOutsideAutoFilter(
   for (let row = end; row < rowCount; row++) kept[at++] = row;
   return kept;
 }
-
-/** The rows of ascending `rows` from `start` to `end`, both included. */
-export function rowsWithin(rows: Uint32Array, start: number, end: number): Uint32Array {
-  return rows.subarray(lowerBound(rows, start), lowerBound(rows, end + 1));
-}
-
-/** The rows in both ascending row lists. */
-export function intersectSortedRows(left: Uint32Array, right: Uint32Array): Uint32Array {
-  const out = new Uint32Array(Math.min(left.length, right.length));
-  let count = 0;
-  let i = 0;
-  let j = 0;
-  while (i < left.length && j < right.length) {
-    const a = left[i]!;
-    const b = right[j]!;
-    if (a === b) {
-      out[count++] = a;
-      i++;
-      j++;
-    } else if (a < b) i++;
-    else j++;
-  }
-  return out.subarray(0, count);
-}
