@@ -35,6 +35,8 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   // Excel's Fill Down and Fill Right.
   fillDown: ["Mod+D"],
   fillRight: ["Mod+R"],
+  // Excel turns filters on and off with Ctrl+Shift+L.
+  toggleFilter: ["Mod+Shift+L"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;
