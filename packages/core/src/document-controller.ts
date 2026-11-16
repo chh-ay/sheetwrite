@@ -71,7 +71,8 @@ export interface DocumentControllerOptions {
   epoch: () => number;
   materializeVirtualColumns: (patches: DocumentOp[]) => DocumentOp[];
   onMutationRejected: (issues: MutationIssue[]) => void;
-  onHistoryApplied: () => void;
+  /** Called after an undo or redo applies, with the operations it applied. */
+  onHistoryApplied: (patches: readonly DocumentOp[]) => void;
   transactionResourceLimits?: Readonly<TransactionResourceLimits>;
   admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
   /** Only engine-owned callbacks may preserve payload measurements by identity. */
@@ -1445,7 +1446,7 @@ export class DocumentController {
     }
     if (outcome.status !== "applied") return outcome;
     this.rebaseHistoryFor(outcome.transaction.patches);
-    this.options.onHistoryApplied();
+    this.options.onHistoryApplied(outcome.transaction.patches);
     return outcome;
   }
 
