@@ -331,7 +331,60 @@ function resourceScenarios(): {
   };
 }
 
-function main(): void {
+/** `full` runs on a quiet machine (local or release); `smoke` runs on a shared CI runner. */
+export type BenchMode = "smoke" | "full";
+
+/** How much slower than the Map baseline a packed lookup may be in a full run. */
+const LOOKUP_P95_REGRESSION_LIMIT = 0.1;
+/**
+ * How much slower the packed lookup's fastest run may be than the Map
+ * baseline's in a smoke. Ten develop smokes on a loaded machine measured
+ * −0.39 to +0.12; a packed lookup slowed to twice its work measured +0.34 to
+ * +0.49.
+ */
+const LOOKUP_BEST_MEDIAN_REGRESSION_LIMIT = 0.25;
+
+/** The lookup gate of a run: the packed index against the Map baseline. */
+export interface LookupGate {
+  readonly name: "lookupP95" | "lookupBestMedian";
+  readonly regression: number;
+  readonly passed: boolean;
+}
+
+/**
+ * A full run, on a quiet machine, compares the median of the run p95s. The
+ * smoke runs on a shared runner, where a neighbour can double a run's p95 and
+ * even its median, but never makes a lookup faster: it compares each engine's
+ * fastest run median, with headroom from the spread such runs show.
+ */
+export function lookupGate(
+  mode: BenchMode,
+  baselineRuns: readonly Pick<IndexMetrics, "lookupMedianNs" | "lookupP95Ns">[],
+  packedRuns: readonly Pick<IndexMetrics, "lookupMedianNs" | "lookupP95Ns">[],
+): LookupGate {
+  if (mode === "full") {
+    const regression =
+      median(packedRuns.map((run) => run.lookupP95Ns)) /
+        median(baselineRuns.map((run) => run.lookupP95Ns)) -
+      1;
+    return {
+      name: "lookupP95",
+      regression,
+      passed: regression <= LOOKUP_P95_REGRESSION_LIMIT,
+    };
+  }
+  const regression =
+    Math.min(...packedRuns.map((run) => run.lookupMedianNs)) /
+      Math.min(...baselineRuns.map((run) => run.lookupMedianNs)) -
+    1;
+  return {
+    name: "lookupBestMedian",
+    regression,
+    passed: regression <= LOOKUP_BEST_MEDIAN_REGRESSION_LIMIT,
+  };
+}
+
+function main(mode: BenchMode): void {
   const runs: Record<Engine, IndexMetrics[]> = { map: [], packed: [] };
   for (let repeat = 0; repeat < REPEATS; repeat++) {
     const order: readonly Engine[] = repeat % 2 === 0 ? ["map", "packed"] : ["packed", "map"];
@@ -343,6 +396,7 @@ function main(): void {
   const resources = resourceScenarios();
   const heapReduction = 1 - packed.retained.jscTotalBytes / baseline.retained.jscTotalBytes;
   const lookupP95Regression = packed.lookupP95Ns / baseline.lookupP95Ns - 1;
+  const lookup = lookupGate(mode, runs.map, runs.packed);
   const gates = {
     absentFilteredRow: baseline.absentResult === null && packed.absentResult === null,
     actualDenseStorage:
@@ -355,7 +409,7 @@ function main(): void {
       baseline.retained.jscTotalBytes > 0 &&
       packed.retained.jscTotalBytes >= 0 &&
       heapReduction >= 0.5,
-    lookupP95: lookupP95Regression <= 0.1,
+    [lookup.name]: lookup.passed,
     coldBuild: packed.coldBuildMs <= baseline.coldBuildMs,
   };
 
@@ -363,6 +417,7 @@ function main(): void {
     JSON.stringify(
       {
         rows: ROWS,
+        mode,
         lookupsPerRun: LOOKUP_BATCHES * LOOKUPS_PER_BATCH,
         repeats: REPEATS,
         attribution:
@@ -372,6 +427,7 @@ function main(): void {
         resources,
         heapReduction,
         lookupP95Regression,
+        lookupGate: lookup,
         gates,
         runs,
       },
@@ -386,6 +442,6 @@ function main(): void {
 const workerEngine = process.argv[2] === "--worker" ? process.argv[3] : undefined;
 if (workerEngine === "map" || workerEngine === "packed") {
   console.log(JSON.stringify(runWorker(workerEngine)));
-} else {
-  main();
+} else if (import.meta.main) {
+  main(process.argv.includes("--smoke") ? "smoke" : "full");
 }

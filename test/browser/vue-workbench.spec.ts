@@ -125,15 +125,17 @@ test("sheet tabs rename, add and reorder by keyboard, and the host syncs every c
 }) => {
   await open(page);
   const ordersOptions = page.getByRole("button", { name: "Options for Orders sheet" });
+  // Insert comes first in the sheet menu, as in Excel.
+  const insertOption = page.getByRole("menuitem", { name: "Insert a sheet before Orders" });
   const renameOption = page.getByRole("menuitem", { name: "Rename Orders sheet" });
   await ordersOptions.focus();
   await page.keyboard.press("ArrowDown");
-  await expect(renameOption).toBeFocused();
+  await expect(insertOption).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(ordersOptions).toBeFocused();
   await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("ArrowDown");
-  await expect(renameOption).toBeFocused();
+  await expect(insertOption).toBeFocused();
   // A pointer press on a focused menu must not close it first (WebKit does not
   // focus pressed buttons).
   await renameOption.click();

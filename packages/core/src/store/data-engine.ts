@@ -3802,6 +3802,9 @@ export class StoreDataEngine {
           return false;
         }
 
+        // The protocol checked the color's format before the operation got here.
+        const { tabColor } = patch.patch;
+        if (tabColor !== undefined) sheet.tabColor = tabColor ?? undefined;
         if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
         if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
         if (patch.patch.conditionalFormats !== undefined) {
@@ -4362,6 +4365,7 @@ export class StoreDataEngine {
       name: name.name,
       ...dashboardFields(snapshot),
       visibility: snapshot.visibility,
+      tabColor: snapshot.tabColor,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),
       frozenRows: snapshot.frozenRows,

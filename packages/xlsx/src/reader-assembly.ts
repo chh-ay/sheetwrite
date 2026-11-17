@@ -318,6 +318,7 @@ export function buildWorkbookSheets(
       ...(source.state === "hidden" || source.state === "veryHidden"
         ? { visibility: source.state }
         : {}),
+      ...(source.tabColor ? { tabColor: source.tabColor } : {}),
       rowCount,
       columns,
       ...(source.frozenRows ? { frozenRows: source.frozenRows } : {}),

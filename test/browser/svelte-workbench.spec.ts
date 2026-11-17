@@ -58,7 +58,9 @@ test("svelte workbench boots synced and shows live presence", async ({ page }) =
   await expect(toggle).toHaveAttribute("aria-checked", "true");
   await expect(toggle).toHaveAccessibleName("Connected · Go offline");
   await expect(page.getByTestId("sync-status")).toHaveRole("status");
-  await expect(page.getByTestId("presence-list")).toContainText("Rina · HQ ops");
+  await expect(page.getByTestId("presence-list").locator('li[data-present="true"]')).toHaveText(
+    "Rina · HQ ops",
+  );
   // The colleague's selection is painted on the grid, labelled and inert.
   await page.evaluate(
     ({ row, col }) => window.__sheetwriteSvelteGrid?.scrollToCell({ sheet: "dispatch", row, col }),

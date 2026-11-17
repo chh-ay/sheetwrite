@@ -9,6 +9,8 @@ export interface SheetTabRecord {
   id: SheetId;
   name: string;
   visibility?: "visible" | "hidden" | "veryHidden";
+  /** The tab's color as `#RRGGBB`; absent shows the default tab. */
+  tabColor?: string;
 }
 
 /**
@@ -22,16 +24,26 @@ export function changesSheetTabs(operation: DocumentOp): boolean {
     operation.op === "removeSheet" ||
     operation.op === "renameSheet" ||
     operation.op === "moveSheet" ||
-    operation.op === "setSheetVisibility"
+    operation.op === "setSheetVisibility" ||
+    (operation.op === "setSheetMeta" && operation.patch.tabColor !== undefined)
   );
 }
 
+/** The sheet menu's Move or Copy… and Tab Color…, whose panels load on first use. */
+export type SheetTabCommand = "moveCopy" | "tabColor";
+
 export interface SheetTabsOptions {
   onActivate: (id: SheetId) => void;
-  onAdd?: () => SheetLifecycleResult;
+  /**
+   * Add a sheet at workbook position `index`, or after the last one. The add
+   * button and Shift+F11 add at the end; the sheet menu's Insert, before its sheet.
+   */
+  onAdd?: (index?: number) => SheetLifecycleResult;
   onRemove?: (id: SheetId) => SheetLifecycleResult;
   onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
+  /** Open a panel of `sheet-commands.ts` for sheet `id`; it shows itself with `showPanel`. */
+  onCommand?: (command: SheetTabCommand, id: SheetId) => void;
   onHide?: (id: SheetId) => SheetLifecycleResult;
   onUnhide?: (id: SheetId) => SheetLifecycleResult;
   /** Accessible tablist label (default "Sheets"). */
@@ -107,10 +119,11 @@ function feedbackFrom(result: SheetLifecycleResult): Omit<LifecycleFeedback, "sh
 export class SheetTabs {
   private readonly host: HTMLElement;
   private readonly onActivate: (id: SheetId) => void;
-  private readonly onAdd?: () => SheetLifecycleResult;
+  private readonly onAdd?: (index?: number) => SheetLifecycleResult;
   private readonly onRemove?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
+  private readonly onCommand?: (command: SheetTabCommand, id: SheetId) => void;
   private readonly onHide?: (id: SheetId) => SheetLifecycleResult;
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
   private readonly label: string;
@@ -122,6 +135,8 @@ export class SheetTabs {
   private focusedId: SheetId | null = null;
   private editing: RenameState | null = null;
   private menuSheetId: SheetId | null = null;
+  /** A panel shown in place of the open menu's items. */
+  private menuPanel: HTMLElement | null = null;
   /** Viewport position of the options trigger when the open menu was placed. */
   private menuAnchor: { left: number; top: number } | null = null;
   private feedback: LifecycleFeedback | null = null;
@@ -141,6 +156,7 @@ export class SheetTabs {
     this.onRemove = options.onRemove;
     this.onRename = options.onRename;
     this.onMove = options.onMove;
+    this.onCommand = options.onCommand;
     this.onHide = options.onHide;
     this.onUnhide = options.onUnhide;
     this.readOnly = options.readOnly ?? false;
@@ -375,6 +391,7 @@ export class SheetTabs {
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-label", `${sheet.name} sheet`);
     tab.setAttribute("aria-selected", active ? "true" : "false");
+    if (sheet.tabColor) tab.style.setProperty("--sheetwrite-tab-color", sheet.tabColor);
     if (this.feedback?.sheet === sheet.id) tab.setAttribute("aria-describedby", this.errorId);
     tab.tabIndex = sheet.id === this.focusedId ? 0 : -1;
     tab.draggable = !this.readOnly && this.onMove !== undefined;
@@ -494,7 +511,9 @@ export class SheetTabs {
 
   private hasSheetOptions(visibleCount: number): boolean {
     return (
+      this.onAdd !== undefined ||
       this.onRename !== undefined ||
+      this.onCommand !== undefined ||
       this.onHide !== undefined ||
       (this.onRemove !== undefined && visibleCount > 1)
     );
@@ -528,7 +547,9 @@ export class SheetTabs {
 
     options.appendChild(trigger);
 
-    if (this.menuSheetId === sheet.id) {
+    if (this.menuPanel) {
+      options.appendChild(this.menuPanel);
+    } else if (this.menuSheetId === sheet.id) {
       const menu = document.createElement("div");
       menu.id = this.menuId;
       menu.className = "sheetwrite-tab-menu";
@@ -538,12 +559,35 @@ export class SheetTabs {
       // of the menu and close it before the click; keep focus where it is.
       menu.addEventListener("mousedown", (event) => event.preventDefault());
 
+      const onAdd = this.onAdd;
+      if (onAdd) {
+        // Excel's Insert adds a sheet before this one.
+        const index = this.sheets.indexOf(sheet);
+        menu.appendChild(
+          this.createMenuItem("Insert", `Insert a sheet before ${sheet.name}`, "", () =>
+            this.performLifecycle(sheet.id, () => onAdd(index)),
+          ),
+        );
+      }
+
       if (this.onRename) {
         menu.appendChild(
           this.createMenuItem("Rename", `Rename ${sheet.name} sheet`, "F2", () => {
             this.clearMenuState();
             this.startRename(sheet.id);
           }),
+        );
+      }
+
+      const onCommand = this.onCommand;
+      if (onCommand) {
+        menu.append(
+          this.createMenuItem("Move or Copy…", `Move or copy ${sheet.name} sheet`, "", () =>
+            onCommand("moveCopy", sheet.id),
+          ),
+          this.createMenuItem("Tab Color…", `Tab color for ${sheet.name} sheet`, "", () =>
+            onCommand("tabColor", sheet.id),
+          ),
         );
       }
 
@@ -597,7 +641,7 @@ export class SheetTabs {
     button.tabIndex = -1;
     button.setAttribute("role", "menuitem");
     button.setAttribute("aria-label", label);
-    button.setAttribute("aria-keyshortcuts", shortcut);
+    if (shortcut) button.setAttribute("aria-keyshortcuts", shortcut);
     button.addEventListener("click", action);
     return button;
   }
@@ -773,15 +817,26 @@ export class SheetTabs {
     this.addMenuDismissListeners();
   }
 
+  /**
+   * Show `panel` in place of the items of sheet `id`'s open menu; it closes as
+   * the menu does. `sheet-commands.ts` builds the panels.
+   */
+  showPanel(id: SheetId, panel: HTMLElement): void {
+    if (this.menuSheetId !== id) return;
+    this.menuPanel = panel;
+    this.render();
+  }
+
   private clearMenuState(): SheetId | null {
     const id = this.menuSheetId;
     this.menuSheetId = null;
+    this.menuPanel = null;
     this.menuAnchor = null;
     this.removeMenuDismissListeners();
     return id;
   }
 
-  private closeMenu(restoreFocus: boolean): void {
+  closeMenu(restoreFocus: boolean): void {
     const id = this.clearMenuState();
     if (!id) return;
     this.host.querySelector<HTMLElement>(TAB_MENU_SELECTOR)?.remove();
@@ -861,7 +916,7 @@ export class SheetTabs {
     if (!(next instanceof Node) || !options?.contains(next)) this.closeMenu(false);
   };
 
-  private performLifecycle(
+  performLifecycle(
     id: SheetId,
     operation: () => SheetLifecycleResult,
     restoreOptions = false,
