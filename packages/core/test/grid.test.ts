@@ -658,6 +658,24 @@ describe("setBlock arrays at every entry point", () => {
     });
     return { entries, counter };
   };
+  /** Text over the byte limit of `limitedGrid`. */
+  const overLimit = "kept, now longer than the byte limit allows";
+  /** A grid whose byte limit fits `setBlock(["kept", "text"])` exactly. */
+  const limitedGrid = (workbook = makeWorkbook(4)) => {
+    const exact = validateTransactionResources([setBlock(["kept", "text"])]);
+    if (!exact.ok) throw new Error("expected a measurable block");
+    return new GridImpl(mountHost(), {
+      workbook,
+      transactionResourceLimits: { maxEncodedBytes: exact.encodedBytes },
+    });
+  };
+  /** Entry 0 becomes a getter that reads 1 the first time and `overLimit` after. */
+  const smallThenOverLimit = (operation: DocumentOp | undefined) => {
+    if (operation?.op !== "setBlock") throw new Error("expected a setBlock");
+    return withGetter<CellScalar>(operation.block.values, 0, (count) =>
+      count === 1 ? 1 : overLimit,
+    ).counter;
+  };
   const entryPoints: Array<
     [string, (grid: GridImpl, patches: DocumentOp[]) => ApplyTransactionResult]
   > = [
@@ -776,7 +794,81 @@ describe("setBlock arrays at every entry point", () => {
       });
       belowLimit.destroy();
     });
+
+    it(`${name} stores the measured values when an operation from a change event is sent again`, () => {
+      const grid = limitedGrid();
+      const emitted: DocumentOp[] = [];
+      grid.on("change", (event) => emitted.push(...event.transaction.patches));
+      expect(apply(grid, [setBlock(["kept", "text"])]).status).toBe("applied");
+      const kept = emitted[0];
+      if (!kept) throw new Error("expected the emitted setBlock");
+      const getter = smallThenOverLimit(kept);
+
+      expect(apply(grid, [kept]).status).toBe("applied");
+      expect(getter.reads).toBe(1);
+      expect(cellAt(grid, 0)).toBe(1);
+      grid.destroy();
+    });
+
+    it(`${name} rejects a hole that Array.prototype would fill`, () => {
+      const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
+      const holey: CellScalar[] = ["kept"];
+      holey.length = 2;
+      Object.defineProperty(Array.prototype, 1, {
+        value: "inherited",
+        configurable: true,
+        writable: true,
+      });
+      const result = (() => {
+        try {
+          return apply(grid, [setBlock(holey)]);
+        } finally {
+          delete (Array.prototype as unknown as Record<number, unknown>)[1];
+        }
+      })();
+      expect(result.status).toBe("rejected");
+      expect(cellAt(grid, 1)).toBeNull();
+      grid.destroy();
+    });
   }
+
+  it("re-measures an entry a permission callback turned into a getter", () => {
+    // The resolver is asked only about edits to a protected range.
+    const workbook = makeWorkbook(4);
+    const sheet = workbook.sheets[0];
+    if (!sheet) throw new Error("fixture is missing its sheet");
+    sheet.protectedRanges = [{ id: "locked", range }];
+    const grid = limitedGrid(workbook);
+    let installed = false;
+    grid.setProtectionResolver(({ operation }) => {
+      if (!installed) smallThenOverLimit(operation);
+      installed = true;
+      return "allow";
+    });
+
+    expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
+      "rejected",
+    );
+    expect(cellAt(grid, 0)).toBeNull();
+    grid.destroy();
+  });
+
+  it("re-measures an entry a sync guard turned into a getter", () => {
+    const grid = limitedGrid();
+    const disposeAdmission = registerGridTransactionAdmission(grid, {
+      reserve: (operations) => {
+        smallThenOverLimit(operations[0]);
+        return { ok: true, reservation: { cancel: () => {}, finish: () => {} } };
+      },
+    });
+
+    expect(grid.applyTransaction({ patches: [setBlock(["kept", "text"])] }).status).toBe(
+      "rejected",
+    );
+    expect(cellAt(grid, 0)).toBeNull();
+    disposeAdmission();
+    grid.destroy();
+  });
 
   it("grid.applyTransaction sends, undoes and redoes the value an entry getter returned once", () => {
     const grid = new GridImpl(mountHost(), { workbook: makeWorkbook(4) });
