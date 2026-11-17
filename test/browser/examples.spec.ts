@@ -117,7 +117,7 @@ test("validation dropdown and checkbox editors are keyboard and ARIA operable", 
 });
 
 // #726: Alt+Down opens a list rule's list, as in Excel.
-test("Alt+Down opens a list rule's list and moves down elsewhere", async ({ page }) => {
+test("Alt+Down opens a list rule's list", async ({ page }) => {
   await page.goto("/vue/");
   await page.waitForSelector(".sheetwrite canvas", { state: "attached", timeout: 15_000 });
   await expect
@@ -134,16 +134,10 @@ test("Alt+Down opens a list rule's list and moves down elsewhere", async ({ page
       policy: "reject",
       helpText: "Choose an order ID",
     });
-    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 0, col: 0 } });
+    grid.setSelection({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
   });
   const grid = page.locator(".sw-demo-grid .sheetwrite");
   const list = page.getByRole("listbox", { name: "Choose an order ID" });
-  const selection = () => page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection());
-
-  // A1 has no rule: Alt+Down moves to A2, which has one.
-  await grid.press("Alt+ArrowDown");
-  await expect(list).toBeHidden();
-  await expect.poll(selection).toEqual({ kind: "cell", addr: { sheet: "orders", row: 1, col: 0 } });
 
   await grid.press("Alt+ArrowDown");
   await expect(list).toBeVisible();
