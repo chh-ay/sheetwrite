@@ -721,8 +721,16 @@ export type DocumentOp =
    * may be on another sheet, as Excel's Cut and Paste does. The cells it
    * lands on are replaced, the cells it leaves are emptied, and every
    * reference to a moved cell follows it.
+   *
+   * With `shift`, it is Excel's Insert or Delete with Shift cells instead:
+   * `range` moves along one axis of its sheet, and references to every cell
+   * of its columns (rows, for a move along a row) from where it starts or
+   * lands to the sheet's edge follow the rule of inserted and deleted rows.
+   * Moving down or right inserts the cells it leaves; moving up or left
+   * deletes the cells between where it lands and where it started, so
+   * references to them become `#REF!`.
    */
-  | { op: "moveCells"; range: Range; to: CellAddress }
+  | { op: "moveCells"; range: Range; to: CellAddress; shift?: true }
   | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> }
   | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null }
   | { op: "addMerge"; sheet: SheetId; merge: MergeRange }

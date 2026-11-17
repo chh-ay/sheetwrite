@@ -2,7 +2,7 @@ import { capturedClearCells } from "./clear-capture.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_SHEET_ID } from "./grid-constants.js";
 import { restoreBlockFacts } from "./restore-block.js";
-import { cellRange, movedBlock, normalizedRange } from "./store/ranges.js";
+import { cellRange, movedBlock, movedCellBounds, normalizedRange } from "./store/ranges.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
@@ -777,9 +777,9 @@ export class RowBridge<
         }
       }
     } else if (operation.op === "moveCells") {
-      // The cells the block leaves and the cells it lands on; the store
-      // reports each new value as a change.
-      for (const range of [normalizedRange(operation.range), movedBlock(operation)]) {
+      // The cells the block leaves and the cells it lands on (for a shift,
+      // every cell from the first to the last); the store reports each new value as a change.
+      for (const range of movedCellBounds(operation)) {
         for (let row = range.start.row; row <= range.end.row; row += 1) {
           for (let col = range.start.col; col <= range.end.col; col += 1) {
             addresses.push({ sheet: range.sheet, row, col });

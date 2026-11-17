@@ -2934,6 +2934,7 @@ export class GridImpl implements Grid {
         grid: this,
         dialogs: this.dialogHost,
         style: this.styleDeps,
+        commit: (patches) => this.document.commit(patches, "structure").status === "applied",
         bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
         font: () => this.theme.font,
       };

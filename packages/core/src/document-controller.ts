@@ -39,8 +39,8 @@ import type { PermuteRowsOperation } from "./row-order.js";
 import { cloneQuery, findQuery } from "./saved-query.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import { cellBlockMove, type MoveCellsOperation } from "./store/move-cells.js";
-import { rangesIntersect } from "./store/ranges.js";
+import { cellBlockMove, type MoveCellsOperation, shiftDeletedCells } from "./store/move-cells.js";
+import { movedCellBounds, rangesIntersect } from "./store/ranges.js";
 import {
   type GridTransactionAdmissionDecision,
   setTransactionReplayRollback,
@@ -1158,12 +1158,19 @@ export class DocumentController {
    * the block landed on, the conditional formats of both sheets, and the
    * formulas elsewhere whose reference became `#REF!` or lost an edge. Each
    * block is captured before the move.
+   * A shift moves back by the opposite shift; its cells and items are those
+   * from the first block to the last, the cells a deletion closes included,
+   * and the merged cells it restores are those of the deleted cells.
    */
   private inverseMoveCells(patch: MoveCellsOperation): Array<DocumentOp | HistoryPart> {
-    const { from, to } = cellBlockMove(patch);
+    const move = cellBlockMove(patch);
+    const { from, to } = move;
+    const blocks = move.shift ? movedCellBounds(patch) : [to, from];
+    const landed = blocks[0]!;
+    const deleted = move.shift ? shiftDeletedCells(move) : to;
     const engine = storeEngine(this.options.store);
     const sheet = this.sheetById(to.sheet);
-    const meetsTarget = (range: Range) => rangesIntersect(range, to);
+    const meetsTarget = (range: Range) => rangesIntersect(range, landed);
     // A conditional format has no ID, so each sheet gets its whole list back.
     const formats = [...new Set([from.sheet, to.sheet])].map((id): DocumentOp => ({
       op: "setSheetMeta",
@@ -1171,9 +1178,13 @@ export class DocumentController {
       patch: { conditionalFormats: cloneJsonValue(this.sheetById(id)?.conditionalFormats ?? []) },
     }));
     return [
-      { op: "moveCells", range: to, to: { sheet: from.sheet, ...from.start } },
-      this.blockCells(to),
-      this.blockCells(from),
+      {
+        op: "moveCells",
+        range: to,
+        to: { sheet: from.sheet, ...from.start },
+        ...(move.shift ? { shift: true as const } : {}),
+      },
+      ...blocks.map((block) => this.blockCells(block)),
       ...(sheet?.notes ?? [])
         .filter((note) => meetsTarget({ sheet: to.sheet, start: note.addr, end: note.addr }))
         .map((note): DocumentOp => ({ op: "setNote", addr: { ...note.addr }, text: note.text })),
@@ -1193,12 +1204,14 @@ export class DocumentController {
         })),
       ...formats,
       ...(sheet?.merges ?? [])
-        .filter((merge) =>
-          meetsTarget({
-            sheet: to.sheet,
-            start: { row: merge.r0, col: merge.c0 },
-            end: { row: merge.r1, col: merge.c1 },
-          }),
+        .filter(
+          (merge) =>
+            deleted !== null &&
+            rangesIntersect(deleted, {
+              sheet: to.sheet,
+              start: { row: merge.r0, col: merge.c0 },
+              end: { row: merge.r1, col: merge.c1 },
+            }),
         )
         .map((merge): DocumentOp => ({ op: "addMerge", sheet: to.sheet, merge: { ...merge } })),
       ...(engine?.moveCellsLosses(patch) ?? []).map((addr) => this.snapshotCell(addr)),

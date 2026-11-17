@@ -386,6 +386,27 @@ export function movedBlock(patch: Extract<DocumentOp, { op: "moveCells" }>): Ran
 }
 
 /**
+ * The cells a `moveCells` operation reads or writes: the block and where it
+ * lands, or for a shift one range from the first of them to the last, which
+ * also holds the cells a deletion closes between them.
+ */
+export function movedCellBounds(patch: Extract<DocumentOp, { op: "moveCells" }>): Range[] {
+  const from = normalizedRange(patch.range);
+  const to = movedBlock(patch);
+  if (patch.shift !== true) return [from, to];
+  return [
+    {
+      sheet: from.sheet,
+      start: {
+        row: Math.min(from.start.row, to.start.row),
+        col: Math.min(from.start.col, to.start.col),
+      },
+      end: { row: Math.max(from.end.row, to.end.row), col: Math.max(from.end.col, to.end.col) },
+    },
+  ];
+}
+
+/**
  * The cells whose contents `patch` writes, which pivot output may own; null
  * for operations that write no cell contents, such as a style-only clear.
  */

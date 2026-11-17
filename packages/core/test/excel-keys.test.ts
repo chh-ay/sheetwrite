@@ -432,19 +432,20 @@ describe("insert and delete keys", () => {
     expect(title?.textContent).toBe("Insert");
     const choices = [...dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")];
     expect(choices.map((radio) => [radio.parentElement?.textContent, radio.disabled])).toEqual([
-      ["Shift cells right", true],
-      ["Shift cells down", true],
+      ["Shift cells right", false],
+      ["Shift cells down", false],
       ["Entire row", false],
       ["Entire column", false],
     ]);
-    // A wide range defaults to rows; the focus starts on the chosen option.
-    expect(document.activeElement).toBe(choices[2]!);
+    // A wide range defaults to Shift cells down; the focus starts on the chosen option.
+    expect(document.activeElement).toBe(choices[1]!);
+    choices[2]!.checked = true;
     await answerDialog(host, "OK");
     expect(sheet().rowCount).toBe(11);
     expect(value(2, 0)).toBe("Customer 1");
     expect(document.activeElement).toBe(host);
 
-    // A tall range defaults to columns, and Escape cancels.
+    // A tall range defaults to Shift cells left, and Escape cancels.
     select(0, 1, 3, 1);
     press("-", { ctrlKey: true, code: "Minus" });
     const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
@@ -455,10 +456,115 @@ describe("insert and delete keys", () => {
       "Entire row",
       "Entire column",
     ]);
-    expect(removeChoices[3]?.checked).toBe(true);
+    expect(removeChoices[0]?.checked).toBe(true);
     remove.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(remove.isConnected).toBe(false);
     expect(sheet().columns).toHaveLength(3);
+  });
+
+  // https://support.microsoft.com/en-us/office/insert-or-delete-cells-rows-and-columns-6f40e6e4-85af-45e0-b39d-65dd504a3246
+  it("shift cells up and down, and the formulas that refer to them follow", async () => {
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 2 },
+          value: { kind: "formula", src: "=A6" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 2 },
+          value: { kind: "formula", src: "=A3" },
+        },
+      ],
+    });
+    const choose = async (choice: number) => {
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[choice]!.checked = true;
+      await answerDialog(host, "OK");
+    };
+
+    // Delete A3:A4, Shift cells up: A5:A10 move to A3:A8.
+    select(2, 0, 3, 0);
+    press("-", { ctrlKey: true, code: "Minus" });
+    await choose(1);
+    expect([2, 7, 8, 9].map((row) => value(row, 0))).toEqual([
+      "Customer 4",
+      "Customer 9",
+      null,
+      null,
+    ]);
+    expect(formula(0, 2)).toBe("=A4");
+    expect(value(0, 2)).toBe("Customer 5");
+    expect(formula(1, 2)).toBe("=#REF!");
+    expect(value(2, 1)).toBe(20.5);
+
+    grid.actions.undo();
+    expect(value(2, 0)).toBe("Customer 2");
+    expect(formula(0, 2)).toBe("=A6");
+    expect(formula(1, 2)).toBe("=A3");
+
+    // Insert at A2, Shift cells down: A2:A10 would push Customer 9 off the sheet.
+    select(1, 0);
+    press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    await choose(1);
+    const notice = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    expect(notice.getAttribute("role")).toBe("alertdialog");
+    expect(notice.textContent).toContain("can't be shifted off the sheet");
+    await answerDialog(host, "OK");
+    expect(value(1, 0)).toBe("Customer 1");
+
+    // With A10 empty, they fit: A2:A9 move to A3:A10.
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 9, col: 0 },
+          value: { kind: "literal", value: null },
+        },
+      ],
+    });
+    select(1, 0);
+    press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    await choose(1);
+    expect([1, 2, 9].map((row) => value(row, 0))).toEqual([null, "Customer 1", "Customer 8"]);
+    expect(formula(0, 2)).toBe("=A7");
+    expect(formula(1, 2)).toBe("=A4");
+    expect(value(1, 1)).toBe(10.5);
+  });
+
+  it("shift cells right and left along their rows", async () => {
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 2 },
+          value: { kind: "literal", value: null },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 5, col: 0 },
+          value: { kind: "formula", src: "=B2" },
+        },
+      ],
+    });
+    // Insert at A2 (tall), Shift cells right: A2:B2 move to B2:C2.
+    select(1, 0);
+    press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[0]!.checked = true;
+    await answerDialog(host, "OK");
+    expect([0, 1, 2].map((col) => value(1, col))).toEqual([null, "Customer 1", 10.5]);
+    expect(formula(5, 0)).toBe("=C2");
+
+    // Delete A2, Shift cells left: B2:C2 move back.
+    select(1, 0);
+    press("-", { ctrlKey: true, code: "Minus" });
+    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    remove.querySelectorAll<HTMLInputElement>("input[type=radio]")[0]!.checked = true;
+    await answerDialog(host, "OK");
+    expect([0, 1, 2].map((col) => value(1, col))).toEqual(["Customer 1", 10.5, null]);
+    expect(formula(5, 0)).toBe("=B2");
   });
 });

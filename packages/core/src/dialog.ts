@@ -213,8 +213,6 @@ export function confirmDialog(
 interface DialogChoice {
   readonly value: string;
   readonly label: string;
-  /** Shown but not choosable. */
-  readonly disabled?: boolean;
 }
 
 /** What {@link choiceDialog} offers. */
@@ -250,7 +248,6 @@ function choiceDialog(
     radio.type = "radio";
     radio.name = name;
     radio.value = choice.value;
-    radio.disabled = choice.disabled === true;
     radio.checked = choice.value === options.initial;
     label.append(radio, choice.label);
     group.append(label);
@@ -278,12 +275,10 @@ function choiceDialog(
 /**
  * Excel's Insert (`insert`) or Delete dialog for a range that is neither
  * whole rows nor whole columns: Shift cells right or down (left or up on
- * delete), Entire row and Entire column. Shifting cells needs a move of the
- * cells beside the range that rewrites references, which the grid does not
- * have yet, so those two choices show disabled. Excel's default is Shift
- * cells down for a `wide` range and Shift cells right for a tall one; while
- * those are disabled the dialog starts on Entire row or Entire column, the
- * same way round. `result` resolves to `entireRow`, `entireColumn` or null.
+ * delete), Entire row and Entire column. As in Excel, it starts on Shift
+ * cells down (up) for a `wide` range and Shift cells right (left) for a tall
+ * one. `result` resolves to `shiftRight`, `shiftDown`, `entireRow`,
+ * `entireColumn` or null.
  */
 export function insertDeleteDialog(
   grid: DialogHost,
@@ -291,20 +286,11 @@ export function insertDeleteDialog(
   wide: boolean,
 ): { readonly result: Promise<string | null>; close(): void } {
   const choices = [
-    {
-      value: "shiftRight",
-      label: insert ? "Shift cells right" : "Shift cells left",
-      disabled: true,
-    },
-    { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up", disabled: true },
+    { value: "shiftRight", label: insert ? "Shift cells right" : "Shift cells left" },
+    { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up" },
     { value: "entireRow", label: "Entire row" },
     { value: "entireColumn", label: "Entire column" },
   ];
-  const preferred = wide ? "shiftDown" : "shiftRight";
-  const initial = choices.some((choice) => choice.value === preferred && !choice.disabled)
-    ? preferred
-    : wide
-      ? "entireRow"
-      : "entireColumn";
+  const initial = wide ? "shiftDown" : "shiftRight";
   return choiceDialog(grid, { title: insert ? "Insert" : "Delete", choices, initial });
 }

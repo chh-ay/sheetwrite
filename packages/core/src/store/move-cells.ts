@@ -4,7 +4,10 @@
  * hyperlinks, validation and conditional-format rules and merged cells go
  * with it and replace those of the cells it lands on. A range elsewhere
  * follows the block by the rule the engine uses for formula references
- * (`moveCellRange`).
+ * (`moveCellRange`). A shifting move (Excel's Insert or Delete with Shift
+ * cells) moves every item and range by the rule of inserted and deleted
+ * cells instead (`shiftCellRange`), and refuses to cut through a merged
+ * cell.
  */
 import { moveFormulaCellRefs } from "../a1.js";
 import type { CellHyperlink, ConditionalFormatRule } from "../types/cell.js";
@@ -14,14 +17,18 @@ import { cellRange, movedBlock, normalizedRange } from "./ranges.js";
 
 export type MoveCellsOperation = Extract<DocumentOp, { op: "moveCells" }>;
 
-/** The normalized source block of a move and the block it lands on. */
+/**
+ * The normalized source block of a move, the block it lands on, and whether
+ * it is Excel's Insert or Delete with Shift cells.
+ */
 export interface CellBlockMove {
   readonly from: Range;
   readonly to: Range;
+  readonly shift: boolean;
 }
 
 export function cellBlockMove(patch: MoveCellsOperation): CellBlockMove {
-  return { from: normalizedRange(patch.range), to: movedBlock(patch) };
+  return { from: normalizedRange(patch.range), to: movedBlock(patch), shift: patch.shift === true };
 }
 
 function holds(block: Range, sheet: SheetId, row: number, col: number): boolean {
@@ -99,6 +106,7 @@ const SHEET_LAST = { row: 1_048_575, col: 16_383 } as const;
  * sheet.
  */
 export function moveCellRange(range: Range, move: CellBlockMove): Range | null {
+  if (move.shift) return shiftCellRange(range, move);
   const bounds = normalizedRange(range);
   const { from, to } = move;
   if (holdsRange(from, bounds)) return shifted(bounds, move);
@@ -123,6 +131,90 @@ export function moveCellRange(range: Range, move: CellBlockMove): Range | null {
     };
   }
   return range;
+}
+
+/**
+ * The span `start..end` after `delta` indices are inserted (positive) or
+ * deleted (negative) at `at`, as inserted and deleted rows change a range:
+ * it grows or shrinks, and `null` when every index of it is deleted.
+ */
+function shiftedSpan(
+  start: number,
+  end: number,
+  at: number,
+  delta: number,
+): [number, number] | null {
+  if (delta >= 0) return [start >= at ? start + delta : start, end >= at ? end + delta : end];
+  const deletedEnd = at - delta;
+  if (end < at) return [start, end];
+  if (start >= deletedEnd) return [start + delta, end + delta];
+  if (start < at) return [start, end >= deletedEnd ? end + delta : at - 1];
+  return end >= deletedEnd ? [at, end + delta] : null;
+}
+
+/**
+ * Where `range` is after a shifting move, as the engine moves a reference
+ * (`CellMove::shift_fate`): inside the block's columns (rows, for a move
+ * along a row), inserting moves everything from the block's first row down
+ * and deleting removes the cells between where the block lands and where it
+ * starts. A range in deleted cells, or pushed past the sheet's edge, is
+ * lost: `null`. A range that also covers a column beside the block, or
+ * spans its sheet, keeps its place.
+ */
+export function shiftCellRange(range: Range, move: CellBlockMove): Range | null {
+  const bounds = normalizedRange(range);
+  const { from, to } = move;
+  if (bounds.sheet !== from.sheet) return range;
+  const [axis, across] = from.start.col === to.start.col ? AXES[0] : AXES[1];
+  const { start, end } = bounds;
+  const last = SHEET_LAST[axis];
+  if (
+    start[across] < from.start[across] ||
+    end[across] > from.end[across] ||
+    (start[axis] === 0 && end[axis] >= last)
+  ) {
+    return range;
+  }
+  const blockStart = from.start[axis];
+  const landing = to.start[axis];
+  const at = Math.min(blockStart, landing);
+  const span = shiftedSpan(start[axis], end[axis], at, landing - blockStart);
+  if (!span || span[0] > last) return null;
+  const movedEnd = Math.min(span[1], last);
+  if (span[0] === start[axis] && movedEnd === end[axis]) return range;
+  return {
+    sheet: bounds.sheet,
+    start: { ...start, [axis]: span[0] },
+    end: { ...end, [axis]: movedEnd },
+  };
+}
+
+/**
+ * The cells a shifting move changes: from where the block starts or lands,
+ * whichever is first, to the sheet's edge, in the block's columns (rows,
+ * for a move along a row).
+ */
+function shiftedArea(move: CellBlockMove): Range {
+  const { from, to } = move;
+  const [axis] = from.start.col === to.start.col ? AXES[0] : AXES[1];
+  const start = { ...from.start, [axis]: Math.min(from.start[axis], to.start[axis]) };
+  const end = { ...from.end, [axis]: SHEET_LAST[axis] };
+  return { sheet: from.sheet, start, end };
+}
+/**
+ * The cells a shifting move deletes: those between where the block lands
+ * and where it started, when it moves up or left; otherwise `null`.
+ */
+export function shiftDeletedCells(move: CellBlockMove): Range | null {
+  const { from, to } = move;
+  if (!move.shift) return null;
+  const [axis] = from.start.col === to.start.col ? AXES[0] : AXES[1];
+  if (to.start[axis] >= from.start[axis]) return null;
+  return {
+    sheet: from.sheet,
+    start: { ...from.start, [axis]: to.start[axis] },
+    end: { ...from.end, [axis]: from.start[axis] - 1 },
+  };
 }
 
 /** The lists of a sheet that hold items on ranges of cells, which a block move carries. */
@@ -151,6 +243,18 @@ function movedItems<T>(
   move: CellBlockMove,
   kind: ItemKind<T>,
 ): { from: T[]; to: T[] } {
+  if (move.shift) {
+    // A shift stays on one sheet; each item follows the rule of inserted
+    // and deleted cells, and one in deleted cells goes.
+    const items: T[] = [];
+    for (const item of fromItems) {
+      const range = kind.rangeOf(item);
+      const moved = shiftCellRange(range, move);
+      if (moved === range) items.push(item);
+      else if (moved) items.push(kind.placed(item, moved, move));
+    }
+    return { from: items, to: items };
+  }
   const moving: T[] = [];
   const keptFrom: T[] = [];
   for (const item of fromItems) {
@@ -191,7 +295,7 @@ const VALIDATION_RULES: ItemKind<DataValidationRule> = {
  */
 const CONDITIONAL_FORMATS: ItemKind<ConditionalFormatRule> = {
   rangeOf: (rule) => normalizedRange(rule.range),
-  placed: (rule, range, { from, to }) => {
+  placed: (rule, range, { from, to, shift }) => {
     if (rule.when.kind !== "formula") return { ...rule, range };
     const block = {
       row: from.start.row,
@@ -199,7 +303,7 @@ const CONDITIONAL_FORMATS: ItemKind<ConditionalFormatRule> = {
       rows: from.end.row - from.start.row + 1,
       cols: from.end.col - from.start.col + 1,
     };
-    const source = moveFormulaCellRefs(rule.when.source, block, to.start);
+    const source = moveFormulaCellRefs(rule.when.source, block, to.start, shift);
     return { ...rule, range, when: { kind: "formula", source } };
   },
   replaced: holdsRange,
@@ -259,6 +363,32 @@ export function movedMerges(
   toSheet: Sheet,
   move: CellBlockMove,
 ): { from: MergeRange[]; to: MergeRange[] } | null {
+  if (move.shift) {
+    // A merged cell inside the shifted cells moves whole, one in deleted
+    // cells goes, and one the shift would stretch, shrink or split stops it.
+    const area = shiftedArea(move);
+    const size = (range: Range) =>
+      `${range.end.row - range.start.row},${range.end.col - range.start.col}`;
+    const merges: MergeRange[] = [];
+    for (const merge of fromSheet.merges ?? []) {
+      const range = mergeRange(fromSheet.id, merge);
+      if (!meets(area, range)) {
+        merges.push(merge);
+        continue;
+      }
+      const moved = shiftCellRange(range, move);
+      if (moved === null) continue;
+      if (moved === range || size(moved) !== size(range)) return null;
+      merges.push({
+        ...merge,
+        r0: moved.start.row,
+        c0: moved.start.col,
+        r1: moved.end.row,
+        c1: moved.end.col,
+      });
+    }
+    return { from: merges, to: merges };
+  }
   const moving: MergeRange[] = [];
   const keptFrom: MergeRange[] = [];
   for (const merge of fromSheet.merges ?? []) {

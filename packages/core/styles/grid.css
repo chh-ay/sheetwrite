@@ -281,10 +281,6 @@
   gap: 6px;
 }
 
-.sheetwrite-dialog-choice:has(input:disabled) {
-  opacity: 0.55;
-}
-
 /* Format Cells (src/format-cells.ts): tabs over one panel at a time. */
 .sheetwrite-format-cells-dialog {
   width: min(440px, calc(100% - 32px));

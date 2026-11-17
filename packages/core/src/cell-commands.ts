@@ -5,10 +5,11 @@
  * of them, and keys pressed meanwhile wait for it.
  */
 
-import { type DialogHost, insertDeleteDialog } from "./dialog.js";
+import { type DialogHost, insertDeleteDialog, openDialog } from "./dialog.js";
 import type { SelRect } from "./selection.js";
 import { StyleActions, type StyleActionsDeps } from "./style-actions.js";
 import type { CellStyle } from "./types/cell.js";
+import type { CellAddress, Range } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
 import type { BorderPreset, Grid, KeyboardAction } from "./types/grid.js";
 
@@ -42,6 +43,8 @@ export interface CellCommandsHost {
   readonly dialogs: DialogHost;
   /** The selection, the store and the commit the style commands use. */
   readonly style: StyleActionsDeps;
+  /** Commit a structural change as one undoable step; whether it applied. */
+  commit(patches: DocumentOp[]): boolean;
   /** The sheet's row count and its first and last shown columns. */
   bounds(): readonly [rows: number, firstCol: number, lastCol: number];
   /** The theme's font shorthand, for the size and family an unstyled cell shows. */
@@ -127,7 +130,9 @@ function insertOrDelete(host: CellCommandsHost, insert: boolean): void {
   if (rect === null || host.style.readOnly()) return;
   const { actions } = host.grid;
   const run = (choice: string | null): void => {
-    if (choice === "entireRow") {
+    if (choice === "shiftDown" || choice === "shiftRight") {
+      shiftCells(host, rect, insert, choice === "shiftDown");
+    } else if (choice === "entireRow") {
       if (insert) actions.insertRowAbove();
       else actions.deleteRow();
     } else if (choice === "entireColumn") {
@@ -145,6 +150,131 @@ function insertOrDelete(host: CellCommandsHost, insert: boolean): void {
   // Excel's default choice follows the range's shape.
   const wide = rect.c1 - rect.c0 >= rect.r1 - rect.r0;
   void insertDeleteDialog(host.dialogs, insert, wide).result.then(run);
+}
+
+/** Excel's messages when Insert or Delete cannot shift the cells. */
+const SHIFT_OFF_SHEET =
+  "To prevent possible loss of data, cells that are not blank can't be shifted off the sheet.";
+const SHIFT_BLOCKED =
+  "The cells can't be shifted: a table, PivotTable, merged cell or spill range is in the way.";
+const SHIFT_IN_VIEW = "Cells can't be shifted while the sheet is sorted or filtered.";
+
+/** Tell the user why a shift did not happen; OK closes it and focus goes back to the grid. */
+function shiftNotice(host: CellCommandsHost, insert: boolean, message: string): void {
+  openDialog(host.dialogs, {
+    title: insert ? "Insert" : "Delete",
+    role: "alertdialog",
+    body: message,
+    buttons: [{ label: "OK", value: "ok", default: true }],
+    cancel: "ok",
+  });
+}
+
+/**
+ * The last cell from `from` on, along a line of the sheet (a column for a
+ * shift down, a row for a shift right), that holds a value or a formula;
+ * -1 when none does. `last` is the line's last index.
+ */
+function lastUsedAlong(
+  host: CellCommandsHost,
+  down: boolean,
+  line: number,
+  from: number,
+  last: number,
+): number {
+  const { store } = host.style;
+  const sheet = host.style.activeSheet();
+  const at = (index: number): CellAddress =>
+    down ? { sheet, row: index, col: line } : { sheet, row: line, col: index };
+  const used = (index: number) =>
+    store.getCell(at(index)).resolved !== null || store.getFormula(at(index)) !== null;
+  if (used(last)) return last;
+  if (!down) {
+    // A row has few cells: look at each from the end.
+    for (let index = last - 1; index >= from; index--) if (used(index)) return index;
+    return -1;
+  }
+  // A column can have a million: Ctrl+Up from its empty last cell reaches
+  // the data nearest the end, at one end of its block, and Ctrl+Down from
+  // there finds the block's far end, the last used cell.
+  let found = host.grid.dataEdge(last, line, -1, 0);
+  if (found === null) return last;
+  if (!used(found)) return -1;
+  if (found < last && used(found + 1)) found = host.grid.dataEdge(found, line, 1, 0) ?? last;
+  return found >= from ? found : -1;
+}
+
+/**
+ * Insert or Delete with Shift cells down (up) or right (left), as Excel
+ * does: one `moveCells` with `shift` of the used cells after the selection
+ * in its columns (rows), so references follow Excel's rule for inserted and
+ * deleted cells. An insert that would push cells that are not blank off the
+ * sheet does nothing, with Excel's message.
+ */
+function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down: boolean): void {
+  const { style } = host;
+  const sheet = style.sheet();
+  const sheetId = style.activeSheet();
+  const r0 = style.toDataRow(rect.r0);
+  const r1 = style.toDataRow(rect.r1);
+  if (r1 - r0 !== rect.r1 - rect.r0 || host.bounds()[0] !== sheet.rowCount) {
+    shiftNotice(host, insert, SHIFT_IN_VIEW);
+    return;
+  }
+  // Along the shift, then across it.
+  const [first, last] = down ? [r0, r1] : [rect.c0, rect.c1];
+  const [crossFirst, crossLast] = down ? [rect.c0, rect.c1] : [r0, r1];
+  const lastAlong = down ? sheet.rowCount - 1 : sheet.columns.length - 1;
+  const count = last - first + 1;
+  const at = (along: number, across: number) =>
+    down ? { row: along, col: across } : { row: across, col: along };
+  const span = (start: number, end: number): Range => ({
+    sheet: sheetId,
+    start: at(start, crossFirst),
+    end: at(end, crossLast),
+  });
+  const lastUsed = (from: number): number => {
+    let used = -1;
+    for (let line = crossFirst; line <= crossLast; line++) {
+      used = Math.max(used, lastUsedAlong(host, down, line, from, lastAlong));
+    }
+    return used;
+  };
+
+  let patch: DocumentOp;
+  if (insert) {
+    // The used cells from the selection on move; with none, one empty line
+    // still carries the references to the cells after it.
+    const used = lastUsed(first);
+    const end = Math.max(used, first);
+    if (end + count > lastAlong) {
+      if (used >= first) shiftNotice(host, insert, SHIFT_OFF_SHEET);
+      else host.commit([{ op: "clearRange", range: span(first, last) }]);
+      return;
+    }
+    patch = {
+      op: "moveCells",
+      range: span(first, end),
+      to: { sheet: sheetId, ...at(first + count, crossFirst) },
+      shift: true,
+    };
+  } else {
+    const below = last + 1;
+    if (below > lastAlong) {
+      host.commit([{ op: "clearRange", range: span(first, last) }]);
+      return;
+    }
+    // At least as many cells as are deleted move up, so they cover them;
+    // the engine empties what a shorter block at the sheet's edge leaves.
+    const end = Math.min(Math.max(lastUsed(below), below + count - 1), lastAlong);
+    patch = {
+      op: "moveCells",
+      range: span(below, end),
+      to: { sheet: sheetId, ...at(first, crossFirst) },
+      shift: true,
+    };
+  }
+  if (!host.commit([patch])) shiftNotice(host, insert, SHIFT_BLOCKED);
 }
 
 /**
