@@ -4,7 +4,7 @@ import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import { checkStylePart } from "./style-parts.js";
-import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";
+import type { HighlightRange, PresenceOverlay, Range, SheetId } from "./types/coordinates.js";
 import type { AutoFilter, CellNote, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
 
@@ -267,6 +267,16 @@ export interface OverlayPainterDeps {
   scheduleRender: () => void;
 }
 
+/** Where the four dash strips of a cut mark start, and where one step of their run ends. */
+const CUT_DASHES_FROM = "0 0, 0 100%, 0 0, 100% 0";
+const CUT_DASHES_TO = "8px 0, -8px 100%, 0 -8px, 100% 8px";
+
+/** Stop the dashes of a pooled div that marked a cut, so it can serve another rect. */
+function endCutDashes(el: HTMLDivElement): void {
+  el.removeAttribute("data-sheetwrite-cut");
+  for (const animation of el.getAnimations?.() ?? []) animation.cancel();
+}
+
 /**
  * Owns Layer 2 DOM: selection rectangles, fill affordances, search matches, and
  * manual cell highlights painted over the renderer output.
@@ -276,6 +286,8 @@ export class OverlayPainter {
   private readonly deps: OverlayPainterDeps;
   private manualHighlights: { ranges: readonly HighlightRange[]; color: string } | null = null;
   private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
+  /** The cells of a cut that waits for a paste, in data rows. */
+  private cutMark: Range | null = null;
 
   // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
   // `acquireRect` hands out `pool[cursor++]`, creating and appending a fresh
@@ -299,6 +311,7 @@ export class OverlayPainter {
 
   private highlightVersion = 0;
   private presenceVersion = 0;
+  private cutVersion = 0;
 
   // Repaints look up only the rows in the painted band. Each index rebuilds
   // when its items or the view order change, never on scroll.
@@ -326,6 +339,7 @@ export class OverlayPainter {
   private lastSelVersion = -1;
   private lastHighlightVersion = -1;
   private lastPresenceVersion = -1;
+  private lastCutVersion = -1;
   private lastSearchVersion = -1;
   private lastGeometryVersion = -1;
   private lastPaintNotes: readonly CellNote[] | undefined;
@@ -389,6 +403,13 @@ export class OverlayPainter {
     this.deps.scheduleRender();
   }
 
+  /** Mark the cells of a cut with a moving dashed border, as Excel does, or remove the mark. */
+  setCutMark(range: Range | null): void {
+    this.cutMark = range;
+    this.cutVersion += 1;
+    this.deps.scheduleRender();
+  }
+
   private getPresenceColorContext(): CanvasRenderingContext2D | null {
     if (this.presenceColorContext !== undefined) return this.presenceColorContext;
     this.presenceColorContext = document.createElement("canvas").getContext("2d");
@@ -424,6 +445,8 @@ export class OverlayPainter {
       this.paintFillHandle(theme, contentTop, scrollLeft);
     }
 
+    // As in Excel, the moving border of a cut shows over the selection.
+    this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
     this.hideSurplus();
     this.hideSurplusPresenceLabels();
@@ -490,6 +513,7 @@ export class OverlayPainter {
       selVersion === this.lastSelVersion &&
       this.highlightVersion === this.lastHighlightVersion &&
       this.presenceVersion === this.lastPresenceVersion &&
+      this.cutVersion === this.lastCutVersion &&
       searchVersion === this.lastSearchVersion &&
       geometryVersion === this.lastGeometryVersion &&
       notes === this.lastPaintNotes &&
@@ -515,6 +539,7 @@ export class OverlayPainter {
     this.lastSelVersion = selVersion;
     this.lastHighlightVersion = this.highlightVersion;
     this.lastPresenceVersion = this.presenceVersion;
+    this.lastCutVersion = this.cutVersion;
     this.lastSearchVersion = searchVersion;
     this.lastGeometryVersion = geometryVersion;
     this.lastPaintNotes = notes;
@@ -1266,6 +1291,64 @@ export class OverlayPainter {
     sq.style.cursor = "crosshair";
   }
 
+  /**
+   * Draw the cut mark as dashes that run clockwise around the cells, the
+   * "marching ants" of Excel; still dashes when the user asks for reduced
+   * motion. Every piece runs on the document timeline, so a repaint while
+   * scrolling does not restart the dashes.
+   */
+  private paintCutMark(
+    theme: Theme,
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const mark = this.cutMark;
+    if (!mark || mark.sheet !== this.deps.activeSheet()) return;
+    const first = this.deps.toViewRow(mark.start.row);
+    const last = this.deps.toViewRow(mark.end.row);
+    if (first === null || last === null) return;
+
+    const before = this.cursor;
+    this.appendClampedRange(
+      Math.min(first, last),
+      mark.start.col,
+      Math.max(first, last),
+      mark.end.col,
+      "transparent",
+      "transparent",
+      theme,
+      sheet,
+      contentTop,
+      scrollLeft,
+      clientW,
+      clientH,
+    );
+    const color = theme.selectionBorder;
+    const across = `linear-gradient(90deg, ${color} 50%, transparent 50%)`;
+    const down = `linear-gradient(0deg, ${color} 50%, transparent 50%)`;
+    const still =
+      typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    for (let index = before; index < this.cursor; index++) {
+      const el = this.pool[index];
+      if (!el) continue;
+      el.setAttribute("data-sheetwrite-cut", "");
+      el.style.outlineStyle = "none";
+      el.style.backgroundImage = `${across}, ${across}, ${down}, ${down}`;
+      el.style.backgroundRepeat = "repeat-x, repeat-x, repeat-y, repeat-y";
+      el.style.backgroundSize = "8px 2px, 8px 2px, 2px 8px, 2px 8px";
+      el.style.backgroundPosition = CUT_DASHES_FROM;
+      if (still || typeof el.animate !== "function") continue;
+      const dashes = el.animate(
+        [{ backgroundPosition: CUT_DASHES_FROM }, { backgroundPosition: CUT_DASHES_TO }],
+        { duration: 400, iterations: Number.POSITIVE_INFINITY },
+      );
+      dashes.startTime = 0;
+    }
+  }
+
   private colRight(col: number, sheet: Sheet): number {
     // Column widths persist in base units; display geometry is zoomed.
     return this.deps.colLeftOf(col) + (sheet.columns[col]?.width ?? 0) * this.deps.zoom();
@@ -1336,6 +1419,7 @@ export class OverlayPainter {
       el.style.display = "";
     }
     this.cursor++;
+    if (el.hasAttribute("data-sheetwrite-cut")) endCutDashes(el);
 
     el.style.clipPath = "";
     if (el.className) el.className = "";
@@ -1367,6 +1451,7 @@ export class OverlayPainter {
   private hideSurplus(): void {
     for (let i = this.cursor; i < this.pool.length; i++) {
       const el = this.pool[i]!;
+      if (el.hasAttribute("data-sheetwrite-cut")) endCutDashes(el);
       el.removeAttribute("data-sheetwrite-presence");
       // A hidden filter button must not stay one, for queries and styles alike.
       if (el.className) el.className = "";

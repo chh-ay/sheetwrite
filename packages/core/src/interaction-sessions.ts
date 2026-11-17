@@ -159,6 +159,8 @@ interface InteractionDependencies {
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Runs before a cell editor opens; hides the note card that would cover it. */
   onEditStart: () => void;
+  /** Ends the cut that waits for a paste; returns whether there was one. */
+  cancelCut: () => boolean;
   readOnly: () => boolean;
 }
 
@@ -1369,6 +1371,11 @@ export class InteractionSessions {
         // Excel clears the active cell and opens it for typing; Esc restores it.
         if (mod || e.altKey || !focus) return;
         this.beginEdit(focus.row, focus.col, "");
+        break;
+
+      case "Escape":
+        // Esc ends a cut's moving border, as in Excel.
+        if (!this.deps.cancelCut()) return;
         break;
 
       default:

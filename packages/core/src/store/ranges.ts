@@ -342,6 +342,7 @@ export function patchSheetId(patch: DocumentOp): SheetId | null {
     case "setRangeStyle":
     case "clearRange":
     case "permuteRows":
+    case "moveCells":
       return patch.range.sheet;
     case "addTable":
       return patch.table.range.sheet;
@@ -368,6 +369,19 @@ export function cellRange(addr: CellAddress): Range {
     sheet: addr.sheet,
     start: { row: addr.row, col: addr.col },
     end: { row: addr.row, col: addr.col },
+  };
+}
+
+/** The block of cells a `moveCells` operation lands on. */
+export function movedBlock(patch: Extract<DocumentOp, { op: "moveCells" }>): Range {
+  const from = normalizedRange(patch.range);
+  return {
+    sheet: patch.to.sheet,
+    start: { row: patch.to.row, col: patch.to.col },
+    end: {
+      row: patch.to.row + from.end.row - from.start.row,
+      col: patch.to.col + from.end.col - from.start.col,
+    },
   };
 }
 

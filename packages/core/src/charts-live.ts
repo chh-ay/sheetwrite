@@ -587,6 +587,14 @@ function classifyPatch(patch: DocumentOp, context: PatchContext): void {
       context.rebuild = true;
       return;
 
+    case "moveCells":
+      // The moved cells take their sources along, and both blocks change.
+      sheetWide(patch.range.sheet);
+      sheetWide(patch.to.sheet);
+      context.valuesChanged = true;
+      context.rebuild = true;
+      return;
+
     case "addSheet":
       for (const chart of patch.sheet.charts ?? []) {
         direct.push({ sheet: patch.sheet.id, id: chart.id });
