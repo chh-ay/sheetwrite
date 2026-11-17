@@ -13,6 +13,7 @@ use crate::calc::{
     shift_range, Ast, NamedRangeRef, ParseFeatures, StructuredRef, UnresolvedStructuredRef,
     WrittenNames,
 };
+use crate::cell_move::CellMove;
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DirtyRowWrite,
     DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS, MAX_DENSE_CELLS, MAX_LOCAL_PAGED_CELLS,
@@ -3760,7 +3761,25 @@ impl CellStore {
         self.graph.invalidate();
     }
 
-    fn drop_invalid_references(&mut self) {
+    /// Follow a block of cells that moves, in every formula and defined
+    /// name of the workbook. The cells themselves move afterwards.
+    pub(crate) fn move_cell_references(&mut self, edit: &CellMove) {
+        for (formula_sheet, sheet) in self.sheets.iter_mut().enumerate() {
+            sheet
+                .formulas
+                .rewrite_entries(&mut self.formula_slots, |entry| {
+                    entry.move_cells(formula_sheet as u32, edit);
+                });
+            sheet.formulas.mark_all_dirty();
+        }
+
+        let mut changed = Vec::new();
+        self.move_named_cells(edit, &mut changed);
+        self.rebind_name_users(changed);
+    }
+
+    /// Remove reference cells whose target an edit deleted.
+    pub(crate) fn drop_invalid_references(&mut self) {
         for (sheet_index, sheet) in self.sheets.iter_mut().enumerate() {
             let invalid: Vec<_> = sheet
                 .formulas

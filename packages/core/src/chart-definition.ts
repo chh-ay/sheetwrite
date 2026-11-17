@@ -356,7 +356,7 @@ export function chartTouchesSheet(chart: ChartDefinition, owner: SheetId, sheet:
 }
 
 /** Apply `map` to every live source; unchanged charts keep their identity. */
-function mapChartSources(
+export function mapChartSources(
   chart: ChartDefinition,
   map: (range: Range) => ChartRange,
 ): ChartDefinition {

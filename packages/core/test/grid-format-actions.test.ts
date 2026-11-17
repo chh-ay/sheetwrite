@@ -4,7 +4,6 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellStyle, Workbook } from "../src/types.js";
-import { answerDialog } from "./fixtures.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -58,7 +57,7 @@ function setup(columnStyle?: CellStyle) {
       range: { sheet: "s1", start: { row, col }, end: { row: endRow, col: endCol } },
     });
   const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col });
-  return { grid, store, host, select, cell };
+  return { grid, store, select, cell };
 }
 
 it("keeps other border sides and undoes a whole edge preset once", () => {
@@ -81,11 +80,10 @@ it("keeps other border sides and undoes a whole edge preset once", () => {
   expect(cell(1, 0).style.border).toEqual({ left });
 });
 
-it("merges and centers in one undo step", async () => {
-  const { grid, store, host, select, cell } = setup();
+it("merges and centers in one undo step", () => {
+  const { grid, store, select, cell } = setup();
   select(0, 0, 0, 1);
   grid.actions.mergeAndCenter();
-  await answerDialog(host, "OK");
   expect(cell(0, 0).style.align).toBe("center");
   expect(cell(0, 1).resolved).toBeNull();
   expect(store.getWorkbook().sheets[0]?.merges).toHaveLength(1);
