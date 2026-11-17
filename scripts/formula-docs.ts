@@ -219,12 +219,10 @@ function snakeCase(name: string): string {
  * both names (`criteria_range, criteria`), and an argument after the
  * repeating one the name at the same place from the end of the line.
  */
-function excelArgumentNames(
-  args: readonly FormulaArgument[],
-  syntax: string,
-): string[] {
-  const parts = syntaxArguments(syntax.slice(syntax.indexOf("(") + 1, syntax.lastIndexOf(")")))
-    .filter((part) => part !== "…");
+function excelArgumentNames(args: readonly FormulaArgument[], syntax: string): string[] {
+  const parts = syntaxArguments(
+    syntax.slice(syntax.indexOf("(") + 1, syntax.lastIndexOf(")")),
+  ).filter((part) => part !== "…");
   const repeating = args.findIndex((argument) => argument.repeat !== "once");
   const single = (part: string | undefined, argument: FormulaArgument, repeats = false) =>
     part === undefined || part.includes(",")

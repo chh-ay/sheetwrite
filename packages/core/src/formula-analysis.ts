@@ -590,7 +590,12 @@ function choiceCompletion(
   const to = cursor + (/^[\w."]*/.exec(text.slice(cursor))?.[0].length ?? 0);
   const matches = choices
     .filter((choice) => startsWith(choice.value, prefix))
-    .map(({ value, description }) => ({ kind: "choice" as const, name: value, insert: value, description }));
+    .map(({ value, description }) => ({
+      kind: "choice" as const,
+      name: value,
+      insert: value,
+      description,
+    }));
   return matches.length === 0 ? null : { from, to, matches };
 }
 

@@ -155,7 +155,12 @@ function editDistance(left: string, right: string, limit: number): number {
         (current[col - 1] ?? 0) + 1,
         (previous[col - 1] ?? 0) + (same ? 0 : 1),
       );
-      if (row > 1 && col > 1 && left[row - 1] === right[col - 2] && left[row - 2] === right[col - 1]) {
+      if (
+        row > 1 &&
+        col > 1 &&
+        left[row - 1] === right[col - 2] &&
+        left[row - 2] === right[col - 1]
+      ) {
         cost = Math.min(cost, (before[col - 2] ?? 0) + 1);
       }
       current.push(cost);
@@ -261,7 +266,11 @@ function syntaxFix(
  * The defined names a formula on `sheet` sees, the workbook's tables, and
  * the table that holds `cell`, for the completion list.
  */
-function formulaNames(store: Store, sheet: SheetId, cell: Readonly<CellAddress> | null): FormulaNames {
+function formulaNames(
+  store: Store,
+  sheet: SheetId,
+  cell: Readonly<CellAddress> | null,
+): FormulaNames {
   const workbook = store.getWorkbook();
   const names = new Set<string>();
   for (const defined of workbook.namedRanges ?? []) {
