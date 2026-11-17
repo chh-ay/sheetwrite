@@ -3,7 +3,13 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellChange, Grid } from "../src/types.js";
-import { makeColumnarData, makeWorkbook } from "./fixtures.js";
+import {
+  answerDialog,
+  elementAdded,
+  makeColumnarData,
+  makeWorkbook,
+  mountHost,
+} from "./fixtures.js";
 
 let restoreCanvasStubs: () => void;
 
@@ -20,11 +26,7 @@ afterEach(() => {
   document.body.innerHTML = "";
 });
 
-function makeGrid(rowCount = 10): Grid {
-  const host = document.createElement("div");
-  Object.defineProperty(host, "clientWidth", { value: 800, configurable: true });
-  Object.defineProperty(host, "clientHeight", { value: 400, configurable: true });
-  document.body.appendChild(host);
+function makeGrid(rowCount = 10, host = mountHost()): Grid {
   return createGrid(host, {
     workbook: makeWorkbook(rowCount),
     data: makeColumnarData(rowCount),
@@ -33,8 +35,9 @@ function makeGrid(rowCount = 10): Grid {
 }
 
 describe("StyleActions merge policy", () => {
-  it("restores formula and reference sources and styles when undoing a merge", () => {
-    const grid = makeGrid(4);
+  it("restores formula and reference sources and styles when undoing a merge", async () => {
+    const host = mountHost();
+    const grid = makeGrid(4, host);
     const anchor = { sheet: "s1", row: 1, col: 0 };
     const covered = { ...anchor, row: 2, col: 1 };
     const target = { ...anchor, row: 0, col: 1 };
@@ -56,6 +59,7 @@ describe("StyleActions merge policy", () => {
     });
 
     grid.actions.merge();
+    await answerDialog(host, "OK");
     expect(grid.store.getCell(covered).resolved).toBeNull();
     grid.actions.undo();
     expect(grid.store.getFormula(anchor)).toBe("=B1*2");
@@ -135,8 +139,9 @@ describe("StyleActions merge policy", () => {
     grid.destroy();
   });
 
-  it("keeps anchor content, clears covered cells, and restores the merge with one undo", () => {
-    const grid = makeGrid(4);
+  it("keeps anchor content, clears covered cells, and restores the merge with one undo", async () => {
+    const host = mountHost();
+    const grid = makeGrid(4, host);
     const addresses = [
       { sheet: "s1", row: 1, col: 0 },
       { sheet: "s1", row: 1, col: 1 },
@@ -160,6 +165,7 @@ describe("StyleActions merge policy", () => {
     });
 
     grid.actions.merge();
+    await answerDialog(host, "OK");
 
     expect(grid.store.getWorkbook().sheets[0]!.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
     expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
@@ -178,5 +184,100 @@ describe("StyleActions merge policy", () => {
       "value-3",
     ]);
     grid.destroy();
+  });
+
+  describe("warning before values are dropped, as in Excel", () => {
+    const a6 = { sheet: "s1", row: 5, col: 0 };
+    const b6 = { sheet: "s1", row: 5, col: 1 };
+
+    /** A grid with `m1` in A6 and `m2` in B6, and A6:B6 selected. */
+    function twoValues(): { host: HTMLDivElement; grid: Grid } {
+      const host = mountHost();
+      const grid = makeGrid(10, host);
+      grid.applyTransaction({
+        patches: [
+          { op: "set", addr: a6, value: { kind: "literal", value: "m1" } },
+          { op: "set", addr: b6, value: { kind: "literal", value: "m2" } },
+        ],
+      });
+      grid.setSelection({ kind: "range", range: { sheet: "s1", start: a6, end: b6 } });
+      return { host, grid };
+    }
+
+    const merges = (grid: Grid) => grid.store.getWorkbook().sheets[0]!.merges ?? [];
+
+    it("asks first, in a labelled alert dialog, and merges after OK", async () => {
+      const { host, grid } = twoValues();
+      grid.actions.mergeAndCenter();
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+
+      expect(merges(grid)).toEqual([]);
+      expect(grid.store.getCell(b6).resolved).toBe("m2");
+      expect(dialog.getAttribute("role")).toBe("alertdialog");
+      expect(dialog.getAttribute("aria-modal")).toBe("true");
+      const title = document.getElementById(dialog.getAttribute("aria-labelledby") ?? "");
+      expect(title?.textContent).toBe("Merge Cells");
+      const message = document.getElementById(dialog.getAttribute("aria-describedby") ?? "");
+      expect(message?.textContent).toBe(
+        "Merging cells only keeps the upper-left value and discards other values.",
+      );
+      expect(document.activeElement?.textContent).toBe("OK");
+
+      await answerDialog(host, "OK");
+      expect(host.querySelector(".sheetwrite-dialog")).toBeNull();
+      expect(document.activeElement).toBe(host);
+      expect(merges(grid)).toEqual([{ r0: 5, c0: 0, r1: 5, c1: 1 }]);
+      expect(grid.store.getCell(a6)).toMatchObject({ resolved: "m1", style: { align: "center" } });
+      expect(grid.store.getCell(b6).resolved).toBeNull();
+      grid.actions.undo();
+      expect(merges(grid)).toEqual([]);
+      expect(grid.store.getCell(b6).resolved).toBe("m2");
+      grid.destroy();
+    });
+
+    it("keeps every value on Cancel or Escape, and keeps grid keys out", async () => {
+      const { host, grid } = twoValues();
+      grid.actions.merge();
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      // Delete would clear the selection if it reached the grid.
+      document.activeElement?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
+      );
+      await answerDialog(host, "Cancel");
+      expect(merges(grid)).toEqual([]);
+      expect(grid.store.getCell(a6).resolved).toBe("m1");
+      expect(grid.store.getCell(b6).resolved).toBe("m2");
+      expect(document.activeElement).toBe(host);
+      expect(dialog.isConnected).toBe(false);
+
+      grid.actions.merge();
+      const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      again.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(again.isConnected).toBe(false);
+      expect(merges(grid)).toEqual([]);
+      expect(grid.store.getCell(b6).resolved).toBe("m2");
+      grid.destroy();
+    });
+
+    it("keeps Tab inside the dialog, and Enter chooses OK", async () => {
+      const { host, grid } = twoValues();
+      grid.actions.merge();
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const [ok, cancel] = dialog.querySelectorAll("button");
+      cancel!.focus();
+      cancel!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
+      expect(document.activeElement).toBe(ok!);
+      ok!.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Tab", shiftKey: true, bubbles: true }),
+      );
+      expect(document.activeElement).toBe(cancel!);
+
+      dialog.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(merges(grid)).toEqual([{ r0: 5, c0: 0, r1: 5, c1: 1 }]);
+      expect(grid.store.getCell(b6).resolved).toBeNull();
+      grid.destroy();
+    });
   });
 });
