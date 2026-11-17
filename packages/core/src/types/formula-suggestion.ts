@@ -34,6 +34,11 @@ export interface FormulaSheetReads {
   /** Excel's current region around a cell (Ctrl+*): the block bounded by empty rows and columns. */
   region(sheet: SheetId, row: number, col: number): Range | null;
   /**
+   * The range the AutoSum command sums for a cell: the run of numbers right
+   * above it, or else right to its left; `null` when there is none.
+   */
+  autoSumRange(sheet: SheetId, row: number, col: number): Range | null;
+  /**
    * `source` copied `dRow` rows and `dCol` columns away: its relative
    * references move, as a fill or paste moves them.
    */

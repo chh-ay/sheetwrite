@@ -1,14 +1,26 @@
-// The predictor: the candidates each signal proposes for one formula edit,
-// ranked into at most one suggestion. This module is the add-on's lazy chunk;
-// the add-on entry loads it on the first formula edit.
+// The predictor: opens each signal for one formula edit and, on every key,
+// ranks their candidates into at most one suggestion. This module is the
+// add-on's lazy chunk; the add-on entry loads it on the first formula edit.
 
 import type { FormulaAnalysis, FormulaEdit, FormulaSuggestion } from "@sheetwrite/core";
 
-/** The signals, strongest first, as #801 lists them. */
-export const SIGNALS = ["neighbours", "shape", "roles", "patterns", "syntax"] as const;
+import {
+  type Candidate,
+  type Choice,
+  choose,
+  continues,
+  LEAD,
+  type OpenSignal,
+  rank,
+  type Signal,
+  SIGNALS,
+  type SignalName,
+} from "./candidates.js";
+import { openNeighbours } from "./signals/neighbours.js";
+import { openShape } from "./signals/shape.js";
+import { openSyntax } from "./signals/syntax.js";
 
-/** One signal's name. */
-export type SignalName = (typeof SIGNALS)[number];
+export { SIGNALS, type SignalName } from "./candidates.js";
 
 /** A suggestion and the signal that made it, for the benchmark's per-signal report. */
 export interface Prediction extends FormulaSuggestion {
@@ -27,19 +39,88 @@ export interface PredictorOptions {
   readonly signals: readonly SignalName[];
 }
 
+/** The signals built so far, by name. */
+const OPEN_SIGNAL: Partial<Record<SignalName, OpenSignal>> = {
+  neighbours: openNeighbours,
+  shape: openShape,
+  syntax: openSyntax,
+};
+
 const ALL_SIGNALS: PredictorOptions = { signals: SIGNALS };
 
-/**
- * Open the suggestions of one formula edit. With no signal built yet, the
- * session suggests nothing and the formula bar behaves as Excel's.
- */
+/** The suggestion on screen: the text it was shown after, and what it inserts. */
+interface Shown {
+  readonly text: string;
+  readonly choice: Choice;
+}
+
+/** Letter case aside, so a dismissed formula stays dismissed however it is typed. */
+function formulaKey(formula: string): string {
+  return formula.toUpperCase();
+}
+
+class Session implements PredictionSession {
+  private readonly signals: Signal[];
+  private shown: Shown | null = null;
+  /** Formulas the user dismissed in this edit; they are not suggested again. */
+  private readonly dismissed = new Set<string>();
+
+  constructor(edit: FormulaEdit, options: PredictorOptions) {
+    this.signals = options.signals.flatMap((name) => {
+      const open = OPEN_SIGNAL[name];
+      return open === undefined ? [] : [open(edit)];
+    });
+  }
+
+  suggest(text: string, analysis: FormulaAnalysis): Prediction | null {
+    if (!text.startsWith("=")) {
+      this.shown = null;
+      return null;
+    }
+
+    const candidates: Candidate[] = [];
+    for (const signal of this.signals) {
+      for (const candidate of signal.candidates(text, analysis)) {
+        if (!this.dismissed.has(formulaKey(candidate.formula))) candidates.push(candidate);
+      }
+    }
+    const choice = this.steady(text, choose(rank(text, candidates)));
+    this.shown = choice === null ? null : { text, choice };
+    return choice === null ? null : { text: choice.text, signal: choice.signal };
+  }
+
+  /**
+   * Keep the suggestion on screen while the user types it: it is replaced
+   * only by a different one that is clearly likelier, so it doesn't flicker.
+   */
+  private steady(text: string, choice: Choice | null): Choice | null {
+    const shown = this.shown;
+    if (shown === null) return choice;
+
+    const formula = shown.text + shown.choice.text;
+    if (!continues(formula, text)) return choice;
+
+    const rest = { ...shown.choice, text: formula.slice(text.length) };
+    if (choice === null || choice.text === rest.text) return rest;
+    return choice.confidence >= shown.choice.confidence + LEAD ? choice : rest;
+  }
+
+  feedback(event: "accept" | "accept-word" | "dismiss"): void {
+    const shown = this.shown;
+    if (event !== "dismiss" || shown === null) return;
+    this.dismissed.add(formulaKey(shown.text + shown.choice.text));
+    this.shown = null;
+  }
+
+  close(): void {
+    this.shown = null;
+  }
+}
+
+/** Open the suggestions of one formula edit. */
 export function openPrediction(
-  _edit: FormulaEdit,
-  _options: PredictorOptions = ALL_SIGNALS,
+  edit: FormulaEdit,
+  options: PredictorOptions = ALL_SIGNALS,
 ): PredictionSession {
-  return {
-    suggest: () => null,
-    feedback: () => undefined,
-    close: () => undefined,
-  };
+  return new Session(edit, options);
 }
