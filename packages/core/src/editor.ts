@@ -9,6 +9,7 @@ import {
 import { toggleReferenceAnchors } from "./formula-analysis.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
+import { type FormulaDiagnostic, formulaEntry } from "./formula-syntax.js";
 import type { CellFormat } from "./types/cell.js";
 import type { CellMode } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
@@ -90,6 +91,12 @@ export interface BeginEditOptions {
   complete?: (field: HTMLTextAreaElement) => string | null;
   /** The editor's cell mode changed: Enter, Edit, or Point after a picked reference. */
   onMode?: (mode: EditorMode) => void;
+  /**
+   * Excel refuses to store a formula that does not parse: show `message`,
+   * which explains the problem, and resolve once the user has closed it.
+   * The edit stays open meanwhile.
+   */
+  onRefuse?: (message: string) => Promise<void>;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -141,6 +148,8 @@ export class EditController {
   private completion: string | null = null;
   /** The mode `onMode` last reported. */
   private reportedMode: EditorMode | null = null;
+  /** A refused formula's message is open: commits and blur wait for it. */
+  private refusing = false;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -370,17 +379,65 @@ export class EditController {
     this.sizing = { width: ta.style.width, minimumHeight, lines: lineCount(ta.value) };
   }
 
-  commit(navigate: EditNavigate): void {
+  /**
+   * Store the text and close the editor. A formula that does not parse is
+   * not stored, as in Excel: the editor stays open and false is returned.
+   * Missing closing parentheses at the end are added, as Excel adds them.
+   */
+  commit(navigate: EditNavigate): boolean {
     const opts = this.opts;
     const ta = this.textarea;
-    if (!opts || !ta) return;
+    if (!opts || !ta || this.refusing) return false;
     const completion = this.completion;
-    const value =
+    let value =
       completion !== null && ta.value.toLowerCase() === completion.toLowerCase()
         ? completion
         : ta.value;
+    const formula = value.trim();
+    if (formula.length > 1 && formula.startsWith("=")) {
+      const entry = formulaEntry(formula);
+      if (typeof entry !== "string") {
+        this.refuse(entry, value.length - value.trimStart().length);
+        return false;
+      }
+      value = entry;
+    }
     this.teardown();
     opts.onCommit(value, navigate);
+    return true;
+  }
+
+  /**
+   * Excel's answer to a formula that does not parse: the message, then the
+   * problem selected in the field the user committed from (this editor or a
+   * formula bar), so they can fix it. `offset` is the blank space before the
+   * formula, which `problem`'s offsets do not count.
+   */
+  private refuse(problem: FormulaDiagnostic, offset: number): void {
+    const ta = this.textarea;
+    if (ta === null) return;
+    const active = document.activeElement;
+    const field =
+      isEditSurface(active) &&
+      (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement)
+        ? active
+        : ta;
+    const show = (): void => {
+      if (this.textarea !== ta) return;
+      this.refusing = false;
+      field.focus();
+      field.setSelectionRange(problem.from + offset, problem.to + offset);
+    };
+    const message = this.opts?.onRefuse?.(problem.message);
+    if (message === undefined) {
+      show();
+      return;
+    }
+    this.refusing = true;
+    void message.then(show, (error: unknown) => {
+      show();
+      throw error;
+    });
   }
 
   cancel(): void {
@@ -475,7 +532,7 @@ export class EditController {
   };
 
   private readonly onBlur = (event: FocusEvent): void => {
-    if (!this.textarea || this.tearingDown) return;
+    if (!this.textarea || this.tearingDown || this.refusing) return;
     // Moving into a formula bar keeps the edit open there, as in Excel.
     if (isEditSurface(event.relatedTarget)) {
       this.detachAssist();
@@ -507,6 +564,7 @@ export class EditController {
     this.entering = false;
     this.completion = null;
     this.reportedMode = null;
+    this.refusing = false;
     this.tearingDown = false;
   }
 }
