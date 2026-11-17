@@ -549,15 +549,16 @@ describe("custom editor canonical lifecycle", () => {
   };
 
   /**
-   * Open the editor of cell A at data row `row`: a list rule's list opens on
-   * Alt+Down, as in Excel; F2 would edit its text.
+   * Open the editor of the cell at view row 0, column A: a list rule's list
+   * opens on Alt+Down, as in Excel; F2 would edit its text.
    */
-  const openEditor = (grid: GridImpl, host: HTMLElement, kind: string, row: number): void => {
+  const openEditor = (grid: GridImpl, host: HTMLElement, kind: string): void => {
     if (kind !== "list") {
       grid.beginEdit(0, 0);
       return;
     }
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row, col: 0 } });
+    // The selection, like `beginEdit`, takes the row as shown.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     host.dispatchEvent(
       new KeyboardEvent("keydown", {
         key: "ArrowDown",
@@ -595,7 +596,7 @@ describe("custom editor canonical lifecycle", () => {
         const host = mountHost();
         const grid = new GridImpl(host, { workbook }, store);
         if (viewChange !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
-        openEditor(grid, host, editorKind, viewChange === "sort" ? 0 : 2);
+        openEditor(grid, host, editorKind);
         const selector =
           editorKind === "stock"
             ? "textarea.sheetwrite-editor"
@@ -679,7 +680,7 @@ describe("custom editor canonical lifecycle", () => {
       );
       const committed: unknown[] = [];
       grid.on("edit-commit", (event) => committed.push(event));
-      openEditor(grid, host, editorKind, 0);
+      openEditor(grid, host, editorKind);
       const selector =
         editorKind === "stock"
           ? "textarea.sheetwrite-editor"
