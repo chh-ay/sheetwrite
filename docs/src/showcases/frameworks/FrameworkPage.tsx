@@ -3,20 +3,22 @@ import { ANALYTICS_ROWS } from "@docs/showcases/scenarios/analytics.js";
 import { BUSINESS_ROWS } from "@docs/showcases/scenarios/business.js";
 import { ENGINE_ROWS } from "@docs/showcases/scenarios/engine.js";
 import { OFFLINE_ROWS } from "@docs/showcases/scenarios/offline.js";
-import { For, type JSX } from "solid-js";
+import { For, type JSX, Show } from "solid-js";
 
 import corePackage from "../../../../packages/core/package.json" with { type: "json" };
 import { Icon } from "../../components/Icon.js";
 import { SiteTopbar } from "../../components/SiteTopbar.js";
 import { PackageCommand } from "../../islands/content.js";
 import { ProofCards } from "../layout/ProofPage.js";
+import { type ShowcaseCode, ShowcaseCodeBlock } from "../layout/ShowcasePage.js";
 
 /*
  * The page around each framework workbench (/vanilla/, /react/, /vue/,
- * /svelte/): the capability hero, the live workbench as the page's island,
- * what it demonstrates, and the install and next links. Renders on the
- * server only. Styles: @docs/styles/workbench-stage.css and
- * @docs/styles/showcase-capability-hero.css.
+ * /svelte/): the capability hero, the live workbench as the page's island, its
+ * panels and the code behind it, what it demonstrates, and the install and
+ * next links. Renders on the server only. Styles:
+ * @docs/styles/workbench-stage.css, @docs/styles/showcase-capability-hero.css
+ * and, with code, @docs/styles/showcase-layout.css.
  */
 
 export type Framework = "vanilla" | "react" | "vue" | "svelte";
@@ -24,6 +26,21 @@ export type Framework = "vanilla" | "react" | "vue" | "svelte";
 export interface FrameworkProof {
   readonly title: string;
   readonly detail: string;
+}
+
+/**
+ * One panel of a workbench that mounts in the browser. The page describes it
+ * in its static HTML, beside the live example, so the text and links are
+ * there without JavaScript.
+ */
+export interface FrameworkPanel {
+  /** The panel's heading in the workbench. */
+  readonly title: string;
+  readonly detail: string;
+  /** The panel's controls and readouts, by their labels. */
+  readonly controls: readonly string[];
+  /** A page the panel links to. */
+  readonly link?: { readonly href: string; readonly label: string };
 }
 
 interface FrameworkPageProps {
@@ -35,6 +52,10 @@ interface FrameworkPageProps {
   readonly proof: readonly FrameworkProof[];
   /** A picture for each proof, by its title. */
   readonly proofArt?: Readonly<Record<string, () => JSX.Element>>;
+  /** The panels of a workbench that renders in the browser only. */
+  readonly panels?: readonly FrameworkPanel[];
+  /** The code behind the workbench. */
+  readonly code?: ShowcaseCode;
   readonly guide: string;
   readonly packageName: string;
   readonly sourcePath: string;
@@ -71,6 +92,7 @@ export function FrameworkPage(props: FrameworkPageProps) {
     { label: "Version", value: `Sheetwrite ${corePackage.version}` },
   ];
   const detailsId = `${props.framework}-runtime-details`;
+  const panelsId = `${props.framework}-panels`;
 
   return (
     <div class="sw-showcase-frame sw-showcase-frame--workbench">
@@ -105,6 +127,51 @@ export function FrameworkPage(props: FrameworkPageProps) {
             <span>Keyboard ready · Canvas rendered</span>
           </footer>
         </section>
+
+        <Show when={props.panels}>
+          {(panels) => (
+            <section aria-labelledby={panelsId} class="sw-showcase-page__panels">
+              <header>
+                <p class="sw-showcase-page__eyebrow">Inside the workbench</p>
+                <h2 id={panelsId}>What each panel does.</h2>
+                <p>
+                  The live example above has these panels. Their controls work through the adapter
+                  and the public Grid API; the code below shows the calls.
+                </p>
+              </header>
+              <ul class="sw-workbench-panels">
+                <For each={panels()}>
+                  {(panel) => (
+                    <li>
+                      <h3>{panel.title}</h3>
+                      <p>{panel.detail}</p>
+                      <p class="sw-workbench-panels__controls">
+                        <span>Controls</span> {panel.controls.join(", ")}
+                      </p>
+                      <Show when={panel.link}>
+                        {(link) => (
+                          <a class="sw-link-arrow" href={link().href}>
+                            {link().label}
+                            <Icon name="arrow-right" />
+                          </a>
+                        )}
+                      </Show>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </section>
+          )}
+        </Show>
+
+        <Show when={props.code}>
+          {(code) => (
+            <ShowcaseCodeBlock
+              code={code()}
+              guide={{ href: props.guide, label: `Read the ${current.label} guide` }}
+            />
+          )}
+        </Show>
 
         <section aria-labelledby={detailsId} class="sw-showcase-page__proof">
           <header>
