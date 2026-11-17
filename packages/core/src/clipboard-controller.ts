@@ -1050,7 +1050,10 @@ export class ClipboardController {
     // fewer rows than the sheet, and a selection made from sheet rows can
     // reach past it.
     const activeSheet = this.deps.activeSheet();
-    const rect = { ...selected, r1: Math.min(selected.r1, this.deps.store.viewRowCount(activeSheet) - 1) };
+    const rect = {
+      ...selected,
+      r1: Math.min(selected.r1, this.deps.store.viewRowCount(activeSheet) - 1),
+    };
     if (rect.r1 < rect.r0) return null;
 
     const selectedColumns = Array.from(
