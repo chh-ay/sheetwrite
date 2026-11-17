@@ -3,6 +3,7 @@ import { contrastRatio, relativeLuminance } from "./color-contrast.js";
 import type { EditRect } from "./editor.js";
 import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
+import { checkStylePart } from "./style-parts.js";
 import type { HighlightRange, PresenceOverlay, SheetId } from "./types/coordinates.js";
 import type { AutoFilter, CellNote, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
@@ -1272,7 +1273,8 @@ export class OverlayPainter {
 
   /**
    * The filter button of each AutoFilter header cell in view, at the cell's
-   * right edge: an arrow, or a funnel when its column is filtered.
+   * right edge, and its glyph from the icon sheet: `filterArrow`, or
+   * `filterActive` when its column is filtered.
    */
   private paintFilterButtons(
     sheet: Sheet,
@@ -1297,6 +1299,12 @@ export class OverlayPainter {
       el.className = "sheetwrite-autofilter-button";
       el.style.outlineStyle = "none";
       el.dataset.filtered = String(filtered.has(col));
+      const glyph = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      glyph.className = "sheetwrite-icon sheetwrite-autofilter-glyph";
+      glyph.style.outlineStyle = "none";
+      glyph.style.setProperty("--sheetwrite-icon-size", `${button.w}px`);
+      glyph.dataset.icon = filtered.has(col) ? "filterActive" : "filterArrow";
+      checkStylePart(glyph, "icons", "The filter buttons");
     }
   }
 
@@ -1332,6 +1340,8 @@ export class OverlayPainter {
     el.style.clipPath = "";
     if (el.className) el.className = "";
     el.removeAttribute("data-filtered");
+    el.removeAttribute("data-icon");
+    el.style.removeProperty("--sheetwrite-icon-size");
     el.textContent = "";
     el.removeAttribute("data-sheetwrite-presence");
     el.removeAttribute("data-sheetwrite-presence-range");
@@ -1361,6 +1371,7 @@ export class OverlayPainter {
       // A hidden filter button must not stay one, for queries and styles alike.
       if (el.className) el.className = "";
       el.removeAttribute("data-filtered");
+      el.removeAttribute("data-icon");
       el.removeAttribute("data-sheetwrite-presence-range");
       el.removeAttribute("aria-hidden");
       el.removeAttribute("title");

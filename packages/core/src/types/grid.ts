@@ -447,6 +447,8 @@ export type ToolbarIcon = string | Node | (() => Node);
  * as plain text; DOM nodes and node factories support SVG or HTML icons. To
  * replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
  * to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
+ * The AutoFilter header buttons draw `filterArrow` and `filterActive` from the
+ * sheet itself, so only a replacement sheet changes them.
  */
 export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 
@@ -531,6 +533,8 @@ export type ContextMenuActionName =
   | "editNote"
   | "deleteNote"
   | "pivotFields"
+  | "insertCells"
+  | "deleteCells"
   | "formatCells"
   | "separator";
 
