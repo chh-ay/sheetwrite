@@ -104,7 +104,11 @@ function neighbourProposals(edit: FormulaEdit): Proposal[] {
     const others = all.filter((other) => other !== entry);
     const contradiction: Contradiction =
       others.length === 0 ? "none" : others.some((other) => support(other) > 1) ? "pair" : "single";
-    return { formula: entry.formula, signal: "neighbours" as const, reason: reasonOf(entry, contradiction) };
+    return {
+      formula: entry.formula,
+      signal: "neighbours" as const,
+      reason: reasonOf(entry, contradiction),
+    };
   });
   // Only neighbours on both sides of the cell agreeing are strong enough to show (#801 decision):
   // a formula from one side only was wrong too often on the held-out samples.

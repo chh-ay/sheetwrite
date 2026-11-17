@@ -509,7 +509,8 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       );
       const data = field(result, "screenshotData");
       // A frame without changes has no new picture: the previous one stands, so the count holds.
-      const image: Uint8Array | null = typeof data === "string" ? Buffer.from(data, "base64") : previous;
+      const image: Uint8Array | null =
+        typeof data === "string" ? Buffer.from(data, "base64") : previous;
       if (image === null) throw new Error("The first recorded frame has no picture");
       encoder.stdin.write(image);
       previous = image;
@@ -530,7 +531,9 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
 }
 
 /** A video file's frame count, counted by decoding it, and its size in pixels. */
-async function probeVideo(path: string): Promise<{ frames: number; width: number; height: number }> {
+async function probeVideo(
+  path: string,
+): Promise<{ frames: number; width: number; height: number }> {
   const child = Bun.spawn(
     [
       "ffprobe",
@@ -629,7 +632,9 @@ async function publish(name: TakeName, master: string, frames: number): Promise<
   for (const file of ["demo.mp4", "demo.webm"]) {
     const written = await probeVideo(out(file));
     if (written.frames !== frames)
-      throw new Error(`${name}-${file} has ${written.frames} frames, not ${frames}: a frame was dropped`);
+      throw new Error(
+        `${name}-${file} has ${written.frames} frames, not ${frames}: a frame was dropped`,
+      );
     if (written.width !== size.width || written.height !== size.height) {
       throw new Error(
         `${name}-${file} is ${written.width}×${written.height}, not ${size.width}×${size.height}`,

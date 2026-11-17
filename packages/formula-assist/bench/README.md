@@ -54,11 +54,10 @@ The confidences in `src/calibration.ts` are the 95% lower bounds this prints, fr
 
 ## Latency: 4 ms per key on 100,000 rows
 
-`latency.ts` opens 200 edits spread over a 100,000-row sheet and times opening each edit and every `suggest` call:
+`latency.ts` opens 200 edits spread over a 100,000-row sheet and times opening each edit, every `suggest` call, and the formula bar's whole work per key (analysis, `suggest` and the ghost). Run it on a quiet core, away from builds:
 
 ```sh
-/home/vvin/learn/bench-run --slot 4 bun packages/formula-assist/bench/latency.ts   # Linux
-~/learn/mac-quiet bun packages/formula-assist/bench/latency.ts                     # Mac
+bun packages/formula-assist/bench/latency.ts
 ```
 
 It fails when the 95th percentile of either step reaches 4 ms. Report the two machines in separate tables and never compare them.
