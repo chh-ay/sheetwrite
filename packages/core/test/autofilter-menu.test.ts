@@ -93,11 +93,44 @@ describe("AutoFilter dropdown", () => {
     search.dispatchEvent(new Event("input"));
     expect(second.options()).toEqual([
       ["(Select All Search Results)", "true"],
+      ["Add current selection to filter", "false"],
       ["apple", "true"],
       ["pear", "true"],
     ]);
     second.key(search, "Enter");
     expect(second.applied).toEqual([{ kind: "values", values: ["apple", "pear"] }]);
+  });
+
+  it("ticks every search result, and adds them to the filter with Add current selection to filter", () => {
+    const search = () => {
+      const box = document.querySelector<HTMLInputElement>('input[type="search"]');
+      if (!box) throw new Error("no search box");
+      return box;
+    };
+    const replaced = open({ kept: [1] });
+    search().value = "p";
+    search().dispatchEvent(new Event("input"));
+    expect(replaced.options()).toEqual([
+      ["(Select All Search Results)", "true"],
+      ["Add current selection to filter", "false"],
+      ["apple", "true"],
+      ["pear", "true"],
+    ]);
+    replaced.key(search(), "Enter");
+    expect(replaced.applied).toEqual([{ kind: "values", values: ["apple", "pear"] }]);
+
+    const added = open({ kept: [1] });
+    search().value = "p";
+    search().dispatchEvent(new Event("input"));
+    added.list.focus();
+    added.key(added.list, "ArrowDown");
+    added.key(added.list, " ");
+    added.key(added.list, "End");
+    added.key(added.list, " ");
+    expect(added.options()).toContainEqual(["Add current selection to filter", "true"]);
+    expect(added.options()).toContainEqual(["pear", "false"]);
+    added.key(added.list, "Enter");
+    expect(added.applied).toEqual([{ kind: "values", values: [1, "apple"] }]);
   });
 
   it("disables OK while nothing is checked and closes on Escape without applying", () => {
