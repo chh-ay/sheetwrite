@@ -227,6 +227,13 @@
   content: "▾";
 }
 
+/* How many rows hold a value, after its label: "North 12". */
+.sheetwrite-autofilter-tally {
+  margin-inline-start: auto;
+  padding-inline-start: 8px;
+  opacity: 0.65;
+}
+
 .sheetwrite-autofilter-check {
   flex: none;
   width: 12px;

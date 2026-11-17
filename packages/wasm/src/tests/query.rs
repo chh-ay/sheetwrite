@@ -392,12 +392,13 @@ fn distinct_values_in_rows_reads_only_the_row_range() {
     fill_mixed_distinct_column(&mut store, sheet);
 
     // Rows 11..14 hold "Alpha", a formula that evaluates to "Alpha", and "Beta".
-    let mut middle = store.distinct_values_in_rows(sheet, 0, 11, 14, 0, None);
+    let mut middle = store.distinct_values_in_rows(sheet, 0, 11, 14, 0, None, false);
     assert_eq!(middle.take_kinds(), vec![2, 2]);
     assert_eq!(middle.take_texts(), vec!["Alpha", "Beta"]);
+    assert_eq!(middle.take_counts(), vec![2, 1]);
 
     // A range past the last row is clipped to the sheet.
-    let mut tail = store.distinct_values_in_rows(sheet, 0, 14, 100, 0, None);
+    let mut tail = store.distinct_values_in_rows(sheet, 0, 14, 100, 0, None, false);
     assert_eq!(tail.take_kinds(), vec![3, 1]);
     assert_eq!(
         distinct_number_bits(&mut tail),
@@ -414,12 +415,12 @@ fn distinct_values_in_rows_reads_only_the_listed_rows_in_the_range() {
     // Listed rows are read in their order; row 15 lies past the range and
     // row 40 past the sheet, so both are skipped.
     let rows = vec![13, 15, 11, 40];
-    let mut listed = store.distinct_values_in_rows(sheet, 0, 11, 14, 0, Some(rows));
+    let mut listed = store.distinct_values_in_rows(sheet, 0, 11, 14, 0, Some(rows), false);
     assert_eq!(listed.take_kinds(), vec![2, 2]);
     assert_eq!(listed.take_texts(), vec!["Beta", "Alpha"]);
 
     // An empty list keeps no rows, unlike no list.
-    let mut none = store.distinct_values_in_rows(sheet, 0, 0, 16, 0, Some(Vec::new()));
+    let mut none = store.distinct_values_in_rows(sheet, 0, 0, 16, 0, Some(Vec::new()), false);
     assert!(none.take_kinds().is_empty());
 }
 
