@@ -14,7 +14,8 @@ export interface SetBar {
 /** The bar of each set the gate runs. The development half is tuned on, so the gate does not use it. */
 export const QUALITY_BAR: Readonly<Partial<Record<ReplaySetName, SetBar>>> = {
   "enron-heldout": { minSaved: 0.4, maxWrong: 0.02 },
-  conformance: { minSaved: 0, maxWrong: 0.02 },
+  // A regression floor a little under the measured 16.4%, so noise in the corpus cannot trip it.
+  conformance: { minSaved: 0.16, maxWrong: 0.02 },
   fixtures: { minSaved: 0, maxWrong: 0.02 },
 };
 
