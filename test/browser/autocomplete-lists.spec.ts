@@ -48,11 +48,12 @@ test("Alt+Down lists the column's entries, and AutoComplete lists several matche
   await expect(pick).toHaveCount(0);
   await expect.poll(() => region(page, 49)).toBe("North");
 
-  // Two entries begin "Nor": AutoComplete lists them and completes nothing inline.
-  await select(page, "B51");
+  // B50 is the sheet's last row. With Northeast there, two entries begin "Nor"
+  // for B49: AutoComplete lists them and completes nothing inline.
+  await select(page, "B50");
   await page.keyboard.type("Northeast");
   await page.keyboard.press("Enter");
-  await select(page, "B52");
+  await select(page, "B49");
   await page.keyboard.type("Nor");
   const listed = page.getByRole("listbox", { name: "AutoComplete" });
   await expect(listed.getByRole("option")).toHaveText(["North", "Northeast"]);
@@ -60,5 +61,5 @@ test("Alt+Down lists the column's entries, and AutoComplete lists several matche
   await page.keyboard.press("Alt+ArrowDown");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
-  await expect.poll(() => region(page, 51)).toBe("Northeast");
+  await expect.poll(() => region(page, 48)).toBe("Northeast");
 });
