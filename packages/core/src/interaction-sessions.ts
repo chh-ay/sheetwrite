@@ -352,7 +352,15 @@ export class InteractionSessions {
       if (viewRow === null) return;
       const column = this.deps.sheet().columns[address.col];
       const value =
-        typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
+        typeof input === "string"
+          ? parseCellInput(
+              input,
+              column?.type ?? "text",
+              this.deps.store.getCell(address).style.numberFormat ??
+                column?.cellStyle?.numberFormat ??
+                column?.numberFormat,
+            )
+          : input;
       this.commitCellEditAt(address, viewRow, value, navigate);
     } finally {
       this.deps.editDraft.end();
@@ -546,10 +554,19 @@ export class InteractionSessions {
         : navigate === "right" || navigate === "left"
           ? "edit-tab"
           : "edit-enter";
+    // An entry keeps the cell's formatting, as in Excel; a `set` without a
+    // style would clear it.
     const patches: DocumentOp[] =
       navigate === "stay"
         ? this.selectionFill(address, viewRow, value)
-        : [{ op: "set", addr: { ...address }, value }];
+        : [
+            {
+              op: "set",
+              addr: { ...address },
+              value,
+              style: this.deps.store.getCell(address).style,
+            },
+          ];
     const outcome = this.deps.commit(patches, reason);
 
     if (outcome.status === "applied") {
@@ -582,9 +599,11 @@ export class InteractionSessions {
         for (let col = rect.c0; col <= rect.c1; col++) {
           const anchor = this.deps.anchorCell(row, col);
           if (anchor.row !== row || anchor.col !== col) continue;
+          const addr = { sheet: address.sheet, row: dataRow, col };
           patches.push({
             op: "set",
-            addr: { sheet: address.sheet, row: dataRow, col },
+            addr,
+            style: this.deps.store.getCell(addr).style,
             value:
               value.kind === "formula"
                 ? {
@@ -596,7 +615,9 @@ export class InteractionSessions {
         }
       }
     });
-    return patches.length > 0 ? patches : [{ op: "set", addr: { ...address }, value }];
+    return patches.length > 0
+      ? patches
+      : [{ op: "set", addr: { ...address }, value, style: this.deps.store.getCell(address).style }];
   }
 
   private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {

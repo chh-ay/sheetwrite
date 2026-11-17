@@ -14,11 +14,7 @@ export interface NumberFormatPreset {
 /** Code behind the ribbon's $ button, also listed as the Accounting preset. */
 export const ACCOUNTING_FORMAT = '_($* #,##0.00_);_($* (#,##0.00);_($* "-"??_);_(@_)';
 
-/**
- * Number formats the formatter renders faithfully, in Excel's Home > Number
- * order. Fraction (`# ?/?`) and Text (`@`) are omitted: the formatter does not
- * support them, and a preset that paints the wrong digits is worse than none.
- */
+/** The Home > Number format list, in Excel's order. */
 export const NUMBER_FORMAT_PRESETS: readonly NumberFormatPreset[] = [
   { label: "General", code: "General" },
   { label: "Number", code: "0.00" },
@@ -28,7 +24,9 @@ export const NUMBER_FORMAT_PRESETS: readonly NumberFormatPreset[] = [
   { label: "Long Date", code: "dddd, mmmm d, yyyy" },
   { label: "Time", code: "h:mm:ss AM/PM" },
   { label: "Percentage", code: "0.00%" },
+  { label: "Fraction", code: "# ?/?" },
   { label: "Scientific", code: "0.00E+00" },
+  { label: "Text", code: "@" },
 ];
 
 /** Codes behind the ribbon's % and comma-style buttons. */

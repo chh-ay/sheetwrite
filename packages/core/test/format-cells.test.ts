@@ -148,6 +148,27 @@ describe("Format Cells", () => {
     await answerDialog(host, "OK");
     expect(cell(0, 1).style.numberFormat).toBe('0.0 "kg"');
   });
+
+  it("offers Excel's Fraction types and the Text category", async () => {
+    let dialog = await openFormatCells();
+    setValue(control(dialog, "Category", HTMLSelectElement), "Fraction");
+    const type = [...dialog.querySelectorAll("select")].find((select) =>
+      [...select.options].some((option) => option.value === "# ?/4"),
+    )!;
+    expect(type.closest("label")!.hidden).toBe(false);
+    expect([...type.options].map((option) => option.textContent)).toContain("As quarters (2/4)");
+    setValue(type, "# ?/4");
+    expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe(" 2/4");
+    await answerDialog(host, "OK");
+    expect(cell(0, 1).style.numberFormat).toBe("# ?/4");
+
+    dialog = await openFormatCells();
+    expect(control(dialog, "Category", HTMLSelectElement).value).toBe("Fraction");
+    setValue(control(dialog, "Category", HTMLSelectElement), "Text");
+    expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe("0.5");
+    await answerDialog(host, "OK");
+    expect(cell(1, 1).style.numberFormat).toBe("@");
+  });
 });
 
 describe("Number tab categories", () => {
@@ -160,6 +181,8 @@ describe("Number tab categories", () => {
       [{ ...base, category: "Percentage", decimals: 0 }, "0%"],
       [{ ...base, category: "Scientific" }, "0.00E+00"],
       [{ ...base, category: "Date", code: "d-mmm-yy" }, "d-mmm-yy"],
+      [{ ...base, category: "Fraction", code: "# ??/16" }, "# ??/16"],
+      [{ ...base, category: "Text", code: "@" }, "@"],
     ] as const;
     for (const [parts, code] of cases) {
       expect(numberFormatCode(parts)).toBe(code);
