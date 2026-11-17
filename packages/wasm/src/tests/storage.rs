@@ -146,7 +146,7 @@ fn public_api_bounds_checks_do_not_panic() {
         assert!(store.sort_rows(sheet, 9, true).is_empty());
         assert!(store.filter_rows(99, 0, "x").is_empty());
         assert!(store.filter_rows(sheet, 9, "x").is_empty());
-        assert!(store.search(99, &[0], "x", true, false).is_empty());
+        assert!(store.search(99, &[0], "x", true, false, false).is_empty());
         assert_eq!(store.get_window(99, 0, 1, &[0]).n_rows(), 0);
     }));
 

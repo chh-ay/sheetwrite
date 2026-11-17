@@ -1,5 +1,6 @@
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
-import { replaceInText } from "./search-replace.js";
+import { getEngine } from "./engine.js";
+import { findMatcher, replaceInText } from "./search-replace.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
@@ -109,6 +110,7 @@ export class SearchController {
   private searchActive = -1;
   private searchQuery = "";
   private searchOpts: SearchOptions = {};
+  private searchMatcher: (text: string) => boolean = () => false;
   private revision = 0;
 
   constructor(deps: SearchControllerDeps) {
@@ -187,11 +189,9 @@ export class SearchController {
 
     const text = engineSearchText(this.deps.store.getCell(patch.addr).resolved);
     if (text === null) return false;
-    const caseFolded = !this.searchOpts.matchCase;
-    if (caseFolded && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery))) return false;
-    const haystack = caseFolded ? text.toLowerCase() : text;
-    const needle = caseFolded ? this.searchQuery.toLowerCase() : this.searchQuery;
-    const matchesNow = this.searchOpts.wholeCell ? haystack === needle : haystack.includes(needle);
+    if (!this.searchOpts.matchCase && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery)))
+      return false;
+    const matchesNow = this.searchMatcher(text);
     const matches = this.searchMatches;
     let start = 0;
     let end = matches.length;
@@ -211,6 +211,7 @@ export class SearchController {
   search(query: string, opts: SearchOptions = {}): SearchResult {
     this.searchQuery = query;
     this.searchOpts = opts;
+    this.searchMatcher = findMatcher(query, opts);
     this.searchMatches = query ? this.scanMatches(query, opts) : EMPTY_MATCHES;
     this.searchActive =
       this.searchMatches.length > 0
@@ -254,8 +255,9 @@ export class SearchController {
 
   /**
    * Replace the active match, then advance to the next match after it (in
-   * row-major order, wrapping). Formula/ref cells are skipped rather than
-   * rewritten; the active pointer still advances so the caller is never stuck.
+   * row-major order, wrapping). A formula's text is rewritten unless the search
+   * looks in values; reference cells are skipped. The active pointer still
+   * advances so the caller is never stuck.
    */
   replaceCurrent(replacement: string): SearchResult {
     const target = this.searchMatches.at(this.searchActive);
@@ -311,11 +313,13 @@ export class SearchController {
       for (const [index, addr] of matches.entries()) {
         const cell = captured?.[index];
         // Custom stores without an engine retain their scalar read contract.
-        const patch = cell
-          ? cell.value.kind === "formula" || cell.value.kind === "ref"
-            ? null
-            : this.replacementFromCell(addr, replacement, cell)
-          : this.replacementPatch(addr, replacement);
+        const patch = !cell
+          ? this.replacementPatch(addr, replacement)
+          : cell.value.kind === "formula"
+            ? this.formulaReplacement(addr, replacement, cell.value.src, cell.style)
+            : cell.value.kind === "ref"
+              ? null
+              : this.replacementFromCell(addr, replacement, cell);
         if (!patch) continue;
         if (scalarWrites) {
           patches.push(patch);
@@ -355,7 +359,8 @@ export class SearchController {
 
   /**
    * Build a `set` patch that rewrites `addr` for the current query, or null when
-   * the cell is not eligible (formula/ref) or holds no occurrence to replace.
+   * the cell is not eligible (a reference, or a formula in a value search) or
+   * holds no occurrence to replace.
    * Preserves the cell's existing style and re-parses through `parseCellInput`
    * so numbers stay numbers.
    */
@@ -363,11 +368,45 @@ export class SearchController {
     addr: CellAddress,
     replacement: string,
   ): Extract<DocumentOp, { op: "set" }> | null {
-    // Formula and reference sources must never be rewritten by a resolved-value search.
-    if (this.deps.store.getFormula(addr) !== null) return null;
     if (this.deps.store.getRefTarget(addr) !== null) return null;
+    const formula = this.deps.store.getFormula(addr);
+    if (formula !== null) {
+      return this.formulaReplacement(
+        addr,
+        replacement,
+        formula,
+        this.deps.store.getCell(addr).style,
+      );
+    }
 
     return this.replacementFromCell(addr, replacement, this.deps.store.getCell(addr));
+  }
+
+  /**
+   * Rewrite a formula's text, as Excel's Replace does: null when the search
+   * looks in values, when nothing in the text matches, or when the new text is
+   * not a formula the engine can read. Text that no longer starts with `=` is
+   * entered as a value.
+   */
+  private formulaReplacement(
+    addr: CellAddress,
+    replacement: string,
+    source: string,
+    style: ResolvedCell["style"],
+  ): Extract<DocumentOp, { op: "set" }> | null {
+    if (this.searchOpts.lookIn === "values") return null;
+    const next = replaceInText(source, this.searchQuery, replacement, this.searchOpts);
+    if (next === null) return null;
+    if (!next.startsWith("=")) {
+      const column = this.deps.sheet(addr.sheet).columns[addr.col];
+      return { op: "set", addr, value: parseCellInput(next, column?.type ?? "text"), style };
+    }
+
+    const error = getEngine().checkFormulaSyntax(next);
+    if (error === undefined)
+      return { op: "set", addr, value: { kind: "formula", src: next }, style };
+    error.free();
+    return null;
   }
 
   private replacementFromCell(
@@ -444,7 +483,8 @@ export class SearchController {
     // Fallback for a non-SheetwriteStore store: bulk-read the sheet and scan in JS.
     const sheet = this.deps.sheet(sheetId);
     const cols = opts.columns ?? sheet.columns.map((_, i) => i);
-    const needle = opts.matchCase ? query : query.toLowerCase();
+    const matches = findMatcher(query, opts);
+    const formulas = opts.lookIn !== "values";
     const pairs: number[] = [];
     if (sheet.rowCount === 0 || cols.length === 0) return EMPTY_MATCHES;
 
@@ -459,8 +499,10 @@ export class SearchController {
       for (let c = 0; c < n; c++) {
         const v = view.values[r * n + c];
         if (v === null || v === undefined || v === "") continue;
-        const text = opts.matchCase ? String(v) : String(v).toLowerCase();
-        if (opts.wholeCell ? text === needle : text.includes(needle)) {
+        const formula = formulas
+          ? this.deps.store.getFormula({ sheet: sheetId, row: r, col: cols[c]! })
+          : null;
+        if (matches(formula ?? String(v))) {
           pairs.push(r, cols[c]!);
         }
       }
