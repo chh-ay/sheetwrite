@@ -6,9 +6,9 @@
    stage takes the width, one evidence rail holds the handoff panels in normal
    flow. No panel nests a short scroll region. */
 
-/* The workbench grows with its content; the shared stage viewport keeps the
-   44rem floor that all four framework workbenches share, so the island fills
-   that height from the board instead of padding an empty band. */
+/* The workbench grows with its content; the stage keeps the height it takes
+   once mounted (workbench-stage.css), so the island fills that height from
+   the board instead of padding an empty band. */
 .sw-svw {
   min-height: 0;
   /* The Svelte brand accent is tuned for demo surfaces; mixing keeps accent
@@ -562,12 +562,6 @@
 /* ---- Narrow screens ----------------------------------------------------- */
 
 @media (max-width: 48rem) {
-  /* Stacked: a fixed viewport floor would only pad the page, and the rail
-     keeps normal flow below the board. */
-  .sw-showcase-page[data-framework="svelte"] .sw-showcase-stage__viewport {
-    min-height: 0;
-  }
-
   .sw-svw-gridstage {
     min-height: 25rem;
   }

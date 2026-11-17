@@ -161,3 +161,113 @@
 .sw-showcase-page > .sw-showcase__code-row {
   padding-top: clamp(var(--sw-space-8), 3vw, var(--sw-space-10));
 }
+
+/* The stage keeps the height each React, Vue and Svelte workbench takes once
+   it mounts: the tallest mounted stage in each band of widths, measured in
+   Chromium every 16 px from 320 to 1920 px. The workbench mounts when its code
+   arrives, seconds after the page paints, so a shorter stage would push the
+   rest of the page down. Measure again when a workbench's layout changes. */
+.sw-showcase-page:is([data-framework="react"], [data-framework="vue"], [data-framework="svelte"])
+  .sw-showcase-stage__viewport {
+  min-height: var(--sw-workbench-height);
+}
+
+.sw-showcase-page[data-framework="react"] {
+  --sw-workbench-height: 77.5rem;
+}
+
+.sw-showcase-page[data-framework="vue"] {
+  --sw-workbench-height: 101.25rem;
+}
+
+.sw-showcase-page[data-framework="svelte"] {
+  --sw-workbench-height: 74.75rem;
+}
+
+@media (min-width: 25rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 68.75rem;
+  }
+}
+
+@media (min-width: 28rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 94.25rem;
+  }
+}
+
+@media (min-width: 35rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 69.75rem;
+  }
+}
+
+@media (min-width: 38rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 59rem;
+  }
+}
+
+@media (min-width: 43rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 87rem;
+  }
+}
+
+@media (min-width: 48rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 81.75rem;
+  }
+
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 63.25rem;
+  }
+}
+
+@media (min-width: 49rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 85.25rem;
+  }
+}
+
+@media (min-width: 52rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 63.75rem;
+  }
+}
+
+@media (min-width: 58rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 60.75rem;
+  }
+}
+
+@media (min-width: 60rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 59.25rem;
+  }
+}
+
+@media (min-width: 71rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 82.5rem;
+  }
+}
+
+@media (min-width: 75rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 57.25rem;
+  }
+}
+
+@media (min-width: 98rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 56rem;
+  }
+}
+
+@media (min-width: 107rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 53.25rem;
+  }
+}
