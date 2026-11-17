@@ -89,11 +89,15 @@ A small fill handle sits at the bottom-right corner of the selection. Drag it **
 | --- | --- |
 | One number | Copies it. |
 | One date (a date number format or a date column) | Counts up by one day per cell. |
+| One time (a number format with only a time, such as `h:mm`) | Counts up by one hour per cell. |
+| Dates on the same day of the month (`1-Jan`, `1-Apr`), or each on the last day of its month | Steps by whole months or years: `1-Jul`, `1-Oct`, … |
 | Numbers with a constant step, such as 1, 2 | Continues the step: 3, 4, … |
 | Other numbers, such as 1, 2, 4 | Continues their linear trend. |
 | Day or month names (`Mon`, `Monday`, `Jan`, `January`) | Continues the list in the same letter case. |
+| Quarters (`Q3`, `Qtr3`, `Qtr 3`, `Quarter 3`, `3rd Qtr`) | Counts to 4, then starts again at 1: `Qtr4`, `Qtr1`, … |
+| Text that starts with an ordinal (`1st`, `1st Period`) | Counts up: `2nd Period`, `3rd Period`, … |
 | Text that ends in a number (`Item 1`, `Q01`) | Counts the number up, keeping leading zeros. |
-| Formulas and other text | Copies the source cells in turn. |
+| Formulas and other text | Copies the source cells in turn. In a mix, each text with a number counts up once per repeat: `text1`, `textA` fills `text2`, `textA`, `text3`, … |
 
 Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one number then counts up by 1, and a series is copied. Double-click the fill handle to fill down as far as the data in the column next to the selection reaches. Ctrl/Cmd + D and Ctrl/Cmd + R copy the top row or left column of the selection, with its format, into the rest of it; with one cell selected they copy the cell above or to the left.
 

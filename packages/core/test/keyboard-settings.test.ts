@@ -145,7 +145,7 @@ describe("opening the panel", () => {
     expect(panel.getAttribute("aria-modal")).toBe("true");
     const title = host.querySelector(`#${panel.getAttribute("aria-labelledby")}`);
     expect(title?.textContent).toBe("Keyboard shortcuts");
-    expect(shownCommands(panel)).toHaveLength(36);
+    expect(shownCommands(panel)).toHaveLength(37);
     const bold = panel.querySelector<HTMLElement>('tr[data-action="bold"]')!;
     expect(bold.querySelector("th")?.textContent).toBe("Bold");
     expect(bold.querySelector("[data-default]")?.textContent).toBe("Ctrl+B, Ctrl+2");

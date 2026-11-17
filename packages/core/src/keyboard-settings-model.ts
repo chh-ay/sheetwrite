@@ -92,6 +92,7 @@ export const COMMAND_GROUPS: readonly {
     commands: [
       ["nextSheet", "Next Sheet"],
       ["previousSheet", "Previous Sheet"],
+      ["insertSheet", "Insert Sheet"],
     ],
   },
 ];
