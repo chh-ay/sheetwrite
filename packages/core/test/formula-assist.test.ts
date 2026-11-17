@@ -273,7 +273,8 @@ describe("fixes for live errors", () => {
     fix()?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
     expect(textarea.value).toBe("=SUM(A1:A3)+1");
 
-    type(textarea, "=SUM(A1:A3", 4);
+    // The caret away from the end, where a missing ) shows, and outside the name SUM.
+    type(textarea, "=SUM(A1:A3", 5);
     expect(fix()?.textContent).toBe("Add the missing )");
     textarea.dispatchEvent(keydown("Tab"));
     expect(textarea.value).toBe("=SUM(A1:A3)");
