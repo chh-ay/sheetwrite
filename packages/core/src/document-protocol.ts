@@ -1717,6 +1717,8 @@ function validateSheetShape(value: unknown, path: string, errors: DocumentValida
     validateColumnShape(column, `${path}.columns[${index}]`, errors);
   });
 
+  validateTabColor(ownValue(sheet, "tabColor"), `${path}.tabColor`, errors);
+
   for (const key of ["frozenRows", "frozenCols"]) {
     const frozen = ownValue(sheet, key);
     if (frozen !== undefined && !nonNegativeInteger(frozen)) {
@@ -2478,6 +2480,10 @@ export function validateDocumentOperationShape(
         validateAutoFilterShape(autoFilter, `${patchPath}.autoFilter`, errors);
       }
 
+      // `null` gives the tab its default look back.
+      const tabColor = ownValue(patch, "tabColor");
+      if (tabColor !== null) validateTabColor(tabColor, `${patchPath}.tabColor`, errors);
+
       break;
     }
 
@@ -2797,7 +2803,16 @@ const MAX_UNSUPPORTED_QUERIES = 256;
 const MAX_QUERY_MEMBER_LENGTH = 1024;
 const MAX_QUERY_REASON_LENGTH = 64;
 const MAX_XLSX_CONTENT_TYPE_LENGTH = 256;
+const TAB_COLOR = /^#[\dA-Fa-f]{6}$/u;
 const BASE64_PATTERN = /^(?:[A-Za-z\d+/]{4})*(?:[A-Za-z\d+/]{2}==|[A-Za-z\d+/]{3}=)?$/;
+
+/** A sheet's tab color, when present, is `#RRGGBB`. */
+function validateTabColor(value: unknown, path: string, errors: DocumentValidationError[]): void {
+  if (value !== undefined && !(typeof value === "string" && TAB_COLOR.test(value))) {
+    invalid(errors, path, "tabColor must be a #RRGGBB color");
+  }
+}
+
 const CONTENT_TYPE_PATTERN = /^[a-z\d!#$&^_.+-]+\/[a-z\d!#$&^_.+-]+$/i;
 const RELATIONSHIP_TYPE_PATTERN = /^https?:\/\/[^\s<>"'&]+$/;
 

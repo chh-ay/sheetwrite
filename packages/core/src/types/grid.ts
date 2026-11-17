@@ -582,6 +582,8 @@ export type KeyboardAction =
   | "selectAll"
   | "fillDown"
   | "fillRight"
+  | "nextSheet"
+  | "previousSheet"
   | "toggleFilter"
   | "formatGeneral"
   | "formatNumber"
@@ -1334,6 +1336,24 @@ export interface Grid {
   renameSheet(id: SheetId, name: string): SheetLifecycleResult;
   /** Move a sheet to position `toIndex` in the sheet order. */
   moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  /**
+   * Copy a sheet, as Excel's Move or Copy with "Create a copy" does: its
+   * cells, formats, rules, tables, charts and pivots, and its sheet-scoped
+   * names. The copy is named like `Sales (2)` unless `name` is given, and goes
+   * to tab position `index` (default: right after the sheet). In the copy,
+   * references to the sheet itself refer to the copy, and its tables get new
+   * names. `sheet` in the result is the copy's ID. The copy's code loads the
+   * first time a sheet is copied, so the result is a promise.
+   */
+  copySheet(
+    id: SheetId,
+    options?: { index?: number; name?: string },
+  ): Promise<SheetLifecycleResult>;
+  /**
+   * Color a sheet's tab with `#RRGGBB`, or restore the default tab with
+   * `null`, as Excel's Tab Color does.
+   */
+  setSheetTabColor(id: SheetId, color: string | null): SheetLifecycleResult;
   /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
   setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
   /** Replace every conditional format rule of the active sheet with `rules`, as one undo step. */

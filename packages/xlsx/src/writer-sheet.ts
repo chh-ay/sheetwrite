@@ -259,7 +259,13 @@ function sheetOutlines(sheet: SheetSnapshot, context: XlsxCodecContext): Workshe
 function appendSheetHeader(xml: XmlBuffer, sheet: SheetSnapshot, styles: StylesRegistry): void {
   xml.append('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>');
   xml.append(`<worksheet xmlns="${MAIN_NS}" xmlns:r="${RELATIONSHIPS_NS}">`);
-  if (sheet.rowGroups?.length) xml.append('<sheetPr><outlinePr summaryBelow="1"/></sheetPr>');
+  // `tabColor` comes before `outlinePr` in `sheetPr`.
+  const tabColor =
+    sheet.tabColor && /^#[\dA-Fa-f]{6}$/u.test(sheet.tabColor)
+      ? `<tabColor rgb="FF${sheet.tabColor.slice(1).toUpperCase()}"/>`
+      : "";
+  const outline = sheet.rowGroups?.length ? '<outlinePr summaryBelow="1"/>' : "";
+  if (tabColor || outline) xml.append(`<sheetPr>${tabColor}${outline}</sheetPr>`);
   const maxRow = Math.max(1, sheet.rowCount);
   const maxCol = Math.max(0, sheet.columns.length - 1);
   xml.append(`<dimension ref="A1:${cellA1(maxRow - 1, maxCol)}"/>`);

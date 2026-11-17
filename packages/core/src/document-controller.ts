@@ -824,6 +824,7 @@ export class DocumentController {
                   : sheet.autoFilter
                     ? structuredClone(sheet.autoFilter)
                     : null,
+              tabColor: patch.patch.tabColor === undefined ? undefined : (sheet.tabColor ?? null),
             },
           },
         ];
@@ -1279,7 +1280,8 @@ export class DocumentController {
     return restores;
   }
 
-  private snapshotSheet(id: SheetId): SheetSnapshot | null {
+  /** The whole sheet as a snapshot, as `addSheet` takes it back, or null when there is none. */
+  snapshotSheet(id: SheetId): SheetSnapshot | null {
     const sheet = this.sheetById(id);
     if (!sheet) return null;
 
@@ -1316,6 +1318,7 @@ export class DocumentController {
       id: sheet.id,
       name: sheet.name,
       visibility: sheet.visibility,
+      tabColor: sheet.tabColor,
       order: this.options.store.getWorkbook().sheets.findIndex((candidate) => candidate.id === id),
       rowCount: sheet.rowCount,
       columns: sheet.columns.map((column) => ({ ...column })),
