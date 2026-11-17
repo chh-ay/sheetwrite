@@ -8,7 +8,7 @@
 import type { CellHyperlink } from "../types/cell.js";
 import type { MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type { CellNote, DocumentOp, Sheet } from "../types/document.js";
-import { movedBlock, normalizedRange } from "./ranges.js";
+import { cellRange, movedBlock, normalizedRange } from "./ranges.js";
 
 export type MoveCellsOperation = Extract<DocumentOp, { op: "moveCells" }>;
 
@@ -78,6 +78,12 @@ function movedEdge(
   return span[0] <= span[1] ? span : null;
 }
 
+/** The axis a block moves along, then the axis it must cover the range on. */
+const AXES = [
+  ["row", "col"],
+  ["col", "row"],
+] as const;
+
 /**
  * Where `range` is after `move`, as the engine moves a reference. A range
  * inside the source block moves with it. A range inside the cells the block
@@ -99,83 +105,80 @@ export function moveCellRange(
   if (bounds.sheet !== from.sheet || to.sheet !== from.sheet) return range;
 
   const { start, end } = bounds;
-  const alongRows =
-    from.start.col === to.start.col &&
-    from.start.col <= start.col &&
-    end.col <= from.end.col &&
-    !(start.row === 0 && end.row >= last.row);
-  const alongCols =
-    from.start.row === to.start.row &&
-    from.start.row <= start.row &&
-    end.row <= from.end.row &&
-    !(start.col === 0 && end.col >= last.col);
-  if (alongRows) {
-    const rows = from.end.row - from.start.row + 1;
-    const span = movedEdge(start.row, end.row, from.start.row, rows, to.start.row);
-    return span
-      ? { sheet: bounds.sheet, start: { ...start, row: span[0] }, end: { ...end, row: span[1] } }
-      : range;
-  }
-  if (alongCols) {
-    const cols = from.end.col - from.start.col + 1;
-    const span = movedEdge(start.col, end.col, from.start.col, cols, to.start.col);
-    return span
-      ? { sheet: bounds.sheet, start: { ...start, col: span[0] }, end: { ...end, col: span[1] } }
-      : range;
+  for (const [axis, across] of AXES) {
+    const along =
+      from.start[across] === to.start[across] &&
+      from.start[across] <= start[across] &&
+      end[across] <= from.end[across] &&
+      !(start[axis] === 0 && end[axis] >= last[axis]);
+    if (!along) continue;
+    const count = from.end[axis] - from.start[axis] + 1;
+    const span = movedEdge(start[axis], end[axis], from.start[axis], count, to.start[axis]);
+    if (!span) return range;
+    return {
+      sheet: bounds.sheet,
+      start: { ...start, [axis]: span[0] },
+      end: { ...end, [axis]: span[1] },
+    };
   }
   return range;
 }
 
-/** Notes of both sheets after the move. For a move on one sheet, `fromNotes` and `toNotes` are the same list. */
+/**
+ * Items of both sheets that sit on a range of cells, after the move: an item
+ * inside the block moves with it, and one on the cells it lands on goes. For
+ * a move on one sheet, `fromItems` and `toItems` are the same list.
+ */
+function movedItems<T>(
+  fromItems: readonly T[],
+  toItems: readonly T[],
+  move: CellBlockMove,
+  rangeOf: (item: T) => Range,
+  placed: (item: T, range: Range) => T,
+): { from: T[]; to: T[] } {
+  const moving: T[] = [];
+  const keptFrom: T[] = [];
+  for (const item of fromItems) {
+    const range = rangeOf(item);
+    if (holdsRange(move.from, range)) moving.push(placed(item, shifted(range, move)));
+    else if (!meets(move.to, range)) keptFrom.push(item);
+  }
+  if (move.from.sheet === move.to.sheet) {
+    const items = [...keptFrom, ...moving];
+    return { from: items, to: items };
+  }
+  const keptTo = toItems.filter((item) => !meets(move.to, rangeOf(item)));
+  return { from: keptFrom, to: [...keptTo, ...moving] };
+}
+
+/** Notes of both sheets after the move; see `movedItems`. */
 export function movedNotes(
   fromNotes: readonly CellNote[],
   toNotes: readonly CellNote[],
   move: CellBlockMove,
 ): { from: CellNote[]; to: CellNote[] } {
-  const rows = move.to.start.row - move.from.start.row;
-  const cols = move.to.start.col - move.from.start.col;
-  const moving: CellNote[] = [];
-  const keptFrom: CellNote[] = [];
-  for (const note of fromNotes) {
-    const { sheet, row, col } = note.addr;
-    if (holds(move.from, sheet, row, col)) {
-      moving.push({ ...note, addr: { sheet: move.to.sheet, row: row + rows, col: col + cols } });
-    } else if (!holds(move.to, sheet, row, col)) {
-      keptFrom.push(note);
-    }
-  }
-  if (move.from.sheet === move.to.sheet) {
-    const notes = [...keptFrom, ...moving];
-    return { from: notes, to: notes };
-  }
-  const keptTo = toNotes.filter(
-    (note) => !holds(move.to, note.addr.sheet, note.addr.row, note.addr.col),
+  return movedItems(
+    fromNotes,
+    toNotes,
+    move,
+    (note) => cellRange(note.addr),
+    (note, range) => ({ ...note, addr: { sheet: range.sheet, ...range.start } }),
   );
-  return { from: keptFrom, to: [...keptTo, ...moving] };
 }
 
-/**
- * Hyperlinks of both sheets after the move: a link inside the block moves
- * with it, and a link on the cells it lands on goes.
- */
+/** Hyperlinks of both sheets after the move; see `movedItems`. */
 export function movedHyperlinks(
   fromLinks: readonly CellHyperlink[],
   toLinks: readonly CellHyperlink[],
   move: CellBlockMove,
 ): { from: CellHyperlink[]; to: CellHyperlink[] } {
-  const moving: CellHyperlink[] = [];
-  const keptFrom: CellHyperlink[] = [];
-  for (const link of fromLinks) {
-    const range = normalizedRange(link.range);
-    if (holdsRange(move.from, range)) moving.push({ ...link, range: shifted(range, move) });
-    else if (!meets(move.to, range)) keptFrom.push(link);
-  }
-  if (move.from.sheet === move.to.sheet) {
-    const links = [...keptFrom, ...moving];
-    return { from: links, to: links };
-  }
-  const keptTo = toLinks.filter((link) => !meets(move.to, normalizedRange(link.range)));
-  return { from: keptFrom, to: [...keptTo, ...moving] };
+  return movedItems(
+    fromLinks,
+    toLinks,
+    move,
+    (link) => normalizedRange(link.range),
+    (link, range) => ({ ...link, range }),
+  );
 }
 
 function mergeRange(sheet: SheetId, merge: MergeRange): Range {
