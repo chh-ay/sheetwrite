@@ -730,6 +730,7 @@ const REQUIRED_API_EXAMPLES: Readonly<Record<string, readonly string[]>> = {
   "@sheetwrite/xlsx": ["xlsxAddon"],
   "@sheetwrite/queries": ["loadQueryEngine"],
   "@sheetwrite/charts": ["createChartViewCache", "chartsAddon"],
+  "@sheetwrite/formula-assist": ["formulaAssistAddon"],
   "@sheetwrite/wasm": ["load"],
   "@sheetwrite/formulas": ["load"],
 };

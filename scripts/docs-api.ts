@@ -1444,6 +1444,8 @@ const PACKAGE_PURPOSES: Readonly<Record<string, string>> = {
     "The full formula engine: the default engine plus pivots, the data model and the analysis functions.",
   "@sheetwrite/xlsx": "Read and write Excel files.",
   "@sheetwrite/charts": "Draw charts over cell ranges.",
+  "@sheetwrite/formula-assist":
+    "Suggest the rest of a formula in the formula bar, accepted with Tab.",
   "@sheetwrite/queries": "Saved queries that load CSV, JSON or your own data into tables.",
   "@sheetwrite/react": "The grid as a React component.",
   "@sheetwrite/vue": "The grid as a Vue component.",

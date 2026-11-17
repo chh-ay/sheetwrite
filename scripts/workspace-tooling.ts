@@ -17,6 +17,7 @@ export const PUBLISHABLE_PACKAGE_ORDER = [
   "@sheetwrite/xlsx",
   "@sheetwrite/queries",
   "@sheetwrite/charts",
+  "@sheetwrite/formula-assist",
   "@sheetwrite/react",
   "@sheetwrite/vue",
   "@sheetwrite/svelte",
@@ -224,6 +225,7 @@ export const COVERED_PACKAGE_TEST_ROOTS = [
   "packages/svelte/test",
   "packages/xlsx/test",
   "packages/charts/test",
+  "packages/formula-assist/test",
   "packages/queries/test",
 ] as const;
 
