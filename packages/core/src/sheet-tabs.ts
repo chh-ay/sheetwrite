@@ -29,26 +29,21 @@ export function changesSheetTabs(operation: DocumentOp): boolean {
   );
 }
 
-/**
- * Load the sheet commands that run only when a user acts: copying a sheet, and
- * the tab menu's Move or Copy dialog and Tab Color palette. Grid and the tabs
- * share this loader, so bundlers emit the commands as one chunk.
- */
-export const loadSheetCommands = (): Promise<typeof import("./sheet-commands.js")> =>
-  import("./sheet-commands.js");
+/** The sheet menu's Move or Copy… and Tab Color…, whose panels load on first use. */
+export type SheetTabCommand = "moveCopy" | "tabColor";
 
 export interface SheetTabsOptions {
   onActivate: (id: SheetId) => void;
-  onAdd?: () => SheetLifecycleResult;
-  /** Excel's Insert: add a sheet before sheet `id`. */
-  onInsert?: (id: SheetId) => SheetLifecycleResult;
+  /**
+   * Add a sheet at workbook position `index`, or after the last one. The add
+   * button and Shift+F11 add at the end; the sheet menu's Insert, before its sheet.
+   */
+  onAdd?: (index?: number) => SheetLifecycleResult;
   onRemove?: (id: SheetId) => SheetLifecycleResult;
   onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
-  /** Excel's Move or Copy with "Create a copy": copy sheet `id` to workbook position `index`. */
-  onCopy?: (id: SheetId, index: number) => SheetLifecycleResult | Promise<SheetLifecycleResult>;
-  /** Excel's Tab Color: `#RRGGBB`, or `null` for No Color. */
-  onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
+  /** Open a panel of `sheet-commands.ts` for sheet `id`; it shows itself with `showPanel`. */
+  onCommand?: (command: SheetTabCommand, id: SheetId) => void;
   onHide?: (id: SheetId) => SheetLifecycleResult;
   onUnhide?: (id: SheetId) => SheetLifecycleResult;
   /** Accessible tablist label (default "Sheets"). */
@@ -124,16 +119,11 @@ function feedbackFrom(result: SheetLifecycleResult): Omit<LifecycleFeedback, "sh
 export class SheetTabs {
   private readonly host: HTMLElement;
   private readonly onActivate: (id: SheetId) => void;
-  private readonly onAdd?: () => SheetLifecycleResult;
-  private readonly onInsert?: (id: SheetId) => SheetLifecycleResult;
+  private readonly onAdd?: (index?: number) => SheetLifecycleResult;
   private readonly onRemove?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
-  private readonly onCopy?: (
-    id: SheetId,
-    index: number,
-  ) => SheetLifecycleResult | Promise<SheetLifecycleResult>;
-  private readonly onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
+  private readonly onCommand?: (command: SheetTabCommand, id: SheetId) => void;
   private readonly onHide?: (id: SheetId) => SheetLifecycleResult;
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
   private readonly label: string;
@@ -145,9 +135,8 @@ export class SheetTabs {
   private focusedId: SheetId | null = null;
   private editing: RenameState | null = null;
   private menuSheetId: SheetId | null = null;
-  /** The Move or Copy dialog or Tab Color palette open for a sheet, and the code that builds them. */
-  private panel: { readonly kind: "moveCopy" | "tabColor"; readonly id: SheetId } | null = null;
-  private panels: typeof import("./sheet-commands.js") | null = null;
+  /** A panel shown in place of the open menu's items. */
+  private menuPanel: HTMLElement | null = null;
   /** Viewport position of the options trigger when the open menu was placed. */
   private menuAnchor: { left: number; top: number } | null = null;
   private feedback: LifecycleFeedback | null = null;
@@ -164,12 +153,10 @@ export class SheetTabs {
     this.host = host;
     this.onActivate = options.onActivate;
     this.onAdd = options.onAdd;
-    this.onInsert = options.onInsert;
     this.onRemove = options.onRemove;
     this.onRename = options.onRename;
     this.onMove = options.onMove;
-    this.onCopy = options.onCopy;
-    this.onTabColor = options.onTabColor;
+    this.onCommand = options.onCommand;
     this.onHide = options.onHide;
     this.onUnhide = options.onUnhide;
     this.readOnly = options.readOnly ?? false;
@@ -404,10 +391,7 @@ export class SheetTabs {
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-label", `${sheet.name} sheet`);
     tab.setAttribute("aria-selected", active ? "true" : "false");
-    if (sheet.tabColor !== undefined) {
-      tab.classList.add("sheetwrite-tab-colored");
-      tab.style.setProperty("--sheetwrite-tab-color", sheet.tabColor);
-    }
+    if (sheet.tabColor) tab.style.setProperty("--sheetwrite-tab-color", sheet.tabColor);
     if (this.feedback?.sheet === sheet.id) tab.setAttribute("aria-describedby", this.errorId);
     tab.tabIndex = sheet.id === this.focusedId ? 0 : -1;
     tab.draggable = !this.readOnly && this.onMove !== undefined;
@@ -527,10 +511,9 @@ export class SheetTabs {
 
   private hasSheetOptions(visibleCount: number): boolean {
     return (
-      this.onInsert !== undefined ||
+      this.onAdd !== undefined ||
       this.onRename !== undefined ||
-      this.onTabColor !== undefined ||
-      (this.onMove !== undefined && this.onCopy !== undefined) ||
+      this.onCommand !== undefined ||
       this.onHide !== undefined ||
       (this.onRemove !== undefined && visibleCount > 1)
     );
@@ -564,7 +547,9 @@ export class SheetTabs {
 
     options.appendChild(trigger);
 
-    if (this.menuSheetId === sheet.id) {
+    if (this.menuPanel) {
+      options.appendChild(this.menuPanel);
+    } else if (this.menuSheetId === sheet.id) {
       const menu = document.createElement("div");
       menu.id = this.menuId;
       menu.className = "sheetwrite-tab-menu";
@@ -574,13 +559,14 @@ export class SheetTabs {
       // of the menu and close it before the click; keep focus where it is.
       menu.addEventListener("mousedown", (event) => event.preventDefault());
 
-      const onInsert = this.onInsert;
-      if (onInsert) {
+      const onAdd = this.onAdd;
+      if (onAdd) {
+        // Excel's Insert adds a sheet before this one.
+        const index = this.sheets.indexOf(sheet);
         menu.appendChild(
-          this.createMenuItem("Insert", `Insert a sheet before ${sheet.name}`, "", () => {
-            this.clearMenuState();
-            this.performLifecycle(sheet.id, () => onInsert(sheet.id));
-          }),
+          this.createMenuItem("Insert", `Insert a sheet before ${sheet.name}`, "", () =>
+            this.performLifecycle(sheet.id, () => onAdd(index)),
+          ),
         );
       }
 
@@ -593,19 +579,15 @@ export class SheetTabs {
         );
       }
 
-      if (this.onMove && this.onCopy) {
-        menu.appendChild(
-          this.createMenuItem("Move or Copy…", `Move or copy ${sheet.name} sheet`, "", () => {
-            this.openPanel("moveCopy", sheet.id);
-          }),
-        );
-      }
-
-      if (this.onTabColor) {
-        menu.appendChild(
-          this.createMenuItem("Tab Color…", `Tab color for ${sheet.name} sheet`, "", () => {
-            this.openPanel("tabColor", sheet.id);
-          }),
+      const onCommand = this.onCommand;
+      if (onCommand) {
+        menu.append(
+          this.createMenuItem("Move or Copy…", `Move or copy ${sheet.name} sheet`, "", () =>
+            onCommand("moveCopy", sheet.id),
+          ),
+          this.createMenuItem("Tab Color…", `Tab color for ${sheet.name} sheet`, "", () =>
+            onCommand("tabColor", sheet.id),
+          ),
         );
       }
 
@@ -638,26 +620,6 @@ export class SheetTabs {
       }
 
       options.appendChild(menu);
-    } else if (this.panel?.id === sheet.id && this.panels) {
-      options.appendChild(
-        this.panels.createTabPanel(
-          this.panel.kind,
-          {
-            sheets: this.sheets,
-            visible: this.visibleSheets(),
-            close: () => {
-              this.panel = null;
-              this.render(true);
-              this.focusOptions(sheet.id);
-            },
-            perform: (operation, restore) => this.performLifecycle(sheet.id, operation, restore),
-            onMove: this.onMove,
-            onCopy: this.onCopy,
-            onTabColor: this.onTabColor,
-          },
-          sheet,
-        ),
-      );
     }
 
     return options;
@@ -682,18 +644,6 @@ export class SheetTabs {
     if (shortcut) button.setAttribute("aria-keyshortcuts", shortcut);
     button.addEventListener("click", action);
     return button;
-  }
-
-  /** Open a panel; its code loads the first time. */
-  private openPanel(kind: "moveCopy" | "tabColor", id: SheetId): void {
-    this.clearMenuState();
-    this.panel = { kind, id };
-    void loadSheetCommands().then((panels) => {
-      this.panels = panels;
-      if (this.destroyed || this.panel?.kind !== kind || this.panel.id !== id) return;
-      this.render();
-      this.host.querySelector<HTMLElement>(".sheetwrite-tab-panel :is(select, button)")?.focus();
-    });
   }
 
   private createAddButton(onAdd: () => SheetLifecycleResult): HTMLButtonElement {
@@ -867,16 +817,26 @@ export class SheetTabs {
     this.addMenuDismissListeners();
   }
 
+  /**
+   * Show `panel` in place of the items of sheet `id`'s open menu; it closes as
+   * the menu does. `sheet-commands.ts` builds the panels.
+   */
+  showPanel(id: SheetId, panel: HTMLElement): void {
+    if (this.menuSheetId !== id) return;
+    this.menuPanel = panel;
+    this.render();
+  }
+
   private clearMenuState(): SheetId | null {
     const id = this.menuSheetId;
     this.menuSheetId = null;
-    this.panel = null;
+    this.menuPanel = null;
     this.menuAnchor = null;
     this.removeMenuDismissListeners();
     return id;
   }
 
-  private closeMenu(restoreFocus: boolean): void {
+  closeMenu(restoreFocus: boolean): void {
     const id = this.clearMenuState();
     if (!id) return;
     this.host.querySelector<HTMLElement>(TAB_MENU_SELECTOR)?.remove();
@@ -956,34 +916,18 @@ export class SheetTabs {
     if (!(next instanceof Node) || !options?.contains(next)) this.closeMenu(false);
   };
 
-  private performLifecycle(
+  performLifecycle(
     id: SheetId,
-    operation: () => SheetLifecycleResult | Promise<SheetLifecycleResult>,
+    operation: () => SheetLifecycleResult,
     restoreOptions = false,
   ): void {
     if (this.destroyed || this.readOnly) return;
     this.clearMenuState();
     const result = operation();
-    if (result instanceof Promise) {
-      void result.then((settled) => this.finishLifecycle(id, settled, restoreOptions));
-      return;
-    }
-    this.finishLifecycle(id, result, restoreOptions);
-  }
-
-  private finishLifecycle(
-    id: SheetId,
-    result: SheetLifecycleResult,
-    restoreOptions: boolean,
-  ): void {
-    if (this.destroyed) return;
     const feedback = feedbackFrom(result);
     this.feedback = feedback ? { sheet: id || result.sheet, ...feedback } : null;
     this.render(restoreOptions || this.host.contains(document.activeElement));
-    if (restoreOptions) this.focusOptions(id);
-  }
-
-  private focusOptions(id: SheetId): void {
+    if (!restoreOptions) return;
     const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
     if (trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) trigger.focus();
   }

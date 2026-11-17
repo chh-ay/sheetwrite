@@ -39,7 +39,6 @@ import {
 import { dateToSerial } from "../date-serial.js";
 import {
   DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
-  isTabColor,
   isValidCalculationSettings,
   type SnapshotResourceLimits,
   storedCalculationSettings,
@@ -3770,9 +3769,6 @@ export class StoreDataEngine {
 
       case "setSheetMeta": {
         const sheet = this.sheets.sheetMeta(patch.sheet);
-        const { tabColor } = patch.patch;
-        if (tabColor !== undefined && tabColor !== null && !isTabColor(tabColor)) return false;
-
         if (
           patch.patch.frozenRows !== undefined &&
           (!integerAt(patch.patch.frozenRows) || patch.patch.frozenRows > sheet.rowCount)
@@ -3806,8 +3802,9 @@ export class StoreDataEngine {
           return false;
         }
 
-        if (tabColor === null) delete sheet.tabColor;
-        else if (tabColor !== undefined) sheet.tabColor = tabColor;
+        // The protocol checked the color's format before the operation got here.
+        const { tabColor } = patch.patch;
+        if (tabColor !== undefined) sheet.tabColor = tabColor ?? undefined;
         if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
         if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
         if (patch.patch.conditionalFormats !== undefined) {
@@ -4368,9 +4365,9 @@ export class StoreDataEngine {
       name: name.name,
       ...dashboardFields(snapshot),
       visibility: snapshot.visibility,
+      tabColor: snapshot.tabColor,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),
-      ...(snapshot.tabColor !== undefined ? { tabColor: snapshot.tabColor } : {}),
       frozenRows: snapshot.frozenRows,
       frozenCols: snapshot.frozenCols,
       merges,

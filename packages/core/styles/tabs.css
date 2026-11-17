@@ -61,6 +61,8 @@
   font-weight: 550;
   background: transparent;
   color: var(--sheetwrite-tab-fg, #5f6368);
+  /* Excel's tab color is a bar under the tab text, so the text keeps its contrast. */
+  box-shadow: inset 0 -3px 0 var(--sheetwrite-tab-color, transparent);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -81,7 +83,9 @@
 }
 
 .sheetwrite-tab:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
+  box-shadow:
+    inset 0 -3px 0 var(--sheetwrite-tab-color, transparent),
+    inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
 }
 
 .sheetwrite-tab-options-button:focus-visible,
@@ -308,17 +312,6 @@
   .sheetwrite-tab {
     transition: none;
   }
-}
-
-/* Excel's tab color shows as a bar under the tab text, so the text keeps its contrast. */
-.sheetwrite-tab-colored {
-  box-shadow: inset 0 -3px 0 var(--sheetwrite-tab-color);
-}
-
-.sheetwrite-tab-colored:focus-visible {
-  box-shadow:
-    inset 0 -3px 0 var(--sheetwrite-tab-color),
-    inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
 }
 
 .sheetwrite-tab-colors {

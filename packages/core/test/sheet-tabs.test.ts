@@ -112,79 +112,50 @@ describe("SheetTabs", () => {
     expect(menu?.getAttribute("aria-label")).toBe("Summary sheet options");
   });
 
-  it("offers Insert, Tab Color and Move or Copy in a sheet's menu, as Excel does", async () => {
+  it("offers Insert, Move or Copy and Tab Color in a sheet's menu, as Excel does", () => {
     const calls: string[] = [];
+    const panel = document.createElement("div");
+    panel.className = "sheetwrite-tab-menu";
+    panel.appendChild(document.createElement("button"));
     tabs.destroy();
     tabs = new SheetTabs(host, {
       onActivate: () => {},
-      onInsert: (id) => {
-        calls.push(`insert:${id}`);
+      onAdd: (index) => {
+        calls.push(`add:${index}`);
         return applied("new");
       },
-      onTabColor: (id, color) => {
-        calls.push(`color:${id}:${color}`);
-        return applied(id);
-      },
-      onMove: (id, to) => {
-        calls.push(`move:${id}:${to}`);
-        return applied(id);
-      },
-      onCopy: (id, index) => {
-        calls.push(`copy:${id}:${index}`);
-        return applied("copy");
+      onCommand: (command, id) => {
+        calls.push(`${command}:${id}`);
+        tabs.showPanel(id, panel);
       },
     });
     tabs.update(SHEETS, "b");
-    const openMenu = (): HTMLElement => {
-      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
-      return host.querySelector<HTMLElement>('[role="menu"]')!;
-    };
     const choose = (label: string): void => {
-      openMenu().querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
-    };
-    // The Tab Color palette and the Move or Copy dialog load on first use.
-    const panel = async (role: string): Promise<HTMLElement> => {
-      for (let attempt = 0; attempt < 100; attempt++) {
-        const found = host.querySelector<HTMLElement>(`.sheetwrite-tab-panel[role="${role}"]`);
-        if (found) return found;
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-      throw new Error(`No ${role} opened`);
-    };
-    const color = async (name: string): Promise<HTMLElement> => {
-      choose("Tab color for Sales sheet");
-      const palette = await panel("menu");
-      palette.querySelector<HTMLButtonElement>(`[aria-label="${name}"]`)!.click();
-      return palette;
+      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+      const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+      expect([...menu.querySelectorAll("button")].map((item) => item.textContent)).toEqual([
+        "Insert",
+        "Move or Copy…",
+        "Tab Color…",
+      ]);
+      menu.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
     };
 
+    // Insert adds a sheet at the sheet's own position, so before it.
     choose("Insert a sheet before Sales");
-    expect((await color("Dark Red")).querySelectorAll('[role="menuitemradio"]').length).toBe(11);
-    await color("No Color");
-    expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();
+    expect(host.querySelector('[role="menu"]')).toBeNull();
 
-    const moveOrCopy = async (before: string, copy: boolean): Promise<void> => {
-      choose("Move or copy Sales sheet");
-      const dialog = await panel("dialog");
-      expect(dialog.getAttribute("aria-label")).toBe("Move or copy Sales sheet");
-      const list = dialog.querySelector<HTMLSelectElement>('select[aria-label="Before sheet"]')!;
-      list.value = [...list.options].find((option) => option.text === before)!.value;
-      dialog.querySelector<HTMLInputElement>('input[aria-label="Create a copy"]')!.checked = copy;
-      [...dialog.querySelectorAll("button")].find((button) => button.textContent === "OK")!.click();
-      expect(host.querySelector('[role="dialog"]')).toBeNull();
-    };
-    await moveOrCopy("Summary", true);
-    await moveOrCopy("(move to end)", false);
-    await moveOrCopy("Sales", false);
+    // The panels show in place of the menu, and close as it does.
+    choose("Move or copy Sales sheet");
+    expect(host.querySelector(".sheetwrite-tab-options > .sheetwrite-tab-menu")).toBe(panel);
+    const inPanel = panel.querySelector("button")!;
+    inPanel.focus();
+    key(inPanel, "Escape");
+    expect(panel.isConnected).toBe(false);
+    choose("Tab color for Sales sheet");
+    expect(panel.isConnected).toBe(true);
 
-    expect(calls).toEqual([
-      "insert:b",
-      "color:b:#C00000",
-      "color:b:null",
-      "copy:b:2",
-      "move:b:2",
-      "move:b:0",
-    ]);
+    expect(calls).toEqual(["add:1", "moveCopy:b", "tabColor:b"]);
   });
 
   it("shows a sheet's tab color", () => {

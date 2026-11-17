@@ -1,50 +1,27 @@
 // The panels a sheet tab's menu opens: Excel's Move or Copy dialog and its
-// Tab Color palette. They load on first use, so a page that never opens them
-// does not download them.
+// Tab Color palette. They show in place of the menu's items and close as the
+// menu does (Escape, a press outside, or focus leaving them).
 
+import type { SheetTabCommand, SheetTabs } from "./sheet-tabs.js";
 import type { SheetId } from "./types/coordinates.js";
-import type { SheetLifecycleResult } from "./types/grid.js";
+import type { Sheet } from "./types/document.js";
+import type { Grid } from "./types/grid.js";
 
-/** The sheet record a panel reads. */
-export interface TabPanelSheet {
-  readonly id: SheetId;
-  readonly name: string;
-  readonly tabColor?: string;
-}
-
-/** What a panel needs from the tab bar that opened it. */
-export interface TabPanelHost {
-  /** Every sheet, in workbook order. */
-  readonly sheets: readonly TabPanelSheet[];
-  /** The visible sheets, with their positions in `sheets`. */
-  readonly visible: ReadonlyArray<{
-    readonly sheet: TabPanelSheet;
-    readonly workbookIndex: number;
-  }>;
-  /** Close the panel and give focus back to the tab's options button. */
-  close(): void;
-  /** Close the panel and run a lifecycle command, showing its error the way the menu does. */
-  perform(
-    operation: () => SheetLifecycleResult | Promise<SheetLifecycleResult>,
-    restoreOptions: boolean,
-  ): void;
-  readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
-  readonly onCopy?: (
-    id: SheetId,
-    index: number,
-  ) => SheetLifecycleResult | Promise<SheetLifecycleResult>;
-  readonly onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
-}
-
-/** The Tab Color palette or the Move or Copy dialog for `sheet`. */
-export function createTabPanel(
-  kind: "moveCopy" | "tabColor",
-  host: TabPanelHost,
-  sheet: TabPanelSheet,
-): HTMLElement {
-  return kind === "tabColor"
-    ? createTabColorPalette(host, sheet)
-    : createMoveCopyDialog(host, sheet);
+/** Show the Move or Copy dialog or the Tab Color palette of sheet `id` in its open menu. */
+export function openTabPanel(
+  grid: Grid,
+  tabs: SheetTabs,
+  command: SheetTabCommand,
+  id: SheetId,
+): void {
+  const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === id);
+  if (!sheet) return;
+  const panel =
+    command === "tabColor"
+      ? createTabColorPalette(grid, tabs, sheet)
+      : createMoveCopyDialog(grid, tabs, sheet);
+  tabs.showPanel(id, panel);
+  panel.querySelector<HTMLElement>("select, button")?.focus();
 }
 
 /** Excel's standard tab colors, in the order of its Tab Color palette. */
@@ -69,11 +46,8 @@ function createButton(className: string, text: string): HTMLButtonElement {
   return button;
 }
 
-/**
- * Excel's Tab Color palette: the standard colors, then No Color. Arrow keys,
- * Home and End move between the colors; Escape closes it.
- */
-function createTabColorPalette(host: TabPanelHost, sheet: TabPanelSheet): HTMLElement {
+/** Excel's Tab Color palette: the standard colors, then No Color. Arrow keys, Home and End move. */
+function createTabColorPalette(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLElement {
   const palette = document.createElement("div");
   palette.className = "sheetwrite-tab-menu sheetwrite-tab-panel sheetwrite-tab-colors";
   palette.setAttribute("role", "menu");
@@ -99,18 +73,12 @@ function createTabColorPalette(host: TabPanelHost, sheet: TabPanelSheet): HTMLEl
     swatch.setAttribute("aria-checked", String(current === color));
     if (color !== null) swatch.style.backgroundColor = color;
     swatch.addEventListener("click", () =>
-      host.perform(() => host.onTabColor!(sheet.id, color), true),
+      tabs.performLifecycle(sheet.id, () => grid.setSheetTabColor(sheet.id, color), true),
     );
     swatches.push(swatch);
   }
 
   palette.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      host.close();
-      return;
-    }
     const index = swatches.indexOf(document.activeElement as HTMLButtonElement);
     const step =
       event.key === "ArrowRight" || event.key === "ArrowDown"
@@ -130,22 +98,31 @@ function createTabColorPalette(host: TabPanelHost, sheet: TabPanelSheet): HTMLEl
   return palette;
 }
 
-function createOption(text: string, value: string): HTMLOptionElement {
+function createOption(text: string, value: number): HTMLOptionElement {
   const option = document.createElement("option");
   option.textContent = text;
-  option.value = value;
+  option.value = String(value);
   return option;
 }
 
 /**
  * Excel's Move or Copy dialog: the sheet to put the tab before, or the end,
- * and whether to create a copy instead of moving the sheet.
+ * and whether to create a copy instead of moving the sheet. The copy is
+ * activated.
  */
-function createMoveCopyDialog(host: TabPanelHost, sheet: TabPanelSheet): HTMLElement {
+function createMoveCopyDialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLElement {
+  const sheets = grid.store.getWorkbook().sheets;
   const dialog = document.createElement("div");
   dialog.className = "sheetwrite-tab-menu sheetwrite-tab-panel sheetwrite-tab-dialog";
   dialog.setAttribute("role", "dialog");
   dialog.setAttribute("aria-label", `Move or copy ${sheet.name} sheet`);
+  // WebKit does not focus a pressed button or checkbox, so a press would move
+  // focus out and close the dialog first; the list takes its presses.
+  dialog.addEventListener("mousedown", (event) => {
+    if (!(event.target instanceof Element && event.target.closest("select"))) {
+      event.preventDefault();
+    }
+  });
 
   const listLabel = document.createElement("span");
   listLabel.className = "sheetwrite-tab-dialog-label";
@@ -154,10 +131,12 @@ function createMoveCopyDialog(host: TabPanelHost, sheet: TabPanelSheet): HTMLEle
   const list = document.createElement("select");
   list.size = 6;
   list.setAttribute("aria-label", "Before sheet");
-  for (const { sheet: candidate, workbookIndex } of host.visible) {
-    list.appendChild(createOption(candidate.name, String(workbookIndex)));
-  }
-  list.appendChild(createOption("(move to end)", String(host.sheets.length)));
+  sheets.forEach((candidate, index) => {
+    if ((candidate.visibility ?? "visible") === "visible") {
+      list.appendChild(createOption(candidate.name, index));
+    }
+  });
+  list.appendChild(createOption("(move to end)", sheets.length));
   list.selectedIndex = 0;
 
   const copyLabel = document.createElement("label");
@@ -170,32 +149,30 @@ function createMoveCopyDialog(host: TabPanelHost, sheet: TabPanelSheet): HTMLEle
   const ok = (): void => {
     const before = Number(list.value);
     if (copy.checked) {
-      host.perform(() => host.onCopy!(sheet.id, before), false);
+      void grid.copySheet(sheet.id, { index: before }).then((result) => {
+        if (result.status === "applied") grid.setActiveSheet(result.sheet);
+        tabs.performLifecycle(sheet.id, () => result);
+      });
       return;
     }
-    const from = host.sheets.findIndex((candidate) => candidate.id === sheet.id);
+    const from = sheets.findIndex((candidate) => candidate.id === sheet.id);
     const to = from < before ? before - 1 : before;
-    if (to === from) host.close();
-    else host.perform(() => host.onMove!(sheet.id, to), true);
+    if (to === from) tabs.closeMenu(true);
+    else tabs.performLifecycle(sheet.id, () => grid.moveSheet(sheet.id, to), true);
   };
   const okButton = createButton("sheetwrite-tab-dialog-button", "OK");
   okButton.addEventListener("click", ok);
   const cancel = createButton("sheetwrite-tab-dialog-button", "Cancel");
-  cancel.addEventListener("click", () => host.close());
+  cancel.addEventListener("click", () => tabs.closeMenu(true));
   const buttons = document.createElement("div");
   buttons.className = "sheetwrite-tab-dialog-buttons";
   buttons.append(okButton, cancel);
 
-  dialog.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      host.close();
-    } else if (event.key === "Enter" && event.target === list) {
-      event.preventDefault();
-      event.stopPropagation();
-      ok();
-    }
+  list.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    event.stopPropagation();
+    ok();
   });
   dialog.append(listLabel, list, copyLabel, buttons);
   return dialog;

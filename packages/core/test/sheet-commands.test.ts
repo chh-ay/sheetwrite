@@ -14,6 +14,8 @@ import { mountHost, sheet } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
+  // The sheet commands load on first use; load them once here.
+  await import("../src/sheet-commands.js");
 });
 
 let restoreStubs: () => void;
@@ -57,6 +59,11 @@ function press(key: string, init: KeyboardEventInit): void {
   );
 }
 
+/** Let a command whose code loads on first use finish. */
+function commandLoaded(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 function set(sheetId: SheetId, row: number, value: CellValue): void {
   store.applyTransaction({
     patches: [{ op: "set", addr: { sheet: sheetId, row, col: 0 }, value }],
@@ -64,18 +71,23 @@ function set(sheetId: SheetId, row: number, value: CellValue): void {
 }
 
 describe("switching sheets from the keyboard", () => {
-  it("moves to the next or previous visible sheet with Ctrl+PageDown and Ctrl+PageUp, or with Ctrl+Alt as in Excel for the web", () => {
+  it("moves to the next or previous visible sheet with Ctrl+PageDown and Ctrl+PageUp, or with Ctrl+Alt as in Excel for the web", async () => {
     press("PageDown", { ctrlKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("b");
     // The hidden sheet is skipped.
     press("PageDown", { ctrlKey: true, altKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("d");
     // The last sheet stays active.
     press("PageDown", { ctrlKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("d");
     press("PageUp", { ctrlKey: true, altKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("b");
     press("PageUp", { ctrlKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("a");
   });
 });
@@ -131,5 +143,60 @@ describe("Move or Copy", () => {
     expect(names()).toEqual(["Sales", "Costs", "Costs (2)", "Old", "Notes"]);
     grid.undo();
     expect(names()).toEqual(["Sales", "Costs", "Old", "Notes"]);
+  });
+});
+
+describe("the sheet menu", () => {
+  /** Choose an item of the active sheet's menu, and let a panel it opens load. */
+  async function choose(label: string): Promise<HTMLElement | null> {
+    host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button")!.click();
+    host.querySelector<HTMLButtonElement>(`[role="menuitem"][aria-label="${label}"]`)!.click();
+    await commandLoaded();
+    return host.querySelector<HTMLElement>(".sheetwrite-tab-panel");
+  }
+
+  it("inserts a sheet before the sheet and activates it", async () => {
+    await choose("Insert a sheet before Sales");
+    expect(names()).toEqual(["Sheet 5", "Sales", "Costs", "Old", "Notes"]);
+    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet 5");
+  });
+
+  it("colors the tab from Excel's Tab Color palette", async () => {
+    const palette = (await choose("Tab color for Sales sheet"))!;
+    expect(palette.querySelectorAll('[role="menuitemradio"]').length).toBe(11);
+    palette.querySelector<HTMLButtonElement>('[aria-label="Dark Red"]')!.click();
+    expect(sheetById("a")?.tabColor).toBe("#C00000");
+    expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();
+    const tab = host.querySelector<HTMLElement>('[role="tab"][data-sheet-id="a"]')!;
+    expect(tab.style.getPropertyValue("--sheetwrite-tab-color")).toBe("#C00000");
+
+    (await choose("Tab color for Sales sheet"))!
+      .querySelector<HTMLButtonElement>('[aria-label="No Color"]')!
+      .click();
+    expect(sheetById("a")?.tabColor).toBeUndefined();
+  });
+
+  it("copies or moves the sheet from the Move or Copy dialog", async () => {
+    const moveOrCopy = async (name: string, before: string, copy: boolean): Promise<void> => {
+      const dialog = (await choose(`Move or copy ${name} sheet`))!;
+      const list = dialog.querySelector<HTMLSelectElement>('select[aria-label="Before sheet"]')!;
+      // The hidden sheet is not offered.
+      expect([...list.options].map((option) => option.text)).not.toContain("Old");
+      list.value = [...list.options].find((option) => option.text === before)!.value;
+      dialog.querySelector<HTMLInputElement>('input[aria-label="Create a copy"]')!.checked = copy;
+      [...dialog.querySelectorAll("button")].find((button) => button.textContent === "OK")!.click();
+      await commandLoaded();
+      expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();
+    };
+
+    // The copy goes before the chosen sheet and is activated.
+    await moveOrCopy("Sales", "Notes", true);
+    expect(names()).toEqual(["Sales", "Costs", "Old", "Sales (2)", "Notes"]);
+    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sales (2)");
+
+    await moveOrCopy("Sales (2)", "(move to end)", false);
+    expect(names()).toEqual(["Sales", "Costs", "Old", "Notes", "Sales (2)"]);
+    await moveOrCopy("Sales (2)", "Sales", false);
+    expect(names()).toEqual(["Sales (2)", "Sales", "Costs", "Old", "Notes"]);
   });
 });

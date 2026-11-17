@@ -268,26 +268,19 @@ export function createSpreadsheetShell(
     bottomRow.prepend(tabHost);
     tabs = new SheetTabs(tabHost, {
       onActivate: (id) => grid.setActiveSheet(id),
-      onAdd: () => {
-        const result = grid.addSheet({ name: nextSheetName() });
-        if (result.status === "applied") grid.setActiveSheet(result.sheet);
-        return result;
-      },
-      onInsert: (id) => {
-        const index = grid.store.getWorkbook().sheets.findIndex((sheet) => sheet.id === id);
-        const result = grid.addSheet({ name: nextSheetName(), index: Math.max(index, 0) });
+      onAdd: (index) => {
+        const result = grid.addSheet({ name: nextSheetName(), index });
         if (result.status === "applied") grid.setActiveSheet(result.sheet);
         return result;
       },
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),
       onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
-      onCopy: (id, index) =>
-        grid.copySheet(id, { index }).then((result) => {
-          if (result.status === "applied") grid.setActiveSheet(result.sheet);
-          return result;
+      // The same chunk Grid loads for its own tab bar.
+      onCommand: (command, id) =>
+        void import("../sheet-commands.js").then(({ openTabPanel }) => {
+          if (tabs) openTabPanel(grid, tabs, command, id);
         }),
-      onTabColor: (id, color) => grid.setSheetTabColor(id, color),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
     });

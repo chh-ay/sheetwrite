@@ -18,6 +18,7 @@ import type { Keymap } from "./keymap.js";
 import { filterButtonRect } from "./overlay-painter.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
+import type { SheetKey } from "./sheet-commands.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
@@ -76,8 +77,11 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
-  /** Run a command of `cell-commands.ts`, which loads on first use. */
-  cellCommand: (command: CellCommand) => void;
+  /**
+   * Run a key's command from `cell-commands.ts` or, for the keys that switch
+   * sheets, `sheet-commands.ts`; both load on first use.
+   */
+  keyCommand: (command: CellCommand | SheetKey) => void;
   /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   store: Store;
@@ -1209,18 +1213,13 @@ export class InteractionSessions {
           this.fillFromEdge(false);
           break;
 
-        case "nextSheet":
-        case "previousSheet":
-          this.stepSheet(action === "nextSheet" ? 1 : -1);
-          break;
-
         case "toggleFilter":
           this.deps.grid.actions.toggleAutoFilter();
           break;
 
         default:
-          // The format, hide, insert and Format Cells keys run from a chunk.
-          this.deps.cellCommand(action);
+          // The format, hide, insert, Format Cells and sheet keys run from chunks.
+          this.deps.keyCommand(action);
       }
 
       return;
@@ -1712,17 +1711,6 @@ export class InteractionSessions {
    * with its formats, into the rest of it. With one cell selected, copy the
    * cell above (or to the left) into it, as Excel's Fill Down and Fill Right do.
    */
-  /** Activate the next or previous visible sheet; the first and last sheets stay. */
-  private stepSheet(step: 1 | -1): void {
-    const grid = this.deps.grid;
-    const visible = grid.store
-      .getWorkbook()
-      .sheets.filter((sheet) => (sheet.visibility ?? "visible") === "visible");
-    const index = visible.findIndex((sheet) => sheet.id === grid.getActiveSheet());
-    const next = index < 0 ? undefined : visible[index + step];
-    if (next) grid.setActiveSheet(next.id);
-  }
-
   private fillFromEdge(down: boolean): void {
     const rect = this.fillSourceRect();
     if (!rect) return;

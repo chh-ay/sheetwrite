@@ -4,7 +4,7 @@
 // and its sheet-scoped names are copied with it.
 
 import { getEngine } from "./engine.js";
-import { ENGINE_KINDS, TOKEN_FIELDS } from "./formula-token-kinds.js";
+import { formulaTokens } from "./formula-syntax.js";
 import { formulaNameKey, sheetNameKey } from "./name-key.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp, NamedRangeSnapshot, SheetSnapshot, Workbook } from "./types/document.js";
@@ -13,10 +13,6 @@ import type { DocumentOp, NamedRangeSnapshot, SheetSnapshot, Workbook } from "./
 const MAX_SHEET_NAME = 31;
 /** A sheet name that a reference can write without quotes. */
 const PLAIN_SHEET_NAME = /^[A-Za-z_][A-Za-z0-9_.]*$/u;
-const IDENT = ENGINE_KINDS.indexOf("ident");
-const QUOTED = ENGINE_KINDS.indexOf("quoted");
-const BANG = ENGINE_KINDS.indexOf("bang");
-const COLON = ENGINE_KINDS.indexOf("colon");
 
 /** The copy of a sheet, and the sheet-scoped names that go with it. */
 interface SheetCopy {
@@ -77,27 +73,20 @@ function referenceSheetName(name: string): string {
  * 3-D reference such as `Sheet1:Sheet3!A1` names a span of sheets and stays.
  */
 function renameSheetReferences(text: string, from: string, to: string): string {
-  const packed = getEngine().formulaTokens(text);
+  const tokens = formulaTokens(text);
   const fromKey = sheetNameKey(from);
   let out = "";
   let copied = 0;
-  for (let at = 0; at + TOKEN_FIELDS <= packed.length; at += TOKEN_FIELDS) {
-    const kind = packed[at];
-    if ((kind !== IDENT && kind !== QUOTED) || packed[at + TOKEN_FIELDS] !== BANG) continue;
+  tokens.forEach(({ kind, from: start, to: end, text: written }, index) => {
+    if ((kind !== "ident" && kind !== "quoted") || tokens[index + 1]?.kind !== "bang") return;
     // `Sheet1:Sheet3!`: the sheet before the colon has no `!` of its own.
-    const before = at - TOKEN_FIELDS;
-    if (before >= 0 && packed[before] === COLON && packed[before - 2 * TOKEN_FIELDS] !== BANG) {
-      continue;
+    if (tokens[index - 1]?.kind === "colon" && tokens[index - 3]?.kind !== "bang") return;
+    const name = kind === "quoted" ? written.slice(1, -1).replaceAll("''", "'") : written;
+    if (sheetNameKey(name) === fromKey) {
+      out += text.slice(copied, start) + referenceSheetName(to);
+      copied = end;
     }
-
-    const start = packed[at + 1]!;
-    const end = packed[at + 2]!;
-    const written = text.slice(start, end);
-    const name = kind === QUOTED ? written.slice(1, -1).replaceAll("''", "'") : written;
-    if (sheetNameKey(name) !== fromKey) continue;
-    out += text.slice(copied, start) + referenceSheetName(to);
-    copied = end;
-  }
+  });
   return copied === 0 ? text : out + text.slice(copied);
 }
 

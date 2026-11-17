@@ -82,7 +82,7 @@ import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { validateSheetName } from "./sheet-name.js";
-import { changesSheetTabs, loadSheetCommands, SheetTabs } from "./sheet-tabs.js";
+import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SHEET_LIFECYCLE_MESSAGES, SheetwriteStore } from "./store.js";
@@ -1008,7 +1008,15 @@ export class GridImpl implements Grid {
         },
       },
       openFind: (options) => this.openFindBar(options),
-      cellCommand: (command) => this.cellCommand(command),
+      keyCommand: (command) => {
+        if (command !== "nextSheet" && command !== "previousSheet") {
+          this.cellCommand(command);
+          return;
+        }
+        void this.sheetCommand((commands) => {
+          if (!this.lifetime.closed) commands.stepSheet(this, command);
+        });
+      },
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
@@ -1684,29 +1692,18 @@ export class GridImpl implements Grid {
     this.tabBar = bar;
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
-      onAdd: () => {
-        const result = this.addSheet({ name: this.nextDefaultSheetName() });
-        if (result.status === "applied") this.setActiveSheet(result.sheet);
-        return result;
-      },
-      onInsert: (id) => {
-        const index = this.store.getWorkbook().sheets.findIndex((sheet) => sheet.id === id);
-        const result = this.addSheet({
-          name: this.nextDefaultSheetName(),
-          index: Math.max(index, 0),
-        });
+      onAdd: (index) => {
+        const result = this.addSheet({ name: this.nextDefaultSheetName(), index });
         if (result.status === "applied") this.setActiveSheet(result.sheet);
         return result;
       },
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
-      onCopy: (id, index) =>
-        this.copySheet(id, { index }).then((result) => {
-          if (result.status === "applied") this.setActiveSheet(result.sheet);
-          return result;
+      onCommand: (command, id) =>
+        void this.sheetCommand((commands) => {
+          if (this.sheetTabs) commands.openTabPanel(this, this.sheetTabs, command, id);
         }),
-      onTabColor: (id, color) => this.setSheetTabColor(id, color),
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
       readOnly: this.readOnly,
@@ -2926,6 +2923,26 @@ export class GridImpl implements Grid {
     });
   }
 
+  /**
+   * Run a command of `sheet-commands.ts`, which loads on first use, as
+   * `loadCommand` runs one; the promise settles with the command's result.
+   */
+  private sheetCommand<T>(run: (commands: typeof import("./sheet-commands.js")) => T): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.loadCommand(
+        import("./sheet-commands.js"),
+        (commands) => {
+          try {
+            resolve(run(commands));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        reject,
+      );
+    });
+  }
+
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
   private resetFindBar(): void {
     this.findBarBuilds.close();
@@ -3362,16 +3379,11 @@ export class GridImpl implements Grid {
     options: { index?: number; name?: string } = {},
   ): Promise<SheetLifecycleResult> {
     // The copy's code loads the first time a sheet is copied.
-    return loadSheetCommands().then(({ planSheetCopy }) => {
-      const plan = planSheetCopy(
-        this.store.getWorkbook(),
-        (sheet) => this.document.snapshotSheet(sheet),
-        id,
-        options,
-      );
-      if (!plan) return this.rejectSheet(id, "sheet-not-found");
-      return { ...this.document.commit(plan.operations, "structure"), sheet: plan.sheet };
-    });
+    return this.sheetCommand(
+      (commands) =>
+        commands.copySheet(this.document, this.store.getWorkbook(), id, options) ??
+        this.rejectSheet(id, "sheet-not-found"),
+    );
   }
 
   private rejectSheet(id: SheetId, code: "reserved" | "sheet-not-found"): SheetLifecycleResult {

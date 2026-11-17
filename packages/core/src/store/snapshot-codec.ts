@@ -64,7 +64,7 @@ export function decodeWorkbookSnapshot(
         name: source.name,
         ...dashboardFields(source),
         visibility: source.visibility,
-        ...(source.tabColor !== undefined ? { tabColor: source.tabColor } : {}),
+        tabColor: source.tabColor,
         rowCount: source.rowCount,
         columns: cloneJsonValue(source.columns) ?? [],
         frozenRows: source.frozenRows,
