@@ -1386,7 +1386,8 @@ export class OverlayPainter {
       for (let col = area.c0; col <= area.c1; col++) {
         const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
         if (rect.x >= clientW) break;
-        if (rect.w <= 0 || rect.x + rect.w <= theme.rowHeaderWidth || rect.y + rect.h <= clip) continue;
+        if (rect.w <= 0 || rect.x + rect.w <= theme.rowHeaderWidth || rect.y + rect.h <= clip)
+          continue;
         const value = this.deps.fillValueAt(row, col);
         if (!value) continue;
         context.save();

@@ -1463,7 +1463,12 @@ export class InteractionSessions {
         break;
 
       case "Escape":
-        // Esc ends a cut's moving border, as in Excel.
+        // Esc ends a fill-handle drag without filling, and a cut's moving
+        // border, as in Excel.
+        if (this.fillTarget !== null) {
+          this.cancelPointer();
+          break;
+        }
         if (!this.deps.cancelCut()) return;
         break;
 

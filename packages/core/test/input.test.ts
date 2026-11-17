@@ -276,8 +276,13 @@ describe("pointer input: touch policy", () => {
       // Rows 4 to 8 each show their value: 30, 40, 50, 60, 70.
       expect(context.calls.fillText).toBe(5);
 
-      scroller.dispatchEvent(pointer("pointerup", cellPoint(7, 1, workbook)));
+      // Esc ends the drag without filling, as in Excel.
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
       expect(canvas?.hidden).toBe(true);
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(7, 1, workbook)));
+      expect(store.getCell(at(7)).resolved).toBe(70.5);
       grid.destroy();
       store.dispose();
     });
