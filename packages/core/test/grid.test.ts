@@ -1840,6 +1840,10 @@ describe("element height cap measurement", () => {
 });
 
 describe("undo and redo selection", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
   it("selects the cells undo and redo change, as Excel does", () => {
     const workbook = makeWorkbook(20);
     const store = new SheetwriteStore(workbook, makeColumnarData(20));
@@ -1867,5 +1871,34 @@ describe("undo and redo selection", () => {
     expect(grid.getSelection()).toEqual(changed);
 
     grid.destroy();
+  });
+});
+
+describe("a sheet named History", () => {
+  beforeAll(async () => {
+    await initSheetwrite();
+  });
+
+  it("is refused only to a user's rename, so undo gives the name back", () => {
+    const workbook = makeWorkbook(5);
+    const first = workbook.sheets[0]!;
+    workbook.sheets = [
+      { ...first, name: "History" },
+      { ...first, id: "s2", name: "Notes" },
+    ];
+    const store = new SheetwriteStore(workbook);
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const names = (): string[] => store.getWorkbook().sheets.map((sheet) => sheet.name);
+
+    expect(grid.renameSheet("s1", "Data").status).toBe("applied");
+    expect(grid.renameSheet("s2", "History")).toMatchObject({
+      status: "rejected",
+      issues: [{ code: "reserved" }],
+    });
+    grid.undo();
+    expect(names()).toEqual(["History", "Notes"]);
+
+    grid.destroy();
+    store.dispose();
   });
 });
