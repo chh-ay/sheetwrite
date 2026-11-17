@@ -489,7 +489,7 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       );
       const data = field(result, "screenshotData");
       // A frame without changes has no new picture: the previous one stands, so the count holds.
-      const image = typeof data === "string" ? Buffer.from(data, "base64") : previous;
+      const image: Uint8Array | null = typeof data === "string" ? Buffer.from(data, "base64") : previous;
       if (image === null) throw new Error("The first recorded frame has no picture");
       encoder.stdin.write(image);
       previous = image;
