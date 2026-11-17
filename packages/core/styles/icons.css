@@ -406,6 +406,10 @@
   --sheetwrite-icon-x: -9;
   --sheetwrite-icon-y: -13.5;
 }
+.sheetwrite-icon[data-icon="dataValidation"] {
+  --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -13.5;
+}
 .sheetwrite-icon[data-icon="dashboard"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -15;

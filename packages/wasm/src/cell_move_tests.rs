@@ -38,7 +38,7 @@ fn after_move(formula: &str, from: [usize; 4], to: (usize, usize)) -> String {
     store.set_formula(summary, 0, 0, formula, 0);
     let [row, col, rows, cols] = from;
     assert_eq!(
-        store.move_cells(data, row, col, rows, cols, data, to.0, to.1),
+        store.move_cells(data, row, col, rows, cols, data, to.0, to.1, false),
         BLOCK_OK,
         "the move succeeds"
     );
@@ -54,7 +54,10 @@ fn moved_cells_leave_the_source_and_references_follow_them() {
     store.set_formula(data, 0, 1, "=A1*10", 0);
     store.set_formula(data, 5, 5, "=A1+A2", 0);
 
-    assert_eq!(store.move_cells(data, 0, 0, 2, 1, data, 19, 0), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 0, 0, 2, 1, data, 19, 0, false),
+        BLOCK_OK
+    );
     store.recompute(data);
 
     assert_eq!(number(&store, data, 19, 0), 1.0);
@@ -75,7 +78,10 @@ fn a_moved_formula_keeps_pointing_at_the_same_cells() {
     store.set_formula(data, 0, 1, "=A1+C1", 0);
 
     // A1:B1 lands on D10:E10; C1 stays.
-    assert_eq!(store.move_cells(data, 0, 0, 1, 2, data, 9, 3), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 0, 0, 1, 2, data, 9, 3, false),
+        BLOCK_OK
+    );
     store.recompute(data);
 
     assert_eq!(text(&store, data, 9, 4), "=D10+C1");
@@ -90,7 +96,10 @@ fn a_reference_to_a_cell_the_block_lands_on_becomes_ref() {
     store.set_formula(data, 0, 6, "=C5", 0);
     store.set_formula(data, 1, 6, "=SUM(C5:C5)+1", 0);
 
-    assert_eq!(store.move_cells(data, 0, 0, 1, 1, data, 4, 2), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 0, 0, 1, 1, data, 4, 2, false),
+        BLOCK_OK
+    );
 
     assert_eq!(number(&store, data, 4, 2), 1.0);
     assert_eq!(text(&store, data, 0, 6), "=#REF!");
@@ -105,7 +114,10 @@ fn a_block_moves_onto_part_of_itself() {
     }
     store.set_formula(summary, 0, 0, "=SUM(Data!A1:A3)", 0);
 
-    assert_eq!(store.move_cells(data, 0, 0, 3, 1, data, 1, 0), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 0, 0, 3, 1, data, 1, 0, false),
+        BLOCK_OK
+    );
     store.recompute(summary);
 
     assert!(is_empty(&store, data, 0, 0), "A1 is empty");
@@ -159,7 +171,10 @@ fn a_block_moves_to_another_sheet() {
     store.set_formula(summary, 0, 0, "=Data!A2", 0);
 
     // Data!A1:A2 lands on Summary!C3:C4.
-    assert_eq!(store.move_cells(data, 0, 0, 2, 1, summary, 2, 2), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 0, 0, 2, 1, summary, 2, 2, false),
+        BLOCK_OK
+    );
     store.recompute(data);
     store.recompute(summary);
 
@@ -187,7 +202,10 @@ fn defined_names_follow_moved_cells() {
     );
     store.set_formula(summary, 0, 0, "=Second+Double", 0);
 
-    assert_eq!(store.move_cells(data, 1, 0, 1, 1, data, 7, 3), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 1, 0, 1, 1, data, 7, 3, false),
+        BLOCK_OK
+    );
     store.recompute(summary);
 
     assert_eq!(
@@ -206,7 +224,7 @@ fn losses_list_the_formulas_a_move_back_cannot_restore() {
 
     // A1 lands on C5; A1:A10 keeps its address, and A1 follows back.
     assert_eq!(
-        store.move_cells_losses(data, 0, 0, 1, 1, data, 4, 2),
+        store.move_cells_losses(data, 0, 0, 1, 1, data, 4, 2, false),
         [summary as u32, 0, 0]
     );
 }
@@ -219,15 +237,24 @@ fn a_spill_moves_with_its_formula_and_a_move_that_does_not_fit_changes_nothing()
 
     // Spilled cells without their formula cannot move.
     assert_eq!(
-        store.move_cells(data, 1, 0, 2, 1, data, 0, 4),
+        store.move_cells(data, 1, 0, 2, 1, data, 0, 4, false),
         PERMUTE_PARTIAL_SPILL
     );
-    assert_ne!(store.move_cells(data, 0, 0, 1, 1, data, ROWS, 0), BLOCK_OK);
-    assert_ne!(store.move_cells(data, 0, 0, 0, 1, data, 5, 0), BLOCK_OK);
+    assert_ne!(
+        store.move_cells(data, 0, 0, 1, 1, data, ROWS, 0, false),
+        BLOCK_OK
+    );
+    assert_ne!(
+        store.move_cells(data, 0, 0, 0, 1, data, 5, 0, false),
+        BLOCK_OK
+    );
     assert_eq!(text(&store, data, 0, 0), "=SEQUENCE(3)");
 
     // The formula moves and spills again where it lands.
-    assert_eq!(store.move_cells(data, 0, 0, 1, 1, data, 0, 4), BLOCK_OK);
+    assert_eq!(
+        store.move_cells(data, 0, 0, 1, 1, data, 0, 4, false),
+        BLOCK_OK
+    );
     store.recompute(data);
     assert_eq!(text(&store, data, 0, 4), "=SEQUENCE(3)");
     assert_eq!(number(&store, data, 2, 4), 3.0);
@@ -246,7 +273,8 @@ fn a_range_down_to_the_last_row_of_a_short_sheet_is_not_a_whole_column() {
 #[test]
 fn formula_text_follows_a_block_moved_on_its_sheet() {
     // A1:B3 lands on D10:E12, as a conditional-format rule's formula reads it.
-    let moved = |source: &str| crate::formula_rewrite::move_formula_cells(source, 0, 0, 3, 2, 9, 3);
+    let moved =
+        |source: &str| crate::formula_rewrite::move_formula_cells(source, 0, 0, 3, 2, 9, 3, false);
     assert_eq!(moved("=A1>B1+$C$1"), "=D10>E10+$C$1");
     assert_eq!(moved("=SUM(A1:B3)"), "=SUM(D10:E12)");
     assert_eq!(moved("=D11*2"), "=#REF!*2");

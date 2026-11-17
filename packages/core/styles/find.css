@@ -144,3 +144,104 @@
   border-radius: 6px;
   font-weight: 500;
 }
+
+/* Excel's Options: Within, Search and Look in, then the two match checkboxes. */
+.sheetwrite-find-options {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 6px 12px;
+  align-items: center;
+}
+
+.sheetwrite-find-options[hidden],
+.sheetwrite-find-results[hidden] {
+  display: none;
+}
+
+.sheetwrite-find-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.sheetwrite-find-option select {
+  height: 26px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 6px;
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+  color: inherit;
+  font: inherit;
+}
+
+.sheetwrite-find-check {
+  grid-column: span 3;
+}
+
+/* Find All: a header, the virtual list of matches and the "12 cells found" status. */
+.sheetwrite-find-results {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Rows are 24px tall; RESULT_ROW_HEIGHT in src/find-bar.ts uses the same value. */
+.sheetwrite-find-result {
+  display: grid;
+  grid-template-columns: 1fr 64px 1.4fr 1.4fr;
+  gap: 8px;
+  left: 0;
+  right: 0;
+  height: 24px;
+  padding: 0 6px;
+  align-items: center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.sheetwrite-find-result > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sheetwrite-find-results-head {
+  cursor: default;
+  font-weight: 500;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-find-results-list {
+  max-height: 192px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 6px;
+}
+
+.sheetwrite-find-results-list:focus-visible {
+  outline: 2px solid var(--sheetwrite-widget-accent, #2563eb);
+  outline-offset: 1px;
+}
+
+.sheetwrite-find-results-list .sheetwrite-find-result:hover {
+  background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
+}
+
+.sheetwrite-find-results-list .sheetwrite-find-result[aria-selected="true"] {
+  background: var(--sheetwrite-widget-selection, var(--sheetwrite-selection, #2563eb33));
+}
+
+.sheetwrite-find-results-status {
+  font-size: 0.9em;
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+/* Replace all's preview sits under the replace field, its summary first. */
+.sheetwrite-find-preview .sheetwrite-find-results-status {
+  order: -1;
+}

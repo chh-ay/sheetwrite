@@ -8,6 +8,7 @@ import { formulaTokens } from "./formula-syntax.js";
 import { formulaNameKey, sheetNameKey } from "./name-key.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp, NamedRangeSnapshot, SheetSnapshot, Workbook } from "./types/document.js";
+import { mapValidationFormulas } from "./validation-rule.js";
 
 /** The longest sheet name Excel allows, in UTF-16 code units. */
 const MAX_SHEET_NAME = 31;
@@ -167,6 +168,9 @@ function copySheet(
   for (const rule of sheet.conditionalFormats ?? []) {
     if (rule.when.kind === "formula")
       rule.when = { kind: "formula", source: rewrite(rule.when.source) };
+  }
+  for (const rule of sheet.validationRules ?? []) {
+    rule.condition = mapValidationFormulas(rule.condition, rewrite);
   }
 
   const pivotIds = new Set(

@@ -2,7 +2,8 @@
    pivot field list, names, sort, queries, links, history, explain formula). */
 
 /* Development builds read this to warn once when this part is missing. */
-.sheetwrite-panel {
+.sheetwrite-panel,
+.sheetwrite-keyboard-settings {
   --sheetwrite-panels-ready: 1;
 }
 
@@ -364,4 +365,200 @@
 .sheetwrite-panel-format input {
   flex: 1;
   min-width: 0;
+}
+
+/* The Keyboard shortcuts panel (src/keyboard-settings.ts): a dialog over the
+   grid with a searchable table of commands, their keys and Excel's default. */
+.sheetwrite-keyboard-settings {
+  width: min(680px, calc(100% - 32px));
+  max-width: none;
+}
+
+.sheetwrite-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+}
+
+.sheetwrite-keys-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.sheetwrite-keys-search {
+  flex: 1 1 220px;
+}
+
+.sheetwrite-keys-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.sheetwrite-keys-hint,
+.sheetwrite-keys-count,
+.sheetwrite-keys-default,
+.sheetwrite-keys-reset,
+.sheetwrite-keys-none,
+.sheetwrite-keys-group th,
+.sheetwrite-keys-empty td {
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-keys-hint {
+  margin: 0;
+  font-size: 12px;
+}
+
+.sheetwrite-keys-scroll {
+  max-height: min(420px, 55vh);
+  overflow: auto;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+}
+
+.sheetwrite-keys-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sheetwrite-keys-table th,
+.sheetwrite-keys-table td {
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.sheetwrite-keys-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  background: var(--sheetwrite-widget-bg, #ffffff);
+  font-weight: 600;
+}
+
+.sheetwrite-keys-table tbody th {
+  font-weight: 400;
+}
+
+.sheetwrite-keys-table .sheetwrite-keys-group th {
+  padding-top: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sheetwrite-keys-chip {
+  display: inline-flex;
+  margin: 0 4px 4px 0;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sheetwrite-keys-chip kbd,
+.sheetwrite-keys-change,
+.sheetwrite-keys-remove,
+.sheetwrite-keys-add,
+.sheetwrite-keys-reset-button {
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-keys-chip kbd {
+  cursor: default;
+}
+
+.sheetwrite-keys-remove {
+  border-left: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  color: var(
+    --sheetwrite-widget-muted,
+    color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
+  );
+}
+
+.sheetwrite-keys-add,
+.sheetwrite-keys-reset-button {
+  border: 1px dashed var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+}
+
+.sheetwrite-keys-reset-button {
+  border-style: solid;
+}
+
+.sheetwrite-keys-change:hover,
+.sheetwrite-keys-remove:hover,
+.sheetwrite-keys-add:hover,
+.sheetwrite-keys-reset-button:hover {
+  background: var(--sheetwrite-menu-hover, #eeeeee);
+}
+
+.sheetwrite-keys-change[data-recording] {
+  background: var(--sheetwrite-widget-selection, rgba(37, 99, 235, 0.12));
+  box-shadow: inset 0 0 0 2px var(--sheetwrite-widget-accent, #2563eb);
+}
+
+.sheetwrite-keys-warning {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(
+    --sheetwrite-widget-error,
+    color-mix(in srgb, #d92d20 80%, var(--sheetwrite-widget-fg))
+  );
+}
+
+.sheetwrite-keys-conflict {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--sheetwrite-widget-accent, #2563eb);
+  border-radius: 4px;
+}
+
+.sheetwrite-keys-conflict[hidden],
+.sheetwrite-keys-undo[hidden] {
+  display: none;
+}
+
+.sheetwrite-keys-conflict-text,
+.sheetwrite-keys-message {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
+.sheetwrite-keys-conflict-buttons,
+.sheetwrite-keys-toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sheetwrite-keys-toast {
+  min-height: 28px;
+}
+
+.sheetwrite-keys-hidden-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }

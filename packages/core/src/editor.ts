@@ -11,6 +11,7 @@ import type { AssistDeps } from "./formula-help.js";
 import { toggleReferenceAnchors } from "./formula-references.js";
 import { type FormulaDiagnostic, formulaEntry } from "./formula-syntax.js";
 import type { CellFormat } from "./types/cell.js";
+import type { CellMode } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 
 export type { AssistDeps };
@@ -42,6 +43,27 @@ const ARROW_STEPS: Readonly<Record<string, readonly [number, number, EditNavigat
 
 /** Text before the caret after which an arrow key points at a cell, as in Excel. */
 const POINTABLE = /[=(,;+\-*/^&<>:]$/;
+
+/** Excel's AutoComplete for one edit (`autocomplete.ts`), with its list of matching entries. */
+export interface EditCompletion {
+  /**
+   * After each change to the text, list the entries that begin it. When
+   * `typed` (a typed character, the key that opened the editor, or an IME
+   * composition that ended), also complete the text in place with the added
+   * text selected. Returns the entry the text then shows, or null.
+   */
+  complete(field: HTMLTextAreaElement, typed: boolean): string | null;
+  /**
+   * A key pressed in the editor; true when the list used it. Enter and Tab
+   * in the list put its entry in the field and return false, so the editor
+   * commits the entry as usual.
+   */
+  keyDown(event: KeyboardEvent, field: HTMLTextAreaElement): boolean;
+  /** Follow the field after it moves. */
+  reposition(field: HTMLTextAreaElement): void;
+  /** Remove the list: the edit ended. */
+  close(): void;
+}
 
 export interface EditRect {
   x: number;
@@ -82,12 +104,12 @@ export interface BeginEditOptions {
   /** An arrow key in Enter mode points from the last pointed cell by (`dRow`, `dCol`); Shift extends. */
   onPoint?: (dRow: number, dCol: number, extend: boolean) => void;
   /**
-   * Excel's AutoComplete: completes the field's text in place, with the added
-   * text selected, and returns the entry it shows, or null. Asked after each
-   * typed character, after the key that opened the editor and after an IME
-   * composition ends.
+   * Excel's AutoComplete, asked after each change to the text, and given the
+   * keys first.
    */
-  complete?: (field: HTMLTextAreaElement) => string | null;
+  complete?: EditCompletion;
+  /** The editor's cell mode changed: Enter, Edit, or Point after a picked reference. */
+  onMode?: (mode: EditorMode) => void;
   /**
    * Excel refuses to store a formula that does not parse: show `message`,
    * which explains the problem, and resolve once the user has closed it.
@@ -103,6 +125,9 @@ interface EditorSizing {
   /** Explicit lines of the text when it was sized. */
   readonly lines: number;
 }
+
+/** The cell modes of an open text editor. */
+export type EditorMode = Exclude<CellMode, "ready">;
 
 /** Whether focus moving to `target` keeps the edit open in another surface. */
 function isEditSurface(target: EventTarget | null): boolean {
@@ -140,6 +165,8 @@ export class EditController {
    * then stores the entry's own letter case, as Excel does.
    */
   private completion: string | null = null;
+  /** The mode `onMode` last reported. */
+  private reportedMode: EditorMode | null = null;
   /** A refused formula's message is open: commits and blur wait for it. */
   private refusing = false;
 
@@ -155,6 +182,22 @@ export class EditController {
   /** Whether the user is typing in this editor, not in another edit surface. */
   get isFocused(): boolean {
     return this.textarea !== null && document.activeElement === this.textarea;
+  }
+
+  /**
+   * Excel's cell mode: Point while a picked reference stays replaceable,
+   * else Enter or Edit.
+   */
+  get mode(): EditorMode {
+    if (this.refStart >= 0) return "point";
+    return this.entering ? "enter" : "edit";
+  }
+
+  private reportMode(): void {
+    const mode = this.mode;
+    if (this.textarea === null || mode === this.reportedMode) return;
+    this.reportedMode = mode;
+    this.opts?.onMode?.(mode);
   }
 
   begin(opts: BeginEditOptions): void {
@@ -201,6 +244,7 @@ export class EditController {
     // The key that opened the editor is the first typed character.
     if (opts.focus && opts.entering) this.autoComplete(ta);
     if (opts.focus) this.attachAssist();
+    this.reportMode();
   }
 
   /**
@@ -219,6 +263,7 @@ export class EditController {
       if (this.sizing?.lines !== lineCount(value)) this.resize();
     }
     ta.setSelectionRange(selectionStart, selectionEnd);
+    this.reportMode();
   }
 
   /** Follow the cell. A move that keeps the cell's size only writes the position. */
@@ -245,6 +290,7 @@ export class EditController {
       this.size(rect.h);
     }
     this.assist?.reposition();
+    this.opts?.complete?.reposition(ta);
   }
 
   get value(): string {
@@ -269,12 +315,14 @@ export class EditController {
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
+    this.reportMode();
   }
 
   /** Finish a reference pick; the next pick inserts fresh at the caret. */
   endReference(): void {
     this.refStart = -1;
     this.refEnd = -1;
+    this.reportMode();
   }
 
   /** Whether the last change was a picked reference, which the next pick or arrow replaces. */
@@ -303,6 +351,7 @@ export class EditController {
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
+    this.reportMode();
   }
 
   private readonly onInput = (event: Event): void => {
@@ -310,15 +359,19 @@ export class EditController {
     if (!ta) return;
     this.refStart = -1;
     this.completion = null;
-    if (!this.composing && typedText(event)) this.autoComplete(ta);
+    if (!this.composing) {
+      if (typedText(event)) this.autoComplete(ta);
+      else this.opts?.complete?.complete(ta, false);
+    }
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
+    this.reportMode();
   };
 
   /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
   private autoComplete(ta: HTMLTextAreaElement): void {
-    this.completion = this.opts?.complete?.(ta) ?? null;
+    this.completion = this.opts?.complete?.complete(ta, true) ?? null;
   }
 
   /** The user moved into the cell editor: formula help follows the caret here. */
@@ -456,6 +509,12 @@ export class EditController {
       e.stopPropagation();
       return;
     }
+    // AutoComplete's list takes its keys once Alt+Down moved into it.
+    if (this.textarea && this.opts?.complete?.keyDown(e, this.textarea)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (this.textarea && insertEditorLineBreak(e, this.textarea)) {
       e.stopPropagation();
       return;
@@ -482,6 +541,7 @@ export class EditController {
       // F2 switches between Enter mode (arrows leave the cell) and Edit mode (arrows move the caret).
       e.preventDefault();
       this.entering = !this.entering;
+      this.reportMode();
     } else if (e.key === "F4" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       this.toggleAnchors();
@@ -515,6 +575,7 @@ export class EditController {
     if (!ta) return;
     this.tearingDown = true;
     this.detachAssist();
+    this.opts?.complete?.close();
     ta.removeEventListener("compositionstart", this.onCompositionStart);
     ta.removeEventListener("compositionend", this.onCompositionEnd);
     ta.removeEventListener("keydown", this.onKeyDown);
@@ -532,6 +593,7 @@ export class EditController {
     this.sizing = null;
     this.entering = false;
     this.completion = null;
+    this.reportedMode = null;
     this.refusing = false;
     this.tearingDown = false;
   }

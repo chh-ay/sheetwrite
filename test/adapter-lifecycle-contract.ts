@@ -346,7 +346,8 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
         workbook,
         ...handlersFor("old"),
       });
-      // Edits, selects a cell, then switches sheets, which clears the selection.
+      // Edits, selects a cell, then switches sheets, which selects the other
+      // sheet's last cell, or A1, as in Excel.
       const exercise = (row: number, nextSheet: string): string[] => {
         log.length = 0;
         const value = { kind: "literal" as const, value: `edit ${row}` };
@@ -363,7 +364,6 @@ export function runSharedAdapterLifecycleContract(adapter: string, mount: MountA
           `${tag} change 1`,
           `${tag} command`,
           `${tag} select cell`,
-          `${tag} select none`,
           `${tag} sheet ${sheet}`,
           `${tag} viewport`,
         ].sort();

@@ -470,7 +470,7 @@ export function steppedZoom(zoom: number, direction: 1 | -1): number {
 export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   {
     label: "File",
-    reduceOrder: ["import"],
+    reduceOrder: ["options", "import"],
     groups: [
       {
         id: "import",
@@ -478,6 +478,23 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "importXlsx",
         layout: "flow",
         controls: [xlsxImportCommand],
+      },
+      // Excel keeps its settings under File › Options; the host turns the
+      // Keyboard shortcuts panel on with `keyboardSettings`.
+      {
+        id: "options",
+        label: "Options",
+        icon: "keyboardShortcuts",
+        layout: "flow",
+        controls: [
+          button(
+            "Keyboard Shortcuts",
+            "keyboardShortcuts",
+            (grid) => grid.openKeyboardSettings(),
+            "view",
+            { large: true, flags: ["keyboardSettings"] },
+          ),
+        ],
       },
     ],
   },
@@ -915,6 +932,18 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "dataModel",
         layout: "flow",
         controls: [
+          {
+            ...button(
+              "Data Validation",
+              "dataValidation",
+              (grid) => grid.actions.dataValidation(),
+              "edit",
+              {
+                large: true,
+              },
+            ),
+            description: "Data Validation: choose the values a cell takes",
+          },
           {
             // Excel's "Manage Data Model" wraps to three lines under a large
             // glyph, so the label is short and the tooltip keeps Excel's name.

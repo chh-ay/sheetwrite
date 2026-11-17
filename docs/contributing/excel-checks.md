@@ -1,6 +1,6 @@
 # Excel checks
 
-Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433), external links (#226), measures (#230), dashboards (#231) and multi-level category labels (#501) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 7, 10 to 15 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
+Some behavior of Sorting (#353), table relationships (#229), saved queries (#227), number formats (#433, #799), external links (#226), measures (#230), dashboards (#231) and multi-level category labels (#501) can only be confirmed in desktop Excel. Sheetwrite wrote every input file below; none of them was saved by Excel. `scripts/excel-check-fixtures.ts` writes the input files of checks 7, 10 to 16 with the full engine, through the same XLSX export a user runs. Run the checks in one sitting with Microsoft 365 Excel for Windows or Mac, en-US locale.
 
 For each check, save the result file under the name given and attach it to the issue in a comment. A test then compares the file with Sheetwrite's result. When a result differs from the expected one, also write down what Excel showed.
 
@@ -21,7 +21,8 @@ For each check, save the result file under the name given and attach it to the i
 | 13 | #230 | `test/fixtures/excel-checks/measures-only-model.xlsx` | `measures-only-model-excel.xlsx` |
 | 14 | #231 | `test/fixtures/excel-checks/dashboard-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 15 | #501 | `test/fixtures/excel-checks/chart-levels-sheetwrite-export.xlsx` | `chart-levels-excel.xlsx` |
-| 17 | #827, #824 | none; type the values into a new workbook | none; record what Excel shows |
+| 16 | #799 | `test/fixtures/excel-checks/number-format-unsure.xlsx` | `number-format-unsure-excel.xlsx` |
+| 18 | #827, #824 | none; type the values into a new workbook | none; record what Excel shows |
 
 ## 1. Sort order (#353)
 
@@ -237,7 +238,21 @@ Expected:
 - After import, Sheetwrite has the two charts on `Sales` with the categories A2:B5, the bar chart with `axes.multiLevelLabels: false`, and the chart on `Report` over the pivot `by-segment`.
 
 
-## 17. AutoFill series that Excel's table does not list (#827, #824)
+## 16. Fraction and Text formats (#799)
+
+Sheet `Cases` holds the cases of `test/fixtures/number-format-cases.json` whose note starts with "unsure", one per row. Column A is the value, shown with the format code in column B. Column C is `TEXT(A, B)` between brackets, so leading and trailing spaces show. Column D is what Sheetwrite shows, also between brackets. Column E is `TRUE` when C and D are the same. Column F says why the case is unsure.
+
+1. Open the file and let it calculate.
+2. Write down every row whose column E is `FALSE`, with its column C.
+3. Save as `number-format-unsure-excel.xlsx`.
+
+Expected:
+
+- Column E is `TRUE` in every row.
+- Column A shows the same text as column D, without the brackets.
+- Where a row differs, Excel's column C replaces the row's text in `number-format-cases.json`, and both formatters change to match it.
+
+## 18. AutoFill series that Excel's table does not list (#827, #824)
 
 Excel's AutoFill table names `Qtr3`, `1st Period` and `text1, textA`. Sheetwrite generalises them; check these in a new workbook. For each, type the source, select it and drag the fill handle down four rows.
 

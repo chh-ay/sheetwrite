@@ -3,7 +3,7 @@ import type { DiffKernel } from "@sheetwrite/wasm/history";
 import type { SheetwriteStore } from "../store.js";
 import type { StoreDataEngine } from "../store/data-engine.js";
 import { storeEngine } from "../store/engine-registry.js";
-import { cellBlockMove } from "../store/move-cells.js";
+import { movedCellBounds } from "../store/ranges.js";
 import { styleKey } from "../style-dictionary.js";
 import type { CellScalar, CellStyle } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
@@ -250,10 +250,10 @@ function writtenCells(
 function track(state: Tracking, operation: DocumentOp, author: number): void {
   const { kernel, slots } = state;
 
-  // A block move writes the cells it leaves and the cells it lands on.
+  // A block move writes the cells it leaves and the cells it lands on, and a
+  // shift every cell between them.
   if (operation.op === "moveCells") {
-    const { from, to } = cellBlockMove(operation);
-    for (const block of [from, to]) {
+    for (const block of movedCellBounds(operation)) {
       const slot = slots.get(block.sheet);
       if (slot === undefined) continue;
       kernel.touch(slot, block.start.row, block.start.col, block.end.row, block.end.col, author);

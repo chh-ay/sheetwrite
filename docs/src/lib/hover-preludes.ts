@@ -12,7 +12,7 @@ import { lineStartOffsets } from "./source-offsets.js";
  */
 
 const CORE_TYPES =
-  'import type { AggregateOp, ApplyTransactionResult, AutoFilter, CellAddress, CellBorders, CellEditor, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridCommandName, GridCommandState, GridConfig, GridEvents, GridOptions, GridTransaction, HighlightRange, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, Range, RemoteOperationOptions, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
+  'import type { AggregateOp, ApplyTransactionResult, AutoFilter, CellAddress, CellBorders, CellEditor, CellPaintContext, CellRenderer, CellScalar, CellStyle, ChangeEvent, Column, ColumnarData, ColumnFilter, DataSource, DataValidationRule, DocumentOp, Grid, GridActions, GridCommandName, GridCommandState, GridConfig, GridEvents, GridOptions, GridTransaction, HighlightRange, KeyBindings, MutationPolicyMode, PersistenceAdapter, ProtectedRange, ProtectionResolver, Range, RemoteOperationOptions, ReplaceResult, ResolvedCell, RowGroup, SearchOptions, SearchResult, Selection, SheetId, SortKey, Store, SyncCoordinator, Theme, Transaction, VisibleWindowView, Workbook, WorkbookSnapshot } from "@sheetwrite/core";';
 const CORE_VALUES =
   'import { createGrid, createGridFromSnapshot, initSheetwrite, validateWorkbookSnapshot } from "@sheetwrite/core";';
 const CORE_PRELUDE = [
@@ -43,6 +43,8 @@ const FRAMEWORK_PRELUDE = [
   "declare const editors: Record<string, CellEditor>;",
   "declare const setCommandStates: (states: Readonly<Record<GridCommandName, GridCommandState>>) => void;",
   "declare let commandStates: Readonly<Record<GridCommandName, GridCommandState>>;",
+  "declare const setBindings: (bindings: KeyBindings) => void;",
+  "declare let bindings: KeyBindings;",
 ].join("\n");
 
 const HOVER_PRELUDES: ReadonlyMap<string, string> = new Map([
