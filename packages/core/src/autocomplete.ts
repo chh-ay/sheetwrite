@@ -181,7 +181,11 @@ function completionSheet(host: CompletionHost, engine: StoreDataEngine): Complet
     rowCount: host.rowCount(),
     toDataRow: (viewRow) => host.toDataRow(viewRow),
     filled: (viewRow, column) => {
-      const value = host.store.getCell({ sheet, row: host.toDataRow(viewRow), col: column }).resolved;
+      const value = host.store.getCell({
+        sheet,
+        row: host.toDataRow(viewRow),
+        col: column,
+      }).resolved;
       return value !== null && value !== "";
     },
     dataEdge: (viewRow, column, dRow, dCol) => host.dataEdge(viewRow, column, dRow, dCol),

@@ -247,7 +247,9 @@ describe("Pick From Drop-down List", () => {
     expect(document.activeElement).toBe(list);
 
     for (const name of ["ArrowDown", "Enter"]) {
-      list.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+      list.dispatchEvent(
+        new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }),
+      );
     }
     expect(value(6)).toBe("North");
     expect(list.isConnected).toBe(false);

@@ -121,7 +121,10 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
  * The glyph a built-in action shows when its row names no icon. Pick From
  * Drop-down List has none, as in Excel.
  */
-const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator" | "pickFromList">, IconName> = {
+const ACTION_ICON: Record<
+  Exclude<ContextMenuActionName, "separator" | "pickFromList">,
+  IconName
+> = {
   cut: "cut",
   copy: "copy",
   paste: "paste",
