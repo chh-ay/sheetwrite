@@ -39,6 +39,8 @@ import type { PermuteRowsOperation } from "./row-order.js";
 import { cloneQuery, findQuery } from "./saved-query.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
+import { cellBlockMove, type MoveCellsOperation } from "./store/move-cells.js";
+import { rangesIntersect } from "./store/ranges.js";
 import {
   type GridTransactionAdmissionDecision,
   setTransactionReplayRollback,
@@ -640,6 +642,9 @@ export class DocumentController {
           ...this.chartRestores(patch.sheet, { includeOwned: true }),
         ];
 
+      case "moveCells":
+        return this.inverseMoveCells(patch);
+
       case "setColumn": {
         const sheet = this.sheetById(patch.sheet);
         const column = sheet?.columns[patch.col];
@@ -824,6 +829,7 @@ export class DocumentController {
                   : sheet.autoFilter
                     ? structuredClone(sheet.autoFilter)
                     : null,
+              tabColor: patch.patch.tabColor === undefined ? undefined : (sheet.tabColor ?? null),
             },
           },
         ];
@@ -1146,6 +1152,70 @@ export class DocumentController {
     return engine ? engine.moveLosses(patch).map((addr) => this.snapshotCell(addr)) : [];
   }
 
+  /**
+   * The move back, then what it cannot restore: the cells both blocks held,
+   * the notes, hyperlinks, validation rules and merged cells of the cells
+   * the block landed on, the conditional formats of both sheets, and the
+   * formulas elsewhere whose reference became `#REF!` or lost an edge. Each
+   * block is captured before the move.
+   */
+  private inverseMoveCells(patch: MoveCellsOperation): Array<DocumentOp | HistoryPart> {
+    const { from, to } = cellBlockMove(patch);
+    const engine = storeEngine(this.options.store);
+    const sheet = this.sheetById(to.sheet);
+    const meetsTarget = (range: Range) => rangesIntersect(range, to);
+    // A conditional format has no ID, so each sheet gets its whole list back.
+    const formats = [...new Set([from.sheet, to.sheet])].map((id): DocumentOp => ({
+      op: "setSheetMeta",
+      sheet: id,
+      patch: { conditionalFormats: cloneJsonValue(this.sheetById(id)?.conditionalFormats ?? []) },
+    }));
+    return [
+      { op: "moveCells", range: to, to: { sheet: from.sheet, ...from.start } },
+      this.blockCells(to),
+      this.blockCells(from),
+      ...(sheet?.notes ?? [])
+        .filter((note) => meetsTarget({ sheet: to.sheet, start: note.addr, end: note.addr }))
+        .map((note): DocumentOp => ({ op: "setNote", addr: { ...note.addr }, text: note.text })),
+      ...(sheet?.hyperlinks ?? [])
+        .filter((link) => meetsTarget(link.range))
+        .map((link): DocumentOp => ({
+          op: "setHyperlink",
+          sheet: to.sheet,
+          hyperlink: cloneCellHyperlink(link),
+        })),
+      ...(sheet?.validationRules ?? [])
+        .filter((rule) => meetsTarget(rule.range))
+        .map((rule): DocumentOp => ({
+          op: "setValidationRule",
+          sheet: to.sheet,
+          rule: cloneJsonValue(rule),
+        })),
+      ...formats,
+      ...(sheet?.merges ?? [])
+        .filter((merge) =>
+          meetsTarget({
+            sheet: to.sheet,
+            start: { row: merge.r0, col: merge.c0 },
+            end: { row: merge.r1, col: merge.c1 },
+          }),
+        )
+        .map((merge): DocumentOp => ({ op: "addMerge", sheet: to.sheet, merge: { ...merge } })),
+      ...(engine?.moveCellsLosses(patch) ?? []).map((addr) => this.snapshotCell(addr)),
+    ];
+  }
+
+  /** The cells of `block` as they are now, as one history part. */
+  private blockCells(block: Range): DocumentOp | HistoryPart {
+    return (
+      this.compactHistoryPart(block) ?? {
+        op: "setRange",
+        range: block,
+        cells: this.snapshotRangeCells(block),
+      }
+    );
+  }
+
   private snapshotCell(addr: CellAddress): Extract<DocumentOp, { op: "set" }> {
     const formula = this.options.loadable?.getFormula(addr) ?? this.options.store.getFormula(addr);
     const refTarget = this.options.store.getRefTarget(addr);
@@ -1279,7 +1349,8 @@ export class DocumentController {
     return restores;
   }
 
-  private snapshotSheet(id: SheetId): SheetSnapshot | null {
+  /** The whole sheet as a snapshot, as `addSheet` takes it back, or null when there is none. */
+  snapshotSheet(id: SheetId): SheetSnapshot | null {
     const sheet = this.sheetById(id);
     if (!sheet) return null;
 
@@ -1316,6 +1387,7 @@ export class DocumentController {
       id: sheet.id,
       name: sheet.name,
       visibility: sheet.visibility,
+      tabColor: sheet.tabColor,
       order: this.options.store.getWorkbook().sheets.findIndex((candidate) => candidate.id === id),
       rowCount: sheet.rowCount,
       columns: sheet.columns.map((column) => ({ ...column })),

@@ -21,6 +21,18 @@
   color: var(--sw-state-pending);
 }
 
+.sw-rwb-sync__label {
+  display: inline-grid;
+}
+
+.sw-rwb-sync__label > span {
+  grid-area: 1 / 1;
+}
+
+.sw-rwb-sync__label > [aria-hidden="true"] {
+  visibility: hidden;
+}
+
 /* Formula entry is the one primary command: select, change, commit. */
 .sw-rwb-editrow {
   display: flex;

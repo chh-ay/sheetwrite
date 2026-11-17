@@ -55,6 +55,9 @@ async function open(page: Page) {
 
 const grid = (page: Page) => page.locator(".sw-demo-grid .sheetwrite");
 const buttons = (page: Page) => page.locator(".sw-demo-grid .sheetwrite-autofilter-button");
+/** The glyphs drawn over the buttons, from the icon sheet. */
+const buttonGlyphs = (page: Page) =>
+  page.locator(".sw-demo-grid .sheetwrite-autofilter-glyph.sheetwrite-icon");
 const dropdown = (page: Page, header: string) =>
   page.getByRole("dialog", { name: `Filter ${header}` });
 
@@ -96,8 +99,10 @@ test("Ctrl+Shift+L turns the filter buttons on for the current region and off ag
   await grid(page).press("ControlOrMeta+Shift+L");
   await expect(buttons(page)).toHaveCount(2);
   await expect(buttons(page).first()).toHaveAttribute("data-filtered", "false");
+  await expect(buttonGlyphs(page).first()).toHaveAttribute("data-icon", "filterArrow");
   await grid(page).press("ControlOrMeta+Shift+L");
   await expect(buttons(page)).toHaveCount(0);
+  await expect(buttonGlyphs(page)).toHaveCount(0);
 });
 
 test("a value filter from the dropdown hides the unticked rows; the header stays", async ({
@@ -117,6 +122,7 @@ test("a value filter from the dropdown hides the unticked rows; the header stays
   await expect(dialog).toBeHidden();
   await expect.poll(() => shownItems(page)).toEqual(["Item", "apple", "Apricot", "grape"]);
   await expect(buttons(page).first()).toHaveAttribute("data-filtered", "true");
+  await expect(buttonGlyphs(page).first()).toHaveAttribute("data-icon", "filterActive");
   // The header cell keeps the selection, as in Excel.
   await expect
     .poll(() => page.evaluate(() => window.__sheetwriteVueWorkbench?.grid.getSelection()))
@@ -180,11 +186,13 @@ test("the dropdown is keyboard-usable: search, arrows, Space and Enter", async (
   await expect(list).toBeFocused();
   await expect(list.getByRole("option")).toHaveText([
     "(Select All Search Results)",
+    "Add current selection to filter",
     "apple",
     "Apricot",
     "grape",
   ]);
   // Untick "apple", then apply: only the other search results stay.
+  await page.keyboard.press("ArrowDown");
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press(" ");
   await page.keyboard.press("Enter");

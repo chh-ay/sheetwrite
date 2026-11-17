@@ -161,7 +161,9 @@ function excelSyntaxHtml(name: string, syntax: string): string {
     const optional = argument.startsWith("[") || /^(?:…|\.\.\.)$/u.test(argument);
     return `<span class="sw-formula-arg"${optional ? " data-optional" : ""}>${tokens.join("")}</span>`;
   });
-  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span>(${parts.join(", ")})</code>`;
+  // Search weighs the name like a page title: "XLOOKUP" finds the page that
+  // defines it above pages that only mention it.
+  return `<code class="sw-formula-syntax"><span class="sw-code-function" data-pagefind-weight="10">${html(name)}</span>(${parts.join(", ")})</code>`;
 }
 
 function parseFunctions(value: unknown): FormulaRecord[] {
@@ -198,27 +200,81 @@ const BUILD_FLAGS: Readonly<Record<string, number>> = {
   "@sheetwrite/formulas": FUNCTION_FLAG_FULL_ENGINE,
 };
 
+/** An argument name from a part of a syntax line: `[sum_range]` is `sum_range`; a repeating `number1` is `number`. */
+function excelArgumentName(part: string, repeating: boolean): string {
+  const name = part.replaceAll(/[[\]]/g, "").trim();
+  return repeating ? name.replace(/\d+$/, "") : name;
+}
+
+/** `instanceNum` as `instance_num`, for an argument the syntax line gives no single name. */
+function snakeCase(name: string): string {
+  return name.replaceAll(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+}
+
+/**
+ * Excel's names for the arguments of a signature profile, read from the
+ * function's syntax line: `VLOOKUP(lookup_value, table_array, col_index_num,
+ * [range_lookup])`. A repeating argument takes the name of its first
+ * occurrence without the number (`number1` is `number`), a repeating pair
+ * both names (`criteria_range, criteria`), and an argument after the
+ * repeating one the name at the same place from the end of the line.
+ */
+function excelArgumentNames(args: readonly FormulaArgument[], syntax: string): string[] {
+  const parts = syntaxArguments(
+    syntax.slice(syntax.indexOf("(") + 1, syntax.lastIndexOf(")")),
+  ).filter((part) => part !== "…");
+  const repeating = args.findIndex((argument) => argument.repeat !== "once");
+  const single = (part: string | undefined, argument: FormulaArgument, repeats = false) =>
+    part === undefined || part.includes(",")
+      ? snakeCase(argument.name)
+      : excelArgumentName(part, repeats);
+
+  return args.map((argument, index) => {
+    if (repeating < 0 || index < repeating) return single(parts[index], argument);
+    if (index > repeating) return single(parts[parts.length - (args.length - index)], argument);
+    if (argument.repeat !== "paired") return single(parts[index], argument, true);
+
+    const part = parts[index] ?? "";
+    const pair = part.includes(",")
+      ? syntaxArguments(part.replaceAll(/[[\]]/g, ""))
+      : [part, parts[index + 1] ?? ""];
+    return pair
+      .slice(0, 2)
+      .map((name) => excelArgumentName(name, true))
+      .join(", ");
+  });
+}
+
 /**
  * The built-in function table that core loads on demand. Each signature
- * profile and family title is written once and rows refer to them by index,
- * which keeps the module small. `volatileNames` comes from the engine source.
+ * profile, family title and list of Excel argument names is written once and
+ * rows refer to them by index, which keeps the module small. `volatileNames`
+ * comes from the engine source; `reference` holds Excel's syntax line of
+ * each function, which names its arguments.
  */
 export function renderFunctionMetadata(
   inventoryValue: unknown,
   volatileNames: ReadonlySet<string>,
+  reference: Readonly<Record<string, FormulaReferenceEntry>>,
 ): string {
   const inventory = object(inventoryValue, "formula inventory");
   const signatures = parseSignatureProfiles(inventory.signatureProfiles);
   const families = recordMap(inventory.families, "families");
   const familyIds = Object.keys(families);
   const signatureIds = Object.keys(signatures);
+  const argumentNames = new Map<string, number>();
 
   const rows = parseFunctions(inventory.functions).flatMap((formula) => {
     const familyIndex = familyIds.indexOf(formula.family);
     const profileIndex = signatureIds.indexOf(formula.signature);
-    if (familyIndex < 0 || profileIndex < 0) {
+    const profile = signatures[formula.signature];
+    const syntax = reference[formula.canonical]?.syntax;
+    if (familyIndex < 0 || profile === undefined || syntax === undefined) {
       throw new Error(`Missing metadata for ${formula.canonical}`);
     }
+    const names = JSON.stringify(excelArgumentNames(profile.arguments, syntax));
+    const namesIndex = argumentNames.get(names) ?? argumentNames.size;
+    argumentNames.set(names, namesIndex);
 
     let flags = volatileNames.has(formula.canonical) ? FUNCTION_FLAG_VOLATILE : 0;
     for (const build of formula.builds) {
@@ -228,7 +284,7 @@ export function renderFunctionMetadata(
     }
 
     return [formula.canonical, ...formula.aliases].map((name) =>
-      JSON.stringify([name, familyIndex, profileIndex, flags]),
+      JSON.stringify([name, familyIndex, profileIndex, flags, namesIndex]),
     );
   });
 
@@ -241,7 +297,6 @@ export function renderFunctionMetadata(
 
     return JSON.stringify({
       arguments: signature.arguments.map((argument) => ({
-        name: argument.name,
         types: argument.accepts,
         optional: !argument.required,
         repeating: argument.repeat !== "once",
@@ -252,13 +307,18 @@ export function renderFunctionMetadata(
 
   return [
     "// Generated by scripts/function-metadata.ts from the formula contract inventory",
-    "// and the engine's volatile functions. Core loads it on first use only:",
-    "// from listFunctions(), formula help and Explain Formula.",
+    "// and the engine's volatile functions; the argument names are Excel's, from the",
+    "// syntax lines in scripts/formula-reference.json. Core loads it on first use",
+    "// only: from listFunctions(), formula help and Explain Formula, with the values",
+    "// some arguments take, in the same chunk.",
     'import type { BuiltInFunctionTable } from "../functions/types.js";',
+    "",
+    'export { ARGUMENT_CHOICES } from "../functions/argument-choices.js";',
     "",
     "export const BUILT_IN_FUNCTIONS: BuiltInFunctionTable = {",
     `  families: [\n    ${familyTitles.join(",\n    ")},\n  ],`,
     `  profiles: [\n    ${profiles.join(",\n    ")},\n  ],`,
+    `  argumentNames: [\n    ${[...argumentNames.keys()].join(",\n    ")},\n  ],`,
     `  functions: [\n    ${rows.join(",\n    ")},\n  ],`,
     "};",
     "",

@@ -6,6 +6,7 @@ use crate::calc::{
     resolve_structured_refs, shift_cols, shift_rows, Ast, Func, NameId, ParseFeatures, RefFlags,
     SheetRef, SheetResolver, SpanPlacer, TableRefresh, UnresolvedStructuredRef, WrittenNames,
 };
+use crate::cell_move::{move_cell_refs, CellMove};
 use crate::eval::{
     expand_let_reachable_ast, intersection_range, read_shifted, reference_shift, shifted_cell,
     shifted_range,
@@ -643,6 +644,21 @@ impl FormulaEntry {
         }
     }
 
+    /// The text of the entry after `rewrite` changes a copy of its tree, for
+    /// a formula that is about to be written where other references apply.
+    pub(crate) fn source_with(
+        &self,
+        names: &WrittenNames<'_>,
+        rewrite: impl FnOnce(&mut Ast) -> bool,
+    ) -> String {
+        let Some(ast) = &self.ast else {
+            return self.source.clone();
+        };
+        let mut rewritten = ast.clone();
+        rewrite(&mut rewritten);
+        write_references(&self.source, &rewritten, names)
+    }
+
     /// Capture a history entry with current source text. Its stale bit is
     /// cleared, so history can read/export it without retaining the registry.
     pub(crate) fn captured(&self, names: &WrittenNames<'_>) -> Self {
@@ -1047,6 +1063,12 @@ impl FormulaEntry {
         self.rewrite_ast(names, |ast| {
             move_refs(ast, edited_sheet, names.sheet, columns, block)
         })
+    }
+
+    /// Follow a block of cells that moved; see [`move_cell_refs`]. The
+    /// formula is on `names.sheet`.
+    pub(crate) fn move_cells(&mut self, names: NameScope<'_>, edit: &CellMove) -> bool {
+        self.rewrite_ast(names, |ast| move_cell_refs(ast, names.sheet, edit))
     }
 
     /// Point the entry's references to a sheet of another workbook at the

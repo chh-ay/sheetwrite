@@ -118,6 +118,32 @@ XLSX import keeps each cell's own format, so a column that mixes formats round-t
 
 The grid actions `setNumberFormat(code: string | null)` and `stepDecimals(direction: 1 | -1)` change the format of the selection. `setNumberFormat(null)` returns the cells to the column's format. `stepDecimals` shows one more (`1`) or one fewer (`-1`) decimal place than the focus cell does.
 
+### Keys and the Format Cells dialog
+
+As in Excel ([Keyboard shortcuts in Excel](https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f)), Ctrl/Cmd + Shift with the keys `~ ! @ # $ % ^` applies a format to the selection:
+
+| Key | Format | Code |
+| --- | --- | --- |
+| Ctrl/Cmd + Shift + ~ | General | `General` |
+| Ctrl/Cmd + Shift + ! | Number, two decimals and a thousands separator | `#,##0.00` |
+| Ctrl/Cmd + Shift + @ | Time with hours, minutes and AM or PM | `h:mm AM/PM` |
+| Ctrl/Cmd + Shift + # | Date with day, month and year | `d-mmm-yy` |
+| Ctrl/Cmd + Shift + $ | Currency, two decimals, negatives in parentheses | `$#,##0.00_);($#,##0.00)` |
+| Ctrl/Cmd + Shift + % | Percentage, no decimals | `0%` |
+| Ctrl/Cmd + Shift + ^ | Scientific, two decimals | `0.00E+00` |
+
+Ctrl/Cmd + 1, the context menu's Format cells… or `grid.actions.formatCells()` opens the **Format Cells** dialog over the selection. It shows the active cell's format on five tabs:
+
+- **Number**: General, Number (decimal places, 1000 separator, negative numbers), Currency (decimal places, negative numbers), Accounting, Date and Time (a list of types), Percentage, Scientific (decimal places) and Custom (any format code), with a sample of the active cell's value.
+- **Alignment**: horizontal and vertical alignment, and wrap text.
+- **Font**: font, size, bold, italic, underline, strikethrough and color.
+- **Border**: None, Outline, All borders, Thick outline, Top, Bottom, Left or Right.
+- **Fill**: no fill or a color.
+
+OK applies only what you changed, to every selected cell, as one undoable step; the cells keep their other formatting. Cancel and Escape change nothing. Arrow keys move between the tabs, Tab moves into the shown tab, and Enter chooses OK. The dialog is in its own chunk, loaded on first use; keys pressed meanwhile reach it. Excel's Fraction and Text categories are not offered, because the formatter does not support them.
+
+From code, `grid.actions.formatCells({ style, border })` applies a format to the selection without the dialog, as OK does: `style` merges into each cell's style and `border` is a border preset such as `"all"` or `"outside"`, as one undoable step that is in place when the call returns.
+
 ## Format codes
 
 `formatNumber(value, code?, locale?)` is exported from `@sheetwrite/core`. It is a cached renderer for the supported Excel-style families:

@@ -283,6 +283,7 @@ impl CellStore {
         store.volatile_serial = f64::from_bits(input.u64()?);
         store.random = RandomSource::from_state(input.u64()?);
         store.spill_owner_cell_limit = input.usize()?;
+        store.set_storage_limits(input.usize()?, input.usize()?);
         if input.bool()? {
             let max_iterations = input.u32()?;
             let max_change = f64::from_bits(input.u64()?);
@@ -405,6 +406,8 @@ impl CellStore {
         out.u64(self.volatile_serial.to_bits());
         out.u64(self.random.state());
         out.usize(self.spill_owner_cell_limit);
+        out.usize(self.dense_cell_limit);
+        out.usize(self.local_paged_cell_limit);
         out.bool(self.iteration.is_some());
         if let Some(limits) = &self.iteration {
             out.u32(limits.max_iterations());
@@ -589,6 +592,25 @@ mod tests {
         replacement.set_number(0, 0, 1, 2.0, 0);
         replacement.recompute_changed();
         assert_eq!(replacement.get_cell(0, 0, 0).num(), 9.0);
+    }
+
+    #[test]
+    fn memory_transfer_keeps_the_host_storage_limits() {
+        let mut original = CellStore::new();
+        original.set_storage_limits(4, 6);
+        original.add_sheet(2, 2);
+
+        let mut replacement =
+            CellStore::read_memory_state(&original.export_memory_state()).unwrap();
+        let local = replacement.add_sheet(2, 3);
+        assert!(
+            replacement.is_local_paged(local),
+            "past the dense limit of 4"
+        );
+        assert!(
+            replacement.try_add_sheet(1, 1).is_err(),
+            "past the local limit of 6"
+        );
     }
 
     #[test]

@@ -1,9 +1,32 @@
 import { describe, expect, it } from "bun:test";
 
+import { dateToSerial } from "../src/date-serial.js";
 import { detectFillSeries, type FillSourceCell } from "../src/fill-series.js";
 
 function cells(values: readonly number[]): FillSourceCell[] {
   return values.map((value) => ({ value, isFormula: false }));
+}
+
+function filled(source: FillSourceCell[], from: number, to: number): unknown[] {
+  const plan = detectFillSeries(source);
+  const out: unknown[] = [];
+  for (let p = from; p <= to; p++) {
+    const step = plan.stepAt(p);
+    out.push(step.kind === "value" ? step.value : `tile ${step.sourceIndex}`);
+  }
+  return out;
+}
+
+function texts(values: readonly string[]): FillSourceCell[] {
+  return values.map((value) => ({ value, isFormula: false }));
+}
+
+function dates(values: readonly [number, number, number][]): FillSourceCell[] {
+  return values.map(([year, month, day]) => ({
+    value: dateToSerial(new Date(Date.UTC(year, month - 1, day))),
+    isFormula: false,
+    isDate: true,
+  }));
 }
 
 describe("detectFillSeries", () => {
@@ -69,5 +92,47 @@ describe("detectFillSeries", () => {
     const plan = detectFillSeries(cells([0.1, 0.2, 0.30000000000000004]));
 
     expect(plan.stepAt(3)).toEqual({ kind: "value", value: 0.4 });
+  });
+
+  it("wraps quarters after 4 and continues ordinals, as Excel's AutoFill table does", () => {
+    expect(filled(texts(["Qtr3"]), 1, 3)).toEqual(["Qtr4", "Qtr1", "Qtr2"]);
+    expect(filled(texts(["Q3"]), 1, 3)).toEqual(["Q4", "Q1", "Q2"]);
+    expect(filled(texts(["Quarter 4"]), 1, 1)).toEqual(["Quarter 1"]);
+    expect(filled(texts(["3rd Qtr"]), 1, 2)).toEqual(["4th Qtr", "1st Qtr"]);
+    expect(filled(texts(["1st Period"]), 1, 3)).toEqual(["2nd Period", "3rd Period", "4th Period"]);
+    expect(filled(texts(["1st"]), 10, 12)).toEqual(["11th", "12th", "13th"]);
+    expect(filled(texts(["21ST"]), 1, 1)).toEqual(["22ND"]);
+  });
+
+  it("counts each text with a number once per repeat in a mixed source", () => {
+    expect(filled(texts(["text1", "textA"]), 2, 5)).toEqual(["text2", "tile 1", "text3", "tile 1"]);
+  });
+
+  it("steps one time by an hour and dates on one day of the month by months", () => {
+    expect(filled([{ value: 0.25, isFormula: false, isTime: true }], 1, 1)).toEqual([
+      0.25 + 1 / 24,
+    ]);
+    const serial = (year: number, month: number, day: number) =>
+      dateToSerial(new Date(Date.UTC(year, month - 1, day)));
+    expect(
+      filled(
+        dates([
+          [1999, 1, 1],
+          [1999, 4, 1],
+        ]),
+        2,
+        4,
+      ),
+    ).toEqual([serial(1999, 7, 1), serial(1999, 10, 1), serial(2000, 1, 1)]);
+    expect(
+      filled(
+        dates([
+          [2015, 1, 31],
+          [2015, 2, 28],
+        ]),
+        2,
+        3,
+      ),
+    ).toEqual([serial(2015, 3, 31), serial(2015, 4, 30)]);
   });
 });

@@ -29,6 +29,13 @@ describe("replaceInText", () => {
   it("matchCase only hits exact casing", () => {
     expect(replaceInText("aXbxc", "x", "-", { matchCase: true })).toBe("aXb-c");
   });
+  it("replaces what Excel's wildcards match", () => {
+    // `?` is one character: "ple" in "Apple" and "pie".
+    expect(replaceInText("Apple pie", "p?e", "X")).toBe("ApX X");
+    expect(replaceInText("a*e", "a~*e", "ok")).toBe("ok");
+    expect(replaceInText("abc", "*", "X")).toBe("X");
+    expect(replaceInText("abc", "a?", "X", { wholeCell: true })).toBeNull();
+  });
 });
 
 describe("replaceAll", () => {
@@ -187,6 +194,75 @@ describe("find", () => {
     grid.findPrev();
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: A(1, 2) });
 
+    grid.destroy();
+  });
+
+  it("searches and replaces only a selection of more than one cell, as Excel does", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    // makeColumnarData puts Tokyo in column 2 of rows 1, 4 and 7.
+    const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 5, col: 2 } };
+    grid.setSelection({ kind: "range", range });
+
+    // Each keystroke searches the same selection, because the selection stays.
+    expect(grid.search("Toky").matches).toEqual([A(1, 2), A(4, 2)]);
+    expect(grid.search("Tokyo").matches).toEqual([A(1, 2), A(4, 2)]);
+    // Find Next moves the active cell inside the selection.
+    expect(grid.getSelection()).toEqual({ kind: "range", range, active: A(1, 2) });
+    grid.findNext();
+    expect(grid.getSelection()).toEqual({ kind: "range", range, active: A(4, 2) });
+
+    expect(grid.replaceAll("Kyoto").replaced).toBe(2);
+    expect(store.getCell(A(1, 2)).resolved).toBe("Kyoto");
+    expect(store.getCell(A(4, 2)).resolved).toBe("Kyoto");
+    expect(store.getCell(A(7, 2)).resolved).toBe("Tokyo");
+    expect(grid.getSelection()).toMatchObject({ kind: "range", range });
+
+    grid.destroy();
+  });
+});
+
+describe("find with Excel's wildcards and Look in", () => {
+  function cellsGrid(): { grid: GridImpl; store: SheetwriteStore } {
+    const workbook = makeWorkbook(6);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: A(0, 0), value: { kind: "literal", value: "apple" } },
+        { op: "set", addr: A(1, 0), value: { kind: "literal", value: "Apple pie" } },
+        { op: "set", addr: A(2, 0), value: { kind: "formula", src: '=A1&"*"' } },
+        { op: "set", addr: A(3, 0), value: { kind: "literal", value: "a*e" } },
+      ],
+    });
+    return { grid: new GridImpl(mountHost(), { workbook }, store), store };
+  }
+  const rows = (result: { matches: { row: number }[] }): number[] =>
+    result.matches.map((match) => match.row);
+
+  it("matches `*`, `?` and `~`, and looks in formulas unless told to look in values", () => {
+    const { grid } = cellsGrid();
+    // A3's formula, =A1&"*", has no "e"; its value, apple*, has one.
+    expect(rows(grid.search("A*e"))).toEqual([0, 1, 3]);
+    expect(rows(grid.search("A*e", { lookIn: "values" }))).toEqual([0, 1, 2, 3]);
+    expect(rows(grid.search("a?ple", { wholeCell: true }))).toEqual([0]);
+    expect(rows(grid.search("a~*e"))).toEqual([3]);
+    expect(rows(grid.search("A1"))).toEqual([2]);
+    expect(rows(grid.search("A1", { lookIn: "values" }))).toEqual([]);
+    grid.destroy();
+  });
+
+  it("replaces inside formulas, as Excel's Replace does", () => {
+    const { grid, store } = cellsGrid();
+    grid.search("A1");
+    expect(grid.replaceAll("A2").replaced).toBe(1);
+    expect(store.getFormula(A(2, 0))).toBe('=A2&"*"');
+    expect(store.getCell(A(2, 0)).resolved).toBe("Apple pie*");
+
+    // A replacement that breaks the formula leaves the cell as it was.
+    grid.search("A2");
+    expect(grid.replaceAll("(").replaced).toBe(0);
+    expect(store.getFormula(A(2, 0))).toBe('=A2&"*"');
     grid.destroy();
   });
 });

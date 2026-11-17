@@ -10,7 +10,7 @@ import {
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import { answerDialog, makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
@@ -94,6 +94,8 @@ describe("createToolbar", () => {
     expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.border?.all).toBeUndefined();
     expect(store.getCell({ sheet: "s1", row: 0, col: 0 }).style.border?.all).toBeUndefined();
     await click("merge");
+    // A1:B2 holds values, so the merge asks first, as in Excel.
+    await answerDialog(host, "OK");
     expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(1);
     await click("unmerge");
     expect(grid.store.getWorkbook().sheets[0]?.merges ?? []).toHaveLength(0);
@@ -103,6 +105,32 @@ describe("createToolbar", () => {
     piece.destroy();
     grid.destroy();
     store.dispose();
+  });
+
+  it("draws no separator that an unavailable command leaves, from its first paint", () => {
+    // No XLSX add-on is registered, so Import XLSX, the first command, is unavailable.
+    const { grid, store, host } = makeGrid();
+    const piece = createToolbar(host, grid);
+    try {
+      const importButton = piece.element.querySelector('[aria-label="Import XLSX"]');
+      if (importButton === null) throw new Error("the toolbar has no Import XLSX button");
+      expect(importButton.closest("[hidden]")).not.toBeNull();
+      // Read before any animation frame runs: what the browser paints first.
+      const row = piece.element.querySelector(".sheetwrite-command-toolbar-row");
+      if (row === null) throw new Error("the toolbar has no row");
+      const shown = [...row.children].filter((item) => item instanceof HTMLElement && !item.hidden);
+      const isSeparator = (item: Element | undefined): boolean =>
+        item?.getAttribute("role") === "separator";
+      expect(isSeparator(shown[0])).toBe(false);
+      expect(isSeparator(shown.at(-1))).toBe(false);
+      expect(shown.some((item, index) => isSeparator(item) && isSeparator(shown[index + 1]))).toBe(
+        false,
+      );
+    } finally {
+      piece.destroy();
+      grid.destroy();
+      store.dispose();
+    }
   });
 
   it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {

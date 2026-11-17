@@ -50,9 +50,19 @@ const EDIT_LINKS_PANEL_MARKER = "This workbook has no links to other workbooks."
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
-// The AutoFilter's commands and dropdown load on first use, together; the
-// message Data › Filter shows outside a range of data survives minifiers.
-const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
+// The AutoFilter's header dropdown loads on first use; its class names survive
+// minifiers. Webpack may put the pivot model's value order it sorts with into its chunk.
+const AUTOFILTER_MARKER = "sheetwrite-autofilter-presets";
+// The dialog shell of the merge warning and the Insert and Delete dialogs
+// loads on first use; the class of its button row survives minifiers.
+const DIALOG_MARKER = "sheetwrite-dialog-buttons";
+// Format Cells (Ctrl+1) loads on first use; its class names survive minifiers.
+// Webpack may give the dialog shell a chunk of its own or copy it into the
+// Format Cells chunk.
+const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
+// The sheet menu's Move or Copy dialog and Tab Color palette load on first
+// use, together; the dialog's last list entry survives minifiers.
+const SHEET_TAB_PANELS_MARKER = "(move to end)";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -74,6 +84,9 @@ const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
+const formatCellsChunks = [];
+const dialogChunks = [];
+const sheetTabPanelChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -88,6 +101,8 @@ for (const file of lazyChunks) {
   else if (ADDON_SEAM_MARKERS.some((marker) => code.includes(marker))) addonSeamChunks.push(file);
   else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  // Before the dashboard markers: the dropdown's chunk may hold the pivot model.
+  else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
   // Before the function table: the shared dashboard code also lists the pivot aggregations.
   else if (DASHBOARD_SHARED_MARKERS.some((marker) => code.includes(marker)))
     dashboardChunks.push(file);
@@ -96,7 +111,9 @@ for (const file of lazyChunks) {
     chromeChunks.push(file);
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
-  else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
+  else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
+  else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
@@ -125,6 +142,15 @@ if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
+if (formatCellsChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
+if (dialogChunks.length > 1)
+  throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
+if (sheetTabPanelChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack sheet tab panel chunk, got ${sheetTabPanelChunks.length}`,
+  );
+}
 if (addonRegistryChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
@@ -160,7 +186,16 @@ if (mainCode.includes(FIND_MARKER)) {
   throw new Error("The find bar is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(AUTOFILTER_MARKER)) {
-  throw new Error("The AutoFilter commands are in webpack's main.js; they must load lazily");
+  throw new Error("The AutoFilter dropdown is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(DIALOG_MARKER)) {
+  throw new Error("The dialog shell is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(FORMAT_CELLS_MARKER)) {
+  throw new Error("Format Cells is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(SHEET_TAB_PANELS_MARKER)) {
+  throw new Error("The sheet tab panels are in webpack's main.js; they must load lazily");
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
@@ -211,6 +246,9 @@ const assets = publicFiles.map((file) => {
       functionTableChunks,
       findChunks,
       autoFilterChunks,
+      formatCellsChunks,
+      dialogChunks,
+      sheetTabPanelChunks,
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,

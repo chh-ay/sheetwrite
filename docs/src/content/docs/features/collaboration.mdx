@@ -1,10 +1,10 @@
 ---
 title: Collaboration and offline work
-description: Sequence, persist, acknowledge, retry, and conservatively rebase Sheetwrite document operations.
+description: Let several people edit one workbook, online or offline, without losing changes.
 ---
 import CollaborationFlow from "../../../components/CollaborationFlow";
 
-Sheetwrite provides transport-, database-, and authentication-neutral collaboration primitives. The host still owns server sequencing, durable document storage, user identity, authorization, and network lifecycle.
+Sheetwrite queues each edit until your server accepts it, sends the queue in order and applies the edits of others. Your server puts the edits in order and stores the document. You also own user identity, permissions and the connection. Sheetwrite works with any transport, database and sign-in.
 
 <CollaborationFlow />
 

@@ -58,12 +58,17 @@ If cells B2 and D7 contain "error", the log shows `2 match(es)`. `result.matches
 
 `findNext()` and `findPrev()` move the active match and select it, as Excel's Find Next does, so typing then edits the found cell. `clearSearch()` clears the highlights. The built-in **Ctrl+F** find widget, gated by `config.find` (on by default), drives this same API.
 
+## Search a selection
+
+As in Excel, a selection of more than one cell limits the search to it. Select B2:B10 and `grid.search("North")` finds only the matches in B2:B10, and `replaceAll` changes only those cells. The selection stays: `findNext()` and `findPrev()` move the active cell inside it. With one cell selected, or one merged cell, the search covers the whole sheet. The selection applies only when the search runs on the active sheet.
+
 ## Options and result
 
 ```ts prelude="core" partial="requires surrounding host state" title="SearchOptions and SearchResult"
 interface SearchOptions {
   matchCase?: boolean; // case-sensitive match (default false)
   wholeCell?: boolean; // match the whole cell, not a substring (default false)
+  lookIn?: "formulas" | "values"; // search formula text or formula results (default "formulas")
   sheet?: SheetId;     // restrict to one sheet (default: the active sheet)
   columns?: number[];  // restrict to these column indices (default: all)
 }
@@ -80,7 +85,23 @@ interface SearchResult {
 | `search(query, opts?)` | Find matching cells; highlights them, emits `search`, returns a `SearchResult`. |
 | `findNext()` / `findPrev()` | Step the active match forward / backward, select it and scroll it into view. |
 | `clearSearch()` | Drop the current search and clear its highlights. |
-| `replaceCurrent(replacement)` / `replaceAll(replacement)` | Replace literal text/number matches through undoable transactions. |
+| `replaceCurrent(replacement)` / `replaceAll(replacement)` | Replace matches through undoable transactions, in formula text too unless `lookIn` is `"values"`. |
+
+## Wildcards and Look in
+
+As in Excel's Find, the query takes three wildcard characters:
+
+| Character | Matches |
+| --- | --- |
+| `?` | Any one character: `sm?th` finds "smith" and "smyth". |
+| `*` | Any run of characters: `*east` finds "Northeast" and "Southeast". |
+| `~` | The next `*`, `?` or `~` as itself: `fy06~?` finds "fy06?". |
+
+Without `wholeCell`, a pattern can match anywhere in the cell's text, as in Excel.
+
+By default a formula cell is searched by its formula text, like Excel's default **Look in: Formulas**. So `grid.search("A1")` finds a cell holding `=A1*2`. Pass `lookIn: "values"` to search formula results instead. Cells without a formula are searched by their value either way.
+
+Replace follows the same rules. It replaces the whole run a wildcard pattern matches, and `*` takes the longest run it can. When looking in formulas, `replaceCurrent` and `replaceAll` rewrite formula text, as Excel's Replace does. A replacement that leaves a formula the engine cannot read leaves that cell unchanged. Reference cells are never rewritten.
 
 ## Styles
 
@@ -90,6 +111,7 @@ The find bar needs `@sheetwrite/core/styles/find.css`. `@sheetwrite/core/styles.
 
 - An active search picks up matches that a value edit adds or removes, without scrolling.
 - On sheets with formulas or references, an active search rescans after each edit, including edits to off-screen inputs or other sheets. This keeps matches whose computed text changes.
+- Numbers are searched by their stored value, such as `1234.5`, not by the text a number format shows.
 - `highlightCells(ranges, color?)` highlights arbitrary ranges independently of search. Pass `null` to clear; `color` overrides the theme highlight color. See [Temporary highlights](/docs/features/grid/context-menu/#temporary-highlights).
 - Set `config.find: false` to turn off the Ctrl+F widget. The methods still work.
 

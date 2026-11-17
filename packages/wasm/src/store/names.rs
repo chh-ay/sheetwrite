@@ -36,6 +36,7 @@ use crate::calc::{
     translate_name_refs, ArrayLiteral, Ast, NameId, NamedRangeRef, RefFlags, WrittenNames,
     SHEET_COLS, SHEET_ROWS,
 };
+use crate::cell_move::{move_cell_refs, CellMove};
 use crate::eval::{current_formula_origin, read_shifted, shifted_cell, shifted_range};
 use crate::formula_rewrite::write_references;
 use crate::formula_slots::{FormulaId, FormulaStore};
@@ -1278,6 +1279,40 @@ impl CellStore {
                         differs
                     }
                     DefinedName::Range(_) => false,
+                };
+            }
+            if moved {
+                changed.push(workbook_name_key(&entry.spelling));
+            }
+        }
+    }
+
+    /// Follow a block of cells that moves in every name: a name's formula
+    /// as a cell's formula follows it, and a named range as a range in a
+    /// formula does.
+    pub(super) fn move_named_cells(&mut self, edit: &CellMove, changed: &mut Vec<String>) {
+        let sheets = &self.sheet_names;
+        for entry in self.bindings.names.entries_mut() {
+            let mut moved = false;
+            for (_, definition) in &mut entry.definitions {
+                moved |= match definition {
+                    DefinedName::Formula(formula) => {
+                        formula.positional
+                            | formula.rewrite(sheets, |ast| move_cell_refs(ast, NO_SHEET, edit))
+                    }
+                    DefinedName::Range(range) => {
+                        let moved = edit.moved_range(
+                            range.sheet,
+                            (range.row_start, range.col_start),
+                            (range.row_end, range.col_end),
+                        );
+                        if let Some([sheet, r0, c0, r1, c1]) = moved {
+                            range.sheet = sheet;
+                            (range.row_start, range.col_start) = (r0, c0);
+                            (range.row_end, range.col_end) = (r1, c1);
+                        }
+                        moved.is_some()
+                    }
                 };
             }
             if moved {

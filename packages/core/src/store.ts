@@ -11,8 +11,8 @@ import {
 } from "./data-model.js";
 import {
   assertWorkbookAllocationLimits,
-  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
   isEngineBuiltTransaction,
+  resolveSnapshotResourceLimits,
   resolveTransactionResourceLimits,
   resolveTransactionResourceValidation,
   SnapshotResourceError,
@@ -31,6 +31,7 @@ import {
 } from "./engine.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
+import { releaseOwnedArrays } from "./json-bytes.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
@@ -120,7 +121,8 @@ export interface SheetwriteStoreOptions extends StoreDataEngineOptions {
 }
 
 type ChangeListener = (event: ChangeEvent) => void;
-const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
+/** The message of each sheet lifecycle issue code. */
+export const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
   blank: "Sheet name cannot be blank",
   "too-long": "Sheet name exceeds 31 UTF-16 code units",
   "forbidden-character": "Sheet name contains a forbidden character",
@@ -233,13 +235,10 @@ export class SheetwriteStore implements Store {
       resourceLimits: options.snapshotResourceLimits,
     });
     // The assertion above has validated every override.
-    this.snapshotResourceLimits = {
-      ...DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
-      ...options.snapshotResourceLimits,
-    };
+    this.snapshotResourceLimits = resolveSnapshotResourceLimits(options.snapshotResourceLimits);
 
     try {
-      this.dataEngine = new StoreDataEngine(workbook, data, options);
+      this.dataEngine = new StoreDataEngine(workbook, data, options, this.snapshotResourceLimits);
     } catch (error) {
       if (!isSnapshotAllocationFailure(error)) throw error;
       const resource = storage === "dense" ? "maxDenseCells" : "maxLogicalCellsPerSheet";
@@ -249,12 +248,9 @@ export class SheetwriteStore implements Store {
         actual = storage === "dense" ? actual + cells : Math.max(actual, cells);
       }
 
-      throw new SnapshotResourceError(
-        resource,
-        options.snapshotResourceLimits?.[resource] ?? DEFAULT_SNAPSHOT_RESOURCE_LIMITS[resource],
-        actual,
-        { cause: error },
-      );
+      throw new SnapshotResourceError(resource, this.snapshotResourceLimits[resource], actual, {
+        cause: error,
+      });
     }
 
     this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
@@ -799,11 +795,20 @@ export class SheetwriteStore implements Store {
     return this.engine.dataEdge(sheet, row, col, dRow, dCol);
   }
 
-  /** Cells whose text matches `query`, in row order. */
+  /**
+   * Cells that Find's `query` matches, in row order. `query` takes Excel's
+   * wildcards (`*`, `?`, `~`); formula cells match by their formula text
+   * unless `lookIn` is `"values"`.
+   */
   searchCells(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): CellAddress[] {
     return this.engine.searchCells(sheet, query, opts);
   }
@@ -812,7 +817,12 @@ export class SheetwriteStore implements Store {
   searchCellsFlat(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): Uint32Array {
     return this.engine.searchCellsFlat(sheet, query, opts);
   }
@@ -924,6 +934,8 @@ export class SheetwriteStore implements Store {
         !this.protectionResolver,
       replayPivotSources: source === "remote" || commitReason === "undo" || commitReason === "redo",
     });
+    // Listeners and the result hand the operations to callers.
+    releaseOwnedArrays();
 
     if (effects.appliedPatches.length === 0) {
       return {
@@ -987,6 +999,8 @@ export class SheetwriteStore implements Store {
     limits: Readonly<TransactionResourceLimits>,
     preparation: TransactionPreparation,
   ): LocalPolicyOutcome | ApplyTransactionResult {
+    // Permission callbacks receive the operations; the re-check below must not trust them.
+    releaseOwnedArrays();
     const policy = this.policy.evaluate(
       tx.patches,
       commitReason,
@@ -1193,7 +1207,7 @@ export class SheetwriteStore implements Store {
     return undefined;
   }
 
-  /** Every sheet's dimensions now, and which hold dense storage, for {@link SheetGrowth}. */
+  /** Every sheet's dimensions now, and where its cells live, for {@link SheetGrowth}. */
   private sheetGrowth(): SheetGrowth {
     const sheets = new Map<SheetId, SheetDimensions>();
     for (const sheet of this.engine.getWorkbook().sheets) {
@@ -1201,7 +1215,11 @@ export class SheetwriteStore implements Store {
         name: sheet.name,
         rows: sheet.rowCount,
         columns: sheet.columns.length,
-        dense: !this.engine.isPaged(sheet.id),
+        storage: this.engine.isPaged(sheet.id)
+          ? "paged"
+          : this.engine.isLocalPaged(sheet.id)
+            ? "local"
+            : "dense",
       });
     }
     return new SheetGrowth(sheets, this.snapshotResourceLimits);

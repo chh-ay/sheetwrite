@@ -1,13 +1,16 @@
 ---
 title: Formula help
-description: Function autocomplete, the argument guide, live errors, coloured references and Explain Formula, and the analyzeFormula API that they use.
+description: Formula AutoComplete, the argument guide, live errors, coloured references and Explain Formula, and the analyzeFormula API that they use.
 ---
 
 When a cell editor or the formula bar holds a formula (text that starts with `=`), the grid shows formula help:
 
-- **Autocomplete.** A list of the functions whose names start with the name at the caret. It lists the built-in functions of the active engine and the [custom functions](/docs/features/formulas/custom-functions/) of the store, shorter names first.
-- **Argument guide.** The signature of the function around the caret, for example `ROUND(number, digits)`, with the current argument in bold, and the function's description.
-- **Live errors.** Syntax errors, unknown function names and wrong argument counts are underlined in the text, and the guide shows the first one. The syntax check is the parser of the active engine, so formula help marks exactly the formulas that the engine rejects. An error that only says the formula is not finished, such as a missing `)`, waits while the caret is at the end of the text.
+- **Autocomplete.** As Excel's [Formula AutoComplete](https://support.microsoft.com/en-us/excel/use-formula-autocomplete), a list of what can go at the caret:
+  - the functions, defined names and tables whose names start with the name at the caret, shorter names first. Functions are the built-in functions of the active engine and the [custom functions](/docs/features/formulas/custom-functions/) of the store; defined names are the workbook's and those of the formula's sheet.
+  - inside `Table1[`, the table's columns; after `Table1[[`, the sections `#Headers` and `#Totals`. In a cell of a table, `[` alone lists that table's columns, as in `=[Sales]`.
+  - where an argument takes one of a few values, those values with Excel's words for them: `TRUE - Approximate match` and `FALSE - Exact match` for the last argument of `VLOOKUP` and `HLOOKUP`, and the values of `CELL`'s `info_type`, the `type` of `FV`, `PMT` and `PV`, `MATCH`'s `match_type`, the `order` of `RANK`, `RANK.AVG` and `RANK.EQ`, `SUBTOTAL`'s `function_num`, and the `match_mode` and `search_mode` of `XLOOKUP` and `XMATCH`. The list closes once the argument holds a whole value.
+- **Argument guide.** The signature of the function around the caret with Excel's argument names, for example `ROUND(number, num_digits)` or `SUM(number1, [number2], …)`, with the current argument in bold, and the function's description.
+- **Live errors.** Syntax errors, unknown function names and wrong argument counts are underlined in the text, and the guide shows the first one. The syntax check is the parser of the active engine, so formula help marks exactly the formulas that the engine rejects. An error that only says the formula is not finished, such as a missing `)`, waits while the caret is at the end of the text. Enter never stores a formula with a syntax error; see [A formula with a problem](/docs/features/grid/editing-and-clipboard/#a-formula-with-a-problem).
 - **Coloured references.** Each reference gets a colour in the text, and its range on the grid gets a fill in the same colour. Equal references share one colour.
 
 - **Result preview.** When you stop typing for a moment and the formula has no problem, a line under the guide shows its result, such as `= 0.99`, or the first value and size of an array, such as `= 5 … (2 × 3 array)`.
@@ -44,12 +47,12 @@ Formula help needs `@sheetwrite/core/styles/formula-help.css`. The Explain Formu
 
 **Alt+Enter** inserts a line break at the caret (or replaces selected text), even while the function list is open. The cell editor and formula bar grow to show up to eight lines; longer formulas scroll. Lines do not wrap. Autocomplete, argument guidance and reference colours follow the caret across lines. Plain Enter still accepts a completion or commits the edit.
 
-While the function list is open:
+While the list is open:
 
 | Key | Action |
 | --- | --- |
 | Arrow Down, Arrow Up | Move through the list. The list wraps at both ends. |
-| Enter, Tab | Replace the name at the caret with the selected function and type `(`. |
+| Enter, Tab | Replace the text at the caret with the selected item. A function also types `(`. As in Excel, a table reference's `]` is yours to type. |
 | Escape | Close the list. The list stays closed until the text changes. |
 
 While the list is closed, the keys do what the editor does: Enter commits, Tab moves, and Escape cancels the edit. A click on a list item picks it.
@@ -57,7 +60,7 @@ While the list is closed, the keys do what the editor does: Enter commits, Tab m
 ## Accessibility
 
 - The editor field has `aria-autocomplete="list"`, `aria-controls` names the list, and `aria-activedescendant` names the selected item. Both editors are multi-line text fields (`aria-multiline="true"`), without a combobox role.
-- The list is an ARIA listbox with one option per function.
+- The list is an ARIA listbox named "Formula AutoComplete", with one option per item. Each option's `data-kind` is `function`, `name`, `table`, `column` or `choice`.
 - The argument guide is a polite live region (`role="status"`) and describes the field (`aria-describedby`), with the result preview. The preview is not a live region, because it changes as you type. A screen reader reads the guide when the function, the argument or the first error changes.
 - The field has `aria-invalid="true"` while it shows an error.
 
@@ -78,7 +81,7 @@ Formula help is not in the grid's first download. The cell editor and the formul
 
 ## analyzeFormula
 
-Host editors can use the same analysis. Import `analyzeFormula` from `@sheetwrite/core/functions`, and give it the text, the caret offset and the list from [`listFunctions`](/docs/features/formulas/custom-functions/#function-metadata). The tokens and the syntax error come from the engine, so call it after `initSheetwrite()`.
+Host editors can use the same analysis. Import `analyzeFormula` from `@sheetwrite/core/functions`, and give it the text, the caret offset, the list from [`listFunctions`](/docs/features/formulas/custom-functions/#function-metadata) and, to list them too, the defined names and tables as `{ names, tables, cellTable? }`: `names` holds the defined names, `tables` each table's `name` and `columns`, and `cellTable` the name of the table that holds the formula's cell. The tokens and the syntax error come from the engine, so call it after `initSheetwrite()`.
 
 ```ts prelude="core" partial="requires an initialized grid" title="Read the argument at the caret"
 import { analyzeFormula, listFunctions } from "@sheetwrite/core/functions";
@@ -88,7 +91,7 @@ const text = "=ROUND(A1, ";
 const analysis = analyzeFormula(text, text.length, functions);
 
 console.log(analysis.call?.name); // "ROUND"
-console.log(analysis.call?.argument?.name); // "digits"
+console.log(analysis.call?.argument?.name); // "num_digits"
 ```
 
 The result has these fields. Every `from` and `to` is a UTF-16 offset into the text.
@@ -98,7 +101,7 @@ The result has these fields. Every `from` and `to` is a UTF-16 offset into the t
 | `tokens` | Each token with its kind (`number`, `string`, `function`, `reference`, `operator` and so on), for syntax colours. |
 | `references` | Each cell, range, whole-column or whole-row reference: its sheet name as written (or `null` for the formula's own sheet), its 0-based `start` and `end`, and a `colorIndex` that equal references share. |
 | `call` | The innermost function call around the caret: its name, the 0-based `argumentIndex`, and the metadata of the function and of the argument. `null` outside every call. |
-| `completion` | The functions that complete the name at the caret, and the span to replace. `null` when there is no name to complete. |
+| `completion` | The items that complete the text at the caret, in list order, and the span a chosen item replaces. Each item has a `kind` (`function`, `name`, `table`, `column` or `choice`), the `name` the list shows, the `insert` text, a `description`, and for a function its metadata. `null` when nothing completes. |
 | `diagnostics` | Each problem with its span and message: the first syntax error that the engine's parser finds, then each unknown function name and each wrong argument count. `incomplete` marks a problem at the end of an unfinished formula. |
 
 Commas inside strings, array constants such as `{1, 2}` and union groups such as `(A1, B1)` do not count as argument separators. A repeating argument, such as the numbers of `SUM`, takes every later position. The argument count of a call is checked only after its `)`. With an empty function list, `completion` is `null` and no name is reported as unknown.

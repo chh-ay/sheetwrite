@@ -21,6 +21,8 @@ compile_error!(
 #[cfg(feature = "formula-engine")]
 mod calc;
 #[cfg(feature = "formula-engine")]
+mod cell_move;
+#[cfg(feature = "formula-engine")]
 mod cells;
 #[cfg(feature = "analysis")]
 mod data_model;
@@ -74,6 +76,8 @@ mod types;
 mod window;
 
 #[cfg(all(test, feature = "formula-engine"))]
+mod cell_move_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod external_reference_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_rewrite_tests;
@@ -83,6 +87,8 @@ mod formula_syntax_tests;
 mod formula_text_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_tokens_tests;
+#[cfg(all(test, feature = "formula-engine"))]
+mod local_paged_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod move_tests;
 #[cfg(all(test, feature = "formula-engine"))]

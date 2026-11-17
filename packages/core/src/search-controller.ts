@@ -1,5 +1,7 @@
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
-import { replaceInText } from "./search-replace.js";
+import { getEngine } from "./engine.js";
+import { findMatcher, replaceInText } from "./search-replace.js";
+import type { SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
@@ -18,6 +20,13 @@ export interface SearchControllerDeps {
   scrollToCell: (addr: CellAddress) => void;
   /** Select one cell, in view rows. */
   selectCell: (addr: CellAddress) => void;
+  /** Move the active cell to `addr`, in view rows, and keep the selected cells. */
+  setActiveCell: (addr: CellAddress) => void;
+  /**
+   * The selected rectangles of the active sheet, in view rows, when they hold
+   * more than one cell; null for one cell or one merged cell.
+   */
+  selectionScope: () => readonly SelRect[] | null;
   scheduleRender: () => void;
   emit: (result: SearchResult) => void;
   /** Whether writes are disabled; replace becomes a no-op. */
@@ -109,6 +118,9 @@ export class SearchController {
   private searchActive = -1;
   private searchQuery = "";
   private searchOpts: SearchOptions = {};
+  private searchMatcher: (text: string) => boolean = () => false;
+  /** The selection a search runs in, in view rows; null searches the whole sheet. */
+  private searchScope: { sheet: SheetId; rects: readonly SelRect[] } | null = null;
   private revision = 0;
 
   constructor(deps: SearchControllerDeps) {
@@ -184,14 +196,14 @@ export class SearchController {
     if (patch.addr.sheet !== sheet) return true;
     if (patch.value.kind !== "literal") return false;
     if (this.searchOpts.columns && !this.searchOpts.columns.includes(patch.addr.col)) return true;
+    // A cell outside the searched selection is never a match.
+    if (!this.inScope(sheet, patch.addr.row, patch.addr.col)) return true;
 
     const text = engineSearchText(this.deps.store.getCell(patch.addr).resolved);
     if (text === null) return false;
-    const caseFolded = !this.searchOpts.matchCase;
-    if (caseFolded && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery))) return false;
-    const haystack = caseFolded ? text.toLowerCase() : text;
-    const needle = caseFolded ? this.searchQuery.toLowerCase() : this.searchQuery;
-    const matchesNow = this.searchOpts.wholeCell ? haystack === needle : haystack.includes(needle);
+    if (!this.searchOpts.matchCase && (NON_ASCII.test(text) || NON_ASCII.test(this.searchQuery)))
+      return false;
+    const matchesNow = this.searchMatcher(text);
     const matches = this.searchMatches;
     let start = 0;
     let end = matches.length;
@@ -208,9 +220,17 @@ export class SearchController {
     return matchesNow === matchedBefore;
   }
 
+  /**
+   * Find `query` on a sheet. On the active sheet a selection of more than one
+   * cell limits the search to it, as in Excel.
+   */
   search(query: string, opts: SearchOptions = {}): SearchResult {
     this.searchQuery = query;
     this.searchOpts = opts;
+    this.searchMatcher = findMatcher(query, opts);
+    const sheet = opts.sheet ?? this.deps.activeSheet();
+    const rects = sheet === this.deps.activeSheet() ? this.deps.selectionScope() : null;
+    this.searchScope = rects ? { sheet, rects } : null;
     this.searchMatches = query ? this.scanMatches(query, opts) : EMPTY_MATCHES;
     this.searchActive =
       this.searchMatches.length > 0
@@ -245,6 +265,7 @@ export class SearchController {
 
   clearSearch(): void {
     this.searchQuery = "";
+    this.searchScope = null;
     this.searchMatches = EMPTY_MATCHES;
     this.searchActive = -1;
     this.revision += 1;
@@ -254,8 +275,9 @@ export class SearchController {
 
   /**
    * Replace the active match, then advance to the next match after it (in
-   * row-major order, wrapping). Formula/ref cells are skipped rather than
-   * rewritten; the active pointer still advances so the caller is never stuck.
+   * row-major order, wrapping). A formula's text is rewritten unless the search
+   * looks in values; reference cells are skipped. The active pointer still
+   * advances so the caller is never stuck.
    */
   replaceCurrent(replacement: string): SearchResult {
     const target = this.searchMatches.at(this.searchActive);
@@ -311,11 +333,13 @@ export class SearchController {
       for (const [index, addr] of matches.entries()) {
         const cell = captured?.[index];
         // Custom stores without an engine retain their scalar read contract.
-        const patch = cell
-          ? cell.value.kind === "formula" || cell.value.kind === "ref"
-            ? null
-            : this.replacementFromCell(addr, replacement, cell)
-          : this.replacementPatch(addr, replacement);
+        const patch = !cell
+          ? this.replacementPatch(addr, replacement)
+          : cell.value.kind === "formula"
+            ? this.formulaReplacement(addr, replacement, cell.value.src, cell.style)
+            : cell.value.kind === "ref"
+              ? null
+              : this.replacementFromCell(addr, replacement, cell);
         if (!patch) continue;
         if (scalarWrites) {
           patches.push(patch);
@@ -355,7 +379,8 @@ export class SearchController {
 
   /**
    * Build a `set` patch that rewrites `addr` for the current query, or null when
-   * the cell is not eligible (formula/ref) or holds no occurrence to replace.
+   * the cell is not eligible (a reference, or a formula in a value search) or
+   * holds no occurrence to replace.
    * Preserves the cell's existing style and re-parses through `parseCellInput`
    * so numbers stay numbers.
    */
@@ -363,11 +388,45 @@ export class SearchController {
     addr: CellAddress,
     replacement: string,
   ): Extract<DocumentOp, { op: "set" }> | null {
-    // Formula and reference sources must never be rewritten by a resolved-value search.
-    if (this.deps.store.getFormula(addr) !== null) return null;
     if (this.deps.store.getRefTarget(addr) !== null) return null;
+    const formula = this.deps.store.getFormula(addr);
+    if (formula !== null) {
+      return this.formulaReplacement(
+        addr,
+        replacement,
+        formula,
+        this.deps.store.getCell(addr).style,
+      );
+    }
 
     return this.replacementFromCell(addr, replacement, this.deps.store.getCell(addr));
+  }
+
+  /**
+   * Rewrite a formula's text, as Excel's Replace does: null when the search
+   * looks in values, when nothing in the text matches, or when the new text is
+   * not a formula the engine can read. Text that no longer starts with `=` is
+   * entered as a value.
+   */
+  private formulaReplacement(
+    addr: CellAddress,
+    replacement: string,
+    source: string,
+    style: ResolvedCell["style"],
+  ): Extract<DocumentOp, { op: "set" }> | null {
+    if (this.searchOpts.lookIn === "values") return null;
+    const next = replaceInText(source, this.searchQuery, replacement, this.searchOpts);
+    if (next === null) return null;
+    if (!next.startsWith("=")) {
+      const column = this.deps.sheet(addr.sheet).columns[addr.col];
+      return { op: "set", addr, value: parseCellInput(next, column?.type ?? "text"), style };
+    }
+
+    const error = getEngine().checkFormulaSyntax(next);
+    if (error === undefined)
+      return { op: "set", addr, value: { kind: "formula", src: next }, style };
+    error.free();
+    return null;
   }
 
   private replacementFromCell(
@@ -430,9 +489,42 @@ export class SearchController {
     return afterIndex >= 0 ? afterIndex : firstIndex;
   }
 
+  /** Scan for matches, keeping only those inside the searched selection. */
   private scanMatches(query: string, opts: SearchOptions): SearchMatchSet {
     const sheetId = opts.sheet ?? this.deps.activeSheet();
+    const scope = this.searchScope;
+    if (scope?.sheet !== sheetId) return this.scanSheet(sheetId, query, opts);
 
+    const columns = new Set<number>();
+    for (const rect of scope.rects) {
+      for (let col = rect.c0; col <= rect.c1; col++) {
+        if (!opts.columns || opts.columns.includes(col)) columns.add(col);
+      }
+    }
+    const found = this.scanSheet(sheetId, query, { ...opts, columns: [...columns] });
+    const pairs: number[] = [];
+    for (let index = 0; index < found.length; index++) {
+      const row = found.rowAt(index);
+      const col = found.colAt(index);
+      if (this.inScope(sheetId, row, col)) pairs.push(row, col);
+    }
+    return pairs.length === 0
+      ? EMPTY_MATCHES
+      : new FlatSearchMatchSet(sheetId, Uint32Array.from(pairs));
+  }
+
+  /** Whether a data cell lies in the searched selection; every cell does without one. */
+  private inScope(sheet: SheetId, dataRow: number, col: number): boolean {
+    const scope = this.searchScope;
+    if (scope?.sheet !== sheet) return true;
+    const viewRow = this.deps.toViewRow(dataRow);
+    if (viewRow === null) return false;
+    return scope.rects.some(
+      (rect) => rect.r0 <= viewRow && viewRow <= rect.r1 && rect.c0 <= col && col <= rect.c1,
+    );
+  }
+
+  private scanSheet(sheetId: SheetId, query: string, opts: SearchOptions): SearchMatchSet {
     // Fast path: scan the columnar store in WASM (no per-cell JS materialization).
     if (this.deps.loadable) {
       return new FlatSearchMatchSet(
@@ -444,7 +536,8 @@ export class SearchController {
     // Fallback for a non-SheetwriteStore store: bulk-read the sheet and scan in JS.
     const sheet = this.deps.sheet(sheetId);
     const cols = opts.columns ?? sheet.columns.map((_, i) => i);
-    const needle = opts.matchCase ? query : query.toLowerCase();
+    const matches = findMatcher(query, opts);
+    const formulas = opts.lookIn !== "values";
     const pairs: number[] = [];
     if (sheet.rowCount === 0 || cols.length === 0) return EMPTY_MATCHES;
 
@@ -459,8 +552,10 @@ export class SearchController {
       for (let c = 0; c < n; c++) {
         const v = view.values[r * n + c];
         if (v === null || v === undefined || v === "") continue;
-        const text = opts.matchCase ? String(v) : String(v).toLowerCase();
-        if (opts.wholeCell ? text === needle : text.includes(needle)) {
+        const formula = formulas
+          ? this.deps.store.getFormula({ sheet: sheetId, row: r, col: cols[c]! })
+          : null;
+        if (matches(formula ?? String(v))) {
           pairs.push(r, cols[c]!);
         }
       }
@@ -470,7 +565,10 @@ export class SearchController {
       : new FlatSearchMatchSet(sheetId, Uint32Array.from(pairs));
   }
 
-  /** Select the active match and scroll to it, as Excel's Find Next does. */
+  /**
+   * Select the active match and scroll to it, as Excel's Find Next does. In a
+   * searched selection the active cell moves and the selection stays.
+   */
   private revealActiveMatch(): void {
     const m = this.searchMatches.at(this.searchActive);
     if (!m || m.sheet !== this.deps.activeSheet()) return;
@@ -479,7 +577,8 @@ export class SearchController {
     if (viewRow === null) return;
 
     const cell = { ...m, row: viewRow };
-    this.deps.selectCell(cell);
+    if (this.searchScope?.sheet === m.sheet) this.deps.setActiveCell(cell);
+    else this.deps.selectCell(cell);
     this.deps.scrollToCell(cell);
   }
 

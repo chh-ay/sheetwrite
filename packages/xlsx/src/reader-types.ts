@@ -107,6 +107,8 @@ export interface ParsedSheet {
   readonly merges: MergeRange[];
   readonly frozenRows?: number;
   readonly frozenCols?: number;
+  /** The sheet's tab color as `#RRGGBB`. */
+  readonly tabColor?: string;
   readonly rowGroups: NonNullable<SheetSnapshot["rowGroups"]>;
   readonly validations: ParsedValidation[];
   readonly notes: { row: number; col: number; text: string }[];

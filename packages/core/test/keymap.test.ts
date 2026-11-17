@@ -281,7 +281,8 @@ describe("custom key combinations", () => {
       config: {
         contextMenu: [
           item("letter", "Mod+Shift+K"),
-          item("digit", "Ctrl+Shift+1"),
+          // Ctrl+Shift+1 to 6 are Excel's number-format keys; 8 is free.
+          item("digit", "Ctrl+Shift+8"),
           item("symbol", "Mod+Shift+/"),
           item("alt", "Mod+Alt+L"),
         ],
@@ -291,11 +292,11 @@ describe("custom key combinations", () => {
       grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
       // With Shift held, the browser reports the shifted character in `key`.
       press(host, "K", { ctrlKey: true, shiftKey: true, code: "KeyK" });
-      press(host, "!", { ctrlKey: true, shiftKey: true, code: "Digit1" });
+      press(host, "*", { ctrlKey: true, shiftKey: true, code: "Digit8" });
       press(host, "?", { ctrlKey: true, shiftKey: true, code: "Slash" });
       press(host, "¬", { ctrlKey: true, altKey: true, code: "KeyL" });
-      // A plain "1" without Shift must not run the Shift+1 command.
-      press(host, "1", { ctrlKey: true, code: "Digit1" });
+      // A plain "8" without Shift must not run the Shift+8 command.
+      press(host, "8", { ctrlKey: true, code: "Digit8" });
       expect(runs).toEqual(["letter", "digit", "symbol", "alt"]);
     } finally {
       grid.destroy();

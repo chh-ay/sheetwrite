@@ -18,7 +18,10 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     );
     assert_eq!(checked_dense_cell_count(1, MAX_DENSE_CELLS + 1), None);
     assert_eq!(checked_dense_cell_count(usize::MAX, 2), None);
-    assert!(SheetData::try_new(usize::MAX, 2).is_err());
+    assert!(
+        SheetData::try_new(usize::MAX, 2).is_err(),
+        "a dense sheet past the cap is refused; the store places it in local pages"
+    );
     let at_limit = SheetData::try_new(1, MAX_DENSE_CELLS).expect("limit must be accepted");
     assert_eq!(
         at_limit.cells.source_kind_at(MAX_DENSE_CELLS - 1),
@@ -27,7 +30,9 @@ fn sheet_noops_dense_limits_and_paged_load_state_preserve_invariants() {
     drop(at_limit);
 
     let mut bounded_store = CellStore::new();
-    assert!(bounded_store.try_add_sheet(1, MAX_DENSE_CELLS + 1).is_err());
+    assert!(bounded_store
+        .try_add_sheet(1, crate::cells::MAX_LOCAL_PAGED_CELLS + 1)
+        .is_err());
     assert!(bounded_store.sheets.is_empty());
     let mut dense = SheetData::new(2, 2);
     put_number(&mut dense, 1, 1, 9.0);
@@ -142,7 +147,7 @@ fn public_api_bounds_checks_do_not_panic() {
         assert!(store.sort_rows(sheet, 9, true).is_empty());
         assert!(store.filter_rows(99, 0, "x").is_empty());
         assert!(store.filter_rows(sheet, 9, "x").is_empty());
-        assert!(store.search(99, &[0], "x", true, false).is_empty());
+        assert!(store.search(99, &[0], "x", true, false, false).is_empty());
         assert_eq!(store.get_window(99, 0, 1, &[0]).n_rows(), 0);
     }));
 

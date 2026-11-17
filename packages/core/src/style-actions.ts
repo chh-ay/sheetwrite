@@ -1,7 +1,7 @@
 import type { SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import { mergeCrossesFreeze, mergesOverlap } from "./store/ranges.js";
+import { mergesOverlap } from "./store/ranges.js";
 import { selectionBorderPatches } from "./style-borders.js";
 import type { CellStyle, CellValue } from "./types/cell.js";
 import type { CellAddress, SheetId } from "./types/coordinates.js";
@@ -224,74 +224,6 @@ export class StyleActions {
         op: "setRange",
         range: { sheet: activeSheet, start: { row: 0, col: 0 }, end: { row: endRow, col: endCol } },
         cells,
-      });
-
-    this.deps.commit(patches);
-  }
-
-  mergeSelection(center = false): void {
-    if (this.deps.readOnly()) return;
-    const activeSheet = this.deps.activeSheet();
-    if (this.deps.loadable?.hasView(activeSheet)) return;
-
-    const sel = this.deps.selection().toSelection(activeSheet);
-    if (sel?.kind !== "range") return;
-    const { start, end } = sel.range;
-    const merge = {
-      r0: Math.min(start.row, end.row),
-      c0: Math.min(start.col, end.col),
-      r1: Math.max(start.row, end.row),
-      c1: Math.max(start.col, end.col),
-    };
-    if (merge.r0 === merge.r1 && merge.c0 === merge.c1) return;
-    const sheet = this.deps.sheet();
-    if (
-      mergeCrossesFreeze(sheet, merge) ||
-      this.deps.merges().some((candidate) => mergesOverlap(merge, candidate))
-    ) {
-      return;
-    }
-
-    const range = {
-      sheet: activeSheet,
-      start: { row: merge.r0, col: merge.c0 },
-      end: { row: merge.r1, col: merge.c1 },
-    };
-    const engine = storeEngine(this.deps.store);
-    // Per-cell operations preserve policy issue indices and partial spill rejection.
-    const scalarWrites =
-      !engine ||
-      Boolean(
-        sheet.validationRules?.length ||
-        sheet.protectedRanges?.length ||
-        engine.hasSpillChildren(range),
-      );
-    const cells: SnapshotCell[] = [];
-    const patches: DocumentOp[] = [{ op: "addMerge", sheet: activeSheet, merge }];
-    for (let row = merge.r0; row <= merge.r1; row++) {
-      for (let col = merge.c0; col <= merge.c1; col++) {
-        if (row === merge.r0 && col === merge.c0) continue;
-        const value: CellValue = { kind: "literal", value: null };
-        if (scalarWrites) {
-          patches.push({
-            op: "set",
-            addr: { sheet: activeSheet, row: this.deps.toDataRow(row), col },
-            value,
-          });
-        } else cells.push({ rowOffset: row - merge.r0, colOffset: col - merge.c0, value });
-      }
-    }
-
-    if (cells.length > 0) patches.push({ op: "setRange", range, cells });
-    if (center)
-      patches.push({
-        op: "setRangeStyle",
-        range: {
-          sheet: activeSheet,
-          start: { row: merge.r0, col: merge.c0 },
-          end: { row: merge.r0, col: merge.c0 },
-        },
-        style: { align: "center" },
       });
 
     this.deps.commit(patches);

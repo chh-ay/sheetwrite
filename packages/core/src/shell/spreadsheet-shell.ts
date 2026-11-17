@@ -6,9 +6,9 @@
 
 import { createGridController, type GridController } from "../grid-controller.js";
 import { DEFAULT_THEME } from "../grid.js";
-import { sheetNameKey } from "../name-key.js";
 import { assertRibbonConfig, ribbonHeight, TOOLBAR_HEIGHT } from "../ribbon/ribbon-metrics.js";
 import { Scope } from "../scope.js";
+import { insertSheet } from "../sheet-commands.js";
 import { changesSheetTabs, SheetTabs } from "../sheet-tabs.js";
 import type { Selection, SheetId } from "../types/coordinates.js";
 import type {
@@ -255,12 +255,6 @@ export function createSpreadsheetShell(
   let tabHost: HTMLDivElement | null = null;
   let tabs: SheetTabs | null = null;
   lifetime.add(() => tabs?.destroy());
-  const nextSheetName = (): string => {
-    const names = new Set(grid.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
-    let suffix = grid.store.getWorkbook().sheets.length + 1;
-    while (names.has(sheetNameKey(`Sheet ${suffix}`))) suffix++;
-    return `Sheet ${suffix}`;
-  };
   const createTabs = (): void => {
     if (!tabsEnabled || tabs) return;
     tabHost = document.createElement("div");
@@ -268,16 +262,18 @@ export function createSpreadsheetShell(
     bottomRow.prepend(tabHost);
     tabs = new SheetTabs(tabHost, {
       onActivate: (id) => grid.setActiveSheet(id),
-      onAdd: () => {
-        const result = grid.addSheet({ name: nextSheetName() });
-        if (result.status === "applied") grid.setActiveSheet(result.sheet);
-        return result;
-      },
+      onAdd: (index) => insertSheet(grid, index),
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),
       onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
+      // The same chunk Grid loads for its own tab bar.
+      onCommand: (command, id) =>
+        void import("../sheet-tab-panels.js").then(({ openTabPanel }) => {
+          if (tabs) openTabPanel(grid, tabs, command, id);
+        }),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
+      icons: () => chrome.icons,
     });
     tabs.setReadOnly(readOnly);
   };

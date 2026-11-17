@@ -7,6 +7,7 @@ import {
   type ChartAxisEdit,
   chartFitsSheets,
   invalidateChartSheet,
+  mapChartSources,
   MAX_CHARTS_PER_SHEET,
   rebaseChartAxis,
   sanitizeChartDefinition,
@@ -37,7 +38,12 @@ import {
   withRelationship,
 } from "../data-model.js";
 import { dateToSerial } from "../date-serial.js";
-import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
+import {
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  isValidCalculationSettings,
+  type SnapshotResourceLimits,
+  storedCalculationSettings,
+} from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import {
   datasourceFailure,
@@ -103,7 +109,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { canAddSheetName, validateSheetName } from "../sheet-name.js";
+import { operationAcceptsSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -169,6 +175,18 @@ import {
   workbookTableNameKey,
 } from "../workbook-table.js";
 import { decodePreview, type FormulaPreview, PREVIEW_FIELDS } from "./formula-preview-result.js";
+import {
+  cellBlockMove,
+  type CellBlockMove,
+  moveCellRange,
+  type MoveCellsOperation,
+  movedConditionalFormats,
+  movedHyperlinks,
+  movedMerges,
+  movedNotes,
+  type MovedSheetItems,
+  movedValidationRules,
+} from "./move-cells.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
   MERGED_CELLS_SORT_MESSAGE,
@@ -188,6 +206,7 @@ import {
   integerAt,
   mergeCrossesFreeze,
   mergesOverlap,
+  movedBlock,
   moveRemap,
   normalizedRange,
   normalizeMerge,
@@ -227,6 +246,9 @@ import {
   CELL_STATE_LOADED_EMPTY,
   CELL_STATE_LOCAL_EDIT,
 } from "./wire-tags.js";
+
+/** The snapshot limits the engine applies to dense and local sheets. */
+type StorageLimits = Pick<SnapshotResourceLimits, "maxDenseCells" | "maxLocalPagedCells">;
 
 /** Shared report of a commit that recalculated nothing; never written. */
 const EMPTY_RECALCULATION = new Uint32Array(0);
@@ -735,7 +757,17 @@ export class StoreDataEngine {
     admissionReferenceMapsMaterialized: 0,
   };
 
-  constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
+  /**
+   * `storageLimits` are the store's resolved snapshot limits; the engine
+   * places and refuses dense and local sheets with them, as snapshot
+   * validation and `SheetGrowth` do.
+   */
+  constructor(
+    workbook: Workbook,
+    data?: ColumnarData,
+    options: SheetwriteStoreOptions = {},
+    storageLimits: Readonly<StorageLimits> = DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  ) {
     if (!isLoaded()) {
       throw storeFailure(
         "initialization-required",
@@ -770,6 +802,7 @@ export class StoreDataEngine {
     this.sheets = new SheetRegistry(workbook);
     this.storageOptions = options;
     this.wasm = new (getEngine().CellStore)();
+    this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, this.sheets);
     this.windowReader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
@@ -1398,6 +1431,11 @@ export class StoreDataEngine {
     return this.wasm.isPaged(this.sheets.handleOf(sheet));
   }
 
+  /** Whether the engine keeps a dense sheet past `maxDenseCells` in local pages. */
+  isLocalPaged(sheet: SheetId): boolean {
+    return this.wasm.isLocalPaged(this.sheets.handleOf(sheet));
+  }
+
   getPagedStats(sheet: SheetId): PagedStoreStats {
     const stats = this.wasm.pagedStats(this.sheets.handleOf(sheet));
     return {
@@ -1502,6 +1540,9 @@ export class StoreDataEngine {
   }
 
   canApplyLocally(patch: DocumentOp): boolean {
+    if (patch.op === "moveCells") {
+      return this.blockLoaded(patch.range) && this.blockLoaded(movedBlock(patch));
+    }
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.sheets.handles.has(sheet) || !this.isPaged(sheet)) return true;
     if (
@@ -2178,11 +2219,16 @@ export class StoreDataEngine {
     return this.view.dataEdge(sheet, row, col, dRow, dCol);
   }
 
-  /** Cells whose text matches `query`, scanned in WASM and returned row-major. */
+  /** Cells that Find's `query` matches, scanned in WASM and returned row-major. */
   searchCells(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): CellAddress[] {
     const flat = this.searchCellsFlat(sheet, query, opts);
 
@@ -2199,7 +2245,12 @@ export class StoreDataEngine {
   searchCellsFlat(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): Uint32Array {
     this.requireCompleteQuery(sheet);
     const handle = this.sheets.handleOf(sheet);
@@ -2211,6 +2262,7 @@ export class StoreDataEngine {
       query,
       !opts.matchCase,
       opts.wholeCell ?? false,
+      opts.lookIn !== "values",
     );
   }
 
@@ -2351,6 +2403,39 @@ export class StoreDataEngine {
       patch.from,
       patch.count,
       patch.to,
+    );
+    const losses: CellAddress[] = [];
+    for (let index = 0; index + 2 < triples.length; index += 3) {
+      const sheet = this.sheetIdsByHandle[triples[index] ?? -1];
+      const row = triples[index + 1];
+      const col = triples[index + 2];
+      if (sheet !== undefined && row !== undefined && col !== undefined) {
+        losses.push({ sheet, row, col });
+      }
+    }
+    return losses;
+  }
+
+  /**
+   * Cells outside both blocks, at their address before the move, whose
+   * formula a move back cannot restore: a reference that became `#REF!` or a
+   * range whose edge moved. History captures them before the move applies.
+   */
+  moveCellsLosses(patch: MoveCellsOperation): CellAddress[] {
+    const { from, to } = cellBlockMove(patch);
+    const handle = this.sheets.handles.get(from.sheet);
+    const toHandle = this.sheets.handles.get(to.sheet);
+    if (handle === undefined || toHandle === undefined) return [];
+
+    const triples = this.wasm.moveCellsLosses(
+      handle,
+      from.start.row,
+      from.start.col,
+      from.end.row - from.start.row + 1,
+      from.end.col - from.start.col + 1,
+      toHandle,
+      to.start.row,
+      to.start.col,
     );
     const losses: CellAddress[] = [];
     for (let index = 0; index + 2 < triples.length; index += 3) {
@@ -3269,6 +3354,9 @@ export class StoreDataEngine {
       case "permuteRows":
         return this.permuteRows(patch, changes, captureDetailedChanges);
 
+      case "moveCells":
+        return this.moveCells(patch, changes, captureDetailedChanges);
+
       case "addColumns": {
         const meta = this.sheets.sheetMeta(patch.sheet);
         if (
@@ -3556,7 +3644,11 @@ export class StoreDataEngine {
             .filter((candidate) => candidate.id !== patch.sheet)
             .map((candidate) => candidate.name),
         );
-        if (!name.ok || !this.renameSheetFormulaIdentity(patch.sheet, name.name)) return false;
+        if (
+          !operationAcceptsSheetName(name) ||
+          !this.renameSheetFormulaIdentity(patch.sheet, name.name)
+        )
+          return false;
         sheet.name = name.name;
         this.refreshNamedFormulas();
         return true;
@@ -3763,6 +3855,9 @@ export class StoreDataEngine {
           return false;
         }
 
+        // The protocol checked the color's format before the operation got here.
+        const { tabColor } = patch.patch;
+        if (tabColor !== undefined) sheet.tabColor = tabColor ?? undefined;
         if (patch.patch.frozenRows !== undefined) sheet.frozenRows = patch.patch.frozenRows;
         if (patch.patch.frozenCols !== undefined) sheet.frozenCols = patch.patch.frozenCols;
         if (patch.patch.conditionalFormats !== undefined) {
@@ -4181,6 +4276,140 @@ export class StoreDataEngine {
   }
 
   /**
+   * Move a block of cells, as Excel's Cut and Paste does. The engine moves
+   * the cells and makes every formula and defined name follow them; this
+   * carries the block's notes, hyperlinks and merged cells, which replace
+   * those of the cells it lands on, and moves named ranges and chart sources
+   * by the engine's rule. A block that would cut through a table, pivot
+   * output or merged cell does not move.
+   */
+  private moveCells(
+    patch: MoveCellsOperation,
+    changes: ChangeEvent["changes"] | null,
+    captureDetailedChanges: boolean,
+  ): boolean {
+    const move = cellBlockMove(patch);
+    const { from, to } = move;
+    const fromSheet = this.workbook.sheets.find((sheet) => sheet.id === from.sheet);
+    const toSheet = this.workbook.sheets.find((sheet) => sheet.id === to.sheet);
+    if (
+      !fromSheet ||
+      !toSheet ||
+      isDashboard(toSheet) ||
+      ![from.start.row, from.start.col, to.start.row, to.start.col].every(integerAt) ||
+      from.end.row >= fromSheet.rowCount ||
+      from.end.col >= fromSheet.columns.length ||
+      to.end.row >= toSheet.rowCount ||
+      to.end.col >= toSheet.columns.length
+    ) {
+      return false;
+    }
+
+    if (
+      from.sheet === to.sheet &&
+      from.start.row === to.start.row &&
+      from.start.col === to.start.col
+    ) {
+      return true;
+    }
+
+    if (this.blockMeetsOwnedCells(fromSheet, from) || this.blockMeetsOwnedCells(toSheet, to)) {
+      return false;
+    }
+
+    const merges = movedMerges(fromSheet, toSheet, move);
+    if (!merges || merges.to.some((merge) => mergeCrossesFreeze(toSheet, merge))) return false;
+
+    const rows = from.end.row - from.start.row + 1;
+    const cols = from.end.col - from.start.col + 1;
+    const before =
+      changes && captureDetailedChanges
+        ? [from, to].map((bounds) => ({
+            bounds,
+            cells: this.captureBlockBeforeCells(bounds, rows, cols),
+          }))
+        : null;
+
+    this.noteRangeMutationFfi(rows);
+    const status = this.wasm.moveCells(
+      this.sheets.handleOf(from.sheet),
+      from.start.row,
+      from.start.col,
+      rows,
+      cols,
+      this.sheets.handleOf(to.sheet),
+      to.start.row,
+      to.start.col,
+    );
+    if (status !== 0) return false;
+
+    if (fromSheet.merges || merges.from.length > 0) fromSheet.merges = merges.from;
+    if (toSheet.merges || merges.to.length > 0) toSheet.merges = merges.to;
+    this.spillBlockersDirty.add(from.sheet);
+    this.spillBlockersDirty.add(to.sheet);
+    this.moveBlockItems(fromSheet, toSheet, move);
+    if (before && changes) {
+      for (const block of before) this.pushPermutedChanges(block.bounds, block.cells, changes);
+    }
+    return true;
+  }
+
+  /** Whether a table or pivot output meets the block: a cut moves neither in part. */
+  private blockMeetsOwnedCells(sheet: Sheet, block: Range): boolean {
+    return (
+      (sheet.tables ?? []).some((table) => rangesIntersect(table.range, block)) ||
+      this.pivotOutputs(sheet.id).some((output) => rangesIntersect(output.range, block))
+    );
+  }
+
+  /**
+   * Carry the notes, hyperlinks, validation and conditional-format rules,
+   * named ranges and chart sources that a block move takes along.
+   */
+  private moveBlockItems(fromSheet: Sheet, toSheet: Sheet, move: CellBlockMove): void {
+    const place = <K extends MovedSheetItems>(key: K, lists: { from: Sheet[K]; to: Sheet[K] }) => {
+      if (fromSheet[key] || lists.from?.length) fromSheet[key] = lists.from;
+      if (toSheet[key] || lists.to?.length) toSheet[key] = lists.to;
+    };
+    place("notes", movedNotes(fromSheet.notes ?? [], toSheet.notes ?? [], move));
+    place(
+      "hyperlinks",
+      movedHyperlinks(fromSheet.hyperlinks ?? [], toSheet.hyperlinks ?? [], move),
+    );
+    place(
+      "validationRules",
+      movedValidationRules(fromSheet.validationRules ?? [], toSheet.validationRules ?? [], move),
+    );
+    place(
+      "conditionalFormats",
+      movedConditionalFormats(
+        fromSheet.conditionalFormats ?? [],
+        toSheet.conditionalFormats ?? [],
+        move,
+      ),
+    );
+    this.windowReader.conditionalRulesChanged(fromSheet.id);
+    if (toSheet !== fromSheet) this.windowReader.conditionalRulesChanged(toSheet.id);
+
+    this.rewriteCharts((chart) =>
+      mapChartSources(chart, (range) => moveCellRange(range, move) ?? "#REF!"),
+    );
+    // A named range follows as a formula's range does; the engine moved its own copy.
+    for (const namedRange of [...(this.workbook.namedRanges ?? [])]) {
+      if (!namedRange.range) continue;
+      const range = moveCellRange(namedRange.range, move);
+      if (range && range !== namedRange.range) this.upsertMovedNamedRange({ ...namedRange, range });
+    }
+    this.refreshNamedFormulas();
+  }
+
+  /** Whether every cell of the block is loaded, so a move can read and write it. */
+  private blockLoaded(range: Range): boolean {
+    if (!this.sheets.handles.has(range.sheet) || !this.isPaged(range.sheet)) return true;
+    return this.isRangeFullyLoaded(range);
+  }
+
+  /**
    * Cell-level effects of a row permutation, for listeners that ask for them
    * (such as a row bridge). Other listeners read the operation's range.
    */
@@ -4316,13 +4545,14 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!canAddSheetName(name)) return false;
+    if (!operationAcceptsSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,
       name: name.name,
       ...dashboardFields(snapshot),
       visibility: snapshot.visibility,
+      tabColor: snapshot.tabColor,
       rowCount: snapshot.rowCount,
       columns: snapshot.columns.map((column) => ({ ...column })),
       frozenRows: snapshot.frozenRows,

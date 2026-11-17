@@ -105,7 +105,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Home | Move to A1. |
 | Ctrl/Cmd + End | Move to the last used cell: the lowest used row of the rightmost used column. |
 | Shift + any of the above | Extend the selection from its moving corner; the active cell stays. |
-| Enter / Shift + Enter | Move the active cell down / up. Inside a selected range it moves within the range. |
+| Enter / Shift + Enter | Move the active cell down / up. Inside a selected range it moves within the range. After a run of Tab moves, Enter goes to the next row in the column where the run started, as in Excel. |
 | Tab / Shift + Tab | Move the active cell right / left, within a selected range. |
 | Ctrl/Cmd + Space / Shift + Space | Select the active cell's column / row. |
 | Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
@@ -113,14 +113,31 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule. |
 | Delete | Clear the selected cells. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
-| A printable character | Start editing the active cell, replacing its content. |
+| A printable character | Start editing the active cell, replacing its content. A text entry may be completed from the column ([AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete)). |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
+| Ctrl + Page Down / Ctrl + Page Up | Move to the next / previous visible sheet. Browsers keep these keys for their own tabs, so Ctrl + Alt + Page Down / Page Up, Excel for the web's keys, do the same. |
+| Shift + F11 | Insert an empty sheet before the active one and make it active, as Excel does. |
 | Ctrl/Cmd + Shift + L | Turn the AutoFilter on for the current range, or off. |
+| Ctrl/Cmd + 1 | Open Format Cells: Number, Alignment, Font, Border and Fill. |
+| Ctrl/Cmd + Shift + ~ | Apply the General number format. |
+| Ctrl/Cmd + Shift + ! | Apply the Number format, `#,##0.00`. |
+| Ctrl/Cmd + Shift + @ | Apply the Time format, `h:mm AM/PM`. |
+| Ctrl/Cmd + Shift + # | Apply the Date format, `d-mmm-yy`. |
+| Ctrl/Cmd + Shift + $ | Apply the Currency format, `$#,##0.00_);($#,##0.00)`. |
+| Ctrl/Cmd + Shift + % | Apply the Percentage format, `0%`. |
+| Ctrl/Cmd + Shift + ^ | Apply the Scientific format, `0.00E+00`. |
+| Ctrl/Cmd + 9 / Ctrl/Cmd + Shift + 9 | Hide the selected rows / show the hidden rows inside the selection. |
+| Ctrl/Cmd + 0 / Ctrl/Cmd + Shift + 0 | Hide the selected columns / show the hidden columns inside the selection. |
+| Ctrl/Cmd + + (Ctrl/Cmd + Shift + = or the keypad +) / Ctrl/Cmd + - | Insert / delete. Whole selected rows or columns are inserted above or left, or deleted, at once; for any other range a dialog asks for entire rows or entire columns. |
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
+
+From code, `grid.actions.insertCells()` and `grid.actions.deleteCells()` insert or delete before they return, without a dialog, as Excel's `Range.Insert` and `Range.Delete` do in a macro. For a range that is neither whole rows nor whole columns, `{ entire: "row" }` or `{ entire: "column" }` chooses; without it, a range at least as wide as it is tall takes entire rows and a taller one entire columns, the choice Excel's dialog starts on. `{ ask: true }` opens the dialog, as the keys do.
+
+In a dialog the grid opens, such as the merge warning, Tab and Shift + Tab move between its controls and stay inside it, Enter chooses OK, and Escape cancels. The grid has focus again when the dialog closes.
 
 ## Rebind an action
 
@@ -184,7 +201,7 @@ Pressing Mod+Shift+O logs the focused cell's row.
 | `false` | Turn off all built-in keys. The host handles every key. |
 | `(e, grid) => boolean` | Intercept each keydown before the defaults. Return `true` to consume the key, or `false` to let the built-in handler continue. |
 
-The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;) and `selectAll` (Ctrl/Cmd + A). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
+The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;), `selectAll` (Ctrl/Cmd + A), `fillDown` (Ctrl/Cmd + D), `fillRight` (Ctrl/Cmd + R), `toggleFilter` (Ctrl/Cmd + Shift + L), `formatCells` (Ctrl/Cmd + 1), `formatGeneral`, `formatNumber`, `formatTime`, `formatDate`, `formatCurrency`, `formatPercent` and `formatScientific` (Ctrl/Cmd + Shift + ~, 1 to 6), `hideRows` and `unhideRows` (Ctrl/Cmd + 9, with Shift), `hideColumns` and `unhideColumns` (Ctrl/Cmd + 0, with Shift), `insertCells` (Ctrl/Cmd + Shift + = or Ctrl/Cmd and the keypad +), `deleteCells` (Ctrl/Cmd + -), `nextSheet` (Ctrl + Page Down, or with Alt), `previousSheet` (Ctrl + Page Up, or with Alt) and `insertSheet` (Shift + F11). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
 
 ## Edge cases and limits
 

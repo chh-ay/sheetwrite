@@ -125,15 +125,17 @@ test("sheet tabs rename, add and reorder by keyboard, and the host syncs every c
 }) => {
   await open(page);
   const ordersOptions = page.getByRole("button", { name: "Options for Orders sheet" });
+  // Insert comes first in the sheet menu, as in Excel.
+  const insertOption = page.getByRole("menuitem", { name: "Insert a sheet before Orders" });
   const renameOption = page.getByRole("menuitem", { name: "Rename Orders sheet" });
   await ordersOptions.focus();
   await page.keyboard.press("ArrowDown");
-  await expect(renameOption).toBeFocused();
+  await expect(insertOption).toBeFocused();
   await page.keyboard.press("Escape");
   await expect(ordersOptions).toBeFocused();
   await expect(ordersOptions).toHaveAttribute("aria-expanded", "false");
   await page.keyboard.press("ArrowDown");
-  await expect(renameOption).toBeFocused();
+  await expect(insertOption).toBeFocused();
   // A pointer press on a focused menu must not close it first (WebKit does not
   // focus pressed buttons).
   await renameOption.click();
@@ -149,16 +151,17 @@ test("sheet tabs rename, add and reorder by keyboard, and the host syncs every c
   await editor.press("Enter");
   await expect(page.getByRole("tab", { name: "Purchase orders sheet" })).toBeVisible();
 
+  // As in Excel, the add button adds the sheet after the active one.
   await page.getByRole("button", { name: "Add sheet", exact: true }).click();
-  const added = page.getByRole("tab", { name: "Sheet 3 sheet" });
+  const added = page.getByRole("tab", { name: "Sheet3 sheet" });
   await expect(added).toHaveAttribute("aria-selected", "true");
   await added.focus();
-  await page.keyboard.press("Control+Shift+ArrowLeft");
+  await page.keyboard.press("Control+Shift+ArrowRight");
   expect(
     await page.evaluate(() =>
       window.__sheetwriteVueWorkbench?.grid.store.getWorkbook().sheets.map((sheet) => sheet.name),
     ),
-  ).toEqual(["Purchase orders", "Sheet 3", "Suppliers"]);
+  ).toEqual(["Purchase orders", "Suppliers", "Sheet3"]);
 
   await expect(page.getByTestId("pending-count")).toHaveText("3");
   await page.getByRole("tab", { name: "Persistence", exact: true }).click();

@@ -76,16 +76,38 @@ Commit and navigation keys:
 
 | Key | Result |
 | --- | --- |
-| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. |
-| Tab / Shift + Tab | Commit, move **right** / **left**, within a selected range. |
+| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. After a run of Tab entries, Enter goes to the next row in the column where the run started, so you can type a table row by row. Accepts an [AutoComplete](#autocomplete) completion. |
+| Tab / Shift + Tab | Commit, move **right** / **left**, within a selected range. Accepts an AutoComplete completion. |
 | Ctrl/Cmd + Enter | Commit and stay. With a range selected, write the entry into every selected cell; relative references shift. |
 | Alt + Enter | Insert a line break. |
 | Arrow keys | Enter mode: commit and move, or in a formula after an operator, point at a cell (Shift extends the reference). Edit mode: move the caret. |
 | F4 | Cycle the reference at the caret through `A1`, `$A$1`, `A$1` and `$A1`. |
+| Backspace / Delete | Delete a character, or the text AutoComplete added. |
 | Escape | Cancel the edit. |
-| Blur (click away) | Commit in place. |
+| Blur (click away) | Commit in place. A formula with a problem stays open (see below). |
 
 While the IME is composing, keystrokes belong to the composition. The grid does not treat them as navigation. Editing emits `edit-begin` and `edit-commit` events.
+
+### A formula with a problem
+
+As in Excel, each of these keys checks a formula before it stores it ([How to avoid broken formulas](https://support.microsoft.com/en-us/excel/how-to-avoid-broken-formulas-in-excel)):
+
+- When only closing parentheses are missing at the end, they are added: `=SUM(A1:A3` stores `=SUM(A1:A3)`.
+- Any other syntax error stores nothing. A message says "There's a problem with this formula." and names the problem, for example "This ) has no matching (.". After OK the edit stays open with the problem selected, so you can fix it; Escape cancels the edit as usual. Enter in the formula bar does the same, and the bar keeps the focus.
+
+An unknown function name is not a syntax error: `=SUMM(A1:A3)` is stored and the cell shows `#NAME?`, as in Excel.
+
+### AutoComplete
+
+As in Excel, typing a text entry completes it from the entries in the same column ([Automatically complete or not complete entries in cells](https://support.microsoft.com/en-us/office/turn-automatic-completion-of-cell-entries-on-or-off-0f4aa749-b927-4ff3-a8e0-28d6e2e4d4b4)). The grid reads the distinct text values of the filled cells directly above and below the edited cell, up to the first empty cell each way and at most 100,000 rows each way. The engine reads them once per edit, on the first typed character. When exactly one of them begins with what you typed, ignoring letter case, the editor shows the rest of it selected:
+
+- Enter, Tab, Ctrl/Cmd + Enter, an arrow key in Enter mode or clicking away stores the completed entry, in the entry's own letter case.
+- Backspace or Delete removes the added text; typing on replaces it and completes again.
+- Nothing is completed when you type a formula, a number, a date or a logical value, or when no entry or more than one entry begins with the typed text. Numbers, dates and logical values in the column are never entries.
+- During IME composition nothing is completed; the composed text is completed when the composition ends. Formula help, the function list after `=`, is separate: AutoComplete never acts on a formula.
+- The code loads with the first edit, so the grid's first load does not carry it; the edit a key opened is completed as soon as it arrives.
+
+Excel turns AutoComplete off with **Enable AutoComplete for cell values**. In Sheetwrite the host sets `config: { autoComplete: false }`; `setConfig` turns it on or off for the next edit.
 
 ### Event order
 
@@ -110,9 +132,25 @@ Paste prefers the private Sheetwrite payload, then sanitized HTML tables, then p
 - TSV handles quoted, multi-line fields, the same as Excel and Google Sheets.
 - External text that begins with `=`, `+`, `-`, `@`, tab, or CR gets a single-quote prefix, so it cannot become an executable formula.
 
-`paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose. Cut clears its source only after the system clipboard accepts the payload.
+`paste()` keeps supported formula and style data. `pasteValues()` writes resolved literals and drops formulas and styles on purpose.
 
 Paste lands on the top-left cell of the selection. When the selection is a whole multiple of the copied block, the block repeats to fill it and each copy's relative references shift to its own place, as in Excel.
+
+### Cut and paste moves cells
+
+Cut and paste works as in Excel ([Move or copy cells and cell contents](https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e)):
+
+- Cut changes nothing. It writes the cells to the system clipboard and marks them with a moving dashed border (still dashes when the user asks for reduced motion).
+- Paste moves the cells to the top-left cell of the selection, on this sheet or another one: values, formulas, formats, notes, hyperlinks and merged cells. The cells it leaves are emptied, and the cells it lands on are replaced.
+- Validation and conditional-format rules whose range lies inside the cut cells move with them. A conditional-format formula follows the moved cells as a moved formula does. A rule whose whole range the paste lands on goes; a rule the paste covers only in part keeps its range.
+- Every formula, defined name and chart that refers to a moved cell now refers to its new place. A reference to a cell that the paste replaced becomes `#REF!`.
+- A formula inside the moved block keeps pointing at the same cells: its relative references do not shift as they do after a copy.
+- A range that the block covers only in part changes only when the block holds a whole edge of it and moves along it, as in Excel: with `=SUM(A1:A10)`, moving A10 to A15 gives `=SUM(A1:A15)`.
+- The move is one `moveCells` operation, so it is one undo step and reaches collaborators as one change.
+
+The cut ends without a move when the user presses Esc, starts an edit, makes any other change, copies or cuts again, or when a change moves rows or cells on its sheet. A cut that was pasted or ended does not paste again; `paste()` resolves `"empty"`. When the clipboard holds something else by the time of the paste, for example text copied in another app, the paste is a plain paste and the cut ends. Pasting the cut in another app gives its values and leaves the cells in place.
+
+As in Excel, where Paste Special is not available after a cut, `pasteValues()` does nothing while a cut waits; it resolves `"empty"` and the cut stays. A move that would cut through a merged cell, a table, a pivot table or a spill range changes nothing, and so does a paste whose rows a sorted view splits.
 
 ### Report the clipboard outcome
 
@@ -169,6 +207,7 @@ grid.on("mutation-rejected", ({ issues }) => {
 - Stock, validation, and custom editors keep the underlying document cell while sorting or filtering changes its visible position. Completion writes that same cell, not the row that now occupies the old position.
 - If the edited cell leaves the view, or the sheet structure changes, the grid cancels the editor.
 - Paste does nothing when `readOnly` is on; it resolves `"empty"`.
+- Cut on a read-only grid copies: nothing is marked or moved.
 - An undo that is too large to send changes nothing and leaves the history; see [Undo a large clear](#undo-a-large-clear).
 
 ## See also

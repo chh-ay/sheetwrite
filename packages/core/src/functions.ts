@@ -9,13 +9,17 @@ export {
   analyzeFormula,
   type FormulaAnalysis,
   type FormulaCall,
-  type FormulaCellPosition,
   type FormulaCompletion,
+  type FormulaCompletionItem,
+  type FormulaCompletionKind,
   type FormulaDiagnostic,
-  type FormulaReference,
+  type FormulaNames,
+  type FormulaTableNames,
   type FormulaToken,
   type FormulaTokenKind,
 } from "./formula-analysis.js";
+
+export type { FormulaCellPosition, FormulaReference } from "./formula-references.js";
 
 export {
   previewFormula,
@@ -26,6 +30,7 @@ export {
 
 export type {
   FormulaArgument,
+  FormulaArgumentChoice,
   FormulaArgumentMetadata,
   FormulaFunction,
   FormulaFunctionMetadata,

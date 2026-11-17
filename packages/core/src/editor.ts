@@ -6,9 +6,10 @@ import {
   readEditorFieldMetrics,
   sizeEditorTextarea,
 } from "./editor-textarea.js";
-import { toggleReferenceAnchors } from "./formula-analysis.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
+import { toggleReferenceAnchors } from "./formula-references.js";
+import { type FormulaDiagnostic, formulaEntry } from "./formula-syntax.js";
 import type { CellFormat } from "./types/cell.js";
 import type { Theme } from "./types/render.js";
 
@@ -80,6 +81,19 @@ export interface BeginEditOptions {
   onShortcut?: (event: KeyboardEvent) => boolean;
   /** An arrow key in Enter mode points from the last pointed cell by (`dRow`, `dCol`); Shift extends. */
   onPoint?: (dRow: number, dCol: number, extend: boolean) => void;
+  /**
+   * Excel's AutoComplete: completes the field's text in place, with the added
+   * text selected, and returns the entry it shows, or null. Asked after each
+   * typed character, after the key that opened the editor and after an IME
+   * composition ends.
+   */
+  complete?: (field: HTMLTextAreaElement) => string | null;
+  /**
+   * Excel refuses to store a formula that does not parse: show `message`,
+   * which explains the problem, and resolve once the user has closed it.
+   * The edit stays open meanwhile.
+   */
+  onRefuse?: (message: string) => Promise<void>;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -93,6 +107,11 @@ interface EditorSizing {
 /** Whether focus moving to `target` keeps the edit open in another surface. */
 function isEditSurface(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(`[${EDIT_SURFACE_ATTRIBUTE}]`) !== null;
+}
+
+/** Whether `event` typed text, not deleted, pasted or composed it. */
+function typedText(event: Event): boolean {
+  return event instanceof InputEvent && !event.isComposing && event.inputType === "insertText";
 }
 
 /**
@@ -116,6 +135,13 @@ export class EditController {
   private sizing: EditorSizing | null = null;
   /** Excel's Enter mode; see {@link BeginEditOptions.entering}. */
   private entering = false;
+  /**
+   * The entry AutoComplete shows, while the text still reads as it; a commit
+   * then stores the entry's own letter case, as Excel does.
+   */
+  private completion: string | null = null;
+  /** A refused formula's message is open: commits and blur wait for it. */
+  private refusing = false;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -172,6 +198,8 @@ export class EditController {
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
     }
+    // The key that opened the editor is the first typed character.
+    if (opts.focus && opts.entering) this.autoComplete(ta);
     if (opts.focus) this.attachAssist();
   }
 
@@ -185,6 +213,7 @@ export class EditController {
     if (ta.value !== value) {
       ta.value = value;
       this.refStart = -1;
+      this.completion = null;
       // Mirrored text resizes only when it gains or loses a line, so typing
       // in the other surface lays this one out only at a line break.
       if (this.sizing?.lines !== lineCount(value)) this.resize();
@@ -276,14 +305,21 @@ export class EditController {
     this.opts?.onText(ta.value);
   }
 
-  private readonly onInput = (): void => {
+  private readonly onInput = (event: Event): void => {
     const ta = this.textarea;
     if (!ta) return;
     this.refStart = -1;
+    this.completion = null;
+    if (!this.composing && typedText(event)) this.autoComplete(ta);
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
   };
+
+  /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
+  private autoComplete(ta: HTMLTextAreaElement): void {
+    this.completion = this.opts?.complete?.(ta) ?? null;
+  }
 
   /** The user moved into the cell editor: formula help follows the caret here. */
   private readonly onFocus = (): void => {
@@ -313,13 +349,65 @@ export class EditController {
     this.sizing = { width: ta.style.width, minimumHeight, lines: lineCount(ta.value) };
   }
 
-  commit(navigate: EditNavigate): void {
+  /**
+   * Store the text and close the editor. A formula that does not parse is
+   * not stored, as in Excel: the editor stays open and false is returned.
+   * Missing closing parentheses at the end are added, as Excel adds them.
+   */
+  commit(navigate: EditNavigate): boolean {
     const opts = this.opts;
     const ta = this.textarea;
-    if (!opts || !ta) return;
-    const value = ta.value;
+    if (!opts || !ta || this.refusing) return false;
+    const completion = this.completion;
+    let value =
+      completion !== null && ta.value.toLowerCase() === completion.toLowerCase()
+        ? completion
+        : ta.value;
+    const formula = value.trim();
+    if (formula.length > 1 && formula.startsWith("=")) {
+      const entry = formulaEntry(formula);
+      if (typeof entry !== "string") {
+        this.refuse(entry, value.length - value.trimStart().length);
+        return false;
+      }
+      value = entry;
+    }
     this.teardown();
     opts.onCommit(value, navigate);
+    return true;
+  }
+
+  /**
+   * Excel's answer to a formula that does not parse: the message, then the
+   * problem selected in the field the user committed from (this editor or a
+   * formula bar), so they can fix it. `offset` is the blank space before the
+   * formula, which `problem`'s offsets do not count.
+   */
+  private refuse(problem: FormulaDiagnostic, offset: number): void {
+    const ta = this.textarea;
+    if (ta === null) return;
+    const active = document.activeElement;
+    const field =
+      isEditSurface(active) &&
+      (active instanceof HTMLTextAreaElement || active instanceof HTMLInputElement)
+        ? active
+        : ta;
+    const show = (): void => {
+      if (this.textarea !== ta) return;
+      this.refusing = false;
+      field.focus();
+      field.setSelectionRange(problem.from + offset, problem.to + offset);
+    };
+    const message = this.opts?.onRefuse?.(problem.message);
+    if (message === undefined) {
+      show();
+      return;
+    }
+    this.refusing = true;
+    void message.then(show, (error: unknown) => {
+      show();
+      throw error;
+    });
   }
 
   cancel(): void {
@@ -335,11 +423,32 @@ export class EditController {
 
   private readonly onCompositionStart = (): void => {
     this.composing = true;
+    this.completion = null;
   };
 
   private readonly onCompositionEnd = (): void => {
     this.composing = false;
+    // Browsers differ on whether the composed text's input event comes before
+    // or after compositionend; complete once both have passed.
+    const ta = this.textarea;
+    setTimeout(() => {
+      if (this.textarea === ta) this.completeNow();
+    }, 0);
   };
+
+  /**
+   * Complete the typed text now: after an IME composition, or when
+   * AutoComplete's code arrives after the key that opened the editor.
+   */
+  completeNow(): void {
+    const ta = this.textarea;
+    if (ta === null || this.composing || this.completion !== null) return;
+    const before = ta.value;
+    this.autoComplete(ta);
+    if (ta.value === before) return;
+    this.resize();
+    this.opts?.onText(ta.value);
+  }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // While the IME is composing, every keystroke belongs to the composition.
@@ -392,7 +501,7 @@ export class EditController {
   };
 
   private readonly onBlur = (event: FocusEvent): void => {
-    if (!this.textarea || this.tearingDown) return;
+    if (!this.textarea || this.tearingDown || this.refusing) return;
     // Moving into a formula bar keeps the edit open there, as in Excel.
     if (isEditSurface(event.relatedTarget)) {
       this.detachAssist();
@@ -422,6 +531,8 @@ export class EditController {
     this.metricsLineHeight = "";
     this.sizing = null;
     this.entering = false;
+    this.completion = null;
+    this.refusing = false;
     this.tearingDown = false;
   }
 }

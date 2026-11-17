@@ -1,9 +1,11 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
+import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
+import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import {
@@ -17,6 +19,7 @@ import type { Keymap } from "./keymap.js";
 import { filterButtonRect } from "./overlay-painter.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
+import type { SheetKey } from "./sheet-commands.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
@@ -50,11 +53,16 @@ const MODIFIER_KEYS: Readonly<Record<string, true>> = {
   Meta: true,
 };
 
-/** Whether a number format shows a date (day or year parts), so one cell fills by days. */
-function showsDate(format: string | undefined): boolean {
-  if (format === undefined) return false;
+/**
+ * Whether a number format shows a date (day or year parts), so one cell fills
+ * by days, or only a time, so one cell fills by hours.
+ */
+function dateKind(format: string | undefined): "date" | "time" | null {
+  if (format === undefined) return null;
   const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
-  return /[dy]/i.test(visible) && !/[#0?]/.test(visible);
+  if (/[#0?]/.test(visible)) return null;
+  if (/[dy]/i.test(visible)) return "date";
+  return /[hs]/i.test(visible) || /\[[hms]+\]/i.test(format) ? "time" : null;
 }
 
 interface InteractionDependencies {
@@ -75,6 +83,15 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
+  /**
+   * Run a key's command from `cell-commands.ts` or, for the keys that switch
+   * sheets, `sheet-commands.ts`.
+   */
+  keyCommand: (command: CellCommand | SheetKey) => void;
+  /** Hold a key pressed while lazily loaded UI's code loads; false when none loads. */
+  holdKey: (e: KeyboardEvent) => boolean;
+  /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
+  autoComplete: () => boolean;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -148,7 +165,11 @@ interface InteractionDependencies {
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Runs before a cell editor opens; hides the note card that would cover it. */
   onEditStart: () => void;
+  /** Ends the cut that waits for a paste; returns whether there was one. */
+  cancelCut: () => boolean;
   readOnly: () => boolean;
+  /** Where the grid's dialogs open, such as the message for a formula that does not parse. */
+  dialogs: DialogHost;
 }
 
 /**
@@ -170,6 +191,16 @@ export class InteractionSessions {
   private fillTarget: SelRect | null = null;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /**
+   * Excel's Tab run: the cell a run of Tab moves left active, and the column
+   * the run started in, where the next Enter goes. Any other move ends it.
+   */
+  private tabRun: { readonly row: number; readonly col: number; readonly start: number } | null =
+    null;
+  /** AutoComplete's code, once the first edit has loaded it. */
+  private autocomplete: typeof import("./autocomplete.js") | null = null;
+  /** The load of AutoComplete's code, started by the first edit. */
+  private autocompleteLoad: Promise<void> | null = null;
   private dragMove: ((ev: PointerEvent) => void) | null = null;
   private dragUp: ((ev: PointerEvent) => void) | null = null;
   private dragCancel: ((ev: PointerEvent) => void) | null = null;
@@ -278,8 +309,39 @@ export class InteractionSessions {
     }
   }
 
+  /**
+   * Excel's AutoComplete for an edit of view row `row` in `col` (see
+   * `autocomplete.ts`). Its code loads with the first edit; while it loads,
+   * nothing is completed, and once it arrives the edit that a key opened is
+   * completed at once. Hosts that turn AutoComplete off get no completion.
+   */
+  private completion(
+    row: number,
+    col: number,
+    typed: boolean,
+  ): ((field: HTMLTextAreaElement) => string | null) | undefined {
+    if (!this.deps.autoComplete()) return undefined;
+    if (this.autocomplete === null) {
+      const generation = this.generation;
+      this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
+        this.autocomplete = module;
+        if (typed && this.generation === generation) this.editor.completeNow();
+      });
+    }
+    let complete: ((field: HTMLTextAreaElement) => string | null) | undefined;
+    return (field) =>
+      (complete ??= this.autocomplete?.editCompletion(this.deps, row, col))?.(field) ?? null;
+  }
+
+  /**
+   * The editor's accessible name: the column and the row number the row
+   * header shows, the sheet row under a filter and the view position under a
+   * view sort.
+   */
   private editorLabel(row: number, col: number): string {
-    return `Edit ${this.deps.columnHeader(col)}, row ${row + 1}`;
+    const sorted = (this.deps.sheet().sortKeys?.length ?? 0) > 0;
+    const shown = sorted ? row : this.deps.toDataRow(row);
+    return `Edit ${this.deps.columnHeader(col)}, row ${shown + 1}`;
   }
 
   private editorRect(
@@ -292,11 +354,19 @@ export class InteractionSessions {
     return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
   }
 
-  /** Put the reference from `anchor` to `end` into the editor, replacing a picked one. */
+  /**
+   * Put the reference from view cell `anchor` to `end` into the editor,
+   * replacing a picked one. It names sheet rows: under a sort or filter view
+   * the pointed cell's row in the sheet, as in Excel.
+   */
   private pointAt(anchor: CellRef, end: CellRef): void {
     this.pointAnchor = anchor;
     this.pointEnd = end;
-    this.editor.setReference(rangeA1(anchor, end));
+    const sheetCell = (cell: CellRef): CellRef => ({
+      row: this.deps.toDataRow(cell.row),
+      col: cell.col,
+    });
+    this.editor.setReference(rangeA1(sheetCell(anchor), sheetCell(end)));
   }
 
   /**
@@ -497,9 +567,20 @@ export class InteractionSessions {
       onText: (value) => this.deps.editDraft.text(value),
       onShortcut: (event) => this.runCustomShortcut(event, true),
       onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
+      complete: this.completion(editCell.row, editCell.col, initial !== undefined),
+      onRefuse: (message) => this.refuseFormula(message),
     });
-    // A formula bar showing the draft starts from the opened text.
-    this.deps.editDraft.text(text);
+    // A formula bar showing the draft starts from the opened text, completed or not.
+    this.deps.editDraft.text(this.editor.value);
+  }
+
+  /** Excel's message for a formula that does not parse, with what is wrong with it. */
+  private async refuseFormula(problem: string): Promise<void> {
+    const { alertDialog } = await import("./dialog.js");
+    await alertDialog(this.deps.dialogs, {
+      title: "Formula",
+      message: `There's a problem with this formula. ${problem}`,
+    });
   }
 
   /**
@@ -519,9 +600,12 @@ export class InteractionSessions {
     return true;
   }
 
-  /** Commit the open cell edit in place, as Enter does in a formula bar. */
-  commitEdit(): void {
-    if (this.activeEditor === this.editor) this.editor.commit("none");
+  /**
+   * Commit the open cell edit in place, as Enter does in a formula bar. False
+   * when the edit stays open: its formula does not parse.
+   */
+  commitEdit(): boolean {
+    return this.activeEditor !== this.editor || this.editor.commit("none");
   }
 
   /** Cancel the open cell edit; both the editor and any formula bar show the stored value again. */
@@ -1059,6 +1143,30 @@ export class InteractionSessions {
     );
   }
 
+  /**
+   * Act on a key that waited while a command's code loaded, where the focus
+   * is now: on the grid as usual, as text in a field the command focused, or
+   * at the element that has the focus.
+   */
+  replayKey(e: KeyboardEvent): void {
+    const target = document.activeElement;
+    // Nothing focused, or the grid: the key acts on the grid, which it was pressed on.
+    if (!target || target === this.deps.host || target === document.body) {
+      this.onKeyDown(e);
+    } else if (
+      (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) &&
+      e.key.length === 1 &&
+      !e.ctrlKey &&
+      !e.metaKey &&
+      !e.altKey
+    ) {
+      target.setRangeText(e.key, target.selectionStart ?? 0, target.selectionEnd ?? 0, "end");
+      target.dispatchEvent(new Event("input", { bubbles: true }));
+    } else {
+      target.dispatchEvent(new KeyboardEvent("keydown", e));
+    }
+  }
+
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // The inline editor keeps its keys and forwards host shortcuts itself.
     if (this.isEditing) return;
@@ -1073,6 +1181,11 @@ export class InteractionSessions {
         target instanceof HTMLTextAreaElement ||
         (target instanceof HTMLElement && target.isContentEditable));
     if (inEditableWidget) return;
+    // A key pressed while a command loads its code acts after that command.
+    if (this.deps.holdKey(e)) {
+      e.preventDefault();
+      return;
+    }
 
     // Headless hosts own the keymap: a handler intercepts first and consumes
     // by returning true; `false` drops every stock binding but keeps the
@@ -1178,6 +1291,10 @@ export class InteractionSessions {
         case "toggleFilter":
           this.deps.grid.actions.toggleAutoFilter();
           break;
+
+        default:
+          // The format, hide, insert, Format Cells and sheet keys.
+          this.deps.keyCommand(action);
       }
 
       return;
@@ -1298,6 +1415,11 @@ export class InteractionSessions {
         this.beginEdit(focus.row, focus.col, "");
         break;
 
+      case "Escape":
+        // Esc ends a cut's moving border, as in Excel.
+        if (!this.deps.cancelCut()) return;
+        break;
+
       default:
         if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {
           this.beginEdit(focus.row, focus.col, e.key, false);
@@ -1312,20 +1434,25 @@ export class InteractionSessions {
   /**
    * Enter and Tab: move the active cell one step. Inside a selection of
    * several cells the active cell wraps within it and the selection stays,
-   * as in Excel; otherwise it moves to the next visible cell.
+   * as in Excel; otherwise it moves to the next visible cell, and Enter after
+   * a run of Tab moves goes to the column where the run started.
    */
   private moveActiveCell(dRow: -1 | 0 | 1, dCol: -1 | 0 | 1): void {
     const selection = this.deps.selection();
     const focus = selection.focusCell;
     if (!focus) return;
+    const run = this.tabRun;
+    this.tabRun = null;
     const rect = this.activeRect();
     if (rect === null || (rect.r0 === rect.r1 && rect.c0 === rect.c1)) {
-      this.navigate(
-        focus,
-        focus.row + dRow,
-        dCol === 0 ? undefined : this.deps.nextVisibleCol(focus.col, dCol),
-        false,
-      );
+      const inRun = run !== null && run.row === focus.row && run.col === focus.col;
+      const start = inRun ? run.start : focus.col;
+      let col: number | undefined;
+      if (dCol !== 0) col = this.deps.nextVisibleCol(focus.col, dCol);
+      else if (dRow > 0 && inRun) col = start;
+      this.navigate(focus, focus.row + dRow, col, false);
+      const moved = this.deps.selection().focusCell;
+      if (dCol !== 0 && moved) this.tabRun = { row: moved.row, col: moved.col, start };
       return;
     }
 
@@ -1706,7 +1833,7 @@ export class InteractionSessions {
       return {
         resolved: read.resolved,
         style: read.style,
-        isDate: showsDate(read.style.numberFormat) || columns[coordinate.col]?.type === "date",
+        kind: columns[coordinate.col]?.type === "date" ? "date" : dateKind(read.style.numberFormat),
         formula: cell
           ? cell.value.kind === "formula"
             ? cell.value.src
@@ -1737,7 +1864,12 @@ export class InteractionSessions {
       const [from, to] = vertical ? [source.r0, source.r1] : [source.c0, source.c1];
       for (let along = from; along <= to; along++) {
         const cell = vertical ? sourceAt(along, line) : sourceAt(line, along);
-        cells.push({ value: cell.resolved, isFormula: cell.formula !== null, isDate: cell.isDate });
+        cells.push({
+          value: cell.resolved,
+          isFormula: cell.formula !== null,
+          isDate: cell.kind === "date",
+          isTime: cell.kind === "time",
+        });
       }
       series.set(line, detectFillSeries(cells, options));
     }

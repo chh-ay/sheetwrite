@@ -36,6 +36,12 @@ describe("XLSX worksheet lifecycle fidelity", () => {
     await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
   });
 
+  it("opens and saves a sheet named History, which only a rename refuses", async () => {
+    const imported = await backend.fromXlsxWorkbook(rawNamed("History"));
+    expect(imported.sheets[0]?.name).toBe("History");
+    await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
   it("round-trips visible, hidden, and veryHidden states with a visible activeTab fallback", async () => {
     const { warnings, onWarning } = collectWarnings();
     const bytes = await backend.toXlsxWorkbook(
@@ -78,6 +84,16 @@ describe("XLSX worksheet lifecycle fidelity", () => {
       }),
     );
     expect(hiddenActive.workbook.activeSheet).toBe(sheetAt(hiddenActive, 1).id);
+  });
+
+  it("reads and writes Excel's tab colors", async () => {
+    const bytes = await backend.toXlsxWorkbook(
+      book([sheet("s0", "Sales", [], { tabColor: "#C00000" }), named("s1", "Costs")]),
+    );
+    expect(partText(bytes, "xl/worksheets/sheet1.xml")).toContain('<tabColor rgb="FFC00000"/>');
+    expect(partText(bytes, "xl/worksheets/sheet2.xml")).not.toContain("tabColor");
+    const imported = await backend.fromXlsxWorkbook(bytes);
+    expect(imported.sheets.map((entry) => entry.tabColor)).toEqual(["#C00000", undefined]);
   });
 
   it("gives a sheet inserted before a known sheet its own identity", async () => {

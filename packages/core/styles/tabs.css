@@ -61,6 +61,8 @@
   font-weight: 550;
   background: transparent;
   color: var(--sheetwrite-tab-fg, #5f6368);
+  /* Excel's tab color is a bar under the tab text, so the text keeps its contrast. */
+  box-shadow: inset 0 -3px 0 var(--sheetwrite-tab-color, transparent);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -81,7 +83,9 @@
 }
 
 .sheetwrite-tab:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
+  box-shadow:
+    inset 0 -3px 0 var(--sheetwrite-tab-color, transparent),
+    inset 0 0 0 2px var(--sheetwrite-tab-focus, var(--sheetwrite-tab-active-fg, #1a73e8));
 }
 
 .sheetwrite-tab-options-button:focus-visible,
@@ -181,7 +185,9 @@
 }
 
 .sheetwrite-tab-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   min-height: 28px;
   border: 1px solid transparent;
@@ -193,6 +199,13 @@
   font: inherit;
   text-align: start;
   white-space: nowrap;
+}
+
+/* The icon column: a glyph from icons.css, or an empty slot that keeps labels aligned. */
+.sheetwrite-tab-menu-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
 }
 
 .sheetwrite-tab-menu-item:hover,
@@ -308,4 +321,61 @@
   .sheetwrite-tab {
     transition: none;
   }
+}
+
+.sheetwrite-tab-colors {
+  display: grid;
+  grid-template-columns: repeat(5, 24px);
+  gap: 4px;
+  min-width: 0;
+}
+
+.sheetwrite-tab-swatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.sheetwrite-tab-swatch[aria-checked="true"],
+.sheetwrite-tab-swatch:focus-visible {
+  outline: 2px solid var(--sheetwrite-tab-active-fg, #1a73e8);
+  outline-offset: 1px;
+}
+
+.sheetwrite-tab-swatch-none {
+  grid-column: 1 / -1;
+  width: auto;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.sheetwrite-tab-dialog {
+  display: grid;
+  gap: 8px;
+  min-width: 12rem;
+  padding: 8px;
+}
+
+.sheetwrite-tab-dialog select,
+.sheetwrite-tab-dialog-button {
+  font: inherit;
+}
+
+.sheetwrite-tab-dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.sheetwrite-tab-dialog-button {
+  padding: 4px 12px;
+  border: 1px solid var(--sheetwrite-tab-border, var(--sheetwrite-grid-line, #eeeeee));
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
 }

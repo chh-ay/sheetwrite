@@ -112,6 +112,64 @@ describe("SheetTabs", () => {
     expect(menu?.getAttribute("aria-label")).toBe("Summary sheet options");
   });
 
+  it("offers Insert, Move or Copy and Tab Color in a sheet's menu, as Excel does", () => {
+    const calls: string[] = [];
+    const panel = document.createElement("div");
+    panel.className = "sheetwrite-tab-menu";
+    panel.appendChild(document.createElement("button"));
+    tabs.destroy();
+    tabs = new SheetTabs(host, {
+      onActivate: () => {},
+      onAdd: (index) => {
+        calls.push(`add:${index}`);
+        return applied("new");
+      },
+      onCommand: (command, id) => {
+        calls.push(`${command}:${id}`);
+        tabs.showPanel(id, panel);
+      },
+    });
+    tabs.update(SHEETS, "b");
+    const choose = (label: string): void => {
+      host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
+      const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
+      // Each item shows its glyph from the command icon sheet.
+      const items = [...menu.querySelectorAll("button")].map((item) => [
+        item.textContent,
+        item.querySelector<HTMLElement>(".sheetwrite-icon")?.dataset.icon,
+      ]);
+      expect(items).toEqual([
+        ["Insert", "insertSheet"],
+        ["Move or Copy…", "moveCopySheet"],
+        ["Tab Color…", "tabColor"],
+      ]);
+      menu.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
+    };
+
+    // Insert adds a sheet at the sheet's own position, so before it.
+    choose("Insert a sheet before Sales");
+    expect(host.querySelector('[role="menu"]')).toBeNull();
+
+    // The panels show in place of the menu, and close as it does.
+    choose("Move or copy Sales sheet");
+    expect(host.querySelector(".sheetwrite-tab-options > .sheetwrite-tab-menu")).toBe(panel);
+    const inPanel = panel.querySelector("button")!;
+    inPanel.focus();
+    key(inPanel, "Escape");
+    expect(panel.isConnected).toBe(false);
+    choose("Tab color for Sales sheet");
+    expect(panel.isConnected).toBe(true);
+
+    expect(calls).toEqual(["add:1", "moveCopy:b", "tabColor:b"]);
+  });
+
+  it("shows a sheet's tab color", () => {
+    tabs.update([{ ...SHEETS[0]!, tabColor: "#C00000" }, SHEETS[1]!, SHEETS[2]!], "b");
+    const colored = tabButtons(host)[0]!;
+    expect(colored.style.getPropertyValue("--sheetwrite-tab-color")).toBe("#C00000");
+    expect(tabButtons(host)[1]!.style.getPropertyValue("--sheetwrite-tab-color")).toBe("");
+  });
+
   it("does not remove the last visible sheet or remove a tab with Backspace", () => {
     tabs.destroy();
     const removed: string[] = [];

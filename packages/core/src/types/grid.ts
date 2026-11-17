@@ -206,8 +206,12 @@ export interface GridActions {
   setNumberFormat(code: string | null): void;
   /** Show one more (1) or one fewer (-1) decimal place than the focus cell does. */
   stepDecimals(direction: 1 | -1): void;
-  /** Merge the selection and center its text, as one undoable step. */
-  mergeAndCenter(): void;
+  /**
+   * Merge the selection and center its text, as one undoable step. Like
+   * {@link GridActions.merge}, it applies before the call returns, or with
+   * `ask: true` asks first when more than one cell holds a value.
+   */
+  mergeAndCenter(options?: { ask?: boolean }): void;
   /** Clear the selection's contents and formatting, as one undoable step. */
   clearAll(): void;
   /**
@@ -227,8 +231,17 @@ export interface GridActions {
   freezePanes(): void;
   /** Remove the selection's cell formatting, keeping the contents. */
   clearFormat(): void;
-  /** Merge the selected range into one cell; does nothing unless a range is selected. */
-  merge(): void;
+  /**
+   * Merge the selected range into one cell, keeping only its upper-left
+   * value; does nothing unless a range is selected. The merge applies before
+   * the call returns, as Excel's `Range.Merge` does with
+   * `DisplayAlerts = False`. With `ask: true`, as the toolbar, the ribbon and
+   * the context menu pass, a range in which more than one cell holds a value
+   * asks first, as Excel's Merge does: a dialog warns that only the
+   * upper-left value stays, the merge happens after OK, and Cancel or Escape
+   * leaves the cells as they were.
+   */
+  merge(options?: { ask?: boolean }): void;
   /** Split merged cells in the selection back into single cells. */
   unmerge(): void;
   /** Quick sort of the cells around the focus cell by its column (`Grid.sortBy`). */
@@ -249,6 +262,37 @@ export interface GridActions {
   insertColumnRight(): void;
   /** Delete the focus cell's column. */
   deleteColumn(): void;
+  /**
+   * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
+   * them; with whole columns, as many columns to their left. For any other
+   * range it inserts the entire rows (`entire: "row"`) or columns
+   * (`entire: "column"`) of the range; without `entire`, rows for a range at
+   * least as wide as it is tall and columns for a taller one, the choice
+   * Excel's Insert dialog starts on. The change applies before the call
+   * returns. With `ask: true` and no `entire`, as the Ctrl++ key passes,
+   * Excel's Insert dialog asks first, and the rows or columns go in after OK.
+   * Its Shift cells right and Shift cells down choices are shown but not
+   * available yet.
+   */
+  insertCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
+  /**
+   * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
+   * any other range, its entire rows or columns, chosen as
+   * {@link GridActions.insertCells} chooses them. The change applies before
+   * the call returns; with `ask: true` and no `entire`, as the Ctrl+- key
+   * passes, Excel's Delete dialog asks first.
+   */
+  deleteCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
+  /**
+   * Ctrl+1, Format Cells. With `format`, merge `format.style` into the style
+   * of every selected cell and apply the border preset `format.border`, as
+   * one undoable step that applies before the call returns, as the dialog's
+   * OK does. Without it, open the Format Cells dialog for the selection, with
+   * Number, Alignment, Font, Border and Fill tabs, showing the active cell's
+   * format; OK applies what changed. The dialog's code loads the first time it
+   * opens. Does nothing on a read-only grid.
+   */
+  formatCells(format?: { style?: Partial<CellStyle>; border?: BorderPreset }): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
@@ -267,25 +311,24 @@ export interface GridActions {
    * Data › Filter (Ctrl+Shift+L): turn the AutoFilter on for the table, the
    * selected range or the current region around the focus cell, whose first
    * row becomes the header; or off when the sheet has one.
-   * Its code loads on first use, so the change lands a moment after the call.
    */
   toggleAutoFilter(): void;
-  /**
-   * Data › Clear: remove every column filter of the sheet; the filter buttons stay.
-   * Its code loads on first use, so the change lands a moment after the call.
-   */
+  /** Data › Clear: remove every column filter of the sheet; the filter buttons stay. */
   clearFilters(): void;
   /** Data › Reapply: filter again, after edits changed which rows match. */
   reapplyFilter(): void;
   /**
    * Filter the focus cell's column to the focus cell's value, as Excel's
    * "Filter by Selected Cell's Value"; turns the AutoFilter on first if needed.
-   * Its code loads on first use, so the change lands a moment after the call.
    */
   filterBySelection(): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
   copy(): Promise<ClipboardOutcome>;
-  /** Copy + clear the source (after the clipboard accepted). Never rejects. */
+  /**
+   * Copy the focused rectangle and mark it with a moving border; the next
+   * paste moves its cells, as in Excel. Esc or another edit ends the cut.
+   * Never rejects.
+   */
   cut(): Promise<ClipboardOutcome>;
   /** Paste at the focus cell. Never rejects. */
   paste(): Promise<ClipboardOutcome>;
@@ -408,10 +451,12 @@ export type ToolbarIcon = string | Node | (() => Node);
 /**
  * Per-glyph icon overrides, keyed by the names on the command icon sheet
  * (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
- * toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+ * toolbar, the ribbon and ribbon menus, the context menu and the sheet tab menu. Strings render
  * as plain text; DOM nodes and node factories support SVG or HTML icons. To
  * replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
  * to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
+ * The AutoFilter header buttons draw `filterArrow` and `filterActive` from the
+ * sheet itself, so only a replacement sheet changes them.
  */
 export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 
@@ -496,6 +541,9 @@ export type ContextMenuActionName =
   | "editNote"
   | "deleteNote"
   | "pivotFields"
+  | "insertCells"
+  | "deleteCells"
+  | "formatCells"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -546,7 +594,24 @@ export type KeyboardAction =
   | "selectAll"
   | "fillDown"
   | "fillRight"
-  | "toggleFilter";
+  | "nextSheet"
+  | "previousSheet"
+  | "insertSheet"
+  | "toggleFilter"
+  | "formatGeneral"
+  | "formatNumber"
+  | "formatTime"
+  | "formatDate"
+  | "formatCurrency"
+  | "formatPercent"
+  | "formatScientific"
+  | "hideRows"
+  | "unhideRows"
+  | "hideColumns"
+  | "unhideColumns"
+  | "insertCells"
+  | "deleteCells"
+  | "formatCells";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
@@ -661,7 +726,7 @@ export interface GridConfig {
    * toolbar instead.
    */
   ribbon?: boolean | RibbonConfig;
-  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
+  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus, context menu and sheet tab menu. See {@link IconOverrides}. */
   icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
   contextMenu?: boolean | ContextMenuItems;
@@ -669,6 +734,12 @@ export interface GridConfig {
   undo?: boolean;
   /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
   find?: boolean;
+  /**
+   * Excel's AutoComplete for cell values (default true): typing a text entry
+   * completes it from the entries above and below in the column. `false`
+   * turns it off, as Excel's "Enable AutoComplete for cell values" does.
+   */
+  autoComplete?: boolean;
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**
@@ -780,12 +851,18 @@ export interface GridOptions {
   addons?: SheetwriteAddonSettings;
 }
 
-/** Case, whole-cell, sheet, and column constraints for grid search. */
+/** Case, whole-cell, Look in, sheet, and column constraints for grid search. */
 export interface SearchOptions {
   /** Case-sensitive match (default false). */
   matchCase?: boolean;
   /** Match only when the whole cell text equals the query (default false: substring). */
   wholeCell?: boolean;
+  /**
+   * What a formula cell is searched by, as in Excel's "Look in": its formula
+   * text (`"formulas"`, the default) or its result (`"values"`). Replace
+   * rewrites formula text only when looking in formulas.
+   */
+  lookIn?: "formulas" | "values";
   /** Restrict to a sheet (defaults to the active sheet). */
   sheet?: SheetId;
   /** Restrict to these column indices (defaults to all columns). */
@@ -1154,6 +1231,23 @@ export interface Grid {
   showRows(rows?: readonly number[]): void;
   /** Currently hidden data rows on the active sheet. */
   hiddenRows(): readonly number[];
+  /**
+   * The sheet row, zero-based, that view row `viewRow` shows on the active
+   * sheet. Selections, `scrollToCell` and the selection events count rows in
+   * the view; a filter, hidden rows or a view sort make view rows differ
+   * from sheet rows, which A1 references and the row headers use. `null`
+   * when the view has no such row. Constant time.
+   *
+   * Columns need no mapping: hidden columns keep their sheet indices.
+   */
+  sheetRowOf(viewRow: number): number | null;
+  /**
+   * The view row that shows sheet row `sheetRow` on the active sheet, the
+   * inverse of {@link sheetRowOf}. `null` while a filter or the user hides
+   * the row, or when the sheet has no such row. Constant time once the view
+   * has indexed its rows, which it does once per filter, sort or hide.
+   */
+  viewRowOf(sheetRow: number): number | null;
   /** Hide columns through one bulk-safe metadata transaction. */
   hideColumns(cols?: readonly number[]): void;
   /** Show columns through one bulk-safe metadata transaction. */
@@ -1227,7 +1321,12 @@ export interface Grid {
     source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
     options?: { signal?: AbortSignal },
   ): Promise<void>;
-  /** Find cells matching `query`; highlights matches, emits `search`, returns the result. */
+  /**
+   * Find cells matching `query`, which takes Excel's wildcards (`*`, `?`,
+   * `~`); highlights matches, selects the first, emits `search`, returns the result.
+   * On the active sheet a selection of more than one cell limits the search to
+   * it, as in Excel; the selection stays and the active cell moves to the match.
+   */
   search(query: string, opts?: SearchOptions): SearchResult;
   /** Move the active match to the next match and scroll it into view. */
   findNext(): SearchResult;
@@ -1269,6 +1368,20 @@ export interface Grid {
   renameSheet(id: SheetId, name: string): SheetLifecycleResult;
   /** Move a sheet to position `toIndex` in the sheet order. */
   moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  /**
+   * Copy a sheet, as Excel's Move or Copy with "Create a copy" does: its
+   * cells, formats, rules, tables, charts and pivots, and its sheet-scoped
+   * names. The copy is named like `Sales (2)` unless `name` is given, and goes
+   * to tab position `index` (default: right after the sheet). In the copy,
+   * references to the sheet itself refer to the copy, and its tables get new
+   * names. `sheet` in the result is the copy's ID.
+   */
+  copySheet(id: SheetId, options?: { index?: number; name?: string }): SheetLifecycleResult;
+  /**
+   * Color a sheet's tab with `#RRGGBB`, or restore the default tab with
+   * `null`, as Excel's Tab Color does.
+   */
+  setSheetTabColor(id: SheetId, color: string | null): SheetLifecycleResult;
   /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
   setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
   /** Replace every conditional format rule of the active sheet with `rules`, as one undo step. */

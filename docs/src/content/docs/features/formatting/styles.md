@@ -191,7 +191,7 @@ import "@sheetwrite/core/styles.css";
 
 | Part | What it styles | Needed when |
 | --- | --- | --- |
-| `grid.css` | The grid host, the cell editor, data validation lists, notes, action messages and the theme variables | Always |
+| `grid.css` | The grid host, the cell editor, data validation lists, notes, action messages, dialogs such as the merge warning, and the theme variables | Always |
 | `formula-help.css` | The function list, argument guide and colored references while a formula is edited | Always, unless users never type formulas |
 | `find.css` | The find and replace bar | `find` is not `false` |
 | `ribbon.css` | The ribbon, the toolbar, and their menus and forms | `toolbar` or `ribbon` is set, or you call `createToolbar` or `createRibbon` |
@@ -199,7 +199,7 @@ import "@sheetwrite/core/styles.css";
 | `context-menu.css` | The right-click menu | `contextMenu` is not `false` |
 | `tabs.css` | The sheet tab bar | `tabs` is not `false`, or the shell shows sheet tabs |
 | `charts.css` | Chart series colors and charts over the cells | The grid shows charts from `@sheetwrite/charts`, also on a dashboard |
-| `icons.css` | Command icons | The ribbon, the toolbar, the context menu or the chart panel shows built-in icons |
+| `icons.css` | Command icons | The ribbon, the toolbar, the context menu, the sheet tab menu, the chart panel or an AutoFilter's header buttons show built-in icons |
 | `dashboard.css` | The dashboard view | The workbook has a dashboard |
 
 The find bar, the context menu, formula help and the sheet tabs are on by default. This is the default grid, with no toolbar or ribbon:

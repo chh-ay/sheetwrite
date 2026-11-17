@@ -3555,7 +3555,8 @@ pub(crate) fn serialize(ast: &Ast) -> String {
     out
 }
 
-fn sheet_name_needs_quotes(name: &str) -> bool {
+/// Whether a reference must quote the sheet `name`, as in `'Q1 Sales'!A1`.
+pub(crate) fn sheet_name_needs_quotes(name: &str) -> bool {
     let mut chars = name.chars();
     let Some(first) = chars.next() else {
         return true;
