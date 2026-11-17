@@ -38,11 +38,11 @@ test("Alt+Down lists the column's entries, and AutoComplete lists several matche
 }) => {
   await open(page);
 
-  // Pick From Drop-down List under the Region column.
+  // Pick From Drop-down List under the Region column; the header is a text entry too, as in Excel.
   await select(page, "B50");
   await page.keyboard.press("Alt+ArrowDown");
   const pick = page.getByRole("listbox", { name: "Pick From Drop-down List" });
-  await expect(pick.getByRole("option")).toHaveText(["East", "North", "South", "West"]);
+  await expect(pick.getByRole("option")).toHaveText(["East", "North", "Region", "South", "West"]);
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(pick).toHaveCount(0);
