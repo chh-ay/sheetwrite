@@ -76,7 +76,7 @@ Commit and navigation keys:
 
 | Key | Result |
 | --- | --- |
-| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. Accepts an [AutoComplete](#autocomplete) completion. |
+| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. After a run of Tab entries, Enter goes to the next row in the column where the run started, so you can type a table row by row. Accepts an [AutoComplete](#autocomplete) completion. |
 | Tab / Shift + Tab | Commit, move **right** / **left**, within a selected range. Accepts an AutoComplete completion. |
 | Ctrl/Cmd + Enter | Commit and stay. With a range selected, write the entry into every selected cell; relative references shift. |
 | Alt + Enter | Insert a line break. |

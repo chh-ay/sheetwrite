@@ -105,7 +105,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Home | Move to A1. |
 | Ctrl/Cmd + End | Move to the last used cell: the lowest used row of the rightmost used column. |
 | Shift + any of the above | Extend the selection from its moving corner; the active cell stays. |
-| Enter / Shift + Enter | Move the active cell down / up. Inside a selected range it moves within the range. |
+| Enter / Shift + Enter | Move the active cell down / up. Inside a selected range it moves within the range. After a run of Tab moves, Enter goes to the next row in the column where the run started, as in Excel. |
 | Tab / Shift + Tab | Move the active cell right / left, within a selected range. |
 | Ctrl/Cmd + Space / Shift + Space | Select the active cell's column / row. |
 | Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
