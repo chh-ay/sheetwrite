@@ -66,9 +66,9 @@ const suggester: FormulaSuggester = {
  * The formula assist add-on. While a formula is typed in a grid's formula
  * bar, it shows the most likely rest of the formula as dimmed text after the
  * caret: Tab takes all of it, Ctrl+→ one word, and Esc hides it. It predicts
- * from the sheet itself (neighbouring formulas, the shape of the data,
- * argument roles, the workbook's own patterns and the formula's syntax),
- * without network or AI, and shows a suggestion only when it is confident.
+ * from the sheet itself, without network or AI: a formula that the cells
+ * above and below, or left and right, agree on, and the formula's syntax. It
+ * shows a suggestion only when it is confident, and nothing otherwise.
  *
  * @example
  * ```ts
