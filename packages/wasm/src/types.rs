@@ -420,11 +420,38 @@ fn ast_is_plain(ast: &Ast) -> bool {
     }
 }
 
+/// Whether `ast` calls a volatile function, in a formula that uses no
+/// defined name. It passes itself to `any_child` as a plain function: with
+/// no name scope to capture, the walk keeps no closure in memory.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
 )]
-fn ast_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
+fn ast_is_volatile(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(
+            Func::Today
+            | Func::Now
+            | Func::Rand
+            | Func::RandBetween
+            | Func::Offset
+            | Func::Indirect
+            | Func::Sheet
+            | Func::Sheets
+            | Func::Info,
+            _,
+        ) => true,
+        _ => ast.any_child(&mut ast_is_volatile),
+    }
+}
+
+/// [`ast_is_volatile`] of a formula that may use a defined name: a name's
+/// formula counts, read through `names`.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
+fn ast_with_names_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(
             Func::Today
@@ -440,15 +467,15 @@ fn ast_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
         ) => true,
         Ast::DefinedName(id) => match names.in_place(*id) {
             Some(InPlace::Formula(expression) | InPlace::Shifted(expression, _)) => {
-                ast_is_volatile(expression, names)
+                ast_with_names_is_volatile(expression, names)
             }
             Some(InPlace::Range(_)) => false,
             None => names
                 .read(*id)
                 .formula()
-                .is_some_and(|expression| ast_is_volatile(expression, names)),
+                .is_some_and(|expression| ast_with_names_is_volatile(expression, names)),
         },
-        _ => ast.any_child(&mut |child| ast_is_volatile(child, names)),
+        _ => ast.any_child(&mut |child| ast_with_names_is_volatile(child, names)),
     }
 }
 
@@ -465,32 +492,76 @@ fn ast_contains_let(ast: &Ast) -> bool {
     }
 }
 
+/// Whether `ast` has a spill or runtime reference, in a formula that uses
+/// no defined name; a plain function, as [`ast_is_volatile`] is.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
 )]
-fn ast_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
+fn ast_contains_spill_ref(ast: &Ast) -> bool {
+    match ast {
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
+        _ => ast.any_child(&mut ast_contains_spill_ref),
+    }
+}
+
+/// [`ast_contains_spill_ref`] of a formula that may use a defined name: a
+/// name's formula counts, read through `names`.
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+)]
+fn ast_with_names_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
         Ast::DefinedName(id) => names
             .read(*id)
             .formula()
-            .is_some_and(|expression| ast_contains_spill_ref(expression, names)),
-        _ => ast.any_child(&mut |child| ast_contains_spill_ref(child, names)),
+            .is_some_and(|expression| ast_with_names_contains_spill_ref(expression, names)),
+        _ => ast.any_child(&mut |child| ast_with_names_contains_spill_ref(child, names)),
+    }
+}
+
+/// Whether the formula `ast` has a spill or runtime reference, through the
+/// formulas of its defined names when it `uses_names`.
+fn formula_has_spill_refs(ast: &Ast, names: NameScope<'_>, uses_names: bool) -> bool {
+    if uses_names {
+        ast_with_names_contains_spill_ref(ast, names)
+    } else {
+        ast_contains_spill_ref(ast)
+    }
+}
+
+/// Whether the formula `ast` calls a volatile function, through the
+/// formulas of its defined names when it `uses_names`.
+fn formula_is_volatile(ast: &Ast, names: NameScope<'_>, uses_names: bool) -> bool {
+    if uses_names {
+        ast_with_names_is_volatile(ast, names)
+    } else {
+        ast_is_volatile(ast)
     }
 }
 
 /// The reads and volatility of `ast`; `contains_let` is
-/// [`ast_contains_let`] of it, which the caller may need too.
-fn formula_metadata(ast: &Ast, names: NameScope<'_>, contains_let: bool) -> (ReadSet, bool) {
+/// [`ast_contains_let`] of it, which the caller may need too, and
+/// `uses_names` whether the formula may use a defined name.
+fn formula_metadata(
+    ast: &Ast,
+    names: NameScope<'_>,
+    contains_let: bool,
+    uses_names: bool,
+) -> (ReadSet, bool) {
     if !contains_let {
-        return (ReadSet::from_ast(ast, names), ast_is_volatile(ast, names));
+        return (
+            ReadSet::from_ast(ast, names),
+            formula_is_volatile(ast, names, uses_names),
+        );
     }
     let expanded = expand_let_reachable_ast(ast).ok();
     let metadata = expanded.as_ref().unwrap_or(ast);
     (
         ReadSet::from_ast(metadata, names),
-        ast_is_volatile(metadata, names),
+        formula_is_volatile(metadata, names, uses_names),
     )
 }
 
@@ -679,7 +750,7 @@ impl FormulaEntry {
         }
 
         let contains_let = ast_contains_let(&ast);
-        let (reads, volatile) = formula_metadata(&ast, names, contains_let);
+        let (reads, volatile) = formula_metadata(&ast, names, contains_let, features.names);
 
         let mut entry = Self {
             flags: 0,
@@ -689,7 +760,7 @@ impl FormulaEntry {
         };
 
         entry.set_volatile(volatile);
-        entry.set_has_spill_refs(ast_contains_spill_ref(&ast, names));
+        entry.set_has_spill_refs(formula_has_spill_refs(&ast, names, features.names));
         entry.set_produces_array(crate::eval::ast_produces_array(
             &ast,
             crate::eval::Shapes::top(names),
@@ -727,7 +798,7 @@ impl FormulaEntry {
         names: NameScope<'_>,
     ) -> Self {
         if let Some(tree) = ast.as_mut().filter(|candidate| {
-            ast_contains_let(candidate) && !ast_contains_spill_ref(candidate, names)
+            ast_contains_let(candidate) && !formula_has_spill_refs(candidate, names, features.names)
         }) {
             crate::eval::resolve_let_names(tree, names);
         }
@@ -832,6 +903,7 @@ impl FormulaEntry {
         names: NameScope<'_>,
         rewrite: impl FnOnce(&mut Ast) -> bool,
     ) -> bool {
+        let uses_names = self.uses_names();
         let Some(ast) = &mut self.ast else {
             return false;
         };
@@ -839,7 +911,7 @@ impl FormulaEntry {
             return false;
         }
 
-        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast));
+        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast), uses_names);
         self.reads = reads;
 
         // A plain reference has no source text: its tree is the target.
@@ -972,6 +1044,7 @@ impl FormulaEntry {
         names: NameScope<'_>,
         sheet_names: &[String],
     ) -> bool {
+        let uses_names = self.uses_names();
         let Some(ast) = &mut self.ast else {
             return false;
         };
@@ -981,7 +1054,7 @@ impl FormulaEntry {
 
         // A relinked reference writes the same text, so the source stays as
         // the user wrote it instead of being written again from the tree.
-        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast));
+        let (reads, volatile) = formula_metadata(ast, names, ast_contains_let(ast), uses_names);
         self.reads = reads;
         self.set_volatile(volatile);
         true
