@@ -1097,7 +1097,6 @@ export class GridImpl implements Grid {
       cut: () => this.runKeyboardClipboard(this.clipboard.cut()),
       paste: () => this.runKeyboardClipboard(this.clipboard.paste()),
       pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
-      dialogs: this.dialogHost,
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
       onEditStart: () => {

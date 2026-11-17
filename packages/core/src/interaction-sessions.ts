@@ -173,8 +173,6 @@ interface InteractionDependencies {
   cut: () => void;
   paste: () => void;
   pasteValues: () => void;
-  /** What the lazily loaded validation error alert opens over. */
-  dialogs: DialogHost;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Runs before a cell editor opens; hides the note card that would cover it. */
   onEditStart: () => void;
