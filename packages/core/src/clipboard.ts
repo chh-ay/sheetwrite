@@ -72,6 +72,6 @@ export interface ClipboardSnapshot {
   hyperlinks: CellHyperlink[];
   /** The TSV written to the system clipboard as its plain-text flavor. */
   tsv: string;
-  /** True when produced by cut: formulas paste verbatim (Sheets shifts on copy, not cut). */
+  /** True when produced by cut; only the grid that cut the cells moves them on paste. */
   cut: boolean;
 }

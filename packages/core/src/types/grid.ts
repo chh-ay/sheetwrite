@@ -324,7 +324,11 @@ export interface GridActions {
   filterBySelection(): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
   copy(): Promise<ClipboardOutcome>;
-  /** Copy + clear the source (after the clipboard accepted). Never rejects. */
+  /**
+   * Copy the focused rectangle and mark it with a moving border; the next
+   * paste moves its cells, as in Excel. Esc or another edit ends the cut.
+   * Never rejects.
+   */
   cut(): Promise<ClipboardOutcome>;
   /** Paste at the focus cell. Never rejects. */
   paste(): Promise<ClipboardOutcome>;
