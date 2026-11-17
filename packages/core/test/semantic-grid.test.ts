@@ -559,7 +559,12 @@ describe("custom editor canonical lifecycle", () => {
     }
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row, col: 0 } });
     host.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowDown", altKey: true, bubbles: true, cancelable: true }),
+      new KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
     );
   };
 

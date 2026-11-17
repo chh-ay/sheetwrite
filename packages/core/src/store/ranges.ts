@@ -170,7 +170,6 @@ function validValidationComparison(value: unknown, textLength: boolean): boolean
       (typeof min !== "number" || typeof max !== "number" || min <= max) &&
       comparison.value === undefined
     );
-    );
   }
   if (
     ![
