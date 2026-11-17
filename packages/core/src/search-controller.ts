@@ -121,7 +121,12 @@ class MatchList {
   /** The sheet that holds match `index`. */
   locate(index: number): SheetMatches | undefined {
     if (index < 0 || index >= this.length) return undefined;
-    return this.sheets.findLast((part) => part.start <= index);
+    let found: SheetMatches | undefined;
+    for (const part of this.sheets) {
+      if (part.start > index) break;
+      found = part;
+    }
+    return found;
   }
 
   at(index: number): CellAddress | null {
