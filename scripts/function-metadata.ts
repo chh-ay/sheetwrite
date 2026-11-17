@@ -8,22 +8,28 @@ import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 
 import { extractVolatileFunctions } from "./formula-contract.js";
-import { loadFormulaContractInventory, renderFunctionMetadata } from "./formula-docs.js";
+import {
+  loadFormulaContractInventory,
+  loadFormulaReferenceEntries,
+  renderFunctionMetadata,
+} from "./formula-docs.js";
 import { writeIfChanged } from "./script-io.js";
 
 /** Repository-relative path of the generated table. */
 const FUNCTION_METADATA_PATH = "packages/core/src/generated/function-metadata.ts";
 
-/** Renders the table from the formula contract inventory and the engine's volatile functions. */
+/** Renders the table from the formula contract inventory, the engine's volatile functions and Excel's syntax lines. */
 async function renderFunctionMetadataModule(repositoryRoot: string): Promise<string> {
-  const [inventory, engineTypes, engineCalc] = await Promise.all([
+  const [inventory, engineTypes, engineCalc, reference] = await Promise.all([
     loadFormulaContractInventory(repositoryRoot),
     readFile(join(repositoryRoot, "packages/wasm/src/types.rs"), "utf8"),
     readFile(join(repositoryRoot, "packages/wasm/src/calc.rs"), "utf8"),
+    loadFormulaReferenceEntries(repositoryRoot),
   ]);
   return renderFunctionMetadata(
     inventory,
     new Set(extractVolatileFunctions(engineTypes, engineCalc)),
+    reference,
   );
 }
 
