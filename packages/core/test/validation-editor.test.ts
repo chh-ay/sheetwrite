@@ -33,7 +33,9 @@ function type(input: HTMLInputElement, text: string): void {
 }
 
 function shownItems(): string[] {
-  return [...document.querySelectorAll('[role="option"]')].map((option) => option.textContent ?? "");
+  return [...document.querySelectorAll('[role="option"]')].map(
+    (option) => option.textContent ?? "",
+  );
 }
 
 afterEach(() => {
@@ -76,9 +78,9 @@ describe("ValidationEditor", () => {
 
     press(input, "ArrowDown");
     press(input, "ArrowDown");
-    expect(document.getElementById(input.getAttribute("aria-activedescendant") ?? "")?.textContent).toBe(
-      "South-West",
-    );
+    expect(
+      document.getElementById(input.getAttribute("aria-activedescendant") ?? "")?.textContent,
+    ).toBe("South-West");
     press(input, "Enter");
     expect(commits).toEqual([{ value: "South-West", navigate: "down" }]);
     editor.destroy();

@@ -125,7 +125,11 @@ export function validationPatches(
   if (everywhere) {
     patches.push(
       settings
-        ? { op: "setValidationRule", sheet, rule: { ...settings, id: everywhere.id, range: everywhere.range } }
+        ? {
+            op: "setValidationRule",
+            sheet,
+            rule: { ...settings, id: everywhere.id, range: everywhere.range },
+          }
         : { op: "removeValidationRule", sheet, id: everywhere.id },
     );
     targets = areas.flatMap((area) => subtract(area, everywhere.range));
@@ -171,7 +175,13 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
     rule = undefined;
   } else if (
     rule &&
-    areas.some((area) => subtractAll(area, touching.map((item) => item.range)).length > 0)
+    areas.some(
+      (area) =>
+        subtractAll(
+          area,
+          touching.map((item) => item.range),
+        ).length > 0,
+    )
   ) {
     const extend = await askYesNo(
       host.dialogs,
@@ -181,9 +191,7 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
   }
 
   const canApplyToAll =
-    rule !== undefined &&
-    touching.length === 1 &&
-    subtractAll(rule.range, areas).length > 0;
+    rule !== undefined && touching.length === 1 && subtractAll(rule.range, areas).length > 0;
   const change = await dataValidationDialog(host.dialogs, {
     settings: rule ?? null,
     canApplyToAll,

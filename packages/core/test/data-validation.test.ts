@@ -30,7 +30,9 @@ function enter(host: HTMLElement, grid: GridImpl, row: number, col: number, text
   grid.beginEdit(row, col, text);
   host
     .querySelector("textarea.sheetwrite-editor")
-    ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    ?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
 }
 
 /** Let a lazily loaded alert open, if one does. */
@@ -145,7 +147,11 @@ describe("Data Validation command", () => {
   } satisfies Omit<DataValidationRule, "id" | "range">;
 
   it("splits a rule around the selection and gives the selection its own rule", () => {
-    const existing: DataValidationRule = { id: "validation-1", range: range(0, 0, 9, 0), ...settings };
+    const existing: DataValidationRule = {
+      id: "validation-1",
+      range: range(0, 0, 9, 0),
+      ...settings,
+    };
     const patches = validationPatches(
       "s1",
       [existing],

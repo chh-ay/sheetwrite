@@ -146,21 +146,30 @@ export function mergeCrossesFreeze(sheet: Sheet, merge: MergeRange): boolean {
   );
 }
 
+/** Whether `value` is a validation formula: text with its leading `=` and something after it. */
+function isValidationFormula(value: unknown): value is string {
+  return typeof value === "string" && value.length > 1 && value.startsWith("=");
+}
+
 function validValidationComparison(value: unknown, textLength: boolean): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const comparison = value as Record<string, unknown>;
   const operator = comparison.operator;
-  const validOperand = (operand: unknown): operand is number =>
-    textLength
+  // A formula bound is checked when a value is, in its cell.
+  const validOperand = (operand: unknown): boolean =>
+    isValidationFormula(operand) ||
+    (textLength
       ? typeof operand === "number" && Number.isSafeInteger(operand) && operand >= 0
-      : typeof operand === "number" && Number.isFinite(operand);
+      : typeof operand === "number" && Number.isFinite(operand));
 
   if (operator === "between" || operator === "notBetween") {
+    const { min, max } = comparison;
     return (
-      validOperand(comparison.min) &&
-      validOperand(comparison.max) &&
-      comparison.min <= comparison.max &&
+      validOperand(min) &&
+      validOperand(max) &&
+      (typeof min !== "number" || typeof max !== "number" || min <= max) &&
       comparison.value === undefined
+    );
     );
   }
   if (
@@ -197,8 +206,11 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
     }
     const condition = rule.condition;
     if (condition.kind === "list") {
-      if (!Array.isArray(condition.values) || condition.values.length === 0) return false;
-    } else if (condition.kind === "number" || condition.kind === "date") {
+      const items = "source" in condition ? null : condition.values;
+      if (items ? !Array.isArray(items) || items.length === 0 : !isValidationFormula(condition.source)) {
+        return false;
+      }
+    } else if (condition.kind === "number" || condition.kind === "date" || condition.kind === "time") {
       if (
         (condition.min !== undefined && !Number.isFinite(condition.min)) ||
         (condition.max !== undefined && !Number.isFinite(condition.max)) ||
@@ -228,7 +240,9 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
       ) {
         return false;
       }
-    } else if (condition.kind !== "checkbox") {
+    } else if (condition.kind === "custom") {
+      if (!isValidationFormula(condition.formula)) return false;
+    } else if (condition.kind !== "checkbox" && condition.kind !== "any") {
       return false;
     }
   }

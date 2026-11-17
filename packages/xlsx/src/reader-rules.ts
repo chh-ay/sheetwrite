@@ -195,9 +195,7 @@ function validationComparison(
     }
     return { operator, min: first, max: second };
   }
-  return isSingleOperator(operator) && first !== undefined
-    ? { operator, value: first }
-    : undefined;
+  return isSingleOperator(operator) && first !== undefined ? { operator, value: first } : undefined;
 }
 
 /**

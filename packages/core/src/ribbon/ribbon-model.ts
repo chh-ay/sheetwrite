@@ -912,9 +912,15 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
-            ...button("Data Validation", "dataValidation", (grid) => grid.actions.dataValidation(), "edit", {
-              large: true,
-            }),
+            ...button(
+              "Data Validation",
+              "dataValidation",
+              (grid) => grid.actions.dataValidation(),
+              "edit",
+              {
+                large: true,
+              },
+            ),
             description: "Data Validation: choose the values a cell takes",
           },
           {

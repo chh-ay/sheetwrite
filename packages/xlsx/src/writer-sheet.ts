@@ -124,12 +124,7 @@ function validationXml(
     type = "list";
     formulas = [`"${list}"`];
   } else {
-    type =
-      condition.kind === "number"
-        ? condition.integer
-          ? "whole"
-          : "decimal"
-        : condition.kind;
+    type = condition.kind === "number" ? (condition.integer ? "whole" : "decimal") : condition.kind;
     if (condition.comparison) {
       operator = condition.comparison.operator;
       formulas = (

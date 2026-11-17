@@ -371,7 +371,11 @@ describe("raw spec-authored OOXML fidelity", () => {
           rule('type="list" showDropDown="1"', "A1", "<formula1>$H$2:$H$5</formula1>"),
           rule('type="list"', "B1", "<formula1>Regions</formula1>"),
           rule('type="custom"', "C1", "<formula1>COUNTIF($C:$C,C1)=1</formula1>"),
-          rule('type="time" operator="between"', "D1", "<formula1>0.375</formula1><formula2>0.75</formula2>"),
+          rule(
+            'type="time" operator="between"',
+            "D1",
+            "<formula1>0.375</formula1><formula2>0.75</formula2>",
+          ),
           rule('type="date" operator="greaterThanOrEqual"', "E1", "<formula1>TODAY()</formula1>"),
           rule('type="none" promptTitle="Note" prompt="Any value."', "F1"),
         ].join("")}</dataValidations>`,

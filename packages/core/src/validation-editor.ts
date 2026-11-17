@@ -140,7 +140,9 @@ export class ValidationEditor {
     this.renderList();
     // Opened without typing, the list starts on the cell's own value, as in Excel.
     if (options.filter === "") {
-      this.setActive(this.shown.findIndex((index) => Object.is(this.values[index], options.current)));
+      this.setActive(
+        this.shown.findIndex((index) => Object.is(this.values[index], options.current)),
+      );
     }
   }
 

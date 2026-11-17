@@ -88,9 +88,11 @@ it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere
   altDown();
   expect(host.querySelector('[role="listbox"]')).not.toBeNull();
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-  host.querySelector('[role="combobox"]')?.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-  );
+  host
+    .querySelector('[role="combobox"]')
+    ?.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
+    );
   expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("Open");
 
   grid.destroy();
@@ -118,7 +120,8 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
   const grid = new GridImpl(host, { workbook }, store);
   const press = (target: Element | null, key: string) =>
     target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
-  const options = () => [...host.querySelectorAll('[role="option"]')].map((item) => item.textContent);
+  const options = () =>
+    [...host.querySelectorAll('[role="option"]')].map((item) => item.textContent);
 
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
   expect(host.querySelector(".sheetwrite-list-button")).toBeNull();
