@@ -232,6 +232,41 @@ describe("createNameBox", () => {
     store.dispose();
   });
 
+  it("shows and reads the sheet's row numbers under a filter, as Excel does", () => {
+    const { grid, store, host } = makeGrid();
+    const piece = createNameBox(host, grid, {});
+    const input = piece.element;
+    if (!(input instanceof HTMLInputElement)) throw new Error("name box must be an input");
+    const enter = (reference: string): void => {
+      input.value = reference;
+      input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    };
+
+    // Only the Tokyo rows show: sheet rows 2, 5, 8 and so on.
+    grid.filterBy(2, "Tokyo");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
+    expect(input.value).toBe("A5");
+
+    enter("B8");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
+    expect(input.value).toBe("B8");
+
+    // A range selects the rows of it that show.
+    enter("A2:B8");
+    expect(grid.getSelection()).toEqual({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 2, col: 1 } },
+    });
+
+    // A cell whose row the filter hides cannot be selected.
+    enter("A3");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+
   it("marks invalid or out-of-bounds references without touching the grid", () => {
     const { grid, store, host } = makeGrid();
     const piece = createNameBox(host, grid, {});

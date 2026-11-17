@@ -14,6 +14,7 @@ import {
 import { FormulaAssist } from "../formula-assist.js";
 import { Scope } from "../scope.js";
 import { selectionCell } from "../selection.js";
+import type { Range } from "../types/coordinates.js";
 import type { CellInputSnapshot, Grid } from "../types/grid.js";
 import { commitCellInput } from "./grid-binding.js";
 
@@ -39,7 +40,10 @@ const A1_CELL_OR_RANGE = /^\$?([A-Za-z]{1,3})\$?(\d+)(?::\$?([A-Za-z]{1,3})\$?(\
 /**
  * A1 jump box, like Excel's name box: shows the focused cell's reference, and
  * on Enter selects the typed cell (`B7`) or range (`B2:D9`); `$` markers are
- * accepted. Invalid or out-of-bounds references set `aria-invalid` and make
+ * accepted. References use the sheet's row numbers, as the row headers do,
+ * also while a filter, hidden rows or a view sort change which rows show; a
+ * typed range selects the rows of it that show. Invalid or out-of-bounds
+ * references, and a cell whose row does not show, set `aria-invalid` and make
  * no grid calls; Escape restores the displayed reference.
  *
  * @param host - Element the name box is appended to.
@@ -62,7 +66,8 @@ export function createNameBox(
   const refresh = (): void => {
     if (document.activeElement === input && dirty) return;
     const focus = selectionCell(grid.getSelection());
-    committed = focus ? `${colToA1(focus.col)}${focus.row + 1}` : "";
+    const row = focus ? grid.sheetRowOf(focus.row) : null;
+    committed = focus && row !== null ? `${colToA1(focus.col)}${row + 1}` : "";
     input.value = committed;
     input.removeAttribute("aria-invalid");
     dirty = false;
@@ -83,23 +88,55 @@ export function createNameBox(
     });
     const start = corner(startCol, startRow);
     const end = corner(endCol, endRow);
+    const left = Math.min(start.col, end.col);
+    const right = Math.max(start.col, end.col);
+    const sheetId = grid.getActiveSheet();
+    const rowCount =
+      grid.store.getWorkbook().sheets.find((sheet) => sheet.id === sheetId)?.rowCount ?? 0;
+
+    // The typed sheet rows that show, as view rows; a filter, hidden rows or a
+    // view sort can leave gaps or change their order.
+    const shown: number[] = [];
+    if (start.row >= 0 && end.row >= 0 && Math.max(start.row, end.row) < rowCount) {
+      for (let row = Math.min(start.row, end.row); row <= Math.max(start.row, end.row); row++) {
+        const viewRow = grid.viewRowOf(row);
+        if (viewRow !== null) shown.push(viewRow);
+      }
+    }
+    shown.sort((a, b) => a - b);
+
     // The cells the grid shows and edits: the sheet's columns and the empty
     // ones past them that fill the grid's width.
+    const first = shown[0];
     if (
-      grid.getCellInput(start.row, start.col) === null ||
-      grid.getCellInput(end.row, end.col) === null
+      first === undefined ||
+      grid.getCellInput(first, left) === null ||
+      grid.getCellInput(first, right) === null
     ) {
       input.setAttribute("aria-invalid", "true");
       return;
     }
 
-    const sheetId = grid.getActiveSheet();
-    const addr = { sheet: sheetId, ...start };
-    if (start.row === end.row && start.col === end.col) {
-      grid.setSelection({ kind: "cell", addr });
-    } else {
-      grid.setSelection({ kind: "range", range: { sheet: sheetId, start, end } });
+    // Consecutive view rows make one range each.
+    const ranges: Range[] = [];
+    let runStart = first;
+    for (let index = 1; index <= shown.length; index++) {
+      const previous = shown[index - 1]!;
+      if (shown[index] === previous + 1) continue;
+      ranges.push({
+        sheet: sheetId,
+        start: { row: runStart, col: left },
+        end: { row: previous, col: right },
+      });
+      runStart = shown[index] ?? 0;
     }
+
+    const addr = { sheet: sheetId, row: first, col: left };
+    const [only] = ranges;
+    if (ranges.length > 1) grid.setSelection({ kind: "multi", ranges });
+    else if (only && (only.start.row !== only.end.row || left !== right)) {
+      grid.setSelection({ kind: "range", range: only });
+    } else grid.setSelection({ kind: "cell", addr });
     grid.scrollToCell(addr);
     dirty = false;
     input.removeAttribute("aria-invalid");
