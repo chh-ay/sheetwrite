@@ -164,15 +164,21 @@ function dateUnitSeries(base: number, unit: FillDateUnit): FillSeries {
   const time = base - whole;
   if (unit === "day") return { stepAt: (p) => ({ kind: "value", value: base + p }) };
   if (unit === "weekday") {
+    // Serial 1 is a Sunday; 0 is Sunday … 6 is Saturday.
+    const weekday = (serial: number): number => wrap(serial - 1, 7);
     return {
       stepAt: (p) => {
-        // Serial 1 is a Sunday; 0 is Sunday … 6 is Saturday.
+        if (p === 0) return { kind: "value", value: base };
         const direction = p < 0 ? -1 : 1;
-        let serial = whole + 7 * Math.trunc(p / 5);
+        // From a weekend, count from the weekday next to it on the side the fill
+        // leaves from: Saturday's first weekday down is Monday, and up is Friday.
+        let start = whole;
+        while (weekday(start) === 0 || weekday(start) === 6) start -= direction;
+        let serial = start + 7 * Math.trunc(p / 5);
         for (let left = Math.abs(p % 5); left > 0;) {
           serial += direction;
-          const weekday = wrap(serial - 1, 7);
-          if (weekday !== 0 && weekday !== 6) left--;
+          const day = weekday(serial);
+          if (day !== 0 && day !== 6) left--;
         }
         return { kind: "value", value: serial + time };
       },
