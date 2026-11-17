@@ -1,6 +1,7 @@
 import { cellScalarToText, parseCellInput } from "./cell-input.js";
 import { getEngine } from "./engine.js";
 import { findMatcher, replaceInText } from "./search-replace.js";
+import type { SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
@@ -19,6 +20,13 @@ export interface SearchControllerDeps {
   scrollToCell: (addr: CellAddress) => void;
   /** Select one cell, in view rows. */
   selectCell: (addr: CellAddress) => void;
+  /** Move the active cell to `addr`, in view rows, and keep the selected cells. */
+  setActiveCell: (addr: CellAddress) => void;
+  /**
+   * The selected rectangles of the active sheet, in view rows, when they hold
+   * more than one cell; null for one cell or one merged cell.
+   */
+  selectionScope: () => readonly SelRect[] | null;
   scheduleRender: () => void;
   emit: (result: SearchResult) => void;
   /** Whether writes are disabled; replace becomes a no-op. */
@@ -111,6 +119,8 @@ export class SearchController {
   private searchQuery = "";
   private searchOpts: SearchOptions = {};
   private searchMatcher: (text: string) => boolean = () => false;
+  /** The selection a search runs in, in view rows; null searches the whole sheet. */
+  private searchScope: { sheet: SheetId; rects: readonly SelRect[] } | null = null;
   private revision = 0;
 
   constructor(deps: SearchControllerDeps) {
@@ -186,6 +196,8 @@ export class SearchController {
     if (patch.addr.sheet !== sheet) return true;
     if (patch.value.kind !== "literal") return false;
     if (this.searchOpts.columns && !this.searchOpts.columns.includes(patch.addr.col)) return true;
+    // A cell outside the searched selection is never a match.
+    if (!this.inScope(sheet, patch.addr.row, patch.addr.col)) return true;
 
     const text = engineSearchText(this.deps.store.getCell(patch.addr).resolved);
     if (text === null) return false;
@@ -208,10 +220,17 @@ export class SearchController {
     return matchesNow === matchedBefore;
   }
 
+  /**
+   * Find `query` on a sheet. On the active sheet a selection of more than one
+   * cell limits the search to it, as in Excel.
+   */
   search(query: string, opts: SearchOptions = {}): SearchResult {
     this.searchQuery = query;
     this.searchOpts = opts;
     this.searchMatcher = findMatcher(query, opts);
+    const sheet = opts.sheet ?? this.deps.activeSheet();
+    const rects = sheet === this.deps.activeSheet() ? this.deps.selectionScope() : null;
+    this.searchScope = rects ? { sheet, rects } : null;
     this.searchMatches = query ? this.scanMatches(query, opts) : EMPTY_MATCHES;
     this.searchActive =
       this.searchMatches.length > 0
@@ -246,6 +265,7 @@ export class SearchController {
 
   clearSearch(): void {
     this.searchQuery = "";
+    this.searchScope = null;
     this.searchMatches = EMPTY_MATCHES;
     this.searchActive = -1;
     this.revision += 1;
@@ -469,9 +489,42 @@ export class SearchController {
     return afterIndex >= 0 ? afterIndex : firstIndex;
   }
 
+  /** Scan for matches, keeping only those inside the searched selection. */
   private scanMatches(query: string, opts: SearchOptions): SearchMatchSet {
     const sheetId = opts.sheet ?? this.deps.activeSheet();
+    const scope = this.searchScope;
+    if (scope?.sheet !== sheetId) return this.scanSheet(sheetId, query, opts);
 
+    const columns = new Set<number>();
+    for (const rect of scope.rects) {
+      for (let col = rect.c0; col <= rect.c1; col++) {
+        if (!opts.columns || opts.columns.includes(col)) columns.add(col);
+      }
+    }
+    const found = this.scanSheet(sheetId, query, { ...opts, columns: [...columns] });
+    const pairs: number[] = [];
+    for (let index = 0; index < found.length; index++) {
+      const row = found.rowAt(index);
+      const col = found.colAt(index);
+      if (this.inScope(sheetId, row, col)) pairs.push(row, col);
+    }
+    return pairs.length === 0
+      ? EMPTY_MATCHES
+      : new FlatSearchMatchSet(sheetId, Uint32Array.from(pairs));
+  }
+
+  /** Whether a data cell lies in the searched selection; every cell does without one. */
+  private inScope(sheet: SheetId, dataRow: number, col: number): boolean {
+    const scope = this.searchScope;
+    if (scope?.sheet !== sheet) return true;
+    const viewRow = this.deps.toViewRow(dataRow);
+    if (viewRow === null) return false;
+    return scope.rects.some(
+      (rect) => rect.r0 <= viewRow && viewRow <= rect.r1 && rect.c0 <= col && col <= rect.c1,
+    );
+  }
+
+  private scanSheet(sheetId: SheetId, query: string, opts: SearchOptions): SearchMatchSet {
     // Fast path: scan the columnar store in WASM (no per-cell JS materialization).
     if (this.deps.loadable) {
       return new FlatSearchMatchSet(
@@ -512,7 +565,10 @@ export class SearchController {
       : new FlatSearchMatchSet(sheetId, Uint32Array.from(pairs));
   }
 
-  /** Select the active match and scroll to it, as Excel's Find Next does. */
+  /**
+   * Select the active match and scroll to it, as Excel's Find Next does. In a
+   * searched selection the active cell moves and the selection stays.
+   */
   private revealActiveMatch(): void {
     const m = this.searchMatches.at(this.searchActive);
     if (!m || m.sheet !== this.deps.activeSheet()) return;
@@ -521,7 +577,8 @@ export class SearchController {
     if (viewRow === null) return;
 
     const cell = { ...m, row: viewRow };
-    this.deps.selectCell(cell);
+    if (this.searchScope?.sheet === m.sheet) this.deps.setActiveCell(cell);
+    else this.deps.selectCell(cell);
     this.deps.scrollToCell(cell);
   }
 
