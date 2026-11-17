@@ -332,7 +332,7 @@ export class CommandToolbar {
       const hidden = !commandAvailable(spec, this.grid);
       if (this.unavailable.has(element) === hidden) continue;
       // Hidden at once, so an unavailable command never shows for a frame;
-      // the next fit decides where a newly available one goes.
+      // the fit below places a newly available one.
       if (hidden) {
         this.unavailable.add(element);
         element.hidden = true;
@@ -341,9 +341,11 @@ export class CommandToolbar {
       }
       changed = true;
     }
+    // Fit now rather than on the next frame, so the row the browser paints
+    // first has no separator an unavailable command leaves behind.
     if (changed) {
       this.fittedWidth = -1;
-      this.scheduleFit();
+      this.fit();
     }
 
     refreshControls(this.controls, this.grid, state);

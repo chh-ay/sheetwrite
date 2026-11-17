@@ -611,6 +611,25 @@ it("replaces a glyph in every ribbon control that shows it, by glyph name", asyn
   expect(hideRows.querySelector(".sheetwrite-icon")).toBeNull();
 });
 
+it("offers Excel's cell dialogs in the Cells menus, each with its own glyph", async () => {
+  const { host, control, select, press } = await setup();
+  select(0, 0);
+  const glyphs = (["Insert", "Delete", "Format"] as const).map((menu) => {
+    // Home › Cells; the Insert tab shares the name "Insert".
+    press(control(menu, ".sheetwrite-ribbon-group-body"));
+    const label = `${menu} Cells…`;
+    const item = [...host.querySelectorAll<HTMLElement>(".sheetwrite-ribbon-menu-item")].find(
+      (candidate) => candidate.textContent?.includes(label),
+    );
+    return [label, item?.querySelector<HTMLElement>(".sheetwrite-icon")?.dataset.icon];
+  });
+  expect(glyphs).toEqual([
+    ["Insert Cells…", "insertCells"],
+    ["Delete Cells…", "deleteCells"],
+    ["Format Cells…", "formatCells"],
+  ]);
+});
+
 it("keeps Tab inside a form popup, wrapping at both ends", async () => {
   const { host, control, openTab, select, key, press } = await setup();
   openTab("Insert");
