@@ -149,7 +149,11 @@ export default function ReactWorkbench() {
             role="status"
           >
             <Icon name="monitor" />
-            {bench.generation === 0 ? "Connecting" : "React synced"}
+            {/* Both labels share one grid cell, so the strip keeps its width when the label changes. */}
+            <span className="sw-rwb-sync__label">
+              <span aria-hidden={bench.generation !== 0}>Connecting</span>
+              <span aria-hidden={bench.generation === 0}>React synced</span>
+            </span>
           </span>
         </header>
 

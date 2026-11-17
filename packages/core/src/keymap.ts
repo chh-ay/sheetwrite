@@ -35,6 +35,11 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   // Excel's Fill Down and Fill Right.
   fillDown: ["Mod+D"],
   fillRight: ["Mod+R"],
+  // Excel switches sheets with Ctrl+PageDown and Ctrl+PageUp. Browsers keep
+  // those keys for their own tabs, so Excel for the web's Ctrl+Alt+PageDown
+  // and Ctrl+Alt+PageUp work too.
+  nextSheet: ["Ctrl+PageDown", "Ctrl+Alt+PageDown"],
+  previousSheet: ["Ctrl+PageUp", "Ctrl+Alt+PageUp"],
   // Excel turns filters on and off with Ctrl+Shift+L.
   toggleFilter: ["Mod+Shift+L"],
   // Excel's number-format keys, Ctrl+Shift+~ ! @ # $ % ^, named by their unshifted keys.
