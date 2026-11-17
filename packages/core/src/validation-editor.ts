@@ -282,6 +282,11 @@ export class ValidationEditor {
       this.commitItem(named, navigate);
       return;
     }
+    // A list opened and closed without a choice or text changes nothing, as in Excel.
+    if (text === "") {
+      this.cancel();
+      return;
+    }
     this.cancel(false);
     options.onCommitText(text, navigate);
   }

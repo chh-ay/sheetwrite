@@ -208,10 +208,10 @@ export interface GridActions {
   stepDecimals(direction: 1 | -1): void;
   /**
    * Merge the selection and center its text, as one undoable step. Like
-   * {@link GridActions.merge}, it asks first when more than one cell holds a
-   * value.
+   * {@link GridActions.merge}, it applies before the call returns, or with
+   * `ask: true` asks first when more than one cell holds a value.
    */
-  mergeAndCenter(): void;
+  mergeAndCenter(options?: { ask?: boolean }): void;
   /** Clear the selection's contents and formatting, as one undoable step. */
   clearAll(): void;
   /**
@@ -232,14 +232,16 @@ export interface GridActions {
   /** Remove the selection's cell formatting, keeping the contents. */
   clearFormat(): void;
   /**
-   * Merge the selected range into one cell; does nothing unless a range is
-   * selected. As in Excel, when more than one of its cells holds a value, a
-   * dialog warns that only the upper-left value stays. The merge happens after
-   * OK, and Cancel or Escape leaves the cells as they were. The command and
-   * its dialog load on first use, so the merge lands a moment after the
-   * call, as `toggleAutoFilter()`'s change does.
+   * Merge the selected range into one cell, keeping only its upper-left
+   * value; does nothing unless a range is selected. The merge applies before
+   * the call returns, as Excel's `Range.Merge` does with
+   * `DisplayAlerts = False`. With `ask: true`, as the toolbar, the ribbon and
+   * the context menu pass, a range in which more than one cell holds a value
+   * asks first, as Excel's Merge does: a dialog warns that only the
+   * upper-left value stays, the merge happens after OK, and Cancel or Escape
+   * leaves the cells as they were.
    */
-  merge(): void;
+  merge(options?: { ask?: boolean }): void;
   /** Split merged cells in the selection back into single cells. */
   unmerge(): void;
   /** Quick sort of the cells around the focus cell by its column (`Grid.sortBy`). */
@@ -263,34 +265,41 @@ export interface GridActions {
   /**
    * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
    * them; with whole columns, as many columns to their left. For any other
-   * range an Insert dialog asks whether to insert entire rows or columns.
+   * range it inserts the entire rows (`entire: "row"`) or columns
+   * (`entire: "column"`) of the range; without `entire`, rows for a range at
+   * least as wide as it is tall and columns for a taller one, the choice
+   * Excel's Insert dialog starts on. The change applies before the call
+   * returns. With `ask: true` and no `entire`, as the Ctrl++ key passes,
+   * Excel's Insert dialog asks first, and the rows or columns go in after OK.
    * Its Shift cells right and Shift cells down choices are shown but not
-   * available yet. The command loads on first use, so the change lands a
-   * moment after the call; a host can wait for the grid's `change` event.
+   * available yet.
    */
-  insertCells(): void;
+  insertCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
   /**
    * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
-   * any other range, ask in a Delete dialog whether to delete entire rows or
-   * columns. Like {@link GridActions.insertCells}, it loads on first use and
-   * lands a moment after the call.
+   * any other range, its entire rows or columns, chosen as
+   * {@link GridActions.insertCells} chooses them. The change applies before
+   * the call returns; with `ask: true` and no `entire`, as the Ctrl+- key
+   * passes, Excel's Delete dialog asks first.
    */
-  deleteCells(): void;
+  deleteCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
   /**
-   * Ctrl+1: open the Format Cells dialog for the selection, with Number,
-   * Alignment, Font, Border and Fill tabs, showing the active cell's format.
-   * OK applies what changed to every selected cell as one undoable step. The
-   * command and the dialog load on first use, so the dialog opens a moment
-   * after the call. Does nothing on a read-only grid.
+   * Ctrl+1, Format Cells. With `format`, merge `format.style` into the style
+   * of every selected cell and apply the border preset `format.border`, as
+   * one undoable step that applies before the call returns, as the dialog's
+   * OK does. Without it, open the Format Cells dialog for the selection, with
+   * Number, Alignment, Font, Border and Fill tabs, showing the active cell's
+   * format; OK applies what changed. The dialog's code loads the first time it
+   * opens. Does nothing on a read-only grid.
    */
-  formatCells(): void;
+  formatCells(format?: { style?: Partial<CellStyle>; border?: BorderPreset }): void;
   /**
    * Data › Data Validation: open Excel's Data Validation dialog for the
    * selection, with Settings, Input Message and Error Alert tabs showing the
    * active cell's rule. OK gives the selected cells the rule, or removes it
    * after Clear All, as one undoable step. When the selection holds several
    * kinds of rule, or cells with and without one, Excel's question comes
-   * first. The command and the dialog load on first use. Does nothing on a
+   * first. The dialog's code loads the first time it opens. Does nothing on a
    * read-only grid.
    */
   dataValidation(): void;
@@ -312,20 +321,15 @@ export interface GridActions {
    * Data › Filter (Ctrl+Shift+L): turn the AutoFilter on for the table, the
    * selected range or the current region around the focus cell, whose first
    * row becomes the header; or off when the sheet has one.
-   * Its code loads on first use, so the change lands a moment after the call.
    */
   toggleAutoFilter(): void;
-  /**
-   * Data › Clear: remove every column filter of the sheet; the filter buttons stay.
-   * Its code loads on first use, so the change lands a moment after the call.
-   */
+  /** Data › Clear: remove every column filter of the sheet; the filter buttons stay. */
   clearFilters(): void;
   /** Data › Reapply: filter again, after edits changed which rows match. */
   reapplyFilter(): void;
   /**
    * Filter the focus cell's column to the focus cell's value, as Excel's
    * "Filter by Selected Cell's Value"; turns the AutoFilter on first if needed.
-   * Its code loads on first use, so the change lands a moment after the call.
    */
   filterBySelection(): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
@@ -1360,13 +1364,9 @@ export interface Grid {
    * names. The copy is named like `Sales (2)` unless `name` is given, and goes
    * to tab position `index` (default: right after the sheet). In the copy,
    * references to the sheet itself refer to the copy, and its tables get new
-   * names. `sheet` in the result is the copy's ID. The copy's code loads the
-   * first time a sheet is copied, so the result is a promise.
+   * names. `sheet` in the result is the copy's ID.
    */
-  copySheet(
-    id: SheetId,
-    options?: { index?: number; name?: string },
-  ): Promise<SheetLifecycleResult>;
+  copySheet(id: SheetId, options?: { index?: number; name?: string }): SheetLifecycleResult;
   /**
    * Color a sheet's tab with `#RRGGBB`, or restore the default tab with
    * `null`, as Excel's Tab Color does.
