@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, GridConfig, Workbook } from "../src/types.js";
-import { mountHost } from "./fixtures.js";
+import { elementAdded, mountHost } from "./fixtures.js";
 
 // Excel's AutoComplete: typing a text entry completes it from the entries
 // above and below in the column.
