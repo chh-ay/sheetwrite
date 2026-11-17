@@ -337,6 +337,7 @@ export class FormulaHelp {
       default:
         return false;
     }
+  }
 
   /** The ghost's keys, while the function list is closed and the caret is at the end of the text. */
   private ghostKey(event: KeyboardEvent): boolean {
@@ -360,10 +361,7 @@ export class FormulaHelp {
     field.dispatchEvent(new Event("input", { bubbles: true }));
     return true;
   }
-  }
 
-  /** Follow the field after it moves (scroll, resize). */
-  reposition(): void {
   /** Announce `ghost` once it has held for a moment; a cleared ghost clears the status at once. */
   private announce(ghost: string): void {
     clearTimeout(this.announceTimer);
@@ -380,6 +378,8 @@ export class FormulaHelp {
     }, ANNOUNCE_DELAY_MS);
   }
 
+  /** Follow the field after it moves (scroll, resize). */
+  reposition(): void {
     const field = this.field;
     const layer = this.layer;
     if (field === null || layer === null) return;
