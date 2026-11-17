@@ -77,3 +77,13 @@ it("shows Excel's Average, Count and Sum in the shell status line", async () => 
   expect(piece.element.textContent).toMatch(/Average: 3\.66?7/);
   piece.destroy();
 });
+
+it("names a selected row by its sheet row under a filter", () => {
+  const { grid } = setup();
+  const piece = createSelectionStatus(document.createElement("div"), grid);
+  // B keeps 3 and 4: view row 1 shows sheet row 3, labelled 4.
+  grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
+  grid.setSelection({ kind: "row", sheet: "s1", row: 1 });
+  expect(piece.element.textContent).toContain("Row 4");
+  piece.destroy();
+});
