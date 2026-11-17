@@ -11,7 +11,6 @@ import type {
   DataValidationComparison,
   DataValidationCondition,
   DataValidationOperand,
-  DataValidationRule,
   ValidationErrorStyle,
 } from "./types/document.js";
 import { validationErrorStyle } from "./validation-rule.js";

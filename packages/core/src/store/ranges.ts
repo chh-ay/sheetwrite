@@ -205,10 +205,11 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
     }
     const condition = rule.condition;
     if (condition.kind === "list") {
-      const items = "source" in condition ? null : condition.values;
-      if (
-        items ? !Array.isArray(items) || items.length === 0 : !isValidationFormula(condition.source)
-      ) {
+      const valid =
+        "source" in condition
+          ? isValidationFormula(condition.source)
+          : Array.isArray(condition.values) && condition.values.length > 0;
+      if (!valid) {
         return false;
       }
     } else if (
