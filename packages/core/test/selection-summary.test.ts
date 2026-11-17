@@ -103,14 +103,15 @@ it("names the step an undo or redo applied, and tints its cells for a moment", (
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
 
   grid.undo();
-  expect(piece.element.textContent).toStartWith("Undo: Format Cells in A2:B3");
+  // The step leads the summary, after #849's cell mode.
+  expect(piece.element.lastElementChild?.textContent).toStartWith("Undo: Format Cells in A2:B3");
   expect(flashed()).toBeGreaterThan(0);
   jest.advanceTimersByTime(600);
   grid.refresh();
   expect(flashed()).toBe(0);
 
   grid.redo();
-  expect(piece.element.textContent).toStartWith("Redo: Format Cells in A2:B3");
+  expect(piece.element.lastElementChild?.textContent).toStartWith("Redo: Format Cells in A2:B3");
   // The next selection replaces the step with the selection's own status.
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
   expect(piece.element.textContent).not.toContain("Redo");
