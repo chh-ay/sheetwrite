@@ -357,6 +357,11 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
             href: "/docs/features/formulas/formula-help/",
             icon: "info",
           },
+          {
+            label: "Formula assist",
+            href: "/docs/features/formulas/formula-assist/",
+            icon: "function",
+          },
         ],
       },
       {
