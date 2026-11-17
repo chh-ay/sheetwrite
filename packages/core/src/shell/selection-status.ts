@@ -18,9 +18,15 @@ import type { ShellPiece } from "./formula-controls.js";
  * Human phrase for a selection's geometry; blank for null/single-cell.
  *
  * @param selection - The grid's selection, or `null` when nothing is selected.
+ * @param sheetRowOf - The sheet row a view row shows, as `Grid.sheetRowOf`
+ *   gives it, so `Row N` names the row A1 references use under a filter.
+ *   Defaults to the view row.
  * @returns Text such as `3 × 2 cells` or `Row 4`, or an empty string.
  */
-export function describeSelection(selection: Selection | null): string {
+export function describeSelection(
+  selection: Selection | null,
+  sheetRowOf: (viewRow: number) => number | null = (row) => row,
+): string {
   if (!selection || selection.kind === "cell") return "";
 
   if (selection.kind === "range") {
@@ -30,7 +36,7 @@ export function describeSelection(selection: Selection | null): string {
     return `${rows} × ${cols} cells`;
   }
 
-  if (selection.kind === "row") return `Row ${selection.row + 1}`;
+  if (selection.kind === "row") return `Row ${(sheetRowOf(selection.row) ?? selection.row) + 1}`;
   if (selection.kind === "column") return `Column ${selection.col + 1}`;
   return `${selection.ranges.length} ranges`;
 }
@@ -128,7 +134,7 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   };
 
   const onSelection = (selection: Selection | null): void => {
-    geometry = describeSelection(selection);
+    geometry = describeSelection(selection, (row) => grid.sheetRowOf(row));
     show();
     summarize();
   };
