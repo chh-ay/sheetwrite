@@ -387,7 +387,11 @@ pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, F
     let mut parts = sections(code);
     // A last section that holds `@` is the text section, which numbers skip.
     // The Text format, `@` alone, shows a number as General would.
-    if parts.len() < 4 && parts.last().is_some_and(|last| has_text_placeholder(last)) {
+    // `contains` is a fast byte search; most codes have no `@`.
+    if parts.len() < 4
+        && code.contains('@')
+        && parts.last().is_some_and(|last| has_text_placeholder(last))
+    {
         if parts.len() == 1 {
             return Ok(Some(general_text(number)));
         }
@@ -708,6 +712,10 @@ impl Fraction {
     /// with digit placeholders right before it and placeholders or digits
     /// right after it.
     fn parse(code: &str) -> Option<Self> {
+        // A fast byte search first: most codes have no `/`.
+        if !code.contains('/') {
+            return None;
+        }
         let slash = fraction_slash(code)?;
         let (head, tail) = (&code[..slash], &code[slash + 1..]);
 
