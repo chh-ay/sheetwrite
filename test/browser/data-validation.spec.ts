@@ -129,7 +129,7 @@ test("a list cell's arrow opens its list, and typing filters it, from the keyboa
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(list).toHaveCount(0);
-  expect(await regionAt50(page)).toBe("South-West");
+  expect(await regionAtB10(page)).toBe("South-West");
 
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Alt+ArrowDown");
