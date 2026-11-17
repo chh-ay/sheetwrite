@@ -205,13 +205,13 @@ describe("find", () => {
     const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 5, col: 2 } };
     grid.setSelection({ kind: "range", range });
 
+    // Each keystroke searches the same selection, because the selection stays.
+    expect(grid.search("Toky").matches).toEqual([A(1, 2), A(4, 2)]);
     expect(grid.search("Tokyo").matches).toEqual([A(1, 2), A(4, 2)]);
-    // The selection stays; Find Next moves the active cell inside it.
+    // Find Next moves the active cell inside the selection.
     expect(grid.getSelection()).toEqual({ kind: "range", range, active: A(1, 2) });
     grid.findNext();
     expect(grid.getSelection()).toEqual({ kind: "range", range, active: A(4, 2) });
-    // Typing more of the query searches the same selection.
-    expect(grid.search("Toky").matches).toEqual([A(1, 2), A(4, 2)]);
 
     expect(grid.replaceAll("Kyoto").replaced).toBe(2);
     expect(store.getCell(A(1, 2)).resolved).toBe("Kyoto");
