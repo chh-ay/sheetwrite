@@ -164,7 +164,7 @@ const BORDER_ITEMS: readonly [string, IconName, BorderPreset][] = [
 ];
 
 const INSERT_ITEMS: readonly RibbonMenuItem[] = [
-  item("Insert Cells…", (grid) => grid.actions.insertCells(), "insertCells"),
+  item("Insert Cells…", (grid) => grid.actions.insertCells({ ask: true }), "insertCells"),
   item("Insert Rows Above", (grid) => grid.actions.insertRowAbove()),
   item("Insert Rows Below", (grid) => grid.actions.insertRowBelow()),
   item("Insert Columns Left", (grid) => grid.actions.insertColumnLeft()),
@@ -172,7 +172,7 @@ const INSERT_ITEMS: readonly RibbonMenuItem[] = [
 ];
 
 const DELETE_ITEMS: readonly RibbonMenuItem[] = [
-  item("Delete Cells…", (grid) => grid.actions.deleteCells(), "deleteCells"),
+  item("Delete Cells…", (grid) => grid.actions.deleteCells({ ask: true }), "deleteCells"),
   item("Delete Rows", (grid) => grid.actions.deleteRow()),
   item("Delete Columns", (grid) => grid.actions.deleteColumn()),
 ];
@@ -591,10 +591,14 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
               label: "Merge & Center",
               icon: "mergeAndCenter",
               availability: "edit",
-              run: (grid) => grid.actions.mergeAndCenter(),
+              run: (grid) => grid.actions.mergeAndCenter({ ask: true }),
               items: [
-                item("Merge & Center", (grid) => grid.actions.mergeAndCenter(), "mergeAndCenter"),
-                item("Merge Cells", (grid) => grid.actions.merge(), "merge"),
+                item(
+                  "Merge & Center",
+                  (grid) => grid.actions.mergeAndCenter({ ask: true }),
+                  "mergeAndCenter",
+                ),
+                item("Merge Cells", (grid) => grid.actions.merge({ ask: true }), "merge"),
                 item("Unmerge Cells", (grid) => grid.actions.unmerge(), "unmerge"),
               ],
             },
