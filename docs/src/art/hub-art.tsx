@@ -75,7 +75,10 @@ const HUB_LAYOUTS = {
   ),
   // Neighbours that agree, and the rest of the formula that Tab takes.
   "formula-assist": hub(
-    [{ title: "", code: ["=C4*D4"] }, { title: "", code: ["=C6*D6"] }],
+    [
+      { title: "", code: ["=C4*D4"] },
+      { title: "", code: ["=C6*D6"] },
+    ],
     [{ title: "Tab", code: ["=C5*D5"], tone: "accent" }],
   ),
   // Two clients synced through one sequencing server.

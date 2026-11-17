@@ -112,12 +112,7 @@ const tableAddon: SheetwriteAddon = {
   },
 };
 void initSheetwrite({
-  addons: [
-    Xlsx.xlsxAddon(),
-    Charts.chartsAddon(),
-    FormulaAssist.formulaAssistAddon(),
-    tableAddon,
-  ],
+  addons: [Xlsx.xlsxAddon(), Charts.chartsAddon(), FormulaAssist.formulaAssistAddon(), tableAddon],
 });
 void toXlsxTable;
 void fromXlsxTable;
