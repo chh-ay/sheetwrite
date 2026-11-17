@@ -23,6 +23,8 @@ import {
   type HistoryAction,
   type HistoryPart,
   type HistoryResourceStats,
+  type HistoryStep,
+  historyStepName,
   materializeHistoryAction,
   UndoManager,
 } from "./history.js";
@@ -73,8 +75,14 @@ export interface DocumentControllerOptions {
   epoch: () => number;
   materializeVirtualColumns: (patches: DocumentOp[]) => DocumentOp[];
   onMutationRejected: (issues: MutationIssue[]) => void;
-  /** Called after an undo or redo applies, with the operations it applied. */
-  onHistoryApplied: (patches: readonly DocumentOp[]) => void;
+  /**
+   * Called after an undo or redo applies, with the operations it applied and
+   * the step: its direction and its name, such as "Paste".
+   */
+  onHistoryApplied: (
+    patches: readonly DocumentOp[],
+    step: { readonly direction: "undo" | "redo"; readonly name: string },
+  ) => void;
   transactionResourceLimits?: Readonly<TransactionResourceLimits>;
   admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
   /** Only engine-owned callbacks may preserve payload measurements by identity. */
@@ -291,7 +299,7 @@ export class DocumentController {
     }
 
     this.rebaseHistoryFor(applied);
-    this.history.push(inverse, applied);
+    this.history.push(inverse, applied, historyStepName(reason, applied));
 
     return outcome;
   }
@@ -305,13 +313,13 @@ export class DocumentController {
   }
 
   undo(): void {
-    const action = this.history.undo();
-    if (!action) return;
+    const step = this.history.undo();
+    if (!step) return;
 
     let outcome: ApplyTransactionResult | null;
 
     try {
-      outcome = this.applyHistoryPatches(action, "undo");
+      outcome = this.applyHistoryPatches(step, "undo");
     } catch (error) {
       this.history.restoreUndo();
       throw error;
@@ -331,12 +339,11 @@ export class DocumentController {
   }
 
   redo(): void {
-    const action = this.history.redo();
-    if (!action) return;
+    const step = this.history.redo();
+    if (!step) return;
 
     try {
-      if (this.applyHistoryPatches(action, "redo")?.status !== "applied")
-        this.history.restoreRedo();
+      if (this.applyHistoryPatches(step, "redo")?.status !== "applied") this.history.restoreRedo();
     } catch (error) {
       this.history.restoreRedo();
       throw error;
@@ -1532,14 +1539,14 @@ export class DocumentController {
   }
 
   private applyHistoryPatches(
-    action: HistoryAction,
+    step: HistoryStep,
     reason: "undo" | "redo",
   ): ApplyTransactionResult | null {
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
     const preparation = new TransactionPreparation();
     try {
-      const patches = materializeHistoryAction(action, preparation);
+      const patches = materializeHistoryAction(step.action, preparation);
       if (patches.length === 0) return null;
       const fitted = this.fitHistoryPatches(patches, preparation);
       outcome = this.commit(fitted.patches, reason, fitted.admitted);
@@ -1549,7 +1556,10 @@ export class DocumentController {
     }
     if (outcome.status !== "applied") return outcome;
     this.rebaseHistoryFor(outcome.transaction.patches);
-    this.options.onHistoryApplied(outcome.transaction.patches);
+    this.options.onHistoryApplied(outcome.transaction.patches, {
+      direction: reason,
+      name: step.name,
+    });
     return outcome;
   }
 

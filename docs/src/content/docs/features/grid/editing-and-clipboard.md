@@ -176,6 +176,8 @@ Custom UI can show the outcome without tripping global error monitoring.
 
 Each sheet keeps its selection and scroll position: going back to a sheet shows them again, and a sheet shown for the first time has A1 selected, as in Excel. Clicking a sheet tab gives the keyboard to the sheet, so Ctrl/Cmd + Z and the other keys act on it at once.
 
+After each undo or redo, the cells it changed flash for a moment, and the grid emits `history-step` with the step's direction, its name as Excel's undo list gives it ("Typing", "Paste", "Insert Rows") and the range it changed, in sheet rows. The shell's [status bar](/docs/features/grid/status-bar/) shows it as `Undo: Paste in B2:D9`. Excel changes the cells silently; the flash and the name show what changed and what the step was, even over many cells.
+
 History keeps at most 200 entries and 256 MiB of retained range snapshots, about twenty million-cell clears. When it passes either limit, it drops its oldest entries. The newest entry always stays undoable. The 256 MiB limit counts the snapshot bytes that the engine reports. It is not a limit on total process memory: it excludes cloned formula ASTs and JavaScript patch and redo payloads, which only the 200-entry limit bounds.
 
 ### Undo a large clear

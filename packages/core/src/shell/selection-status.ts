@@ -1,16 +1,18 @@
 // Status line in the spirit of Excel's: how many records an AutoFilter keeps
 // right after it filters, then the selection's shape plus Average, Count and
-// Sum. Geometry is constant-time per selection event; the totals come from
+// Sum, and after an undo or redo the step it applied. Geometry is
+// constant-time per selection event; the totals come from
 // Grid.summarizeSelection, which reads in bounded chunks between frames, so
 // this piece stays safe next to any selection size.
 
+import { colToA1 } from "../a1.js";
 import { formatNumber } from "../number-format.js";
 import { isAbortError, Scope, ScopeSlot } from "../scope.js";
 import { autoFilterBody } from "../store/autofilter.js";
 import { storeEngine } from "../store/engine-registry.js";
-import type { Selection } from "../types/coordinates.js";
+import type { Range, Selection } from "../types/coordinates.js";
 import type { DocumentOp } from "../types/document.js";
-import type { Grid, SelectionSummary } from "../types/grid.js";
+import type { Grid, GridEvents, SelectionSummary } from "../types/grid.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import type { ShellPiece } from "./formula-controls.js";
 
@@ -57,6 +59,19 @@ function describeSummary(summary: SelectionSummary | null): string {
 /** Runs of spaces collapse in HTML, so parts need a visible separator. */
 const STATUS_SEPARATOR = " · ";
 
+/** `B2:D9`, or `C5` for one cell, with the sheet's row numbers. */
+function rangeA1({ start, end }: Range): string {
+  const first = `${colToA1(start.col)}${start.row + 1}`;
+  const last = `${colToA1(end.col)}${end.row + 1}`;
+  return first === last ? first : `${first}:${last}`;
+}
+
+/** "Undo: Paste in B2:D9", or "Redo: Insert Rows" for a step that changed no cells. */
+function describeHistoryStep({ direction, step, range }: GridEvents["history-step"]): string {
+  const place = range ? ` in ${rangeA1(range)}` : "";
+  return `${direction === "undo" ? "Undo" : "Redo"}: ${step}${place}`;
+}
+
 /** Whether `patch` turns the AutoFilter of `sheet` on or off, or changes its filters. */
 function changesFilter(patch: DocumentOp, sheet: string): boolean {
   return (
@@ -102,11 +117,13 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   let records = "";
   let geometry = "";
   let totals = "";
+  // The last undo or redo, shown until the selection changes again.
+  let historyStep = "";
   const lifetime = new Scope();
   const summaries = new ScopeSlot(lifetime);
 
   const show = (): void => {
-    const text = [records, totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
+    const text = [historyStep, records, totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
     output.textContent = text;
     output.hidden = text === "";
     host.hidden = output.hidden && host.childElementCount === 1;
@@ -134,6 +151,7 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   };
 
   const onSelection = (selection: Selection | null): void => {
+    historyStep = "";
     geometry = describeSelection(selection, (row) => grid.sheetRowOf(row));
     show();
     summarize();
@@ -156,6 +174,13 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   lifetime.add(
     grid.on("active-sheet", () => {
       records = "";
+      show();
+    }),
+  );
+  // Undo and redo select what they changed first, so the step outlives that selection event.
+  lifetime.add(
+    grid.on("history-step", (event) => {
+      historyStep = describeHistoryStep(event);
       show();
     }),
   );

@@ -103,6 +103,7 @@ status.destroy();
 
 | Part | When it shows |
 | --- | --- |
+| Undo or redo step | Right after Ctrl/Cmd + Z or Ctrl/Cmd + Y, until the selection changes: the step and the cells it changed, such as `Undo: Paste in B2:D9` or `Redo: Insert Rows`. Steps are named as in Excel's undo list: Typing, Paste, Clear, Auto Fill, Replace, Sort, Format Cells, Insert Rows and so on. |
 | Average | Two or more selected cells hold values, and at least one of them is a number. |
 | Count | Two or more selected cells hold values. Text and errors count. |
 | Sum | Two or more selected cells hold values, and at least one of them is a number. |
@@ -110,7 +111,9 @@ status.destroy();
 
 The parts are joined with ` · `. When there is nothing to show, the `<output>` is hidden, and so is its host when the status bar is the host's only child.
 
-The status bar updates on each `selection` and `change` event. It is a polite live region, so screen readers announce changes without interrupting the user.
+The status bar updates on each `selection`, `change` and `history-step` event. It is a polite live region, so screen readers announce changes without interrupting the user.
+
+Excel changes the cells of an undo silently. Here the step's name says what was undone, and the changed cells also flash in the grid for a moment, so a change spread over many cells, or one that started out of view, is easy to check. The grid reports each step with the `history-step` event, `{ direction, step, range }`, so a status bar of your own can show it too.
 
 ## Read the totals yourself
 

@@ -233,6 +233,10 @@ export function measureMaxElementHeight(
 const DEFAULT_OVERSCAN = 6;
 /** Width of synthesized workbook and presentation-padding columns, in CSS pixels. */
 const DEFAULT_COL_WIDTH = 100;
+/** How long the cells an undo or redo changed stay tinted, in milliseconds. */
+const FLASH_MS = 600;
+/** Changed ranges tinted at most; a step that changes more cells tints the first ones. */
+const FLASH_RANGES = 256;
 /** Width of the side panel, in CSS pixels; the cells give up this much room while it is open. */
 const PANEL_WIDTH = 320;
 const GRID_COMMANDS: readonly GridCommandName[] = [
@@ -637,6 +641,7 @@ export class GridImpl implements Grid {
     search: new Set(),
     "command-state-change": new Set(),
     "active-sheet": new Set(),
+    "history-step": new Set(),
     "hyperlink-activate": new Set(),
     "renderer-fallback": new Set(),
     "datasource-error": new Set(),
@@ -672,6 +677,8 @@ export class GridImpl implements Grid {
     SheetId,
     { selection: Selection | null; top: number; left: number }
   >();
+  /** Removes the tint of the cells the last undo or redo changed. */
+  private flashTimer: number | undefined;
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
   /** The open side panel; closing it runs the panel's cleanup. */
@@ -814,9 +821,10 @@ export class GridImpl implements Grid {
       onMutationRejected: (issues) => {
         for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
       },
-      onHistoryApplied: (patches) => {
+      onHistoryApplied: (patches, step) => {
         this.selectChangedCells(patches);
         this.emitSelection();
+        this.showHistoryStep(patches, step);
         this.render();
       },
       transactionResourceLimits: this.transactionResourceLimits,
@@ -824,6 +832,7 @@ export class GridImpl implements Grid {
       trustedResourceCallbacks: true,
     });
     registerGridDocument(this, this.document);
+    this.lifetime.add(() => window.clearTimeout(this.flashTimer));
     registerEditDraft(this, {
       subscribe: (listener) => {
         this.editDraftListeners.add(listener);
@@ -2032,6 +2041,46 @@ export class GridImpl implements Grid {
         : { kind: "range", range: { sheet, start, end: { row: bottom, col: right } } },
     );
     this.scrollToCell({ sheet, ...start });
+  }
+
+  /**
+   * After an undo or redo, tint the cells it changed on the active sheet for
+   * a moment and report the step with `history-step`, so the user sees what
+   * changed and what the step was, even over many cells.
+   */
+  private showHistoryStep(
+    patches: readonly DocumentOp[],
+    step: { readonly direction: "undo" | "redo"; readonly name: string },
+  ): void {
+    const sheet = this.activeSheet;
+    const flash: Range[] = [];
+    let top = Number.POSITIVE_INFINITY;
+    let left = Number.POSITIVE_INFINITY;
+    let bottom = -1;
+    let right = -1;
+    for (const patch of patches) {
+      const range = changedCells(patch);
+      if (range?.sheet !== sheet) continue;
+      if (flash.length < FLASH_RANGES) flash.push(range);
+      top = Math.min(top, range.start.row, range.end.row);
+      bottom = Math.max(bottom, range.start.row, range.end.row);
+      left = Math.min(left, range.start.col, range.end.col);
+      right = Math.max(right, range.start.col, range.end.col);
+    }
+
+    window.clearTimeout(this.flashTimer);
+    this.overlayPainter.setFlash(flash);
+    if (flash.length > 0) {
+      this.flashTimer = window.setTimeout(() => this.overlayPainter.setFlash([]), FLASH_MS);
+    }
+
+    const range =
+      bottom < 0
+        ? null
+        : { sheet, start: { row: top, col: left }, end: { row: bottom, col: right } };
+    for (const fn of this.listeners["history-step"]) {
+      fn({ direction: step.direction, step: step.name, range });
+    }
   }
 
   private mergeAnchorAt(row: number, col: number): SelRect | null {

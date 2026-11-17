@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, expect, it, jest } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { createSelectionStatus } from "../src/shell.js";
@@ -19,6 +19,7 @@ afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
   document.body.replaceChildren();
   restore();
+  jest.useRealTimers();
 });
 
 // Column A mixes numbers, text and a blank; column B is all numbers.
@@ -52,7 +53,7 @@ function setup() {
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
     });
-  return { grid, selectAll };
+  return { grid, host, selectAll };
 }
 
 it("leaves out rows a filter hides", async () => {
@@ -85,6 +86,34 @@ it("names a selected row by its sheet row under a filter", () => {
   grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
   grid.setSelection({ kind: "row", sheet: "s1", row: 1 });
   expect(piece.element.textContent).toContain("Row 4");
+  piece.destroy();
+});
+
+it("names the step an undo or redo applied, and tints its cells for a moment", () => {
+  jest.useFakeTimers();
+  const { grid, host } = setup();
+  const statusHost = document.createElement("div");
+  const piece = createSelectionStatus(statusHost, grid);
+  const flashed = () => host.querySelectorAll("[data-sheetwrite-flash]").length;
+  grid.setSelection({
+    kind: "range",
+    range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+  });
+  grid.actions.toggleBold();
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+
+  grid.undo();
+  expect(piece.element.textContent).toStartWith("Undo: Format Cells in A2:B3");
+  expect(flashed()).toBeGreaterThan(0);
+  jest.advanceTimersByTime(600);
+  grid.refresh();
+  expect(flashed()).toBe(0);
+
+  grid.redo();
+  expect(piece.element.textContent).toStartWith("Redo: Format Cells in A2:B3");
+  // The next selection replaces the step with the selection's own status.
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+  expect(piece.element.textContent).not.toContain("Redo");
   piece.destroy();
 });
 

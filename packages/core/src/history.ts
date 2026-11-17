@@ -1,7 +1,7 @@
 import { pivotAxisPlan, rebasePivot } from "./pivot.js";
 import type { TransactionPreparation } from "./transaction-preparation.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
-import type { DocumentOp } from "./types/document.js";
+import type { CommitReason, DocumentOp } from "./types/document.js";
 import type { PivotDefinition } from "./types/pivot.js";
 
 export type HistoryPart =
@@ -22,6 +22,72 @@ export type HistoryAction = HistoryPart[];
 interface UndoEntry {
   undo: HistoryAction;
   redo: DocumentOp[];
+  /** The step's name, such as "Paste", for the status bar after undo or redo. */
+  name: string;
+}
+
+/** An entry undo or redo applies: the parts to apply and the step's name. */
+export interface HistoryStep {
+  readonly action: HistoryAction;
+  readonly name: string;
+}
+
+/** Excel's undo-list names for the commits that say what they did. */
+const REASON_STEPS: Partial<Record<CommitReason, string>> = {
+  "edit-blur": "Typing",
+  "edit-enter": "Typing",
+  "edit-tab": "Typing",
+  "edit-programmatic": "Typing",
+  paste: "Paste",
+  clear: "Clear",
+  fill: "Auto Fill",
+  replace: "Replace",
+  sort: "Sort",
+  restore: "Restore Version",
+};
+
+/** Excel's undo-list names for the other commits, by their first such operation. */
+const OPERATION_STEPS: Partial<Record<DocumentOp["op"], string>> = {
+  addRows: "Insert Rows",
+  removeRows: "Delete Rows",
+  moveRows: "Move Rows",
+  removeColumns: "Delete Columns",
+  moveColumns: "Move Columns",
+  moveCells: "Move",
+  setColumn: "Column Format",
+  setRowMeta: "Row Format",
+  addMerge: "Merge Cells",
+  removeMerge: "Unmerge Cells",
+  setRangeStyle: "Format Cells",
+  addSheet: "Insert Sheet",
+  removeSheet: "Delete Sheet",
+  renameSheet: "Rename Sheet",
+  moveSheet: "Move Sheet",
+  setSheetVisibility: "Hide Sheet",
+  setNote: "Edit Note",
+};
+
+/**
+ * The name undo and redo show for a commit: "Typing", "Paste", "Insert Rows"
+ * and so on, as Excel's undo list names its steps; "Change" when nothing
+ * names it.
+ */
+export function historyStepName(reason: CommitReason, operations: readonly DocumentOp[]): string {
+  const named = REASON_STEPS[reason];
+  if (named !== undefined) return named;
+
+  // Typing or formatting past the sheet's columns first adds them, so a later
+  // operation names the step when one does.
+  let addsColumns = false;
+  for (const operation of operations) {
+    if (operation.op === "addColumns") {
+      addsColumns = true;
+      continue;
+    }
+    const step = OPERATION_STEPS[operation.op];
+    if (step !== undefined) return step;
+  }
+  return addsColumns ? "Insert Columns" : "Change";
 }
 
 /** A row or column insert (`delta > 0`) or delete (`delta < 0`) at `at`, in data space. */
@@ -79,11 +145,11 @@ export class UndoManager {
 
   constructor(private readonly limit = DEFAULT_HISTORY_LIMIT) {}
 
-  /** Record an applied edit. A fresh edit disposes the discarded redo stack. */
-  push(undo: HistoryAction, redo: DocumentOp[]): void {
+  /** Record an applied edit named `name`. A fresh edit disposes the discarded redo stack. */
+  push(undo: HistoryAction, redo: DocumentOp[], name: string): void {
     if (undo.length === 0) return;
 
-    this.undoStack.push({ undo, redo });
+    this.undoStack.push({ undo, redo, name });
     for (const entry of this.redoStack) disposeEntry(entry);
     this.redoStack.length = 0;
     this.evictOldest();
@@ -139,12 +205,12 @@ export class UndoManager {
     rebaseEntries(this.redoStack, mapAddr, mapPivot);
   }
 
-  undo(): HistoryAction | null {
+  undo(): HistoryStep | null {
     const entry = this.undoStack.pop();
     if (!entry) return null;
 
     this.redoStack.push(entry);
-    return entry.undo;
+    return { action: entry.undo, name: entry.name };
   }
 
   /** Restore the most recently moved undo entry after its transaction was rejected. */
@@ -162,12 +228,12 @@ export class UndoManager {
     if (entry) disposeEntry(entry);
   }
 
-  redo(): HistoryAction | null {
+  redo(): HistoryStep | null {
     const entry = this.redoStack.pop();
     if (!entry) return null;
 
     this.undoStack.push(entry);
-    return [{ kind: "patches", patches: entry.redo }];
+    return { action: [{ kind: "patches", patches: entry.redo }], name: entry.name };
   }
 
   /** Restore the most recently moved redo entry after its transaction was rejected. */

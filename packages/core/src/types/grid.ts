@@ -997,6 +997,13 @@ export interface GridEvents {
   "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
+  /**
+   * An undo or redo applied a step. `step` names it as Excel's undo list does
+   * ("Typing", "Paste", "Insert Rows"); `range` spans the cells it changed on
+   * the sheet it shows, in sheet rows, or is null when it changed no cells.
+   * The spreadsheet shell's status bar shows it: "Undo: Paste in B2:D9".
+   */
+  "history-step": { direction: "undo" | "redo"; step: string; range: Range | null };
   /** The user followed a hyperlink in a cell. */
   "hyperlink-activate": HyperlinkActivationEvent;
   /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
