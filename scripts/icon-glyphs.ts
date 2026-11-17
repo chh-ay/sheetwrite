@@ -390,7 +390,7 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
     // An AutoFilter header cell's button, drawn to fill the button's square:
     // a chevron, and a funnel beside it once the column is filtered, as in Excel.
     ["filterArrow", ["m7.5 10 4.5 4.5 4.5-4.5"]],
-    ["filterActive", ["M3.5 6h10l-3.75 4.5v5.25l-2.5 1.25v-6.5Z", "m15.5 11 2.5 2.5 2.5-2.5"]],
+    ["filterActive", ["M4.5 6.5H13l-3.15 4v5l-2.2 1.1v-6.1Z", "m15 11 2.25 2.25L19.5 11"]],
   ],
   // Charts, one glyph per chart kind, and pivot tables.
   [
