@@ -593,6 +593,18 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         bold("M9.5 13.5h.01M14.5 13.5h.01M9.5 17.5h.01M14.5 17.5h.01"),
       ],
     ],
+    // A cell with a check mark, and a no-entry sign: Data Validation keeps
+    // the values a cell takes, as Excel's glyph shows.
+    [
+      "dataValidation",
+      [
+        tint(frame(3, 4, 12, 9)),
+        frame(3, 4, 12, 9),
+        "m6 8.5 2 2 3.5-3.5",
+        "M21 17a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0Z",
+        "m15 19.5 5-5",
+      ],
+    ],
   ],
   // Dashboards and version history.
   [

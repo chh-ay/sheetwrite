@@ -7,6 +7,7 @@ import {
 import type { CopiedConditionalFormat, CopiedNote } from "./paste-rules.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
 import type { Range } from "./types/coordinates.js";
+import type { CopiedValidation } from "./validation-transfer.js";
 
 // Text beginning with `=`, `+`, `-`, `@`, tab or carriage return gets a leading
 // apostrophe wherever Sheetwrite hands text to another application (clipboard
@@ -72,6 +73,11 @@ export interface ClipboardSnapshot {
   cells: ClipboardCell[][];
   /** Fully-contained source hyperlinks; source ranges retain stable data coordinates. */
   hyperlinks: CellHyperlink[];
+  /**
+   * The data validation rules over the copied cells, cut to them, which a
+   * paste in this grid lands with the cells, as Excel's does.
+   */
+  validation?: readonly CopiedValidation[];
   /** The TSV written to the system clipboard as its plain-text flavor. */
   tsv: string;
   /** True when produced by cut; only the grid that cut the cells moves them on paste. */

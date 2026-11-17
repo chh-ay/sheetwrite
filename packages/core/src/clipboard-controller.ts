@@ -26,11 +26,13 @@ import { type Scope, ScopeSlot } from "./scope.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import { referenceSheetName } from "./sheet-copy.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
-import type { Range, SheetId } from "./types/coordinates.js";
+import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
 import type { ClipboardOutcome, PasteSpecialOptions } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
+import { failingValidationRule, type ValidationReads } from "./validation-rule.js";
+import { copiedValidation, validationPastePatches } from "./validation-transfer.js";
 
 /** Paste Special's code, which loads on first use. */
 type PasteSpecialModule = typeof import("./paste-special.js");
@@ -55,6 +57,16 @@ export interface ClipboardControllerDeps {
   askPasteSpecial: (ownCopy: boolean) => Promise<PasteSpecialOptions | null>;
   /** A sheet's name, for Paste Link's references to another sheet. */
   sheetName: (sheet: SheetId) => string | undefined;
+  /** Whether a paste keeps the target's validation rules (`GridConfig.paste.keepValidation`), read per paste. */
+  keepValidation?: () => boolean;
+  /**
+   * Called after a paste that kept the target's rules, with the cells whose
+   * values a `reject` rule refused (not pasted) and those a `warn` rule
+   * refused (pasted), in data coordinates.
+   */
+  onValidationRefused?: (refused: readonly CellAddress[], warned: readonly CellAddress[]) => void;
+  /** Formula results and list sources for the rules a kept paste checks. */
+  validationReads?: () => ValidationReads | undefined;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -850,13 +862,18 @@ export class ClipboardController {
     const deltaRow = targetAnchorRow - snapshot.anchor.row;
     const deltaCol = focus.col - snapshot.anchor.col;
     const width = snapshot.cells[0]?.length ?? 0;
-    // The pasted cells take the copied notes and conditional formats too, as in Excel.
+    // The pasted cells take the copied notes, conditional formats and validation
+    // rules too, as in Excel; `paste.keepValidation` keeps the target's rules.
     const area = valuesOnly ? null : this.pasteArea(focus, snapshot.cells.length, width);
     const extras: DocumentOp[] = valuesOnly
       ? []
       : [
           ...this.hyperlinkPatches(snapshot, deltaRow, deltaCol, false),
-          ...this.rulePatches(snapshot, area, "replace", true),
+          ...this.rulePatches(snapshot, area, {
+            notes: true,
+            conditionalFormats: "replace",
+            validation: this.deps.keepValidation?.() !== true,
+          }),
         ];
 
     this.commitBlock(
@@ -907,26 +924,34 @@ export class ClipboardController {
     }));
   }
 
-  /** The copied notes and conditional formats at `area`; none when the paste has no area. */
+  /** The copied notes, conditional formats and validation rules at `area`; none without an area. */
   private rulePatches(
     snapshot: ClipboardSnapshot,
     area: PasteArea | null,
-    conditionalFormats: "replace" | "merge" | null,
-    notes: boolean,
+    parts: {
+      readonly notes: boolean;
+      readonly conditionalFormats: "replace" | "merge" | null;
+      readonly validation: boolean;
+    },
   ): DocumentOp[] {
     if (area === null) return [];
     const sheet = this.deps.sheet();
     const block = { rows: snapshot.cells.length, cols: snapshot.cells[0]?.length ?? 0 };
     return [
-      ...(notes ? notePastePatches(sheet, snapshot.notes ?? [], block, area) : []),
-      ...(conditionalFormats
+      ...(parts.notes ? notePastePatches(sheet, snapshot.notes ?? [], block, area) : []),
+      ...(parts.conditionalFormats
         ? conditionalFormatPastePatches(
             sheet,
             snapshot.conditionalFormats ?? [],
             block,
             area,
-            conditionalFormats === "merge",
+            parts.conditionalFormats === "merge",
           )
+        : []),
+      ...(parts.validation
+        ? validationPastePatches(sheet, snapshot.validation ?? [], block, area, {
+            transpose: area.transpose,
+          })
         : []),
     ];
   }
@@ -1089,7 +1114,14 @@ export class ClipboardController {
             ...(parts.hyperlinks
               ? this.hyperlinkPatches(snapshot, delta.row, delta.col, transpose)
               : []),
-            ...this.rulePatches(snapshot, area, parts.conditionalFormats, parts.notes),
+            ...this.rulePatches(snapshot, area, {
+              notes: parts.notes,
+              conditionalFormats: parts.conditionalFormats,
+              // Validation pastes only rules; All keeps the target's rules with `paste.keepValidation`, as Paste does.
+              validation:
+                parts.validation &&
+                (options.paste === "validation" || this.deps.keepValidation?.() !== true),
+            }),
           ]
         : [];
     if (parts.content === null && parts.style === null) {
@@ -1207,6 +1239,19 @@ export class ClipboardController {
     extraPatches: DocumentOp[] = [],
   ): void {
     const activeSheet = this.deps.activeSheet();
+    // With `paste.keepValidation`, a value a reject rule refuses is not pasted.
+    const check = this.deps.keepValidation?.() ? this.validationCheck() : null;
+    const writeAt = check
+      ? (r: number, c: number, targetCol: number): CellWrite | null => {
+          const write = cellAt(r, c, targetCol);
+          const addr = {
+            sheet: activeSheet,
+            row: this.deps.toDataRow(focus.row + r),
+            col: targetCol,
+          };
+          return write && check.admits(write, addr) ? write : null;
+        }
+      : cellAt;
     const rowLimit = this.deps.store.viewRowCount(activeSheet);
     const colIndices = this.deps.colIndices();
     const startPos = colIndices.indexOf(focus.col);
@@ -1242,7 +1287,7 @@ export class ClipboardController {
             break;
           }
 
-          const write = cellAt(row, col, targetCol);
+          const write = writeAt(row, col, targetCol);
           if (!write) {
             canPack = false;
             break;
@@ -1301,6 +1346,7 @@ export class ClipboardController {
           ],
           "paste",
         );
+        check?.report();
         return;
       }
     }
@@ -1316,7 +1362,7 @@ export class ClipboardController {
         const merge = this.deps.mergeAnchorAt(targetRow, targetCol);
         if (merge && (merge.r0 !== targetRow || merge.c0 !== targetCol)) continue;
 
-        const write = cellAt(r, c, targetCol);
+        const write = writeAt(r, c, targetCol);
         if (!write) continue;
         patches.push({
           op: "set",
@@ -1328,6 +1374,48 @@ export class ClipboardController {
     }
 
     this.deps.commit([...patches, ...extraPatches], "paste");
+    check?.report();
+  }
+
+  /**
+   * The check of a paste that keeps the target's validation rules: each
+   * cell's value against the rules over its cell. It records the cells a
+   * `reject` rule refuses and those a `warn` rule refuses, once each, and
+   * `report` hands them to the grid's notice.
+   */
+  private validationCheck(): {
+    admits(write: CellWrite, addr: CellAddress): boolean;
+    report(): void;
+  } {
+    const rules = this.deps.sheet().validationRules ?? [];
+    const reads = this.deps.validationReads?.();
+    const refused = new Map<string, CellAddress>();
+    const warned = new Map<string, CellAddress>();
+    return {
+      admits: (write, addr) => {
+        if (rules.length === 0) return true;
+        let value: CellScalar | undefined;
+        if (write.value.kind === "literal") value = write.value.value;
+        else if (write.value.kind === "formula") {
+          const result = reads?.formula(write.value.src, addr);
+          value = typeof result === "object" && result !== null ? result.error : result;
+        }
+        if (value === undefined) return true;
+        const rule = failingValidationRule(rules, addr, value, reads);
+        if (!rule) return true;
+        const key = `${addr.row}:${addr.col}`;
+        if (rule.policy === "reject") {
+          refused.set(key, addr);
+          return false;
+        }
+        warned.set(key, addr);
+        return true;
+      },
+      report: () => {
+        if (refused.size === 0 && warned.size === 0) return;
+        this.deps.onValidationRefused?.([...refused.values()], [...warned.values()]);
+      },
+    };
   }
 
   /**
@@ -1484,6 +1572,7 @@ export class ClipboardController {
       // Paste and Paste Special carry these to the target, as in Excel.
       notes: source ? copyNotes(sheet, source) : [],
       conditionalFormats: source ? copyConditionalFormats(sheet, source) : [],
+      validation: source && !merged ? copiedValidation(sheet.validationRules ?? [], source) : [],
       columnWidths: selectedColumns.map((col) => sheet.columns[col]?.width ?? 0),
     };
   }

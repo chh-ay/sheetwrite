@@ -253,7 +253,11 @@ export class SheetwriteStore implements Store {
       });
     }
 
-    this.policy = new StoreMutationPolicy(workbook, (sheet) => this.engine.pivotOutputs(sheet));
+    this.policy = new StoreMutationPolicy(
+      workbook,
+      (sheet) => this.engine.pivotOutputs(sheet),
+      this.engine.validationReads,
+    );
     this.protectionResolver = options.protectionResolver;
     this.mutationPolicy = options.mutationPolicy ?? "atomic";
     registerStoreEngine(this, this.engine, this.generation);
@@ -324,8 +328,10 @@ export class SheetwriteStore implements Store {
     this.documentId = replacement.documentId;
     this.documentVersion = replacement.documentVersion;
     this.epoch += 1;
-    this.policy = new StoreMutationPolicy(this.workbook, (sheet) =>
-      this.engine.pivotOutputs(sheet),
+    this.policy = new StoreMutationPolicy(
+      this.workbook,
+      (sheet) => this.engine.pivotOutputs(sheet),
+      this.engine.validationReads,
     );
     replaceStoreXlsxSource(this, replacement);
 

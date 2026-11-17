@@ -342,6 +342,16 @@ export interface GridActions {
    * opens. Does nothing on a read-only grid.
    */
   formatCells(format?: { style?: Partial<CellStyle>; border?: BorderPreset }): void;
+  /**
+   * Data › Data Validation: open Excel's Data Validation dialog for the
+   * selection, with Settings, Input Message and Error Alert tabs showing the
+   * active cell's rule. OK gives the selected cells the rule, or removes it
+   * after Clear All, as one undoable step. When the selection holds several
+   * kinds of rule, or cells with and without one, Excel's question comes
+   * first. The dialog's code loads the first time it opens. Does nothing on a
+   * read-only grid.
+   */
+  dataValidation(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
@@ -808,6 +818,18 @@ export interface GridConfig {
    * turns it off, as Excel's "Enable AutoComplete for cell values" does.
    */
   autoComplete?: boolean;
+  /** How a paste treats the cells it lands on. */
+  paste?: {
+    /**
+     * Keep the data validation rules of the cells a paste covers (default
+     * false). Excel's paste, the default, gives them the copied cells' rules
+     * and lands every value unchecked. With `true`, the cells keep their
+     * rules, a value a `reject` rule refuses is not pasted, a value a `warn`
+     * rule refuses lands, and the status bar names both kinds of cell with a
+     * "Select them" button.
+     */
+    keepValidation?: boolean;
+  };
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**

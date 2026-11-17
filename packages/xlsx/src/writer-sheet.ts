@@ -1,5 +1,6 @@
 import type {
   ConditionalFormatRule,
+  DataValidationOperand,
   DataValidationRule,
   SheetSnapshot,
   WorkbookSnapshot,
@@ -93,10 +94,23 @@ function validationXml(
   sheet: string,
 ): string | null {
   const condition = rule.condition;
+  // XLSX keeps a validation formula without its leading `=`.
+  const formulaText = (formula: string): string => formula.slice(1);
+  const operandText = (operand: DataValidationOperand): string =>
+    typeof operand === "number" ? String(operand) : formulaText(operand);
   let type: string;
   let operator = "";
-  let formulas: (string | number)[];
-  if (condition.kind === "list" || condition.kind === "checkbox") {
+  let formulas: string[];
+  if (condition.kind === "any") {
+    type = "none";
+    formulas = [];
+  } else if (condition.kind === "custom") {
+    type = "custom";
+    formulas = [formulaText(condition.formula)];
+  } else if (condition.kind === "list" && "source" in condition) {
+    type = "list";
+    formulas = [formulaText(condition.source)];
+  } else if (condition.kind === "list" || condition.kind === "checkbox") {
     const values =
       condition.kind === "list"
         ? condition.values
@@ -110,25 +124,19 @@ function validationXml(
     type = "list";
     formulas = [`"${list}"`];
   } else {
-    type =
-      condition.kind === "date"
-        ? "date"
-        : condition.kind === "textLength"
-          ? "textLength"
-          : condition.kind === "number" && condition.integer
-            ? "whole"
-            : "decimal";
+    type = condition.kind === "number" ? (condition.integer ? "whole" : "decimal") : condition.kind;
     if (condition.comparison) {
       operator = condition.comparison.operator;
-      formulas =
+      formulas = (
         "value" in condition.comparison
           ? [condition.comparison.value]
-          : [condition.comparison.min, condition.comparison.max];
+          : [condition.comparison.min, condition.comparison.max]
+      ).map(operandText);
     } else {
-      formulas = [condition.min, condition.max].filter(
+      const bounds = [condition.min, condition.max].filter(
         (value): value is number => value !== undefined,
       );
-      if (formulas.length === 0) return null;
+      if (bounds.length === 0) return null;
       operator =
         condition.min !== undefined && condition.max !== undefined
           ? condition.min === condition.max
@@ -137,34 +145,41 @@ function validationXml(
           : condition.min !== undefined
             ? "greaterThanOrEqual"
             : "lessThanOrEqual";
-      if (operator === "equal" && condition.min !== undefined) formulas = [condition.min];
+      formulas = (operator === "equal" ? bounds.slice(0, 1) : bounds).map(String);
     }
   }
-  let helpText = rule.helpText;
-  if (helpText && Array.from(helpText).length > 255) {
-    emitWarning(context, {
-      code: "validation-loss",
-      message: `Validation rule "${rule.id}" prompt/error exceeded 255 characters and was omitted from native XLSX`,
-      sheet,
-    });
-    helpText = undefined;
+  const texts = [
+    ["error", rule.helpText, 255],
+    ["errorTitle", rule.errorTitle, 32],
+    ["promptTitle", rule.inputTitle, 32],
+    ["prompt", rule.inputMessage, 255],
+  ] as const;
+  const textAttributes: string[] = [];
+  for (const [attribute, text, maxLength] of texts) {
+    if (!text) continue;
+    if (Array.from(text).length > maxLength) {
+      emitWarning(context, {
+        code: "validation-loss",
+        message: `Validation rule "${rule.id}" ${attribute} exceeded ${maxLength} characters and was omitted from native XLSX`,
+        sheet,
+      });
+      continue;
+    }
+    textAttributes.push(`${attribute}="${escapeXml(encodeXstring(text))}"`);
   }
+  const errorStyle = rule.errorStyle ?? (rule.policy === "warn" ? "warning" : "stop");
   const attributes = [
     `type="${type}"`,
     ...(operator ? [`operator="${operator}"`] : []),
     `sqref="${areaA1(rule.range)}"`,
     `allowBlank="${rule.allowBlank === false ? 0 : 1}"`,
-    `showInputMessage="${helpText ? 1 : 0}"`,
+    // Excel's showDropDown means the opposite: 1 hides the in-cell dropdown.
+    ...(condition.kind === "list" && rule.inCellDropdown === false ? ['showDropDown="1"'] : []),
+    `showInputMessage="${rule.showInputMessage === false ? 0 : 1}"`,
     `showErrorMessage="${rule.policy === "allow" ? 0 : 1}"`,
-    ...(rule.policy !== "allow"
-      ? [`errorStyle="${rule.policy === "reject" ? "stop" : "warning"}"`]
-      : []),
-    ...(helpText
-      ? [
-          `prompt="${escapeXml(encodeXstring(helpText))}"`,
-          `error="${escapeXml(encodeXstring(helpText))}"`,
-        ]
-      : []),
+    // Stop is the schema default, so Excel writes the style only when it is another.
+    ...(errorStyle === "stop" ? [] : [`errorStyle="${errorStyle}"`]),
+    ...textAttributes,
   ].join(" ");
   return `<dataValidation ${attributes}>${formulas.map((formula, index) => `<formula${index + 1}>${escapeXml(encodeXstring(String(formula)))}</formula${index + 1}>`).join("")}</dataValidation>`;
 }

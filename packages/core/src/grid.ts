@@ -1,4 +1,4 @@
-import { colToA1 } from "./a1.js";
+import { cellA1, colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
@@ -105,6 +105,7 @@ import {
   addRowGroup,
   collapseRowGroup,
   movedBlock,
+  rangeContains,
   removeRowGroup,
   visibleSheetNeighbor,
 } from "./store/ranges.js";
@@ -188,6 +189,7 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
+import { hasInputMessage } from "./validation-rule.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
@@ -948,6 +950,11 @@ export class GridImpl implements Grid {
           special.pasteSpecialDialog(host, ownCopy),
         ),
       sheetName: (sheet) => this.sheetById(sheet)?.name,
+      keepValidation: () => this.config?.paste?.keepValidation === true,
+      onValidationRefused: (refused, warned) => {
+        this.validationRefusedNotice(refused, warned);
+      },
+      validationReads: () => storeEngine(this.store)?.validationReads,
     });
 
     this.styleDeps = {
@@ -1160,6 +1167,7 @@ export class GridImpl implements Grid {
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
       geometryVersion: () => this.readWindows.geometryVersion,
+      validationRuleAt: (row, col) => this.validationRuleAt(row, col),
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -1218,8 +1226,7 @@ export class GridImpl implements Grid {
       presentation: this.presentation,
       columnHeader: (col) => this.columnHeader(col),
       focusCell: () => this.selection.focusCell,
-      noteAt: (row, col) =>
-        this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
+      descriptionAt: (row, col) => this.cellDescription(row, col),
       selection: () => this.selection.toSelection(this.activeSheet),
     });
 
@@ -2011,6 +2018,60 @@ export class GridImpl implements Grid {
   private anchorCell(row: number, col: number): CellRef {
     const merge = this.mergeAnchorAt(row, col);
     return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
+  }
+
+  /**
+   * What a screen reader hears after the cell at view `row`, `col`: its note,
+   * and the input message of its validation rule, which Excel shows beside it.
+   */
+  private cellDescription(row: number, col: number): string | null {
+    const note = this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col });
+    const rule = this.validationRuleAt(row, col);
+    const input =
+      rule && hasInputMessage(rule)
+        ? [rule.inputTitle, rule.inputMessage].filter(Boolean).join(": ")
+        : "";
+    return [note ? `Note: ${note}` : "", input].filter(Boolean).join(". ") || null;
+  }
+
+  /**
+   * The status notice after a paste that kept the target's validation rules
+   * (`paste.keepValidation`): the cells whose values it refused, and those it
+   * pasted against a `warn` rule, with a button that selects them.
+   */
+  private validationRefusedNotice(
+    refused: readonly CellAddress[],
+    warned: readonly CellAddress[],
+  ): void {
+    const SHOWN = 3;
+    const named = (cells: readonly CellAddress[], what: string): string => {
+      const names = cells.slice(0, SHOWN).map((cell) => cellA1(cell.row, cell.col));
+      const more = cells.length > SHOWN ? ` and ${cells.length - SHOWN} more` : "";
+      return `${cells.length} ${cells.length === 1 ? "cell" : "cells"} ${what}: ${names.join(", ")}${more}.`;
+    };
+    const parts = [
+      ...(refused.length > 0 ? [named(refused, "refused")] : []),
+      ...(warned.length > 0 ? [named(warned, "outside the rules")] : []),
+    ];
+    const cells = [...refused, ...warned];
+    const ranges = cells.map(({ sheet, row, col }) => ({
+      sheet,
+      start: { row, col },
+      end: { row, col },
+    }));
+    this.actionFeedback.show(parts.join(" "), {
+      label: "Select them",
+      run: () => this.setSelection({ kind: "multi", ranges }),
+    });
+  }
+
+  /** The validation rule over the cell at view `row`, `col`, if any; a merge answers for its anchor. */
+  private validationRuleAt(row: number, col: number): DataValidationRule | undefined {
+    const rules = this.sheet().validationRules;
+    if (!rules?.length) return undefined;
+    const cell = this.anchorCell(row, col);
+    const addr = { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col };
+    return rules.find((rule) => rangeContains(rule.range, addr));
   }
 
   private scheduleRender(): void {
@@ -2952,6 +3013,14 @@ export class GridImpl implements Grid {
   private releaseKeys(): void {
     if (--this.commandLoads > 0) return;
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
+  }
+
+  /** Data › Data Validation; the command and its dialog load the first time it opens. */
+  private dataValidation(): void {
+    this.loadCommand(import("./data-validation-command.js"), ({ dataValidationCommand }) => {
+      if (this.lifetime.closed) return;
+      void dataValidationCommand({ dialogs: this.dialogHost, style: this.styleDeps });
+    });
   }
 
   /** What the commands of `cell-commands.ts` use; built on first use. */
@@ -3914,6 +3983,7 @@ export class GridImpl implements Grid {
       insertCells: (options) => insertOrDelete(this.cellCommands(), true, options),
       deleteCells: (options) => insertOrDelete(this.cellCommands(), false, options),
       formatCells: (format) => formatCells(this.cellCommands(), format),
+      dataValidation: () => this.dataValidation(),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =

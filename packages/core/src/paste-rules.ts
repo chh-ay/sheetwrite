@@ -4,9 +4,11 @@
 // conditional formats" keeps the target's rules beside the copied ones.
 
 import { shiftA1Refs } from "./a1.js";
+import { rangesIntersect } from "./store/ranges.js";
 import type { ConditionalFormatRule } from "./types/cell.js";
 import type { Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, Sheet } from "./types/document.js";
+import { subtractRanges } from "./validation-transfer.js";
 
 /** A copied note, at its offset from the copied block's top-left. */
 export interface CopiedNote {
@@ -181,32 +183,21 @@ export function conditionalFormatPastePatches(
 ): DocumentOp[] {
   const existing = sheet.conditionalFormats ?? [];
   if (parts.length === 0 && (merge || existing.length === 0)) return [];
-  const hole = {
-    r0: area.row,
-    c0: area.col,
-    r1: area.row + area.rows - 1,
-    c1: area.col + area.cols - 1,
+  const hole: Range = {
+    sheet: area.sheet,
+    start: { row: area.row, col: area.col },
+    end: { row: area.row + area.rows - 1, col: area.col + area.cols - 1 },
   };
   const rules: ConditionalFormatRule[] = [];
   for (const rule of existing) {
-    const r = boundsOf(rule.range);
-    if (merge || r.r1 < hole.r0 || r.r0 > hole.r1 || r.c1 < hole.c0 || r.c0 > hole.c1) {
+    if (merge || !rangesIntersect(rule.range, hole)) {
       rules.push(rule);
       continue;
     }
-    // The rest of the range around the hole: the rows above and below it,
-    // then the columns beside it.
-    const top = Math.max(r.r0, hole.r0);
-    const bottom = Math.min(r.r1, hole.r1);
-    const pieces: Bounds[] = [
-      { r0: r.r0, c0: r.c0, r1: hole.r0 - 1, c1: r.c1 },
-      { r0: hole.r1 + 1, c0: r.c0, r1: r.r1, c1: r.c1 },
-      { r0: top, c0: r.c0, r1: bottom, c1: hole.c0 - 1 },
-      { r0: top, c0: hole.c1 + 1, r1: bottom, c1: r.c1 },
-    ];
-    for (const piece of pieces) {
-      if (piece.r0 > piece.r1 || piece.c0 > piece.c1) continue;
-      rules.push(rulePart(rule, r, piece, area.sheet));
+    // The rest of the range around the hole, as validation rules split.
+    const from = boundsOf(rule.range);
+    for (const piece of subtractRanges(rule.range, [hole])) {
+      rules.push(rulePart(rule, from, boundsOf(piece), area.sheet));
     }
   }
   for (const copy of copiesOf(block, area)) {

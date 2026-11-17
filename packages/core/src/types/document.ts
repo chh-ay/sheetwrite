@@ -262,11 +262,32 @@ interface NamedFormulaSnapshot {
 export type ValidationPolicy = "reject" | "warn" | "allow";
 
 /**
+ * The style of Excel's error alert for a value a rule rejects, chosen in Data
+ * Validation › Error Alert. `stop` refuses the value (Retry, Cancel);
+ * `warning` asks whether to keep it (Yes, No, Cancel); `information` tells
+ * the user and keeps it (OK, Cancel).
+ */
+export type ValidationErrorStyle = "stop" | "warning" | "information";
+
+/**
+ * One bound of a validation comparison: a number, or a formula with its
+ * leading `=`, such as `"=B1"` or `"=TODAY()"`, as Excel's Minimum and
+ * Maximum boxes take. A formula's relative references are relative to the
+ * top-left cell of the rule's range; each checked cell reads them shifted to
+ * itself, as Excel does.
+ */
+export type DataValidationOperand = number | string;
+
+/**
  * Native comparison semantics for numeric, date-serial, and text-length validation.
  * Interval operands are inclusive; `notBetween` accepts values outside that interval.
  */
 export type DataValidationComparison =
-  | { operator: "between" | "notBetween"; min: number; max: number }
+  | {
+      operator: "between" | "notBetween";
+      min: DataValidationOperand;
+      max: DataValidationOperand;
+    }
   | {
       operator:
         | "equal"
@@ -275,7 +296,7 @@ export type DataValidationComparison =
         | "lessThan"
         | "greaterThanOrEqual"
         | "lessThanOrEqual";
-      value: number;
+      value: DataValidationOperand;
     };
 
 /**
@@ -283,9 +304,19 @@ export type DataValidationComparison =
  *
  * `min` and `max` remain inclusive legacy bounds. Use `comparison` when the
  * operator itself is significant; comparison and legacy bounds are mutually exclusive.
+ * Formulas (`source`, `formula`, formula operands) are relative to the
+ * top-left cell of the rule's range, as in Excel.
  */
 export type DataValidationCondition =
+  /** Excel's "Any value": every value passes; the rule carries an input message. */
+  | { kind: "any" }
   | { kind: "list"; values: readonly CellScalar[]; allowCustom?: boolean }
+  /**
+   * A list whose items are the cells of a range or a defined name, written
+   * as Excel's Source box takes it: `"=$H$2:$H$5"`, `"=Lists!$A$1:$A$9"` or
+   * `"=Regions"`. The list follows edits to those cells.
+   */
+  | { kind: "list"; source: string; allowCustom?: boolean }
   | {
       kind: "number";
       min?: number;
@@ -294,7 +325,15 @@ export type DataValidationCondition =
       comparison?: DataValidationComparison;
     }
   | { kind: "date"; min?: number; max?: number; comparison?: DataValidationComparison }
+  /** A time of day as a fraction of a day: 0.5 is 12:00. */
+  | { kind: "time"; min?: number; max?: number; comparison?: DataValidationComparison }
   | { kind: "textLength"; min?: number; max?: number; comparison?: DataValidationComparison }
+  /**
+   * Excel's Custom: a value passes when `formula` (with its leading `=`) is
+   * TRUE or a non-zero number in its cell with the value in it, as in
+   * `"=COUNTIF($A:$A,A1)=1"`.
+   */
+  | { kind: "custom"; formula: string }
   | {
       kind: "checkbox";
       checkedValue?: CellScalar;
@@ -309,12 +348,40 @@ export interface DataValidationRule {
   range: Range;
   /** What a value must satisfy, such as a list of choices or a number range. */
   condition: DataValidationCondition;
-  /** `reject` refuses a failing value, `warn` accepts it with a warning, `allow` skips the check. */
+  /**
+   * `reject` refuses a failing value, `warn` accepts it with a warning, `allow`
+   * skips the check. In the grid, `reject` shows a Stop alert, `warn` a Warning
+   * or Information alert ({@link DataValidationRule.errorStyle}), and `allow`
+   * no alert (Excel's "Show error alert" turned off).
+   */
   policy: ValidationPolicy;
   /** Whether clearing a cell passes the rule; defaults to `true`. */
   allowBlank?: boolean;
-  /** Message shown when a value fails; without it, a message is built from the condition. */
+  /**
+   * Whether a list rule shows its dropdown arrow and list (Excel's "In-cell
+   * dropdown"); defaults to `true`. Other kinds ignore it.
+   */
+  inCellDropdown?: boolean;
+  /**
+   * The error alert's message, shown when a value fails; without it, the grid
+   * shows Excel's default text and `MutationIssue.message` is built from the
+   * condition. At most 255 characters.
+   */
   helpText?: string;
+  /** The error alert's title; without it, "Data Validation". At most 32 characters. */
+  errorTitle?: string;
+  /**
+   * The error alert's style. Must agree with `policy`: `stop` (the default)
+   * for `reject`; `warning` (the default) or `information` for `warn`. With
+   * `allow` it keeps the style chosen while the alert is off; default `stop`.
+   */
+  errorStyle?: ValidationErrorStyle;
+  /** Whether the input message shows when a cell of the rule is selected; defaults to `true`. */
+  showInputMessage?: boolean;
+  /** The input message's title. At most 32 characters. */
+  inputTitle?: string;
+  /** The input message, shown beside a selected cell of the rule. At most 255 characters. */
+  inputMessage?: string;
 }
 
 /** Serializable client UX policy. A host resolver decides whether a local mutation may proceed. */

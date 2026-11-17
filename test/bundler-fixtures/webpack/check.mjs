@@ -60,6 +60,9 @@ const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
 // Webpack may give the dialog shell a chunk of its own or copy it into the
 // Format Cells chunk.
 const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
+// Data › Data Validation's command and dialog load on first use; their class
+// names survive minifiers. Webpack may copy the dialog shell into the chunk.
+const DATA_VALIDATION_MARKER = "sheetwrite-data-validation";
 // The sheet menu's Move or Copy dialog and Tab Color palette load on first
 // use, together; the dialog's last list entry survives minifiers.
 const SHEET_TAB_PANELS_MARKER = "(move to end)";
@@ -85,6 +88,7 @@ const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
 const formatCellsChunks = [];
+const dataValidationChunks = [];
 const dialogChunks = [];
 const sheetTabPanelChunks = [];
 const dashboardChunks = [];
@@ -111,6 +115,7 @@ for (const file of lazyChunks) {
     chromeChunks.push(file);
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
+  else if (code.includes(DATA_VALIDATION_MARKER)) dataValidationChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
@@ -144,6 +149,11 @@ if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
 if (formatCellsChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
+if (dataValidationChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack Data Validation chunk, got ${dataValidationChunks.length}`,
+  );
+}
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
 if (sheetTabPanelChunks.length !== 1) {
@@ -193,6 +203,9 @@ if (mainCode.includes(DIALOG_MARKER)) {
 }
 if (mainCode.includes(FORMAT_CELLS_MARKER)) {
   throw new Error("Format Cells is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(DATA_VALIDATION_MARKER)) {
+  throw new Error("Data Validation is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(SHEET_TAB_PANELS_MARKER)) {
   throw new Error("The sheet tab panels are in webpack's main.js; they must load lazily");
@@ -247,6 +260,7 @@ const assets = publicFiles.map((file) => {
       findChunks,
       autoFilterChunks,
       formatCellsChunks,
+      dataValidationChunks,
       dialogChunks,
       sheetTabPanelChunks,
       documentChunks,

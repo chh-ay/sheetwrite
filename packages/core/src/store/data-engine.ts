@@ -167,6 +167,7 @@ import type {
 } from "../types/store.js";
 import type { WorkbookTable, WorkbookTableColumn } from "../types/table.js";
 import type { ChangeEvent } from "../types/transaction.js";
+import { mapValidationFormulas, type ValidationReads } from "../validation-rule.js";
 import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
@@ -230,6 +231,7 @@ import {
 } from "./ranges.js";
 import { SheetRegistry } from "./sheet-registry.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
+import { storeValidationReads } from "./validation-reads.js";
 import { StoreViewState } from "./view-state.js";
 import type { PivotOutputCells, RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
@@ -576,6 +578,29 @@ function rebaseConditionalFormats(
     rebased.push({ ...rule, range, when });
   }
   return rebased;
+}
+
+/**
+ * Validation rules after a row or column edit on `editedSheet`: their ranges
+ * follow it, and so do the references of their formulas.
+ */
+function rebaseValidationRules(
+  rules: readonly DataValidationRule[],
+  editedSheet: SheetId,
+  axis: SheetAxis,
+  remap: (index: number) => number | null,
+  formulaEdit: FormulaAxisEdit,
+): DataValidationRule[] {
+  return rebaseRangeItems(rules, editedSheet, axis, remap).map((rule) =>
+    rule.range.sheet === editedSheet
+      ? {
+          ...rule,
+          condition: mapValidationFormulas(rule.condition, (formula) =>
+            remapFormulaA1Refs(formula, axis, formulaEdit),
+          ),
+        }
+      : rule,
+  );
 }
 
 /** A store failure caused by the workbook, options or call the host gave. */
@@ -1399,6 +1424,38 @@ export class StoreDataEngine {
     const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
     const result = this.wasm.previewFormula(target, text, fields);
     return decodePreview(fields, result);
+  }
+
+  /**
+   * As {@link previewFormula}, as if `cell` held `trial`: the formulas that
+   * read the cell see `trial`, and the cell keeps its content. A data
+   * validation custom formula checks a typed value with it before it is stored.
+   */
+  previewFormulaWith(cell: CellAddress, text: string, trial: CellScalar): FormulaPreview {
+    const fields = new Float64Array(PREVIEW_FIELDS);
+    const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
+    const result = this.wasm.previewFormulaWith(
+      target,
+      text,
+      trialKind(trial),
+      typeof trial === "number" ? trial : trial === true ? 1 : 0,
+      typeof trial === "string" ? trial : "",
+      fields,
+    );
+    return decodePreview(fields, result);
+  }
+
+  private validationReadsCache: ValidationReads | undefined;
+
+  /** What data validation rules read from this store: formula results and list sources. */
+  get validationReads(): ValidationReads {
+    this.validationReadsCache ??= storeValidationReads({
+      workbook: () => this.workbook,
+      getCell: (addr) => this.getCell(addr),
+      previewFormula: (cell, text) => this.previewFormula(cell, text),
+      previewFormulaWith: (cell, text, trial) => this.previewFormulaWith(cell, text, trial),
+    });
+    return this.validationReadsCache;
   }
 
   private sameNamedRange(
@@ -4175,7 +4232,13 @@ export class StoreDataEngine {
       to: patch.to,
     };
 
-    sheet.validationRules = rebaseRangeItems(moved.validationRules, sheet.id, axis, moveAt);
+    sheet.validationRules = rebaseValidationRules(
+      moved.validationRules,
+      sheet.id,
+      axis,
+      moveAt,
+      formulaEdit,
+    );
     sheet.protectedRanges = rebaseRangeItems(moved.protectedRanges, sheet.id, axis, moveAt);
     sheet.notes = rebaseNotes(moved.notes, sheet.id, axis, moveAt);
     sheet.conditionalFormats = rebaseConditionalFormats(
@@ -4711,7 +4774,8 @@ export class StoreDataEngine {
 
     this.windowReader.conditionalRulesChanged(sheet);
     meta.validationRules =
-      meta.validationRules && rebaseRangeItems(meta.validationRules, sheet, axis, remap);
+      meta.validationRules &&
+      rebaseValidationRules(meta.validationRules, sheet, axis, remap, formulaEdit);
     meta.protectedRanges =
       meta.protectedRanges && rebaseRangeItems(meta.protectedRanges, sheet, axis, remap);
     meta.notes = meta.notes && rebaseNotes(meta.notes, sheet, axis, remap);
@@ -5395,4 +5459,11 @@ function columnarScalar(
     return columnarScalar(unwrapped.value, type);
   }
   return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
+}
+
+/** The engine's number for the kind of a trial value: 0 blank, 1 number, 2 text, 3 logical. */
+function trialKind(trial: CellScalar): number {
+  if (trial === null) return 0;
+  if (typeof trial === "number") return 1;
+  return typeof trial === "string" ? 2 : 3;
 }

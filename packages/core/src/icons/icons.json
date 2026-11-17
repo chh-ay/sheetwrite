@@ -397,6 +397,10 @@
       "column": 6,
       "row": 9
     },
+    "dataValidation": {
+      "column": 7,
+      "row": 9
+    },
     "dashboard": {
       "column": 0,
       "row": 10
