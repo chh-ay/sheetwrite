@@ -188,7 +188,7 @@ describe("Data Validation command", () => {
     const { grid, host, store } = mountGridWithData(10);
     grid.setSelection({ kind: "range", range: range(0, 2, 4, 2) });
     grid.actions.dataValidation();
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.querySelector(".sheetwrite-dialog-title")?.textContent).toBe("Data Validation");
     const [allow] = [...dialog.querySelectorAll("select")];
     if (!allow) throw new Error("expected the Allow box");
@@ -236,7 +236,7 @@ describe("Data Validation command", () => {
     });
     grid.setSelection({ kind: "range", range: range(0, 0, 1, 0) });
     grid.actions.dataValidation();
-    const question = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const question = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(question.textContent).toContain("more than one type of validation");
     await answerDialog(host, "No");
     expect(host.querySelector(".sheetwrite-dialog")).toBeNull();

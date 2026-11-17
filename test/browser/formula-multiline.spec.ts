@@ -43,7 +43,7 @@ for (const kind of ["cell", "bar"] as const) {
     );
     expect(await editor.getAttribute("role")).not.toBe("combobox");
     await page.keyboard.type("SUM");
-    const list = page.getByRole("listbox", { name: "Functions" });
+    const list = page.getByRole("listbox", { name: "Formula AutoComplete" });
     await expect(list.getByRole("option", { name: "SUM", exact: true })).toBeVisible();
     // Alt+Enter must not accept the open completion.
     await editor.press("Alt+Enter");
@@ -56,7 +56,7 @@ for (const kind of ["cell", "bar"] as const) {
     await editor.press("Alt+Enter");
     await page.keyboard.type("2)");
     await page.keyboard.press("ArrowLeft");
-    await expect(guide.locator("strong")).toHaveText("digits");
+    await expect(guide.locator("strong")).toHaveText("num_digits");
     const source = "=ROUND(\nSUM(A1:A3),\n2)";
     const mirror = page.locator(".sheetwrite-formula-mirror");
     await expect(mirror).toHaveText(source);

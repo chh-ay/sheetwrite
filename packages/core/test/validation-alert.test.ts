@@ -54,7 +54,7 @@ describe("data validation error alert", () => {
     grid.setValidationRule(amountRule());
 
     typeIntoAmount(host, grid, "99");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.getAttribute("role")).toBe("alertdialog");
     expect(dialog.textContent).toContain("Data Validation");
     expect(dialog.textContent).toContain(
@@ -80,7 +80,7 @@ describe("data validation error alert", () => {
     grid.setValidationRule(amountRule({ errorTitle: "Quantity", helpText: "Enter 1 to 5." }));
 
     typeIntoAmount(host, grid, "99");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.querySelector(".sheetwrite-dialog-title")?.textContent).toBe("Quantity");
     expect(dialog.textContent).toContain("Enter 1 to 5.");
     await answerDialog(host, "Cancel");
@@ -95,7 +95,7 @@ describe("data validation error alert", () => {
     grid.setValidationRule(amountRule({ policy: "warn" }));
 
     typeIntoAmount(host, grid, "99");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.textContent).toContain("Continue?");
     expect(dialog.querySelector(".sheetwrite-dialog-default")?.textContent).toBe("No");
     await answerDialog(host, "No");
@@ -116,7 +116,7 @@ describe("data validation error alert", () => {
     grid.setValidationRule(amountRule({ policy: "warn", errorStyle: "information" }));
 
     typeIntoAmount(host, grid, "99");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect([...dialog.querySelectorAll("button")].map((button) => button.textContent)).toEqual([
       "OK",
       "Cancel",
@@ -136,7 +136,7 @@ describe("data validation error alert", () => {
     expect(store.getCell(amount).resolved).toBe(3);
 
     typeIntoAmount(host, grid, "=2*50");
-    await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(store.getCell(amount).resolved).toBe(3);
     grid.destroy();
     store.dispose();

@@ -80,25 +80,38 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
 /**
  * The built-in functions of the active engine. A static import would put the
  * table in every bundle that includes the store, so it loads on the first
- * call and bundlers split it into its own chunk.
+ * call and bundlers split it into its own chunk, with the values Excel's
+ * Formula AutoComplete lists for some arguments.
  */
 async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
-  const { BUILT_IN_FUNCTIONS } = await import("../generated/function-metadata.js");
+  const { BUILT_IN_FUNCTIONS, ARGUMENT_CHOICES } =
+    await import("../generated/function-metadata.js");
   const engineFlag =
     engineFunctionNames === undefined ? FUNCTION_FLAG_DEFAULT_ENGINE : FUNCTION_FLAG_FULL_ENGINE;
 
-  return BUILT_IN_FUNCTIONS.functions.flatMap(([name, family, profile, flags]) => {
+  return BUILT_IN_FUNCTIONS.functions.flatMap(([name, family, profile, flags, names]) => {
     const familyTitle = BUILT_IN_FUNCTIONS.families[family];
     const signature = BUILT_IN_FUNCTIONS.profiles[profile];
-    if ((flags & engineFlag) === 0 || familyTitle === undefined || signature === undefined) {
+    const argumentNames = BUILT_IN_FUNCTIONS.argumentNames[names];
+    if (
+      (flags & engineFlag) === 0 ||
+      familyTitle === undefined ||
+      signature === undefined ||
+      argumentNames === undefined
+    ) {
       return [];
     }
 
+    const choices = ARGUMENT_CHOICES[name];
     return [
       {
         name,
         description: `${familyTitle} function.`,
-        arguments: signature.arguments,
+        arguments: signature.arguments.map((argument, index) => {
+          const argumentChoices = choices?.[index];
+          const named = { ...argument, name: argumentNames[index] ?? "" };
+          return argumentChoices === undefined ? named : { ...named, choices: argumentChoices };
+        }),
         returnKind: signature.returnKind,
         examples: [],
         volatile: (flags & FUNCTION_FLAG_VOLATILE) !== 0,
