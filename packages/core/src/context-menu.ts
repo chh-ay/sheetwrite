@@ -263,10 +263,10 @@ function actionHandler(
       return () => actions.deleteColumn();
 
     case "insertCells":
-      return () => actions.insertCells();
+      return () => actions.insertCells({ ask: true });
 
     case "deleteCells":
-      return () => actions.deleteCells();
+      return () => actions.deleteCells({ ask: true });
 
     case "hideColumn":
       return () => actions.hideColumns();
