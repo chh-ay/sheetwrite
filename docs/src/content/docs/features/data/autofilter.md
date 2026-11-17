@@ -24,10 +24,10 @@ Click a header button, or press **Alt+Down** on a header cell, to open the colum
 - **Sort A to Z** and **Sort Z to A** sort the range below its header in place. Number columns say Smallest to Largest, and date columns Oldest to Newest.
 - **Clear Filter From "Region"** removes the column's filter.
 - **Number Filters**, **Text Filters** or **Date Filters**, by what the column holds, open the Custom AutoFilter form. It takes one or two conditions, joined by **And** or **Or**.
-- A search box narrows the value list. With a search, **OK** keeps only the ticked results.
+- A search box narrows the value list and ticks every result. With a search, **OK** keeps only the ticked results. Tick **Add current selection to filter** to add them to the values the filter keeps already: filter Region to North, then search `South` and press **OK** with the box ticked, and both regions show.
 - The value list ticks the values to show, with **(Select All)** and **(Blanks)**. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
 
-A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet.
+A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet, and while a filter is on, the numbers of the filtered list are blue (the theme's `selectionBorder`), as in Excel. After each filter change the spreadsheet shell's status bar says how many rows the filter keeps, for example "12 of 48 records found", until the next edit.
 
 The dropdown is a dialog named for its column. Tab moves between its parts and stays inside it. In the value list, the arrow keys, Home, End, Page Up and Page Down move, Space ticks or unticks, and Enter applies. Escape closes the dropdown and gives the focus back to the cell.
 

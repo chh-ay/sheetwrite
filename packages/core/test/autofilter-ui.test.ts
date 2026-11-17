@@ -211,4 +211,13 @@ describe("AutoFilter in the grid", () => {
     const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
     expect([1, 2, 3].map(qty)).toEqual(["apple", "banana", "fig"]);
   });
+
+  it("maps view rows to sheet rows and back under a filter", () => {
+    const { grid } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    // The view shows the header, apple (sheet row 1), fig (3), then sheet rows 4 to 9.
+    expect([0, 1, 2, 3, 8, 9].map((row) => grid.sheetRowOf(row))).toEqual([0, 1, 3, 4, 9, null]);
+    expect([0, 1, 2, 3, 9, 10].map((row) => grid.viewRowOf(row))).toEqual([0, 1, null, 2, 8, null]);
+  });
 });
