@@ -188,7 +188,9 @@ describe("AutoFilter in the grid", () => {
       const list = dialog.querySelector<HTMLElement>(".sheetwrite-autofilter-list");
       if (!list) throw new Error("no value list");
       const labels = () =>
-        [...list.querySelectorAll(".sheetwrite-autofilter-option")].map((row) => row.textContent);
+        [...list.querySelectorAll(".sheetwrite-autofilter-label")].map(
+          (label) => label.textContent,
+        );
       return { dialog, list, labels };
     };
 

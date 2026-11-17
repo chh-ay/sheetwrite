@@ -1,10 +1,12 @@
 // Excel's AutoFilter dropdown: sort, clear, the Number, Text or Date Filters
 // conditions, and a searchable value list with (Select All) and (Blanks),
-// which groups dates by year, month and day. The grid imports this module
-// the first time a dropdown opens.
+// which groups dates by year, month and day and counts each value's rows.
+// OK counts the rows the choice keeps. The grid imports this module the
+// first time a dropdown opens.
 
 import { serialToDate } from "./date-serial.js";
 import { popupPosition } from "./menu-surface.js";
+import { formatNumber } from "./number-format.js";
 import { compareScalars } from "./panels/pivot-model.js";
 import { checkStylePart } from "./style-parts.js";
 import type { CellScalar } from "./types/cell.js";
@@ -24,8 +26,14 @@ export interface AutoFilterMenuRequest {
   readonly kind: AutoFilterColumnKind;
   /** The values the list offers: those of the rows the other columns' filters keep. */
   readonly values: readonly CellScalar[];
+  /** How many of those rows hold each value, aligned with `values`. */
+  readonly counts: ArrayLike<number>;
   /** The listed values the column's filter keeps; `null` keeps them all. */
   readonly kept: readonly CellScalar[] | null;
+  /** How many rows below the header the other columns' filters keep. */
+  readonly rows: number;
+  /** How many rows the filtered range has below its header. */
+  readonly total: number;
   readonly filter: ColumnFilter | undefined;
   /** The text a value shows in the column. */
   readonly format: (value: CellScalar) => string;
@@ -187,15 +195,17 @@ type ListItem =
       readonly key: string;
       readonly label: string;
       readonly values: readonly number[];
+      /** How many rows hold its dates. */
+      readonly rows: number;
       readonly open: boolean;
     };
-
-const valueKey = (value: CellScalar): string => `${typeof value}:${String(value)}`;
 
 /** Nesting of a date list: a year, a month and a day group, as Excel's. */
 const DAY_LEVEL = 2;
 /** Indent of each nesting level of a date list, in CSS pixels. */
 const LEVEL_INDENT = 16;
+/** Row counts read with thousands separators: "1,204". */
+const ROW_COUNT_FORMAT = "#,##0";
 
 let nextId = 0;
 
@@ -214,16 +224,18 @@ interface Session {
   readonly values: readonly CellScalar[];
   /** Whether the list groups dates by year, month and day. */
   readonly dated: boolean;
+  /** How many rows hold each value, by value key. */
+  readonly counts: ReadonlyMap<CellScalar, number>;
   /** The years and months a date list shows open, by group key. */
   readonly expanded: Set<string>;
   /** The values checked in the whole list. */
-  readonly checked: Set<string>;
+  readonly checked: Set<CellScalar>;
   /** The search the list shows, trimmed and in lower case; empty without one. */
   query: string;
   /** The values the search leaves; all of them without a search. */
   shown: CellScalar[];
   /** The search results checked; each new search checks all of them, as in Excel. */
-  found: Set<string>;
+  found: Set<CellScalar>;
   /** Whether OK adds the checked search results to the values `checked` keeps. */
   addCurrent: boolean;
   /** The rows the search leaves, (Select All) first. */
@@ -258,6 +270,10 @@ export class AutoFilterMenu {
     this.dismiss();
     const idPrefix = `sheetwrite-autofilter-${nextId++}`;
     const values = [...request.values].sort(blanksLast);
+    const counts = new Map<CellScalar, number>();
+    for (const [index, value] of request.values.entries()) {
+      counts.set(value, request.counts[index] ?? 0);
+    }
     const kept = request.kept === null ? values : request.kept;
     const root = document.createElement("div");
     root.className = "sheetwrite-autofilter";
@@ -310,6 +326,8 @@ export class AutoFilterMenu {
     footer.className = "sheetwrite-autofilter-footer";
     const ok = this.command("OK", () => this.applyValues());
     ok.classList.add("sheetwrite-autofilter-ok");
+    // The button is named OK; its live row count is its description.
+    ok.setAttribute("aria-label", "OK");
     const cancel = this.command("Cancel", () => this.close());
     footer.append(ok, cancel);
 
@@ -338,8 +356,9 @@ export class AutoFilterMenu {
       presetButton,
       values,
       dated: request.kind === "date",
+      counts,
       expanded: new Set(),
-      checked: new Set(kept.map(valueKey)),
+      checked: new Set(kept),
       query: "",
       shown: [],
       found: new Set(),
@@ -635,7 +654,7 @@ export class AutoFilterMenu {
     );
     if (query !== session.query) {
       session.query = query;
-      session.found = new Set(matches.map(valueKey));
+      session.found = new Set(matches);
       session.addCurrent = false;
     }
     session.shown = matches;
@@ -673,11 +692,13 @@ export class AutoFilterMenu {
       readonly key: string;
       readonly label: string;
       readonly values: number[];
+      rows: number;
       readonly children: DateGroup[];
     }
     const years: DateGroup[] = [];
     for (const value of dates) {
       const date = serialToDate(Math.floor(value));
+      const rows = session.counts.get(value) ?? 0;
       let siblings = years;
       let key = "";
       for (const label of [
@@ -688,19 +709,20 @@ export class AutoFilterMenu {
         key = `${key}/${label}`;
         let group = siblings.at(-1);
         if (group?.key !== key) {
-          group = { key, label, values: [], children: [] };
+          group = { key, label, values: [], rows: 0, children: [] };
           siblings.push(group);
         }
         group.values.push(value);
+        group.rows += rows;
         siblings = group.children;
       }
     }
 
     const items: ListItem[] = [];
     const flatten = (groups: readonly DateGroup[], level: number): void => {
-      for (const { key, label, values, children } of groups) {
+      for (const { key, label, values, rows, children } of groups) {
         const open = level < DAY_LEVEL && (session.query !== "" || session.expanded.has(key));
-        items.push({ kind: "group", level, key, label, values, open });
+        items.push({ kind: "group", level, key, label, values, rows, open });
         if (open) flatten(children, level + 1);
       }
     };
@@ -714,7 +736,7 @@ export class AutoFilterMenu {
   }
 
   /** The checks the list shows: the search results' while searching, else the whole list's. */
-  private shownChecks(session: Session): Set<string> {
+  private shownChecks(session: Session): Set<CellScalar> {
     return session.query === "" ? session.checked : session.found;
   }
 
@@ -722,7 +744,7 @@ export class AutoFilterMenu {
   private stateOf(session: Session, values: readonly CellScalar[]): "true" | "false" | "mixed" {
     const checks = this.shownChecks(session);
     let checked = 0;
-    for (const value of values) if (checks.has(valueKey(value))) checked++;
+    for (const value of values) if (checks.has(value)) checked++;
     return checked === 0 ? "false" : checked === values.length ? "true" : "mixed";
   }
 
@@ -760,7 +782,7 @@ export class AutoFilterMenu {
     if (item.kind === "all") state = this.stateOf(session, session.shown);
     else if (item.kind === "group") state = this.stateOf(session, item.values);
     else if (item.kind === "add") state = session.addCurrent ? "true" : "false";
-    else state = this.shownChecks(session).has(valueKey(item.value)) ? "true" : "false";
+    else state = this.shownChecks(session).has(item.value) ? "true" : "false";
     option.setAttribute("aria-selected", String(state === "true"));
     if (state === "mixed") option.setAttribute("aria-checked", "mixed");
     option.classList.toggle("sheetwrite-autofilter-active", index === session.active);
@@ -785,6 +807,7 @@ export class AutoFilterMenu {
     box.dataset.state = state;
     box.setAttribute("aria-hidden", "true");
     const text = document.createElement("span");
+    text.className = "sheetwrite-autofilter-label";
     if (item.kind === "all") {
       text.textContent = session.query ? "(Select All Search Results)" : "(Select All)";
     } else if (item.kind === "add") {
@@ -793,6 +816,19 @@ export class AutoFilterMenu {
       text.textContent = item.kind === "group" ? item.label : this.label(item.value);
     }
     option.append(box, text);
+    // Each value and date group shows how many rows hold it: "North 12".
+    const rows =
+      item.kind === "group"
+        ? item.rows
+        : item.kind === "value"
+          ? session.counts.get(item.value)
+          : undefined;
+    if (rows !== undefined) {
+      const tally = document.createElement("span");
+      tally.className = "sheetwrite-autofilter-tally";
+      tally.textContent = ` ${formatNumber(rows, ROW_COUNT_FORMAT)}`;
+      option.appendChild(tally);
+    }
     return option;
   }
 
@@ -821,7 +857,7 @@ export class AutoFilterMenu {
     if (item.kind === "add") {
       session.addCurrent = !session.addCurrent;
     } else if (item.kind === "value") {
-      const key = valueKey(item.value);
+      const key = item.value;
       if (!checks.delete(key)) checks.add(key);
     } else {
       // (Select All), or a year, month or day: check all of it, or uncheck it
@@ -829,8 +865,8 @@ export class AutoFilterMenu {
       const values = item.kind === "all" ? session.shown : item.values;
       const check = this.stateOf(session, values) !== "true";
       for (const value of values) {
-        if (check) checks.add(valueKey(value));
-        else checks.delete(valueKey(value));
+        if (check) checks.add(value);
+        else checks.delete(value);
       }
     }
     this.renderRows();
@@ -861,11 +897,24 @@ export class AutoFilterMenu {
     this.renderRows();
   }
 
-  /** Excel disables OK while it would keep nothing. */
+  /**
+   * Excel disables OK while it would keep nothing. OK also counts the rows
+   * the choice keeps, live: "OK (12 of 48 rows)".
+   */
   private updateOk(): void {
     const session = this.session;
     if (!session) return;
-    session.ok.disabled = this.keptValues(session).length === 0;
+    const keep = this.keptValues(session);
+    // Every value keeps every row the other filters keep, listed or not.
+    let rows = session.request.rows;
+    if (keep.length < session.values.length) {
+      rows = 0;
+      for (const value of keep) rows += session.counts.get(value) ?? 0;
+    }
+    const { total } = session.request;
+    session.ok.disabled = keep.length === 0;
+    session.ok.textContent = `OK (${formatNumber(rows, ROW_COUNT_FORMAT)} of ${formatNumber(total, ROW_COUNT_FORMAT)} rows)`;
+    session.ok.setAttribute("aria-description", `Keeps ${rows} of ${total} rows`);
   }
 
   /**
@@ -875,10 +924,10 @@ export class AutoFilterMenu {
    */
   private keptValues(session: Session): CellScalar[] {
     if (session.query === "") {
-      return session.values.filter((value) => session.checked.has(valueKey(value)));
+      return session.values.filter((value) => session.checked.has(value));
     }
     return session.values.filter((value) => {
-      const key = valueKey(value);
+      const key = value;
       return session.found.has(key) || (session.addCurrent && session.checked.has(key));
     });
   }

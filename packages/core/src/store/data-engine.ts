@@ -2250,23 +2250,31 @@ export class StoreDataEngine {
   }
 
   /**
-   * {@link distinctValues} with the number format each value shows with: its
-   * first cell's, or `undefined` when that cell has none.
+   * {@link distinctValues} with the number format each value shows with (its
+   * first cell's, or `undefined` when that cell has none) and how many rows
+   * hold it. The counts cover every row of `rows`, past `limit` values too.
    */
-  distinctValuesWithFormats(
+  distinctEntries(
     sheet: SheetId,
     col: number,
     limit: number,
-    rows?: { start: number; end: number },
+    rows: { start: number; end: number },
     only?: Uint32Array,
-  ): { values: CellScalar[]; formats: (string | undefined)[] } {
+  ): { values: CellScalar[]; formats: (string | undefined)[]; counts: Uint32Array } {
     this.requireCompleteQuery(sheet);
-    const { values, styles } = this.view.distinctValues(sheet, col, limit, rows, only);
+    const { values, styles, counts } = this.view.distinctValues(
+      sheet,
+      col,
+      limit,
+      rows,
+      only,
+      true,
+    );
     const formats = new Array<string | undefined>(styles.length);
     for (let index = 0; index < styles.length; index++) {
       formats[index] = this.styles.get(styles[index] ?? 0).numberFormat;
     }
-    return { values, formats };
+    return { values, formats, counts };
   }
 
   /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */

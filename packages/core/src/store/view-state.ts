@@ -313,8 +313,10 @@ export class StoreViewState {
   }
 
   /**
-   * The distinct values of a column, in first-seen order, and the style id of
-   * each value's first cell.
+   * The distinct values of a column, in first-seen order, the style id of
+   * each value's first cell, and how many scanned rows hold each value. With
+   * `rows` and `counted`, the scan reads past `limit` values so the counts
+   * cover every row.
    */
   distinctValues(
     sheet: SheetId,
@@ -322,15 +324,17 @@ export class StoreViewState {
     limit: number,
     rows?: { start: number; end: number },
     only?: Uint32Array,
-  ): { values: CellScalar[]; styles: Uint32Array } {
+    counted = false,
+  ): { values: CellScalar[]; styles: Uint32Array; counts: Uint32Array } {
     const handle = this.sheets.handleOf(sheet);
     const column = rows
-      ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit, only)
+      ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit, only, counted)
       : this.wasm.distinctValues(handle, col, limit);
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
     const texts = column.takeTexts();
     const styles = column.takeStyles();
+    const counts = column.takeCounts();
     column.free();
 
     const out: CellScalar[] = new Array(kinds.length);
@@ -344,7 +348,7 @@ export class StoreViewState {
       else out[i] = null;
     }
 
-    return { values: out, styles };
+    return { values: out, styles, counts };
   }
 
   /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
