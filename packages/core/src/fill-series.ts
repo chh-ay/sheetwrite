@@ -6,6 +6,7 @@
 // grid layer).
 // https://support.microsoft.com/en-us/excel/get-started/fill-data-automatically-in-worksheet-cells
 
+import { dateToSerial, FICTIONAL_LEAP_DAY_SERIAL, serialToDate } from "./date-serial.js";
 import type { CellScalar } from "./types/cell.js";
 
 /** One source cell in fill order (top→bottom for a vertical fill, left→right for a horizontal one). */
@@ -16,6 +17,8 @@ export interface FillSourceCell {
   isFormula: boolean;
   /** True when the cell shows its number as a date, so one cell steps by a day. */
   isDate?: boolean;
+  /** True when the cell shows only a time of day, so one cell steps by an hour. */
+  isTime?: boolean;
 }
 
 /**
@@ -49,6 +52,9 @@ export interface FillOptions {
 /** Relative+absolute slack so float deltas (0.1, 0.2, 0.3, …) read as constant. */
 const DELTA_EPSILON = 1e-9;
 
+/** One hour as a fraction of a date serial's day. */
+const HOUR = 1 / 24;
+
 /** Excel's built-in custom lists, which AutoFill continues. */
 const NAME_LISTS: readonly (readonly string[])[] = [
   ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
@@ -72,6 +78,16 @@ const NAME_LISTS: readonly (readonly string[])[] = [
 
 /** Text that ends in a whole number, such as `Item 1` or `Q01`. */
 const TRAILING_NUMBER = /^(.*?)(\d+)$/s;
+/** A quarter that wraps after 4: `Q3`, `Q 3`, `Qtr3`, `Qtr 3`, `Quarter 3`. */
+const QUARTER = /^(q|qtr|quarter)(\s*)([1-4])$/i;
+/** A quarter written as an ordinal: `3rd Qtr`, `3rd Quarter`. */
+const ORDINAL_QUARTER = /^([1-4])(st|nd|rd|th)(\s*)(qtr|quarter)$/i;
+/** Text that starts with an ordinal number, such as `1st` or `1st Period`. */
+const ORDINAL = /^(\d+)(st|nd|rd|th)(?![a-z])(.*)$/is;
+
+function wrap(offset: number, size: number): number {
+  return ((offset % size) + size) % size;
+}
 
 function isFiniteNumber(v: CellScalar): v is number {
   return typeof v === "number" && Number.isFinite(v);
@@ -80,7 +96,7 @@ function isFiniteNumber(v: CellScalar): v is number {
 function tilingSeries(length: number): FillSeries {
   const n = Math.max(1, length);
   return {
-    stepAt: (p) => ({ kind: "tile", sourceIndex: ((p % n) + n) % n }),
+    stepAt: (p) => ({ kind: "tile", sourceIndex: wrap(p, n) }),
   };
 }
 
@@ -117,18 +133,68 @@ function linearTrend(values: readonly number[]): { base: number; slope: number }
   return { base: meanY - slope * meanX, slope };
 }
 
+function daysInMonth(year: number, month: number): number {
+  return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+}
+
+/**
+ * Dates on the same day of the month (`1-Jan, 1-Apr`), or each on the last
+ * day of its month (`31-Jan, 28-Feb`), step by whole months or years as in
+ * Excel; other dates step by days.
+ */
+function monthSeries(values: readonly number[]): FillSeries | null {
+  const months: number[] = [];
+  let day: number | null = null;
+  let sameDay = true;
+  let lastDays = true;
+  for (const value of values) {
+    if (!Number.isInteger(value) || value === FICTIONAL_LEAP_DAY_SERIAL) return null;
+    const date = serialToDate(value);
+    const year = date.getUTCFullYear();
+    const month = date.getUTCMonth();
+    const dayOfMonth = date.getUTCDate();
+    months.push(year * 12 + month);
+    day ??= dayOfMonth;
+    sameDay &&= dayOfMonth === day;
+    lastDays &&= dayOfMonth === daysInMonth(year, month);
+  }
+  const step = constantStep(months);
+  if (step === null || step === 0 || day === null || !(sameDay || lastDays)) return null;
+  const first = months[0] ?? 0;
+  const toLastDay = !sameDay;
+  return {
+    stepAt: (p) => {
+      const index = first + step * p;
+      const year = Math.floor(index / 12);
+      const month = wrap(index, 12);
+      const last = daysInMonth(year, month);
+      const target = toLastDay ? last : Math.min(day, last);
+      return { kind: "value", value: dateToSerial(new Date(Date.UTC(year, month, target))) };
+    },
+  };
+}
+
 function numericSeries(
   cells: readonly FillSourceCell[],
   values: number[],
   swap: boolean,
 ): FillSeries {
   if (values.length === 1) {
-    // One date counts up by a day; one number is copied. Ctrl swaps the two.
-    const counts = (cells[0]?.isDate === true) !== swap;
+    // One date counts up by a day and one time by an hour; one number is
+    // copied. Ctrl swaps counting and copying.
+    const time = cells[0]?.isTime === true;
+    const counts = (cells[0]?.isDate === true || time) !== swap;
+    const unit = time && !swap ? HOUR : 1;
     const base = values[0] ?? 0;
-    return counts ? { stepAt: (p) => ({ kind: "value", value: base + p }) } : tilingSeries(1);
+    return counts
+      ? { stepAt: (p) => ({ kind: "value", value: base + unit * p }) }
+      : tilingSeries(1);
   }
   if (swap) return tilingSeries(values.length);
+  if (cells.every((cell) => cell.isDate === true)) {
+    const months = monthSeries(values);
+    if (months !== null) return months;
+  }
   const delta = constantStep(values);
   if (delta !== null) {
     const base = values[0] ?? 0;
@@ -138,24 +204,82 @@ function numericSeries(
   return { stepAt: (p) => ({ kind: "value", value: base + slope * p }) };
 }
 
-/** `Item 1`, `Item 2`: the shared text, and the numbers with their written width. */
-function trailingNumbers(
-  texts: readonly string[],
-): { prefix: string; numbers: number[]; width: number } | null {
-  let prefix: string | null = null;
-  let width = 0;
-  const numbers: number[] = [];
-  for (const text of texts) {
-    const match = TRAILING_NUMBER.exec(text);
-    const digits = match?.[2];
-    if (match === null || digits === undefined) return null;
-    const head = match[1] ?? "";
-    if (prefix !== null && head !== prefix) return null;
-    prefix = head;
-    if (digits.startsWith("0")) width = Math.max(width, digits.length);
-    numbers.push(Number(digits));
+/** Text with a number AutoFill counts: `Item 1`, `1st Period`, `Qtr3`. */
+interface CountedText {
+  /** The same for every text of one series: the text around the number. */
+  readonly key: string;
+  readonly number: number;
+  /** The text for another number of the series. */
+  readonly write: (number: number) => string;
+}
+
+/** `st`, `nd`, `rd` or `th` for a whole number, in upper case when `upper`. */
+function ordinalSuffix(number: number, upper: boolean): string {
+  const tens = number % 100;
+  const units = number % 10;
+  const suffix =
+    tens >= 11 && tens <= 13
+      ? "th"
+      : units === 1
+        ? "st"
+        : units === 2
+          ? "nd"
+          : units === 3
+            ? "rd"
+            : "th";
+  return upper ? suffix.toUpperCase() : suffix;
+}
+
+/** Quarters run 1 to 4 and start again, as Excel's `Qtr4, Qtr1` does. */
+function quarter(number: number): number {
+  return wrap(number - 1, 4) + 1;
+}
+
+function countedText(text: string): CountedText | null {
+  const quarterMatch = QUARTER.exec(text);
+  if (quarterMatch !== null) {
+    const [, label = "", space = "", digit = ""] = quarterMatch;
+    return {
+      key: `q${label}${space}`,
+      number: Number(digit),
+      write: (number) => `${label}${space}${quarter(number)}`,
+    };
   }
-  return prefix === null ? null : { prefix, numbers, width };
+  const ordinalQuarter = ORDINAL_QUARTER.exec(text);
+  if (ordinalQuarter !== null) {
+    const [, digit = "", suffix = "", space = "", label = ""] = ordinalQuarter;
+    const upper = suffix === suffix.toUpperCase();
+    return {
+      key: `r${upper}${space}${label}`,
+      number: Number(digit),
+      write: (number) => {
+        const q = quarter(number);
+        return `${q}${ordinalSuffix(q, upper)}${space}${label}`;
+      },
+    };
+  }
+  const ordinal = ORDINAL.exec(text);
+  const [, digits = "", suffix = "", rest = ""] = ordinal ?? [];
+  const upper = suffix === suffix.toUpperCase();
+  if (ordinal !== null && suffix === ordinalSuffix(Number(digits), upper)) {
+    return {
+      key: `o${upper}${rest}`,
+      number: Number(digits),
+      write: (number) => {
+        const whole = Math.abs(number);
+        return `${whole}${ordinalSuffix(whole, upper)}${rest}`;
+      },
+    };
+  }
+  const trailing = TRAILING_NUMBER.exec(text);
+  if (trailing === null) return null;
+  const [, prefix = "", trailingDigits = ""] = trailing;
+  const width = trailingDigits.startsWith("0") ? trailingDigits.length : 0;
+  return {
+    key: `t${prefix}`,
+    number: Number(trailingDigits),
+    write: (number) => `${prefix}${String(Math.abs(number)).padStart(width, "0")}`,
+  };
 }
 
 /** Write `name` in the letter case of `sample`: `MON`, `mon` or `Mon`. */
@@ -186,30 +310,55 @@ function listSeries(texts: readonly string[]): FillSeries | null {
   return null;
 }
 
-function textSeries(texts: readonly string[], swap: boolean): FillSeries {
-  if (swap) return tilingSeries(texts.length);
-  const listed = listSeries(texts);
-  if (listed !== null) return listed;
-  const numbered = trailingNumbers(texts);
-  if (numbered === null) return tilingSeries(texts.length);
-  const { prefix, numbers, width } = numbered;
-  const step = numbers.length > 1 ? constantStep(numbers) : 1;
-  if (step === null) return tilingSeries(texts.length);
-  const base = numbers[0] ?? 0;
+/**
+ * The source repeats, and each text with a number counts up by one per
+ * repeat, as Excel fills `text1, textA` with `text2, textA, text3, textA`.
+ */
+function repeatingSeries(cells: readonly FillSourceCell[]): FillSeries {
+  const n = cells.length;
+  const counted = cells.map((cell) =>
+    typeof cell.value === "string" ? countedText(cell.value) : null,
+  );
+  if (counted.every((text) => text === null)) return tilingSeries(n);
   return {
     stepAt: (p) => {
-      const number = Math.abs(base + step * p);
-      return { kind: "value", value: `${prefix}${String(number).padStart(width, "0")}` };
+      const sourceIndex = wrap(p, n);
+      const text = counted[sourceIndex];
+      if (!text) return { kind: "tile", sourceIndex };
+      return { kind: "value", value: text.write(text.number + Math.floor(p / n)) };
     },
   };
 }
 
+function textSeries(
+  cells: readonly FillSourceCell[],
+  texts: readonly string[],
+  swap: boolean,
+): FillSeries {
+  if (swap) return tilingSeries(texts.length);
+  const listed = listSeries(texts);
+  if (listed !== null) return listed;
+  const counted = texts.map(countedText);
+  const first = counted[0];
+  if (first && counted.every((text) => text?.key === first.key)) {
+    const numbers = counted.map((text) => text?.number ?? 0);
+    const step = numbers.length > 1 ? constantStep(numbers) : 1;
+    if (step !== null) {
+      return { stepAt: (p) => ({ kind: "value", value: first.write(first.number + step * p) }) };
+    }
+  }
+  return repeatingSeries(cells);
+}
+
 /**
  * Classify the source cells and return their fill plan, as Excel's AutoFill:
- * - one number → copy; one date → one day per cell;
- * - numbers with a constant step → continue the step; other numbers → linear trend;
- * - day and month names → continue the list; text ending in a number → count up;
- * - formulas, mixed or other text → copy the source cells in turn.
+ * - one number → copy; one date → one day per cell; one time → one hour per cell;
+ * - dates on one day of the month → step by months; numbers with a constant
+ *   step → continue the step; other numbers → linear trend;
+ * - day and month names → continue the list; quarters → count to 4 and wrap;
+ *   text that ends in a number or starts with an ordinal → count up;
+ * - formulas → copy the source cells in turn; other text and mixed cells →
+ *   repeat, each text with a number counting up once per repeat.
  * `options.swap` (Ctrl-drag) counts one number up and copies a series instead.
  */
 export function detectFillSeries(
@@ -229,6 +378,6 @@ export function detectFillSeries(
     else if (typeof cell.value === "string" && cell.value !== "") texts.push(cell.value);
   }
   if (numbers.length === n) return numericSeries(source, numbers, swap);
-  if (texts.length === n) return textSeries(texts, swap);
-  return tilingSeries(n);
+  if (texts.length === n) return textSeries(source, texts, swap);
+  return swap ? tilingSeries(n) : repeatingSeries(source);
 }

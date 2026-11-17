@@ -4,6 +4,14 @@ export type FormulaScalar = number | string | boolean | null;
 /** Ranges use row-major nested arrays. Scalar expressions use a scalar. */
 export type FormulaArgument = FormulaScalar | readonly (readonly FormulaScalar[])[];
 
+/** One value an argument takes, as Excel's Formula AutoComplete lists it: `FALSE` - `Exact match`. */
+export interface FormulaArgumentChoice {
+  /** The value as it is typed in the formula, such as `FALSE`, `-1` or `"address"`. */
+  readonly value: string;
+  /** What the value means, such as `Exact match`. */
+  readonly description: string;
+}
+
 /** Argument documentation used by built-in and host functions. Types are descriptive, not coercion rules. */
 export interface FormulaArgumentMetadata {
   /** Argument name shown in formula help, such as `region`. */
@@ -14,6 +22,11 @@ export interface FormulaArgumentMetadata {
   readonly optional?: boolean;
   /** Whether the argument can be given any number of times, like `SUM`'s values. */
   readonly repeating?: boolean;
+  /**
+   * The values the argument takes, which formula help lists when the cursor
+   * reaches it, as Excel does for `VLOOKUP`'s `range_lookup`.
+   */
+  readonly choices?: readonly FormulaArgumentChoice[];
 }
 
 /** One metadata format for built-in and host functions. */
@@ -39,9 +52,14 @@ export type FormulaFunction = (...arguments_: readonly FormulaArgument[]) => For
 export interface BuiltInFunctionTable {
   readonly families: readonly string[];
   readonly profiles: readonly {
-    readonly arguments: readonly FormulaArgumentMetadata[];
+    readonly arguments: readonly Omit<FormulaArgumentMetadata, "name">[];
     readonly returnKind: string;
   }[];
-  /** Each row holds the name, family index, signature index, and engine/volatility flags. */
-  readonly functions: readonly (readonly [string, number, number, number])[];
+  /** Excel's argument names, one list per distinct naming of a profile's arguments. */
+  readonly argumentNames: readonly (readonly string[])[];
+  /**
+   * Each row holds the name, family index, signature index, engine/volatility
+   * flags and argument names index.
+   */
+  readonly functions: readonly (readonly [string, number, number, number, number])[];
 }

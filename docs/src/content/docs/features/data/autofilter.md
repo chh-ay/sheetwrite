@@ -30,7 +30,7 @@ Click a header button, or press **Alt+Down** on a header cell, to open the colum
 - Each value shows how many of those rows hold it, "North 12", and so do a date column's years, months and days. **OK** counts the rows the choice keeps as you tick: "OK (12 of 48 rows)". Excel shows neither; a value's count helps to spot a typo that one row holds, and OK's count shows the result before it applies.
 - In a date column the list groups the dates by year, month and day. Right Arrow or the arrow before a year or month opens it, and Left Arrow closes it. Ticking a year or month ticks all its dates.
 
-A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet.
+A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet, and while a filter is on, the numbers of the filtered list are blue (the theme's `selectionBorder`), as in Excel. After each filter change the spreadsheet shell's status bar says how many rows the filter keeps, for example "12 of 48 records found", until the next edit.
 
 The dropdown is a dialog named for its column. Tab moves between its parts and stays inside it. In the value list, the arrow keys, Home, End, Page Up and Page Down move, Space ticks or unticks, and Enter applies. Escape closes the dropdown and gives the focus back to the cell.
 
