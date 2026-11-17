@@ -12,11 +12,11 @@ import {
   type FormulaCompletionItem,
   type FormulaDiagnostic,
   type FormulaNames,
-  type FormulaReference,
   type FormulaTableNames,
 } from "./formula-analysis.js";
 import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
+import type { FormulaReference } from "./formula-references.js";
 import { storeFunctions } from "./functions/registry.js";
 import { argumentLabel, signature } from "./functions/signature.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";

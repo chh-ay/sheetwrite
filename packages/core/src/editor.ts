@@ -6,9 +6,9 @@ import {
   readEditorFieldMetrics,
   sizeEditorTextarea,
 } from "./editor-textarea.js";
-import { toggleReferenceAnchors } from "./formula-analysis.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
+import { toggleReferenceAnchors } from "./formula-references.js";
 import { type FormulaDiagnostic, formulaEntry } from "./formula-syntax.js";
 import type { CellFormat } from "./types/cell.js";
 import type { Theme } from "./types/render.js";
