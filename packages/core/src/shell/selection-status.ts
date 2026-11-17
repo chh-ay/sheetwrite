@@ -1,13 +1,21 @@
-// Status line in the spirit of Excel's: the selection's shape plus Average,
-// Count and Sum. Geometry is constant-time per selection event; the totals
-// come from Grid.summarizeSelection, which reads in bounded chunks between
-// frames, so this piece stays safe next to any selection size.
+// Status line in the spirit of Excel's: the cell mode, then the selection's
+// shape plus Average, Count and Sum. Geometry is constant-time per selection
+// event; the totals come from Grid.summarizeSelection, which reads in bounded
+// chunks between frames, so this piece stays safe next to any selection size.
 
 import { formatNumber } from "../number-format.js";
 import { isAbortError, Scope, ScopeSlot } from "../scope.js";
 import type { Selection } from "../types/coordinates.js";
-import type { Grid, SelectionSummary } from "../types/grid.js";
+import type { CellMode, Grid, SelectionSummary } from "../types/grid.js";
 import type { ShellPiece } from "./formula-controls.js";
+
+/** The words Excel's status bar shows for each cell mode. */
+const MODE_LABELS: Readonly<Record<CellMode, string>> = {
+  ready: "Ready",
+  enter: "Enter",
+  edit: "Edit",
+  point: "Point",
+};
 
 /**
  * Human phrase for a selection's geometry; blank for null/single-cell.
@@ -47,9 +55,10 @@ function describeSummary(summary: SelectionSummary | null): string {
 const STATUS_SEPARATOR = " · ";
 
 /**
- * `<output role="status">` that follows the grid's selection and its values.
- * Text nodes only; polite live region so screen readers announce changes
- * without interrupting.
+ * `<output role="status">` that names Excel's cell mode (Ready, Enter, Edit
+ * or Point) and follows the grid's selection and its values. Text only; a
+ * polite live region, so screen readers announce changes without
+ * interrupting.
  *
  * @param host - Element the status is appended to.
  */
@@ -58,17 +67,24 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   output.className = "sheetwrite-shell-status";
   output.setAttribute("role", "status");
   output.setAttribute("aria-live", "polite");
+  // Excel names the cell mode first, so the user knows what an arrow key does.
+  const mode = document.createElement("span");
+  mode.className = "sheetwrite-shell-mode";
+  const summary = document.createElement("span");
+  output.append(mode, summary);
 
   let geometry = "";
   let totals = "";
   const lifetime = new Scope();
   const summaries = new ScopeSlot(lifetime);
 
+  const showMode = (cellMode: CellMode): void => {
+    mode.textContent = MODE_LABELS[cellMode];
+  };
   const show = (): void => {
     const text = [totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
-    output.textContent = text;
-    output.hidden = text === "";
-    host.hidden = output.hidden && host.childElementCount === 1;
+    summary.textContent = text;
+    summary.hidden = text === "";
   };
 
   // A newer selection or edit makes an unfinished summary stale: the next
@@ -101,6 +117,8 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   lifetime.add(() => output.remove());
   lifetime.add(grid.on("selection", (event) => onSelection(event.selection)));
   lifetime.add(grid.on("change", summarize));
+  lifetime.add(grid.on("cell-mode", (event) => showMode(event.mode)));
+  showMode(grid.getCellMode());
   onSelection(grid.getSelection());
 
   return {

@@ -29,6 +29,7 @@ import type { KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellEditorRect,
+  CellMode,
   ContextMenuItem,
   Grid,
   GridConfig,
@@ -69,7 +70,9 @@ interface InteractionDependencies {
   columnHeader: (col: number) => string;
   toViewRow: (dataRow: number) => number | null;
   editListeners: {
-    readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
+    readonly [K in "edit-begin" | "edit-commit" | "cell-mode"]: ReadonlySet<
+      (payload: GridEvents[K]) => void
+    >;
   };
   /** Hears the cell edit's draft for the shell's formula bar (see `edit-draft.ts`). */
   editDraft: EditDraftSink;
@@ -183,6 +186,8 @@ export class InteractionSessions {
   private fillTarget: SelRect | null = null;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /** Excel's cell mode, which the `cell-mode` event last reported. */
+  private mode: CellMode = "ready";
   /** AutoComplete's code, once the first edit has loaded it. */
   private autocomplete: typeof import("./autocomplete.js") | null = null;
   /** The load of AutoComplete's code, started by the first edit. */
@@ -212,6 +217,22 @@ export class InteractionSessions {
 
   get isEditing(): boolean {
     return this.activeEditor !== null;
+  }
+
+  /** Excel's cell mode now; see {@link CellMode}. */
+  get cellMode(): CellMode {
+    return this.mode;
+  }
+
+  /** Emit `cell-mode` when the mode of the open editor, or of none, changed. */
+  private reportCellMode(): void {
+    const editor = this.activeEditor;
+    let mode: CellMode = "ready";
+    if (editor === this.editor) mode = this.editor.mode;
+    else if (editor === this.customEditor) mode = "edit";
+    if (mode === this.mode) return;
+    this.mode = mode;
+    for (const listener of this.deps.editListeners["cell-mode"]) listener({ mode });
   }
 
   configureMenu(config: GridConfig | undefined, theme: Theme): void {
@@ -361,6 +382,7 @@ export class InteractionSessions {
   private endEditor(): void {
     this.editingAddress = null;
     this.activeEditor = null;
+    this.reportCellMode();
     this.deps.host.focus();
     this.deps.scheduleRender();
     this.deps.editDraft.end();
@@ -372,6 +394,7 @@ export class InteractionSessions {
     const editor = this.activeEditor;
     this.activeEditor = null;
     editor?.cancel();
+    this.reportCellMode();
   }
 
   private finishEdit(
@@ -382,6 +405,7 @@ export class InteractionSessions {
     if (this.editingAddress !== address) return;
     this.editingAddress = null;
     this.activeEditor = null;
+    this.reportCellMode();
     try {
       if (address.sheet !== this.deps.activeSheet()) return;
       const viewRow = this.deps.toViewRow(address.row);
@@ -489,6 +513,7 @@ export class InteractionSessions {
         onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
         onCancel: () => this.endEditor(),
       });
+      this.reportCellMode();
 
       return;
     }
@@ -539,6 +564,7 @@ export class InteractionSessions {
       onShortcut: (event) => this.runCustomShortcut(event, true),
       onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
       complete: this.completion(editCell.row, editCell.col, initial !== undefined),
+      onMode: () => this.reportCellMode(),
     });
     // A formula bar showing the draft starts from the opened text, completed or not.
     this.deps.editDraft.text(this.editor.value);

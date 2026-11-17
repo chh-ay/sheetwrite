@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { createSelectionStatus } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Workbook } from "../src/types.js";
+import type { CellMode, Workbook } from "../src/types.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -75,5 +75,32 @@ it("shows Excel's Average, Count and Sum in the shell status line", async () => 
   expect(piece.element.textContent).toContain("Sum: 22");
   // The status line uses the grid's General number display, not full precision.
   expect(piece.element.textContent).toMatch(/Average: 3\.66?7/);
+  piece.destroy();
+});
+
+// https://support.microsoft.com/en-us/office/excel-status-bar-options-6055ecd9-e20f-4a7a-a611-4481bd488c55
+it("names Excel's cell mode: Ready, Enter, Edit and Point", () => {
+  const { grid } = setup();
+  const piece = createSelectionStatus(document.createElement("div"), grid);
+  const mode = () => piece.element.querySelector(".sheetwrite-shell-mode")?.textContent;
+  const modes: CellMode[] = [];
+  grid.on("cell-mode", (event) => modes.push(event.mode));
+  const press = (key: string) =>
+    document
+      .querySelector("textarea.sheetwrite-editor")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+
+  expect(mode()).toBe("Ready");
+  grid.beginEdit(1, 0, "x");
+  expect(mode()).toBe("Enter");
+  press("F2");
+  expect(mode()).toBe("Edit");
+  press("Escape");
+  expect(mode()).toBe("Ready");
+  grid.beginEdit(2, 1, "=");
+  press("ArrowDown");
+  expect(mode()).toBe("Point");
+  expect(grid.getCellMode()).toBe("point");
+  expect(modes).toEqual(["enter", "edit", "ready", "enter", "point"]);
   piece.destroy();
 });

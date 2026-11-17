@@ -270,6 +270,7 @@ export type {
   CellHyperlink,
   CellInputSnapshot,
   CellLoadState,
+  CellMode,
   CellNote,
   CellPaintContext,
   CellRenderer,

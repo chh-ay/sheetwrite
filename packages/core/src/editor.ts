@@ -10,6 +10,7 @@ import { toggleReferenceAnchors } from "./formula-analysis.js";
 import { FormulaAssist } from "./formula-assist.js";
 import type { AssistDeps } from "./formula-help.js";
 import type { CellFormat } from "./types/cell.js";
+import type { CellMode } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 
 export type { AssistDeps };
@@ -87,6 +88,8 @@ export interface BeginEditOptions {
    * composition ends.
    */
   complete?: (field: HTMLTextAreaElement) => string | null;
+  /** The editor's cell mode changed: Enter, Edit, or Point after a picked reference. */
+  onMode?: (mode: EditorMode) => void;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -96,6 +99,9 @@ interface EditorSizing {
   /** Explicit lines of the text when it was sized. */
   readonly lines: number;
 }
+
+/** The cell modes of an open text editor. */
+export type EditorMode = Exclude<CellMode, "ready">;
 
 /** Whether focus moving to `target` keeps the edit open in another surface. */
 function isEditSurface(target: EventTarget | null): boolean {
@@ -133,6 +139,8 @@ export class EditController {
    * then stores the entry's own letter case, as Excel does.
    */
   private completion: string | null = null;
+  /** The mode `onMode` last reported. */
+  private reportedMode: EditorMode | null = null;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -146,6 +154,22 @@ export class EditController {
   /** Whether the user is typing in this editor, not in another edit surface. */
   get isFocused(): boolean {
     return this.textarea !== null && document.activeElement === this.textarea;
+  }
+
+  /**
+   * Excel's cell mode: Point while a picked reference stays replaceable,
+   * else Enter or Edit.
+   */
+  get mode(): EditorMode {
+    if (this.refStart >= 0) return "point";
+    return this.entering ? "enter" : "edit";
+  }
+
+  private reportMode(): void {
+    const mode = this.mode;
+    if (this.textarea === null || mode === this.reportedMode) return;
+    this.reportedMode = mode;
+    this.opts?.onMode?.(mode);
   }
 
   begin(opts: BeginEditOptions): void {
@@ -192,6 +216,7 @@ export class EditController {
     // The key that opened the editor is the first typed character.
     if (opts.focus && opts.entering) this.autoComplete(ta);
     if (opts.focus) this.attachAssist();
+    this.reportMode();
   }
 
   /**
@@ -210,6 +235,7 @@ export class EditController {
       if (this.sizing?.lines !== lineCount(value)) this.resize();
     }
     ta.setSelectionRange(selectionStart, selectionEnd);
+    this.reportMode();
   }
 
   /** Follow the cell. A move that keeps the cell's size only writes the position. */
@@ -260,12 +286,14 @@ export class EditController {
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
+    this.reportMode();
   }
 
   /** Finish a reference pick; the next pick inserts fresh at the caret. */
   endReference(): void {
     this.refStart = -1;
     this.refEnd = -1;
+    this.reportMode();
   }
 
   /** Whether the last change was a picked reference, which the next pick or arrow replaces. */
@@ -294,6 +322,7 @@ export class EditController {
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
+    this.reportMode();
   }
 
   private readonly onInput = (event: Event): void => {
@@ -305,6 +334,7 @@ export class EditController {
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
+    this.reportMode();
   };
 
   /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
@@ -425,6 +455,7 @@ export class EditController {
       // F2 switches between Enter mode (arrows leave the cell) and Edit mode (arrows move the caret).
       e.preventDefault();
       this.entering = !this.entering;
+      this.reportMode();
     } else if (e.key === "F4" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       this.toggleAnchors();
@@ -475,6 +506,7 @@ export class EditController {
     this.sizing = null;
     this.entering = false;
     this.completion = null;
+    this.reportedMode = null;
     this.tearingDown = false;
   }
 }
