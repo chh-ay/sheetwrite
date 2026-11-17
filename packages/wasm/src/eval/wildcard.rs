@@ -1,6 +1,6 @@
 //! Excel wildcard patterns, shared by criteria (`COUNTIF`, `SUMIFS`, the
 //! database functions), wildcard lookups (`XLOOKUP` and `XMATCH` match mode 2)
-//! and `SEARCH`.
+//! and `SEARCH`, and by Find.
 //!
 //! `*` matches any run of characters and `?` exactly one character; `~` makes
 //! the next `*`, `?` or `~` literal, and a `~` before anything else is a
@@ -20,7 +20,7 @@ enum Token {
 
 /// A pattern parsed once and matched against many candidates.
 #[derive(Debug)]
-pub(super) struct Wildcard {
+pub(crate) struct Wildcard {
     tokens: Vec<Token>,
     has_wildcards: bool,
 }
@@ -29,7 +29,7 @@ impl Wildcard {
     /// Parses `pattern`, or fails with `#NUM!` when its tokens (four bytes
     /// per character) cannot be allocated, as for a pattern of millions of
     /// characters on a nearly full WebAssembly memory.
-    pub(super) fn parse(pattern: &str) -> Result<Self, FormulaError> {
+    pub(crate) fn parse(pattern: &str) -> Result<Self, FormulaError> {
         let mut tokens = Vec::new();
         tokens
             .try_reserve_exact(pattern.chars().count())
@@ -68,15 +68,60 @@ impl Wildcard {
 
     /// Whether the pattern uses `*`, `?` or a `~` escape. Criteria compare a
     /// pattern without them as a plain value instead.
-    pub(super) const fn has_wildcards(&self) -> bool {
+    pub(crate) const fn has_wildcards(&self) -> bool {
         self.has_wildcards
+    }
+
+    /// Find's pattern for a search within cell text: it may start and end
+    /// anywhere, as if it began and ended with `*`. `None` when the two extra
+    /// tokens cannot be allocated.
+    pub(crate) fn within_text(mut self) -> Option<Self> {
+        self.tokens.try_reserve_exact(2).ok()?;
+        if self.tokens.first() != Some(&Token::AnyMany) {
+            self.tokens.insert(0, Token::AnyMany);
+        }
+        if self.tokens.last() != Some(&Token::AnyMany) {
+            self.tokens.push(Token::AnyMany);
+        }
+        Some(self)
     }
 
     /// Whether the pattern matches all of `text`.
     pub(super) fn matches(&self, text: &str) -> bool {
-        match match_prefix(&self.tokens, text, Anchor::Whole, &mut || {
-            Ok::<(), Infallible>(())
-        }) {
+        match match_prefix(
+            &self.tokens,
+            text,
+            Anchor::Whole,
+            &mut || Ok::<(), Infallible>(()),
+            characters_equal_ignore_case,
+        ) {
+            Ok(matched) => matched,
+            Err(never) => match never {},
+        }
+    }
+
+    /// Whether the pattern matches all of `text`; with `match_case`, letters
+    /// compare as written, as in Find's "Match case".
+    pub(crate) fn matches_with_case(&self, text: &str, match_case: bool) -> bool {
+        let mut unbounded = || Ok::<(), Infallible>(());
+        let result = if match_case {
+            match_prefix(
+                &self.tokens,
+                text,
+                Anchor::Whole,
+                &mut unbounded,
+                |left, right| left == right,
+            )
+        } else {
+            match_prefix(
+                &self.tokens,
+                text,
+                Anchor::Whole,
+                &mut unbounded,
+                characters_equal_ignore_case,
+            )
+        };
+        match result {
             Ok(matched) => matched,
             Err(never) => match never {},
         }
@@ -97,7 +142,13 @@ impl Wildcard {
             .map(|(offset, _)| start + offset)
             .chain(std::iter::once(text.len()));
         for candidate in candidates {
-            if match_prefix(&self.tokens, &text[candidate..], Anchor::Start, step)? {
+            if match_prefix(
+                &self.tokens,
+                &text[candidate..],
+                Anchor::Start,
+                step,
+                characters_equal_ignore_case,
+            )? {
                 return Ok(Some(candidate));
             }
         }
@@ -115,12 +166,14 @@ enum Anchor {
 
 /// Matches with one remembered `*`: on a mismatch, that star takes one more
 /// character and matching resumes after it. Text is walked by byte offset, so
-/// a candidate is matched where it lies.
-fn match_prefix<E>(
+/// a candidate is matched where it lies. `equal` compares a text character
+/// with a literal one of the pattern.
+fn match_prefix<E, Equal: Fn(char, char) -> bool>(
     tokens: &[Token],
     text: &str,
     anchor: Anchor,
     step: &mut impl FnMut() -> Result<(), E>,
+    equal: Equal,
 ) -> Result<bool, E> {
     let (mut token_index, mut text_index) = (0usize, 0usize);
     // The token after the last `*` and the text offset that star has reached.
@@ -137,9 +190,7 @@ fn match_prefix<E>(
                 continue;
             }
             Some(Token::AnyOne) => next,
-            Some(Token::Literal(expected)) => {
-                next.filter(|character| characters_equal_ignore_case(*character, *expected))
-            }
+            Some(Token::Literal(expected)) => next.filter(|character| equal(*character, *expected)),
         };
         if let Some(character) = consumed {
             text_index += character.len_utf8();
