@@ -29,7 +29,7 @@ Click a header button, or press **Alt+Down** on a header cell, to open the colum
 - The value list ticks the values to show, with **(Select All)** and **(Blanks)**. Each value shows as its cell shows it, so prices read `$39.50`. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
 - In a date column the list groups the dates by year, month and day. Right Arrow or the arrow before a year or month opens it, and Left Arrow closes it. Ticking a year or month ticks all its dates.
 
-A filtered column's button shows a funnel. While rows are hidden, the row headers show each row's number in the sheet.
+A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet.
 
 The dropdown is a dialog named for its column. Tab moves between its parts and stays inside it. In the value list, the arrow keys, Home, End, Page Up and Page Down move, Space ticks or unticks, and Enter applies. Escape closes the dropdown and gives the focus back to the cell.
 

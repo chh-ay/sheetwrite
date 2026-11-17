@@ -287,23 +287,10 @@
   border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #c8c8c8));
   border-radius: 3px;
   background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+}
+
+/* The button's glyph, over it: a chevron, or a funnel and a chevron on a
+   filtered column, as Excel's button shows. The glyphs come from icons.css. */
+.sheetwrite-autofilter-glyph {
   color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #333333));
-}
-
-.sheetwrite-autofilter-button::after {
-  position: absolute;
-  inset: 0;
-  margin: auto;
-  width: 8px;
-  height: 5px;
-  background: currentColor;
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
-  content: "";
-}
-
-/* A filtered column shows a funnel, as Excel's button does. */
-.sheetwrite-autofilter-button[data-filtered="true"]::after {
-  width: 9px;
-  height: 9px;
-  clip-path: polygon(0 0, 100% 0, 62% 45%, 62% 100%, 38% 85%, 38% 45%);
 }
