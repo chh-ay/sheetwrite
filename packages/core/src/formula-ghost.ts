@@ -109,9 +109,9 @@ export class FormulaGhost {
     return this.shown;
   }
 
-  /** The suggestion on screen, if any. */
-  get current(): ShownSuggestion | null {
-    return this.shown;
+  /** Take the ghost off: the field no longer holds a formula. */
+  hide(): void {
+    this.shown = null;
   }
 
   /**

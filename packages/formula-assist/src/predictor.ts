@@ -41,8 +41,8 @@ export interface PredictorOptions {
   readonly signals: readonly SignalName[];
 }
 
-/** The signals built so far, by name. */
-const OPEN_SIGNAL: Partial<Record<SignalName, OpenSignal>> = {
+/** How each signal opens for one edit. */
+const OPEN_SIGNAL: Readonly<Record<SignalName, OpenSignal>> = {
   neighbours: openNeighbours,
   patterns: openPatterns,
   roles: openRoles,
@@ -50,12 +50,9 @@ const OPEN_SIGNAL: Partial<Record<SignalName, OpenSignal>> = {
   syntax: openSyntax,
 };
 
-/** The signals named in `signals` that are built, opened for one edit. */
+/** The signals named in `signals`, opened for one edit. */
 export function openSignals(edit: FormulaEdit, signals: readonly SignalName[]): Signal[] {
-  return signals.flatMap((name) => {
-    const open = OPEN_SIGNAL[name];
-    return open === undefined ? [] : [open(edit)];
-  });
+  return signals.map((name) => OPEN_SIGNAL[name](edit));
 }
 
 const ALL_SIGNALS: PredictorOptions = { signals: SIGNALS };

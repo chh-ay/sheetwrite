@@ -463,6 +463,8 @@ export class FormulaHelp {
 
   private clear(): void {
     this.deps.highlightCells(null);
+    this.ghost?.hide();
+    this.announce("");
     this.mirror?.remove();
     this.mirror = null;
     this.cancelPreview();
