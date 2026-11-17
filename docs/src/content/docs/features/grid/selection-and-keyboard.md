@@ -113,7 +113,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule. |
 | Delete | Clear the selected cells. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
-| A printable character | Start editing the active cell, replacing its content. |
+| A printable character | Start editing the active cell, replacing its content. A text entry may be completed from the column ([AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete)). |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |

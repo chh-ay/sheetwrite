@@ -77,6 +77,8 @@ interface InteractionDependencies {
   openAutoFilter: (col: number) => void;
   /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
+  /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
+  autoComplete: () => boolean;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -288,7 +290,8 @@ export class InteractionSessions {
    * Excel's AutoComplete for an edit of view row `row` in `col` (see
    * `autocomplete.ts`). Its code loads with the first edit; while it loads,
    * nothing is completed, and once it arrives the edit that a key opened is
-   * completed at once. Stores without an engine get no completion.
+   * completed at once. Stores without an engine, and hosts that turn
+   * AutoComplete off, get no completion.
    */
   private completion(
     row: number,
@@ -296,7 +299,7 @@ export class InteractionSessions {
     typed: boolean,
   ): ((typed: string) => string | null) | undefined {
     const engine = storeEngine(this.deps.store);
-    if (engine === null) return undefined;
+    if (engine === null || !this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
       this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {

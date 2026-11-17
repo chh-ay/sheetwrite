@@ -680,6 +680,12 @@ export interface GridConfig {
   undo?: boolean;
   /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
   find?: boolean;
+  /**
+   * Excel's AutoComplete for cell values (default true): typing a text entry
+   * completes it from the entries above and below in the column. `false`
+   * turns it off, as Excel's "Enable AutoComplete for cell values" does.
+   */
+  autoComplete?: boolean;
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**

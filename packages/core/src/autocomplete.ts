@@ -9,6 +9,12 @@ import type { StoreDataEngine } from "./store/data-engine.js";
 import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
 
+/**
+ * The most rows read each way from the edited cell, so one edit's read stays
+ * bounded however long the column's block of entries is.
+ */
+const AUTOCOMPLETE_ROWS = 100_000;
+
 /** What AutoComplete reads of the sheet being edited, in view rows. */
 export interface CompletionSheet {
   readonly engine: StoreDataEngine;
@@ -23,9 +29,12 @@ export interface CompletionSheet {
   dataEdge(viewRow: number, col: number, dRow: number, dCol: number): number | null;
 }
 
-/** `text` with the characters that mean something in a regular expression escaped. */
+/**
+ * `text` with the characters that mean something in a regular expression
+ * escaped. Only these: the `u` flag rejects any other escape, such as `\-`.
+ */
 function escapeRegExp(text: string): string {
-  return text.replace(/[\\^$.*+?()[\]{}|/-]/g, "\\$&");
+  return text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
 }
 
 /**
@@ -93,10 +102,10 @@ function blockEdge(sheet: CompletionSheet, row: number, col: number, direction: 
 /**
  * Excel's AutoComplete for an edit of view row `row` in `col`: the distinct
  * text entries of the column's filled cells directly above and below it, up
- * to the first empty cell each way, read from the engine on the first typed
- * character. Typed numbers, dates, currency and TRUE or FALSE are not
- * completed, whatever the column's type, and neither are sheets whose data
- * is still loading.
+ * to the first empty cell and at most {@link AUTOCOMPLETE_ROWS} rows each
+ * way, read from the engine on the first typed character. Typed numbers,
+ * dates, currency and TRUE or FALSE are not completed, whatever the column's
+ * type, and neither are sheets whose data is still loading.
  */
 export function columnCompletions(
   sheet: CompletionSheet,
@@ -106,8 +115,8 @@ export function columnCompletions(
   const { engine } = sheet;
   const completions = new ColumnCompletions(() => {
     if (engine.queryCapability(sheet.sheet).status === "incomplete") return [];
-    const top = blockEdge(sheet, row, col, -1);
-    const bottom = blockEdge(sheet, row, col, 1);
+    const top = Math.max(blockEdge(sheet, row, col, -1), row - AUTOCOMPLETE_ROWS);
+    const bottom = Math.min(blockEdge(sheet, row, col, 1), row + AUTOCOMPLETE_ROWS);
     const values: CellScalar[] = [];
     for (const [start, end] of [
       [top, row],

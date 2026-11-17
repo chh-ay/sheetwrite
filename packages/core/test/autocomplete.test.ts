@@ -3,7 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellScalar, Workbook } from "../src/types.js";
+import type { CellScalar, GridConfig, Workbook } from "../src/types.js";
 import { mountHost } from "./fixtures.js";
 
 // Excel's AutoComplete: typing a text entry completes it from the entries
@@ -21,9 +21,14 @@ let grid: GridImpl;
 let store: SheetwriteStore;
 let host: HTMLDivElement;
 
-/** A sheet whose column A holds `values` from A1 down, and an empty text column B. */
-function mount(values: readonly CellScalar[]): void {
-  const rowCount = 12;
+/**
+ * A sheet of `rows` rows (12 unless given) whose column A holds `values` from
+ * A1 down, and an empty text column B.
+ */
+function mount(
+  values: readonly CellScalar[],
+  { rows: rowCount = 12, config }: { rows?: number; config?: GridConfig } = {},
+): void {
   const workbook: Workbook = {
     activeSheet: "s1",
     sheets: [
@@ -44,7 +49,7 @@ function mount(values: readonly CellScalar[]): void {
     columns: { a, b: Array.from({ length: rowCount }, () => null) },
   });
   host = mountHost();
-  grid = new GridImpl(host, { workbook }, store);
+  grid = new GridImpl(host, { workbook, config }, store);
 }
 
 beforeEach(() => {
@@ -131,7 +136,10 @@ describe("AutoComplete", () => {
     expect(shown()).toEqual(["Da", ""]);
   });
 
-  it("removes the completion with Backspace, and Enter stores what was typed", async () => {
+  it.each([
+    ["Backspace", "deleteContentBackward"],
+    ["Delete", "deleteContentForward"],
+  ])("removes the completion with %s, and Enter stores what was typed", async (_, inputType) => {
     mount(["Apple", "Banana"]);
     at(2);
     await type("Ap");
@@ -139,12 +147,42 @@ describe("AutoComplete", () => {
     const field = editor();
     field.value = "Ap";
     field.setSelectionRange(2, 2);
-    field.dispatchEvent(
-      new InputEvent("input", { inputType: "deleteContentBackward", bubbles: true }),
-    );
+    field.dispatchEvent(new InputEvent("input", { inputType, bubbles: true }));
     expect(shown()).toEqual(["Ap", ""]);
     key("Enter");
     expect(value(2)).toBe("Ap");
+  });
+
+  it("completes text with a hyphen, a slash or other pattern characters", async () => {
+    mount(["Well-known (a/b) $1.5", "Banana"]);
+    at(2);
+    await type("well-known (a/");
+    expect(shown()).toEqual(["well-known (a/b) $1.5", "b) $1.5"]);
+    key("Enter");
+    expect(value(2)).toBe("Well-known (a/b) $1.5");
+  });
+
+  it("does not complete while the host turns AutoComplete off", async () => {
+    mount(["Apple", "Banana"], { config: { toolbar: false, autoComplete: false } });
+    at(2);
+    await type("Ap");
+    expect(shown()).toEqual(["Ap", ""]);
+    key("Escape");
+    grid.setConfig({ toolbar: false });
+    await type("Ap");
+    expect(shown()).toEqual(["Apple", "ple"]);
+  });
+
+  it("reads at most 100,000 entries each way from the edited cell", async () => {
+    // Zebra is the 100,001st entry above row 100,001 and the 100,000th above row 100,000.
+    mount(["Zebra", ...Array.from({ length: 100_000 }, () => "Yak")], { rows: 100_002 });
+    at(100_001);
+    await type("Z");
+    expect(shown()).toEqual(["Z", ""]);
+    key("Escape");
+    at(100_000);
+    await type("Z");
+    expect(shown()).toEqual(["Zebra", "ebra"]);
   });
 
   it("does not complete while two entries match; entries that differ only in case are one", async () => {

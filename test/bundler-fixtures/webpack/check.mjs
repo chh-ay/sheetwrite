@@ -53,9 +53,6 @@ const FIND_MARKER = "sheetwrite-find-replace-row";
 // The AutoFilter's commands and dropdown load on first use, together; the
 // message Data › Filter shows outside a range of data survives minifiers.
 const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
-// AutoComplete loads with the first edit; the replacement that escapes a typed
-// prefix for its pattern survives minifiers.
-const AUTOCOMPLETE_MARKER = "\\\\$&";
 // Merge and Merge & Center load on first use, with the dialog shell of their
 // warning; the warning's text and the dialog's backdrop class survive minifiers.
 const MERGE_MARKER = "Merging cells only keeps the upper-left value";
@@ -81,7 +78,6 @@ const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
-const autoCompleteChunks = [];
 const mergeChunks = [];
 const dashboardChunks = [];
 const workers = [];
@@ -106,7 +102,6 @@ for (const file of lazyChunks) {
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
-  else if (code.includes(AUTOCOMPLETE_MARKER)) autoCompleteChunks.push(file);
   else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
@@ -136,8 +131,6 @@ if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
-if (autoCompleteChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack AutoComplete chunk, got ${autoCompleteChunks.length}`);
 if (mergeChunks.length !== 1)
   throw new Error(`Expected one lazy webpack merge command chunk, got ${mergeChunks.length}`);
 if (addonRegistryChunks.length !== 1) {
@@ -176,9 +169,6 @@ if (mainCode.includes(FIND_MARKER)) {
 }
 if (mainCode.includes(AUTOFILTER_MARKER)) {
   throw new Error("The AutoFilter commands are in webpack's main.js; they must load lazily");
-}
-if (mainCode.includes(AUTOCOMPLETE_MARKER)) {
-  throw new Error("AutoComplete is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(DIALOG_MARKER)) {
   throw new Error("The dialog shell is in webpack's main.js; it must load lazily");
@@ -235,7 +225,6 @@ const assets = publicFiles.map((file) => {
       functionTableChunks,
       findChunks,
       autoFilterChunks,
-      autoCompleteChunks,
       mergeChunks,
       documentChunks,
       dashboardChunks,

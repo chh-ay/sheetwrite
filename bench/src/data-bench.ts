@@ -1102,8 +1102,9 @@ async function benchSheetwrite(
   if (measures("autocomplete-first-key")) {
     // The editor's first typed key in the column's first cell: find the block
     // below it, read its distinct entries from the engine and scan them for
-    // the prefix. Every customer is distinct, the worst case; only the last
-    // row's entry begins with the prefix, its text without the last digit.
+    // the first letter. Every customer is distinct and begins with "C", the
+    // worst case: all 100,000 entries match, so nothing is completed. A later
+    // key of the same edit then completes the last row's entry.
     const engine = storeEngine(queryStore);
     if (!engine) throw new Error("autocomplete: the query store has no engine");
     const sheet = {
@@ -1117,17 +1118,19 @@ async function benchSheetwrite(
       dataEdge: (viewRow: number, col: number, dRow: number, dCol: number) =>
         queryStore.dataEdge(SHEET, viewRow, col, dRow, dCol),
     };
-    const expected = ds.customer[rows - 1]!;
-    const prefix = expected.slice(0, -1).toLowerCase();
-    let completed: string | null = null;
+    let completed: string | null = "";
     queries["autocomplete-first-key"] = measure(
       () => {
-        completed = columnCompletions(sheet, 0, COL.customer)(prefix);
+        completed = columnCompletions(sheet, 0, COL.customer)("c");
       },
       plan("autocomplete-first-key", rows),
     );
-    if (completed !== expected) {
-      throw new Error(`autocomplete ${rows}: completed ${String(completed)}, not ${expected}`);
+    const expected = ds.customer[rows - 1]!;
+    const edit = columnCompletions(sheet, 0, COL.customer);
+    const first = edit("c");
+    const later = edit(expected.slice(0, -1).toLowerCase());
+    if (completed !== null || first !== null || later !== expected) {
+      throw new Error(`autocomplete ${rows}: completed ${String(later)}, not ${expected}`);
     }
   }
 
