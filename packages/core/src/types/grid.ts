@@ -791,12 +791,18 @@ export interface GridOptions {
   addons?: SheetwriteAddonSettings;
 }
 
-/** Case, whole-cell, sheet, and column constraints for grid search. */
+/** Case, whole-cell, Look in, sheet, and column constraints for grid search. */
 export interface SearchOptions {
   /** Case-sensitive match (default false). */
   matchCase?: boolean;
   /** Match only when the whole cell text equals the query (default false: substring). */
   wholeCell?: boolean;
+  /**
+   * What a formula cell is searched by, as in Excel's "Look in": its formula
+   * text (`"formulas"`, the default) or its result (`"values"`). Replace
+   * rewrites formula text only when looking in formulas.
+   */
+  lookIn?: "formulas" | "values";
   /** Restrict to a sheet (defaults to the active sheet). */
   sheet?: SheetId;
   /** Restrict to these column indices (defaults to all columns). */
@@ -1238,7 +1244,10 @@ export interface Grid {
     source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
     options?: { signal?: AbortSignal },
   ): Promise<void>;
-  /** Find cells matching `query`; highlights matches, emits `search`, returns the result. */
+  /**
+   * Find cells matching `query`, which takes Excel's wildcards (`*`, `?`,
+   * `~`); highlights matches, selects the first, emits `search`, returns the result.
+   */
   search(query: string, opts?: SearchOptions): SearchResult;
   /** Move the active match to the next match and scroll it into view. */
   findNext(): SearchResult;
