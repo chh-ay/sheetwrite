@@ -4,13 +4,9 @@
 // volatile or host function. The panel follows the cell selection.
 
 import { colToA1 } from "../a1.js";
-import {
-  analyzeFormula,
-  argumentOf,
-  type FormulaAnalysis,
-  type FormulaReference,
-} from "../formula-analysis.js";
+import { analyzeFormula, argumentOf, type FormulaAnalysis } from "../formula-analysis.js";
 import { referenceColor } from "../formula-colors.js";
+import type { FormulaReference } from "../formula-references.js";
 import { storeFunctions } from "../functions/registry.js";
 import { signature } from "../functions/signature.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";

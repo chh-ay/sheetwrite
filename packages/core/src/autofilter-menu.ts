@@ -112,8 +112,14 @@ const SORT_LABELS: Readonly<Record<AutoFilterColumnKind, readonly [string, strin
   date: ["Sort Oldest to Newest", "Sort Newest to Oldest"],
 };
 
-/** A row of the value list: (Select All), a value, or (Blanks). */
-type ListItem = { readonly kind: "all" } | { readonly kind: "value"; readonly value: CellScalar };
+/**
+ * A row of the value list: (Select All), Add current selection to filter
+ * (only while searching), a value, or (Blanks).
+ */
+type ListItem =
+  | { readonly kind: "all" }
+  | { readonly kind: "add" }
+  | { readonly kind: "value"; readonly value: CellScalar };
 
 const valueKey = (value: CellScalar): string => `${typeof value}:${String(value)}`;
 
@@ -132,7 +138,14 @@ interface Session {
   readonly presetButton: HTMLButtonElement;
   /** Every listed value, sorted, blanks last. */
   readonly values: readonly CellScalar[];
+  /** The values checked in the whole list. */
   readonly checked: Set<string>;
+  /** The search the list shows, trimmed and in lower case; empty without one. */
+  query: string;
+  /** The search results checked; each new search checks all of them, as in Excel. */
+  found: Set<string>;
+  /** Whether OK adds the checked search results to the values `checked` keeps. */
+  addCurrent: boolean;
   /** The rows the search leaves, (Select All) first. */
   items: ListItem[];
   active: number;
@@ -244,6 +257,9 @@ export class AutoFilterMenu {
       presetButton,
       values,
       checked: new Set(kept.map(valueKey)),
+      query: "",
+      found: new Set(),
+      addCurrent: false,
       items: [],
       active: 0,
       form: null,
@@ -470,7 +486,11 @@ export class AutoFilterMenu {
     return { row, op: select, value: input };
   }
 
-  /** Narrow the list to values whose text holds the search, and redraw it. */
+  /**
+   * Narrow the list to values whose text holds the search, and redraw it. A
+   * new search checks every result and unchecks Add current selection to
+   * filter, as Excel does.
+   */
   private refilter(): void {
     const session = this.session;
     if (!session) return;
@@ -478,8 +498,14 @@ export class AutoFilterMenu {
     const matches = session.values.filter(
       (value) => query === "" || this.label(value).toLowerCase().includes(query),
     );
+    if (query !== session.query) {
+      session.query = query;
+      session.found = new Set(matches.map(valueKey));
+      session.addCurrent = false;
+    }
     session.items = [
       { kind: "all" },
+      ...(query === "" ? [] : [{ kind: "add" } as const]),
       ...matches.map((value): ListItem => ({ kind: "value", value })),
     ];
     session.active = Math.min(session.active, session.items.length - 1);
@@ -498,9 +524,15 @@ export class AutoFilterMenu {
     return session.items.flatMap((item) => (item.kind === "value" ? [item.value] : []));
   }
 
+  /** The checks the list shows: the search results' while searching, else the whole list's. */
+  private shownChecks(session: Session): Set<string> {
+    return session.query === "" ? session.checked : session.found;
+  }
+
   private allState(session: Session): "true" | "false" | "mixed" {
     const values = this.visibleValues(session);
-    const checked = values.filter((value) => session.checked.has(valueKey(value))).length;
+    const checks = this.shownChecks(session);
+    const checked = values.filter((value) => checks.has(valueKey(value))).length;
     return checked === 0 ? "false" : checked === values.length ? "true" : "mixed";
   }
 
@@ -531,12 +563,11 @@ export class AutoFilterMenu {
     option.dataset.index = String(index);
     option.style.top = `${index * ROW_HEIGHT}px`;
     option.style.height = `${ROW_HEIGHT}px`;
-    const state =
-      item.kind === "all"
-        ? this.allState(session)
-        : session.checked.has(valueKey(item.value))
-          ? "true"
-          : "false";
+    const checked =
+      item.kind === "add"
+        ? session.addCurrent
+        : item.kind === "value" && this.shownChecks(session).has(valueKey(item.value));
+    const state = item.kind === "all" ? this.allState(session) : checked ? "true" : "false";
     option.setAttribute("aria-selected", String(state === "true"));
     if (state === "mixed") option.setAttribute("aria-checked", "mixed");
     option.classList.toggle("sheetwrite-autofilter-active", index === session.active);
@@ -547,10 +578,12 @@ export class AutoFilterMenu {
     const text = document.createElement("span");
     text.textContent =
       item.kind === "all"
-        ? session.search.value.trim()
+        ? session.query
           ? "(Select All Search Results)"
           : "(Select All)"
-        : this.label(item.value);
+        : item.kind === "add"
+          ? "Add current selection to filter"
+          : this.label(item.value);
     option.append(box, text);
     return option;
   }
@@ -574,15 +607,18 @@ export class AutoFilterMenu {
     const session = this.session;
     const item = session?.items[index];
     if (!session || !item) return;
+    const checks = this.shownChecks(session);
     if (item.kind === "all") {
       const check = this.allState(session) !== "true";
       for (const value of this.visibleValues(session)) {
-        if (check) session.checked.add(valueKey(value));
-        else session.checked.delete(valueKey(value));
+        if (check) checks.add(valueKey(value));
+        else checks.delete(valueKey(value));
       }
+    } else if (item.kind === "add") {
+      session.addCurrent = !session.addCurrent;
     } else {
       const key = valueKey(item.value);
-      if (!session.checked.delete(key)) session.checked.add(key);
+      if (!checks.delete(key)) checks.add(key);
     }
     this.renderRows();
     this.updateOk();
@@ -601,20 +637,34 @@ export class AutoFilterMenu {
     this.renderRows();
   }
 
-  /** Excel disables OK while nothing in the list is checked. */
+  /** Excel disables OK while it would keep nothing. */
   private updateOk(): void {
     const session = this.session;
     if (!session) return;
-    session.ok.disabled = this.allState(session) === "false";
+    session.ok.disabled = this.keptValues(session).length === 0;
   }
 
-  /** OK: keep the checked values; with a search, only the checked results. */
+  /**
+   * The values OK keeps, in list order: the checked ones; with a search, the
+   * checked results, and with Add current selection to filter also the
+   * values the whole list has checked.
+   */
+  private keptValues(session: Session): CellScalar[] {
+    if (session.query === "") {
+      return session.values.filter((value) => session.checked.has(valueKey(value)));
+    }
+    return session.values.filter((value) => {
+      const key = valueKey(value);
+      return session.found.has(key) || (session.addCurrent && session.checked.has(key));
+    });
+  }
+
+  /** OK: keep the values {@link keptValues} lists; all of them clear the filter. */
   private applyValues(): void {
     const session = this.session;
     if (!session || session.ok.disabled) return;
-    const visible = this.visibleValues(session);
-    const keep = visible.filter((value) => session.checked.has(valueKey(value)));
-    const everything = !session.search.value.trim() && keep.length === session.values.length;
+    const keep = this.keptValues(session);
+    const everything = keep.length === session.values.length;
     const { request } = session;
     this.run(() => request.apply(everything ? null : { kind: "values", values: keep }));
   }

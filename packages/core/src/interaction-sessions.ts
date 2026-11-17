@@ -53,11 +53,16 @@ const MODIFIER_KEYS: Readonly<Record<string, true>> = {
   Meta: true,
 };
 
-/** Whether a number format shows a date (day or year parts), so one cell fills by days. */
-function showsDate(format: string | undefined): boolean {
-  if (format === undefined) return false;
+/**
+ * Whether a number format shows a date (day or year parts), so one cell fills
+ * by days, or only a time, so one cell fills by hours.
+ */
+function dateKind(format: string | undefined): "date" | "time" | null {
+  if (format === undefined) return null;
   const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
-  return /[dy]/i.test(visible) && !/[#0?]/.test(visible);
+  if (/[#0?]/.test(visible)) return null;
+  if (/[dy]/i.test(visible)) return "date";
+  return /[hs]/i.test(visible) || /\[[hms]+\]/i.test(format) ? "time" : null;
 }
 
 interface InteractionDependencies {
@@ -186,6 +191,12 @@ export class InteractionSessions {
   private fillTarget: SelRect | null = null;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /**
+   * Excel's Tab run: the cell a run of Tab moves left active, and the column
+   * the run started in, where the next Enter goes. Any other move ends it.
+   */
+  private tabRun: { readonly row: number; readonly col: number; readonly start: number } | null =
+    null;
   /** AutoComplete's code, once the first edit has loaded it. */
   private autocomplete: typeof import("./autocomplete.js") | null = null;
   /** The load of AutoComplete's code, started by the first edit. */
@@ -1427,20 +1438,25 @@ export class InteractionSessions {
   /**
    * Enter and Tab: move the active cell one step. Inside a selection of
    * several cells the active cell wraps within it and the selection stays,
-   * as in Excel; otherwise it moves to the next visible cell.
+   * as in Excel; otherwise it moves to the next visible cell, and Enter after
+   * a run of Tab moves goes to the column where the run started.
    */
   private moveActiveCell(dRow: -1 | 0 | 1, dCol: -1 | 0 | 1): void {
     const selection = this.deps.selection();
     const focus = selection.focusCell;
     if (!focus) return;
+    const run = this.tabRun;
+    this.tabRun = null;
     const rect = this.activeRect();
     if (rect === null || (rect.r0 === rect.r1 && rect.c0 === rect.c1)) {
-      this.navigate(
-        focus,
-        focus.row + dRow,
-        dCol === 0 ? undefined : this.deps.nextVisibleCol(focus.col, dCol),
-        false,
-      );
+      const inRun = run !== null && run.row === focus.row && run.col === focus.col;
+      const start = inRun ? run.start : focus.col;
+      let col: number | undefined;
+      if (dCol !== 0) col = this.deps.nextVisibleCol(focus.col, dCol);
+      else if (dRow > 0 && inRun) col = start;
+      this.navigate(focus, focus.row + dRow, col, false);
+      const moved = this.deps.selection().focusCell;
+      if (dCol !== 0 && moved) this.tabRun = { row: moved.row, col: moved.col, start };
       return;
     }
 
@@ -1821,7 +1837,7 @@ export class InteractionSessions {
       return {
         resolved: read.resolved,
         style: read.style,
-        isDate: showsDate(read.style.numberFormat) || columns[coordinate.col]?.type === "date",
+        kind: columns[coordinate.col]?.type === "date" ? "date" : dateKind(read.style.numberFormat),
         formula: cell
           ? cell.value.kind === "formula"
             ? cell.value.src
@@ -1852,7 +1868,12 @@ export class InteractionSessions {
       const [from, to] = vertical ? [source.r0, source.r1] : [source.c0, source.c1];
       for (let along = from; along <= to; along++) {
         const cell = vertical ? sourceAt(along, line) : sourceAt(line, along);
-        cells.push({ value: cell.resolved, isFormula: cell.formula !== null, isDate: cell.isDate });
+        cells.push({
+          value: cell.resolved,
+          isFormula: cell.formula !== null,
+          isDate: cell.kind === "date",
+          isTime: cell.kind === "time",
+        });
       }
       series.set(line, detectFillSeries(cells, options));
     }
