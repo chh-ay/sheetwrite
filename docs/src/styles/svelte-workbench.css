@@ -124,6 +124,16 @@
   content: "";
 }
 
+/* The colleague's pill stays while they are away, muted with a hollow dot. */
+.sw-svw-presence li[data-present="false"] {
+  color: var(--sw-fg-muted);
+}
+
+.sw-svw-presence li[data-present="false"]::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--sw-svw-peer);
+}
+
 /* ---- Workspace: the board at full width, its evidence in a band under it -- */
 
 .sw-svw .sw-demo-workspace {
