@@ -128,7 +128,7 @@ function feedbackFrom(result: SheetLifecycleResult): Omit<LifecycleFeedback, "sh
 export class SheetTabs {
   private readonly host: HTMLElement;
   private readonly onActivate: (id: SheetId) => void;
-  private readonly onAdd?: (index?: number) => SheetLifecycleResult;
+  private readonly onAdd?: (index: number) => SheetLifecycleResult;
   private readonly onRemove?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
