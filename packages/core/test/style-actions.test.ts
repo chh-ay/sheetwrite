@@ -259,7 +259,7 @@ describe("StyleActions merge policy", () => {
       });
 
       grid.actions.merge({ ask: true });
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       const message = document.getElementById(dialog.getAttribute("aria-describedby") ?? "");
       expect(message?.textContent).toBe(
         "Merging cells only keeps the upper-left value and discards other values. These values will be discarded: B1: 50%, C1: 'A very long customer na…', A2: 3, B2: 4, C2: 5 and 9 more.",
