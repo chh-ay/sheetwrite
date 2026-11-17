@@ -287,6 +287,10 @@ fn name_reference_family(id: NameId, names: NameScope<'_>) -> Option<CellRange> 
 /// argument most callers meet, is read inline; every other node takes
 /// [`node_range`].
 #[inline]
+#[allow(
+    clippy::wildcard_enum_match_arm,
+    reason = "every other node takes the full walk; listing them here would only repeat it"
+)]
 pub(crate) fn range_from_ast(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     match ast {
         Ast::Range(r0, c0, r1, c1, flags) => {
