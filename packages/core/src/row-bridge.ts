@@ -2,7 +2,7 @@ import { capturedClearCells } from "./clear-capture.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_SHEET_ID } from "./grid-constants.js";
 import { restoreBlockFacts } from "./restore-block.js";
-import { cellRange, movedBlock, movedCellBounds, normalizedRange } from "./store/ranges.js";
+import { cellRange, movedBlock, movedCellBounds } from "./store/ranges.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
