@@ -61,7 +61,7 @@ test("merging cells that hold two values warns first, from the keyboard @portabi
   const dialog = page.getByRole("alertdialog", { name: "Merge Cells" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(
-    "Merging cells only keeps the upper-left value and discards other values.",
+    "Merging cells only keeps the upper-left value and discards other values. This value will be discarded: B6: 'm2'.",
   );
   const ok = dialog.getByRole("button", { name: "OK" });
   const cancel = dialog.getByRole("button", { name: "Cancel" });
