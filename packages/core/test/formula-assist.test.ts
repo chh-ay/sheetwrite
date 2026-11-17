@@ -249,3 +249,39 @@ describe("result preview", () => {
     expect(preview()).toBe("");
   });
 });
+
+describe("fixes for live errors", () => {
+  it("offers the fix under the error and applies it with Tab or a click", async () => {
+    const named = new SheetwriteStore({
+      ...makeWorkbook(2),
+      namedRanges: [
+        { name: "SalesUnits", range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } } },
+      ],
+    });
+    const { textarea } = beginEdit(named);
+    const fix = () => document.querySelector<HTMLButtonElement>(".sheetwrite-formula-fix");
+    await typeUntilListed(textarea, "=SU", "SUM");
+
+    type(textarea, "=SUMM(A1:A3)");
+    expect(fix()?.textContent).toBe("Did you mean SUM?");
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=SUM(A1:A3)");
+    expect(fix()).toBeNull();
+
+    type(textarea, "=SUM(A1:A3))+1");
+    expect(fix()?.textContent).toBe("Remove the extra )");
+    fix()?.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true }));
+    expect(textarea.value).toBe("=SUM(A1:A3)+1");
+
+    type(textarea, "=SUM(A1:A3", 4);
+    expect(fix()?.textContent).toBe("Add the missing )");
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=SUM(A1:A3)");
+
+    type(textarea, "=SalesUnit*2");
+    expect(fix()?.textContent).toBe("Did you mean SalesUnits?");
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=SalesUnits*2");
+    named.dispose();
+  });
+});
