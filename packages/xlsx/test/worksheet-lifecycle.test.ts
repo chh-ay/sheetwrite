@@ -36,6 +36,12 @@ describe("XLSX worksheet lifecycle fidelity", () => {
     await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
   });
 
+  it("opens and saves a sheet named History, which only a rename refuses", async () => {
+    const imported = await backend.fromXlsxWorkbook(rawNamed("History"));
+    expect(imported.sheets[0]?.name).toBe("History");
+    await expect(backend.toXlsxWorkbook(imported)).resolves.toBeInstanceOf(Uint8Array);
+  });
+
   it("round-trips visible, hidden, and veryHidden states with a visible activeTab fallback", async () => {
     const { warnings, onWarning } = collectWarnings();
     const bytes = await backend.toXlsxWorkbook(

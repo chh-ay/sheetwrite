@@ -204,7 +204,16 @@ describe("SheetwriteStore facade contract", () => {
         type: "text",
       });
     }
-    expect(() => new SheetwriteStore(large)).toThrow(SnapshotResourceError);
+    // Past the dense cell limit a dense sheet loads in local pages, still not paged.
+    const local = new SheetwriteStore(large);
+    expect(local.isPaged("s1")).toBe(false);
+    local.dispose();
+    expect(
+      () =>
+        new SheetwriteStore(large, undefined, {
+          snapshotResourceLimits: { maxLocalPagedCells: 5_999_999 },
+        }),
+    ).toThrow(SnapshotResourceError);
     const paged = new SheetwriteStore(large, undefined, { storage: "paged" });
     expect(paged.isPaged("s1")).toBe(true);
     paged.dispose();
