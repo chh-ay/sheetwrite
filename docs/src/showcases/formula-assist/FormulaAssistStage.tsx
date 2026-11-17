@@ -72,15 +72,15 @@ export function FormulaAssistStage(props: FormulaAssistStageProps) {
             <ControlActions>
               <For each={TARGETS}>
                 {(target) => (
-                <ControlButton
-                  disabled={action.disabled()}
-                  icon="function"
-                  onClick={() =>
-                    void action.run(target.label, (current) => current.focusCell(target.id))
-                  }
-                >
-                  {target.label}
-                </ControlButton>
+                  <ControlButton
+                    disabled={action.disabled()}
+                    icon="function"
+                    onClick={() =>
+                      void action.run(target.label, (current) => current.focusCell(target.id))
+                    }
+                  >
+                    {target.label}
+                  </ControlButton>
                 )}
               </For>
             </ControlActions>
