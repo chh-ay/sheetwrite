@@ -180,9 +180,12 @@ import {
   type CellBlockMove,
   moveCellRange,
   type MoveCellsOperation,
+  movedConditionalFormats,
   movedHyperlinks,
   movedMerges,
   movedNotes,
+  type MovedSheetItems,
+  movedValidationRules,
 } from "./move-cells.js";
 import { PagedDirtyPreflight } from "./paged-dirty-preflight.js";
 import {
@@ -4379,23 +4382,42 @@ export class StoreDataEngine {
     );
   }
 
-  /** Carry the notes, hyperlinks, named ranges and chart sources that a block move takes along. */
+  /**
+   * Carry the notes, hyperlinks, validation and conditional-format rules,
+   * named ranges and chart sources that a block move takes along.
+   */
   private moveBlockItems(fromSheet: Sheet, toSheet: Sheet, move: CellBlockMove): void {
-    const notes = movedNotes(fromSheet.notes ?? [], toSheet.notes ?? [], move);
-    if (fromSheet.notes || notes.from.length > 0) fromSheet.notes = notes.from;
-    if (toSheet.notes || notes.to.length > 0) toSheet.notes = notes.to;
-    const links = movedHyperlinks(fromSheet.hyperlinks ?? [], toSheet.hyperlinks ?? [], move);
-    if (fromSheet.hyperlinks || links.from.length > 0) fromSheet.hyperlinks = links.from;
-    if (toSheet.hyperlinks || links.to.length > 0) toSheet.hyperlinks = links.to;
+    const place = <K extends MovedSheetItems>(key: K, lists: { from: Sheet[K]; to: Sheet[K] }) => {
+      if (fromSheet[key] || lists.from?.length) fromSheet[key] = lists.from;
+      if (toSheet[key] || lists.to?.length) toSheet[key] = lists.to;
+    };
+    place("notes", movedNotes(fromSheet.notes ?? [], toSheet.notes ?? [], move));
+    place(
+      "hyperlinks",
+      movedHyperlinks(fromSheet.hyperlinks ?? [], toSheet.hyperlinks ?? [], move),
+    );
+    place(
+      "validationRules",
+      movedValidationRules(fromSheet.validationRules ?? [], toSheet.validationRules ?? [], move),
+    );
+    place(
+      "conditionalFormats",
+      movedConditionalFormats(
+        fromSheet.conditionalFormats ?? [],
+        toSheet.conditionalFormats ?? [],
+        move,
+      ),
+    );
+    this.windowReader.conditionalRulesChanged(fromSheet.id);
+    if (toSheet !== fromSheet) this.windowReader.conditionalRulesChanged(toSheet.id);
 
-    const last = { row: fromSheet.rowCount - 1, col: fromSheet.columns.length - 1 };
     this.rewriteCharts((chart) =>
-      mapChartSources(chart, (range) => moveCellRange(range, move, last) ?? "#REF!"),
+      mapChartSources(chart, (range) => moveCellRange(range, move) ?? "#REF!"),
     );
     // A named range follows as a formula's range does; the engine moved its own copy.
     for (const namedRange of [...(this.workbook.namedRanges ?? [])]) {
       if (!namedRange.range) continue;
-      const range = moveCellRange(namedRange.range, move, last);
+      const range = moveCellRange(namedRange.range, move);
       if (range && range !== namedRange.range) this.upsertMovedNamedRange({ ...namedRange, range });
     }
     this.refreshNamedFormulas();
