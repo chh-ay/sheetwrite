@@ -252,6 +252,12 @@ export interface OverlayPainterDeps {
   fillHandleScreen: (contentTop: number, scrollLeft: number) => { x: number; y: number } | null;
   /** The value tip beside the fill handle while it is dragged. */
   fillTip: () => FillTip | null;
+  /** The new cells of the dragged fill handle's fill, which show their values in place. */
+  fillValuesArea: () => SelRect | null;
+  /** What a cell of `fillValuesArea` will show; null for a formula. */
+  fillValueAt: (row: number, col: number) => { text: string; right: boolean } | null;
+  /** The view row at a content offset, to start the painted rows at the first one on screen. */
+  rowAtOffset: (contentY: number) => number;
   /** The cells of the last fill, whose Auto Fill Options button shows at their bottom-right. */
   autoFillTarget: () => SelRect | null;
   /** Open Auto Fill Options at a viewport point, below its button. */
@@ -369,6 +375,8 @@ export class OverlayPainter {
   private tipElement: HTMLDivElement | null = null;
   /** The Auto Fill Options button; made after the first fill. */
   private autoFillButton: HTMLButtonElement | null = null;
+  /** The values a dragged fill will write, drawn faintly in their cells; made on the first drag. */
+  private fillValues: HTMLCanvasElement | null = null;
 
   constructor(parent: HTMLElement, deps: OverlayPainterDeps) {
     this.deps = deps;
@@ -462,6 +470,7 @@ export class OverlayPainter {
       this.paintFillHandle(theme, contentTop, scrollLeft);
     }
 
+    this.paintFillValues(theme, contentTop, scrollLeft, clientW, clientH);
     this.paintFillTip();
     this.paintAutoFillButton(theme, contentTop, scrollLeft, clientW, clientH);
     // As in Excel, the moving border of a cut shows over the selection.
@@ -1314,6 +1323,84 @@ export class OverlayPainter {
       theme.selectionBorder,
     );
     sq.style.cursor = "crosshair";
+  }
+
+  /**
+   * The value each new cell of a dragged fill will get, drawn faintly in the
+   * cell, so the whole series shows before the release. Only the cells on
+   * screen are drawn, on one canvas: the cost follows the viewport, not the
+   * size of the fill.
+   */
+  private paintFillValues(
+    theme: Theme,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const area = this.deps.fillValuesArea();
+    let canvas = this.fillValues;
+    if (!area) {
+      if (canvas) canvas.hidden = true;
+      return;
+    }
+    if (!canvas) {
+      canvas = document.createElement("canvas");
+      canvas.className = "sheetwrite-fill-values";
+      canvas.setAttribute("aria-hidden", "true");
+      this.overlay.prepend(canvas);
+      this.fillValues = canvas;
+    }
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const ratio = window.devicePixelRatio || 1;
+    const width = Math.ceil(clientW * ratio);
+    const height = Math.ceil(clientH * ratio);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+      canvas.style.width = `${clientW}px`;
+      canvas.style.height = `${clientH}px`;
+    }
+    canvas.hidden = false;
+    const zoom = this.deps.zoom();
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, clientW, clientH);
+    context.font = theme.font;
+    context.fillStyle = theme.fg;
+    context.globalAlpha = 0.45;
+    context.textBaseline = "middle";
+
+    const { fr, frozenH } = this.deps.freeze();
+    const top = theme.headerHeight;
+    // Pinned rows first, then the body rows from the first one on screen.
+    const bodyStart = Math.max(area.r0, fr, this.deps.rowAtOffset(contentTop));
+    const rows: number[] = [];
+    for (let row = area.r0; row <= Math.min(area.r1, fr - 1); row++) rows.push(row);
+    for (let row = bodyStart; row <= area.r1; row++) {
+      if (this.deps.screenRect(row, area.c0, contentTop, scrollLeft).y >= clientH) break;
+      rows.push(row);
+    }
+    for (const row of rows) {
+      const clip = row < fr ? top : top + frozenH;
+      for (let col = area.c0; col <= area.c1; col++) {
+        const rect = this.deps.screenRect(row, col, contentTop, scrollLeft);
+        if (rect.x >= clientW) break;
+        if (rect.w <= 0 || rect.x + rect.w <= theme.rowHeaderWidth || rect.y + rect.h <= clip) continue;
+        const value = this.deps.fillValueAt(row, col);
+        if (!value) continue;
+        context.save();
+        context.beginPath();
+        context.rect(rect.x, Math.max(rect.y, clip), rect.w, rect.h);
+        context.clip();
+        const x = value.right ? rect.x + rect.w - 4 * zoom : rect.x + 4 * zoom;
+        context.textAlign = value.right ? "right" : "left";
+        // The canvas draws text at the zoom the cells use.
+        context.setTransform(ratio * zoom, 0, 0, ratio * zoom, 0, 0);
+        context.fillText(value.text, x / zoom, (rect.y + rect.h / 2) / zoom);
+        context.restore();
+      }
+    }
   }
 
   /** Excel's tip beside the dragged fill handle: the value the last cell will get. */
