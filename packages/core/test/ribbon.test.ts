@@ -223,7 +223,8 @@ it("shows the format a cell displays, its column's when it has none of its own",
   press(increase);
   for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
   expect(cell(0, 1).style.numberFormat).toBe("0.000%");
-  expect(box()).toBe("Custom");
+  // Not a preset, but the Percentage category's code, which Excel's box names.
+  expect(box()).toBe("Percentage");
 });
 
 it.each(["full", "compact"] as const)(
