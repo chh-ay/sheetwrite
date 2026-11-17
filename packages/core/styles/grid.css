@@ -197,6 +197,17 @@
   box-shadow: var(--sheetwrite-menu-shadow, 0 2px 6px rgba(0, 0, 0, 0.18));
 }
 
+/* The values a dragged fill will write, drawn faintly in their cells. */
+.sheetwrite-fill-values {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.sheetwrite-fill-values[hidden] {
+  display: none;
+}
+
 .sheetwrite-fill-tip {
   padding: 1px 6px;
   border-radius: 3px;

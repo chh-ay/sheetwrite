@@ -1008,6 +1008,16 @@ export class InteractionSessions {
     return this.tip;
   }
 
+  /** The new cells of the dragged fill handle's fill, which show their values in place. */
+  get fillValuesArea(): SelRect | null {
+    return this.fillTarget ? this.fills.dragArea : null;
+  }
+
+  /** What a cell of {@link fillValuesArea} will show; null for a formula. */
+  fillValueAt(row: number, col: number): { text: string; right: boolean } | null {
+    return this.fills.preview(row, col);
+  }
+
   /** The cells of the last fill-handle fill, whose Auto Fill Options button shows with menus on. */
   get autoFillTarget(): SelRect | null {
     return this.contextMenu && !this.fillTarget ? this.fills.optionsTarget : null;
@@ -1748,7 +1758,12 @@ export class InteractionSessions {
         break;
 
       case "Escape":
-        // Esc ends a cut's moving border, as in Excel.
+        // Esc ends a fill-handle drag without filling, and a cut's moving
+        // border, as in Excel.
+        if (this.fillTarget !== null) {
+          this.cancelPointer();
+          break;
+        }
         if (!this.deps.cancelCut()) return;
         break;
 
@@ -2112,7 +2127,7 @@ export class InteractionSessions {
       const target = this.extendFill(source, c);
       this.fillTarget = target;
       // Excel's tip: the value the last cell will get, beside the pointer.
-      const text = this.fills.tip(target, { swap: ev.ctrlKey || ev.altKey });
+      const text = this.fills.drag(target, { swap: ev.ctrlKey || ev.altKey });
       const viewport = this.deps.viewportEl.getBoundingClientRect();
       this.tip =
         text === null

@@ -1211,6 +1211,9 @@ export class GridImpl implements Grid {
       fillHandleScreen: (contentTop, scrollLeft) =>
         this.interactions.fillHandleScreen(contentTop, scrollLeft),
       fillTip: () => this.interactions.fillTip,
+      fillValuesArea: () => this.interactions.fillValuesArea,
+      fillValueAt: (row, col) => this.interactions.fillValueAt(row, col),
+      rowAtOffset: (contentY) => this.geometry.rowAtOffset(contentY),
       autoFillTarget: () => this.interactions.autoFillTarget,
       openAutoFillOptions: (clientX, clientY) => {
         this.interactions.openAutoFillOptions(clientX, clientY);

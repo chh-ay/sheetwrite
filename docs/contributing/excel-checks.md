@@ -23,6 +23,7 @@ For each check, save the result file under the name given and attach it to the i
 | 15 | #501 | `test/fixtures/excel-checks/chart-levels-sheetwrite-export.xlsx` | `chart-levels-excel.xlsx` |
 | 16 | #799 | `test/fixtures/excel-checks/number-format-unsure.xlsx` | `number-format-unsure-excel.xlsx` |
 | 17 | #821 | none; type the values into a new workbook | none; record what Excel shows |
+| 18 | #827, #824 | none; type the values into a new workbook | none; record what Excel shows |
 
 ## 1. Sort order (#353)
 
@@ -261,3 +262,15 @@ Sheetwrite's Paste Special follows Excel's Paste options page, which does not sa
 3. Undo, then do step 2 again with **All** and **Add**, then with **Divide** and `0` typed in A1.
 
 Expected (what Sheetwrite does): with Values and Add, C1 is `11`, C2 is the formula `=(5)+20`, C3 stays `7` (the copied text leaves it), C4 stays `xyz` (the target's text stays). With All and Add, C2 is `=(5)+(C1*2)`: the copied `=A1*2` shifted two columns, as a copy shifts it. Dividing by a copied `0` gives `#DIV/0!`. Record the cell contents Excel shows, formulas included.
+
+## 18. AutoFill series that Excel's table does not list (#827, #824)
+
+Excel's AutoFill table names `Qtr3`, `1st Period` and `text1, textA`. Sheetwrite generalises them; check these in a new workbook. For each, type the source, select it and drag the fill handle down four rows.
+
+1. `A1` in D1 and `B1` in D2 (one column; select both). Sheetwrite: D3:D6 read `A2`, `B2`, `A3`, `B3`.
+2. `Quarter 4` in F1. Sheetwrite: `Quarter 1`, `Quarter 2`, `Quarter 3`, `Quarter 4`.
+3. `1 Apple` in G1. Sheetwrite copies it (only an ordinal such as `1st` counts at the start).
+4. `Q4 2024` in H1. Sheetwrite: `Q4 2025`, `Q4 2026`… (the number at the end counts).
+5. 2026-01-03 (a Saturday) in I1, drag down five rows, **Auto Fill Options › Fill Weekdays**. Sheetwrite: 2026-01-05 to 2026-01-09, Monday to Friday.
+
+Record what Excel fills in each case.
