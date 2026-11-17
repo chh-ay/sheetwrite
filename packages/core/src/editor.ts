@@ -80,6 +80,13 @@ export interface BeginEditOptions {
   onShortcut?: (event: KeyboardEvent) => boolean;
   /** An arrow key in Enter mode points from the last pointed cell by (`dRow`, `dCol`); Shift extends. */
   onPoint?: (dRow: number, dCol: number, extend: boolean) => void;
+  /**
+   * Excel's AutoComplete: completes the field's text in place, with the added
+   * text selected, and returns the entry it shows, or null. Asked after each
+   * typed character, after the key that opened the editor and after an IME
+   * composition ends.
+   */
+  complete?: (field: HTMLTextAreaElement) => string | null;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -93,6 +100,11 @@ interface EditorSizing {
 /** Whether focus moving to `target` keeps the edit open in another surface. */
 function isEditSurface(target: EventTarget | null): boolean {
   return target instanceof Element && target.closest(`[${EDIT_SURFACE_ATTRIBUTE}]`) !== null;
+}
+
+/** Whether `event` typed text, not deleted, pasted or composed it. */
+function typedText(event: Event): boolean {
+  return event instanceof InputEvent && !event.isComposing && event.inputType === "insertText";
 }
 
 /**
@@ -116,6 +128,11 @@ export class EditController {
   private sizing: EditorSizing | null = null;
   /** Excel's Enter mode; see {@link BeginEditOptions.entering}. */
   private entering = false;
+  /**
+   * The entry AutoComplete shows, while the text still reads as it; a commit
+   * then stores the entry's own letter case, as Excel does.
+   */
+  private completion: string | null = null;
 
   constructor(host: HTMLElement, assist?: AssistDeps) {
     this.host = host;
@@ -172,6 +189,8 @@ export class EditController {
       const end = ta.value.length;
       ta.setSelectionRange(end, end);
     }
+    // The key that opened the editor is the first typed character.
+    if (opts.focus && opts.entering) this.autoComplete(ta);
     if (opts.focus) this.attachAssist();
   }
 
@@ -185,6 +204,7 @@ export class EditController {
     if (ta.value !== value) {
       ta.value = value;
       this.refStart = -1;
+      this.completion = null;
       // Mirrored text resizes only when it gains or loses a line, so typing
       // in the other surface lays this one out only at a line break.
       if (this.sizing?.lines !== lineCount(value)) this.resize();
@@ -276,14 +296,21 @@ export class EditController {
     this.opts?.onText(ta.value);
   }
 
-  private readonly onInput = (): void => {
+  private readonly onInput = (event: Event): void => {
     const ta = this.textarea;
     if (!ta) return;
     this.refStart = -1;
+    this.completion = null;
+    if (!this.composing && typedText(event)) this.autoComplete(ta);
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
   };
+
+  /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
+  private autoComplete(ta: HTMLTextAreaElement): void {
+    this.completion = this.opts?.complete?.(ta) ?? null;
+  }
 
   /** The user moved into the cell editor: formula help follows the caret here. */
   private readonly onFocus = (): void => {
@@ -317,7 +344,11 @@ export class EditController {
     const opts = this.opts;
     const ta = this.textarea;
     if (!opts || !ta) return;
-    const value = ta.value;
+    const completion = this.completion;
+    const value =
+      completion !== null && ta.value.toLowerCase() === completion.toLowerCase()
+        ? completion
+        : ta.value;
     this.teardown();
     opts.onCommit(value, navigate);
   }
@@ -335,11 +366,32 @@ export class EditController {
 
   private readonly onCompositionStart = (): void => {
     this.composing = true;
+    this.completion = null;
   };
 
   private readonly onCompositionEnd = (): void => {
     this.composing = false;
+    // Browsers differ on whether the composed text's input event comes before
+    // or after compositionend; complete once both have passed.
+    const ta = this.textarea;
+    setTimeout(() => {
+      if (this.textarea === ta) this.completeNow();
+    }, 0);
   };
+
+  /**
+   * Complete the typed text now: after an IME composition, or when
+   * AutoComplete's code arrives after the key that opened the editor.
+   */
+  completeNow(): void {
+    const ta = this.textarea;
+    if (ta === null || this.composing || this.completion !== null) return;
+    const before = ta.value;
+    this.autoComplete(ta);
+    if (ta.value === before) return;
+    this.resize();
+    this.opts?.onText(ta.value);
+  }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // While the IME is composing, every keystroke belongs to the composition.
@@ -422,6 +474,7 @@ export class EditController {
     this.metricsLineHeight = "";
     this.sizing = null;
     this.entering = false;
+    this.completion = null;
     this.tearingDown = false;
   }
 }

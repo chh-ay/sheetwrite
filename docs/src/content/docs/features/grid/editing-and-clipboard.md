@@ -76,16 +76,29 @@ Commit and navigation keys:
 
 | Key | Result |
 | --- | --- |
-| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. |
-| Tab / Shift + Tab | Commit, move **right** / **left**, within a selected range. |
+| Enter / Shift + Enter | Commit, move **down** / **up**. Inside a selected range the active cell moves within the range. Accepts an [AutoComplete](#autocomplete) completion. |
+| Tab / Shift + Tab | Commit, move **right** / **left**, within a selected range. Accepts an AutoComplete completion. |
 | Ctrl/Cmd + Enter | Commit and stay. With a range selected, write the entry into every selected cell; relative references shift. |
 | Alt + Enter | Insert a line break. |
 | Arrow keys | Enter mode: commit and move, or in a formula after an operator, point at a cell (Shift extends the reference). Edit mode: move the caret. |
 | F4 | Cycle the reference at the caret through `A1`, `$A$1`, `A$1` and `$A1`. |
+| Backspace / Delete | Delete a character, or the text AutoComplete added. |
 | Escape | Cancel the edit. |
 | Blur (click away) | Commit in place. |
 
 While the IME is composing, keystrokes belong to the composition. The grid does not treat them as navigation. Editing emits `edit-begin` and `edit-commit` events.
+
+### AutoComplete
+
+As in Excel, typing a text entry completes it from the entries in the same column ([Automatically complete or not complete entries in cells](https://support.microsoft.com/en-us/office/turn-automatic-completion-of-cell-entries-on-or-off-0f4aa749-b927-4ff3-a8e0-28d6e2e4d4b4)). The grid reads the distinct text values of the filled cells directly above and below the edited cell, up to the first empty cell each way and at most 100,000 rows each way. The engine reads them once per edit, on the first typed character. When exactly one of them begins with what you typed, ignoring letter case, the editor shows the rest of it selected:
+
+- Enter, Tab, Ctrl/Cmd + Enter, an arrow key in Enter mode or clicking away stores the completed entry, in the entry's own letter case.
+- Backspace or Delete removes the added text; typing on replaces it and completes again.
+- Nothing is completed when you type a formula, a number, a date or a logical value, or when no entry or more than one entry begins with the typed text. Numbers, dates and logical values in the column are never entries.
+- During IME composition nothing is completed; the composed text is completed when the composition ends. Formula help, the function list after `=`, is separate: AutoComplete never acts on a formula.
+- The code loads with the first edit, so the grid's first load does not carry it; the edit a key opened is completed as soon as it arrives.
+
+Excel turns AutoComplete off with **Enable AutoComplete for cell values**. In Sheetwrite the host sets `config: { autoComplete: false }`; `setConfig` turns it on or off for the next edit.
 
 ### Event order
 
