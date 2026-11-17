@@ -1,4 +1,5 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
+import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
@@ -43,19 +44,6 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 /** The formats Excel gives a date or time entered with Ctrl+; or Ctrl+Shift+; (en-US). */
 const SHORT_DATE_FORMAT = "m/d/yyyy";
 const SHORT_TIME_FORMAT = "h:mm AM/PM";
-/**
- * Excel's number-format keys, Ctrl+Shift+~ ! @ # $ % ^, and the en-US formats
- * they apply.
- */
-const KEY_NUMBER_FORMATS = {
-  formatGeneral: "General",
-  formatNumber: "#,##0.00",
-  formatTime: SHORT_TIME_FORMAT,
-  formatDate: "d-mmm-yy",
-  formatCurrency: "$#,##0.00_);($#,##0.00)",
-  formatPercent: "0%",
-  formatScientific: "0.00E+00",
-} as const;
 const MODIFIER_KEYS: Readonly<Record<string, true>> = {
   Shift: true,
   Control: true,
@@ -88,8 +76,8 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
-  /** Ctrl+Shift+9 and Ctrl+Shift+0: show the hidden rows or columns inside the selection. */
-  unhide: (rows: boolean) => void;
+  /** Run a command of `cell-commands.ts`, which loads on first use. */
+  cellCommand: (command: CellCommand) => void;
   /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   store: Store;
@@ -1225,43 +1213,9 @@ export class InteractionSessions {
           this.deps.grid.actions.toggleAutoFilter();
           break;
 
-        case "formatGeneral":
-        case "formatNumber":
-        case "formatTime":
-        case "formatDate":
-        case "formatCurrency":
-        case "formatPercent":
-        case "formatScientific":
-          this.deps.grid.actions.setNumberFormat(KEY_NUMBER_FORMATS[action]);
-          break;
-
-        case "hideRows":
-          this.deps.grid.actions.hideRows();
-          break;
-
-        case "unhideRows":
-          this.deps.unhide(true);
-          break;
-
-        case "hideColumns":
-          this.deps.grid.actions.hideColumns();
-          break;
-
-        case "unhideColumns":
-          this.deps.unhide(false);
-          break;
-
-        case "insertCells":
-          this.deps.grid.actions.insertCells();
-          break;
-
-        case "deleteCells":
-          this.deps.grid.actions.deleteCells();
-          break;
-
-        case "formatCells":
-          this.deps.grid.actions.formatCells();
-          break;
+        default:
+          // The format, hide, insert and Format Cells keys run from a chunk.
+          this.deps.cellCommand(action);
       }
 
       return;

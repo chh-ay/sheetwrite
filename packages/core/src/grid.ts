@@ -12,7 +12,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import type { CellCommandsHost } from "./cell-commands.js";
+import type { CellCommand, CellCommandsHost } from "./cell-commands.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
@@ -1008,8 +1008,7 @@ export class GridImpl implements Grid {
         },
       },
       openFind: (options) => this.openFindBar(options),
-      unhide: (rows) =>
-        this.cellCommand((commands, host) => commands.unhideInSelection(host, rows)),
+      cellCommand: (command) => this.cellCommand(command),
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
@@ -2898,37 +2897,17 @@ export class GridImpl implements Grid {
   }
 
   /** Run a command of `cell-commands.ts`, which loads on first use. */
-  private cellCommand(
-    run: (commands: typeof import("./cell-commands.js"), host: CellCommandsHost) => void,
-  ): void {
-    this.loadCommand(import("./cell-commands.js"), (commands) => {
+  private cellCommand(command: CellCommand): void {
+    this.loadCommand(import("./cell-commands.js"), ({ runCellCommand }) => {
       if (this.lifetime.closed) return;
       this.cellCommandsHost ??= {
         grid: this,
         dialogs: this.dialogHost,
-        readOnly: () => this.readOnly,
-        activeRect: () => this.activeSelectionRect(),
-        firstCol: () => this.firstCol(),
-        lastCol: () => this.lastCol(),
-        rowCount: () => this.geometry.rowCount,
-        toDataRow: (viewRow) => this.toDataRow(viewRow),
-        activeCell: () => {
-          const focus = this.selection.focusCell;
-          if (focus === null) return null;
-          const anchor = this.anchorCell(focus.row, focus.col);
-          const cell = this.store.getCell({
-            sheet: this.activeSheet,
-            row: this.toDataRow(anchor.row),
-            col: anchor.col,
-          });
-          const numberFormat =
-            cell.style.numberFormat ?? this.sheet().columns[anchor.col]?.numberFormat;
-          return { style: { ...cell.style, numberFormat }, sample: cell.resolved };
-        },
+        style: this.styleDeps,
+        bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
         font: () => this.theme.font,
-        formatSelection: (style, border) => this.styleActions.formatSelection(style, border),
       };
-      run(commands, this.cellCommandsHost);
+      runCellCommand(this.cellCommandsHost, command);
     });
   }
 
@@ -3827,9 +3806,9 @@ export class GridImpl implements Grid {
         const cols = this.selectedColumns();
         if (cols) this.removeColumns(cols.first, cols.count);
       },
-      insertCells: () => this.cellCommand((commands, host) => commands.insertOrDelete(host, true)),
-      deleteCells: () => this.cellCommand((commands, host) => commands.insertOrDelete(host, false)),
-      formatCells: () => this.cellCommand((commands, host) => void commands.formatCells(host)),
+      insertCells: () => this.cellCommand("insertCells"),
+      deleteCells: () => this.cellCommand("deleteCells"),
+      formatCells: () => this.cellCommand("formatCells"),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =

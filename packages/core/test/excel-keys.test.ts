@@ -340,7 +340,7 @@ describe("formatting and date keys", () => {
 });
 
 describe("number-format keys", () => {
-  it("apply Excel's formats with Ctrl+Shift+~ ! @ # $ % ^", () => {
+  it("apply Excel's formats with Ctrl+Shift+~ ! @ # $ % ^", async () => {
     select(0, 1, 1, 1);
     const keys = [
       ["~", "Backquote", "General"],
@@ -354,6 +354,7 @@ describe("number-format keys", () => {
     for (const [key, code, format] of keys) {
       const event = press(key, { ctrlKey: true, shiftKey: true, code });
       expect(event.defaultPrevented).toBe(true);
+      await commandLoaded();
       expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.numberFormat).toBe(format);
     }
   });
@@ -363,6 +364,7 @@ describe("hide and unhide keys", () => {
   it("hide the selected rows with Ctrl+9 and show them with Ctrl+Shift+9", async () => {
     select(2, 0, 3, 0);
     press("9", { ctrlKey: true, code: "Digit9" });
+    await commandLoaded();
     expect(grid.hiddenRows()).toEqual([2, 3]);
     // A range around the hidden rows shows them again.
     select(1, 0, 4, 0);
@@ -374,6 +376,7 @@ describe("hide and unhide keys", () => {
   it("hide the selected columns with Ctrl+0 and show them with Ctrl+Shift+0", async () => {
     select(0, 1);
     press("0", { ctrlKey: true, code: "Digit0" });
+    await commandLoaded();
     expect(grid.hiddenColumns()).toEqual([1]);
     select(0, 0, 0, 2);
     press(")", { ctrlKey: true, shiftKey: true, code: "Digit0" });

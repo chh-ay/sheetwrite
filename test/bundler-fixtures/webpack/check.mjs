@@ -61,9 +61,9 @@ const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
 // Webpack may give the dialog shell a chunk of its own or copy it into the
 // merge, cell commands and Format Cells chunks.
 const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
-// Show hidden rows or columns, Insert and Delete load on first use; webpack keeps
-// the names of exports that a dynamic import reads.
-const CELL_COMMANDS_MARKER = "insertOrDelete";
+// The commands of the format, hide, insert and Format Cells keys load on first
+// use; the Currency key's format code survives minifiers.
+const CELL_COMMANDS_MARKER = "$#,##0.00_);($#,##0.00)";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -197,6 +197,11 @@ if (mainCode.includes(MERGE_MARKER)) {
 }
 if (mainCode.includes(FORMAT_CELLS_MARKER)) {
   throw new Error("Format Cells is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(CELL_COMMANDS_MARKER)) {
+  throw new Error(
+    "The format, hide and insert commands are in webpack's main.js; they must load lazily",
+  );
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
