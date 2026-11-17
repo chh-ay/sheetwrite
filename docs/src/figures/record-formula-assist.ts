@@ -50,11 +50,14 @@ function nextFrameTicks(): number {
  * The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). Each is
  * as wide in CSS pixels as the page shows it, so the formula bar reads at its
  * own size, and is drawn at `scale` device pixels per CSS pixel.
+ *
+ * `reveal` scrolls each scene's cell into view. The wide take holds every cell
+ * the session fills, so it never scrolls; the narrow one has to.
  */
 const TAKES = {
-  wide: { width: 960, height: 540, scale: 2, mobile: false },
+  wide: { width: 960, height: 540, scale: 2, mobile: false, reveal: false },
   // A narrow window, not a phone emulation: the shell lays out the same as on a 390 px phone.
-  narrow: { width: 390, height: 700, scale: 2, mobile: false },
+  narrow: { width: 390, height: 700, scale: 2, mobile: false, reveal: true },
 } as const;
 type TakeName = keyof typeof TAKES;
 
@@ -273,7 +276,8 @@ const KEY_CODES: Readonly<Record<string, number>> = {
 /** CDP's modifier bit for Ctrl. */
 const CTRL = 2;
 
-async function dispatch(cdp: Cdp, sessionId: string, step: Step): Promise<void> {
+/** Send one step to the page; `reveal` scrolls a selected cell into view first. */
+async function dispatch(cdp: Cdp, sessionId: string, step: Step, reveal: boolean): Promise<void> {
   if (step.kind === "select") {
     const addr = /^([A-Z]+)([0-9]+)$/.exec(step.cell);
     const [, letters = "A", digits = "1"] = addr ?? [];
@@ -285,7 +289,7 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step): Promise<void> 
         expression: `(() => {
           const grid = window.__sheetwriteAssistGrid;
           const addr = { sheet: grid.getActiveSheet(), row: ${row}, col: ${col} };
-          grid.scrollToCell(addr);
+          if (${reveal}) grid.scrollToCell(addr);
           grid.setSelection({ kind: "cell", addr });
           document.querySelector('textarea[aria-label="Formula bar"]').focus();
         })()`,
@@ -441,12 +445,12 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
 
     // Warm up: one formula edit loads the add-on's predictor, then the page is put back.
     // An open cell: its neighbours give a suggestion as soon as `=` is typed.
-    await dispatch(cdp, sessionId, { kind: "select", cell: "H6" });
-    await dispatch(cdp, sessionId, { kind: "text", char: "=" });
+    await dispatch(cdp, sessionId, { kind: "select", cell: "H6" }, take.reveal);
+    await dispatch(cdp, sessionId, { kind: "text", char: "=" }, take.reveal);
     await pumpUntil(cdp, sessionId, "document.querySelector('.sheetwrite-formula-ghost') !== null");
-    await dispatch(cdp, sessionId, { kind: "key", key: "Escape" });
-    await dispatch(cdp, sessionId, { kind: "key", key: "Escape" });
-    await dispatch(cdp, sessionId, { kind: "select", cell: "A1" });
+    await dispatch(cdp, sessionId, { kind: "key", key: "Escape" }, take.reveal);
+    await dispatch(cdp, sessionId, { kind: "key", key: "Escape" }, take.reveal);
+    await dispatch(cdp, sessionId, { kind: "select", cell: "A1" }, take.reveal);
     await cdp.send("Runtime.evaluate", { expression: "document.activeElement.blur()" }, sessionId);
     await pumpUntil(cdp, sessionId, "true");
 
@@ -488,7 +492,7 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       const now = frame * FRAME_MS;
       while (next < steps.length && (steps[next]?.at ?? Number.POSITIVE_INFINITY) <= now) {
         const due = steps[next];
-        if (due !== undefined) await dispatch(cdp, sessionId, due.step);
+        if (due !== undefined) await dispatch(cdp, sessionId, due.step, take.reveal);
         next++;
       }
       const expired = cdp.once("Emulation.virtualTimeBudgetExpired");
