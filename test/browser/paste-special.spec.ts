@@ -111,8 +111,10 @@ test("Paste Special adds copied values to the selected cells", async ({ page, br
   });
   await page.keyboard.press("Control+Alt+KeyV");
   const dialog = page.getByRole("dialog", { name: "Paste Special" });
+  await expect(dialog).toBeVisible();
   await page.keyboard.press("v");
   await page.keyboard.press("d");
+  await expect(dialog.getByRole("radio", { name: "Add", exact: true })).toBeChecked();
   await dialog.getByRole("button", { name: "OK" }).click();
   await expect(dialog).toHaveCount(0);
   const values = () =>
