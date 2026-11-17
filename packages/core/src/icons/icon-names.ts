@@ -60,6 +60,9 @@ export const ICON_NAMES = [
   "freeze",
   "groupRows",
   "ungroupRows",
+  "insertCells",
+  "deleteCells",
+  "formatCells",
   "sortAsc",
   "sortDesc",
   "sortFilter",
@@ -68,6 +71,8 @@ export const ICON_NAMES = [
   "sortView",
   "filter",
   "reapplyFilter",
+  "filterArrow",
+  "filterActive",
   "chart",
   "chartColumn",
   "chartBar",
@@ -77,6 +82,7 @@ export const ICON_NAMES = [
   "chartDoughnut",
   "chartScatter",
   "pivotTable",
+  "pivotChart",
   "insertFunction",
   "defineName",
   "nameManager",
@@ -94,6 +100,11 @@ export const ICON_NAMES = [
   "versionHistory",
   "saveVersion",
   "importXlsx",
+  "settings",
+  "keyboardShortcuts",
+  "insertSheet",
+  "moveCopySheet",
+  "tabColor",
 ] as const;
 
 /** The name of one glyph on the command icon sheet; the key of `IconOverrides`. */
