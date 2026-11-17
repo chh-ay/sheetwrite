@@ -2202,11 +2202,16 @@ export class StoreDataEngine {
     return this.view.dataEdge(sheet, row, col, dRow, dCol);
   }
 
-  /** Cells whose text matches `query`, scanned in WASM and returned row-major. */
+  /** Cells that Find's `query` matches, scanned in WASM and returned row-major. */
   searchCells(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): CellAddress[] {
     const flat = this.searchCellsFlat(sheet, query, opts);
 
@@ -2223,7 +2228,12 @@ export class StoreDataEngine {
   searchCellsFlat(
     sheet: SheetId,
     query: string,
-    opts: { matchCase?: boolean; wholeCell?: boolean; columns?: number[] } = {},
+    opts: {
+      matchCase?: boolean;
+      wholeCell?: boolean;
+      columns?: number[];
+      lookIn?: "formulas" | "values";
+    } = {},
   ): Uint32Array {
     this.requireCompleteQuery(sheet);
     const handle = this.sheets.handleOf(sheet);
@@ -2235,6 +2245,7 @@ export class StoreDataEngine {
       query,
       !opts.matchCase,
       opts.wholeCell ?? false,
+      opts.lookIn !== "values",
     );
   }
 
