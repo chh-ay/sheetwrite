@@ -43,7 +43,7 @@ function referenceSheetName(name: string): string {
  * Point the references of `text` that name sheet `from` at sheet `to`. A
  * 3-D reference such as `Sheet1:Sheet3!A1` names a span of sheets and stays.
  */
-export function renameSheetReferences(text: string, from: string, to: string): string {
+function renameSheetReferences(text: string, from: string, to: string): string {
   const packed = getEngine().formulaTokens(text);
   const fromKey = sheetNameKey(from);
   let out = "";
