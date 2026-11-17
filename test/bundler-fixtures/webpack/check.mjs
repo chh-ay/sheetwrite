@@ -272,6 +272,7 @@ const assets = publicFiles.map((file) => {
       autoFilterChunks,
       formatCellsChunks,
       dataValidationChunks,
+      pasteSpecialChunks,
       dialogChunks,
       sheetTabPanelChunks,
       documentChunks,
