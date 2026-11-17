@@ -191,7 +191,7 @@ import "@sheetwrite/core/styles.css";
 
 | Part | What it styles | Needed when |
 | --- | --- | --- |
-| `grid.css` | The grid host, the cell editor, data validation lists, notes, action messages and the theme variables | Always |
+| `grid.css` | The grid host, the cell editor, data validation lists, notes, action messages, dialogs such as the merge warning, and the theme variables | Always |
 | `formula-help.css` | The function list, argument guide and colored references while a formula is edited | Always, unless users never type formulas |
 | `find.css` | The find and replace bar | `find` is not `false` |
 | `ribbon.css` | The ribbon, the toolbar, and their menus and forms | `toolbar` or `ribbon` is set, or you call `createToolbar` or `createRibbon` |
