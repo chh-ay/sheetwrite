@@ -23,9 +23,11 @@ Click a header button, or press **Alt+Down** on a header cell, to open the colum
 
 - **Sort A to Z** and **Sort Z to A** sort the range below its header in place. Number columns say Smallest to Largest, and date columns Oldest to Newest.
 - **Clear Filter From "Region"** removes the column's filter.
-- **Number Filters**, **Text Filters** or **Date Filters**, by what the column holds, open the Custom AutoFilter form. It takes one or two conditions, joined by **And** or **Or**.
+- **Number Filters**, **Text Filters** or **Date Filters**, by what most of the column's values are, open the Custom AutoFilter form. It takes one or two conditions, joined by **And** or **Or**. A number counts as a date when its cell has a date format.
+- **Date Filters** also applies Excel's periods at once: **Tomorrow**, **Today** and **Yesterday**, the next, this and last week, month, quarter and year, **Year to Date**, and **All Dates in the Period** with each quarter and month of any year. Weeks start on Sunday, and "today" is the computer's date when the filter applies.
 - A search box narrows the value list and ticks every result. With a search, **OK** keeps only the ticked results. Tick **Add current selection to filter** to add them to the values the filter keeps already: filter Region to North, then search `South` and press **OK** with the box ticked, and both regions show.
-- The value list ticks the values to show, with **(Select All)** and **(Blanks)**. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
+- The value list ticks the values to show, with **(Select All)** and **(Blanks)**. Each value shows as its cell shows it, so prices read `$39.50`. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
+- In a date column the list groups the dates by year, month and day. Right Arrow or the arrow before a year or month opens it, and Left Arrow closes it. Ticking a year or month ticks all its dates.
 
 A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet, and while a filter is on, the numbers of the filtered list are blue (the theme's `selectionBorder`), as in Excel. After each filter change the spreadsheet shell's status bar says how many rows the filter keeps, for example "12 of 48 records found", until the next edit.
 
@@ -64,12 +66,19 @@ grid.setColumnFilter(2, {
 
 Conditions match as `COUNTIF` criteria do. In text, `*` and `?` are wildcards, and `~` before one makes it a plain character. "Does not equal" also keeps blank cells.
 
+A date column also takes Excel's dynamic date filters, by their XLSX names: `today`, `thisMonth`, `lastQuarter`, `yearToDate` and the others, or `Q1` to `Q4` and `M1` to `M12` for a quarter or month of any year:
+
+```ts prelude="core" partial="requires an initialized grid with an AutoFilter over the orders table" title="Orders of this month, then of any March"
+grid.setColumnFilter(0, { kind: "dynamic", type: "thisMonth" });
+grid.setColumnFilter(0, { kind: "dynamic", type: "M3" });
+```
+
 As in Excel, edits don't filter again on their own. A row whose value no longer matches stays until you choose **Data › Reapply** or call `grid.reapplyFilter()`. **Data › Clear** (`grid.actions.clearFilters()`) removes every column filter and keeps the buttons. The cell menu's **Filter** submenu filters by the selected cell's value, reapplies the filter, or clears the column's filter.
 
 ## Undo, collaboration and XLSX files
 
 Turning the AutoFilter on or off is one undo step, and so is each filter change. Collaborators receive each step. The range follows inserted and deleted rows and columns. Deleting the header row removes the AutoFilter. It saves with the sheet's snapshot.
 
-An AutoFilter round-trips through XLSX. Export writes the worksheet's `autoFilter` with each column's conditions, and the `_xlnm._FilterDatabase` name Excel expects. From a grid or store, it also marks the hidden rows, so Excel opens the file filtered. Import reads an Excel AutoFilter back: its range, value lists, custom filters and non-blank filters. Colour, icon, top 10 and dynamic date filters have no Sheetwrite equivalent, so import drops them with a warning.
+An AutoFilter round-trips through XLSX. Export writes the worksheet's `autoFilter` with each column's conditions, and the `_xlnm._FilterDatabase` name Excel expects. A value list names each number by the text its cell shows, as Excel does. From a grid or store, export also marks the hidden rows, so Excel opens the file filtered. Import reads an Excel AutoFilter back: its range, value lists, custom filters, non-blank filters and dynamic date filters. Colour, icon, top 10, above or below average and date group filters have no Sheetwrite equivalent, so import drops them with a warning.
 
 See [Data operations](/docs/features/data/data-operations/) for view sorts, hidden rows and filters without an AutoFilter.

@@ -42,7 +42,7 @@ import {
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
-import { validFilterCondition } from "./store/autofilter.js";
+import { DYNAMIC_DATE_FILTERS, validFilterCondition } from "./store/autofilter.js";
 import { normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
@@ -1592,6 +1592,10 @@ function validateFilterShape(
         invalid(errors, conditionPath, "Filter condition operation or value is invalid");
       }
     });
+  } else if (kind === "dynamic") {
+    if (!DYNAMIC_DATE_FILTERS.has(String(ownValue(filter, "type")))) {
+      invalid(errors, `${path}.type`, "Dynamic date filter type is invalid");
+    }
   } else if (kind !== "empty" && kind !== "nonEmpty") {
     invalid(errors, `${path}.kind`, "Filter kind is invalid");
   }

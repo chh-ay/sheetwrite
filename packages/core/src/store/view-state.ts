@@ -4,7 +4,7 @@ import type { CellScalar } from "../types/cell.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { ColumnFilter, RowGroup, SortKey } from "../types/document.js";
 import type { ResourceOwnerBytes } from "../types/store.js";
-import { conditionCriterion, keepOutsideAutoFilter } from "./autofilter.js";
+import { conditionCriterion, dynamicDateSpan, keepOutsideAutoFilter } from "./autofilter.js";
 import { EngineHiddenRows } from "./engine-hidden-rows.js";
 import type { SheetRegistry } from "./sheet-registry.js";
 import type { RecomputingCellStore } from "./wasm-contract.js";
@@ -312,13 +312,17 @@ export class StoreViewState {
     this.engineHiddenRows.dispose();
   }
 
+  /**
+   * The distinct values of a column, in first-seen order, and the style id of
+   * each value's first cell.
+   */
   distinctValues(
     sheet: SheetId,
     col: number,
     limit: number,
     rows?: { start: number; end: number },
     only?: Uint32Array,
-  ): CellScalar[] {
+  ): { values: CellScalar[]; styles: Uint32Array } {
     const handle = this.sheets.handleOf(sheet);
     const column = rows
       ? this.wasm.distinctValuesInRows(handle, col, rows.start, rows.end, limit, only)
@@ -326,6 +330,7 @@ export class StoreViewState {
     const kinds = column.takeKinds();
     const numbers = column.takeNumbers();
     const texts = column.takeTexts();
+    const styles = column.takeStyles();
     column.free();
 
     const out: CellScalar[] = new Array(kinds.length);
@@ -339,7 +344,7 @@ export class StoreViewState {
       else out[i] = null;
     }
 
-    return out;
+    return { values: out, styles };
   }
 
   /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
@@ -471,6 +476,20 @@ export class StoreViewState {
           textCounts[i] = filter.conditions.length;
           for (const condition of filter.conditions) valueTexts.push(conditionCriterion(condition));
           break;
+        case "dynamic": {
+          // Relative spans compare serials; periods match months in Rust.
+          const span = dynamicDateSpan(filter.type, new Date());
+          if ("months" in span) {
+            kinds[i] = 6;
+            numCounts[i] = span.months.length;
+            valueNums.push(...span.months);
+          } else {
+            kinds[i] = 5;
+            textCounts[i] = 2;
+            valueTexts.push(`>=${span.start}`, `<${span.end}`);
+          }
+          break;
+        }
       }
 
       i++;

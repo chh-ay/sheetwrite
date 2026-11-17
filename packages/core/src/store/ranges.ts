@@ -11,7 +11,7 @@ import type {
   SheetVisibility,
   SortKey,
 } from "../types/document.js";
-import { validCustomFilter } from "./autofilter.js";
+import { DYNAMIC_DATE_FILTERS, validCustomFilter } from "./autofilter.js";
 
 export function integerAt(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
@@ -330,6 +330,8 @@ function validColumnFilter(filter: ColumnFilter): boolean {
     case "empty":
     case "nonEmpty":
       return true;
+    case "dynamic":
+      return DYNAMIC_DATE_FILTERS.has(filter.type);
     default:
       return false;
   }

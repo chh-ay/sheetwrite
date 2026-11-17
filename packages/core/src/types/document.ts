@@ -130,7 +130,50 @@ export type ColumnFilter =
   | { kind: "compare"; op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq"; value: number }
   | { kind: "empty" }
   | { kind: "nonEmpty" }
-  | CustomColumnFilter;
+  | CustomColumnFilter
+  | { kind: "dynamic"; type: DynamicDateFilter };
+
+/**
+ * One of Excel's Date Filters that has no value: dates relative to today, as
+ * the computer's clock gives it when the filter applies (`today`,
+ * `thisMonth`, `lastQuarter`, `yearToDate` and the others), or the dates
+ * in a quarter (`Q1` to `Q4`) or month (`M1` to `M12`) of any year, as
+ * All Dates in the Period. Weeks start on Sunday. The names are those of
+ * Excel's XLSX `dynamicFilter`.
+ */
+export type DynamicDateFilter =
+  | "tomorrow"
+  | "today"
+  | "yesterday"
+  | "nextWeek"
+  | "thisWeek"
+  | "lastWeek"
+  | "nextMonth"
+  | "thisMonth"
+  | "lastMonth"
+  | "nextQuarter"
+  | "thisQuarter"
+  | "lastQuarter"
+  | "nextYear"
+  | "thisYear"
+  | "lastYear"
+  | "yearToDate"
+  | "Q1"
+  | "Q2"
+  | "Q3"
+  | "Q4"
+  | "M1"
+  | "M2"
+  | "M3"
+  | "M4"
+  | "M5"
+  | "M6"
+  | "M7"
+  | "M8"
+  | "M9"
+  | "M10"
+  | "M11"
+  | "M12";
 
 /**
  * Excel's custom AutoFilter: one or two conditions joined by AND or OR. A
