@@ -161,7 +161,7 @@ function shiftedSpan(
  * lost: `null`. A range that also covers a column beside the block, or
  * spans its sheet, keeps its place.
  */
-export function shiftCellRange(range: Range, move: CellBlockMove): Range | null {
+function shiftCellRange(range: Range, move: CellBlockMove): Range | null {
   const bounds = normalizedRange(range);
   const { from, to } = move;
   if (bounds.sheet !== from.sheet) return range;
