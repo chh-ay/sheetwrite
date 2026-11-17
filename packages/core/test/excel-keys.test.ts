@@ -251,7 +251,7 @@ describe("the cell editor", () => {
     expect(dialog.textContent).toContain("There's a problem with this formula.");
     await answerDialog(host, "OK");
     const field = editor();
-    expect(value(3, 2)).toBe("Berlin");
+    expect(value(3, 2)).toBe("Phnom Penh");
     expect(document.activeElement).toBe(field);
     expect([field?.selectionStart, field?.selectionEnd]).toEqual([11, 12]);
     press("Escape");
