@@ -143,6 +143,8 @@ In a dialog the grid opens, such as the merge warning, Tab and Shift + Tab move 
 
 Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions keep their defaults. Use `null` to remove an action's keys, or an array for multiple bindings. These bindings apply when the grid has focus and is not editing.
 
+To let users change the keys themselves, turn on the [Keyboard shortcuts panel](/docs/features/grid/keyboard-shortcuts/) and store the bindings it emits.
+
 ```ts prelude="core" partial="requires surrounding host state" title="Rebind copy and keep its menu label in sync"
 grid.setConfig({
   keyboard: {

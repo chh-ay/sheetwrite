@@ -133,6 +133,8 @@ export interface GridAdapterEventHandlers<Id extends RowBridgeId = RowBridgeId> 
   onDatasourceError?: (event: GridEvents["datasource-error"]) => void;
   /** Receives failures from built-in XLSX export actions. */
   onExportError?: (event: GridEvents["export-error"]) => void;
+  /** Receives the user's key bindings after each change in the Keyboard shortcuts panel. */
+  onKeyBindingsChange?: (event: GridEvents["key-bindings-change"]) => void;
   /** Fires after the adapter publishes a ready Grid generation. */
   onReady?: (event: GridReadyEvent) => void;
   /** Receives a WASM initialization failure while the adapter remains mounted. */

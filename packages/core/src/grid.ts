@@ -653,6 +653,7 @@ export class GridImpl implements Grid {
     "chart-select": new Set(),
     "chart-activate": new Set(),
     "engine-failed": new Set(),
+    "key-bindings-change": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -2314,6 +2315,24 @@ export class GridImpl implements Grid {
 
   getShortcutLabel(action: KeyboardAction): string {
     return this.keymap.label(action);
+  }
+
+  /** The panel's code is a chunk of its own, loaded on first use. */
+  openKeyboardSettings(): void {
+    if (!this.config?.keyboardSettings || this.lifetime.closed) return;
+    const opener = this.host.ownerDocument.activeElement;
+    this.loadCommand(import("./keyboard-settings.js"), ({ openKeyboardSettings }) => {
+      if (this.lifetime.closed) return;
+      openKeyboardSettings({
+        grid: this,
+        dialogs: this.dialogHost,
+        opener,
+        config: () => this.config,
+        changed: (bindings) => {
+          for (const fn of this.listeners["key-bindings-change"]) fn({ bindings });
+        },
+      });
+    });
   }
 
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {

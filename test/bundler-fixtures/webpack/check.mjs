@@ -63,6 +63,9 @@ const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
 // Data › Data Validation's command and dialog load on first use; their class
 // names survive minifiers. Webpack may copy the dialog shell into the chunk.
 const DATA_VALIDATION_MARKER = "sheetwrite-data-validation";
+// The Keyboard shortcuts panel loads on first use; its dialog class survives
+// minifiers. Like Format Cells, its chunk may hold a copy of the dialog shell.
+const KEYBOARD_SETTINGS_MARKER = "sheetwrite-keyboard-settings";
 // The sheet menu's Move or Copy dialog and Tab Color palette load on first
 // use, together; the dialog's last list entry survives minifiers.
 const SHEET_TAB_PANELS_MARKER = "(move to end)";
@@ -89,6 +92,7 @@ const findChunks = [];
 const autoFilterChunks = [];
 const formatCellsChunks = [];
 const dataValidationChunks = [];
+const keyboardSettingsChunks = [];
 const dialogChunks = [];
 const sheetTabPanelChunks = [];
 const dashboardChunks = [];
@@ -117,6 +121,7 @@ for (const file of lazyChunks) {
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(DATA_VALIDATION_MARKER)) dataValidationChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(KEYBOARD_SETTINGS_MARKER)) keyboardSettingsChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
@@ -154,6 +159,10 @@ if (dataValidationChunks.length !== 1) {
     `Expected one lazy webpack Data Validation chunk, got ${dataValidationChunks.length}`,
   );
 }
+if (keyboardSettingsChunks.length !== 1)
+  throw new Error(
+    `Expected one lazy webpack Keyboard shortcuts chunk, got ${keyboardSettingsChunks.length}`,
+  );
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
 if (sheetTabPanelChunks.length !== 1) {
@@ -261,6 +270,7 @@ const assets = publicFiles.map((file) => {
       autoFilterChunks,
       formatCellsChunks,
       dataValidationChunks,
+      keyboardSettingsChunks,
       dialogChunks,
       sheetTabPanelChunks,
       documentChunks,
