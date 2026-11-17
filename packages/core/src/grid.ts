@@ -1,4 +1,4 @@
-import { colToA1 } from "./a1.js";
+import { cellA1, colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
@@ -954,6 +954,11 @@ export class GridImpl implements Grid {
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
+      keepValidation: () => this.config?.paste?.keepValidation === true,
+      onValidationRefused: (refused, warned) => {
+        this.validationRefusedNotice(refused, warned);
+      },
+      validationReads: () => storeEngine(this.store)?.validationReads,
     });
 
     this.styleDeps = {
@@ -2032,6 +2037,37 @@ export class GridImpl implements Grid {
         ? [rule.inputTitle, rule.inputMessage].filter(Boolean).join(": ")
         : "";
     return [note ? `Note: ${note}` : "", input].filter(Boolean).join(". ") || null;
+  }
+
+  /**
+   * The status notice after a paste that kept the target's validation rules
+   * (`paste.keepValidation`): the cells whose values it refused, and those it
+   * pasted against a `warn` rule, with a button that selects them.
+   */
+  private validationRefusedNotice(
+    refused: readonly CellAddress[],
+    warned: readonly CellAddress[],
+  ): void {
+    const SHOWN = 3;
+    const named = (cells: readonly CellAddress[], what: string): string => {
+      const names = cells.slice(0, SHOWN).map((cell) => cellA1(cell.row, cell.col));
+      const more = cells.length > SHOWN ? ` and ${cells.length - SHOWN} more` : "";
+      return `${cells.length} ${cells.length === 1 ? "cell" : "cells"} ${what}: ${names.join(", ")}${more}.`;
+    };
+    const parts = [
+      ...(refused.length > 0 ? [named(refused, "refused")] : []),
+      ...(warned.length > 0 ? [named(warned, "outside the rules")] : []),
+    ];
+    const cells = [...refused, ...warned];
+    const ranges = cells.map(({ sheet, row, col }) => ({
+      sheet,
+      start: { row, col },
+      end: { row, col },
+    }));
+    this.actionFeedback.show(parts.join(" "), {
+      label: "Select them",
+      run: () => this.setSelection({ kind: "multi", ranges }),
+    });
   }
 
   /** The validation rule over the cell at view `row`, `col`, if any; a merge answers for its anchor. */

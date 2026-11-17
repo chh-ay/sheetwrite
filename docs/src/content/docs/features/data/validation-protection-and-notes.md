@@ -57,7 +57,9 @@ A typed value that fails a rule shows Excel's error alert before it is stored. A
 
 While a cell of a rule is selected, the rule's `inputTitle` and `inputMessage` show in a box below it, as in Excel, unless `showInputMessage` is `false`. Screen readers hear the input message as the cell's description.
 
-Every mutation path passes through the same validation boundary, including paste, fill, clear, and host transactions.
+Typing, fill, clear and host transactions pass through the same validation boundary. A paste works as Excel's does: its values land unchecked, and the cells it covers take the copied cells' rules in place of their own (Paste Values keeps the target's rules). A paste from outside the grid keeps the target's rules.
+
+With `GridConfig.paste.keepValidation: true`, a paste keeps the target's rules instead. A value a `reject` rule refuses is not pasted, a value a `warn` rule refuses lands, and the status bar names both kinds of cell, such as "3 cells refused: B4, B7, B9.", with a **Select them** button. This is an addition on top of Excel: a dropdown list keeps working after a paste, and the user sees at once which pasted values did not fit.
 
 ## Protection
 
@@ -90,7 +92,7 @@ Sheets can also carry `validationRules`, `protectedRanges` and `notes` in the wo
 ## Edge cases and limits
 
 - Remote operations bypass the protection policy. Protection is client UX, not authorization: a server must enforce its own authorization.
-- Validation applies to paste, fill, clear, and host transactions, not only to typing.
+- Validation applies to typing, fill, clear and host transactions. A paste lands its values unchecked, as in Excel, unless `paste.keepValidation` is on.
 
 ## See also
 

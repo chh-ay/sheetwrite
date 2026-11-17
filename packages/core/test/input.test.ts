@@ -509,33 +509,6 @@ describe("pointer input: drag lifecycle", () => {
     });
   }
 });
-describe("validation through input mutation paths", () => {
-  it("rejects invalid external paste at the shared commit boundary", async () => {
-    const { grid, store } = makeGrid();
-    grid.setValidationRule({
-      id: "small-amount",
-      range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } },
-      condition: { kind: "number", max: 5 },
-      policy: "reject",
-    });
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    const before = store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved;
-    const rejected: string[] = [];
-    grid.on("mutation-rejected", ({ issues }) =>
-      rejected.push(...issues.map((issue) => issue.kind)),
-    );
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { readText: () => Promise.resolve("99") },
-    });
-
-    await expect(grid.actions.paste()).resolves.toBe("done");
-    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(before);
-    expect(rejected).toEqual(["validation"]);
-    grid.destroy();
-  });
-});
-
 describe("pointer input: headers", () => {
   it("selects rows by clicking and dragging the row numbers, as in Excel", () => {
     const { grid, scroller, store } = makeGrid();

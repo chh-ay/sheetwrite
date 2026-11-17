@@ -213,6 +213,6 @@ grid.on("mutation-rejected", ({ issues }) => {
 ## See also
 
 - [Selection and keyboard](/docs/features/grid/selection-and-keyboard/)
-- [Validation, protection and notes](/docs/features/data/validation-protection-and-notes/): rules that every edit and paste passes through
+- [Validation, protection and notes](/docs/features/data/validation-protection-and-notes/): rules that every edit passes through, and how a paste lands the copied cells' rules
 - [Collaboration](/docs/features/collaboration/)
 - [`GridActions` API](/docs/api/core/grid-actions/)

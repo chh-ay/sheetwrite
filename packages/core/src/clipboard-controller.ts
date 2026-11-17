@@ -17,11 +17,13 @@ import {
 import { type Scope, ScopeSlot } from "./scope.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
-import type { Range, SheetId } from "./types/coordinates.js";
+import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
 import type { ClipboardOutcome } from "./types/grid.js";
 import type { Store } from "./types/store.js";
 import type { ChangeEvent } from "./types/transaction.js";
+import { failingValidationRule, type ValidationReads } from "./validation-rule.js";
+import { copiedValidation, validationPastePatches } from "./validation-transfer.js";
 
 export interface ClipboardControllerDeps {
   /** The grid's scope; its close stops every clipboard action that is still running. */
@@ -37,6 +39,16 @@ export interface ClipboardControllerDeps {
   commit: (patches: DocumentOp[], reason: CommitReason) => void;
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
+  /** Whether a paste keeps the target's validation rules (`GridConfig.paste.keepValidation`), read per paste. */
+  keepValidation?: () => boolean;
+  /**
+   * Called after a paste that kept the target's rules, with the cells whose
+   * values a `reject` rule refused (not pasted) and those a `warn` rule
+   * refused (pasted), in data coordinates.
+   */
+  onValidationRefused?: (refused: readonly CellAddress[], warned: readonly CellAddress[]) => void;
+  /** Formula results and list sources for the rules a kept paste checks. */
+  validationReads?: () => ValidationReads | undefined;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -762,31 +774,35 @@ export class ClipboardController {
   ): void {
     // Copy shifts every relative formula ref by the block's rigid displacement.
     // Hyperlink source ranges move to the paste destination, while stable
-    // internal targets remain unchanged.
+    // internal targets remain unchanged. The copied cells' validation rules
+    // replace those of the cells the paste covers, as in Excel.
     const targetAnchorRow = this.deps.toDataRow(focus.row);
     const deltaRow = targetAnchorRow - snapshot.anchor.row;
     const deltaCol = focus.col - snapshot.anchor.col;
-    const hyperlinkPatches: DocumentOp[] = valuesOnly
+    const extraPatches: DocumentOp[] = valuesOnly
       ? []
-      : snapshot.hyperlinks.map((source) => ({
-          op: "setHyperlink" as const,
-          sheet: this.deps.activeSheet(),
-          hyperlink: {
-            ...cloneCellHyperlink(source),
-            id: createHyperlinkId(),
-            range: {
-              sheet: this.deps.activeSheet(),
-              start: {
-                row: source.range.start.row + deltaRow,
-                col: source.range.start.col + deltaCol,
-              },
-              end: {
-                row: source.range.end.row + deltaRow,
-                col: source.range.end.col + deltaCol,
+      : [
+          ...(this.deps.keepValidation?.() ? [] : this.validationPatches(snapshot, focus)),
+          ...snapshot.hyperlinks.map((source) => ({
+            op: "setHyperlink" as const,
+            sheet: this.deps.activeSheet(),
+            hyperlink: {
+              ...cloneCellHyperlink(source),
+              id: createHyperlinkId(),
+              range: {
+                sheet: this.deps.activeSheet(),
+                start: {
+                  row: source.range.start.row + deltaRow,
+                  col: source.range.start.col + deltaCol,
+                },
+                end: {
+                  row: source.range.end.row + deltaRow,
+                  col: source.range.end.col + deltaCol,
+                },
               },
             },
-          },
-        }));
+          })),
+        ];
 
     this.commitBlock(
       focus,
@@ -802,7 +818,33 @@ export class ClipboardController {
           style: cell.style,
         };
       },
-      hyperlinkPatches,
+      extraPatches,
+    );
+  }
+
+  /**
+   * The rule changes of pasting `snapshot` at `focus`: the target's rules
+   * leave the pasted cells and the copied rules land on them. None when the
+   * pasted rows are not one block of data rows, as under a sorted view.
+   */
+  private validationPatches(snapshot: ClipboardSnapshot, focus: PasteTarget): DocumentOp[] {
+    const sheet = this.deps.sheet();
+    const copied = snapshot.validation ?? [];
+    if (copied.length === 0 && !sheet.validationRules?.length) return [];
+    const height = snapshot.cells.length;
+    const width = snapshot.cells[0]?.length ?? 0;
+    const rows = focus.rows % height === 0 && focus.cols % width === 0 ? focus.rows : height;
+    // A paste cut short by the sheet's last row carries no rules past it.
+    if (focus.row + rows > this.deps.store.viewRowCount(this.deps.activeSheet())) return [];
+    const firstRow = this.deps.toDataRow(focus.row);
+    for (let row = 1; row < rows; row++) {
+      if (this.deps.toDataRow(focus.row + row) !== firstRow + row) return [];
+    }
+    return validationPastePatches(
+      sheet,
+      copied,
+      { rows: height, cols: width },
+      { row: firstRow, col: focus.col, rows: focus.rows, cols: focus.cols },
     );
   }
 
@@ -902,6 +944,19 @@ export class ClipboardController {
     extraPatches: DocumentOp[] = [],
   ): void {
     const activeSheet = this.deps.activeSheet();
+    // With `paste.keepValidation`, a value a reject rule refuses is not pasted.
+    const check = this.deps.keepValidation?.() ? this.validationCheck() : null;
+    const writeAt = check
+      ? (r: number, c: number, targetCol: number): CellWrite | null => {
+          const write = cellAt(r, c, targetCol);
+          const addr = {
+            sheet: activeSheet,
+            row: this.deps.toDataRow(focus.row + r),
+            col: targetCol,
+          };
+          return write && check.admits(write, addr) ? write : null;
+        }
+      : cellAt;
     const rowLimit = this.deps.store.viewRowCount(activeSheet);
     const colIndices = this.deps.colIndices();
     const startPos = colIndices.indexOf(focus.col);
@@ -937,7 +992,7 @@ export class ClipboardController {
             break;
           }
 
-          const write = cellAt(row, col, targetCol);
+          const write = writeAt(row, col, targetCol);
           if (!write) {
             canPack = false;
             break;
@@ -996,6 +1051,7 @@ export class ClipboardController {
           ],
           "paste",
         );
+        check?.report();
         return;
       }
     }
@@ -1011,7 +1067,7 @@ export class ClipboardController {
         const merge = this.deps.mergeAnchorAt(targetRow, targetCol);
         if (merge && (merge.r0 !== targetRow || merge.c0 !== targetCol)) continue;
 
-        const write = cellAt(r, c, targetCol);
+        const write = writeAt(r, c, targetCol);
         if (!write) continue;
         patches.push({
           op: "set",
@@ -1023,6 +1079,48 @@ export class ClipboardController {
     }
 
     this.deps.commit([...patches, ...extraPatches], "paste");
+    check?.report();
+  }
+
+  /**
+   * The check of a paste that keeps the target's validation rules: each
+   * cell's value against the rules over its cell. It records the cells a
+   * `reject` rule refuses and those a `warn` rule refuses, once each, and
+   * `report` hands them to the grid's notice.
+   */
+  private validationCheck(): {
+    admits(write: CellWrite, addr: CellAddress): boolean;
+    report(): void;
+  } {
+    const rules = this.deps.sheet().validationRules ?? [];
+    const reads = this.deps.validationReads?.();
+    const refused = new Map<string, CellAddress>();
+    const warned = new Map<string, CellAddress>();
+    return {
+      admits: (write, addr) => {
+        if (rules.length === 0) return true;
+        let value: CellScalar | undefined;
+        if (write.value.kind === "literal") value = write.value.value;
+        else if (write.value.kind === "formula") {
+          const result = reads?.formula(write.value.src, addr);
+          value = typeof result === "object" && result !== null ? result.error : result;
+        }
+        if (value === undefined) return true;
+        const rule = failingValidationRule(rules, addr, value, reads);
+        if (!rule) return true;
+        const key = `${addr.row}:${addr.col}`;
+        if (rule.policy === "reject") {
+          refused.set(key, addr);
+          return false;
+        }
+        warned.set(key, addr);
+        return true;
+      },
+      report: () => {
+        if (refused.size === 0 && warned.size === 0) return;
+        this.deps.onValidationRefused?.([...refused.values()], [...warned.values()]);
+      },
+    };
   }
 
   /**
@@ -1168,6 +1266,8 @@ export class ClipboardController {
     }
 
     const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
-    return { anchor, cells, hyperlinks, tsv: rowsToTsv(values), cut, source };
+    const validation =
+      source && !merged ? copiedValidation(this.deps.sheet().validationRules ?? [], source) : [];
+    return { anchor, cells, hyperlinks, validation, tsv: rowsToTsv(values), cut, source };
   }
 }
