@@ -606,6 +606,7 @@ export type KeyboardAction =
   | "fillRight"
   | "nextSheet"
   | "previousSheet"
+  | "insertSheet"
   | "toggleFilter"
   | "formatGeneral"
   | "formatNumber"
@@ -1240,6 +1241,23 @@ export interface Grid {
   showRows(rows?: readonly number[]): void;
   /** Currently hidden data rows on the active sheet. */
   hiddenRows(): readonly number[];
+  /**
+   * The sheet row, zero-based, that view row `viewRow` shows on the active
+   * sheet. Selections, `scrollToCell` and the selection events count rows in
+   * the view; a filter, hidden rows or a view sort make view rows differ
+   * from sheet rows, which A1 references and the row headers use. `null`
+   * when the view has no such row. Constant time.
+   *
+   * Columns need no mapping: hidden columns keep their sheet indices.
+   */
+  sheetRowOf(viewRow: number): number | null;
+  /**
+   * The view row that shows sheet row `sheetRow` on the active sheet, the
+   * inverse of {@link sheetRowOf}. `null` while a filter or the user hides
+   * the row, or when the sheet has no such row. Constant time once the view
+   * has indexed its rows, which it does once per filter, sort or hide.
+   */
+  viewRowOf(sheetRow: number): number | null;
   /** Hide columns through one bulk-safe metadata transaction. */
   hideColumns(cols?: readonly number[]): void;
   /** Show columns through one bulk-safe metadata transaction. */
@@ -1316,6 +1334,8 @@ export interface Grid {
   /**
    * Find cells matching `query`, which takes Excel's wildcards (`*`, `?`,
    * `~`); highlights matches, selects the first, emits `search`, returns the result.
+   * On the active sheet a selection of more than one cell limits the search to
+   * it, as in Excel; the selection stays and the active cell moves to the match.
    */
   search(query: string, opts?: SearchOptions): SearchResult;
   /** Move the active match to the next match and scroll it into view. */

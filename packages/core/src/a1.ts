@@ -103,3 +103,25 @@ export function remapFormulaA1Refs(
     ? engine.shiftFormulaAxis(source, columns, edit.at, edit.delta)
     : engine.moveFormulaAxis(source, columns, edit.from, edit.count, edit.to);
 }
+
+/**
+ * Rewrite the unqualified references of a formula on the sheet of a block
+ * that a cut and paste moves from `from` (top-left row and column, rows,
+ * columns) to `to`, by the engine's cut rules: a reference to a moved cell
+ * follows it and one to a cell the block lands on becomes `#REF!`.
+ */
+export function moveFormulaCellRefs(
+  source: string,
+  from: { row: number; col: number; rows: number; cols: number },
+  to: CellRef,
+): string {
+  return getEngine().moveFormulaCells(
+    source,
+    from.row,
+    from.col,
+    from.rows,
+    from.cols,
+    to.row,
+    to.col,
+  );
+}
