@@ -119,8 +119,9 @@ export class StoreMutationPolicy {
             resolver,
           ),
           // A paste lands its values as in Excel, whose validation checks
-          // typed entries only; `paste.keepValidation` checks in the grid.
-          ...(commitReason === "paste"
+          // typed entries only (`paste.keepValidation` checks in the grid),
+          // and undo and redo return to a document that was already allowed.
+          ...(commitReason === "paste" || commitReason === "undo" || commitReason === "redo"
             ? []
             : this.validationIssues(patch, operationIndex, rulesFor(sheetId))),
           ...this.pivotOutputIssues(

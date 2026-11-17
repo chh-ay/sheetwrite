@@ -103,7 +103,7 @@ describe("paste and data validation", () => {
     grid.undo();
     grid.undo();
     expect(rules()).toEqual([regions]);
-    expect(cell(3, 2)).toBe("Berlin");
+    expect(cell(3, 2)).toBe("Phnom Penh");
     grid.destroy();
     store.dispose();
   });

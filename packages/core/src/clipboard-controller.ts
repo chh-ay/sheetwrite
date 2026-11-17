@@ -40,15 +40,15 @@ export interface ClipboardControllerDeps {
   /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
   onCutChange: (range: Range | null) => void;
   /** Whether a paste keeps the target's validation rules (`GridConfig.paste.keepValidation`), read per paste. */
-  keepValidation: () => boolean;
+  keepValidation?: () => boolean;
   /**
    * Called after a paste that kept the target's rules, with the cells whose
    * values a `reject` rule refused (not pasted) and those a `warn` rule
    * refused (pasted), in data coordinates.
    */
-  onValidationRefused: (refused: readonly CellAddress[], warned: readonly CellAddress[]) => void;
+  onValidationRefused?: (refused: readonly CellAddress[], warned: readonly CellAddress[]) => void;
   /** Formula results and list sources for the rules a kept paste checks. */
-  validationReads: () => ValidationReads | undefined;
+  validationReads?: () => ValidationReads | undefined;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -782,7 +782,7 @@ export class ClipboardController {
     const extraPatches: DocumentOp[] = valuesOnly
       ? []
       : [
-          ...(this.deps.keepValidation() ? [] : this.validationPatches(snapshot, focus)),
+          ...(this.deps.keepValidation?.() ? [] : this.validationPatches(snapshot, focus)),
           ...snapshot.hyperlinks.map((source) => ({
             op: "setHyperlink" as const,
             sheet: this.deps.activeSheet(),
@@ -945,7 +945,7 @@ export class ClipboardController {
   ): void {
     const activeSheet = this.deps.activeSheet();
     // With `paste.keepValidation`, a value a reject rule refuses is not pasted.
-    const check = this.deps.keepValidation() ? this.validationCheck() : null;
+    const check = this.deps.keepValidation?.() ? this.validationCheck() : null;
     const writeAt = check
       ? (r: number, c: number, targetCol: number): CellWrite | null => {
           const write = cellAt(r, c, targetCol);
@@ -1093,7 +1093,7 @@ export class ClipboardController {
     report(): void;
   } {
     const rules = this.deps.sheet().validationRules ?? [];
-    const reads = this.deps.validationReads();
+    const reads = this.deps.validationReads?.();
     const refused = new Map<string, CellAddress>();
     const warned = new Map<string, CellAddress>();
     return {
@@ -1118,7 +1118,7 @@ export class ClipboardController {
       },
       report: () => {
         if (refused.size === 0 && warned.size === 0) return;
-        this.deps.onValidationRefused([...refused.values()], [...warned.values()]);
+        this.deps.onValidationRefused?.([...refused.values()], [...warned.values()]);
       },
     };
   }

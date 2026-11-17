@@ -279,9 +279,6 @@ function makeHarness(
       }
     },
     onCutChange: (range) => cutMarks.push(range),
-    keepValidation: () => false,
-    onValidationRefused: () => {},
-    validationReads: () => undefined,
   });
 
   return {
