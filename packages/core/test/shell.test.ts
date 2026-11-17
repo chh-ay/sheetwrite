@@ -118,9 +118,7 @@ describe("createToolbar", () => {
       // Read before any animation frame runs: what the browser paints first.
       const row = piece.element.querySelector(".sheetwrite-command-toolbar-row");
       if (row === null) throw new Error("the toolbar has no row");
-      const shown = [...row.children].filter(
-        (item) => item instanceof HTMLElement && !item.hidden,
-      );
+      const shown = [...row.children].filter((item) => item instanceof HTMLElement && !item.hidden);
       const isSeparator = (item: Element | undefined): boolean =>
         item?.getAttribute("role") === "separator";
       expect(isSeparator(shown[0])).toBe(false);
