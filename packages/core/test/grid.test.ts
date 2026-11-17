@@ -1012,6 +1012,15 @@ describe("Grid.setMinColumns", () => {
     expect(columnCount({ presentation: "data-grid" })).toBe("3");
     expect(columnCount({ presentation: "data-grid", minColumns: 6 })).toBe("6");
 
+    // A sheet added later fills the width too.
+    const later = mountHost();
+    const added = new GridImpl(later, { workbook: makeWorkbook(5) });
+    const one = { key: "a", header: "A", width: 100, type: "text" as const };
+    added.addSheet({ id: "later", name: "Later", rowCount: 5, columns: [one] });
+    added.setActiveSheet("later");
+    expect(later.getAttribute("aria-colcount")).toBe("9");
+    added.destroy();
+
     const host = mountHost();
     const grid = new GridImpl(host, { workbook: makeWorkbook(5), presentation: "data-grid" });
     grid.setMinColumns(5);

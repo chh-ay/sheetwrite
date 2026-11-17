@@ -43,10 +43,11 @@ export interface SheetTabsOptions {
    */
   focusSheet?: () => void;
   /**
-   * Add a sheet at workbook position `index`, or after the last one. The add
-   * button and Shift+F11 add at the end; the sheet menu's Insert, before its sheet.
+   * Add a sheet at workbook position `index`. As in Excel, the add button
+   * adds it after the active sheet, Shift+F11 before it, and the sheet
+   * menu's Insert before the menu's sheet.
    */
-  onAdd?: (index?: number) => SheetLifecycleResult;
+  onAdd?: (index: number) => SheetLifecycleResult;
   onRemove?: (id: SheetId) => SheetLifecycleResult;
   onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
@@ -133,7 +134,7 @@ function feedbackFrom(result: SheetLifecycleResult): Omit<LifecycleFeedback, "sh
 export class SheetTabs {
   private readonly host: HTMLElement;
   private readonly onActivate: (id: SheetId) => void;
-  private readonly onAdd?: (index?: number) => SheetLifecycleResult;
+  private readonly onAdd?: (index: number) => SheetLifecycleResult;
   private readonly onRemove?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
@@ -263,6 +264,11 @@ export class SheetTabs {
     this.feedback = null;
     this.focusedId = null;
     this.draggedId = null;
+  }
+
+  /** The active sheet's workbook position. */
+  private activeIndex(): number {
+    return this.sheets.findIndex((sheet) => sheet.id === this.activeId);
   }
 
   private visibleSheets(): VisibleSheet[] {
@@ -685,15 +691,16 @@ export class SheetTabs {
     return button;
   }
 
-  private createAddButton(onAdd: () => SheetLifecycleResult): HTMLButtonElement {
+  private createAddButton(onAdd: (index: number) => SheetLifecycleResult): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sheetwrite-tab-add";
     button.appendChild(createTabIcon("M10 4v12M4 10h12", "1.33"));
     button.setAttribute("aria-label", "Add sheet");
     button.title = "Add sheet";
-    button.setAttribute("aria-keyshortcuts", "Shift+F11");
-    button.addEventListener("click", () => this.performLifecycle(this.activeId, onAdd));
+    button.addEventListener("click", () =>
+      this.performLifecycle(this.activeId, () => onAdd(this.activeIndex() + 1)),
+    );
     return button;
   }
 
@@ -1025,9 +1032,10 @@ export class SheetTabs {
       }
     }
 
-    if (!this.readOnly && event.shiftKey && event.key === "F11" && this.onAdd) {
+    const onAdd = this.onAdd;
+    if (!this.readOnly && event.shiftKey && event.key === "F11" && onAdd) {
       event.preventDefault();
-      this.performLifecycle(this.activeId, this.onAdd);
+      this.performLifecycle(this.activeId, () => onAdd(this.activeIndex()));
       return;
     }
 
