@@ -45,7 +45,11 @@ The setup has ten columns and at least 100 rows; A1:C3 contain the invoice data 
 
 ## Validation
 
-`DataValidationRule` covers list, numeric range, date range, text-length, and checkbox conditions. A rule has a stable ID, a range, a `reject` / `warn` / `allow` policy, optional blank handling, and Excel's Error Alert and Input Message.
+`DataValidationRule` covers Excel's Allow choices: any value, whole number and decimal (`number`), list, date, time, text length and custom, and a checkbox. A rule has a stable ID, a range, a `reject` / `warn` / `allow` policy, optional blank handling, and Excel's Error Alert and Input Message.
+
+**Data › Data Validation** opens Excel's dialog for the selection: Settings (Allow, Data, the bounds, Source, In-cell dropdown, Formula, Ignore blank), Input Message and Error Alert. OK gives the selected cells the rule as one undoable step; cells of a larger rule leave it, and the rest of that rule stays. "Apply these changes to all other cells with the same settings" changes the whole rule instead. Clear All then OK removes the rule. When the selection holds several kinds of rule, or cells with and without one, Excel's question comes first. The command is `grid.actions.dataValidation()`.
+
+A list's `source` is what Excel's Source box takes: a range such as `"=$H$2:$H$5"` or `"=Lists!$A$1:$A$9"`, or a defined name such as `"=Regions"`. The list shows the cells' current values, so it follows edits to them, and its references follow inserted and deleted rows and columns. Bounds can be formulas too (`"=B1"`, `"=TODAY()"`), and a custom rule passes a value when its formula is TRUE with the value in the cell, as `"=COUNTIF($A:$A,A1)=1"` refuses duplicates. Formulas are relative to the rule's top-left cell, as in Excel. Text compares with list items without case, as in Excel.
 
 A selected cell of a list rule shows a dropdown arrow just right of it, as in Excel. The arrow and Alt+Down open the list, an ARIA `combobox` with a `listbox`. Typing in the cell opens the list too, and the list keeps only the items that contain the typed text, ignoring case, as Excel's AutoComplete for dropdown lists does. Up and Down highlight an item; Enter stores it, Tab stores it and moves, and Escape cancels. Without a highlighted item, Enter stores the item the text names, or the text as typed, which the rule then checks. F2 and a double-click edit the cell's text, as in Excel. Checkbox rules open a real ARIA `checkbox`; Space toggles it.
 
@@ -67,7 +71,9 @@ Plain-text notes use `setNote(addr, text)` and `getNote(addr)`. The focused cell
 
 | Field or API | Values | Effect |
 | --- | --- | --- |
-| `DataValidationRule.condition.kind` | `list`, `number`, `date`, `textLength`, `checkbox` | The kind of check. |
+| `DataValidationRule.condition.kind` | `any`, `list`, `number`, `date`, `time`, `textLength`, `custom`, `checkbox` | The kind of check. |
+| `condition.source` (list) / `condition.formula` (custom) | formula with `=` | A list from a range or defined name; a custom check. |
+| `DataValidationRule.inCellDropdown` | `boolean` | A list rule's dropdown arrow and list; `true` unless you turn it off. |
 | `DataValidationRule.policy` | `"reject"`, `"warn"`, `"allow"` | What happens to a value that fails the check. |
 | `DataValidationRule.allowBlank` | `boolean` | Blank cells are allowed unless you turn this off. |
 | `DataValidationRule.errorStyle` | `"stop"`, `"warning"`, `"information"` | The error alert's style: `stop` for `reject`, `warning` (default) or `information` for `warn`. |

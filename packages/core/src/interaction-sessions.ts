@@ -45,7 +45,7 @@ import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
-import { failingValidationRule } from "./validation-rule.js";
+import { failingValidationRule, hasListDropdown, validationListItems } from "./validation-rule.js";
 
 const PRINTABLE = /^.$/u;
 const MINUTES_PER_HOUR = 60;
@@ -480,7 +480,12 @@ export class InteractionSessions {
       if (covering.length === 0) continue;
       const value = this.enteredScalar(patch.addr, patch.value);
       if (value === undefined) continue;
-      const rule = failingValidationRule(covering, patch.addr, value);
+      const rule = failingValidationRule(
+        covering,
+        patch.addr,
+        value,
+        storeEngine(this.deps.store)?.validationReads,
+      );
       if (rule?.policy === "reject") return rule;
       broken ??= rule;
     }
@@ -664,7 +669,11 @@ export class InteractionSessions {
         row: editCell.row,
         col: editCell.col,
         rule: validationRule,
-        values: condition?.kind === "list" ? condition.values : [],
+        values: validationListItems(
+          validationRule,
+          dataAddr,
+          storeEngine(this.deps.store)?.validationReads,
+        ),
         current,
         filter: list ?? "",
         rect: this.deps.screenRect(
@@ -1797,7 +1806,7 @@ export class InteractionSessions {
       this.deps
         .sheet()
         .validationRules?.some(
-          (rule) => rule.condition.kind === "list" && rangeContains(rule.range, addr),
+          (rule) => hasListDropdown(rule) && rangeContains(rule.range, addr),
         ) ?? false
     );
   }

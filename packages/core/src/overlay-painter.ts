@@ -7,7 +7,7 @@ import { checkStylePart } from "./style-parts.js";
 import type { HighlightRange, PresenceOverlay, Range, SheetId } from "./types/coordinates.js";
 import type { AutoFilter, CellNote, DataValidationRule, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
-import { hasInputMessage } from "./validation-rule.js";
+import { hasInputMessage, hasListDropdown } from "./validation-rule.js";
 
 const PRESENCE_LABEL_HEIGHT = 18;
 const PRESENCE_LABEL_MAX_WIDTH = 160;
@@ -1451,7 +1451,7 @@ export class OverlayPainter {
       return;
     }
 
-    if (rule.condition.kind === "list") {
+    if (hasListDropdown(rule)) {
       const button = listButtonRect(cell);
       const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
       el.className = "sheetwrite-list-button";

@@ -916,6 +916,18 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         layout: "flow",
         controls: [
           {
+            ...button(
+              "Data Validation",
+              "dataValidation",
+              (grid) => grid.actions.dataValidation(),
+              "edit",
+              {
+                large: true,
+              },
+            ),
+            description: "Data Validation: choose the values a cell takes",
+          },
+          {
             // Excel's "Manage Data Model" wraps to three lines under a large
             // glyph, so the label is short and the tooltip keeps Excel's name.
             ...button("Data Model", "dataModel", openDataModel, "view", { large: true }),

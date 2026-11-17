@@ -326,6 +326,7 @@ export type {
   DataSourceStorageOptions,
   DataValidationComparison,
   DataValidationCondition,
+  DataValidationOperand,
   DataValidationRule,
   DocumentOp,
   ExternalLink,

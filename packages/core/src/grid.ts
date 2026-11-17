@@ -3002,6 +3002,14 @@ export class GridImpl implements Grid {
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
+  /** Data › Data Validation; the command and its dialog load the first time it opens. */
+  private dataValidation(): void {
+    this.loadCommand(import("./data-validation-command.js"), ({ dataValidationCommand }) => {
+      if (this.lifetime.closed) return;
+      void dataValidationCommand({ dialogs: this.dialogHost, style: this.styleDeps });
+    });
+  }
+
   /** What the commands of `cell-commands.ts` use; built on first use. */
   private cellCommands(): CellCommandsHost {
     this.cellCommandsHost ??= {
@@ -3962,6 +3970,7 @@ export class GridImpl implements Grid {
       insertCells: (options) => insertOrDelete(this.cellCommands(), true, options),
       deleteCells: (options) => insertOrDelete(this.cellCommands(), false, options),
       formatCells: (format) => formatCells(this.cellCommands(), format),
+      dataValidation: () => this.dataValidation(),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =

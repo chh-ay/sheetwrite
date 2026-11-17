@@ -249,6 +249,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "CommitReason",
       "CustomColumnFilter",
       "DataValidationComparison",
+      "DataValidationOperand",
       "DataValidationCondition",
       "DataValidationRule",
       "DocumentOp",

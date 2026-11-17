@@ -1359,6 +1359,19 @@ function validateHyperlinkShape(
   }
 }
 
+/** The longest formula Excel takes in a data validation rule. */
+const MAX_VALIDATION_FORMULA_LENGTH = 255;
+
+/** Whether `value` is a validation formula: text with its leading `=`, within Excel's length. */
+function validationFormula(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 1 &&
+    value.length <= MAX_VALIDATION_FORMULA_LENGTH &&
+    value.startsWith("=")
+  );
+}
+
 function validateValidationComparison(
   value: unknown,
   path: string,
@@ -1384,6 +1397,8 @@ function validateValidationComparison(
 
   const validateOperand = (key: "min" | "max" | "value"): number | undefined => {
     const operand = ownValue(comparison, key);
+    // A formula bound is checked when a value is, in its cell.
+    if (validationFormula(operand)) return undefined;
     if (textLength) {
       if (nonNegativeInteger(operand)) return operand;
     } else if (finiteNumber(operand)) {
@@ -1393,8 +1408,8 @@ function validateValidationComparison(
       errors,
       `${path}.${key}`,
       textLength
-        ? "Text length comparison operands must be non-negative integers"
-        : "Validation comparison operands must be finite",
+        ? "Text length comparison operands must be non-negative integers or formulas"
+        : "Validation comparison operands must be finite numbers or formulas",
     );
     return undefined;
   };
@@ -1425,7 +1440,28 @@ function validateValidationCondition(
   const condition = recordAt(value, path, errors);
   if (!condition) return;
   const kind = ownValue(condition, "kind");
+  if (kind === "any") return;
+  if (kind === "custom") {
+    if (!validationFormula(ownValue(condition, "formula"))) {
+      invalid(errors, `${path}.formula`, "A custom validation needs a formula that starts with =");
+    }
+    return;
+  }
   if (kind === "list") {
+    optionalBoolean(condition, "allowCustom", path, errors);
+    if (ownValue(condition, "source") !== undefined) {
+      if (
+        !validationFormula(ownValue(condition, "source")) ||
+        ownValue(condition, "values") !== undefined
+      ) {
+        invalid(
+          errors,
+          `${path}.source`,
+          "A list source is one formula that starts with =, without values",
+        );
+      }
+      return;
+    }
     const values = arrayAt(ownValue(condition, "values"), `${path}.values`, errors);
     if (values && values.length === 0) {
       invalid(errors, `${path}.values`, "List validation needs at least one value");
@@ -1437,11 +1473,10 @@ function validateValidationCondition(
       }
     });
 
-    optionalBoolean(condition, "allowCustom", path, errors);
     return;
   }
 
-  if (kind === "number" || kind === "date") {
+  if (kind === "number" || kind === "date" || kind === "time") {
     const min = ownValue(condition, "min");
     const max = ownValue(condition, "max");
     const comparison = ownValue(condition, "comparison");
@@ -1958,6 +1993,7 @@ function validateValidationRuleShape(
     }
   }
   optionalBoolean(rule, "allowBlank", path, errors);
+  optionalBoolean(rule, "inCellDropdown", path, errors);
   optionalString(rule, "helpText", path, errors);
   optionalString(rule, "errorTitle", path, errors);
   optionalBoolean(rule, "showInputMessage", path, errors);

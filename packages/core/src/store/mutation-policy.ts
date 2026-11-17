@@ -13,7 +13,11 @@ import type {
   Workbook,
 } from "../types/document.js";
 import type { PivotDefinition } from "../types/pivot.js";
-import { validationAccepts, validationIssueMessage } from "../validation-rule.js";
+import {
+  validationAccepts,
+  validationIssueMessage,
+  type ValidationReads,
+} from "../validation-rule.js";
 import {
   cellRange,
   fullSheetRange,
@@ -39,6 +43,8 @@ export class StoreMutationPolicy {
   constructor(
     private readonly workbook: Workbook,
     private readonly pivotOutputs: PivotOutputProvider = () => [],
+    /** Formula results and list sources for rules that need them. */
+    private readonly reads?: ValidationReads,
   ) {}
 
   evaluate(
@@ -393,7 +399,7 @@ export class StoreMutationPolicy {
         if (
           rule.policy === "allow" ||
           !rangeContains(rule.range, patch.addr) ||
-          validationAccepts(rule, patch.value.value)
+          validationAccepts(rule, patch.value.value, patch.addr, this.reads)
         ) {
           continue;
         }
@@ -444,7 +450,10 @@ export class StoreMutationPolicy {
         };
 
         for (const rule of candidates) {
-          if (!rangeContains(rule.range, addr) || validationAccepts(rule, cell.value.value)) {
+          if (
+            !rangeContains(rule.range, addr) ||
+            validationAccepts(rule, cell.value.value, addr, this.reads)
+          ) {
             continue;
           }
 
@@ -516,7 +525,8 @@ export class StoreMutationPolicy {
           const offset = rowOffset + col - range.start.col;
           if (formulaOffsets.has(offset) || refOffsets.has(offset)) continue;
           const scalar = block.values[offset] ?? null;
-          if (validationAccepts(rule, scalar)) continue;
+          const addr = { sheet: range.sheet, row, col };
+          if (validationAccepts(rule, scalar, addr, this.reads)) continue;
           const value: CellValue = { kind: "literal", value: scalar };
           issues.push({
             kind: "validation",

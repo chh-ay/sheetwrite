@@ -137,3 +137,59 @@ test("a list cell's arrow opens its list, and typing filters it, from the keyboa
   await page.keyboard.press("Tab");
   await expect(list).toHaveCount(0);
 });
+
+test("Data › Data Validation creates a list from another sheet, from the keyboard @portability", async ({
+  page,
+}) => {
+  await open(page);
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteSpreadsheetGrid!;
+    const sheet = grid.getActiveSheet();
+    grid.setSelection({
+      kind: "range",
+      range: { sheet, start: { row: 1, col: 1 }, end: { row: 49, col: 1 } },
+    });
+  });
+  await page.getByRole("tab", { name: "Data" }).click();
+  await page.getByRole("button", { name: "Data Validation" }).click();
+  const dialog = page.getByRole("dialog", { name: "Data Validation" });
+  await expect(dialog).toBeVisible();
+  const allow = dialog.getByLabel("Allow");
+  await expect(allow).toBeFocused();
+  await allow.selectOption("list");
+  // The Summary sheet lists the four regions in A2:A5.
+  await dialog.getByLabel("Source").fill("=Summary!$A$2:$A$5");
+  await dialog.getByRole("tab", { name: "Settings" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(dialog.getByRole("tab", { name: "Input Message" })).toBeFocused();
+  const inputPanel = dialog.getByRole("tabpanel", { name: "Input Message" });
+  await inputPanel.getByLabel("Title").fill("Region");
+  await page.keyboard.press("Enter");
+  await expect(dialog).toHaveCount(0);
+
+  const rules = await page.evaluate(() => {
+    const grid = window.__sheetwriteSpreadsheetGrid!;
+    const sheet = grid.getActiveSheet();
+    return grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheet)
+      ?.validationRules;
+  });
+  expect(rules).toEqual([
+    expect.objectContaining({
+      condition: { kind: "list", source: "=Summary!$A$2:$A$5" },
+      inputTitle: "Region",
+    }),
+  ]);
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteSpreadsheetGrid!;
+    grid.setSelection({ kind: "cell", addr: { sheet: grid.getActiveSheet(), row: 1, col: 1 } });
+  });
+  await page.locator(".sheetwrite").first().focus();
+  await page.keyboard.press("Alt+ArrowDown");
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveText([
+    "North",
+    "South",
+    "East",
+    "West",
+  ]);
+  await page.keyboard.press("Escape");
+});
