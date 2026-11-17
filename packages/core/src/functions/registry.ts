@@ -84,10 +84,8 @@ function frozenMetadata(metadata: FormulaFunctionMetadata): FormulaFunctionMetad
  * Formula AutoComplete lists for some arguments.
  */
 async function builtInFunctions(): Promise<FormulaFunctionMetadata[]> {
-  const [{ BUILT_IN_FUNCTIONS }, { ARGUMENT_CHOICES }] = await Promise.all([
-    import("../generated/function-metadata.js"),
-    import("./argument-choices.js"),
-  ]);
+  const { BUILT_IN_FUNCTIONS, ARGUMENT_CHOICES } =
+    await import("../generated/function-metadata.js");
   const engineFlag =
     engineFunctionNames === undefined ? FUNCTION_FLAG_DEFAULT_ENGINE : FUNCTION_FLAG_FULL_ENGINE;
 
