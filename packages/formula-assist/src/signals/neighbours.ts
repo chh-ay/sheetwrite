@@ -31,12 +31,26 @@ interface Moved {
   readonly sides: Map<Side, number>;
 }
 
+/** What else the neighbours said: nothing, one other formula, or another formula two of them agree on. */
+type Contradiction = "none" | "single" | "pair";
+
+/**
+ * A number written in the formula itself, outside references: the `31` of
+ * `=D11*31`. Neighbours copied across days or months often differ in it.
+ */
+const LITERAL_NUMBER = /(?<![A-Za-z$\d.:])\d+(?:\.\d+)?(?![\d.]*[A-Za-z(])/;
+
+function hasLiteralNumber(formula: string): boolean {
+  return LITERAL_NUMBER.test(formula.replace(/"[^"]*"/g, '""'));
+}
+
 /**
  * The situation a moved formula was found in, strongest first: which sides
- * gave it, whether both neighbours on that side did, and whether another
- * neighbour gave a different formula.
+ * gave it and whether both neighbours on a side did, what the other
+ * neighbours said, and whether it holds numbers of its own.
  */
-function reasonOf(sides: ReadonlyMap<Side, number>, contradicted: boolean): string {
+function reasonOf(moved: Moved, contradiction: Contradiction): string {
+  const { sides, formula } = moved;
   const on = (side: Side): number => sides.get(side) ?? 0;
   let reason: string;
   if (on("above") > 0 && on("below") > 0) reason = "aboveAndBelow";
@@ -46,7 +60,9 @@ function reasonOf(sides: ReadonlyMap<Side, number>, contradicted: boolean): stri
     const [side, count]: [Side, number] = strongest ?? ["furtherAbove", 1];
     reason = count > 1 ? `two ${side}` : side;
   }
-  return contradicted ? `${reason}, contradicted` : reason;
+  if (contradiction === "single") reason += ", contradicted";
+  if (contradiction === "pair") reason += ", contradicted by a pair";
+  return hasLiteralNumber(formula) ? `${reason}, with numbers` : reason;
 }
 
 /** The formulas next to the edited cell, moved to it. */
@@ -77,12 +93,14 @@ function neighbourProposals(edit: FormulaEdit): Proposal[] {
     aboveFound = read("furtherAbove", cell.row - distance, cell.col);
   }
 
-  const contradicted = moved.size > 1;
-  return [...moved.values()].map(({ formula, sides }) => ({
-    formula,
-    signal: "neighbours",
-    reason: reasonOf(sides, contradicted),
-  }));
+  const all = [...moved.values()];
+  const support = (entry: Moved): number => [...entry.sides.values()].reduce((sum, count) => sum + count, 0);
+  return all.map((entry) => {
+    const others = all.filter((other) => other !== entry);
+    const contradiction: Contradiction =
+      others.length === 0 ? "none" : others.some((other) => support(other) > 1) ? "pair" : "single";
+    return { formula: entry.formula, signal: "neighbours", reason: reasonOf(entry, contradiction) };
+  });
 }
 
 /** Open the neighbouring-formulas signal of one edit; it reads the neighbours once. */

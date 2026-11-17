@@ -24,7 +24,13 @@ import {
 import { openReplayStore, type ReplayTarget, type ReplayWorkbook } from "./replay.js";
 
 /** The sets the replay knows, by name. */
-export const REPLAY_SETS = ["conformance", "fixtures", "enron-dev", "enron-heldout"] as const;
+export const REPLAY_SETS = [
+  "conformance",
+  "fixtures",
+  "enron-dev",
+  "enron-dev2",
+  "enron-heldout",
+] as const;
 
 /** One replay set's name. */
 export type ReplaySetName = (typeof REPLAY_SETS)[number];
@@ -236,9 +242,12 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
   }
 }
 
-/** One half of the Enron sample: `dev` to tune on, `heldout` for the gate only. */
-async function* enronWorkbooks(half: "dev" | "heldout"): AsyncGenerator<ReplayWorkbook> {
-  const path = new URL(`./enron/${half}.json`, import.meta.url);
+/**
+ * One set of the Enron sample: `dev` and `dev2` to tune on, `heldout` for the
+ * gate only (see enron/README.md).
+ */
+async function* enronWorkbooks(set: "dev" | "dev2" | "heldout"): AsyncGenerator<ReplayWorkbook> {
+  const path = new URL(`./enron/${set}.json`, import.meta.url);
   const sample: unknown = JSON.parse(await readFile(path, "utf8"));
   if (!isEnronSample(sample)) throw new Error(`${path.pathname} is not an Enron sample file`);
 
@@ -303,5 +312,7 @@ export function replayWorkbooks(set: ReplaySetName): AsyncGenerator<ReplayWorkbo
       return enronWorkbooks("dev");
     case "enron-heldout":
       return enronWorkbooks("heldout");
+    case "enron-dev2":
+      return enronWorkbooks("dev2");
   }
 }

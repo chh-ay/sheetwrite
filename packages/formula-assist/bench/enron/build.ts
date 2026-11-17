@@ -1,11 +1,13 @@
 // Builds the Enron sample of the formula assist replay (see README.md in this
 // folder) from the corpus archive of Hermans and Murphy-Hill:
 //
-//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch folder>
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch>             dev.json, dev2.json
+//   bun packages/formula-assist/bench/enron/build.ts <spreadsheets.7z> <scratch> --held-out  heldout.json
 //
 // The archive is https://ndownloader.figshare.com/files/3242531 (CC BY 4.0).
 // Needs `7z` on the PATH. The same archive gives the same sample: every
-// choice comes from one seeded generator.
+// choice comes from a seeded generator. The held-out draw skips every
+// spreadsheet the development sets hold.
 
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,10 +24,12 @@ import { xlsxAddon } from "@sheetwrite/xlsx";
 
 /** MD5 of the archive as figshare lists it. */
 const ARCHIVE_MD5 = "188ec98d04c83a4725d9205cc75ce5a2";
-/** Seed of every random choice; #801. */
-const SEED = 801;
-/** Workbooks in the sample; half go to each set. */
-const WORKBOOKS = 100;
+/** Seed of the development draw (#801); its workbooks alternate between dev.json and dev2.json. */
+const DEV_SEED = 801;
+const DEV_WORKBOOKS = 100;
+/** Seed of the held-out draw, from the spreadsheets the development draw did not take. */
+const HELD_OUT_SEED = 802;
+const HELD_OUT_WORKBOOKS = 50;
 /** A workbook needs this many formulas to be sampled. */
 const MIN_FORMULAS = 10;
 /** Formulas typed per workbook, at most. */
@@ -108,12 +112,17 @@ async function distinctSpreadsheets(archive: string): Promise<string[]> {
     .map((line) => line.slice("Path = ".length))
     .sort();
   for (const path of paths) {
-    const title = path.split("__").at(-1)?.toLowerCase() ?? path;
+    const title = titleOf(path);
     if (!byTitle.has(title)) byTitle.set(title, path);
   }
   return [...byTitle.values()];
 }
 
+
+/** A file's spreadsheet title, which copies of one spreadsheet in several messages share. */
+function titleOf(path: string): string {
+  return (path.split("__").at(-1) ?? path).toLowerCase();
+}
 /** A cell of the sample: `[row, col, value]`; a formula is its text with `=`. */
 type SampleCell = [number, number, CellScalar];
 
@@ -269,22 +278,24 @@ function sampleWorkbook(
   };
 }
 
-async function main(): Promise<void> {
-  const [archive, scratch] = process.argv.slice(2);
-  if (archive === undefined || scratch === undefined) {
-    throw new Error("Usage: bun build.ts <spreadsheets.7z> <scratch folder>");
-  }
-  await checkArchive(archive);
-  await initSheetwrite({ addons: [xlsxAddon()] });
-
-  const random = seededRandom(SEED);
-  const candidates = shuffled(await distinctSpreadsheets(archive), random);
+/** One seeded draw of `count` workbooks, skipping the spreadsheet titles in `exclude`. */
+async function draw(
+  archive: string,
+  scratch: string,
+  options: { seed: number; count: number; exclude: ReadonlySet<string> },
+): Promise<{ sampled: SampleWorkbook[]; refused: number }> {
+  const random = seededRandom(options.seed);
+  const spreadsheets = await distinctSpreadsheets(archive);
+  const candidates = shuffled(
+    spreadsheets.filter((path) => !options.exclude.has(titleOf(path))),
+    random,
+  );
   const sampled: SampleWorkbook[] = [];
   let refused = 0;
 
   for (
     let start = 0;
-    start < candidates.length && sampled.length < WORKBOOKS;
+    start < candidates.length && sampled.length < options.count;
     start += EXTRACT_BATCH
   ) {
     const batch = candidates.slice(start, start + EXTRACT_BATCH);
@@ -296,7 +307,7 @@ async function main(): Promise<void> {
     await run(["7z", "e", "-y", `-o${folder}`, archive, `@${list}`]);
 
     for (const file of batch) {
-      if (sampled.length >= WORKBOOKS) break;
+      if (sampled.length >= options.count) break;
       let snapshot: WorkbookSnapshot;
       try {
         snapshot = await fromXlsxWorkbook(await readFile(join(folder, file)));
@@ -311,20 +322,58 @@ async function main(): Promise<void> {
     }
   }
   await rm(join(scratch, "batch"), { recursive: true, force: true });
+  return { sampled, refused };
+}
 
-  // Alternate the sampled order between the sets: the same seed, the same halves.
-  const halves: Record<"dev" | "heldout", SampleWorkbook[]> = { dev: [], heldout: [] };
-  for (const [index, workbook] of sampled.entries()) {
-    (index % 2 === 0 ? halves.dev : halves.heldout).push(workbook);
+async function writeSet(name: string, seed: number, workbooks: SampleWorkbook[]): Promise<void> {
+  const path = new URL(`./${name}.json`, import.meta.url);
+  await writeFile(path, `${JSON.stringify({ seed, workbooks })}\n`);
+}
+
+/** The spreadsheet titles of a written set, so a later draw can stay clear of them. */
+async function titlesIn(name: string): Promise<string[]> {
+  const text = await readFile(new URL(`./${name}.json`, import.meta.url), "utf8");
+  const set: unknown = JSON.parse(text);
+  const workbooks = typeof set === "object" && set !== null && "workbooks" in set ? set.workbooks : [];
+  if (!Array.isArray(workbooks)) return [];
+  return workbooks.flatMap((workbook: unknown) =>
+    typeof workbook === "object" && workbook !== null && "file" in workbook && typeof workbook.file === "string"
+      ? [titleOf(workbook.file)]
+      : [],
+  );
+}
+
+async function main(): Promise<void> {
+  const [archive, scratch, mode] = process.argv.slice(2);
+  if (archive === undefined || scratch === undefined) {
+    throw new Error("Usage: bun build.ts <spreadsheets.7z> <scratch folder> [--held-out]");
   }
-  for (const [half, workbooks] of Object.entries(halves)) {
-    const path = new URL(`./${half}.json`, import.meta.url);
-    await writeFile(path, `${JSON.stringify({ seed: SEED, workbooks })}\n`);
+  await checkArchive(archive);
+  await initSheetwrite({ addons: [xlsxAddon()] });
+
+  let report: { sampled: SampleWorkbook[]; refused: number };
+  if (mode === "--held-out") {
+    const exclude = new Set([...(await titlesIn("dev")), ...(await titlesIn("dev2"))]);
+    report = await draw(archive, scratch, {
+      seed: HELD_OUT_SEED,
+      count: HELD_OUT_WORKBOOKS,
+      exclude,
+    });
+    await writeSet("heldout", HELD_OUT_SEED, report.sampled);
+  } else {
+    report = await draw(archive, scratch, {
+      seed: DEV_SEED,
+      count: DEV_WORKBOOKS,
+      exclude: new Set(),
+    });
+    // Alternate the drawn order between the two development sets.
+    await writeSet("dev", DEV_SEED, report.sampled.filter((_, index) => index % 2 === 0));
+    await writeSet("dev2", DEV_SEED, report.sampled.filter((_, index) => index % 2 === 1));
   }
 
-  const formulas = sampled.reduce((sum, workbook) => sum + workbook.targets.length, 0);
+  const formulas = report.sampled.reduce((sum, workbook) => sum + workbook.targets.length, 0);
   process.stdout.write(
-    `${sampled.length} workbooks, ${formulas} formulas; ${refused} files refused by the reader\n`,
+    `${report.sampled.length} workbooks, ${formulas} formulas; ${report.refused} files refused by the reader\n`,
   );
 }
 

@@ -2,8 +2,8 @@
 //
 //   bun packages/formula-assist/bench/replay-cli.ts [--set <name>]... [--per-signal]
 //
-// Without `--set` it runs every set except `enron-heldout`, the half kept
-// back for the gate: tune on `enron-dev`, never on the held-out half.
+// Without `--set` it runs every set except `enron-heldout`, the set kept
+// back for the gate: tune on `enron-dev` and `enron-dev2`, never on the held-out set.
 // `--per-signal` adds each signal alone and the predictor without each one.
 
 import { parseArgs } from "node:util";

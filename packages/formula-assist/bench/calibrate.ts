@@ -30,7 +30,7 @@ function isDevelopmentSet(name: string): name is ReplaySetName {
   return name !== "enron-heldout" && REPLAY_SETS.some((set) => set === name);
 }
 
-const sets = (values.set ?? ["enron-dev", "conformance", "fixtures"]).map((name) => {
+const sets = (values.set ?? ["enron-dev", "enron-dev2", "conformance", "fixtures"]).map((name) => {
   if (!isDevelopmentSet(name)) throw new Error(`${name} is not a development set`);
   return name;
 });
