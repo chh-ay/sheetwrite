@@ -107,6 +107,32 @@ describe("createToolbar", () => {
     store.dispose();
   });
 
+  it("draws no separator that an unavailable command leaves, from its first paint", () => {
+    // No XLSX add-on is registered, so Import XLSX, the first command, is unavailable.
+    const { grid, store, host } = makeGrid();
+    const piece = createToolbar(host, grid);
+    try {
+      const importButton = piece.element.querySelector('[aria-label="Import XLSX"]');
+      if (importButton === null) throw new Error("the toolbar has no Import XLSX button");
+      expect(importButton.closest("[hidden]")).not.toBeNull();
+      // Read before any animation frame runs: what the browser paints first.
+      const row = piece.element.querySelector(".sheetwrite-command-toolbar-row");
+      if (row === null) throw new Error("the toolbar has no row");
+      const shown = [...row.children].filter((item) => item instanceof HTMLElement && !item.hidden);
+      const isSeparator = (item: Element | undefined): boolean =>
+        item?.getAttribute("role") === "separator";
+      expect(isSeparator(shown[0])).toBe(false);
+      expect(isSeparator(shown.at(-1))).toBe(false);
+      expect(shown.some((item, index) => isSeparator(item) && isSeparator(shown[index + 1]))).toBe(
+        false,
+      );
+    } finally {
+      piece.destroy();
+      grid.destroy();
+      store.dispose();
+    }
+  });
+
   it("moves keyboard focus within toolbar bounds and ignores unrelated keys", () => {
     const { grid, store, host } = makeGrid();
     const piece = createToolbar(host, grid, {

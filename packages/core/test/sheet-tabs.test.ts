@@ -133,10 +133,15 @@ describe("SheetTabs", () => {
     const choose = (label: string): void => {
       host.querySelector<HTMLButtonElement>('[aria-label="Options for Sales sheet"]')!.click();
       const menu = host.querySelector<HTMLElement>('[role="menu"]')!;
-      expect([...menu.querySelectorAll("button")].map((item) => item.textContent)).toEqual([
-        "Insert",
-        "Move or Copy…",
-        "Tab Color…",
+      // Each item shows its glyph from the command icon sheet.
+      const items = [...menu.querySelectorAll("button")].map((item) => [
+        item.textContent,
+        item.querySelector<HTMLElement>(".sheetwrite-icon")?.dataset.icon,
+      ]);
+      expect(items).toEqual([
+        ["Insert", "insertSheet"],
+        ["Move or Copy…", "moveCopySheet"],
+        ["Tab Color…", "tabColor"],
       ]);
       menu.querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
     };

@@ -1723,6 +1723,7 @@ export class GridImpl implements Grid {
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
       readOnly: this.readOnly,
+      icons: () => this.config?.icons,
     });
     this.syncTabBarTheme();
     this.renderTabs();
