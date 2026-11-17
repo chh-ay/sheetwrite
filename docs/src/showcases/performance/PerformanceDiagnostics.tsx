@@ -249,11 +249,8 @@ function ResourcesSection() {
           Data size, allocated memory and WASM pages, apart
         </h2>
         <p>
-          The public resource report
-          <span data-empty={!stats().resource} data-testid="scale-resource-schema">
-            {stats().resource ? ` v${stats().resource?.schemaVersion}` : " (loading report)"}
-          </span>{" "}
-          shows each separately. The page cache and the unsaved edits are counted on their own.
+          The public resource report shows each separately. The page cache and the unsaved edits are
+          counted on their own.
         </p>
       </div>
       <div class="sw-sp-resource-panel">

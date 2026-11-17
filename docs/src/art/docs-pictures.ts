@@ -4,7 +4,7 @@
 // marks. Read by lib/rehype-docs-pictures.ts (page bodies) and DocsShell (page
 // headers). Pages not listed get no art: API symbol and formula function pages
 // carry none.
-import type { ShotSize } from "../lib/content-components.js";
+import type { FramedCrop, ShotSize } from "../lib/content-components.js";
 import type { SectionMarkName } from "./section-marks.js";
 
 /**
@@ -18,6 +18,8 @@ export interface ShotPicture {
   readonly caption: string;
   /** The capture's size; `app` by default. */
   readonly size?: ShotSize;
+  /** Crops for tablets and phones (`<name>-tablet`, `<name>-phone` in the capture script). */
+  readonly narrow?: { readonly tablet: FramedCrop; readonly phone: FramedCrop };
 }
 
 /** A picture in a page body: after a heading (by its id) or after the lead paragraph. */
@@ -92,6 +94,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     { after: "order-and-precedence", picture: "rule-precedence" },
   ],
   "/docs/features/grid/": [
+    { after: AT_START, picture: "grid-section" },
     {
       after: AT_START,
       shot: {
@@ -99,10 +102,23 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
         alt: "The spreadsheet shell on an Orders sheet: the Home ribbon, the formula bar, the grid with column letters and row numbers and a selected range, the sheet tabs and the status bar.",
         caption:
           "The grid inside the spreadsheet shell, with the ribbon, formula bar, sheet tabs and status bar.",
+        narrow: {
+          tablet: {
+            name: "grid-overview-tablet",
+            alt: "The Home ribbon's Undo, Clipboard, Font and Alignment groups, the formula bar showing 136 for D2, and the Orders columns A to E with D2:E9 selected.",
+            caption: "The grid under the ribbon and the formula bar.",
+          },
+          phone: {
+            name: "grid-overview-phone",
+            alt: "The Orders columns Product, Units and Revenue, with the units and revenue of rows 2 to 9 selected.",
+            caption: "The grid with a selected range.",
+          },
+        },
       },
     },
   ],
   "/docs/features/grid/context-menu/": [
+    { after: "how-the-bundled-menu-works", picture: "context-menu" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -117,6 +133,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     { after: "editor-contract", picture: "editor-lifecycle" },
   ],
   "/docs/features/grid/editing-and-clipboard/": [
+    { after: "clipboard-interoperability", picture: "paste-formats" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -129,6 +146,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   ],
   "/docs/features/grid/grid-methods/": [{ after: AFTER_LEAD, picture: "grid-handle" }],
   "/docs/features/grid/options-and-presentation/": [
+    { after: "custom-cell-renderers", picture: "cell-renderer-hooks" },
     {
       after: "spreadsheet-and-data-grid-presentation",
       shot: {
@@ -140,6 +158,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/grid/resize-merge-and-fill/": [
+    { after: "drag-to-fill", picture: "fill" },
     {
       after: "drag-to-fill",
       shot: {
@@ -151,6 +170,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/grid/search/": [
+    { after: "options-and-result", picture: "search-steps" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -162,6 +182,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/grid/selection-and-keyboard/": [
+    { after: "selection-model", picture: "selection-shapes" },
     {
       after: "selection-model",
       shot: {
@@ -173,6 +194,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/grid/status-bar/": [
+    { after: "what-it-shows", picture: "status-totals" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -184,6 +206,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/grid/toolbar-and-ribbon/": [
+    { after: AFTER_LEAD, picture: "ribbon-commands" },
     {
       after: "ribbon",
       shot: {
@@ -202,6 +225,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     { after: "registration", picture: "custom-functions" },
   ],
   "/docs/features/formulas/formula-help/": [
+    { after: AFTER_LEAD, picture: "formula-help" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -258,6 +282,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   "/docs/releases/0.6.1/": [{ after: AFTER_LEAD, picture: "release-0.6.1" }],
   "/docs/releases/0.7.0/": [{ after: "highlights", picture: "release-0.7.0" }],
   "/docs/features/formatting/": [
+    { after: AT_START, picture: "formatting-section" },
     {
       after: AT_START,
       shot: {
@@ -265,10 +290,23 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
         alt: "A Report sheet formatted as a regional revenue report: a large merged title, a header row with a green fill and a bottom border, revenue and target in dollars, attainment as percentages, centred statuses, wrapped comments, a bold total row with a top border, and a column chart of revenue by region below.",
         caption:
           "One sheet with a merged title, fills, borders, number formats, wrapped text and a chart.",
+        narrow: {
+          tablet: {
+            name: "report-tablet",
+            alt: "The Report sheet's merged title over a green header row, regions with managers, revenue and targets in dollars, attainment in percent, and a bold total row.",
+            caption: "Fills, borders and number formats on one sheet.",
+          },
+          phone: {
+            name: "report-phone",
+            alt: "Regions, managers in italics and revenue in dollars under a merged title and a green header row, down to a bold total of $11,654,550.",
+            caption: "A merged title, a header fill and dollar amounts.",
+          },
+        },
       },
     },
   ],
   "/docs/features/formatting/fonts-and-alignment/": [
+    { after: "font-and-alignment-fields", picture: "font-fields" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -280,6 +318,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/formatting/number-formats/": [
+    { after: "format-codes", picture: "number-format-codes" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -292,27 +331,42 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
   ],
   "/docs/features/formatting/styles/": [{ after: "resolution-order", picture: "theme-layers" }],
   "/docs/features/analysis/": [
+    { after: AT_START, picture: "analysis-section" },
     {
       after: AT_START,
       shot: {
         name: "pivot-chart",
         alt: "A Pivot sheet with a pivot table of revenue and units by region and, beside it, a column chart of the pivot's revenue by region.",
         caption: "A pivot table of the orders and a PivotChart that plots it.",
+        narrow: {
+          tablet: {
+            name: "pivot-chart-tablet",
+            alt: "A column chart of revenue by region for Americas, APAC, EMEA and LATAM, from $0 to $5,000,000.",
+            caption: "The PivotChart that plots the pivot's revenue by region.",
+          },
+          phone: {
+            name: "pivot-chart-phone",
+            alt: "A pivot table of revenue and units for Americas, APAC, EMEA and LATAM, with a total row.",
+            caption: "The pivot table of revenue and units by region.",
+          },
+        },
       },
     },
   ],
   "/docs/features/analysis/charts/": [
+    { after: AFTER_LEAD, picture: "chart-ranges" },
     {
-      after: AFTER_LEAD,
+      after: "insert-and-edit-in-the-grid",
       shot: {
         name: "chart",
         size: "app",
         alt: "A column chart of revenue by region floating over the Report sheet, below the cells it reads, selected so its frame and resize handles show.",
-        caption: "A chart floats over the cells and redraws when the cells it reads change.",
+        caption: "A selected chart shows its frame and resize handles: drag it to move it.",
       },
     },
   ],
   "/docs/features/analysis/pivot-tables/": [
+    { after: "define-a-pivot", picture: "pivot-output" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -324,6 +378,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/data/": [
+    { after: AT_START, picture: "data-section" },
     {
       after: AT_START,
       shot: {
@@ -331,11 +386,24 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
         size: "panel",
         alt: "The Orders sheet with its columns named Month, Region, Product, Units and Revenue, and the Region column filtered to EMEA: only the EMEA orders show.",
         caption: "Filtering the Region column to EMEA hides the other orders.",
+        narrow: {
+          tablet: {
+            name: "filter-tablet",
+            alt: "The Orders data with the Region column filtered to EMEA: the month, product, units and revenue of the EMEA orders only.",
+            caption: "Filtering the Region column to EMEA hides the other orders.",
+          },
+          phone: {
+            name: "filter-phone",
+            alt: "The month, region and product of the EMEA orders, with B1 selected and EMEA in the formula bar.",
+            caption: "Only the EMEA orders show.",
+          },
+        },
       },
     },
   ],
   "/docs/features/data/autofilter/": [{ after: AFTER_LEAD, picture: "autofilter" }],
   "/docs/features/data/validation-protection-and-notes/": [
+    { after: "validation", picture: "write-checks" },
     {
       after: AFTER_LEAD,
       shot: {
@@ -347,6 +415,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/formulas/": [
+    { after: AT_START, picture: "formulas-section" },
     {
       after: AT_START,
       shot: {
@@ -354,10 +423,23 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
         size: "panel",
         alt: "A revenue cell selected on the Report sheet, and the formula bar showing its formula, =SUMIFS(Orders[Revenue],Orders[Region],A3).",
         caption: "A formula keeps its source; the cell shows its result.",
+        narrow: {
+          tablet: {
+            name: "formula-bar-tablet",
+            alt: "C3 selected on the Report sheet, and the formula bar showing =SUMIFS(Orders[Revenue],Orders[Region],A3).",
+            caption: "A formula keeps its source; the cell shows its result.",
+          },
+          phone: {
+            name: "formula-bar-phone",
+            alt: "The formula =SUMIFS(Orders[Revenue],Orders[Region],A3) in the formula bar, over the selected revenue cell, $4,047,955.",
+            caption: "The formula bar shows the selected cell's formula.",
+          },
+        },
       },
     },
   ],
   "/docs/features/formulas/analysis-formulas/": [
+    { after: "summarize-groupby-pivotby-percentof", picture: "groupby-spill" },
     {
       after: AFTER_LEAD,
       shot: {
