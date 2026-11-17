@@ -438,7 +438,7 @@ fn a_trial_value_is_what_formulas_read_in_its_cell_and_the_cell_keeps_its_conten
     let before = store.export_memory_state();
     // A2 holds 2. Data validation's "no duplicates" rule, tried with 1 in A2.
     let trial = |store: &mut CellStore, source: &str, value: TrialValue<'_>| {
-        store.preview_formula_with(sheet, 1, 0, source, value)
+        store.preview_formula_with((sheet, 1, 0), source, value)
     };
     let count = "=COUNTIF($A$1:$A$3,A2)";
     assert_eq!(
@@ -474,5 +474,5 @@ fn a_trial_value_is_what_formulas_read_in_its_cell_and_the_cell_keeps_its_conten
 }
 
 fn trial_at_formula(store: &mut CellStore, sheet: usize, value: TrialValue<'_>) -> FormulaPreview {
-    store.preview_formula_with(sheet, 0, 1, "=LEN(B1)", value)
+    store.preview_formula_with((sheet, 0, 1), "=LEN(B1)", value)
 }
