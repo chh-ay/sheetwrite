@@ -35,10 +35,25 @@ const LOOKUP_SEARCH_MODE = choices([
   ["2", "Binary search (sorted ascending order)"],
   ["-2", "Binary search (sorted descending order)"],
 ]);
-const SUBTOTAL_FUNCTIONS = ["AVERAGE", "COUNT", "COUNTA", "MAX", "MIN", "PRODUCT", "STDEV"]
-  .concat(["STDEVP", "SUM", "VAR", "VARP"])
-  .flatMap((name, index) => [[String(index + 1), name] as const, [String(index + 101), name] as const])
-  .sort(([left], [right]) => Number(left) - Number(right));
+/** SUBTOTAL's functions: 1 to 11, and 101 to 111, which leave out hidden rows. */
+const SUBTOTAL_FUNCTIONS = [
+  "AVERAGE",
+  "COUNT",
+  "COUNTA",
+  "MAX",
+  "MIN",
+  "PRODUCT",
+  "STDEV",
+  "STDEVP",
+  "SUM",
+  "VAR",
+  "VARP",
+];
+const SUBTOTAL_CHOICES = choices(
+  [0, 100].flatMap((base) =>
+    SUBTOTAL_FUNCTIONS.map((name, index) => [String(base + index + 1), name] as const),
+  ),
+);
 
 /**
  * Choices by function name and argument position. CELL lists only the
@@ -68,7 +83,7 @@ export const ARGUMENT_CHOICES: Readonly<Record<string, Readonly<Record<number, C
   RANK: { 2: RANK_ORDER },
   "RANK.AVG": { 2: RANK_ORDER },
   "RANK.EQ": { 2: RANK_ORDER },
-  SUBTOTAL: { 0: choices(SUBTOTAL_FUNCTIONS) },
+  SUBTOTAL: { 0: SUBTOTAL_CHOICES },
   VLOOKUP: { 3: RANGE_LOOKUP },
   XLOOKUP: { 4: LOOKUP_MATCH_MODE, 5: LOOKUP_SEARCH_MODE },
   XMATCH: { 2: LOOKUP_MATCH_MODE, 3: LOOKUP_SEARCH_MODE },
