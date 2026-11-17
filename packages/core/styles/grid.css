@@ -399,23 +399,28 @@
   font-family: Georgia, serif;
 }
 
-/* Format Cells (src/format-cells.ts): tabs over one panel at a time. */
-.sheetwrite-format-cells-dialog {
+/* Format Cells (src/format-cells.ts) and Data Validation
+   (src/data-validation-dialog.ts): tabs over one panel at a time. */
+.sheetwrite-format-cells-dialog,
+.sheetwrite-data-validation-dialog {
   width: min(440px, calc(100% - 32px));
 }
 
-.sheetwrite-format-cells {
+.sheetwrite-format-cells,
+.sheetwrite-data-validation {
   display: grid;
   gap: 10px;
 }
 
-.sheetwrite-format-cells-tabs {
+.sheetwrite-format-cells-tabs,
+.sheetwrite-data-validation-tabs {
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
 }
 
-.sheetwrite-format-cells-tab {
+.sheetwrite-format-cells-tab,
+.sheetwrite-data-validation-tab {
   padding: 4px 10px;
   border: none;
   border-bottom: 2px solid transparent;
@@ -425,19 +430,22 @@
   cursor: pointer;
 }
 
-.sheetwrite-format-cells-tab[aria-selected="true"] {
+.sheetwrite-format-cells-tab[aria-selected="true"],
+.sheetwrite-data-validation-tab[aria-selected="true"] {
   border-bottom-color: var(--sheetwrite-widget-accent, #2563eb);
   font-weight: 600;
 }
 
-.sheetwrite-format-cells-panel {
+.sheetwrite-format-cells-panel,
+.sheetwrite-data-validation-panel {
   display: grid;
   gap: 8px;
   min-height: 220px;
   align-content: start;
 }
 
-.sheetwrite-format-cells-panel[hidden] {
+.sheetwrite-format-cells-panel[hidden],
+.sheetwrite-data-validation-panel[hidden] {
   display: none;
 }
 

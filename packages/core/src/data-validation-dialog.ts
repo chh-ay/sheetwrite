@@ -236,12 +236,12 @@ export function dataValidationDialog(
   const id = `sheetwrite-data-validation-${++dialogCount}`;
   const start = input.settings;
   const body = document.createElement("div");
-  body.className = "sheetwrite-format-cells";
+  body.className = "sheetwrite-data-validation";
 
   const tabList = document.createElement("div");
   tabList.setAttribute("role", "tablist");
   tabList.setAttribute("aria-label", "Data Validation");
-  tabList.className = "sheetwrite-format-cells-tabs";
+  tabList.className = "sheetwrite-data-validation-tabs";
   const tabs: HTMLButtonElement[] = [];
   const panels: HTMLDivElement[] = [];
   const showTab = (index: number, focus = false): void => {
@@ -259,12 +259,12 @@ export function dataValidationDialog(
     const tab = document.createElement("button");
     tab.type = "button";
     tab.id = `${id}-tab-${index}`;
-    tab.className = "sheetwrite-format-cells-tab";
+    tab.className = "sheetwrite-data-validation-tab";
     tab.setAttribute("role", "tab");
     tab.textContent = label;
     const panel = document.createElement("div");
     panel.id = `${id}-panel-${index}`;
-    panel.className = "sheetwrite-format-cells-panel";
+    panel.className = "sheetwrite-data-validation-panel";
     panel.setAttribute("role", "tabpanel");
     panel.setAttribute("aria-labelledby", tab.id);
     tab.setAttribute("aria-controls", panel.id);
@@ -501,7 +501,7 @@ export function dataValidationDialog(
       return true;
     },
   });
-  dialog.element.classList.add("sheetwrite-format-cells-dialog");
+  dialog.element.classList.add("sheetwrite-data-validation-dialog");
   return {
     result: dialog.result.then((choice) =>
       choice === "ok" ? { settings: accepted, applyToAll: applyToAll.input.checked } : null,

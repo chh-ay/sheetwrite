@@ -261,11 +261,10 @@ impl CellStore {
             TrialValue::Text(text) => (KIND_STRING, encode_str_id(self.intern(text))),
         };
         let (cell_row, cell_col) = (row as usize, col as usize);
-        let Some(saved) = self
-            .sheets
-            .get_mut(sheet)
-            .and_then(|data| data.cells.show_dense_trial(cell_row, cell_col, kind, payload))
-        else {
+        let Some(saved) = self.sheets.get_mut(sheet).and_then(|data| {
+            data.cells
+                .show_dense_trial(cell_row, cell_col, kind, payload)
+        }) else {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);
         };
         let preview = self.preview_formula(sheet, row, col, source);

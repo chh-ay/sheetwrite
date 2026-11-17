@@ -441,10 +441,19 @@ fn a_trial_value_is_what_formulas_read_in_its_cell_and_the_cell_keeps_its_conten
         store.preview_formula_with(sheet, 1, 0, source, value)
     };
     let count = "=COUNTIF($A$1:$A$3,A2)";
-    assert_eq!(number(&trial(&mut store, count, TrialValue::Number(1.0))), 2.0);
-    assert_eq!(number(&trial(&mut store, count, TrialValue::Number(7.0))), 1.0);
+    assert_eq!(
+        number(&trial(&mut store, count, TrialValue::Number(1.0))),
+        2.0
+    );
+    assert_eq!(
+        number(&trial(&mut store, count, TrialValue::Number(7.0))),
+        1.0
+    );
     // B1's SUM keeps its stored result: nothing recalculates.
-    assert_eq!(number(&trial(&mut store, "=B1+A2", TrialValue::Number(10.0))), 16.0);
+    assert_eq!(
+        number(&trial(&mut store, "=B1+A2", TrialValue::Number(10.0))),
+        16.0
+    );
     assert_eq!(
         number(&trial(&mut store, "=ISBLANK(A2)+0", TrialValue::Blank)),
         1.0
@@ -454,7 +463,11 @@ fn a_trial_value_is_what_formulas_read_in_its_cell_and_the_cell_keeps_its_conten
 
     // A trial in a formula cell leaves the formula and its result in place.
     assert_eq!(
-        number(&trial_at_formula(&mut store, sheet, TrialValue::Text("abc"))),
+        number(&trial_at_formula(
+            &mut store,
+            sheet,
+            TrialValue::Text("abc")
+        )),
         3.0
     );
     assert_eq!(store.get_cell(sheet, 0, 1).num(), 6.0);
