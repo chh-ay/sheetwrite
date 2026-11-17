@@ -1,4 +1,4 @@
-import type { FormulaReference } from "./formula-analysis.js";
+import type { FormulaReference } from "./formula-references.js";
 
 /**
  * Reference colours, cycled by `colorIndex`. Text uses the colour; the grid

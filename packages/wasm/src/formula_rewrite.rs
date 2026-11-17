@@ -13,6 +13,7 @@ use crate::calc::{
     area, lex_token, rewrite_own_sheet_axis, translate_relative_refs, write_ast,
     write_ast_with_names, AreaEnd, Ast, Axis, AxisChange, Func, Tok, WrittenNames,
 };
+use crate::cell_move::{move_cell_refs, CellMove};
 use crate::types::FormulaError;
 
 /// Move the relative references of a copied formula by the distance from
@@ -110,6 +111,44 @@ pub fn move_formula_axis(
     to: u32,
 ) -> String {
     rewrite_own_sheet(source, columns, AxisChange::Move { from, count, to })
+}
+
+/// Follow a block of cells cut and pasted on the formula's own sheet, as
+/// Excel's Cut and Paste moves the references of a formula: a reference to a
+/// moved cell follows it, one to a cell the block lands on becomes `#REF!`.
+/// A conditional-format rule that moves with the block uses it.
+#[wasm_bindgen(
+    js_name = moveFormulaCells,
+    return_description = "The formula with its references adjusted; the text unchanged when it can't be read as a formula."
+)]
+#[allow(
+    unreachable_pub,
+    reason = "wasm_bindgen exports need `pub`; re-exporting from the crate root instead grew these four exports by 157 B of code"
+)]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "a WebAssembly export: JavaScript passes the block as numbers, without building an object per call"
+)]
+pub fn move_formula_cells(
+    #[wasm_bindgen(param_description = "Formula text on the sheet of the moved block.")]
+    source: &str,
+    #[wasm_bindgen(param_description = "Zero-based first row of the block before the move.")]
+    row: u32,
+    #[wasm_bindgen(param_description = "Zero-based first column of the block before the move.")]
+    col: u32,
+    #[wasm_bindgen(param_description = "Rows in the block.")] rows: u32,
+    #[wasm_bindgen(param_description = "Columns in the block.")] cols: u32,
+    #[wasm_bindgen(param_description = "Zero-based first row of the block after the move.")]
+    to_row: u32,
+    #[wasm_bindgen(param_description = "Zero-based first column of the block after the move.")]
+    to_col: u32,
+) -> String {
+    let edit = CellMove::on_own_sheet((row, col), (rows, cols), (to_row, to_col));
+    rewrite_references(source, |reference, qualified| {
+        if !qualified {
+            move_cell_refs(reference, 0, &edit);
+        }
+    })
 }
 
 /// A structural edit moves cells, so absolute and relative parts both follow
