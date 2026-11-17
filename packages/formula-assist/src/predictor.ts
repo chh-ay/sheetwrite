@@ -17,6 +17,7 @@ import {
   type SignalName,
 } from "./candidates.js";
 import { openNeighbours } from "./signals/neighbours.js";
+import { openPatterns } from "./signals/patterns.js";
 import { openShape } from "./signals/shape.js";
 import { openSyntax } from "./signals/syntax.js";
 
@@ -42,6 +43,7 @@ export interface PredictorOptions {
 /** The signals built so far, by name. */
 const OPEN_SIGNAL: Partial<Record<SignalName, OpenSignal>> = {
   neighbours: openNeighbours,
+  patterns: openPatterns,
   shape: openShape,
   syntax: openSyntax,
 };

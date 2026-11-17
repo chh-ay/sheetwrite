@@ -99,3 +99,10 @@
   text-decoration: underline wavy #c5221f;
   text-decoration-skip-ink: none;
 }
+
+/* A suggestion the field doesn't hold yet: the text colour, dimmed. At 45%
+   it keeps at least 3:1 contrast on the light and dark grid backgrounds. */
+.sheetwrite-formula-ghost {
+  opacity: var(--sheetwrite-formula-ghost-opacity, 0.45);
+  font-style: normal;
+}

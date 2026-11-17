@@ -16,7 +16,7 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { analyzeFormula, type FormulaAnalysis } from "@sheetwrite/core/functions";
-import { openFormulaEdit, suggestionWordEnds } from "@sheetwrite/core/testing";
+import { openFormulaEdit, shownSuggestion, suggestionWordEnds } from "@sheetwrite/core/testing";
 
 /** One formula to type, in the cell it was found in. */
 export interface ReplayTarget {
@@ -254,8 +254,10 @@ class TypedFormula {
     const suggestion = this.session.suggest(this.text, analysis);
     this.counts.suggestMs.push(performance.now() - started);
 
-    if (suggestion !== null && suggestion.text.length > 0) {
-      const keys = this.considerSuggestion(suggestion);
+    // What the formula bar would show: with the function list open, only what one entry inserts.
+    const shown = shownSuggestion(this.text, analysis, suggestion);
+    if (suggestion !== null && shown !== null) {
+      const keys = this.considerSuggestion({ text: shown.text, signal: suggestion.signal });
       if (keys > 0) return keys;
     } else {
       this.shown = null;
