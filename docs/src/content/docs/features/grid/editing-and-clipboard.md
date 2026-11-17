@@ -84,9 +84,18 @@ Commit and navigation keys:
 | F4 | Cycle the reference at the caret through `A1`, `$A$1`, `A$1` and `$A1`. |
 | Backspace / Delete | Delete a character, or the text AutoComplete added. |
 | Escape | Cancel the edit. |
-| Blur (click away) | Commit in place. |
+| Blur (click away) | Commit in place. A formula with a problem stays open (see below). |
 
 While the IME is composing, keystrokes belong to the composition. The grid does not treat them as navigation. Editing emits `edit-begin` and `edit-commit` events.
+
+### A formula with a problem
+
+As in Excel, each of these keys checks a formula before it stores it ([How to avoid broken formulas](https://support.microsoft.com/en-us/excel/how-to-avoid-broken-formulas-in-excel)):
+
+- When only closing parentheses are missing at the end, they are added: `=SUM(A1:A3` stores `=SUM(A1:A3)`.
+- Any other syntax error stores nothing. A message says "There's a problem with this formula." and names the problem, for example "This ) has no matching (.". After OK the edit stays open with the problem selected, so you can fix it; Escape cancels the edit as usual. Enter in the formula bar does the same, and the bar keeps the focus.
+
+An unknown function name is not a syntax error: `=SUMM(A1:A3)` is stored and the cell shows `#NAME?`, as in Excel.
 
 ### AutoComplete
 

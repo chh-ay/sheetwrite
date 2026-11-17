@@ -1117,6 +1117,7 @@ export class GridImpl implements Grid {
         this.clipboard.cancelCut();
       },
       cancelCut: () => this.clipboard.cancelCut(),
+      dialogs: this.dialogHost,
     });
 
     this.interactions.configureMenu(config, this.theme);
