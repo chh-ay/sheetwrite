@@ -123,6 +123,26 @@ describe("Enter and Tab on a selected cell", () => {
       range: { sheet: "s1", start: { row: 1, col: 2 }, end: { row: 2, col: 2 } },
     });
   });
+
+  it("go to the next row in the column where a run of Tab entries started", () => {
+    select(4, 0);
+    type("a");
+    press("Tab");
+    type("2");
+    press("Tab");
+    type("c");
+    press("Enter");
+    expect([value(4, 0), value(4, 1), value(4, 2)]).toEqual(["a", 2, "c"]);
+    expect(active()).toEqual({ sheet: "s1", row: 5, col: 0 });
+    // Tab without typing starts a run too; any other move ends it.
+    press("Tab");
+    press("Enter");
+    expect(active()).toEqual({ sheet: "s1", row: 6, col: 0 });
+    press("Tab");
+    press("ArrowDown");
+    press("Enter");
+    expect(active()).toEqual({ sheet: "s1", row: 8, col: 1 });
+  });
 });
 
 describe("the active cell", () => {
