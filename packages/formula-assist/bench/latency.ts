@@ -20,7 +20,7 @@ import {
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
 import { analyzeFormula } from "@sheetwrite/core/functions";
-import { openFormulaEdit } from "@sheetwrite/core/testing";
+import { openFormulaEdit, shownSuggestion } from "@sheetwrite/core/testing";
 
 import { openPrediction } from "../src/predictor.js";
 
@@ -179,6 +179,8 @@ await initSheetwrite();
 const store = SheetwriteStore.fromSnapshot(workbook());
 const open: number[] = [];
 const suggest: number[] = [];
+/** Everything the formula bar does per key: the analysis, `suggest`, and the ghost's own analysis. */
+const perKey: number[] = [];
 try {
   for (const target of targets()) {
     const cell = { sheet: "orders", row: target.row, col: target.col };
@@ -192,10 +194,15 @@ try {
     open.push(performance.now() - started);
     for (let length = 1; length <= target.formula.length; length++) {
       const text = target.formula.slice(0, length);
+      const keyStarted = performance.now();
       const analysis = analyzeFormula(text, text.length, functions);
       started = performance.now();
-      session.suggest(text, analysis);
+      const suggestion = session.suggest(text, analysis);
       suggest.push(performance.now() - started);
+      const shown = shownSuggestion(text, analysis, suggestion);
+      // The bar analyses the text with the ghost to colour the ranges it names.
+      if (shown !== null) analyzeFormula(text + shown.text, text.length, functions);
+      perKey.push(performance.now() - keyStarted);
     }
     session.close();
     const restored: CellValue =
@@ -210,12 +217,14 @@ const result = {
   rows: DATA_ROWS,
   open: summary(open),
   suggest: summary(suggest),
+  perKey: summary(perKey),
   budgetMs: BUDGET_MS,
 };
 const MS_DIGITS = 3;
 const rows: [string, Summary][] = [
   ["open (per edit)", result.open],
   ["suggest (per key)", result.suggest],
+  ["formula bar per key (analysis, suggest, ghost)", result.perKey],
 ];
 process.stdout.write(
   "| Step | Calls | p50 (ms) | p95 (ms) | max (ms) |\n| --- | ---: | ---: | ---: | ---: |\n",
