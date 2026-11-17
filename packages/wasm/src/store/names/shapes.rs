@@ -10,10 +10,11 @@
 //! sheet, so it is read in a copy marked for the reading sheet
 //! ([`read_in_copy`], [`mark_copy`]), as develop expanded it per sheet.
 
-use super::{Definition, NameScope};
+use super::{Definition, NameFacts, NameScope};
 use crate::calc::{Ast, NameId};
-use crate::eval::{ast_produces_array, Shapes};
+use crate::eval::{ast_calls_subtotal, ast_produces_array, Shapes};
 use crate::store::CellStore;
+use crate::types::{ast_with_names_contains_spill_ref, ast_with_names_is_volatile};
 
 /// Mark each use of a defined name in `ast` with its shape, as `names` reads
 /// it for the formula being bound: its sheet, and the cell
@@ -40,12 +41,13 @@ pub(super) fn mark_copy(tree: &mut Ast, formula: &Definition, names: NameScope<'
 impl CellStore {
     /// Mark the shapes of the names in each name's formula, as read from the
     /// formula's scope (a sheet, or [`super::NO_SHEET`] for the workbook),
-    /// and find the workbook formulas whose shapes depend on the reading
-    /// sheet ([`Definition::sheet_shapes`]). One formula's marks can depend
-    /// on another's, so the marking repeats until nothing changes, at most
-    /// once more than there are formulas: a longer run comes only from names
-    /// that use each other, which read as undefined. While a formula is
-    /// marked, it reads itself as empty, as a name met in its own formula
+    /// work out each formula's [`NameFacts`], and find the workbook formulas
+    /// whose shapes depend on the reading sheet
+    /// ([`Definition::sheet_shapes`]). One formula's marks and facts can
+    /// depend on another's, so the marking repeats until nothing changes, at
+    /// most once more than there are formulas: a longer run comes only from
+    /// names that use each other, which read as undefined. While a formula
+    /// is marked, it reads itself as empty, as a name met in its own formula
     /// reads as undefined.
     pub(super) fn mark_definition_shapes(&mut self) {
         let mut definitions = Vec::new();
@@ -55,6 +57,11 @@ impl CellStore {
                     let sheet = scope.unwrap_or(super::NO_SHEET);
                     definitions.push(((entry_index, definition_index), sheet));
                 }
+            }
+        }
+        for &(at, _) in &definitions {
+            if let Some(formula) = self.bindings.names.formula_at_position(at) {
+                formula.facts = NameFacts::default();
             }
         }
         for _ in 0..=definitions.len() {
@@ -73,6 +80,13 @@ impl CellStore {
                     formula.sheet_shapes = sheet_shapes;
                     formula.expression = expression;
                 }
+                let names = NameScope::new(&self.bindings, sheet);
+                let facts =
+                    NameId::at(at.0).map_or_else(NameFacts::default, |id| name_facts(id, names));
+                if let Some(formula) = self.bindings.names.formula_at_position(at) {
+                    changed |= formula.facts != facts;
+                    formula.facts = facts;
+                }
             }
             if !changed {
                 return;
@@ -84,12 +98,63 @@ impl CellStore {
 /// [`mark`], returning whether a mark changed.
 fn mark_uses(ast: &mut Ast, names: NameScope<'_>) -> bool {
     if let Ast::DefinedName(id, produces_array) = ast {
-        let marked = name_produces_array(*id, names);
+        let marked = names.facts(*id).map_or_else(
+            || name_produces_array(*id, names),
+            |facts| facts.has(NameFacts::ARRAY),
+        );
         let changed = *produces_array != marked;
         *produces_array = marked;
         return changed;
     }
     ast.fold_children_mut(&mut |child| mark_uses(child, names))
+}
+
+/// The facts of the formula that `id` holds for the sheet of `names`, read
+/// through `names` as a formula that uses it reads it.
+fn name_facts(id: NameId, names: NameScope<'_>) -> NameFacts {
+    let read = names.read(id);
+    if let Some(range) = read.range() {
+        return NameFacts::default().with(
+            NameFacts::ARRAY,
+            range.row_start != range.row_end || range.col_start != range.col_end,
+        );
+    }
+    let Some(expression) = read.formula() else {
+        return NameFacts::default();
+    };
+    let facts = NameFacts::default()
+        .with(
+            NameFacts::ARRAY,
+            ast_produces_array(expression, Shapes::top(names)),
+        )
+        .with(
+            NameFacts::VOLATILE,
+            ast_with_names_is_volatile(expression, names),
+        )
+        .with(
+            NameFacts::SPILL_REFS,
+            ast_with_names_contains_spill_ref(expression, names),
+        )
+        .with(
+            NameFacts::CALLS_SUBTOTAL,
+            ast_calls_subtotal(expression, names),
+        );
+    with_pivot_data_fact(facts, expression, names)
+}
+
+/// `facts` with whether `expression` calls GETPIVOTDATA, a fact only the
+/// analysis engine has.
+#[cfg(feature = "analysis")]
+fn with_pivot_data_fact(facts: NameFacts, expression: &Ast, names: NameScope<'_>) -> NameFacts {
+    facts.with(
+        NameFacts::CALLS_PIVOT_DATA,
+        crate::eval::analysis::ast_calls_pivot_data(expression, names),
+    )
+}
+
+#[cfg(not(feature = "analysis"))]
+const fn with_pivot_data_fact(facts: NameFacts, _: &Ast, _: NameScope<'_>) -> NameFacts {
+    facts
 }
 
 /// Whether the defined name `id`, read through `names`, evaluates to an

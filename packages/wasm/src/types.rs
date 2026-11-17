@@ -12,7 +12,7 @@ use crate::eval::{
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::{shapes, FormulaTest, InPlace, NameScope};
+use crate::store::names::{shapes, FormulaTest, InPlace, NameFacts, NameScope};
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -423,41 +423,68 @@ fn ast_is_plain(ast: &Ast) -> bool {
 /// Whether `ast` calls a volatile function, in a formula that uses no
 /// defined name. It passes itself to `any_child` as a plain function: with
 /// no name scope to capture, the walk keeps no closure in memory.
+fn ast_is_volatile(ast: &Ast) -> bool {
+    calls_volatile(ast) || ast.any_child(&mut ast_is_volatile)
+}
+
+/// Whether the node `ast` is a call of a volatile function.
 #[allow(
     clippy::wildcard_enum_match_arm,
-    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; no other node is a call"
 )]
-fn ast_is_volatile(ast: &Ast) -> bool {
-    match ast {
+const fn calls_volatile(ast: &Ast) -> bool {
+    matches!(
+        ast,
         Ast::Func(
             Func::Today
-            | Func::Now
-            | Func::Rand
-            | Func::RandBetween
-            | Func::Offset
-            | Func::Indirect
-            | Func::Sheet
-            | Func::Sheets
-            | Func::Info,
+                | Func::Now
+                | Func::Rand
+                | Func::RandBetween
+                | Func::Offset
+                | Func::Indirect
+                | Func::Sheet
+                | Func::Sheets
+                | Func::Info,
             _,
-        ) => true,
-        _ => ast.any_child(&mut ast_is_volatile),
-    }
+        )
+    )
 }
 
 /// [`ast_is_volatile`] of a formula that may use a defined name: a name's
-/// formula counts, read through `names`.
-fn ast_with_names_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
-    ast_is_volatile(ast) || any_name_formula(ast, names, ast_with_names_is_volatile)
+/// formula counts, by its facts ([`NameFacts`]) or read through `names`.
+pub(crate) fn ast_with_names_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
+    any_with_names(
+        ast,
+        names,
+        calls_volatile,
+        NameFacts::VOLATILE,
+        ast_with_names_is_volatile,
+    )
 }
 
-/// Whether `test` holds for the formula of a defined name `ast` uses, read
-/// through `names`. One walk serves each check that looks through names.
-fn any_name_formula(ast: &Ast, names: NameScope<'_>, test: FormulaTest) -> bool {
-    if let Ast::DefinedName(id, _) = ast {
-        return names.formula_satisfies_family(*id, test);
+/// Whether a node of `ast` satisfies `node`, or `fact` holds for the
+/// formula of a defined name it uses: by the name's facts, or, when they
+/// depend on the reading sheet, by `test` on its formula read through
+/// `names`. One walk serves each check that looks through names; `node` is
+/// a function item, so each check gets its own copy with the node test
+/// inline.
+fn any_with_names(
+    ast: &Ast,
+    names: NameScope<'_>,
+    node: impl Fn(&Ast) -> bool + Copy,
+    fact: NameFacts,
+    test: FormulaTest,
+) -> bool {
+    if node(ast) {
+        return true;
     }
-    ast.any_child(&mut |child| any_name_formula(child, names, test))
+    if let Ast::DefinedName(id, _) = ast {
+        return names.facts(*id).map_or_else(
+            || names.formula_satisfies_family(*id, test),
+            |facts| facts.has(fact),
+        );
+    }
+    ast.any_child(&mut |child| any_with_names(child, names, node, fact, test))
 }
 
 /// Whether the formula's own tree has a LET. A defined name's LET is in the
@@ -475,21 +502,32 @@ fn ast_contains_let(ast: &Ast) -> bool {
 
 /// Whether `ast` has a spill or runtime reference, in a formula that uses
 /// no defined name; a plain function, as [`ast_is_volatile`] is.
+fn ast_contains_spill_ref(ast: &Ast) -> bool {
+    calls_spill_ref(ast) || ast.any_child(&mut ast_contains_spill_ref)
+}
+
+/// Whether the node `ast` is a spill or runtime reference.
 #[allow(
     clippy::wildcard_enum_match_arm,
-    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
+    reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; no other node is such a call"
 )]
-fn ast_contains_spill_ref(ast: &Ast) -> bool {
-    match ast {
-        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _) => true,
-        _ => ast.any_child(&mut ast_contains_spill_ref),
-    }
+const fn calls_spill_ref(ast: &Ast) -> bool {
+    matches!(
+        ast,
+        Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect, _)
+    )
 }
 
 /// [`ast_contains_spill_ref`] of a formula that may use a defined name: a
-/// name's formula counts, read through `names`.
-fn ast_with_names_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
-    ast_contains_spill_ref(ast) || any_name_formula(ast, names, ast_with_names_contains_spill_ref)
+/// name's formula counts, by its facts or read through `names`.
+pub(crate) fn ast_with_names_contains_spill_ref(ast: &Ast, names: NameScope<'_>) -> bool {
+    any_with_names(
+        ast,
+        names,
+        calls_spill_ref,
+        NameFacts::SPILL_REFS,
+        ast_with_names_contains_spill_ref,
+    )
 }
 
 /// Whether the formula `ast` has a spill or runtime reference, through the

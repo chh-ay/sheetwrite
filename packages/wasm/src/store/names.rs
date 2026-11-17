@@ -167,12 +167,48 @@ pub(super) struct Definition {
     /// sheet reads the formula in place. [`NEVER_IN_PLACE`] for a formula
     /// that reads a table or holds a LAMBDA.
     reach: (u32, u32),
-    /// Whether a name `expression` uses can have another shape on some
-    /// sheet than the one marked in it: a workbook formula that uses a name
-    /// some sheet defines in its own scope, directly or through other names.
-    /// Such a formula is read in a copy whose name shapes are marked for the
-    /// reading sheet ([`shapes`]).
+    /// Whether a name `expression` uses can have another shape or facts on
+    /// some sheet than the ones worked out for it: a workbook formula that
+    /// uses a name some sheet defines in its own scope, directly or through
+    /// other names. Such a formula is read in a copy whose name shapes are
+    /// marked for the reading sheet, and has no [`Self::facts`]
+    /// ([`shapes`]).
     sheet_shapes: bool,
+    /// What the formula does that the formulas using the name inherit,
+    /// worked out when the names are bound.
+    facts: NameFacts,
+}
+
+/// What a name's formula does that the formulas using the name inherit:
+/// whether it evaluates to an array, calls a volatile function, has a spill
+/// or runtime reference, or calls SUBTOTAL or GETPIVOTDATA. Worked out once
+/// per definition when the names are bound
+/// ([`CellStore::mark_definition_shapes`]), so the walks that bind a formula
+/// read one byte per name instead of reading and walking its formula.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct NameFacts(u8);
+
+impl NameFacts {
+    pub(crate) const ARRAY: Self = Self(1);
+    pub(crate) const VOLATILE: Self = Self(1 << 1);
+    pub(crate) const SPILL_REFS: Self = Self(1 << 2);
+    pub(crate) const CALLS_SUBTOTAL: Self = Self(1 << 3);
+    #[cfg(feature = "analysis")]
+    pub(crate) const CALLS_PIVOT_DATA: Self = Self(1 << 4);
+
+    /// Whether `fact` holds.
+    pub(crate) const fn has(self, fact: Self) -> bool {
+        self.0 & fact.0 != 0
+    }
+
+    /// These facts, with `fact` added when it `holds`.
+    pub(crate) const fn with(self, fact: Self, holds: bool) -> Self {
+        if holds {
+            Self(self.0 | fact.0)
+        } else {
+            self
+        }
+    }
 }
 
 /// What a defined name stands for in the formula being read.
@@ -350,6 +386,26 @@ impl<'a> NameScope<'a> {
     /// The table slots, which place a name's table references.
     pub(crate) const fn tables(self) -> &'a TableSlots {
         &self.bindings.tables
+    }
+
+    /// The facts of the name `id` for this sheet: a range's (an array when
+    /// it has more than one cell), its formula's as worked out when the
+    /// names were bound, or none while it is undefined. `None` when its
+    /// formula's facts depend on the reading sheet
+    /// ([`Definition::sheet_shapes`]); the caller then reads the name.
+    #[inline]
+    pub(crate) fn facts(self, id: NameId) -> Option<NameFacts> {
+        let Some(entry) = self.table().entry(id) else {
+            return Some(NameFacts::default());
+        };
+        match NameTable::definition_for(entry, self.sheet) {
+            None => Some(NameFacts::default()),
+            Some(DefinedName::Range(range)) => Some(NameFacts::default().with(
+                NameFacts::ARRAY,
+                range.row_start != range.row_end || range.col_start != range.col_end,
+            )),
+            Some(DefinedName::Formula(formula)) => (!formula.sheet_shapes).then_some(formula.facts),
+        }
     }
 
     /// What `id` stands for when it can be read with no cycle guard and no
@@ -923,6 +979,7 @@ impl CellStore {
             plain: false,
             reach: NEVER_IN_PLACE,
             sheet_shapes: false,
+            facts: NameFacts::default(),
         };
         self.bindings.names.insert(
             name_scope,
@@ -1307,6 +1364,7 @@ impl CellStore {
             plain: false,
             reach: NEVER_IN_PLACE,
             sheet_shapes: false,
+            facts: NameFacts::default(),
         };
         self.bindings.names.insert(
             scope,

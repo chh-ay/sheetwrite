@@ -3,7 +3,7 @@
 //! AGGREGATE, which Excel skips so that a subtotal is not counted twice.
 
 use crate::calc::{Ast, Func};
-use crate::store::names::NameScope;
+use crate::store::names::{NameFacts, NameScope};
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, RANGE_CELL_LIMIT,
@@ -38,7 +38,10 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => calls(left) || calls(right),
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => calls(inner),
         Ast::LetSlot { expression, .. } => calls(expression),
-        Ast::DefinedName(id, _) => names.formula_satisfies_family(*id, ast_calls_subtotal),
+        Ast::DefinedName(id, _) => names.facts(*id).map_or_else(
+            || names.formula_satisfies_family(*id, ast_calls_subtotal),
+            |facts| facts.has(NameFacts::CALLS_SUBTOTAL),
+        ),
         _ => false,
     }
 }
