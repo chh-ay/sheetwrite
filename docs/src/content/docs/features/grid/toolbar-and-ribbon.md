@@ -350,6 +350,7 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | Field | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `find` | `boolean` | `true` | Built-in **Ctrl+F** search box, next/previous controls, and live match count. See [Search](/docs/features/grid/search/). |
+| `autoComplete` | `boolean` | `true` | Excel's AutoComplete for cell values: typing a text entry completes it from the column. `false` turns it off. See [AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete). |
 | `contextMenu` | `boolean \| ContextMenuItems` | `true` | Built-in right-click menu, disabled menu, static readonly rows, or a context-aware row factory. See [Context menu](/docs/features/grid/context-menu/). |
 | `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus and context menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
 | `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. A right-click on a tab, or its options button, opens Excel's sheet menu: Insert, Rename, Move or Copy…, Tab color, Hide and Remove. |

@@ -1,0 +1,33 @@
+```vue prelude="vue" partial="excerpt of the Vue workbench; the full source is linked below" title="PurchaseOrders.vue"
+<script setup lang="ts">
+import { ref } from "vue";
+
+const role = ref<"reviewer" | "finance-lead">("reviewer");
+
+// Sheet chrome stays open to reviewers; the protected totals need the finance lead.
+const protectionResolver: ProtectionResolver = (request) => {
+  if (request.operation.op === "addSheet" || request.operation.op === "renameSheet") {
+    return "allow";
+  }
+  if (request.protectedRange.permissionKey !== "orders:totals") return "deny";
+  return role.value === "finance-lead" ? "allow" : "deny";
+};
+
+function onReady({ grid }: GridReadyEvent) {
+  // A denied edit leaves the cell as it was and reports the rule that refused it.
+  grid.on("mutation-rejected", ({ issues }) => console.warn(issues));
+}
+</script>
+
+<template>
+  <SheetwriteGrid
+    :workbook="workbook"
+    :data="data"
+    presentation="data-grid"
+    mutation-policy="atomic"
+    :protection-resolver="protectionResolver"
+    @ready="onReady"
+    @grid-change="(event) => persist(event.transaction)"
+  />
+</template>
+```

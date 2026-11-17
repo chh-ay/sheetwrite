@@ -1020,6 +1020,7 @@ export class GridImpl implements Grid {
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
+      autoComplete: () => this.config?.autoComplete !== false,
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
