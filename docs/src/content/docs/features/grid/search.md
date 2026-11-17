@@ -58,6 +58,10 @@ If cells B2 and D7 contain "error", the log shows `2 match(es)`. `result.matches
 
 `findNext()` and `findPrev()` move the active match and select it, as Excel's Find Next does, so typing then edits the found cell. `clearSearch()` clears the highlights. The built-in **Ctrl+F** find widget, gated by `config.find` (on by default), drives this same API.
 
+## Search a selection
+
+As in Excel, a selection of more than one cell limits the search to it. Select B2:B10 and `grid.search("North")` finds only the matches in B2:B10, and `replaceAll` changes only those cells. The selection stays: `findNext()` and `findPrev()` move the active cell inside it. With one cell selected, or one merged cell, the search covers the whole sheet. The selection applies only when the search runs on the active sheet.
+
 ## Options and result
 
 ```ts prelude="core" partial="requires surrounding host state" title="SearchOptions and SearchResult"

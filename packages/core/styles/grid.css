@@ -239,22 +239,15 @@
   }
 }
 
-/* Modal dialogs over the grid (src/dialog.ts): the merge warning and Format
-   Cells. The backdrop covers the grid root; the dialog sits in its middle. */
-.sheetwrite-dialog-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 1001;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Modal dialogs (src/dialog.ts): the merge warning, Insert and Delete, and
+   Format Cells. Each is a <dialog> in the top layer, centred in the window
+   as Excel's are. A short window scrolls the body; the title and the buttons
+   stay in view. */
+.sheetwrite-dialog::backdrop {
   background: var(--sheetwrite-dialog-backdrop, rgba(0, 0, 0, 0.2));
 }
 
 .sheetwrite-dialog {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
   max-width: min(480px, calc(100% - 32px));
   max-height: calc(100% - 32px);
   padding: 16px;
@@ -265,6 +258,18 @@
   font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
   box-shadow: var(--sheetwrite-dialog-shadow, 0 4px 16px rgba(60, 64, 67, 0.3));
   box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sheetwrite-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sheetwrite-dialog-body {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 

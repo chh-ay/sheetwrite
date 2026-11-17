@@ -189,6 +189,12 @@ export class InteractionSessions {
   private readonly fills: FillController;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /**
+   * Excel's Tab run: the cell a run of Tab moves left active, and the column
+   * the run started in, where the next Enter goes. Any other move ends it.
+   */
+  private tabRun: { readonly row: number; readonly col: number; readonly start: number } | null =
+    null;
   /** AutoComplete's code, once the first edit has loaded it. */
   private autocomplete: typeof import("./autocomplete.js") | null = null;
   /** The load of AutoComplete's code, started by the first edit. */
@@ -1486,20 +1492,25 @@ export class InteractionSessions {
   /**
    * Enter and Tab: move the active cell one step. Inside a selection of
    * several cells the active cell wraps within it and the selection stays,
-   * as in Excel; otherwise it moves to the next visible cell.
+   * as in Excel; otherwise it moves to the next visible cell, and Enter after
+   * a run of Tab moves goes to the column where the run started.
    */
   private moveActiveCell(dRow: -1 | 0 | 1, dCol: -1 | 0 | 1): void {
     const selection = this.deps.selection();
     const focus = selection.focusCell;
     if (!focus) return;
+    const run = this.tabRun;
+    this.tabRun = null;
     const rect = this.activeRect();
     if (rect === null || (rect.r0 === rect.r1 && rect.c0 === rect.c1)) {
-      this.navigate(
-        focus,
-        focus.row + dRow,
-        dCol === 0 ? undefined : this.deps.nextVisibleCol(focus.col, dCol),
-        false,
-      );
+      const inRun = run !== null && run.row === focus.row && run.col === focus.col;
+      const start = inRun ? run.start : focus.col;
+      let col: number | undefined;
+      if (dCol !== 0) col = this.deps.nextVisibleCol(focus.col, dCol);
+      else if (dRow > 0 && inRun) col = start;
+      this.navigate(focus, focus.row + dRow, col, false);
+      const moved = this.deps.selection().focusCell;
+      if (dCol !== 0 && moved) this.tabRun = { row: moved.row, col: moved.col, start };
       return;
     }
 
