@@ -16,7 +16,7 @@ use crate::calc::{
 use crate::cell_move::CellMove;
 use crate::cells::{
     encode_num, encode_str_id, payload_num, payload_str_id, DirtyRowWrite,
-    DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS,
+    DEFAULT_MAX_PAGED_DIRTY_CELLS, DEFAULT_PAGE_CHUNK_ROWS, MAX_DENSE_CELLS, MAX_LOCAL_PAGED_CELLS,
 };
 use crate::eval::{IterationLimits, RandomSource};
 use crate::formula_slots::{FormulaId, FormulaResults, FormulaStore};
@@ -420,6 +420,12 @@ pub struct CellStore {
     pub(crate) volatile_serial: f64,
     pub(crate) random: RandomSource,
     pub(crate) spill_owner_cell_limit: usize,
+    /// Cells dense sheets may hold across the workbook, at most
+    /// [`MAX_DENSE_CELLS`]; the host's `maxDenseCells`.
+    dense_cell_limit: usize,
+    /// Logical cells local sheets may hold across the workbook, at most
+    /// [`MAX_LOCAL_PAGED_CELLS`]; the host's `maxLocalPagedCells`.
+    local_paged_cell_limit: usize,
     /// Iterative calculation limits; `None` while iteration is off, as in a
     /// new Excel workbook, so circular references show `#CYCLE!`. Boxed so
     /// workbooks that never turn iteration on pay one pointer.
@@ -523,6 +529,8 @@ impl CellStore {
             volatile_serial: 0.0,
             random: RandomSource::from_host(),
             spill_owner_cell_limit: MAX_SPILL_OWNER_CELLS,
+            dense_cell_limit: MAX_DENSE_CELLS,
+            local_paged_cell_limit: MAX_LOCAL_PAGED_CELLS,
             iteration: None,
             pivots: None,
             #[cfg(feature = "analysis")]
@@ -651,7 +659,27 @@ impl CellStore {
     pub fn is_paged(&self, sheet: usize) -> bool {
         self.sheets
             .get(sheet)
-            .is_some_and(|data| data.cells.is_paged())
+            .is_some_and(|data| data.cells.is_datasource_paged())
+    }
+
+    /// Whether `sheet` keeps its cells in local pages: a dense sheet that
+    /// grew past the dense cell cap. `isPaged` is false for such a sheet.
+    #[wasm_bindgen(js_name = isLocalPaged)]
+    pub fn is_local_paged(&self, sheet: usize) -> bool {
+        self.sheets
+            .get(sheet)
+            .is_some_and(|data| data.cells.is_local_paged())
+    }
+
+    /// Sets the workbook-wide limits on dense cells and on local-page cells,
+    /// each capped at the engine's ceiling (5,000,000 and 20,000,000). A sheet
+    /// added or grown past the dense limit continues in local pages, and one
+    /// that would pass the local limit is refused. Sheets already held stay
+    /// where they are, so a host sets the limits before adding sheets.
+    #[wasm_bindgen(js_name = setStorageLimits)]
+    pub fn set_storage_limits(&mut self, dense_cells: usize, local_paged_cells: usize) {
+        self.dense_cell_limit = dense_cells.min(MAX_DENSE_CELLS);
+        self.local_paged_cell_limit = local_paged_cells.min(MAX_LOCAL_PAGED_CELLS);
     }
 
     /// `[chunks, loaded cells, dirty cells, clean chunk bytes, fully loaded, dirty bytes]`.
@@ -1289,7 +1317,7 @@ impl CellStore {
         if !offsets.is_empty()
             && formula_offsets.is_empty()
             && reference_offsets.is_empty()
-            && (hydrating || !existing.cells.is_paged())
+            && (hydrating || !existing.cells.is_datasource_paged())
             && existing.spill.is_empty()
         {
             let mut block = SparseLiteralBlock {
@@ -2219,8 +2247,18 @@ impl CellStore {
     /// drops calculated values, which the edit moves. Changes nothing when the
     /// size is over the sheet's limit.
     fn begin_structural_edit(&mut self, sheet: usize, rows: usize, cols: usize) -> bool {
+        let cells = rows.saturating_mul(cols);
+        let data = &self.sheets[sheet];
+        // Dense sheets share the dense-cell limit across the workbook; a
+        // dense sheet that would pass it continues in local pages.
+        let to_local = !data.cells.is_paged() && !self.dense_cells_fit(Some(sheet), cells);
+        if (to_local || data.cells.is_local_paged())
+            && !self.local_paged_cells_fit(Some(sheet), cells)
+        {
+            return false;
+        }
         let data = &mut self.sheets[sheet];
-        if data.cells.check_dimensions(rows, cols).is_err() {
+        if to_local && data.cells.convert_to_local_paged().is_err() {
             return false;
         }
         data.spill.clear_all(&mut data.cells);
@@ -3558,7 +3596,17 @@ impl CellStore {
         n_cols: usize,
         row_count: usize,
     ) -> Result<usize, String> {
-        let sheet = SheetData::try_new(n_cols, row_count)?;
+        let cells = n_cols.saturating_mul(row_count);
+        let sheet = if self.dense_cells_fit(None, cells) {
+            SheetData::try_new(n_cols, row_count)?
+        } else if self.local_paged_cells_fit(None, cells) {
+            SheetData::try_new_local(n_cols, row_count)?
+        } else {
+            return Err(format!(
+                "local sheet resource limit exceeded: {n_cols} columns by {row_count} rows passes {} cells across the workbook",
+                self.local_paged_cell_limit
+            ));
+        };
         let index = self.sheets.len();
         self.sheets.push(sheet);
         self.sheet_names.push(String::new());
@@ -3567,6 +3615,43 @@ impl CellStore {
             order.push(index as u32);
         }
         Ok(index)
+    }
+
+    /// Moves a dense sheet to local pages, as growing past the dense cap does.
+    #[cfg(test)]
+    pub(crate) fn convert_sheet_to_local_paged(&mut self, sheet: usize) {
+        self.sheets[sheet]
+            .cells
+            .convert_to_local_paged()
+            .expect("a small sheet converts");
+    }
+
+    /// Whether dense sheets fit the dense-cell limit with one sheet, `sheet`
+    /// when it exists already, holding `cells` cells densely.
+    fn dense_cells_fit(&self, sheet: Option<usize>, cells: usize) -> bool {
+        let others = self
+            .sheets
+            .iter()
+            .enumerate()
+            .filter(|&(index, data)| {
+                Some(index) != sheet && self.sheet_alive[index] && !data.cells.is_paged()
+            })
+            .map(|(_, data)| data.cells.row_count().saturating_mul(data.cells.n_cols()))
+            .fold(0usize, usize::saturating_add);
+        others.saturating_add(cells) <= self.dense_cell_limit
+    }
+
+    /// Whether local sheets fit the local-cell limit with one sheet,
+    /// `sheet` when it exists already, holding `cells` logical cells.
+    fn local_paged_cells_fit(&self, sheet: Option<usize>, cells: usize) -> bool {
+        let others = self
+            .sheets
+            .iter()
+            .enumerate()
+            .filter(|&(index, _)| Some(index) != sheet && self.sheet_alive[index])
+            .map(|(_, data)| data.cells.local_paged_cells())
+            .fold(0usize, usize::saturating_add);
+        others.saturating_add(cells) <= self.local_paged_cell_limit
     }
 
     pub(crate) fn intern(&mut self, s: &str) -> u32 {

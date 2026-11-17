@@ -38,7 +38,12 @@ import {
   withRelationship,
 } from "../data-model.js";
 import { dateToSerial } from "../date-serial.js";
-import { isValidCalculationSettings, storedCalculationSettings } from "../document-protocol.js";
+import {
+  DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  isValidCalculationSettings,
+  type SnapshotResourceLimits,
+  storedCalculationSettings,
+} from "../document-protocol.js";
 import { ENGINE_LOAD_HINT, getEngine, isEngineLoaded as isLoaded } from "../engine.js";
 import {
   datasourceFailure,
@@ -238,6 +243,9 @@ import {
   CELL_STATE_LOADED_EMPTY,
   CELL_STATE_LOCAL_EDIT,
 } from "./wire-tags.js";
+
+/** The snapshot limits the engine applies to dense and local sheets. */
+type StorageLimits = Pick<SnapshotResourceLimits, "maxDenseCells" | "maxLocalPagedCells">;
 
 /** Shared report of a commit that recalculated nothing; never written. */
 const EMPTY_RECALCULATION = new Uint32Array(0);
@@ -746,7 +754,17 @@ export class StoreDataEngine {
     admissionReferenceMapsMaterialized: 0,
   };
 
-  constructor(workbook: Workbook, data?: ColumnarData, options: SheetwriteStoreOptions = {}) {
+  /**
+   * `storageLimits` are the store's resolved snapshot limits; the engine
+   * places and refuses dense and local sheets with them, as snapshot
+   * validation and `SheetGrowth` do.
+   */
+  constructor(
+    workbook: Workbook,
+    data?: ColumnarData,
+    options: SheetwriteStoreOptions = {},
+    storageLimits: Readonly<StorageLimits> = DEFAULT_SNAPSHOT_RESOURCE_LIMITS,
+  ) {
     if (!isLoaded()) {
       throw storeFailure(
         "initialization-required",
@@ -781,6 +799,7 @@ export class StoreDataEngine {
     this.sheets = new SheetRegistry(workbook);
     this.storageOptions = options;
     this.wasm = new (getEngine().CellStore)();
+    this.wasm.setStorageLimits(storageLimits.maxDenseCells, storageLimits.maxLocalPagedCells);
     this.boundaryAccounting.record("startup", "js-to-wasm", 0, "scalar");
     this.view = new StoreViewState(this.wasm, this.sheets);
     this.windowReader = new StoreWindowReader(this.wasm, this.sheets, this.styles);
@@ -1407,6 +1426,11 @@ export class StoreDataEngine {
 
   isPaged(sheet: SheetId): boolean {
     return this.wasm.isPaged(this.sheets.handleOf(sheet));
+  }
+
+  /** Whether the engine keeps a dense sheet past `maxDenseCells` in local pages. */
+  isLocalPaged(sheet: SheetId): boolean {
+    return this.wasm.isLocalPaged(this.sheets.handleOf(sheet));
   }
 
   getPagedStats(sheet: SheetId): PagedStoreStats {
