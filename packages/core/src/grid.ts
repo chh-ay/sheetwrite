@@ -3324,16 +3324,7 @@ export class GridImpl implements Grid {
     // Excel refuses History only when a user names a sheet; operations, undo
     // and version restore may give the name back.
     if (!validation.ok && validation.code === "reserved") {
-      const issue: MutationIssue = {
-        kind: "sheet-lifecycle",
-        severity: "error",
-        code: "reserved",
-        sheet: id,
-        operationIndex: 0,
-        message: SHEET_LIFECYCLE_MESSAGES.reserved,
-      };
-      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
-      return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
+      return this.rejectSheet(id, "reserved");
     }
     const result = this.document.commit(
       [{ op: "renameSheet", sheet: id, name: validation.name }],
@@ -3352,52 +3343,29 @@ export class GridImpl implements Grid {
     options: { index?: number; name?: string } = {},
   ): Promise<SheetLifecycleResult> {
     // The copy's code loads the first time a sheet is copied.
-    return import("./sheet-commands.js").then((copies) => this.copySheetWith(copies, id, options));
+    return import("./sheet-commands.js").then(({ planSheetCopy }) => {
+      const plan = planSheetCopy(
+        this.store.getWorkbook(),
+        (sheet) => this.document.snapshotSheet(sheet),
+        id,
+        options,
+      );
+      if (!plan) return this.rejectSheet(id, "sheet-not-found");
+      return { ...this.document.commit(plan.operations, "structure"), sheet: plan.sheet };
+    });
   }
 
-  private copySheetWith(
-    copies: typeof import("./sheet-commands.js"),
-    id: SheetId,
-    options: { index?: number; name?: string },
-  ): SheetLifecycleResult {
-    const workbook = this.store.getWorkbook();
-    const from = workbook.sheets.findIndex((sheet) => sheet.id === id);
-    const source = from < 0 ? null : this.document.snapshotSheet(id);
-    if (!source) {
-      const issue: MutationIssue = {
-        kind: "sheet-lifecycle",
-        severity: "error",
-        code: "sheet-not-found",
-        sheet: id,
-        operationIndex: 0,
-        message: "Sheet does not exist",
-      };
-      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
-      return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
-    }
-
-    const used = new Set(workbook.sheets.map((sheet) => sheet.id));
-    let copyId = `${id}-copy`;
-    for (let suffix = 2; used.has(copyId); suffix++) copyId = `${id}-copy-${suffix}`;
-    const name =
-      options.name ??
-      copies.copySheetName(
-        source.name,
-        workbook.sheets.map((sheet) => sheet.name),
-      );
-    const copy = copies.copySheet(
-      source,
-      { id: copyId, name, order: options.index ?? from + 1 },
-      workbook,
-    );
-    const result = this.document.commit(
-      [
-        { op: "addSheet", sheet: copy.sheet },
-        ...copy.names.map((namedRange) => ({ op: "setNamedRange" as const, namedRange })),
-      ],
-      "structure",
-    );
-    return { ...result, sheet: copyId };
+  private rejectSheet(id: SheetId, code: "reserved" | "sheet-not-found"): SheetLifecycleResult {
+    const issue: MutationIssue = {
+      kind: "sheet-lifecycle",
+      severity: "error",
+      code,
+      sheet: id,
+      operationIndex: 0,
+      message: SHEET_LIFECYCLE_MESSAGES[code],
+    };
+    for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+    return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
   }
 
   setSheetTabColor(id: SheetId, color: string | null): SheetLifecycleResult {

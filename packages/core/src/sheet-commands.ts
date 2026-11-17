@@ -2,5 +2,5 @@
 // first use: copying a sheet, and the Move or Copy dialog and Tab Color
 // palette of the sheet tab menu.
 
-export { copySheet, copySheetName } from "./sheet-copy.js";
-export { createMoveCopyDialog, createTabColorPalette } from "./sheet-tab-panels.js";
+export { planSheetCopy } from "./sheet-copy.js";
+export { createTabPanel } from "./sheet-tab-panels.js";

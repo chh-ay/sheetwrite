@@ -1,5 +1,4 @@
 import { type PopupPlacement, popupPosition } from "./menu-surface.js";
-import type { TabPanelHost } from "./sheet-tab-panels.js";
 import { checkStylePart } from "./style-parts.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
@@ -632,7 +631,25 @@ export class SheetTabs {
 
       options.appendChild(menu);
     } else if (this.panel?.id === sheet.id && this.panels) {
-      options.appendChild(this.createPanel(sheet, this.panels));
+      options.appendChild(
+        this.panels.createTabPanel(
+          this.panel.kind,
+          {
+            sheets: this.sheets,
+            visible: this.visibleSheets(),
+            close: () => {
+              this.panel = null;
+              this.render(true);
+              this.focusOptions(sheet.id);
+            },
+            perform: (operation, restore) => this.performLifecycle(sheet.id, operation, restore),
+            onMove: this.onMove,
+            onCopy: this.onCopy,
+            onTabColor: this.onTabColor,
+          },
+          sheet,
+        ),
+      );
     }
 
     return options;
@@ -663,48 +680,12 @@ export class SheetTabs {
   private openPanel(kind: "moveCopy" | "tabColor", id: SheetId): void {
     this.clearMenuState();
     this.panel = { kind, id };
-    (this.panels ? Promise.resolve(this.panels) : import("./sheet-commands.js")).then(
-      (panels) => {
-        this.panels = panels;
-        if (this.destroyed || this.panel?.kind !== kind || this.panel.id !== id) return;
-        this.render();
-        this.host
-          .querySelector<HTMLElement>(".sheetwrite-tab-panel select, .sheetwrite-tab-panel button")
-          ?.focus();
-      },
-      () => {
-        if (this.panel?.id === id) this.closePanel();
-      },
-    );
-  }
-
-  private closePanel(): void {
-    const id = this.panel?.id;
-    this.panel = null;
-    this.render(true);
-    const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
-    if (trigger && trigger.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) {
-      trigger.focus();
-    }
-  }
-
-  private createPanel(
-    sheet: SheetTabRecord,
-    panels: typeof import("./sheet-commands.js"),
-  ): HTMLElement {
-    const host: TabPanelHost = {
-      sheets: this.sheets,
-      visible: this.visibleSheets(),
-      close: () => this.closePanel(),
-      perform: (operation, restoreOptions) =>
-        this.performLifecycle(sheet.id, operation, restoreOptions),
-    };
-    const { onMove, onCopy, onTabColor } = this;
-    if (this.panel?.kind === "tabColor" && onTabColor) {
-      return panels.createTabColorPalette(host, sheet, onTabColor);
-    }
-    if (onMove && onCopy) return panels.createMoveCopyDialog(host, sheet, onMove, onCopy);
-    return document.createElement("div");
+    void import("./sheet-commands.js").then((panels) => {
+      this.panels = panels;
+      if (this.destroyed || this.panel?.kind !== kind || this.panel.id !== id) return;
+      this.render();
+      this.host.querySelector<HTMLElement>(".sheetwrite-tab-panel :is(select, button)")?.focus();
+    });
   }
 
   private createAddButton(onAdd: () => SheetLifecycleResult): HTMLButtonElement {
@@ -991,7 +972,10 @@ export class SheetTabs {
     const feedback = feedbackFrom(result);
     this.feedback = feedback ? { sheet: id || result.sheet, ...feedback } : null;
     this.render(restoreOptions || this.host.contains(document.activeElement));
-    if (!restoreOptions) return;
+    if (restoreOptions) this.focusOptions(id);
+  }
+
+  private focusOptions(id: SheetId): void {
     const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
     if (trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) trigger.focus();
   }

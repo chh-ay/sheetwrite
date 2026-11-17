@@ -28,6 +28,23 @@ export interface TabPanelHost {
     operation: () => SheetLifecycleResult | Promise<SheetLifecycleResult>,
     restoreOptions: boolean,
   ): void;
+  readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
+  readonly onCopy?: (
+    id: SheetId,
+    index: number,
+  ) => SheetLifecycleResult | Promise<SheetLifecycleResult>;
+  readonly onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
+}
+
+/** The Tab Color palette or the Move or Copy dialog for `sheet`. */
+export function createTabPanel(
+  kind: "moveCopy" | "tabColor",
+  host: TabPanelHost,
+  sheet: TabPanelSheet,
+): HTMLElement {
+  return kind === "tabColor"
+    ? createTabColorPalette(host, sheet)
+    : createMoveCopyDialog(host, sheet);
 }
 
 /** Excel's standard tab colors, in the order of its Tab Color palette. */
@@ -56,11 +73,7 @@ function createButton(className: string, text: string): HTMLButtonElement {
  * Excel's Tab Color palette: the standard colors, then No Color. Arrow keys,
  * Home and End move between the colors; Escape closes it.
  */
-export function createTabColorPalette(
-  host: TabPanelHost,
-  sheet: TabPanelSheet,
-  onTabColor: (id: SheetId, color: string | null) => SheetLifecycleResult,
-): HTMLElement {
+function createTabColorPalette(host: TabPanelHost, sheet: TabPanelSheet): HTMLElement {
   const palette = document.createElement("div");
   palette.className = "sheetwrite-tab-menu sheetwrite-tab-panel sheetwrite-tab-colors";
   palette.setAttribute("role", "menu");
@@ -85,7 +98,9 @@ export function createTabColorPalette(
     swatch.setAttribute("aria-label", name);
     swatch.setAttribute("aria-checked", String(current === color));
     if (color !== null) swatch.style.backgroundColor = color;
-    swatch.addEventListener("click", () => host.perform(() => onTabColor(sheet.id, color), true));
+    swatch.addEventListener("click", () =>
+      host.perform(() => host.onTabColor!(sheet.id, color), true),
+    );
     swatches.push(swatch);
   }
 
@@ -126,12 +141,7 @@ function createOption(text: string, value: string): HTMLOptionElement {
  * Excel's Move or Copy dialog: the sheet to put the tab before, or the end,
  * and whether to create a copy instead of moving the sheet.
  */
-export function createMoveCopyDialog(
-  host: TabPanelHost,
-  sheet: TabPanelSheet,
-  onMove: (id: SheetId, toIndex: number) => SheetLifecycleResult,
-  onCopy: (id: SheetId, index: number) => SheetLifecycleResult | Promise<SheetLifecycleResult>,
-): HTMLElement {
+function createMoveCopyDialog(host: TabPanelHost, sheet: TabPanelSheet): HTMLElement {
   const dialog = document.createElement("div");
   dialog.className = "sheetwrite-tab-menu sheetwrite-tab-panel sheetwrite-tab-dialog";
   dialog.setAttribute("role", "dialog");
@@ -160,13 +170,13 @@ export function createMoveCopyDialog(
   const ok = (): void => {
     const before = Number(list.value);
     if (copy.checked) {
-      host.perform(() => onCopy(sheet.id, before), false);
+      host.perform(() => host.onCopy!(sheet.id, before), false);
       return;
     }
     const from = host.sheets.findIndex((candidate) => candidate.id === sheet.id);
     const to = from < before ? before - 1 : before;
     if (to === from) host.close();
-    else host.perform(() => onMove(sheet.id, to), true);
+    else host.perform(() => host.onMove!(sheet.id, to), true);
   };
   const okButton = createButton("sheetwrite-tab-dialog-button", "OK");
   okButton.addEventListener("click", ok);

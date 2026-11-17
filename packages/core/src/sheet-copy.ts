@@ -7,7 +7,7 @@ import { getEngine } from "./engine.js";
 import { ENGINE_KINDS, TOKEN_FIELDS } from "./formula-token-kinds.js";
 import { formulaNameKey, sheetNameKey } from "./name-key.js";
 import type { SheetId } from "./types/coordinates.js";
-import type { NamedRangeSnapshot, SheetSnapshot, Workbook } from "./types/document.js";
+import type { DocumentOp, NamedRangeSnapshot, SheetSnapshot, Workbook } from "./types/document.js";
 
 /** The longest sheet name Excel allows, in UTF-16 code units. */
 const MAX_SHEET_NAME = 31;
@@ -19,13 +19,46 @@ const BANG = ENGINE_KINDS.indexOf("bang");
 const COLON = ENGINE_KINDS.indexOf("colon");
 
 /** The copy of a sheet, and the sheet-scoped names that go with it. */
-export interface SheetCopy {
+interface SheetCopy {
   readonly sheet: SheetSnapshot;
   readonly names: NamedRangeSnapshot[];
 }
 
+/**
+ * The operations that copy sheet `id` to tab position `index` (default: right
+ * after it), named `name` or like `Sales (2)`; null when there is no such sheet.
+ */
+export function planSheetCopy(
+  workbook: Workbook,
+  snapshotSheet: (id: SheetId) => SheetSnapshot | null,
+  id: SheetId,
+  options: { index?: number; name?: string },
+): { readonly sheet: SheetId; readonly operations: DocumentOp[] } | null {
+  const from = workbook.sheets.findIndex((sheet) => sheet.id === id);
+  const source = from < 0 ? null : snapshotSheet(id);
+  if (!source) return null;
+
+  const used = new Set(workbook.sheets.map((sheet) => sheet.id));
+  let copyId = `${id}-copy`;
+  for (let suffix = 2; used.has(copyId); suffix++) copyId = `${id}-copy-${suffix}`;
+  const name =
+    options.name ??
+    copySheetName(
+      source.name,
+      workbook.sheets.map((sheet) => sheet.name),
+    );
+  const copy = copySheet(source, { id: copyId, name, order: options.index ?? from + 1 }, workbook);
+  return {
+    sheet: copyId,
+    operations: [
+      { op: "addSheet", sheet: copy.sheet },
+      ...copy.names.map((namedRange) => ({ op: "setNamedRange" as const, namedRange })),
+    ],
+  };
+}
+
 /** Excel's name for a copy of the sheet `name`: `Sales (2)`, or the next free number. */
-export function copySheetName(name: string, taken: readonly string[]): string {
+function copySheetName(name: string, taken: readonly string[]): string {
   const keys = new Set(taken.map(sheetNameKey));
   for (let number = 2; ; number++) {
     const suffix = ` (${number})`;
@@ -99,7 +132,7 @@ function moveSheetIds(value: unknown, from: SheetId, to: SheetId): void {
  * get new names (`Sales` becomes `Sales2`) that the copy's structured
  * references follow, and pivots get new IDs that the copy's charts follow.
  */
-export function copySheet(
+function copySheet(
   source: SheetSnapshot,
   target: { id: SheetId; name: string; order: number },
   workbook: Workbook,
