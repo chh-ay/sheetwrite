@@ -1,11 +1,12 @@
 /**
  * The commands behind Excel's format, hide, insert and Format Cells keys
- * (Ctrl+Shift+~ ! @ # $ % ^, Ctrl+9, Ctrl+0, Ctrl++, Ctrl+-, Ctrl+1). Only
- * their key bindings are in the first load; this chunk loads with the first
- * of them, and keys pressed meanwhile wait for it.
+ * (Ctrl+Shift+~ ! @ # $ % ^, Ctrl+9, Ctrl+0, Ctrl++, Ctrl+-, Ctrl+1), and
+ * `GridActions.insertCells`, `deleteCells` and `formatCells`. They apply when
+ * they are called; only the Insert, Delete and Format Cells dialogs load on
+ * first use.
  */
 
-import { type DialogHost, insertDeleteDialog, openDialog } from "./dialog.js";
+import type { FormatCellsChange } from "./format-cells.js";
 import type { SelRect } from "./selection.js";
 import { StyleActions, type StyleActionsDeps } from "./style-actions.js";
 import type { CellStyle } from "./types/cell.js";
@@ -24,7 +25,7 @@ const KEY_NUMBER_FORMATS = {
   formatScientific: "0.00E+00",
 } as const;
 
-/** The keyboard actions this chunk runs. */
+/** The keyboard actions `runCellCommand` runs. */
 export type CellCommand = Extract<
   KeyboardAction,
   | keyof typeof KEY_NUMBER_FORMATS
@@ -40,18 +41,37 @@ export type CellCommand = Extract<
 /** What the commands read and change in the grid that runs them. */
 export interface CellCommandsHost {
   readonly grid: Grid;
-  readonly dialogs: DialogHost;
   /** The selection, the store and the commit the style commands use. */
   readonly style: StyleActionsDeps;
-  /** Commit a structural change as one undoable step; whether it applied. */
-  commit(patches: DocumentOp[]): boolean;
+  /** The selected rectangle that holds the active cell, in view rows. */
+  rect(): SelRect | null;
   /** The sheet's row count and its first and last shown columns. */
   bounds(): readonly [rows: number, firstCol: number, lastCol: number];
-  /** The theme's font shorthand, for the size and family an unstyled cell shows. */
-  font(): string;
+  /** Commit a structural change as one undoable step; whether it applied. */
+  commit(patches: DocumentOp[]): boolean;
+  /** Tell the user why a command did nothing, in an alert they close with OK. */
+  alert(title: string, message: string): void;
+  /**
+   * Excel's Insert (`insert`) or Delete dialog for a `wide` or a tall range;
+   * resolves to `shiftRight`, `shiftDown`, `row`, `column` or null. Its code
+   * loads on first use, and keys pressed meanwhile reach it once it opens.
+   */
+  insertDeleteDialog(insert: boolean, wide: boolean): Promise<string | null>;
+  /**
+   * The Format Cells dialog for the selection; resolves to what OK changes,
+   * or null. It loads as the Insert dialog does.
+   */
+  formatCellsDialog(): Promise<FormatCellsChange | null>;
 }
 
-/** Run `command` for the grid behind `host`. */
+/** What to insert or delete in a range that is neither whole rows nor whole columns. */
+type InsertDeleteOptions = {
+  readonly entire?: "row" | "column";
+  readonly shift?: "right" | "down";
+  readonly ask?: boolean;
+};
+
+/** Run the key's `command` for the grid behind `host`. */
 export function runCellCommand(host: CellCommandsHost, command: CellCommand): void {
   const { actions } = host.grid;
   switch (command) {
@@ -67,33 +87,14 @@ export function runCellCommand(host: CellCommandsHost, command: CellCommand): vo
       break;
     case "insertCells":
     case "deleteCells":
-      insertOrDelete(host, command === "insertCells");
+      insertOrDelete(host, command === "insertCells", { ask: true });
       break;
     case "formatCells":
-      void formatCells(host);
+      formatCells(host);
       break;
     default:
       actions.setNumberFormat(KEY_NUMBER_FORMATS[command]);
   }
-}
-
-/** The selected rectangle that holds the active cell, in view rows. */
-function activeRect(style: StyleActionsDeps): SelRect | null {
-  const selection = style.selection();
-  const focus = selection.focusCell;
-  if (focus === null) return null;
-  let found: SelRect | null = null;
-  selection.forEachRect((rect) => {
-    if (
-      rect.r0 <= focus.row &&
-      focus.row <= rect.r1 &&
-      rect.c0 <= focus.col &&
-      focus.col <= rect.c1
-    ) {
-      found = rect;
-    }
-  });
-  return found;
 }
 
 /**
@@ -104,7 +105,7 @@ function activeRect(style: StyleActionsDeps): SelRect | null {
  */
 function unhideInSelection(host: CellCommandsHost, rows: boolean): void {
   const { grid, style } = host;
-  const rect = activeRect(style);
+  const rect = host.rect();
   if (rect === null || style.readOnly()) return;
   const [rowCount, firstCol, lastCol] = host.bounds();
   if (rows) {
@@ -122,20 +123,27 @@ function unhideInSelection(host: CellCommandsHost, rows: boolean): void {
 
 /**
  * Ctrl++ and Ctrl+-: insert or delete as Excel does. Whole selected rows or
- * columns go at once; for other ranges Excel's Insert or Delete dialog asks
- * what to insert or delete.
+ * columns go at once. Other ranges take entire rows or columns: `entire`, or
+ * with `ask` the user's choice in Excel's Insert or Delete dialog, or else the
+ * dialog's own default, rows for a range at least as wide as it is tall.
  */
-function insertOrDelete(host: CellCommandsHost, insert: boolean): void {
-  const rect = activeRect(host.style);
+export function insertOrDelete(
+  host: CellCommandsHost,
+  insert: boolean,
+  options: InsertDeleteOptions = {},
+): void {
+  const rect = host.rect();
   if (rect === null || host.style.readOnly()) return;
   const { actions } = host.grid;
   const run = (choice: string | null): void => {
-    if (choice === "shiftDown" || choice === "shiftRight") {
-      shiftCells(host, rect, insert, choice === "shiftDown");
-    } else if (choice === "entireRow") {
+    if (choice === "shiftRight" || choice === "right") {
+      shiftCells(host, rect, insert, false);
+    } else if (choice === "shiftDown" || choice === "down") {
+      shiftCells(host, rect, insert, true);
+    } else if (choice === "row") {
       if (insert) actions.insertRowAbove();
       else actions.deleteRow();
-    } else if (choice === "entireColumn") {
+    } else if (choice === "column") {
       if (insert) actions.insertColumnLeft();
       else actions.deleteColumn();
     }
@@ -144,12 +152,14 @@ function insertOrDelete(host: CellCommandsHost, insert: boolean): void {
   const wholeRows = rect.c0 <= firstCol && rect.c1 >= lastCol;
   const wholeColumns = rect.r0 === 0 && rect.r1 >= rowCount - 1;
   if (wholeRows || wholeColumns) {
-    run(wholeRows ? "entireRow" : "entireColumn");
+    run(wholeRows ? "row" : "column");
     return;
   }
   // Excel's default choice follows the range's shape.
   const wide = rect.c1 - rect.c0 >= rect.r1 - rect.r0;
-  void insertDeleteDialog(host.dialogs, insert, wide).result.then(run);
+  const chosen = options.entire ?? options.shift;
+  if (chosen === undefined && options.ask) void host.insertDeleteDialog(insert, wide).then(run);
+  else run(chosen ?? (wide ? "row" : "column"));
 }
 
 /** Excel's messages when Insert or Delete cannot shift the cells. */
@@ -158,17 +168,6 @@ const SHIFT_OFF_SHEET =
 const SHIFT_BLOCKED =
   "The cells can't be shifted: a table, PivotTable, merged cell or spill range is in the way.";
 const SHIFT_IN_VIEW = "Cells can't be shifted while the sheet is sorted or filtered.";
-
-/** Tell the user why a shift did not happen; OK closes it and focus goes back to the grid. */
-function shiftNotice(host: CellCommandsHost, insert: boolean, message: string): void {
-  openDialog(host.dialogs, {
-    title: insert ? "Insert" : "Delete",
-    role: "alertdialog",
-    body: message,
-    buttons: [{ label: "OK", value: "ok", default: true }],
-    cancel: "ok",
-  });
-}
 
 /**
  * The last cell from `from` on, along a line of the sheet (a column for a
@@ -218,7 +217,7 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
   const r0 = style.toDataRow(rect.r0);
   const r1 = style.toDataRow(rect.r1);
   if (r1 - r0 !== rect.r1 - rect.r0 || host.bounds()[0] !== sheet.rowCount) {
-    shiftNotice(host, insert, SHIFT_IN_VIEW);
+    host.alert(insert ? "Insert" : "Delete", SHIFT_IN_VIEW);
     return;
   }
   // Along the shift, then across it.
@@ -248,7 +247,7 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
     const used = lastUsed(first);
     const end = Math.max(used, first);
     if (end + count > lastAlong) {
-      if (used >= first) shiftNotice(host, insert, SHIFT_OFF_SHEET);
+      if (used >= first) host.alert(insert ? "Insert" : "Delete", SHIFT_OFF_SHEET);
       else host.commit([{ op: "clearRange", range: span(first, last) }]);
       return;
     }
@@ -274,7 +273,7 @@ function shiftCells(host: CellCommandsHost, rect: SelRect, insert: boolean, down
       shift: true,
     };
   }
-  if (!host.commit([patch])) shiftNotice(host, insert, SHIFT_BLOCKED);
+  if (!host.commit([patch])) host.alert(insert ? "Insert" : "Delete", SHIFT_BLOCKED);
 }
 
 /**
@@ -294,24 +293,21 @@ function formatSelection(
   if (patches.length > 0) deps.commit(patches);
 }
 
-/** Ctrl+1: the Format Cells dialog for the selection; its code is a chunk of its own. */
-async function formatCells(host: CellCommandsHost): Promise<void> {
+/**
+ * Ctrl+1: apply `format` to the selection at once, as Format Cells' OK does;
+ * without it, open the Format Cells dialog.
+ */
+export function formatCells(
+  host: CellCommandsHost,
+  format?: { readonly style?: Partial<CellStyle>; readonly border?: BorderPreset },
+): void {
   const deps = host.style;
-  const focus = deps.selection().focusCell;
-  if (focus === null || deps.readOnly()) return;
-  const anchor = deps.anchorCell(focus.row, focus.col);
-  const cell = deps.store.getCell({
-    sheet: deps.activeSheet(),
-    row: deps.toDataRow(anchor.row),
-    col: anchor.col,
+  if (deps.selection().focusCell === null || deps.readOnly()) return;
+  if (format) {
+    formatSelection(deps, format.style ?? {}, format.border ?? null);
+    return;
+  }
+  void host.formatCellsDialog().then((change) => {
+    if (change !== null) formatSelection(deps, change.style, change.border);
   });
-  const numberFormat = cell.style.numberFormat ?? deps.sheet().columns[anchor.col]?.numberFormat;
-  const { formatCellsDialog } = await import("./format-cells.js");
-  const input = {
-    style: { ...cell.style, numberFormat },
-    sample: cell.resolved,
-    font: host.font(),
-  };
-  const change = await formatCellsDialog(host.dialogs, input).result;
-  if (change !== null) formatSelection(deps, change.style, change.border);
 }

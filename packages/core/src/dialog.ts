@@ -209,6 +209,26 @@ export function confirmDialog(
   return { result: dialog.result.then((value) => value === "ok"), close: () => dialog.close() };
 }
 
+/** Labels for {@link alertDialog}. */
+export interface AlertOptions {
+  readonly title: string;
+  readonly message: string;
+}
+
+/**
+ * Tell the user something they must read, as Excel's message boxes do: an
+ * alert dialog with the message and OK. Resolves once it closes.
+ */
+export async function alertDialog(grid: DialogHost, options: AlertOptions): Promise<void> {
+  await openDialog(grid, {
+    title: options.title,
+    role: "alertdialog",
+    body: options.message,
+    buttons: [{ label: "OK", value: "ok", default: true }],
+    cancel: "ok",
+  }).result;
+}
+
 /** One option of {@link choiceDialog}. */
 interface DialogChoice {
   readonly value: string;
@@ -277,8 +297,8 @@ function choiceDialog(
  * whole rows nor whole columns: Shift cells right or down (left or up on
  * delete), Entire row and Entire column. As in Excel, it starts on Shift
  * cells down (up) for a `wide` range and Shift cells right (left) for a tall
- * one. `result` resolves to `shiftRight`, `shiftDown`, `entireRow`,
- * `entireColumn` or null.
+ * one. `result` resolves to `shiftRight`, `shiftDown`, `row`, `column` or
+ * null.
  */
 export function insertDeleteDialog(
   grid: DialogHost,
@@ -288,8 +308,8 @@ export function insertDeleteDialog(
   const choices = [
     { value: "shiftRight", label: insert ? "Shift cells right" : "Shift cells left" },
     { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up" },
-    { value: "entireRow", label: "Entire row" },
-    { value: "entireColumn", label: "Entire column" },
+    { value: "row", label: "Entire row" },
+    { value: "column", label: "Entire column" },
   ];
   const initial = wide ? "shiftDown" : "shiftRight";
   return choiceDialog(grid, { title: insert ? "Insert" : "Delete", choices, initial });
