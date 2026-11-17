@@ -1056,6 +1056,11 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
+  /**
+   * The text a cell shows: its value through the cell's or the column's number
+   * format, as the grid paints it. `addr` is a data address on any sheet.
+   */
+  getCellText(addr: CellAddress): string;
   /** The current selection, or null when nothing is selected. */
   getSelection(): Selection | null;
   /** Select `sel`, or clear the selection with null. */

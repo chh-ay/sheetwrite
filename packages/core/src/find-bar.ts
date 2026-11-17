@@ -1,6 +1,5 @@
 import { colToA1 } from "./a1.js";
 import { actionFeedbackFor } from "./action-feedback.js";
-import { cellDisplayText } from "./cell-input.js";
 import { checkStylePart } from "./style-parts.js";
 import type { Grid, ReplaceChange, SearchOptions, SearchResult } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
@@ -570,7 +569,7 @@ export class FindBar {
   private renderFindAll(): void {
     const { matches, active } = this.result;
     const store = this.grid.store;
-    const sheets = new Map(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet]));
+    const names = new Map(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name]));
     this.elements?.findAll.show(
       matches.length,
       active,
@@ -578,18 +577,11 @@ export class FindBar {
       (index) => {
         const addr = matches[index];
         if (!addr) return [];
-        const sheet = sheets.get(addr.sheet);
-        const column = sheet?.columns[addr.col];
-        const cell = store.getCell(addr);
         return [
-          sheet?.name ?? addr.sheet,
+          names.get(addr.sheet) ?? addr.sheet,
           // Excel's Find All shows absolute references.
           `$${colToA1(addr.col)}$${addr.row + 1}`,
-          cellDisplayText(
-            cell.resolved,
-            cell.style.numberFormat ?? column?.numberFormat,
-            column?.numberLocale,
-          ),
+          this.grid.getCellText(addr),
           store.getFormula(addr) ?? "",
         ];
       },
