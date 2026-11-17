@@ -139,7 +139,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::DefinedName(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -254,7 +254,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::DefinedName(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -335,7 +335,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::DefinedName(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)

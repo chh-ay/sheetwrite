@@ -235,7 +235,8 @@ impl CellStore {
             return Value::Error(FormulaError::Name);
         };
         let mut call = Vec::with_capacity(arguments.len() + 1);
-        call.push(Ast::DefinedName(id));
+        // The callee of the call: a name that holds a LAMBDA, so no array.
+        call.push(Ast::DefinedName(id, false));
         call.extend_from_slice(arguments);
         let invocation = super::analysis::lambda::Invocation::Call;
         super::analysis::lambda::evaluate(self, invocation, &call, sheet, pass, depth)
@@ -303,7 +304,7 @@ fn calls_volatile_custom(ast: &Ast, functions: &CustomFunctions, names: NameScop
             calls_volatile_custom(inner, functions, names)
         }
         Ast::LetSlot { expression, .. } => calls_volatile_custom(expression, functions, names),
-        Ast::DefinedName(id) => names
+        Ast::DefinedName(id, _) => names
             .read(*id)
             .formula()
             .is_some_and(|expression| calls_volatile_custom(expression, functions, names)),

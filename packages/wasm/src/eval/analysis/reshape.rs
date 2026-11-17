@@ -98,7 +98,7 @@ fn literal_number(ast: &Ast) -> Option<f64> {
         | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)

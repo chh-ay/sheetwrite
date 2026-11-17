@@ -8,7 +8,7 @@ use std::hash::{Hash, Hasher};
 use std::mem::size_of;
 use std::rc::Rc;
 
-use crate::calc::{Ast, Func, NameId, RangeFlags, SheetRef};
+use crate::calc::{Ast, Func, RangeFlags, SheetRef};
 use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
@@ -39,7 +39,7 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -63,43 +63,23 @@ pub(super) fn static_integer(ast: Option<&Ast>) -> Option<i64> {
     }
 }
 
-/// What shape checks know about LAMBDA parameters, and the defined names
-/// they read; the default engine has no LAMBDA, so it knows only the names.
+/// What shape checks know about LAMBDA parameters and the named LAMBDAs
+/// they call; the default engine has no LAMBDA, so it knows nothing and
+/// costs nothing. A defined name's own shape is marked on its use
+/// ([`Ast::DefinedName`]), so no check reads it.
 #[cfg(feature = "analysis")]
 pub(crate) use super::analysis::lambda::Shapes;
 
 #[cfg(not(feature = "analysis"))]
 #[derive(Clone, Copy)]
-pub(crate) struct Shapes<'a> {
-    names: NameScope<'a>,
-}
+pub(crate) struct Shapes<'a>(std::marker::PhantomData<&'a ()>);
 
 #[cfg(not(feature = "analysis"))]
 impl<'a> Shapes<'a> {
-    /// A formula's own shape, outside every call, reading its defined
-    /// names through `names`.
-    pub(crate) const fn top(names: NameScope<'a>) -> Self {
-        Self { names }
-    }
-
-    /// The defined names the checked formula reads.
-    pub(crate) const fn names(self) -> NameScope<'a> {
-        self.names
-    }
-}
-
-/// Whether the defined name `id` evaluates to an array: a range of more
-/// than one cell, or a formula that does. Out of line, so
-/// [`ast_produces_array`] keeps no name read in its own frame; see
-/// [`NameScope::range_family`].
-#[inline(never)]
-fn name_produces_array_family(id: NameId, shapes: Shapes<'_>) -> bool {
-    let read = shapes.names().read(id);
-    match read.range() {
-        Some(range) => range.row_start != range.row_end || range.col_start != range.col_end,
-        None => read
-            .formula()
-            .is_some_and(|expression| ast_produces_array(expression, shapes)),
+    /// A formula's own shape, outside every call. `_names` serves the
+    /// analysis engine's named LAMBDA calls; this engine has none.
+    pub(crate) const fn top(_names: NameScope<'a>) -> Self {
+        Self(std::marker::PhantomData)
     }
 }
 
@@ -121,35 +101,35 @@ pub(crate) fn ast_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
 }
 
 /// [`ast_produces_array`] of any node.
-fn node_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
+fn node_produces_array(ast: &Ast, _shapes: Shapes<'_>) -> bool {
     match ast {
         Ast::Func(Func::AnchorArray | Func::Offset | Func::Indirect | Func::Intersect, _) => true,
         #[cfg(feature = "analysis")]
-        Ast::Parameter { depth, index, .. } => shapes.parameter_is_array(*depth, *index),
+        Ast::Parameter { depth, index, .. } => _shapes.parameter_is_array(*depth, *index),
         #[cfg(feature = "analysis")]
         Ast::UnknownFunc(call) if call.name == super::analysis::lambda::CALL => {
             let args = &call.args;
             super::analysis::lambda::produces_array(
                 super::analysis::lambda::Invocation::Call,
                 args,
-                shapes,
+                _shapes,
             )
         }
-        Ast::DefinedName(id) => name_produces_array_family(*id, shapes),
+        Ast::DefinedName(_, produces_array) => *produces_array,
         Ast::Structured(reference) => reference.row_start != reference.row_end,
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Array(_) => true,
-        Ast::LetSlot { expression, .. } => ast_produces_array(expression, shapes),
+        Ast::LetSlot { expression, .. } => ast_produces_array(expression, _shapes),
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => {
-            ast_produces_array(left, shapes) || ast_produces_array(right, shapes)
+            ast_produces_array(left, _shapes) || ast_produces_array(right, _shapes)
         }
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => {
-            ast_produces_array(inner, shapes)
+            ast_produces_array(inner, _shapes)
         }
         #[cfg(feature = "analysis")]
         Ast::Func(Func::Analysis(id), args) => super::analysis::family(*id)
             .array
             .as_ref()
-            .is_some_and(|hooks| (hooks.produces_array)(*id, args, shapes)),
+            .is_some_and(|hooks| (hooks.produces_array)(*id, args, _shapes)),
         Ast::Func(
             Func::Filter
             | Func::Sort
@@ -163,12 +143,12 @@ fn node_produces_array(ast: &Ast, shapes: Shapes<'_>) -> bool {
             | Func::TrimRange,
             _,
         ) => true,
-        Ast::Func(Func::Let, args) => args.iter().any(|arg| ast_produces_array(arg, shapes)),
+        Ast::Func(Func::Let, args) => args.iter().any(|arg| ast_produces_array(arg, _shapes)),
         Ast::Func(Func::Index, args) => index_selects_whole_axis(args),
         Ast::Func(Func::Choose, args) => args.get(1..).is_some_and(|choices| {
             choices
                 .iter()
-                .any(|choice| ast_produces_array(choice, shapes))
+                .any(|choice| ast_produces_array(choice, _shapes))
         }),
         _ => false,
     }
@@ -323,7 +303,7 @@ impl CellStore {
             Ast::LetSlot { expression, .. } => {
                 self.dynamic_array_bound(expression, formula_sheet, pass)
             }
-            Ast::DefinedName(id) => {
+            Ast::DefinedName(id, _) => {
                 let read = self.name_scope(formula_sheet).read(*id);
                 if read.range().is_some() {
                     Some(
@@ -523,7 +503,7 @@ impl CellStore {
             Ast::LetSlot { expression, .. } => {
                 return self.eval_array(expression, sheet, pass, depth)
             }
-            Ast::DefinedName(id) => {
+            Ast::DefinedName(id, _) => {
                 let read = self.name_scope(sheet).read(*id);
                 if read.range().is_none() {
                     return read
@@ -736,7 +716,7 @@ impl CellStore {
                     return self.matrix_shape(bound, formula_sheet, pass);
                 }
             }
-            Ast::DefinedName(id) => {
+            Ast::DefinedName(id, _) => {
                 let read = self.name_scope(formula_sheet).read(*id);
                 if let Some(shape) = read
                     .with_formula(|expression| self.matrix_shape(expression, formula_sheet, pass))
@@ -803,7 +783,7 @@ impl CellStore {
             | Ast::Bool(_)
             | Ast::Missing
             | Ast::Name(_)
-            | Ast::DefinedName(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)

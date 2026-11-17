@@ -14,6 +14,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::calc::{Ast, Func, NameId};
 use crate::formula_slots::{FormulaResults, FormulaWork};
+use crate::store::names::shapes;
 use crate::store::CellStore;
 use crate::types::{FormulaError, Value};
 
@@ -218,7 +219,7 @@ impl CellStore {
         if self.sheets.get(sheet).is_none() {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Syntax);
         }
-        let Ok(ast) = self.resolve_preview_ast(source, formula_sheet, row, col) else {
+        let Ok(mut ast) = self.resolve_preview_ast(source, formula_sheet, row, col) else {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Syntax);
         };
 
@@ -236,6 +237,8 @@ impl CellStore {
         if let Some(refusal) = walk.refusal {
             return FormulaPreview::unavailable(refusal);
         }
+        // Marked as a stored formula's uses are, for the shape checks.
+        shapes::mark(&mut ast, self.name_scope(sheet));
 
         let preview = self.evaluate_preview(&ast, sheet);
         if scope.exceeded() {
@@ -306,7 +309,7 @@ impl SafetyWalk<'_> {
         if matches!(ast, Ast::Func(Func::Rand | Func::RandBetween, _)) {
             return self.refuse(FormulaPreviewStatus::UnsafeFunction);
         }
-        if let Ast::DefinedName(id) = ast {
+        if let Ast::DefinedName(id, _) = ast {
             if !self.named.contains(id) {
                 self.named.push(*id);
                 let names = self.store.name_scope(self.sheet);
@@ -357,7 +360,8 @@ impl SafetyWalk<'_> {
             .names
             .formula_id(name, self.sheet as u32)
         {
-            return self.visit(&Ast::DefinedName(id), depth + 1);
+            // Only walked for what it calls, so its shape is not marked.
+            return self.visit(&Ast::DefinedName(id, false), depth + 1);
         }
 
         false

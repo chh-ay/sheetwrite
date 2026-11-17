@@ -348,7 +348,7 @@ impl Aggregator {
         // defines.
         let written_name = if let Ast::Name(name) = expression {
             Some(name.to_ascii_uppercase())
-        } else if let Ast::DefinedName(id) = expression {
+        } else if let Ast::DefinedName(id, _) = expression {
             Some(names.spelling(*id).to_ascii_uppercase())
         } else {
             None

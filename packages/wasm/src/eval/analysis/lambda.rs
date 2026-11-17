@@ -422,7 +422,7 @@ fn resolve_in(ast: &mut Ast, scopes: &mut Vec<Scope>) {
         | Ast::Missing
         | Ast::Parameter { .. }
         | Ast::RegexPattern(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -906,7 +906,7 @@ impl<'a, 'p> Context<'a, 'p> {
     /// evaluation reads it.
     fn lambda(&self, expression: &Ast) -> Option<Rc<LambdaDefinition>> {
         let names = self.names();
-        let Ast::DefinedName(id) = expression else {
+        let Ast::DefinedName(id, _) = expression else {
             return definition(expression, names).ok().cloned();
         };
         // A formula read in place holds no LAMBDA when it is shifted: a
@@ -991,7 +991,7 @@ impl<'a, 'p> Context<'a, 'p> {
         // Only a LAMBDA, a LET binding or a defined name can stand for one.
         let may_be_lambda = matches!(
             argument,
-            Ast::Lambda(_) | Ast::LetSlot { .. } | Ast::DefinedName(_)
+            Ast::Lambda(_) | Ast::LetSlot { .. } | Ast::DefinedName(..)
         );
         if let Some(shared) = may_be_lambda.then(|| self.lambda(argument)).flatten() {
             return Ok(Slot::Closure {
@@ -1378,7 +1378,7 @@ impl Context<'_, '_> {
         {
             return self.written_shape(bound, depth + 1);
         }
-        if let Ast::DefinedName(id) = expression {
+        if let Ast::DefinedName(id, _) = expression {
             let read = self.names().read(*id);
             return read
                 .formula()

@@ -10,6 +10,7 @@ use super::{ast_produces_array, literal_cell_value, EvalPass, Shapes};
 
 use crate::calc::{Ast, Func};
 use crate::cells::{payload_num, CellStorage};
+use crate::store::names::NameScope;
 use crate::store::CellStore;
 use crate::types::{
     CellRange, EvalResult, FormulaError, Value, FORMULA_RECURSION_LIMIT, KIND_BOOL, KIND_EMPTY,
@@ -68,7 +69,7 @@ impl CellStore {
                 .all(|arg| super::matrix::range_from_ast(arg, names).is_some())
             || !args
                 .iter()
-                .all(|arg| sum_scalar_or_range(arg, pass.shapes(names)).is_some())
+                .all(|arg| sum_scalar_or_range(arg, names, pass.shapes(names)).is_some())
         {
             return None;
         }
@@ -76,7 +77,7 @@ impl CellStore {
         let mut fold = ReductionFold::new(Func::Sum)?;
         let mut deferred = None;
         for arg in args {
-            let result = match sum_scalar_or_range(arg, pass.shapes(names))? {
+            let result = match sum_scalar_or_range(arg, names, pass.shapes(names))? {
                 SumArg::Range(range) => self
                     .fold_range(range, &mut fold, true, pass, depth)
                     .map(|_| ()),
@@ -300,16 +301,15 @@ enum SumArg {
     },
 }
 
-/// The accumulator's reading of `arg`, or `None` for arguments the mixed
-/// path leaves to it: arrays, unions, sheet spans, intersections and
-/// missing arguments.
-fn sum_scalar_or_range(arg: &Ast, shapes: Shapes<'_>) -> Option<SumArg> {
-    let names = shapes.names();
+/// The accumulator's reading of `arg`, its defined names read through
+/// `names`, or `None` for arguments the mixed path leaves to it: arrays,
+/// unions, sheet spans, intersections and missing arguments.
+fn sum_scalar_or_range(arg: &Ast, names: NameScope<'_>, shapes: Shapes<'_>) -> Option<SumArg> {
     match arg {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(_) => {
             super::matrix::range_from_ast(arg, names).map(SumArg::Range)
         }
-        Ast::DefinedName(id) => match names.range_family(*id) {
+        Ast::DefinedName(id, _) => match names.range_family(*id) {
             Some(range) => Some(SumArg::Range(range)),
             None if ast_produces_array(arg, shapes) => None,
             None => Some(SumArg::Scalar { reference: false }),

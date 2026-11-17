@@ -27,6 +27,8 @@ use std::rc::Rc;
 use rustc_hash::FxHashMap;
 use wasm_bindgen::prelude::*;
 
+pub(crate) mod shapes;
+
 use super::{workbook_name_key, CellStore};
 use crate::calc::{
     bind_defined_names, for_each_table_ref, invalidate_sheet_refs, move_refs, moved_span, parse,
@@ -165,6 +167,12 @@ pub(super) struct Definition {
     /// sheet reads the formula in place. [`NEVER_IN_PLACE`] for a formula
     /// that reads a table or holds a LAMBDA.
     reach: (u32, u32),
+    /// Whether a name `expression` uses can have another shape on some
+    /// sheet than the one marked in it: a workbook formula that uses a name
+    /// some sheet defines in its own scope, directly or through other names.
+    /// Such a formula is read in a copy whose name shapes are marked for the
+    /// reading sheet ([`shapes`]).
+    sheet_shapes: bool,
 }
 
 /// What a defined name stands for in the formula being read.
@@ -423,6 +431,9 @@ impl<'a> NameScope<'a> {
     /// copy: a range when it is one reference, else the formula, shifted
     /// when it is positional. `None` when it must be placed in a copy.
     fn view_in_place(self, formula: &'a Definition) -> Option<NameView<'a>> {
+        if shapes::read_in_copy(formula) {
+            return None;
+        }
         let shift = if formula.positional {
             let origin = current_formula_origin().unwrap_or_default();
             if !formula.fits_at(origin) {
@@ -452,13 +463,17 @@ impl<'a> NameScope<'a> {
         if formula.follows_names && entry.followed_by.get() == Some(cell) {
             return NameRead::unguarded(NameView::Undefined);
         }
-        let view = self.view_in_place(formula).unwrap_or_else(|| {
+        let mut view = self.view_in_place(formula).unwrap_or_else(|| {
             let placed = formula.placed(self.sheet, row, col, self.tables());
             reference_target(&placed, self.sheet, (0, 0))
                 .map_or(NameView::Placed(placed), NameView::Range)
         });
         let followed = (formula.follows_names && !matches!(view, NameView::Range(_)))
             .then(|| (entry, entry.followed_by.replace(Some(cell))));
+        // With the guard up, marking the copy can read the names in it.
+        if let NameView::Placed(tree) = &mut view {
+            shapes::mark_copy(tree, formula, self);
+        }
         NameRead { view, followed }
     }
 
@@ -495,7 +510,7 @@ impl<'a> NameScope<'a> {
                 Ast::LetSlot {
                     expression: bound, ..
                 } => bound,
-                Ast::DefinedName(id) => match self.formula(*id) {
+                Ast::DefinedName(id, _) => match self.formula(*id) {
                     Some(formula) => formula,
                     None => return expression,
                 },
@@ -907,6 +922,7 @@ impl CellStore {
             follows_names: true,
             plain: false,
             reach: NEVER_IN_PLACE,
+            sheet_shapes: false,
         };
         self.bindings.names.insert(
             name_scope,
@@ -940,6 +956,7 @@ impl CellStore {
     /// Bind the defined names of a formula on `formula_sheet`: each name
     /// becomes its table id, and a call of a name that holds a formula
     /// becomes a call of that formula's value. LET and LAMBDA names stay.
+    /// Each use's shape is left clear for [`shapes::mark`].
     pub(super) fn bind_formula_names(&self, ast: Ast, formula_sheet: u32) -> Ast {
         let table = &self.bindings.names;
         bind_defined_names(ast, &mut |name, call| {
@@ -948,9 +965,11 @@ impl CellStore {
                 let id = table.id(&key)?;
                 return table
                     .holds_formula(id, formula_sheet)
-                    .then_some(Ast::DefinedName(id));
+                    .then_some(Ast::DefinedName(id, false));
             }
-            table.intern(key, name).map(Ast::DefinedName)
+            table
+                .intern(key, name)
+                .map(|id| Ast::DefinedName(id, false))
         })
     }
 
@@ -1069,7 +1088,8 @@ impl CellStore {
     /// Bind every name definition's formula again: its names to their ids
     /// and its calls to the names that hold a formula now. A formula whose
     /// reads would pass [`EXPANSION_NODE_LIMIT`] nodes, counting each name
-    /// it uses at that name's size, becomes `#NUM!`.
+    /// it uses at that name's size, becomes `#NUM!`. Then the shapes of the
+    /// names in each formula are marked ([`Self::mark_definition_shapes`]).
     pub(super) fn bind_name_definitions(&mut self) {
         let table = self.bindings.names.settled();
         let mut written = Vec::new();
@@ -1129,6 +1149,7 @@ impl CellStore {
                 }));
             }
         }
+        self.mark_definition_shapes();
     }
 
     /// Follow a row (or, with `columns`, column) insertion or deletion on
@@ -1285,6 +1306,7 @@ impl CellStore {
             follows_names: true,
             plain: false,
             reach: NEVER_IN_PLACE,
+            sheet_shapes: false,
         };
         self.bindings.names.insert(
             scope,
@@ -1321,7 +1343,7 @@ fn definition_size(table: &NameTable, (scope, id): (Option<u32>, NameId), depth:
 /// The nodes of `ast`, counting each name in it at the size of its
 /// definition in `scope`, else the workbook's.
 fn expression_size(table: &NameTable, ast: &Ast, scope: Option<u32>, depth: usize) -> usize {
-    if let Ast::DefinedName(id) = ast {
+    if let Ast::DefinedName(id, _) = ast {
         let own = scope.filter(|_| table.defined_at(scope, *id).is_some());
         return definition_size(table, (own, *id), depth + 1);
     }
@@ -1377,11 +1399,11 @@ fn name_use(
     let mut binds = false;
     let mut has_let = false;
     let mut visit = |node: &Ast| match node {
-        Ast::DefinedName(id) => reads |= ids.contains(id),
+        Ast::DefinedName(id, _) => reads |= ids.contains(id),
         Ast::Name(name) => binds |= keys.contains(&workbook_name_key(name)),
         Ast::UnknownFunc(call) => {
             binds |= keys.contains(&workbook_name_key(&call.name))
-                || matches!(call.args.first(), Some(Ast::DefinedName(id))
+                || matches!(call.args.first(), Some(Ast::DefinedName(id, _))
                     if ids.contains(id) && !callable(*id));
         }
         Ast::Func(crate::calc::Func::Let, _) => has_let = true,
@@ -1408,7 +1430,7 @@ fn walk(ast: &Ast, visit: &mut dyn FnMut(&Ast)) {
 
 /// Whether `ast` uses a defined name or calls a function that may be one.
 fn follows_names(ast: &Ast) -> bool {
-    matches!(ast, Ast::DefinedName(_) | Ast::UnknownFunc(_))
+    matches!(ast, Ast::DefinedName(..) | Ast::UnknownFunc(_))
         || ast.any_child(&mut |child| follows_names(child))
 }
 

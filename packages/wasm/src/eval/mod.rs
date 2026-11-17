@@ -463,7 +463,7 @@ fn expand_let_node<'a>(
         | Ast::Str(_)
         | Ast::Bool(_)
         | Ast::Missing
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -600,7 +600,7 @@ fn shift_parameters(ast: &mut Ast, by: u16) {
             | Ast::Parameter { .. }
             | Ast::RegexPattern(_)
             | Ast::Name(_)
-            | Ast::DefinedName(_)
+            | Ast::DefinedName(..)
             | Ast::UnresolvedStructured(_)
             | Ast::Structured(_)
             | Ast::Cell(..)
@@ -1987,7 +1987,7 @@ impl CellStore {
                 }
             }
             Ast::LetName { slot, .. } => self.eval_let_name_family(*slot, sheet, pass, depth),
-            Ast::DefinedName(id) => self.eval_defined_name_family(*id, sheet, pass, depth),
+            Ast::DefinedName(id, _) => self.eval_defined_name_family(*id, sheet, pass, depth),
             #[cfg(feature = "host-functions")]
             Ast::UnknownFunc(call) => {
                 let crate::calc::UnknownCall {
@@ -2023,7 +2023,7 @@ impl CellStore {
                     | Ast::Bool(_)
                     | Ast::Missing
                     | Ast::Name(_)
-                    | Ast::DefinedName(_)
+                    | Ast::DefinedName(..)
                     | Ast::UnresolvedStructured(_)
                     | Ast::Structured(_)
                     | Ast::Cell(..)

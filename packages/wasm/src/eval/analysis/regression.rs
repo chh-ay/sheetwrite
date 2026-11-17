@@ -113,7 +113,7 @@ fn argument_shape(
         | Ast::Lambda(_)
         | Ast::RegexPattern(_)
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -519,7 +519,7 @@ fn is_reference(ast: &Ast, names: NameScope<'_>) -> bool {
         | Ast::AbsRange(..)
         | Ast::Structured(..) => true,
         Ast::LetSlot { expression, .. } => is_reference(expression, names),
-        Ast::DefinedName(id) => {
+        Ast::DefinedName(id, _) => {
             let read = names.read(*id);
             read.range().is_some()
                 || read

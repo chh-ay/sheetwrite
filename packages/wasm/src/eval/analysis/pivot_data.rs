@@ -25,7 +25,7 @@ family_functions! {
 pub(crate) fn ast_calls_pivot_data(ast: &Ast, names: NameScope<'_>) -> bool {
     match ast {
         Ast::Func(Func::Analysis(super::GETPIVOTDATA_ID), _) => true,
-        Ast::DefinedName(id) => names
+        Ast::DefinedName(id, _) => names
             .read(*id)
             .formula()
             .is_some_and(|expression| ast_calls_pivot_data(expression, names)),

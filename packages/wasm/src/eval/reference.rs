@@ -99,7 +99,7 @@ pub(super) fn ast_contains_runtime_ref(ast: &Ast, names: NameScope<'_>) -> bool 
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => contains(left) || contains(right),
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => contains(inner),
         Ast::LetSlot { expression, .. } => contains(expression),
-        Ast::DefinedName(id) => names.formula_satisfies_family(*id, ast_contains_runtime_ref),
+        Ast::DefinedName(id, _) => names.formula_satisfies_family(*id, ast_contains_runtime_ref),
         Ast::Num(_)
         | Ast::Str(_)
         | Ast::Bool(_)
@@ -351,7 +351,7 @@ impl CellStore {
             }
             // The copy is only evaluated, never written back, so the name's
             // formula, placed for the formula's cell, takes the node's place.
-            Ast::DefinedName(id) => {
+            Ast::DefinedName(id, _) => {
                 let formula = self.name_scope(sheet).read(*id).placed_formula();
                 if let Some(mut expression) = formula {
                     self.rewrite_references(&mut expression, sheet, pass, depth + 1, scope);
@@ -542,7 +542,7 @@ impl CellStore {
         let entry = self.parse_formula_entry(name, sheet as u32, row, col);
         match entry.ast.as_ref()? {
             Ast::Structured(_) => range_from_ast(entry.ast.as_ref()?, self.name_scope(sheet)),
-            Ast::DefinedName(id) => self.name_scope(sheet).read(*id).range(),
+            Ast::DefinedName(id, _) => self.name_scope(sheet).read(*id).range(),
             Ast::Num(_)
             | Ast::Str(_)
             | Ast::Bool(_)

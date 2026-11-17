@@ -3954,8 +3954,8 @@ impl CellStore {
 
     /// Resolves a parsed formula as if it were in the cell at
     /// (`formula_row`, `formula_col`) of `formula_sheet`: sheet names, defined
-    /// names, then structured references. Measures resolve their inlined
-    /// expression this way.
+    /// names with their shapes, then structured references. Measures
+    /// resolve their inlined expression this way.
     #[cfg(feature = "analysis")]
     pub(crate) fn resolve_parsed_formula(
         &self,
@@ -3967,6 +3967,9 @@ impl CellStore {
         let with_sheets = self.resolve_sheets(ast)?;
         let mut with_names = self.bind_formula_names(with_sheets, formula_sheet);
         self.resolve_table_refs(&mut with_names, formula_sheet, formula_row, formula_col);
+        crate::eval::with_formula_origin((formula_row, formula_col), || {
+            names::shapes::mark(&mut with_names, self.name_scope(formula_sheet as usize));
+        });
         Ok(with_names)
     }
 

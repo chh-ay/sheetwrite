@@ -12,7 +12,7 @@ use crate::eval::{
 };
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
-use crate::store::names::{FormulaTest, InPlace, NameScope};
+use crate::store::names::{shapes, FormulaTest, InPlace, NameScope};
 use std::borrow::Cow;
 use std::rc::Rc;
 
@@ -237,7 +237,7 @@ impl ReadSet {
         let collect = |reads: &mut Self, child: &Ast| reads.collect(child, names, shift);
         match ast {
             Ast::LetSlot { expression, .. } => collect(self, expression),
-            Ast::DefinedName(id) => self.collect_name(*id, names, shift),
+            Ast::DefinedName(id, _) => self.collect_name(*id, names, shift),
             Ast::Cell(row, col, flags) => {
                 let (placed_row, placed_col) = shifted_cell(shift, *row, *col, *flags);
                 self.push_cell(AbsCellKey {
@@ -454,7 +454,7 @@ fn ast_with_names_is_volatile(ast: &Ast, names: NameScope<'_>) -> bool {
 /// Whether `test` holds for the formula of a defined name `ast` uses, read
 /// through `names`. One walk serves each check that looks through names.
 fn any_name_formula(ast: &Ast, names: NameScope<'_>, test: FormulaTest) -> bool {
-    if let Ast::DefinedName(id) = ast {
+    if let Ast::DefinedName(id, _) = ast {
         return names.formula_satisfies_family(*id, test);
     }
     ast.any_child(&mut |child| any_name_formula(child, names, test))
@@ -719,6 +719,10 @@ impl FormulaEntry {
             return entry;
         }
 
+        // Shape checks read each name's shape from its use.
+        if features.names {
+            shapes::mark(&mut ast, names);
+        }
         let contains_let = ast_contains_let(&ast);
         let (reads, volatile) = formula_metadata(&ast, names, contains_let, features.names);
 
@@ -767,6 +771,9 @@ impl FormulaEntry {
         features: ParseFeatures,
         names: NameScope<'_>,
     ) -> Self {
+        if let Some(tree) = ast.as_mut().filter(|_| features.names) {
+            shapes::mark(tree, names);
+        }
         if let Some(tree) = ast.as_mut().filter(|candidate| {
             ast_contains_let(candidate) && !formula_has_spill_refs(candidate, names, features.names)
         }) {

@@ -117,7 +117,7 @@ pub(crate) fn scalar_binding(expression: &Ast, names: NameScope<'_>) -> bool {
         }
         Ast::Func(..) => call_has_scalar_result(expression, names),
         Ast::Missing
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -152,7 +152,7 @@ fn scalar_operand(ast: &Ast, names: NameScope<'_>) -> bool {
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => scalar_operand(inner, names),
         Ast::Func(..) => call_has_scalar_result(ast, names),
         Ast::Missing
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Range(..)

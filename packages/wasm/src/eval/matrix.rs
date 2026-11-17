@@ -191,7 +191,7 @@ pub(super) fn written_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -224,7 +224,7 @@ pub(super) fn written_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange
 pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
     match argument {
         Ast::Range(..) | Ast::AbsRange(..) | Ast::Structured(..) => true,
-        Ast::DefinedName(id) => names.range_family(*id).is_some(),
+        Ast::DefinedName(id, _) => names.range_family(*id).is_some(),
         _ => false,
     }
 }
@@ -235,7 +235,7 @@ pub(crate) fn is_range_argument(argument: &Ast, names: NameScope<'_>) -> bool {
 pub(super) fn argument_range(arg: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     match arg {
         Ast::Range(..) | Ast::AbsRange(..) => range_from_ast(arg, names),
-        Ast::DefinedName(id) => names.range_family(*id),
+        Ast::DefinedName(id, _) => names.range_family(*id),
         Ast::Structured(reference) => Some(CellRange::new(
             reference.sheet,
             reference.row_start,
@@ -309,7 +309,7 @@ fn node_range(ast: &Ast, names: NameScope<'_>) -> Option<CellRange> {
     let formula_sheet = names.sheet;
     match ast {
         Ast::LetSlot { expression, .. } => range_from_ast(expression, names),
-        Ast::DefinedName(id) => name_reference_family(*id, names),
+        Ast::DefinedName(id, _) => name_reference_family(*id, names),
         Ast::Cell(row, col, flags) => {
             let (placed_row, placed_col) = placed_cell(*row, *col, *flags);
             Some(CellRange::new(
@@ -390,7 +390,7 @@ pub(crate) fn intersection_range(
                 | Ast::Bool(_)
                 | Ast::Missing
                 | Ast::Name(_)
-                | Ast::DefinedName(_)
+                | Ast::DefinedName(..)
                 | Ast::UnresolvedStructured(_)
                 | Ast::Structured(_)
                 | Ast::Cell(..)

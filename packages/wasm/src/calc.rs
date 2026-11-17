@@ -858,8 +858,10 @@ pub(crate) enum Ast {
     Name(Box<str>),
     /// A use of a defined name, bound to its id in the store's name table.
     /// It reads the name's definition for its formula's sheet through the
-    /// table (`NameScope::read`), defined yet or not.
-    DefinedName(NameId),
+    /// table (`NameScope::read`), defined yet or not. The flag records
+    /// whether the name evaluates to an array there, so shape checks need no
+    /// name table (`store::names::shapes`).
+    DefinedName(NameId, bool),
     UnresolvedStructured(Box<UnresolvedStructuredRef>),
     Structured(StructuredRef),
     Cell(u32, u32, RefFlags),
@@ -938,7 +940,7 @@ impl Ast {
             | Self::Bool(_)
             | Self::Missing
             | Self::Name(_)
-            | Self::DefinedName(_)
+            | Self::DefinedName(..)
             | Self::UnresolvedStructured(_)
             | Self::Structured(_)
             | Self::Cell(..)
@@ -984,7 +986,7 @@ impl Ast {
             | Self::Bool(_)
             | Self::Missing
             | Self::Name(_)
-            | Self::DefinedName(_)
+            | Self::DefinedName(..)
             | Self::UnresolvedStructured(_)
             | Self::Structured(_)
             | Self::Cell(..)
@@ -1027,7 +1029,7 @@ impl Ast {
             Self::Name(value) => out.add_payload(value.len(), value.len()),
             Self::LetName { name, .. } => out.add_payload(name.len(), name.len()),
             // The store's name table holds the name's definitions.
-            Self::DefinedName(_) => {}
+            Self::DefinedName(..) => {}
             Self::UnresolvedStructured(value) => {
                 let bytes = std::mem::size_of::<UnresolvedStructuredRef>();
                 out.add_payload(bytes, bytes);
@@ -2745,7 +2747,7 @@ pub(crate) fn refresh_sheet_spans(ast: &mut Ast, order: &[u32], names: &[String]
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -2987,7 +2989,7 @@ fn add_relative_reach(ast: &Ast, depth: usize, reach: &mut (u32, u32)) {
         }
         // A conditional-format rule that uses a defined name takes the
         // translated copy, which reads the name for the rule's cell.
-        Ast::DefinedName(_) => *reach = PAST_SHEET,
+        Ast::DefinedName(..) => *reach = PAST_SHEET,
         // These hold no reference of their own; `any_child` visits the
         // children of those that have some.
         Ast::Func(..)
@@ -3207,7 +3209,7 @@ fn translate_relative_refs_inner(
         | Ast::Missing
         | Ast::Name(_)
         | Ast::LetName { .. }
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::InvalidRef
@@ -3415,7 +3417,7 @@ fn rewrite_axis(ast: &mut Ast, edit: AxisEdit) -> bool {
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -3593,7 +3595,7 @@ pub(crate) fn rename_sheet_refs(ast: &mut Ast, handle: u32, name: &str) -> bool 
         | Ast::Bool(_)
         | Ast::Missing
         | Ast::Name(_)
-        | Ast::DefinedName(_)
+        | Ast::DefinedName(..)
         | Ast::UnresolvedStructured(_)
         | Ast::Structured(_)
         | Ast::Cell(..)
@@ -3822,7 +3824,7 @@ pub(crate) fn write_ast_with_names(ast: &Ast, out: &mut String, names: &WrittenN
         Ast::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
         Ast::Name(name) => out.push_str(name),
         Ast::LetName { name, .. } => out.push_str(name),
-        Ast::DefinedName(id) => {
+        Ast::DefinedName(id, _) => {
             if let Some(table) = names.names {
                 table.write_spelling(*id, out);
             }
@@ -4382,7 +4384,11 @@ mod tests {
         let cases: Vec<(&str, Ast, usize)> = vec![
             ("string", Ast::Str("abc".to_owned().into()), 3),
             ("name", Ast::Name("Total".to_owned().into()), 5),
-            ("defined name", Ast::DefinedName(NameId::at(0).unwrap()), 0),
+            (
+                "defined name",
+                Ast::DefinedName(NameId::at(0).unwrap(), false),
+                0,
+            ),
             (
                 "unqualified structured ref",
                 Ast::UnresolvedStructured(Box::new(UnresolvedStructuredRef {

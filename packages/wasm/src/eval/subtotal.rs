@@ -38,7 +38,7 @@ pub(crate) fn ast_calls_subtotal(ast: &Ast, names: NameScope<'_>) -> bool {
         Ast::Bin(_, left, right) | Ast::Cmp(_, left, right) => calls(left) || calls(right),
         Ast::Neg(inner) | Ast::Pos(inner) | Ast::Percent(inner) => calls(inner),
         Ast::LetSlot { expression, .. } => calls(expression),
-        Ast::DefinedName(id) => names.formula_satisfies_family(*id, ast_calls_subtotal),
+        Ast::DefinedName(id, _) => names.formula_satisfies_family(*id, ast_calls_subtotal),
         _ => false,
     }
 }
