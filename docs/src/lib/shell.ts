@@ -1,9 +1,10 @@
 /**
  * The docs shell's behaviour that needs no component (components/DocsShell.tsx
  * renders it all as static markup): the theme toggle, the documentation menu,
- * the search shortcut and the outline's current section. The islands client
- * runs it on every page; the sidebar's scroll position is set by an inline
- * script before first paint (lib/shell-ids.ts).
+ * the search opener (lib/search-opener.ts, loaded on pages with search) and
+ * the outline's current section. The islands client runs it on every page; the
+ * sidebar's scroll position is set by an inline script before first paint
+ * (lib/shell-ids.ts).
  */
 import { iconHref } from "@docs/icons/icon-href.js";
 import { writePreference } from "@docs/lib/preference-storage.js";
@@ -80,35 +81,6 @@ function installNavigationMenu(): void {
   });
 }
 
-/** Apple platforms name the Command key; others use Ctrl. */
-function isApplePlatform(): boolean {
-  return /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-}
-
-/**
- * Search opens from ⌘K or Ctrl K anywhere, and from "/" outside text fields.
- * The search island hydrates on first use, so the shortcut presses its button:
- * the islands client holds that press until the island is ready.
- */
-function installSearchShortcut(): void {
-  const button = document.querySelector<HTMLElement>("[data-search-open]");
-  if (button === null) return;
-  const keyCap = button.querySelector("kbd");
-  if (keyCap !== null && !isApplePlatform()) keyCap.textContent = "Ctrl K";
-  window.addEventListener("keydown", (event) => {
-    const commandK = event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey);
-    const slash = event.key === "/" && !event.metaKey && !event.ctrlKey && !event.altKey;
-    if (!commandK && !slash) return;
-    const target = event.target;
-    // "/" keeps typing semantics inside fields; Ctrl+K may not.
-    if (slash && (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)) {
-      return;
-    }
-    event.preventDefault();
-    button.click();
-  });
-}
-
 /**
  * The outline marks the section being read (the last heading above the
  * reading line, or at the page's end the last on screen), and lists only
@@ -177,8 +149,8 @@ function installOutline(): void {
 
 export function installDocsShell(): void {
   installThemeToggle();
-  // Every page with the search control (docs pages and the 404 page).
-  installSearchShortcut();
+  // Only pages with the search control (docs pages and the 404 page) load its opener.
+  if (document.querySelector("[data-search-open]") !== null) void import("./search-opener.js");
   if (document.querySelector(".sw-docs") === null) return;
   installNavigationMenu();
   installOutline();

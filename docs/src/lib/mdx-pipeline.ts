@@ -300,9 +300,36 @@ function markShortCells(node: HastNode): void {
   }
 }
 
+/** The children of `node` that are `tagName` elements. */
+function childElements(node: HastNode | undefined, tagName: string): HastNode[] {
+  return (node?.children ?? []).filter((child) => child.tagName === tagName);
+}
+
+/**
+ * Labels each body cell of a two-column table with its column's heading, so
+ * a phone can stack each row (old, then new) under those labels. Returns
+ * whether the table has two columns.
+ */
+function labelPairCells(table: HastNode): boolean {
+  const [head] = childElements(table, "thead");
+  const [headRow] = childElements(head, "tr");
+  const labels = childElements(headRow, "th").map((cell) => textOf(cell).trim());
+  if (labels.length !== 2) return false;
+  for (const body of childElements(table, "tbody")) {
+    for (const row of childElements(body, "tr")) {
+      for (const [index, cell] of childElements(row, "td").entries()) {
+        cell.properties = { ...cell.properties, dataLabel: labels[index] };
+      }
+    }
+  }
+  return true;
+}
+
 /**
  * Markdown tables get a scroll frame: a wide table scrolls inside the column
  * instead of widening the page, so short cells can stay on one line.
+ * Two-column tables stack their rows on a phone instead, so the second
+ * column is never out of view.
  * Tables with their own class are designed layouts and keep their markup.
  */
 function wrapProseTables() {
@@ -314,10 +341,12 @@ function wrapProseTables() {
       node.children = node.children.map((child) => {
         if (child.tagName !== "table" || child.properties?.className) return child;
         markShortCells(child);
+        const className = ["sw-table-frame"];
+        if (labelPairCells(child)) className.push("sw-table-frame--pairs");
         return {
           type: "element",
           tagName: "div",
-          properties: { className: ["sw-table-frame"], tabIndex: 0 },
+          properties: { className, tabIndex: 0 },
           children: [child],
         };
       });

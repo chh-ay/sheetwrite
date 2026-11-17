@@ -43,8 +43,10 @@ import { dirname } from "node:path";
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 
+import { autoFilterValues } from "../../packages/core/src/autofilter-actions.js";
 import { getEngine } from "../../packages/core/src/engine.js";
 import { initSheetwrite, SheetwriteStore } from "../../packages/core/src/index.js";
+import { storeEngine } from "../../packages/core/src/store/engine-registry.js";
 import { optionValue } from "./cli-options.js";
 import {
   AGG_COL,
@@ -141,6 +143,8 @@ export const QUERY_SCENARIOS = [
   "filter-value-set-10",
   "filter-value-set-1000",
   "filter-value-set-50000",
+  "autofilter-dropdown",
+  "autofilter-apply-values",
   "ingest-numeric-only",
 ] as const;
 export type QueryScenario = (typeof QUERY_SCENARIOS)[number];
@@ -171,6 +175,8 @@ const QUERY_LABELS: Record<QueryScenario, string> = {
   "filter-value-set-10": "Filter customer by 10 picked values",
   "filter-value-set-1000": "Filter customer by 1,000 picked values",
   "filter-value-set-50000": "Filter customer by 50,000 picked values",
+  "autofilter-dropdown": "Open the AutoFilter dropdown of city (filtered)",
+  "autofilter-apply-values": "Apply an AutoFilter value filter to city",
   "ingest-numeric-only": "Ingest N rows (5 numeric columns)",
 };
 
@@ -186,6 +192,8 @@ export const QUERY_FIXTURES: Readonly<Record<QueryScenario, string>> = {
   "filter-value-set-10": "seeded-dataset-v1",
   "filter-value-set-1000": "seeded-dataset-v1",
   "filter-value-set-50000": "seeded-dataset-v1",
+  "autofilter-dropdown": "seeded-dataset-v1",
+  "autofilter-apply-values": "seeded-dataset-v1",
   "ingest-numeric-only": "numeric-five-column-v1",
 };
 
@@ -198,6 +206,9 @@ export const QUERY_FIXTURES: Readonly<Record<QueryScenario, string>> = {
  */
 const QUERY_SCENARIO_ROWS: Partial<Record<QueryScenario, readonly number[]>> = {
   "filter-value-set-50000": [100_000],
+  // The AutoFilter rows cover the 100,000-row column of #735's acceptance.
+  "autofilter-dropdown": [100_000],
+  "autofilter-apply-values": [100_000],
 };
 
 function measuresQueryScenario(
@@ -274,6 +285,8 @@ function plan(workload: Workload | QueryScenario, rows: number): IterationPlan {
     case "sort-with-candidates":
     case "filter-value-set-10":
     case "filter-value-set-1000":
+    case "autofilter-dropdown":
+    case "autofilter-apply-values":
       return atScale
         ? { workload, warmup: 1, iters: 5 }
         : { workload, warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
@@ -670,6 +683,74 @@ export function validateDataBenchmark(
   }
 }
 
+/** Cities the AutoFilter rows keep: three of the seven, as a user ticks them. */
+const AUTO_FILTER_CITIES: readonly string[] = ["Tokyo", "Lima", "Oslo"];
+/** Most values an AutoFilter dropdown lists, as in core. */
+const AUTO_FILTER_LIST_LIMIT = 10_000;
+
+/**
+ * The AutoFilter rows of #735: an AutoFilter over the whole sheet (row 0 its
+ * header), applying a value filter to city, and opening city's dropdown while
+ * that filter is on, which lists the column's values and the kept ones.
+ */
+function measureAutoFilter(
+  queryStore: SheetwriteStore,
+  ds: ColumnarDataset,
+  rows: number,
+  queries: Partial<Record<QueryScenario, DataStat>>,
+  measures: (scenario: QueryScenario) => boolean,
+): void {
+  const engine = storeEngine(queryStore);
+  if (!engine) throw new Error("autofilter: the query store has no engine");
+  const range = {
+    sheet: SHEET,
+    start: { row: 0, col: 0 },
+    end: { row: rows - 1, col: COLUMNS.length - 1 },
+  };
+  const filter = { kind: "values" as const, values: AUTO_FILTER_CITIES };
+  const keptRows = ds.city.slice(1).filter((city) => AUTO_FILTER_CITIES.includes(city)).length;
+  const listedCities = new Set(ds.city.slice(1)).size;
+  queryStore.applyTransaction({
+    patches: [{ op: "setSheetMeta", sheet: SHEET, patch: { autoFilter: { range }, filters: [] } }],
+  });
+
+  if (measures("autofilter-apply-values")) {
+    queries["autofilter-apply-values"] = measure(
+      () => queryStore.setColumnFilter(SHEET, COL.city, filter),
+      {
+        ...plan("autofilter-apply-values", rows),
+        after: () => queryStore.setColumnFilter(SHEET, COL.city, null),
+      },
+    );
+  }
+
+  queryStore.setColumnFilter(SHEET, COL.city, filter);
+  // The header row stays; the body keeps the three cities' rows.
+  if (queryStore.viewRowCount(SHEET) !== 1 + keptRows) {
+    throw new Error(`autofilter ${rows}: ${queryStore.viewRowCount(SHEET)} rows shown`);
+  }
+
+  if (measures("autofilter-dropdown")) {
+    // What a dropdown lists, from the sheet as the grid holds it.
+    const sheet = queryStore.getWorkbook().sheets.find((candidate) => candidate.id === SHEET);
+    if (!sheet) throw new Error(`autofilter ${rows}: no ${SHEET} sheet`);
+    let listed: ReturnType<typeof autoFilterValues> | undefined;
+    queries["autofilter-dropdown"] = measure(
+      () => {
+        listed = autoFilterValues(engine, sheet, COL.city, AUTO_FILTER_LIST_LIMIT);
+      },
+      plan("autofilter-dropdown", rows),
+    );
+    if (listed?.values.length !== listedCities || listed.kept?.length !== 3) {
+      throw new Error(`autofilter ${rows}: the dropdown listed the wrong values`);
+    }
+  }
+
+  queryStore.applyTransaction({
+    patches: [{ op: "setSheetMeta", sheet: SHEET, patch: { autoFilter: null, filters: [] } }],
+  });
+}
+
 function makeWorkbook(rowCount: number): Workbook {
   const columns: Column[] = COLUMNS.map((c) => ({
     key: c.key,
@@ -1005,6 +1086,10 @@ async function benchSheetwrite(
       seededRowSource(ds),
     );
     queryStore.clearView(SHEET);
+  }
+
+  if (measures("autofilter-dropdown") || measures("autofilter-apply-values")) {
+    measureAutoFilter(queryStore, ds, rows, queries, measures);
   }
 
   if (measures("ingest-numeric-only")) {
