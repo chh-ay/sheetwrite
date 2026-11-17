@@ -46,6 +46,14 @@ const OPEN_SIGNAL: Partial<Record<SignalName, OpenSignal>> = {
   syntax: openSyntax,
 };
 
+/** The signals named in `signals` that are built, opened for one edit. */
+export function openSignals(edit: FormulaEdit, signals: readonly SignalName[]): Signal[] {
+  return signals.flatMap((name) => {
+    const open = OPEN_SIGNAL[name];
+    return open === undefined ? [] : [open(edit)];
+  });
+}
+
 const ALL_SIGNALS: PredictorOptions = { signals: SIGNALS };
 
 /** The suggestion on screen: the text it was shown after, and what it inserts. */
@@ -66,10 +74,7 @@ class Session implements PredictionSession {
   private readonly dismissed = new Set<string>();
 
   constructor(edit: FormulaEdit, options: PredictorOptions) {
-    this.signals = options.signals.flatMap((name) => {
-      const open = OPEN_SIGNAL[name];
-      return open === undefined ? [] : [open(edit)];
-    });
+    this.signals = openSignals(edit, options.signals);
   }
 
   suggest(text: string, analysis: FormulaAnalysis): Prediction | null {

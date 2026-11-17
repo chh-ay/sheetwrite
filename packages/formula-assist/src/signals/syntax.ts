@@ -138,13 +138,13 @@ class Syntax implements Signal {
     if (matches.length === 1 && sheets.length === 0 && fn !== undefined) {
       const constant = constants.find((name) => name === fn.name.toUpperCase());
       const rest = constant ?? `${fn.name}(`;
-      this.add(candidates, `${text.slice(0, last.from)}${rest}`, text, CONFIDENCE.functionName);
+      this.add(candidates, `${text.slice(0, last.from)}${rest}`, text, "functionName");
       return;
     }
 
     const [only] = sheets;
     if (sheets.length === 1 && matches.length === 0 && only !== undefined) {
-      this.add(candidates, `${text.slice(0, last.from)}${only.name}!`, text, CONFIDENCE.sheetName);
+      this.add(candidates, `${text.slice(0, last.from)}${only.name}!`, text, "sheetName");
     }
   }
 
@@ -158,13 +158,17 @@ class Syntax implements Signal {
     if (closing.length === 0) return;
 
     const ends = last.kind === "paren" || (last.kind === "string" && text.endsWith('"'));
-    const confidence = ends ? CONFIDENCE.closeAfterEnd : CONFIDENCE.closeAfterValue;
-    this.add(candidates, text + closing, text, confidence);
+    this.add(candidates, text + closing, text, ends ? "closeAfterEnd" : "closeAfterValue");
   }
 
-  private add(candidates: Candidate[], formula: string, text: string, confidence: number): void {
+  private add(
+    candidates: Candidate[],
+    formula: string,
+    text: string,
+    reason: keyof typeof CONFIDENCE,
+  ): void {
     if (formula.length - text.length < MIN_INSERT) return;
-    candidates.push({ formula, confidence, signal: "syntax" });
+    candidates.push({ formula, confidence: CONFIDENCE[reason], signal: "syntax", reason });
   }
 }
 

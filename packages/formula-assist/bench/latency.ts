@@ -146,7 +146,15 @@ function percentile(sorted: readonly number[], rank: number): number {
   return sorted[Math.min(sorted.length - 1, Math.floor(rank * sorted.length))] ?? 0;
 }
 
-function summary(samples: number[]): { count: number; p50: number; p95: number; max: number } {
+/** Times of one step, in milliseconds. */
+interface Summary {
+  readonly count: number;
+  readonly p50: number;
+  readonly p95: number;
+  readonly max: number;
+}
+
+function summary(samples: number[]): Summary {
   const sorted = [...samples].sort((left, right) => left - right);
   return {
     count: sorted.length,
@@ -189,7 +197,7 @@ try {
 
 const result = { rows: DATA_ROWS, open: summary(open), suggest: summary(suggest), budgetMs: BUDGET_MS };
 const MS_DIGITS = 3;
-const rows: [string, ReturnType<typeof summary>][] = [
+const rows: [string, Summary][] = [
   ["open (per edit)", result.open],
   ["suggest (per key)", result.suggest],
 ];

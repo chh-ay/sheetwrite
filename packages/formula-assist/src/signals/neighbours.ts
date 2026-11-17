@@ -7,7 +7,7 @@ import type { FormulaEdit } from "@sheetwrite/core";
 import type { Candidate, Signal } from "../candidates.js";
 
 /** Where a neighbour sits, relative to the edited cell. */
-type Side = "above" | "below" | "left" | "right";
+type Side = "above" | "below" | "left" | "right" | "furtherAbove";
 
 /** The neighbours read, nearest first on each side. */
 const NEIGHBOURS: readonly { readonly side: Side; readonly dRow: number; readonly dCol: number }[] = [
@@ -40,24 +40,23 @@ const CONFIDENCE = {
 /** A candidate that another neighbour contradicts keeps this share of its confidence. */
 const CONTRADICTED = 0.8;
 
-/** The moved formulas, each with the sides that gave it. */
-type Moved = Map<string, { formula: string; sides: Set<Side | "furtherAbove">; count: number }>;
-
-function confidence(sides: ReadonlySet<Side | "furtherAbove">, count: number): number {
-  if (sides.has("above") && sides.has("below")) return CONFIDENCE.aboveAndBelow;
-  if (sides.has("left") && sides.has("right")) return CONFIDENCE.leftAndRight;
-  if (sides.has("above")) return count > 1 ? CONFIDENCE.twoAbove : CONFIDENCE.above;
-  if (sides.has("below")) return CONFIDENCE.below;
-  if (sides.has("left")) return CONFIDENCE.left;
-  if (sides.has("right")) return CONFIDENCE.right;
-  return CONFIDENCE.furtherAbove;
+/** The situation a moved formula was found in, strongest first. */
+function reasonOf(sides: ReadonlySet<Side>, count: number): keyof typeof CONFIDENCE {
+  if (sides.has("above") && sides.has("below")) return "aboveAndBelow";
+  if (sides.has("left") && sides.has("right")) return "leftAndRight";
+  if (sides.has("above")) return count > 1 ? "twoAbove" : "above";
+  if (sides.has("below")) return "below";
+  if (sides.has("left")) return "left";
+  if (sides.has("right")) return "right";
+  return "furtherAbove";
 }
 
 /** The formulas next to the edited cell, moved to it, with their confidence. */
 function neighbourCandidates(edit: FormulaEdit): Candidate[] {
   const { cell, reads } = edit;
-  const moved: Moved = new Map();
-  const add = (side: Side | "furtherAbove", row: number, col: number): boolean => {
+  const moved = new Map<string, { formula: string; sides: Set<Side>; count: number }>();
+  /** Whether the cell holds a formula; one that moves off the sheet is no candidate. */
+  const read = (side: Side, row: number, col: number): boolean => {
     if (row < 0 || col < 0) return false;
     const source = reads.formula(cell.sheet, row, col);
     if (source === null) return false;
@@ -65,7 +64,7 @@ function neighbourCandidates(edit: FormulaEdit): Candidate[] {
     const formula = reads.translate(source, cell.row - row, cell.col - col);
     if (formula.includes("#REF!")) return true;
     const key = formula.toUpperCase();
-    const entry = moved.get(key) ?? { formula, sides: new Set(), count: 0 };
+    const entry = moved.get(key) ?? { formula, sides: new Set<Side>(), count: 0 };
     entry.sides.add(side);
     entry.count++;
     moved.set(key, entry);
@@ -74,19 +73,23 @@ function neighbourCandidates(edit: FormulaEdit): Candidate[] {
 
   let aboveFound = false;
   for (const { side, dRow, dCol } of NEIGHBOURS) {
-    const found = add(side, cell.row + dRow, cell.col + dCol);
+    const found = read(side, cell.row + dRow, cell.col + dCol);
     if (side === "above") aboveFound ||= found;
   }
   for (let distance = 3; !aboveFound && distance <= SEARCH_ABOVE; distance++) {
-    aboveFound = add("furtherAbove", cell.row - distance, cell.col);
+    aboveFound = read("furtherAbove", cell.row - distance, cell.col);
   }
 
   const contradicted = moved.size > 1;
-  return [...moved.values()].map(({ formula, sides, count }) => ({
-    formula,
-    confidence: confidence(sides, count) * (contradicted ? CONTRADICTED : 1),
-    signal: "neighbours",
-  }));
+  return [...moved.values()].map(({ formula, sides, count }) => {
+    const reason = reasonOf(sides, count);
+    return {
+      formula,
+      confidence: CONFIDENCE[reason] * (contradicted ? CONTRADICTED : 1),
+      signal: "neighbours",
+      reason: contradicted ? `${reason}, contradicted` : reason,
+    };
+  });
 }
 
 /** Open the neighbouring-formulas signal of one edit; it reads the neighbours once. */

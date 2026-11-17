@@ -21,6 +21,8 @@ export interface Candidate {
    */
   readonly confidence: number;
   readonly signal: SignalName;
+  /** Why the signal proposed it: the situation its confidence was measured in. */
+  readonly reason: string;
 }
 
 /** One signal's view of one edit: candidates for the text typed so far. */

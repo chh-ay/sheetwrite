@@ -33,6 +33,10 @@ function rangeText(range: Range): string {
   return start === end ? start : `${start}:${end}`;
 }
 
+function candidate(formula: string, reason: keyof typeof CONFIDENCE): Candidate {
+  return { formula, confidence: CONFIDENCE[reason], signal: "shape", reason };
+}
+
 class Shape implements Signal {
   private readonly run: string | null;
 
@@ -46,17 +50,11 @@ class Shape implements Signal {
     const run = this.run;
     if (run === null) return [];
 
-    const candidates: Candidate[] = [
-      { formula: `=SUM(${run})`, confidence: CONFIDENCE.sumFromStart, signal: "shape" },
-    ];
+    const candidates = [candidate(`=SUM(${run})`, "sumFromStart")];
     const call = analysis.call;
     const name = call?.name.toUpperCase() ?? "";
-    if (call !== null && call.argumentIndex === 0 && AGGREGATES[name] === true && text.endsWith("(")) {
-      candidates.push({
-        formula: `${text}${run})`,
-        confidence: CONFIDENCE.aggregateArgument,
-        signal: "shape",
-      });
+    if (call?.argumentIndex === 0 && AGGREGATES[name] === true && text.endsWith("(")) {
+      candidates.push(candidate(`${text}${run})`, "aggregateArgument"));
     }
     return candidates;
   }
