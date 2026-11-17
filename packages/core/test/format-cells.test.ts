@@ -41,7 +41,7 @@ afterEach(() => {
 const cell = (row: number, col: number) => store.getCell({ sheet: "s1", row, col });
 
 /** Ctrl+1 on the grid over B1:B2, then the open dialog. */
-async function openFormatCells(): Promise<HTMLDivElement> {
+async function openFormatCells(): Promise<HTMLDialogElement> {
   grid.setSelection({
     kind: "range",
     range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
@@ -55,7 +55,7 @@ async function openFormatCells(): Promise<HTMLDivElement> {
   });
   host.dispatchEvent(event);
   expect(event.defaultPrevented).toBe(true);
-  return elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+  return elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
 }
 
 function control<T extends HTMLElement>(dialog: HTMLElement, label: string, type: new () => T): T {

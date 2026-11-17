@@ -54,8 +54,8 @@ const FIND_MARKER = "sheetwrite-find-replace-row";
 // minifiers. Webpack may put the pivot model's value order it sorts with into its chunk.
 const AUTOFILTER_MARKER = "sheetwrite-autofilter-presets";
 // The dialog shell of the merge warning and the Insert and Delete dialogs
-// loads on first use; the dialog's backdrop class survives minifiers.
-const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
+// loads on first use; the class of its button row survives minifiers.
+const DIALOG_MARKER = "sheetwrite-dialog-buttons";
 // Format Cells (Ctrl+1) loads on first use; its class names survive minifiers.
 // Webpack may give the dialog shell a chunk of its own or copy it into the
 // Format Cells chunk.
