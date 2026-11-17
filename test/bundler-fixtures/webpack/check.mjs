@@ -57,6 +57,9 @@ const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
 // warning; the warning's text and the dialog's backdrop class survive minifiers.
 const MERGE_MARKER = "Merging cells only keeps the upper-left value";
 const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
+// Copying a sheet and the sheet tab menu's Move or Copy dialog and Tab Color
+// palette load on first use, together; the dialog's last list entry survives minifiers.
+const SHEET_COMMANDS_MARKER = "(move to end)";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -79,6 +82,7 @@ const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
 const mergeChunks = [];
+const sheetCommandChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -103,6 +107,7 @@ for (const file of lazyChunks) {
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
   else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
+  else if (code.includes(SHEET_COMMANDS_MARKER)) sheetCommandChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
@@ -133,6 +138,11 @@ if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
 if (mergeChunks.length !== 1)
   throw new Error(`Expected one lazy webpack merge command chunk, got ${mergeChunks.length}`);
+if (sheetCommandChunks.length !== 1) {
+  throw new Error(
+    `Expected one lazy webpack sheet command chunk, got ${sheetCommandChunks.length}`,
+  );
+}
 if (addonRegistryChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
@@ -177,6 +187,11 @@ if (mainCode.includes(MERGE_MARKER)) {
   throw new Error("The merge command is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
+  if (mainCode.includes(SHEET_COMMANDS_MARKER)) {
+    throw new Error(
+      "The sheet copy and tab panels are in webpack's main.js; they must load lazily",
+    );
+  }
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
 }
 for (const marker of [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER]) {
@@ -227,6 +242,7 @@ const assets = publicFiles.map((file) => {
       autoFilterChunks,
       mergeChunks,
       documentChunks,
+      sheetCommandChunks,
       dashboardChunks,
       addonRegistryChunks,
       addonSeamChunks,

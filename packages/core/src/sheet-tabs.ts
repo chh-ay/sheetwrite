@@ -140,7 +140,7 @@ export class SheetTabs {
   private menuSheetId: SheetId | null = null;
   /** The Move or Copy dialog or Tab Color palette open for a sheet, and the code that builds them. */
   private panel: { readonly kind: "moveCopy" | "tabColor"; readonly id: SheetId } | null = null;
-  private panels: typeof import("./sheet-tab-panels.js") | null = null;
+  private panels: typeof import("./sheet-commands.js") | null = null;
   /** Viewport position of the options trigger when the open menu was placed. */
   private menuAnchor: { left: number; top: number } | null = null;
   private feedback: LifecycleFeedback | null = null;
@@ -663,7 +663,7 @@ export class SheetTabs {
   private openPanel(kind: "moveCopy" | "tabColor", id: SheetId): void {
     this.clearMenuState();
     this.panel = { kind, id };
-    (this.panels ? Promise.resolve(this.panels) : import("./sheet-tab-panels.js")).then(
+    (this.panels ? Promise.resolve(this.panels) : import("./sheet-commands.js")).then(
       (panels) => {
         this.panels = panels;
         if (this.destroyed || this.panel?.kind !== kind || this.panel.id !== id) return;
@@ -690,7 +690,7 @@ export class SheetTabs {
 
   private createPanel(
     sheet: SheetTabRecord,
-    panels: typeof import("./sheet-tab-panels.js"),
+    panels: typeof import("./sheet-commands.js"),
   ): HTMLElement {
     const host: TabPanelHost = {
       sheets: this.sheets,

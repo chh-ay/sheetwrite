@@ -3352,11 +3352,11 @@ export class GridImpl implements Grid {
     options: { index?: number; name?: string } = {},
   ): Promise<SheetLifecycleResult> {
     // The copy's code loads the first time a sheet is copied.
-    return import("./sheet-copy.js").then((copies) => this.copySheetWith(copies, id, options));
+    return import("./sheet-commands.js").then((copies) => this.copySheetWith(copies, id, options));
   }
 
   private copySheetWith(
-    copies: typeof import("./sheet-copy.js"),
+    copies: typeof import("./sheet-commands.js"),
     id: SheetId,
     options: { index?: number; name?: string },
   ): SheetLifecycleResult {
