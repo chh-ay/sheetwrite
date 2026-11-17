@@ -94,7 +94,8 @@ function neighbourProposals(edit: FormulaEdit): Proposal[] {
   }
 
   const all = [...moved.values()];
-  const support = (entry: Moved): number => [...entry.sides.values()].reduce((sum, count) => sum + count, 0);
+  const support = (entry: Moved): number =>
+    [...entry.sides.values()].reduce((sum, count) => sum + count, 0);
   return all.map((entry) => {
     const others = all.filter((other) => other !== entry);
     const contradiction: Contradiction =

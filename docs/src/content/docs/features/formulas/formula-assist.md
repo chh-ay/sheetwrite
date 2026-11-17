@@ -5,7 +5,7 @@ description: The optional formula-assist add-on predicts the rest of the formula
 
 `@sheetwrite/formula-assist` is an optional add-on. While you type a formula in the formula bar, it shows the most likely rest of the formula as dimmed text after the caret. Tab takes it.
 
-```ts prelude="none" title="Install the add-on"
+```ts prelude="core" title="Install the add-on"
 import { initSheetwrite } from "@sheetwrite/core";
 import { formulaAssistAddon } from "@sheetwrite/formula-assist";
 
@@ -57,7 +57,7 @@ The ghost text uses the field's text colour at `--sheetwrite-formula-ghost-opaci
 
 The formula bar reads suggestions from any add-on that registers a `FormulaSuggester` in its grid hook:
 
-```ts prelude="none" title="A suggester that closes SUM calls"
+```ts prelude="core" title="A suggester that closes SUM calls"
 import type { FormulaSuggester, SheetwriteAddon } from "@sheetwrite/core";
 
 const suggester: FormulaSuggester = {

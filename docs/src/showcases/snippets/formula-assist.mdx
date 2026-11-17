@@ -1,22 +1,14 @@
-```ts prelude="none" title="formula-assist.ts"
-import { createGrid, initSheetwrite } from "@sheetwrite/core";
+```ts prelude="core" title="formula-assist.ts"
 import { createFormulaBar } from "@sheetwrite/core/shell";
 import { formulaAssistAddon } from "@sheetwrite/formula-assist";
 
 // Install once per page; grids created afterwards get suggestions in their formula bar.
 await initSheetwrite({ addons: [formulaAssistAddon()] });
 
-const gridHost = document.getElementById("grid");
-const barHost = document.getElementById("formula-bar");
-if (gridHost === null || barHost === null) throw new Error("The page needs #grid and #formula-bar");
-
-const grid = createGrid(gridHost, {
-  workbook: {
-    activeSheet: "budget",
-    sheets: [{ id: "budget", name: "Budget", rowCount: 20, columns: [] }],
-  },
-});
-createFormulaBar(barHost, grid);
+const assisted = createGrid(host, { workbook });
+const bar = document.createElement("div");
+host.before(bar);
+createFormulaBar(bar, assisted);
 
 // In the formula bar: type "=" under a column of =SUM(B2:G2), =SUM(B3:G3), …
 // Tab takes the ghost text, Ctrl+→ one word, Esc hides it until you type.

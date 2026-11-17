@@ -33,7 +33,7 @@ export interface ReplayWorkbook {
 }
 
 /** A suggestion and the name of the signal that made it. */
-export interface AttributedSuggestion {
+interface AttributedSuggestion {
   readonly text: string;
   readonly signal: string;
 }
@@ -49,7 +49,7 @@ export interface ReplaySession {
 export type OpenReplaySession = (edit: FormulaEdit) => ReplaySession;
 
 /** What one signal's suggestions did. */
-export interface SignalTally {
+interface SignalTally {
   shown: number;
   wrong: number;
   /** Suggestions taken whole with Tab or in part with Ctrl+→. */

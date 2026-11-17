@@ -88,8 +88,7 @@ function applyQueries(grid: Grid, sources?: Sources, requests: QueryFetchRequest
       queryCommands: () => () => {},
       historyCommand: () => {},
       formulaSuggestions: () => () => {},
-    }) ??
-    (() => {});
+    }) ?? (() => {});
   cleanups.push(cleanup);
   return cleanup;
 }

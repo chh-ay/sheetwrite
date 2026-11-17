@@ -46,7 +46,6 @@ function nextFrameTicks(): number {
   return frameTicks;
 }
 
-
 /** The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). */
 const TAKES = {
   wide: { width: 1280, height: 720, scale: 1.5, mobile: false },
@@ -381,7 +380,9 @@ async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<vo
         },
         sessionId,
       );
-      throw new Error(`Timed out waiting for ${ready}; page: ${String(field(field(state, "result"), "value"))}`);
+      throw new Error(
+        `Timed out waiting for ${ready}; page: ${String(field(field(state, "result"), "value"))}`,
+      );
     }
     await Bun.sleep(FRAME_MS);
   }
@@ -497,7 +498,9 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
     await encoder.stdin.end();
     if ((await encoder.exited) !== 0) throw new Error(`Encoding ${name} failed`);
     if (changed < frames * MIN_CHANGED_FRAMES) {
-      throw new Error(`${name}: only ${changed} of ${frames} frames changed; the page did not follow the session`);
+      throw new Error(
+        `${name}: only ${changed} of ${frames} frames changed; the page did not follow the session`,
+      );
     }
     return frames;
   } finally {

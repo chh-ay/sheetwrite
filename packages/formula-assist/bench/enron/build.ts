@@ -118,7 +118,6 @@ async function distinctSpreadsheets(archive: string): Promise<string[]> {
   return [...byTitle.values()];
 }
 
-
 /** A file's spreadsheet title, which copies of one spreadsheet in several messages share. */
 function titleOf(path: string): string {
   return (path.split("__").at(-1) ?? path).toLowerCase();
@@ -217,7 +216,7 @@ function sampleNames(snapshot: WorkbookSnapshot): SampleName[] {
   for (const named of snapshot.workbook.namedRanges ?? []) {
     const key = named.name.toUpperCase();
     if (seen.has(key)) continue;
-    if ("range" in named) {
+    if (named.range !== undefined) {
       const sheet = snapshot.sheets.findIndex((entry) => entry.id === named.range.sheet);
       if (sheet < 0) continue;
       names.push({ name: named.name, sheet, start: named.range.start, end: named.range.end });
@@ -334,10 +333,14 @@ async function writeSet(name: string, seed: number, workbooks: SampleWorkbook[])
 async function titlesIn(name: string): Promise<string[]> {
   const text = await readFile(new URL(`./${name}.json`, import.meta.url), "utf8");
   const set: unknown = JSON.parse(text);
-  const workbooks = typeof set === "object" && set !== null && "workbooks" in set ? set.workbooks : [];
+  const workbooks =
+    typeof set === "object" && set !== null && "workbooks" in set ? set.workbooks : [];
   if (!Array.isArray(workbooks)) return [];
   return workbooks.flatMap((workbook: unknown) =>
-    typeof workbook === "object" && workbook !== null && "file" in workbook && typeof workbook.file === "string"
+    typeof workbook === "object" &&
+    workbook !== null &&
+    "file" in workbook &&
+    typeof workbook.file === "string"
       ? [titleOf(workbook.file)]
       : [],
   );
@@ -367,8 +370,16 @@ async function main(): Promise<void> {
       exclude: new Set(),
     });
     // Alternate the drawn order between the two development sets.
-    await writeSet("dev", DEV_SEED, report.sampled.filter((_, index) => index % 2 === 0));
-    await writeSet("dev2", DEV_SEED, report.sampled.filter((_, index) => index % 2 === 1));
+    await writeSet(
+      "dev",
+      DEV_SEED,
+      report.sampled.filter((_, index) => index % 2 === 0),
+    );
+    await writeSet(
+      "dev2",
+      DEV_SEED,
+      report.sampled.filter((_, index) => index % 2 === 1),
+    );
   }
 
   const formulas = report.sampled.reduce((sum, workbook) => sum + workbook.targets.length, 0);

@@ -3,7 +3,7 @@ import type {
   FormulaAssistSnapshot,
   OPEN_CELLS,
 } from "@docs/showcases/scenarios/formula-assist.js";
-import { Show } from "solid-js";
+import { For, Show } from "solid-js";
 
 import { ActionError } from "../../lib/use-action.js";
 import {
@@ -70,7 +70,8 @@ export function FormulaAssistStage(props: FormulaAssistStageProps) {
             title="Type a formula"
           >
             <ControlActions>
-              {TARGETS.map((target) => (
+              <For each={TARGETS}>
+                {(target) => (
                 <ControlButton
                   disabled={action.disabled()}
                   icon="function"
@@ -80,7 +81,8 @@ export function FormulaAssistStage(props: FormulaAssistStageProps) {
                 >
                   {target.label}
                 </ControlButton>
-              ))}
+                )}
+              </For>
             </ControlActions>
           </ShowcaseControlGroup>
           <ShowcaseControlGroup

@@ -12,7 +12,7 @@
   aspect-ratio: 16 / 9;
   border: 1px solid var(--sw-border, rgb(0 0 0 / 12%));
   border-radius: 10px;
-  background: var(--sw-surface, #f6f7f9);
+  background: var(--sw-surface-1, #fff);
 }
 
 .sw-demo-video__poster,
