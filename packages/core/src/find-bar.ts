@@ -20,6 +20,135 @@ function formatCount(result: SearchResult): string {
   return `${result.active + 1} of ${result.matches.length}`;
 }
 
+/** A unique element ID for ARIA references inside one find bar. */
+function uniqueId(part: string): string {
+  return `sheetwrite-find-${part}-${Math.random().toString(36).slice(2)}`;
+}
+
+/**
+ * A list of cells under the find bar: a header, a virtual list and a status
+ * line. Only the rows in view are in the DOM, so thousands of matches list
+ * without building thousands of rows. A click on a row, or Up, Down, Home
+ * and End in the list, calls `onSelect` with the row's index.
+ */
+class CellList {
+  readonly el = document.createElement("div");
+  private readonly list = document.createElement("div");
+  private readonly spacer = document.createElement("div");
+  private readonly status = document.createElement("span");
+  private rowCount = 0;
+  private active = -1;
+  private rowText: (index: number) => readonly string[] = () => [];
+
+  constructor(label: string, headers: readonly string[], onSelect: (index: number) => void) {
+    this.el.className = "sheetwrite-find-results";
+    this.el.hidden = true;
+
+    const head = document.createElement("div");
+    head.className = "sheetwrite-find-result sheetwrite-find-results-head";
+    head.setAttribute("aria-hidden", "true");
+    for (const text of headers) {
+      const cell = document.createElement("span");
+      cell.textContent = text;
+      head.appendChild(cell);
+    }
+
+    const list = this.list;
+    list.className = "sheetwrite-find-results-list";
+    list.id = uniqueId("list");
+    list.tabIndex = 0;
+    list.setAttribute("role", "listbox");
+    list.setAttribute("aria-label", label);
+    list.style.position = "relative";
+    list.style.overflowY = "auto";
+    list.appendChild(this.spacer);
+    list.addEventListener("scroll", () => {
+      this.render();
+    });
+    list.addEventListener("keydown", (e) => {
+      const last = this.rowCount - 1;
+      const target =
+        e.key === "ArrowDown"
+          ? Math.min(last, this.active + 1)
+          : e.key === "ArrowUp"
+            ? Math.max(0, this.active - 1)
+            : e.key === "Home"
+              ? 0
+              : e.key === "End"
+                ? last
+                : -1;
+      if (target < 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onSelect(target);
+    });
+    // Rows keep the focus where it is, as the bar's buttons do.
+    this.spacer.addEventListener("mousedown", (e) => e.preventDefault());
+    this.spacer.addEventListener("click", (e) => {
+      const row =
+        e.target instanceof Element ? e.target.closest<HTMLElement>("[data-index]") : null;
+      if (row) onSelect(Number(row.dataset.index));
+    });
+
+    this.status.className = "sheetwrite-find-results-status";
+    this.status.setAttribute("aria-live", "polite");
+    this.el.append(head, list, this.status);
+  }
+
+  /** List `rowCount` rows, with row `active` (or none, -1) highlighted and scrolled into view. */
+  show(
+    rowCount: number,
+    active: number,
+    status: string,
+    rowText: (index: number) => readonly string[],
+  ): void {
+    this.rowCount = rowCount;
+    this.active = active;
+    this.rowText = rowText;
+    this.status.textContent = status;
+    this.spacer.style.height = `${rowCount * RESULT_ROW_HEIGHT}px`;
+
+    const list = this.list;
+    const top = active * RESULT_ROW_HEIGHT;
+    if (active >= 0 && top < list.scrollTop) list.scrollTop = top;
+    else if (active >= 0 && top + RESULT_ROW_HEIGHT > list.scrollTop + list.clientHeight)
+      list.scrollTop = top + RESULT_ROW_HEIGHT - list.clientHeight;
+    this.render();
+  }
+
+  /** Draw the rows the list's scroll position shows. */
+  private render(): void {
+    const list = this.list;
+    const first = Math.max(0, Math.floor(list.scrollTop / RESULT_ROW_HEIGHT) - RESULT_OVERSCAN);
+    const end = Math.min(
+      this.rowCount,
+      Math.ceil((list.scrollTop + list.clientHeight) / RESULT_ROW_HEIGHT) + RESULT_OVERSCAN,
+    );
+    const rows: HTMLDivElement[] = [];
+    for (let index = first; index < end; index++) {
+      const row = document.createElement("div");
+      row.className = "sheetwrite-find-result";
+      row.id = `${list.id}-${index}`;
+      row.dataset.index = String(index);
+      row.setAttribute("role", "option");
+      row.setAttribute("aria-selected", String(index === this.active));
+      row.style.position = "absolute";
+      row.style.top = `${index * RESULT_ROW_HEIGHT}px`;
+      for (const text of this.rowText(index)) {
+        const span = document.createElement("span");
+        span.textContent = text;
+        span.title = text;
+        row.appendChild(span);
+      }
+      rows.push(row);
+    }
+    this.spacer.replaceChildren(...rows);
+
+    if (this.active >= 0) list.setAttribute("aria-activedescendant", `${list.id}-${this.active}`);
+    else list.removeAttribute("aria-activedescendant");
+  }
+}
+
 /** The find bar's DOM, built on first open. */
 interface FindBarElements {
   readonly el: HTMLDivElement;
@@ -28,10 +157,7 @@ interface FindBarElements {
   readonly replaceInput: HTMLInputElement | null;
   readonly optionsToggle: HTMLButtonElement;
   readonly options: HTMLDivElement;
-  readonly results: HTMLDivElement;
-  readonly resultList: HTMLDivElement;
-  readonly resultSpacer: HTMLDivElement;
-  readonly resultStatus: HTMLSpanElement;
+  readonly findAll: CellList;
 }
 
 /** A control the Windows dialog reaches with Alt and a letter. */
@@ -84,7 +210,7 @@ export class FindBar {
   close(): void {
     if (this.elements) {
       this.elements.el.style.display = "none";
-      this.elements.results.hidden = true;
+      this.elements.findAll.el.hidden = true;
     }
     this._open = false;
 
@@ -151,13 +277,13 @@ export class FindBar {
         this.grid.findNext();
       },
     );
-    const findAll = this.button(
+    const findAllButton = this.button(
       "sheetwrite-find-all",
       "sheetwrite-find-icon-btn",
       "≡",
       "Find all",
       () => {
-        this.showResults();
+        this.showFindAll();
       },
     );
     const optionsToggle = this.button(
@@ -191,22 +317,22 @@ export class FindBar {
         e.stopPropagation();
         if (e.shiftKey) this.grid.findPrev();
         else this.grid.findNext();
-        return;
-      }
-
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        this.close();
       }
     });
 
-    findRow.append(field, prev, next, findAll, optionsToggle, close);
+    findRow.append(field, prev, next, findAllButton, optionsToggle, close);
     el.appendChild(findRow);
 
     const replace = this.readOnly ? null : this.buildReplaceRow(el);
     const options = this.buildOptions();
-    const { results, resultList, resultSpacer, resultStatus } = this.buildResults();
-    el.append(options.panel, results);
+    const findAll = new CellList(
+      "Find all results",
+      ["Sheet", "Cell", "Value", "Formula"],
+      (index) => {
+        this.grid.selectMatch(index);
+      },
+    );
+    el.append(options.panel, findAll.el);
     this.host.appendChild(el);
     checkStylePart(el, "find", "The find bar");
 
@@ -217,19 +343,16 @@ export class FindBar {
       replaceInput: replace?.input ?? null,
       optionsToggle,
       options: options.panel,
-      results,
-      resultList,
-      resultSpacer,
-      resultStatus,
+      findAll,
     };
-    options.panel.id = this.uniqueId("options");
+    options.panel.id = uniqueId("options");
     optionsToggle.setAttribute("aria-controls", options.panel.id);
 
     // Excel's Find and Replace dialog: Alt and the underlined letter.
     const accessKeys: Record<string, AccessKeyAction> = {
       n: () => input.focus(),
       f: () => this.grid.findNext(),
-      i: () => this.showResults(),
+      i: () => this.showFindAll(),
       t: () => this.toggleOptions(),
       h: () => this.focusOption(options.within),
       s: () => this.focusOption(options.searchBy),
@@ -243,6 +366,11 @@ export class FindBar {
       }),
     };
     el.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        this.close();
+        return;
+      }
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
       // On macOS Option+letter types a character instead (Option+C is ç), so
       // it never equals the letter and typing keeps working there.
@@ -298,12 +426,6 @@ export class FindBar {
         e.stopPropagation();
         e.preventDefault();
         replaceButton.click();
-        return;
-      }
-
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        this.close();
       }
     });
 
@@ -364,73 +486,6 @@ export class FindBar {
     return { panel, within, searchBy, lookIn, matchCase, wholeCell };
   }
 
-  private buildResults(): {
-    results: HTMLDivElement;
-    resultList: HTMLDivElement;
-    resultSpacer: HTMLDivElement;
-    resultStatus: HTMLSpanElement;
-  } {
-    const results = document.createElement("div");
-    results.className = "sheetwrite-find-results";
-    results.hidden = true;
-
-    const head = document.createElement("div");
-    head.className = "sheetwrite-find-result sheetwrite-find-results-head";
-    head.setAttribute("aria-hidden", "true");
-    for (const label of ["Sheet", "Cell", "Value", "Formula"]) {
-      const cell = document.createElement("span");
-      cell.textContent = label;
-      head.appendChild(cell);
-    }
-
-    // A virtual list: only the rows in view are in the DOM, so a search with
-    // thousands of matches lists them all without building thousands of rows.
-    const resultList = document.createElement("div");
-    resultList.className = "sheetwrite-find-results-list";
-    resultList.id = this.uniqueId("results");
-    resultList.tabIndex = 0;
-    resultList.setAttribute("role", "listbox");
-    resultList.setAttribute("aria-label", "Find all results");
-    resultList.style.position = "relative";
-    resultList.style.overflowY = "auto";
-    const resultSpacer = document.createElement("div");
-    resultList.appendChild(resultSpacer);
-    resultList.addEventListener("scroll", () => {
-      this.renderResults();
-    });
-    resultList.addEventListener("keydown", (e) => {
-      const last = this.result.matches.length - 1;
-      const active = this.result.active;
-      const target =
-        e.key === "ArrowDown"
-          ? Math.min(last, active + 1)
-          : e.key === "ArrowUp"
-            ? Math.max(0, active - 1)
-            : e.key === "Home"
-              ? 0
-              : e.key === "End"
-                ? last
-                : null;
-      if (target !== null) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.selectResult(target);
-        return;
-      }
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        this.close();
-      }
-    });
-
-    const resultStatus = document.createElement("span");
-    resultStatus.className = "sheetwrite-find-results-status";
-    resultStatus.setAttribute("aria-live", "polite");
-
-    results.append(head, resultList, resultStatus);
-    return { results, resultList, resultSpacer, resultStatus };
-  }
-
   private toggleOptions(): void {
     const elements = this.elements;
     if (!elements) return;
@@ -447,21 +502,14 @@ export class FindBar {
   }
 
   /** Find All: list every match with its sheet, cell, value and formula. */
-  private showResults(): void {
-    const elements = this.elements;
-    if (!elements) return;
-    if (elements.results.hidden) {
-      elements.results.hidden = false;
+  private showFindAll(): void {
+    const findAll = this.elements?.findAll;
+    if (!findAll) return;
+    if (findAll.el.hidden) {
+      findAll.el.hidden = false;
       this.search();
     }
-    this.renderResults();
-    this.scrollResultIntoView();
-  }
-
-  private selectResult(index: number): void {
-    if (index < 0) return;
-    this.grid.selectMatch(index);
-    this.scrollResultIntoView();
+    this.renderFindAll();
   }
 
   private update(result: SearchResult): void {
@@ -469,78 +517,36 @@ export class FindBar {
     const elements = this.elements;
     if (!elements) return;
     elements.count.textContent = formatCount(result);
-    if (!elements.results.hidden) this.renderResults();
+    if (!elements.findAll.el.hidden) this.renderFindAll();
   }
 
-  private scrollResultIntoView(): void {
-    const list = this.elements?.resultList;
-    const active = this.result.active;
-    if (!list || active < 0) return;
-    const top = active * RESULT_ROW_HEIGHT;
-    if (top < list.scrollTop) list.scrollTop = top;
-    else if (top + RESULT_ROW_HEIGHT > list.scrollTop + list.clientHeight)
-      list.scrollTop = top + RESULT_ROW_HEIGHT - list.clientHeight;
-    this.renderResults();
-  }
-
-  /** Draw the result rows the list's scroll position shows. */
-  private renderResults(): void {
-    const elements = this.elements;
-    if (!elements || elements.results.hidden) return;
-    const { resultList: list, resultSpacer: spacer } = elements;
+  private renderFindAll(): void {
     const { matches, active } = this.result;
-
-    elements.resultStatus.textContent = `${matches.length} ${matches.length === 1 ? "cell" : "cells"} found`;
-    spacer.style.height = `${matches.length * RESULT_ROW_HEIGHT}px`;
-    const first = Math.max(0, Math.floor(list.scrollTop / RESULT_ROW_HEIGHT) - RESULT_OVERSCAN);
-    const end = Math.min(
-      matches.length,
-      Math.ceil((list.scrollTop + list.clientHeight) / RESULT_ROW_HEIGHT) + RESULT_OVERSCAN,
-    );
-
     const store = this.grid.store;
     const sheets = new Map(store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet]));
-    const rows: HTMLDivElement[] = [];
-    for (let index = first; index < end; index++) {
-      const addr = matches[index];
-      if (!addr) continue;
-      const sheet = sheets.get(addr.sheet);
-      const column = sheet?.columns[addr.col];
-      const cell = store.getCell(addr);
-      const row = document.createElement("div");
-      row.className = "sheetwrite-find-result";
-      row.id = `${list.id}-${index}`;
-      row.setAttribute("role", "option");
-      row.setAttribute("aria-selected", String(index === active));
-      row.style.position = "absolute";
-      row.style.top = `${index * RESULT_ROW_HEIGHT}px`;
-      const texts = [
-        sheet?.name ?? addr.sheet,
-        // Excel's Find All shows absolute references.
-        `$${colToA1(addr.col)}$${addr.row + 1}`,
-        cellDisplayText(
-          cell.resolved,
-          cell.style.numberFormat ?? column?.numberFormat,
-          column?.numberLocale,
-        ),
-        store.getFormula(addr) ?? "",
-      ];
-      for (const text of texts) {
-        const span = document.createElement("span");
-        span.textContent = text;
-        span.title = text;
-        row.appendChild(span);
-      }
-      row.addEventListener("mousedown", (e) => e.preventDefault());
-      row.addEventListener("click", () => {
-        this.selectResult(index);
-      });
-      rows.push(row);
-    }
-    spacer.replaceChildren(...rows);
-
-    if (active >= 0) list.setAttribute("aria-activedescendant", `${list.id}-${active}`);
-    else list.removeAttribute("aria-activedescendant");
+    this.elements?.findAll.show(
+      matches.length,
+      active,
+      `${matches.length} ${matches.length === 1 ? "cell" : "cells"} found`,
+      (index) => {
+        const addr = matches[index];
+        if (!addr) return [];
+        const sheet = sheets.get(addr.sheet);
+        const column = sheet?.columns[addr.col];
+        const cell = store.getCell(addr);
+        return [
+          sheet?.name ?? addr.sheet,
+          // Excel's Find All shows absolute references.
+          `$${colToA1(addr.col)}$${addr.row + 1}`,
+          cellDisplayText(
+            cell.resolved,
+            cell.style.numberFormat ?? column?.numberFormat,
+            column?.numberLocale,
+          ),
+          store.getFormula(addr) ?? "",
+        ];
+      },
+    );
   }
 
   /**
@@ -563,10 +569,6 @@ export class FindBar {
     const row = document.createElement("div");
     row.className = className;
     return row;
-  }
-
-  private uniqueId(part: string): string {
-    return `sheetwrite-find-${part}-${Math.random().toString(36).slice(2)}`;
   }
 
   /** A labelled select in the options panel; `accessKey` is Excel's Alt letter. */
