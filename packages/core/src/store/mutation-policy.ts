@@ -21,7 +21,7 @@ import {
 import {
   cellRange,
   fullSheetRange,
-  movedBlock,
+  movedCellBounds,
   normalizedRange,
   patchSheetId,
   pivotWrittenRange,
@@ -289,7 +289,7 @@ export class StoreMutationPolicy {
         return [normalizedRange(patch.range)];
 
       case "moveCells":
-        return [normalizedRange(patch.range), movedBlock(patch)];
+        return movedCellBounds(patch);
 
       case "addMerge":
       case "removeMerge":

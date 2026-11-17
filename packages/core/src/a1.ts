@@ -109,11 +109,13 @@ export function remapFormulaA1Refs(
  * that a cut and paste moves from `from` (top-left row and column, rows,
  * columns) to `to`, by the engine's cut rules: a reference to a moved cell
  * follows it and one to a cell the block lands on becomes `#REF!`.
+ * With `shift`, by the rule of Excel's Insert or Delete with Shift cells.
  */
 export function moveFormulaCellRefs(
   source: string,
   from: { row: number; col: number; rows: number; cols: number },
   to: CellRef,
+  shift = false,
 ): string {
   return getEngine().moveFormulaCells(
     source,
@@ -123,5 +125,6 @@ export function moveFormulaCellRefs(
     from.cols,
     to.row,
     to.col,
+    shift,
   );
 }

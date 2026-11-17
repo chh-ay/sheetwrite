@@ -9,12 +9,21 @@
 //! so `=SUM(A1:A10)` becomes `=SUM(A1:A15)` when A10 moves to A15
 //! (<https://chandoo.org/forum/threads/cut-and-paste-weirdness.2548/>). A
 //! formula inside the block keeps pointing at the same cells.
+//!
+//! A move with `shift` is Excel's Insert or Delete with Shift cells instead
+//! (<https://support.microsoft.com/en-us/office/insert-or-delete-cells-rows-and-columns-6f40e6e4-85af-45e0-b39d-65dd504a3246>):
+//! the block holds every used cell from the inserted or deleted cells to the
+//! sheet's edge in their columns (rows, for a move along a row), and
+//! references follow the rule of inserted and deleted rows inside those
+//! columns (see [`CellMove::shift_fate`]).
 
 use rustc_hash::FxHashMap;
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{sheet_name_needs_quotes, Ast, RangeFlags, SheetRef, SHEET_COLS, SHEET_ROWS};
+use crate::calc::{
+    sheet_name_needs_quotes, shift_range, Ast, RangeFlags, SheetRef, SHEET_COLS, SHEET_ROWS,
+};
 use crate::graph::DirtyRect;
 use crate::permute::PERMUTE_PARTIAL_SPILL;
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK, BLOCK_RESOURCE_LIMIT};
@@ -39,6 +48,10 @@ pub(crate) struct CellMove {
     from_quoted: bool,
     /// Whether a reference to the target sheet's name needs quotes.
     to_quoted: bool,
+    /// Excel's Insert or Delete with Shift cells: on one sheet, along one
+    /// axis, with references moved by [`CellMove::shift_fate`] instead of
+    /// the rule of Cut and Paste.
+    shift: bool,
 }
 
 /// Where a referenced cell or range is after a move.
@@ -52,11 +65,13 @@ enum Fate {
 
 impl CellMove {
     /// A move of the block at `row`, `col` to `to_row`, `to_col` on the sheet
-    /// that a formula's unqualified references name.
+    /// that a formula's unqualified references name; `shift` as in
+    /// [`CellMove::shift`].
     pub(crate) const fn on_own_sheet(
         (row, col): (u32, u32),
         (rows, cols): (u32, u32),
         (to_row, to_col): (u32, u32),
+        shift: bool,
     ) -> Self {
         Self {
             from: BlockAt { sheet: 0, row, col },
@@ -69,6 +84,7 @@ impl CellMove {
             cols,
             from_quoted: false,
             to_quoted: false,
+            shift,
         }
     }
 
@@ -81,6 +97,7 @@ impl CellMove {
             cols: self.cols,
             from_quoted: self.to_quoted,
             to_quoted: self.from_quoted,
+            shift: self.shift,
         }
     }
 
@@ -93,8 +110,15 @@ impl CellMove {
             && col - at.col < self.cols
     }
 
-    /// Whether the cell is in the source block or the target block.
-    pub(crate) const fn touches(&self, sheet: u32, row: u32, col: u32) -> bool {
+    /// Whether the cell is in the source block or the target block, or, for
+    /// a shift, in the cells a deletion closes between them.
+    pub(crate) fn touches(&self, sheet: u32, row: u32, col: u32) -> bool {
+        if self.shift {
+            let (from, to) = (self.from, self.to);
+            return sheet == from.sheet
+                && (from.row.min(to.row)..from.row.max(to.row) + self.rows).contains(&row)
+                && (from.col.min(to.col)..from.col.max(to.col) + self.cols).contains(&col);
+        }
         self.holds(self.from, sheet, row, col) || self.holds(self.to, sheet, row, col)
     }
 
@@ -124,6 +148,9 @@ impl CellMove {
     /// The fate of the range `r0..=r1` by `c0..=c1` on `sheet`; a cell is a
     /// range of one.
     fn fate(&self, sheet: u32, (r0, c0): (u32, u32), (r1, c1): (u32, u32)) -> Fate {
+        if self.shift {
+            return self.shift_fate(sheet, (r0, c0), (r1, c1));
+        }
         let (from, to) = (self.from, self.to);
         if self.holds(from, sheet, r0, c0) && self.holds(from, sheet, r1, c1) {
             return Fate::Moved(
@@ -167,6 +194,53 @@ impl CellMove {
             Some((start, end)) if along_rows => Fate::Moved(from.sheet, start, c0, end, c1),
             Some((start, end)) => Fate::Moved(from.sheet, r0, start, r1, end),
             None => Fate::Kept,
+        }
+    }
+
+    /// Excel's Insert or Delete with Shift cells, as inserted or deleted rows
+    /// change references, but only inside the block's columns (rows, for a
+    /// move along a row). Inserting moves every cell from the block's first
+    /// row down by the offset; deleting removes the cells between where the
+    /// block lands and where it starts, and moves the cells below them up. A
+    /// reference to a deleted cell, or one pushed past the sheet's edge, is
+    /// lost; a range inside the columns grows or shrinks; a range that also
+    /// covers a column beside them, or spans the whole sheet, keeps its place.
+    fn shift_fate(&self, sheet: u32, (r0, c0): (u32, u32), (r1, c1): (u32, u32)) -> Fate {
+        let (from, to) = (self.from, self.to);
+        let down = from.col == to.col;
+        // The span along the move, the span across it, the block's span across it.
+        let ((start, end), (cross_start, cross_end), (first, count)) = if down {
+            ((r0, r1), (c0, c1), (from.col, self.cols))
+        } else {
+            ((c0, c1), (r0, r1), (from.row, self.rows))
+        };
+        let (block_start, landing, last) = if down {
+            (from.row, to.row, SHEET_ROWS - 1)
+        } else {
+            (from.col, to.col, SHEET_COLS - 1)
+        };
+        let outside = cross_start < first || cross_end >= first + count;
+        if sheet != from.sheet || outside || (start == 0 && end >= last) {
+            return Fate::Kept;
+        }
+        // Inserting at the block's start, or deleting from where it lands.
+        let (at, delta) = if landing >= block_start {
+            (block_start, i64::from(landing - block_start))
+        } else {
+            (landing, -i64::from(block_start - landing))
+        };
+        let Some((moved_start, moved_end)) =
+            shift_range(start, end, at, delta).filter(|&(moved_start, _)| moved_start <= last)
+        else {
+            return Fate::Lost;
+        };
+        let clamped_end = moved_end.min(last);
+        if (moved_start, clamped_end) == (start, end) {
+            Fate::Kept
+        } else if down {
+            Fate::Moved(sheet, moved_start, c0, clamped_end, c1)
+        } else {
+            Fate::Moved(sheet, r0, moved_start, r1, clamped_end)
         }
     }
 }
@@ -330,6 +404,10 @@ impl CellStore {
     /// Excel's Cut and Paste does. The block keeps its values, styles and
     /// formulas, the cells it lands on are replaced, the cells it leaves are
     /// emptied, and references follow the cells (see the module docs).
+    /// With `shift`, the move is Excel's Insert or Delete with Shift cells
+    /// along one axis of one sheet: references follow that rule instead, and
+    /// a deletion also empties the cells between where the block lands and
+    /// where it starts.
     /// Status: `0` success, `1` invalid block, `3` dirty-capacity rejection,
     /// `4` a block that holds cells of a spill range without its formula.
     #[wasm_bindgen(js_name = moveCells)]
@@ -347,9 +425,12 @@ impl CellStore {
         to_sheet: usize,
         to_row: usize,
         to_col: usize,
+        shift: bool,
     ) -> u32 {
-        let Some(edit) = self.cell_move([sheet, row, col, rows, cols, to_sheet, to_row, to_col])
-        else {
+        let Some(edit) = self.cell_move(
+            [sheet, row, col, rows, cols, to_sheet, to_row, to_col],
+            shift,
+        ) else {
             return BLOCK_INVALID;
         };
         if edit.from == edit.to {
@@ -367,7 +448,8 @@ impl CellStore {
         }
 
         self.move_cell_references(&edit);
-        let written = self.move_block_cells(&edit, revision);
+        let written =
+            self.move_block_cells(&edit, revision) && self.clear_shift_gap(&edit, revision);
         self.drop_invalid_references();
         self.graph.invalidate();
         if written {
@@ -396,9 +478,12 @@ impl CellStore {
         to_sheet: usize,
         to_row: usize,
         to_col: usize,
+        shift: bool,
     ) -> Vec<u32> {
-        let Some(edit) = self.cell_move([sheet, row, col, rows, cols, to_sheet, to_row, to_col])
-        else {
+        let Some(edit) = self.cell_move(
+            [sheet, row, col, rows, cols, to_sheet, to_row, to_col],
+            shift,
+        ) else {
             return Vec::new();
         };
         let back = edit.reversed();
@@ -448,14 +533,23 @@ impl CellStore {
         losses
     }
 
-    /// The move of a block, when both blocks lie on live sheets.
+    /// The move of a block, when both blocks lie on live sheets; a shift
+    /// also needs one sheet, one axis, and every cell between the blocks.
     #[inline(never)]
-    fn cell_move(&self, at: [usize; 8]) -> Option<CellMove> {
+    fn cell_move(&self, at: [usize; 8], shift: bool) -> Option<CellMove> {
         let [sheet, row, col, rows, cols, to_sheet, to_row, to_col] = at;
         if !(self.block_fits(sheet, (row, col), (rows, cols))
             && self.block_fits(to_sheet, (to_row, to_col), (rows, cols)))
         {
             return None;
+        }
+        if shift {
+            let one_axis = sheet == to_sheet && (row == to_row || col == to_col);
+            let (top, left) = (row.min(to_row), col.min(to_col));
+            let span = (row.max(to_row) - top + rows, col.max(to_col) - left + cols);
+            if !(one_axis && self.block_fits(sheet, (top, left), span)) {
+                return None;
+            }
         }
         let quoted = |handle: usize| {
             self.sheet_names
@@ -477,6 +571,7 @@ impl CellStore {
             cols: u32::try_from(cols).ok()?,
             from_quoted: quoted(sheet),
             to_quoted: quoted(to_sheet),
+            shift,
         })
     }
 
@@ -529,6 +624,33 @@ impl CellStore {
             inside &= edit.holds(from, from.sheet, anchor.0, anchor.1);
         });
         inside
+    }
+
+    /// A deletion that shifts cells up (or left) by more than the block it
+    /// moves empties the deleted cells the block does not land on.
+    fn clear_shift_gap(&mut self, edit: &CellMove, revision: Option<u64>) -> bool {
+        let (from, to) = (edit.from, edit.to);
+        let sheet = from.sheet as usize;
+        if !edit.shift {
+            return true;
+        }
+        if from.col == to.col {
+            let start = to.row + edit.rows;
+            if start >= from.row {
+                return true;
+            }
+            let empty: MovedSlots = vec![(KIND_EMPTY, 0, 0); (from.row - start) as usize];
+            return (from.col..from.col + edit.cols).all(|col| {
+                let top = (start as usize, col as usize);
+                self.write_moved_column(sheet, top, revision, MovedSources::default(), &empty)
+            });
+        }
+        let start = to.col + edit.cols;
+        let empty: MovedSlots = vec![(KIND_EMPTY, 0, 0); edit.rows as usize];
+        (start..from.col).all(|col| {
+            let top = (from.row as usize, col as usize);
+            self.write_moved_column(sheet, top, revision, MovedSources::default(), &empty)
+        })
     }
 
     /// Read every column of the source block, then empty the source block and

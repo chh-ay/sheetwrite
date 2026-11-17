@@ -3202,6 +3202,13 @@ export class GridImpl implements Grid {
       style: this.styleDeps,
       rect: () => this.activeSelectionRect(),
       bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
+      commit: (patches) => this.document.commit(patches, "structure").status === "applied",
+      alert: (title, message) => {
+        void this.openDialog(import("./dialog.js"), async (dialogs, host) => {
+          await dialogs.alertDialog(host, { title, message });
+          return null;
+        });
+      },
       // The dialogs' lazy imports stay in this module, with the grid's others.
       insertDeleteDialog: (insert, wide) =>
         this.openDialog(

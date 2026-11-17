@@ -207,7 +207,7 @@ import {
   integerAt,
   mergeCrossesFreeze,
   mergesOverlap,
-  movedBlock,
+  movedCellBounds,
   moveRemap,
   normalizedRange,
   normalizeMerge,
@@ -1598,7 +1598,7 @@ export class StoreDataEngine {
 
   canApplyLocally(patch: DocumentOp): boolean {
     if (patch.op === "moveCells") {
-      return this.blockLoaded(patch.range) && this.blockLoaded(movedBlock(patch));
+      return movedCellBounds(patch).every((range) => this.blockLoaded(range));
     }
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.sheets.handles.has(sheet) || !this.isPaged(sheet)) return true;
@@ -2507,7 +2507,8 @@ export class StoreDataEngine {
    * range whose edge moved. History captures them before the move applies.
    */
   moveCellsLosses(patch: MoveCellsOperation): CellAddress[] {
-    const { from, to } = cellBlockMove(patch);
+    const move = cellBlockMove(patch);
+    const { from, to } = move;
     const handle = this.sheets.handles.get(from.sheet);
     const toHandle = this.sheets.handles.get(to.sheet);
     if (handle === undefined || toHandle === undefined) return [];
@@ -2521,6 +2522,7 @@ export class StoreDataEngine {
       toHandle,
       to.start.row,
       to.start.col,
+      move.shift,
     );
     const losses: CellAddress[] = [];
     for (let index = 0; index + 2 < triples.length; index += 3) {
@@ -4404,7 +4406,13 @@ export class StoreDataEngine {
       return true;
     }
 
-    if (this.blockMeetsOwnedCells(fromSheet, from) || this.blockMeetsOwnedCells(toSheet, to)) {
+    // A shift also moves the cells a deletion closes between the blocks.
+    const bounds = movedCellBounds(patch);
+    if (
+      bounds.some((block) =>
+        this.blockMeetsOwnedCells(block.sheet === from.sheet ? fromSheet : toSheet, block),
+      )
+    ) {
       return false;
     }
 
@@ -4415,9 +4423,13 @@ export class StoreDataEngine {
     const cols = from.end.col - from.start.col + 1;
     const before =
       changes && captureDetailedChanges
-        ? [from, to].map((bounds) => ({
-            bounds,
-            cells: this.captureBlockBeforeCells(bounds, rows, cols),
+        ? bounds.map((block) => ({
+            bounds: block,
+            cells: this.captureBlockBeforeCells(
+              block,
+              block.end.row - block.start.row + 1,
+              block.end.col - block.start.col + 1,
+            ),
           }))
         : null;
 
@@ -4431,6 +4443,7 @@ export class StoreDataEngine {
       this.sheets.handleOf(to.sheet),
       to.start.row,
       to.start.col,
+      move.shift,
     );
     if (status !== 0) return false;
 

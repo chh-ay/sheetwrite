@@ -1144,6 +1144,37 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
   }
 }
 
+/**
+ * A shifting `moveCells` (Insert or Delete with Shift cells) stays on its
+ * sheet and moves along one axis.
+ */
+function validateCellShift(
+  operation: PlainRecord,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const shift = ownValue(operation, "shift");
+  if (shift === undefined) return;
+  if (shift !== true) {
+    invalid(errors, `${path}.shift`, "shift must be true when present");
+    return;
+  }
+  const range = ownValue(operation, "range");
+  const to = ownValue(operation, "to");
+  if (!isPlainRecord(range) || !isPlainRecord(to)) return;
+  const start = ownValue(range, "start");
+  const end = ownValue(range, "end");
+  if (!isPlainRecord(start) || !isPlainRecord(end)) return;
+  const first = (key: string) => Math.min(Number(ownValue(start, key)), Number(ownValue(end, key)));
+  const sameSheet = ownValue(range, "sheet") === ownValue(to, "sheet");
+  if (
+    !sameSheet ||
+    (first("row") !== ownValue(to, "row") && first("col") !== ownValue(to, "col"))
+  ) {
+    invalid(errors, `${path}.shift`, "A shift moves cells along one row or column of their sheet");
+  }
+}
+
 function validateAddress(value: unknown, path: string, errors: DocumentValidationError[]): void {
   const address = recordAt(value, path, errors);
   if (!address) return;
@@ -2351,6 +2382,7 @@ export function validateDocumentOperationShape(
     case "moveCells":
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       validateAddress(ownValue(operation, "to"), `${path}.to`, errors);
+      validateCellShift(operation, path, errors);
       break;
 
     case "addRows":
