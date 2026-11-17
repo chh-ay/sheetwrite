@@ -2127,6 +2127,18 @@
     display: none;
   }
 
+  /* The boot line is one line; "Loaded: …" that replaces it wraps to three
+     on a phone. Holding three from the start keeps the page below still. */
+  .sw-si-status {
+    min-height: 3lh;
+  }
+
+  /* A tile's figure changes once its lab has run ("Loaded on first use"
+     becomes "Core alone: a typed error"); two lines keep the tiles' height. */
+  .sw-labs__tile-figure {
+    min-height: 2lh;
+  }
+
   .sw-labs__panel {
     padding: var(--sw-space-5) var(--sw-space-4);
     border-radius: var(--sw-radius-md);

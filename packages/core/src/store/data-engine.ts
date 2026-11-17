@@ -108,7 +108,7 @@ import {
   withQuery,
 } from "../saved-query.js";
 import { canAddSheetSnapshot } from "../sheet-lifecycle.js";
-import { canAddSheetName, validateSheetName } from "../sheet-name.js";
+import { operationAcceptsSheetName, validateSheetName } from "../sheet-name.js";
 import { StyleDictionary } from "../style-dictionary.js";
 import { preparedHistoryBlock, type TransactionPreparation } from "../transaction-preparation.js";
 import type {
@@ -3580,7 +3580,11 @@ export class StoreDataEngine {
             .filter((candidate) => candidate.id !== patch.sheet)
             .map((candidate) => candidate.name),
         );
-        if (!name.ok || !this.renameSheetFormulaIdentity(patch.sheet, name.name)) return false;
+        if (
+          !operationAcceptsSheetName(name) ||
+          !this.renameSheetFormulaIdentity(patch.sheet, name.name)
+        )
+          return false;
         sheet.name = name.name;
         this.refreshNamedFormulas();
         return true;
@@ -4340,7 +4344,7 @@ export class StoreDataEngine {
       snapshot.name,
       this.workbook.sheets.map((sheet) => sheet.name),
     );
-    if (!canAddSheetName(name)) return false;
+    if (!operationAcceptsSheetName(name)) return false;
     const merges = snapshot.merges?.map(normalizeMerge) ?? [];
     const sheet: Sheet = {
       id: snapshot.id,
