@@ -216,6 +216,26 @@ export function confirmDialog(
   return { result: dialog.result.then((value) => value === "ok"), close: () => dialog.close() };
 }
 
+/** Labels for {@link alertDialog}. */
+export interface AlertOptions {
+  readonly title: string;
+  readonly message: string;
+}
+
+/**
+ * Tell the user something they must read, as Excel's message boxes do: an
+ * alert dialog with the message and OK. Resolves once it closes.
+ */
+export async function alertDialog(grid: DialogHost, options: AlertOptions): Promise<void> {
+  await openDialog(grid, {
+    title: options.title,
+    role: "alertdialog",
+    body: options.message,
+    buttons: [{ label: "OK", value: "ok", default: true }],
+    cancel: "ok",
+  }).result;
+}
+
 /** One option of {@link choiceDialog}. */
 interface DialogChoice {
   readonly value: string;
