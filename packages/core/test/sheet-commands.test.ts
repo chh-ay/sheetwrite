@@ -14,8 +14,8 @@ import { mountHost, sheet } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
-  // The sheet menu's panels load on first use; load them once here.
-  await import("../src/sheet-tab-panels.js");
+  // The sheet commands load on first use; load them once here.
+  await import("../src/sheet-commands.js");
 });
 
 let restoreStubs: () => void;
@@ -59,8 +59,8 @@ function press(key: string, init: KeyboardEventInit): void {
   );
 }
 
-/** Let a panel whose code loads on first use open. */
-function panelLoaded(): Promise<void> {
+/** Let a command whose code loads on first use finish. */
+function commandLoaded(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
@@ -71,18 +71,23 @@ function set(sheetId: SheetId, row: number, value: CellValue): void {
 }
 
 describe("switching sheets from the keyboard", () => {
-  it("moves to the next or previous visible sheet with Ctrl+PageDown and Ctrl+PageUp, or with Ctrl+Alt as in Excel for the web", () => {
+  it("moves to the next or previous visible sheet with Ctrl+PageDown and Ctrl+PageUp, or with Ctrl+Alt as in Excel for the web", async () => {
     press("PageDown", { ctrlKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("b");
     // The hidden sheet is skipped.
     press("PageDown", { ctrlKey: true, altKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("d");
     // The last sheet stays active.
     press("PageDown", { ctrlKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("d");
     press("PageUp", { ctrlKey: true, altKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("b");
     press("PageUp", { ctrlKey: true });
+    await commandLoaded();
     expect(grid.getActiveSheet()).toBe("a");
   });
 });
@@ -113,12 +118,12 @@ describe("Tab Color", () => {
 });
 
 describe("Move or Copy", () => {
-  it("copies a sheet before another and points the copy's own references at the copy", () => {
+  it("copies a sheet before another and points the copy's own references at the copy", async () => {
     set("a", 0, { kind: "literal", value: 5 });
     set("a", 1, { kind: "formula", src: "=Sales!A1*2" });
     set("a", 2, { kind: "formula", src: "=Costs!A1+A1" });
 
-    const result = grid.copySheet("a", { index: 2 });
+    const result = await grid.copySheet("a", { index: 2 });
     expect(result.status).toBe("applied");
     expect(names()).toEqual(["Sales", "Costs", "Sales (2)", "Old", "Notes"]);
     const copy = result.sheet;
@@ -129,12 +134,12 @@ describe("Move or Copy", () => {
     expect(store.getCell({ sheet: copy, row: 1, col: 0 }).resolved).toBe(14);
     expect(store.getCell({ sheet: "a", row: 1, col: 0 }).resolved).toBe(10);
 
-    expect(grid.copySheet("a").status).toBe("applied");
+    expect((await grid.copySheet("a")).status).toBe("applied");
     expect(names()).toContain("Sales (3)");
   });
 
-  it("removes the copy on undo", () => {
-    grid.copySheet("b");
+  it("removes the copy on undo", async () => {
+    await grid.copySheet("b");
     expect(names()).toEqual(["Sales", "Costs", "Costs (2)", "Old", "Notes"]);
     grid.undo();
     expect(names()).toEqual(["Sales", "Costs", "Old", "Notes"]);
@@ -146,7 +151,7 @@ describe("the sheet menu", () => {
   async function choose(label: string): Promise<HTMLElement | null> {
     host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button")!.click();
     host.querySelector<HTMLButtonElement>(`[role="menuitem"][aria-label="${label}"]`)!.click();
-    await panelLoaded();
+    await commandLoaded();
     return host.querySelector<HTMLElement>(".sheetwrite-tab-panel");
   }
 
@@ -180,6 +185,7 @@ describe("the sheet menu", () => {
       list.value = [...list.options].find((option) => option.text === before)!.value;
       dialog.querySelector<HTMLInputElement>('input[aria-label="Create a copy"]')!.checked = copy;
       [...dialog.querySelectorAll("button")].find((button) => button.textContent === "OK")!.click();
+      await commandLoaded();
       expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();
     };
 

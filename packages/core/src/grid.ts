@@ -18,12 +18,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import {
-  type CellCommandsHost,
-  formatCells,
-  insertOrDelete,
-  runCellCommand,
-} from "./cell-commands.js";
+import type { CellCommand } from "./cell-commands.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
@@ -67,6 +62,7 @@ import {
   DEFAULT_DISTINCT_VALUES_LIMIT,
 } from "./grid-constants.js";
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
+import { type CellCommandsHost, formatCells, insertOrDelete } from "./insert-delete-format.js";
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { mergeSelection } from "./merge-command.js";
@@ -93,8 +89,6 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
-import { stepSheet } from "./sheet-commands.js";
-import { planSheetCopy } from "./sheet-copy.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
@@ -607,7 +601,7 @@ export class GridImpl implements Grid {
   private readonly dialogHost: DialogHost;
   /** What the cell commands use; built on their first use. */
   private cellCommandsHost: CellCommandsHost | null = null;
-  /** Find, dialogs, panels and the dashboard builder whose code is loading on first use. */
+  /** Commands and UI whose code is loading on first use. */
   private commandLoads = 0;
   /** Keys pressed on the grid while they load, in order. */
   private readonly heldKeys: KeyboardEvent[] = [];
@@ -1023,8 +1017,17 @@ export class GridImpl implements Grid {
       },
       openFind: (options) => this.openFindBar(options),
       keyCommand: (command) => {
-        if (command === "nextSheet" || command === "previousSheet") stepSheet(this, command);
-        else runCellCommand(this.cellCommands(), command);
+        if (command === "insertCells" || command === "deleteCells") {
+          insertOrDelete(this.cellCommands(), command === "insertCells", { ask: true });
+        } else if (command === "formatCells") {
+          formatCells(this.cellCommands());
+        } else if (command === "nextSheet" || command === "previousSheet") {
+          void this.sheetCommand((commands) => {
+            if (!this.lifetime.closed) commands.stepSheet(this, command);
+          });
+        } else {
+          this.cellCommand(command);
+        }
       },
       openAutoFilter: (col) =>
         this.withAutoFilterMenu((filters, host) => filters.openAutoFilterMenu(host, col)),
@@ -1711,8 +1714,8 @@ export class GridImpl implements Grid {
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
       onCommand: (command, id) =>
-        this.loadCommand(import("./sheet-tab-panels.js"), ({ openTabPanel }) => {
-          if (this.sheetTabs) openTabPanel(this, this.sheetTabs, command, id);
+        void this.sheetCommand((commands) => {
+          if (this.sheetTabs) commands.openTabPanel(this, this.sheetTabs, command, id);
         }),
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
@@ -2879,24 +2882,24 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * Merge or Merge & Center. With `ask`, as Excel's own command, a range in
-   * which more than one cell holds a value merges after the warning's OK;
-   * otherwise it merges now.
+   * Merge or Merge & Center, now. With `ask`, as Excel's own command, the
+   * warning's code loads first, and a range in which more than one cell holds
+   * a value merges after its OK.
    */
   private mergeCells(center: boolean, options?: { ask?: boolean }): void {
-    const warn = (message: string): Promise<boolean> =>
-      this.openDialog(
-        import("./dialog.js"),
-        (dialogs, host) => dialogs.confirmDialog(host, { title: "Merge Cells", message }).result,
-      ).then((ok) => ok === true);
-    mergeSelection(this.styleDeps, center, options?.ask ? warn : undefined);
+    if (!options?.ask) {
+      mergeSelection(this.styleDeps, center);
+      return;
+    }
+    this.loadCommand(import("./merge-warning.js"), ({ askToMerge }) => {
+      if (!this.lifetime.closed) askToMerge(this.styleDeps, center, this.dialogHost);
+    });
   }
 
   /**
-   * Run UI whose code loads on first use: the find bar, a dialog, a panel or
-   * the dashboard builder. Keys pressed on the grid while any such load is
-   * pending wait, then act in order where the UI left the focus, as they
-   * would have had the code been there.
+   * Run a command or UI whose code loads on first use. Keys pressed on the
+   * grid while any such load is pending wait, then act in order where it left
+   * the focus, as they would have had the code been there.
    */
   private loadCommand<T>(
     load: Promise<T>,
@@ -2927,14 +2930,21 @@ export class GridImpl implements Grid {
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
-  /** What the commands of `cell-commands.ts` use; built on first use. */
+  /** Run a key's command of `cell-commands.ts`, which loads on first use. */
+  private cellCommand(command: CellCommand): void {
+    this.loadCommand(import("./cell-commands.js"), ({ runCellCommand }) => {
+      if (!this.lifetime.closed) runCellCommand(this.cellCommands(), command);
+    });
+  }
+
+  /** What the cell commands use; built on first use. */
   private cellCommands(): CellCommandsHost {
     this.cellCommandsHost ??= {
       grid: this,
       style: this.styleDeps,
+      rect: () => this.activeSelectionRect(),
       bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
       font: () => this.theme.font,
-      // The dialogs' lazy imports stay in this module, with the grid's others.
       insertDeleteDialog: (insert, wide) =>
         this.openDialog(
           import("./dialog.js"),
@@ -2951,7 +2961,7 @@ export class GridImpl implements Grid {
 
   /**
    * Open a dialog from `load`, a module that loads on first use, as
-   * `loadCommand` runs UI. Resolves with the dialog's answer, or null when
+   * `loadCommand` runs one. Resolves with the dialog's answer, or null when
    * the grid is destroyed before it opens.
    */
   private openDialog<M, T>(
@@ -2962,6 +2972,26 @@ export class GridImpl implements Grid {
       this.loadCommand(
         load,
         (module) => resolve(this.lifetime.closed ? null : open(module, this.dialogHost)),
+        reject,
+      );
+    });
+  }
+
+  /**
+   * Run a command of `sheet-commands.ts`, which loads on first use, as
+   * `loadCommand` runs one; the promise settles with the command's result.
+   */
+  private sheetCommand<T>(run: (commands: typeof import("./sheet-commands.js")) => T): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.loadCommand(
+        import("./sheet-commands.js"),
+        (commands) => {
+          try {
+            resolve(run(commands));
+          } catch (error) {
+            reject(error);
+          }
+        },
         reject,
       );
     });
@@ -3398,15 +3428,16 @@ export class GridImpl implements Grid {
     return { ...result, sheet: id };
   }
 
-  copySheet(id: SheetId, options: { index?: number; name?: string } = {}): SheetLifecycleResult {
-    const plan = planSheetCopy(
-      this.store.getWorkbook(),
-      (sheet) => this.document.snapshotSheet(sheet),
-      id,
-      options,
+  copySheet(
+    id: SheetId,
+    options: { index?: number; name?: string } = {},
+  ): Promise<SheetLifecycleResult> {
+    // The copy's code loads the first time a sheet is copied.
+    return this.sheetCommand(
+      (commands) =>
+        commands.copySheet(this.document, this.store.getWorkbook(), id, options) ??
+        this.rejectSheet(id, "sheet-not-found"),
     );
-    if (!plan) return this.rejectSheet(id, "sheet-not-found");
-    return { ...this.document.commit(plan.operations, "structure"), sheet: plan.sheet };
   }
 
   private rejectSheet(id: SheetId, code: "reserved" | "sheet-not-found"): SheetLifecycleResult {

@@ -78,11 +78,14 @@ interface InteractionDependencies {
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
   /**
-   * Run a key's command from `cell-commands.ts` or, for the keys that switch
-   * sheets, `sheet-commands.ts`.
+   * Run a key's command: Insert, Delete or Format Cells, or one from
+   * `cell-commands.ts` or, for the keys that switch sheets,
+   * `sheet-commands.ts`, which load on first use.
    */
-  keyCommand: (command: CellCommand | SheetKey) => void;
-  /** Hold a key pressed while lazily loaded UI's code loads; false when none loads. */
+  keyCommand: (
+    command: CellCommand | SheetKey | "insertCells" | "deleteCells" | "formatCells",
+  ) => void;
+  /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
   autoComplete: () => boolean;
@@ -1249,7 +1252,7 @@ export class InteractionSessions {
           break;
 
         default:
-          // The format, hide, insert, Format Cells and sheet keys.
+          // The format, hide, insert, Format Cells and sheet keys; some load first.
           this.deps.keyCommand(action);
       }
 

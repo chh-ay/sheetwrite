@@ -53,16 +53,21 @@ const FIND_MARKER = "sheetwrite-find-replace-row";
 // The AutoFilter's header dropdown loads on first use; its class names survive
 // minifiers. Webpack may put the pivot model's value order it sorts with into its chunk.
 const AUTOFILTER_MARKER = "sheetwrite-autofilter-presets";
-// The dialog shell of the merge warning and the Insert and Delete dialogs
-// loads on first use; the dialog's backdrop class survives minifiers.
+// The merge warning loads on first use, with the dialog shell; the warning's
+// text and the dialog's backdrop class survive minifiers.
+const MERGE_MARKER = "Merging cells only keeps the upper-left value";
 const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
 // Format Cells (Ctrl+1) loads on first use; its class names survive minifiers.
 // Webpack may give the dialog shell a chunk of its own or copy it into the
-// Format Cells chunk.
+// merge warning and Format Cells chunks.
 const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
-// The sheet menu's Move or Copy dialog and Tab Color palette load on first
-// use, together; the dialog's last list entry survives minifiers.
-const SHEET_TAB_PANELS_MARKER = "(move to end)";
+// The commands of the number-format and hide keys load on first use; the
+// Currency key's format code survives minifiers.
+const CELL_COMMANDS_MARKER = "$#,##0.00_);($#,##0.00)";
+// Copying a sheet, the sheet menu's Move or Copy dialog and Tab Color palette,
+// and the keys that switch sheets load on first use, together; the dialog's
+// last list entry survives minifiers.
+const SHEET_COMMANDS_MARKER = "(move to end)";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -84,9 +89,11 @@ const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
+const mergeChunks = [];
 const formatCellsChunks = [];
 const dialogChunks = [];
-const sheetTabPanelChunks = [];
+const cellCommandChunks = [];
+const sheetCommandChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -112,8 +119,10 @@ for (const file of lazyChunks) {
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(CELL_COMMANDS_MARKER)) cellCommandChunks.push(file);
+  else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
-  else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
+  else if (code.includes(SHEET_COMMANDS_MARKER)) sheetCommandChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
@@ -142,13 +151,17 @@ if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
+if (mergeChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack merge warning chunk, got ${mergeChunks.length}`);
 if (formatCellsChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
-if (sheetTabPanelChunks.length !== 1) {
+if (cellCommandChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack cell commands chunk, got ${cellCommandChunks.length}`);
+if (sheetCommandChunks.length !== 1) {
   throw new Error(
-    `Expected one lazy webpack sheet tab panel chunk, got ${sheetTabPanelChunks.length}`,
+    `Expected one lazy webpack sheet commands chunk, got ${sheetCommandChunks.length}`,
   );
 }
 if (addonRegistryChunks.length !== 1) {
@@ -191,11 +204,19 @@ if (mainCode.includes(AUTOFILTER_MARKER)) {
 if (mainCode.includes(DIALOG_MARKER)) {
   throw new Error("The dialog shell is in webpack's main.js; it must load lazily");
 }
+if (mainCode.includes(MERGE_MARKER)) {
+  throw new Error("The merge warning is in webpack's main.js; it must load lazily");
+}
 if (mainCode.includes(FORMAT_CELLS_MARKER)) {
   throw new Error("Format Cells is in webpack's main.js; it must load lazily");
 }
-if (mainCode.includes(SHEET_TAB_PANELS_MARKER)) {
-  throw new Error("The sheet tab panels are in webpack's main.js; they must load lazily");
+if (mainCode.includes(CELL_COMMANDS_MARKER)) {
+  throw new Error(
+    "The number-format and hide commands are in webpack's main.js; they must load lazily",
+  );
+}
+if (mainCode.includes(SHEET_COMMANDS_MARKER)) {
+  throw new Error("The sheet commands are in webpack's main.js; they must load lazily");
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
@@ -246,9 +267,11 @@ const assets = publicFiles.map((file) => {
       functionTableChunks,
       findChunks,
       autoFilterChunks,
+      mergeChunks,
       formatCellsChunks,
       dialogChunks,
-      sheetTabPanelChunks,
+      cellCommandChunks,
+      sheetCommandChunks,
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,

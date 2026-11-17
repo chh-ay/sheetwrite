@@ -144,14 +144,3 @@ describe("AutoFilter commands", () => {
     expect(grid.getAutoFilter()).not.toBeNull();
   });
 });
-
-describe("copySheet", () => {
-  it("returns the copy's result, with its ID, before the call returns", () => {
-    const result = grid.copySheet("s1");
-
-    expect(result.status).toBe("applied");
-    const copy = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === result.sheet);
-    expect(copy?.name).toBe("Sheet 1 (2)");
-    expect(grid.store.getCell({ sheet: result.sheet, row: 0, col: 0 }).resolved).toBe("Customer 0");
-  });
-});

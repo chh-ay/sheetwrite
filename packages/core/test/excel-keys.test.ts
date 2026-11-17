@@ -18,6 +18,8 @@ import {
 
 beforeAll(async () => {
   await initSheetwrite();
+  // The commands behind some keys load on first use; load them once here.
+  await import("../src/cell-commands.js");
 });
 
 let restoreStubs: () => void;
@@ -44,6 +46,11 @@ function press(key: string, init: KeyboardEventInit = {}): KeyboardEvent {
   const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
   target.dispatchEvent(event);
   return event;
+}
+
+/** Let a command whose code loads on first use finish. */
+function commandLoaded(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 function editor(): HTMLTextAreaElement | null {
@@ -333,7 +340,7 @@ describe("formatting and date keys", () => {
 });
 
 describe("number-format keys", () => {
-  it("apply Excel's formats with Ctrl+Shift+~ ! @ # $ % ^", () => {
+  it("apply Excel's formats with Ctrl+Shift+~ ! @ # $ % ^", async () => {
     select(0, 1, 1, 1);
     const keys = [
       ["~", "Backquote", "General"],
@@ -347,28 +354,33 @@ describe("number-format keys", () => {
     for (const [key, code, format] of keys) {
       const event = press(key, { ctrlKey: true, shiftKey: true, code });
       expect(event.defaultPrevented).toBe(true);
+      await commandLoaded();
       expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.numberFormat).toBe(format);
     }
   });
 });
 
 describe("hide and unhide keys", () => {
-  it("hide the selected rows with Ctrl+9 and show them with Ctrl+Shift+9", () => {
+  it("hide the selected rows with Ctrl+9 and show them with Ctrl+Shift+9", async () => {
     select(2, 0, 3, 0);
     press("9", { ctrlKey: true, code: "Digit9" });
+    await commandLoaded();
     expect(grid.hiddenRows()).toEqual([2, 3]);
     // A range around the hidden rows shows them again.
     select(1, 0, 4, 0);
     press("(", { ctrlKey: true, shiftKey: true, code: "Digit9" });
+    await commandLoaded();
     expect(grid.hiddenRows()).toEqual([]);
   });
 
-  it("hide the selected columns with Ctrl+0 and show them with Ctrl+Shift+0", () => {
+  it("hide the selected columns with Ctrl+0 and show them with Ctrl+Shift+0", async () => {
     select(0, 1);
     press("0", { ctrlKey: true, code: "Digit0" });
+    await commandLoaded();
     expect(grid.hiddenColumns()).toEqual([1]);
     select(0, 0, 0, 2);
     press(")", { ctrlKey: true, shiftKey: true, code: "Digit0" });
+    await commandLoaded();
     expect(grid.hiddenColumns()).toEqual([]);
   });
 });
@@ -376,31 +388,37 @@ describe("hide and unhide keys", () => {
 describe("insert and delete keys", () => {
   const sheet = () => store.getWorkbook().sheets[0]!;
 
-  it("insert whole rows with Ctrl++ and delete them with Ctrl+-", () => {
+  it("insert whole rows with Ctrl++ and delete them with Ctrl+-", async () => {
     grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    await commandLoaded();
     expect(sheet().rowCount).toBe(11);
     expect(value(2, 0)).toBeNull();
     expect(value(3, 0)).toBe("Customer 2");
     // The keypad + inserts too.
     grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
     press("+", { ctrlKey: true, code: "NumpadAdd" });
+    await commandLoaded();
     expect(sheet().rowCount).toBe(12);
     // A range of a few columns is not a whole row; Shift+Space selects one.
     grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
     press("-", { ctrlKey: true, code: "Minus" });
+    await commandLoaded();
     grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
     press("-", { ctrlKey: true, code: "NumpadSubtract" });
+    await commandLoaded();
     expect(sheet().rowCount).toBe(10);
     expect(value(2, 0)).toBe("Customer 2");
   });
 
-  it("insert and delete whole columns", () => {
+  it("insert and delete whole columns", async () => {
     grid.setSelection({ kind: "column", sheet: "s1", col: 1 });
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    await commandLoaded();
     expect(sheet().columns).toHaveLength(4);
     expect(value(0, 2)).toBe(0.5);
     press("-", { ctrlKey: true, code: "Minus" });
+    await commandLoaded();
     expect(sheet().columns).toHaveLength(3);
     expect(value(0, 1)).toBe(0.5);
   });

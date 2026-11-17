@@ -1,7 +1,7 @@
 /**
- * Merge and Merge & Center, with Excel's warning before values are dropped.
- * The merge itself is in the first load; the warning's dialog loads the first
- * time it opens.
+ * Merge and Merge & Center. Excel's warning before values are dropped is in
+ * `merge-warning.ts`, which loads the first time the toolbar, the ribbon or
+ * the context menu merges.
  */
 
 import { storeEngine } from "./store/engine-registry.js";
@@ -10,14 +10,8 @@ import type { StyleActionsDeps } from "./style-actions.js";
 import type { CellValue } from "./types/cell.js";
 import type { DocumentOp, SnapshotCell } from "./types/document.js";
 
-/** Excel's warning before a merge that drops values. */
-const MERGE_WARNING = "Merging cells only keeps the upper-left value and discards other values.";
-
-/** Cells read at once while counting the values a merge would cover. */
-const MERGE_SCAN_CELLS = 65_536;
-
 /** A merge's inclusive bounds, in rows and columns of the active sheet. */
-interface MergeBounds {
+export interface MergeBounds {
   r0: number;
   c0: number;
   r1: number;
@@ -25,43 +19,16 @@ interface MergeBounds {
 }
 
 /**
- * Merge the selected range, keeping only its upper-left value. With `warn`,
- * as Excel's own Merge does, a range in which more than one cell holds a
- * value is merged only once `warn` resolves true for Excel's warning that only
- * the upper-left value stays, and only if the selection is still that range.
- * Without `warn`, as Excel's `Range.Merge` with `DisplayAlerts = False`, it
- * merges at once.
+ * Merge the selected range now, keeping only its upper-left value, as Excel's
+ * `Range.Merge` does with `DisplayAlerts = False`.
  */
-export function mergeSelection(
-  deps: StyleActionsDeps,
-  center: boolean,
-  warn?: (message: string) => Promise<boolean>,
-): void {
+export function mergeSelection(deps: StyleActionsDeps, center: boolean): void {
   const merge = mergeBounds(deps);
-  if (merge === null) return;
-  if (!warn || countValues(deps, merge, 2) < 2) {
-    commitMerge(deps, merge, center);
-    return;
-  }
-
-  void warn(MERGE_WARNING).then((ok) => {
-    // The selection or the sheet may have changed while the warning was open.
-    const now = mergeBounds(deps);
-    if (
-      ok &&
-      now !== null &&
-      now.r0 === merge.r0 &&
-      now.c0 === merge.c0 &&
-      now.r1 === merge.r1 &&
-      now.c1 === merge.c1
-    ) {
-      commitMerge(deps, merge, center);
-    }
-  });
+  if (merge !== null) commitMerge(deps, merge, center);
 }
 
 /** The selected range as a merge, or null when it cannot merge. */
-function mergeBounds(deps: StyleActionsDeps): MergeBounds | null {
+export function mergeBounds(deps: StyleActionsDeps): MergeBounds | null {
   if (deps.readOnly()) return null;
   const activeSheet = deps.activeSheet();
   if (deps.loadable?.hasView(activeSheet)) return null;
@@ -86,26 +53,8 @@ function mergeBounds(deps: StyleActionsDeps): MergeBounds | null {
   return merge;
 }
 
-/** How many cells of `merge` hold a value, counted up to `limit`. */
-function countValues(deps: StyleActionsDeps, merge: MergeBounds, limit: number): number {
-  const sheet = deps.activeSheet();
-  const cols = Array.from({ length: merge.c1 - merge.c0 + 1 }, (_, index) => merge.c0 + index);
-  const band = Math.max(1, Math.floor(MERGE_SCAN_CELLS / cols.length));
-  let count = 0;
-  for (let start = merge.r0; start <= merge.r1; start += band) {
-    const rows = { start, end: Math.min(merge.r1 + 1, start + band) };
-    const { values } = deps.store.getVisibleWindow(sheet, rows, cols);
-    for (let index = 0; index < values.length; index++) {
-      const value = values[index];
-      if (value !== null && value !== undefined && value !== "" && ++count >= limit) {
-        return count;
-      }
-    }
-  }
-  return count;
-}
-
-function commitMerge(deps: StyleActionsDeps, merge: MergeBounds, center: boolean): void {
+/** Merge `merge` as one undoable step, centering its text for Merge & Center. */
+export function commitMerge(deps: StyleActionsDeps, merge: MergeBounds, center: boolean): void {
   const activeSheet = deps.activeSheet();
   const sheet = deps.sheet();
   const range = {
