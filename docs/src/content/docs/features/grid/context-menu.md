@@ -83,11 +83,11 @@ The lean `ContextMenuContext` carries only `cell`, `clientX`, and `clientY`.
 
 The built-in action names are:
 
-| Clipboard/content | Rows | Columns | View/export |
-| --- | --- | --- | --- |
-| `cut`, `copy`, `paste`, `clearContents` | `insertRowAbove`, `insertRowBelow`, `deleteRow`, `hideRow`, `showAllRows`, `autoFitRow` | `insertColumnLeft`, `insertColumnRight`, `deleteColumn`, `hideColumn`, `showAllColumns`, `autoFitColumn` | `clearFilter`, `filterBySelection`, `reapplyFilter`, `merge`, `unmerge`, `exportCsv`, `exportXlsx` |
+| Clipboard/content | Cells | Rows | Columns | View/export |
+| --- | --- | --- | --- | --- |
+| `cut`, `copy`, `paste`, `clearContents` | `insertCells`, `deleteCells`, `formatCells` | `insertRowAbove`, `insertRowBelow`, `deleteRow`, `hideRow`, `showAllRows`, `autoFitRow` | `insertColumnLeft`, `insertColumnRight`, `deleteColumn`, `hideColumn`, `showAllColumns`, `autoFitColumn` | `clearFilter`, `filterBySelection`, `reapplyFilter`, `merge`, `unmerge`, `exportCsv`, `exportXlsx` |
 
-The default menu contains copy, cut, paste, clear contents, row insert/delete/hide/show/auto-fit, column insert/delete/hide/show/auto-fit, a Filter submenu (filter by the selected cell's value, reapply, clear the column's filter), merge, and unmerge actions, with separators between groups. `exportCsv` and `exportXlsx` are not in the default menu, but you can use them in a custom list. XLSX still requires `xlsxAddon()` from `@sheetwrite/xlsx` in `initSheetwrite({ addons })`.
+The default menu contains copy, cut, paste, clear contents, Insert and Delete submenus (cells, which open Excel's Insert or Delete dialog, rows and columns), row and column hide/show/auto-fit, a Filter submenu (filter by the selected cell's value, reapply, clear the column's filter), merge, unmerge and Format cells…, with separators between groups. `exportCsv` and `exportXlsx` are not in the default menu, but you can use them in a custom list. XLSX still requires `xlsxAddon()` from `@sheetwrite/xlsx` in `initSheetwrite({ addons })`.
 
 ## Host-owned menu
 

@@ -266,6 +266,18 @@
   --sheetwrite-icon-x: -13.5;
   --sheetwrite-icon-y: -7.5;
 }
+.sheetwrite-icon[data-icon="insertCells"] {
+  --sheetwrite-icon-x: -15;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="deleteCells"] {
+  --sheetwrite-icon-x: -16.5;
+  --sheetwrite-icon-y: -7.5;
+}
+.sheetwrite-icon[data-icon="formatCells"] {
+  --sheetwrite-icon-x: -18;
+  --sheetwrite-icon-y: -7.5;
+}
 .sheetwrite-icon[data-icon="sortAsc"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -9;
@@ -296,6 +308,14 @@
 }
 .sheetwrite-icon[data-icon="reapplyFilter"] {
   --sheetwrite-icon-x: -10.5;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="filterArrow"] {
+  --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -9;
+}
+.sheetwrite-icon[data-icon="filterActive"] {
+  --sheetwrite-icon-x: -13.5;
   --sheetwrite-icon-y: -9;
 }
 .sheetwrite-icon[data-icon="chart"] {
@@ -332,6 +352,10 @@
 }
 .sheetwrite-icon[data-icon="pivotTable"] {
   --sheetwrite-icon-x: -12;
+  --sheetwrite-icon-y: -10.5;
+}
+.sheetwrite-icon[data-icon="pivotChart"] {
+  --sheetwrite-icon-x: -13.5;
   --sheetwrite-icon-y: -10.5;
 }
 .sheetwrite-icon[data-icon="insertFunction"] {
@@ -401,4 +425,24 @@
 .sheetwrite-icon[data-icon="importXlsx"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -16.5;
+}
+.sheetwrite-icon[data-icon="settings"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -16.5;
+}
+.sheetwrite-icon[data-icon="keyboardShortcuts"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -16.5;
+}
+.sheetwrite-icon[data-icon="insertSheet"] {
+  --sheetwrite-icon-x: 0;
+  --sheetwrite-icon-y: -18;
+}
+.sheetwrite-icon[data-icon="moveCopySheet"] {
+  --sheetwrite-icon-x: -1.5;
+  --sheetwrite-icon-y: -18;
+}
+.sheetwrite-icon[data-icon="tabColor"] {
+  --sheetwrite-icon-x: -3;
+  --sheetwrite-icon-y: -18;
 }

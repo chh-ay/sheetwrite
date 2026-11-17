@@ -278,11 +278,12 @@ export function createSpreadsheetShell(
       onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
       // The same chunk Grid loads for its own tab bar.
       onCommand: (command, id) =>
-        void import("../sheet-commands.js").then(({ openTabPanel }) => {
+        void import("../sheet-tab-panels.js").then(({ openTabPanel }) => {
           if (tabs) openTabPanel(grid, tabs, command, id);
         }),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
+      icons: () => chrome.icons,
     });
     tabs.setReadOnly(readOnly);
   };
