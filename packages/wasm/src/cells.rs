@@ -741,11 +741,13 @@ impl CellStorage {
         col * self.row_count + row
     }
 
-    /// Puts `kind` and `payload` straight into a dense cell's slot, leaving
-    /// its formula, spill and dependents as they are, and returns what the
-    /// slot held; a second call with that returned pair puts it back. `None`
+    /// Shows the literal `kind` and `payload` in a dense cell for a trial
+    /// read, leaving its formula, spill and dependents as they are, and
+    /// returns what the slot held for [`Self::restore_dense_slot`]. A formula
+    /// cell stays a formula whose stored result is the value, as formula
+    /// reads expect; any other cell holds the value as its literal. `None`
     /// for paged storage or a cell outside the sheet, which stay unchanged.
-    pub(crate) fn swap_dense_slot(
+    pub(crate) fn show_dense_trial(
         &mut self,
         row: usize,
         col: usize,
@@ -758,10 +760,28 @@ impl CellStorage {
         let index = self.idx(row, col);
         let slot_kind = self.kind.get_mut(index)?;
         let slot_payload = self.payload.get_mut(index)?;
-        Some((
-            std::mem::replace(slot_kind, kind),
-            std::mem::replace(slot_payload, payload),
-        ))
+        let saved = (*slot_kind, *slot_payload);
+        if saved.0 & !CALCULATED == KIND_FORMULA {
+            *slot_kind = KIND_FORMULA | CALCULATED;
+            *slot_payload = encode_cell(kind, payload);
+        } else {
+            *slot_kind = kind;
+            *slot_payload = payload;
+        }
+        Some(saved)
+    }
+
+    /// Puts back what [`Self::show_dense_trial`] returned.
+    pub(crate) fn restore_dense_slot(&mut self, row: usize, col: usize, saved: (u8, u64)) {
+        if self.paged.is_some() || !self.contains_cell(row, col) {
+            return;
+        }
+        let index = self.idx(row, col);
+        if let (Some(slot_kind), Some(slot_payload)) =
+            (self.kind.get_mut(index), self.payload.get_mut(index))
+        {
+            (*slot_kind, *slot_payload) = saved;
+        }
     }
 
     /// The logical cells this sheet counts toward the store's local-cell

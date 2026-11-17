@@ -261,17 +261,16 @@ impl CellStore {
             TrialValue::Text(text) => (KIND_STRING, encode_str_id(self.intern(text))),
         };
         let (cell_row, cell_col) = (row as usize, col as usize);
-        let Some((saved_kind, saved_payload)) = self
+        let Some(saved) = self
             .sheets
             .get_mut(sheet)
-            .and_then(|data| data.cells.swap_dense_slot(cell_row, cell_col, kind, payload))
+            .and_then(|data| data.cells.show_dense_trial(cell_row, cell_col, kind, payload))
         else {
             return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);
         };
         let preview = self.preview_formula(sheet, row, col, source);
         if let Some(data) = self.sheets.get_mut(sheet) {
-            data.cells
-                .swap_dense_slot(cell_row, cell_col, saved_kind, saved_payload);
+            data.cells.restore_dense_slot(cell_row, cell_col, saved);
         }
         preview
     }

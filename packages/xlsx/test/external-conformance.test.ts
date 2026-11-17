@@ -183,9 +183,13 @@ describe("pinned external XLSX behavioral vectors", () => {
       }),
       expect.objectContaining({ range: at(0, 1), condition: { kind: "list", values: ["A", "B"] } }),
       expect.objectContaining({ range: at(1, 1), condition: { kind: "list", values: ["A", "B"] } }),
+      expect.objectContaining({
+        range: expect.objectContaining({ start: { row: 0, col: 2 }, end: { row: 1, col: 2 } }),
+        condition: { kind: "custom", formula: "=ISNUMBER(C1)" },
+      }),
     ]);
-    // The custom rule; the input message and the error message both stay.
-    expect(warnings.map((warning) => warning.code)).toEqual(["validation-loss"]);
+    // Every rule maps, custom ones too, and the input and error messages both stay.
+    expect(warnings).toEqual([]);
   });
 
   it("ports case 39: never fetches external targets and resolves internal parent targets within OPC root", async () => {
