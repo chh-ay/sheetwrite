@@ -68,14 +68,16 @@ As in Excel, a selection of more than one cell limits the search to it. Select B
 interface SearchOptions {
   matchCase?: boolean; // case-sensitive match (default false)
   wholeCell?: boolean; // match the whole cell, not a substring (default false)
-  lookIn?: "formulas" | "values"; // search formula text or formula results (default "formulas")
+  lookIn?: "formulas" | "values" | "notes"; // formula text, formula results or notes (default "formulas")
+  within?: "sheet" | "workbook"; // the sheet, or every visible sheet (default "sheet")
+  searchBy?: "rows" | "columns"; // match order: across rows or down columns (default "rows")
   sheet?: SheetId;     // restrict to one sheet (default: the active sheet)
   columns?: number[];  // restrict to these column indices (default: all)
 }
 
 interface SearchResult {
   query: string;
-  matches: CellAddress[]; // matching cells, in row-major order
+  matches: CellAddress[]; // matching cells, in search order; sheets in tab order
   active: number;         // index of the active match, or -1 when there are none
 }
 ```
@@ -84,8 +86,27 @@ interface SearchResult {
 | --- | --- |
 | `search(query, opts?)` | Find matching cells; highlights them, emits `search`, returns a `SearchResult`. |
 | `findNext()` / `findPrev()` | Step the active match forward / backward, select it and scroll it into view. |
+| `selectMatch(index)` | Make `matches[index]` the active match, select it and show its sheet, as clicking a Find All result does. |
 | `clearSearch()` | Drop the current search and clear its highlights. |
 | `replaceCurrent(replacement)` / `replaceAll(replacement)` | Replace matches through undoable transactions, in formula text too unless `lookIn` is `"values"`. |
+
+## Options and Find All in the find bar
+
+The find bar's **⋯ Options** button shows Excel's options. Each one sets the matching `SearchOptions` field:
+
+| Option | Choices | Field |
+| --- | --- | --- |
+| Within | Sheet, Workbook | `within` |
+| Search | By Rows, By Columns | `searchBy` |
+| Look in | Formulas, Values, Notes | `lookIn` |
+| Match case | on or off | `matchCase` |
+| Match entire cell contents | on or off | `wholeCell` |
+
+A workbook search looks in every visible sheet in tab order and skips hidden sheets, as Excel's does. Find Next goes on to the next sheet that has a match and shows that sheet.
+
+**≡ Find all** lists every match with its sheet, cell, value and formula, and counts them ("12 cells found"). Click a result, or move through the list with the arrow keys, to go to that cell. The list follows the search as you type or change an option.
+
+On Windows and Linux, Alt and a letter reach the controls as in Excel's dialog: Alt+N the Find field, Alt+F Find Next, Alt+I Find All, Alt+T Options, Alt+H Within, Alt+S Search, Alt+L Look in, Alt+C Match case, Alt+O Match entire cell contents, Alt+E the Replace field, Alt+R Replace and Alt+A Replace All.
 
 ## Wildcards and Look in
 
@@ -99,9 +120,9 @@ As in Excel's Find, the query takes three wildcard characters:
 
 Without `wholeCell`, a pattern can match anywhere in the cell's text, as in Excel.
 
-By default a formula cell is searched by its formula text, like Excel's default **Look in: Formulas**. So `grid.search("A1")` finds a cell holding `=A1*2`. Pass `lookIn: "values"` to search formula results instead. Cells without a formula are searched by their value either way.
+By default a formula cell is searched by its formula text, like Excel's default **Look in: Formulas**. So `grid.search("A1")` finds a cell holding `=A1*2`. Pass `lookIn: "values"` to search formula results instead. Cells without a formula are searched by their value either way. `lookIn: "notes"` searches the text of cell notes instead of the cells.
 
-Replace follows the same rules. It replaces the whole run a wildcard pattern matches, and `*` takes the longest run it can. When looking in formulas, `replaceCurrent` and `replaceAll` rewrite formula text, as Excel's Replace does. A replacement that leaves a formula the engine cannot read leaves that cell unchanged. Reference cells are never rewritten.
+Replace follows the same rules. It replaces the whole run a wildcard pattern matches, and `*` takes the longest run it can. When looking in formulas, `replaceCurrent` and `replaceAll` rewrite formula text, as Excel's Replace does. A replacement that leaves a formula the engine cannot read leaves that cell unchanged. Reference cells are never rewritten. When looking in notes, they rewrite the note text and leave the cells as they are.
 
 ## Styles
 
