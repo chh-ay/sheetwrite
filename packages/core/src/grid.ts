@@ -2919,7 +2919,8 @@ export class GridImpl implements Grid {
     // Excel's default choice follows the range's shape.
     const wide = rect.c1 - rect.c0 >= rect.r1 - rect.r0;
     this.loadCommand(import("./dialog.js"), ({ insertDeleteDialog }) => {
-      if (!this.lifetime.closed) void insertDeleteDialog(this.dialogHost, insert, wide).result.then(run);
+      if (!this.lifetime.closed)
+        void insertDeleteDialog(this.dialogHost, insert, wide).result.then(run);
     });
   }
 
@@ -2945,8 +2946,6 @@ export class GridImpl implements Grid {
         if (change !== null) this.styleActions.formatSelection(change.style, change.border);
       });
     });
-  }
-
   }
 
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
