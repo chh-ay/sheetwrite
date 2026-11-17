@@ -85,10 +85,10 @@ import { mountSidePanel } from "./side-panel.js";
 import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
-import { movedBlock } from "./store/move-cells.js";
 import {
   addRowGroup,
   collapseRowGroup,
+  movedBlock,
   removeRowGroup,
   visibleSheetNeighbor,
 } from "./store/ranges.js";

@@ -372,6 +372,19 @@ export function cellRange(addr: CellAddress): Range {
   };
 }
 
+/** The block of cells a `moveCells` operation lands on. */
+export function movedBlock(patch: Extract<DocumentOp, { op: "moveCells" }>): Range {
+  const from = normalizedRange(patch.range);
+  return {
+    sheet: patch.to.sheet,
+    start: { row: patch.to.row, col: patch.to.col },
+    end: {
+      row: patch.to.row + from.end.row - from.start.row,
+      col: patch.to.col + from.end.col - from.start.col,
+    },
+  };
+}
+
 /**
  * The cells whose contents `patch` writes, which pivot output may own; null
  * for operations that write no cell contents, such as a style-only clear.

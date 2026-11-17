@@ -8,7 +8,7 @@
 import type { CellHyperlink } from "../types/cell.js";
 import type { MergeRange, Range, SheetId } from "../types/coordinates.js";
 import type { CellNote, DocumentOp, Sheet } from "../types/document.js";
-import { normalizedRange } from "./ranges.js";
+import { movedBlock, normalizedRange } from "./ranges.js";
 
 export type MoveCellsOperation = Extract<DocumentOp, { op: "moveCells" }>;
 
@@ -16,19 +16,6 @@ export type MoveCellsOperation = Extract<DocumentOp, { op: "moveCells" }>;
 export interface CellBlockMove {
   readonly from: Range;
   readonly to: Range;
-}
-
-/** The block of cells a `moveCells` operation lands on. */
-export function movedBlock(patch: MoveCellsOperation): Range {
-  const from = normalizedRange(patch.range);
-  return {
-    sheet: patch.to.sheet,
-    start: { row: patch.to.row, col: patch.to.col },
-    end: {
-      row: patch.to.row + from.end.row - from.start.row,
-      col: patch.to.col + from.end.col - from.start.col,
-    },
-  };
 }
 
 export function cellBlockMove(patch: MoveCellsOperation): CellBlockMove {

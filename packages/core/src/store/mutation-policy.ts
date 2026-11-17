@@ -14,10 +14,10 @@ import type {
   Workbook,
 } from "../types/document.js";
 import type { PivotDefinition } from "../types/pivot.js";
-import { movedBlock } from "./move-cells.js";
 import {
   cellRange,
   fullSheetRange,
+  movedBlock,
   normalizedRange,
   patchSheetId,
   pivotWrittenRange,
