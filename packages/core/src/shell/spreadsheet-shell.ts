@@ -283,6 +283,7 @@ export function createSpreadsheetShell(
         }),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
+      icons: () => chrome.icons,
     });
     tabs.setReadOnly(readOnly);
   };
