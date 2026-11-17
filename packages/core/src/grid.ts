@@ -1210,6 +1210,12 @@ export class GridImpl implements Grid {
       fillTarget: () => this.interactions.fillPreview,
       fillHandleScreen: (contentTop, scrollLeft) =>
         this.interactions.fillHandleScreen(contentTop, scrollLeft),
+      fillTip: () => this.interactions.fillTip,
+      autoFillTarget: () => this.interactions.autoFillTarget,
+      openAutoFillOptions: (clientX, clientY) => {
+        this.interactions.openAutoFillOptions(clientX, clientY);
+      },
+      icons: () => this.config?.icons,
       searchMatches: () => this.searchController.matches,
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,

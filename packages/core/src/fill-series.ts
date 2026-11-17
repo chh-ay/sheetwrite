@@ -38,6 +38,9 @@ export interface FillSeries {
   stepAt(p: number): FillStep;
 }
 
+/** The date step of Auto Fill Options › Fill Days, Fill Weekdays, Fill Months and Fill Years. */
+export type FillDateUnit = "day" | "weekday" | "month" | "year";
+
 /** How a fill treats its source. */
 export interface FillOptions {
   /**
@@ -47,6 +50,16 @@ export interface FillOptions {
   readonly swap?: boolean;
   /** Copy the source unchanged, as Fill Down (Ctrl+D) and Fill Right (Ctrl+R) do. */
   readonly copy?: boolean;
+  /**
+   * Fill a series even where the default copies, as Auto Fill Options ›
+   * Fill Series does: one number then counts up by 1.
+   */
+  readonly series?: boolean;
+  /**
+   * Step from the first source date by this unit per cell, as Auto Fill
+   * Options › Fill Days, Fill Weekdays, Fill Months and Fill Years do.
+   */
+  readonly unit?: FillDateUnit;
 }
 
 /** Relative+absolute slack so float deltas (0.1, 0.2, 0.3, …) read as constant. */
@@ -137,6 +150,49 @@ function daysInMonth(year: number, month: number): number {
   return new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
 }
 
+/** The serial of `day` (clamped, or the month's last day) in month `index` counted from year 0. */
+function monthSerial(index: number, day: number | "last"): number {
+  const year = Math.floor(index / 12);
+  const month = wrap(index, 12);
+  const last = daysInMonth(year, month);
+  return dateToSerial(new Date(Date.UTC(year, month, day === "last" ? last : Math.min(day, last))));
+}
+
+/** One unit per cell from `base`, keeping its time of day; weekdays skip Saturday and Sunday. */
+function dateUnitSeries(base: number, unit: FillDateUnit): FillSeries {
+  const whole = Math.floor(base);
+  const time = base - whole;
+  if (unit === "day") return { stepAt: (p) => ({ kind: "value", value: base + p }) };
+  if (unit === "weekday") {
+    // Serial 1 is a Sunday; 0 is Sunday … 6 is Saturday.
+    const weekday = (serial: number): number => wrap(serial - 1, 7);
+    return {
+      stepAt: (p) => {
+        if (p === 0) return { kind: "value", value: base };
+        const direction = p < 0 ? -1 : 1;
+        // From a weekend, count from the weekday next to it on the side the fill
+        // leaves from: Saturday's first weekday down is Monday, and up is Friday.
+        let start = whole;
+        while (weekday(start) === 0 || weekday(start) === 6) start -= direction;
+        let serial = start + 7 * Math.trunc(p / 5);
+        for (let left = Math.abs(p % 5); left > 0;) {
+          serial += direction;
+          const day = weekday(serial);
+          if (day !== 0 && day !== 6) left--;
+        }
+        return { kind: "value", value: serial + time };
+      },
+    };
+  }
+  const date = serialToDate(whole);
+  const first = date.getUTCFullYear() * 12 + date.getUTCMonth();
+  const day = date.getUTCDate();
+  const months = unit === "month" ? 1 : 12;
+  return {
+    stepAt: (p) => ({ kind: "value", value: monthSerial(first + months * p, day) + time }),
+  };
+}
+
 /**
  * Dates on the same day of the month (`1-Jan, 1-Apr`), or each on the last
  * day of its month (`31-Jan, 28-Feb`), step by whole months or years as in
@@ -161,16 +217,9 @@ function monthSeries(values: readonly number[]): FillSeries | null {
   const step = constantStep(months);
   if (step === null || step === 0 || day === null || !(sameDay || lastDays)) return null;
   const first = months[0] ?? 0;
-  const toLastDay = !sameDay;
+  const target = sameDay ? day : "last";
   return {
-    stepAt: (p) => {
-      const index = first + step * p;
-      const year = Math.floor(index / 12);
-      const month = wrap(index, 12);
-      const last = daysInMonth(year, month);
-      const target = toLastDay ? last : Math.min(day, last);
-      return { kind: "value", value: dateToSerial(new Date(Date.UTC(year, month, target))) };
-    },
+    stepAt: (p) => ({ kind: "value", value: monthSerial(first + step * p, target) }),
   };
 }
 
@@ -360,6 +409,8 @@ function textSeries(
  * - formulas → copy the source cells in turn; other text and mixed cells →
  *   repeat, each text with a number counting up once per repeat.
  * `options.swap` (Ctrl-drag) counts one number up and copies a series instead.
+ * `options.series` counts one number up and fills every series;
+ * `options.unit` steps the first date by days, weekdays, months or years.
  */
 export function detectFillSeries(
   source: readonly FillSourceCell[],
@@ -369,7 +420,12 @@ export function detectFillSeries(
   if (n === 0 || options.copy === true || source.some((cell) => cell.isFormula)) {
     return tilingSeries(n);
   }
-  const swap = options.swap === true;
+  const first = source[0];
+  if (options.unit !== undefined && first && isFiniteNumber(first.value)) {
+    return dateUnitSeries(first.value, options.unit);
+  }
+  const plainNumber = n === 1 && first?.isDate !== true && first?.isTime !== true;
+  const swap = options.series === true ? plainNumber : options.swap === true;
 
   const numbers: number[] = [];
   const texts: string[] = [];

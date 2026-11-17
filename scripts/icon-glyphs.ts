@@ -406,6 +406,18 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "M18.5 12.5a1.77 1.77 0 0 1 2.5 2.5l-5.5 5.5-3.5 1 1-3.5Z",
       ],
     ],
+    // Auto Fill Options: the source cell, tinted, with its fill handle, the
+    // filled cells below it dotted, and the menu's arrow.
+    [
+      "autoFillOptions",
+      [
+        tint("M4 3.5h9v5H4Z"),
+        "M4 3.5h9v5H4Z",
+        guide("M4 8.5v11h9v-11M4 14h9"),
+        bold("M13 8.5h.01"),
+        "m15.5 16 2.5 2.5 2.5-2.5",
+      ],
+    ],
   ],
   // Sorting and filtering.
   [

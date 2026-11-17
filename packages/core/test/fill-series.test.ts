@@ -135,4 +135,15 @@ describe("detectFillSeries", () => {
       ),
     ).toEqual([serial(2015, 3, 31), serial(2015, 4, 30)]);
   });
+
+  it("fills weekdays from a weekend date as Auto Fill Options › Fill Weekdays does", () => {
+    const serial = (day: number) => dateToSerial(new Date(Date.UTC(2026, 0, day)));
+    // 2026-01-03 is a Saturday.
+    const plan = detectFillSeries([{ value: serial(3), isFormula: false, isDate: true }], {
+      unit: "weekday",
+    });
+    expect([1, 2, 5, 6, -1].map((p) => plan.stepAt(p))).toEqual(
+      [5, 6, 9, 12, 2].map((day) => ({ kind: "value", value: serial(day) })),
+    );
+  });
 });

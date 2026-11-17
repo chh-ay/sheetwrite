@@ -101,6 +101,20 @@ A small fill handle sits at the bottom-right corner of the selection. Drag it **
 
 Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one number then counts up by 1, and a series is copied. Double-click the fill handle to fill down as far as the data in the column next to the selection reaches. Ctrl/Cmd + D and Ctrl/Cmd + R copy the top row or left column of the selection, with its format, into the rest of it; with one cell selected they copy the cell above or to the left.
 
+While you drag, a tip beside the pointer shows the value the last cell will get, as in Excel, with Ctrl counted as you move. A cell that will get a formula shows no tip.
+
+After a drag or a double-click on the fill handle, the **Auto Fill Options** button shows at the bottom-right corner of the filled cells. Its menu redoes the fill another way, as one undo step:
+
+| Choice | Fill |
+| --- | --- |
+| Copy Cells | Copies the source cells, with their formats. |
+| Fill Series | Continues the series; one number counts up by 1. |
+| Fill Formatting Only | Copies only the formats; the cells keep their values. |
+| Fill Without Formatting | Fills the values; the cells keep their formats. |
+| Fill Days, Fill Weekdays, Fill Months, Fill Years | Offered for dates: steps the first date by a day, a weekday (skipping Saturday and Sunday), a month or a year per cell. |
+
+Any other change, or a switch to another sheet, removes the button, as in Excel. Sheetwrite has no Flash Fill, so the menu does not offer it. A grid with `contextMenu: false` shows no button. See Microsoft's [Fill data automatically in worksheet cells](https://support.microsoft.com/en-us/excel/get-started/fill-data-automatically-in-worksheet-cells).
+
 For example, after unmerging, select A1:B2 from Full setup and drag the fill handle down through row 4. Each column continues its step:
 
 <div class="sw-grid-result" data-caption="Result: filling A1:B2 down through row 4 continues 10, 20 with 30, 40 and 30, 40 with 50, 60; this static illustration has no draggable handle.">

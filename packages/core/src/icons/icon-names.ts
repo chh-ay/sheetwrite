@@ -69,6 +69,7 @@ export const ICON_NAMES = [
   "insertCells",
   "deleteCells",
   "formatCells",
+  "autoFillOptions",
   "sortAsc",
   "sortDesc",
   "sortFilter",

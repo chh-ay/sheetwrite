@@ -8,12 +8,7 @@ import { dateToSerial } from "./date-serial.js";
 import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
 import { type EditCompletion, EditController, type EditNavigate } from "./editor.js";
-import {
-  detectFillSeries,
-  type FillOptions,
-  type FillSeries,
-  type FillSourceCell,
-} from "./fill-series.js";
+import { type AutoFillChoice, FillController, type FillTip } from "./fill-controller.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
 import { filterButtonRect, listButtonRect } from "./overlay-painter.js";
@@ -26,13 +21,7 @@ import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
 import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
-import type {
-  CommitReason,
-  DataValidationRule,
-  DocumentOp,
-  Sheet,
-  SnapshotCell,
-} from "./types/document.js";
+import type { CommitReason, DataValidationRule, DocumentOp, Sheet } from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
@@ -62,17 +51,17 @@ const MODIFIER_KEYS: Readonly<Record<string, true>> = {
   Meta: true,
 };
 
-/**
- * Whether a number format shows a date (day or year parts), so one cell fills
- * by days, or only a time, so one cell fills by hours.
- */
-function dateKind(format: string | undefined): "date" | "time" | null {
-  if (format === undefined) return null;
-  const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
-  if (/[#0?]/.test(visible)) return null;
-  if (/[dy]/i.test(visible)) return "date";
-  return /[hs]/i.test(visible) || /\[[hms]+\]/i.test(format) ? "time" : null;
-}
+/** The Auto Fill Options rows, with Excel's labels. */
+const AUTO_FILL_LABELS: Record<AutoFillChoice, string> = {
+  copy: "Copy Cells",
+  series: "Fill Series",
+  formats: "Fill Formatting Only",
+  values: "Fill Without Formatting",
+  day: "Fill Days",
+  weekday: "Fill Weekdays",
+  month: "Fill Months",
+  year: "Fill Years",
+};
 
 /** How an edit opens. */
 interface EditRequest {
@@ -228,6 +217,10 @@ export class InteractionSessions {
   private pickList: PickList | null = null;
   private generation = 0;
   private fillTarget: SelRect | null = null;
+  /** The value tip of the fill handle's drag. */
+  private tip: FillTip | null = null;
+  /** Fills and the Auto Fill Options that redo them. */
+  private readonly fills: FillController;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
   /** Excel's cell mode, which the `cell-mode` event last reported. */
@@ -258,6 +251,16 @@ export class InteractionSessions {
     });
     this.validationEditor = new ValidationEditor(deps.viewportEl);
     this.customEditor = new CustomEditorController(deps.viewportEl);
+    this.fills = new FillController({
+      store: deps.store,
+      loadable: deps.loadable,
+      activeSheet: deps.activeSheet,
+      sheet: deps.sheet,
+      toDataRow: deps.toDataRow,
+      readOnly: deps.readOnly,
+      commit: deps.commit,
+      undo: deps.undo,
+    });
     deps.scroller.addEventListener("contextmenu", this.onContextMenu);
     deps.scroller.addEventListener("pointerdown", this.onPointerDown);
     deps.scroller.addEventListener("dblclick", this.onDblClick);
@@ -326,6 +329,9 @@ export class InteractionSessions {
 
   reconcile(change: "view" | "sheet" | "structure" | "read-only" | "value"): void {
     if (change !== "value") this.cancelPointer();
+    // Any change but the fill's own ends Auto Fill Options, as in Excel.
+    if (change === "sheet" || change === "read-only") this.fills.dismiss();
+    else this.fills.documentChanged();
     if (change === "sheet" || change === "structure" || change === "read-only") {
       this.cancelEditor();
       return;
@@ -997,6 +1003,43 @@ export class InteractionSessions {
     return this.fillTarget;
   }
 
+  /** The value tip beside the fill handle while it is dragged. */
+  get fillTip(): FillTip | null {
+    return this.tip;
+  }
+
+  /** The cells of the last fill-handle fill, whose Auto Fill Options button shows with menus on. */
+  get autoFillTarget(): SelRect | null {
+    return this.contextMenu && !this.fillTarget ? this.fills.optionsTarget : null;
+  }
+
+  /**
+   * Open Auto Fill Options under its button: each choice redoes the last fill
+   * that way, as one undo step. Returns false when the host turned menus off.
+   */
+  openAutoFillOptions(clientX: number, clientY: number): boolean {
+    return this.openMenu(
+      this.fills.choices().map((choice) => ({
+        id: `autoFill-${choice}`,
+        label: AUTO_FILL_LABELS[choice],
+        onClick: () => {
+          const target = this.fills.optionsTarget;
+          if (target && this.fills.redo(choice)) this.selectFilled(target);
+          this.deps.scheduleRender();
+        },
+      })),
+      clientX,
+      clientY,
+    );
+  }
+
+  private selectFilled(target: SelRect): void {
+    const selection = this.deps.selection();
+    selection.selectCell(target.r0, target.c0);
+    selection.extendTo(target.r1, target.c1);
+    this.deps.emitSelection();
+  }
+
   cellAtPointer(clientX: number, clientY: number): CellRef | null {
     const rect = this.deps.viewportEl.getBoundingClientRect();
     const py = clientY - rect.top;
@@ -1302,12 +1345,7 @@ export class InteractionSessions {
       const end = this.deps.dataEdge(below, col, 1, 0);
       if (end === null || end < below) return;
       const target = { ...source, r1: end };
-      if (this.commitFill(source, target)) {
-        const selection = this.deps.selection();
-        selection.selectCell(target.r0, target.c0);
-        selection.extendTo(target.r1, target.c1);
-        this.deps.emitSelection();
-      }
+      if (this.fills.fill(source, target, {}, true)) this.selectFilled(target);
       this.deps.scheduleRender();
       return;
     }
@@ -2067,27 +2105,38 @@ export class InteractionSessions {
     const source = this.fillSourceRect();
     if (!source) return;
     this.fillTarget = null;
+    this.fills.dismiss();
+    this.fills.beginDrag(source);
     const move = (ev: PointerEvent): void => {
       const c = this.fillCellAt(ev.clientX, ev.clientY);
-      this.fillTarget = this.extendFill(source, c);
+      const target = this.extendFill(source, c);
+      this.fillTarget = target;
+      // Excel's tip: the value the last cell will get, beside the pointer.
+      const text = this.fills.tip(target, { swap: ev.ctrlKey || ev.altKey });
+      const viewport = this.deps.viewportEl.getBoundingClientRect();
+      this.tip =
+        text === null
+          ? null
+          : { text, x: ev.clientX - viewport.left, y: ev.clientY - viewport.top };
       this.deps.scheduleRender();
     };
     const up = (ev: PointerEvent): void => {
       this.detachDrag();
       const target = this.fillTarget;
       this.fillTarget = null;
+      this.tip = null;
       // Ctrl (Option on a Mac) swaps counting and copying, as in Excel.
-      if (target && this.commitFill(source, target, { swap: ev.ctrlKey || ev.altKey })) {
-        const selection = this.deps.selection();
-        selection.selectCell(target.r0, target.c0);
-        selection.extendTo(target.r1, target.c1);
-        this.deps.emitSelection();
+      if (target && this.fills.fill(source, target, { swap: ev.ctrlKey || ev.altKey }, true)) {
+        this.selectFilled(target);
       }
+      this.fills.endDrag();
       this.deps.scheduleRender();
     };
     const cancel = (): void => {
       // A cancelled fill-drag (browser reclaimed the pointer) commits nothing.
       this.fillTarget = null;
+      this.tip = null;
+      this.fills.endDrag();
       this.detachDrag();
       this.deps.scheduleRender();
     };
@@ -2126,141 +2175,8 @@ export class InteractionSessions {
         : { ...rect, c0: this.deps.nextVisibleCol(rect.c0, -1) }
       : rect;
     const source = down ? { ...target, r1: target.r0 } : { ...target, c1: target.c0 };
-    this.commitFill(source, target, { copy: true });
+    this.fills.fill(source, target, { copy: true });
     this.deps.scheduleRender();
-  }
-
-  private commitFill(source: SelRect, target: SelRect, options: FillOptions = {}): boolean {
-    if (this.deps.readOnly()) return false;
-
-    const sheet = this.deps.activeSheet();
-    const srcCols = source.c1 - source.c0 + 1;
-    const coordinates: Array<{ row: number; col: number }> = [];
-    for (let row = source.r0; row <= source.r1; row++) {
-      for (let col = source.c0; col <= source.c1; col++) {
-        coordinates.push({ row: this.deps.toDataRow(row), col });
-      }
-    }
-
-    const columns = this.deps.sheet().columns;
-    const captured = storeEngine(this.deps.store)?.captureCells(sheet, coordinates);
-    // Custom stores without an engine retain their scalar read contract.
-    const sources = coordinates.map((coordinate, index) => {
-      const cell = captured?.[index];
-      const addr = { sheet, ...coordinate };
-      const read = cell ?? this.deps.store.getCell(addr);
-      return {
-        resolved: read.resolved,
-        style: read.style,
-        kind: columns[coordinate.col]?.type === "date" ? "date" : dateKind(read.style.numberFormat),
-        formula: cell
-          ? cell.value.kind === "formula"
-            ? cell.value.src
-            : null
-          : (this.deps.loadable?.getFormula(addr) ?? null),
-      };
-    });
-    const sourceAt = (row: number, col: number) => {
-      const cell = sources[(row - source.r0) * srcCols + col - source.c0];
-      if (!cell) throw new Error("Missing captured fill source");
-      return cell;
-    };
-
-    const output = { ...target };
-    if (target.r0 < source.r0) output.r1 = source.r0 - 1;
-    else if (target.r1 > source.r1) output.r0 = source.r1 + 1;
-    else if (target.c0 < source.c0) output.c1 = source.c0 - 1;
-    else if (target.c1 > source.c1) output.c0 = source.c1 + 1;
-    else return false;
-    // A fill runs along the axis it extends: each source column for an up or
-    // down fill, each source row for a left or right fill.
-    const vertical = output.c0 === source.c0 && output.c1 === source.c1;
-
-    const series = new Map<number, FillSeries>();
-    const lines = vertical ? [source.c0, source.c1] : [source.r0, source.r1];
-    for (let line = lines[0] ?? 0; line <= (lines[1] ?? -1); line++) {
-      const cells: FillSourceCell[] = [];
-      const [from, to] = vertical ? [source.r0, source.r1] : [source.c0, source.c1];
-      for (let along = from; along <= to; along++) {
-        const cell = vertical ? sourceAt(along, line) : sourceAt(line, along);
-        cells.push({
-          value: cell.resolved,
-          isFormula: cell.formula !== null,
-          isDate: cell.kind === "date",
-          isTime: cell.kind === "time",
-        });
-      }
-      series.set(line, detectFillSeries(cells, options));
-    }
-
-    const dataRows: number[] = [];
-    for (let row = output.r0; row <= output.r1; row++) dataRows.push(this.deps.toDataRow(row));
-    const firstRow = dataRows[0];
-    if (firstRow === undefined) return false;
-
-    const startRow = dataRows.reduce((minimum, row) => Math.min(minimum, row), firstRow);
-    const endRow = dataRows.reduce((maximum, row) => Math.max(maximum, row), firstRow);
-    const range = {
-      sheet,
-      start: { row: startRow, col: output.c0 },
-      end: { row: endRow, col: output.c1 },
-    };
-    const metadata = this.deps.sheet();
-    // Validation and protection require per-cell operations for policy issue indices.
-    const scalarWrites = Boolean(
-      metadata.validationRules?.length || metadata.protectedRanges?.length,
-    );
-    const patches: DocumentOp[] = [];
-    const cells: SnapshotCell[] = [];
-    const srcRows = source.r1 - source.r0 + 1;
-    const wrap = (offset: number, size: number): number => ((offset % size) + size) % size;
-
-    for (let r = output.r0; r <= output.r1; r++) {
-      for (let c = output.c0; c <= output.c1; c++) {
-        // The source cell this target repeats; series steps count along the fill axis.
-        const sr = source.r0 + wrap(r - source.r0, srcRows);
-        const sc = source.c0 + wrap(c - source.c0, srcCols);
-        const lineSeries = series.get(vertical ? sc : sr);
-        if (!lineSeries) throw new Error(`Missing fill series for ${vertical ? "column" : "row"}`);
-
-        const step = lineSeries.stepAt(vertical ? r - source.r0 : c - source.c0);
-        const sourceRow = vertical && step.kind === "tile" ? source.r0 + step.sourceIndex : sr;
-        const sourceCol = !vertical && step.kind === "tile" ? source.c0 + step.sourceIndex : sc;
-        const cell = sourceAt(sourceRow, sourceCol);
-        const targetDataRow = this.deps.toDataRow(r);
-        let value: CellValue;
-        if (step.kind === "value") value = { kind: "literal", value: step.value };
-        else {
-          value = cell.formula
-            ? {
-                kind: "formula",
-                src: shiftA1Refs(
-                  cell.formula,
-                  targetDataRow - this.deps.toDataRow(sourceRow),
-                  c - sourceCol,
-                ),
-              }
-            : { kind: "literal", value: cell.resolved };
-        }
-
-        // Fill copies the source cell's format along with its value, as in Excel.
-        const style = cell.style;
-        if (scalarWrites) {
-          patches.push({ op: "set", addr: { sheet, row: targetDataRow, col: c }, value, style });
-        } else {
-          cells.push({
-            rowOffset: targetDataRow - startRow,
-            colOffset: c - output.c0,
-            value,
-            style,
-          });
-        }
-      }
-    }
-
-    // setRange keeps per-cell change events; setBlock reports them only on opt-in.
-    const patch: DocumentOp = { op: "setRange", range, cells };
-    return this.deps.commit(scalarWrites ? patches : [patch], "fill").status === "applied";
   }
 
   /**

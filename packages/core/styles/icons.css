@@ -302,6 +302,10 @@
   --sheetwrite-icon-x: -18;
   --sheetwrite-icon-y: -7.5;
 }
+.sheetwrite-icon[data-icon="autoFillOptions"] {
+  --sheetwrite-icon-x: -19.5;
+  --sheetwrite-icon-y: -7.5;
+}
 .sheetwrite-icon[data-icon="sortAsc"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -9;
