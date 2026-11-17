@@ -343,3 +343,33 @@ describe("find options", () => {
     grid.destroy();
   });
 });
+
+describe("previewReplaceAll", () => {
+  it("lists exactly the changes replaceAll writes, without writing", () => {
+    const workbook = makeWorkbook(4);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: A(0, 0), value: { kind: "literal", value: "A1 total" } },
+        { op: "set", addr: A(1, 0), value: { kind: "formula", src: "=A1&B1" } },
+        { op: "set", addr: A(2, 0), value: { kind: "formula", src: "=SUM(A1)" } },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.search("A1");
+
+    // `(A1` would break =SUM(A1), so neither the preview nor Replace all touch it.
+    const changes = grid.previewReplaceAll("(A1");
+    expect(changes).toEqual([
+      { addr: A(0, 0), kind: "value", before: "A1 total", after: "(A1 total" },
+      { addr: A(1, 0), kind: "formula", before: "=A1&B1", after: "=(A1&B1" },
+    ]);
+    expect(store.getCell(A(0, 0)).resolved).toBe("A1 total");
+
+    expect(grid.replaceAll("(A1").replaced).toBe(changes.length);
+    expect(store.getCell(A(0, 0)).resolved).toBe("(A1 total");
+    expect(store.getFormula(A(1, 0))).toBe("=(A1&B1");
+    expect(store.getFormula(A(2, 0))).toBe("=SUM(A1)");
+    grid.destroy();
+  });
+});

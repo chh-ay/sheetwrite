@@ -2,7 +2,7 @@ import { colToA1 } from "./a1.js";
 import { actionFeedbackFor } from "./action-feedback.js";
 import { cellDisplayText } from "./cell-input.js";
 import { checkStylePart } from "./style-parts.js";
-import type { Grid, SearchOptions, SearchResult } from "./types/grid.js";
+import type { Grid, ReplaceChange, SearchOptions, SearchResult } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
@@ -18,6 +18,19 @@ function formatCount(result: SearchResult): string {
   }
 
   return `${result.active + 1} of ${result.matches.length}`;
+}
+
+/** Replace all's summary: "8 cells, 2 of them formulas", "3 notes" or "Nothing to replace". */
+function previewSummary(changes: readonly ReplaceChange[]): string {
+  const count = changes.length;
+  if (count === 0) return "Nothing to replace";
+  if (changes[0]?.kind === "note") return `${count} ${count === 1 ? "note" : "notes"}`;
+
+  const cells = `${count} ${count === 1 ? "cell" : "cells"}`;
+  const formulas = changes.filter((change) => change.kind === "formula").length;
+  if (formulas === 0) return cells;
+  if (formulas === count) return `${cells}, ${count === 1 ? "a formula" : "all formulas"}`;
+  return `${cells}, ${formulas} of them ${formulas === 1 ? "a formula" : "formulas"}`;
 }
 
 /** A unique element ID for ARIA references inside one find bar. */
@@ -158,6 +171,7 @@ interface FindBarElements {
   readonly optionsToggle: HTMLButtonElement;
   readonly options: HTMLDivElement;
   readonly findAll: CellList;
+  readonly preview: CellList | null;
 }
 
 /** A control the Windows dialog reaches with Alt and a letter. */
@@ -183,6 +197,8 @@ export class FindBar {
   private elements: FindBarElements | null = null;
   private _open = false;
   private options: SearchOptions = {};
+  /** The changes the Replace all preview lists, in its row order. */
+  private changes: ReplaceChange[] = [];
   private result: SearchResult = { query: "", matches: [], active: -1 };
   private unsubscribe: (() => void) | null = null;
 
@@ -211,6 +227,7 @@ export class FindBar {
     if (this.elements) {
       this.elements.el.style.display = "none";
       this.elements.findAll.el.hidden = true;
+      if (this.elements.preview) this.elements.preview.el.hidden = true;
     }
     this._open = false;
 
@@ -332,6 +349,24 @@ export class FindBar {
         this.grid.selectMatch(index);
       },
     );
+    const preview = replace
+      ? new CellList("Replace all preview", ["Sheet", "Cell", "Before", "After"], (index) => {
+          this.goToChange(index);
+        })
+      : null;
+    if (preview) {
+      preview.el.classList.add("sheetwrite-find-preview");
+      el.append(preview.el);
+      replace?.input.addEventListener("input", () => {
+        this.renderPreview();
+      });
+      el.addEventListener("focusin", () => {
+        this.renderPreview();
+      });
+      el.addEventListener("focusout", (e) => {
+        this.renderPreview(e.relatedTarget);
+      });
+    }
     el.append(options.panel, findAll.el);
     this.host.appendChild(el);
     checkStylePart(el, "find", "The find bar");
@@ -344,6 +379,7 @@ export class FindBar {
       optionsToggle,
       options: options.panel,
       findAll,
+      preview,
     };
     options.panel.id = uniqueId("options");
     optionsToggle.setAttribute("aria-controls", options.panel.id);
@@ -518,6 +554,7 @@ export class FindBar {
     if (!elements) return;
     elements.count.textContent = formatCount(result);
     if (!elements.findAll.el.hidden) this.renderFindAll();
+    this.renderPreview();
   }
 
   private renderFindAll(): void {
@@ -547,6 +584,56 @@ export class FindBar {
         ];
       },
     );
+  }
+
+  /**
+   * Show what Replace all will change while the replace field has text or
+   * focus: a summary, and each cell or note with its text before and after.
+   * `focused` is the element that has, or is getting, the focus.
+   */
+  private renderPreview(focused: EventTarget | null = document.activeElement): void {
+    const preview = this.elements?.preview;
+    const replaceInput = this.elements?.replaceInput;
+    if (!preview || !replaceInput) return;
+    const engaged =
+      replaceInput.value !== "" ||
+      (focused instanceof Node && (focused === replaceInput || preview.el.contains(focused)));
+    preview.el.hidden = !this.result.query || !engaged;
+    if (preview.el.hidden) return;
+
+    const changes = this.grid.previewReplaceAll(replaceInput.value);
+    this.changes = changes;
+    const active = this.result.matches[this.result.active];
+    const activeRow = active
+      ? changes.findIndex(
+          ({ addr }) =>
+            addr.sheet === active.sheet && addr.row === active.row && addr.col === active.col,
+        )
+      : -1;
+    const names = new Map(
+      this.grid.store.getWorkbook().sheets.map((sheet) => [sheet.id, sheet.name]),
+    );
+    preview.show(changes.length, activeRow, previewSummary(changes), (index) => {
+      const change = changes[index];
+      if (!change) return [];
+      const { addr } = change;
+      return [
+        names.get(addr.sheet) ?? addr.sheet,
+        `$${colToA1(addr.col)}$${addr.row + 1}`,
+        change.before,
+        change.after,
+      ];
+    });
+  }
+
+  /** Go to the cell of one previewed change, as clicking a Find All result does. */
+  private goToChange(index: number): void {
+    const addr = this.changes[index]?.addr;
+    if (!addr) return;
+    const match = this.result.matches.findIndex(
+      (cell) => cell.sheet === addr.sheet && cell.row === addr.row && cell.col === addr.col,
+    );
+    if (match >= 0) this.grid.selectMatch(match);
   }
 
   /**

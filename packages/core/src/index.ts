@@ -395,6 +395,7 @@ export type {
   RelationshipStatus,
   RemoteOperationOptions,
   RemoteOperationSource,
+  ReplaceChange,
   ReplaceResult,
   ResolvedCell,
   ResourceOwnerBytes,

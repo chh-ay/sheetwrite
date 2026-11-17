@@ -890,6 +890,18 @@ export interface ReplaceResult {
   result: SearchResult;
 }
 
+/** One change `replaceAll` would make, as `previewReplaceAll` lists it. */
+export interface ReplaceChange {
+  /** The cell, or the cell the note belongs to. */
+  addr: CellAddress;
+  /** What is rewritten: a formula's text, a value, or a note. */
+  kind: "formula" | "value" | "note";
+  /** The text before the replacement: formula text, value text or note text. */
+  before: string;
+  /** The text after the replacement. */
+  after: string;
+}
+
 /**
  * View-aware editable snapshot of one cell, for hosts building a detached
  * formula bar or cell inspector. `address` is the translated *data* address —
@@ -1336,10 +1348,18 @@ export interface Grid {
   replaceCurrent(replacement: string): SearchResult;
   /**
    * Replace every current match in a single undoable transaction (one
-   * `undo()` restores them all), then re-scan. Formula/ref cells are skipped
-   * and not counted. No-op when read-only.
+   * `undo()` restores them all), then re-scan. Formula text is rewritten
+   * unless `lookIn` is `"values"`; reference cells and formulas the new text
+   * would break are skipped and not counted. No-op when read-only.
    */
   replaceAll(replacement: string): ReplaceResult;
+  /**
+   * The changes `replaceAll(replacement)` would make, in search order, without
+   * writing: each cell or note with its text before and after. It comes from
+   * the same plan as `replaceAll`, so it lists exactly what that writes.
+   * Empty when read-only.
+   */
+  previewReplaceAll(replacement: string): ReplaceChange[];
   /** Insert `count` (default 1) empty rows at row `at` of the active sheet, as one undo step. */
   insertRows(at: number, count?: number): void;
   /** Remove `count` (default 1) rows from row `at` of the active sheet, as one undo step. */
