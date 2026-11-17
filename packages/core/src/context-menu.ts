@@ -222,7 +222,7 @@ function actionHandler(
       return () => actions.clearContents();
 
     case "merge":
-      return () => actions.merge();
+      return () => actions.merge({ ask: true });
 
     case "unmerge":
       return () => actions.unmerge();

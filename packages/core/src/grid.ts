@@ -3,6 +3,12 @@ import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
 import type { AutoFilterHost } from "./autofilter-actions.js";
+import {
+  type AutoFilterCommandsHost,
+  clearFilters,
+  filterBySelection,
+  toggleAutoFilter,
+} from "./autofilter-commands.js";
 import { readBlockArraysOnce } from "./block-ingress.js";
 import {
   fontFor,
@@ -12,7 +18,12 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
-import type { CellCommand, CellCommandsHost } from "./cell-commands.js";
+import {
+  type CellCommandsHost,
+  formatCells,
+  insertOrDelete,
+  runCellCommand,
+} from "./cell-commands.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
@@ -58,6 +69,7 @@ import {
 import { hyperlinkAt, resolveHyperlinkTarget, sanitizeCellHyperlink } from "./hyperlink.js";
 import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
+import { mergeSelection } from "./merge-command.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
 import { sheetNameKey } from "./name-key.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
@@ -81,6 +93,8 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
+import { stepSheet } from "./sheet-commands.js";
+import { planSheetCopy } from "./sheet-copy.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
@@ -583,17 +597,17 @@ export class GridImpl implements Grid {
   private findBar: FindBar | null = null;
   /** The find bar build; a reset closes it, so a chunk that loads late is dropped. */
   private readonly findBarBuilds = new ScopeSlot(this.lifetime);
-  /** What the lazily loaded AutoFilter commands use; built on their first use. */
-  private autoFilterHost: AutoFilterHost | null = null;
-  /** The AutoFilter chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
+  /** What the AutoFilter commands and the lazily loaded dropdown use; built on first use. */
+  private autoFilterHost: (AutoFilterHost & AutoFilterCommandsHost) | null = null;
+  /** The dropdown chunk's build; a destroy closes it, so a chunk that loads late is dropped. */
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
   /** The open dialog; opening another or destroying the grid closes it. */
   private readonly dialogs = new ScopeSlot(this.lifetime);
   /** What the lazily loaded dialogs use; one is open at a time. */
   private readonly dialogHost: DialogHost;
-  /** What the lazily loaded cell commands use; built on their first use. */
+  /** What the cell commands use; built on their first use. */
   private cellCommandsHost: CellCommandsHost | null = null;
-  /** Commands whose code is loading on first use. */
+  /** Find, dialogs, panels and the dashboard builder whose code is loading on first use. */
   private commandLoads = 0;
   /** Keys pressed on the grid while they load, in order. */
   private readonly heldKeys: KeyboardEvent[] = [];
@@ -1009,16 +1023,11 @@ export class GridImpl implements Grid {
       },
       openFind: (options) => this.openFindBar(options),
       keyCommand: (command) => {
-        if (command !== "nextSheet" && command !== "previousSheet") {
-          this.cellCommand(command);
-          return;
-        }
-        void this.sheetCommand((commands) => {
-          if (!this.lifetime.closed) commands.stepSheet(this, command);
-        });
+        if (command === "nextSheet" || command === "previousSheet") stepSheet(this, command);
+        else runCellCommand(this.cellCommands(), command);
       },
       openAutoFilter: (col) =>
-        this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
+        this.withAutoFilterMenu((filters, host) => filters.openAutoFilterMenu(host, col)),
       holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
       autoComplete: () => this.config?.autoComplete !== false,
       store: this.store,
@@ -1702,8 +1711,8 @@ export class GridImpl implements Grid {
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
       onCommand: (command, id) =>
-        void this.sheetCommand((commands) => {
-          if (this.sheetTabs) commands.openTabPanel(this, this.sheetTabs, command, id);
+        this.loadCommand(import("./sheet-tab-panels.js"), ({ openTabPanel }) => {
+          if (this.sheetTabs) openTabPanel(this, this.sheetTabs, command, id);
         }),
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
@@ -2822,10 +2831,35 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * Run an AutoFilter command once its chunk has loaded: the commands and
-   * the dropdown load on first use, as the find bar does.
+   * What the AutoFilter commands and its dropdown read and change in the
+   * grid; built on first use.
    */
-  private withAutoFilter(
+  private autoFilter(): AutoFilterHost & AutoFilterCommandsHost {
+    this.autoFilterHost ??= {
+      grid: this,
+      host: this.host,
+      theme: this.baseTheme,
+      sheet: () => this.sheet(),
+      focus: () => {
+        const focus = this.selection.focusCell;
+        return focus
+          ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
+          : null;
+      },
+      selectedRange: () => this.selectedSortRange(),
+      commit: (op) => this.document.commit([op], "structure"),
+      feedback: (message) => this.actionFeedback.show(message),
+      anchor: (row, col) => {
+        const viewRow = this.toViewRow(row);
+        return viewRow === null ? null : this.cellClientRect(viewRow, col);
+      },
+      adopt: (dispose) => this.autoFilterBuilds.current().add(dispose),
+    };
+    return this.autoFilterHost;
+  }
+
+  /** Run `run` with the AutoFilter dropdown's code, which loads on first use, as the find bar's does. */
+  private withAutoFilterMenu(
     run: (filters: typeof import("./autofilter-actions.js"), host: AutoFilterHost) => void,
   ): void {
     if (this.lifetime.closed) return;
@@ -2833,28 +2867,7 @@ export class GridImpl implements Grid {
     this.loadCommand(
       import("./autofilter-actions.js"),
       (filters) => {
-        if (build.closed) return;
-        this.autoFilterHost ??= {
-          grid: this,
-          host: this.host,
-          theme: this.baseTheme,
-          sheet: () => this.sheet(),
-          focus: () => {
-            const focus = this.selection.focusCell;
-            return focus
-              ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
-              : null;
-          },
-          selectedRange: () => this.selectedSortRange(),
-          commit: (op) => this.document.commit([op], "structure"),
-          feedback: (message) => this.actionFeedback.show(message),
-          anchor: (row, col) => {
-            const viewRow = this.toViewRow(row);
-            return viewRow === null ? null : this.cellClientRect(viewRow, col);
-          },
-          adopt: (dispose) => this.autoFilterBuilds.current().add(dispose),
-        };
-        run(filters, this.autoFilterHost);
+        if (!build.closed) run(filters, this.autoFilter());
       },
       (error: unknown) => {
         if (build.closed) return;
@@ -2866,19 +2879,24 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * Merge or Merge & Center. The command loads on first use, with the
-   * warning it may show, so the merge lands a moment after the call.
+   * Merge or Merge & Center. With `ask`, as Excel's own command, a range in
+   * which more than one cell holds a value merges after the warning's OK;
+   * otherwise it merges now.
    */
-  private mergeCells(center: boolean): void {
-    this.loadCommand(import("./merge-command.js"), ({ mergeSelection }) => {
-      if (!this.lifetime.closed) mergeSelection(this.styleDeps, center, this.dialogHost);
-    });
+  private mergeCells(center: boolean, options?: { ask?: boolean }): void {
+    const warn = (message: string): Promise<boolean> =>
+      this.openDialog(
+        import("./dialog.js"),
+        (dialogs, host) => dialogs.confirmDialog(host, { title: "Merge Cells", message }).result,
+      ).then((ok) => ok === true);
+    mergeSelection(this.styleDeps, center, options?.ask ? warn : undefined);
   }
 
   /**
-   * Run a command whose code loads on first use. Keys pressed on the grid
-   * while any such load is pending wait, then act in order where the
-   * commands left the focus, as they would have had the code been there.
+   * Run UI whose code loads on first use: the find bar, a dialog, a panel or
+   * the dashboard builder. Keys pressed on the grid while any such load is
+   * pending wait, then act in order where the UI left the focus, as they
+   * would have had the code been there.
    */
   private loadCommand<T>(
     load: Promise<T>,
@@ -2909,36 +2927,31 @@ export class GridImpl implements Grid {
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
-  /** Run a command of `cell-commands.ts`, which loads on first use. */
-  private cellCommand(command: CellCommand): void {
-    this.loadCommand(import("./cell-commands.js"), ({ runCellCommand }) => {
-      if (this.lifetime.closed) return;
-      this.cellCommandsHost ??= {
-        grid: this,
-        dialogs: this.dialogHost,
-        style: this.styleDeps,
-        bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
-        font: () => this.theme.font,
-      };
-      runCellCommand(this.cellCommandsHost, command);
-    });
+  /** What the commands of `cell-commands.ts` use; built on first use. */
+  private cellCommands(): CellCommandsHost {
+    this.cellCommandsHost ??= {
+      grid: this,
+      style: this.styleDeps,
+      bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
+      font: () => this.theme.font,
+      dialog: (load, open) => this.openDialog(load, open),
+    };
+    return this.cellCommandsHost;
   }
 
   /**
-   * Run a command of `sheet-commands.ts`, which loads on first use, as
-   * `loadCommand` runs one; the promise settles with the command's result.
+   * Open a dialog from `load`, a module that loads on first use, as
+   * `loadCommand` runs UI. Resolves with the dialog's answer, or null when
+   * the grid is destroyed before it opens.
    */
-  private sheetCommand<T>(run: (commands: typeof import("./sheet-commands.js")) => T): Promise<T> {
+  private openDialog<M, T>(
+    load: Promise<M>,
+    open: (module: M, dialogs: DialogHost) => Promise<T | null>,
+  ): Promise<T | null> {
     return new Promise((resolve, reject) => {
       this.loadCommand(
-        import("./sheet-commands.js"),
-        (commands) => {
-          try {
-            resolve(run(commands));
-          } catch (error) {
-            reject(error);
-          }
-        },
+        load,
+        (module) => resolve(this.lifetime.closed ? null : open(module, this.dialogHost)),
         reject,
       );
     });
@@ -3375,16 +3388,15 @@ export class GridImpl implements Grid {
     return { ...result, sheet: id };
   }
 
-  copySheet(
-    id: SheetId,
-    options: { index?: number; name?: string } = {},
-  ): Promise<SheetLifecycleResult> {
-    // The copy's code loads the first time a sheet is copied.
-    return this.sheetCommand(
-      (commands) =>
-        commands.copySheet(this.document, this.store.getWorkbook(), id, options) ??
-        this.rejectSheet(id, "sheet-not-found"),
+  copySheet(id: SheetId, options: { index?: number; name?: string } = {}): SheetLifecycleResult {
+    const plan = planSheetCopy(
+      this.store.getWorkbook(),
+      (sheet) => this.document.snapshotSheet(sheet),
+      id,
+      options,
     );
+    if (!plan) return this.rejectSheet(id, "sheet-not-found");
+    return { ...this.document.commit(plan.operations, "structure"), sheet: plan.sheet };
   }
 
   private rejectSheet(id: SheetId, code: "reserved" | "sheet-not-found"): SheetLifecycleResult {
@@ -3806,7 +3818,7 @@ export class GridImpl implements Grid {
         this.styleActions.applyStyle({ numberFormat });
       },
       setBorders: (preset) => this.styleActions.setBorders(preset),
-      mergeAndCenter: () => this.mergeCells(true),
+      mergeAndCenter: (options) => this.mergeCells(true, options),
       clearAll: () => this.styleActions.clearAll(),
       autoSum: () => this.autoSum(),
       find: () => this.openFindBar(),
@@ -3816,7 +3828,7 @@ export class GridImpl implements Grid {
       },
       toggleBorder: () => this.styleActions.toggleBorder(),
       clearFormat: () => this.styleActions.applyStyle(null),
-      merge: () => this.mergeCells(false),
+      merge: (options) => this.mergeCells(false, options),
       unmerge: () => this.styleActions.unmergeSelection(),
       sort: (ascending) => {
         const f = this.selection.focusCell;
@@ -3863,9 +3875,9 @@ export class GridImpl implements Grid {
         const cols = this.selectedColumns();
         if (cols) this.removeColumns(cols.first, cols.count);
       },
-      insertCells: () => this.cellCommand("insertCells"),
-      deleteCells: () => this.cellCommand("deleteCells"),
-      formatCells: () => this.cellCommand("formatCells"),
+      insertCells: (options) => insertOrDelete(this.cellCommands(), true, options),
+      deleteCells: (options) => insertOrDelete(this.cellCommands(), false, options),
+      formatCells: (format) => formatCells(this.cellCommands(), format),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =
@@ -3902,14 +3914,12 @@ export class GridImpl implements Grid {
         const target = col ?? this.selection.focusCell?.col;
         if (target !== undefined) this.setColumnFilter(target, null);
       },
-      toggleAutoFilter: () =>
-        this.withAutoFilter((filters, host) => filters.toggleAutoFilter(host)),
-      clearFilters: () => this.withAutoFilter((filters, host) => filters.clearFilters(host)),
+      toggleAutoFilter: () => toggleAutoFilter(this.autoFilter()),
+      clearFilters: () => clearFilters(this.autoFilter()),
       reapplyFilter: () => {
         this.reapplyFilter();
       },
-      filterBySelection: () =>
-        this.withAutoFilter((filters, host) => filters.filterBySelection(host)),
+      filterBySelection: () => filterBySelection(this.autoFilter()),
       copy: () => this.clipboard.copy(),
       cut: () => this.clipboard.cut(),
       paste: () => this.clipboard.paste(),

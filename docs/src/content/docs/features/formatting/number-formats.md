@@ -140,7 +140,9 @@ Ctrl/Cmd + 1, the context menu's Format cells… or `grid.actions.formatCells()`
 - **Border**: None, Outline, All borders, Thick outline, Top, Bottom, Left or Right.
 - **Fill**: no fill or a color.
 
-OK applies only what you changed, to every selected cell, as one undoable step; the cells keep their other formatting. Cancel and Escape change nothing. Arrow keys move between the tabs, Tab moves into the shown tab, and Enter chooses OK. The dialog is in its own chunk, loaded on first use. Excel's Fraction and Text categories are not offered, because the formatter does not support them.
+OK applies only what you changed, to every selected cell, as one undoable step; the cells keep their other formatting. Cancel and Escape change nothing. Arrow keys move between the tabs, Tab moves into the shown tab, and Enter chooses OK. The dialog is in its own chunk, loaded on first use; keys pressed meanwhile reach it. Excel's Fraction and Text categories are not offered, because the formatter does not support them.
+
+From code, `grid.actions.formatCells({ style, border })` applies a format to the selection without the dialog, as OK does: `style` merges into each cell's style and `border` is a border preset such as `"all"` or `"outside"`, as one undoable step that is in place when the call returns.
 
 ## Format codes
 

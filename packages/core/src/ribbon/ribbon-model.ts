@@ -589,10 +589,14 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
               label: "Merge & Center",
               icon: "mergeAndCenter",
               availability: "edit",
-              run: (grid) => grid.actions.mergeAndCenter(),
+              run: (grid) => grid.actions.mergeAndCenter({ ask: true }),
               items: [
-                item("Merge & Center", (grid) => grid.actions.mergeAndCenter(), "mergeAndCenter"),
-                item("Merge Cells", (grid) => grid.actions.merge(), "merge"),
+                item(
+                  "Merge & Center",
+                  (grid) => grid.actions.mergeAndCenter({ ask: true }),
+                  "mergeAndCenter",
+                ),
+                item("Merge Cells", (grid) => grid.actions.merge({ ask: true }), "merge"),
                 item("Unmerge Cells", (grid) => grid.actions.unmerge(), "unmerge"),
               ],
             },
