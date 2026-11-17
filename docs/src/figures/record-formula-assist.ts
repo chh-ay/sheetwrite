@@ -33,9 +33,9 @@ const KEY_MS = { min: 110, max: 220 } as const;
 /** How long the page may take to draw its first frame. */
 const READY_TIMEOUT_MS = 60_000;
 /** The loop on the page: this slice of the demo, in seconds. */
-const LOOP = { start: 1, length: 7 } as const;
+const LOOP = { start: 2, length: 8 } as const;
 /** The poster: the frame at this second, a suggestion on screen. */
-const POSTER_AT = 3.2;
+const POSTER_AT = 5;
 /** A recording must change its picture in at least this share of frames, or the page did not respond. */
 const MIN_CHANGED_FRAMES = 0.02;
 
