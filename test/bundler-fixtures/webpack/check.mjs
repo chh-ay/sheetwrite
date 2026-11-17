@@ -60,6 +60,9 @@ const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
 // Webpack may give the dialog shell a chunk of its own or copy it into the
 // Format Cells chunk.
 const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
+// The Keyboard shortcuts panel loads on first use; its dialog class survives
+// minifiers. Like Format Cells, its chunk may hold a copy of the dialog shell.
+const KEYBOARD_SETTINGS_MARKER = "sheetwrite-keyboard-settings";
 // The sheet menu's Move or Copy dialog and Tab Color palette load on first
 // use, together; the dialog's last list entry survives minifiers.
 const SHEET_TAB_PANELS_MARKER = "(move to end)";
@@ -85,6 +88,7 @@ const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
 const formatCellsChunks = [];
+const keyboardSettingsChunks = [];
 const dialogChunks = [];
 const sheetTabPanelChunks = [];
 const dashboardChunks = [];
@@ -112,6 +116,7 @@ for (const file of lazyChunks) {
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(KEYBOARD_SETTINGS_MARKER)) keyboardSettingsChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
@@ -144,6 +149,10 @@ if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
 if (formatCellsChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
+if (keyboardSettingsChunks.length !== 1)
+  throw new Error(
+    `Expected one lazy webpack Keyboard shortcuts chunk, got ${keyboardSettingsChunks.length}`,
+  );
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
 if (sheetTabPanelChunks.length !== 1) {
@@ -247,6 +256,7 @@ const assets = publicFiles.map((file) => {
       findChunks,
       autoFilterChunks,
       formatCellsChunks,
+      keyboardSettingsChunks,
       dialogChunks,
       sheetTabPanelChunks,
       documentChunks,
