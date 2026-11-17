@@ -144,7 +144,11 @@ function fencedCode(source: string): string {
   return fence?.[2] ?? source;
 }
 
-function ShowcaseCodeBlock(props: {
+/**
+ * The code behind a demo beside the APIs it calls, or beside its figure.
+ * Styles: showcase-layout.css.
+ */
+export function ShowcaseCodeBlock(props: {
   readonly code: ShowcaseCode;
   readonly guide: ShowcaseGuide | undefined;
 }) {

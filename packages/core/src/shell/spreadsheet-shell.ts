@@ -268,16 +268,22 @@ export function createSpreadsheetShell(
     bottomRow.prepend(tabHost);
     tabs = new SheetTabs(tabHost, {
       onActivate: (id) => grid.setActiveSheet(id),
-      onAdd: () => {
-        const result = grid.addSheet({ name: nextSheetName() });
+      onAdd: (index) => {
+        const result = grid.addSheet({ name: nextSheetName(), index });
         if (result.status === "applied") grid.setActiveSheet(result.sheet);
         return result;
       },
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),
       onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
+      // The same chunk Grid loads for its own tab bar.
+      onCommand: (command, id) =>
+        void import("../sheet-tab-panels.js").then(({ openTabPanel }) => {
+          if (tabs) openTabPanel(grid, tabs, command, id);
+        }),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
+      icons: () => chrome.icons,
     });
     tabs.setReadOnly(readOnly);
   };

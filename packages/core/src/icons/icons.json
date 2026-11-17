@@ -237,6 +237,18 @@
       "column": 9,
       "row": 5
     },
+    "insertCells": {
+      "column": 10,
+      "row": 5
+    },
+    "deleteCells": {
+      "column": 11,
+      "row": 5
+    },
+    "formatCells": {
+      "column": 12,
+      "row": 5
+    },
     "sortAsc": {
       "column": 0,
       "row": 6
@@ -267,6 +279,14 @@
     },
     "reapplyFilter": {
       "column": 7,
+      "row": 6
+    },
+    "filterArrow": {
+      "column": 8,
+      "row": 6
+    },
+    "filterActive": {
+      "column": 9,
       "row": 6
     },
     "chart": {
@@ -303,6 +323,10 @@
     },
     "pivotTable": {
       "column": 8,
+      "row": 7
+    },
+    "pivotChart": {
+      "column": 9,
       "row": 7
     },
     "insertFunction": {
@@ -372,6 +396,26 @@
     "importXlsx": {
       "column": 0,
       "row": 11
+    },
+    "settings": {
+      "column": 1,
+      "row": 11
+    },
+    "keyboardShortcuts": {
+      "column": 2,
+      "row": 11
+    },
+    "insertSheet": {
+      "column": 0,
+      "row": 12
+    },
+    "moveCopySheet": {
+      "column": 1,
+      "row": 12
+    },
+    "tabColor": {
+      "column": 2,
+      "row": 12
     }
   }
 }

@@ -35,9 +35,8 @@ function makeGrid(rowCount = 10, host = mountHost()): Grid {
 }
 
 describe("StyleActions merge policy", () => {
-  it("restores formula and reference sources and styles when undoing a merge", async () => {
-    const host = mountHost();
-    const grid = makeGrid(4, host);
+  it("restores formula and reference sources and styles when undoing a merge", () => {
+    const grid = makeGrid(4);
     const anchor = { sheet: "s1", row: 1, col: 0 };
     const covered = { ...anchor, row: 2, col: 1 };
     const target = { ...anchor, row: 0, col: 1 };
@@ -59,7 +58,6 @@ describe("StyleActions merge policy", () => {
     });
 
     grid.actions.merge();
-    await answerDialog(host, "OK");
     expect(grid.store.getCell(covered).resolved).toBeNull();
     grid.actions.undo();
     expect(grid.store.getFormula(anchor)).toBe("=B1*2");
@@ -139,9 +137,8 @@ describe("StyleActions merge policy", () => {
     grid.destroy();
   });
 
-  it("keeps anchor content, clears covered cells, and restores the merge with one undo", async () => {
-    const host = mountHost();
-    const grid = makeGrid(4, host);
+  it("keeps anchor content, clears covered cells, and restores the merge with one undo", () => {
+    const grid = makeGrid(4);
     const addresses = [
       { sheet: "s1", row: 1, col: 0 },
       { sheet: "s1", row: 1, col: 1 },
@@ -165,7 +162,6 @@ describe("StyleActions merge policy", () => {
     });
 
     grid.actions.merge();
-    await answerDialog(host, "OK");
 
     expect(grid.store.getWorkbook().sheets[0]!.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
     expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
@@ -206,10 +202,10 @@ describe("StyleActions merge policy", () => {
 
     const merges = (grid: Grid) => grid.store.getWorkbook().sheets[0]!.merges ?? [];
 
-    it("asks first, in a labelled alert dialog, and merges after OK", async () => {
+    it("asks first with `ask`, in a labelled alert dialog, and merges after OK", async () => {
       const { host, grid } = twoValues();
-      grid.actions.mergeAndCenter();
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      grid.actions.mergeAndCenter({ ask: true });
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
 
       expect(merges(grid)).toEqual([]);
       expect(grid.store.getCell(b6).resolved).toBe("m2");
@@ -237,8 +233,8 @@ describe("StyleActions merge policy", () => {
 
     it("keeps every value on Cancel or Escape, and keeps grid keys out", async () => {
       const { host, grid } = twoValues();
-      grid.actions.merge();
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      grid.actions.merge({ ask: true });
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       // Delete would clear the selection if it reached the grid.
       document.activeElement?.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
@@ -250,8 +246,8 @@ describe("StyleActions merge policy", () => {
       expect(document.activeElement).toBe(host);
       expect(dialog.isConnected).toBe(false);
 
-      grid.actions.merge();
-      const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      grid.actions.merge({ ask: true });
+      const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       again.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(again.isConnected).toBe(false);
@@ -262,8 +258,8 @@ describe("StyleActions merge policy", () => {
 
     it("keeps Tab inside the dialog, and Enter chooses OK", async () => {
       const { host, grid } = twoValues();
-      grid.actions.merge();
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      grid.actions.merge({ ask: true });
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       const [ok, cancel] = dialog.querySelectorAll("button");
       cancel!.focus();
       cancel!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));

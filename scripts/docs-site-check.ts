@@ -74,7 +74,10 @@ const CONTENT_SAMPLE: readonly {
   { path: "/docs/releases/0.7.0/", text: 7000, headings: 10, links: 50, code: true },
   { path: "/showcases/", text: 1500, headings: 2, links: 10, code: false },
   { path: "/showcases/recalculation/", text: 1500, headings: 3, links: 30, code: false },
-  { path: "/react/", text: 800, headings: 1, links: 1, code: false },
+  // The framework workbenches mount in the browser; their panels and code are static.
+  { path: "/react/", text: 2400, headings: 6, links: 50, code: true },
+  { path: "/vue/", text: 2400, headings: 7, links: 30, code: true },
+  { path: "/svelte/", text: 1900, headings: 5, links: 30, code: true },
 ];
 
 type Route =

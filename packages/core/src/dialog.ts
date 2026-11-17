@@ -49,7 +49,7 @@ interface Dialog {
 
 /** What a dialog needs from the grid that opens it. */
 export interface DialogHost {
-  /** The grid root; the backdrop covers it. */
+  /** The grid root, which holds the dialog element. */
   readonly host: HTMLElement;
   /** The grid's theme, for the widget variables. */
   theme(): Theme;
@@ -64,29 +64,30 @@ const FOCUSABLE = "button, input, select, textarea, [tabindex]:not([tabindex='-1
 let dialogCount = 0;
 
 /**
- * Open a modal dialog over the grid. A backdrop covers the grid until the
- * dialog closes. Tab and Shift+Tab stay inside the dialog, Escape cancels and
- * Enter chooses the default button. Keys never reach the grid while the
- * dialog has focus. On close the dialog is removed and the grid gets its
- * focus back.
+ * Open a modal dialog, centred in the window as Excel's are, whatever the
+ * size and place of the grid: a `<dialog>` in the browser's top layer, so no
+ * ancestor's overflow, transform or stacking can cut it. Its body scrolls
+ * when the window is short, and the title and buttons stay in view. The rest
+ * of the page is inert until the dialog closes. Tab and Shift+Tab stay inside
+ * the dialog, Escape cancels and Enter chooses the default button. Keys never
+ * reach the grid while the dialog has focus. On close the dialog is removed
+ * and the grid gets its focus back.
  */
 export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
   const { host } = grid;
   seedWidgetTheme(host, grid.theme());
   const id = `sheetwrite-dialog-${++dialogCount}`;
 
-  const backdrop = document.createElement("div");
-  backdrop.className = "sheetwrite-dialog-backdrop";
-  // A press on the backdrop keeps focus in the dialog.
-  backdrop.addEventListener("pointerdown", (event) => {
-    if (event.target === backdrop) event.preventDefault();
-  });
-
-  const element = document.createElement("div");
+  // The dialog stays in the grid root, so it inherits the widget variables.
+  const element = document.createElement("dialog");
   element.className = "sheetwrite-dialog";
   element.setAttribute("role", options.role ?? "dialog");
   element.setAttribute("aria-modal", "true");
   element.setAttribute("aria-labelledby", `${id}-title`);
+  // A press on the backdrop keeps focus in the dialog.
+  element.addEventListener("pointerdown", (event) => {
+    if (event.target === element) event.preventDefault();
+  });
 
   const title = document.createElement("h2");
   title.id = `${id}-title`;
@@ -111,7 +112,7 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
   const close = (value: string = options.cancel): void => {
     if (!open) return;
     open = false;
-    backdrop.remove();
+    element.remove();
     grid.returnFocus();
     resolve(value);
   };
@@ -136,7 +137,7 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
   }
 
   element.addEventListener("keydown", (event) => {
-    // The grid listens on its root, the backdrop's parent: its keys stop here.
+    // The grid listens on its root, the dialog's parent: its keys stop here.
     event.stopPropagation();
     if (event.isComposing) return;
     if (event.key === "Escape") {
@@ -169,9 +170,15 @@ export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
     }
   });
 
+  // The browser's own close request (Escape, or the Back gesture) cancels too.
+  element.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+
   element.append(title, body, row);
-  backdrop.append(element);
-  host.append(backdrop);
+  host.append(element);
+  element.showModal();
   checkStylePart(element, "grid", "The dialog");
   (options.initialFocus ?? defaultButton ?? element.querySelector<HTMLElement>(FOCUSABLE))?.focus();
   grid.adopt(() => close());
@@ -207,6 +214,26 @@ export function confirmDialog(
     cancel: "cancel",
   });
   return { result: dialog.result.then((value) => value === "ok"), close: () => dialog.close() };
+}
+
+/** Labels for {@link alertDialog}. */
+export interface AlertOptions {
+  readonly title: string;
+  readonly message: string;
+}
+
+/**
+ * Tell the user something they must read, as Excel's message boxes do: an
+ * alert dialog with the message and OK. Resolves once it closes.
+ */
+export async function alertDialog(grid: DialogHost, options: AlertOptions): Promise<void> {
+  await openDialog(grid, {
+    title: options.title,
+    role: "alertdialog",
+    body: options.message,
+    buttons: [{ label: "OK", value: "ok", default: true }],
+    cancel: "ok",
+  }).result;
 }
 
 /** One option of {@link choiceDialog}. */
@@ -283,7 +310,7 @@ function choiceDialog(
  * have yet, so those two choices show disabled. Excel's default is Shift
  * cells down for a `wide` range and Shift cells right for a tall one; while
  * those are disabled the dialog starts on Entire row or Entire column, the
- * same way round. `result` resolves to `entireRow`, `entireColumn` or null.
+ * same way round. `result` resolves to `row`, `column` or null.
  */
 export function insertDeleteDialog(
   grid: DialogHost,
@@ -297,14 +324,14 @@ export function insertDeleteDialog(
       disabled: true,
     },
     { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up", disabled: true },
-    { value: "entireRow", label: "Entire row" },
-    { value: "entireColumn", label: "Entire column" },
+    { value: "row", label: "Entire row" },
+    { value: "column", label: "Entire column" },
   ];
   const preferred = wide ? "shiftDown" : "shiftRight";
   const initial = choices.some((choice) => choice.value === preferred && !choice.disabled)
     ? preferred
     : wide
-      ? "entireRow"
-      : "entireColumn";
+      ? "row"
+      : "column";
   return choiceDialog(grid, { title: insert ? "Insert" : "Delete", choices, initial });
 }
