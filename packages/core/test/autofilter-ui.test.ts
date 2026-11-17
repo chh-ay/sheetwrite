@@ -80,7 +80,7 @@ const press = (target: HTMLElement, key: string, init: KeyboardEventInit = {}) =
     new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init }),
   );
 
-/** The grid imports the AutoFilter commands lazily; awaiting the same module runs its callback first. */
+/** The grid imports the AutoFilter dropdown lazily; awaiting the same module runs its callback first. */
 async function loaded(): Promise<void> {
   await import(ACTIONS_MODULE);
   await Promise.resolve();
@@ -94,11 +94,10 @@ async function dropdown(): Promise<HTMLElement> {
 }
 
 describe("AutoFilter in the grid", () => {
-  it("turns on for the current region with Ctrl+Shift+L and off again", async () => {
+  it("turns on for the current region with Ctrl+Shift+L and off again", () => {
     const { grid, host } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 1 } });
     press(host, "L", { ctrlKey: true, shiftKey: true });
-    await loaded();
     expect(grid.getAutoFilter()?.range).toEqual({
       sheet: "s1",
       start: { row: 0, col: 0 },
@@ -107,7 +106,6 @@ describe("AutoFilter in the grid", () => {
     expect(grid.getCommandState("filter").activity).toBe("active");
 
     press(host, "L", { ctrlKey: true, shiftKey: true });
-    await loaded();
     expect(grid.getAutoFilter()).toBeNull();
   });
 
@@ -115,7 +113,6 @@ describe("AutoFilter in the grid", () => {
     const { grid, host, store } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 0 } });
     grid.actions.toggleAutoFilter();
-    await loaded();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
     press(host, "ArrowDown", { altKey: true });
 
@@ -134,26 +131,25 @@ describe("AutoFilter in the grid", () => {
     expect(document.activeElement).toBe(host);
   });
 
-  it("filters by the selected cell's value, turning the AutoFilter on", async () => {
+  it("filters by the selected cell's value, turning the AutoFilter on", () => {
     const { grid } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 3, col: 0 } });
     grid.actions.filterBySelection();
-    await loaded();
     expect(grid.getAutoFilter()?.range.start).toEqual({ row: 0, col: 0 });
     expect(grid.getColumnFilters().get(0)).toEqual({ kind: "values", values: ["fig"] });
     grid.undo();
     expect(grid.getAutoFilter()).toBeNull();
   });
 
-  it("acts on keys pressed while its code loads, after the command, in order", async () => {
+  it("opens the dropdown for Alt+Down pressed right after Ctrl+Shift+L and ArrowUp", async () => {
     const { grid, host } = mount();
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-    // All three keys arrive before the AutoFilter's chunk has loaded; ArrowUp reaches B1.
+    // Ctrl+Shift+L acts at once and ArrowUp reaches B1; Alt+Down loads the dropdown.
     press(host, "L", { ctrlKey: true, shiftKey: true });
     press(host, "ArrowUp");
     press(host, "ArrowDown", { altKey: true });
 
-    // Ctrl+Shift+L acts first, so Alt+Down on B1 opens the Qty header's dropdown.
+    // Alt+Down on B1 opens the Qty header's dropdown.
     for (let tick = 0; tick < 10 && !document.querySelector('[role="dialog"]'); tick++) {
       await loaded();
     }
