@@ -3,7 +3,7 @@
 // They apply when they are called. Excel's Insert, Delete and Format Cells
 // dialogs, which the keys and `ask` open, load on first use.
 
-import type { FormatCellsChange, FormatCellsInput } from "./format-cells.js";
+import type { FormatCellsChange } from "./format-cells.js";
 import type { SelRect } from "./selection.js";
 import { StyleActions, type StyleActionsDeps } from "./style-actions.js";
 import type { CellStyle } from "./types/cell.js";
@@ -19,19 +19,17 @@ export interface CellCommandsHost {
   rect(): SelRect | null;
   /** The sheet's row count and its first and last shown columns. */
   bounds(): readonly [rows: number, firstCol: number, lastCol: number];
-  /** The theme's font shorthand, for the size and family an unstyled cell shows. */
-  font(): string;
   /**
    * Excel's Insert (`insert`) or Delete dialog for a `wide` or a tall range;
-   * resolves to `entireRow`, `entireColumn` or null. Its code loads on first
-   * use, and keys pressed meanwhile reach it once it opens.
+   * resolves to `row`, `column` or null. Its code loads on first use, and
+   * keys pressed meanwhile reach it once it opens.
    */
   insertDeleteDialog(insert: boolean, wide: boolean): Promise<string | null>;
   /**
-   * The Format Cells dialog for `input`; resolves to what OK changes, or null.
-   * It loads as the Insert dialog does.
+   * The Format Cells dialog for the selection; resolves to what OK changes,
+   * or null. It loads as the Insert dialog does.
    */
-  formatCellsDialog(input: FormatCellsInput): Promise<FormatCellsChange | null>;
+  formatCellsDialog(): Promise<FormatCellsChange | null>;
 }
 
 /**
@@ -48,7 +46,7 @@ export function insertOrDelete(
   const rect = host.rect();
   if (rect === null || host.style.readOnly()) return;
   const { actions } = host.grid;
-  const run = (choice: "row" | "column" | null): void => {
+  const run = (choice: string | null): void => {
     if (choice === "row") {
       if (insert) actions.insertRowAbove();
       else actions.deleteRow();
@@ -66,15 +64,8 @@ export function insertOrDelete(
   }
   // Excel's default choice follows the range's shape.
   const wide = rect.c1 - rect.c0 >= rect.r1 - rect.r0;
-  if (options.entire || !options.ask) {
-    run(options.entire ?? (wide ? "row" : "column"));
-    return;
-  }
-  void host
-    .insertDeleteDialog(insert, wide)
-    .then((choice) =>
-      run(choice === "entireRow" ? "row" : choice === "entireColumn" ? "column" : null),
-    );
+  if (options.entire || !options.ask) run(options.entire ?? (wide ? "row" : "column"));
+  else void host.insertDeleteDialog(insert, wide).then(run);
 }
 
 /**
@@ -103,25 +94,12 @@ export function formatCells(
   format?: { readonly style?: Partial<CellStyle>; readonly border?: BorderPreset },
 ): void {
   const deps = host.style;
-  const focus = deps.selection().focusCell;
-  if (focus === null || deps.readOnly()) return;
+  if (deps.selection().focusCell === null || deps.readOnly()) return;
   if (format) {
     formatSelection(deps, format.style ?? {}, format.border ?? null);
     return;
   }
-  const anchor = deps.anchorCell(focus.row, focus.col);
-  const cell = deps.store.getCell({
-    sheet: deps.activeSheet(),
-    row: deps.toDataRow(anchor.row),
-    col: anchor.col,
-  });
-  const numberFormat = cell.style.numberFormat ?? deps.sheet().columns[anchor.col]?.numberFormat;
-  const input = {
-    style: { ...cell.style, numberFormat },
-    sample: cell.resolved,
-    font: host.font(),
-  };
-  void host.formatCellsDialog(input).then((change) => {
+  void host.formatCellsDialog().then((change) => {
     if (change !== null) formatSelection(deps, change.style, change.border);
   });
 }

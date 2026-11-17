@@ -1019,17 +1019,15 @@ export class GridImpl implements Grid {
       },
       openFind: (options) => this.openFindBar(options),
       keyCommand: (command) => {
-        if (command === "insertCells" || command === "deleteCells") {
-          insertOrDelete(this.cellCommands(), command === "insertCells", { ask: true });
-        } else if (command === "formatCells") {
-          formatCells(this.cellCommands());
+        // Insert, Delete and Format Cells are in the first load; with Ctrl++ and Ctrl+- they ask.
+        if (command === "formatCells") this.actions.formatCells();
+        else if (command === "insertCells" || command === "deleteCells") {
+          this.actions[command]({ ask: true });
         } else if (command === "nextSheet" || command === "previousSheet") {
           void this.sheetCommand((commands) => {
             if (!this.lifetime.closed) commands.stepSheet(this, command);
           });
-        } else {
-          this.cellCommand(command);
-        }
+        } else this.cellCommand(command);
       },
       openAutoFilter: (col) =>
         this.withAutoFilterMenu((filters, host) => filters.openAutoFilterMenu(host, col)),
@@ -2961,16 +2959,14 @@ export class GridImpl implements Grid {
       style: this.styleDeps,
       rect: () => this.activeSelectionRect(),
       bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
-      font: () => this.theme.font,
       insertDeleteDialog: (insert, wide) =>
         this.openDialog(
           import("./dialog.js"),
           (dialogs, host) => dialogs.insertDeleteDialog(host, insert, wide).result,
         ),
-      formatCellsDialog: (input) =>
-        this.openDialog(
-          import("./format-cells.js"),
-          (dialogs, host) => dialogs.formatCellsDialog(host, input).result,
+      formatCellsDialog: () =>
+        this.openDialog(import("./format-cells.js"), (dialogs, host) =>
+          dialogs.formatSelectionDialog(host, this.styleDeps, this.theme.font),
         ),
     };
     return this.cellCommandsHost;
