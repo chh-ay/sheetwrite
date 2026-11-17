@@ -139,7 +139,9 @@ export class FormulaGhost {
       this.dismiss(text);
       return text;
     }
-    if (shown === null && plainTab && movesToNextArgument(text, analysis)) return `${text},`;
+    // Only with a suggester: without the add-on the bar keeps Excel's keys exactly.
+    const stops = shown === null && plainTab && this.session !== null;
+    if (stops && movesToNextArgument(text, analysis)) return `${text},`;
     return null;
   }
 
