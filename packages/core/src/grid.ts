@@ -84,7 +84,7 @@ import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { currentRegion, looksLikeHeader } from "./sort-target.js";
-import { IncompleteDataError, SheetwriteStore } from "./store.js";
+import { IncompleteDataError, SHEET_LIFECYCLE_MESSAGES, SheetwriteStore } from "./store.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
   addRowGroup,
@@ -3306,6 +3306,20 @@ export class GridImpl implements Grid {
         .sheets.filter((sheet) => sheet.id !== id)
         .map((sheet) => sheet.name),
     );
+    // Excel refuses History only when a user names a sheet; operations, undo
+    // and version restore may give the name back.
+    if (!validation.ok && validation.code === "reserved") {
+      const issue: MutationIssue = {
+        kind: "sheet-lifecycle",
+        severity: "error",
+        code: "reserved",
+        sheet: id,
+        operationIndex: 0,
+        message: SHEET_LIFECYCLE_MESSAGES.reserved,
+      };
+      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+      return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
+    }
     const result = this.document.commit(
       [{ op: "renameSheet", sheet: id, name: validation.name }],
       "structure",
