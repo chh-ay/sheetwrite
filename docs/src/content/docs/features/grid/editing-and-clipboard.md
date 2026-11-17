@@ -133,6 +133,7 @@ Cut and paste works as in Excel ([Move or copy cells and cell contents](https://
 
 - Cut changes nothing. It writes the cells to the system clipboard and marks them with a moving dashed border (still dashes when the user asks for reduced motion).
 - Paste moves the cells to the top-left cell of the selection, on this sheet or another one: values, formulas, formats, notes, hyperlinks and merged cells. The cells it leaves are emptied, and the cells it lands on are replaced.
+- Validation and conditional-format rules whose range lies inside the cut cells move with them. A conditional-format formula follows the moved cells as a moved formula does. A rule whose whole range the paste lands on goes; a rule the paste covers only in part keeps its range.
 - Every formula, defined name and chart that refers to a moved cell now refers to its new place. A reference to a cell that the paste replaced becomes `#REF!`.
 - A formula inside the moved block keeps pointing at the same cells: its relative references do not shift as they do after a copy.
 - A range that the block covers only in part changes only when the block holds a whole edge of it and moves along it, as in Excel: with `=SUM(A1:A10)`, moving A10 to A15 gives `=SUM(A1:A15)`.

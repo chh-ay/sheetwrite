@@ -1154,15 +1154,22 @@ export class DocumentController {
 
   /**
    * The move back, then what it cannot restore: the cells both blocks held,
-   * the notes, hyperlinks and merged cells of the cells the block landed on,
-   * and the formulas elsewhere whose reference became `#REF!` or lost an
-   * edge. Each block is captured before the move.
+   * the notes, hyperlinks, validation rules and merged cells of the cells
+   * the block landed on, the conditional formats of both sheets, and the
+   * formulas elsewhere whose reference became `#REF!` or lost an edge. Each
+   * block is captured before the move.
    */
   private inverseMoveCells(patch: MoveCellsOperation): Array<DocumentOp | HistoryPart> {
     const { from, to } = cellBlockMove(patch);
     const engine = storeEngine(this.options.store);
     const sheet = this.sheetById(to.sheet);
     const meetsTarget = (range: Range) => rangesIntersect(range, to);
+    // A conditional format has no ID, so each sheet gets its whole list back.
+    const formats = [...new Set([from.sheet, to.sheet])].map((id): DocumentOp => ({
+      op: "setSheetMeta",
+      sheet: id,
+      patch: { conditionalFormats: cloneJsonValue(this.sheetById(id)?.conditionalFormats ?? []) },
+    }));
     return [
       { op: "moveCells", range: to, to: { sheet: from.sheet, ...from.start } },
       this.blockCells(to),
@@ -1177,6 +1184,14 @@ export class DocumentController {
           sheet: to.sheet,
           hyperlink: cloneCellHyperlink(link),
         })),
+      ...(sheet?.validationRules ?? [])
+        .filter((rule) => meetsTarget(rule.range))
+        .map((rule): DocumentOp => ({
+          op: "setValidationRule",
+          sheet: to.sheet,
+          rule: cloneJsonValue(rule),
+        })),
+      ...formats,
       ...(sheet?.merges ?? [])
         .filter((merge) =>
           meetsTarget({

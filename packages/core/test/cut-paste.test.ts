@@ -9,7 +9,7 @@ import { Scope } from "../src/scope.js";
 import { SelectionModel } from "../src/selection.js";
 import { SheetwriteStore } from "../src/store.js";
 import type { CellAddress, DocumentOp, Range } from "../src/types.js";
-import { sheet } from "./fixtures.js";
+import { range, sheet } from "./fixtures.js";
 
 // Excel, "Move or copy cells and cell contents":
 // https://support.microsoft.com/en-us/office/move-or-copy-cells-and-cell-contents-803d65eb-6a3e-4534-8c6f-ff12d1c4139e
@@ -320,6 +320,76 @@ describe("cut and paste", () => {
 
     expect([h.value(0, 0), h.value(5, 0)]).toEqual([1, 42]);
     expect(h.marks.at(-1)).toBeNull();
+  });
+
+  it("moves validation and conditional-format rules inside the block, and undo puts them back", async () => {
+    harness = cutHarness();
+    const h = harness;
+    h.set(0, 0, 4);
+    h.set(0, 1, 1);
+    const formats = [
+      {
+        range: range("s1", 0, 0, 2, 0),
+        when: { kind: "formula" as const, source: "=A1>B1" },
+        style: { bold: true },
+      },
+    ];
+    h.document.commit(
+      [
+        {
+          op: "setValidationRule",
+          sheet: "s1",
+          rule: {
+            id: "moved",
+            range: range("s1", 0, 0, 2, 0),
+            condition: { kind: "list", values: [1, 2, 3, 4] },
+            policy: "warn",
+          },
+        },
+        {
+          op: "setValidationRule",
+          sheet: "s1",
+          rule: {
+            id: "replaced",
+            range: range("s1", 9, 3, 9, 3),
+            condition: { kind: "list", values: [5] },
+            policy: "warn",
+          },
+        },
+        { op: "setSheetMeta", sheet: "s1", patch: { conditionalFormats: formats } },
+      ],
+      "api",
+    );
+
+    // A1:B5 lands on D10:E14.
+    h.select(0, 0, 4, 1);
+    await h.clipboard.cut();
+    h.select(9, 3);
+    expect(await h.clipboard.paste()).toBe("done");
+
+    const moved = h.store.getWorkbook().sheets[0]!;
+    expect(moved.validationRules?.map((rule) => [rule.id, rule.range])).toEqual([
+      ["moved", range("s1", 9, 3, 11, 3)],
+    ]);
+    expect(moved.conditionalFormats).toEqual([
+      {
+        ...formats[0],
+        range: range("s1", 9, 3, 11, 3),
+        when: { kind: "formula", source: "=D10>E10" },
+      },
+    ]);
+
+    h.document.undo();
+    const restored = h.store.getWorkbook().sheets[0]!;
+    expect(
+      restored.validationRules
+        ?.map((rule) => [rule.id, rule.range] as const)
+        .sort(([left], [right]) => left.localeCompare(right)),
+    ).toEqual([
+      ["moved", range("s1", 0, 0, 2, 0)],
+      ["replaced", range("s1", 9, 3, 9, 3)],
+    ]);
+    expect(restored.conditionalFormats).toEqual(formats);
   });
 
   it("does not paste values after a cut, as Excel greys out Paste Special", async () => {
