@@ -14,7 +14,7 @@ use rustc_hash::FxHashMap;
 
 use wasm_bindgen::prelude::*;
 
-use crate::calc::{sheet_name_needs_quotes, Ast, RangeFlags, SheetRef};
+use crate::calc::{sheet_name_needs_quotes, Ast, RangeFlags, SheetRef, SHEET_COLS, SHEET_ROWS};
 use crate::graph::DirtyRect;
 use crate::permute::PERMUTE_PARTIAL_SPILL;
 use crate::store::{CellStore, BLOCK_INVALID, BLOCK_OK, BLOCK_RESOURCE_LIMIT};
@@ -35,11 +35,6 @@ pub(crate) struct CellMove {
     pub(crate) to: BlockAt,
     pub(crate) rows: u32,
     pub(crate) cols: u32,
-    /// The last row and column of the source sheet: a range that spans one
-    /// of them whole keeps spanning it.
-    from_last: (u32, u32),
-    /// The last row and column of the target sheet.
-    to_last: (u32, u32),
     /// Whether a reference to the source sheet's name needs quotes.
     from_quoted: bool,
     /// Whether a reference to the target sheet's name needs quotes.
@@ -56,6 +51,27 @@ enum Fate {
 }
 
 impl CellMove {
+    /// A move of the block at `row`, `col` to `to_row`, `to_col` on the sheet
+    /// that a formula's unqualified references name.
+    pub(crate) const fn on_own_sheet(
+        (row, col): (u32, u32),
+        (rows, cols): (u32, u32),
+        (to_row, to_col): (u32, u32),
+    ) -> Self {
+        Self {
+            from: BlockAt { sheet: 0, row, col },
+            to: BlockAt {
+                sheet: 0,
+                row: to_row,
+                col: to_col,
+            },
+            rows,
+            cols,
+            from_quoted: false,
+            to_quoted: false,
+        }
+    }
+
     /// The move that puts the block back.
     pub(crate) const fn reversed(&self) -> Self {
         Self {
@@ -63,8 +79,6 @@ impl CellMove {
             to: self.from,
             rows: self.rows,
             cols: self.cols,
-            from_last: self.to_last,
-            to_last: self.from_last,
             from_quoted: self.to_quoted,
             to_quoted: self.from_quoted,
         }
@@ -137,11 +151,11 @@ impl CellMove {
         let along_rows = from.col == to.col
             && from.col <= c0
             && c1 < from.col + self.cols
-            && !(r0 == 0 && r1 >= self.from_last.0);
+            && !(r0 == 0 && r1 >= SHEET_ROWS - 1);
         let along_cols = from.row == to.row
             && from.row <= r0
             && r1 < from.row + self.rows
-            && !(c0 == 0 && c1 >= self.from_last.1);
+            && !(c0 == 0 && c1 >= SHEET_COLS - 1);
         let moved_edge = if along_rows {
             moved_edge((r0, r1), (from.row, self.rows, to.row))
         } else if along_cols {
@@ -438,8 +452,11 @@ impl CellStore {
     #[inline(never)]
     fn cell_move(&self, at: [usize; 8]) -> Option<CellMove> {
         let [sheet, row, col, rows, cols, to_sheet, to_row, to_col] = at;
-        let from_last = self.block_fits(sheet, (row, col), (rows, cols))?;
-        let to_last = self.block_fits(to_sheet, (to_row, to_col), (rows, cols))?;
+        if !(self.block_fits(sheet, (row, col), (rows, cols))
+            && self.block_fits(to_sheet, (to_row, to_col), (rows, cols)))
+        {
+            return None;
+        }
         let quoted = |handle: usize| {
             self.sheet_names
                 .get(handle)
@@ -458,22 +475,22 @@ impl CellStore {
             },
             rows: u32::try_from(rows).ok()?,
             cols: u32::try_from(cols).ok()?,
-            from_last,
-            to_last,
             from_quoted: quoted(sheet),
             to_quoted: quoted(to_sheet),
         })
     }
 
-    /// The last row and column of a live sheet whose cells are all loaded
-    /// over the block, or `None` when the block does not fit.
+    /// Whether the block lies on a live sheet whose cells are all loaded
+    /// over it.
     fn block_fits(
         &self,
         sheet: usize,
         (row, col): (usize, usize),
         (rows, cols): (usize, usize),
-    ) -> Option<(u32, u32)> {
-        let data = self.sheets.get(sheet).filter(|_| self.sheet_alive[sheet])?;
+    ) -> bool {
+        let Some(data) = self.sheets.get(sheet).filter(|_| self.sheet_alive[sheet]) else {
+            return false;
+        };
         let (sheet_rows, sheet_cols) = (data.cells.row_count(), data.cells.n_cols());
         let fits = rows > 0
             && cols > 0
@@ -481,13 +498,7 @@ impl CellStore {
             && col.checked_add(cols).is_some_and(|end| end <= sheet_cols);
         let loaded = !data.cells.is_paged()
             || (row..row + rows).all(|r| (col..col + cols).all(|c| data.cells.is_loaded(r, c)));
-        if !(fits && loaded) {
-            return None;
-        }
-        Some((
-            u32::try_from(sheet_rows - 1).ok()?,
-            u32::try_from(sheet_cols - 1).ok()?,
-        ))
+        fits && loaded
     }
 
     fn can_dirty(&self, at: BlockAt, edit: &CellMove) -> bool {
