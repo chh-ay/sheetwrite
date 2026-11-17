@@ -58,9 +58,12 @@ const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
 const MERGE_MARKER = "Merging cells only keeps the upper-left value";
 const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
 // Format Cells (Ctrl+1) loads on first use; its class names survive minifiers.
-// The Insert and Delete dialogs load the dialog shell alone, which webpack may
-// also copy into the merge and Format Cells chunks.
+// Webpack may give the dialog shell a chunk of its own or copy it into the
+// merge, cell commands and Format Cells chunks.
 const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
+// Show hidden rows or columns, Insert and Delete load on first use; webpack keeps
+// the names of exports that a dynamic import reads.
+const CELL_COMMANDS_MARKER = "insertOrDelete";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -85,6 +88,7 @@ const autoFilterChunks = [];
 const mergeChunks = [];
 const formatCellsChunks = [];
 const dialogChunks = [];
+const cellCommandChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -109,6 +113,7 @@ for (const file of lazyChunks) {
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(CELL_COMMANDS_MARKER)) cellCommandChunks.push(file);
   else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
@@ -145,6 +150,8 @@ if (formatCellsChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
+if (cellCommandChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack cell commands chunk, got ${cellCommandChunks.length}`);
 if (addonRegistryChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
@@ -243,6 +250,7 @@ const assets = publicFiles.map((file) => {
       mergeChunks,
       formatCellsChunks,
       dialogChunks,
+      cellCommandChunks,
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,

@@ -265,21 +265,23 @@ export interface GridActions {
    * them; with whole columns, as many columns to their left. For any other
    * range an Insert dialog asks whether to insert entire rows or columns.
    * Its Shift cells right and Shift cells down choices are shown but not
-   * available yet. The dialog is in its own chunk, loaded on first use.
+   * available yet. The command loads on first use, so the change lands a
+   * moment after the call; a host can wait for the grid's `change` event.
    */
   insertCells(): void;
   /**
    * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
    * any other range, ask in a Delete dialog whether to delete entire rows or
-   * columns.
+   * columns. Like {@link GridActions.insertCells}, it loads on first use and
+   * lands a moment after the call.
    */
   deleteCells(): void;
   /**
    * Ctrl+1: open the Format Cells dialog for the selection, with Number,
    * Alignment, Font, Border and Fill tabs, showing the active cell's format.
    * OK applies what changed to every selected cell as one undoable step. The
-   * dialog is in its own chunk, loaded on first use. Does nothing on a
-   * read-only grid.
+   * command and the dialog load on first use, so the dialog opens a moment
+   * after the call. Does nothing on a read-only grid.
    */
   formatCells(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */

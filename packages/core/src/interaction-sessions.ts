@@ -88,6 +88,8 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
+  /** Ctrl+Shift+9 and Ctrl+Shift+0: show the hidden rows or columns inside the selection. */
+  unhide: (rows: boolean) => void;
   /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   store: Store;
@@ -1238,7 +1240,7 @@ export class InteractionSessions {
           break;
 
         case "unhideRows":
-          this.unhideInSelection(true);
+          this.deps.unhide(true);
           break;
 
         case "hideColumns":
@@ -1246,7 +1248,7 @@ export class InteractionSessions {
           break;
 
         case "unhideColumns":
-          this.unhideInSelection(false);
+          this.deps.unhide(false);
           break;
 
         case "insertCells":
@@ -1433,29 +1435,6 @@ export class InteractionSessions {
     this.deps.emitSelection();
     this.deps.scrollToCell({ sheet: this.deps.activeSheet(), row, col });
     this.deps.scheduleRender();
-  }
-
-  /**
-   * Ctrl+Shift+9 and Ctrl+Shift+0: show the hidden rows (or columns) inside
-   * the selected range, as Excel does. A range that starts at the first or
-   * ends at the last shown row also takes the hidden rows beyond it, so the
-   * whole sheet selected shows every hidden row.
-   */
-  private unhideInSelection(rows: boolean): void {
-    const rect = this.activeRect();
-    if (!rect || this.deps.readOnly()) return;
-    const grid = this.deps.grid;
-    if (rows) {
-      const first = rect.r0 === 0 ? 0 : this.deps.toDataRow(rect.r0);
-      const last = rect.r1 >= this.deps.rowCount() - 1 ? Infinity : this.deps.toDataRow(rect.r1);
-      const hidden = grid.hiddenRows().filter((row) => row >= first && row <= last);
-      if (hidden.length > 0) grid.actions.showRows(hidden);
-      return;
-    }
-    const first = rect.c0 <= this.deps.firstCol() ? 0 : rect.c0;
-    const last = rect.c1 >= this.deps.lastCol() ? Infinity : rect.c1;
-    const hidden = grid.hiddenColumns().filter((col) => col >= first && col <= last);
-    if (hidden.length > 0) grid.actions.showColumns(hidden);
   }
 
   /** The selected rectangle that holds the active cell, or null without a selection. */
