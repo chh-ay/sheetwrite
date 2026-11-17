@@ -19,6 +19,13 @@ import type { IslandName } from "./Island.tsx";
 const ISLANDS_ENTRY = "src/islands/client.tsx";
 const ISLANDS_MANIFEST = "islands-manifest.json";
 
+/**
+ * The search opener: lib/shell.ts imports it on pages with a search button,
+ * which preload it so the button and shortcuts work as soon as the page runs.
+ */
+const SEARCH_OPENER = "src/lib/search-opener.ts";
+const SEARCH_BUTTON = /\bdata-search-open\b/;
+
 /** The module each island loads on demand (islands/client.tsx imports the same paths). */
 const ON_DEMAND_ISLANDS: Readonly<Record<IslandName, string>> = {
   "activation-fixture": "src/islands/ActivationFixture.tsx",
@@ -112,6 +119,7 @@ function pageScripts(manifest: Manifest, html: string): string {
   // in the page, so their stylesheets are linked like every other island's.
   const preloads = new Set([
     ...chunkFiles(manifest, ISLANDS_ENTRY),
+    ...(SEARCH_BUTTON.test(html) ? chunkFiles(manifest, SEARCH_OPENER) : []),
     ...islands
       .filter((island) => !island.deferred)
       .flatMap((island) => chunkFiles(manifest, island.source)),
