@@ -364,7 +364,7 @@ try {
   await loadPanels(grid);
   await Promise.resolve();
   const added = grid.store.getWorkbook().sheets.at(-1);
-  assert.equal(added?.name, "Sheet 2");
+  assert.equal(added?.name, "Sheet2");
   assert.equal(grid.getActiveSheet(), added?.id);
   const inserted = grid.getPivots(added?.id).find((pivot) => pivot.id === "pivot-2");
   assert.deepEqual(inserted?.anchor, { row: 2, col: 0 });

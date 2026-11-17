@@ -101,6 +101,12 @@ export interface Viewport {
    * each row's sheet number, as Excel does, not its view position.
    */
   rowNumbers?: Uint32Array;
+  /**
+   * The zero-based, end-inclusive sheet rows of an AutoFilter's list below its
+   * header while a filter is on. Their row numbers paint in
+   * `Theme.selectionBorder`, as Excel shows a filtered list's numbers in blue.
+   */
+  filteredRows?: { start: number; end: number };
 }
 
 /** One frozen-pane paint: a window plus the clip rect and scroll offsets it paints with. */
@@ -117,6 +123,8 @@ export interface PanePaint {
   rowHeights?: Float64Array;
   /** Per-pane row header labels, like `Viewport.rowNumbers`. */
   rowNumbers?: Uint32Array;
+  /** The filtered list's rows, like `Viewport.filteredRows`. */
+  filteredRows?: { start: number; end: number };
 }
 
 export interface Renderer {
