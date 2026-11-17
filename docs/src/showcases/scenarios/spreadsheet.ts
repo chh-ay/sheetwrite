@@ -263,8 +263,7 @@ export function createSpreadsheetScenario(host: HTMLElement): SpreadsheetScenari
       grid: {
         workbook: salesWorkbook(),
         theme: siteGridTheme(),
-        // File › Options › Keyboard Shortcuts, and the gear of the compact ribbon.
-        config: { keyboardSettings: true },
+        config: {},
         addons: {
           queries: {
             fetchSource: async () => ({

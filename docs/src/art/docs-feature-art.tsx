@@ -845,7 +845,11 @@ export function KeyboardShortcutsDiagram() {
         from: 2,
         step: {
           title: "key-bindings-change",
-          lines: ["The host stores the bindings and passes them back as config.keyboard.bindings"],
+          lines: [
+            "The host stores the",
+            "bindings and passes them back",
+            "as config.keyboard.bindings",
+          ],
           tone: "muted",
         },
       }}
