@@ -16,12 +16,12 @@ For each check, save the result file under the name given and attach it to the i
 | 8 | #227 | `test/fixtures/excel-checks/power-query-csv.xlsx` | `power-query-csv-excel.xlsx` |
 | 9 | #433 | none; type the formulas into a new workbook | none; record what Excel shows |
 | 10 | #226 | `test/fixtures/excel-checks/links-sheetwrite-export.xlsx` and `Budget.xlsx` | `links-excel.xlsx` |
-| 16 | #821 | none; type the values into a new workbook | none; record what Excel shows |
 | 11 | #226 | `test/fixtures/excel-checks/links-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 12 | #230 | `test/fixtures/excel-checks/measures-model-pivot.xlsx` | none; record what Excel shows |
 | 13 | #230 | `test/fixtures/excel-checks/measures-only-model.xlsx` | `measures-only-model-excel.xlsx` |
 | 14 | #231 | `test/fixtures/excel-checks/dashboard-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 15 | #501 | `test/fixtures/excel-checks/chart-levels-sheetwrite-export.xlsx` | `chart-levels-excel.xlsx` |
+| 16 | #821 | none; type the values into a new workbook | none; record what Excel shows |
 
 ## 1. Sort order (#353)
 
@@ -245,4 +245,4 @@ Sheetwrite's Paste Special follows Excel's Paste options page, which does not sa
 2. Select A1:A4, **Copy**. Select C1, **Home › Paste › Paste Special…**, choose **Values** and **Add**, **OK**.
 3. Undo, then do step 2 again with **All** and **Add**, then with **Divide** and `0` typed in A1.
 
-Expected (what Sheetwrite does): with Values and Add, C1 is `11`, C2 is the formula `=(5)+20`, C3 stays `7` (the copied text leaves it), C4 stays `xyz` (the target's text stays). With All and Add, C2 is `=(5)+(A2*2)` with A2's reference shifted as a copy shifts it. Dividing by a copied `0` gives `#DIV/0!`. Record the cell contents Excel shows, formulas included.
+Expected (what Sheetwrite does): with Values and Add, C1 is `11`, C2 is the formula `=(5)+20`, C3 stays `7` (the copied text leaves it), C4 stays `xyz` (the target's text stays). With All and Add, C2 is `=(5)+(C1*2)`: the copied `=A1*2` shifted two columns, as a copy shifts it. Dividing by a copied `0` gives `#DIV/0!`. Record the cell contents Excel shows, formulas included.
