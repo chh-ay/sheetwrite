@@ -257,17 +257,17 @@ export function extractParserSpellings(source: string): string[] {
 }
 
 /**
- * Canonical names of the functions that `ast_is_volatile` in the engine treats
+ * Canonical names of the functions that `calls_volatile` in the engine treats
  * as volatile. Reading the engine source keeps the published metadata in step
  * with what the engine recalculates, instead of a second hand-written list.
  */
 export function extractVolatileFunctions(typesSource: string, calcSource: string): string[] {
   const arm = typesSource.match(
-    /fn ast_is_volatile\(ast: &Ast(?:, names: NameScope<'_>)?\) -> bool \{\s*match ast \{\s*Ast::Func\(\s*([^)]*?),\s*_,?\s*\)\s*=>\s*true,/,
+    /fn calls_volatile\(ast: &Ast\) -> bool \{\s*matches!\(\s*ast,\s*Ast::Func\(\s*([^)]*?),\s*_,?\s*\)/,
   );
   const variants = arm?.[1]?.split("|").map((entry) => entry.trim().replace(/^Func::/, ""));
   if (!variants || variants.some((variant) => !/^[A-Za-z][A-Za-z0-9_]*$/.test(variant))) {
-    throw new Error("volatile function arm not found in ast_is_volatile");
+    throw new Error("volatile function list not found in calls_volatile");
   }
 
   const canonical = new Map<string, string>();
