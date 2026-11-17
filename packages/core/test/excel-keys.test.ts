@@ -518,7 +518,7 @@ describe("insert and delete keys", () => {
       ],
     });
     const choose = async (choice: number) => {
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[choice]!.checked = true;
       await answerDialog(host, "OK");
     };
@@ -547,7 +547,7 @@ describe("insert and delete keys", () => {
     select(1, 0);
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
     await choose(1);
-    const notice = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const notice = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(notice.getAttribute("role")).toBe("alertdialog");
     expect(notice.textContent).toContain("can't be shifted off the sheet");
     await answerDialog(host, "OK");
@@ -590,7 +590,7 @@ describe("insert and delete keys", () => {
     // Insert at A2 (tall), Shift cells right: A2:B2 move to B2:C2.
     select(1, 0);
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")[0]!.checked = true;
     await answerDialog(host, "OK");
     expect([0, 1, 2].map((col) => value(1, col))).toEqual([null, "Customer 1", 10.5]);
@@ -599,7 +599,7 @@ describe("insert and delete keys", () => {
     // Delete A2, Shift cells left: B2:C2 move back.
     select(1, 0);
     press("-", { ctrlKey: true, code: "Minus" });
-    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     remove.querySelectorAll<HTMLInputElement>("input[type=radio]")[0]!.checked = true;
     await answerDialog(host, "OK");
     expect([0, 1, 2].map((col) => value(1, col))).toEqual(["Customer 1", 10.5, null]);
