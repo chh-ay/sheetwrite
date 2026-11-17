@@ -47,6 +47,17 @@
   display: none;
 }
 
+/* A notice's one action, such as "Show them", reads as a link. */
+.sheetwrite-action-status-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sheetwrite-selection-border);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 [data-theme="dark"] .sheetwrite,
 .dark .sheetwrite {
   --sheetwrite-bg: #0b0b0c;

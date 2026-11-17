@@ -928,6 +928,17 @@ export class GridImpl implements Grid {
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
+      // Excel's cut moves the rows a filter hides without a word; say so.
+      onHiddenRowsMoved: (count, step) => {
+        const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
+        this.actionFeedback.show(
+          step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
+          {
+            label: "Show them",
+            run: () => this.actions.clearFilters(),
+          },
+        );
+      },
     });
 
     this.styleDeps = {

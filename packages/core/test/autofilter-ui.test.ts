@@ -196,10 +196,18 @@ describe("AutoFilter in the grid", () => {
       range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
     });
     expect(await grid.actions.cut()).toBe("done");
+    // Excel moves the hidden rows silently; the grid says so (#843).
+    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+    expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
     // Paste on A7: view row 5 is sheet row 7 below the filtered range.
     grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
     expect(await grid.actions.paste()).toBe("done");
     const item = (row: number) => store.getCell({ sheet: "s1", row, col: 0 }).resolved;
     expect([1, 2, 3, 6, 7, 8].map(item)).toEqual([null, null, null, "apple", "banana", "fig"]);
+    expect(notice()?.textContent).toBe("This paste moved 1 hidden row. Show them");
+    notice()?.querySelector("button")?.click();
+    await loaded();
+    expect(grid.getColumnFilters().size).toBe(0);
+    expect(notice()?.hidden).toBe(true);
   });
 });

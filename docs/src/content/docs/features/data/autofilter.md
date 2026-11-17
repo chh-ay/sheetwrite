@@ -70,6 +70,8 @@ As in Excel, edits don't filter again on their own. A row whose value no longer 
 
 As in Excel, copy, delete, formatting and the fill handle act on the rows the filter shows and skip the rows it hides. Cut is the exception, as in Excel: it moves every row from the first selected row to the last, the hidden ones too, so their data stays with the rows around it.
 
+Beyond Excel, which moves the hidden rows without a word, the grid says so: a cut that covers hidden rows shows "This cut includes 12 hidden rows", and its paste "This paste moved 12 hidden rows". **Show them** clears the filters, so you can check where the rows went. The cut and the paste give Excel's result either way.
+
 ## Undo, collaboration and XLSX files
 
 Turning the AutoFilter on or off is one undo step, and so is each filter change. Collaborators receive each step. The range follows inserted and deleted rows and columns. Deleting the header row removes the AutoFilter. It saves with the sheet's snapshot.

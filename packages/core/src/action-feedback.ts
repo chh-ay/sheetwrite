@@ -89,10 +89,25 @@ class ActionFeedback {
     }
   }
 
-  show(message: string): void {
+  /**
+   * Show `message`, with a button that runs `action` and clears the message
+   * when one is given.
+   */
+  show(message: string, action?: { readonly label: string; readonly run: () => void }): void {
     // A command that settles after destroy must not start a timer on a removed element.
     if (this.lifetime.closed) return;
     this.el.textContent = message;
+    if (action) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "sheetwrite-action-status-button";
+      button.textContent = action.label;
+      button.addEventListener("click", () => {
+        this.clear();
+        action.run();
+      });
+      this.el.append(" ", button);
+    }
     this.el.hidden = false;
     window.clearTimeout(this.timer);
     this.timer = window.setTimeout(() => this.clear(), MESSAGE_MS);
