@@ -209,6 +209,26 @@ export function confirmDialog(
   return { result: dialog.result.then((value) => value === "ok"), close: () => dialog.close() };
 }
 
+/** Labels for {@link alertDialog}. */
+export interface AlertOptions {
+  readonly title: string;
+  readonly message: string;
+}
+
+/**
+ * Tell the user something they must read, as Excel's message boxes do: an
+ * alert dialog with the message and OK. Resolves once it closes.
+ */
+export async function alertDialog(grid: DialogHost, options: AlertOptions): Promise<void> {
+  await openDialog(grid, {
+    title: options.title,
+    role: "alertdialog",
+    body: options.message,
+    buttons: [{ label: "OK", value: "ok", default: true }],
+    cancel: "ok",
+  }).result;
+}
+
 /** One option of {@link choiceDialog}. */
 interface DialogChoice {
   readonly value: string;
@@ -283,7 +303,7 @@ function choiceDialog(
  * have yet, so those two choices show disabled. Excel's default is Shift
  * cells down for a `wide` range and Shift cells right for a tall one; while
  * those are disabled the dialog starts on Entire row or Entire column, the
- * same way round. `result` resolves to `entireRow`, `entireColumn` or null.
+ * same way round. `result` resolves to `row`, `column` or null.
  */
 export function insertDeleteDialog(
   grid: DialogHost,
@@ -297,14 +317,14 @@ export function insertDeleteDialog(
       disabled: true,
     },
     { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up", disabled: true },
-    { value: "entireRow", label: "Entire row" },
-    { value: "entireColumn", label: "Entire column" },
+    { value: "row", label: "Entire row" },
+    { value: "column", label: "Entire column" },
   ];
   const preferred = wide ? "shiftDown" : "shiftRight";
   const initial = choices.some((choice) => choice.value === preferred && !choice.disabled)
     ? preferred
     : wide
-      ? "entireRow"
-      : "entireColumn";
+      ? "row"
+      : "column";
   return choiceDialog(grid, { title: insert ? "Insert" : "Delete", choices, initial });
 }

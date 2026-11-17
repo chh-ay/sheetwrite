@@ -3,7 +3,6 @@ import { beforeAll, describe, expect, it, spyOn } from "bun:test";
 import { getEngine } from "../src/engine.js";
 import { initSheetwrite, releaseEngineMemory, SheetwriteStore } from "../src/index.js";
 import { storeEngine } from "../src/store/engine-registry.js";
-import { collectUntilFreed } from "./collect-garbage.js";
 import { makeWorkbook } from "./fixtures.js";
 
 beforeAll(async () => {
@@ -11,6 +10,11 @@ beforeAll(async () => {
 });
 
 const address = (row: number, col: number) => ({ sheet: "s1", row, col });
+
+// A datasource request in flight keeps its store reachable until it settles. A test
+// that only counts a request holds its store here instead; otherwise a collection
+// while the release instantiates can free the store before the release asks it.
+const storesWithOpenRequests = new Set<SheetwriteStore>();
 
 describe("explicit engine memory release", () => {
   it("moves every live dense store without changing source, style, cached results, or events", async () => {
@@ -78,7 +82,7 @@ describe("explicit engine memory release", () => {
     }
   });
 
-  it("drops the retired linear memory and shares concurrent release calls", async () => {
+  it("shares concurrent release calls and keeps disposed stores and history safe", async () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     const disposed = new SheetwriteStore(makeWorkbook(2));
     const range = { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } };
@@ -88,13 +92,9 @@ describe("explicit engine memory release", () => {
     disposed.dispose();
 
     try {
-      const retired = new WeakRef(getEngine().getMemory());
       const first = releaseEngineMemory();
       expect(releaseEngineMemory()).toBe(first);
       await first;
-      await collectUntilFreed([retired]);
-
-      expect(retired.deref()).toBeUndefined();
 
       // Retained disposed facades/resources must not retain an old glue memory cache.
       expect(disposed.getWorkbook().sheets).toHaveLength(1);
@@ -111,6 +111,25 @@ describe("explicit engine memory release", () => {
     }
   });
 
+  it("drops the retired linear memory while disposed facades stay reachable", async () => {
+    // Concurrent JIT compilations keep the values they profiled alive until they
+    // finish, and sibling suites keep starting them, so the probe runs alone and
+    // compiles on the main thread: only the product's own references remain.
+    const probe = new URL("./engine-release-lifetime-probe.ts", import.meta.url).pathname;
+    const process = Bun.spawn(["bun", probe], {
+      env: { ...Bun.env, BUN_JSC_useConcurrentJIT: "0" },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(process.stdout).text(),
+      new Response(process.stderr).text(),
+      process.exited,
+    ]);
+    expect(exitCode, `Memory release lifetime probe failed:\n${stderr}`).toBe(0);
+    expect(JSON.parse(stdout)).toEqual({ stores: 1, freed: true });
+  });
+
   it("finishes a release when a store that waits for a page load is disposed", async () => {
     const store = new SheetwriteStore(makeWorkbook(2));
     const engine = storeEngine(store);
@@ -118,6 +137,7 @@ describe("explicit engine memory release", () => {
 
     // A datasource request that never ends; disposing the store must end the wait.
     engine.beginPageRequest();
+    storesWithOpenRequests.add(store);
     const asked = Promise.withResolvers<void>();
     const waitForPageLoads = engine.waitForPageLoads.bind(engine);
     spyOn(engine, "waitForPageLoads").mockImplementation(() => {
@@ -130,6 +150,7 @@ describe("explicit engine memory release", () => {
 
     // Without the fix this await never settles and the test runner times out.
     store.dispose();
+    storesWithOpenRequests.delete(store);
 
     await expect(release).resolves.toMatchObject({ wasmBytesAfter: expect.any(Number) });
   });

@@ -5,6 +5,7 @@ import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
+import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
 import { type EditCompletion, EditController, type EditNavigate } from "./editor.js";
 import {
@@ -80,10 +81,10 @@ interface InteractionDependencies {
   openAutoFilter: (col: number) => void;
   /**
    * Run a key's command from `cell-commands.ts` or, for the keys that switch
-   * sheets, `sheet-commands.ts`; both load on first use.
+   * sheets, `sheet-commands.ts`.
    */
   keyCommand: (command: CellCommand | SheetKey) => void;
-  /** Hold a key pressed while a command's code loads; false when none loads. */
+  /** Hold a key pressed while lazily loaded UI's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
   autoComplete: () => boolean;
@@ -163,6 +164,8 @@ interface InteractionDependencies {
   /** Ends the cut that waits for a paste; returns whether there was one. */
   cancelCut: () => boolean;
   readOnly: () => boolean;
+  /** Where the grid's dialogs open, such as the message for a formula that does not parse. */
+  dialogs: DialogHost;
 }
 
 /**
@@ -401,8 +404,15 @@ export class InteractionSessions {
     });
   }
 
+  /**
+   * The editor's accessible name: the column and the row number the row
+   * header shows, the sheet row under a filter and the view position under a
+   * view sort.
+   */
   private editorLabel(row: number, col: number): string {
-    return `Edit ${this.deps.columnHeader(col)}, row ${row + 1}`;
+    const sorted = (this.deps.sheet().sortKeys?.length ?? 0) > 0;
+    const shown = sorted ? row : this.deps.toDataRow(row);
+    return `Edit ${this.deps.columnHeader(col)}, row ${shown + 1}`;
   }
 
   private editorRect(
@@ -415,11 +425,19 @@ export class InteractionSessions {
     return { x: rect.x, y: rect.y, width: rect.w, height: rect.h };
   }
 
-  /** Put the reference from `anchor` to `end` into the editor, replacing a picked one. */
+  /**
+   * Put the reference from view cell `anchor` to `end` into the editor,
+   * replacing a picked one. It names sheet rows: under a sort or filter view
+   * the pointed cell's row in the sheet, as in Excel.
+   */
   private pointAt(anchor: CellRef, end: CellRef): void {
     this.pointAnchor = anchor;
     this.pointEnd = end;
-    this.editor.setReference(rangeA1(anchor, end));
+    const sheetCell = (cell: CellRef): CellRef => ({
+      row: this.deps.toDataRow(cell.row),
+      col: cell.col,
+    });
+    this.editor.setReference(rangeA1(sheetCell(anchor), sheetCell(end)));
   }
 
   /**
@@ -621,9 +639,19 @@ export class InteractionSessions {
       onShortcut: (event) => this.runCustomShortcut(event, true),
       onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
       complete: this.completion(editCell.row, editCell.col, initial !== undefined),
+      onRefuse: (message) => this.refuseFormula(message),
     });
     // A formula bar showing the draft starts from the opened text, completed or not.
     this.deps.editDraft.text(this.editor.value);
+  }
+
+  /** Excel's message for a formula that does not parse, with what is wrong with it. */
+  private async refuseFormula(problem: string): Promise<void> {
+    const { alertDialog } = await import("./dialog.js");
+    await alertDialog(this.deps.dialogs, {
+      title: "Formula",
+      message: `There's a problem with this formula. ${problem}`,
+    });
   }
 
   /**
@@ -643,9 +671,12 @@ export class InteractionSessions {
     return true;
   }
 
-  /** Commit the open cell edit in place, as Enter does in a formula bar. */
-  commitEdit(): void {
-    if (this.activeEditor === this.editor) this.editor.commit("none");
+  /**
+   * Commit the open cell edit in place, as Enter does in a formula bar. False
+   * when the edit stays open: its formula does not parse.
+   */
+  commitEdit(): boolean {
+    return this.activeEditor !== this.editor || this.editor.commit("none");
   }
 
   /** Cancel the open cell edit; both the editor and any formula bar show the stored value again. */
@@ -1334,7 +1365,7 @@ export class InteractionSessions {
           break;
 
         default:
-          // The format, hide, insert, Format Cells and sheet keys run from chunks.
+          // The format, hide, insert, Format Cells and sheet keys.
           this.deps.keyCommand(action);
       }
 

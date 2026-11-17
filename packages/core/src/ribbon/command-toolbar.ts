@@ -76,7 +76,7 @@ const ONE_CLICK_ACTIONS: Partial<Record<ToolbarActionName, OneClickAction>> = {
     command: "mergeAndCenter",
     label: "Merge Cells",
     icon: "merge",
-    run: (grid) => grid.actions.merge(),
+    run: (grid) => grid.actions.merge({ ask: true }),
   },
   unmerge: {
     command: "mergeAndCenter",
