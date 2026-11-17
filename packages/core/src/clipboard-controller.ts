@@ -52,7 +52,11 @@ interface PasteTarget extends CellRef {
 }
 
 interface CapturedClipboard extends ClipboardSnapshot {
-  /** The selected cells as one block of data rows; `null` when a sorted view splits them. */
+  /**
+   * The data rows a cut moves: every row from the first selected one to the
+   * last, rows a filter or the user hides included, as in Excel. `null` when
+   * a sorted view puts the selected rows out of data order.
+   */
   source: Range | null;
 }
 
@@ -1081,19 +1085,26 @@ export class ClipboardController {
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
     const firstDataRow = this.deps.toDataRow(rect.r0);
+    // A filter or hidden rows leave gaps between the selected data rows; a
+    // view sort puts them out of order.
     let contiguous = true;
+    let ascending = true;
+    let lastDataRow = firstDataRow;
     let merged = false;
-    for (let row = rect.r0; row <= rect.r1 && contiguous; row++) {
-      contiguous = this.deps.toDataRow(row) === firstDataRow + row - rect.r0;
+    for (let row = rect.r0; row <= rect.r1; row++) {
+      const dataRow = this.deps.toDataRow(row);
+      contiguous &&= dataRow === firstDataRow + row - rect.r0;
+      ascending &&= row === rect.r0 || dataRow > lastDataRow;
+      lastDataRow = dataRow;
       for (let col = rect.c0; col <= rect.c1 && !merged; col++) {
         merged = this.deps.mergeAnchorAt(row, col) !== null;
       }
     }
-    const source: Range | null = contiguous
+    const source: Range | null = ascending
       ? {
           sheet: activeSheet,
           start: { row: firstDataRow, col: rect.c0 },
-          end: { row: firstDataRow + rect.r1 - rect.r0, col: rect.c1 },
+          end: { row: lastDataRow, col: rect.c1 },
         }
       : null;
 
