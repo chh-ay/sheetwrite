@@ -1,10 +1,9 @@
 /**
  * Merge and Merge & Center, with Excel's warning before values are dropped.
- * The command loads on first use, with the dialog it may open, so the first
- * load carries none of it.
+ * The merge itself is in the first load; the warning's dialog loads the first
+ * time it opens.
  */
 
-import { confirmDialog, type DialogHost } from "./dialog.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { mergeCrossesFreeze, mergesOverlap } from "./store/ranges.js";
 import type { StyleActionsDeps } from "./style-actions.js";
@@ -26,20 +25,26 @@ interface MergeBounds {
 }
 
 /**
- * Merge the selected range. As in Excel, when more than one of its cells
- * holds a value, a warning that only the upper-left value stays opens first,
- * and the merge happens only after OK.
+ * Merge the selected range, keeping only its upper-left value. With `warn`,
+ * as Excel's own Merge does, a range in which more than one cell holds a
+ * value is merged only once `warn` resolves true for Excel's warning that only
+ * the upper-left value stays, and only if the selection is still that range.
+ * Without `warn`, as Excel's `Range.Merge` with `DisplayAlerts = False`, it
+ * merges at once.
  */
-export function mergeSelection(deps: StyleActionsDeps, center: boolean, dialogs: DialogHost): void {
+export function mergeSelection(
+  deps: StyleActionsDeps,
+  center: boolean,
+  warn?: (message: string) => Promise<boolean>,
+): void {
   const merge = mergeBounds(deps);
   if (merge === null) return;
-  if (countValues(deps, merge, 2) < 2) {
+  if (!warn || countValues(deps, merge, 2) < 2) {
     commitMerge(deps, merge, center);
     return;
   }
 
-  const warning = confirmDialog(dialogs, { title: "Merge Cells", message: MERGE_WARNING });
-  void warning.result.then((ok) => {
+  void warn(MERGE_WARNING).then((ok) => {
     // The selection or the sheet may have changed while the warning was open.
     const now = mergeBounds(deps);
     if (
