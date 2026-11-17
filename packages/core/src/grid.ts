@@ -4411,6 +4411,20 @@ export class GridImpl implements Grid {
     return [...(this.sheet().hiddenRows ?? [])].sort((a, b) => a - b);
   }
 
+  sheetRowOf(viewRow: number): number | null {
+    if (!Number.isInteger(viewRow) || viewRow < 0 || viewRow >= this.geometry.rowCount) {
+      return null;
+    }
+    return this.toDataRow(viewRow);
+  }
+
+  viewRowOf(sheetRow: number): number | null {
+    if (!Number.isInteger(sheetRow) || sheetRow < 0 || sheetRow >= this.sheet().rowCount) {
+      return null;
+    }
+    return this.toViewRow(sheetRow);
+  }
+
   hideColumns(cols?: readonly number[]): void {
     const sheet = this.sheet();
     const targets = cols ?? (this.selection.focusCell ? [this.selection.focusCell.col] : []);
