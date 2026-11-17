@@ -1,6 +1,6 @@
 import { isAtomicBatch, markAtomicBatch } from "./atomic-batch.js";
 import { SheetwriteError } from "./errors.js";
-import { isOwnedArray, markOwnedArray } from "./json-bytes.js";
+import { CANONICAL_ARRAY_INDEX, isOwnedArray, markOwnedArray } from "./json-bytes.js";
 import type { DocumentOp } from "./types/document.js";
 
 /**
@@ -22,18 +22,34 @@ function copyDataRecord(value: unknown): Record<string, unknown> | undefined {
 }
 
 /**
+ * Whether `Array.prototype` or `Object.prototype` has an index key, so that
+ * reading a hole by index would return its value instead of `undefined`.
+ */
+function prototypesFillHoles(): boolean {
+  return [Array.prototype, Object.prototype].some((prototype) =>
+    Reflect.ownKeys(prototype).some(
+      (key) => typeof key === "string" && CANONICAL_ARRAY_INDEX.test(key),
+    ),
+  );
+}
+
+/**
  * Entries of a plain array, each read once by index into a new dense array.
  * A getter on an entry runs here, once. Undefined when `value` is not a plain
- * array or an entry reads as `undefined` (a hole); validation then reports it
- * on the original.
+ * array or has a hole; validation then reports it on the original. A hole
+ * reads as `undefined` unless a prototype has that index, and only then is
+ * each index checked as an own property, because that check costs more than
+ * the copy.
  */
 function readEntriesOnce(value: unknown): unknown[] | undefined {
   if (!Array.isArray(value) || Object.getPrototypeOf(value) !== Array.prototype) return undefined;
   const length = value.length;
+  const checkOwnIndexes = prototypesFillHoles();
   const entries: unknown[] = [];
   let index = 0;
   try {
     for (; index < length; index++) {
+      if (checkOwnIndexes && !Object.hasOwn(value, index)) return undefined;
       const entry: unknown = value[index];
       if (entry === undefined) return undefined;
       entries.push(entry);
@@ -60,8 +76,9 @@ function ownDataField(value: unknown, key: string): unknown {
 /**
  * `operation` with the `values` and `styleIds` of its block replaced by
  * private copies, or `operation` itself when it is not a `setBlock`, its
- * arrays are already private copies, or any field it is made of is not plain
- * data (validation then judges the original exactly as before).
+ * arrays are already private copies that no caller has reached yet, or any
+ * field it is made of is not plain data (validation then judges the original
+ * exactly as before).
  */
 function withOwnedBlockArrays(operation: DocumentOp): DocumentOp {
   if (ownDataField(operation, "op") !== "setBlock") return operation;

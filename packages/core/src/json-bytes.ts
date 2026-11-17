@@ -63,7 +63,7 @@ const POWERS_OF_TEN = Float64Array.from(
   { length: PLAIN_INTEGER_DIGITS + 1 },
   (_unused, exponent) => DECIMAL_BASE ** exponent,
 );
-const CANONICAL_ARRAY_INDEX = /^(0|[1-9]\d*)$/;
+export const CANONICAL_ARRAY_INDEX = /^(0|[1-9]\d*)$/;
 
 /** Thrown inside the walk to unwind to `measureJson`; never escapes it. */
 class JsonWalkStop {
@@ -247,7 +247,7 @@ function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
   if (Object.getPrototypeOf(array) !== Array.prototype) {
     stopInvalid(walk, "Arrays with custom prototypes are not JSON-safe");
   }
-  if (ownedArrays.has(array) && addOwnedScalarArray(walk, array)) return;
+  if (ownedArrays.get(array) === ownedGeneration && addOwnedScalarArray(walk, array)) return;
 
   for (const key in array) {
     if (!Object.hasOwn(array, key)) continue;
@@ -271,20 +271,34 @@ function visitJsonArray(walk: JsonWalk, array: unknown[]): void {
   }
 }
 
-/** Arrays Sheetwrite built itself from values it read once; no caller holds them. */
-const ownedArrays = new WeakSet<unknown[]>();
+/** Arrays Sheetwrite built itself from values it read once, by the generation they were built in. */
+const ownedArrays = new WeakMap<unknown[], number>();
+/** Only arrays marked in this generation are trusted; `releaseOwnedArrays` starts the next one. */
+let ownedGeneration = 0;
 
 /**
  * Record that `array` is a dense array of plain data properties that only
- * Sheetwrite can reach, so a measurement may read its entries directly.
+ * Sheetwrite can reach, so a measurement may read its entries directly until
+ * the next `releaseOwnedArrays`.
  */
 export function markOwnedArray(array: unknown[]): void {
-  ownedArrays.add(array);
+  ownedArrays.set(array, ownedGeneration);
 }
 
-/** Whether `value` is an array recorded by `markOwnedArray`. */
+/** Whether `value` was recorded by `markOwnedArray` since the last `releaseOwnedArrays`. */
 export function isOwnedArray(value: unknown): boolean {
-  return Array.isArray(value) && ownedArrays.has(value);
+  return Array.isArray(value) && ownedArrays.get(value) === ownedGeneration;
+}
+
+/**
+ * Stop trusting every array recorded so far. Call it before code outside
+ * Sheetwrite can reach them: a callback, a listener or a returned result.
+ * That code could put a getter on an entry, and an array sent back would
+ * then measure one value and store another. Freezing the arrays instead
+ * costs more than copying them again.
+ */
+export function releaseOwnedArrays(): void {
+  ownedGeneration++;
 }
 
 /**

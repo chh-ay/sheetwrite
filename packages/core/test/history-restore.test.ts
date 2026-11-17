@@ -29,8 +29,8 @@ beforeEach(() => {
 
 afterEach(() => restoreStubs());
 
-/** Data!A1:A8 hold 1..8; Summary!A1 refers to Data!A8. */
-function snapshot(): WorkbookSnapshot {
+/** Data!A1:A8 hold 1..8; Summary!A1 refers to Data!A8. `dataName` names the Data sheet. */
+function snapshot(dataName = "Data"): WorkbookSnapshot {
   return {
     schemaVersion: 1,
     documentId: DOCUMENT,
@@ -39,7 +39,7 @@ function snapshot(): WorkbookSnapshot {
     sheets: [
       {
         id: "data",
-        name: "Data",
+        name: dataName,
         order: 0,
         rowCount: 8,
         columns: [
@@ -108,10 +108,11 @@ interface Session {
 
 async function session(
   storage: HistoryStorageAdapter = new MemoryHistoryStorage(),
+  dataName = "Data",
 ): Promise<Session> {
-  const adapter = new MemoryPersistenceAdapter(snapshot());
+  const adapter = new MemoryPersistenceAdapter(snapshot(dataName));
   const archive = await HistoryArchive.open({ documentId: DOCUMENT, storage });
-  await archive.initialize(snapshot(), 0);
+  await archive.initialize(snapshot(dataName), 0);
 
   const journal = new Journal(archive);
   adapter.recordHistory(DOCUMENT, journal);
@@ -251,6 +252,25 @@ describe("restore a sheet", () => {
     ).toBe(8);
     expect(alice.grid.store.getFormula({ sheet: "summary", row: 0, col: 0 })).toBe("=Numbers!A8");
     expect(value(alice.grid, "summary", 0, 0)).toBe(80);
+  });
+});
+
+describe("restore a sheet named History", () => {
+  it("gives the sheet back the name History, which only a user's rename refuses", async () => {
+    const { adapter, archive } = await session(new MemoryHistoryStorage(), "History");
+    const alice = await client(adapter, "alice");
+    const named = await archive.saveVersion("Named History", "alice", 0);
+    await edit(alice, [{ op: "renameSheet", sheet: "data", name: "Numbers" }]);
+
+    const outcome = await archive.restoreVersion(
+      alice.grid,
+      named.id,
+      { kind: "sheet", sheet: "data" },
+      { sync: alice.sync },
+    );
+    expect(outcome.status).toBe("applied");
+    const data = alice.grid.store.getWorkbook().sheets.find((sheet) => sheet.id === "data");
+    expect(data?.name).toBe("History");
   });
 });
 
