@@ -99,8 +99,12 @@ describe("analyzeFormula: completion", () => {
       cellTable: "Sales",
     };
     const list = (marked: string) =>
-      analyzeFormula(marked.replace("|", ""), marked.indexOf("|"), [vlookup], names)
-        .completion?.matches.map((item) => `${item.kind} ${item.insert}`) ?? null;
+      analyzeFormula(
+        marked.replace("|", ""),
+        marked.indexOf("|"),
+        [vlookup],
+        names,
+      ).completion?.matches.map((item) => `${item.kind} ${item.insert}`) ?? null;
 
     expect(list("=sal|")).toEqual(["table Sales", "name SalesUnits"]);
     expect(list("=Sales[|")).toEqual(["column Region", "column Amount"]);

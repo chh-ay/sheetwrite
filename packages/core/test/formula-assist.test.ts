@@ -160,7 +160,10 @@ describe("function list", () => {
     const named = new SheetwriteStore({
       ...workbook,
       namedRanges: [
-        { name: "SalesUnits", range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } } },
+        {
+          name: "SalesUnits",
+          range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
+        },
       ],
       sheets: [
         {

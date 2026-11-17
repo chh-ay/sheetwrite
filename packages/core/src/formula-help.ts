@@ -127,7 +127,11 @@ function sameMatches(
  * The defined names a formula on `sheet` sees, the workbook's tables, and
  * the table that holds `cell`, for the completion list.
  */
-function formulaNames(store: Store, sheet: SheetId, cell: Readonly<CellAddress> | null): FormulaNames {
+function formulaNames(
+  store: Store,
+  sheet: SheetId,
+  cell: Readonly<CellAddress> | null,
+): FormulaNames {
   const workbook = store.getWorkbook();
   const names = new Set<string>();
   for (const defined of workbook.namedRanges ?? []) {
