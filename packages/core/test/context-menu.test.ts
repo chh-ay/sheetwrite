@@ -58,6 +58,8 @@ describe("ContextMenu", () => {
       ["clearFilter", "clearFilter"],
       ["exportCsv", "exportCsv"],
       ["exportXlsx", "exportXlsx"],
+      ["insertCells", "insertCells"],
+      ["deleteCells", "deleteCells"],
     ] as const;
     const menu = new ContextMenu(
       host,
@@ -160,6 +162,35 @@ describe("ContextMenu", () => {
     grid.destroy();
   });
 
+  it("shows Excel's cell dialogs with their own glyphs: Cells… in Insert and Delete, and Format cells…", () => {
+    const { host, grid, menu } = liveMenu();
+    const cell = { sheet: "s1", row: 1, col: 1 };
+    grid.setSelection({ kind: "cell", addr: cell });
+    menu.open({ cell, clientX: 10, clientY: 10 });
+    /** The glyph of row `id` in the open menu at `level`. */
+    const glyph = (id: string, level = 0): string | undefined =>
+      openMenu(host, level).querySelector<HTMLElement>(
+        `[data-context-menu-item="${id}"] [data-icon]`,
+      )?.dataset.icon;
+    const openSubmenu = (id: string): void =>
+      openMenu(host).querySelector<HTMLElement>(`[data-context-menu-item="${id}"]`)!.click();
+
+    expect(glyph("formatCells")).toBe("formatCells");
+    openSubmenu("insert");
+    expect([rowIds(openMenu(host, 1))[0], glyph("insertCells", 1)]).toEqual([
+      "insertCells",
+      "insertCells",
+    ]);
+    openSubmenu("delete");
+    expect([rowIds(openMenu(host, 1))[0], glyph("deleteCells", 1)]).toEqual([
+      "deleteCells",
+      "deleteCells",
+    ]);
+
+    menu.destroy();
+    grid.destroy();
+  });
+
   it("moves through the menu and its submenus with the keyboard", () => {
     const { host, grid, menu } = liveMenu();
     const cell = { sheet: "s1", row: 0, col: 0 };
@@ -182,7 +213,7 @@ describe("ContextMenu", () => {
     // Right opens the submenu on its first row; Left or Escape returns to the parent.
     key(document.activeElement, "ArrowRight");
     expect(openMenus(host)).toHaveLength(2);
-    expect(focusedId()).toBe("insertRowAbove");
+    expect(focusedId()).toBe("insertCells");
     key(document.activeElement, "ArrowLeft");
     expect(openMenus(host)).toHaveLength(1);
     expect(focusedId()).toBe("insert");
