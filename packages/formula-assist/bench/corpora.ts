@@ -13,6 +13,7 @@ import {
   fromXlsxWorkbook,
   labelToCol,
   SheetwriteError,
+  SheetwriteStore,
   type SheetSnapshot,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
@@ -197,6 +198,32 @@ function enronValue(value: CellScalar): CellValue {
     : { kind: "literal", value };
 }
 
+/**
+ * `snapshot` without the defined names the engine refuses. The sample keeps
+ * only the cells near its formulas, so a name whose definition read cells
+ * that are gone can be invalid; it is left out, as the formulas that use it
+ * still read the name as text.
+ */
+function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
+  let names = snapshot.workbook.namedRanges ?? [];
+  for (;;) {
+    const candidate = { ...snapshot, workbook: { ...snapshot.workbook, namedRanges: names } };
+    try {
+      SheetwriteStore.fromSnapshot(candidate).dispose();
+      return candidate;
+    } catch (error) {
+      const refused =
+        error instanceof SheetwriteError && error.code === "invalid-snapshot"
+          ? error.context?.name
+          : undefined;
+      if (typeof refused !== "string") throw error;
+      const remaining = names.filter((named) => named.name !== refused);
+      if (remaining.length === names.length) throw error;
+      names = remaining;
+    }
+  }
+}
+
 /** One half of the Enron sample: `dev` to tune on, `heldout` for the gate only. */
 async function* enronWorkbooks(half: "dev" | "heldout"): AsyncGenerator<ReplayWorkbook> {
   const path = new URL(`./enron/${half}.json`, import.meta.url);
@@ -248,7 +275,8 @@ async function* enronWorkbooks(half: "dev" | "heldout"): AsyncGenerator<ReplayWo
       const range = { start: clip(named.sheet, named.start), end: clip(named.sheet, named.end) };
       return { name: named.name, range: { sheet: `s${named.sheet}`, ...range } };
     });
-    yield { id: workbook.file, snapshot: workbookSnapshot(sheets, names), targets };
+    const snapshot = withAcceptedNames(workbookSnapshot(sheets, names));
+    yield { id: workbook.file, snapshot, targets };
   }
 }
 
