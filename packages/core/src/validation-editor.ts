@@ -140,7 +140,9 @@ export class ValidationEditor {
     this.renderList();
     // Opened without typing, the list starts on the cell's own value, as in Excel.
     if (options.filter === "") {
-      this.setActive(this.shown.findIndex((index) => Object.is(this.values[index], options.current)));
+      this.setActive(
+        this.shown.findIndex((index) => Object.is(this.values[index], options.current)),
+      );
     }
   }
 
@@ -278,6 +280,11 @@ export class ValidationEditor {
     );
     if (text !== "" && named >= 0) {
       this.commitItem(named, navigate);
+      return;
+    }
+    // A list opened and closed without a choice or text changes nothing, as in Excel.
+    if (text === "") {
+      this.cancel();
       return;
     }
     this.cancel(false);

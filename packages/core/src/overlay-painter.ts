@@ -1438,9 +1438,7 @@ export class OverlayPainter {
     const focus = this.deps.selection().focusCell;
     const rule = focus ? this.deps.validationRuleAt(focus.row, focus.col) : undefined;
     const cell =
-      focus && rule
-        ? this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft)
-        : null;
+      focus && rule ? this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft) : null;
     if (
       !rule ||
       !cell ||

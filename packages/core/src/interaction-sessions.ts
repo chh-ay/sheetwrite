@@ -629,7 +629,10 @@ export class InteractionSessions {
     // A list opens only on request (its arrow, Alt+Down or typing); F2 and a
     // double-click edit the text, as in Excel. A checkbox opens on any edit.
     const condition = validationRule?.condition;
-    if (validationRule && (condition?.kind === "list" ? list !== undefined : initial === undefined)) {
+    if (
+      validationRule &&
+      (condition?.kind === "list" ? list !== undefined : initial === undefined)
+    ) {
       this.activeEditor = this.validationEditor;
       this.validationEditor.begin({
         row: editCell.row,
