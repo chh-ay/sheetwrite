@@ -158,9 +158,7 @@ function comparisonOf(condition: DataValidationCondition | undefined): DataValid
   if (condition.comparison) return condition.comparison;
   const { min, max } = condition;
   if (min !== undefined && max !== undefined) {
-    return min === max
-      ? { operator: "equal", value: min }
-      : { operator: "between", min, max };
+    return min === max ? { operator: "equal", value: min } : { operator: "between", min, max };
   }
   if (min !== undefined) return { operator: "greaterThanOrEqual", value: min };
   return { operator: "lessThanOrEqual", value: max ?? 0 };
@@ -199,7 +197,11 @@ function select(options: readonly (readonly [string, string])[], value: string):
   return element;
 }
 
-function textBox(value: string, maxLength: number, multiline = false): HTMLInputElement | HTMLTextAreaElement {
+function textBox(
+  value: string,
+  maxLength: number,
+  multiline = false,
+): HTMLInputElement | HTMLTextAreaElement {
   const element = document.createElement(multiline ? "textarea" : "input");
   element.className = "sheetwrite-dialog-control";
   element.maxLength = maxLength;
@@ -207,7 +209,10 @@ function textBox(value: string, maxLength: number, multiline = false): HTMLInput
   return element;
 }
 
-function checkbox(label: string, checked: boolean): { wrapper: HTMLLabelElement; input: HTMLInputElement } {
+function checkbox(
+  label: string,
+  checked: boolean,
+): { wrapper: HTMLLabelElement; input: HTMLInputElement } {
   const wrapper = document.createElement("label");
   wrapper.className = "sheetwrite-dialog-choice";
   const input = document.createElement("input");
@@ -308,7 +313,10 @@ export function dataValidationDialog(
     start?.condition.kind === "custom" ? start.condition.formula : "",
     MAX_MESSAGE,
   );
-  const applyToAll = checkbox("Apply these changes to all other cells with the same settings", false);
+  const applyToAll = checkbox(
+    "Apply these changes to all other cells with the same settings",
+    false,
+  );
   applyToAll.input.disabled = !input.canApplyToAll;
   const operatorField = field("Data", operator);
   const minField = field("Minimum", min);
@@ -316,8 +324,7 @@ export function dataValidationDialog(
   const valueField = field("Value", value);
   const sourceField = field("Source", source);
   const formulaField = field("Formula", formula);
-  const labelOf = (wrapper: HTMLLabelElement): HTMLElement | null =>
-    wrapper.querySelector("span");
+  const labelOf = (wrapper: HTMLLabelElement): HTMLElement | null => wrapper.querySelector("span");
   const syncSettings = (): void => {
     const kind = allow.value as Allow;
     const bounded = kind !== "any" && kind !== "list" && kind !== "custom";

@@ -49,7 +49,9 @@ export interface ValidationReads {
 }
 
 /** The alert style of `rule`, from its policy when the rule names none. */
-export function validationErrorStyle(rule: DataValidationRule): ValidationErrorStyle {
+export function validationErrorStyle(
+  rule: Pick<DataValidationRule, "errorStyle" | "policy">,
+): ValidationErrorStyle {
   return rule.errorStyle ?? (rule.policy === "warn" ? "warning" : "stop");
 }
 

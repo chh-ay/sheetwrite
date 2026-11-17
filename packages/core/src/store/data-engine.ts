@@ -1449,7 +1449,12 @@ export class StoreDataEngine {
 
   /** What data validation rules read from this store: formula results and list sources. */
   get validationReads(): ValidationReads {
-    this.validationReadsCache ??= storeValidationReads(this);
+    this.validationReadsCache ??= storeValidationReads({
+      workbook: () => this.workbook,
+      getCell: (addr) => this.getCell(addr),
+      previewFormula: (cell, text) => this.previewFormula(cell, text),
+      previewFormulaWith: (cell, text, trial) => this.previewFormulaWith(cell, text, trial),
+    });
     return this.validationReadsCache;
   }
 

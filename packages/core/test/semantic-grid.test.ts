@@ -88,9 +88,11 @@ it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere
   altDown();
   expect(host.querySelector('[role="listbox"]')).not.toBeNull();
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-  host.querySelector('[role="combobox"]')?.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-  );
+  // B2 holds none of the items, so none is highlighted until Down.
+  const box = host.querySelector('[role="combobox"]');
+  for (const key of ["ArrowDown", "Enter"]) {
+    box?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  }
   expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("Open");
 
   grid.destroy();
@@ -118,7 +120,8 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
   const grid = new GridImpl(host, { workbook }, store);
   const press = (target: Element | null, key: string) =>
     target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
-  const options = () => [...host.querySelectorAll('[role="option"]')].map((item) => item.textContent);
+  const options = () =>
+    [...host.querySelectorAll('[role="option"]')].map((item) => item.textContent);
 
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
   expect(host.querySelector(".sheetwrite-list-button")).toBeNull();
@@ -131,8 +134,9 @@ it("shows a list cell's dropdown arrow, opens the list from it or by typing, and
 
   const scroller = host.querySelector(".sheetwrite-scroller");
   const click = new PointerEvent("pointerdown", {
-    clientX: cellRight + 5,
-    clientY: DEFAULT_THEME.headerHeight + 2 * DEFAULT_THEME.rowHeight - 5,
+    // The middle of the arrow, clear of the fill handle at the cell's corner.
+    clientX: cellRight + 9,
+    clientY: DEFAULT_THEME.headerHeight + 2 * DEFAULT_THEME.rowHeight - 9,
     button: 0,
     pointerType: "mouse",
     bubbles: true,
@@ -539,6 +543,32 @@ describe("custom editor canonical lifecycle", () => {
     }
   });
 
+  /** Press `key` on `target`, as a user does. */
+  const press = (target: HTMLElement, key: string): void => {
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  };
+
+  /**
+   * Open the editor of the cell at view row 0, column A: a list rule's list
+   * opens on Alt+Down, as in Excel; F2 would edit its text.
+   */
+  const openEditor = (grid: GridImpl, host: HTMLElement, kind: string): void => {
+    if (kind !== "list") {
+      grid.beginEdit(0, 0);
+      return;
+    }
+    // The selection, like `beginEdit`, takes the row as shown.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  };
+
   for (const editorKind of ["stock", "list", "checkbox"] as const) {
     for (const viewChange of ["sort", "clearView", "filter"] as const) {
       it(`commits the ${editorKind} editor to its canonical row after ${viewChange}`, () => {
@@ -566,12 +596,12 @@ describe("custom editor canonical lifecycle", () => {
         const host = mountHost();
         const grid = new GridImpl(host, { workbook }, store);
         if (viewChange !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
-        grid.beginEdit(0, 0);
+        openEditor(grid, host, editorKind);
         const selector =
           editorKind === "stock"
             ? "textarea.sheetwrite-editor"
             : editorKind === "list"
-              ? '[role="listbox"]'
+              ? '[role="combobox"]'
               : '[role="checkbox"]';
         const editor = host.querySelector<HTMLElement>(selector);
         if (!editor) throw new Error(`${editorKind} editor missing`);
@@ -583,13 +613,8 @@ describe("custom editor canonical lifecycle", () => {
         else if (viewChange === "filter") grid.filterBy(0, "Customer 2");
         else grid.setViewSort([{ col: 1, ascending: false }]);
         expect(host.querySelector(selector)).toBe(editor);
-        editor.dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: editorKind === "checkbox" ? " " : "Enter",
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
+        if (editorKind === "list") press(editor, "ArrowDown");
+        press(editor, editorKind === "checkbox" ? " " : "Enter");
 
         const canonicalRow = viewChange === "sort" ? 0 : 2;
         const otherRow = viewChange === "sort" ? 2 : 0;
@@ -655,12 +680,12 @@ describe("custom editor canonical lifecycle", () => {
       );
       const committed: unknown[] = [];
       grid.on("edit-commit", (event) => committed.push(event));
-      grid.beginEdit(0, 0);
+      openEditor(grid, host, editorKind);
       const selector =
         editorKind === "stock"
           ? "textarea.sheetwrite-editor"
           : editorKind === "list"
-            ? '[role="listbox"]'
+            ? '[role="combobox"]'
             : editorKind === "checkbox"
               ? '[role="checkbox"]'
               : ".sheetwrite-custom-editor input";
@@ -679,13 +704,8 @@ describe("custom editor canonical lifecycle", () => {
 
       grid.filterBy(0, "Customer 2");
       expect(host.querySelector(selector)).toBeNull();
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: editorKind === "checkbox" ? " " : "Enter",
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+      if (editorKind === "list") press(editor, "ArrowDown");
+      press(editor, editorKind === "checkbox" ? " " : "Enter");
       pending.resolve("Stale choice");
       await pending.promise;
       await Promise.resolve();

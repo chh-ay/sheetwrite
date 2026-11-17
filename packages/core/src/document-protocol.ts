@@ -1365,7 +1365,10 @@ const MAX_VALIDATION_FORMULA_LENGTH = 255;
 /** Whether `value` is a validation formula: text with its leading `=`, within Excel's length. */
 function validationFormula(value: unknown): value is string {
   return (
-    typeof value === "string" && value.length > 1 && value.length <= MAX_VALIDATION_FORMULA_LENGTH && value.startsWith("=")
+    typeof value === "string" &&
+    value.length > 1 &&
+    value.length <= MAX_VALIDATION_FORMULA_LENGTH &&
+    value.startsWith("=")
   );
 }
 
@@ -1447,8 +1450,15 @@ function validateValidationCondition(
   if (kind === "list") {
     optionalBoolean(condition, "allowCustom", path, errors);
     if (ownValue(condition, "source") !== undefined) {
-      if (!validationFormula(ownValue(condition, "source")) || ownValue(condition, "values") !== undefined) {
-        invalid(errors, `${path}.source`, "A list source is one formula that starts with =, without values");
+      if (
+        !validationFormula(ownValue(condition, "source")) ||
+        ownValue(condition, "values") !== undefined
+      ) {
+        invalid(
+          errors,
+          `${path}.source`,
+          "A list source is one formula that starts with =, without values",
+        );
       }
       return;
     }

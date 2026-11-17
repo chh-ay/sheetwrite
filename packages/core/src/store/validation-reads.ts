@@ -16,7 +16,7 @@ const MAX_LIST_ITEMS = 32_767;
 
 /** What the reads use from the store engine. */
 export interface ValidationReadSource {
-  readonly workbook: Workbook;
+  workbook(): Workbook;
   getCell(addr: CellAddress): ResolvedCell;
   previewFormula(cell: CellAddress, text: string): FormulaPreview;
   previewFormulaWith(cell: CellAddress, text: string, trial: CellScalar): FormulaPreview;
@@ -40,7 +40,7 @@ export function storeValidationReads(source: ValidationReadSource): ValidationRe
     return items;
   };
   const parse = (reference: string, sheet: string): Range | undefined => {
-    const parsed = parseRangeText(reference, source.workbook.sheets, sheet);
+    const parsed = parseRangeText(reference, source.workbook().sheets, sheet);
     return "range" in parsed ? parsed.range : undefined;
   };
 
@@ -55,7 +55,7 @@ export function storeValidationReads(source: ValidationReadSource): ValidationRe
     range(reference, addr) {
       // A defined name first, the sheet's own before the workbook's, as Excel resolves it.
       const key = formulaNameKey(reference.trim());
-      const named = (source.workbook.namedRanges ?? [])
+      const named = (source.workbook().namedRanges ?? [])
         .filter((candidate) => formulaNameKey(candidate.name) === key)
         .sort((a, b) => Number(b.scope === addr.sheet) - Number(a.scope === addr.sheet))
         .find((candidate) => candidate.scope === undefined || candidate.scope === addr.sheet);
