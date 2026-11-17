@@ -8,7 +8,7 @@ use rustc_hash::{FxBuildHasher, FxHashSet};
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
-use crate::eval::{Criterion, Wildcard};
+use crate::eval::{excel_date_parts, Criterion, Wildcard};
 use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
@@ -729,6 +729,10 @@ impl CellStore {
     /// - 5, Excel's custom filter: its next `text_counts[i]` texts in
     ///   `value_texts` are COUNTIF criteria (`">5"`, `"=ab*"`); bit 1 of
     ///   `flags[i]` keeps a row that meets any of them, else it must meet all.
+    /// - 6, dates in some months of any year, as Excel's "All Dates in the
+    ///   Period": its next `num_counts[i]` numbers in `value_nums` are the
+    ///   months it keeps, 1 to 12. Numbers that are not dates and other
+    ///   cells do not match.
     ///
     /// Empty when the sheet or a column does not exist.
     #[wasm_bindgen(js_name = filterRowsMulti)]
@@ -942,6 +946,16 @@ impl CellStore {
                     }
                     3 => kind == 0,
                     4 => kind != 0,
+                    6 => numeric_cell_value(data, index, &self.formula_slots)
+                        .and_then(excel_date_parts)
+                        .and_then(|(_, month, _)| i32::try_from(month).ok())
+                        .is_some_and(|month| {
+                            let count = num_counts.get(i).copied().unwrap_or_default() as usize;
+                            value_nums
+                                .get(num_offsets[i]..num_offsets[i] + count)
+                                .unwrap_or_default()
+                                .contains(&f64::from(month))
+                        }),
                     _ => false,
                 };
                 if !matches {
@@ -1094,6 +1108,7 @@ fn distinct_over(
                 continue;
             }
             out.kinds.push(kind);
+            out.styles.push(data.cells.style_at(index));
             if kind == 1 {
                 out.numbers.push(
                     numeric_cell_value(data, index, &store.formula_slots).unwrap_or_default(),
@@ -1221,13 +1236,15 @@ fn resolved_text<'a>(
 }
 
 /// Distinct-value scan result for one column: parallel kind/number/text
-/// arrays whose buffers are surrendered once through the `take*` accessors.
+/// arrays, and the style of each value's first cell, whose buffers are
+/// surrendered once through the `take*` accessors.
 #[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
     kinds: Vec<u8>,
     numbers: Vec<f64>,
     texts: Vec<String>,
+    styles: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -1249,6 +1266,13 @@ impl DistinctColumn {
     #[wasm_bindgen(js_name = takeTexts)]
     pub fn take_texts(&mut self) -> Vec<String> {
         std::mem::take(&mut self.texts)
+    }
+
+    /// Surrenders the style id of each value's first cell, one per kind tag,
+    /// which gives the number format the value shows with.
+    #[wasm_bindgen(js_name = takeStyles)]
+    pub fn take_styles(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.styles)
     }
 }
 

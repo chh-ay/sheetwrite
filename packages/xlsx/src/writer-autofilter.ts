@@ -46,20 +46,51 @@ function conditionXml(condition: FilterCondition): string {
   }
 }
 
-/** The text a value shows in `column`, which Excel's value lists name it by. */
-function valueText(value: Exclude<CellScalar, null>, column: Column | undefined): string {
+/**
+ * The text a value shows in its cells, which Excel's value lists name it by:
+ * a number in the format of its first cell in the list, else the column's.
+ */
+function valueText(
+  value: Exclude<CellScalar, null>,
+  formats: ReadonlyMap<number, string | undefined>,
+  column: Column | undefined,
+): string {
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   if (typeof value === "string") return value;
-  return formatNumber(value, column?.numberFormat, column?.numberLocale);
+  return formatNumber(value, formats.get(value) ?? column?.numberFormat, column?.numberLocale);
 }
 
-function filterXml(filter: ColumnFilter, column: Column | undefined): string {
+/** The number format of the first body cell in `col` that holds each number. */
+function cellFormats(
+  sheet: SheetSnapshot,
+  col: number,
+  body: { readonly start: number; readonly end: number },
+): Map<number, string | undefined> {
+  const formats = new Map<number, string | undefined>();
+  for (const block of sheet.cells) {
+    if (col < block.startCol || col >= block.startCol + block.colCount) continue;
+    for (const cell of block.cells) {
+      const row = block.startRow + cell.rowOffset;
+      if (block.startCol + cell.colOffset !== col || row < body.start || row > body.end) continue;
+      const { value } = cell;
+      if (value.kind !== "literal" || typeof value.value !== "number") continue;
+      if (!formats.has(value.value)) formats.set(value.value, cell.style?.numberFormat);
+    }
+  }
+  return formats;
+}
+
+function filterXml(
+  filter: ColumnFilter,
+  formats: ReadonlyMap<number, string | undefined>,
+  column: Column | undefined,
+): string {
   switch (filter.kind) {
     case "values": {
       const blank = filter.values.includes(null) ? ' blank="1"' : "";
       const values = filter.values
         .filter((value): value is Exclude<CellScalar, null> => value !== null)
-        .map((value) => `<filter val="${attribute(valueText(value, column))}"/>`);
+        .map((value) => `<filter val="${attribute(valueText(value, formats, column))}"/>`);
       return `<filters${blank}>${values.join("")}</filters>`;
     }
     case "contains":
@@ -75,6 +106,8 @@ function filterXml(filter: ColumnFilter, column: Column | undefined): string {
       const and = filter.join === "and" && filter.conditions.length > 1 ? ' and="1"' : "";
       return `<customFilters${and}>${filter.conditions.map(conditionXml).join("")}</customFilters>`;
     }
+    case "dynamic":
+      return `<dynamicFilter type="${filter.type}"/>`;
   }
 }
 
@@ -84,10 +117,15 @@ export function autoFilterXml(sheet: SheetSnapshot, autoFilter: AutoFilter): str
   const columns = (sheet.filters ?? [])
     .filter(([col]) => col >= start.col && col <= end.col)
     .sort(([left], [right]) => left - right)
-    .map(
-      ([col, filter]) =>
-        `<filterColumn colId="${col - start.col}">${filterXml(filter, sheet.columns[col])}</filterColumn>`,
-    );
+    .map(([col, filter]) => {
+      // Only a value list names numbers by their text, so only it reads cells.
+      const formats =
+        filter.kind === "values"
+          ? cellFormats(sheet, col, { start: start.row + 1, end: end.row })
+          : new Map<number, string | undefined>();
+      const xml = filterXml(filter, formats, sheet.columns[col]);
+      return `<filterColumn colId="${col - start.col}">${xml}</filterColumn>`;
+    });
   const ref = `${cellA1(start.row, start.col)}:${cellA1(end.row, end.col)}`;
   return columns.length > 0
     ? `<autoFilter ref="${ref}">${columns.join("")}</autoFilter>`

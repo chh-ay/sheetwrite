@@ -74,6 +74,7 @@ use array::dynamic_recompute_within_limit;
 pub(crate) use array::{ast_produces_array, Shapes};
 use criteria::{aggregate_if, extreme_if};
 pub(crate) use criteria::{sum_range_extent, Criterion};
+pub(crate) use date::excel_date_parts;
 use date::host_clock_serial;
 pub(crate) use dependency::{build_dep_index, DepIndex};
 use dependency::{

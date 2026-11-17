@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { dateToSerial } from "../src/date-serial.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -30,7 +31,14 @@ const ROWS: (readonly CellScalar[])[] = [
   ["fig", 7],
 ];
 
-function mount(): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } {
+/**
+ * A grid of `rows` on sheet s1. `formats` gives the number format of each
+ * column's cells below the header, on the cells, as XLSX import puts it.
+ */
+function mount(
+  rows: readonly (readonly CellScalar[])[] = ROWS,
+  formats: readonly (string | undefined)[] = [],
+): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } {
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     workbook: { activeSheet: "s1" },
@@ -48,14 +56,18 @@ function mount(): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } 
           {
             startRow: 0,
             startCol: 0,
-            rowCount: ROWS.length,
+            rowCount: rows.length,
             colCount: 2,
-            cells: ROWS.flatMap((row, rowOffset) =>
-              row.map((value, colOffset) => ({
-                rowOffset,
-                colOffset,
-                value: { kind: "literal" as const, value },
-              })),
+            cells: rows.flatMap((row, rowOffset) =>
+              row.map((value, colOffset) => {
+                const numberFormat = rowOffset > 0 ? formats[colOffset] : undefined;
+                return {
+                  rowOffset,
+                  colOffset,
+                  value: { kind: "literal" as const, value },
+                  ...(numberFormat ? { style: { numberFormat } } : {}),
+                };
+              }),
             ),
           },
         ],
@@ -161,5 +173,71 @@ describe("AutoFilter in the grid", () => {
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
     const dialog = await dropdown();
     expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
+  });
+
+  it("lists a date column by year, month and day with Date Filters, and prices as their cells show", async () => {
+    // 2 January 2026, 2 February 2026 and 1 January 2025, in the cells' own formats.
+    const rows = [
+      ["Date", "Price"],
+      [46024, 39.5],
+      [46055, 64.25],
+      [45658, 39.5],
+    ];
+    const { grid, host, store } = mount(rows, ["m/d/yyyy", "$#,##0.00"]);
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    const open = async (col: number) => {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col } });
+      press(host, "ArrowDown", { altKey: true });
+      const dialog = await dropdown();
+      const list = dialog.querySelector<HTMLElement>(".sheetwrite-autofilter-list");
+      if (!list) throw new Error("no value list");
+      const labels = () =>
+        [...list.querySelectorAll(".sheetwrite-autofilter-option")].map((row) => row.textContent);
+      return { dialog, list, labels };
+    };
+
+    const dates = await open(0);
+    expect(dates.list.getAttribute("role")).toBe("tree");
+    expect(
+      [...dates.dialog.querySelectorAll("button")].map((button) => button.textContent),
+    ).toContain("Date Filters");
+    expect(dates.labels()).toEqual(["(Select All)", "2025", "2026"]);
+    dates.list.focus();
+    press(dates.list, "End");
+    press(dates.list, "ArrowRight");
+    press(dates.list, "End");
+    press(dates.list, "ArrowRight");
+    expect(dates.labels()).toEqual(["(Select All)", "2025", "2026", "January", "February", "02"]);
+    // Untick 2025: the 2026 rows stay.
+    press(dates.list, "Home");
+    press(dates.list, "ArrowDown");
+    press(dates.list, " ");
+    press(dates.list, "Enter");
+    expect(grid.getColumnFilters().get(0)).toEqual({ kind: "values", values: [46024, 46055] });
+    expect(store.viewRowCount("s1")).toBe(9);
+
+    const prices = await open(1);
+    expect(prices.labels()).toEqual(["(Select All)", "$39.50", "$64.25"]);
+    press(prices.list, "Escape");
+
+    // All Dates in the Period › February keeps the February date of any year.
+    grid.setColumnFilter(0, { kind: "dynamic", type: "M2" });
+    expect(store.viewRowCount("s1")).toBe(8);
+    // Today keeps the dates of the computer's calendar day.
+    const now = new Date();
+    const today = dateToSerial(
+      new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+    );
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: today + 0.5 },
+        },
+      ],
+    });
+    grid.setColumnFilter(0, { kind: "dynamic", type: "today" });
+    expect(store.viewRowCount("s1")).toBe(8);
   });
 });

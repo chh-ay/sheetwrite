@@ -212,6 +212,21 @@
   background: var(--sheetwrite-menu-hover, var(--sheetwrite-grid-line, #eeeeee));
 }
 
+/* A date list's open or closed arrow; months and days indent before it. */
+.sheetwrite-autofilter-expander {
+  flex: none;
+  width: 10px;
+  text-align: center;
+}
+
+.sheetwrite-autofilter-expander[data-open="false"]::before {
+  content: "▸";
+}
+
+.sheetwrite-autofilter-expander[data-open="true"]::before {
+  content: "▾";
+}
+
 .sheetwrite-autofilter-check {
   flex: none;
   width: 12px;

@@ -226,6 +226,7 @@ export {
 } from "./sheet-name.js";
 
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
+export { isDynamicDateFilter } from "./store/autofilter.js";
 
 export {
   type PendingCommitLoadOptions,
@@ -328,6 +329,7 @@ export type {
   DataValidationCondition,
   DataValidationRule,
   DocumentOp,
+  DynamicDateFilter,
   ExternalLink,
   ExternalLinkCell,
   ExternalLinkName,

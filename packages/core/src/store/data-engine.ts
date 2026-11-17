@@ -2186,7 +2186,27 @@ export class StoreDataEngine {
     only?: Uint32Array,
   ): CellScalar[] {
     this.requireCompleteQuery(sheet);
-    return this.view.distinctValues(sheet, col, limit, rows, only);
+    return this.view.distinctValues(sheet, col, limit, rows, only).values;
+  }
+
+  /**
+   * {@link distinctValues} with the number format each value shows with: its
+   * first cell's, or `undefined` when that cell has none.
+   */
+  distinctValuesWithFormats(
+    sheet: SheetId,
+    col: number,
+    limit: number,
+    rows?: { start: number; end: number },
+    only?: Uint32Array,
+  ): { values: CellScalar[]; formats: (string | undefined)[] } {
+    this.requireCompleteQuery(sheet);
+    const { values, styles } = this.view.distinctValues(sheet, col, limit, rows, only);
+    const formats = new Array<string | undefined>(styles.length);
+    for (let index = 0; index < styles.length; index++) {
+      formats[index] = this.styles.get(styles[index] ?? 0).numberFormat;
+    }
+    return { values, formats };
   }
 
   /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
