@@ -491,10 +491,11 @@ details[open] > summary > .sw-disclosure-icon {
 .sw-toc a:hover {
   border-left-color: var(--sw-border-strong);
 }
+/* Colour and the rail mark the current section, not weight: a bolder label
+   can wrap onto one more line and push every entry below it down. */
 .sw-toc a[aria-current="location"] {
   border-left-color: var(--sw-accent);
   color: var(--sw-accent-strong);
-  font-weight: var(--sw-weight-semibold);
 }
 .sw-toc li[data-depth="1"],
 .sw-toc-inline li[data-depth="1"] {

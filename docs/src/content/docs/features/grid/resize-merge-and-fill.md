@@ -11,10 +11,10 @@ grid.setSelection({
   kind: "range",
   range: { sheet: "sheet1", start: { row: 0, col: 0 }, end: { row: 0, col: 1 } },
 });
-grid.actions.merge(); // A1:B1 is now one cell that shows A1's value
+grid.actions.merge(); // B1 holds a value too, so a warning asks first; OK merges A1:B1
 ```
 
-<div class="sw-grid-result" data-caption="Result: A1:B1 is merged and shows 10, the value from A1. B1's 30 is hidden. This static illustration shows the merge, not the grid's pixel widths.">
+<div class="sw-grid-result" data-caption="Result after OK: A1:B1 is merged and shows 10, the value from A1. B1's 30 is discarded. This static illustration shows the merge, not the grid's pixel widths.">
 
 <table>
 <tbody>
@@ -67,7 +67,7 @@ grid.actions.merge();
 
 </details>
 
-Column A is 160 px wide. After `merge()`, A1's value spans both columns and B1 is hidden. Call `grid.actions.unmerge()` to separate them again.
+Column A is 160 px wide. B1 holds a value too, so `merge()` first warns that only the upper-left value stays. After OK, A1's value spans both columns and B1 is cleared. Cancel leaves both cells as they were. Call `grid.actions.unmerge()` to separate them again.
 
 [Try it live → Spreadsheet showcase](/showcases/spreadsheet/)
 
@@ -78,6 +78,8 @@ Drag a column-header boundary or a row-header boundary to preview its size. The 
 ## Merged cells
 
 Merging combines the selected range into one cell. The top-left value shows, and the covered cells are hidden. A per-sheet merge registry tracks them. Unmerge reverses it.
+
+As in Excel, when more than one cell of the range holds a value, a dialog warns first: "Merging cells only keeps the upper-left value and discards other values." OK merges and clears the other cells, as one undoable step. Cancel or Escape leaves the cells as they were. A range with at most one value merges at once. Merge, Merge & Center, the context menu and `grid.actions.merge()` all ask. See Microsoft's [Merge and unmerge cells](https://support.microsoft.com/en-us/office/merge-and-unmerge-cells-in-excel-5cbd15d5-9375-4540-907f-c673a93fcedf).
 
 ## Drag-to-fill
 
@@ -121,8 +123,8 @@ See [Formulas → Point mode and reference rewriting](/docs/features/formulas/au
 | --- | --- |
 | `grid.setColumnWidth(col, width)` | Set one column's width with an undoable `setColumn` patch. |
 | `grid.setRowHeight(row, height)` | Set one row's persistent display height through document history. |
-| `grid.actions.merge()` / `grid.actions.unmerge()` | Merge or unmerge the selection. |
-| `grid.actions.mergeAndCenter()` | Merge the selection and center its text, as one undoable step. |
+| `grid.actions.merge()` / `grid.actions.unmerge()` | Merge or unmerge the selection. Merge asks first when more than one cell holds a value. Its code loads on first use, so the merge lands a moment after the call. |
+| `grid.actions.mergeAndCenter()` | Merge the selection and center its text, as one undoable step. It asks first like `merge()`. |
 | `readOnly: true` | Turns off drag-to-fill and resizing, including double-click autofit. Turning it on ends an active resize without committing. |
 
 ## Edge cases and limits
