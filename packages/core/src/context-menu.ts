@@ -33,7 +33,21 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
   return [
     { action: "cut" },
     { action: "copy" },
-    { action: "paste" },
+    // Excel's "Paste Options:" row, then Paste Special.
+    {
+      id: "pasteOptions",
+      label: "Paste Options",
+      inline: true,
+      items: [
+        { action: "paste" },
+        { action: "pasteValues" },
+        { action: "pasteFormulas" },
+        { action: "pasteTranspose" },
+        { action: "pasteFormatting" },
+        { action: "pasteLink" },
+      ],
+    },
+    { action: "pasteSpecial" },
     { action: "separator" },
     {
       id: "insert",
@@ -132,6 +146,12 @@ const ACTION_ICON: Record<
   cut: "cut",
   copy: "copy",
   paste: "paste",
+  pasteValues: "pasteValues",
+  pasteFormulas: "pasteFormulas",
+  pasteFormatting: "pasteFormatting",
+  pasteTranspose: "pasteTranspose",
+  pasteLink: "pasteLink",
+  pasteSpecial: "pasteSpecial",
   clearContents: "clear",
   merge: "merge",
   unmerge: "unmerge",
@@ -187,6 +207,12 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   cut: "Cut",
   copy: "Copy",
   paste: "Paste",
+  pasteValues: "Values",
+  pasteFormulas: "Formulas",
+  pasteFormatting: "Formatting",
+  pasteTranspose: "Transpose",
+  pasteLink: "Paste Link",
+  pasteSpecial: "Paste Special…",
   clearContents: "Clear contents",
   merge: "Merge cells",
   unmerge: "Unmerge",
@@ -233,6 +259,24 @@ function actionHandler(
 
     case "paste":
       return () => actions.paste();
+
+    case "pasteValues":
+      return () => actions.pasteValues();
+
+    case "pasteFormulas":
+      return () => actions.pasteSpecial({ paste: "formulas" });
+
+    case "pasteFormatting":
+      return () => actions.pasteSpecial({ paste: "formats" });
+
+    case "pasteTranspose":
+      return () => actions.pasteSpecial({ transpose: true });
+
+    case "pasteLink":
+      return () => actions.pasteSpecial({ link: true });
+
+    case "pasteSpecial":
+      return () => actions.pasteSpecial({ ask: true });
 
     case "clearContents":
       return () => actions.clearContents();
@@ -471,7 +515,9 @@ export class ContextMenu {
   private enabledRows(menu: HTMLElement): HTMLElement[] {
     return [
       ...menu.querySelectorAll<HTMLElement>(
-        ":scope > .sheetwrite-context-menu-item:not(.sheetwrite-context-menu-item-disabled)",
+        ":scope > .sheetwrite-context-menu-item:not(.sheetwrite-context-menu-item-disabled), " +
+          ":scope > .sheetwrite-context-menu-inline > div > " +
+          ".sheetwrite-context-menu-item:not(.sheetwrite-context-menu-item-disabled)",
       ),
     ];
   }
@@ -490,8 +536,44 @@ export class ContextMenu {
         menu.appendChild(separator);
         continue;
       }
-      menu.appendChild(this.renderRow(menu, item, context));
+      menu.appendChild(
+        item.inline && item.items
+          ? this.renderInlineRow(menu, item, item.items, context)
+          : this.renderRow(menu, item, context),
+      );
     }
+  }
+
+  /**
+   * A row of icon buttons under its label, as Excel's "Paste Options:". Each
+   * button names itself in its tooltip and to screen readers.
+   */
+  private renderInlineRow(
+    menu: HTMLDivElement,
+    item: ContextMenuItem,
+    children: readonly ContextMenuItem[],
+    context: ContextMenuContext,
+  ): HTMLDivElement {
+    const group = document.createElement("div");
+    group.className = "sheetwrite-context-menu-inline";
+    group.setAttribute("role", "group");
+    if (item.id) group.dataset.contextMenuItem = item.id;
+    const label = document.createElement("div");
+    label.className = "sheetwrite-context-menu-inline-label";
+    label.textContent = `${item.label ?? ""}:`;
+    group.setAttribute("aria-label", item.label ?? "");
+    const buttons = document.createElement("div");
+    for (const child of visibleItems(children, context)) {
+      if (child.action === "separator") continue;
+      const button = this.renderRow(menu, child, context);
+      const name = button.querySelector(".sheetwrite-context-menu-label")?.textContent ?? "";
+      const shortcut = button.querySelector(".sheetwrite-context-menu-shortcut")?.textContent;
+      button.title = shortcut ? `${name} (${shortcut})` : name;
+      button.setAttribute("aria-label", name);
+      buttons.append(button);
+    }
+    group.append(label, buttons);
+    return group;
   }
 
   private renderRow(
@@ -678,6 +760,10 @@ export class ContextMenu {
     const focusAt = (next: number): void => {
       rows[(next + rows.length) % rows.length]?.focus({ preventScroll: true });
     };
+    // A row of icon buttons is one stop for Up and Down; Left and Right move inside it.
+    const groupOf = (row: Element | null | undefined): Element | null =>
+      row?.closest(".sheetwrite-context-menu-inline") ?? null;
+    const group = active instanceof HTMLElement ? groupOf(active) : null;
 
     const backToParent = (): void => {
       const parentRow = this.submenus[level - 1]?.parentRow;
@@ -686,13 +772,22 @@ export class ContextMenu {
     };
 
     switch (event.key) {
-      case "ArrowDown":
-        focusAt(index + 1);
+      case "ArrowDown": {
+        let next = index + 1;
+        while (group && groupOf(rows[next]) === group) next++;
+        focusAt(next);
         break;
+      }
 
-      case "ArrowUp":
-        focusAt(index < 0 ? -1 : index - 1);
+      case "ArrowUp": {
+        let next = index < 0 ? -1 : index - 1;
+        while (group && next >= 0 && groupOf(rows[next]) === group) next--;
+        // Coming up into a row of buttons lands on its first button.
+        const above = groupOf(rows.at(next));
+        while (above && next > 0 && groupOf(rows[next - 1]) === above) next--;
+        focusAt(next);
         break;
+      }
 
       case "Home":
         focusAt(0);
@@ -708,14 +803,21 @@ export class ContextMenu {
         break;
 
       case "ArrowRight":
-        if (active instanceof HTMLElement && active.getAttribute("aria-haspopup") === "menu") {
+        if (group) {
+          if (groupOf(rows[index + 1]) === group) focusAt(index + 1);
+        } else if (
+          active instanceof HTMLElement &&
+          active.getAttribute("aria-haspopup") === "menu"
+        ) {
           active.click();
         }
 
         break;
 
       case "ArrowLeft":
-        if (level > 0) backToParent();
+        if (group) {
+          if (index > 0 && groupOf(rows[index - 1]) === group) focusAt(index - 1);
+        } else if (level > 0) backToParent();
         break;
 
       case "Escape":

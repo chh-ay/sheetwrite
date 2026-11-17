@@ -90,6 +90,9 @@ function cutHarness() {
       document.commit(patches, reason);
     },
     onCutChange: (range) => marks.push(range),
+    loadPasteSpecial: () => import("../src/paste-special.js"),
+    askPasteSpecial: async () => null,
+    sheetName: () => "Sheet 1",
   });
   const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
 

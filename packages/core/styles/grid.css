@@ -425,6 +425,37 @@
   opacity: 0.55;
 }
 
+/* Paste Special (src/paste-special.ts): Paste and Operation in two columns
+   each, as Excel's dialog; Paste Link sits apart from OK and Cancel. */
+.sheetwrite-paste-special {
+  display: grid;
+  gap: 10px;
+}
+
+.sheetwrite-paste-special-group {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(6, auto);
+  gap: 4px 16px;
+  margin: 0;
+  padding: 6px 10px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+}
+
+.sheetwrite-paste-special-group + .sheetwrite-paste-special-group {
+  grid-template-rows: repeat(3, auto);
+}
+
+.sheetwrite-paste-special-checks {
+  display: flex;
+  gap: 24px;
+}
+
+.sheetwrite-paste-special-dialog .sheetwrite-dialog-button:first-child {
+  margin-right: auto;
+}
+
 /* The data-validation error alert (src/validation-alert.ts): the style's
    glyph beside the message, as Excel's Stop, Warning and Information icons. */
 .sheetwrite-validation-alert {

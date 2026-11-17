@@ -65,7 +65,7 @@ function copySheetName(name: string, taken: readonly string[]): string {
 }
 
 /** How a reference writes a sheet name: plain, or quoted with doubled apostrophes. */
-function referenceSheetName(name: string): string {
+export function referenceSheetName(name: string): string {
   return PLAIN_SHEET_NAME.test(name) ? name : `'${name.replaceAll("'", "''")}'`;
 }
 
