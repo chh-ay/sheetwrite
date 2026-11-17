@@ -240,3 +240,8 @@
     color-mix(in srgb, var(--sheetwrite-widget-fg) 62%, var(--sheetwrite-widget-bg))
   );
 }
+
+/* Replace all's preview sits under the replace field, its summary first. */
+.sheetwrite-find-preview .sheetwrite-find-results-status {
+  order: -1;
+}

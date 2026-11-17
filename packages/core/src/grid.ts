@@ -173,6 +173,7 @@ import type {
   GridOptions,
   GridPanel,
   GridPresentation,
+  ReplaceChange,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -2229,6 +2230,10 @@ export class GridImpl implements Grid {
 
   replaceAll(replacement: string): ReplaceResult {
     return this.searchController.replaceAll(replacement);
+  }
+
+  previewReplaceAll(replacement: string): ReplaceChange[] {
+    return this.searchController.previewReplaceAll(replacement);
   }
 
   getShortcutLabel(action: KeyboardAction): string {
