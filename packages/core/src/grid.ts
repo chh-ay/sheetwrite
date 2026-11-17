@@ -2662,6 +2662,16 @@ export class GridImpl implements Grid {
     return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
   }
 
+  getCellText(addr: CellAddress): string {
+    const cell = this.store.getCell(addr);
+    const column = this.sheet(addr.sheet).columns[addr.col];
+    return cellDisplayText(
+      cell.resolved,
+      cell.style.numberFormat ?? column?.numberFormat,
+      column?.numberLocale,
+    );
+  }
+
   /**
    * View-aware editable snapshot of a cell: `(row, col)` are active-sheet view
    * coordinates; the returned address is the translated data address, so a
