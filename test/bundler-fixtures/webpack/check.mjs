@@ -63,6 +63,9 @@ const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
 // Data › Data Validation's command and dialog load on first use; their class
 // names survive minifiers. Webpack may copy the dialog shell into the chunk.
 const DATA_VALIDATION_MARKER = "sheetwrite-data-validation";
+// Paste Special's choices and dialog load on first use; their class names
+// survive minifiers. Webpack may copy the dialog shell into the chunk.
+const PASTE_SPECIAL_MARKER = "sheetwrite-paste-special";
 // The sheet menu's Move or Copy dialog and Tab Color palette load on first
 // use, together; the dialog's last list entry survives minifiers.
 const SHEET_TAB_PANELS_MARKER = "(move to end)";
@@ -89,6 +92,7 @@ const findChunks = [];
 const autoFilterChunks = [];
 const formatCellsChunks = [];
 const dataValidationChunks = [];
+const pasteSpecialChunks = [];
 const dialogChunks = [];
 const sheetTabPanelChunks = [];
 const dashboardChunks = [];
@@ -117,6 +121,7 @@ for (const file of lazyChunks) {
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(DATA_VALIDATION_MARKER)) dataValidationChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(PASTE_SPECIAL_MARKER)) pasteSpecialChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
@@ -153,6 +158,9 @@ if (dataValidationChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack Data Validation chunk, got ${dataValidationChunks.length}`,
   );
+}
+if (pasteSpecialChunks.length !== 1) {
+  throw new Error(`Expected one lazy webpack Paste Special chunk, got ${pasteSpecialChunks.length}`);
 }
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
@@ -203,6 +211,9 @@ if (mainCode.includes(DIALOG_MARKER)) {
 }
 if (mainCode.includes(FORMAT_CELLS_MARKER)) {
   throw new Error("Format Cells is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(PASTE_SPECIAL_MARKER)) {
+  throw new Error("Paste Special is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(DATA_VALIDATION_MARKER)) {
   throw new Error("Data Validation is in webpack's main.js; it must load lazily");
