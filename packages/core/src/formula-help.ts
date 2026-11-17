@@ -9,11 +9,14 @@ import {
   argumentOf,
   type FormulaCall,
   type FormulaCompletion,
+  type FormulaCompletionItem,
   type FormulaDiagnostic,
-  type FormulaReference,
+  type FormulaNames,
+  type FormulaTableNames,
 } from "./formula-analysis.js";
 import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
+import type { FormulaReference } from "./formula-references.js";
 import { storeFunctions } from "./functions/registry.js";
 import { argumentLabel, signature } from "./functions/signature.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
@@ -111,10 +114,48 @@ function shownDiagnostics(
 }
 
 function sameMatches(
-  left: readonly FormulaFunctionMetadata[],
-  right: readonly FormulaFunctionMetadata[],
+  left: readonly FormulaCompletionItem[],
+  right: readonly FormulaCompletionItem[],
 ): boolean {
-  return left.length === right.length && left.every((fn, index) => fn === right[index]);
+  return (
+    left.length === right.length &&
+    left.every((item, index) => item.kind === right[index]?.kind && item.name === right[index].name)
+  );
+}
+
+/**
+ * The defined names a formula on `sheet` sees, the workbook's tables, and
+ * the table that holds `cell`, for the completion list.
+ */
+function formulaNames(
+  store: Store,
+  sheet: SheetId,
+  cell: Readonly<CellAddress> | null,
+): FormulaNames {
+  const workbook = store.getWorkbook();
+  const names = new Set<string>();
+  for (const defined of workbook.namedRanges ?? []) {
+    if (defined.scope === undefined || defined.scope === sheet) names.add(defined.name);
+  }
+  const tables: FormulaTableNames[] = [];
+  let cellTable: string | undefined;
+  for (const entry of workbook.sheets) {
+    for (const table of entry.tables ?? []) {
+      tables.push({ name: table.name, columns: table.columns.map((column) => column.name) });
+      const { range } = table;
+      if (
+        cell !== null &&
+        range.sheet === cell.sheet &&
+        cell.row >= range.start.row &&
+        cell.row <= range.end.row &&
+        cell.col >= range.start.col &&
+        cell.col <= range.end.col
+      ) {
+        cellTable = table.name;
+      }
+    }
+  }
+  return { names: [...names], tables, ...(cellTable === undefined ? {} : { cellTable }) };
 }
 
 /** `NAME(a, b, ...)` with the argument at `active` in bold. */
@@ -154,6 +195,8 @@ export class FormulaHelp {
   private readonly id: string;
   private field: FormulaEditorElement | null = null;
   private functions: readonly FormulaFunctionMetadata[] = [];
+  /** The defined names and tables the list offers, read when the field is attached. */
+  private names: FormulaNames = { names: [], tables: [] };
 
   private layer: HTMLDivElement | null = null;
   private guide: HTMLDivElement | null = null;
@@ -186,6 +229,7 @@ export class FormulaHelp {
   attach(field: FormulaEditorElement, theme: Theme | null): void {
     this.detach();
     this.field = field;
+    this.names = formulaNames(this.deps.store, this.deps.sheet(), this.deps.cell());
     this.mountLayer(field, theme);
     field.setAttribute("aria-autocomplete", "list");
     if (field instanceof HTMLInputElement) {
@@ -246,7 +290,7 @@ export class FormulaHelp {
     }
 
     const cursor = field.selectionStart ?? text.length;
-    const analysis = analyzeFormula(text, cursor, this.functions);
+    const analysis = analyzeFormula(text, cursor, this.functions, this.names);
     const diagnostics = shownDiagnostics(analysis.diagnostics, cursor, text.length);
     if (this.dismissedText !== null && this.dismissedText !== text) this.dismissedText = null;
 
@@ -441,7 +485,7 @@ export class FormulaHelp {
     this.renderList(completion.matches);
   }
 
-  private renderList(matches: readonly FormulaFunctionMetadata[]): void {
+  private renderList(matches: readonly FormulaCompletionItem[]): void {
     const field = this.field;
     if (field === null || this.layer === null) return;
 
@@ -449,15 +493,18 @@ export class FormulaHelp {
     list.className = "sheetwrite-assist";
     list.id = `${this.id}-list`;
     list.setAttribute("role", "listbox");
-    list.setAttribute("aria-label", "Functions");
+    list.setAttribute("aria-label", "Formula AutoComplete");
     list.replaceChildren(
-      ...matches.map((fn, index) => {
+      ...matches.map((item, index) => {
         const option = document.createElement("div");
         option.className = "sheetwrite-assist-item";
         option.id = `${this.id}-option-${index}`;
         option.setAttribute("role", "option");
-        option.title = fn.description;
-        option.textContent = fn.name;
+        option.dataset.kind = item.kind;
+        option.title = item.description;
+        // Excel writes an argument's value and its meaning on one line: `FALSE - Exact match`.
+        option.textContent =
+          item.kind === "choice" ? `${item.name} - ${item.description}` : item.name;
 
         // mousedown, not click, so the pick lands before the field blurs.
         option.addEventListener("mousedown", (event) => {
@@ -500,17 +547,19 @@ export class FormulaHelp {
     }
   }
 
-  /** Replace the name at the caret with the active function and open its call. */
+  /** Replace the text at the caret with the active item; a function opens its call. */
   private accept(): void {
     const field = this.field;
     const completion = this.completion;
-    const fn = completion?.matches[this.activeIndex];
-    if (field === null || completion === null || fn === undefined) return;
+    const item = completion?.matches[this.activeIndex];
+    if (field === null || completion === null || item === undefined) return;
 
     const text = field.value;
-    const hasParenthesis = text.charAt(completion.to) === "(";
-    const caret = completion.from + fn.name.length + 1;
-    field.value = `${text.slice(0, completion.from)}${fn.name}${hasParenthesis ? "" : "("}${text.slice(completion.to)}`;
+    // A function before an existing `(` keeps it; the caret goes after it either way.
+    const opened = item.kind === "function" && text.charAt(completion.to) === "(";
+    const insert = opened ? item.name : item.insert;
+    const caret = completion.from + insert.length + (opened ? 1 : 0);
+    field.value = `${text.slice(0, completion.from)}${insert}${text.slice(completion.to)}`;
     field.setSelectionRange(caret, caret);
     field.focus();
 
@@ -527,7 +576,7 @@ export class FormulaHelp {
     if (guide === null) return;
 
     const call = this.call;
-    const listed = this.completion?.matches[this.activeIndex];
+    const listed = this.completion?.matches[this.activeIndex]?.function;
     const fn = listed ?? call?.function;
     const active = listed === undefined ? (call?.argumentIndex ?? null) : null;
     const error = this.diagnostics[0]?.message;

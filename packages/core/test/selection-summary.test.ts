@@ -87,3 +87,23 @@ it("names a selected row by its sheet row under a filter", () => {
   expect(piece.element.textContent).toContain("Row 4");
   piece.destroy();
 });
+
+it("shows Excel's records found after an AutoFilter filters, until the next edit", () => {
+  const { grid } = setup();
+  const piece = createSelectionStatus(document.createElement("div"), grid);
+  grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+  expect(piece.element.textContent).not.toContain("records found");
+
+  grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
+  expect(piece.element.textContent).toContain("2 of 3 records found");
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+  expect(piece.element.textContent).toContain("2 of 3 records found");
+
+  grid.applyTransaction({
+    patches: [
+      { op: "set", addr: { sheet: "s1", row: 0, col: 0 }, value: { kind: "literal", value: 1 } },
+    ],
+  });
+  expect(piece.element.textContent).not.toContain("records found");
+  piece.destroy();
+});
