@@ -122,7 +122,10 @@ export class SheetTabs {
   private readonly onRemove?: (id: SheetId) => SheetLifecycleResult;
   private readonly onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   private readonly onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
-  private readonly onCopy?: (id: SheetId, index: number) => SheetLifecycleResult;
+  private readonly onCopy?: (
+    id: SheetId,
+    index: number,
+  ) => SheetLifecycleResult | Promise<SheetLifecycleResult>;
   private readonly onTabColor?: (id: SheetId, color: string | null) => SheetLifecycleResult;
   private readonly onHide?: (id: SheetId) => SheetLifecycleResult;
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
@@ -680,7 +683,9 @@ export class SheetTabs {
     this.panel = null;
     this.render(true);
     const trigger = this.host.querySelector<HTMLButtonElement>(".sheetwrite-tab-options-button");
-    if (trigger?.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) trigger.focus();
+    if (trigger && trigger.closest<HTMLElement>("[data-sheet-id]")?.dataset.sheetId === id) {
+      trigger.focus();
+    }
   }
 
   private createPanel(
