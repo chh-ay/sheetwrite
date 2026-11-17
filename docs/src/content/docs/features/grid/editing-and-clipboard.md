@@ -95,6 +95,7 @@ As in Excel, typing a text entry completes it from the entries in the same colum
 - Backspace or Delete removes the added text; typing on replaces it and completes again.
 - Nothing is completed when you type a formula, a number, a date or a logical value, or when no entry or more than one entry begins with the typed text. Numbers, dates and logical values in the column are never entries.
 - During IME composition nothing is completed; the composed text is completed when the composition ends. Formula help, the function list after `=`, is separate: AutoComplete never acts on a formula.
+- The code loads with the first edit, so the grid's first load does not carry it; the edit a key opened is completed as soon as it arrives.
 
 ### Event order
 
