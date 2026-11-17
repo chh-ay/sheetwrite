@@ -98,6 +98,8 @@ export class FillController {
   private readonly deps: FillControllerDeps;
   /** The source of the fill handle's drag, read when the drag starts. */
   private dragSource: FillSource | null = null;
+  /** The fill the dragged handle would write now: the new cells and their plan. */
+  private dragFill: { readonly output: SelRect; readonly plan: FillPlan } | null = null;
   private finished: FinishedFill | null = null;
   /** True while this controller commits or undoes, so its own changes keep the button. */
   private changing = false;
@@ -113,25 +115,51 @@ export class FillController {
 
   endDrag(): void {
     this.dragSource = null;
+    this.dragFill = null;
   }
 
   /**
-   * The text the last cell of `target` will show, for the tip beside the
-   * fill handle; null when the drag adds no cells or that cell gets a formula.
+   * Plan the dragged handle's fill into `target`, for the tip and the values
+   * shown in place. Returns the text the last cell will show, for the tip;
+   * null when the drag adds no cells or that cell gets a formula.
    */
-  tip(target: SelRect, options: FillOptions): string | null {
+  drag(target: SelRect, options: FillOptions): string | null {
     const source = this.dragSource;
-    if (!source) return null;
-    const output = outputOf(source.rect, target);
-    if (!output) return null;
+    const output = source ? outputOf(source.rect, target) : null;
+    if (!source || !output) {
+      this.dragFill = null;
+      return null;
+    }
     const vertical = output.c0 === source.rect.c0 && output.c1 === source.rect.c1;
+    const plan = this.plan(source, vertical, options);
+    this.dragFill = { output, plan };
     // The far end of the fill, in its last row or column.
     const row = vertical && output.r0 < source.rect.r0 ? output.r0 : output.r1;
     const col = !vertical && output.c0 < source.rect.c0 ? output.c0 : output.c1;
-    const plan = this.plan(source, vertical, options);
-    const write = this.write(plan, row, col);
+    return this.preview(row, col)?.text ?? null;
+  }
+
+  /** The new cells of the dragged handle's fill, whose values show in place. */
+  get dragArea(): SelRect | null {
+    return this.dragFill?.output ?? null;
+  }
+
+  /**
+   * What view cell (`row`, `col`) of the dragged handle's fill will show: its
+   * text, and whether it sits at the right as a number does. Null for a cell
+   * that gets a formula, whose value is known only once it is written.
+   */
+  preview(row: number, col: number): { text: string; right: boolean } | null {
+    const fill = this.dragFill;
+    if (!fill) return null;
+    const write = this.write(fill.plan, row, col);
     if (write.value.kind !== "literal") return null;
-    return cellDisplayText(write.value.value, write.style.numberFormat);
+    const value = write.value.value;
+    const align = write.style.align;
+    return {
+      text: cellDisplayText(value, write.style.numberFormat),
+      right: align === "right" || (align === undefined && typeof value === "number"),
+    };
   }
 
   /**

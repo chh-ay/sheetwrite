@@ -22,6 +22,7 @@ For each check, save the result file under the name given and attach it to the i
 | 14 | #231 | `test/fixtures/excel-checks/dashboard-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 15 | #501 | `test/fixtures/excel-checks/chart-levels-sheetwrite-export.xlsx` | `chart-levels-excel.xlsx` |
 | 16 | #799 | `test/fixtures/excel-checks/number-format-unsure.xlsx` | `number-format-unsure-excel.xlsx` |
+| 18 | #827, #824 | none; type the values into a new workbook | none; record what Excel shows |
 
 ## 1. Sort order (#353)
 
@@ -250,3 +251,15 @@ Expected:
 - Column E is `TRUE` in every row.
 - Column A shows the same text as column D, without the brackets.
 - Where a row differs, Excel's column C replaces the row's text in `number-format-cases.json`, and both formatters change to match it.
+
+## 18. AutoFill series that Excel's table does not list (#827, #824)
+
+Excel's AutoFill table names `Qtr3`, `1st Period` and `text1, textA`. Sheetwrite generalises them; check these in a new workbook. For each, type the source, select it and drag the fill handle down four rows.
+
+1. `A1` in D1 and `B1` in D2 (one column; select both). Sheetwrite: D3:D6 read `A2`, `B2`, `A3`, `B3`.
+2. `Quarter 4` in F1. Sheetwrite: `Quarter 1`, `Quarter 2`, `Quarter 3`, `Quarter 4`.
+3. `1 Apple` in G1. Sheetwrite copies it (only an ordinal such as `1st` counts at the start).
+4. `Q4 2024` in H1. Sheetwrite: `Q4 2025`, `Q4 2026`… (the number at the end counts).
+5. 2026-01-03 (a Saturday) in I1, drag down five rows, **Auto Fill Options › Fill Weekdays**. Sheetwrite: 2026-01-05 to 2026-01-09, Monday to Friday.
+
+Record what Excel fills in each case.

@@ -293,6 +293,38 @@ describe("pointer input: touch policy", () => {
       store.dispose();
     });
 
+    it("shows the value every new cell will get, in place, while the fill handle drags", () => {
+      const { grid, store, scroller, workbook, host } = makeGrid();
+      store.applyTransaction({
+        patches: [
+          { op: "set", addr: at(1), value: { kind: "literal", value: 10 } },
+          { op: "set", addr: at(2), value: { kind: "literal", value: 20 } },
+        ],
+      });
+      grid.setSelection({
+        kind: "range",
+        range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      });
+
+      scroller.dispatchEvent(pointer("pointerdown", fillHandlePoint(2, 1, workbook)));
+      scroller.dispatchEvent(pointer("pointermove", cellPoint(7, 1, workbook)));
+      const canvas = host.querySelector<HTMLCanvasElement>("canvas.sheetwrite-fill-values");
+      const context = canvas?.getContext("2d") as unknown as { calls: Record<string, number> };
+      expect(canvas?.hidden).toBe(false);
+      // Rows 4 to 8 each show their value: 30, 40, 50, 60, 70.
+      expect(context.calls.fillText).toBe(5);
+
+      // Esc ends the drag without filling, as in Excel.
+      host.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }),
+      );
+      expect(canvas?.hidden).toBe(true);
+      scroller.dispatchEvent(pointer("pointerup", cellPoint(7, 1, workbook)));
+      expect(store.getCell(at(7)).resolved).toBe(70.5);
+      grid.destroy();
+      store.dispose();
+    });
+
     it("redoes a fill from the Auto Fill Options button as one undo step", () => {
       const { grid, store, scroller, workbook, host } = makeGrid();
       store.applyTransaction({

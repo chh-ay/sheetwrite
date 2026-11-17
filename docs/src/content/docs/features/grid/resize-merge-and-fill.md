@@ -103,6 +103,8 @@ Hold Ctrl (Option on a Mac) while you release to swap counting and copying: one 
 
 While you drag, a tip beside the pointer shows the value the last cell will get, as in Excel, with Ctrl counted as you move. A cell that will get a formula shows no tip.
 
+Every new cell on screen also shows the value it will get, as faint text in the cell, so you see the whole series and catch a wrong pattern (a copy instead of a series, a step of 2) before you release. A cell that will get a formula shows nothing until it is written. Only the cells on screen are drawn, so a fill of 10,000 cells costs about half a millisecond per pointer move in Chromium. Esc ends the drag without filling, as in Excel.
+
 After a drag or a double-click on the fill handle, the **Auto Fill Options** button shows at the bottom-right corner of the filled cells. Its menu redoes the fill another way, as one undo step:
 
 | Choice | Fill |
