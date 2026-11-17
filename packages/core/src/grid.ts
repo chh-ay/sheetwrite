@@ -81,7 +81,7 @@ import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
 import { validateSheetName } from "./sheet-name.js";
-import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
+import { changesSheetTabs, loadSheetCommands, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SHEET_LIFECYCLE_MESSAGES, SheetwriteStore } from "./store.js";
@@ -3343,7 +3343,7 @@ export class GridImpl implements Grid {
     options: { index?: number; name?: string } = {},
   ): Promise<SheetLifecycleResult> {
     // The copy's code loads the first time a sheet is copied.
-    return import("./sheet-commands.js").then(({ planSheetCopy }) => {
+    return loadSheetCommands().then(({ planSheetCopy }) => {
       const plan = planSheetCopy(
         this.store.getWorkbook(),
         (sheet) => this.document.snapshotSheet(sheet),

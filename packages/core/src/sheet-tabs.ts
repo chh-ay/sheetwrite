@@ -29,6 +29,14 @@ export function changesSheetTabs(operation: DocumentOp): boolean {
   );
 }
 
+/**
+ * Load the sheet commands that run only when a user acts: copying a sheet, and
+ * the tab menu's Move or Copy dialog and Tab Color palette. Grid and the tabs
+ * share this loader, so bundlers emit the commands as one chunk.
+ */
+export const loadSheetCommands = (): Promise<typeof import("./sheet-commands.js")> =>
+  import("./sheet-commands.js");
+
 export interface SheetTabsOptions {
   onActivate: (id: SheetId) => void;
   onAdd?: () => SheetLifecycleResult;
@@ -680,7 +688,7 @@ export class SheetTabs {
   private openPanel(kind: "moveCopy" | "tabColor", id: SheetId): void {
     this.clearMenuState();
     this.panel = { kind, id };
-    void import("./sheet-commands.js").then((panels) => {
+    void loadSheetCommands().then((panels) => {
       this.panels = panels;
       if (this.destroyed || this.panel?.kind !== kind || this.panel.id !== id) return;
       this.render();
