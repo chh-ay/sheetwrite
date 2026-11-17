@@ -17,10 +17,11 @@ import {
 import { type Scope, ScopeSlot } from "./scope.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { CellHyperlink, CellScalar, CellStyle, CellValue } from "./types/cell.js";
-import type { SheetId } from "./types/coordinates.js";
+import type { Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, PackedCellBlock, Sheet } from "./types/document.js";
 import type { ClipboardOutcome } from "./types/grid.js";
 import type { Store } from "./types/store.js";
+import type { ChangeEvent } from "./types/transaction.js";
 
 export interface ClipboardControllerDeps {
   /** The grid's scope; its close stops every clipboard action that is still running. */
@@ -34,6 +35,8 @@ export interface ClipboardControllerDeps {
   mergeAnchorAt: (row: number, col: number) => SelRect | null;
   toDataRow: (viewRow: number) => number;
   commit: (patches: DocumentOp[], reason: CommitReason) => void;
+  /** Called when a cut starts waiting for a paste (its cells, in data rows) and when it ends. */
+  onCutChange: (range: Range | null) => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -49,14 +52,20 @@ interface PasteTarget extends CellRef {
 }
 
 interface CapturedClipboard extends ClipboardSnapshot {
-  /** Exact source addresses captured before an asynchronous cut writes the clipboard. */
-  clearPatches: DocumentOp[];
+  /** The selected cells as one block of data rows; `null` when a sorted view splits them. */
+  source: Range | null;
 }
 
 /** A copied snapshot and the in-memory token that proves a paste came from it. */
 interface TrustedClipboard {
   token: string;
   snapshot: ClipboardSnapshot;
+}
+
+/** A cut that waits for a paste: the cells it moves and the token of its clipboard payload. */
+interface PendingCut {
+  range: Range;
+  token: string;
 }
 
 /** Private-format MIME type used for rich Sheetwrite clipboard payloads. */
@@ -398,16 +407,50 @@ function shiftValue(value: CellValue, dRow: number, dCol: number): CellValue {
   return value;
 }
 
+/** Whether `patch` moves or removes cells of `sheet`, so a cut there no longer names its cells. */
+function movesCellsOf(patch: DocumentOp, sheet: SheetId): boolean {
+  switch (patch.op) {
+    case "addRows":
+    case "removeRows":
+    case "moveRows":
+    case "addColumns":
+    case "removeColumns":
+    case "moveColumns":
+    case "removeSheet":
+      return patch.sheet === sheet;
+    case "moveCells":
+      return patch.range.sheet === sheet || patch.to.sheet === sheet;
+    default:
+      return false;
+  }
+}
+
 /**
  * Translates between the current selection and clipboard payloads. Formula/ref
  * fidelity is restored only when a versioned private envelope carries the
  * controller's current in-memory token. Every other clipboard source is inert.
+ *
+ * As in Excel, a cut changes nothing: it marks its cells, and the next paste
+ * moves them with one `moveCells` operation. Esc, an edit, another copy or cut,
+ * or a change that moves the cells' sheet ends the cut.
  */
 export class ClipboardController {
   private readonly deps: ClipboardControllerDeps;
 
   /** Last rich copy/cut and its unguessable in-memory provenance token. */
   private trusted: TrustedClipboard | null = null;
+
+  /** The cut that waits for a paste. */
+  private pendingCut: PendingCut | null = null;
+
+  /**
+   * The token of the last cut that was pasted or ended. As in Excel, its
+   * clipboard payload no longer pastes.
+   */
+  private endedCutToken: string | null = null;
+
+  /** True while the paste of a cut commits its move. */
+  private movingCut = false;
 
   /**
    * The running copy or cut, and the running paste. A newer action of the
@@ -429,11 +472,46 @@ export class ClipboardController {
     this.writes.close();
     this.reads.close();
     this.trusted = null;
+    this.endCut();
+  }
+
+  /** End the cut that waits for a paste, as Esc does in Excel. Returns whether there was one. */
+  cancelCut(): boolean {
+    if (!this.pendingCut) return false;
+    this.endCut();
+    return true;
+  }
+
+  /**
+   * Follow a committed change: the move of the pending cut ends it, and so
+   * does any other local edit, or a change that moves or removes cells of
+   * its sheet.
+   */
+  storeChanged(event: ChangeEvent): void {
+    const cut = this.pendingCut;
+    if (!cut) return;
+    const patches = event.transaction.patches;
+    if (this.movingCut) {
+      if (patches.some((patch) => patch.op === "moveCells")) this.endCut();
+      return;
+    }
+    if (event.source === "local" || patches.some((patch) => movesCellsOf(patch, cut.range.sheet))) {
+      this.endCut();
+    }
+  }
+
+  private endCut(): void {
+    const cut = this.pendingCut;
+    if (!cut) return;
+    this.pendingCut = null;
+    this.endedCutToken = cut.token;
+    this.deps.onCutChange(null);
   }
 
   async copy(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(false);
     if (!snapshot) return "empty";
+    this.endCut();
     const write = this.writes.next();
     try {
       const token = createClipboardToken();
@@ -448,17 +526,20 @@ export class ClipboardController {
 
   async cut(): Promise<ClipboardOutcome> {
     const snapshot = this.capture(true);
-    if (!snapshot) return "empty";
+    if (!snapshot?.source) return "empty";
+    const source = snapshot.source;
     const write = this.writes.next();
     try {
       const token = createClipboardToken();
       const outcome = await this.writeCaptured(snapshot, token);
-      // The clipboard holds the cells, but the source stays: nothing is lost.
       if (write.closed) return "empty";
       if (outcome !== "done") return outcome;
       this.trusted = { snapshot, token };
+      this.endCut();
+      // A read-only grid copies: nothing can move.
       if (this.deps.readOnly()) return "done";
-      this.deps.commit(snapshot.clearPatches, "cut");
+      this.pendingCut = { range: source, token };
+      this.deps.onCutChange(source);
       return "done";
     } finally {
       write.close();
@@ -583,6 +664,12 @@ export class ClipboardController {
           const envelope = parseClipboardJson(await (await item.getType(customType)).text());
           if (read.closed) return "empty";
           if (!envelope) continue;
+          if (this.pendingCut?.token === envelope.token) {
+            return this.pasteCut(this.pendingCut, focus, valuesOnly);
+          }
+          // A cut that was pasted or ended does not paste again, as in Excel.
+          if (this.endedCutToken === envelope.token) return "empty";
+          this.endCut();
           if (this.trusted?.token === envelope.token) {
             this.pasteInternal(this.trusted.snapshot, focus, valuesOnly);
           } else {
@@ -592,6 +679,8 @@ export class ClipboardController {
           return "done";
         }
 
+        // The clipboard no longer holds the cut: this is a plain paste.
+        this.endCut();
         for (const item of items) {
           if (!item.types.includes("text/html")) continue;
           const html = await (await item.getType("text/html")).text();
@@ -622,6 +711,7 @@ export class ClipboardController {
     try {
       const text = await clipboard.readText();
       if (read.closed || text.length === 0) return "empty";
+      this.endCut();
       this.pasteExternal(text, focus);
       return "done";
     } catch {
@@ -629,19 +719,53 @@ export class ClipboardController {
     }
   }
 
+  /**
+   * Move the pending cut so that its top-left cell lands on the paste target's,
+   * as Excel's Cut and Paste does. Paste Values is not available after a cut,
+   * and a target that a sorted view splits takes no move; the cut stays.
+   */
+  private pasteCut(cut: PendingCut, target: PasteTarget, valuesOnly: boolean): ClipboardOutcome {
+    const rows = cut.range.end.row - cut.range.start.row + 1;
+    const cols = cut.range.end.col - cut.range.start.col + 1;
+    const firstRow = this.deps.toDataRow(target.row);
+    const fits =
+      !valuesOnly &&
+      target.row + rows <= this.deps.store.viewRowCount(this.deps.activeSheet()) &&
+      target.col + cols <= this.deps.sheet().columns.length &&
+      Array.from({ length: rows }, (_, row) => row).every(
+        (row) => this.deps.toDataRow(target.row + row) === firstRow + row,
+      );
+    if (!fits) return "empty";
+
+    this.movingCut = true;
+    try {
+      this.deps.commit(
+        [
+          {
+            op: "moveCells",
+            range: cut.range,
+            to: { sheet: this.deps.activeSheet(), row: firstRow, col: target.col },
+          },
+        ],
+        "paste",
+      );
+    } finally {
+      this.movingCut = false;
+    }
+    return "done";
+  }
+
   private pasteInternal(
     snapshot: ClipboardSnapshot,
     focus: PasteTarget,
     valuesOnly: boolean,
   ): void {
-    // Copy shifts every relative formula ref by the block's rigid displacement;
-    // cut keeps formula source verbatim. Hyperlink source ranges always move to
-    // the paste destination, while stable internal targets remain unchanged.
+    // Copy shifts every relative formula ref by the block's rigid displacement.
+    // Hyperlink source ranges move to the paste destination, while stable
+    // internal targets remain unchanged.
     const targetAnchorRow = this.deps.toDataRow(focus.row);
-    const sourceDeltaRow = targetAnchorRow - snapshot.anchor.row;
-    const sourceDeltaCol = focus.col - snapshot.anchor.col;
-    const formulaRowDelta = snapshot.cut ? 0 : sourceDeltaRow;
-    const formulaColDelta = snapshot.cut ? 0 : sourceDeltaCol;
+    const deltaRow = targetAnchorRow - snapshot.anchor.row;
+    const deltaCol = focus.col - snapshot.anchor.col;
     const hyperlinkPatches: DocumentOp[] = valuesOnly
       ? []
       : snapshot.hyperlinks.map((source) => ({
@@ -649,16 +773,16 @@ export class ClipboardController {
           sheet: this.deps.activeSheet(),
           hyperlink: {
             ...cloneCellHyperlink(source),
-            id: snapshot.cut ? source.id : createHyperlinkId(),
+            id: createHyperlinkId(),
             range: {
               sheet: this.deps.activeSheet(),
               start: {
-                row: source.range.start.row + sourceDeltaRow,
-                col: source.range.start.col + sourceDeltaCol,
+                row: source.range.start.row + deltaRow,
+                col: source.range.start.col + deltaCol,
               },
               end: {
-                row: source.range.end.row + sourceDeltaRow,
-                col: source.range.end.col + sourceDeltaCol,
+                row: source.range.end.row + deltaRow,
+                col: source.range.end.col + deltaCol,
               },
             },
           },
@@ -674,11 +798,7 @@ export class ClipboardController {
         if (valuesOnly) return { value: { kind: "literal", value: cell.resolved } };
         // Each repeated copy of a copied block shifts by its own offset, as in Excel.
         return {
-          value: shiftValue(
-            cell.value,
-            formulaRowDelta + (snapshot.cut ? 0 : repeat.row),
-            formulaColDelta + (snapshot.cut ? 0 : repeat.col),
-          ),
+          value: shiftValue(cell.value, deltaRow + repeat.row, deltaCol + repeat.col),
           style: cell.style,
         };
       },
@@ -908,8 +1028,9 @@ export class ClipboardController {
   /**
    * Snapshot the focused selection rectangle into a {@link ClipboardSnapshot}:
    * per-cell value (formula src preserved, else literal), resolved scalar, and
-   * style, plus the source anchor and the TSV those resolved scalars produce.
-   * Returns `null` when there is no focused rectangle.
+   * style, plus the source anchor, the TSV those resolved scalars produce, and
+   * the rectangle in data rows when they are one block. Returns `null` when
+   * there is no focused rectangle.
    */
   private capture(cut: boolean): CapturedClipboard | null {
     const focus = this.deps.selection().focusCell;
@@ -959,56 +1080,41 @@ export class ClipboardController {
       : null;
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
-    const clearPatches: DocumentOp[] = [];
     const firstDataRow = this.deps.toDataRow(rect.r0);
-    let rangeClear = true;
-    for (let row = rect.r0; row <= rect.r1 && rangeClear; row++) {
-      if (this.deps.toDataRow(row) !== firstDataRow + row - rect.r0) {
-        rangeClear = false;
-        break;
-      }
-
-      for (let col = rect.c0; col <= rect.c1; col++) {
-        if (this.deps.mergeAnchorAt(row, col)) {
-          rangeClear = false;
-          break;
-        }
+    let contiguous = true;
+    let merged = false;
+    for (let row = rect.r0; row <= rect.r1 && contiguous; row++) {
+      contiguous = this.deps.toDataRow(row) === firstDataRow + row - rect.r0;
+      for (let col = rect.c0; col <= rect.c1 && !merged; col++) {
+        merged = this.deps.mergeAnchorAt(row, col) !== null;
       }
     }
-
-    if (rangeClear) {
-      clearPatches.push({
-        op: "clearRange",
-        range: {
+    const source: Range | null = contiguous
+      ? {
           sheet: activeSheet,
           start: { row: firstDataRow, col: rect.c0 },
           end: { row: firstDataRow + rect.r1 - rect.r0, col: rect.c1 },
-        },
-      });
-    }
+        }
+      : null;
 
-    const hyperlinks = rangeClear
-      ? (this.deps.sheet().hyperlinks ?? [])
-          .filter((hyperlink) => {
-            const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
-            const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
-            const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
-            const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
-            return (
-              hyperlink.range.sheet === activeSheet &&
-              r0 >= firstDataRow &&
-              r1 <= firstDataRow + rect.r1 - rect.r0 &&
-              c0 >= rect.c0 &&
-              c1 <= rect.c1
-            );
-          })
-          .map(cloneCellHyperlink)
-      : [];
-    if (cut) {
-      for (const hyperlink of hyperlinks) {
-        clearPatches.push({ op: "removeHyperlink", sheet: activeSheet, id: hyperlink.id });
-      }
-    }
+    const hyperlinks =
+      contiguous && !merged
+        ? (this.deps.sheet().hyperlinks ?? [])
+            .filter((hyperlink) => {
+              const r0 = Math.min(hyperlink.range.start.row, hyperlink.range.end.row);
+              const r1 = Math.max(hyperlink.range.start.row, hyperlink.range.end.row);
+              const c0 = Math.min(hyperlink.range.start.col, hyperlink.range.end.col);
+              const c1 = Math.max(hyperlink.range.start.col, hyperlink.range.end.col);
+              return (
+                hyperlink.range.sheet === activeSheet &&
+                r0 >= firstDataRow &&
+                r1 <= firstDataRow + rect.r1 - rect.r0 &&
+                c0 >= rect.c0 &&
+                c1 <= rect.c1
+              );
+            })
+            .map(cloneCellHyperlink)
+        : [];
 
     for (let r = rect.r0; r <= rect.r1; r++) {
       const cellLine: ClipboardCell[] = [];
@@ -1055,13 +1161,6 @@ export class ClipboardController {
                 : { kind: "literal", value: cell.resolved };
         cellLine.push({ value, resolved: cell.resolved, style: cell.style });
         valueLine.push(cell.resolved);
-        if (!rangeClear) {
-          clearPatches.push({
-            op: "set",
-            addr,
-            value: { kind: "literal", value: null },
-          });
-        }
       }
 
       cells.push(cellLine);
@@ -1069,6 +1168,6 @@ export class ClipboardController {
     }
 
     const anchor = { row: bulk?.dataRows[0] ?? this.deps.toDataRow(rect.r0), col: rect.c0 };
-    return { anchor, cells, hyperlinks, tsv: rowsToTsv(values), cut, clearPatches };
+    return { anchor, cells, hyperlinks, tsv: rowsToTsv(values), cut, source };
   }
 }

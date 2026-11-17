@@ -2,7 +2,7 @@ import { capturedClearCells } from "./clear-capture.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_SHEET_ID } from "./grid-constants.js";
 import { restoreBlockFacts } from "./restore-block.js";
-import { cellRange } from "./store/ranges.js";
+import { cellRange, movedBlock, normalizedRange } from "./store/ranges.js";
 import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, SheetSnapshot } from "./types/document.js";
@@ -375,6 +375,8 @@ function operationRange(operation: DocumentOp): Range | null {
     case "clearRange":
     case "permuteRows":
       return operation.range;
+    case "moveCells":
+      return movedBlock(operation);
     default:
       return null;
   }
@@ -774,6 +776,16 @@ export class RowBridge<
           addresses.push({ sheet: range.sheet, row, col });
         }
       }
+    } else if (operation.op === "moveCells") {
+      // The cells the block leaves and the cells it lands on; the store
+      // reports each new value as a change.
+      for (const range of [normalizedRange(operation.range), movedBlock(operation)]) {
+        for (let row = range.start.row; row <= range.end.row; row += 1) {
+          for (let col = range.start.col; col <= range.end.col; col += 1) {
+            addresses.push({ sheet: range.sheet, row, col });
+          }
+        }
+      }
     }
 
     return addresses.map((addr) => {
@@ -823,6 +835,13 @@ export class RowBridge<
       case "restoreBlock":
       case "permuteRows":
         return this.rangeDelta(operation, transaction, changeQueues);
+
+      case "moveCells": {
+        const cells = this.cellsFor(operation, changeQueues);
+        const base = this.cellsBase(transaction, operation, cells);
+        const kind = writeDeltaKind(transaction.commitReason) ?? "range";
+        return { ...base, kind, range: movedBlock(operation), cells };
+      }
 
       case "clearRange": {
         const cells = this.cellsFor(operation, changeQueues);
