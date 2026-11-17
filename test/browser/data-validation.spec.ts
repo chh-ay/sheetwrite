@@ -100,3 +100,39 @@ test("a Warning alert keeps the entry on Yes and an Information alert on OK @por
   await expect(information).toHaveCount(0);
   expect(await regionAt50(page)).toBe("Elsewhere");
 });
+
+test("a list cell's arrow opens its list, and typing filters it, from the keyboard @portability", async ({
+  page,
+}) => {
+  await open(page);
+  await regionRule(page, {
+    condition: { kind: "list", values: ["North", "South", "East", "West", "North-East", "South-West"] },
+  });
+  const arrow = page.locator(".sheetwrite-list-button");
+  await expect(arrow).toBeVisible();
+  const box = await arrow.boundingBox();
+  if (!box) throw new Error("expected the dropdown arrow");
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  const list = page.getByRole("listbox");
+  await expect(list.getByRole("option")).toHaveCount(6);
+  await page.keyboard.press("Escape");
+  await expect(list).toHaveCount(0);
+  await expect(page.locator(".sheetwrite").first()).toBeFocused();
+
+  await page.keyboard.type("we");
+  const combobox = page.getByRole("combobox");
+  await expect(combobox).toBeFocused();
+  await expect(combobox).toHaveValue("we");
+  await expect(list.getByRole("option")).toHaveText(["West", "South-West"]);
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("Enter");
+  await expect(list).toHaveCount(0);
+  expect(await regionAt50(page)).toBe("South-West");
+
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Alt+ArrowDown");
+  await expect(list.getByRole("option")).toHaveCount(6);
+  await page.keyboard.press("Tab");
+  await expect(list).toHaveCount(0);
+});
