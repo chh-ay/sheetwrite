@@ -50,7 +50,8 @@ function nextFrameTicks(): number {
 /** The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). */
 const TAKES = {
   wide: { width: 1280, height: 720, scale: 1.5, mobile: false },
-  narrow: { width: 390, height: 700, scale: 2, mobile: true },
+  // A narrow window, not a phone emulation: the shell lays out the same as on a 390 px phone.
+  narrow: { width: 390, height: 700, scale: 2, mobile: false },
 } as const;
 type TakeName = keyof typeof TAKES;
 
