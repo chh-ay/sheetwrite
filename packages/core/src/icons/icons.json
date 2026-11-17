@@ -45,6 +45,30 @@
       "column": 9,
       "row": 0
     },
+    "pasteValues": {
+      "column": 10,
+      "row": 0
+    },
+    "pasteFormulas": {
+      "column": 11,
+      "row": 0
+    },
+    "pasteFormatting": {
+      "column": 12,
+      "row": 0
+    },
+    "pasteTranspose": {
+      "column": 13,
+      "row": 0
+    },
+    "pasteLink": {
+      "column": 14,
+      "row": 0
+    },
+    "pasteSpecial": {
+      "column": 15,
+      "row": 0
+    },
     "bold": {
       "column": 0,
       "row": 1

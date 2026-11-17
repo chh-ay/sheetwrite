@@ -14,6 +14,8 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   cut: ["Mod+X"],
   paste: ["Mod+V"],
   pasteValues: ["Mod+Shift+V"],
+  // Excel's Paste Special: Ctrl+Alt+V, and Ctrl+Cmd+V in Excel for Mac.
+  pasteSpecial: ["Mod+Alt+V", "Ctrl+Meta+V"],
   undo: ["Mod+Z"],
   redo: ["Mod+Shift+Z", "Mod+Y"],
   find: ["Mod+F"],

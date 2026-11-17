@@ -157,6 +157,7 @@ interface InteractionDependencies {
   cut: () => void;
   paste: () => void;
   pasteValues: () => void;
+  pasteSpecial: () => void;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Runs before a cell editor opens; hides the note card that would cover it. */
   onEditStart: () => void;
@@ -1234,6 +1235,10 @@ export class InteractionSessions {
 
         case "pasteValues":
           this.deps.pasteValues();
+          break;
+
+        case "pasteSpecial":
+          this.deps.pasteSpecial();
           break;
 
         case "clearContents":
