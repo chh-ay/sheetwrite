@@ -197,5 +197,18 @@ describe("AutoFilter in the grid", () => {
     expect(await grid.actions.paste()).toBe("done");
     const item = (row: number) => store.getCell({ sheet: "s1", row, col: 0 }).resolved;
     expect([1, 2, 3, 6, 7, 8].map(item)).toEqual([null, null, null, "apple", "banana", "fig"]);
+
+    // Pasted in the filtered list, the cut lands on the sheet rows from B2
+    // down, the hidden B3 included, as in Excel.
+    grid.undo();
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    expect([1, 2, 3].map(qty)).toEqual(["apple", "banana", "fig"]);
   });
 });

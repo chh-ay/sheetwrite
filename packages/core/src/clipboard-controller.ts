@@ -725,20 +725,24 @@ export class ClipboardController {
 
   /**
    * Move the pending cut so that its top-left cell lands on the paste target's,
-   * as Excel's Cut and Paste does. Paste Values is not available after a cut,
+   * as Excel's Cut and Paste does: on the sheet rows from the target's down,
+   * rows a filter hides included. Paste Values is not available after a cut,
    * and a target that a sorted view splits takes no move; the cut stays.
    */
   private pasteCut(cut: PendingCut, target: PasteTarget, valuesOnly: boolean): ClipboardOutcome {
     const rows = cut.range.end.row - cut.range.start.row + 1;
     const cols = cut.range.end.col - cut.range.start.col + 1;
     const firstRow = this.deps.toDataRow(target.row);
+    const sheet = this.deps.sheet();
+    const sorted = (sheet.sortKeys?.length ?? 0) > 0;
     const fits =
       !valuesOnly &&
-      target.row + rows <= this.deps.store.viewRowCount(this.deps.activeSheet()) &&
-      target.col + cols <= this.deps.sheet().columns.length &&
-      Array.from({ length: rows }, (_, row) => row).every(
-        (row) => this.deps.toDataRow(target.row + row) === firstRow + row,
-      );
+      firstRow + rows <= sheet.rowCount &&
+      target.col + cols <= sheet.columns.length &&
+      (!sorted ||
+        Array.from({ length: rows }, (_, row) => row).every(
+          (row) => this.deps.toDataRow(target.row + row) === firstRow + row,
+        ));
     if (!fits) return "empty";
 
     this.movingCut = true;
