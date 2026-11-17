@@ -12,6 +12,8 @@ import { mountHost } from "./fixtures.js";
 
 beforeAll(async () => {
   await initSheetwrite();
+  // Load the chunk once, so each edit gets it within a turn.
+  await import("../src/autocomplete.js");
 });
 
 let restoreStubs: () => void;
@@ -72,10 +74,12 @@ function key(name: string, init: KeyboardEventInit = {}): void {
  * Type `text` into the active cell as a browser does: the first key opens the
  * editor, and each later key replaces the selected text and fires `input`.
  */
-function type(text: string): void {
+async function type(text: string): Promise<void> {
   for (const char of text) {
     if (host.querySelector("textarea.sheetwrite-editor") === null) {
       key(char);
+      // AutoComplete loads with the first edit and completes once it arrives.
+      await new Promise((resolve) => setTimeout(resolve, 0));
       continue;
     }
     const field = editor();
@@ -99,38 +103,38 @@ const shown = () => {
 };
 
 describe("AutoComplete", () => {
-  it("completes from the entries above, with the added text selected, and Enter stores it", () => {
+  it("completes from the entries above, with the added text selected, and Enter stores it", async () => {
     mount(["Apple", "Banana"]);
     at(2);
-    type("Ap");
+    await type("Ap");
     expect(shown()).toEqual(["Apple", "ple"]);
     key("Enter");
     expect(value(2)).toBe("Apple");
   });
 
-  it("completes from the first letter, and Tab accepts in the entry's letter case", () => {
+  it("completes from the first letter, and Tab accepts in the entry's letter case", async () => {
     mount(["Apple", "Banana"]);
     at(2);
-    type("b");
+    await type("b");
     expect(shown()).toEqual(["banana", "anana"]);
     key("Tab");
     expect(value(2)).toBe("Banana");
   });
 
-  it("uses the entries below too, but not past an empty cell", () => {
+  it("uses the entries below too, but not past an empty cell", async () => {
     mount([null, null, null, "Cherry", null, "Damson"]);
     at(2);
-    type("Ch");
+    await type("Ch");
     expect(shown()).toEqual(["Cherry", "erry"]);
     key("Escape");
-    type("Da");
+    await type("Da");
     expect(shown()).toEqual(["Da", ""]);
   });
 
-  it("removes the completion with Backspace, and Enter stores what was typed", () => {
+  it("removes the completion with Backspace, and Enter stores what was typed", async () => {
     mount(["Apple", "Banana"]);
     at(2);
-    type("Ap");
+    await type("Ap");
     expect(shown()).toEqual(["Apple", "ple"]);
     const field = editor();
     field.value = "Ap";
@@ -143,30 +147,30 @@ describe("AutoComplete", () => {
     expect(value(2)).toBe("Ap");
   });
 
-  it("does not complete while two entries match; entries that differ only in case are one", () => {
+  it("does not complete while two entries match; entries that differ only in case are one", async () => {
     mount(["Apple", "Apricot", "apple"]);
     at(3);
-    type("Ap");
+    await type("Ap");
     expect(shown()).toEqual(["Ap", ""]);
-    type("p");
+    await type("p");
     // "Apple" and "apple" are one entry, the first seen.
     expect(shown()).toEqual(["Apple", "le"]);
     key("Escape");
-    type("Apr");
+    await type("Apr");
     expect(shown()).toEqual(["Apricot", "icot"]);
   });
 
-  it("does not complete numbers or formulas, but completes text that starts with digits", () => {
+  it("does not complete numbers or formulas, but completes text that starts with digits", async () => {
     mount(["12 apples", 12_345, "=SUMMARY"]);
     at(3);
-    type("12");
+    await type("12");
     expect(shown()).toEqual(["12", ""]);
     key("Escape");
-    type("=SU");
+    await type("=SU");
     expect(editor().value).toBe("=SU");
     key("Escape");
     // "12 a" is text, so it completes.
-    type("12 a");
+    await type("12 a");
     expect(shown()).toEqual(["12 apples", "pples"]);
   });
 

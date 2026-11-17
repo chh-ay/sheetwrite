@@ -389,14 +389,23 @@ export class EditController {
     // or after compositionend; complete once both have passed.
     const ta = this.textarea;
     setTimeout(() => {
-      if (this.textarea !== ta || ta === null || this.composing) return;
-      const before = ta.value;
-      this.autoComplete(ta);
-      if (ta.value === before) return;
-      this.resize();
-      this.opts?.onText(ta.value);
+      if (this.textarea === ta) this.completeNow();
     }, 0);
   };
+
+  /**
+   * Complete the typed text now: after an IME composition, or when
+   * AutoComplete's code arrives after the key that opened the editor.
+   */
+  completeNow(): void {
+    const ta = this.textarea;
+    if (ta === null || this.composing || this.completion !== null) return;
+    const before = ta.value;
+    this.autoComplete(ta);
+    if (ta.value === before) return;
+    this.resize();
+    this.opts?.onText(ta.value);
+  }
 
   private readonly onKeyDown = (e: KeyboardEvent): void => {
     // While the IME is composing, every keystroke belongs to the composition.

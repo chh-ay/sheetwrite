@@ -43,7 +43,7 @@ import { dirname } from "node:path";
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 
-import { ColumnCompletions } from "../../packages/core/src/autocomplete.js";
+import { columnCompletions } from "../../packages/core/src/autocomplete.js";
 import { autoFilterValues } from "../../packages/core/src/autofilter-actions.js";
 import { getEngine } from "../../packages/core/src/engine.js";
 import { initSheetwrite, SheetwriteStore } from "../../packages/core/src/index.js";
@@ -1100,20 +1100,29 @@ async function benchSheetwrite(
   }
 
   if (measures("autocomplete-first-key")) {
-    // The editor's first typed key: read the column's distinct entries from
-    // the engine, sort them and look the prefix up. Every customer is
-    // distinct, the worst case; only the last row's entry begins with the
-    // prefix, its text without the last digit.
+    // The editor's first typed key in the column's first cell: find the block
+    // below it, read its distinct entries from the engine and scan them for
+    // the prefix. Every customer is distinct, the worst case; only the last
+    // row's entry begins with the prefix, its text without the last digit.
     const engine = storeEngine(queryStore);
     if (!engine) throw new Error("autocomplete: the query store has no engine");
+    const sheet = {
+      engine,
+      sheet: SHEET,
+      sorted: queryStore.hasView(SHEET),
+      rowCount: rows,
+      toDataRow: (viewRow: number) => viewRow,
+      filled: (viewRow: number, col: number) =>
+        queryStore.getCell({ sheet: SHEET, row: viewRow, col }).resolved !== null,
+      dataEdge: (viewRow: number, col: number, dRow: number, dCol: number) =>
+        queryStore.dataEdge(SHEET, viewRow, col, dRow, dCol),
+    };
     const expected = ds.customer[rows - 1]!;
     const prefix = expected.slice(0, -1).toLowerCase();
     let completed: string | null = null;
     queries["autocomplete-first-key"] = measure(
       () => {
-        completed = new ColumnCompletions(() =>
-          engine.distinctValues(SHEET, COL.customer, 0, { start: 0, end: rows }),
-        ).complete(prefix);
+        completed = columnCompletions(sheet, 0, COL.customer)(prefix);
       },
       plan("autocomplete-first-key", rows),
     );
