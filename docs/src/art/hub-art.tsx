@@ -73,6 +73,11 @@ const HUB_LAYOUTS = {
     [{ title: "", code: ["=SEQUENCE(3)"] }],
     [{ title: "Spill", lines: ["A1:A3"], tone: "accent" }],
   ),
+  // Neighbours that agree, and the rest of the formula that Tab takes.
+  "formula-assist": hub(
+    [{ title: "", code: ["=C4*D4"] }, { title: "", code: ["=C6*D6"] }],
+    [{ title: "Tab", code: ["=C5*D5"], tone: "accent" }],
+  ),
   // Two clients synced through one sequencing server.
   collaboration: hub(
     [{ title: "Client A" }, { title: "Client B" }],

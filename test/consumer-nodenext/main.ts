@@ -32,6 +32,7 @@ import {
 import { createGridController } from "@sheetwrite/core/adapter";
 import * as Xlsx from "@sheetwrite/xlsx";
 import * as Charts from "@sheetwrite/charts";
+import * as FormulaAssist from "@sheetwrite/formula-assist";
 
 // Removed pre-release names must stay absent from packed declarations.
 // @ts-expect-error `Patch` was removed in favor of `DocumentOp`.
@@ -110,7 +111,14 @@ const tableAddon: SheetwriteAddon = {
     context.xlsx({ tableExport: tableExportBackend, tableImport: tableImportBackend });
   },
 };
-void initSheetwrite({ addons: [Xlsx.xlsxAddon(), Charts.chartsAddon(), tableAddon] });
+void initSheetwrite({
+  addons: [
+    Xlsx.xlsxAddon(),
+    Charts.chartsAddon(),
+    FormulaAssist.formulaAssistAddon(),
+    tableAddon,
+  ],
+});
 void toXlsxTable;
 void fromXlsxTable;
 void datasource;
