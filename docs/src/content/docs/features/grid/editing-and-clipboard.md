@@ -72,6 +72,8 @@ Editing happens in a single real `<textarea>` on top of the active cell. The gri
 
 As in Excel, typing opens the editor in **Enter mode** and F2 or double-click opens it in **Edit mode**. F2 switches between the two.
 
+The [status bar](/docs/features/grid/status-bar/) names the mode, as Excel's does: **Ready** with no edit open, **Enter**, **Edit**, and **Point** while an arrow key or a click has just picked a reference for a formula. Typing ends Point mode. Hosts read the mode with `grid.getCellMode()` (`"ready"`, `"enter"`, `"edit"` or `"point"`) and hear changes with the `cell-mode` event. A [host-supplied editor](/docs/features/grid/custom-editors/) counts as Edit mode, and a list rule's list as Ready.
+
 Commit and navigation keys:
 
 | Key | Result |
@@ -109,11 +111,19 @@ As in Excel, typing a text entry completes it from the entries in the same colum
 
 Excel turns AutoComplete off with **Enable AutoComplete for cell values**. In Sheetwrite the host sets `config: { autoComplete: false }`; `setConfig` turns it on or off for the next edit.
 
+#### The list of matching entries
+
+Excel completes nothing while two or more entries begin the typed text: with `North` and `Northeast` in the column, `Nor` shows nothing until you type `Northe`. Sheetwrite then lists those entries under the editor, sorted A to Z, so you see the spellings the column already uses and can pick one. The list is extra and takes no key until you ask: Enter, Tab, Escape and the arrow keys do what Excel does. **Alt+Down** moves into the list; then the arrow keys, Page Up, Page Down, Home and End move in it, Enter or Tab puts the entry in the cell and commits as usual, Escape returns to the editor, and any other key types on. A click on an entry puts it in the cell. The list shows up to 50 entries; with more, it waits until typing narrows them. It reads nothing more than AutoComplete does, and `config: { autoComplete: false }` turns it off too.
+
+### Pick From Drop-down List
+
+As in Excel, **Alt+Down** on a cell, or **Pick from drop-down list…** in its context menu, opens a list under the cell with AutoComplete's entries: the distinct text entries above and below it in the column, one per spelling that differs in more than letter case, sorted A to Z ([Keyboard shortcuts in Excel](https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f)). Arrow keys, Page Up, Page Down, Home and End move in the list and typing jumps to the first entry that begins with the typed letters. Enter or a click puts the entry in the cell, which stays active; Escape or a click away closes the list. A column without text entries opens nothing. On an AutoFilter header Alt+Down opens the filter dropdown, and on a cell with a list rule the rule's list. `grid.actions.pickFromList()` opens it on the focus cell. The list works whether or not AutoComplete is on, as in Excel.
+
 ### Event order
 
 `beginEdit` closes the previous editor. It selects the requested cell, or keeps the selection when the cell is inside it and makes the cell active. It emits `selection` when that changes the selection, then emits `edit-begin` before it opens the editor. A synchronous handler can replace or cancel the request without the old editor reopening.
 
-Successful completion emits `change`, then `edit-commit`, then the navigation's `selection` event. Rejected completion does not emit `edit-commit` or navigate. Event addresses remain view coordinates.
+Successful completion emits `change`, then `edit-commit`, then the navigation's `selection` event. Rejected completion does not emit `edit-commit` or navigate. Event addresses remain view coordinates: under a filter, hidden rows or a view sort, `addr` counts the rows the view shows. Each event also carries the cell in sheet rows, `sheetAddress` on `edit-begin` and `edit-commit` and `sheetFocus` on `selection`; use the sheet address to store or look up data.
 
 ### Formula bar
 
@@ -172,7 +182,11 @@ Custom UI can show the outcome without tripping global error monitoring.
 
 ## Undo and redo
 
-`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step through the recorded transactions. As in Excel, each step selects the cells it changes on the active sheet and scrolls to them; undoing a row, column or object edit keeps the selection. Remote operations from a `SyncCoordinator` do not create undo entries.
+`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step through the recorded transactions. As in Excel, each step selects the cells it changes and scrolls to them. A step that changes cells only on another sheet makes that sheet active first, so the change is in view; undoing a row, column or object edit keeps the selection. Remote operations from a `SyncCoordinator` do not create undo entries.
+
+Each sheet keeps its selection and scroll position: going back to a sheet shows them again, and a sheet shown for the first time has A1 selected, as in Excel. Clicking a sheet tab gives the keyboard to the sheet, so Ctrl/Cmd + Z and the other keys act on it at once.
+
+After each undo or redo, the cells it changed flash for a moment, and the grid emits `history-step` with the step's direction, its name as Excel's undo list gives it ("Typing", "Paste", "Insert Rows") and the range it changed, in sheet rows. The shell's [status bar](/docs/features/grid/status-bar/) shows it as `Undo: Paste in B2:D9`. Excel changes the cells silently; the flash and the name show what changed and what the step was, even over many cells.
 
 History keeps at most 200 entries and 256 MiB of retained range snapshots, about twenty million-cell clears. When it passes either limit, it drops its oldest entries. The newest entry always stays undoable. The 256 MiB limit counts the snapshot bytes that the engine reports. It is not a limit on total process memory: it excludes cloned formula ASTs and JavaScript patch and redo payloads, which only the 200-entry limit bounds.
 
@@ -213,6 +227,6 @@ grid.on("mutation-rejected", ({ issues }) => {
 ## See also
 
 - [Selection and keyboard](/docs/features/grid/selection-and-keyboard/)
-- [Validation, protection and notes](/docs/features/data/validation-protection-and-notes/): rules that every edit and paste passes through
+- [Validation, protection and notes](/docs/features/data/validation-protection-and-notes/): rules that every edit passes through, and how a paste lands the copied cells' rules
 - [Collaboration](/docs/features/collaboration/)
 - [`GridActions` API](/docs/api/core/grid-actions/)

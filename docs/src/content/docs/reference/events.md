@@ -30,6 +30,7 @@ Framework `onGridChange` / `grid-change` callbacks carry the same committed even
 | `scroll` | `{ scrollTop; firstRow; lastRow; scrollLeft; firstVisibleColumn; lastVisibleColumn }`; the visible-column fields are `number \| null`. |
 | `edit-begin` | `{ addr: CellAddress }` |
 | `edit-commit` | `{ addr: CellAddress; value: CellValue }` |
+| `cell-mode` | `{ mode: CellMode }`: `ready`, `enter`, `edit` or `point`, when Excel's cell mode changes. `grid.getCellMode()` reads it. See [Inline editing](/docs/features/grid/editing-and-clipboard/#inline-editing). |
 | `search` | `SearchResult`: `{ query: string; matches: CellAddress[]; active: number }` |
 | `command-state-change` | `{ states }`: every command's `GridCommandState`. See [Host-owned command state](/docs/features/grid/toolbar-and-ribbon/#host-owned-command-state). |
 | `mutation-rejected` | `{ issues: MutationIssue[] }` |

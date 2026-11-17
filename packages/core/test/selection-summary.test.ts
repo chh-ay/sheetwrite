@@ -1,10 +1,10 @@
-import { afterEach, beforeAll, beforeEach, expect, it } from "bun:test";
+import { afterEach, beforeAll, beforeEach, expect, it, jest } from "bun:test";
 
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { createSelectionStatus } from "../src/shell.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { Workbook } from "../src/types.js";
+import type { CellMode, Workbook } from "../src/types.js";
 
 let restore: () => void;
 const grids: GridImpl[] = [];
@@ -19,6 +19,7 @@ afterEach(() => {
   for (const grid of grids.splice(0)) grid.destroy();
   document.body.replaceChildren();
   restore();
+  jest.useRealTimers();
 });
 
 // Column A mixes numbers, text and a blank; column B is all numbers.
@@ -52,7 +53,7 @@ function setup() {
       kind: "range",
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } },
     });
-  return { grid, selectAll };
+  return { grid, host, selectAll };
 }
 
 it("leaves out rows a filter hides", async () => {
@@ -75,6 +76,72 @@ it("shows Excel's Average, Count and Sum in the shell status line", async () => 
   expect(piece.element.textContent).toContain("Sum: 22");
   // The status line uses the grid's General number display, not full precision.
   expect(piece.element.textContent).toMatch(/Average: 3\.66?7/);
+  piece.destroy();
+});
+
+it("names a selected row by its sheet row under a filter", () => {
+  const { grid } = setup();
+  const piece = createSelectionStatus(document.createElement("div"), grid);
+  // B keeps 3 and 4: view row 1 shows sheet row 3, labelled 4.
+  grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 3 });
+  grid.setSelection({ kind: "row", sheet: "s1", row: 1 });
+  expect(piece.element.textContent).toContain("Row 4");
+  piece.destroy();
+});
+
+it("names the step an undo or redo applied, and tints its cells for a moment", () => {
+  jest.useFakeTimers();
+  const { grid, host } = setup();
+  const statusHost = document.createElement("div");
+  const piece = createSelectionStatus(statusHost, grid);
+  const flashed = () => host.querySelectorAll("[data-sheetwrite-flash]").length;
+  grid.setSelection({
+    kind: "range",
+    range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 1 } },
+  });
+  grid.actions.toggleBold();
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+
+  grid.undo();
+  // The step leads the summary, after #849's cell mode.
+  expect(piece.element.lastElementChild?.textContent).toStartWith("Undo: Format Cells in A2:B3");
+  expect(flashed()).toBeGreaterThan(0);
+  jest.advanceTimersByTime(600);
+  grid.refresh();
+  expect(flashed()).toBe(0);
+
+  grid.redo();
+  expect(piece.element.lastElementChild?.textContent).toStartWith("Redo: Format Cells in A2:B3");
+  // The next selection replaces the step with the selection's own status.
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+  expect(piece.element.textContent).not.toContain("Redo");
+  piece.destroy();
+});
+
+// https://support.microsoft.com/en-us/office/excel-status-bar-options-6055ecd9-e20f-4a7a-a611-4481bd488c55
+it("names Excel's cell mode: Ready, Enter, Edit and Point", () => {
+  const { grid } = setup();
+  const piece = createSelectionStatus(document.createElement("div"), grid);
+  const mode = () => piece.element.querySelector(".sheetwrite-shell-mode")?.textContent;
+  const modes: CellMode[] = [];
+  grid.on("cell-mode", (event) => modes.push(event.mode));
+  const press = (key: string) =>
+    document
+      .querySelector("textarea.sheetwrite-editor")
+      ?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+
+  expect(mode()).toBe("Ready");
+  grid.beginEdit(1, 0, "x");
+  expect(mode()).toBe("Enter");
+  press("F2");
+  expect(mode()).toBe("Edit");
+  press("Escape");
+  expect(mode()).toBe("Ready");
+  grid.beginEdit(2, 1, "=");
+  press("ArrowDown");
+  expect(mode()).toBe("Point");
+  expect(grid.getCellMode()).toBe("point");
+  expect(modes).toEqual(["enter", "edit", "ready", "enter", "point"]);
   piece.destroy();
 });
 

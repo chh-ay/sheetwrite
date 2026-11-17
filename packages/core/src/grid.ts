@@ -1,4 +1,4 @@
-import { colToA1 } from "./a1.js";
+import { cellA1, colToA1 } from "./a1.js";
 import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action-feedback.js";
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
@@ -77,7 +77,11 @@ import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
-import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
+import {
+  type PaintedCells,
+  type PaintedWindowTransform,
+  ReadWindowController,
+} from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -105,6 +109,7 @@ import {
   addRowGroup,
   collapseRowGroup,
   movedBlock,
+  rangeContains,
   removeRowGroup,
   visibleSheetNeighbor,
 } from "./store/ranges.js";
@@ -162,6 +167,7 @@ import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/g
 import type {
   CellEditor,
   CellInputSnapshot,
+  CellMode,
   ClipboardOutcome,
   Grid,
   GridActions,
@@ -172,6 +178,7 @@ import type {
   GridOptions,
   GridPanel,
   GridPresentation,
+  ReplaceChange,
   ReplaceResult,
   SearchOptions,
   SearchResult,
@@ -188,6 +195,7 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
+import { hasInputMessage } from "./validation-rule.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
@@ -230,6 +238,10 @@ export function measureMaxElementHeight(
 const DEFAULT_OVERSCAN = 6;
 /** Width of synthesized workbook and presentation-padding columns, in CSS pixels. */
 const DEFAULT_COL_WIDTH = 100;
+/** How long the cells an undo or redo changed stay tinted, in milliseconds. */
+const FLASH_MS = 600;
+/** Changed ranges tinted at most; a step that changes more cells tints the first ones. */
+const FLASH_RANGES = 256;
 /** Width of the side panel, in CSS pixels; the cells give up this much room while it is open. */
 const PANEL_WIDTH = 320;
 const GRID_COMMANDS: readonly GridCommandName[] = [
@@ -631,9 +643,11 @@ export class GridImpl implements Grid {
     scroll: new Set(),
     "edit-begin": new Set(),
     "edit-commit": new Set(),
+    "cell-mode": new Set(),
     search: new Set(),
     "command-state-change": new Set(),
     "active-sheet": new Set(),
+    "history-step": new Set(),
     "hyperlink-activate": new Set(),
     "renderer-fallback": new Set(),
     "datasource-error": new Set(),
@@ -643,6 +657,7 @@ export class GridImpl implements Grid {
     "chart-select": new Set(),
     "chart-activate": new Set(),
     "engine-failed": new Set(),
+    "key-bindings-change": new Set(),
   };
 
   /** Which renderer actually constructed; set by `createRenderer`. */
@@ -662,8 +677,17 @@ export class GridImpl implements Grid {
    * sheet gets its entry when the grid first reads it.
    */
   private readonly virtualColumnTargets = new Map<SheetId, number>();
+  /** Format Cells' preview of the selection while the dialog is open; nothing reaches the document. */
+  private formatPreview: PaintedWindowTransform | null = null;
   /** The `minColumns` option, as constructed or last set. */
   private minColumns: number | undefined;
+  /** Each sheet's selection and scroll when another sheet became active. */
+  private readonly sheetViews = new Map<
+    SheetId,
+    { selection: Selection | null; top: number; left: number }
+  >();
+  /** Removes the tint of the cells the last undo or redo changed. */
+  private flashTimer: number | undefined;
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
   /** The open side panel; closing it runs the panel's cleanup. */
@@ -806,9 +830,10 @@ export class GridImpl implements Grid {
       onMutationRejected: (issues) => {
         for (const fn of this.listeners["mutation-rejected"]) fn({ issues });
       },
-      onHistoryApplied: (patches) => {
+      onHistoryApplied: (patches, step) => {
         this.selectChangedCells(patches);
         this.emitSelection();
+        this.showHistoryStep(patches, step);
         this.render();
       },
       transactionResourceLimits: this.transactionResourceLimits,
@@ -816,6 +841,7 @@ export class GridImpl implements Grid {
       trustedResourceCallbacks: true,
     });
     registerGridDocument(this, this.document);
+    this.lifetime.add(() => window.clearTimeout(this.flashTimer));
     registerEditDraft(this, {
       subscribe: (listener) => {
         this.editDraftListeners.add(listener);
@@ -917,6 +943,7 @@ export class GridImpl implements Grid {
       store: this.store,
       loadable: this.loadable,
       activeSheet: () => this.activeSheet,
+      activateSheet: (sheet) => this.setActiveSheet(sheet),
       sheet: (id) => this.sheet(id),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
       viewportAnchor: () =>
@@ -952,6 +979,22 @@ export class GridImpl implements Grid {
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
       onCutChange: (range) => this.overlayPainter.setCutMark(range),
+      keepValidation: () => this.config?.paste?.keepValidation === true,
+      onValidationRefused: (refused, warned) => {
+        this.validationRefusedNotice(refused, warned);
+      },
+      validationReads: () => storeEngine(this.store)?.validationReads,
+      // Excel's cut moves the rows a filter hides without a word; say so.
+      onHiddenRowsMoved: (count, step) => {
+        const rows = count === 1 ? "1 hidden row" : `${count} hidden rows`;
+        this.actionFeedback.show(
+          step === "cut" ? `This cut includes ${rows}.` : `This paste moved ${rows}.`,
+          {
+            label: "Show them",
+            run: () => this.actions.clearFilters(),
+          },
+        );
+      },
     });
 
     this.styleDeps = {
@@ -1169,6 +1212,7 @@ export class GridImpl implements Grid {
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
       geometryVersion: () => this.readWindows.geometryVersion,
+      validationRuleAt: (row, col) => this.validationRuleAt(row, col),
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -1227,8 +1271,7 @@ export class GridImpl implements Grid {
       presentation: this.presentation,
       columnHeader: (col) => this.columnHeader(col),
       focusCell: () => this.selection.focusCell,
-      noteAt: (row, col) =>
-        this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
+      descriptionAt: (row, col) => this.cellDescription(row, col),
       selection: () => this.selection.toSelection(this.activeSheet),
     });
 
@@ -1273,6 +1316,7 @@ export class GridImpl implements Grid {
       onEngineTrap: (cause) => {
         this.onEngineFailed(stopEngine(cause, this.engineGeneration));
       },
+      previewWindow: () => this.formatPreview,
     });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
@@ -1741,6 +1785,7 @@ export class GridImpl implements Grid {
     this.tabBar = bar;
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
+      focusSheet: () => this.host.focus({ preventScroll: true }),
       onAdd: (index) => insertSheet(this, index),
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
@@ -1966,30 +2011,34 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * Select the cells that `patches` change on the active sheet and scroll to
-   * them, as Excel's undo and redo do. Row, column and object edits leave the
-   * selection alone.
+   * Select the cells that `patches` change and scroll to them, as Excel's
+   * undo and redo do. When they change no cell of the active sheet, the
+   * sheet of the first changed cell becomes active first, so the change is
+   * never out of sight. Row, column and object edits leave the selection
+   * alone.
    */
   private selectChangedCells(patches: readonly DocumentOp[]): void {
+    let target: SheetId | null = null;
+    for (const patch of patches) {
+      const sheet = changedCells(patch)?.sheet;
+      if (sheet === this.activeSheet) {
+        target = sheet;
+        break;
+      }
+      target ??= sheet ?? null;
+    }
+    if (target === null) return;
+    // A hidden sheet cannot become active, so its change stays out of view.
+    if (target !== this.activeSheet) this.setActiveSheet(target);
+    if (target !== this.activeSheet) return;
+
     let top = Number.POSITIVE_INFINITY;
     let left = Number.POSITIVE_INFINITY;
     let bottom = -1;
     let right = -1;
     for (const patch of patches) {
-      const range =
-        patch.op === "set" || patch.op === "setNote"
-          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
-          : patch.op === "setRange" ||
-              patch.op === "setBlock" ||
-              patch.op === "restoreBlock" ||
-              patch.op === "setRangeStyle" ||
-              patch.op === "clearRange" ||
-              patch.op === "permuteRows"
-            ? patch.range
-            : patch.op === "moveCells"
-              ? movedBlock(patch)
-              : null;
-      if (range?.sheet !== this.activeSheet) continue;
+      const range = changedCells(patch);
+      if (range?.sheet !== target) continue;
       const first = this.toViewRow(range.start.row);
       const last = this.toViewRow(range.end.row);
       if (first === null || last === null) continue;
@@ -2010,6 +2059,46 @@ export class GridImpl implements Grid {
     this.scrollToCell({ sheet, ...start });
   }
 
+  /**
+   * After an undo or redo, tint the cells it changed on the active sheet for
+   * a moment and report the step with `history-step`, so the user sees what
+   * changed and what the step was, even over many cells.
+   */
+  private showHistoryStep(
+    patches: readonly DocumentOp[],
+    step: { readonly direction: "undo" | "redo"; readonly name: string },
+  ): void {
+    const sheet = this.activeSheet;
+    const flash: Range[] = [];
+    let top = Number.POSITIVE_INFINITY;
+    let left = Number.POSITIVE_INFINITY;
+    let bottom = -1;
+    let right = -1;
+    for (const patch of patches) {
+      const range = changedCells(patch);
+      if (range?.sheet !== sheet) continue;
+      if (flash.length < FLASH_RANGES) flash.push(range);
+      top = Math.min(top, range.start.row, range.end.row);
+      bottom = Math.max(bottom, range.start.row, range.end.row);
+      left = Math.min(left, range.start.col, range.end.col);
+      right = Math.max(right, range.start.col, range.end.col);
+    }
+
+    window.clearTimeout(this.flashTimer);
+    this.overlayPainter.setFlash(flash);
+    if (flash.length > 0) {
+      this.flashTimer = window.setTimeout(() => this.overlayPainter.setFlash([]), FLASH_MS);
+    }
+
+    const range =
+      bottom < 0
+        ? null
+        : { sheet, start: { row: top, col: left }, end: { row: bottom, col: right } };
+    for (const fn of this.listeners["history-step"]) {
+      fn({ direction: step.direction, step: step.name, range });
+    }
+  }
+
   private mergeAnchorAt(row: number, col: number): SelRect | null {
     if (this.loadable?.hasView(this.activeSheet)) return null;
 
@@ -2022,6 +2111,60 @@ export class GridImpl implements Grid {
   private anchorCell(row: number, col: number): CellRef {
     const merge = this.mergeAnchorAt(row, col);
     return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
+  }
+
+  /**
+   * What a screen reader hears after the cell at view `row`, `col`: its note,
+   * and the input message of its validation rule, which Excel shows beside it.
+   */
+  private cellDescription(row: number, col: number): string | null {
+    const note = this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col });
+    const rule = this.validationRuleAt(row, col);
+    const input =
+      rule && hasInputMessage(rule)
+        ? [rule.inputTitle, rule.inputMessage].filter(Boolean).join(": ")
+        : "";
+    return [note ? `Note: ${note}` : "", input].filter(Boolean).join(". ") || null;
+  }
+
+  /**
+   * The status notice after a paste that kept the target's validation rules
+   * (`paste.keepValidation`): the cells whose values it refused, and those it
+   * pasted against a `warn` rule, with a button that selects them.
+   */
+  private validationRefusedNotice(
+    refused: readonly CellAddress[],
+    warned: readonly CellAddress[],
+  ): void {
+    const SHOWN = 3;
+    const named = (cells: readonly CellAddress[], what: string): string => {
+      const names = cells.slice(0, SHOWN).map((cell) => cellA1(cell.row, cell.col));
+      const more = cells.length > SHOWN ? ` and ${cells.length - SHOWN} more` : "";
+      return `${cells.length} ${cells.length === 1 ? "cell" : "cells"} ${what}: ${names.join(", ")}${more}.`;
+    };
+    const parts = [
+      ...(refused.length > 0 ? [named(refused, "refused")] : []),
+      ...(warned.length > 0 ? [named(warned, "outside the rules")] : []),
+    ];
+    const cells = [...refused, ...warned];
+    const ranges = cells.map(({ sheet, row, col }) => ({
+      sheet,
+      start: { row, col },
+      end: { row, col },
+    }));
+    this.actionFeedback.show(parts.join(" "), {
+      label: "Select them",
+      run: () => this.setSelection({ kind: "multi", ranges }),
+    });
+  }
+
+  /** The validation rule over the cell at view `row`, `col`, if any; a merge answers for its anchor. */
+  private validationRuleAt(row: number, col: number): DataValidationRule | undefined {
+    const rules = this.sheet().validationRules;
+    if (!rules?.length) return undefined;
+    const cell = this.anchorCell(row, col);
+    const addr = { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col };
+    return rules.find((rule) => rangeContains(rule.range, addr));
   }
 
   /**
@@ -2143,7 +2286,11 @@ export class GridImpl implements Grid {
       this.objectLayer.select(null);
     }
 
-    for (const listener of this.listeners.selection) listener({ selection });
+    const focus = this.selection.focusCell;
+    const sheetFocus = focus
+      ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
+      : null;
+    for (const listener of this.listeners.selection) listener({ selection, sheetFocus });
     this.emitCommandStateChange();
   }
 
@@ -2159,6 +2306,10 @@ export class GridImpl implements Grid {
     return this.searchController.findPrev();
   }
 
+  selectMatch(index: number): SearchResult {
+    return this.searchController.selectMatch(index);
+  }
+
   clearSearch(): void {
     this.searchController.clearSearch();
   }
@@ -2171,8 +2322,30 @@ export class GridImpl implements Grid {
     return this.searchController.replaceAll(replacement);
   }
 
+  previewReplaceAll(replacement: string): ReplaceChange[] {
+    return this.searchController.previewReplaceAll(replacement);
+  }
+
   getShortcutLabel(action: KeyboardAction): string {
     return this.keymap.label(action);
+  }
+
+  /** The panel's code is a chunk of its own, loaded on first use. */
+  openKeyboardSettings(): void {
+    if (!this.config?.keyboardSettings || this.lifetime.closed) return;
+    const opener = this.host.ownerDocument.activeElement;
+    this.loadCommand(import("./keyboard-settings.js"), ({ openKeyboardSettings }) => {
+      if (this.lifetime.closed) return;
+      openKeyboardSettings({
+        grid: this,
+        dialogs: this.dialogHost,
+        opener,
+        config: () => this.config,
+        changed: (bindings) => {
+          for (const fn of this.listeners["key-bindings-change"]) fn({ bindings });
+        },
+      });
+    });
   }
 
   highlightCells(ranges: readonly HighlightRange[] | null, color?: string): void {
@@ -2637,6 +2810,15 @@ export class GridImpl implements Grid {
     )
       return;
 
+    if (reset) this.sheetViews.clear();
+    else {
+      this.sheetViews.set(this.activeSheet, {
+        selection: this.getSelection(),
+        top: this.scroller.scrollTop,
+        left: this.scroller.scrollLeft,
+      });
+    }
+
     this.interactions.reconcile("sheet");
     this.notes.dismiss();
     this.cancelAutoFit();
@@ -2652,8 +2834,22 @@ export class GridImpl implements Grid {
     this.geometry.rebuildRows(this.loadable?.viewRowCount(id) ?? sheet.rowCount);
     this.selection = new SelectionModel(this.geometry.rowCount, this.firstCol(), this.lastCol());
     this.datasourceController.reset(sheet.rowCount);
-    this.scroller.scrollTop = 0;
-    this.scroller.scrollLeft = 0;
+
+    // As in Excel, a sheet shows the selection and scroll it was left with;
+    // a spreadsheet's sheet shown for the first time has A1 selected.
+    const view = this.sheetViews.get(id);
+    const firstCell =
+      this.presentation === "spreadsheet" && !isDashboard(sheet) && this.geometry.rowCount > 0
+        ? { kind: "cell" as const, addr: { sheet: id, row: 0, col: this.firstCol() } }
+        : null;
+    this.selection.set(view ? view.selection : firstCell);
+    // Rows or columns removed while the sheet was away can leave the old active cell outside it.
+    const focus = this.selection.focusCell;
+    if (focus && (focus.row >= this.geometry.rowCount || focus.col > this.lastCol())) {
+      this.selection.set(firstCell);
+    }
+    this.scroller.scrollTop = view?.top ?? 0;
+    this.scroller.scrollLeft = view?.left ?? 0;
 
     this.objectLayer.sync();
     this.applyLayout();
@@ -2670,6 +2866,16 @@ export class GridImpl implements Grid {
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null {
     const cell = this.interactions.cellAtPointer(clientX, clientY);
     return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
+  }
+
+  getCellText(addr: CellAddress): string {
+    const cell = this.store.getCell(addr);
+    const column = this.sheet(addr.sheet).columns[addr.col];
+    return cellDisplayText(
+      cell.resolved,
+      cell.style.numberFormat ?? column?.numberFormat,
+      column?.numberLocale,
+    );
   }
 
   /**
@@ -2740,6 +2946,10 @@ export class GridImpl implements Grid {
 
   getSelection(): Selection | null {
     return this.selection.toSelection(this.activeSheet);
+  }
+
+  getCellMode(): CellMode {
+    return this.interactions.cellMode;
   }
 
   setSelection(sel: Selection | null): void {
@@ -2983,6 +3193,14 @@ export class GridImpl implements Grid {
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
+  /** Data › Data Validation; the command and its dialog load the first time it opens. */
+  private dataValidation(): void {
+    this.loadCommand(import("./data-validation-command.js"), ({ dataValidationCommand }) => {
+      if (this.lifetime.closed) return;
+      void dataValidationCommand({ dialogs: this.dialogHost, style: this.styleDeps });
+    });
+  }
+
   /** What the commands of `cell-commands.ts` use; built on first use. */
   private cellCommands(): CellCommandsHost {
     this.cellCommandsHost ??= {
@@ -2990,6 +3208,13 @@ export class GridImpl implements Grid {
       style: this.styleDeps,
       rect: () => this.activeSelectionRect(),
       bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
+      commit: (patches) => this.document.commit(patches, "structure").status === "applied",
+      alert: (title, message) => {
+        void this.openDialog(import("./dialog.js"), async (dialogs, host) => {
+          await dialogs.alertDialog(host, { title, message });
+          return null;
+        });
+      },
       // The dialogs' lazy imports stay in this module, with the grid's others.
       insertDeleteDialog: (insert, wide) =>
         this.openDialog(
@@ -2998,7 +3223,11 @@ export class GridImpl implements Grid {
         ),
       formatCellsDialog: () =>
         this.openDialog(import("./format-cells.js"), (dialogs, host) =>
-          dialogs.formatSelectionDialog(host, this.styleDeps, this.theme.font),
+          dialogs.formatSelectionDialog(host, this.styleDeps, this.theme.font, (preview) => {
+            this.formatPreview = preview;
+            this.readWindows.invalidateData();
+            this.scheduleRender();
+          }),
         ),
     };
     return this.cellCommandsHost;
@@ -3546,7 +3775,12 @@ export class GridImpl implements Grid {
       listener({ address: { ...addr }, hyperlink, target });
     }
     if (target.kind === "internal" && this.hyperlinkActivation === "internal-navigation") {
-      this.scrollToCell(target.address);
+      // The link names a sheet row; a filter or view sort may show it at
+      // another view row, or not at all.
+      const { address } = target;
+      if (address.sheet !== this.activeSheet) this.setActiveSheet(address.sheet);
+      const row = this.toViewRow(address.row);
+      if (row !== null) this.scrollToCell({ ...address, row });
     }
     return true;
   }
@@ -3943,6 +4177,7 @@ export class GridImpl implements Grid {
       insertCells: (options) => insertOrDelete(this.cellCommands(), true, options),
       deleteCells: (options) => insertOrDelete(this.cellCommands(), false, options),
       formatCells: (format) => formatCells(this.cellCommands(), format),
+      dataValidation: () => this.dataValidation(),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =
@@ -4032,6 +4267,10 @@ export class GridImpl implements Grid {
 
         const { address } = this.noteCell(focus.row, focus.col);
         if (this.getNote(address) !== null) this.setNote(address, null);
+      },
+      pickFromList: () => {
+        const focus = this.selection.focusCell;
+        if (focus) this.interactions.pickFromList(focus.row, focus.col);
       },
       showPivotFields: () => {
         // The field list edits the pivot, so a read-only grid does not open it.
@@ -4682,6 +4921,29 @@ export class GridImpl implements Grid {
     // string it paints, and the same cells paint the same output.
     this.readWindows.invalidateData();
     this.scheduleRender();
+  }
+}
+
+/** The cells whose contents or style `patch` writes; null for row, column, sheet and object edits. */
+function changedCells(patch: DocumentOp): Range | null {
+  switch (patch.op) {
+    case "set":
+    case "setNote":
+      return { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr };
+
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+    case "setRangeStyle":
+    case "clearRange":
+    case "permuteRows":
+      return patch.range;
+
+    case "moveCells":
+      return movedBlock(patch);
+
+    default:
+      return null;
   }
 }
 

@@ -1,9 +1,9 @@
 ---
 title: Status bar
-description: Show Excel-style Average, Count and Sum for the selected cells, or read the totals yourself.
+description: Show Excel's cell mode and Average, Count and Sum for the selected cells, or read the totals yourself.
 ---
 
-The status bar shows Excel's Average, Count and Sum for the selected cells, next to the size of the selection.
+The status bar names Excel's cell mode (Ready, Enter, Edit or Point) and shows Average, Count and Sum for the selected cells, next to the size of the selection.
 
 ```ts prelude="core" partial="requires the initialized shell and sales data from Full setup" title="Summarize the selected amounts"
 import type { createSpreadsheetShell } from "@sheetwrite/core/shell";
@@ -24,7 +24,7 @@ shell.grid.setSelection({
 
 <div class="sw-mini-status">
   <span>Sales</span>
-  <output aria-label="Selection summary">Average: 8 · Count: 3 · Sum: 24 · 3 × 1 cells</output>
+  <output aria-label="Selection summary">Ready Average: 8 · Count: 3 · Sum: 24 · 3 × 1 cells</output>
 </div>
 
 <figcaption>Result: selecting the amounts in B1:B3 shows the selection totals and size in the shell's bottom status bar.</figcaption>
@@ -76,7 +76,7 @@ shell.grid.setSelection({
 });
 ```
 
-The status line at the bottom of the shell reads `Average: 8 · Count: 3 · Sum: 24 · 3 × 1 cells`.
+The status line at the bottom of the shell reads `Ready`, then `Average: 8 · Count: 3 · Sum: 24 · 3 × 1 cells`.
 
 </details>
 
@@ -97,20 +97,24 @@ const status = createSelectionStatus(statusHost, grid);
 status.destroy();
 ```
 
-`createSelectionStatus(host, grid)` appends an `<output role="status">` with the class `sheetwrite-shell-status` to `host` and returns a `ShellPiece`: `element` is the `<output>`, and `destroy()` removes it and stops its listeners. Import `@sheetwrite/core/shell.css` for the shell styles.
+`createSelectionStatus(host, grid)` appends an `<output role="status">` with the class `sheetwrite-shell-status` to `host` and returns a `ShellPiece`: `element` is the `<output>`, and `destroy()` removes it and stops its listeners. The cell mode is its first child, a `<span>` with the class `sheetwrite-shell-mode`. Import `@sheetwrite/core/shell.css` for the shell styles.
 
 ## What it shows
 
 | Part | When it shows |
 | --- | --- |
+| Cell mode | Always, as in [Excel](https://support.microsoft.com/en-us/office/excel-status-bar-options-6055ecd9-e20f-4a7a-a611-4481bd488c55): **Ready** with no edit open, **Enter** after typing opened the editor, **Edit** after F2 or a double-click, and **Point** while an arrow key or a click has just picked a reference for a formula. See [Inline editing](/docs/features/grid/editing-and-clipboard/#inline-editing). |
+| Undo or redo step | Right after Ctrl/Cmd + Z or Ctrl/Cmd + Y, until the selection changes: the step and the cells it changed, such as `Undo: Paste in B2:D9` or `Redo: Insert Rows`. Steps are named as in Excel's undo list: Typing, Paste, Clear, Auto Fill, Replace, Sort, Format Cells, Insert Rows and so on. |
 | Average | Two or more selected cells hold values, and at least one of them is a number. |
 | Count | Two or more selected cells hold values. Text and errors count. |
 | Sum | Two or more selected cells hold values, and at least one of them is a number. |
 | Selection size | A range shows `rows × columns cells`, a row shows `Row n`, a column shows `Column n`, and a multi selection shows `n ranges`. A single cell shows nothing. |
 
-The parts are joined with ` · `. When there is nothing to show, the `<output>` is hidden, and so is its host when the status bar is the host's only child.
+The totals and the size are joined with ` · `, after the cell mode.
 
-The status bar updates on each `selection` and `change` event. It is a polite live region, so screen readers announce changes without interrupting the user.
+The status bar updates on each `selection`, `change`, `history-step` and `cell-mode` event. It is a polite live region, so screen readers announce changes without interrupting the user.
+
+Excel changes the cells of an undo silently. Here the step's name says what was undone, and the changed cells also flash in the grid for a moment, so a change spread over many cells, or one that started out of view, is easy to check. The grid reports each step with the `history-step` event, `{ direction, step, range }`, so a status bar of your own can show it too.
 
 ## Read the totals yourself
 

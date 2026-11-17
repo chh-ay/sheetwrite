@@ -95,6 +95,7 @@ export const ICON_NAMES = [
   "relationships",
   "dataModel",
   "measure",
+  "dataValidation",
   "dashboard",
   "slicer",
   "kpiCard",

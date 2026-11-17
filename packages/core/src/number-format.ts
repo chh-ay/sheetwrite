@@ -35,11 +35,36 @@ interface CompiledSection {
   readonly source: string;
   readonly dateTokens: readonly DateToken[] | null;
   readonly numeric: NumericDescriptor | null;
+  readonly fraction: FractionDescriptor | null;
+  /** Holds `@`, the text placeholder. */
+  readonly text: boolean;
   readonly literal: string;
+}
+
+/**
+ * A fraction section, such as `# ?/?`, `?/?`, `# ??/100` or `#,##0 ??/??`:
+ * literal text, an optional whole-number part, the numerator's and the
+ * denominator's placeholders, and literal text after them. A fixed
+ * denominator (`?/16`) is a number.
+ */
+interface FractionDescriptor {
+  readonly prefix: string;
+  /** The whole-number part's placeholders, without its grouping commas. */
+  readonly integer: string | null;
+  readonly grouped: boolean;
+  readonly separator: string;
+  readonly numerator: string;
+  readonly denominator: string | number;
+  readonly suffix: string;
 }
 
 interface CompiledFormat {
   readonly sections: readonly CompiledSection[];
+  /**
+   * The sections numbers choose from: all but a last one that holds `@`,
+   * the text section. Empty for the Text format, `@` alone.
+   */
+  readonly numberSections: readonly CompiledSection[];
 }
 
 export interface NumberFormatResourceStats {
@@ -171,7 +196,7 @@ function sectionFor(
   value: number,
   format: CompiledFormat,
 ): { section: CompiledSection; magnitude: number } {
-  const sections = format.sections;
+  const sections = format.numberSections;
   const fallback = sections[0]!;
   if (value > 0 || sections.length === 1) return { section: fallback, magnitude: value };
   if (value < 0) {
@@ -461,9 +486,14 @@ function compileFormat(code: string): CompiledFormat {
     source,
     dateTokens: compileDateFormat(source),
     numeric: parseNumericFormat(source),
+    fraction: parseFraction(source),
+    text: hasTextPlaceholder(source),
     literal: decodeLiteral(source),
   }));
-  const compiled = { sections };
+  // A last section that holds `@` is the text section, which numbers skip.
+  const numberSections =
+    sections.length < 4 && sections[sections.length - 1]!.text ? sections.slice(0, -1) : sections;
+  const compiled = { sections, numberSections };
   compiledFormats += 1;
   return cacheValue(formatCache, code, compiled, FORMAT_CACHE_LIMIT);
 }
@@ -573,14 +603,208 @@ function formatScientific(value: number, decimals: number, exponentDigits: numbe
   return `${mantissa}E${sign}${String(Math.abs(exponent)).padStart(exponentDigits, "0")}`;
 }
 
+/** Whether a section holds `@` outside quotes and escapes. */
+function hasTextPlaceholder(section: string): boolean {
+  let quoted = false;
+  for (let index = 0; index < section.length; index++) {
+    const char = section[index]!;
+    if (char === '"') quoted = !quoted;
+    else if (quoted) continue;
+    else if (char === "\\") index++;
+    else if (char === "@") return true;
+  }
+  return false;
+}
+
+/** The index of the fraction's `/`, outside quotes, escapes and brackets, or -1. */
+function fractionSlash(section: string): number {
+  let quoted = false;
+  for (let index = 0; index < section.length; index++) {
+    const char = section[index]!;
+    if (char === '"') quoted = !quoted;
+    else if (quoted) continue;
+    else if (char === "\\") index++;
+    else if (char === "[") {
+      const close = section.indexOf("]", index + 1);
+      if (close >= 0) index = close;
+    } else if (char === "/") return index;
+  }
+  return -1;
+}
+
+/**
+ * The literal text of a stretch of a fraction code, or `null` when it holds a
+ * number placeholder, percent, exponent, `General` or a date letter.
+ */
+function fractionLiteral(source: string): string | null {
+  let visible = "";
+  let quoted = false;
+  for (let index = 0; index < source.length; index++) {
+    const char = source[index]!;
+    if (char === '"') quoted = !quoted;
+    else if (quoted) continue;
+    else if (char === "\\" || char === "_" || char === "*") index++;
+    else if (char === "[") {
+      const close = source.indexOf("]", index + 1);
+      if (close >= 0) index = close;
+    } else visible += char;
+  }
+  return /[0#?%dmyhsg]|e[+-]/i.test(visible) ? null : decodeLiteral(source);
+}
+
+/**
+ * The fraction layout of a section, or `null` when it is not one: a `/` with
+ * digit placeholders right before it and placeholders or digits right after.
+ */
+function parseFraction(section: string): FractionDescriptor | null {
+  const slash = fractionSlash(section);
+  if (slash < 0) return null;
+  const head = section.slice(0, slash);
+  const tail = section.slice(slash + 1);
+  const denominatorText = /^[0-9#?]*/.exec(tail)![0];
+  const numerator = /[0#?]+$/.exec(head)?.[0];
+  if (denominatorText === "" || numerator === undefined) return null;
+  const before = head.slice(0, head.length - numerator.length);
+  // The whole-number part: the last run of placeholders and grouping commas
+  // before the numerator, apart from it by literal text.
+  const integer = /([0#?,]*[0#?])([^0#?]*)$/.exec(before);
+  const prefix = fractionLiteral(integer ? before.slice(0, integer.index) : before);
+  const separator = integer ? fractionLiteral(integer[2]!) : "";
+  const suffix = fractionLiteral(tail.slice(denominatorText.length));
+  if (prefix === null || separator === null || suffix === null) return null;
+  return {
+    prefix,
+    integer: integer ? integer[1]!.replaceAll(",", "") : null,
+    grouped: integer?.[1]!.includes(",") ?? false,
+    separator,
+    numerator,
+    denominator: /^[1-9][0-9]*$/.test(denominatorText) ? Number(denominatorText) : denominatorText,
+    suffix,
+  };
+}
+/**
+ * A whole number's digits as Excel writes them: at most 15 significant
+ * digits, then zeros, so a huge whole part reads as TEXT() writes it.
+ */
+function integerDigits(value: number): string {
+  const key = "integer-digits";
+  const cached = numberFormatterCache.get(key);
+  if (cached) return cached.format(value);
+  numberFormatters += 1;
+  return cacheValue(
+    numberFormatterCache,
+    key,
+    new Intl.NumberFormat("en-US", { maximumSignificantDigits: 15, useGrouping: false }),
+    NUMBER_FORMATTER_CACHE_LIMIT,
+  ).format(value);
+}
+
+/** A number rounded to the 15 significant digits Excel keeps. */
+function significant(value: number): number {
+  return Number(value.toPrecision(15));
+}
+
+/**
+ * The fraction closest to `value` whose denominator is at most
+ * `maxDenominator`, as numerator and denominator. On a tie the smaller
+ * denominator wins. The closest fraction is the last convergent of
+ * `value`'s continued fraction within the bound, or the semiconvergent after
+ * it, so a few steps find it instead of trying every denominator.
+ */
+function closestFraction(value: number, maxDenominator: number): [number, number] {
+  // The two latest convergents, oldest first, starting from 0/1 and 1/0.
+  let [p0, q0, p1, q1] = [0, 1, 1, 0];
+  let rest = value;
+  for (;;) {
+    const term = Math.floor(rest);
+    const nextQ = term * q1 + q0;
+    if (nextQ > maxDenominator) {
+      const steps = Math.floor((maxDenominator - q0) / q1);
+      const p = steps * p1 + p0;
+      const q = steps * q1 + q0;
+      const error = Math.abs(value - p / q);
+      const latest = Math.abs(value - p1 / q1);
+      return error < latest || (error === latest && q < q1) ? [p, q] : [p1, q1];
+    }
+    [p0, q0, p1, q1] = [p1, q1, term * p1 + p0, nextQ];
+    const fraction = rest - term;
+    if (fraction === 0 || p1 / q1 === value) return [p1, q1];
+    rest = 1 / fraction;
+  }
+}
+
+/** `0` pads with a zero, `?` with a space, `#` with nothing. */
+function placeholderPad(placeholders: string): string {
+  return placeholders.replaceAll("#", "").replaceAll("?", " ");
+}
+
+/**
+ * The value as Excel writes it with a fraction code: an optional whole
+ * number, then the closest fraction the denominator allows. A fraction that
+ * rounds to zero leaves spaces in its place, and one that rounds to a whole
+ * carries into the whole number. The numerator is right-aligned in its
+ * placeholders and the denominator left-aligned.
+ */
+function renderFraction(value: number, fraction: FractionDescriptor, locale: string): string {
+  const magnitude = significant(Math.abs(value));
+  let whole = 0;
+  let part = magnitude;
+  if (fraction.integer !== null) {
+    whole = Math.trunc(magnitude);
+    part = significant(magnitude - whole);
+  }
+  const fixed = typeof fraction.denominator === "number";
+  const [rounded, denominator] =
+    typeof fraction.denominator === "number"
+      ? [Math.round(significant(part * fraction.denominator)), fraction.denominator]
+      : closestFraction(part, 10 ** fraction.denominator.length - 1);
+  let numerator = rounded;
+  if (fraction.integer !== null && numerator >= denominator) {
+    whole += 1;
+    numerator = 0;
+  }
+
+  let text = value < 0 && (whole > 0 || numerator > 0) ? "-" : "";
+  text += fraction.prefix;
+  if (fraction.integer !== null) {
+    const digits = whole > 0 ? integerDigits(whole) : "";
+    let integer =
+      placeholderPad(
+        fraction.integer.slice(0, Math.max(0, fraction.integer.length - digits.length)),
+      ) + digits;
+    if (integer.trim() === "" && numerator === 0) integer = "0";
+    text +=
+      fraction.grouped && /^\d+$/.test(integer)
+        ? formatter(locale, 0, true).format(Number(integer))
+        : integer;
+    text += fraction.separator;
+    if (numerator === 0) {
+      const width =
+        fraction.numerator.length + 1 + (fixed ? 0 : String(fraction.denominator).length);
+      return text + " ".repeat(width) + fraction.suffix;
+    }
+  }
+  const numeratorText = integerDigits(numerator);
+  text += placeholderPad(
+    fraction.numerator.slice(0, Math.max(0, fraction.numerator.length - numeratorText.length)),
+  );
+  text += `${numeratorText}/`;
+  const denominatorText = integerDigits(denominator);
+  text += fixed
+    ? denominatorText
+    : denominatorText + placeholderPad(String(fraction.denominator).slice(denominatorText.length));
+  return text + fraction.suffix;
+}
+
 /** Excel's explicit "no format" code; a cell can carry it to opt out of its column's format. */
 const GENERAL_CODE_RE = /^general$/i;
 
 /**
  * Deterministic Excel-style number/date formatter. Supports explicit locale
  * separators, percent/scientific notation, UTC date/time tokens, four-section
- * positive/negative/zero/text codes, quoted literals, and backslash escapes.
- * `General` formats exactly like an omitted code.
+ * positive/negative/zero/text codes, fractions (`# ?/?`, `# ??/16`), quoted
+ * literals, and backslash escapes. `General` formats exactly like an omitted
+ * code, and so does the Text format `@` for a number.
  *
  * @param value - The number to format; a string is placed into the code's text section.
  * @param format - Excel number-format code, such as `#,##0.00` or `yyyy-mm-dd`;
@@ -614,7 +838,11 @@ export function formatNumber(value: number | string, format?: string, locale = "
 function renderNumberText(value: number, code: string | undefined, locale: string): string {
   if (!code) return defaultFormatter(locale).format(value);
 
-  const { section, magnitude } = sectionFor(value, compileFormat(code));
+  const format = compileFormat(code);
+  // The Text format, `@` alone, shows a number as General would.
+  if (format.numberSections.length === 0) return defaultFormatter(locale).format(value);
+  const { section, magnitude } = sectionFor(value, format);
+  if (section.fraction) return renderFraction(magnitude, section.fraction, locale);
   if (section.dateTokens) return renderDate(magnitude, section.dateTokens, locale);
 
   const descriptor = section.numeric;

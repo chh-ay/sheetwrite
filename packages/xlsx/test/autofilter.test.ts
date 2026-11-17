@@ -70,6 +70,25 @@ describe("AutoFilter XLSX interchange", () => {
     store.dispose();
   });
 
+  it("writes and reads Excel's dynamic date filters", async () => {
+    const store = SheetwriteStore.fromSnapshot(
+      orders([[1, { kind: "dynamic", type: "thisMonth" }]]),
+    );
+    const xml = partText(await toXlsxWorkbook(store), "xl/worksheets/sheet1.xml");
+    expect(xml).toContain(
+      '<filterColumn colId="1"><dynamicFilter type="thisMonth"/></filterColumn>',
+    );
+    store.dispose();
+
+    const cells = '<row r="1"><c r="A1" t="inlineStr"><is><t>When</t></is></c></row>';
+    const filter =
+      '<autoFilter ref="A1:A3"><filterColumn colId="0"><dynamicFilter type="M3"/></filterColumn></autoFilter>';
+    const imported = sheetAt(
+      await backend.fromXlsxWorkbook(oneSheet(`<sheetData>${cells}</sheetData>${filter}`)),
+    );
+    expect(imported.filters).toEqual([[0, { kind: "dynamic", type: "M3" }]]);
+  });
+
   it("round-trips the range and every kind of condition exactly", async () => {
     const filters: [number, ColumnFilter][] = [
       [

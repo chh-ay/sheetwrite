@@ -23,6 +23,8 @@ import {
   type HistoryAction,
   type HistoryPart,
   type HistoryResourceStats,
+  type HistoryStep,
+  historyStepName,
   materializeHistoryAction,
   UndoManager,
 } from "./history.js";
@@ -39,8 +41,8 @@ import type { PermuteRowsOperation } from "./row-order.js";
 import { cloneQuery, findQuery } from "./saved-query.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
-import { cellBlockMove, type MoveCellsOperation } from "./store/move-cells.js";
-import { rangesIntersect } from "./store/ranges.js";
+import { cellBlockMove, type MoveCellsOperation, shiftDeletedCells } from "./store/move-cells.js";
+import { movedCellBounds, rangesIntersect } from "./store/ranges.js";
 import {
   type GridTransactionAdmissionDecision,
   setTransactionReplayRollback,
@@ -73,8 +75,14 @@ export interface DocumentControllerOptions {
   epoch: () => number;
   materializeVirtualColumns: (patches: DocumentOp[]) => DocumentOp[];
   onMutationRejected: (issues: MutationIssue[]) => void;
-  /** Called after an undo or redo applies, with the operations it applied. */
-  onHistoryApplied: (patches: readonly DocumentOp[]) => void;
+  /**
+   * Called after an undo or redo applies, with the operations it applied and
+   * the step: its direction and its name, such as "Paste".
+   */
+  onHistoryApplied: (
+    patches: readonly DocumentOp[],
+    step: { readonly direction: "undo" | "redo"; readonly name: string },
+  ) => void;
   transactionResourceLimits?: Readonly<TransactionResourceLimits>;
   admitTransaction?: (operations: readonly DocumentOp[]) => GridTransactionAdmissionDecision;
   /** Only engine-owned callbacks may preserve payload measurements by identity. */
@@ -291,7 +299,7 @@ export class DocumentController {
     }
 
     this.rebaseHistoryFor(applied);
-    this.history.push(inverse, applied);
+    this.history.push(inverse, applied, historyStepName(reason, applied));
 
     return outcome;
   }
@@ -305,13 +313,13 @@ export class DocumentController {
   }
 
   undo(): void {
-    const action = this.history.undo();
-    if (!action) return;
+    const step = this.history.undo();
+    if (!step) return;
 
     let outcome: ApplyTransactionResult | null;
 
     try {
-      outcome = this.applyHistoryPatches(action, "undo");
+      outcome = this.applyHistoryPatches(step, "undo");
     } catch (error) {
       this.history.restoreUndo();
       throw error;
@@ -331,12 +339,11 @@ export class DocumentController {
   }
 
   redo(): void {
-    const action = this.history.redo();
-    if (!action) return;
+    const step = this.history.redo();
+    if (!step) return;
 
     try {
-      if (this.applyHistoryPatches(action, "redo")?.status !== "applied")
-        this.history.restoreRedo();
+      if (this.applyHistoryPatches(step, "redo")?.status !== "applied") this.history.restoreRedo();
     } catch (error) {
       this.history.restoreRedo();
       throw error;
@@ -1158,12 +1165,19 @@ export class DocumentController {
    * the block landed on, the conditional formats of both sheets, and the
    * formulas elsewhere whose reference became `#REF!` or lost an edge. Each
    * block is captured before the move.
+   * A shift moves back by the opposite shift; its cells and items are those
+   * from the first block to the last, the cells a deletion closes included,
+   * and the merged cells it restores are those of the deleted cells.
    */
   private inverseMoveCells(patch: MoveCellsOperation): Array<DocumentOp | HistoryPart> {
-    const { from, to } = cellBlockMove(patch);
+    const move = cellBlockMove(patch);
+    const { from, to } = move;
+    const blocks = move.shift ? movedCellBounds(patch) : [to, from];
+    const landed = blocks[0]!;
+    const deleted = move.shift ? shiftDeletedCells(move) : to;
     const engine = storeEngine(this.options.store);
     const sheet = this.sheetById(to.sheet);
-    const meetsTarget = (range: Range) => rangesIntersect(range, to);
+    const meetsTarget = (range: Range) => rangesIntersect(range, landed);
     // A conditional format has no ID, so each sheet gets its whole list back.
     const formats = [...new Set([from.sheet, to.sheet])].map((id): DocumentOp => ({
       op: "setSheetMeta",
@@ -1171,9 +1185,13 @@ export class DocumentController {
       patch: { conditionalFormats: cloneJsonValue(this.sheetById(id)?.conditionalFormats ?? []) },
     }));
     return [
-      { op: "moveCells", range: to, to: { sheet: from.sheet, ...from.start } },
-      this.blockCells(to),
-      this.blockCells(from),
+      {
+        op: "moveCells",
+        range: to,
+        to: { sheet: from.sheet, ...from.start },
+        ...(move.shift ? { shift: true as const } : {}),
+      },
+      ...blocks.map((block) => this.blockCells(block)),
       ...(sheet?.notes ?? [])
         .filter((note) => meetsTarget({ sheet: to.sheet, start: note.addr, end: note.addr }))
         .map((note): DocumentOp => ({ op: "setNote", addr: { ...note.addr }, text: note.text })),
@@ -1193,12 +1211,14 @@ export class DocumentController {
         })),
       ...formats,
       ...(sheet?.merges ?? [])
-        .filter((merge) =>
-          meetsTarget({
-            sheet: to.sheet,
-            start: { row: merge.r0, col: merge.c0 },
-            end: { row: merge.r1, col: merge.c1 },
-          }),
+        .filter(
+          (merge) =>
+            deleted !== null &&
+            rangesIntersect(deleted, {
+              sheet: to.sheet,
+              start: { row: merge.r0, col: merge.c0 },
+              end: { row: merge.r1, col: merge.c1 },
+            }),
         )
         .map((merge): DocumentOp => ({ op: "addMerge", sheet: to.sheet, merge: { ...merge } })),
       ...(engine?.moveCellsLosses(patch) ?? []).map((addr) => this.snapshotCell(addr)),
@@ -1532,14 +1552,14 @@ export class DocumentController {
   }
 
   private applyHistoryPatches(
-    action: HistoryAction,
+    step: HistoryStep,
     reason: "undo" | "redo",
   ): ApplyTransactionResult | null {
     this.applyingHistory = true;
     let outcome: ApplyTransactionResult;
     const preparation = new TransactionPreparation();
     try {
-      const patches = materializeHistoryAction(action, preparation);
+      const patches = materializeHistoryAction(step.action, preparation);
       if (patches.length === 0) return null;
       const fitted = this.fitHistoryPatches(patches, preparation);
       outcome = this.commit(fitted.patches, reason, fitted.admitted);
@@ -1549,7 +1569,10 @@ export class DocumentController {
     }
     if (outcome.status !== "applied") return outcome;
     this.rebaseHistoryFor(outcome.transaction.patches);
-    this.options.onHistoryApplied(outcome.transaction.patches);
+    this.options.onHistoryApplied(outcome.transaction.patches, {
+      direction: reason,
+      name: step.name,
+    });
     return outcome;
   }
 

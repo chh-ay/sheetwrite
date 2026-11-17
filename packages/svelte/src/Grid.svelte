@@ -49,6 +49,7 @@ let {
   onRendererFallback,
   onDatasourceError,
   onExportError,
+  onKeyBindingsChange,
   onReady,
   onInitializationError,
   grid = $bindable(),
@@ -89,6 +90,8 @@ const handlers: GridAdapterEventHandlers = {
     onDatasourceError?.(event),
   onExportError: (event: Parameters<NonNullable<typeof onExportError>>[0]) =>
     onExportError?.(event),
+  onKeyBindingsChange: (event: Parameters<NonNullable<typeof onKeyBindingsChange>>[0]) =>
+    onKeyBindingsChange?.(event),
   onReady: (event: Parameters<NonNullable<typeof onReady>>[0]) => onReady?.(event),
   onInitializationError: (error: Parameters<NonNullable<typeof onInitializationError>>[0]) =>
     onInitializationError?.(error),

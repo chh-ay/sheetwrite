@@ -81,6 +81,15 @@ export interface GridPanel {
 /** Selection movement applied after a successful editor commit. */
 export type CellEditorNavigation = "down" | "right" | "left" | "none";
 
+/**
+ * Excel's cell mode, which its status bar names: `ready` while no cell is
+ * edited, `enter` when typing opened the cell editor (arrow keys commit),
+ * `edit` after F2 or a double-click (arrow keys move the caret), and `point`
+ * while an arrow key or the pointer has just picked a reference for a
+ * formula. A host-supplied editor is `edit`; a list rule's list is `ready`.
+ */
+export type CellMode = "ready" | "enter" | "edit" | "point";
+
 /** Viewport-relative geometry of the cell currently owned by an editor. */
 export interface CellEditorRect {
   /** Left edge of the cell in CSS pixels, from the grid's left edge. */
@@ -266,23 +275,35 @@ export interface GridActions {
    * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
    * them; with whole columns, as many columns to their left. For any other
    * range it inserts the entire rows (`entire: "row"`) or columns
-   * (`entire: "column"`) of the range; without `entire`, rows for a range at
-   * least as wide as it is tall and columns for a taller one, the choice
-   * Excel's Insert dialog starts on. The change applies before the call
-   * returns. With `ask: true` and no `entire`, as the Ctrl++ key passes,
-   * Excel's Insert dialog asks first, and the rows or columns go in after OK.
-   * Its Shift cells right and Shift cells down choices are shown but not
-   * available yet.
+   * (`entire: "column"`) of the range, or shifts the cells from the range on
+   * right (`shift: "right"`) or down (`shift: "down"`), with the references
+   * to them following, as Excel's Shift cells does. An insert that would
+   * push cells that are not blank off the sheet does nothing and says so.
+   * Without either, it inserts rows for a range at least as wide as it is
+   * tall and columns for a taller one. The change applies before the call
+   * returns. With `ask: true` and neither, as the Ctrl++ key passes, Excel's
+   * Insert dialog asks first, starting on Shift cells down for a wide range
+   * and Shift cells right for a tall one.
    */
-  insertCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
+  insertCells(options?: {
+    entire?: "row" | "column";
+    shift?: "right" | "down";
+    ask?: boolean;
+  }): void;
   /**
    * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
-   * any other range, its entire rows or columns, chosen as
-   * {@link GridActions.insertCells} chooses them. The change applies before
-   * the call returns; with `ask: true` and no `entire`, as the Ctrl+- key
-   * passes, Excel's Delete dialog asks first.
+   * any other range, its entire rows or columns, or the range's cells with
+   * the cells right of it (`shift: "right"`) or below it (`shift: "down"`)
+   * moving left or up over them; references to deleted cells become
+   * `#REF!`. The choice without options is as {@link GridActions.insertCells}
+   * makes it. The change applies before the call returns; with `ask: true`
+   * and neither, as the Ctrl+- key passes, Excel's Delete dialog asks first.
    */
-  deleteCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
+  deleteCells(options?: {
+    entire?: "row" | "column";
+    shift?: "right" | "down";
+    ask?: boolean;
+  }): void;
   /**
    * Ctrl+1, Format Cells. With `format`, merge `format.style` into the style
    * of every selected cell and apply the border preset `format.border`, as
@@ -293,6 +314,16 @@ export interface GridActions {
    * opens. Does nothing on a read-only grid.
    */
   formatCells(format?: { style?: Partial<CellStyle>; border?: BorderPreset }): void;
+  /**
+   * Data › Data Validation: open Excel's Data Validation dialog for the
+   * selection, with Settings, Input Message and Error Alert tabs showing the
+   * active cell's rule. OK gives the selected cells the rule, or removes it
+   * after Clear All, as one undoable step. When the selection holds several
+   * kinds of rule, or cells with and without one, Excel's question comes
+   * first. The dialog's code loads the first time it opens. Does nothing on a
+   * read-only grid.
+   */
+  dataValidation(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
@@ -356,6 +387,13 @@ export interface GridActions {
    * none. Does nothing on a read-only grid.
    */
   deleteNote(): void;
+  /**
+   * Open Excel's Pick From Drop-down List on the focus cell, as Alt+Down
+   * does: the text entries of the column above and below it, sorted, in a
+   * list under the cell. Does nothing when there are none, or on a read-only
+   * grid.
+   */
+  pickFromList(): void;
   /**
    * Open the field list of the pivot table whose output holds the focus cell.
    * Does nothing when the focus cell is outside every pivot. Does nothing on a
@@ -492,7 +530,8 @@ export interface RibbonConfig {
 /**
  * The `GridConfig` switches that choose built-in commands. They apply to every
  * renderer of the command model: the toolbar, the full ribbon and the compact
- * ribbon. Each defaults to true, except `export`.
+ * ribbon. Each defaults to true, except `export` and `keyboardSettings`, which
+ * a host turns on.
  */
 export type CommandFlags = Pick<
   GridConfig,
@@ -507,6 +546,7 @@ export type CommandFlags = Pick<
   | "merge"
   | "sort"
   | "export"
+  | "keyboardSettings"
 >;
 
 /** Built-in action names accepted by custom context-menu rows. */
@@ -544,6 +584,7 @@ export type ContextMenuActionName =
   | "insertCells"
   | "deleteCells"
   | "formatCells"
+  | "pickFromList"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -617,6 +658,31 @@ export type KeyboardAction =
 export interface KeyboardOptions {
   /** Shortcut overrides by action name; actions you leave out keep their default keys. */
   bindings?: Partial<Record<KeyboardAction, KeyShortcut | readonly KeyShortcut[] | null>>;
+}
+
+/**
+ * The user's key bindings: the actions whose keys differ from Excel's
+ * defaults, as `KeyboardOptions.bindings` takes them. `null` means the user
+ * removed every key of that action.
+ */
+export type KeyBindings = NonNullable<KeyboardOptions["bindings"]>;
+
+/**
+ * The Keyboard shortcuts panel, where the user rebinds the built-in actions.
+ * Shortcuts are a user preference, not part of the workbook: the grid emits
+ * `key-bindings-change` after each change, and the host stores the bindings
+ * and passes them back through `config.keyboard.bindings`.
+ *
+ * @example
+ * ```ts
+ * import type { GridConfig } from "@sheetwrite/core";
+ *
+ * const config: GridConfig = { keyboardSettings: { locked: ["copy", "paste"] } };
+ * ```
+ */
+export interface KeyboardSettingsOptions {
+  /** Actions the panel shows read-only. A swap or a replace never changes them either. */
+  locked?: readonly KeyboardAction[];
 }
 
 /**
@@ -740,6 +806,18 @@ export interface GridConfig {
    * turns it off, as Excel's "Enable AutoComplete for cell values" does.
    */
   autoComplete?: boolean;
+  /** How a paste treats the cells it lands on. */
+  paste?: {
+    /**
+     * Keep the data validation rules of the cells a paste covers (default
+     * false). Excel's paste, the default, gives them the copied cells' rules
+     * and lands every value unchecked. With `true`, the cells keep their
+     * rules, a value a `reject` rule refuses is not pasted, a value a `warn`
+     * rule refuses lands, and the status bar names both kinds of cell with a
+     * "Select them" button.
+     */
+    keepValidation?: boolean;
+  };
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**
@@ -752,6 +830,13 @@ export interface GridConfig {
    * return true to consume it, false to let the built-in handler continue.
    */
   keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
+  /**
+   * Let the user change the built-in keys in a Keyboard shortcuts panel
+   * (default false). It opens from File › Options in the ribbon, from the gear
+   * of the compact ribbon, and from `grid.openKeyboardSettings()`. Pass an
+   * object to lock some actions. See {@link KeyboardSettingsOptions}.
+   */
+  keyboardSettings?: boolean | KeyboardSettingsOptions;
 }
 
 /** Per-grid add-on settings, keyed by add-on name. */
@@ -858,11 +943,23 @@ export interface SearchOptions {
   /** Match only when the whole cell text equals the query (default false: substring). */
   wholeCell?: boolean;
   /**
-   * What a formula cell is searched by, as in Excel's "Look in": its formula
-   * text (`"formulas"`, the default) or its result (`"values"`). Replace
-   * rewrites formula text only when looking in formulas.
+   * What a cell is searched by, as in Excel's "Look in": a formula cell's
+   * formula text (`"formulas"`, the default) or its result (`"values"`), or
+   * the cell's note (`"notes"`). Replace rewrites formula text only when
+   * looking in formulas, and note text when looking in notes.
    */
-  lookIn?: "formulas" | "values";
+  lookIn?: "formulas" | "values" | "notes";
+  /**
+   * Where to search, as in Excel's "Within": the sheet (`"sheet"`, the
+   * default) or every visible sheet in tab order (`"workbook"`). A workbook
+   * search ignores `sheet` and the selection.
+   */
+  within?: "sheet" | "workbook";
+  /**
+   * The order of matches, as in Excel's "Search": across each row (`"rows"`,
+   * the default) or down each column (`"columns"`).
+   */
+  searchBy?: "rows" | "columns";
   /** Restrict to a sheet (defaults to the active sheet). */
   sheet?: SheetId;
   /** Restrict to these column indices (defaults to all columns). */
@@ -873,7 +970,7 @@ export interface SearchOptions {
 export interface SearchResult {
   /** Query string retained for navigation and subsequent replacement. */
   query: string;
-  /** Matching cells in row-major order. */
+  /** Matching cells in search order; a workbook search lists sheets in tab order. */
   matches: CellAddress[];
   /** Index of the active match within `matches`, or -1 when there are none. */
   active: number;
@@ -885,6 +982,18 @@ export interface ReplaceResult {
   replaced: number;
   /** Search state after the replacement (matches re-scanned against the new data). */
   result: SearchResult;
+}
+
+/** One change `replaceAll` would make, as `previewReplaceAll` lists it. */
+export interface ReplaceChange {
+  /** The cell, or the cell the note belongs to. */
+  addr: CellAddress;
+  /** What is rewritten: a formula's text, a value, or a note. */
+  kind: "formula" | "value" | "note";
+  /** The text before the replacement: formula text, value text or note text. */
+  before: string;
+  /** The text after the replacement. */
+  after: string;
 }
 
 /**
@@ -917,8 +1026,13 @@ interface HyperlinkActivationEvent {
 export interface GridEvents {
   /** A transaction committed, from a user edit, the API, undo, or a remote source. */
   change: ChangeEvent;
-  /** The selection changed; `null` when nothing is selected. */
-  selection: { selection: Selection | null };
+  /**
+   * The selection changed; `null` when nothing is selected. `selection` is in
+   * view rows; `sheetFocus` is its focus cell in sheet rows, which differ
+   * under a filter, hidden rows or a view sort. Use the sheet address to
+   * store or look up data.
+   */
+  selection: { selection: Selection | null; sheetFocus: CellAddress | null };
   /** The grid scrolled; reports the scroll offsets in CSS pixels and the visible rows and columns. */
   scroll: {
     scrollTop: number;
@@ -928,10 +1042,18 @@ export interface GridEvents {
     firstVisibleColumn: number | null;
     lastVisibleColumn: number | null;
   };
-  /** A cell editor is about to open on `addr`. */
-  "edit-begin": { addr: CellAddress };
-  /** An in-cell edit wrote `value` to `addr`. */
-  "edit-commit": { addr: CellAddress; value: CellValue };
+  /**
+   * A cell editor is about to open on `addr`, in view rows; `sheetAddress` is
+   * the same cell in sheet rows. Use the sheet address to store or look up data.
+   */
+  "edit-begin": { addr: CellAddress; sheetAddress: CellAddress };
+  /**
+   * An in-cell edit wrote `value` to `addr`, in view rows; `sheetAddress` is
+   * the same cell in sheet rows. Use the sheet address to store or look up data.
+   */
+  "edit-commit": { addr: CellAddress; sheetAddress: CellAddress; value: CellValue };
+  /** The cell mode changed, for example from `ready` to `enter` when typing opens the editor. */
+  "cell-mode": { mode: CellMode };
   /** A search ran or moved to another match. */
   search: SearchResult;
   /** Command availability or formatting activity changed. */
@@ -940,6 +1062,13 @@ export interface GridEvents {
   "mutation-rejected": { issues: MutationIssue[] };
   /** Emitted after the visible sheet changes (direct call or cross-sheet scroll). */
   "active-sheet": { sheet: SheetId };
+  /**
+   * An undo or redo applied a step. `step` names it as Excel's undo list does
+   * ("Typing", "Paste", "Insert Rows"); `range` spans the cells it changed on
+   * the sheet it shows, in sheet rows, or is null when it changed no cells.
+   * The spreadsheet shell's status bar shows it: "Undo: Paste in B2:D9".
+   */
+  "history-step": { direction: "undo" | "redo"; step: string; range: Range | null };
   /** The user followed a hyperlink in a cell. */
   "hyperlink-activate": HyperlinkActivationEvent;
   /** Emitted after `setTheme` or `replaceTheme` changes the base theme. Holds a copy. */
@@ -969,6 +1098,12 @@ export interface GridEvents {
    * saved document.
    */
   "engine-failed": { error: SheetwriteError };
+  /**
+   * The user changed keys in the Keyboard shortcuts panel. `bindings` holds
+   * every action whose keys differ from Excel's defaults (`{}` after Reset
+   * all); store it and pass it back as `config.keyboard.bindings`.
+   */
+  "key-bindings-change": { bindings: KeyBindings };
 }
 
 /**
@@ -1033,14 +1168,27 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
+  /**
+   * The text a cell shows: its value through the cell's or the column's number
+   * format, as the grid paints it. `addr` is a data address on any sheet.
+   */
+  getCellText(addr: CellAddress): string;
   /** The current selection, or null when nothing is selected. */
   getSelection(): Selection | null;
+  /** Excel's cell mode now: `ready`, `enter`, `edit` or `point`. See {@link CellMode}. */
+  getCellMode(): CellMode;
   /** Select `sel`, or clear the selection with null. */
   setSelection(sel: Selection | null): void;
   /** Resolved base theme, before zoom scaling. The returned object is a copy. */
   getTheme(): Theme;
   /** Platform-aware label for a bound action, or an empty string when disabled. */
   getShortcutLabel(action: KeyboardAction): string;
+  /**
+   * Open the Keyboard shortcuts panel, for a host's own menu. Does nothing
+   * unless `config.keyboardSettings` is set. The panel's code loads on first
+   * use; focus returns to the element that had it when the panel closes.
+   */
+  openKeyboardSettings(): void;
   /** Imperative patch: merge `theme` into the accumulated base theme. */
   setTheme(theme: Partial<Theme>): void;
   /**
@@ -1332,6 +1480,11 @@ export interface Grid {
   findNext(): SearchResult;
   /** Move the active match to the previous match and scroll it into view. */
   findPrev(): SearchResult;
+  /**
+   * Make match `index` of the current search the active match, select it and
+   * scroll to it, showing its sheet, as clicking a Find All result does.
+   */
+  selectMatch(index: number): SearchResult;
   /** Clear the current search and its highlights. */
   clearSearch(): void;
   /**
@@ -1345,10 +1498,18 @@ export interface Grid {
   replaceCurrent(replacement: string): SearchResult;
   /**
    * Replace every current match in a single undoable transaction (one
-   * `undo()` restores them all), then re-scan. Formula/ref cells are skipped
-   * and not counted. No-op when read-only.
+   * `undo()` restores them all), then re-scan. Formula text is rewritten
+   * unless `lookIn` is `"values"`; reference cells and formulas the new text
+   * would break are skipped and not counted. No-op when read-only.
    */
   replaceAll(replacement: string): ReplaceResult;
+  /**
+   * The changes `replaceAll(replacement)` would make, in search order, without
+   * writing: each cell or note with its text before and after. It comes from
+   * the same plan as `replaceAll`, so it lists exactly what that writes.
+   * Empty when read-only.
+   */
+  previewReplaceAll(replacement: string): ReplaceChange[];
   /** Insert `count` (default 1) empty rows at row `at` of the active sheet, as one undo step. */
   insertRows(at: number, count?: number): void;
   /** Remove `count` (default 1) rows from row `at` of the active sheet, as one undo step. */

@@ -5,7 +5,7 @@ import { colToA1 } from "./a1.js";
 import { AutoFilterMenu, type AutoFilterMenuRequest } from "./autofilter-menu.js";
 import { parseCellInput } from "./cell-input.js";
 import { formatNumber } from "./number-format.js";
-import { autoFilterBody } from "./store/autofilter.js";
+import { autoFilterBody, lowerBound } from "./store/autofilter.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -56,20 +56,33 @@ export function openAutoFilterMenu(host: AutoFilterHost, col: number): void {
 }
 
 /**
- * Whether a column's dropdown offers Number, Text or Date Filters: a date
- * column or date format gives dates, a numeric type or all-number values
- * give numbers, anything else text.
+ * Whether a column's dropdown offers Number, Text or Date Filters. As in
+ * Excel, the kind of most listed values wins: a number in a date format is a
+ * date. A date column is dates; a column with no values goes by its type.
  */
 function autoFilterColumnKind(
   column: Column | undefined,
   values: readonly CellScalar[],
+  formats: readonly (string | undefined)[],
 ): "number" | "text" | "date" {
-  if (column?.type === "date" || DATE_FORMAT.test(column?.numberFormat ?? "")) return "date";
-  if (column?.type === "number" || column?.type === "currency") return "number";
-  const present = values.filter((value) => value !== null && value !== "");
-  return present.length > 0 && present.every((value) => typeof value === "number")
-    ? "number"
-    : "text";
+  if (column?.type === "date") return "date";
+  let dates = 0;
+  let numbers = 0;
+  let texts = 0;
+  for (const [index, value] of values.entries()) {
+    if (typeof value === "number") {
+      if (DATE_FORMAT.test(formats[index] ?? column?.numberFormat ?? "")) dates++;
+      else numbers++;
+    } else if (value !== null && value !== "") {
+      texts++;
+    }
+  }
+  if (dates + numbers + texts === 0) {
+    if (DATE_FORMAT.test(column?.numberFormat ?? "")) return "date";
+    return column?.type === "number" || column?.type === "currency" ? "number" : "text";
+  }
+  if (dates >= numbers && dates >= texts) return "date";
+  return numbers >= texts ? "number" : "text";
 }
 
 /** What the dropdown of `col` shows and does; `null` without an AutoFilter there. */
@@ -83,24 +96,39 @@ function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuReq
   if (!anchor) return null;
 
   const column = sheet.columns[col];
+  const { values, formats, counts, kept, rows, total } = autoFilterValues(
+    engine,
+    sheet,
+    col,
+    AUTO_FILTER_VALUE_LIMIT,
+  );
+  const kind = autoFilterColumnKind(column, values, formats);
+  // Each value shows as its first cell shows it, else in the column's format.
+  // Typed numbers and dates take the format of the first listed date.
+  const formatOf = new Map<CellScalar, string | undefined>();
+  for (const [index, value] of values.entries()) formatOf.set(value, formats[index]);
+  const typedFormat =
+    (kind === "date" ? formats.find((code) => DATE_FORMAT.test(code ?? "")) : undefined) ??
+    column?.numberFormat;
   const format = (value: CellScalar): string =>
     typeof value === "number"
-      ? formatNumber(value, column?.numberFormat, column?.numberLocale)
+      ? formatNumber(value, formatOf.get(value) ?? typedFormat, column?.numberLocale)
       : typeof value === "boolean"
         ? value
           ? "TRUE"
           : "FALSE"
         : (value ?? "");
   const headerValue = grid.store.getCell({ sheet: sheet.id, row: range.start.row, col }).resolved;
-  const { values, kept } = autoFilterValues(engine, sheet, col, AUTO_FILTER_VALUE_LIMIT);
-  const kind = autoFilterColumnKind(column, values);
   return {
     anchor,
     header:
       headerValue === null || headerValue === "" ? `Column ${colToA1(col)}` : format(headerValue),
     kind,
     values,
+    counts,
     kept,
+    rows,
+    total,
     filter: grid.getColumnFilters().get(col),
     format,
     parse: (text) => {
@@ -121,38 +149,58 @@ function autoFilterRequest(host: AutoFilterHost, col: number): AutoFilterMenuReq
 /**
  * What the dropdown of `col` lists: the distinct values of the AutoFilter's
  * rows below its header that the other columns' filters keep, as Excel lists
- * them, and of those, the values the column's own filter keeps (`null` when
- * it has none, so every listed value is kept).
+ * them, with the number format of each one's first cell and how many of those
+ * rows hold it; of those values, the ones the column's own filter keeps
+ * (`null` when it has none, so every listed value is kept); how many rows the
+ * other filters keep; and how many rows the list has below its header.
  */
 export function autoFilterValues(
   engine: StoreDataEngine,
   sheet: Sheet,
   col: number,
   limit: number,
-): { values: CellScalar[]; kept: CellScalar[] | null } {
-  if (!sheet.autoFilter) return { values: [], kept: null };
+): {
+  values: CellScalar[];
+  formats: (string | undefined)[];
+  counts: Uint32Array;
+  kept: CellScalar[] | null;
+  rows: number;
+  total: number;
+} {
+  if (!sheet.autoFilter) {
+    return { values: [], formats: [], counts: new Uint32Array(), kept: null, rows: 0, total: 0 };
+  }
   const body = autoFilterBody(sheet.autoFilter);
-  const rows = { start: body.start, end: body.end + 1 };
+  const total = body.end - body.start + 1;
   const filters = new Map(sheet.filters ?? []);
   const own = filters.get(col);
   filters.delete(col);
-  const values = engine.distinctValues(
+  const only = filters.size > 0 ? engine.filteredRows(sheet.id, filters) : undefined;
+  // `only` is ascending, so the rows of the list are one slice of it.
+  const rows = only ? lowerBound(only, body.end + 1) - lowerBound(only, body.start) : total;
+  const { values, formats, counts } = engine.distinctEntries(
     sheet.id,
     col,
     limit,
-    rows,
-    filters.size > 0 ? engine.filteredRows(sheet.id, filters) : undefined,
+    { start: body.start, end: body.end + 1 },
+    only,
   );
-  if (!own) return { values, kept: null };
+  if (!own) return { values, formats, counts, kept: null, rows, total };
 
-  // The rows every filter keeps, the column's own included.
+  // A value list keeps the listed values it names, which needs no second scan.
+  if (own.kind === "values") {
+    const named = new Set(own.values);
+    const kept = values.filter((value) => named.has(value));
+    return { values, formats, counts, kept, rows, total };
+  }
+  // Any other filter: the values of the rows every filter keeps, its own included.
   filters.set(col, own);
   const kept = engine.distinctValues(
     sheet.id,
     col,
     limit,
-    rows,
+    { start: body.start, end: body.end + 1 },
     engine.filteredRows(sheet.id, filters),
   );
-  return { values, kept };
+  return { values, formats, counts, kept, rows, total };
 }

@@ -328,6 +328,85 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(warnings).toContainEqual(expect.objectContaining({ code: "validation-loss" }));
   });
 
+  it("round-trips the error alert and the input message of a validation rule", async () => {
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:B1"/><sheetData/><dataValidations count="2"><dataValidation type="whole" operator="greaterThan" allowBlank="1" showInputMessage="1" showErrorMessage="1" errorStyle="information" errorTitle="Too small" error="Enter more than 0." promptTitle="Quantity" prompt="Units ordered." sqref="A1"><formula1>0</formula1></dataValidation><dataValidation type="whole" operator="greaterThan" showInputMessage="0" showErrorMessage="0" errorStyle="warning" prompt="Hidden." sqref="B1"><formula1>0</formula1></dataValidation></dataValidations>`,
+      ),
+      { onWarning },
+    );
+    expect(warnings).toEqual([]);
+    const expected = [
+      {
+        policy: "warn",
+        errorStyle: "information",
+        errorTitle: "Too small",
+        helpText: "Enter more than 0.",
+        inputTitle: "Quantity",
+        inputMessage: "Units ordered.",
+      },
+      { policy: "allow", errorStyle: "warning", showInputMessage: false, inputMessage: "Hidden." },
+    ];
+    expect(sheetAt(imported).validationRules).toMatchObject(expected);
+    expect(sheetAt(imported).validationRules?.[0]?.showInputMessage).toBeUndefined();
+
+    const exported = await backend.toXlsxWorkbook(imported);
+    const xml = partText(exported, "xl/worksheets/sheet1.xml");
+    expect(xml).toContain('errorStyle="information"');
+    expect(xml).toContain('promptTitle="Quantity"');
+    expect(xml).toContain('showInputMessage="0"');
+    expect(sheetAt(await backend.fromXlsxWorkbook(exported)).validationRules).toMatchObject(
+      expected,
+    );
+  });
+
+  it("round-trips every Data Validation type, formula sources and bounds, and the dropdown flag", async () => {
+    const rule = (attributes: string, sqref: string, formulas = "") =>
+      `<dataValidation ${attributes} showErrorMessage="1" sqref="${sqref}">${formulas}</dataValidation>`;
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:F1"/><sheetData/><dataValidations count="6">${[
+          rule('type="list" showDropDown="1"', "A1", "<formula1>$H$2:$H$5</formula1>"),
+          rule('type="list"', "B1", "<formula1>Regions</formula1>"),
+          rule('type="custom"', "C1", "<formula1>COUNTIF($C:$C,C1)=1</formula1>"),
+          rule(
+            'type="time" operator="between"',
+            "D1",
+            "<formula1>0.375</formula1><formula2>0.75</formula2>",
+          ),
+          rule('type="date" operator="greaterThanOrEqual"', "E1", "<formula1>TODAY()</formula1>"),
+          rule('type="none" promptTitle="Note" prompt="Any value."', "F1"),
+        ].join("")}</dataValidations>`,
+      ),
+      { onWarning },
+    );
+    expect(warnings).toEqual([]);
+    const expected = [
+      { condition: { kind: "list", source: "=$H$2:$H$5" }, inCellDropdown: false },
+      { condition: { kind: "list", source: "=Regions" } },
+      { condition: { kind: "custom", formula: "=COUNTIF($C:$C,C1)=1" } },
+      { condition: { kind: "time", min: 0.375, max: 0.75 } },
+      {
+        condition: {
+          kind: "date",
+          comparison: { operator: "greaterThanOrEqual", value: "=TODAY()" },
+        },
+      },
+      { condition: { kind: "any" }, inputTitle: "Note", inputMessage: "Any value." },
+    ];
+    expect(sheetAt(imported).validationRules).toMatchObject(expected);
+
+    const exported = await backend.toXlsxWorkbook(imported);
+    const xml = partText(exported, "xl/worksheets/sheet1.xml");
+    expect(xml).toContain("<formula1>COUNTIF($C:$C,C1)=1</formula1>");
+    expect(xml).toContain('showDropDown="1"');
+    expect(sheetAt(await backend.fromXlsxWorkbook(exported)).validationRules).toMatchObject(
+      expected,
+    );
+  });
+
   it("maps every native validation comparison operator without broadening", async () => {
     const comparisons: DataValidationComparison[] = [
       { operator: "between", min: 2, max: 4 },

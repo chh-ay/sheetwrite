@@ -7,9 +7,10 @@ import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import { checkStylePart } from "./style-parts.js";
 import type { HighlightRange, PresenceOverlay, Range, SheetId } from "./types/coordinates.js";
-import type { AutoFilter, CellNote, Sheet } from "./types/document.js";
+import type { AutoFilter, CellNote, DataValidationRule, Sheet } from "./types/document.js";
 import type { IconOverrides } from "./types/grid.js";
 import type { Theme } from "./types/render.js";
+import { hasInputMessage, hasListDropdown } from "./validation-rule.js";
 
 const PRESENCE_LABEL_HEIGHT = 18;
 const PRESENCE_LABEL_MAX_WIDTH = 160;
@@ -20,6 +21,12 @@ const NOTE_INDICATOR_COLOR = "#f59e0b";
 
 /** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
 const FILTER_BUTTON_SIZE = 16;
+
+/** Gap between a selected cell and its validation input message. */
+const INPUT_MESSAGE_GAP = 4;
+
+/** Edge of the dropdown arrow beside a selected list cell, in CSS pixels at zoom 1. */
+const LIST_BUTTON_SIZE = 18;
 
 /**
  * Where an AutoFilter header cell's filter button sits: a square at the
@@ -33,6 +40,21 @@ export function filterButtonRect(cell: { x: number; y: number; w: number; h: num
 } {
   const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
   return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+}
+
+/**
+ * Where the dropdown arrow of a selected list cell sits: a square just right
+ * of the cell, on its bottom edge, as in Excel. `cell` and the result share a
+ * coordinate space.
+ */
+export function listButtonRect(cell: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const size = Math.max(0, Math.min(LIST_BUTTON_SIZE, cell.h));
+  return { x: cell.x + cell.w, y: cell.y + cell.h - size, w: size, h: size };
 }
 
 const EMPTY_VIEW_ROWS = new Int32Array(0);
@@ -275,6 +297,8 @@ export interface OverlayPainterDeps {
   freeze: () => { fr: number; frozenH: number; frozenW: number; firstBodyCol: number };
   /** Content zoom factor (column base widths scale by it). */
   zoom: () => number;
+  /** The validation rule over the cell at view `row`, `col`, if any. */
+  validationRuleAt: (row: number, col: number) => DataValidationRule | undefined;
   scheduleRender: () => void;
 }
 
@@ -299,6 +323,8 @@ export class OverlayPainter {
   private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
   /** The cells of a cut that waits for a paste, in data rows. */
   private cutMark: Range | null = null;
+  /** The cells an undo or redo changed, in data rows, shown for a moment. */
+  private flash: readonly Range[] = [];
 
   // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
   // `acquireRect` hands out `pool[cursor++]`, creating and appending a fresh
@@ -311,6 +337,8 @@ export class OverlayPainter {
   private presenceLabelCursor = 0;
   private presenceLabelBoundsCount = 0;
   private presenceColorContext: CanvasRenderingContext2D | null | undefined;
+  /** The active cell's validation input message; built when one first shows. */
+  private inputMessage: HTMLDivElement | null = null;
 
   // Threaded into the `forEachRect` selection callback, which cannot take args.
   private paintContentTop = 0;
@@ -323,6 +351,7 @@ export class OverlayPainter {
   private highlightVersion = 0;
   private presenceVersion = 0;
   private cutVersion = 0;
+  private flashVersion = 0;
 
   // Repaints look up only the rows in the painted band. Each index rebuilds
   // when its items or the view order change, never on scroll.
@@ -351,10 +380,12 @@ export class OverlayPainter {
   private lastHighlightVersion = -1;
   private lastPresenceVersion = -1;
   private lastCutVersion = -1;
+  private lastFlashVersion = -1;
   private lastSearchVersion = -1;
   private lastGeometryVersion = -1;
   private lastPaintNotes: readonly CellNote[] | undefined;
   private lastAutoFilter: AutoFilter | undefined;
+  private lastValidationRules: Sheet["validationRules"];
   private lastFilters: Sheet["filters"];
   private lastSearchActive = -1;
   private lastEditing = false;
@@ -427,6 +458,13 @@ export class OverlayPainter {
     this.deps.scheduleRender();
   }
 
+  /** Tint the cells an undo or redo changed, so the user sees them; `[]` removes the tint. */
+  setFlash(ranges: readonly Range[]): void {
+    this.flash = ranges;
+    this.flashVersion += 1;
+    this.deps.scheduleRender();
+  }
+
   private getPresenceColorContext(): CanvasRenderingContext2D | null {
     if (this.presenceColorContext !== undefined) return this.presenceColorContext;
     this.presenceColorContext = document.createElement("canvas").getContext("2d");
@@ -442,6 +480,7 @@ export class OverlayPainter {
     this.presenceLabelCursor = 0;
     this.presenceLabelBoundsCount = 0;
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintFlash(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintNotes(theme, sheet, contentTop, scrollLeft, clientW, clientH);
 
@@ -467,6 +506,7 @@ export class OverlayPainter {
     // As in Excel, the moving border of a cut shows over the selection.
     this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintValidation(theme, contentTop, scrollLeft, clientW, clientH);
     this.hideSurplus();
     this.hideSurplusPresenceLabels();
   }
@@ -514,6 +554,7 @@ export class OverlayPainter {
     const notes = sheet.notes;
     const autoFilter = sheet.autoFilter;
     const filters = sheet.filters;
+    const validationRules = sheet.validationRules;
     const searchActive = this.deps.searchActive();
     const editing = this.deps.isEditing();
     const fillPresent = fill !== null;
@@ -535,10 +576,12 @@ export class OverlayPainter {
       this.highlightVersion === this.lastHighlightVersion &&
       this.presenceVersion === this.lastPresenceVersion &&
       this.cutVersion === this.lastCutVersion &&
+      this.flashVersion === this.lastFlashVersion &&
       searchVersion === this.lastSearchVersion &&
       geometryVersion === this.lastGeometryVersion &&
       notes === this.lastPaintNotes &&
       autoFilter === this.lastAutoFilter &&
+      validationRules === this.lastValidationRules &&
       filters === this.lastFilters &&
       searchActive === this.lastSearchActive &&
       editing === this.lastEditing &&
@@ -563,10 +606,12 @@ export class OverlayPainter {
     this.lastHighlightVersion = this.highlightVersion;
     this.lastPresenceVersion = this.presenceVersion;
     this.lastCutVersion = this.cutVersion;
+    this.lastFlashVersion = this.flashVersion;
     this.lastSearchVersion = searchVersion;
     this.lastGeometryVersion = geometryVersion;
     this.lastPaintNotes = notes;
     this.lastAutoFilter = autoFilter;
+    this.lastValidationRules = validationRules;
     this.lastFilters = filters;
     this.lastSearchActive = searchActive;
     this.lastEditing = editing;
@@ -1385,6 +1430,42 @@ export class OverlayPainter {
     button.style.transform = `translate(${x}px, ${y}px)`;
   }
 
+  private paintFlash(
+    theme: Theme,
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const activeSheet = this.deps.activeSheet();
+    const tint = `color-mix(in srgb, ${theme.searchActiveMatch} 45%, transparent)`;
+    for (const range of this.flash) {
+      if (range.sheet !== activeSheet) continue;
+      const first = this.deps.toViewRow(range.start.row);
+      const last = this.deps.toViewRow(range.end.row);
+      if (first === null || last === null) continue;
+      const before = this.cursor;
+      this.appendClampedRange(
+        Math.min(first, last),
+        Math.min(range.start.col, range.end.col),
+        Math.max(first, last),
+        Math.max(range.start.col, range.end.col),
+        tint,
+        "transparent",
+        theme,
+        sheet,
+        contentTop,
+        scrollLeft,
+        clientW,
+        clientH,
+      );
+      for (let index = before; index < this.cursor; index++) {
+        this.pool[index]?.setAttribute("data-sheetwrite-flash", "");
+      }
+    }
+  }
+
   /**
    * Draw the cut mark as dashes that run clockwise around the cells, the
    * "marching ants" of Excel; still dashes when the user asks for reduced
@@ -1486,6 +1567,71 @@ export class OverlayPainter {
   }
 
   /**
+   * What Excel shows beside the active cell of a validation rule: the
+   * dropdown arrow of a list rule, and the input message in a box below the
+   * cell, starting at its middle. Screen readers hear the input message as
+   * the cell's description (`aria-mirror.ts`).
+   */
+  private paintValidation(
+    theme: Theme,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const focus = this.deps.selection().focusCell;
+    const rule = focus ? this.deps.validationRuleAt(focus.row, focus.col) : undefined;
+    const cell =
+      focus && rule ? this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft) : null;
+    if (
+      !rule ||
+      !cell ||
+      cell.y + cell.h <= theme.headerHeight ||
+      cell.y >= clientH ||
+      cell.x + cell.w <= theme.rowHeaderWidth ||
+      cell.x >= clientW
+    ) {
+      this.inputMessage?.remove();
+      return;
+    }
+
+    if (hasListDropdown(rule)) {
+      const button = listButtonRect(cell);
+      const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      el.className = "sheetwrite-list-button";
+      el.style.outlineStyle = "none";
+      const glyph = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      glyph.className = "sheetwrite-icon sheetwrite-list-glyph";
+      glyph.style.outlineStyle = "none";
+      glyph.style.setProperty("--sheetwrite-icon-size", `${button.w}px`);
+      glyph.dataset.icon = "filterArrow";
+    }
+    if (!hasInputMessage(rule)) {
+      this.inputMessage?.remove();
+      return;
+    }
+
+    let card = this.inputMessage;
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "sheetwrite-input-message";
+      card.setAttribute("aria-hidden", "true");
+      card.style.position = "absolute";
+      card.style.pointerEvents = "none";
+      this.inputMessage = card;
+    }
+    const title = document.createElement("strong");
+    title.textContent = rule.inputTitle ?? "";
+    title.hidden = !rule.inputTitle;
+    const message = document.createElement("span");
+    message.textContent = rule.inputMessage ?? "";
+    card.replaceChildren(title, message);
+    card.style.left = `${Math.round(cell.x + cell.w / 2)}px`;
+    card.style.top = `${Math.round(cell.y + cell.h + INPUT_MESSAGE_GAP)}px`;
+    if (!card.isConnected) this.overlay.appendChild(card);
+  }
+
+  /**
    * Hand out the next pooled rect div, applying the mutable style fields. Static
    * setup (position, pointer-events, outline-offset, box-sizing) is written once
    * at creation. Outline width/style are rewritten to their defaults each time
@@ -1522,6 +1668,7 @@ export class OverlayPainter {
     el.style.removeProperty("--sheetwrite-icon-size");
     el.textContent = "";
     el.removeAttribute("data-sheetwrite-presence");
+    el.removeAttribute("data-sheetwrite-flash");
     el.removeAttribute("data-sheetwrite-presence-range");
     el.removeAttribute("aria-hidden");
     el.removeAttribute("title");
@@ -1547,6 +1694,7 @@ export class OverlayPainter {
       const el = this.pool[i]!;
       if (el.hasAttribute("data-sheetwrite-cut")) endCutDashes(el);
       el.removeAttribute("data-sheetwrite-presence");
+      el.removeAttribute("data-sheetwrite-flash");
       // A hidden filter button must not stay one, for queries and styles alike.
       if (el.className) el.className = "";
       el.removeAttribute("data-filtered");

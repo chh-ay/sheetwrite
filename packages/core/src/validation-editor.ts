@@ -7,10 +7,19 @@ export interface BeginValidationEditOptions {
   row: number;
   col: number;
   rule: DataValidationRule;
+  /** A list rule's items, in order; a checkbox rule ignores them. */
+  values: readonly CellScalar[];
   current: CellScalar;
+  /**
+   * Text typed into the cell that opened the list. It shows in the list's
+   * box and keeps only the items that contain it; empty shows them all.
+   */
+  filter: string;
   rect: EditRect;
   theme: Theme;
   onCommit: (value: CellScalar, navigate: EditNavigate) => void;
+  /** Typed text that is none of the items, stored as typed: the grid then checks it against the rule. */
+  onCommitText: (text: string, navigate: EditNavigate) => void;
   onCancel: () => void;
 }
 
@@ -20,16 +29,26 @@ function validationLabel(value: CellScalar): string {
   return String(value);
 }
 
-/** Accessible DOM overlay for list and checkbox validation rules. */
+let listCount = 0;
+
+/**
+ * Accessible DOM overlay for list and checkbox validation rules. A list is a
+ * combobox: a text box over the cell and the rule's items below it, as
+ * Excel's dropdown. Typing in the box keeps only the items that contain the
+ * text, as Excel's AutoComplete for dropdown lists does.
+ */
 export class ValidationEditor {
   private readonly host: HTMLElement;
   private root: HTMLElement | null = null;
+  private input: HTMLInputElement | null = null;
+  private listbox: HTMLElement | null = null;
   private options: BeginValidationEditOptions | null = null;
   private values: readonly CellScalar[] = [];
-  private activeIndex = 0;
+  /** Indices into `values` of the items the filter keeps, in list order. */
+  private shown: number[] = [];
+  /** Position in `shown` of the highlighted item; -1 while none is. */
+  private activeIndex = -1;
   private checkboxValue: CellScalar = false;
-  private typeahead = "";
-  private typeaheadAt = 0;
 
   constructor(host: HTMLElement) {
     this.host = host;
@@ -45,17 +64,24 @@ export class ValidationEditor {
     if (condition.kind !== "list" && condition.kind !== "checkbox") return;
 
     this.options = options;
-    if (condition.kind === "list") this.beginList(options, condition.values);
+    if (condition.kind === "list") this.beginList(options);
     else this.beginCheckbox(options);
     this.position(options.rect);
-    this.root?.focus();
+    const focusTarget = this.input ?? this.root;
+    focusTarget?.focus();
+    this.input?.setSelectionRange(options.filter.length, options.filter.length);
   }
 
   position(rect: EditRect): void {
     const root = this.root;
     if (!root) return;
     root.style.left = `${rect.x}px`;
-    root.style.top = `${rect.y + rect.h}px`;
+    if (this.input) {
+      root.style.top = `${rect.y}px`;
+      this.input.style.height = `${rect.h}px`;
+    } else {
+      root.style.top = `${rect.y + rect.h}px`;
+    }
     root.style.minWidth = `${Math.max(120, rect.w)}px`;
   }
 
@@ -63,10 +89,12 @@ export class ValidationEditor {
     const options = this.options;
     const root = this.root;
     this.root = null;
+    this.input = null;
+    this.listbox = null;
     this.options = null;
     this.values = [];
-    this.activeIndex = 0;
-    this.typeahead = "";
+    this.shown = [];
+    this.activeIndex = -1;
     root?.remove();
     if (notify) options?.onCancel();
   }
@@ -75,39 +103,74 @@ export class ValidationEditor {
     this.cancel(false);
   }
 
-  private beginList(options: BeginValidationEditOptions, values: readonly CellScalar[]): void {
+  private beginList(options: BeginValidationEditOptions): void {
     const root = document.createElement("div");
-    root.className = "sheetwrite-validation-list";
-    root.tabIndex = 0;
-    root.setAttribute("role", "listbox");
-    root.setAttribute("aria-label", options.rule.helpText || "Choose a value");
-    root.style.setProperty("--sheetwrite-bg", options.theme.bg);
-    root.style.setProperty("--sheetwrite-fg", options.theme.fg);
-    root.style.setProperty("--sheetwrite-selection-border", options.theme.selectionBorder);
+    root.className = "sheetwrite-validation-combo";
+    this.applyTheme(root, options.theme);
 
-    this.values = values;
-    const selected = values.findIndex((value) => Object.is(value, options.current));
-    this.activeIndex = selected >= 0 ? selected : 0;
-    for (let index = 0; index < values.length; index++) {
-      const option = document.createElement("div");
-      option.className = "sheetwrite-validation-option";
-      option.id = `sheetwrite-validation-${options.row}-${options.col}-${index}`;
-      option.setAttribute("role", "option");
-      option.setAttribute("aria-selected", String(index === this.activeIndex));
-      option.textContent = validationLabel(values[index] ?? null);
-      option.addEventListener("pointerdown", (event) => event.preventDefault());
-      option.addEventListener("click", () => this.commitList(index, "none"));
-      root.appendChild(option);
-    }
-    root.setAttribute(
-      "aria-activedescendant",
-      `sheetwrite-validation-${options.row}-${options.col}-${this.activeIndex}`,
-    );
+    const listId = `sheetwrite-validation-list-${++listCount}`;
+    const input = document.createElement("input");
+    input.className = "sheetwrite-validation-input";
+    input.type = "text";
+    input.value = options.filter;
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-autocomplete", "list");
+    input.setAttribute("aria-expanded", "true");
+    input.setAttribute("aria-controls", listId);
+    input.setAttribute("aria-label", options.rule.inputTitle || "Choose a value");
+    input.addEventListener("keydown", this.onListKeyDown);
+    input.addEventListener("input", this.onListInput);
+    input.addEventListener("blur", this.onBlur);
+
+    const listbox = document.createElement("div");
+    listbox.className = "sheetwrite-validation-list";
+    listbox.id = listId;
+    listbox.setAttribute("role", "listbox");
+    listbox.setAttribute("aria-label", options.rule.inputTitle || "Choices");
+    // A press on an item keeps the focus in the box, so its click commits.
+    listbox.addEventListener("pointerdown", (event) => event.preventDefault());
+
     root.addEventListener("pointerdown", (event) => event.stopPropagation());
-    root.addEventListener("keydown", this.onListKeyDown);
-    root.addEventListener("blur", this.onBlur);
+    root.append(input, listbox);
     this.host.appendChild(root);
     this.root = root;
+    this.input = input;
+    this.listbox = listbox;
+    this.values = options.values;
+    this.renderList();
+    // Opened without typing, the list starts on the cell's own value, as in Excel.
+    if (options.filter === "") {
+      this.setActive(
+        this.shown.findIndex((index) => Object.is(this.values[index], options.current)),
+      );
+    }
+  }
+
+  /** Show the items that contain the box's text, ignoring case; none is highlighted. */
+  private renderList(): void {
+    const listbox = this.listbox;
+    const input = this.input;
+    if (!listbox || !input) return;
+    const needle = input.value.toLocaleLowerCase();
+    this.shown = [];
+    for (let index = 0; index < this.values.length; index++) {
+      const label = validationLabel(this.values[index] ?? null);
+      if (label.toLocaleLowerCase().includes(needle)) this.shown.push(index);
+    }
+    const options = this.shown.map((index, position) => {
+      const option = document.createElement("div");
+      option.className = "sheetwrite-validation-option";
+      option.id = `${listbox.id}-${position}`;
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", "false");
+      option.textContent = validationLabel(this.values[index] ?? null);
+      option.addEventListener("click", () => this.commitItem(index, "none"));
+      return option;
+    });
+    listbox.replaceChildren(...options);
+    listbox.hidden = options.length === 0;
+    input.setAttribute("aria-expanded", String(options.length > 0));
+    this.setActive(-1);
   }
 
   private beginCheckbox(options: BeginValidationEditOptions): void {
@@ -122,9 +185,7 @@ export class ValidationEditor {
     root.className = "sheetwrite-validation-checkbox";
     root.setAttribute("role", "checkbox");
     root.setAttribute("aria-label", options.rule.helpText || "Toggle checkbox");
-    root.style.setProperty("--sheetwrite-bg", options.theme.bg);
-    root.style.setProperty("--sheetwrite-fg", options.theme.fg);
-    root.style.setProperty("--sheetwrite-selection-border", options.theme.selectionBorder);
+    this.applyTheme(root, options.theme);
     this.renderCheckbox(root);
     root.addEventListener("click", () => {
       this.toggleCheckbox();
@@ -137,25 +198,29 @@ export class ValidationEditor {
     this.root = root;
   }
 
+  private applyTheme(root: HTMLElement, theme: Theme): void {
+    root.style.setProperty("--sheetwrite-bg", theme.bg);
+    root.style.setProperty("--sheetwrite-fg", theme.fg);
+    root.style.setProperty("--sheetwrite-selection-border", theme.selectionBorder);
+  }
+
+  private readonly onListInput = (): void => {
+    this.renderList();
+  };
+
   private readonly onListKeyDown = (event: KeyboardEvent): void => {
-    if (event.key === "ArrowDown") this.setActive(this.activeIndex + 1);
-    else if (event.key === "ArrowUp") this.setActive(this.activeIndex - 1);
-    else if (event.key === "Home") this.setActive(0);
-    else if (event.key === "End") this.setActive(this.values.length - 1);
-    else if (event.key === "Enter") this.commitList(this.activeIndex, "down");
-    else if (event.key === "Tab")
-      this.commitList(this.activeIndex, event.shiftKey ? "left" : "right");
+    if (event.isComposing) return;
+    const count = this.shown.length;
+    if (event.key === "ArrowDown" && !event.altKey) {
+      if (count > 0) this.setActive((this.activeIndex + 1) % count);
+    } else if (event.key === "ArrowUp" && !event.altKey) {
+      if (count > 0) this.setActive(this.activeIndex <= 0 ? count - 1 : this.activeIndex - 1);
+    } else if (event.key === "Enter") this.commitList(event.shiftKey ? "up" : "down");
+    else if (event.key === "Tab") this.commitList(event.shiftKey ? "left" : "right");
     else if (event.key === "Escape") this.cancel();
-    else if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-      const now = Date.now();
-      this.typeahead = now - this.typeaheadAt > 700 ? event.key : this.typeahead + event.key;
-      this.typeaheadAt = now;
-      const needle = this.typeahead.toLocaleLowerCase();
-      const index = this.values.findIndex((value) =>
-        validationLabel(value).toLocaleLowerCase().startsWith(needle),
-      );
-      if (index >= 0) this.setActive(index);
-    } else {
+    else {
+      // Other keys type into the box; the grid must not see them.
+      event.stopPropagation();
       return;
     }
     event.preventDefault();
@@ -179,21 +244,54 @@ export class ValidationEditor {
     this.cancel();
   };
 
-  private setActive(index: number): void {
-    if (this.values.length === 0 || !this.root) return;
-    this.activeIndex = (index + this.values.length) % this.values.length;
-    const children = this.root.querySelectorAll<HTMLElement>("[role=option]");
+  private setActive(position: number): void {
+    const listbox = this.listbox;
+    if (!listbox || !this.input) return;
+    this.activeIndex = position;
+    const children = listbox.children;
     for (let current = 0; current < children.length; current++) {
-      children[current]!.setAttribute("aria-selected", String(current === this.activeIndex));
+      children[current]?.setAttribute("aria-selected", String(current === position));
     }
-    const active = children[this.activeIndex];
-    if (active) {
-      this.root.setAttribute("aria-activedescendant", active.id);
-      active.scrollIntoView({ block: "nearest" });
+    const active = children[position];
+    if (active instanceof HTMLElement) {
+      this.input.setAttribute("aria-activedescendant", active.id);
+      active.scrollIntoView?.({ block: "nearest" });
+    } else {
+      this.input.removeAttribute("aria-activedescendant");
     }
   }
 
-  private commitList(index: number, navigate: EditNavigate): void {
+  /**
+   * Enter or Tab in the list: store the highlighted item; without one, the
+   * item the text names (ignoring case), or else the text as typed.
+   */
+  private commitList(navigate: EditNavigate): void {
+    const options = this.options;
+    const text = this.input?.value ?? "";
+    if (!options) return;
+    const highlighted = this.shown[this.activeIndex];
+    if (highlighted !== undefined) {
+      this.commitItem(highlighted, navigate);
+      return;
+    }
+    const needle = text.toLocaleLowerCase();
+    const named = this.values.findIndex(
+      (value) => validationLabel(value).toLocaleLowerCase() === needle,
+    );
+    if (text !== "" && named >= 0) {
+      this.commitItem(named, navigate);
+      return;
+    }
+    // A list opened and closed without a choice or text changes nothing, as in Excel.
+    if (text === "") {
+      this.cancel();
+      return;
+    }
+    this.cancel(false);
+    options.onCommitText(text, navigate);
+  }
+
+  private commitItem(index: number, navigate: EditNavigate): void {
     const value = this.values[index];
     const options = this.options;
     if (value === undefined || !options) return;

@@ -51,6 +51,8 @@ export function cellEditText(value: CellScalar, type: CellFormat): string {
  * input-bar conventions:
  *
  * - blank (after trimming) clears the cell to a `null` literal;
+ * - in a cell formatted as Text (`@`), anything else stays text exactly as
+ *   typed, as in Excel: numbers, dates, `TRUE` and formulas alike;
  * - text longer than one character beginning with `=` becomes a formula;
  * - in a `number`, `currency` or `date` column a finite numeric string becomes a
  *   number literal (in a `date` column, that number is the date serial);
@@ -65,12 +67,18 @@ export function cellEditText(value: CellScalar, type: CellFormat): string {
  *
  * @param raw - The text the user typed.
  * @param type - The column's format, which decides how dates and currency are read.
+ * @param numberFormat - The cell's effective number format (cell style, then
+ *   column); the Text format `@` keeps the input as text.
  */
-export function parseCellInput(raw: string, type: CellFormat): CellValue {
+export function parseCellInput(raw: string, type: CellFormat, numberFormat?: string): CellValue {
   const trimmed = raw.trim();
 
   if (trimmed === "") {
     return { kind: "literal", value: null };
+  }
+
+  if (numberFormat === "@") {
+    return { kind: "literal", value: raw };
   }
 
   if (trimmed.length > 1 && trimmed.startsWith("=")) {
