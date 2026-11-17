@@ -140,7 +140,7 @@ const packageSpecs: PackageSpec[] = [
   },
   {
     directory: "packages/formula-assist",
-    extraFiles: ["dist/predictor.d.ts", "dist/predictor.js"],
+    extraFiles: ["dist/predictor.js"],
   },
   { directory: "packages/react" },
   { directory: "packages/vue" },

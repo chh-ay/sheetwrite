@@ -419,7 +419,6 @@ export const REQUIRED_PACKAGE_FILES: Readonly<Record<string, readonly string[]>>
     "LICENSE",
     "dist/index.d.ts",
     "dist/index.js",
-    "dist/predictor.d.ts",
     "dist/predictor.js",
   ],
   "@sheetwrite/react": [
