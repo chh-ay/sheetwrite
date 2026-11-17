@@ -7,7 +7,7 @@ import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
 import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
-import { EditController, type EditNavigate } from "./editor.js";
+import { type EditCompletion, EditController, type EditNavigate } from "./editor.js";
 import {
   detectFillSeries,
   type FillOptions,
@@ -16,20 +16,28 @@ import {
 } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
-import { filterButtonRect } from "./overlay-painter.js";
+import { filterButtonRect, listButtonRect } from "./overlay-painter.js";
+import type { PickList } from "./pick-list.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetKey } from "./sheet-commands.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
-import type { CellValue } from "./types/cell.js";
+import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
-import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
+import type {
+  CommitReason,
+  DataValidationRule,
+  DocumentOp,
+  Sheet,
+  SnapshotCell,
+} from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
   CellEditorRect,
+  CellMode,
   ContextMenuItem,
   Grid,
   GridConfig,
@@ -39,6 +47,7 @@ import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
+import { failingValidationRule, hasListDropdown, validationListItems } from "./validation-rule.js";
 
 const PRINTABLE = /^.$/u;
 const MINUTES_PER_HOUR = 60;
@@ -65,6 +74,26 @@ function dateKind(format: string | undefined): "date" | "time" | null {
   return /[hs]/i.test(visible) || /\[[hms]+\]/i.test(format) ? "time" : null;
 }
 
+/** How an edit opens. */
+interface EditRequest {
+  /** Text typed to start the edit; without it the editor opens on the cell's content. */
+  readonly initial?: string;
+  readonly selectAll?: boolean;
+  /** False opens the editor as the view of a draft another surface types. */
+  readonly focus?: boolean;
+  /** Open the list of the cell's list rule, keeping the items that contain this text. */
+  readonly list?: string;
+}
+
+/** A finished cell entry and the operations that store it. */
+interface CellEntry {
+  readonly address: Readonly<CellAddress>;
+  readonly value: CellValue;
+  /** One `set` for the cell, or one per selected cell for Ctrl+Enter. */
+  readonly patches: DocumentOp[];
+  readonly navigate: EditNavigate;
+}
+
 interface InteractionDependencies {
   host: HTMLElement;
   scroller: HTMLDivElement;
@@ -75,7 +104,9 @@ interface InteractionDependencies {
   columnHeader: (col: number) => string;
   toViewRow: (dataRow: number) => number | null;
   editListeners: {
-    readonly [K in "edit-begin" | "edit-commit"]: ReadonlySet<(payload: GridEvents[K]) => void>;
+    readonly [K in "edit-begin" | "edit-commit" | "cell-mode"]: ReadonlySet<
+      (payload: GridEvents[K]) => void
+    >;
   };
   /** Hears the cell edit's draft for the shell's formula bar (see `edit-draft.ts`). */
   editDraft: EditDraftSink;
@@ -186,11 +217,20 @@ export class InteractionSessions {
   private pointAnchor: CellRef | null = null;
   private pointEnd: CellRef | null = null;
   private editingAddress: Readonly<CellAddress> | null = null;
-  private activeEditor: EditController | ValidationEditor | CustomEditorController | null = null;
+  private activeEditor:
+    | EditController
+    | ValidationEditor
+    | CustomEditorController
+    | PickList
+    | null = null;
+  /** Pick From Drop-down List, made when it first opens. */
+  private pickList: PickList | null = null;
   private generation = 0;
   private fillTarget: SelRect | null = null;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /** Excel's cell mode, which the `cell-mode` event last reported. */
+  private mode: CellMode = "ready";
   /**
    * Excel's Tab run: the cell a run of Tab moves left active, and the column
    * the run started in, where the next Enter goes. Any other move ends it.
@@ -199,8 +239,8 @@ export class InteractionSessions {
     null;
   /** AutoComplete's code, once the first edit has loaded it. */
   private autocomplete: typeof import("./autocomplete.js") | null = null;
-  /** The load of AutoComplete's code, started by the first edit. */
-  private autocompleteLoad: Promise<void> | null = null;
+  /** The load of AutoComplete's code, started by the first edit or list. */
+  private autocompleteLoad: Promise<typeof import("./autocomplete.js")> | null = null;
   private dragMove: ((ev: PointerEvent) => void) | null = null;
   private dragUp: ((ev: PointerEvent) => void) | null = null;
   private dragCancel: ((ev: PointerEvent) => void) | null = null;
@@ -226,6 +266,22 @@ export class InteractionSessions {
 
   get isEditing(): boolean {
     return this.activeEditor !== null;
+  }
+
+  /** Excel's cell mode now; see {@link CellMode}. */
+  get cellMode(): CellMode {
+    return this.mode;
+  }
+
+  /** Emit `cell-mode` when the mode of the open editor, or of none, changed. */
+  private reportCellMode(): void {
+    const editor = this.activeEditor;
+    let mode: CellMode = "ready";
+    if (editor === this.editor) mode = this.editor.mode;
+    else if (editor === this.customEditor) mode = "edit";
+    if (mode === this.mode) return;
+    this.mode = mode;
+    for (const listener of this.deps.editListeners["cell-mode"]) listener({ mode });
   }
 
   configureMenu(config: GridConfig | undefined, theme: Theme): void {
@@ -315,22 +371,96 @@ export class InteractionSessions {
    * nothing is completed, and once it arrives the edit that a key opened is
    * completed at once. Hosts that turn AutoComplete off get no completion.
    */
-  private completion(
-    row: number,
-    col: number,
-    typed: boolean,
-  ): ((field: HTMLTextAreaElement) => string | null) | undefined {
+  private completion(row: number, col: number, typed: boolean): EditCompletion | undefined {
     if (!this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
-      this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
-        this.autocomplete = module;
+      void this.loadAutocomplete().then(() => {
         if (typed && this.generation === generation) this.editor.completeNow();
       });
     }
-    let complete: ((field: HTMLTextAreaElement) => string | null) | undefined;
-    return (field) =>
-      (complete ??= this.autocomplete?.editCompletion(this.deps, row, col))?.(field) ?? null;
+    // Made on first use once the code is here; null for a store without an engine.
+    let made: EditCompletion | null | undefined;
+    const current = (): EditCompletion | null => {
+      if (made === undefined && this.autocomplete !== null) {
+        made = this.autocomplete.editCompletion(
+          this.deps,
+          row,
+          col,
+          this.deps.viewportEl,
+          this.deps.theme(),
+          () => this.editor.commit("down"),
+        );
+      }
+      return made ?? null;
+    };
+    return {
+      complete: (field, typedText) => current()?.complete(field, typedText) ?? null,
+      keyDown: (event, field) => current()?.keyDown(event, field) ?? false,
+      reposition: (field) => made?.reposition(field),
+      close: () => made?.close(),
+    };
+  }
+
+  /** AutoComplete's code, loaded once. */
+  private loadAutocomplete(): Promise<typeof import("./autocomplete.js")> {
+    this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
+      this.autocomplete = module;
+      return module;
+    });
+    return this.autocompleteLoad;
+  }
+
+  /**
+   * Excel's Pick From Drop-down List (Alt+Down on a cell): the text entries
+   * that AutoComplete reads around the cell, sorted, in a list under it. Its
+   * code loads with AutoComplete's. A column without text entries shows
+   * nothing, and so does a read-only grid.
+   */
+  pickFromList(row: number, col: number): void {
+    if (this.deps.readOnly()) return;
+    const cell = this.deps.anchorCell(row, col);
+    const generation = this.generation;
+    void this.loadAutocomplete().then((module) => {
+      // An edit, a move or read-only since the key wins.
+      const focus = this.deps.selection().focusCell;
+      if (
+        generation !== this.generation ||
+        this.isEditing ||
+        this.deps.readOnly() ||
+        focus?.row !== cell.row ||
+        focus.col !== cell.col
+      ) {
+        return;
+      }
+      const entries = module.pickListEntries(this.deps, cell.row, cell.col);
+      if (entries.length === 0) return;
+
+      const address = {
+        sheet: this.deps.activeSheet(),
+        row: this.deps.toDataRow(cell.row),
+        col: cell.col,
+      };
+      const current = this.deps.store.getCell(address).resolved;
+      this.deps.onEditStart();
+      const list = (this.pickList ??= new module.PickList(this.deps.viewportEl));
+      this.editingAddress = address;
+      this.activeEditor = list;
+      list.begin({
+        entries,
+        current: typeof current === "string" ? current : "",
+        rect: this.deps.screenRect(
+          cell.row,
+          cell.col,
+          this.deps.contentTop(),
+          this.deps.scroller.scrollLeft,
+        ),
+        theme: this.deps.theme(),
+        onCommit: (entry, navigate) =>
+          this.finishEdit(address, { kind: "literal", value: entry }, navigate),
+        onCancel: () => this.endEditor(),
+      });
+    });
   }
 
   /**
@@ -390,6 +520,7 @@ export class InteractionSessions {
   private endEditor(): void {
     this.editingAddress = null;
     this.activeEditor = null;
+    this.reportCellMode();
     this.deps.host.focus();
     this.deps.scheduleRender();
     this.deps.editDraft.end();
@@ -401,6 +532,7 @@ export class InteractionSessions {
     const editor = this.activeEditor;
     this.activeEditor = null;
     editor?.cancel();
+    this.reportCellMode();
   }
 
   private finishEdit(
@@ -411,17 +543,129 @@ export class InteractionSessions {
     if (this.editingAddress !== address) return;
     this.editingAddress = null;
     this.activeEditor = null;
+    this.reportCellMode();
     try {
       if (address.sheet !== this.deps.activeSheet()) return;
       const viewRow = this.deps.toViewRow(address.row);
       if (viewRow === null) return;
       const column = this.deps.sheet().columns[address.col];
       const value =
-        typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
-      this.commitCellEditAt(address, viewRow, value, navigate);
+        typeof input === "string"
+          ? parseCellInput(
+              input,
+              column?.type ?? "text",
+              this.deps.store.getCell(address).style.numberFormat ??
+                column?.cellStyle?.numberFormat ??
+                column?.numberFormat,
+            )
+          : input;
+      // An entry keeps the cell's formatting, as in Excel; a `set` without a
+      // style would clear it.
+      const patches: DocumentOp[] =
+        navigate === "stay"
+          ? this.selectionFill(address, viewRow, value)
+          : [
+              {
+                op: "set",
+                addr: { ...address },
+                value,
+                style: this.deps.store.getCell(address).style,
+              },
+            ];
+      const entry: CellEntry = { address, value, patches, navigate };
+      const rule = this.brokenRule(patches);
+      if (rule) {
+        const text =
+          typeof input === "string" ? input : this.entryText(value, column?.type ?? "text");
+        this.alertEntry(rule, entry, text);
+        return;
+      }
+      this.commitCellEditAt(entry, viewRow);
     } finally {
       this.deps.editDraft.end();
     }
+  }
+
+  /**
+   * The rule an entry breaks, checked before it is stored, as Excel does. A
+   * Stop rule comes first, so Yes on a Warning never meets a Stop afterwards.
+   * A formula is checked by the result it would have in its cell.
+   */
+  private brokenRule(patches: readonly DocumentOp[]): DataValidationRule | undefined {
+    const rules = this.deps.sheet().validationRules;
+    if (!rules?.length) return undefined;
+    let broken: DataValidationRule | undefined;
+    for (const patch of patches) {
+      if (patch.op !== "set") continue;
+      const covering = rules.filter(
+        (rule) => rule.policy !== "allow" && rangeContains(rule.range, patch.addr),
+      );
+      if (covering.length === 0) continue;
+      const value = this.enteredScalar(patch.addr, patch.value);
+      if (value === undefined) continue;
+      const rule = failingValidationRule(
+        covering,
+        patch.addr,
+        value,
+        storeEngine(this.deps.store)?.validationReads,
+      );
+      if (rule?.policy === "reject") return rule;
+      broken ??= rule;
+    }
+    return broken;
+  }
+
+  /** The value `value` gives the cell at `addr`: a formula's result; undefined when unknown. */
+  private enteredScalar(addr: Readonly<CellAddress>, value: CellValue): CellScalar | undefined {
+    if (value.kind === "literal") return value.value;
+    if (value.kind !== "formula") return undefined;
+    const preview = storeEngine(this.deps.store)?.previewFormula(addr, value.src);
+    if (preview?.status !== "value") return undefined;
+    const result = preview.value;
+    return typeof result === "object" && result !== null ? result.error : result;
+  }
+
+  private entryText(value: CellValue, type: CellFormat): string {
+    if (value.kind === "formula") return value.src;
+    return value.kind === "literal" ? cellEditText(value.value, type) : "";
+  }
+
+  /**
+   * Excel's error alert for an entry `rule` refuses. The entry stays in its
+   * cell behind the alert as `text`; Retry and No return to it with the text
+   * selected, Yes and OK store it, and Cancel drops it.
+   */
+  private alertEntry(rule: DataValidationRule, entry: CellEntry, text: string): void {
+    const generation = this.generation;
+    const { address } = entry;
+    const current = (): number | null =>
+      generation === this.generation && address.sheet === this.deps.activeSheet()
+        ? this.deps.toViewRow(address.row)
+        : null;
+    void import("./validation-alert.js").then(
+      async ({ validationAlert }) => {
+        let viewRow = current();
+        if (viewRow === null || this.isEditing) return;
+        this.beginEdit(viewRow, address.col, text, false, false);
+        const shown = this.generation;
+        const answer = await validationAlert(this.deps.dialogs, rule).result;
+        if (shown !== this.generation) return;
+        this.cancelEditor();
+        viewRow = this.deps.toViewRow(address.row);
+        if (viewRow === null || address.sheet !== this.deps.activeSheet()) return;
+        if (answer === "retry" || answer === "no") {
+          this.beginEdit(viewRow, address.col, text, true);
+        } else if (answer === "yes" || answer === "ok") {
+          this.commitCellEditAt(entry, viewRow);
+        }
+      },
+      (error: unknown) => {
+        // Without its alert the entry would vanish unexplained: hand it back to the editor.
+        const viewRow = current();
+        if (viewRow !== null && !this.isEditing) this.beginEdit(viewRow, address.col, text);
+        reportError(error);
+      },
+    );
   }
 
   private cancelPointer(): void {
@@ -436,6 +680,20 @@ export class InteractionSessions {
    * cell's view of a draft another edit surface types (see `setEditText`).
    */
   beginEdit(row: number, col: number, initial?: string, selectAll = false, focus = true): void {
+    this.startEdit(row, col, { initial, selectAll, focus });
+  }
+
+  /**
+   * Open the list of the list rule over view `row`, `col`, as its dropdown
+   * arrow and Alt+Down do in Excel. `filter`, typed into the cell, keeps only
+   * the items that contain it.
+   */
+  openList(row: number, col: number, filter = ""): void {
+    this.startEdit(row, col, { list: filter });
+  }
+
+  private startEdit(row: number, col: number, request: EditRequest): void {
+    const { initial, selectAll = false, focus = true, list } = request;
     if (this.deps.readOnly()) return;
 
     const editCell = this.deps.anchorCell(row, col);
@@ -477,7 +735,10 @@ export class InteractionSessions {
     if (selectionChanged) this.deps.emitSelection();
     if (generation !== this.generation || this.deps.readOnly()) return;
     for (const listener of this.deps.editListeners["edit-begin"]) {
-      listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
+      listener({
+        addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col },
+        sheetAddress: { ...dataAddr },
+      });
     }
 
     // edit-begin remains a before-open notification. Reentrant callbacks can
@@ -518,17 +779,30 @@ export class InteractionSessions {
         onCommit: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
         onCancel: () => this.endEditor(),
       });
+      this.reportCellMode();
 
       return;
     }
 
-    if (initial === undefined && validationRule) {
+    // A list opens only on request (its arrow, Alt+Down or typing); F2 and a
+    // double-click edit the text, as in Excel. A checkbox opens on any edit.
+    const condition = validationRule?.condition;
+    if (
+      validationRule &&
+      (condition?.kind === "list" ? list !== undefined : initial === undefined)
+    ) {
       this.activeEditor = this.validationEditor;
       this.validationEditor.begin({
         row: editCell.row,
         col: editCell.col,
         rule: validationRule,
+        values: validationListItems(
+          validationRule,
+          dataAddr,
+          storeEngine(this.deps.store)?.validationReads,
+        ),
         current,
+        filter: list ?? "",
         rect: this.deps.screenRect(
           editCell.row,
           editCell.col,
@@ -538,6 +812,7 @@ export class InteractionSessions {
         theme: this.deps.theme(),
         onCommit: (value, navigate) =>
           this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
+        onCommitText: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
         onCancel: () => this.endEditor(),
       });
 
@@ -568,6 +843,7 @@ export class InteractionSessions {
       onShortcut: (event) => this.runCustomShortcut(event, true),
       onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
       complete: this.completion(editCell.row, editCell.col, initial !== undefined),
+      onMode: () => this.reportCellMode(),
       onRefuse: (message) => this.refuseFormula(message),
     });
     // A formula bar showing the draft starts from the opened text, completed or not.
@@ -613,28 +889,22 @@ export class InteractionSessions {
     if (this.isEditing) this.cancelEditor();
   }
 
-  private commitCellEditAt(
-    address: Readonly<CellAddress>,
-    viewRow: number,
-    value: CellValue,
-    navigate: EditNavigate,
-  ): void {
+  /** Store `entry`, whose cell shows at `viewRow`, then move as its key asks. */
+  private commitCellEditAt(entry: CellEntry, viewRow: number): void {
+    const { address, value, patches, navigate } = entry;
     const reason: CommitReason =
       navigate === "none"
         ? "edit-blur"
         : navigate === "right" || navigate === "left"
           ? "edit-tab"
           : "edit-enter";
-    const patches: DocumentOp[] =
-      navigate === "stay"
-        ? this.selectionFill(address, viewRow, value)
-        : [{ op: "set", addr: { ...address }, value }];
     const outcome = this.deps.commit(patches, reason);
 
     if (outcome.status === "applied") {
       for (const listener of this.deps.editListeners["edit-commit"]) {
         listener({
           addr: { sheet: address.sheet, row: viewRow, col: address.col },
+          sheetAddress: { ...address },
           value,
         });
       }
@@ -661,9 +931,11 @@ export class InteractionSessions {
         for (let col = rect.c0; col <= rect.c1; col++) {
           const anchor = this.deps.anchorCell(row, col);
           if (anchor.row !== row || anchor.col !== col) continue;
+          const addr = { sheet: address.sheet, row: dataRow, col };
           patches.push({
             op: "set",
-            addr: { sheet: address.sheet, row: dataRow, col },
+            addr,
+            style: this.deps.store.getCell(addr).style,
             value:
               value.kind === "formula"
                 ? {
@@ -675,7 +947,9 @@ export class InteractionSessions {
         }
       }
     });
-    return patches.length > 0 ? patches : [{ op: "set", addr: { ...address }, value }];
+    return patches.length > 0
+      ? patches
+      : [{ op: "set", addr: { ...address }, value, style: this.deps.store.getCell(address).style }];
   }
 
   private moveAfterCommit(row: number, col: number, navigate: EditNavigate): void {
@@ -754,6 +1028,7 @@ export class InteractionSessions {
     this.editor.destroy();
     this.validationEditor.destroy();
     this.customEditor.destroy();
+    this.pickList?.destroy();
     this.contextMenu?.destroy();
     this.deps.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.deps.scroller.removeEventListener("pointerdown", this.onPointerDown);
@@ -858,6 +1133,16 @@ export class InteractionSessions {
         this.deps.scheduleRender();
       };
       this.attachDrag(e, move, () => this.detachDrag());
+      return;
+    }
+
+    // The dropdown arrow beside a selected list cell opens its list, or
+    // closes it while it is open, as in Excel.
+    const listCell = this.activeEditor === this.editor ? null : this.listButtonCellAt(px, py);
+    if (listCell) {
+      e.preventDefault();
+      if (this.activeEditor === this.validationEditor) this.cancelEditor();
+      else this.openList(listCell.row, listCell.col);
       return;
     }
 
@@ -1329,14 +1614,18 @@ export class InteractionSessions {
 
     switch (e.key) {
       case "ArrowDown":
-        // Alt+Down opens a header's AutoFilter dropdown, or a list rule's list,
-        // as in Excel and as on a combobox.
+        // Alt+Down opens a header's AutoFilter dropdown, a list rule's list, or
+        // else Pick From Drop-down List, as in Excel and as on a combobox.
         if (e.altKey && !mod && focus && this.isAutoFilterHeader(focus.row, focus.col)) {
           this.deps.openAutoFilter(focus.col);
           break;
         }
         if (e.altKey && !mod && focus && this.hasListRule(focus.row, focus.col)) {
-          this.beginEdit(focus.row, focus.col);
+          this.openList(focus.row, focus.col);
+          break;
+        }
+        if (e.altKey && !mod && focus) {
+          this.pickFromList(focus.row, focus.col);
           break;
         }
         this.navigate(
@@ -1422,7 +1711,12 @@ export class InteractionSessions {
 
       default:
         if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {
-          this.beginEdit(focus.row, focus.col, e.key, false);
+          // Typing in a list cell opens its list filtered by the typed text,
+          // as Excel's AutoComplete for dropdown lists does; a formula still
+          // starts in the cell editor.
+          if (e.key !== "=" && this.hasListRule(focus.row, focus.col)) {
+            this.openList(focus.row, focus.col, e.key);
+          } else this.beginEdit(focus.row, focus.col, e.key, false);
         } else {
           return;
         }
@@ -1650,9 +1944,29 @@ export class InteractionSessions {
       this.deps
         .sheet()
         .validationRules?.some(
-          (rule) => rule.condition.kind === "list" && rangeContains(rule.range, addr),
+          (rule) => hasListDropdown(rule) && rangeContains(rule.range, addr),
         ) ?? false
     );
+  }
+
+  /**
+   * The active cell when (`x`, `y`), in viewport pixels, falls on the
+   * dropdown arrow painted beside it; null otherwise.
+   */
+  private listButtonCellAt(x: number, y: number): CellRef | null {
+    const focus = this.deps.selection().focusCell;
+    if (!focus || !this.hasListRule(focus.row, focus.col)) return null;
+    const button = listButtonRect(
+      this.deps.screenRect(
+        focus.row,
+        focus.col,
+        this.deps.contentTop(),
+        this.deps.scroller.scrollLeft,
+      ),
+    );
+    const inside =
+      x >= button.x && x <= button.x + button.w && y >= button.y && y <= button.y + button.h;
+    return inside ? focus : null;
   }
 
   private navigate(

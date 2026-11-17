@@ -266,3 +266,110 @@ describe("find with Excel's wildcards and Look in", () => {
     grid.destroy();
   });
 });
+
+describe("find options", () => {
+  const B = (row: number, col: number) => ({ sheet: "s2", row, col });
+  const text = (value: string) => ({ kind: "literal" as const, value });
+
+  /** Sheet 1 and Sheet 2 hold "North" in different cases; a hidden Sheet 3 holds one too. */
+  function workbookGrid(): { grid: GridImpl; store: SheetwriteStore } {
+    const base = makeWorkbook(4);
+    const [first] = base.sheets;
+    if (!first) throw new Error("makeWorkbook gives one sheet");
+    const workbook = {
+      ...base,
+      sheets: [
+        first,
+        { ...first, id: "s2", name: "Sheet 2" },
+        { ...first, id: "s3", name: "Sheet 3", visibility: "hidden" as const },
+      ],
+    };
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: A(1, 0), value: text("North") },
+        { op: "set", addr: A(0, 2), value: text("x") },
+        { op: "set", addr: A(1, 1), value: text("x") },
+        { op: "set", addr: B(0, 2), value: text("north") },
+        { op: "set", addr: { sheet: "s3", row: 0, col: 0 }, value: text("North") },
+        { op: "setNote", addr: A(2, 1), text: "Check North" },
+      ],
+    });
+    return { grid: new GridImpl(mountHost(), { workbook }, store), store };
+  }
+
+  it("searches every visible sheet in tab order and moves to a match on another sheet", () => {
+    const { grid, store } = workbookGrid();
+
+    expect(grid.search("north", { within: "workbook" }).matches).toEqual([A(1, 0), B(0, 2)]);
+    expect(grid.search("north", { within: "workbook", matchCase: true }).matches).toEqual([
+      B(0, 2),
+    ]);
+    expect(grid.getActiveSheet()).toBe("s2");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: B(0, 2) });
+
+    grid.search("north", { within: "workbook" });
+    expect(grid.findNext().active).toBe(0);
+    expect(grid.getActiveSheet()).toBe("s1");
+    expect(grid.selectMatch(1).active).toBe(1);
+    expect(grid.getActiveSheet()).toBe("s2");
+
+    expect(grid.replaceAll("South").replaced).toBe(2);
+    expect(store.getCell(A(1, 0)).resolved).toBe("South");
+    expect(store.getCell(B(0, 2)).resolved).toBe("South");
+    expect(store.getCell({ sheet: "s3", row: 0, col: 0 }).resolved).toBe("North");
+    grid.actions.undo();
+    expect(store.getCell(A(1, 0)).resolved).toBe("North");
+    expect(store.getCell(B(0, 2)).resolved).toBe("north");
+    grid.destroy();
+  });
+
+  it("orders matches down each column for Search: By Columns", () => {
+    const { grid } = workbookGrid();
+    expect(grid.search("x").matches).toEqual([A(0, 2), A(1, 1)]);
+    expect(grid.search("x", { searchBy: "columns" }).matches).toEqual([A(1, 1), A(0, 2)]);
+    grid.findNext();
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: A(0, 2) });
+    grid.destroy();
+  });
+
+  it("looks in notes and replaces note text", () => {
+    const { grid, store } = workbookGrid();
+    expect(grid.search("north", { lookIn: "notes" }).matches).toEqual([A(2, 1)]);
+
+    expect(grid.replaceAll("South").replaced).toBe(1);
+    expect(store.getWorkbook().sheets[0]?.notes).toEqual([{ addr: A(2, 1), text: "Check South" }]);
+    expect(store.getCell(A(1, 0)).resolved).toBe("North");
+    grid.destroy();
+  });
+});
+
+describe("previewReplaceAll", () => {
+  it("lists exactly the changes replaceAll writes, without writing", () => {
+    const workbook = makeWorkbook(4);
+    const store = new SheetwriteStore(workbook);
+    store.applyTransaction({
+      patches: [
+        { op: "set", addr: A(0, 0), value: { kind: "literal", value: "A1 total" } },
+        { op: "set", addr: A(1, 0), value: { kind: "formula", src: "=A1&B1" } },
+        { op: "set", addr: A(2, 0), value: { kind: "formula", src: '="A1"' } },
+      ],
+    });
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    grid.search("A1");
+
+    // `A1)` would break =A1&B1, so neither the preview nor Replace all touch it.
+    const changes = grid.previewReplaceAll("A1)");
+    expect(changes).toEqual([
+      { addr: A(0, 0), kind: "value", before: "A1 total", after: "A1) total" },
+      { addr: A(2, 0), kind: "formula", before: '="A1"', after: '="A1)"' },
+    ]);
+    expect(store.getCell(A(0, 0)).resolved).toBe("A1 total");
+
+    expect(grid.replaceAll("A1)").replaced).toBe(changes.length);
+    expect(store.getCell(A(0, 0)).resolved).toBe("A1) total");
+    expect(store.getFormula(A(1, 0))).toBe("=A1&B1");
+    expect(store.getFormula(A(2, 0))).toBe('="A1)"');
+    grid.destroy();
+  });
+});

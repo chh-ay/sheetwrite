@@ -1,6 +1,6 @@
 //! Result previews: values, refusals, limits, and a store left as it was.
 
-use super::preview::{FormulaPreview, FormulaPreviewKind, FormulaPreviewStatus};
+use super::preview::{FormulaPreview, FormulaPreviewKind, FormulaPreviewStatus, TrialValue};
 use crate::store::CellStore;
 
 fn preview(store: &CellStore, sheet: usize, source: &str) -> FormulaPreview {
@@ -430,4 +430,49 @@ mod full_engine {
         );
         assert_eq!(calls.get(), 0);
     }
+}
+
+#[test]
+fn a_trial_value_is_what_formulas_read_in_its_cell_and_the_cell_keeps_its_content() {
+    let (mut store, sheet) = small_store();
+    let before = store.export_memory_state();
+    // A2 holds 2. Data validation's "no duplicates" rule, tried with 1 in A2.
+    let trial = |store: &mut CellStore, source: &str, value: TrialValue<'_>| {
+        store.preview_formula_with((sheet, 1, 0), source, value)
+    };
+    let count = "=COUNTIF($A$1:$A$3,A2)";
+    assert_eq!(
+        number(&trial(&mut store, count, TrialValue::Number(1.0))),
+        2.0
+    );
+    assert_eq!(
+        number(&trial(&mut store, count, TrialValue::Number(7.0))),
+        1.0
+    );
+    // B1's SUM keeps its stored result: nothing recalculates.
+    assert_eq!(
+        number(&trial(&mut store, "=B1+A2", TrialValue::Number(10.0))),
+        16.0
+    );
+    assert_eq!(
+        number(&trial(&mut store, "=ISBLANK(A2)+0", TrialValue::Blank)),
+        1.0
+    );
+    assert_eq!(store.export_memory_state(), before);
+    assert_eq!(store.get_cell(sheet, 1, 0).num(), 2.0);
+
+    // A trial in a formula cell leaves the formula and its result in place.
+    assert_eq!(
+        number(&trial_at_formula(
+            &mut store,
+            sheet,
+            TrialValue::Text("abc")
+        )),
+        3.0
+    );
+    assert_eq!(store.get_cell(sheet, 0, 1).num(), 6.0);
+}
+
+fn trial_at_formula(store: &mut CellStore, sheet: usize, value: TrialValue<'_>) -> FormulaPreview {
+    store.preview_formula_with((sheet, 0, 1), "=LEN(B1)", value)
 }

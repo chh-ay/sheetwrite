@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFileSync } from "node:fs";
 
 import { dateToSerial, parseDateInput, serialToDate } from "../src/date-serial.js";
 import { formatNumber, resetNumberFormatResourcesForTest } from "../src/number-format.js";
@@ -185,5 +186,28 @@ describe("formatNumber", () => {
       // The second call serves the entry the first call stored.
       expect(formatNumber(value, code, locale), `warm ${value}`).toBe(expected);
     }
+  });
+});
+
+describe("formatNumber shared cases", () => {
+  // The Rust TEXT() reads the same table (number_format_case_tests.rs).
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL("../../../test/fixtures/number-format-cases.json", import.meta.url),
+      "utf8",
+    ),
+  ) as { cases: [number, string, string, string][] };
+
+  it("shows fractions and the Text format as Excel does", () => {
+    const differ = fixture.cases
+      .map(([value, code, expected]) => ({
+        value,
+        code,
+        expected,
+        actual: formatNumber(value, code),
+      }))
+      .filter(({ expected, actual }) => actual !== expected);
+    expect(fixture.cases.length).toBeGreaterThan(300);
+    expect(differ).toEqual([]);
   });
 });

@@ -1,7 +1,8 @@
 /**
  * Writes the input files of the Excel checks for a model pivot (#229),
  * external links (#226), measures (#230), dashboards (#231) and multi-level
- * category labels (#501) to test/fixtures/excel-checks/.
+ * category labels (#501), and the unconfirmed fraction and Text format cases
+ * (#799), to test/fixtures/excel-checks/.
  * Sheetwrite writes each file, through the same export a user runs, with the
  * full engine, so model pivots, measures and dashboards hold their values.
  *
@@ -9,13 +10,14 @@
  *
  * The steps and the expected results are in docs/contributing/excel-checks.md.
  */
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 
 import type {
   PivotDefinition as Pivot,
+  SnapshotCell,
   WorkbookSnapshot as Snapshot,
   WorkbookTable as Table,
 } from "../packages/core/dist/index.js";
@@ -555,6 +557,57 @@ function chartLevelsWorkbook(): Snapshot {
   };
 }
 
+/**
+ * Check 16: the shared number format cases no Excel capture has confirmed.
+ * Each row holds a value shown with its code, the code, Excel's
+ * `TEXT(value, code)` in brackets, Sheetwrite's text in brackets, and whether
+ * the two are the same.
+ */
+function numberFormatWorkbook(): Snapshot {
+  const fixture = JSON.parse(
+    readFileSync(resolve(import.meta.dir, "../test/fixtures/number-format-cases.json"), "utf8"),
+  ) as { cases: [value: number, code: string, shown: string, note: string][] };
+  const unsure = fixture.cases.filter(([, , , note]) => note.startsWith("unsure"));
+  const headers = ["Value", "Format code", "Excel TEXT", "Sheetwrite", "Same?", "Why unsure"];
+  const cells: SnapshotCell[] = headers.map((header, col) => literal(0, col, header));
+  unsure.forEach(([value, code, shown, note], index) => {
+    const row = index + 1;
+    cells.push(
+      { ...literal(row, 0, value), style: { numberFormat: code } },
+      literal(row, 1, code),
+      formula(row, 2, `="["&TEXT(A${row + 1},B${row + 1})&"]"`),
+      literal(row, 3, `[${shown}]`),
+      formula(row, 4, `=EXACT(C${row + 1},D${row + 1})`),
+      literal(row, 5, note.replace(/^unsure: /, "")),
+    );
+  });
+  return {
+    schemaVersion: 1,
+    workbook: { activeSheet: "cases" },
+    sheets: [
+      {
+        id: "cases",
+        name: "Cases",
+        order: 0,
+        rowCount: unsure.length + 1,
+        columns: columns(headers.length).map((column, index) => ({
+          ...column,
+          width: [120, 110, 150, 150, 60, 420][index]!,
+        })),
+        cells: [
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: unsure.length + 1,
+            colCount: headers.length,
+            cells,
+          },
+        ],
+      },
+    ],
+  };
+}
+
 const warnings: Record<string, string[]> = {};
 
 /** Export `snapshot` through a full-engine grid, as **File › Export XLSX** does. */
@@ -586,6 +639,7 @@ await exportThroughGrid("measures-model-pivot.xlsx", measuresWorkbook(true));
 await exportThroughGrid("measures-only-model.xlsx", measuresWorkbook(false));
 await exportThroughGrid("dashboard-sheetwrite-export.xlsx", dashboardWorkbook());
 await exportThroughGrid("chart-levels-sheetwrite-export.xlsx", chartLevelsWorkbook());
+await exportThroughGrid("number-format-unsure.xlsx", numberFormatWorkbook());
 
 restoreCanvas();
 console.log(JSON.stringify(warnings, null, 2));

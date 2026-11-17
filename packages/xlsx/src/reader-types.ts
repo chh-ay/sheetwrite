@@ -2,7 +2,6 @@ import type {
   CellHyperlink,
   Column,
   ConditionalFormatRule,
-  DataValidationCondition,
   DataValidationRule,
   MergeRange,
   SheetSnapshot,
@@ -62,13 +61,10 @@ export class CellStyleIndices {
   }
 }
 
-export interface ParsedValidation {
+/** One `<dataValidation>` range as a rule without its ID and sheet. */
+export type ParsedValidation = Omit<DataValidationRule, "id" | "range"> & {
   readonly range: Omit<DataValidationRule["range"], "sheet">;
-  readonly condition: DataValidationCondition;
-  readonly policy: DataValidationRule["policy"];
-  readonly allowBlank?: boolean;
-  readonly helpText?: string;
-}
+};
 
 export interface ParsedHyperlink {
   readonly range: Omit<CellHyperlink["range"], "sheet">;

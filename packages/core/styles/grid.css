@@ -47,6 +47,17 @@
   display: none;
 }
 
+/* A notice's one action, such as "Show them", reads as a link. */
+.sheetwrite-action-status-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sheetwrite-selection-border);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 [data-theme="dark"] .sheetwrite,
 .dark .sheetwrite {
   --sheetwrite-bg: #0b0b0c;
@@ -79,7 +90,42 @@
   white-space: pre;
 }
 
-.sheetwrite-validation-list,
+/* A list rule's dropdown (src/validation-editor.ts): a text box over the
+   cell, and below it the items the box's text keeps. */
+.sheetwrite-validation-combo {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.sheetwrite-validation-input {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0 4px;
+  border: 2px solid var(--sheetwrite-selection-border);
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  font: var(--sheetwrite-font);
+  outline: none;
+}
+
+.sheetwrite-validation-list {
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-selection-border);
+  border-radius: 6px;
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  font: var(--sheetwrite-font);
+}
+
+.sheetwrite-validation-list[hidden] {
+  display: none;
+}
+
 .sheetwrite-validation-checkbox {
   position: absolute;
   z-index: 5;
@@ -187,6 +233,43 @@
   }
 }
 
+/* A validation rule's input message (src/overlay-painter.ts): a box below the
+   selected cell, as Excel shows it, in the overlay so it scrolls with the cell. */
+.sheetwrite-input-message {
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 8px;
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
+  border-radius: 4px;
+  background: var(--sheetwrite-input-message-bg, var(--sheetwrite-widget-bg, #fffbe6));
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #111111));
+  font: var(--sheetwrite-widget-font, 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  box-shadow: var(--sheetwrite-menu-shadow, 0 6px 20px rgba(0, 0, 0, 0.18));
+}
+
+@media (forced-colors: active) {
+  .sheetwrite-input-message {
+    border-color: CanvasText;
+  }
+}
+
+/* The dropdown arrow beside a selected list cell (src/overlay-painter.ts),
+   as Excel shows it; the glyph comes from icons.css. */
+.sheetwrite-list-button {
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #c8c8c8));
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+}
+
+.sheetwrite-list-glyph {
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #333333));
+}
+
 /* Modal dialogs (src/dialog.ts): the merge warning, Insert and Delete, and
    Format Cells. Each is a <dialog> in the top layer, centred in the window
    as Excel's are. A short window scrolls the body; the title and the buttons
@@ -290,23 +373,70 @@
   opacity: 0.55;
 }
 
-/* Format Cells (src/format-cells.ts): tabs over one panel at a time. */
-.sheetwrite-format-cells-dialog {
+/* The data-validation error alert (src/validation-alert.ts): the style's
+   glyph beside the message, as Excel's Stop, Warning and Information icons. */
+.sheetwrite-validation-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sheetwrite-validation-alert > div {
+  display: grid;
+  gap: 8px;
+}
+
+.sheetwrite-validation-alert-icon {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--sheetwrite-validation-stop, #d92d20);
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.sheetwrite-validation-alert-icon[data-style="warning"] {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+  background: var(--sheetwrite-validation-warning, #f5b800);
+  color: #111111;
+  padding-top: 8px;
+  box-sizing: border-box;
+}
+
+.sheetwrite-validation-alert-icon[data-style="information"] {
+  background: var(--sheetwrite-validation-information, #2563eb);
+  font-family: Georgia, serif;
+}
+
+/* Format Cells (src/format-cells.ts) and Data Validation
+   (src/data-validation-dialog.ts): tabs over one panel at a time. */
+.sheetwrite-format-cells-dialog,
+.sheetwrite-data-validation-dialog {
   width: min(440px, calc(100% - 32px));
 }
 
-.sheetwrite-format-cells {
+.sheetwrite-format-cells,
+.sheetwrite-data-validation {
   display: grid;
   gap: 10px;
 }
 
-.sheetwrite-format-cells-tabs {
+.sheetwrite-format-cells-tabs,
+.sheetwrite-data-validation-tabs {
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #dddddd));
 }
 
-.sheetwrite-format-cells-tab {
+.sheetwrite-format-cells-tab,
+.sheetwrite-data-validation-tab {
   padding: 4px 10px;
   border: none;
   border-bottom: 2px solid transparent;
@@ -316,19 +446,22 @@
   cursor: pointer;
 }
 
-.sheetwrite-format-cells-tab[aria-selected="true"] {
+.sheetwrite-format-cells-tab[aria-selected="true"],
+.sheetwrite-data-validation-tab[aria-selected="true"] {
   border-bottom-color: var(--sheetwrite-widget-accent, #2563eb);
   font-weight: 600;
 }
 
-.sheetwrite-format-cells-panel {
+.sheetwrite-format-cells-panel,
+.sheetwrite-data-validation-panel {
   display: grid;
   gap: 8px;
   min-height: 220px;
   align-content: start;
 }
 
-.sheetwrite-format-cells-panel[hidden] {
+.sheetwrite-format-cells-panel[hidden],
+.sheetwrite-data-validation-panel[hidden] {
   display: none;
 }
 
@@ -363,6 +496,12 @@
 
 select.sheetwrite-dialog-control[size] {
   height: auto;
+}
+
+/* Data Validation's input and error messages (src/data-validation-dialog.ts). */
+textarea.sheetwrite-dialog-control {
+  height: 64px;
+  resize: vertical;
 }
 
 .sheetwrite-dialog-control[aria-invalid="true"] {

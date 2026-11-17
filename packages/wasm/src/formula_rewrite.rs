@@ -142,8 +142,12 @@ pub fn move_formula_cells(
     to_row: u32,
     #[wasm_bindgen(param_description = "Zero-based first column of the block after the move.")]
     to_col: u32,
+    #[wasm_bindgen(
+        param_description = "`true` for Excel's Insert or Delete with Shift cells: references follow the rule of inserted and deleted cells."
+    )]
+    shift: bool,
 ) -> String {
-    let edit = CellMove::on_own_sheet((row, col), (rows, cols), (to_row, to_col));
+    let edit = CellMove::on_own_sheet((row, col), (rows, cols), (to_row, to_col), shift);
     rewrite_references(source, |reference, qualified| {
         if !qualified {
             move_cell_refs(reference, 0, &edit);

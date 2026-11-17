@@ -226,6 +226,12 @@ export const DOCS_NAVIGATION: readonly NavigationSection[] = [
             icon: "keyboard",
           },
           {
+            label: "Keyboard shortcuts panel",
+            href: "/docs/features/grid/keyboard-shortcuts/",
+            icon: "keyboard",
+            added: RELEASE,
+          },
+          {
             label: "Editing and clipboard",
             href: "/docs/features/grid/editing-and-clipboard/",
             icon: "copy",

@@ -1,12 +1,16 @@
 // Excel's AutoFilter dropdown: sort, clear, the Number, Text or Date Filters
-// conditions, and a searchable value list with (Select All) and (Blanks).
-// The grid imports this module the first time a dropdown opens.
+// conditions, and a searchable value list with (Select All) and (Blanks),
+// which groups dates by year, month and day and counts each value's rows.
+// OK counts the rows the choice keeps. The grid imports this module the
+// first time a dropdown opens.
 
+import { serialToDate } from "./date-serial.js";
 import { popupPosition } from "./menu-surface.js";
+import { formatNumber } from "./number-format.js";
 import { compareScalars } from "./panels/pivot-model.js";
 import { checkStylePart } from "./style-parts.js";
 import type { CellScalar } from "./types/cell.js";
-import type { ColumnFilter, FilterCondition } from "./types/document.js";
+import type { ColumnFilter, DynamicDateFilter, FilterCondition } from "./types/document.js";
 import type { Theme } from "./types/render.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 
@@ -22,8 +26,14 @@ export interface AutoFilterMenuRequest {
   readonly kind: AutoFilterColumnKind;
   /** The values the list offers: those of the rows the other columns' filters keep. */
   readonly values: readonly CellScalar[];
+  /** How many of those rows hold each value, aligned with `values`. */
+  readonly counts: ArrayLike<number>;
   /** The listed values the column's filter keeps; `null` keeps them all. */
   readonly kept: readonly CellScalar[] | null;
+  /** How many rows below the header the other columns' filters keep. */
+  readonly rows: number;
+  /** How many rows the filtered range has below its header. */
+  readonly total: number;
   readonly filter: ColumnFilter | undefined;
   /** The text a value shows in the column. */
   readonly format: (value: CellScalar) => string;
@@ -100,6 +110,63 @@ const PRESETS: Readonly<Record<AutoFilterColumnKind, readonly Preset[]>> = {
   ],
 };
 
+/**
+ * Date Filters' entries that apply at once, between Between… and Custom
+ * Filter…, in Excel's groups.
+ */
+const DATE_SPANS: readonly (readonly (readonly [DynamicDateFilter, string])[])[] = [
+  [
+    ["tomorrow", "Tomorrow"],
+    ["today", "Today"],
+    ["yesterday", "Yesterday"],
+  ],
+  [
+    ["nextWeek", "Next Week"],
+    ["thisWeek", "This Week"],
+    ["lastWeek", "Last Week"],
+  ],
+  [
+    ["nextMonth", "Next Month"],
+    ["thisMonth", "This Month"],
+    ["lastMonth", "Last Month"],
+  ],
+  [
+    ["nextQuarter", "Next Quarter"],
+    ["thisQuarter", "This Quarter"],
+    ["lastQuarter", "Last Quarter"],
+  ],
+  [
+    ["nextYear", "Next Year"],
+    ["thisYear", "This Year"],
+    ["lastYear", "Last Year"],
+  ],
+  [["yearToDate", "Year to Date"]],
+];
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+] as const;
+
+/** All Dates in the Period: each quarter, then each month, of any year. */
+const DATE_PERIODS: readonly (readonly [DynamicDateFilter, string])[] = [
+  ["Q1", "Quarter 1"],
+  ["Q2", "Quarter 2"],
+  ["Q3", "Quarter 3"],
+  ["Q4", "Quarter 4"],
+  ...MONTH_NAMES.map((name, index) => [`M${index + 1}` as DynamicDateFilter, name] as const),
+];
+
 const FILTERS_LABEL: Readonly<Record<AutoFilterColumnKind, string>> = {
   number: "Number Filters",
   text: "Text Filters",
@@ -114,14 +181,31 @@ const SORT_LABELS: Readonly<Record<AutoFilterColumnKind, readonly [string, strin
 
 /**
  * A row of the value list: (Select All), Add current selection to filter
- * (only while searching), a value, or (Blanks).
+ * (only while searching), a value, (Blanks), or in a date column a year,
+ * month or day, which stands for the dates in it.
  */
 type ListItem =
   | { readonly kind: "all" }
   | { readonly kind: "add" }
-  | { readonly kind: "value"; readonly value: CellScalar };
+  | { readonly kind: "value"; readonly value: CellScalar }
+  | {
+      readonly kind: "group";
+      /** 0 a year, 1 a month, 2 a day. */
+      readonly level: number;
+      readonly key: string;
+      readonly label: string;
+      readonly values: readonly number[];
+      /** How many rows hold its dates. */
+      readonly rows: number;
+      readonly open: boolean;
+    };
 
-const valueKey = (value: CellScalar): string => `${typeof value}:${String(value)}`;
+/** Nesting of a date list: a year, a month and a day group, as Excel's. */
+const DAY_LEVEL = 2;
+/** Indent of each nesting level of a date list, in CSS pixels. */
+const LEVEL_INDENT = 16;
+/** Row counts read with thousands separators: "1,204". */
+const ROW_COUNT_FORMAT = "#,##0";
 
 let nextId = 0;
 
@@ -138,12 +222,20 @@ interface Session {
   readonly presetButton: HTMLButtonElement;
   /** Every listed value, sorted, blanks last. */
   readonly values: readonly CellScalar[];
+  /** Whether the list groups dates by year, month and day. */
+  readonly dated: boolean;
+  /** How many rows hold each value, by value key. */
+  readonly counts: ReadonlyMap<CellScalar, number>;
+  /** The years and months a date list shows open, by group key. */
+  readonly expanded: Set<string>;
   /** The values checked in the whole list. */
-  readonly checked: Set<string>;
+  readonly checked: Set<CellScalar>;
   /** The search the list shows, trimmed and in lower case; empty without one. */
   query: string;
+  /** The values the search leaves; all of them without a search. */
+  shown: CellScalar[];
   /** The search results checked; each new search checks all of them, as in Excel. */
-  found: Set<string>;
+  found: Set<CellScalar>;
   /** Whether OK adds the checked search results to the values `checked` keeps. */
   addCurrent: boolean;
   /** The rows the search leaves, (Select All) first. */
@@ -156,8 +248,9 @@ interface Session {
 /**
  * The dropdown of one AutoFilter header button. It is a labelled dialog: Tab
  * moves between its controls and stays inside it, the value list is a
- * multi-select listbox (arrows move, Space checks, Enter applies), and Escape
- * closes it and gives the cell its focus back.
+ * multi-select listbox, or tree for dates (arrows move, Right and Left open
+ * and close a year or month, Space checks, Enter applies), and Escape closes
+ * it and gives the cell its focus back.
  */
 export class AutoFilterMenu {
   private session: Session | null = null;
@@ -177,6 +270,10 @@ export class AutoFilterMenu {
     this.dismiss();
     const idPrefix = `sheetwrite-autofilter-${nextId++}`;
     const values = [...request.values].sort(blanksLast);
+    const counts = new Map<CellScalar, number>();
+    for (const [index, value] of request.values.entries()) {
+      counts.set(value, request.counts[index] ?? 0);
+    }
     const kept = request.kept === null ? values : request.kept;
     const root = document.createElement("div");
     root.className = "sheetwrite-autofilter";
@@ -216,7 +313,7 @@ export class AutoFilterMenu {
     list.className = "sheetwrite-autofilter-list";
     list.id = `${idPrefix}-list`;
     list.tabIndex = 0;
-    list.setAttribute("role", "listbox");
+    list.setAttribute("role", request.kind === "date" ? "tree" : "listbox");
     list.setAttribute("aria-multiselectable", "true");
     list.setAttribute("aria-label", `Values of ${request.header}`);
     list.style.height = `${ROW_HEIGHT * LIST_ROWS}px`;
@@ -229,6 +326,8 @@ export class AutoFilterMenu {
     footer.className = "sheetwrite-autofilter-footer";
     const ok = this.command("OK", () => this.applyValues());
     ok.classList.add("sheetwrite-autofilter-ok");
+    // The button is named OK; its live row count is its description.
+    ok.setAttribute("aria-label", "OK");
     const cancel = this.command("Cancel", () => this.close());
     footer.append(ok, cancel);
 
@@ -256,8 +355,12 @@ export class AutoFilterMenu {
       presets,
       presetButton,
       values,
-      checked: new Set(kept.map(valueKey)),
+      dated: request.kind === "date",
+      counts,
+      expanded: new Set(),
+      checked: new Set(kept),
       query: "",
+      shown: [],
       found: new Set(),
       addCurrent: false,
       items: [],
@@ -266,9 +369,21 @@ export class AutoFilterMenu {
       idPrefix,
     };
     this.session = session;
-    for (const preset of PRESETS[request.kind]) {
-      presets.appendChild(this.presetItem(preset));
+    const forms = PRESETS[request.kind];
+    for (const preset of forms.slice(0, -1)) presets.appendChild(this.presetItem(preset));
+    if (request.kind === "date") {
+      const apply = (type: DynamicDateFilter) => () =>
+        this.run(() => request.apply({ kind: "dynamic", type }));
+      for (const group of DATE_SPANS) {
+        presets.appendChild(this.separator());
+        for (const [type, label] of group) presets.appendChild(this.menuItem(label, apply(type)));
+      }
+      presets.append(...this.periodMenu(apply));
+      presets.appendChild(this.separator());
     }
+    // Custom Filter… comes last, as in Excel.
+    const custom = forms.at(-1);
+    if (custom) presets.appendChild(this.presetItem(custom));
 
     search.addEventListener("input", () => this.refilter());
     search.addEventListener("keydown", (event) => {
@@ -344,14 +459,53 @@ export class AutoFilterMenu {
   }
 
   private presetItem(preset: Preset): HTMLButtonElement {
+    return this.menuItem(preset.label, () => this.openForm(preset));
+  }
+
+  private menuItem(label: string, run: () => void): HTMLButtonElement {
     const item = document.createElement("button");
     item.type = "button";
     item.className = "sheetwrite-autofilter-command";
     item.setAttribute("role", "menuitem");
     item.tabIndex = -1;
-    item.textContent = preset.label;
-    item.addEventListener("click", () => this.openForm(preset));
+    item.textContent = label;
+    item.addEventListener("click", run);
     return item;
+  }
+
+  /**
+   * Date Filters › All Dates in the Period: a submenu of the quarters and
+   * months. Right Arrow or a click opens it; Left Arrow or Escape closes it.
+   */
+  private periodMenu(apply: (type: DynamicDateFilter) => () => void): HTMLElement[] {
+    const menu = document.createElement("div");
+    menu.className = "sheetwrite-autofilter-presets";
+    menu.setAttribute("role", "menu");
+    menu.setAttribute("aria-label", "All Dates in the Period");
+    menu.hidden = true;
+    for (const [type, label] of DATE_PERIODS) menu.appendChild(this.menuItem(label, apply(type)));
+    const show = (open: boolean): void => {
+      menu.hidden = !open;
+      parent.setAttribute("aria-expanded", String(open));
+      (open ? menu.querySelector<HTMLElement>('[role="menuitem"]') : parent)?.focus();
+    };
+    const parent = this.menuItem("All Dates in the Period", () =>
+      show(parent.getAttribute("aria-expanded") !== "true"),
+    );
+    parent.setAttribute("aria-haspopup", "menu");
+    parent.setAttribute("aria-expanded", "false");
+    parent.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowRight") return;
+      event.preventDefault();
+      show(true);
+    });
+    menu.addEventListener("keydown", (event) => {
+      if (event.key !== "ArrowLeft" && event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      show(false);
+    });
+    return [parent, menu];
   }
 
   private togglePresets(open?: boolean): void {
@@ -500,13 +654,28 @@ export class AutoFilterMenu {
     );
     if (query !== session.query) {
       session.query = query;
-      session.found = new Set(matches.map(valueKey));
+      session.found = new Set(matches);
       session.addCurrent = false;
+    }
+    session.shown = matches;
+    this.relist();
+  }
+
+  /** Rebuild the rows from the shown values and the open groups, and redraw them. */
+  private relist(): void {
+    const session = this.session;
+    if (!session) return;
+    const dates: number[] = [];
+    const others: ListItem[] = [];
+    for (const value of session.shown) {
+      if (session.dated && typeof value === "number" && value >= 0) dates.push(value);
+      else others.push({ kind: "value", value });
     }
     session.items = [
       { kind: "all" },
-      ...(query === "" ? [] : [{ kind: "add" } as const]),
-      ...matches.map((value): ListItem => ({ kind: "value", value })),
+      ...(session.query === "" ? [] : [{ kind: "add" } as const]),
+      ...this.dateGroups(session, dates),
+      ...others,
     ];
     session.active = Math.min(session.active, session.items.length - 1);
     session.spacer.style.height = `${session.items.length * ROW_HEIGHT}px`;
@@ -514,25 +683,68 @@ export class AutoFilterMenu {
     this.updateOk();
   }
 
+  /**
+   * Ascending dates as Excel's list groups them: each year, its months when
+   * it is open, and their days when a month is open. A search opens them all.
+   */
+  private dateGroups(session: Session, dates: readonly number[]): ListItem[] {
+    interface DateGroup {
+      readonly key: string;
+      readonly label: string;
+      readonly values: number[];
+      rows: number;
+      readonly children: DateGroup[];
+    }
+    const years: DateGroup[] = [];
+    for (const value of dates) {
+      const date = serialToDate(Math.floor(value));
+      const rows = session.counts.get(value) ?? 0;
+      let siblings = years;
+      let key = "";
+      for (const label of [
+        String(date.getUTCFullYear()),
+        MONTH_NAMES[date.getUTCMonth()] ?? "",
+        String(date.getUTCDate()).padStart(2, "0"),
+      ]) {
+        key = `${key}/${label}`;
+        let group = siblings.at(-1);
+        if (group?.key !== key) {
+          group = { key, label, values: [], rows: 0, children: [] };
+          siblings.push(group);
+        }
+        group.values.push(value);
+        group.rows += rows;
+        siblings = group.children;
+      }
+    }
+
+    const items: ListItem[] = [];
+    const flatten = (groups: readonly DateGroup[], level: number): void => {
+      for (const { key, label, values, rows, children } of groups) {
+        const open = level < DAY_LEVEL && (session.query !== "" || session.expanded.has(key));
+        items.push({ kind: "group", level, key, label, values, rows, open });
+        if (open) flatten(children, level + 1);
+      }
+    };
+    flatten(years, 0);
+    return items;
+  }
+
   private label(value: CellScalar): string {
     if (value === null || value === "") return "(Blanks)";
     return this.session?.request.format(value) ?? String(value);
   }
 
-  /** The values the search leaves; all of them without a search. */
-  private visibleValues(session: Session): CellScalar[] {
-    return session.items.flatMap((item) => (item.kind === "value" ? [item.value] : []));
-  }
-
   /** The checks the list shows: the search results' while searching, else the whole list's. */
-  private shownChecks(session: Session): Set<string> {
+  private shownChecks(session: Session): Set<CellScalar> {
     return session.query === "" ? session.checked : session.found;
   }
 
-  private allState(session: Session): "true" | "false" | "mixed" {
-    const values = this.visibleValues(session);
+  /** Whether the list shows all, none or some of `values` checked. */
+  private stateOf(session: Session, values: readonly CellScalar[]): "true" | "false" | "mixed" {
     const checks = this.shownChecks(session);
-    const checked = values.filter((value) => checks.has(valueKey(value))).length;
+    let checked = 0;
+    for (const value of values) if (checks.has(value)) checked++;
     return checked === 0 ? "false" : checked === values.length ? "true" : "mixed";
   }
 
@@ -543,7 +755,9 @@ export class AutoFilterMenu {
     const { list, items } = session;
     const first = Math.max(0, Math.floor(list.scrollTop / ROW_HEIGHT) - OVERSCAN);
     const last = Math.min(items.length, first + LIST_ROWS + OVERSCAN * 2);
-    for (const option of [...list.querySelectorAll('[role="option"]')]) option.remove();
+    for (const option of [...list.querySelectorAll(".sheetwrite-autofilter-option")]) {
+      option.remove();
+    }
     for (let index = first; index < last; index++) {
       list.appendChild(this.option(session, index));
     }
@@ -553,38 +767,68 @@ export class AutoFilterMenu {
   }
 
   private option(session: Session, index: number): HTMLElement {
-    const item = session.items[index]!;
+    const item = session.items[index];
+    if (!item) throw new Error(`The filter list has no row ${index}`);
     const option = document.createElement("div");
     option.className = "sheetwrite-autofilter-option";
     option.id = `${session.idPrefix}-option-${index}`;
-    option.setAttribute("role", "option");
+    option.setAttribute("role", session.dated ? "treeitem" : "option");
     option.setAttribute("aria-posinset", String(index + 1));
     option.setAttribute("aria-setsize", String(session.items.length));
     option.dataset.index = String(index);
     option.style.top = `${index * ROW_HEIGHT}px`;
     option.style.height = `${ROW_HEIGHT}px`;
-    const checked =
-      item.kind === "add"
-        ? session.addCurrent
-        : item.kind === "value" && this.shownChecks(session).has(valueKey(item.value));
-    const state = item.kind === "all" ? this.allState(session) : checked ? "true" : "false";
+    let state: "true" | "false" | "mixed";
+    if (item.kind === "all") state = this.stateOf(session, session.shown);
+    else if (item.kind === "group") state = this.stateOf(session, item.values);
+    else if (item.kind === "add") state = session.addCurrent ? "true" : "false";
+    else state = this.shownChecks(session).has(item.value) ? "true" : "false";
     option.setAttribute("aria-selected", String(state === "true"));
     if (state === "mixed") option.setAttribute("aria-checked", "mixed");
     option.classList.toggle("sheetwrite-autofilter-active", index === session.active);
+
+    // A date list indents its months and days, and opens a year or month from
+    // the arrow before it.
+    if (session.dated) {
+      const level = item.kind === "group" ? item.level : 0;
+      option.setAttribute("aria-level", String(level + 1));
+      const expander = document.createElement("span");
+      expander.className = "sheetwrite-autofilter-expander";
+      expander.setAttribute("aria-hidden", "true");
+      expander.style.marginInlineStart = `${level * LEVEL_INDENT}px`;
+      if (item.kind === "group" && item.level < DAY_LEVEL) {
+        option.setAttribute("aria-expanded", String(item.open));
+        expander.dataset.open = String(item.open);
+      }
+      option.appendChild(expander);
+    }
     const box = document.createElement("span");
     box.className = "sheetwrite-autofilter-check";
     box.dataset.state = state;
     box.setAttribute("aria-hidden", "true");
     const text = document.createElement("span");
-    text.textContent =
-      item.kind === "all"
-        ? session.query
-          ? "(Select All Search Results)"
-          : "(Select All)"
-        : item.kind === "add"
-          ? "Add current selection to filter"
-          : this.label(item.value);
+    text.className = "sheetwrite-autofilter-label";
+    if (item.kind === "all") {
+      text.textContent = session.query ? "(Select All Search Results)" : "(Select All)";
+    } else if (item.kind === "add") {
+      text.textContent = "Add current selection to filter";
+    } else {
+      text.textContent = item.kind === "group" ? item.label : this.label(item.value);
+    }
     option.append(box, text);
+    // Each value and date group shows how many rows hold it: "North 12".
+    const rows =
+      item.kind === "group"
+        ? item.rows
+        : item.kind === "value"
+          ? session.counts.get(item.value)
+          : undefined;
+    if (rows !== undefined) {
+      const tally = document.createElement("span");
+      tally.className = "sheetwrite-autofilter-tally";
+      tally.textContent = ` ${formatNumber(rows, ROW_COUNT_FORMAT)}`;
+      option.appendChild(tally);
+    }
     return option;
   }
 
@@ -595,7 +839,9 @@ export class AutoFilterMenu {
       "aria-activedescendant",
       `${session.idPrefix}-option-${session.active}`,
     );
-    for (const option of session.list.querySelectorAll<HTMLElement>('[role="option"]')) {
+    for (const option of session.list.querySelectorAll<HTMLElement>(
+      ".sheetwrite-autofilter-option",
+    )) {
       option.classList.toggle(
         "sheetwrite-autofilter-active",
         Number(option.dataset.index) === session.active,
@@ -608,20 +854,34 @@ export class AutoFilterMenu {
     const item = session?.items[index];
     if (!session || !item) return;
     const checks = this.shownChecks(session);
-    if (item.kind === "all") {
-      const check = this.allState(session) !== "true";
-      for (const value of this.visibleValues(session)) {
-        if (check) checks.add(valueKey(value));
-        else checks.delete(valueKey(value));
-      }
-    } else if (item.kind === "add") {
+    if (item.kind === "add") {
       session.addCurrent = !session.addCurrent;
-    } else {
-      const key = valueKey(item.value);
+    } else if (item.kind === "value") {
+      const key = item.value;
       if (!checks.delete(key)) checks.add(key);
+    } else {
+      // (Select All), or a year, month or day: check all of it, or uncheck it
+      // when all of it is checked.
+      const values = item.kind === "all" ? session.shown : item.values;
+      const check = this.stateOf(session, values) !== "true";
+      for (const value of values) {
+        if (check) checks.add(value);
+        else checks.delete(value);
+      }
     }
     this.renderRows();
     this.updateOk();
+  }
+
+  /** Open or close the year or month at `index`, and make it the active row. */
+  private setOpen(index: number, open: boolean): void {
+    const session = this.session;
+    const item = session?.items[index];
+    if (!session || item?.kind !== "group" || item.level === DAY_LEVEL) return;
+    if (open) session.expanded.add(item.key);
+    else session.expanded.delete(item.key);
+    session.active = index;
+    this.relist();
   }
 
   private moveActive(index: number): void {
@@ -637,11 +897,24 @@ export class AutoFilterMenu {
     this.renderRows();
   }
 
-  /** Excel disables OK while it would keep nothing. */
+  /**
+   * Excel disables OK while it would keep nothing. OK also counts the rows
+   * the choice keeps, live: "OK (12 of 48 rows)".
+   */
   private updateOk(): void {
     const session = this.session;
     if (!session) return;
-    session.ok.disabled = this.keptValues(session).length === 0;
+    const keep = this.keptValues(session);
+    // Every value keeps every row the other filters keep, listed or not.
+    let rows = session.request.rows;
+    if (keep.length < session.values.length) {
+      rows = 0;
+      for (const value of keep) rows += session.counts.get(value) ?? 0;
+    }
+    const { total } = session.request;
+    session.ok.disabled = keep.length === 0;
+    session.ok.textContent = `OK (${formatNumber(rows, ROW_COUNT_FORMAT)} of ${formatNumber(total, ROW_COUNT_FORMAT)} rows)`;
+    session.ok.setAttribute("aria-description", `Keeps ${rows} of ${total} rows`);
   }
 
   /**
@@ -651,10 +924,10 @@ export class AutoFilterMenu {
    */
   private keptValues(session: Session): CellScalar[] {
     if (session.query === "") {
-      return session.values.filter((value) => session.checked.has(valueKey(value)));
+      return session.values.filter((value) => session.checked.has(value));
     }
     return session.values.filter((value) => {
-      const key = valueKey(value);
+      const key = value;
       return session.found.has(key) || (session.addCurrent && session.checked.has(key));
     });
   }
@@ -670,9 +943,15 @@ export class AutoFilterMenu {
   }
 
   private readonly onListClick = (event: MouseEvent): void => {
-    const option = (event.target as Element).closest<HTMLElement>('[role="option"]');
+    const target = event.target as Element;
+    const option = target.closest<HTMLElement>(".sheetwrite-autofilter-option");
     if (!option) return;
     const index = Number(option.dataset.index);
+    const item = this.session?.items[index];
+    if (item?.kind === "group" && target.closest("[data-open]")) {
+      this.setOpen(index, !item.open);
+      return;
+    }
     if (this.session) this.session.active = index;
     this.toggle(index);
   };
@@ -681,6 +960,7 @@ export class AutoFilterMenu {
     const session = this.session;
     if (!session) return;
     const page = LIST_ROWS - 1;
+    const item = session.items[session.active];
     switch (event.key) {
       case "ArrowDown":
         this.moveActive(session.active + 1);
@@ -700,6 +980,26 @@ export class AutoFilterMenu {
         break;
       case "End":
         this.moveActive(session.items.length - 1);
+        break;
+      // A date list opens a year or month with Right and closes it, or moves
+      // to the group it is in, with Left.
+      case "ArrowRight":
+        if (item?.kind !== "group" || item.level === DAY_LEVEL) return;
+        if (item.open) this.moveActive(session.active + 1);
+        else this.setOpen(session.active, true);
+        break;
+      case "ArrowLeft":
+        if (item?.kind !== "group") return;
+        if (item.open) this.setOpen(session.active, false);
+        else {
+          // The group it is in is the nearest group above at the level above.
+          let parent = session.active - 1;
+          for (; parent >= 0; parent--) {
+            const candidate = session.items[parent];
+            if (candidate?.kind === "group" && candidate.level === item.level - 1) break;
+          }
+          if (parent >= 0) this.moveActive(parent);
+        }
         break;
       case " ":
         this.toggle(session.active);
@@ -728,7 +1028,9 @@ export class AutoFilterMenu {
     }
 
     if (!session.presets.hidden && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
-      const items = [...session.presets.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+      const items = [...session.presets.querySelectorAll<HTMLElement>('[role="menuitem"]')].filter(
+        (menuItem) => !menuItem.closest("[hidden]"),
+      );
       const at = items.indexOf(document.activeElement as HTMLElement);
       const next = (at + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
       items[next]?.focus();

@@ -1922,13 +1922,13 @@ function cellMoveRefsFixture(count: number): TimedFixture {
   return {
     store,
     run: () => {
-      assert(store.moveCells(sheet, 0, 3, 1, 1, sheet, 1, 3) === 0, "cell moved");
+      assert(store.moveCells(sheet, 0, 3, 1, 1, sheet, 1, 3, false) === 0, "cell moved");
       store.recompute(sheet);
     },
     check: () => numberAt(store, sheet, count - 1, 1),
     dispose: () => store.free(),
     restore: () => {
-      assert(store.moveCells(sheet, 1, 3, 1, 1, sheet, 0, 3) === 0, "cell moved back");
+      assert(store.moveCells(sheet, 1, 3, 1, 1, sheet, 0, 3, false) === 0, "cell moved back");
       store.recompute(sheet);
     },
   };

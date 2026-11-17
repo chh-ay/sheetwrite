@@ -112,7 +112,7 @@ pub(super) fn date_parts(serial: f64) -> Option<(i64, i64, i64)> {
 /// The year, month and day that YEAR, MONTH, DAY and date formats give a
 /// serial. Excel's calendar starts at serial 0, shown as 1900-01-00, and a
 /// negative serial is not a date.
-fn excel_date_parts(serial: f64) -> Option<(i64, i64, i64)> {
+pub(crate) fn excel_date_parts(serial: f64) -> Option<(i64, i64, i64)> {
     if serial.is_nan() || serial < 0.0 {
         return None;
     }

@@ -11,7 +11,7 @@ import type {
   SheetVisibility,
   SortKey,
 } from "../types/document.js";
-import { validCustomFilter } from "./autofilter.js";
+import { DYNAMIC_DATE_FILTERS, validCustomFilter } from "./autofilter.js";
 
 export function integerAt(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
@@ -146,20 +146,28 @@ export function mergeCrossesFreeze(sheet: Sheet, merge: MergeRange): boolean {
   );
 }
 
+/** Whether `value` is a validation formula: text with its leading `=` and something after it. */
+function isValidationFormula(value: unknown): value is string {
+  return typeof value === "string" && value.length > 1 && value.startsWith("=");
+}
+
 function validValidationComparison(value: unknown, textLength: boolean): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const comparison = value as Record<string, unknown>;
   const operator = comparison.operator;
-  const validOperand = (operand: unknown): operand is number =>
-    textLength
+  // A formula bound is checked when a value is, in its cell.
+  const validOperand = (operand: unknown): boolean =>
+    isValidationFormula(operand) ||
+    (textLength
       ? typeof operand === "number" && Number.isSafeInteger(operand) && operand >= 0
-      : typeof operand === "number" && Number.isFinite(operand);
+      : typeof operand === "number" && Number.isFinite(operand));
 
   if (operator === "between" || operator === "notBetween") {
+    const { min, max } = comparison;
     return (
-      validOperand(comparison.min) &&
-      validOperand(comparison.max) &&
-      comparison.min <= comparison.max &&
+      validOperand(min) &&
+      validOperand(max) &&
+      (typeof min !== "number" || typeof max !== "number" || min <= max) &&
       comparison.value === undefined
     );
   }
@@ -197,8 +205,18 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
     }
     const condition = rule.condition;
     if (condition.kind === "list") {
-      if (!Array.isArray(condition.values) || condition.values.length === 0) return false;
-    } else if (condition.kind === "number" || condition.kind === "date") {
+      const valid =
+        "source" in condition
+          ? isValidationFormula(condition.source)
+          : Array.isArray(condition.values) && condition.values.length > 0;
+      if (!valid) {
+        return false;
+      }
+    } else if (
+      condition.kind === "number" ||
+      condition.kind === "date" ||
+      condition.kind === "time"
+    ) {
       if (
         (condition.min !== undefined && !Number.isFinite(condition.min)) ||
         (condition.max !== undefined && !Number.isFinite(condition.max)) ||
@@ -228,7 +246,9 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
       ) {
         return false;
       }
-    } else if (condition.kind !== "checkbox") {
+    } else if (condition.kind === "custom") {
+      if (!isValidationFormula(condition.formula)) return false;
+    } else if (condition.kind !== "checkbox" && condition.kind !== "any") {
       return false;
     }
   }
@@ -310,6 +330,8 @@ function validColumnFilter(filter: ColumnFilter): boolean {
     case "empty":
     case "nonEmpty":
       return true;
+    case "dynamic":
+      return DYNAMIC_DATE_FILTERS.has(filter.type);
     default:
       return false;
   }
@@ -383,6 +405,27 @@ export function movedBlock(patch: Extract<DocumentOp, { op: "moveCells" }>): Ran
       col: patch.to.col + from.end.col - from.start.col,
     },
   };
+}
+
+/**
+ * The cells a `moveCells` operation reads or writes: the block and where it
+ * lands, or for a shift one range from the first of them to the last, which
+ * also holds the cells a deletion closes between them.
+ */
+export function movedCellBounds(patch: Extract<DocumentOp, { op: "moveCells" }>): Range[] {
+  const from = normalizedRange(patch.range);
+  const to = movedBlock(patch);
+  if (patch.shift !== true) return [from, to];
+  return [
+    {
+      sheet: from.sheet,
+      start: {
+        row: Math.min(from.start.row, to.start.row),
+        col: Math.min(from.start.col, to.start.col),
+      },
+      end: { row: Math.max(from.end.row, to.end.row), col: Math.max(from.end.col, to.end.col) },
+    },
+  ];
 }
 
 /**

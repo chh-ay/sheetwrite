@@ -224,7 +224,8 @@ inserted, removed or moved row does not make the rows below it changed. `beforeR
 `beforeCol` give the position of a cell in the earlier version, or `HISTORY_DIFF_NONE`
 on a row or column that was added. A sorted range (`permuteRows`) is compared by
 position, so its moved cells show as changed, and so are the cells that a cut and paste
-(`moveCells`) leaves and lands on. Each change names the last person whose
+(`moveCells`) leaves and lands on, and every cell an Insert or Delete with Shift cells
+(`moveCells` with `shift`) moves. Each change names the last person whose
 logged write reached the cell; the write follows the cell through inserted and removed
 rows. When a change is older than the retained log, or a version between the two was
 deleted, `author` is `HISTORY_DIFF_NONE` and `logComplete` is `false`.

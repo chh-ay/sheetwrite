@@ -1,5 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
+import { dateToSerial } from "../src/date-serial.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -30,7 +31,14 @@ const ROWS: (readonly CellScalar[])[] = [
   ["fig", 7],
 ];
 
-function mount(): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } {
+/**
+ * A grid of `rows` on sheet s1. `formats` gives the number format of each
+ * column's cells below the header, on the cells, as XLSX import puts it.
+ */
+function mount(
+  rows: readonly (readonly CellScalar[])[] = ROWS,
+  formats: readonly (string | undefined)[] = [],
+): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } {
   const snapshot: WorkbookSnapshot = {
     schemaVersion: 1,
     workbook: { activeSheet: "s1" },
@@ -48,14 +56,18 @@ function mount(): { grid: GridImpl; host: HTMLElement; store: SheetwriteStore } 
           {
             startRow: 0,
             startCol: 0,
-            rowCount: ROWS.length,
+            rowCount: rows.length,
             colCount: 2,
-            cells: ROWS.flatMap((row, rowOffset) =>
-              row.map((value, colOffset) => ({
-                rowOffset,
-                colOffset,
-                value: { kind: "literal" as const, value },
-              })),
+            cells: rows.flatMap((row, rowOffset) =>
+              row.map((value, colOffset) => {
+                const numberFormat = rowOffset > 0 ? formats[colOffset] : undefined;
+                return {
+                  rowOffset,
+                  colOffset,
+                  value: { kind: "literal" as const, value },
+                  ...(numberFormat ? { style: { numberFormat } } : {}),
+                };
+              }),
             ),
           },
         ],
@@ -157,6 +169,151 @@ describe("AutoFilter in the grid", () => {
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
     const dialog = await dropdown();
     expect(dialog.getAttribute("aria-label")).toBe("Filter Qty");
+  });
+
+  it("lists a date column by year, month and day with Date Filters, and prices as their cells show", async () => {
+    // 2 January 2026, 2 February 2026 and 1 January 2025, in the cells' own formats.
+    const rows = [
+      ["Date", "Price"],
+      [46024, 39.5],
+      [46055, 64.25],
+      [45658, 39.5],
+    ];
+    const { grid, host, store } = mount(rows, ["m/d/yyyy", "$#,##0.00"]);
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    const open = async (col: number) => {
+      grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col } });
+      press(host, "ArrowDown", { altKey: true });
+      const dialog = await dropdown();
+      const list = dialog.querySelector<HTMLElement>(".sheetwrite-autofilter-list");
+      if (!list) throw new Error("no value list");
+      const labels = () =>
+        [...list.querySelectorAll(".sheetwrite-autofilter-label")].map(
+          (label) => label.textContent,
+        );
+      return { dialog, list, labels };
+    };
+
+    const dates = await open(0);
+    expect(dates.list.getAttribute("role")).toBe("tree");
+    expect(
+      [...dates.dialog.querySelectorAll("button")].map((button) => button.textContent),
+    ).toContain("Date Filters");
+    expect(dates.labels()).toEqual(["(Select All)", "2025", "2026"]);
+    dates.list.focus();
+    press(dates.list, "End");
+    press(dates.list, "ArrowRight");
+    press(dates.list, "End");
+    press(dates.list, "ArrowRight");
+    expect(dates.labels()).toEqual(["(Select All)", "2025", "2026", "January", "February", "02"]);
+    // Untick 2025: the 2026 rows stay.
+    press(dates.list, "Home");
+    press(dates.list, "ArrowDown");
+    press(dates.list, " ");
+    press(dates.list, "Enter");
+    expect(grid.getColumnFilters().get(0)).toEqual({ kind: "values", values: [46024, 46055] });
+    expect(store.viewRowCount("s1")).toBe(9);
+
+    const prices = await open(1);
+    expect(prices.labels()).toEqual(["(Select All)", "$39.50", "$64.25"]);
+    press(prices.list, "Escape");
+
+    // All Dates in the Period › February keeps the February date of any year.
+    grid.setColumnFilter(0, { kind: "dynamic", type: "M2" });
+    expect(store.viewRowCount("s1")).toBe(8);
+    // Today keeps the dates of the computer's calendar day.
+    const now = new Date();
+    const today = dateToSerial(
+      new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())),
+    );
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 0 },
+          value: { kind: "literal", value: today + 0.5 },
+        },
+      ],
+    });
+    grid.setColumnFilter(0, { kind: "dynamic", type: "today" });
+    expect(store.viewRowCount("s1")).toBe(8);
+  });
+
+  it("cuts a filtered range as Excel does: the rows the filter hides move too", async () => {
+    // The clipboard's rich format carries the cut's token, as a browser's does.
+    class ClipItem {
+      readonly types: string[];
+      constructor(private readonly entries: Record<string, Blob>) {
+        this.types = Object.keys(entries);
+      }
+      getType(type: string): Promise<Blob> {
+        const blob = this.entries[type];
+        return blob ? Promise.resolve(blob) : Promise.reject(new Error(`No ${type}`));
+      }
+    }
+    let items: ClipItem[] = [];
+    Object.defineProperty(globalThis, "ClipboardItem", { configurable: true, value: ClipItem });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: (written: ClipItem[]) => {
+          items = written;
+          return Promise.resolve();
+        },
+        read: () => Promise.resolve(items),
+      },
+    });
+    const { grid, store } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    // A2:A4 shows apple and fig; banana, between them, is hidden.
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+    // Excel moves the hidden rows silently; the grid says so (#843).
+    const notice = () => document.querySelector<HTMLElement>(".sheetwrite-action-status");
+    expect(notice()?.textContent).toBe("This cut includes 1 hidden row. Show them");
+    // Paste on A7: view row 5 is sheet row 7 below the filtered range.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
+    expect(await grid.actions.paste()).toBe("done");
+    const item = (row: number) => store.getCell({ sheet: "s1", row, col: 0 }).resolved;
+    expect([1, 2, 3, 6, 7, 8].map(item)).toEqual([null, null, null, "apple", "banana", "fig"]);
+    expect(notice()?.textContent).toBe("This paste moved 1 hidden row. Show them");
+
+    // Pasted in the filtered list, the cut lands on the sheet rows from B2
+    // down, the hidden B3 included, as in Excel.
+    grid.undo();
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    expect([1, 2, 3].map(qty)).toEqual(["apple", "banana", "fig"]);
+
+    notice()?.querySelector("button")?.click();
+    await loaded();
+    expect(grid.getColumnFilters().size).toBe(0);
+    expect(notice()?.hidden).toBe(true);
+  });
+
+  it("reports the sheet address of edited and selected cells under a filter", () => {
+    const { grid } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    const begins: unknown[] = [];
+    const focuses: unknown[] = [];
+    grid.on("edit-begin", ({ addr, sheetAddress }) => begins.push([addr.row, sheetAddress.row]));
+    grid.on("selection", ({ sheetFocus }) => focuses.push(sheetFocus?.row));
+    // View row 2 shows fig, on sheet row 3.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+    grid.beginEdit(2, 0);
+    expect(focuses).toEqual([3]);
+    expect(begins).toEqual([[2, 3]]);
   });
 
   it("maps view rows to sheet rows and back under a filter", () => {
