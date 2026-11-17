@@ -32,6 +32,7 @@ use crate::calc::{
     resolve_named_ranges, resolve_structured_refs, shift_cols, shift_rows, translate_name_refs,
     Ast, NameTarget, NamedFormulaRef, NamedRangeRef, RangeFlags, RefFlags, WrittenNames,
 };
+use crate::cell_move::{move_cell_refs, CellMove};
 use crate::formula_rewrite::write_references;
 use crate::memory::MemoryOwnerStats;
 use crate::types::{AbsCellKey, FormulaError, Value};
@@ -595,6 +596,37 @@ impl CellStore {
                     changed
                 }
                 DefinedName::Range(_) => false,
+            };
+            if moved {
+                changed.push(key.clone());
+            }
+        }
+    }
+
+    /// Follow a block of cells that moves in every name: a name's formula
+    /// as a cell's formula follows it, and a named range as a range in a
+    /// formula does.
+    pub(super) fn move_named_cells(&mut self, edit: &CellMove, changed: &mut Vec<String>) {
+        for ((_, key), definition) in &mut self.defined_names {
+            let moved = match definition {
+                DefinedName::Formula(formula) => {
+                    formula.positional
+                        | formula
+                            .rewrite(&self.sheet_names, |ast| move_cell_refs(ast, NO_SHEET, edit))
+                }
+                DefinedName::Range(range) => {
+                    let moved = edit.moved_range(
+                        range.sheet,
+                        (range.row_start, range.col_start),
+                        (range.row_end, range.col_end),
+                    );
+                    if let Some([sheet, r0, c0, r1, c1]) = moved {
+                        range.sheet = sheet;
+                        (range.row_start, range.col_start) = (r0, c0);
+                        (range.row_end, range.col_end) = (r1, c1);
+                    }
+                    moved.is_some()
+                }
             };
             if moved {
                 changed.push(key.clone());
