@@ -150,14 +150,15 @@ describe("FindBar options and Find All", () => {
     input.dispatchEvent(new Event("input", { bubbles: true }));
 
     host.querySelector<HTMLButtonElement>(".sheetwrite-find-all")!.click();
+    const findAll = host.querySelector<HTMLElement>(".sheetwrite-find-all-results")!;
     const rows = [
-      ...host.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
+      ...findAll.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
     ];
     expect(rows.map((row) => [...row.children].map((cell) => cell.textContent))).toEqual([
       ["Sheet 1", "$A$1", "Ada", ""],
       ["Sheet 2", "$C$2", "ada", '="ada"'],
     ]);
-    expect(host.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
+    expect(findAll.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
       "2 cells found",
     );
 
@@ -165,7 +166,7 @@ describe("FindBar options and Find All", () => {
     expect(grid.getActiveSheet()).toBe("s2");
     expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s2", row: 1, col: 2 } });
     expect(
-      host.querySelector(".sheetwrite-find-result[aria-selected=true] span")!.textContent,
+      findAll.querySelector(".sheetwrite-find-result[aria-selected=true] span")!.textContent,
     ).toBe("Sheet 2");
 
     bar.destroy();

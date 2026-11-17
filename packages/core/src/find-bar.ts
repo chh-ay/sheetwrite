@@ -40,8 +40,13 @@ class CellList {
   private active = -1;
   private rowText: (index: number) => readonly string[] = () => [];
 
-  constructor(label: string, headers: readonly string[], onSelect: (index: number) => void) {
-    this.el.className = "sheetwrite-find-results";
+  constructor(
+    className: string,
+    label: string,
+    headers: readonly string[],
+    onSelect: (index: number) => void,
+  ) {
+    this.el.className = `sheetwrite-find-results ${className}`;
     this.el.hidden = true;
 
     const head = document.createElement("div");
@@ -326,6 +331,7 @@ export class FindBar {
     const replace = this.readOnly ? null : this.buildReplaceRow(el);
     const options = this.buildOptions();
     const findAll = new CellList(
+      "sheetwrite-find-all-results",
       "Find all results",
       ["Sheet", "Cell", "Value", "Formula"],
       (index) => {
