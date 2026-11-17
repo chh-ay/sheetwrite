@@ -144,6 +144,8 @@ Ctrl/Cmd + 1, the context menu's Format cells… or `grid.actions.formatCells()`
 
 OK applies only what you changed, to every selected cell, as one undoable step; the cells keep their other formatting. Cancel and Escape change nothing. Arrow keys move between the tabs, Tab moves into the shown tab, and Enter chooses OK. The dialog is in its own chunk, loaded on first use; keys pressed meanwhile reach it.
 
+While the dialog is open, the selected cells show the format it would apply, as you change each setting: negative numbers, zeros, `####` in a narrow column and borders show on the whole selection, not only on the dialog's one sample. The preview changes only what the grid draws: nothing reaches the document, the undo history or collaborators before OK, and Cancel or Escape puts the cells back as they were.
+
 From code, `grid.actions.formatCells({ style, border })` applies a format to the selection without the dialog, as OK does: `style` merges into each cell's style and `border` is a border preset such as `"all"` or `"outside"`, as one undoable step that is in place when the call returns.
 
 ## Format codes

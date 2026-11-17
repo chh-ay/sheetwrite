@@ -20,7 +20,10 @@ import {
   pointsToPixels,
   TIME_TYPES,
 } from "./format-presets.js";
+import { formatPreview } from "./format-preview.js";
 import { formatNumber } from "./number-format.js";
+import type { PaintedWindowTransform } from "./read-window-controller.js";
+import type { SelRect } from "./selection.js";
 import type { StyleActionsDeps } from "./style-actions.js";
 import type { CellAlign, CellScalar, CellStyle, CellVerticalAlign } from "./types/cell.js";
 import type { BorderPreset } from "./types/grid.js";
@@ -33,6 +36,8 @@ export interface FormatCellsInput {
   readonly sample: CellScalar;
   /** The theme's font shorthand, for the size and family an unstyled cell shows. */
   readonly font: string;
+  /** Called with what OK would change each time the user changes a setting. */
+  readonly onChange?: (change: FormatCellsChange) => void;
 }
 
 /** What OK changes: only the properties the user changed, and a border preset. */
@@ -133,12 +138,16 @@ let dialogCount = 0;
 /**
  * Open Format Cells for the selection behind `deps`, showing its active
  * cell's format, with its column's number format when it has none of its
- * own. Resolves to the changes on OK, or to `null`.
+ * own. Resolves to the changes on OK, or to `null`. While it is open,
+ * `preview` receives a transform of the painted windows that shows the
+ * selected cells as OK would format them; it receives `null` when the dialog
+ * closes, before the result resolves.
  */
 export function formatSelectionDialog(
   grid: DialogHost,
   deps: StyleActionsDeps,
   font: string,
+  preview?: (transform: PaintedWindowTransform | null) => void,
 ): Promise<FormatCellsChange | null> {
   const focus = deps.selection().focusCell;
   if (focus === null) return Promise.resolve(null);
@@ -149,8 +158,20 @@ export function formatSelectionDialog(
     col: anchor.col,
   });
   const numberFormat = cell.style.numberFormat ?? deps.sheet().columns[anchor.col]?.numberFormat;
-  const input = { style: { ...cell.style, numberFormat }, sample: cell.resolved, font };
-  return formatCellsDialog(grid, input).result;
+  const rects: SelRect[] = [];
+  deps.selection().forEachRect((rect) => rects.push(rect));
+  const color = deps.theme().fg;
+  const input = {
+    style: { ...cell.style, numberFormat },
+    sample: cell.resolved,
+    font,
+    onChange:
+      preview && ((change: FormatCellsChange) => preview(formatPreview(rects, change, color))),
+  };
+  return formatCellsDialog(grid, input).result.then((change) => {
+    preview?.(null);
+    return change;
+  });
 }
 
 /**
@@ -465,6 +486,10 @@ export function formatCellsDialog(
 
   body.append(tabList, ...panels);
   showTab(0);
+  // Each setting the user changes previews at once, as OK would apply it.
+  const notify = (): void => input.onChange?.(change());
+  body.addEventListener("input", notify);
+  body.addEventListener("change", notify);
 
   /** Only what changed, so the other properties of a mixed selection stay. */
   const change = (): FormatCellsChange => {

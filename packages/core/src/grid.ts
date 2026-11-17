@@ -77,7 +77,11 @@ import { ObjectLayer } from "./object-layer.js";
 import { OverlayPainter } from "./overlay-painter.js";
 import { attachPanelTriggers, showPivotFields, showSortPanel } from "./panels/panel-loader.js";
 import { clonePivots, pivotOwner, uncomputedPivotResult, withoutSavedOutput } from "./pivot.js";
-import { type PaintedCells, ReadWindowController } from "./read-window-controller.js";
+import {
+  type PaintedCells,
+  type PaintedWindowTransform,
+  ReadWindowController,
+} from "./read-window-controller.js";
 import {
   createRuntimeResourceSnapshot,
   type RuntimeMemoryObservation,
@@ -673,6 +677,8 @@ export class GridImpl implements Grid {
    * sheet gets its entry when the grid first reads it.
    */
   private readonly virtualColumnTargets = new Map<SheetId, number>();
+  /** Format Cells' preview of the selection while the dialog is open; nothing reaches the document. */
+  private formatPreview: PaintedWindowTransform | null = null;
   /** The `minColumns` option, as constructed or last set. */
   private minColumns: number | undefined;
   /** Each sheet's selection and scroll when another sheet became active. */
@@ -1304,6 +1310,7 @@ export class GridImpl implements Grid {
       onEngineTrap: (cause) => {
         this.onEngineFailed(stopEngine(cause, this.engineGeneration));
       },
+      previewWindow: () => this.formatPreview,
     });
 
     if (this.tabBarHeight > 0) this.buildTabBar();
@@ -3203,7 +3210,11 @@ export class GridImpl implements Grid {
         ),
       formatCellsDialog: () =>
         this.openDialog(import("./format-cells.js"), (dialogs, host) =>
-          dialogs.formatSelectionDialog(host, this.styleDeps, this.theme.font),
+          dialogs.formatSelectionDialog(host, this.styleDeps, this.theme.font, (preview) => {
+            this.formatPreview = preview;
+            this.readWindows.invalidateData();
+            this.scheduleRender();
+          }),
         ),
     };
     return this.cellCommandsHost;

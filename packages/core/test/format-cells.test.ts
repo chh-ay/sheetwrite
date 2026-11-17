@@ -4,6 +4,7 @@ import { numberFormatCode, numberFormatLabel, numberFormatParts } from "../src/f
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import type { CellStyle, Renderer } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
@@ -168,6 +169,39 @@ describe("Format Cells", () => {
     expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe("0.5");
     await answerDialog(host, "OK");
     expect(cell(1, 1).style.numberFormat).toBe("@");
+  });
+
+  it("previews a change on the selected cells while it is open, and Cancel puts them back", async () => {
+    // The style the grid paints for B1 in each frame.
+    const painted: Array<CellStyle | undefined> = [];
+    const recorder: Renderer = {
+      mount() {},
+      setLayout() {},
+      setViewport() {},
+      paint(view) {
+        const index = (0 - view.rows.start) * view.cols.length + view.cols.indexOf(1);
+        painted.push(view.styles[view.styleIds[index] ?? 0]);
+      },
+      setTheme() {},
+      setRenderers() {},
+      destroy() {},
+    };
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    let changes = 0;
+    grid.on("change", () => changes++);
+
+    const dialog = await openFormatCells();
+    const bold = control(dialog, "Bold", HTMLInputElement);
+    bold.checked = true;
+    bold.dispatchEvent(new Event("change", { bubbles: true }));
+    grid.refresh();
+    expect(painted.at(-1)?.bold).toBe(true);
+    expect(cell(0, 1).style.bold).toBeUndefined();
+
+    await answerDialog(host, "Cancel");
+    grid.refresh();
+    expect(painted.at(-1)?.bold).toBeUndefined();
+    expect(changes).toBe(0);
   });
 });
 
