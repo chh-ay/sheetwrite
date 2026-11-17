@@ -682,6 +682,22 @@ function parseFraction(section: string): FractionDescriptor | null {
     suffix,
   };
 }
+/**
+ * A whole number's digits as Excel writes them: at most 15 significant
+ * digits, then zeros, so a huge whole part reads as TEXT() writes it.
+ */
+function integerDigits(value: number): string {
+  const key = "integer-digits";
+  const cached = numberFormatterCache.get(key);
+  if (cached) return cached.format(value);
+  numberFormatters += 1;
+  return cacheValue(
+    numberFormatterCache,
+    key,
+    new Intl.NumberFormat("en-US", { maximumSignificantDigits: 15, useGrouping: false }),
+    NUMBER_FORMATTER_CACHE_LIMIT,
+  ).format(value);
+}
 
 /** A number rounded to the 15 significant digits Excel keeps. */
 function significant(value: number): number {
@@ -748,7 +764,7 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
   let text = value < 0 && (whole > 0 || numerator > 0) ? "-" : "";
   text += fraction.prefix;
   if (fraction.integer !== null) {
-    const digits = whole > 0 ? whole.toFixed(0) : "";
+    const digits = whole > 0 ? integerDigits(whole) : "";
     let integer =
       placeholderPad(
         fraction.integer.slice(0, Math.max(0, fraction.integer.length - digits.length)),
@@ -765,12 +781,12 @@ function renderFraction(value: number, fraction: FractionDescriptor, locale: str
       return text + " ".repeat(width) + fraction.suffix;
     }
   }
-  const numeratorText = numerator.toFixed(0);
+  const numeratorText = integerDigits(numerator);
   text += placeholderPad(
     fraction.numerator.slice(0, Math.max(0, fraction.numerator.length - numeratorText.length)),
   );
   text += `${numeratorText}/`;
-  const denominatorText = String(denominator);
+  const denominatorText = integerDigits(denominator);
   text += fixed
     ? denominatorText
     : denominatorText + placeholderPad(String(fraction.denominator).slice(denominatorText.length));

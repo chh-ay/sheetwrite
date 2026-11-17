@@ -81,6 +81,10 @@ const ADDON_SEAM_MARKERS = ["setXlsxWorkbookBackend", "registerQueryCommands"];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
+// The number formatter, which the grid, Format Cells and the AutoFilter share;
+// webpack may give it a chunk of its own. Its formatter cache key survives
+// minifiers.
+const NUMBER_FORMAT_MARKER = "fixed:";
 const chromeChunks = [];
 const panelChunks = [];
 const sortPanelChunks = [];
@@ -99,6 +103,7 @@ const workers = [];
 const addonRegistryChunks = [];
 const addonSeamChunks = [];
 const documentChunks = [];
+const numberFormatChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
@@ -127,6 +132,7 @@ for (const file of lazyChunks) {
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
   )
     documentChunks.push(file);
+  else if (code.includes(NUMBER_FORMAT_MARKER)) numberFormatChunks.push(file);
   else workers.push(file);
 }
 if (workers.length !== 1)
@@ -137,6 +143,11 @@ for (const marker of [RIBBON_MARKER, TOOLBAR_MARKER]) {
 }
 if (panelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
+if (numberFormatChunks.length > 1) {
+  throw new Error(
+    `Expected at most one webpack number format chunk, got ${numberFormatChunks.length}`,
+  );
+}
 if (sortPanelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sortPanelChunks.length}`);
 if (queryPanelChunks.length !== 1)
@@ -272,6 +283,7 @@ const assets = publicFiles.map((file) => {
       cellCommandChunks,
       sheetCommandChunks,
       documentChunks,
+      numberFormatChunks,
       dashboardChunks,
       addonRegistryChunks,
       addonSeamChunks,

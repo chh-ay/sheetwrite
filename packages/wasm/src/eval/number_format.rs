@@ -803,11 +803,8 @@ impl Fraction {
         }
         text.push_str(&self.prefix);
         if let Some(placeholders) = &self.integer {
-            let digits = if whole > 0.0 {
-                format!("{whole:.0}")
-            } else {
-                String::new()
-            };
+            // Zero has no integer digits.
+            let digits = Decimal::of(whole).integer_digits();
             let mut integer = filled_left(&digits, placeholders);
             if integer.trim().is_empty() && numerator == 0.0 {
                 integer = "0".into();
@@ -828,12 +825,24 @@ impl Fraction {
                 return text;
             }
         }
-        text.push_str(&filled_left(&format!("{numerator:.0}"), &self.numerator));
+        // Zero has no integer digits; an improper fraction of zero is `0/1`.
+        let numerator_digits = Decimal::of(numerator).integer_digits();
+        text.push_str(&filled_left(
+            if numerator_digits.is_empty() {
+                "0"
+            } else {
+                &numerator_digits
+            },
+            &self.numerator,
+        ));
         text.push('/');
         match &self.denominator {
             Denominator::Fixed(denominator) => text.push_str(&denominator.to_string()),
             Denominator::Digits(placeholders) => {
-                text.push_str(&filled_right(&format!("{denominator:.0}"), placeholders));
+                text.push_str(&filled_right(
+                    &Decimal::of(denominator).integer_digits(),
+                    placeholders,
+                ));
             }
         }
         text.push_str(&self.suffix);

@@ -407,7 +407,7 @@
     "@sheetwrite/core#.#legacyFullWidthDataSource": "a62813cc6aca",
     "@sheetwrite/core#.#observeRuntimeMemory": "90fecd850d3d",
     "@sheetwrite/core#.#openChartViews": "401d4e966763",
-    "@sheetwrite/core#.#parseCellInput": "1014533179cc",
+    "@sheetwrite/core#.#parseCellInput": "9f4ef6283c14",
     "@sheetwrite/core#.#parseCellLiteralInput": "e33f4088a0ee",
     "@sheetwrite/core#.#parseCsv": "a0dc670bc3ce",
     "@sheetwrite/core#.#parseCurrencyInput": "7bf291b578a5",
