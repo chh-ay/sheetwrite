@@ -880,11 +880,23 @@ export interface SearchOptions {
   /** Match only when the whole cell text equals the query (default false: substring). */
   wholeCell?: boolean;
   /**
-   * What a formula cell is searched by, as in Excel's "Look in": its formula
-   * text (`"formulas"`, the default) or its result (`"values"`). Replace
-   * rewrites formula text only when looking in formulas.
+   * What a cell is searched by, as in Excel's "Look in": a formula cell's
+   * formula text (`"formulas"`, the default) or its result (`"values"`), or
+   * the cell's note (`"notes"`). Replace rewrites formula text only when
+   * looking in formulas, and note text when looking in notes.
    */
-  lookIn?: "formulas" | "values";
+  lookIn?: "formulas" | "values" | "notes";
+  /**
+   * Where to search, as in Excel's "Within": the sheet (`"sheet"`, the
+   * default) or every visible sheet in tab order (`"workbook"`). A workbook
+   * search ignores `sheet` and the selection.
+   */
+  within?: "sheet" | "workbook";
+  /**
+   * The order of matches, as in Excel's "Search": across each row (`"rows"`,
+   * the default) or down each column (`"columns"`).
+   */
+  searchBy?: "rows" | "columns";
   /** Restrict to a sheet (defaults to the active sheet). */
   sheet?: SheetId;
   /** Restrict to these column indices (defaults to all columns). */
@@ -895,7 +907,7 @@ export interface SearchOptions {
 export interface SearchResult {
   /** Query string retained for navigation and subsequent replacement. */
   query: string;
-  /** Matching cells in row-major order. */
+  /** Matching cells in search order; a workbook search lists sheets in tab order. */
   matches: CellAddress[];
   /** Index of the active match within `matches`, or -1 when there are none. */
   active: number;
@@ -1055,6 +1067,11 @@ export interface Grid {
    * null when out of bounds. See {@link CellInputSnapshot}.
    */
   getCellInput(row: number, col: number): CellInputSnapshot | null;
+  /**
+   * The text a cell shows: its value through the cell's or the column's number
+   * format, as the grid paints it. `addr` is a data address on any sheet.
+   */
+  getCellText(addr: CellAddress): string;
   /** The current selection, or null when nothing is selected. */
   getSelection(): Selection | null;
   /** Select `sel`, or clear the selection with null. */
@@ -1354,6 +1371,11 @@ export interface Grid {
   findNext(): SearchResult;
   /** Move the active match to the previous match and scroll it into view. */
   findPrev(): SearchResult;
+  /**
+   * Make match `index` of the current search the active match, select it and
+   * scroll to it, showing its sheet, as clicking a Find All result does.
+   */
+  selectMatch(index: number): SearchResult;
   /** Clear the current search and its highlights. */
   clearSearch(): void;
   /**

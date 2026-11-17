@@ -919,6 +919,7 @@ export class GridImpl implements Grid {
       store: this.store,
       loadable: this.loadable,
       activeSheet: () => this.activeSheet,
+      activateSheet: (sheet) => this.setActiveSheet(sheet),
       sheet: (id) => this.sheet(id),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
       viewportAnchor: () =>
@@ -2214,6 +2215,10 @@ export class GridImpl implements Grid {
     return this.searchController.findPrev();
   }
 
+  selectMatch(index: number): SearchResult {
+    return this.searchController.selectMatch(index);
+  }
+
   clearSearch(): void {
     this.searchController.clearSearch();
   }
@@ -2725,6 +2730,16 @@ export class GridImpl implements Grid {
   getCellAtPoint(clientX: number, clientY: number): CellAddress | null {
     const cell = this.interactions.cellAtPointer(clientX, clientY);
     return cell ? { sheet: this.activeSheet, row: cell.row, col: cell.col } : null;
+  }
+
+  getCellText(addr: CellAddress): string {
+    const cell = this.store.getCell(addr);
+    const column = this.sheet(addr.sheet).columns[addr.col];
+    return cellDisplayText(
+      cell.resolved,
+      cell.style.numberFormat ?? column?.numberFormat,
+      column?.numberLocale,
+    );
   }
 
   /**
