@@ -10,7 +10,7 @@ import type { GridConfig } from "@sheetwrite/core";
 import { createFormulaBar, createNameBox, createSelectionStatus } from "@sheetwrite/core/shell";
 import { SheetwriteGrid } from "@sheetwrite/svelte";
 import { createActionGuard, isRepeatClick, type ActionState } from "../lib/action-guard.js";
-import { OFFLINE_ROWS, OFFLINE_LOCAL_ACTOR, OFFLINE_THEME } from "./scenarios/offline.js";
+import { OFFLINE_COLLEAGUE_ACTOR, OFFLINE_ROWS, OFFLINE_LOCAL_ACTOR, OFFLINE_THEME } from "./scenarios/offline.js";
 import SheetwriteIcon from "./SheetwriteIcon.svelte";
 import {
   SvelteWorkbenchSession,
@@ -47,6 +47,10 @@ let syncState = $state<SyncStateSnapshot>();
 let queue = $state<readonly SyncMutationRecord[]>([]);
 let conflict = $state<WorkbenchConflict | null>(null);
 let peers = $state<readonly PresenceMessage[]>([]);
+// The colleague keeps a pill whether or not they are connected, so the header
+// keeps its layout when their presence arrives or leaves.
+const colleaguePresent = $derived(peers.some((peer) => peer.actor.id === OFFLINE_COLLEAGUE_ACTOR.id));
+const otherPeers = $derived(peers.filter((peer) => peer.actor.id !== OFFLINE_COLLEAGUE_ACTOR.id));
 let feed = $state<WorkbenchFeedEntry[]>([]);
 let chromeHost = $state<HTMLDivElement>();
 let gridWrap = $state<HTMLDivElement>();
@@ -305,7 +309,10 @@ async function mergeConflict(): Promise<void> {
           <li style:--sw-svw-peer={OFFLINE_LOCAL_ACTOR.color}>
             {OFFLINE_LOCAL_ACTOR.displayName}
           </li>
-          {#each peers as peer (peer.actor.id)}
+          <li style:--sw-svw-peer={OFFLINE_COLLEAGUE_ACTOR.color} data-present={colleaguePresent}>
+            {OFFLINE_COLLEAGUE_ACTOR.displayName}{#if !colleaguePresent}<span class="sw-visually-hidden"> (away)</span>{/if}
+          </li>
+          {#each otherPeers as peer (peer.actor.id)}
             <li style:--sw-svw-peer={peer.actor.color}>
               {peer.actor.displayName ?? peer.actor.id}
             </li>

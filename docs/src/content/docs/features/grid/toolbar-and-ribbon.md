@@ -365,7 +365,7 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | `autoComplete` | `boolean` | `true` | Excel's AutoComplete for cell values: typing a text entry completes it from the column. `false` turns it off. See [AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete). |
 | `contextMenu` | `boolean \| ContextMenuItems` | `true` | Built-in right-click menu, disabled menu, static readonly rows, or a context-aware row factory. See [Context menu](/docs/features/grid/context-menu/). |
 | `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus and context menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
-| `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. |
+| `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. A right-click on a tab, or its options button, opens Excel's sheet menu: Insert, Rename, Move or Copy…, Tab color, Hide and Remove. |
 | `keyboard` | `boolean \| KeyboardOptions \| function` | `true` | Built-in key bindings. See [Interaction → Keyboard navigation](/docs/features/grid/selection-and-keyboard/#keyboard-navigation). |
 
 Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z** undoes the last edit, **Ctrl+Shift+Z** redoes it, and **Ctrl+F** opens the find widget (unless `find: false`).

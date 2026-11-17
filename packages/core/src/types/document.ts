@@ -56,6 +56,11 @@ export interface Sheet {
   dashboard?: Dashboard;
   /** Hidden worksheets remain addressable but are omitted from the tab strip. */
   visibility?: SheetVisibility;
+  /**
+   * The tab's color, as `#RRGGBB` (Excel's Tab Color); absent shows the
+   * default tab.
+   */
+  tabColor?: string;
   /** Ordered schema; array positions are the zero-based column coordinates. */
   columns: Column[];
   /** Row count for both in-memory and datasource-backed sheets. */
@@ -218,6 +223,8 @@ export interface AddSheetInput {
   kind?: SheetKind;
   rowCount?: number;
   columns?: Column[];
+  /** Zero-based tab position of the new sheet; absent adds it after the last tab. */
+  index?: number;
 }
 
 /**
@@ -525,6 +532,8 @@ export interface SheetSnapshot {
   dashboard?: Dashboard;
   /** Hidden worksheets remain in the workbook and retain formulas/references. */
   visibility?: SheetVisibility;
+  /** See `Sheet.tabColor`. */
+  tabColor?: string;
   /** Number of rows the sheet has. */
   rowCount: number;
   /** Keys are stable, unique document column identities as well as datasource keys. */
@@ -730,6 +739,8 @@ export type DocumentOp =
         filters?: Array<[col: number, filter: ColumnFilter]>;
         /** Turn the sheet's AutoFilter on for a range, or off with `null`. */
         autoFilter?: AutoFilter | null;
+        /** Color the sheet's tab (`#RRGGBB`), or show the default tab with `null`. */
+        tabColor?: string | null;
       };
     }
   | { op: "setValidationRule"; sheet: SheetId; rule: DataValidationRule }
