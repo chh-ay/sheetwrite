@@ -1052,12 +1052,18 @@ export class ClipboardController {
     if (!focus) return null;
     const rects: SelRect[] = [];
     this.deps.selection().forEachRect((r) => rects.push(r));
-    const rect = rects.find(
+    const selected = rects.find(
       (r) => r.r0 <= focus.row && focus.row <= r.r1 && r.c0 <= focus.col && focus.col <= r.c1,
     );
-    if (!rect) return null;
+    if (!selected) return null;
 
+    // Rows past the view's last row hold nothing: under a filter the view has
+    // fewer rows than the sheet, and a selection made from sheet rows can
+    // reach past it.
     const activeSheet = this.deps.activeSheet();
+    const rect = { ...selected, r1: Math.min(selected.r1, this.deps.store.viewRowCount(activeSheet) - 1) };
+    if (rect.r1 < rect.r0) return null;
+
     const selectedColumns = Array.from(
       { length: rect.c1 - rect.c0 + 1 },
       (_, index) => rect.c0 + index,
