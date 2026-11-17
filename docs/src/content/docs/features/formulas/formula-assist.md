@@ -45,6 +45,19 @@ The benchmark also measured argument roles (the row's key as a lookup value), te
 
 Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion shows only when it is at least 90% likely and 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
 
+### When it isn't sure
+
+It shows nothing. If no proposal clears the bar above, no ghost text appears and you type as usual. A suggestion you refuse with Esc doesn't come back during that edit.
+
+### How well it does
+
+The add-on was measured on 50 workbooks from the Enron spreadsheet corpus that it was never tuned on: 975 real formulas, typed key by key in their own workbooks.
+
+- **Keystrokes saved:** 38.5%. Excel's function list alone saves 3.1% on the same formulas.
+- **Wrong suggestions:** 2.6% of the suggestions it showed (15 of 587) weren't how the formula went on.
+
+Neighbouring formulas give almost all of the savings. A formula without agreeing neighbours, like a one-off total, mostly gets only function names and closing brackets. The benchmark and its sets are described in the package's `bench/README.md`.
+
 ## Accessibility
 
 The suggestion is drawn in the layer that colours the formula's references, so screen readers don't read it twice. A polite status announces "Suggestion: … Tab to accept." once a suggestion has held for 400 ms, never on every key.
