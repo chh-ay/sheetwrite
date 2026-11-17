@@ -57,6 +57,9 @@
 }
 
 .sw-svw-shellbar {
+  /* The name box and formula bar (26px in core's shell.css) arrive once the
+     grid is ready; the bar keeps their height so the header does not grow. */
+  min-height: 26px;
   display: flex;
   flex: 1 1 22rem;
   min-width: 0;
