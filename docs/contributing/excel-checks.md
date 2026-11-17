@@ -241,11 +241,10 @@ Expected:
 
 Excel's AutoFill table names `Qtr3`, `1st Period` and `text1, textA`. Sheetwrite generalises them; check these in a new workbook. For each, type the source, select it and drag the fill handle down four rows.
 
-1. `A1` in A1 and `B1` in B1 (select A1:B1 and drag down from B1 is not needed: select the two cells side by side in one row, then drag down). Sheetwrite: A2:B5 read `A2 B2`, `A3 B3`… each counting.
-2. `A1` in D1 and `B1` in D2 (one column). Sheetwrite: D3:D6 read `A2`, `B2`, `A3`, `B3`.
-3. `Quarter 4` in F1. Sheetwrite: `Quarter 1`, `Quarter 2`, `Quarter 3`, `Quarter 4`.
-4. `1 Apple` in G1. Sheetwrite copies it (only an ordinal such as `1st` counts at the start).
-5. `Q4 2024` in H1. Sheetwrite: `Q4 2025`, `Q4 2026`… (the number at the end counts).
-6. 2026-01-03 (a Saturday) in I1, drag down, **Auto Fill Options › Fill Weekdays**. Sheetwrite: 2026-01-05, 2026-01-06, 2026-01-07, 2026-01-08.
+1. `A1` in D1 and `B1` in D2 (one column; select both). Sheetwrite: D3:D6 read `A2`, `B2`, `A3`, `B3`.
+2. `Quarter 4` in F1. Sheetwrite: `Quarter 1`, `Quarter 2`, `Quarter 3`, `Quarter 4`.
+3. `1 Apple` in G1. Sheetwrite copies it (only an ordinal such as `1st` counts at the start).
+4. `Q4 2024` in H1. Sheetwrite: `Q4 2025`, `Q4 2026`… (the number at the end counts).
+5. 2026-01-03 (a Saturday) in I1, drag down five rows, **Auto Fill Options › Fill Weekdays**. Sheetwrite: 2026-01-05 to 2026-01-09, Monday to Friday.
 
 Record what Excel fills in each case.
