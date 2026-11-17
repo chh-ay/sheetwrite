@@ -38,6 +38,7 @@ interface WorkerPane {
   rowTops?: Float64Array;
   rowHeights?: Float64Array;
   rowNumbers?: Uint32Array;
+  filteredRows?: { start: number; end: number };
 }
 
 interface PanesMessage {
@@ -237,6 +238,7 @@ function paintPanesFrame(state: WorkerRuntimeState, msg: PanesMessage): boolean 
       rowTops: pane.rowTops,
       rowHeights: pane.rowHeights,
       rowNumbers: pane.rowNumbers,
+      filteredRows: pane.filteredRows,
     };
     paintFrame(
       state.ctx,

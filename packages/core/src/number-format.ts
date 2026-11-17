@@ -704,30 +704,33 @@ function significant(value: number): number {
   return Number(value.toPrecision(15));
 }
 
-function greatestCommonDivisor(a: number, b: number): number {
-  while (b !== 0) [a, b] = [b, a % b];
-  return a;
-}
-
 /**
  * The fraction closest to `value` whose denominator is at most
  * `maxDenominator`, as numerator and denominator. On a tie the smaller
- * denominator wins.
+ * denominator wins. The closest fraction is the last convergent of
+ * `value`'s continued fraction within the bound, or the semiconvergent after
+ * it, so a few steps find it instead of trying every denominator.
  */
 function closestFraction(value: number, maxDenominator: number): [number, number] {
-  let best: [number, number] = [Math.round(value), 1];
-  let bestError = Math.abs(value - best[0]);
-  for (let denominator = 2; denominator <= maxDenominator; denominator++) {
-    const numerator = Math.round(value * denominator);
-    // A reducible fraction is a smaller denominator's, already tried.
-    if (greatestCommonDivisor(numerator, denominator) !== 1) continue;
-    const error = Math.abs(value - numerator / denominator);
-    if (error < bestError) {
-      best = [numerator, denominator];
-      bestError = error;
+  // The two latest convergents, oldest first, starting from 0/1 and 1/0.
+  let [p0, q0, p1, q1] = [0, 1, 1, 0];
+  let rest = value;
+  for (;;) {
+    const term = Math.floor(rest);
+    const nextQ = term * q1 + q0;
+    if (nextQ > maxDenominator) {
+      const steps = Math.floor((maxDenominator - q0) / q1);
+      const p = steps * p1 + p0;
+      const q = steps * q1 + q0;
+      const error = Math.abs(value - p / q);
+      const latest = Math.abs(value - p1 / q1);
+      return error < latest || (error === latest && q < q1) ? [p, q] : [p1, q1];
     }
+    [p0, q0, p1, q1] = [p1, q1, term * p1 + p0, nextQ];
+    const fraction = rest - term;
+    if (fraction === 0 || p1 / q1 === value) return [p1, q1];
+    rest = 1 / fraction;
   }
-  return best;
 }
 
 /** `0` pads with a zero, `?` with a space, `#` with nothing. */

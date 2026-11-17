@@ -47,19 +47,19 @@ function selectedItem(): string | null {
   return document.querySelector('[role="option"][aria-selected="true"]')?.textContent ?? null;
 }
 
-function deps(highlights: (HighlightRange[] | null)[] = []): AssistDeps {
+function deps(highlights: (HighlightRange[] | null)[] = [], source = store): AssistDeps {
   return {
     highlightCells: (ranges) => {
       highlights.push(ranges);
     },
     sheet: () => "s1",
     cell: () => ({ sheet: "s1", row: 0, col: 0 }),
-    store,
+    store: source,
   };
 }
 
 /** A cell editor with formula help, as the grid builds it, after `begin`. */
-function beginEdit(): {
+function beginEdit(source = store): {
   editor: EditController;
   textarea: HTMLTextAreaElement;
   state: { cancelled: boolean; committed: string | null; highlights: (HighlightRange[] | null)[] };
@@ -72,7 +72,7 @@ function beginEdit(): {
     highlights: [] as (HighlightRange[] | null)[],
   };
 
-  const editor = new EditController(host, deps(state.highlights));
+  const editor = new EditController(host, deps(state.highlights, source));
   editor.begin({
     row: 0,
     col: 0,
@@ -151,6 +151,55 @@ describe("function list", () => {
     textarea.dispatchEvent(keydown("Escape"));
     expect(state.cancelled).toBe(true);
     expect(state.highlights.at(-1)).toBeNull();
+  });
+
+  // https://support.microsoft.com/en-us/excel/use-formula-autocomplete
+  it("lists names, tables, table columns and argument values, with Excel's argument names", async () => {
+    const workbook = makeWorkbook(2);
+    const sheet = workbook.sheets[0]!;
+    const named = new SheetwriteStore({
+      ...workbook,
+      namedRanges: [
+        {
+          name: "SalesUnits",
+          range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 1, col: 1 } },
+        },
+      ],
+      sheets: [
+        {
+          ...sheet,
+          tables: [
+            {
+              id: "orders",
+              name: "Orders",
+              range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 2 } },
+              columns: [
+                { id: "name", name: "Name" },
+                { id: "amount", name: "Amount" },
+                { id: "city", name: "City" },
+              ],
+              headerRow: true,
+              totalsRow: false,
+            },
+          ],
+        },
+      ],
+    });
+    const { textarea } = beginEdit(named);
+    await typeUntilListed(textarea, "=Sa", "SalesUnits");
+    type(textarea, "=Orders[A");
+    expect(itemsOf()).toEqual(["Amount"]);
+
+    type(textarea, "=VLOOKUP(A1,A1:B3,2,");
+    expect(itemsOf()).toEqual(["TRUE - Approximate match", "FALSE - Exact match"]);
+    textarea.dispatchEvent(keydown("ArrowDown"));
+    textarea.dispatchEvent(keydown("Tab"));
+    expect(textarea.value).toBe("=VLOOKUP(A1,A1:B3,2,FALSE");
+
+    type(textarea, "=SUMIF(");
+    const guide = document.querySelector(".sheetwrite-formula-signature")?.textContent;
+    expect(guide).toBe("SUMIF(range, criteria, [sum_range])");
+    named.dispose();
   });
 });
 

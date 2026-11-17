@@ -233,3 +233,22 @@ fn a_spill_moves_with_its_formula_and_a_move_that_does_not_fit_changes_nothing()
     assert_eq!(number(&store, data, 2, 4), 3.0);
     assert!(is_empty(&store, data, 2, 0), "the old spill is gone");
 }
+
+#[test]
+fn a_range_down_to_the_last_row_of_a_short_sheet_is_not_a_whole_column() {
+    // Only `A:A`, which runs to the sheet edge at row 1,048,576, keeps spanning it.
+    assert_eq!(
+        after_move("=SUM(Data!A1:A30)", [29, 0, 1, 1], (24, 0)),
+        "=SUM(Data!A1:A25)"
+    );
+}
+
+#[test]
+fn formula_text_follows_a_block_moved_on_its_sheet() {
+    // A1:B3 lands on D10:E12, as a conditional-format rule's formula reads it.
+    let moved = |source: &str| crate::formula_rewrite::move_formula_cells(source, 0, 0, 3, 2, 9, 3);
+    assert_eq!(moved("=A1>B1+$C$1"), "=D10>E10+$C$1");
+    assert_eq!(moved("=SUM(A1:B3)"), "=SUM(D10:E12)");
+    assert_eq!(moved("=D11*2"), "=#REF!*2");
+    assert_eq!(moved("=Other!A1"), "=Other!A1");
+}

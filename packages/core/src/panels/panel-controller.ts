@@ -4,12 +4,11 @@
 // use and attaches it once per grid. The Sort panel is a chunk of its own
 // (`openLazyPanel`). Everything goes through the public Grid API.
 
-import { colToA1 } from "../a1.js";
 import { MAX_CHART_POINTS } from "../chart-definition.js";
 import { isDashboard } from "../dashboard.js";
 import { firstFreeBox } from "../dashboard/dashboard-layout.js";
 import { readRowValues, scanColumnValues } from "../data-window-reads.js";
-import { sheetNameKey } from "../name-key.js";
+import { newSheetShape, nextSheetName } from "../sheet-commands.js";
 import type { CellScalar } from "../types/cell.js";
 import type { ChartKind, ChartRef } from "../types/chart.js";
 import type { CellAddress, Range, SheetId } from "../types/coordinates.js";
@@ -74,10 +73,6 @@ function stateOf(grid: Grid): PanelState {
 
 /** Where Excel puts a pivot on a new sheet: A3, which leaves room for filters above it. */
 const NEW_SHEET_ANCHOR = { row: 2, col: 0 };
-/** Size of a new pivot sheet: enough room for a typical summary to spill. */
-const NEW_SHEET_ROWS = 1000;
-const NEW_SHEET_COLUMNS = 26;
-const NEW_SHEET_COLUMN_WIDTH = 100;
 
 const PIVOT_LOCATION_ERROR = "Enter a cell for the pivot table, for example Sheet1!H2.";
 const NO_SELECTION = "Select the source data first.";
@@ -497,29 +492,19 @@ function insertDashboardPivot(grid: Grid, table: string): string | null {
   return null;
 }
 
-/** An empty sheet for a new pivot, with Excel's next free `Sheet N` name and a free ID. */
+/** An empty sheet for a new pivot, with Excel's next free `SheetN` name and a free ID. */
 function pivotSheet(
   sheets: readonly { readonly id: SheetId; readonly name: string }[],
 ): SheetSnapshot {
-  const names = new Set(sheets.map((sheet) => sheetNameKey(sheet.name)));
-  let number = sheets.length + 1;
-  while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
-
   const ids = new Set(sheets.map((sheet) => sheet.id));
   let suffix = sheets.length + 1;
   while (ids.has(`sheet-${suffix}`)) suffix += 1;
 
   return {
     id: `sheet-${suffix}`,
-    name: `Sheet ${number}`,
+    name: nextSheetName(sheets),
     order: sheets.length,
-    rowCount: NEW_SHEET_ROWS,
-    columns: Array.from({ length: NEW_SHEET_COLUMNS }, (_, col) => ({
-      key: colToA1(col),
-      header: colToA1(col),
-      width: NEW_SHEET_COLUMN_WIDTH,
-      type: "text" as const,
-    })),
+    ...newSheetShape(),
     cells: [],
   };
 }
