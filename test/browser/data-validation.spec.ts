@@ -121,7 +121,7 @@ test("a list cell's arrow opens its list, and typing filters it, from the keyboa
   await expect(page.locator(".sheetwrite").first()).toBeFocused();
 
   await page.keyboard.type("we");
-  const combobox = page.getByRole("combobox");
+  const combobox = page.locator(".sheetwrite-validation-input");
   await expect(combobox).toBeFocused();
   await expect(combobox).toHaveValue("we");
   await expect(list.getByRole("option")).toHaveText(["West", "South-West"]);
