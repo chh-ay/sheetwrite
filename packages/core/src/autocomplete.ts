@@ -34,7 +34,7 @@ export interface CompletionSheet {
 
 /**
  * `text` with the characters that mean something in a regular expression
- * escaped. Only these: the `u` flag rejects any other escape, such as `\-`.
+ * escaped. Only these: the `u` flag rejects needless escapes such as `\-`.
  */
 function escapeRegExp(text: string): string {
   return text.replace(/[\\^$.*+?()[\]{}|]/g, "\\$&");
