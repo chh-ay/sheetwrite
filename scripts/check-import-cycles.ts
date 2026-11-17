@@ -23,6 +23,8 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/document.ts",
     "../types/pivot.ts",
     "ranges.ts",
+    // What a data validation rule accepts, shared with the grid's error alert.
+    "../validation-rule.ts",
   ],
   "ranges.ts": [
     "../types/cell.ts",
@@ -268,6 +270,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "SheetVisibility",
       "SnapshotCell",
       "SortKey",
+      "ValidationErrorStyle",
       "ValidationPolicy",
       "Workbook",
       "WorkbookSnapshot",
