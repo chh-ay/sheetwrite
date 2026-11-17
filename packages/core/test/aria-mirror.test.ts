@@ -146,7 +146,9 @@ it("shows a validation rule's input message beside its selected cell and in its 
   });
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
   flushFrames();
-  expect(host.querySelector(".sheetwrite-input-message")?.textContent).toBe("QuantityUnits ordered.");
+  expect(host.querySelector(".sheetwrite-input-message")?.textContent).toBe(
+    "QuantityUnits ordered.",
+  );
   expect(gridCell(host, 0, 1)?.getAttribute("aria-description")).toBe("Quantity: Units ordered.");
 
   grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
