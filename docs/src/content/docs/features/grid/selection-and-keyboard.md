@@ -123,6 +123,8 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 
+In a dialog the grid opens, such as the merge warning, Tab and Shift + Tab move between its controls and stay inside it, Enter chooses OK, and Escape cancels. The grid has focus again when the dialog closes.
+
 ## Rebind an action
 
 Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions keep their defaults. Use `null` to remove an action's keys, or an array for multiple bindings. These bindings apply when the grid has focus and is not editing.

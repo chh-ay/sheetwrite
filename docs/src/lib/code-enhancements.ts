@@ -10,7 +10,9 @@
  *   of the first load. They load at the first idle moment after the page is
  *   hydrated, or as soon as the pointer or keyboard focus reaches a code
  *   block, whichever comes first. A trigger hovered or focused before they
- *   are ready opens once they are.
+ *   are ready opens once they are. On a touch screen, the first tap on a
+ *   linked name opens its panel, which links to the API page; a tap on a name
+ *   whose panel is open follows the link.
  */
 
 import type * as CodePopovers from "./code-popovers.js";
@@ -19,6 +21,8 @@ import { CODE_SYMBOL_CLASSES } from "./roving-code-focus.js";
 const CODE_BLOCK_SELECTOR = ".expressive-code pre";
 const CODE_FRAME_SELECTOR = ".expressive-code";
 const TRIGGER_SELECTOR = "[data-sw-code-popover-trigger]";
+/** Set by `code-popovers.ts` on the trigger whose panel is open. */
+const OPEN_ATTRIBUTE = "data-popover-open";
 const CODE_SYMBOL_SELECTOR = CODE_SYMBOL_CLASSES.map((name) => `.${name}`).join(", ");
 /** The latest the popover runtime loads when the browser never goes idle. */
 const IDLE_LOAD_TIMEOUT_MS = 2000;
@@ -192,6 +196,8 @@ function installPopoversOnDemand(): () => void {
   };
 
   function handleApproach(event: Event): void {
+    // A touch opens its panel on the tap (handleTap), not on the way in.
+    if ((event as PointerEvent).pointerType === "touch") return;
     if (!(event.target instanceof Element) || event.target.closest(CODE_FRAME_SELECTOR) === null) {
       return;
     }
@@ -200,13 +206,29 @@ function installPopoversOnDemand(): () => void {
     else replay(trigger);
   }
 
+  /**
+   * Touch has no hover: the first tap on a name opens its panel instead of
+   * its link. Cancelling the touch's end cancels its click and the focus the
+   * click would give the name. A touch that scrolled can't be cancelled.
+   */
+  function handleTap(event: TouchEvent): void {
+    const trigger = (event.target as Element).closest<HTMLElement>(TRIGGER_SELECTOR);
+    if (trigger === null || trigger.hasAttribute(OPEN_ATTRIBUTE) || !event.cancelable) return;
+    event.preventDefault();
+    void load().then((popovers) => {
+      if (!isStopped) popovers.openCodePopover(trigger);
+    });
+  }
+
   document.addEventListener("pointerover", handleApproach);
   document.addEventListener("focusin", handleApproach);
+  document.addEventListener("touchend", handleTap);
   cancelIdleLoad = whenHydratedAndIdle(() => void load());
 
   return () => {
     isStopped = true;
     stopWaiting();
+    document.removeEventListener("touchend", handleTap);
     uninstallPopovers?.();
   };
 }
