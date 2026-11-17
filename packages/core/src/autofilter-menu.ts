@@ -943,11 +943,12 @@ export class AutoFilterMenu {
         if (item?.kind !== "group") return;
         if (item.open) this.setOpen(session.active, false);
         else {
-          const level = item.level - 1;
-          const parent = session.items.findLastIndex(
-            (candidate, at) =>
-              at < session.active && candidate.kind === "group" && candidate.level === level,
-          );
+          // The group it is in is the nearest group above at the level above.
+          let parent = session.active - 1;
+          for (; parent >= 0; parent--) {
+            const candidate = session.items[parent];
+            if (candidate?.kind === "group" && candidate.level === item.level - 1) break;
+          }
           if (parent >= 0) this.moveActive(parent);
         }
         break;

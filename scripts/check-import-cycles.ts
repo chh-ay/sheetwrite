@@ -14,7 +14,7 @@ export interface ImportGraphIssue {
 }
 
 const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
-  "autofilter.ts": ["../types/document.ts"],
+  "autofilter.ts": ["../date-serial.ts", "../types/document.ts"],
   "engine-hidden-rows.ts": ["../types/coordinates.ts", "../types/document.ts", "wasm-contract.ts"],
   "mutation-policy.ts": [
     "../restore-block.ts",
@@ -250,6 +250,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "DataValidationCondition",
       "DataValidationRule",
       "DocumentOp",
+      "DynamicDateFilter",
       "FilterCondition",
       "MutationIssue",
       "MutationPolicyMode",
