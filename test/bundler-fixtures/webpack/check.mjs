@@ -160,7 +160,9 @@ if (dataValidationChunks.length !== 1) {
   );
 }
 if (pasteSpecialChunks.length !== 1) {
-  throw new Error(`Expected one lazy webpack Paste Special chunk, got ${pasteSpecialChunks.length}`);
+  throw new Error(
+    `Expected one lazy webpack Paste Special chunk, got ${pasteSpecialChunks.length}`,
+  );
 }
 if (dialogChunks.length > 1)
   throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
