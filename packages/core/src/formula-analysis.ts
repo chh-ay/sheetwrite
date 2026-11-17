@@ -537,7 +537,7 @@ function tableCompletion(
   const section = text.charAt(start - 1) === "[" && start - 1 === token.from;
   const matches: FormulaCompletionItem[] = section
     ? TABLE_SECTIONS.filter(([name]) => startsWith(name, prefix)).map(([name, description]) => ({
-        kind: "column",
+        kind: "column" as const,
         name,
         insert: name,
         description,
@@ -545,7 +545,7 @@ function tableCompletion(
     : table.columns
         .filter((column) => startsWith(column, prefix))
         .map((column) => ({
-          kind: "column",
+          kind: "column" as const,
           name: column,
           insert: column,
           description: `Column of ${table.name}`,
