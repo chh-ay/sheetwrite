@@ -107,7 +107,8 @@ class Syntax implements Signal {
         proposals.push({ formula, signal: "syntax", reason });
       }
     };
-    if (last.kind === "name") {
+    // After `]` the name is a sheet of another workbook, as in `[Budget.xlsx]Annual!A1`.
+    if (last.kind === "name" && text.charAt(last.from - 1) !== "]") {
       const name = this.name(text, analysis, last);
       if (name !== null) add(`${text.slice(0, last.from)}${name.text}`, name.reason);
     }

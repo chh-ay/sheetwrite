@@ -210,7 +210,7 @@ function session(): { at: number; step: Step }[] {
   wait(900);
   press("Enter");
   wait(1_200);
-  // Facilities: dismiss the suggestion, type an average, and let the range finish itself.
+  // Facilities: dismiss the suggestion and type an average yourself; Excel's list still completes AVERAGE.
   select("H9");
   wait(900);
   type("=");
@@ -221,11 +221,7 @@ function session(): { at: number; step: Step }[] {
   wait(900);
   press("Tab");
   wait(600);
-  type("B9:");
-  wait(1_400);
-  press("Tab");
-  wait(500);
-  type(")");
+  type("B9:G9)");
   wait(1_000);
   press("Enter");
   wait(1_200);
@@ -364,7 +360,17 @@ async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<vo
       sessionId,
     );
     if (field(field(result, "result"), "value") === true) return;
-    if (Date.now() > deadline) throw new Error(`Timed out waiting for ${ready}`);
+    if (Date.now() > deadline) {
+      const state = await cdp.send(
+        "Runtime.evaluate",
+        {
+          expression: `JSON.stringify({ focused: document.activeElement?.getAttribute("aria-label"), bar: document.querySelector('textarea[aria-label="Formula bar"]')?.value })`,
+          returnByValue: true,
+        },
+        sessionId,
+      );
+      throw new Error(`Timed out waiting for ${ready}; page: ${String(field(field(state, "result"), "value"))}`);
+    }
     await Bun.sleep(FRAME_MS);
   }
 }
@@ -405,7 +411,8 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
     await pumpUntil(cdp, sessionId, "document.documentElement.dataset.figureReady === 'true'");
 
     // Warm up: one formula edit loads the add-on's predictor, then the page is put back.
-    await dispatch(cdp, sessionId, { kind: "select", cell: "H2" });
+    // An open cell: its neighbours give a suggestion as soon as `=` is typed.
+    await dispatch(cdp, sessionId, { kind: "select", cell: "H6" });
     await dispatch(cdp, sessionId, { kind: "text", char: "=" });
     await pumpUntil(cdp, sessionId, "document.querySelector('.sheetwrite-formula-ghost') !== null");
     await dispatch(cdp, sessionId, { kind: "key", key: "Escape" });

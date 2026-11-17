@@ -86,10 +86,6 @@ function FormulaAssistShowcase() {
                   continues them.
                 </li>
                 <li>
-                  Once a range's first cell and <code>:</code> are typed, its end is where the block
-                  of filled cells ends.
-                </li>
-                <li>
                   The one function or sheet name the typed letters can start, and the brackets that
                   close calls with all their arguments.
                 </li>

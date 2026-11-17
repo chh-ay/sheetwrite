@@ -36,13 +36,12 @@ While the function list is open, Tab takes the list's entry, as in Excel. A sugg
 
 ## How it predicts
 
-Predictions are deterministic. They use the workbook only: no network, no AI. Three signals each propose whole formulas, strongest first:
+Predictions are deterministic. They use the workbook only: no network, no AI. Two signals each propose whole formulas, strongest first:
 
 1. **Neighbouring formulas.** The formulas two cells up, down, left and right of the cell, moved to it as a fill would move them. When the formulas above and below agree, the cell almost surely continues them.
-2. **The shape of the data.** Once you type a range's first cell and `:`, the end is where its block of filled cells ends, the cell Ctrl+Shift+Arrow would reach. A range along the cell's own row or column stops right before the cell.
-3. **Syntax.** The one function or sheet name that the typed letters can start, and the brackets that close calls which have all the arguments they can take.
+2. **Syntax.** The one function or sheet name that the typed letters can start, and the brackets that close calls which have all the arguments they can take.
 
-The benchmark also measured argument roles (the row's key as a lookup value) and text the formula repeats. Neither was right often enough to show, so neither ships.
+The benchmark also measured argument roles (the row's key as a lookup value), text the formula repeats, the range AutoSum would sum, and the end of the block a typed range starts. None was right often enough to show, so none ships.
 
 Each kind of proposal carries the share of such proposals that were right on a benchmark of real workbooks. A suggestion shows only when it is at least 90% likely and 15 points ahead of the next different one. When two strong proposals disagree only further on, the part they share shows. A suggestion stays steady while you type it, so it doesn't flicker.
 

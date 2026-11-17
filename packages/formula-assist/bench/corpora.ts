@@ -8,6 +8,7 @@ import {
   type CellBlock,
   type CellScalar,
   type CellValue,
+  type NamedRangeSnapshot,
   type Column,
   fromXlsxWorkbook,
   labelToCol,
@@ -52,10 +53,13 @@ function sheetSnapshot(
   };
 }
 
-function workbookSnapshot(sheets: SheetSnapshot[]): WorkbookSnapshot {
+function workbookSnapshot(
+  sheets: SheetSnapshot[],
+  namedRanges: NamedRangeSnapshot[] = [],
+): WorkbookSnapshot {
   const first = sheets[0];
   if (first === undefined) throw new Error("A replay workbook needs at least one sheet");
-  return { schemaVersion: 1, workbook: { activeSheet: first.id }, sheets };
+  return { schemaVersion: 1, workbook: { activeSheet: first.id, namedRanges }, sheets };
 }
 
 const A1_CELL = /^([A-Z]+)([1-9][0-9]*)$/;
@@ -153,6 +157,15 @@ interface EnronSample {
       readonly cells: readonly (readonly [number, number, CellScalar])[];
     }[];
     readonly targets: readonly (readonly [number, number, number])[];
+    readonly names: readonly (
+      | { readonly name: string; readonly formula: string }
+      | {
+          readonly name: string;
+          readonly sheet: number;
+          readonly start: { readonly row: number; readonly col: number };
+          readonly end: { readonly row: number; readonly col: number };
+        }
+    )[];
   }[];
 }
 
@@ -171,7 +184,9 @@ function isEnronSample(value: unknown): value is EnronSample {
         "sheets" in workbook &&
         Array.isArray(workbook.sheets) &&
         "targets" in workbook &&
-        Array.isArray(workbook.targets),
+        Array.isArray(workbook.targets) &&
+        "names" in workbook &&
+        Array.isArray(workbook.names),
     )
   );
 }
@@ -220,7 +235,12 @@ async function* enronWorkbooks(half: "dev" | "heldout"): AsyncGenerator<ReplayWo
       }
       return { cell: { sheet: `s${sheet}`, row, col }, formula };
     });
-    yield { id: workbook.file, snapshot: workbookSnapshot(sheets), targets };
+    const names: NamedRangeSnapshot[] = workbook.names.map((named) =>
+      "formula" in named
+        ? { name: named.name, formula: named.formula }
+        : { name: named.name, range: { sheet: `s${named.sheet}`, start: named.start, end: named.end } },
+    );
+    yield { id: workbook.file, snapshot: workbookSnapshot(sheets, names), targets };
   }
 }
 

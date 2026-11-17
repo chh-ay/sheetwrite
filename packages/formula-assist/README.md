@@ -33,9 +33,8 @@ While the function list is open, Tab takes the list's entry, as in Excel. A sugg
 Predictions are deterministic. They use no network and no AI, only the workbook. In order of strength:
 
 1. **Neighbouring formulas.** The formulas next to the cell, moved to it as a fill would move them.
-2. **The shape of the data.** After a range's first cell and `:`, the end of its block of filled cells.
-3. **Syntax.** Closing brackets, the one function or sheet name the typed letters can start.
+2. **Syntax.** Closing brackets, the one function or sheet name the typed letters can start.
 
-Argument roles and repeats within a formula were measured too, and saved nothing, so they are not part of it.
+Argument roles, repeats within a formula, the AutoSum range and range ends were measured too, and saved nothing, so they are not part of it.
 
 Each kind of candidate carries the share of such candidates that were right on a benchmark of real workbooks. A suggestion shows only when it is likely enough and clearly ahead of the next one. `bench/README.md` describes the benchmark and its bar.

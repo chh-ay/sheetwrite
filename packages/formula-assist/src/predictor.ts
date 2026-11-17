@@ -20,7 +20,6 @@ import {
   type SignalName,
 } from "./candidates.js";
 import { openNeighbours } from "./signals/neighbours.js";
-import { openShape } from "./signals/shape.js";
 import { openSyntax } from "./signals/syntax.js";
 
 export { SIGNALS, type SignalName } from "./candidates.js";
@@ -45,7 +44,6 @@ export interface PredictorOptions {
 /** How each signal opens for one edit. */
 const OPEN_SIGNAL: Readonly<Record<SignalName, OpenSignal>> = {
   neighbours: openNeighbours,
-  shape: openShape,
   syntax: openSyntax,
 };
 

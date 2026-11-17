@@ -47,6 +47,8 @@ const REFERENCE_COLS = 12;
 const MAX_TEXT = 40;
 /** Column count of a key: row × KEY_COLS + col. Excel's last column is XFD (16,384). */
 const KEY_COLS = 16_384;
+/** Longest defined-name formula kept; longer ones are left out with their name. */
+const MAX_NAME_FORMULA = 200;
 
 /** Mulberry32: small, seeded and the same on every machine. */
 function seededRandom(seed: number): () => number {
@@ -126,6 +128,8 @@ interface SampleWorkbook {
   file: string;
   sheets: SampleSheet[];
   targets: [number, number, number][];
+  /** Defined names, so formulas that use them read as names, not as unknown text. */
+  names: SampleName[];
 }
 
 /** The cells of each sheet by `row × KEY_COLS + col`; formulas as their text. */
@@ -187,6 +191,37 @@ function keepAround(
   }
 }
 
+/** A defined name of the sample: its formula, or its range on a sheet given by index. */
+type SampleName =
+  | { name: string; formula: string }
+  | {
+      name: string;
+      sheet: number;
+      start: { row: number; col: number };
+      end: { row: number; col: number };
+    };
+
+/** The workbook's defined names, the first of each name only (a sheet-scoped copy is dropped). */
+function sampleNames(snapshot: WorkbookSnapshot): SampleName[] {
+  const seen = new Set<string>();
+  const names: SampleName[] = [];
+  for (const named of snapshot.workbook.namedRanges ?? []) {
+    const key = named.name.toUpperCase();
+    if (seen.has(key)) continue;
+    if ("range" in named) {
+      const sheet = snapshot.sheets.findIndex((entry) => entry.id === named.range.sheet);
+      if (sheet < 0) continue;
+      names.push({ name: named.name, sheet, start: named.range.start, end: named.range.end });
+    } else if (named.formula.length <= MAX_NAME_FORMULA) {
+      names.push({ name: named.name, formula: named.formula });
+    } else {
+      continue;
+    }
+    seen.add(key);
+  }
+  return names;
+}
+
 function sampledValue(value: CellScalar): CellScalar {
   return typeof value === "string" && !value.startsWith("=") && value.length > MAX_TEXT
     ? value.slice(0, MAX_TEXT)
@@ -230,6 +265,7 @@ function sampleWorkbook(
     file,
     sheets,
     targets: targets.map(({ sheet, row, col }) => [sheet, row, col]),
+    names: sampleNames(snapshot),
   };
 }
 

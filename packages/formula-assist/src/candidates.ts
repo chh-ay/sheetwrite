@@ -8,9 +8,10 @@ import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
 /**
  * The signals that earn their keep on the benchmark, strongest first. #801
- * also listed argument roles and repeats within a formula; they saved nothing.
+ * also listed argument roles and repeats within a formula, and a range
+ * finisher was tried for the shape of the data; none saved a keystroke.
  */
-export const SIGNALS = ["neighbours", "shape", "syntax"] as const;
+export const SIGNALS = ["neighbours", "syntax"] as const;
 
 /** One signal's name. */
 export type SignalName = (typeof SIGNALS)[number];
