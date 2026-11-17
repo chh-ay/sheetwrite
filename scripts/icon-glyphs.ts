@@ -430,6 +430,18 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "m13.5 15-2 2 2 2",
       ],
     ],
+    // PivotChart: the chart's columns with the pivot's turning arrow where the
+    // third column would be, so it differs from Chart beside it.
+    [
+      "pivotChart",
+      [
+        AXES,
+        tint("M7 13h2.5v7H7ZM11.5 9H14v11h-2.5Z"),
+        "M7 20v-7h2.5v7M11.5 20V9H14v11",
+        "M14.5 4H17a2.5 2.5 0 0 1 2.5 2.5V9",
+        "m17.5 7 2 2 2-2",
+      ],
+    ],
   ],
   // Formulas: functions, names and formula help.
   [

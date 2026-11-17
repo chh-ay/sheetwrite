@@ -118,7 +118,7 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 | Data | Sort & Filter | Filter | <span class="sheetwrite-icon" data-icon="filter" aria-hidden="true"></span> `filter` | AutoFilter |
 | Data | Sort & Filter | Clear | <span class="sheetwrite-icon" data-icon="clearFilter" aria-hidden="true"></span> `clearFilter` | AutoFilter |
 | Data | Sort & Filter | Reapply | <span class="sheetwrite-icon" data-icon="reapplyFilter" aria-hidden="true"></span> `reapplyFilter` | AutoFilter |
-| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="chart" aria-hidden="true"></span> `chart` | Dashboards |
+| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="pivotChart" aria-hidden="true"></span> `pivotChart` | Dashboards |
 | Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards |
 | Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards |
 | Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards |

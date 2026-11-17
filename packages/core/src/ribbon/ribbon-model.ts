@@ -394,7 +394,7 @@ const pivotChart: RibbonMenuSpec = {
   kind: "menu",
   id: "pivotChart",
   label: "PivotChart",
-  icon: "chart",
+  icon: "pivotChart",
   availability: "newDashboard",
   large: true,
   run: insertPivotChartOf("column"),
