@@ -356,12 +356,16 @@ export class FindBar {
       },
     );
     const preview = replace
-      ? new CellList("Replace all preview", ["Sheet", "Cell", "Before", "After"], (index) => {
-          this.goToChange(index);
-        })
+      ? new CellList(
+          "sheetwrite-find-preview",
+          "Replace all preview",
+          ["Sheet", "Cell", "Before", "After"],
+          (index) => {
+            this.goToChange(index);
+          },
+        )
       : null;
     if (preview) {
-      preview.el.classList.add("sheetwrite-find-preview");
       el.append(preview.el);
       replace?.input.addEventListener("input", () => {
         this.renderPreview();

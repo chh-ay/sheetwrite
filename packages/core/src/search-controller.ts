@@ -151,15 +151,13 @@ class MatchList {
 
 const NO_MATCHES = new MatchList([]);
 
-type SetOp = Extract<DocumentOp, { op: "set" }>;
-
-/** One replacement: the operation that writes it and the change it shows. */
-interface Planned<Op extends DocumentOp> {
-  readonly patch: Op;
+/** One replacement: the change it shows, and the style its cell keeps. */
+interface Planned {
   readonly change: ReplaceChange;
+  readonly style?: ResolvedCell["style"];
 }
 
-/** What Replace all writes, and the changes its preview lists. */
+/** The changes Replace all makes, and the operations that write them when it writes. */
 interface ReplacePlan {
   readonly patches: DocumentOp[];
   readonly changes: ReplaceChange[];
@@ -415,7 +413,7 @@ export class SearchController {
 
     const planned = this.replacementPatch(target, replacement);
     if (planned) {
-      this.deps.commit([planned.patch]);
+      this.deps.commit([this.patchOf(planned)]);
       this.found = this.scanAll(this.searchQuery, this.searchOpts);
     }
     this.searchActive = this.advanceAfter(target);
@@ -431,7 +429,7 @@ export class SearchController {
    * what Replace all writes. Empty on a read-only grid.
    */
   previewReplaceAll(replacement: string): ReplaceChange[] {
-    return this.deps.readOnly() ? [] : this.planReplaceAll(replacement).changes;
+    return this.deps.readOnly() ? [] : this.planReplaceAll(replacement, false).changes;
   }
 
   /**
@@ -444,7 +442,7 @@ export class SearchController {
       return { replaced: 0, result: this.emitSearch() };
     }
 
-    const { patches, changes } = this.planReplaceAll(replacement);
+    const { patches, changes } = this.planReplaceAll(replacement, true);
     if (patches.length > 0) {
       this.deps.commit(patches);
       this.found = this.scanAll(this.searchQuery, this.searchOpts);
@@ -457,13 +455,17 @@ export class SearchController {
     return { replaced: changes.length, result: this.emitSearch() };
   }
 
-  private planReplaceAll(replacement: string): ReplacePlan {
+  /**
+   * Plan Replace all over every match. The preview passes `writes: false`:
+   * it needs only the changes, so it skips reading the new text into values.
+   */
+  private planReplaceAll(replacement: string, writes: boolean): ReplacePlan {
     const plan: ReplacePlan = { patches: [], changes: [] };
     for (const part of this.found.sheets) {
       const matches = part.set.materialize();
       if (this.searchOpts.lookIn === "notes")
-        this.planNoteReplacements(part.sheet, matches, replacement, plan);
-      else this.planCellReplacements(part.sheet, matches, replacement, plan);
+        this.planNoteReplacements(part.sheet, matches, replacement, plan, writes);
+      else this.planCellReplacements(part.sheet, matches, replacement, plan, writes);
     }
     return plan;
   }
@@ -474,6 +476,7 @@ export class SearchController {
     matches: readonly CellAddress[],
     replacement: string,
     plan: ReplacePlan,
+    writes: boolean,
   ): void {
     const engine = storeEngine(this.deps.store);
     const captured = engine?.captureCells(sheet, matches);
@@ -501,17 +504,17 @@ export class SearchController {
             : this.replacementFromCell(addr, replacement, cell);
       if (!planned) continue;
       plan.changes.push(planned.change);
-      const { patch } = planned;
+      if (!writes) continue;
       if (scalarWrites) {
-        plan.patches.push(patch);
+        plan.patches.push(this.patchOf(planned));
         continue;
       }
 
       cells.push({
         rowOffset: addr.row,
         colOffset: addr.col,
-        value: patch.value,
-        style: patch.style,
+        value: this.valueOf(planned.change),
+        style: planned.style,
       });
       endRow = Math.max(endRow, addr.row);
       endCol = Math.max(endCol, addr.col);
@@ -531,6 +534,7 @@ export class SearchController {
     matches: readonly CellAddress[],
     replacement: string,
     plan: ReplacePlan,
+    writes: boolean,
   ): void {
     const notes = new Map<string, string>();
     for (const note of this.deps.sheet(sheet).notes ?? []) {
@@ -539,28 +543,43 @@ export class SearchController {
     for (const addr of matches) {
       const planned = this.noteReplacement(addr, notes.get(`${addr.row}:${addr.col}`), replacement);
       if (!planned) continue;
-      plan.patches.push(planned.patch);
       plan.changes.push(planned.change);
+      if (writes) plan.patches.push(this.patchOf(planned));
     }
   }
 
-  /** A `setNote` operation that rewrites a note's text, or null when nothing in it matches. */
+  /** The operation that writes one planned change. */
+  private patchOf({ change, style }: Planned): DocumentOp {
+    const { addr, kind, after } = change;
+    return kind === "note"
+      ? { op: "setNote", addr, text: after }
+      : { op: "set", addr, value: this.valueOf(change), style };
+  }
+
+  /**
+   * The value a changed cell holds: the new formula, or the new text read as
+   * if typed into its column, so numbers stay numbers.
+   */
+  private valueOf({ addr, kind, after }: ReplaceChange): CellValue {
+    if (kind === "formula" && after.startsWith("=")) return { kind: "formula", src: after };
+    const column = this.deps.sheet(addr.sheet).columns[addr.col];
+    return parseCellInput(after, column?.type ?? "text");
+  }
+
+  /** The change that rewrites a note's text, or null when nothing in it matches. */
   private noteReplacement(
     addr: CellAddress,
     text: string | undefined,
     replacement: string,
-  ): Planned<Extract<DocumentOp, { op: "setNote" }>> | null {
+  ): Planned | null {
     if (text === undefined) return null;
     const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
     if (next === null) return null;
-    return {
-      patch: { op: "setNote", addr, text: next },
-      change: { addr, kind: "note", before: text, after: next },
-    };
+    return { change: { addr, kind: "note", before: text, after: next } };
   }
 
-  /** The operation that replaces text in one match: its note, or its cell. */
-  private replacementPatch(addr: CellAddress, replacement: string): Planned<DocumentOp> | null {
+  /** The replacement in one match: its note, or its cell. */
+  private replacementPatch(addr: CellAddress, replacement: string): Planned | null {
     if (this.searchOpts.lookIn !== "notes") return this.cellReplacement(addr, replacement);
     const note = this.deps
       .sheet(addr.sheet)
@@ -569,13 +588,11 @@ export class SearchController {
   }
 
   /**
-   * Build a `set` patch that rewrites `addr` for the current query, or null when
-   * the cell is not eligible (a reference, or a formula in a value search) or
-   * holds no occurrence to replace.
-   * Preserves the cell's existing style and re-parses through `parseCellInput`
-   * so numbers stay numbers.
+   * The change that rewrites `addr` for the current query, or null when the
+   * cell is not eligible (a reference, or a formula in a value search) or
+   * holds no occurrence to replace. The cell keeps its style.
    */
-  private cellReplacement(addr: CellAddress, replacement: string): Planned<SetOp> | null {
+  private cellReplacement(addr: CellAddress, replacement: string): Planned | null {
     if (this.deps.store.getRefTarget(addr) !== null) return null;
     const formula = this.deps.store.getFormula(addr);
     if (formula !== null) {
@@ -601,20 +618,18 @@ export class SearchController {
     replacement: string,
     source: string,
     style: ResolvedCell["style"],
-  ): Planned<SetOp> | null {
+  ): Planned | null {
     if (this.searchOpts.lookIn === "values") return null;
     const next = replaceInText(source, this.searchQuery, replacement, this.searchOpts);
     if (next === null) return null;
-    const change: ReplaceChange = { addr, kind: "formula", before: source, after: next };
-    if (!next.startsWith("=")) {
-      const column = this.deps.sheet(addr.sheet).columns[addr.col];
-      const value = parseCellInput(next, column?.type ?? "text");
-      return { patch: { op: "set", addr, value, style }, change };
-    }
+    const planned: Planned = {
+      change: { addr, kind: "formula", before: source, after: next },
+      style,
+    };
+    if (!next.startsWith("=")) return planned;
 
     const error = getEngine().checkFormulaSyntax(next);
-    if (error === undefined)
-      return { patch: { op: "set", addr, value: { kind: "formula", src: next }, style }, change };
+    if (error === undefined) return planned;
     error.free();
     return null;
   }
@@ -623,17 +638,11 @@ export class SearchController {
     addr: CellAddress,
     replacement: string,
     cell: Pick<ResolvedCell, "resolved" | "style">,
-  ): Planned<SetOp> | null {
+  ): Planned | null {
     const text = cellScalarToText(cell.resolved);
     const next = replaceInText(text, this.searchQuery, replacement, this.searchOpts);
     if (next === null) return null;
-
-    const column = this.deps.sheet(addr.sheet).columns[addr.col];
-    const value: CellValue = parseCellInput(next, column?.type ?? "text");
-    return {
-      patch: { op: "set", addr, value, style: cell.style },
-      change: { addr, kind: "value", before: text, after: next },
-    };
+    return { change: { addr, kind: "value", before: text, after: next }, style: cell.style };
   }
 
   /** The sheet's place in the tab order. */
