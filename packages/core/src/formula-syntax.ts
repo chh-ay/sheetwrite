@@ -69,6 +69,33 @@ export function syntaxError(text: string): FormulaDiagnostic | null {
   }
 }
 
+/** Token kinds that leave the formula's last value unwritten, so a `)` cannot end it. */
+const OPEN_ENDED: ReadonlySet<RawKind> = new Set(["op", "colon", "bang", "comma", "semicolon"]);
+
+/**
+ * The formula Excel's Enter stores for `text`: `text` when it parses, or
+ * `text` with the closing parentheses added when only they are missing at
+ * the end. Otherwise the first syntax error: Excel stores nothing and says
+ * "There's a problem with this formula".
+ */
+export function formulaEntry(text: string): string | FormulaDiagnostic {
+  const error = syntaxError(text);
+  if (error === null) return text;
+  if (!error.incomplete) return error;
+
+  const tokens = formulaTokens(text);
+  let open = 0;
+  for (const token of tokens) {
+    if (token.kind === "lparen") open += 1;
+    else if (token.kind === "rparen") open -= 1;
+  }
+  const last = tokens.at(-1);
+  if (open <= 0 || last === undefined || OPEN_ENDED.has(last.kind)) return error;
+
+  const closed = `${text.trimEnd()}${")".repeat(open)}`;
+  return syntaxError(closed) === null ? closed : error;
+}
+
 /** A function call: its name token, and its arguments once its `)` is read. */
 interface CallSpan {
   readonly name: RawToken;

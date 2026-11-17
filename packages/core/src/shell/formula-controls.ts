@@ -231,8 +231,10 @@ export function createFormulaBar(
 
   const commit = (): void => {
     if (readOnly || !snapshot) return;
-    if (editing) draft?.commit();
-    else commitCellInput(grid, snapshot, input.value);
+    if (editing) {
+      // A formula that does not parse stays in the bar to be fixed, as in Excel.
+      if (draft?.commit() === false) return;
+    } else commitCellInput(grid, snapshot, input.value);
     dirty = false;
     options.focusGrid?.();
   };
