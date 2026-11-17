@@ -3487,7 +3487,12 @@ export class GridImpl implements Grid {
       listener({ address: { ...addr }, hyperlink, target });
     }
     if (target.kind === "internal" && this.hyperlinkActivation === "internal-navigation") {
-      this.scrollToCell(target.address);
+      // The link names a sheet row; a filter or view sort may show it at
+      // another view row, or not at all.
+      const { address } = target;
+      if (address.sheet !== this.activeSheet) this.setActiveSheet(address.sheet);
+      const row = this.toViewRow(address.row);
+      if (row !== null) this.scrollToCell({ ...address, row });
     }
     return true;
   }
