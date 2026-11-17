@@ -65,7 +65,12 @@ export function budgetWorkbook(): Workbook {
         rowCount: TOTALS_ROW + 6,
         columns: [
           { key: "department", header: "A", width: 120, type: "text" },
-          ...MONTHS.map((month) => ({ key: month.toLowerCase(), header: month, width: 84, ...money })),
+          ...MONTHS.map((month) => ({
+            key: month.toLowerCase(),
+            header: month,
+            width: 84,
+            ...money,
+          })),
           { key: "total", header: "Total", width: 96, ...money },
           { key: "share", header: "Share", width: 80, type: "number", numberFormat: "0.0%" },
           { key: "notes", header: "Notes", width: 160, type: "text" },
@@ -112,13 +117,23 @@ export function budgetOperations(): DocumentOp[] {
       put(BUDGET_SHEET, row, 1 + month, 4_000 + ((index * 1_733 + month * 911) % 9_000));
     });
     put(BUDGET_SHEET, row, TOTAL_COL, `=SUM(B${line(row)}:${letter(TOTAL_COL - 1)}${line(row)})`);
-    put(BUDGET_SHEET, row, SHARE_COL, `=${letter(TOTAL_COL)}${line(row)}/${letter(TOTAL_COL)}$${totalsLine}`);
+    put(
+      BUDGET_SHEET,
+      row,
+      SHARE_COL,
+      `=${letter(TOTAL_COL)}${line(row)}/${letter(TOTAL_COL)}$${totalsLine}`,
+    );
     put(RATES_SHEET, index, 0, department);
     put(RATES_SHEET, index, 1, 0.02 + (index % 5) * 0.01);
   });
   put(BUDGET_SHEET, TOTALS_ROW, 0, "Total");
   for (let col = 1; col <= TOTAL_COL; col++) {
-    put(BUDGET_SHEET, TOTALS_ROW, col, `=SUM(${letter(col)}${line(FIRST_ROW)}:${letter(col)}${line(LAST_ROW)})`);
+    put(
+      BUDGET_SHEET,
+      TOTALS_ROW,
+      col,
+      `=SUM(${letter(col)}${line(FIRST_ROW)}:${letter(col)}${line(LAST_ROW)})`,
+    );
   }
   return operations;
 }
@@ -172,7 +187,10 @@ export function createFormulaAssistScenario(host: HTMLElement): FormulaAssistSce
     snapshot,
     focusCell(id) {
       const cell = OPEN_CELLS[id];
-      grid?.setSelection({ kind: "cell", addr: { sheet: BUDGET_SHEET, row: cell.row, col: cell.col } });
+      grid?.setSelection({
+        kind: "cell",
+        addr: { sheet: BUDGET_SHEET, row: cell.row, col: cell.col },
+      });
       host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Formula bar"]')?.focus();
     },
     reset() {

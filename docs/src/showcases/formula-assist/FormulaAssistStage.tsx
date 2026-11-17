@@ -46,7 +46,9 @@ function Progress(props: { readonly snapshot: FormulaAssistSnapshot; readonly op
       }
       when={props.snapshot.filled === 0}
     >
-      <ShowcaseStatus tone="neutral">{props.openCells} cells are waiting for a formula</ShowcaseStatus>
+      <ShowcaseStatus tone="neutral">
+        {props.openCells} cells are waiting for a formula
+      </ShowcaseStatus>
     </Show>
   );
 }

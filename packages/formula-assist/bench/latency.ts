@@ -72,7 +72,8 @@ function workbook(): WorkbookSnapshot {
       { kind: "formula", src: `=E${a1}*F${a1}` },
       { kind: "formula", src: `=IF(B${a1}="West",G${a1}*1.1,G${a1})` },
     ];
-    for (const [col, value] of cells.entries()) orders.push({ rowOffset: row, colOffset: col, value });
+    for (const [col, value] of cells.entries())
+      orders.push({ rowOffset: row, colOffset: col, value });
   }
 
   const products: SnapshotCell[] = ["Product", "Price", "Category"].map((header, col) => ({
@@ -100,7 +101,13 @@ function workbook(): WorkbookSnapshot {
         rowCount: DATA_ROWS + 2,
         columns: columns(orderColumns),
         cells: [
-          { startRow: 0, startCol: 0, rowCount: DATA_ROWS + 1, colCount: headers.length, cells: orders },
+          {
+            startRow: 0,
+            startCol: 0,
+            rowCount: DATA_ROWS + 1,
+            colCount: headers.length,
+            cells: orders,
+          },
         ],
       },
       {
@@ -135,7 +142,11 @@ function targets(): { row: number; col: number; formula: string }[] {
       default: {
         const col = 4 + (index % 3);
         const letter = colToA1(col);
-        list.push({ row: DATA_ROWS + 1, col, formula: `=SUM(${letter}2:${letter}${DATA_ROWS + 1})` });
+        list.push({
+          row: DATA_ROWS + 1,
+          col,
+          formula: `=SUM(${letter}2:${letter}${DATA_ROWS + 1})`,
+        });
       }
     }
   }
@@ -195,13 +206,20 @@ try {
   store.dispose();
 }
 
-const result = { rows: DATA_ROWS, open: summary(open), suggest: summary(suggest), budgetMs: BUDGET_MS };
+const result = {
+  rows: DATA_ROWS,
+  open: summary(open),
+  suggest: summary(suggest),
+  budgetMs: BUDGET_MS,
+};
 const MS_DIGITS = 3;
 const rows: [string, Summary][] = [
   ["open (per edit)", result.open],
   ["suggest (per key)", result.suggest],
 ];
-process.stdout.write("| Step | Calls | p50 (ms) | p95 (ms) | max (ms) |\n| --- | ---: | ---: | ---: | ---: |\n");
+process.stdout.write(
+  "| Step | Calls | p50 (ms) | p95 (ms) | max (ms) |\n| --- | ---: | ---: | ---: | ---: |\n",
+);
 for (const [label, stats] of rows) {
   const times = [stats.p50, stats.p95, stats.max].map((ms) => ms.toFixed(MS_DIGITS));
   process.stdout.write(`| ${label} | ${stats.count} | ${times.join(" | ")} |\n`);

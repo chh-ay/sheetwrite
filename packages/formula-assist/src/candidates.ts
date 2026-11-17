@@ -46,7 +46,7 @@ const MOST_TYPED = 3;
  * `=`, as `0`, `1`, `2` or `3+`. A formula that keeps agreeing with what the
  * user types gets likelier with every character.
  */
-export function typedBucket(text: string): string {
+function typedBucket(text: string): string {
   const typed = text.length - 1;
   return typed >= MOST_TYPED ? `${MOST_TYPED}+` : String(typed);
 }
@@ -57,7 +57,7 @@ export function calibrationKey(proposal: Proposal, text: string): string {
 }
 
 /** A suggestion is shown only at this confidence or above… */
-export const SHOW_AT = 0.9;
+const SHOW_AT = 0.9;
 /** …and only when it leads the next different candidate by this much. */
 export const LEAD = 0.15;
 /** A shared start of disagreeing candidates is shown only from this many characters. */

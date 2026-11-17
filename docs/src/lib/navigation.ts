@@ -72,6 +72,7 @@ export interface NavigationSection {
 const API_PACKAGE_ICONS: Readonly<Record<string, IconName>> = {
   "@sheetwrite/charts": "chart",
   "@sheetwrite/core": "sheet",
+  "@sheetwrite/formula-assist": "function",
   "@sheetwrite/formulas": "formula",
   "@sheetwrite/queries": "database",
   "@sheetwrite/react": "framework-react",

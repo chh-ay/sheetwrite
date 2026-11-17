@@ -62,14 +62,18 @@ const CHROME_FLAGS = [
 function headlessShell(): string {
   const cache = join(homedir(), ".cache/ms-playwright");
   const folder = readdirSync(cache).find((name) => name.startsWith("chromium_headless_shell-"));
-  if (folder === undefined) throw new Error("Playwright's Chromium headless shell is not installed");
+  if (folder === undefined)
+    throw new Error("Playwright's Chromium headless shell is not installed");
   return join(cache, folder, "chrome-headless-shell-linux64/chrome-headless-shell");
 }
 
 /** A small CDP client over the browser's WebSocket, with flat sessions. */
 class Cdp {
   private nextId = 1;
-  private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+  private readonly pending = new Map<
+    number,
+    { resolve: (value: unknown) => void; reject: (error: Error) => void }
+  >();
   private readonly listeners = new Map<string, ((params: unknown) => void)[]>();
 
   private constructor(private readonly socket: WebSocket) {
@@ -114,7 +118,10 @@ class Cdp {
     const { promise, resolve } = Promise.withResolvers<unknown>();
     const listeners = this.listeners.get(method) ?? [];
     const listener = (params: unknown): void => {
-      this.listeners.set(method, (this.listeners.get(method) ?? []).filter((entry) => entry !== listener));
+      this.listeners.set(
+        method,
+        (this.listeners.get(method) ?? []).filter((entry) => entry !== listener),
+      );
       resolve(params);
     };
     this.listeners.set(method, [...listeners, listener]);
@@ -127,7 +134,9 @@ class Cdp {
 }
 
 function field(value: unknown, key: string): unknown {
-  return typeof value === "object" && value !== null && key in value ? Reflect.get(value, key) : undefined;
+  return typeof value === "object" && value !== null && key in value
+    ? Reflect.get(value, key)
+    : undefined;
 }
 
 /** Mulberry32, so the typing rhythm is the same on every run. */
@@ -274,7 +283,11 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step): Promise<void> 
   }
   if (step.kind === "text") {
     const { char } = step;
-    await cdp.send("Input.dispatchKeyEvent", { type: "keyDown", key: char, text: char, unmodifiedText: char }, sessionId);
+    await cdp.send(
+      "Input.dispatchKeyEvent",
+      { type: "keyDown", key: char, text: char, unmodifiedText: char },
+      sessionId,
+    );
     await cdp.send("Input.dispatchKeyEvent", { type: "keyUp", key: char }, sessionId);
     return;
   }
@@ -283,7 +296,14 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step): Promise<void> 
   const text = step.key === "Enter" ? "\r" : undefined;
   await cdp.send(
     "Input.dispatchKeyEvent",
-    { type: "rawKeyDown", key: step.key, code: step.key, windowsVirtualKeyCode: code, modifiers, text },
+    {
+      type: "rawKeyDown",
+      key: step.key,
+      code: step.key,
+      windowsVirtualKeyCode: code,
+      modifiers,
+      text,
+    },
     sessionId,
   );
   await cdp.send(
@@ -302,10 +322,13 @@ async function run(command: string[]): Promise<void> {
 /** Launch the headless shell and return its DevTools URL. */
 async function launch(): Promise<{ url: string; stop: () => void }> {
   const profile = mkdtempSync(join(tmpdir(), "sheetwrite-record-profile-"));
-  const child = Bun.spawn([headlessShell(), ...CHROME_FLAGS, `--user-data-dir=${profile}`, "about:blank"], {
-    stdout: "ignore",
-    stderr: "pipe",
-  });
+  const child = Bun.spawn(
+    [headlessShell(), ...CHROME_FLAGS, `--user-data-dir=${profile}`, "about:blank"],
+    {
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+  );
   const reader = child.stderr.getReader();
   let log = "";
   for (;;) {
@@ -330,8 +353,16 @@ async function launch(): Promise<{ url: string; stop: () => void }> {
 async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<void> {
   const deadline = Date.now() + READY_TIMEOUT_MS;
   for (;;) {
-    await cdp.send("HeadlessExperimental.beginFrame", { interval: FRAME_MS, noDisplayUpdates: false }, sessionId);
-    const result = await cdp.send("Runtime.evaluate", { expression: ready, returnByValue: true }, sessionId);
+    await cdp.send(
+      "HeadlessExperimental.beginFrame",
+      { interval: FRAME_MS, noDisplayUpdates: false },
+      sessionId,
+    );
+    const result = await cdp.send(
+      "Runtime.evaluate",
+      { expression: ready, returnByValue: true },
+      sessionId,
+    );
     if (field(field(result, "result"), "value") === true) return;
     if (Date.now() > deadline) throw new Error(`Timed out waiting for ${ready}`);
     await Bun.sleep(FRAME_MS);
@@ -351,14 +382,22 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       width: take.width,
       height: take.height,
     });
-    const attached = await cdp.send("Target.attachToTarget", { targetId: field(target, "targetId"), flatten: true });
+    const attached = await cdp.send("Target.attachToTarget", {
+      targetId: field(target, "targetId"),
+      flatten: true,
+    });
     const sessionId = String(field(attached, "sessionId"));
     for (const method of ["Page.enable", "Runtime.enable", "HeadlessExperimental.enable"]) {
       await cdp.send(method, {}, sessionId);
     }
     await cdp.send(
       "Emulation.setDeviceMetricsOverride",
-      { width: take.width, height: take.height, deviceScaleFactor: take.scale, mobile: take.mobile },
+      {
+        width: take.width,
+        height: take.height,
+        deviceScaleFactor: take.scale,
+        mobile: take.mobile,
+      },
       sessionId,
     );
     await cdp.send("Emulation.setFocusEmulationEnabled", { enabled: true }, sessionId);
@@ -382,9 +421,27 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
     const frames = Math.ceil(last / FRAME_MS) + 1;
     const encoder = Bun.spawn(
       [
-        "ffmpeg", "-loglevel", "error", "-y",
-        "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "png", "-i", "-",
-        "-c:v", "libx264", "-preset", "medium", "-crf", "10", "-pix_fmt", "yuv444p", master,
+        "ffmpeg",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "image2pipe",
+        "-framerate",
+        String(FPS),
+        "-c:v",
+        "png",
+        "-i",
+        "-",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "medium",
+        "-crf",
+        "10",
+        "-pix_fmt",
+        "yuv444p",
+        master,
       ],
       { stdin: "pipe", stderr: "inherit" },
     );
@@ -398,7 +455,11 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
         next++;
       }
       const expired = cdp.once("Emulation.virtualTimeBudgetExpired");
-      await cdp.send("Emulation.setVirtualTimePolicy", { policy: "advance", budget: FRAME_MS }, sessionId);
+      await cdp.send(
+        "Emulation.setVirtualTimePolicy",
+        { policy: "advance", budget: FRAME_MS },
+        sessionId,
+      );
       await expired;
       const result = await cdp.send(
         "HeadlessExperimental.beginFrame",
@@ -424,7 +485,19 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
 /** The number of frames in a video file, counted by decoding it. */
 async function countFrames(path: string): Promise<number> {
   const child = Bun.spawn(
-    ["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", path],
+    [
+      "ffprobe",
+      "-v",
+      "error",
+      "-count_frames",
+      "-select_streams",
+      "v:0",
+      "-show_entries",
+      "stream=nb_read_frames",
+      "-of",
+      "csv=p=0",
+      path,
+    ],
     { stdout: "pipe" },
   );
   return Number((await new Response(child.stdout).text()).trim());
@@ -433,24 +506,84 @@ async function countFrames(path: string): Promise<number> {
 /** The page's files from the master: MP4 and WebM of the demo and of the loop, and the poster. */
 async function publish(name: TakeName, master: string, frames: number): Promise<void> {
   const out = (file: string): string => join(OUTPUT, `${name}-${file}`);
-  const h264 = ["-c:v", "libx264", "-preset", "slow", "-crf", "24", "-pix_fmt", "yuv420p", "-movflags", "+faststart", "-an"];
-  const vp9 = ["-c:v", "libvpx-vp9", "-b:v", "0", "-crf", "36", "-row-mt", "1", "-pix_fmt", "yuv420p", "-an"];
+  const h264 = [
+    "-c:v",
+    "libx264",
+    "-preset",
+    "slow",
+    "-crf",
+    "24",
+    "-pix_fmt",
+    "yuv420p",
+    "-movflags",
+    "+faststart",
+    "-an",
+  ];
+  const vp9 = [
+    "-c:v",
+    "libvpx-vp9",
+    "-b:v",
+    "0",
+    "-crf",
+    "36",
+    "-row-mt",
+    "1",
+    "-pix_fmt",
+    "yuv420p",
+    "-an",
+  ];
   const loop = ["-ss", String(LOOP.start), "-t", String(LOOP.length)];
 
   await run(["ffmpeg", "-loglevel", "error", "-y", "-i", master, ...h264, out("demo.mp4")]);
   await run(["ffmpeg", "-loglevel", "error", "-y", "-i", master, ...vp9, out("demo.webm")]);
-  await run(["ffmpeg", "-loglevel", "error", "-y", ...loop, "-i", master, ...h264, out("loop.mp4")]);
-  await run(["ffmpeg", "-loglevel", "error", "-y", ...loop, "-i", master, ...vp9, out("loop.webm")]);
   await run([
-    "ffmpeg", "-loglevel", "error", "-y", "-ss", String(POSTER_AT), "-i", master,
-    "-frames:v", "1", "-c:v", "libwebp", "-quality", "86", out("poster.webp"),
+    "ffmpeg",
+    "-loglevel",
+    "error",
+    "-y",
+    ...loop,
+    "-i",
+    master,
+    ...h264,
+    out("loop.mp4"),
+  ]);
+  await run([
+    "ffmpeg",
+    "-loglevel",
+    "error",
+    "-y",
+    ...loop,
+    "-i",
+    master,
+    ...vp9,
+    out("loop.webm"),
+  ]);
+  await run([
+    "ffmpeg",
+    "-loglevel",
+    "error",
+    "-y",
+    "-ss",
+    String(POSTER_AT),
+    "-i",
+    master,
+    "-frames:v",
+    "1",
+    "-c:v",
+    "libwebp",
+    "-quality",
+    "86",
+    out("poster.webp"),
   ]);
 
   for (const file of ["demo.mp4", "demo.webm"]) {
     const written = await countFrames(out(file));
-    if (written !== frames) throw new Error(`${name}-${file} has ${written} frames, not ${frames}: a frame was dropped`);
+    if (written !== frames)
+      throw new Error(`${name}-${file} has ${written} frames, not ${frames}: a frame was dropped`);
   }
-  process.stdout.write(`${name}: ${frames} frames (${(frames / FPS).toFixed(2)} s) at ${FPS} fps\n`);
+  process.stdout.write(
+    `${name}: ${frames} frames (${(frames / FPS).toFixed(2)} s) at ${FPS} fps\n`,
+  );
 }
 
 const wanted = process.argv.slice(2);
@@ -458,7 +591,8 @@ function isTakeName(name: string): name is TakeName {
   return name in TAKES;
 }
 const takes = (wanted.length === 0 ? Object.keys(TAKES) : wanted).map((name) => {
-  if (!isTakeName(name)) throw new Error(`Unknown take ${name}; takes: ${Object.keys(TAKES).join(", ")}`);
+  if (!isTakeName(name))
+    throw new Error(`Unknown take ${name}; takes: ${Object.keys(TAKES).join(", ")}`);
   return name;
 });
 

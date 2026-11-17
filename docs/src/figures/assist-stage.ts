@@ -8,8 +8,8 @@ import "@sheetwrite/core/shell.css";
 import "../styles/tokens.css";
 import { type Grid, initSheetwrite } from "@sheetwrite/core";
 import { createSpreadsheetShell } from "@sheetwrite/core/shell";
-import * as formulas from "@sheetwrite/formulas";
 import { formulaAssistAddon } from "@sheetwrite/formula-assist";
+import * as formulas from "@sheetwrite/formulas";
 
 import { budgetOperations, budgetWorkbook } from "../showcases/scenarios/formula-assist.js";
 import { siteGridTheme } from "../showcases/site-grid-theme.js";

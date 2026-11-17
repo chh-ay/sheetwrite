@@ -82,7 +82,13 @@ function applyQueries(grid: Grid, sources?: Sources, requests: QueryFetchRequest
   };
   const settings = sources ? { fetchSource } : undefined;
   const cleanup =
-    addon.grid?.({ grid, settings, queryCommands: () => () => {}, historyCommand: () => {} }) ??
+    addon.grid?.({
+      grid,
+      settings,
+      queryCommands: () => () => {},
+      historyCommand: () => {},
+      formulaSuggestions: () => () => {},
+    }) ??
     (() => {});
   cleanups.push(cleanup);
   return cleanup;

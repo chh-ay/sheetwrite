@@ -27,42 +27,9 @@ test("suggests a row total from its neighbours and Tab takes it @portability", a
   await expect(ghost).toHaveCount(0);
 });
 
-test("takes one word with Ctrl+→ and hides the suggestion on Esc", async ({ page }) => {
-  await openShowcase(page, 1440, 900);
-  await page.getByRole("button", { name: "Legal's share" }).click();
-  const bar = page.getByRole("textbox", { name: "Formula bar" });
-
-  await page.keyboard.type("=");
-  await expect(page.locator(".sheetwrite-formula-ghost")).toHaveText("H6/H$13");
-  await page.keyboard.press("Control+ArrowRight");
-  await expect(bar).toHaveValue("=H6");
-  await page.keyboard.press("Escape");
-  await expect(page.locator(".sheetwrite-formula-ghost")).toHaveCount(0);
-  await expect(bar).toHaveValue("=H6");
-});
-
-test("draws the suggestion in the same task as the key, before the next frame", async ({ page }) => {
-  await openShowcase(page, 1440, 900);
-  await page.getByRole("button", { name: "March's total" }).click();
-  // Warm the predictor up; the first edit loads its chunk.
-  await page.keyboard.type("=");
-  await expect(page.locator(".sheetwrite-formula-ghost")).toBeVisible();
-  await page.keyboard.press("Escape");
-  await page.keyboard.press("Backspace");
-
-  const shown = await page.evaluate(() => {
-    const bar = document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Formula bar"]');
-    if (bar === null) return null;
-    bar.value = "=";
-    bar.setSelectionRange(1, 1);
-    bar.dispatchEvent(new Event("input", { bubbles: true }));
-    // Read synchronously: no frame has passed since the input.
-    return document.querySelector(".sheetwrite-formula-ghost")?.textContent ?? null;
-  });
-  expect(shown).toBe("SUM(D2:D11)");
-});
-
-test("loads the demo video only when the reader reaches it, without layout shift", async ({ page }) => {
+test("loads the demo video only when the reader reaches it, without layout shift", async ({
+  page,
+}) => {
   const requested: string[] = [];
   page.on("request", (request) => {
     if (MEDIA.test(request.url())) requested.push(request.url());

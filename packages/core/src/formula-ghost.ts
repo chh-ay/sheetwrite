@@ -60,7 +60,7 @@ function requiredArguments(fn: FormulaFunctionMetadata): number {
  * the argument guide shows the call, the current argument is filled in, and
  * the function needs more arguments, so the formula is incomplete.
  */
-export function movesToNextArgument(text: string, analysis: FormulaAnalysis): boolean {
+function movesToNextArgument(text: string, analysis: FormulaAnalysis): boolean {
   const call = analysis.call;
   const fn = call?.function;
   if (call === null || fn === undefined) return false;

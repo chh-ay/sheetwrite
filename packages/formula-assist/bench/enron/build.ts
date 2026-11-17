@@ -149,13 +149,7 @@ function cellMaps(snapshot: WorkbookSnapshot): Map<number, CellScalar>[] {
 /** The cells to keep of one sheet, as keys. */
 type KeptCells = Set<number>;
 
-function keepArea(
-  kept: KeptCells,
-  top: number,
-  left: number,
-  bottom: number,
-  right: number,
-): void {
+function keepArea(kept: KeptCells, top: number, left: number, bottom: number, right: number): void {
   for (let row = Math.max(0, top); row <= bottom; row++) {
     for (let col = Math.max(0, left); col <= right; col++) kept.add(row * KEY_COLS + col);
   }
@@ -252,7 +246,11 @@ async function main(): Promise<void> {
   const sampled: SampleWorkbook[] = [];
   let refused = 0;
 
-  for (let start = 0; start < candidates.length && sampled.length < WORKBOOKS; start += EXTRACT_BATCH) {
+  for (
+    let start = 0;
+    start < candidates.length && sampled.length < WORKBOOKS;
+    start += EXTRACT_BATCH
+  ) {
     const batch = candidates.slice(start, start + EXTRACT_BATCH);
     const folder = join(scratch, "batch");
     await rm(folder, { recursive: true, force: true });

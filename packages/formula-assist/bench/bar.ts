@@ -22,10 +22,14 @@ export const QUALITY_BAR: Readonly<Partial<Record<ReplaySetName, SetBar>>> = {
 export function barMisses(set: ReplaySetName, metrics: ReplayMetrics, bar: SetBar): string[] {
   const misses: string[] = [];
   if (metrics.saved < bar.minSaved) {
-    misses.push(`${set}: saves ${percent(metrics.saved)} of keystrokes, below ${percent(bar.minSaved)}`);
+    misses.push(
+      `${set}: saves ${percent(metrics.saved)} of keystrokes, below ${percent(bar.minSaved)}`,
+    );
   }
   if (metrics.wrong >= bar.maxWrong) {
-    misses.push(`${set}: ${percent(metrics.wrong)} of suggestions are wrong, ${percent(bar.maxWrong)} or more`);
+    misses.push(
+      `${set}: ${percent(metrics.wrong)} of suggestions are wrong, ${percent(bar.maxWrong)} or more`,
+    );
   }
   return misses;
 }

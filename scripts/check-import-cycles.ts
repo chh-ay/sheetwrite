@@ -418,9 +418,20 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "ToolbarItem",
     ],
   },
+  "formula-suggestion": {
+    source: "packages/core/src/types/formula-suggestion.ts",
+    dependencies: ["cell", "coordinates", "document"],
+    exports: [
+      "FormulaEdit",
+      "FormulaSheetReads",
+      "FormulaSuggester",
+      "FormulaSuggestion",
+      "FormulaSuggestionSession",
+    ],
+  },
   addon: {
     source: "packages/core/src/types/addon.ts",
-    dependencies: ["grid", "query", "store", "xlsx"],
+    dependencies: ["formula-suggestion", "grid", "query", "store", "xlsx"],
     exports: [
       "SheetwriteAddon",
       "SheetwriteAddonContext",

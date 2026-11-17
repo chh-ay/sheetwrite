@@ -10,16 +10,17 @@ import type { Proposal, Signal } from "../candidates.js";
 type Side = "above" | "below" | "left" | "right" | "furtherAbove";
 
 /** The neighbours read: two on each side, nearest first. */
-const NEIGHBOURS: readonly { readonly side: Side; readonly dRow: number; readonly dCol: number }[] = [
-  { side: "above", dRow: -1, dCol: 0 },
-  { side: "above", dRow: -2, dCol: 0 },
-  { side: "below", dRow: 1, dCol: 0 },
-  { side: "below", dRow: 2, dCol: 0 },
-  { side: "left", dRow: 0, dCol: -1 },
-  { side: "left", dRow: 0, dCol: -2 },
-  { side: "right", dRow: 0, dCol: 1 },
-  { side: "right", dRow: 0, dCol: 2 },
-];
+const NEIGHBOURS: readonly { readonly side: Side; readonly dRow: number; readonly dCol: number }[] =
+  [
+    { side: "above", dRow: -1, dCol: 0 },
+    { side: "above", dRow: -2, dCol: 0 },
+    { side: "below", dRow: 1, dCol: 0 },
+    { side: "below", dRow: 2, dCol: 0 },
+    { side: "left", dRow: 0, dCol: -1 },
+    { side: "left", dRow: 0, dCol: -2 },
+    { side: "right", dRow: 0, dCol: 1 },
+    { side: "right", dRow: 0, dCol: 2 },
+  ];
 
 /** Rows searched upward for the nearest formula of the column, when the two above hold none. */
 const SEARCH_ABOVE = 12;

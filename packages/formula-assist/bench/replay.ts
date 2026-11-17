@@ -339,7 +339,8 @@ function setCell(store: SheetwriteStore, cell: CellAddress, formula: string | nu
       {
         op: "set",
         addr: cell,
-        value: formula === null ? { kind: "literal", value: null } : { kind: "formula", src: formula },
+        value:
+          formula === null ? { kind: "literal", value: null } : { kind: "formula", src: formula },
       },
     ],
   });

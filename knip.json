@@ -45,7 +45,12 @@
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "packages/formula-assist": {
-      "entry": ["src/index.ts", "test/**/*.test.ts", "bench/replay-cli.ts", "bench/enron/build.ts"],
+      "entry": [
+        "src/index.ts",
+        "test/**/*.test.ts",
+        "bench/{calibrate,latency}.ts",
+        "bench/enron/build.ts"
+      ],
       "project": ["src/**/*.ts", "test/**/*.ts", "bench/**/*.ts"]
     }
   }

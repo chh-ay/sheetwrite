@@ -1,5 +1,9 @@
 import { pageMeta } from "@docs/lib/seo.js";
-import { DEPARTMENTS, FORMULA_COUNT, OPEN_CELLS } from "@docs/showcases/scenarios/formula-assist.js";
+import {
+  DEPARTMENTS,
+  FORMULA_COUNT,
+  OPEN_CELLS,
+} from "@docs/showcases/scenarios/formula-assist.js";
 import FormulaAssistSnippet from "@docs/showcases/snippets/formula-assist.mdx";
 import FormulaAssistSnippetSource from "@docs/showcases/snippets/formula-assist.mdx?source";
 import { createFileRoute } from "@tanstack/solid-router";
@@ -68,7 +72,8 @@ function FormulaAssistShowcase() {
                 props={{
                   wide: WIDE,
                   narrow: NARROW,
-                  label: "A recorded session: totals, a share and a lookup typed in the formula bar",
+                  label:
+                    "A recorded session: totals, a share and a lookup typed in the formula bar",
                   duration: DEMO_LENGTH,
                 }}
               />
@@ -76,8 +81,8 @@ function FormulaAssistShowcase() {
             <ShowcaseSection id="formula-assist-how" title="How it predicts">
               <ul>
                 <li>
-                  The formulas above, below, left and right of the cell, moved to it as a fill
-                  would move them. When the formulas above and below agree, the cell almost surely
+                  The formulas above, below, left and right of the cell, moved to it as a fill would
+                  move them. When the formulas above and below agree, the cell almost surely
                   continues them.
                 </li>
                 <li>
@@ -85,8 +90,8 @@ function FormulaAssistShowcase() {
                   of filled cells ends.
                 </li>
                 <li>
-                  The one function or sheet name the typed letters can start, and the brackets
-                  that close calls with all their arguments.
+                  The one function or sheet name the typed letters can start, and the brackets that
+                  close calls with all their arguments.
                 </li>
                 <li>
                   A suggestion shows only when the benchmark measured it right at least 90% of the
@@ -102,7 +107,10 @@ function FormulaAssistShowcase() {
           { label: "Formulas", value: String(FORMULA_COUNT) },
           { label: "Add-on", value: "@sheetwrite/formula-assist", code: true },
         ]}
-        guide={{ href: "/docs/features/formulas/formula-assist/", label: "Read the formula assist guide" }}
+        guide={{
+          href: "/docs/features/formulas/formula-assist/",
+          label: "Read the formula assist guide",
+        }}
         id="formula-assist"
         stage={
           <Island

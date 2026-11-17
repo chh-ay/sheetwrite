@@ -8,7 +8,11 @@ import { storeFunctions } from "./functions/registry.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellAddress } from "./types/coordinates.js";
-import type { FormulaEdit, FormulaSheetReads, FormulaSuggester } from "./types/formula-suggestion.js";
+import type {
+  FormulaEdit,
+  FormulaSheetReads,
+  FormulaSuggester,
+} from "./types/formula-suggestion.js";
 import type { Store } from "./types/store.js";
 
 /** The suggester of each store's grids; a store without one shows no suggestions. */

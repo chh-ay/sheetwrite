@@ -25,7 +25,8 @@ const BEFORE_A = 64;
 
 function columnIndex(letters: string): number {
   let index = 0;
-  for (const letter of letters.toUpperCase()) index = index * LETTERS + letter.charCodeAt(0) - BEFORE_A;
+  for (const letter of letters.toUpperCase())
+    index = index * LETTERS + letter.charCodeAt(0) - BEFORE_A;
   return index - 1;
 }
 
@@ -127,7 +128,8 @@ class Syntax implements Signal {
     const workbook = this.edit.reads.workbook();
     const sheet = workbook.sheets.find((entry) => entry.id === this.edit.cell.sheet);
     // Letters that name a column in use are as likely the start of a reference.
-    if (COLUMN_LETTERS.test(typed) && columnIndex(typed) < (sheet?.columns.length ?? 0)) return null;
+    if (COLUMN_LETTERS.test(typed) && columnIndex(typed) < (sheet?.columns.length ?? 0))
+      return null;
 
     const names = [
       ...(workbook.namedRanges ?? []).map((named) => named.name),
