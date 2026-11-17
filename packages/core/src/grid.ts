@@ -3,7 +3,6 @@ import { type ActionFeedback, attachActionFeedback, errorDetail } from "./action
 import type { AddonRegistry } from "./addons.js";
 import { AriaMirror } from "./aria-mirror.js";
 import type { AutoFilterHost } from "./autofilter-actions.js";
-import { autoSumRange } from "./autosum-range.js";
 import { readBlockArraysOnce } from "./block-ingress.js";
 import {
   fontFor,
@@ -3961,10 +3960,56 @@ export class GridImpl implements Grid {
 
     const row = this.toDataRow(focus.row);
     const col = focus.col;
-    const range = autoSumRange(this.store, this.activeSheet, row, col);
-    if (range === null) return;
-    const start = `${colToA1(range.start.col)}${range.start.row + 1}`;
-    const end = `${colToA1(range.end.col)}${range.end.row + 1}`;
+    const chunkCells = 4_096;
+
+    const numericStart = (vertical: boolean): number => {
+      let end = vertical ? row : col;
+      const origin = end;
+      while (end > 0) {
+        const start = Math.max(0, end - chunkCells);
+        const columns = vertical
+          ? [col]
+          : Array.from({ length: end - start }, (_, index) => start + index);
+        const window = this.store.getDataWindow?.(
+          this.activeSheet,
+          vertical ? { start, end } : { start: row, end: row + 1 },
+          columns,
+        );
+
+        let values: ArrayLike<CellScalar>;
+        if (window) values = window.values;
+        else {
+          const coordinates =
+            columns.length === 1 && vertical
+              ? Array.from({ length: end - start }, (_, index) => ({ row: start + index, col }))
+              : columns.map((column) => ({ row, col: column }));
+
+          const engine = storeEngine(this.store);
+          // Custom stores without canonical windows retain their scalar data-address contract.
+          const cells = engine
+            ? engine.captureResolvedCells(this.activeSheet, coordinates)
+            : coordinates.map((coordinate) =>
+                this.store.getCell({ sheet: this.activeSheet, ...coordinate }),
+              );
+          values = cells.map((cell) => cell.resolved);
+        }
+
+        for (let index = values.length - 1; index >= 0; index--) {
+          if (typeof values[index] !== "number") return start + index + 1;
+        }
+
+        end = start;
+      }
+
+      return origin === 0 ? origin : end;
+    };
+
+    const firstRow = numericStart(true);
+    const vertical = firstRow < row;
+    const firstCol = vertical ? col : numericStart(false);
+    if (!vertical && firstCol === col) return;
+    const start = `${colToA1(firstCol)}${(vertical ? firstRow : row) + 1}`;
+    const end = `${colToA1(vertical ? col : col - 1)}${(vertical ? row - 1 : row) + 1}`;
     this.document.commit(
       [
         {

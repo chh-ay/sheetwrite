@@ -4,7 +4,6 @@
 // suggester loads none of it.
 
 import { shiftA1Refs } from "./a1.js";
-import { autoSumRange } from "./autosum-range.js";
 import { storeFunctions } from "./functions/registry.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
 import { storeEngine } from "./store/engine-registry.js";
@@ -40,8 +39,6 @@ function sheetReads(store: Store): FormulaSheetReads {
     // A custom store without an engine has no Ctrl+Arrow scan: the edge is the cell itself.
     edge: (sheet, row, col, dRow, dCol) =>
       storeEngine(store)?.dataEdge(sheet, row, col, dRow, dCol) ?? (dRow === 0 ? col : row),
-    region: (sheet, row, col) => storeEngine(store)?.currentRegion({ sheet, row, col }) ?? null,
-    autoSumRange: (sheet, row, col) => autoSumRange(store, sheet, row, col),
     translate: shiftA1Refs,
   };
 }

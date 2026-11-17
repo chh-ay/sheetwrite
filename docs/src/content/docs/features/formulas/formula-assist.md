@@ -74,4 +74,4 @@ const closeSums: SheetwriteAddon = {
 };
 ```
 
-`open` runs once per edit, with the cell and `reads`: formulas, values, Ctrl+Arrow edges, the current region, the range AutoSum would sum, and reference moves. `suggest` runs on every key with the text and its [`analyzeFormula`](/docs/features/formulas/formula-help/) result, and must return within a frame. `openFormulaEdit` from `@sheetwrite/core/testing` builds the same edit without a grid, for tests and benchmarks.
+`open` runs once per edit, with the cell and `reads`: formulas, values, Ctrl+Arrow edges and reference moves. `suggest` runs on every key with the text and its [`analyzeFormula`](/docs/features/formulas/formula-help/) result, and must return within a frame. `openFormulaEdit` from `@sheetwrite/core/testing` builds the same edit without a grid, for tests and benchmarks.

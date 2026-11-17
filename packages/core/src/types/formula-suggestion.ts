@@ -4,7 +4,7 @@
 import type { FormulaAnalysis } from "../formula-analysis.js";
 import type { FormulaFunctionMetadata } from "../functions/types.js";
 import type { CellScalar } from "./cell.js";
-import type { CellAddress, Range, SheetId } from "./coordinates.js";
+import type { CellAddress, SheetId } from "./coordinates.js";
 import type { Workbook } from "./document.js";
 
 /** Text a suggester proposes to insert at the caret. */
@@ -31,13 +31,6 @@ export interface FormulaSheetReads {
    * `dCol` is -1 or 1, the other 0.
    */
   edge(sheet: SheetId, row: number, col: number, dRow: number, dCol: number): number;
-  /** Excel's current region around a cell (Ctrl+*): the block bounded by empty rows and columns. */
-  region(sheet: SheetId, row: number, col: number): Range | null;
-  /**
-   * The range the AutoSum command sums for a cell: the run of numbers right
-   * above it, or else right to its left; `null` when there is none.
-   */
-  autoSumRange(sheet: SheetId, row: number, col: number): Range | null;
   /**
    * `source` copied `dRow` rows and `dCol` columns away: its relative
    * references move, as a fill or paste moves them.
