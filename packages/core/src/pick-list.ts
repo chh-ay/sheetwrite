@@ -39,7 +39,8 @@ export class EntryList {
     });
     element.addEventListener("click", (event) => {
       const option = event.target instanceof Element ? event.target.closest("[role=option]") : null;
-      const entry = option instanceof HTMLElement ? this.entries[Number(option.dataset.index)] : undefined;
+      const entry =
+        option instanceof HTMLElement ? this.entries[Number(option.dataset.index)] : undefined;
       if (entry !== undefined) onPick(entry);
     });
     host.appendChild(element);

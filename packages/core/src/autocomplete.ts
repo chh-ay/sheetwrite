@@ -211,7 +211,11 @@ function completionSheet(host: CompletionHost, engine: StoreDataEngine): Complet
     rowCount: host.rowCount(),
     toDataRow: (viewRow) => host.toDataRow(viewRow),
     filled: (viewRow, column) => {
-      const value = host.store.getCell({ sheet, row: host.toDataRow(viewRow), col: column }).resolved;
+      const value = host.store.getCell({
+        sheet,
+        row: host.toDataRow(viewRow),
+        col: column,
+      }).resolved;
       return value !== null && value !== "";
     },
     dataEdge: (viewRow, column, dRow, dCol) => host.dataEdge(viewRow, column, dRow, dCol),
@@ -327,10 +331,15 @@ class CellCompletion implements EditCompletion {
       this.close();
       return;
     }
-    const list = (this.list ??= new EntryList(this.listHost, "AutoComplete", this.theme, (entry) => {
-      field.value = entry;
-      this.commit();
-    }));
+    const list = (this.list ??= new EntryList(
+      this.listHost,
+      "AutoComplete",
+      this.theme,
+      (entry) => {
+        field.value = entry;
+        this.commit();
+      },
+    ));
     this.enterList(field, list, false);
     list.show(matches, 0);
     list.deselect();

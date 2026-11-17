@@ -309,11 +309,7 @@ export class InteractionSessions {
    * nothing is completed, and once it arrives the edit that a key opened is
    * completed at once. Hosts that turn AutoComplete off get no completion.
    */
-  private completion(
-    row: number,
-    col: number,
-    typed: boolean,
-  ): EditCompletion | undefined {
+  private completion(row: number, col: number, typed: boolean): EditCompletion | undefined {
     if (!this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
