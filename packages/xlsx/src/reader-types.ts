@@ -2,7 +2,6 @@ import type {
   CellHyperlink,
   Column,
   ConditionalFormatRule,
-  DataValidationCondition,
   DataValidationRule,
   MergeRange,
   SheetSnapshot,
