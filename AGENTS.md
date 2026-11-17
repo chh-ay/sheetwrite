@@ -16,6 +16,10 @@ Single-context: one root `GLOSSARY.md`. Design decisions are tracked as GitHub i
 
 Before changing any Rust crate (`packages/wasm`, `packages/wasm/history`, `packages/queries/engine`), read `docs/contributing/rust.md`: the lint policy and the performance conventions. Check with `bun run lint:rust`.
 
+### Command glyphs
+
+A command that the toolbar, the ribbon, the context menu or the sheet tab menu shows needs its own glyph on the icon sheet, in the sheet's style. See "Adding a glyph" in `CONTRIBUTING.md`.
+
 ### Tests
 
 Do not add a unit test the change does not need.
@@ -28,3 +32,11 @@ Do not add a unit test the change does not need.
 - A change that no unit test can reach (canvas paint, real keyboard or clipboard input, browser layout) needs steps in the PR body under "Test plan". Do not add a test file that cannot run the changed code.
 
 Test layout: TypeScript unit tests are in `packages/*/test` and run with `bun run test:unit` (`bun test`, no Jest). Rust tests are `#[test]` functions in the crates. Browser tests are in `test/browser` and run with `bun run test:browser` (Playwright).
+
+### Priorities
+
+When goals conflict, choose in this order:
+
+1. **Speed and maintainability.** Make it fast, and keep the code simple to read and change. Don't trade one for the other without a measurement that shows the gain.
+2. **Package size.** Report it in every PR, but a measured speed gain or simpler code is worth more bytes.
+3. **Test count.** Keep only the tests the test rule above requires.

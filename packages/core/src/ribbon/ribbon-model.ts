@@ -164,6 +164,7 @@ const BORDER_ITEMS: readonly [string, IconName, BorderPreset][] = [
 ];
 
 const INSERT_ITEMS: readonly RibbonMenuItem[] = [
+  item("Insert Cells…", (grid) => grid.actions.insertCells(), "insertCells"),
   item("Insert Rows Above", (grid) => grid.actions.insertRowAbove()),
   item("Insert Rows Below", (grid) => grid.actions.insertRowBelow()),
   item("Insert Columns Left", (grid) => grid.actions.insertColumnLeft()),
@@ -171,6 +172,7 @@ const INSERT_ITEMS: readonly RibbonMenuItem[] = [
 ];
 
 const DELETE_ITEMS: readonly RibbonMenuItem[] = [
+  item("Delete Cells…", (grid) => grid.actions.deleteCells(), "deleteCells"),
   item("Delete Rows", (grid) => grid.actions.deleteRow()),
   item("Delete Columns", (grid) => grid.actions.deleteColumn()),
 ];
@@ -392,7 +394,7 @@ const pivotChart: RibbonMenuSpec = {
   kind: "menu",
   id: "pivotChart",
   label: "PivotChart",
-  icon: "chart",
+  icon: "pivotChart",
   availability: "newDashboard",
   large: true,
   run: insertPivotChartOf("column"),
@@ -654,6 +656,7 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
               item("AutoFit Row Height", (grid) => grid.actions.autoFitRows()),
               item("AutoFit Column Width", (grid) => grid.actions.autoFitColumns()),
               ...VISIBILITY_ITEMS,
+              item("Format Cells…", (grid) => grid.actions.formatCells(), "formatCells"),
             ],
           },
         ],
