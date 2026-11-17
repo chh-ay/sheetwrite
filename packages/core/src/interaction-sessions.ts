@@ -1,4 +1,5 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
+import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
@@ -75,8 +76,12 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
+  /** Run a command of `cell-commands.ts`, which loads on first use. */
+  cellCommand: (command: CellCommand) => void;
   /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
+  /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
+  autoComplete: () => boolean;
   store: Store;
   loadable: SheetwriteStore | null;
   selection: () => SelectionModel;
@@ -172,6 +177,10 @@ export class InteractionSessions {
   private fillTarget: SelRect | null = null;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
   private endMode = false;
+  /** AutoComplete's code, once the first edit has loaded it. */
+  private autocomplete: typeof import("./autocomplete.js") | null = null;
+  /** The load of AutoComplete's code, started by the first edit. */
+  private autocompleteLoad: Promise<void> | null = null;
   private dragMove: ((ev: PointerEvent) => void) | null = null;
   private dragUp: ((ev: PointerEvent) => void) | null = null;
   private dragCancel: ((ev: PointerEvent) => void) | null = null;
@@ -278,6 +287,30 @@ export class InteractionSessions {
     } else {
       editor?.position(rect);
     }
+  }
+
+  /**
+   * Excel's AutoComplete for an edit of view row `row` in `col` (see
+   * `autocomplete.ts`). Its code loads with the first edit; while it loads,
+   * nothing is completed, and once it arrives the edit that a key opened is
+   * completed at once. Hosts that turn AutoComplete off get no completion.
+   */
+  private completion(
+    row: number,
+    col: number,
+    typed: boolean,
+  ): ((field: HTMLTextAreaElement) => string | null) | undefined {
+    if (!this.deps.autoComplete()) return undefined;
+    if (this.autocomplete === null) {
+      const generation = this.generation;
+      this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
+        this.autocomplete = module;
+        if (typed && this.generation === generation) this.editor.completeNow();
+      });
+    }
+    let complete: ((field: HTMLTextAreaElement) => string | null) | undefined;
+    return (field) =>
+      (complete ??= this.autocomplete?.editCompletion(this.deps, row, col))?.(field) ?? null;
   }
 
   private editorLabel(row: number, col: number): string {
@@ -499,9 +532,10 @@ export class InteractionSessions {
       onText: (value) => this.deps.editDraft.text(value),
       onShortcut: (event) => this.runCustomShortcut(event, true),
       onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
+      complete: this.completion(editCell.row, editCell.col, initial !== undefined),
     });
-    // A formula bar showing the draft starts from the opened text.
-    this.deps.editDraft.text(text);
+    // A formula bar showing the draft starts from the opened text, completed or not.
+    this.deps.editDraft.text(this.editor.value);
   }
 
   /**
@@ -1209,6 +1243,10 @@ export class InteractionSessions {
         case "toggleFilter":
           this.deps.grid.actions.toggleAutoFilter();
           break;
+
+        default:
+          // The format, hide, insert and Format Cells keys run from a chunk.
+          this.deps.cellCommand(action);
       }
 
       return;

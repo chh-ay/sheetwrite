@@ -81,3 +81,82 @@ test("merging cells that hold two values warns first, from the keyboard @portabi
   await expect(dialog).toHaveCount(0);
   expect(await merged(page)).toEqual({ merges: 1, covered: null });
 });
+
+/** Select `r0..r1` × `c0..c1` (data rows) on the active sheet and give the grid focus. */
+async function selectRange(page: Page, r0: number, c0: number, r1 = r0, c1 = c0): Promise<void> {
+  await page.evaluate(
+    ([startRow, startCol, endRow, endCol]) => {
+      const grid = window.__sheetwriteSpreadsheetGrid!;
+      const sheet = grid.getActiveSheet();
+      grid.setSelection({
+        kind: "range",
+        range: {
+          sheet,
+          start: { row: startRow, col: startCol },
+          end: { row: endRow, col: endCol },
+        },
+      });
+    },
+    [r0, c0, r1, c1] as const,
+  );
+  await page.locator(".sheetwrite").first().focus();
+}
+
+test("Excel's format, hide, insert, delete and Format Cells keys reach the grid @portability", async ({
+  page,
+}) => {
+  await open(page);
+  const state = () =>
+    page.evaluate(() => {
+      const grid = window.__sheetwriteSpreadsheetGrid!;
+      const sheet = grid.getActiveSheet();
+      return {
+        format: grid.store.getCell({ sheet, row: 5, col: 0 }).style.numberFormat ?? null,
+        rows: [...grid.hiddenRows()],
+        columns: [...grid.hiddenColumns()],
+      };
+    });
+  await page.evaluate(() => {
+    const grid = window.__sheetwriteSpreadsheetGrid!;
+    const sheet = grid.getActiveSheet();
+    grid.applyTransaction({
+      patches: [
+        { op: "set", addr: { sheet, row: 5, col: 0 }, value: { kind: "literal", value: 1234.5 } },
+      ],
+    });
+  });
+
+  await selectRange(page, 5, 0);
+  await page.keyboard.press("Control+Shift+Digit4");
+  await expect.poll(async () => (await state()).format).toBe("$#,##0.00_);($#,##0.00)");
+  await page.keyboard.press("Control+Shift+Backquote");
+  await expect.poll(async () => (await state()).format).toBe("General");
+
+  await page.keyboard.press("Control+Digit9");
+  await expect.poll(async () => (await state()).rows).toEqual([5]);
+  await selectRange(page, 4, 0, 6, 0);
+  await page.keyboard.press("Control+Shift+Digit9");
+  await expect.poll(async () => (await state()).rows).toEqual([]);
+
+  await selectRange(page, 5, 1);
+  await page.keyboard.press("Control+Digit0");
+  await expect.poll(async () => (await state()).columns).toEqual([1]);
+  await selectRange(page, 5, 0, 5, 2);
+  await page.keyboard.press("Control+Shift+Digit0");
+  await expect.poll(async () => (await state()).columns).toEqual([]);
+
+  const grid = page.locator(".sheetwrite").first();
+  for (const [key, name] of [
+    ["Control+Shift+Equal", "Insert"],
+    ["Control+Minus", "Delete"],
+    ["Control+Digit1", "Format Cells"],
+  ] as const) {
+    await selectRange(page, 5, 0, 5, 1);
+    await page.keyboard.press(key);
+    const dialog = page.getByRole("dialog", { name, exact: true });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+    await expect(grid).toBeFocused();
+  }
+});

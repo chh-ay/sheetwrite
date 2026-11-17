@@ -113,12 +113,23 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule. |
 | Delete | Clear the selected cells. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
-| A printable character | Start editing the active cell, replacing its content. |
+| A printable character | Start editing the active cell, replacing its content. A text entry may be completed from the column ([AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete)). |
 | Ctrl/Cmd + C / X / V | Copy / cut / paste. |
 | Ctrl/Cmd + Z | Undo the last edit. |
 | Ctrl/Cmd + Shift + Z (or Ctrl/Cmd + Y) | Redo. |
 | Ctrl/Cmd + F | Open the find bar (when `config.find` is not `false`). |
 | Ctrl/Cmd + Shift + L | Turn the AutoFilter on for the current range, or off. |
+| Ctrl/Cmd + 1 | Open Format Cells: Number, Alignment, Font, Border and Fill. |
+| Ctrl/Cmd + Shift + ~ | Apply the General number format. |
+| Ctrl/Cmd + Shift + ! | Apply the Number format, `#,##0.00`. |
+| Ctrl/Cmd + Shift + @ | Apply the Time format, `h:mm AM/PM`. |
+| Ctrl/Cmd + Shift + # | Apply the Date format, `d-mmm-yy`. |
+| Ctrl/Cmd + Shift + $ | Apply the Currency format, `$#,##0.00_);($#,##0.00)`. |
+| Ctrl/Cmd + Shift + % | Apply the Percentage format, `0%`. |
+| Ctrl/Cmd + Shift + ^ | Apply the Scientific format, `0.00E+00`. |
+| Ctrl/Cmd + 9 / Ctrl/Cmd + Shift + 9 | Hide the selected rows / show the hidden rows inside the selection. |
+| Ctrl/Cmd + 0 / Ctrl/Cmd + Shift + 0 | Hide the selected columns / show the hidden columns inside the selection. |
+| Ctrl/Cmd + + (Ctrl/Cmd + Shift + = or the keypad +) / Ctrl/Cmd + - | Insert / delete. Whole selected rows or columns are inserted above or left, or deleted, at once; for any other range a dialog asks for entire rows or entire columns. |
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 
@@ -186,7 +197,7 @@ Pressing Mod+Shift+O logs the focused cell's row.
 | `false` | Turn off all built-in keys. The host handles every key. |
 | `(e, grid) => boolean` | Intercept each keydown before the defaults. Return `true` to consume the key, or `false` to let the built-in handler continue. |
 
-The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;) and `selectAll` (Ctrl/Cmd + A). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
+The actions you can rebind are `copy`, `cut`, `paste`, `pasteValues`, `undo`, `redo`, `find`, `replace`, `clearContents`, `editNote`, `bold` (Ctrl/Cmd + B or 2), `italic` (Ctrl/Cmd + I or 3), `underline` (Ctrl/Cmd + U or 4), `strikethrough` (Ctrl/Cmd + 5), `insertDate` (Ctrl/Cmd + ;), `insertTime` (Ctrl/Cmd + Shift + ;), `selectAll` (Ctrl/Cmd + A), `fillDown` (Ctrl/Cmd + D), `fillRight` (Ctrl/Cmd + R), `toggleFilter` (Ctrl/Cmd + Shift + L), `formatCells` (Ctrl/Cmd + 1), `formatGeneral`, `formatNumber`, `formatTime`, `formatDate`, `formatCurrency`, `formatPercent` and `formatScientific` (Ctrl/Cmd + Shift + ~, 1 to 6), `hideRows` and `unhideRows` (Ctrl/Cmd + 9, with Shift), `hideColumns` and `unhideColumns` (Ctrl/Cmd + 0, with Shift), `insertCells` (Ctrl/Cmd + Shift + = or Ctrl/Cmd and the keypad +) and `deleteCells` (Ctrl/Cmd + -). See [KeyboardOptions](/docs/api/core/keyboard-options/) and [KeyShortcut](/docs/api/core/key-shortcut/).
 
 ## Edge cases and limits
 

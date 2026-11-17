@@ -260,6 +260,30 @@ export interface GridActions {
   insertColumnRight(): void;
   /** Delete the focus cell's column. */
   deleteColumn(): void;
+  /**
+   * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
+   * them; with whole columns, as many columns to their left. For any other
+   * range an Insert dialog asks whether to insert entire rows or columns.
+   * Its Shift cells right and Shift cells down choices are shown but not
+   * available yet. The command loads on first use, so the change lands a
+   * moment after the call; a host can wait for the grid's `change` event.
+   */
+  insertCells(): void;
+  /**
+   * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
+   * any other range, ask in a Delete dialog whether to delete entire rows or
+   * columns. Like {@link GridActions.insertCells}, it loads on first use and
+   * lands a moment after the call.
+   */
+  deleteCells(): void;
+  /**
+   * Ctrl+1: open the Format Cells dialog for the selection, with Number,
+   * Alignment, Font, Border and Fill tabs, showing the active cell's format.
+   * OK applies what changed to every selected cell as one undoable step. The
+   * command and the dialog load on first use, so the dialog opens a moment
+   * after the call. Does nothing on a read-only grid.
+   */
+  formatCells(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
@@ -507,6 +531,7 @@ export type ContextMenuActionName =
   | "editNote"
   | "deleteNote"
   | "pivotFields"
+  | "formatCells"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -557,7 +582,21 @@ export type KeyboardAction =
   | "selectAll"
   | "fillDown"
   | "fillRight"
-  | "toggleFilter";
+  | "toggleFilter"
+  | "formatGeneral"
+  | "formatNumber"
+  | "formatTime"
+  | "formatDate"
+  | "formatCurrency"
+  | "formatPercent"
+  | "formatScientific"
+  | "hideRows"
+  | "unhideRows"
+  | "hideColumns"
+  | "unhideColumns"
+  | "insertCells"
+  | "deleteCells"
+  | "formatCells";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
@@ -680,6 +719,12 @@ export interface GridConfig {
   undo?: boolean;
   /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
   find?: boolean;
+  /**
+   * Excel's AutoComplete for cell values (default true): typing a text entry
+   * completes it from the entries above and below in the column. `false`
+   * turns it off, as Excel's "Enable AutoComplete for cell values" does.
+   */
+  autoComplete?: boolean;
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**
