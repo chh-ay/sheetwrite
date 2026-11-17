@@ -18,7 +18,7 @@ async function open(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
 }
 
-/** Give B2:B50 a list rule with `fields`, select B50 and focus the grid. */
+/** Give B2:B50 a list rule with `fields`, select B10, which shows on screen, and focus the grid. */
 async function regionRule(page: Page, fields: Record<string, unknown>): Promise<void> {
   await page.evaluate((extra) => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
@@ -30,15 +30,15 @@ async function regionRule(page: Page, fields: Record<string, unknown>): Promise<
       policy: "reject",
       ...extra,
     });
-    grid.setSelection({ kind: "cell", addr: { sheet, row: 49, col: 1 } });
+    grid.setSelection({ kind: "cell", addr: { sheet, row: 9, col: 1 } });
   }, fields);
   await page.locator(".sheetwrite").first().focus();
 }
 
-function regionAt50(page: Page): Promise<unknown> {
+function regionAtB10(page: Page): Promise<unknown> {
   return page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
-    return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 49, col: 1 }).resolved;
+    return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 9, col: 1 }).resolved;
   });
 }
 
@@ -48,7 +48,7 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
   await open(page);
   await regionRule(page, { inputTitle: "Region", inputMessage: "Pick a sales region." });
   await expect(page.locator(".sheetwrite-input-message")).toHaveText("RegionPick a sales region.");
-  const before = await regionAt50(page);
+  const before = await regionAtB10(page);
 
   await page.keyboard.type('="Nowhere"');
   await page.keyboard.press("Enter");
@@ -72,7 +72,7 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
   await page.keyboard.press("Escape");
   await expect(alert).toHaveCount(0);
   await expect(page.locator(".sheetwrite").first()).toBeFocused();
-  expect(await regionAt50(page)).toEqual(before);
+  expect(await regionAtB10(page)).toEqual(before);
 });
 
 test("a Warning alert keeps the entry on Yes and an Information alert on OK @portability", async ({
@@ -87,7 +87,7 @@ test("a Warning alert keeps the entry on Yes and an Information alert on OK @por
   await expect(warning.getByRole("button", { name: "No" })).toBeFocused();
   await warning.getByRole("button", { name: "Yes" }).click();
   await expect(warning).toHaveCount(0);
-  expect(await regionAt50(page)).toBe("Nowhere");
+  expect(await regionAtB10(page)).toBe("Nowhere");
 
   await regionRule(page, { policy: "warn", errorStyle: "information" });
   await page.keyboard.type("Elsewhere");
@@ -96,7 +96,7 @@ test("a Warning alert keeps the entry on Yes and an Information alert on OK @por
   await expect(information.getByRole("button", { name: "OK" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(information).toHaveCount(0);
-  expect(await regionAt50(page)).toBe("Elsewhere");
+  expect(await regionAtB10(page)).toBe("Elsewhere");
 });
 
 test("a list cell's arrow opens its list, and typing filters it, from the keyboard @portability", async ({
