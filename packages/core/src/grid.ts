@@ -12,6 +12,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
+import type { CellCommand, CellCommandsHost } from "./cell-commands.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
@@ -590,6 +591,8 @@ export class GridImpl implements Grid {
   private readonly dialogs = new ScopeSlot(this.lifetime);
   /** What the lazily loaded dialogs use; one is open at a time. */
   private readonly dialogHost: DialogHost;
+  /** What the lazily loaded cell commands use; built on their first use. */
+  private cellCommandsHost: CellCommandsHost | null = null;
   /** Commands whose code is loading on first use. */
   private commandLoads = 0;
   /** Keys pressed on the grid while they load, in order. */
@@ -1005,6 +1008,7 @@ export class GridImpl implements Grid {
         },
       },
       openFind: (options) => this.openFindBar(options),
+      cellCommand: (command) => this.cellCommand(command),
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
@@ -2892,6 +2896,21 @@ export class GridImpl implements Grid {
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
+  /** Run a command of `cell-commands.ts`, which loads on first use. */
+  private cellCommand(command: CellCommand): void {
+    this.loadCommand(import("./cell-commands.js"), ({ runCellCommand }) => {
+      if (this.lifetime.closed) return;
+      this.cellCommandsHost ??= {
+        grid: this,
+        dialogs: this.dialogHost,
+        style: this.styleDeps,
+        bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
+        font: () => this.theme.font,
+      };
+      runCellCommand(this.cellCommandsHost, command);
+    });
+  }
+
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
   private resetFindBar(): void {
     this.findBarBuilds.close();
@@ -3787,6 +3806,9 @@ export class GridImpl implements Grid {
         const cols = this.selectedColumns();
         if (cols) this.removeColumns(cols.first, cols.count);
       },
+      insertCells: () => this.cellCommand("insertCells"),
+      deleteCells: () => this.cellCommand("deleteCells"),
+      formatCells: () => this.cellCommand("formatCells"),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =
