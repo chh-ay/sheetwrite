@@ -2,13 +2,19 @@ import type { SnapshotResourceLimits } from "../document-protocol.js";
 import type { SheetId } from "../types/coordinates.js";
 import type { MutationIssue } from "../types/document.js";
 
+/**
+ * Where a sheet's cells live: dense storage, local pages (a dense sheet that
+ * grew past `maxDenseCells`), or datasource-backed pages.
+ */
+type SheetStorage = "dense" | "local" | "paged";
+
 /** One sheet's dimensions as a transaction's row and column inserts grow it. */
 export interface SheetDimensions {
   readonly name: string;
   rows: number;
   columns: number;
-  /** Whether the sheet's cells are held in dense storage, which counts toward `maxDenseCells`. */
-  readonly dense: boolean;
+  /** Dense and local sheets count toward `maxDenseCells` and `maxLocalPagedCells`. */
+  storage: SheetStorage;
 }
 
 type SheetLimitIssue = Extract<MutationIssue, { kind: "resource-limit" }>;
@@ -16,18 +22,24 @@ type SheetLimitIssue = Extract<MutationIssue, { kind: "resource-limit" }>;
 /**
  * Holds row and column inserts to the document limits a snapshot must meet,
  * so a store never commits a sheet that its own snapshot would refuse to
- * load. Dense storage also ends at `maxDenseCells` across the workbook,
- * which the default limit sets to the engine's dense-cell ceiling.
+ * load. A dense sheet that would pass `maxDenseCells` across the workbook
+ * continues in local pages, as the engine does, and local sheets end at
+ * `maxLocalPagedCells` across the workbook. The store gives the engine the
+ * same two limits, capped at its ceilings, so the engine places and refuses
+ * every insert as this check does.
  */
 export class SheetGrowth {
   private denseCells = 0;
+  private localCells = 0;
 
   constructor(
     private readonly sheets: Map<SheetId, SheetDimensions>,
     private readonly limits: Readonly<SnapshotResourceLimits>,
   ) {
     for (const sheet of sheets.values()) {
-      if (sheet.dense) this.denseCells += sheet.rows * sheet.columns;
+      const cells = sheet.rows * sheet.columns;
+      if (sheet.storage === "dense") this.denseCells += cells;
+      if (sheet.storage === "local") this.localCells += cells;
     }
   }
 
@@ -61,25 +73,42 @@ export class SheetGrowth {
     if (nextColumns > this.limits.maxColumnsPerSheet) {
       return issue("sheet-columns", this.limits.maxColumnsPerSheet, nextColumns, "columns");
     }
+    const cells = current.rows * current.columns;
     const nextCells = nextRows * nextColumns;
     if (nextCells > this.limits.maxLogicalCellsPerSheet) {
       return issue("sheet-cells", this.limits.maxLogicalCellsPerSheet, nextCells, "cells");
     }
-    const nextDenseCells = current.dense
-      ? this.denseCells - current.rows * current.columns + nextCells
-      : this.denseCells;
-    if (current.dense && nextDenseCells > this.limits.maxDenseCells) {
-      return issue(
-        "dense-cells",
-        this.limits.maxDenseCells,
-        nextDenseCells,
-        "stored cells in the workbook",
-      );
+
+    let storage = current.storage;
+    let denseCells = this.denseCells;
+    let localCells = this.localCells;
+    if (storage === "dense") {
+      denseCells -= cells;
+      if (denseCells + nextCells <= this.limits.maxDenseCells) {
+        denseCells += nextCells;
+      } else {
+        storage = "local";
+      }
+    } else if (storage === "local") {
+      localCells -= cells;
+    }
+    if (storage === "local") {
+      localCells += nextCells;
+      if (localCells > this.limits.maxLocalPagedCells) {
+        return issue(
+          "local-paged-cells",
+          this.limits.maxLocalPagedCells,
+          localCells,
+          "cells in local pages across the workbook",
+        );
+      }
     }
 
     current.rows = nextRows;
     current.columns = nextColumns;
-    this.denseCells = nextDenseCells;
+    current.storage = storage;
+    this.denseCells = denseCells;
+    this.localCells = localCells;
     return undefined;
   }
 }

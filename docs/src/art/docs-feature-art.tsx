@@ -136,10 +136,69 @@ export function ThemeLayersDiagram() {
   );
 }
 
+/** The AutoFilter page's example: Item and Qty in A1:B5. */
+const AUTOFILTER_CELLS = [
+  [0, 0, "Item"],
+  [1, 0, "Qty"],
+  [0, 1, "apple"],
+  [1, 1, "3"],
+  [0, 2, "fig"],
+  [1, 2, "7"],
+  [0, 3, "kiwi"],
+  [1, 3, "1"],
+  [0, 4, "pear"],
+  [1, 4, "12"],
+] as const;
+
+/** AutoFilter: buttons on the header row, a condition, and the rows below the header it hides. */
+export function AutoFilterDiagram() {
+  return (
+    <FlowFigure
+      steps={[
+        {
+          title: "Ctrl+Shift+L",
+          lines: ["A filter button on", "each header cell"],
+          sheet: {
+            cols: 2,
+            rows: 5,
+            cells: AUTOFILTER_CELLS,
+            ranges: [{ from: [0, 0], to: [1, 0], tone: "accent" }],
+          },
+        },
+        {
+          title: "Alt+Down on Qty",
+          lines: ["Number Filters ›", "Greater Than… 5"],
+          tone: "accent",
+        },
+        {
+          title: "Rows below the header hide",
+          lines: ["The rows of 3 and 1 hide;", "the header row stays"],
+          sheet: {
+            cols: 2,
+            rows: 5,
+            cells: AUTOFILTER_CELLS,
+            ranges: [
+              { from: [0, 0], to: [1, 0], tone: "accent" },
+              { from: [0, 1], to: [1, 1], tone: "muted" },
+              { from: [0, 3], to: [1, 3], tone: "muted" },
+            ],
+          },
+        },
+      ]}
+      text={{
+        title: "How an AutoFilter hides rows",
+        description:
+          "Item and Qty are in A1:B5. Ctrl+Shift+L puts a filter button on each header cell, Item and Qty. Alt+Down on the Qty header opens its dropdown, and Number Filters › Greater Than… with 5 sets the condition. The rows below the header whose Qty is 3 or 1 hide. The rows of 7 and 12 stay, and the header row always shows.",
+      }}
+    />
+  );
+}
+
 /** Feature diagrams by the name a placement uses. */
 export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "grid-handle": GridHandleDiagram,
   "touch-gestures": TouchGesturesDiagram,
   "editor-lifecycle": EditorLifecycleDiagram,
   "theme-layers": ThemeLayersDiagram,
+  autofilter: AutoFilterDiagram,
 };

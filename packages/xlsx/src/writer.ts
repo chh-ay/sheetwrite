@@ -190,7 +190,8 @@ function validateNames(snapshot: WorkbookSnapshot): void {
   const names: string[] = [];
   for (const sheet of snapshot.sheets) {
     const validated = validateSheetName(sheet.name, names);
-    if (!validated.ok) {
+    // A History sheet came from a file or an added sheet; only a rename refuses the name.
+    if (!validated.ok && validated.code !== "reserved") {
       const prefix =
         validated.code === "duplicate"
           ? "duplicate case-insensitive XLSX sheet name"

@@ -26,9 +26,11 @@ export type CoreIslandName =
  * paint, on every page that holds it. `visible`: when it comes near the
  * screen, for self-contained islands far down a page. `interaction`: when the
  * reader first reaches for it (islands/client.tsx); its code is fetched ahead
- * at low priority once the island is on screen and the page is idle.
+ * at low priority once the island is on screen and the page is idle. `use`:
+ * like `interaction`, but nothing is fetched ahead, for an island whose markup
+ * works on its own until then (search: lib/search-opener.ts opens its dialog).
  */
-export type IslandHydration = "load" | "visible" | "interaction";
+export type IslandHydration = "load" | "visible" | "interaction" | "use";
 
 interface IslandProps<Props extends object> {
   readonly name: IslandName;

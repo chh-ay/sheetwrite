@@ -588,10 +588,12 @@ export class GridImpl implements Grid {
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
   /** The open dialog; opening another or destroying the grid closes it. */
   private readonly dialogs = new ScopeSlot(this.lifetime);
-  /** Builds of the commands that load on first use (merge, insert, Format Cells). */
-  private readonly commandBuilds = new ScopeSlot(this.lifetime);
   /** What the lazily loaded dialogs use; one is open at a time. */
   private readonly dialogHost: DialogHost;
+  /** Commands whose code is loading on first use. */
+  private commandLoads = 0;
+  /** Keys pressed on the grid while they load, in order. */
+  private readonly heldKeys: KeyboardEvent[] = [];
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -1005,6 +1007,7 @@ export class GridImpl implements Grid {
       openFind: (options) => this.openFindBar(options),
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
+      holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -2747,7 +2750,8 @@ export class GridImpl implements Grid {
 
     // Opens during the load share one build, so the bar is made once.
     const build = this.findBarBuilds.current();
-    void import("./find-bar.js").then(
+    this.loadCommand(
+      import("./find-bar.js"),
       ({ FindBar: FindBarClass }) => {
         if (build.closed) return;
         if (!this.findBar) {
@@ -2809,7 +2813,8 @@ export class GridImpl implements Grid {
   ): void {
     if (this.lifetime.closed) return;
     const build = this.autoFilterBuilds.current();
-    void import("./autofilter-actions.js").then(
+    this.loadCommand(
+      import("./autofilter-actions.js"),
       (filters) => {
         if (build.closed) return;
         this.autoFilterHost ??= {
@@ -2848,37 +2853,49 @@ export class GridImpl implements Grid {
    * warning it may show, so the merge lands a moment after the call.
    */
   private mergeCells(center: boolean): void {
-    this.withChunk(
-      () => import("./merge-command.js"),
-      ({ mergeSelection }) => mergeSelection(this.styleDeps, center, this.dialogHost),
-    );
+    this.loadCommand(import("./merge-command.js"), ({ mergeSelection }) => {
+      if (!this.lifetime.closed) mergeSelection(this.styleDeps, center, this.dialogHost);
+    });
   }
 
   /**
-   * Run `use` with a command chunk that `load` imports on first use, as the
-   * find bar loads. A chunk that arrives after the grid is destroyed is
-   * dropped; a load error is shown and still reaches the host.
+   * Run a command whose code loads on first use. Keys pressed on the grid
+   * while any such load is pending wait, then act in order where the
+   * commands left the focus, as they would have had the code been there.
    */
-  private withChunk<M>(load: () => Promise<M>, use: (chunk: M) => void): void {
-    if (this.lifetime.closed) return;
-    const build = this.commandBuilds.current();
-    void load().then(
-      (chunk) => {
-        if (!build.closed) use(chunk);
+  private loadCommand<T>(
+    load: Promise<T>,
+    run: (module: T) => void,
+    failed: (error: unknown) => void = (error) => {
+      throw error;
+    },
+  ): void {
+    this.commandLoads++;
+    void load.then(
+      (module) => {
+        try {
+          run(module);
+        } finally {
+          this.releaseKeys();
+        }
       },
       (error: unknown) => {
-        if (build.closed) return;
-        // Tell the user; the load error still reaches the host.
-        this.actionFeedback.show(`The command could not load: ${errorDetail(error)}`);
-        throw error;
+        this.releaseKeys();
+        failed(error);
       },
     );
+  }
+
+  /** Once no command's code is loading, the keys pressed meanwhile act, in order. */
+  private releaseKeys(): void {
+    if (--this.commandLoads > 0) return;
+    for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
   /**
    * Ctrl++ and Ctrl+-: insert or delete as Excel does. Whole selected rows
-   * or columns go at once; for other ranges a dialog asks what to insert or
-   * delete, with Excel's choices and default.
+   * or columns go at once; for other ranges Excel's Insert or Delete dialog,
+   * which loads on first use, asks what to insert or delete.
    */
   private insertOrDelete(insert: boolean): void {
     const rect = this.activeSelectionRect();
@@ -2899,32 +2916,11 @@ export class GridImpl implements Grid {
       return;
     }
 
-    // Excel shifts a wide range down (up on delete) and a tall one right (left).
+    // Excel's default choice follows the range's shape.
     const wide = rect.c1 - rect.c0 >= rect.r1 - rect.r0;
-    // Shifting cells needs a reference-rewriting move of the cells beside the range.
-    const choices = [
-      {
-        value: "shiftRight",
-        label: insert ? "Shift cells right" : "Shift cells left",
-        disabled: true,
-      },
-      { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up", disabled: true },
-      { value: "entireRow", label: "Entire row" },
-      { value: "entireColumn", label: "Entire column" },
-    ];
-    const preferred = wide ? "shiftDown" : "shiftRight";
-    const initial = choices.find((choice) => choice.value === preferred && !choice.disabled)
-      ? preferred
-      : wide
-        ? "entireRow"
-        : "entireColumn";
-    this.withChunk(
-      () => import("./dialog.js"),
-      ({ choiceDialog }) => {
-        const title = insert ? "Insert" : "Delete";
-        void choiceDialog(this.dialogHost, { title, choices, initial }).result.then(run);
-      },
-    );
+    this.loadCommand(import("./dialog.js"), ({ insertDeleteDialog }) => {
+      if (!this.lifetime.closed) void insertDeleteDialog(this.dialogHost, insert, wide).result.then(run);
+    });
   }
 
   /** Ctrl+1: the Format Cells dialog for the selection, from its own chunk. */
@@ -2942,15 +2938,15 @@ export class GridImpl implements Grid {
       cell.style.numberFormat === undefined && columnFormat !== undefined
         ? { ...cell.style, numberFormat: columnFormat }
         : cell.style;
-    this.withChunk(
-      () => import("./format-cells.js"),
-      ({ formatCellsDialog }) => {
-        const input = { style, sample: cell.resolved, font: this.theme.font };
-        void formatCellsDialog(this.dialogHost, input).result.then((change) => {
-          if (change !== null) this.styleActions.formatSelection(change.style, change.border);
-        });
-      },
-    );
+    this.loadCommand(import("./format-cells.js"), ({ formatCellsDialog }) => {
+      if (this.lifetime.closed) return;
+      const input = { style, sample: cell.resolved, font: this.theme.font };
+      void formatCellsDialog(this.dialogHost, input).result.then((change) => {
+        if (change !== null) this.styleActions.formatSelection(change.style, change.border);
+      });
+    });
+  }
+
   }
 
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
@@ -3907,7 +3903,7 @@ export class GridImpl implements Grid {
       versionHistory: () => this.historyCommand?.("open"),
       // The dashboard chunk names and adds the sheet; first paint carries only this call.
       newDashboard: () =>
-        void import("./dashboard/dashboard-layout.js").then((m) => {
+        this.loadCommand(import("./dashboard/dashboard-layout.js"), (m) => {
           if (!this.lifetime.closed) m.newDashboard(this);
         }),
       saveVersion: () => {

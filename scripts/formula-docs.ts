@@ -161,7 +161,9 @@ function excelSyntaxHtml(name: string, syntax: string): string {
     const optional = argument.startsWith("[") || /^(?:…|\.\.\.)$/u.test(argument);
     return `<span class="sw-formula-arg"${optional ? " data-optional" : ""}>${tokens.join("")}</span>`;
   });
-  return `<code class="sw-formula-syntax"><span class="sw-code-function">${html(name)}</span>(${parts.join(", ")})</code>`;
+  // Search weighs the name like a page title: "XLOOKUP" finds the page that
+  // defines it above pages that only mention it.
+  return `<code class="sw-formula-syntax"><span class="sw-code-function" data-pagefind-weight="10">${html(name)}</span>(${parts.join(", ")})</code>`;
 }
 
 function parseFunctions(value: unknown): FormulaRecord[] {
