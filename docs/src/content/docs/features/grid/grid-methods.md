@@ -168,6 +168,7 @@ interface Grid {
 | [`setAutoFilter(range)`](/docs/api/core/grid/#grid-set-auto-filter) / `getAutoFilter()` / `reapplyFilter()` | Excel's AutoFilter: filter buttons on the first row of a range, whose rows below are the only ones column filters hide. `setAutoFilter(null)` turns it off; `reapplyFilter()` filters again after edits. |
 | [`distinctValues(col, limit?)`](/docs/api/core/grid/#grid-distinct-values) | First-seen distinct values for building filter menus. |
 | [`hideRows(rows)`](/docs/api/core/grid/#grid-hide-rows) / `showRows(rows?)` / `hiddenRows()` | Explicit row visibility separate from sort/filter state. |
+| [`sheetRowOf(viewRow)`](/docs/api/core/grid/#grid-sheet-row-of) / [`viewRowOf(sheetRow)`](/docs/api/core/grid/#grid-view-row-of) | Map between the view rows that selections and `scrollToCell` use and the sheet rows of A1 references and the row headers. They differ under a filter, hidden rows or a view sort. Constant time. |
 | [`hideColumns(cols?)`](/docs/api/core/grid/#grid-hide-columns) / `showColumns(cols?)` / `hiddenColumns()` | Bulk-safe persisted column visibility; omitted arguments target the focused column for hide and every column for show. |
 | [`groupRows(start, end)`](/docs/api/core/grid/#grid-group-rows) / `ungroupRows(start, end)` / `setGroupCollapsed(start, collapsed)` / `rowGroups()` | Inclusive data-row groups with collapse state. |
 | [`clearView()`](/docs/api/core/grid/#grid-clear-view) | Clears sort/filter state; hidden rows and row groups remain. |

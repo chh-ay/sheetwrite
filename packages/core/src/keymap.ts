@@ -40,6 +40,8 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   // and Ctrl+Alt+PageUp work too.
   nextSheet: ["Ctrl+PageDown", "Ctrl+Alt+PageDown"],
   previousSheet: ["Ctrl+PageUp", "Ctrl+Alt+PageUp"],
+  // Shift+F11 inserts a sheet before the active one.
+  insertSheet: ["Shift+F11"],
   // Excel turns filters on and off with Ctrl+Shift+L.
   toggleFilter: ["Mod+Shift+L"],
   // Excel's number-format keys, Ctrl+Shift+~ ! @ # $ % ^, named by their unshifted keys.
