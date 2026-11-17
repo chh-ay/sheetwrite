@@ -34,7 +34,7 @@ export interface FormatCellsChange {
 }
 
 /** The Number tab's categories, in Excel's order. */
-export type NumberCategory =
+type NumberCategory =
   | "General"
   | "Number"
   | "Currency"
