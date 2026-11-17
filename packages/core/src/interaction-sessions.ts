@@ -1,4 +1,5 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
+import type { CellCommand } from "./cell-commands.js";
 import { cellEditText, parseCellInput } from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
@@ -75,6 +76,8 @@ interface InteractionDependencies {
   openFind: (options?: { replace?: boolean }) => void;
   /** Open the AutoFilter dropdown of a header cell in `col`. */
   openAutoFilter: (col: number) => void;
+  /** Run a command of `cell-commands.ts`, which loads on first use. */
+  cellCommand: (command: CellCommand) => void;
   /** Hold a key pressed while a command's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
@@ -1240,6 +1243,10 @@ export class InteractionSessions {
         case "toggleFilter":
           this.deps.grid.actions.toggleAutoFilter();
           break;
+
+        default:
+          // The format, hide, insert and Format Cells keys run from a chunk.
+          this.deps.cellCommand(action);
       }
 
       return;
