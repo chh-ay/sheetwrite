@@ -50,7 +50,8 @@ const EDIT_LINKS_PANEL_MARKER = "This workbook has no links to other workbooks."
 // A row of the generated table that functions/registry.ts loads on demand.
 const FUNCTION_TABLE_MARKER = '["SUM",';
 const FIND_MARKER = "sheetwrite-find-replace-row";
-// The AutoFilter's header dropdown loads on first use; its class names survive minifiers.
+// The AutoFilter's header dropdown loads on first use; its class names survive
+// minifiers. Webpack may put the pivot model's value order it sorts with into its chunk.
 const AUTOFILTER_MARKER = "sheetwrite-autofilter-presets";
 // The dialog shell of the merge warning and the Insert and Delete dialogs
 // loads on first use; the dialog's backdrop class survives minifiers.
@@ -100,6 +101,8 @@ for (const file of lazyChunks) {
   else if (ADDON_SEAM_MARKERS.some((marker) => code.includes(marker))) addonSeamChunks.push(file);
   else if (code.includes(SORT_PANEL_MARKER)) sortPanelChunks.push(file);
   else if (code.includes(PANEL_MARKER)) panelChunks.push(file);
+  // Before the dashboard markers: the dropdown's chunk may hold the pivot model.
+  else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
   // Before the function table: the shared dashboard code also lists the pivot aggregations.
   else if (DASHBOARD_SHARED_MARKERS.some((marker) => code.includes(marker)))
     dashboardChunks.push(file);
@@ -108,7 +111,6 @@ for (const file of lazyChunks) {
     chromeChunks.push(file);
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
-  else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);

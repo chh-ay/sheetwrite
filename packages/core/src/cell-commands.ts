@@ -6,7 +6,7 @@
  * first use.
  */
 
-import type { DialogHost } from "./dialog.js";
+import type { FormatCellsChange, FormatCellsInput } from "./format-cells.js";
 import type { SelRect } from "./selection.js";
 import { StyleActions, type StyleActionsDeps } from "./style-actions.js";
 import type { CellStyle } from "./types/cell.js";
@@ -47,14 +47,16 @@ export interface CellCommandsHost {
   /** The theme's font shorthand, for the size and family an unstyled cell shows. */
   font(): string;
   /**
-   * Open a dialog from `load`, a module that loads on first use; keys pressed
-   * while it loads wait, then reach the dialog. Resolves with the dialog's
-   * answer, or null when the grid is gone before it opens.
+   * Excel's Insert (`insert`) or Delete dialog for a `wide` or a tall range;
+   * resolves to `entireRow`, `entireColumn` or null. Its code loads on first
+   * use, and keys pressed meanwhile reach it once it opens.
    */
-  dialog<M, T>(
-    load: Promise<M>,
-    open: (module: M, dialogs: DialogHost) => Promise<T | null>,
-  ): Promise<T | null>;
+  insertDeleteDialog(insert: boolean, wide: boolean): Promise<string | null>;
+  /**
+   * The Format Cells dialog for `input`; resolves to what OK changes, or null.
+   * It loads as the Insert dialog does.
+   */
+  formatCellsDialog(input: FormatCellsInput): Promise<FormatCellsChange | null>;
 }
 
 /** What to insert or delete in a range that is neither whole rows nor whole columns. */
@@ -166,10 +168,7 @@ export function insertOrDelete(
     return;
   }
   void host
-    .dialog(
-      import("./dialog.js"),
-      (module, dialogs) => module.insertDeleteDialog(dialogs, insert, wide).result,
-    )
+    .insertDeleteDialog(insert, wide)
     .then((choice) =>
       run(choice === "entireRow" ? "row" : choice === "entireColumn" ? "column" : null),
     );
@@ -219,12 +218,7 @@ export function formatCells(
     sample: cell.resolved,
     font: host.font(),
   };
-  void host
-    .dialog(
-      import("./format-cells.js"),
-      (module, dialogs) => module.formatCellsDialog(dialogs, input).result,
-    )
-    .then((change) => {
-      if (change !== null) formatSelection(deps, change.style, change.border);
-    });
+  void host.formatCellsDialog(input).then((change) => {
+    if (change !== null) formatSelection(deps, change.style, change.border);
+  });
 }

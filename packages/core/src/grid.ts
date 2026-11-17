@@ -2934,7 +2934,17 @@ export class GridImpl implements Grid {
       style: this.styleDeps,
       bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
       font: () => this.theme.font,
-      dialog: (load, open) => this.openDialog(load, open),
+      // The dialogs' lazy imports stay in this module, with the grid's others.
+      insertDeleteDialog: (insert, wide) =>
+        this.openDialog(
+          import("./dialog.js"),
+          (dialogs, host) => dialogs.insertDeleteDialog(host, insert, wide).result,
+        ),
+      formatCellsDialog: (input) =>
+        this.openDialog(
+          import("./format-cells.js"),
+          (dialogs, host) => dialogs.formatCellsDialog(host, input).result,
+        ),
     };
     return this.cellCommandsHost;
   }
