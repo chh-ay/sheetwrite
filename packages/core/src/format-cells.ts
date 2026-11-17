@@ -6,12 +6,19 @@
 
 import { type DialogHost, openDialog } from "./dialog.js";
 import {
-  ACCOUNTING_FORMAT,
+  DATE_TYPES,
   FONT_FAMILIES,
   FONT_SIZES_PT,
+  FRACTION_TYPES,
   fontShorthandParts,
+  MAX_DECIMALS,
+  type NumberCategory,
+  type NumberFormatParts,
+  numberFormatCode,
+  numberFormatParts,
   pixelsToPoints,
   pointsToPixels,
+  TIME_TYPES,
 } from "./format-presets.js";
 import { formatNumber } from "./number-format.js";
 import type { StyleActionsDeps } from "./style-actions.js";
@@ -35,19 +42,6 @@ export interface FormatCellsChange {
 }
 
 /** The Number tab's categories, in Excel's order. */
-type NumberCategory =
-  | "General"
-  | "Number"
-  | "Currency"
-  | "Accounting"
-  | "Date"
-  | "Time"
-  | "Percentage"
-  | "Fraction"
-  | "Scientific"
-  | "Text"
-  | "Custom";
-
 const CATEGORIES: readonly NumberCategory[] = [
   "General",
   "Number",
@@ -61,99 +55,6 @@ const CATEGORIES: readonly NumberCategory[] = [
   "Text",
   "Custom",
 ];
-
-/** The Date and Time categories' types, as Excel lists them for en-US. */
-const DATE_TYPES = ["m/d/yyyy", "dddd, mmmm d, yyyy", "d-mmm-yy", "d-mmm", "mmm-yy", "yyyy-mm-dd"];
-const TIME_TYPES = ["h:mm AM/PM", "h:mm:ss AM/PM", "h:mm", "h:mm:ss", "m/d/yyyy h:mm"];
-/** The Fraction category's types and Excel's names for them. */
-const FRACTION_TYPES: readonly (readonly [code: string, label: string])[] = [
-  ["# ?/?", "Up to one digit (1/4)"],
-  ["# ??/??", "Up to two digits (21/25)"],
-  ["# ???/???", "Up to three digits (312/943)"],
-  ["# ?/2", "As halves (1/2)"],
-  ["# ?/4", "As quarters (2/4)"],
-  ["# ?/8", "As eighths (4/8)"],
-  ["# ??/16", "As sixteenths (8/16)"],
-  ["# ?/10", "As tenths (3/10)"],
-  ["# ??/100", "As hundredths (30/100)"],
-];
-const TEXT_FORMAT = "@";
-
-/** A category's settings. */
-export interface NumberFormatParts {
-  readonly category: NumberCategory;
-  readonly decimals: number;
-  /** Number: the 1000 separator. */
-  readonly thousands: boolean;
-  /** Number and Currency: negatives in parentheses instead of a minus sign. */
-  readonly parentheses: boolean;
-  /** Date, Time and Fraction: the chosen type; Custom: the code. */
-  readonly code: string;
-}
-
-const MAX_DECIMALS = 30;
-
-function decimalsPart(decimals: number): string {
-  return decimals > 0 ? `.${"0".repeat(decimals)}` : "";
-}
-
-/** The format code a Number-tab category and its settings make. */
-export function numberFormatCode(parts: NumberFormatParts): string {
-  const decimals = decimalsPart(parts.decimals);
-  const negative = (base: string): string => (parts.parentheses ? `${base}_);(${base})` : base);
-  switch (parts.category) {
-    case "General":
-      return "General";
-    case "Number":
-      return negative(`${parts.thousands ? "#,##0" : "0"}${decimals}`);
-    case "Currency":
-      return negative(`$#,##0${decimals}`);
-    case "Accounting":
-      return ACCOUNTING_FORMAT.replaceAll("#,##0.00", `#,##0${decimals}`);
-    case "Percentage":
-      return `0${decimals}%`;
-    case "Scientific":
-      return `0${decimals}E+00`;
-    case "Text":
-      return TEXT_FORMAT;
-    case "Date":
-    case "Time":
-    case "Fraction":
-    case "Custom":
-      return parts.code;
-  }
-}
-
-/** The category and settings that make `code`; a code no category makes is Custom. */
-export function numberFormatParts(code: string | undefined): NumberFormatParts {
-  const base = { decimals: 2, thousands: false, parentheses: false, code: code ?? "General" };
-  if (code === undefined || /^general$/i.test(code)) {
-    return { ...base, category: "General", code: "General" };
-  }
-  if (DATE_TYPES.includes(code)) return { ...base, category: "Date" };
-  if (TIME_TYPES.includes(code)) return { ...base, category: "Time" };
-  if (FRACTION_TYPES.some(([type]) => type === code)) return { ...base, category: "Fraction" };
-  if (code === TEXT_FORMAT) return { ...base, category: "Text" };
-  for (const category of [
-    "Number",
-    "Currency",
-    "Accounting",
-    "Percentage",
-    "Scientific",
-  ] as const) {
-    for (let decimals = 0; decimals <= MAX_DECIMALS; decimals++) {
-      for (const thousands of category === "Number" ? [false, true] : [false]) {
-        for (const parentheses of category === "Number" || category === "Currency"
-          ? [false, true]
-          : [false]) {
-          const parts = { category, decimals, thousands, parentheses, code: "" };
-          if (numberFormatCode(parts) === code) return parts;
-        }
-      }
-    }
-  }
-  return { ...base, category: "Custom" };
-}
 
 /** Label text for a control, and the wrapper that holds both. */
 function field(label: string, control: HTMLElement): HTMLLabelElement {
