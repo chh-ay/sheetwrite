@@ -16,6 +16,7 @@ For each check, save the result file under the name given and attach it to the i
 | 8 | #227 | `test/fixtures/excel-checks/power-query-csv.xlsx` | `power-query-csv-excel.xlsx` |
 | 9 | #433 | none; type the formulas into a new workbook | none; record what Excel shows |
 | 10 | #226 | `test/fixtures/excel-checks/links-sheetwrite-export.xlsx` and `Budget.xlsx` | `links-excel.xlsx` |
+| 16 | #821 | none; type the values into a new workbook | none; record what Excel shows |
 | 11 | #226 | `test/fixtures/excel-checks/links-sheetwrite-export.xlsx` | none; record what Excel shows |
 | 12 | #230 | `test/fixtures/excel-checks/measures-model-pivot.xlsx` | none; record what Excel shows |
 | 13 | #230 | `test/fixtures/excel-checks/measures-only-model.xlsx` | `measures-only-model-excel.xlsx` |
@@ -235,3 +236,13 @@ Expected:
 - The chart on `Board` draws the same labels and columns as the chart on `Report`, from its cache. Select Data shows `#REF!` for the axis labels.
 - After import, Sheetwrite has the two charts on `Sales` with the categories A2:B5, the bar chart with `axes.multiLevelLabels: false`, and the chart on `Report` over the pivot `by-segment`.
 
+
+## 16. Paste Special's operations on formulas and text (#821)
+
+Sheetwrite's Paste Special follows Excel's Paste options page, which does not say what an operation does with formulas and text. Check these in a new workbook:
+
+1. Type `10` in A1, `=A1*2` in A2, `abc` in A3 and leave A4 blank. Type `1` in C1, `=5` in C2, `7` in C3 and `xyz` in C4.
+2. Select A1:A4, **Copy**. Select C1, **Home › Paste › Paste Special…**, choose **Values** and **Add**, **OK**.
+3. Undo, then do step 2 again with **All** and **Add**, then with **Divide** and `0` typed in A1.
+
+Expected (what Sheetwrite does): with Values and Add, C1 is `11`, C2 is the formula `=(5)+20`, C3 stays `7` (the copied text leaves it), C4 stays `xyz` (the target's text stays). With All and Add, C2 is `=(5)+(A2*2)` with A2's reference shifted as a copy shifts it. Dividing by a copied `0` gives `#DIV/0!`. Record the cell contents Excel shows, formulas included.
