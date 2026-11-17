@@ -6,6 +6,7 @@ import type {
   DataValidationComparison,
   DataValidationCondition,
   DataValidationRule,
+  ValidationErrorStyle,
 } from "@sheetwrite/core";
 import {
   MAX_CONDITIONAL_FORMAT_FORMULA_LENGTH,
@@ -146,40 +147,62 @@ export function parseValidation(
     return [];
   }
   const showError = xmlBoolean(xmlAttribute(element, "showErrorMessage"));
-  const errorStyle = xmlAttribute(element, "errorStyle") ?? "stop";
+  const styleAttribute = xmlAttribute(element, "errorStyle");
+  const errorStyle: ValidationErrorStyle =
+    styleAttribute === "warning" || styleAttribute === "information" ? styleAttribute : "stop";
   const policy: DataValidationRule["policy"] = !showError
     ? "allow"
     : errorStyle === "stop"
       ? "reject"
       : "warn";
-  const prompt = xmlAttribute(element, "prompt");
-  const error = xmlAttribute(element, "error");
-  let helpText = prompt ?? error;
-  if (prompt !== undefined && error !== undefined && prompt !== error) {
-    emitWarning(context, {
-      code: "validation-loss",
-      message: "Distinct Excel validation prompt and error text were reduced to the prompt",
-      sheet,
-    });
-  }
-  if (helpText && Array.from(helpText).length > 255) {
-    emitWarning(context, {
-      code: "validation-loss",
-      message: "Excel validation prompt/error exceeded 255 characters and was dropped",
-      sheet,
-    });
-    helpText = undefined;
-  }
+  // A rule keeps only the style its policy does not imply: information for
+  // `warn`, and the style Excel remembers while the alert is off.
+  const impliedStyle = policy === "warn" ? "warning" : "stop";
+  const helpText = validationText(element, "error", 255, context, sheet);
+  const errorTitle = validationText(element, "errorTitle", 32, context, sheet);
+  const inputTitle = validationText(element, "promptTitle", 32, context, sheet);
+  const inputMessage = validationText(element, "prompt", 255, context, sheet);
+  const showInputMessage = xmlAttribute(element, "showInputMessage");
+  const fields = {
+    policy,
+    ...(errorStyle === impliedStyle ? {} : { errorStyle }),
+    ...(showInputMessage !== undefined && !xmlBoolean(showInputMessage)
+      ? { showInputMessage: false }
+      : {}),
+    ...(helpText === undefined ? {} : { helpText }),
+    ...(errorTitle === undefined ? {} : { errorTitle }),
+    ...(inputTitle === undefined ? {} : { inputTitle }),
+    ...(inputMessage === undefined ? {} : { inputMessage }),
+  };
   return ranges.map((rangeText) => {
     const range = parseRange(rangeText);
     return {
       range: { start: { row: range.r0, col: range.c0 }, end: { row: range.r1, col: range.c1 } },
       condition: structuredClone(condition),
-      policy,
+      ...fields,
       allowBlank: xmlBoolean(xmlAttribute(element, "allowBlank")),
-      ...(helpText ? { helpText: decodeXstring(helpText) } : {}),
     };
   });
+}
+
+/** A validation title or message attribute; one longer than Excel allows is dropped with a warning. */
+function validationText(
+  element: XmlElement,
+  attribute: "error" | "errorTitle" | "prompt" | "promptTitle",
+  maxLength: number,
+  context: XlsxCodecContext,
+  sheet: string,
+): string | undefined {
+  const raw = xmlAttribute(element, attribute);
+  if (!raw) return undefined;
+  const text = decodeXstring(raw);
+  if (Array.from(text).length <= maxLength) return text;
+  emitWarning(context, {
+    code: "validation-loss",
+    message: `Excel validation ${attribute} exceeded ${maxLength} characters and was dropped`,
+    sheet,
+  });
+  return undefined;
 }
 
 function conditionalScalar(formula: string | undefined): CellScalar | undefined {

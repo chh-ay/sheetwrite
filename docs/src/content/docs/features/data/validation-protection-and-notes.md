@@ -45,9 +45,13 @@ The setup has ten columns and at least 100 rows; A1:C3 contain the invoice data 
 
 ## Validation
 
-`DataValidationRule` covers list, numeric range, date range, text-length, and checkbox conditions. A rule has a stable ID, a range, a `reject` / `warn` / `allow` policy, optional blank handling, and help text.
+`DataValidationRule` covers list, numeric range, date range, text-length, and checkbox conditions. A rule has a stable ID, a range, a `reject` / `warn` / `allow` policy, optional blank handling, and Excel's Error Alert and Input Message.
 
 List rules open a keyboard-operable `listbox` on F2, Alt+Down or a double-click. Checkbox rules open a real ARIA `checkbox`. Arrow keys and typeahead change a list choice, Space toggles a checkbox, Enter commits, Tab commits and moves, and Escape cancels.
+
+A typed value that fails a rule shows Excel's error alert before it is stored. A `reject` rule shows a Stop alert: Retry returns to the entry with its text selected, and Cancel drops it. A `warn` rule shows a Warning alert (Yes keeps the value, No returns to the entry, Cancel drops it), or with `errorStyle: "information"` an Information alert (OK keeps the value, Cancel drops it). The alert shows `errorTitle` and `helpText`, or Excel's default message. A formula is checked by its result. An `allow` rule, Excel's alert turned off, stores the value without a word.
+
+While a cell of a rule is selected, the rule's `inputTitle` and `inputMessage` show in a box below it, as in Excel, unless `showInputMessage` is `false`. Screen readers hear the input message as the cell's description.
 
 Every mutation path passes through the same validation boundary, including paste, fill, clear, and host transactions.
 
@@ -66,7 +70,10 @@ Plain-text notes use `setNote(addr, text)` and `getNote(addr)`. The focused cell
 | `DataValidationRule.condition.kind` | `list`, `number`, `date`, `textLength`, `checkbox` | The kind of check. |
 | `DataValidationRule.policy` | `"reject"`, `"warn"`, `"allow"` | What happens to a value that fails the check. |
 | `DataValidationRule.allowBlank` | `boolean` | Blank cells are allowed unless you turn this off. |
-| `DataValidationRule.helpText` | `string` | Help text for the rule. |
+| `DataValidationRule.errorStyle` | `"stop"`, `"warning"`, `"information"` | The error alert's style: `stop` for `reject`, `warning` (default) or `information` for `warn`. |
+| `DataValidationRule.errorTitle` / `helpText` | `string` | The error alert's title (32 characters at most) and message (255). |
+| `DataValidationRule.inputTitle` / `inputMessage` | `string` | The input message's title and text, shown beside a selected cell. |
+| `DataValidationRule.showInputMessage` | `boolean` | Show the input message; `true` unless you turn it off. |
 | `ProtectedRange.label` / `permissionKey` | `string` | Optional metadata for the resolver and UI. |
 | `GridOptions.protectionResolver` / `grid.setProtectionResolver(resolver, mode?)` | `(request) => "allow" \| "deny"` | Decides each local write to a protected range. |
 | `GridOptions.mutationPolicy` | `"atomic"`, `"partial"` | Reject the whole transaction, or skip only the denied operations. |

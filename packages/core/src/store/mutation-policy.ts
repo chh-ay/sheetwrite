@@ -1,9 +1,8 @@
 import { restoreBlockFacts } from "../restore-block.js";
-import type { CellScalar, CellValue } from "../types/cell.js";
+import type { CellValue } from "../types/cell.js";
 import type { Range, SheetId } from "../types/coordinates.js";
 import type {
   CommitReason,
-  DataValidationComparison,
   DataValidationRule,
   DocumentOp,
   MutationIssue,
@@ -14,6 +13,7 @@ import type {
   Workbook,
 } from "../types/document.js";
 import type { PivotDefinition } from "../types/pivot.js";
+import { validationAccepts, validationIssueMessage } from "../validation-rule.js";
 import {
   cellRange,
   fullSheetRange,
@@ -405,7 +405,7 @@ export class StoreMutationPolicy {
           addr: patch.addr,
           value: patch.value,
           operationIndex,
-          message: rule.helpText ?? validationMessage(rule),
+          message: validationIssueMessage(rule),
         });
       }
 
@@ -455,7 +455,7 @@ export class StoreMutationPolicy {
             addr,
             value: cell.value,
             operationIndex,
-            message: rule.helpText ?? validationMessage(rule),
+            message: validationIssueMessage(rule),
           });
         }
       }
@@ -488,7 +488,7 @@ export class StoreMutationPolicy {
           addr,
           value: { kind: "literal", value: null },
           operationIndex,
-          message: rule.helpText ?? validationMessage(rule),
+          message: validationIssueMessage(rule),
         });
       }
 
@@ -525,106 +525,13 @@ export class StoreMutationPolicy {
             addr: { sheet: range.sheet, row, col },
             value,
             operationIndex,
-            message: rule.helpText ?? validationMessage(rule),
+            message: validationIssueMessage(rule),
           });
         }
       }
     }
 
     return issues;
-  }
-}
-
-function comparisonAccepts(comparison: DataValidationComparison, value: number): boolean {
-  switch (comparison.operator) {
-    case "between":
-      return value >= comparison.min && value <= comparison.max;
-    case "notBetween":
-      return value < comparison.min || value > comparison.max;
-    case "equal":
-      return value === comparison.value;
-    case "notEqual":
-      return value !== comparison.value;
-    case "greaterThan":
-      return value > comparison.value;
-    case "lessThan":
-      return value < comparison.value;
-    case "greaterThanOrEqual":
-      return value >= comparison.value;
-    case "lessThanOrEqual":
-      return value <= comparison.value;
-  }
-}
-
-function validationAccepts(rule: DataValidationRule, value: CellScalar): boolean {
-  if (value === null && (rule.allowBlank ?? true)) return true;
-  const condition = rule.condition;
-  if (condition.kind === "list") {
-    return (
-      condition.allowCustom === true || condition.values.some((item) => Object.is(item, value))
-    );
-  }
-  if (condition.kind === "checkbox") {
-    const checked = condition.checkedValue ?? true;
-    const unchecked = condition.uncheckedValue ?? false;
-    return Object.is(value, checked) || Object.is(value, unchecked);
-  }
-  if (condition.kind === "textLength") {
-    if (typeof value !== "string") return false;
-    if (condition.comparison) return comparisonAccepts(condition.comparison, value.length);
-    return (
-      (condition.min === undefined || value.length >= condition.min) &&
-      (condition.max === undefined || value.length <= condition.max)
-    );
-  }
-  if (typeof value !== "number" || !Number.isFinite(value)) return false;
-  if (condition.kind === "number" && condition.integer && !Number.isInteger(value)) return false;
-  if (condition.comparison) return comparisonAccepts(condition.comparison, value);
-  return (
-    (condition.min === undefined || value >= condition.min) &&
-    (condition.max === undefined || value <= condition.max)
-  );
-}
-
-function comparisonMessage(subject: string, comparison: DataValidationComparison): string {
-  switch (comparison.operator) {
-    case "between":
-      return `${subject} must be between ${comparison.min} and ${comparison.max}, inclusive`;
-    case "notBetween":
-      return `${subject} must be less than ${comparison.min} or greater than ${comparison.max}`;
-    case "equal":
-      return `${subject} must equal ${comparison.value}`;
-    case "notEqual":
-      return `${subject} must not equal ${comparison.value}`;
-    case "greaterThan":
-      return `${subject} must be greater than ${comparison.value}`;
-    case "lessThan":
-      return `${subject} must be less than ${comparison.value}`;
-    case "greaterThanOrEqual":
-      return `${subject} must be greater than or equal to ${comparison.value}`;
-    case "lessThanOrEqual":
-      return `${subject} must be less than or equal to ${comparison.value}`;
-  }
-}
-
-function validationMessage(rule: DataValidationRule): string {
-  switch (rule.condition.kind) {
-    case "list":
-      return "Value must match one of the allowed options";
-    case "number":
-      return rule.condition.comparison
-        ? comparisonMessage("Value", rule.condition.comparison)
-        : "Value must be within the allowed numeric range";
-    case "date":
-      return rule.condition.comparison
-        ? comparisonMessage("Date", rule.condition.comparison)
-        : "Date must be within the allowed range";
-    case "textLength":
-      return rule.condition.comparison
-        ? comparisonMessage("Text length", rule.condition.comparison)
-        : "Text length is outside the allowed range";
-    case "checkbox":
-      return "Value must be a valid checkbox state";
   }
 }
 

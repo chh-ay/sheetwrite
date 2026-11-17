@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellEditor, CellEditorContext, Workbook } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, pressLikeWebKit } from "./fixtures.js";
+import { answerDialog, makeColumnarData, makeWorkbook, pressLikeWebKit } from "./fixtures.js";
 
 let restoreCanvas: () => void;
 let reportErrorDescriptor: PropertyDescriptor | undefined;
@@ -277,8 +277,10 @@ describe("custom editor canonical lifecycle", () => {
     input.dispatchEvent(
       new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }),
     );
+    // The rule's Stop alert refuses the entry before it reaches the store.
+    await answerDialog(host, "Cancel");
     expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(7);
-    expect(rejected.at(-1)).toEqual(["validation"]);
+    expect(rejected).toEqual([]);
 
     grid.beginEdit(0, 0);
     input = activeEditorInput(host);

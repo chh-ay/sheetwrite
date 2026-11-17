@@ -140,31 +140,36 @@ function validationXml(
       if (operator === "equal" && condition.min !== undefined) formulas = [condition.min];
     }
   }
-  let helpText = rule.helpText;
-  if (helpText && Array.from(helpText).length > 255) {
-    emitWarning(context, {
-      code: "validation-loss",
-      message: `Validation rule "${rule.id}" prompt/error exceeded 255 characters and was omitted from native XLSX`,
-      sheet,
-    });
-    helpText = undefined;
+  const texts = [
+    ["error", rule.helpText, 255],
+    ["errorTitle", rule.errorTitle, 32],
+    ["promptTitle", rule.inputTitle, 32],
+    ["prompt", rule.inputMessage, 255],
+  ] as const;
+  const textAttributes: string[] = [];
+  for (const [attribute, text, maxLength] of texts) {
+    if (!text) continue;
+    if (Array.from(text).length > maxLength) {
+      emitWarning(context, {
+        code: "validation-loss",
+        message: `Validation rule "${rule.id}" ${attribute} exceeded ${maxLength} characters and was omitted from native XLSX`,
+        sheet,
+      });
+      continue;
+    }
+    textAttributes.push(`${attribute}="${escapeXml(encodeXstring(text))}"`);
   }
+  const errorStyle = rule.errorStyle ?? (rule.policy === "warn" ? "warning" : "stop");
   const attributes = [
     `type="${type}"`,
     ...(operator ? [`operator="${operator}"`] : []),
     `sqref="${areaA1(rule.range)}"`,
     `allowBlank="${rule.allowBlank === false ? 0 : 1}"`,
-    `showInputMessage="${helpText ? 1 : 0}"`,
+    `showInputMessage="${rule.showInputMessage === false ? 0 : 1}"`,
     `showErrorMessage="${rule.policy === "allow" ? 0 : 1}"`,
-    ...(rule.policy !== "allow"
-      ? [`errorStyle="${rule.policy === "reject" ? "stop" : "warning"}"`]
-      : []),
-    ...(helpText
-      ? [
-          `prompt="${escapeXml(encodeXstring(helpText))}"`,
-          `error="${escapeXml(encodeXstring(helpText))}"`,
-        ]
-      : []),
+    // Stop is the schema default, so Excel writes the style only when it is another.
+    ...(errorStyle === "stop" ? [] : [`errorStyle="${errorStyle}"`]),
+    ...textAttributes,
   ].join(" ");
   return `<dataValidation ${attributes}>${formulas.map((formula, index) => `<formula${index + 1}>${escapeXml(encodeXstring(String(formula)))}</formula${index + 1}>`).join("")}</dataValidation>`;
 }

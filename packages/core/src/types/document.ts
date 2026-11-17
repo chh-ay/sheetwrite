@@ -262,6 +262,14 @@ interface NamedFormulaSnapshot {
 export type ValidationPolicy = "reject" | "warn" | "allow";
 
 /**
+ * The style of Excel's error alert for a value a rule rejects, chosen in Data
+ * Validation › Error Alert. `stop` refuses the value (Retry, Cancel);
+ * `warning` asks whether to keep it (Yes, No, Cancel); `information` tells
+ * the user and keeps it (OK, Cancel).
+ */
+export type ValidationErrorStyle = "stop" | "warning" | "information";
+
+/**
  * Native comparison semantics for numeric, date-serial, and text-length validation.
  * Interval operands are inclusive; `notBetween` accepts values outside that interval.
  */
@@ -309,12 +317,35 @@ export interface DataValidationRule {
   range: Range;
   /** What a value must satisfy, such as a list of choices or a number range. */
   condition: DataValidationCondition;
-  /** `reject` refuses a failing value, `warn` accepts it with a warning, `allow` skips the check. */
+  /**
+   * `reject` refuses a failing value, `warn` accepts it with a warning, `allow`
+   * skips the check. In the grid, `reject` shows a Stop alert, `warn` a Warning
+   * or Information alert ({@link DataValidationRule.errorStyle}), and `allow`
+   * no alert (Excel's "Show error alert" turned off).
+   */
   policy: ValidationPolicy;
   /** Whether clearing a cell passes the rule; defaults to `true`. */
   allowBlank?: boolean;
-  /** Message shown when a value fails; without it, a message is built from the condition. */
+  /**
+   * The error alert's message, shown when a value fails; without it, the grid
+   * shows Excel's default text and `MutationIssue.message` is built from the
+   * condition. At most 255 characters.
+   */
   helpText?: string;
+  /** The error alert's title; without it, "Data Validation". At most 32 characters. */
+  errorTitle?: string;
+  /**
+   * The error alert's style. Must agree with `policy`: `stop` (the default)
+   * for `reject`; `warning` (the default) or `information` for `warn`. With
+   * `allow` it keeps the style chosen while the alert is off; default `stop`.
+   */
+  errorStyle?: ValidationErrorStyle;
+  /** Whether the input message shows when a cell of the rule is selected; defaults to `true`. */
+  showInputMessage?: boolean;
+  /** The input message's title. At most 32 characters. */
+  inputTitle?: string;
+  /** The input message, shown beside a selected cell of the rule. At most 255 characters. */
+  inputMessage?: string;
 }
 
 /** Serializable client UX policy. A host resolver decides whether a local mutation may proceed. */

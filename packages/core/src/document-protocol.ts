@@ -1945,8 +1945,24 @@ function validateValidationRuleShape(
   if (!["reject", "warn", "allow"].includes(String(policy))) {
     invalid(errors, `${path}.policy`, "Validation policy is invalid");
   }
+  const errorStyle = ownValue(rule, "errorStyle");
+  if (errorStyle !== undefined) {
+    if (!["stop", "warning", "information"].includes(String(errorStyle))) {
+      invalid(errors, `${path}.errorStyle`, "Validation error style is invalid");
+    } else if ((policy === "reject") !== (errorStyle === "stop") && policy !== "allow") {
+      invalid(
+        errors,
+        `${path}.errorStyle`,
+        "A reject rule's error style is stop; a warn rule's is warning or information",
+      );
+    }
+  }
   optionalBoolean(rule, "allowBlank", path, errors);
   optionalString(rule, "helpText", path, errors);
+  optionalString(rule, "errorTitle", path, errors);
+  optionalBoolean(rule, "showInputMessage", path, errors);
+  optionalString(rule, "inputTitle", path, errors);
+  optionalString(rule, "inputMessage", path, errors);
 }
 
 function validateProtectedRangeShape(
