@@ -16,7 +16,7 @@ import {
 } from "./fill-series.js";
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
-import { filterButtonRect } from "./overlay-painter.js";
+import { filterButtonRect, listButtonRect } from "./overlay-painter.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetKey } from "./sheet-commands.js";
@@ -65,6 +65,17 @@ function showsDate(format: string | undefined): boolean {
   if (format === undefined) return false;
   const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
   return /[dy]/i.test(visible) && !/[#0?]/.test(visible);
+}
+
+/** How an edit opens. */
+interface EditRequest {
+  /** Text typed to start the edit; without it the editor opens on the cell's content. */
+  readonly initial?: string;
+  readonly selectAll?: boolean;
+  /** False opens the editor as the view of a draft another surface types. */
+  readonly focus?: boolean;
+  /** Open the list of the cell's list rule, keeping the items that contain this text. */
+  readonly list?: string;
 }
 
 /** A finished cell entry and the operations that store it. */
@@ -515,6 +526,20 @@ export class InteractionSessions {
    * cell's view of a draft another edit surface types (see `setEditText`).
    */
   beginEdit(row: number, col: number, initial?: string, selectAll = false, focus = true): void {
+    this.startEdit(row, col, { initial, selectAll, focus });
+  }
+
+  /**
+   * Open the list of the list rule over view `row`, `col`, as its dropdown
+   * arrow and Alt+Down do in Excel. `filter`, typed into the cell, keeps only
+   * the items that contain it.
+   */
+  openList(row: number, col: number, filter = ""): void {
+    this.startEdit(row, col, { list: filter });
+  }
+
+  private startEdit(row: number, col: number, request: EditRequest): void {
+    const { initial, selectAll = false, focus = true, list } = request;
     if (this.deps.readOnly()) return;
 
     const editCell = this.deps.anchorCell(row, col);
@@ -601,13 +626,18 @@ export class InteractionSessions {
       return;
     }
 
-    if (initial === undefined && validationRule) {
+    // A list opens only on request (its arrow, Alt+Down or typing); F2 and a
+    // double-click edit the text, as in Excel. A checkbox opens on any edit.
+    const condition = validationRule?.condition;
+    if (validationRule && (condition?.kind === "list" ? list !== undefined : initial === undefined)) {
       this.activeEditor = this.validationEditor;
       this.validationEditor.begin({
         row: editCell.row,
         col: editCell.col,
         rule: validationRule,
+        values: condition?.kind === "list" ? condition.values : [],
         current,
+        filter: list ?? "",
         rect: this.deps.screenRect(
           editCell.row,
           editCell.col,
@@ -617,6 +647,7 @@ export class InteractionSessions {
         theme: this.deps.theme(),
         onCommit: (value, navigate) =>
           this.finishEdit(dataAddr, { kind: "literal", value }, navigate),
+        onCommitText: (value, navigate) => this.finishEdit(dataAddr, value, navigate),
         onCancel: () => this.endEditor(),
       });
 
@@ -917,6 +948,16 @@ export class InteractionSessions {
         this.deps.scheduleRender();
       };
       this.attachDrag(e, move, () => this.detachDrag());
+      return;
+    }
+
+    // The dropdown arrow beside a selected list cell opens its list, or
+    // closes it while it is open, as in Excel.
+    const listCell = this.activeEditor === this.editor ? null : this.listButtonCellAt(px, py);
+    if (listCell) {
+      e.preventDefault();
+      if (this.activeEditor === this.validationEditor) this.cancelEditor();
+      else this.openList(listCell.row, listCell.col);
       return;
     }
 
@@ -1395,7 +1436,7 @@ export class InteractionSessions {
           break;
         }
         if (e.altKey && !mod && focus && this.hasListRule(focus.row, focus.col)) {
-          this.beginEdit(focus.row, focus.col);
+          this.openList(focus.row, focus.col);
           break;
         }
         this.navigate(
@@ -1481,7 +1522,12 @@ export class InteractionSessions {
 
       default:
         if (!mod && !e.altKey && focus && PRINTABLE.test(e.key)) {
-          this.beginEdit(focus.row, focus.col, e.key, false);
+          // Typing in a list cell opens its list filtered by the typed text,
+          // as Excel's AutoComplete for dropdown lists does; a formula still
+          // starts in the cell editor.
+          if (e.key !== "=" && this.hasListRule(focus.row, focus.col)) {
+            this.openList(focus.row, focus.col, e.key);
+          } else this.beginEdit(focus.row, focus.col, e.key, false);
         } else {
           return;
         }
@@ -1707,6 +1753,26 @@ export class InteractionSessions {
           (rule) => rule.condition.kind === "list" && rangeContains(rule.range, addr),
         ) ?? false
     );
+  }
+
+  /**
+   * The active cell when (`x`, `y`), in viewport pixels, falls on the
+   * dropdown arrow painted beside it; null otherwise.
+   */
+  private listButtonCellAt(x: number, y: number): CellRef | null {
+    const focus = this.deps.selection().focusCell;
+    if (!focus || !this.hasListRule(focus.row, focus.col)) return null;
+    const button = listButtonRect(
+      this.deps.screenRect(
+        focus.row,
+        focus.col,
+        this.deps.contentTop(),
+        this.deps.scroller.scrollLeft,
+      ),
+    );
+    const inside =
+      x >= button.x && x <= button.x + button.w && y >= button.y && y <= button.y + button.h;
+    return inside ? focus : null;
   }
 
   private navigate(

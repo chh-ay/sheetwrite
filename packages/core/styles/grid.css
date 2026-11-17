@@ -79,7 +79,42 @@
   white-space: pre;
 }
 
-.sheetwrite-validation-list,
+/* A list rule's dropdown (src/validation-editor.ts): a text box over the
+   cell, and below it the items the box's text keeps. */
+.sheetwrite-validation-combo {
+  position: absolute;
+  z-index: 5;
+  display: grid;
+  align-content: start;
+  gap: 2px;
+}
+
+.sheetwrite-validation-input {
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0 4px;
+  border: 2px solid var(--sheetwrite-selection-border);
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  font: var(--sheetwrite-font);
+  outline: none;
+}
+
+.sheetwrite-validation-list {
+  box-sizing: border-box;
+  border: 1px solid var(--sheetwrite-selection-border);
+  border-radius: 6px;
+  color: var(--sheetwrite-fg);
+  background: var(--sheetwrite-bg);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  font: var(--sheetwrite-font);
+}
+
+.sheetwrite-validation-list[hidden] {
+  display: none;
+}
+
 .sheetwrite-validation-checkbox {
   position: absolute;
   z-index: 5;
@@ -211,6 +246,17 @@
   .sheetwrite-input-message {
     border-color: CanvasText;
   }
+}
+
+/* The dropdown arrow beside a selected list cell (src/overlay-painter.ts),
+   as Excel shows it; the glyph comes from icons.css. */
+.sheetwrite-list-button {
+  border: 1px solid var(--sheetwrite-widget-border, var(--sheetwrite-grid-line, #c8c8c8));
+  background: var(--sheetwrite-widget-bg, var(--sheetwrite-bg, #ffffff));
+}
+
+.sheetwrite-list-glyph {
+  color: var(--sheetwrite-widget-fg, var(--sheetwrite-fg, #333333));
 }
 
 /* Modal dialogs over the grid (src/dialog.ts): the merge warning and Format

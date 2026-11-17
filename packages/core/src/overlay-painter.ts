@@ -22,6 +22,9 @@ const FILTER_BUTTON_SIZE = 16;
 /** Gap between a selected cell and its validation input message. */
 const INPUT_MESSAGE_GAP = 4;
 
+/** Edge of the dropdown arrow beside a selected list cell, in CSS pixels at zoom 1. */
+const LIST_BUTTON_SIZE = 18;
+
 /**
  * Where an AutoFilter header cell's filter button sits: a square at the
  * cell's right edge, as in Excel. `cell` and the result share a coordinate space.
@@ -34,6 +37,21 @@ export function filterButtonRect(cell: { x: number; y: number; w: number; h: num
 } {
   const size = Math.max(0, Math.min(FILTER_BUTTON_SIZE, cell.h - 4, cell.w - 4));
   return { x: cell.x + cell.w - size - 2, y: cell.y + (cell.h - size) / 2, w: size, h: size };
+}
+
+/**
+ * Where the dropdown arrow of a selected list cell sits: a square just right
+ * of the cell, on its bottom edge, as in Excel. `cell` and the result share a
+ * coordinate space.
+ */
+export function listButtonRect(cell: { x: number; y: number; w: number; h: number }): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  const size = Math.max(0, Math.min(LIST_BUTTON_SIZE, cell.h));
+  return { x: cell.x + cell.w, y: cell.y + cell.h - size, w: size, h: size };
 }
 
 const EMPTY_VIEW_ROWS = new Int32Array(0);
@@ -457,7 +475,7 @@ export class OverlayPainter {
     // As in Excel, the moving border of a cut shows over the selection.
     this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
-    this.paintInputMessage(theme, contentTop, scrollLeft, clientW, clientH);
+    this.paintValidation(theme, contentTop, scrollLeft, clientW, clientH);
     this.hideSurplus();
     this.hideSurplusPresenceLabels();
   }
@@ -1405,11 +1423,12 @@ export class OverlayPainter {
   }
 
   /**
-   * The input message of the active cell's validation rule, as Excel shows it
-   * while the cell is selected: a box below the cell, starting at its middle.
-   * Screen readers hear it as the cell's description (`aria-mirror.ts`).
+   * What Excel shows beside the active cell of a validation rule: the
+   * dropdown arrow of a list rule, and the input message in a box below the
+   * cell, starting at its middle. Screen readers hear the input message as
+   * the cell's description (`aria-mirror.ts`).
    */
-  private paintInputMessage(
+  private paintValidation(
     theme: Theme,
     contentTop: number,
     scrollLeft: number,
@@ -1419,7 +1438,7 @@ export class OverlayPainter {
     const focus = this.deps.selection().focusCell;
     const rule = focus ? this.deps.validationRuleAt(focus.row, focus.col) : undefined;
     const cell =
-      focus && rule && hasInputMessage(rule)
+      focus && rule
         ? this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft)
         : null;
     if (
@@ -1430,6 +1449,22 @@ export class OverlayPainter {
       cell.x + cell.w <= theme.rowHeaderWidth ||
       cell.x >= clientW
     ) {
+      this.inputMessage?.remove();
+      return;
+    }
+
+    if (rule.condition.kind === "list") {
+      const button = listButtonRect(cell);
+      const el = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      el.className = "sheetwrite-list-button";
+      el.style.outlineStyle = "none";
+      const glyph = this.acquireRect(button.x, button.y, button.w, button.h, "", "transparent");
+      glyph.className = "sheetwrite-icon sheetwrite-list-glyph";
+      glyph.style.outlineStyle = "none";
+      glyph.style.setProperty("--sheetwrite-icon-size", `${button.w}px`);
+      glyph.dataset.icon = "filterArrow";
+    }
+    if (!hasInputMessage(rule)) {
       this.inputMessage?.remove();
       return;
     }

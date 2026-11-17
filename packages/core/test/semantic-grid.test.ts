@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellEditor, CellEditorContext, Workbook } from "../src/types.js";
@@ -86,16 +86,84 @@ it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
 
   altDown();
-  const list = host.querySelector<HTMLElement>('[role="listbox"]');
-  expect(list).not.toBeNull();
+  expect(host.querySelector('[role="listbox"]')).not.toBeNull();
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-  list?.dispatchEvent(
+  host.querySelector('[role="combobox"]')?.dispatchEvent(
     new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
   );
   expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("Open");
 
   grid.destroy();
   store.dispose();
+});
+
+it("shows a list cell's dropdown arrow, opens the list from it or by typing, and edits text on F2", () => {
+  const requestFrame = globalThis.requestAnimationFrame;
+  // Paint at once, so the test reads the state that the next frame shows.
+  globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    callback(0);
+    return 0;
+  };
+  const workbook = makeWorkbook(4);
+  workbook.sheets[0]!.validationRules = [
+    {
+      id: "region",
+      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      condition: { kind: "list", values: ["North", "South", "West", "South-West"] },
+      policy: "reject",
+    },
+  ];
+  const store = new SheetwriteStore(workbook, makeColumnarData(4));
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  const press = (target: Element | null, key: string) =>
+    target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  const options = () => [...host.querySelectorAll('[role="option"]')].map((item) => item.textContent);
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+  expect(host.querySelector(".sheetwrite-list-button")).toBeNull();
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  const button = host.querySelector<HTMLElement>(".sheetwrite-list-button");
+  expect(button).not.toBeNull();
+  // The arrow sits just right of B2, as in Excel.
+  const cellRight = DEFAULT_THEME.rowHeaderWidth + 160 + 120;
+  expect(button?.style.left).toBe(`${cellRight}px`);
+
+  const scroller = host.querySelector(".sheetwrite-scroller");
+  const click = new PointerEvent("pointerdown", {
+    clientX: cellRight + 5,
+    clientY: DEFAULT_THEME.headerHeight + 2 * DEFAULT_THEME.rowHeight - 5,
+    button: 0,
+    pointerType: "mouse",
+    bubbles: true,
+    cancelable: true,
+  });
+  scroller?.dispatchEvent(click);
+  expect(options()).toEqual(["North", "South", "West", "South-West"]);
+  expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  press(host.querySelector('[role="combobox"]'), "Escape");
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+
+  press(host, "w");
+  const box = host.querySelector<HTMLInputElement>('[role="combobox"]');
+  expect(box?.value).toBe("w");
+  if (box) {
+    box.value = "we";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  expect(options()).toEqual(["West", "South-West"]);
+  press(box, "ArrowDown");
+  press(box, "Enter");
+  expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("West");
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  press(host, "F2");
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe("West");
+
+  grid.destroy();
+  store.dispose();
+  globalThis.requestAnimationFrame = requestFrame;
 });
 
 it("removes grid DOM when disposing its owned store fails", () => {
