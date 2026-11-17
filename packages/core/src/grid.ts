@@ -18,6 +18,7 @@ import { ClipboardController } from "./clipboard-controller.js";
 import { isDashboard } from "./dashboard.js";
 import { attachDashboardView, type DashboardViewHook } from "./dashboard/dashboard-loader.js";
 import { DatasourceController } from "./datasource-controller.js";
+import type { DialogHost } from "./dialog.js";
 import { DocumentController } from "./document-controller.js";
 import {
   admitTransactionResources,
@@ -589,6 +590,8 @@ export class GridImpl implements Grid {
   private readonly dialogs = new ScopeSlot(this.lifetime);
   /** The merge command's build; a destroy closes it, so a chunk that loads late is dropped. */
   private readonly mergeBuilds = new ScopeSlot(this.lifetime);
+  /** What the lazily loaded dialogs use; one is open at a time. */
+  private readonly dialogHost: DialogHost;
   private readonly notes: NotePopover;
   private readonly actionFeedback: ActionFeedback;
   private config: GridConfig | undefined;
@@ -934,6 +937,16 @@ export class GridImpl implements Grid {
       commit: (patches) => this.document.commit(patches, "style"),
     };
     this.styleActions = new StyleActions(this.styleDeps);
+    this.dialogHost = {
+      host: this.host,
+      theme: () => this.baseTheme,
+      returnFocus: () => {
+        if (!this.lifetime.closed) this.host.focus();
+      },
+      adopt: (close) => {
+        this.dialogs.next().add(close);
+      },
+    };
 
     this.actions = this.buildActions();
 
@@ -2840,38 +2853,12 @@ export class GridImpl implements Grid {
     void import("./merge-command.js").then(
       ({ mergeSelection }) => {
         if (build.closed) return;
-        mergeSelection(this.styleDeps, center, (request) => this.confirm(request));
+        mergeSelection(this.styleDeps, center, this.dialogHost);
       },
       (error: unknown) => {
         if (build.closed) return;
         // Tell the user; the load error still reaches the host.
         this.actionFeedback.show(`Merge could not load: ${errorDetail(error)}`);
-        throw error;
-      },
-    );
-  }
-
-  /**
-   * Ask the user to confirm in a modal dialog, which loads on first use like
-   * the find bar. Resolves `false` on Cancel or Escape, and when another
-   * dialog opens or the grid is destroyed first.
-   */
-  private confirm(request: { readonly title: string; readonly message: string }): Promise<boolean> {
-    if (this.lifetime.closed) return Promise.resolve(false);
-    const scope = this.dialogs.next();
-    return import("./dialog.js").then(
-      ({ confirmDialog }) => {
-        if (scope.closed) return false;
-        const dialog = confirmDialog(this.host, this.baseTheme, request, () => {
-          if (!this.lifetime.closed) this.host.focus();
-        });
-        scope.add(() => dialog.close());
-        return dialog.result;
-      },
-      (error: unknown) => {
-        if (scope.closed) return false;
-        // Tell the user; the load error still reaches the host.
-        this.actionFeedback.show(`The dialog could not load: ${errorDetail(error)}`);
         throw error;
       },
     );

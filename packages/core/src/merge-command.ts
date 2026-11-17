@@ -4,6 +4,7 @@
  * load carries none of it.
  */
 
+import { confirmDialog, type DialogHost } from "./dialog.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { mergeCrossesFreeze, mergesOverlap } from "./store/ranges.js";
 import type { StyleActionsDeps } from "./style-actions.js";
@@ -24,15 +25,12 @@ interface MergeBounds {
   c1: number;
 }
 
-/** Ask the user to confirm in a dialog; resolves `true` for OK. */
-type Confirm = (request: { readonly title: string; readonly message: string }) => Promise<boolean>;
-
 /**
  * Merge the selected range. As in Excel, when more than one of its cells
  * holds a value, a warning that only the upper-left value stays opens first,
  * and the merge happens only after OK.
  */
-export function mergeSelection(deps: StyleActionsDeps, center: boolean, confirm: Confirm): void {
+export function mergeSelection(deps: StyleActionsDeps, center: boolean, dialogs: DialogHost): void {
   const merge = mergeBounds(deps);
   if (merge === null) return;
   if (countValues(deps, merge, 2) < 2) {
@@ -40,7 +38,8 @@ export function mergeSelection(deps: StyleActionsDeps, center: boolean, confirm:
     return;
   }
 
-  void confirm({ title: "Merge Cells", message: MERGE_WARNING }).then((ok) => {
+  const warning = confirmDialog(dialogs, { title: "Merge Cells", message: MERGE_WARNING });
+  void warning.result.then((ok) => {
     // The selection or the sheet may have changed while the warning was open.
     const now = mergeBounds(deps);
     if (

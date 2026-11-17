@@ -41,24 +41,32 @@ interface Dialog {
   close(value?: string): void;
 }
 
+/** What a dialog needs from the grid that opens it. */
+export interface DialogHost {
+  /** The grid root; the backdrop covers it. */
+  readonly host: HTMLElement;
+  /** The grid's theme, for the widget variables. */
+  theme(): Theme;
+  /** Give the grid its focus back when the dialog closes. */
+  returnFocus(): void;
+  /** Keep `close`, which the grid calls when another dialog opens or the grid is destroyed. */
+  adopt(close: () => void): void;
+}
+
 const FOCUSABLE = "button, input, select, textarea, [tabindex]:not([tabindex='-1'])";
 
 let dialogCount = 0;
 
 /**
- * Open a modal dialog over `host`, the grid root. A backdrop covers the grid
- * until the dialog closes. Tab and Shift+Tab stay inside the dialog, Escape
- * cancels and Enter chooses the default button. Keys never reach the grid
- * while the dialog has focus. On close the dialog is removed and
- * `returnFocus` gives the grid its focus back.
+ * Open a modal dialog over the grid. A backdrop covers the grid until the
+ * dialog closes. Tab and Shift+Tab stay inside the dialog, Escape cancels and
+ * Enter chooses the default button. Keys never reach the grid while the
+ * dialog has focus. On close the dialog is removed and the grid gets its
+ * focus back.
  */
-function openDialog(
-  host: HTMLElement,
-  theme: Theme,
-  options: DialogOptions,
-  returnFocus: () => void,
-): Dialog {
-  seedWidgetTheme(host, theme);
+function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
+  const { host } = grid;
+  seedWidgetTheme(host, grid.theme());
   const id = `sheetwrite-dialog-${++dialogCount}`;
 
   const backdrop = document.createElement("div");
@@ -98,7 +106,7 @@ function openDialog(
     if (!open) return;
     open = false;
     backdrop.remove();
-    returnFocus();
+    grid.returnFocus();
     resolve(value);
   };
 
@@ -157,6 +165,7 @@ function openDialog(
   host.append(backdrop);
   checkStylePart(element, "grid", "The dialog");
   (options.initialFocus ?? defaultButton ?? element.querySelector<HTMLElement>(FOCUSABLE))?.focus();
+  grid.adopt(() => close());
 
   return { element, result, close };
 }
@@ -175,25 +184,18 @@ export interface ConfirmOptions {
  * `true` for OK and to `false` for Cancel, Escape or close.
  */
 export function confirmDialog(
-  host: HTMLElement,
-  theme: Theme,
+  grid: DialogHost,
   options: ConfirmOptions,
-  returnFocus: () => void,
 ): { readonly result: Promise<boolean>; close(): void } {
-  const dialog = openDialog(
-    host,
-    theme,
-    {
-      title: options.title,
-      role: "alertdialog",
-      body: options.message,
-      buttons: [
-        { label: options.ok ?? "OK", value: "ok", default: true },
-        { label: "Cancel", value: "cancel" },
-      ],
-      cancel: "cancel",
-    },
-    returnFocus,
-  );
+  const dialog = openDialog(grid, {
+    title: options.title,
+    role: "alertdialog",
+    body: options.message,
+    buttons: [
+      { label: options.ok ?? "OK", value: "ok", default: true },
+      { label: "Cancel", value: "cancel" },
+    ],
+    cancel: "cancel",
+  });
   return { result: dialog.result.then((value) => value === "ok"), close: () => dialog.close() };
 }

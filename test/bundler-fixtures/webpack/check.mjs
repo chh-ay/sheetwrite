@@ -53,11 +53,10 @@ const FIND_MARKER = "sheetwrite-find-replace-row";
 // The AutoFilter's commands and dropdown load on first use, together; the
 // message Data › Filter shows outside a range of data survives minifiers.
 const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
-// The modal dialog shell (the merge warning) loads with the first dialog; its
-// backdrop class survives minifiers.
-const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
-// Merge and Merge & Center load on first use; Excel's warning text survives minifiers.
+// Merge and Merge & Center load on first use, with the dialog shell of their
+// warning; the warning's text and the dialog's backdrop class survive minifiers.
 const MERGE_MARKER = "Merging cells only keeps the upper-left value";
+const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -79,7 +78,6 @@ const editLinksPanelChunks = [];
 const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
-const dialogChunks = [];
 const mergeChunks = [];
 const dashboardChunks = [];
 const workers = [];
@@ -104,7 +102,6 @@ for (const file of lazyChunks) {
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
-  else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
@@ -134,8 +131,6 @@ if (findChunks.length !== 1)
   throw new Error(`Expected one lazy webpack find bar chunk, got ${findChunks.length}`);
 if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
-if (dialogChunks.length !== 1)
-  throw new Error(`Expected one lazy webpack dialog chunk, got ${dialogChunks.length}`);
 if (mergeChunks.length !== 1)
   throw new Error(`Expected one lazy webpack merge command chunk, got ${mergeChunks.length}`);
 if (addonRegistryChunks.length !== 1) {
@@ -230,7 +225,6 @@ const assets = publicFiles.map((file) => {
       functionTableChunks,
       findChunks,
       autoFilterChunks,
-      dialogChunks,
       mergeChunks,
       documentChunks,
       dashboardChunks,
