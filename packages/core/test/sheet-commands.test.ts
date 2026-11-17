@@ -106,12 +106,12 @@ describe("Tab Color", () => {
 });
 
 describe("Move or Copy", () => {
-  it("copies a sheet before another and points the copy's own references at the copy", () => {
+  it("copies a sheet before another and points the copy's own references at the copy", async () => {
     set("a", 0, { kind: "literal", value: 5 });
     set("a", 1, { kind: "formula", src: "=Sales!A1*2" });
     set("a", 2, { kind: "formula", src: "=Costs!A1+A1" });
 
-    const result = grid.copySheet("a", { index: 2 });
+    const result = await grid.copySheet("a", { index: 2 });
     expect(result.status).toBe("applied");
     expect(names()).toEqual(["Sales", "Costs", "Sales (2)", "Old", "Notes"]);
     const copy = result.sheet;
@@ -122,12 +122,12 @@ describe("Move or Copy", () => {
     expect(store.getCell({ sheet: copy, row: 1, col: 0 }).resolved).toBe(14);
     expect(store.getCell({ sheet: "a", row: 1, col: 0 }).resolved).toBe(10);
 
-    expect(grid.copySheet("a").status).toBe("applied");
+    expect((await grid.copySheet("a")).status).toBe("applied");
     expect(names()).toContain("Sales (3)");
   });
 
-  it("removes the copy on undo", () => {
-    grid.copySheet("b");
+  it("removes the copy on undo", async () => {
+    await grid.copySheet("b");
     expect(names()).toEqual(["Sales", "Costs", "Costs (2)", "Old", "Notes"]);
     grid.undo();
     expect(names()).toEqual(["Sales", "Costs", "Old", "Notes"]);

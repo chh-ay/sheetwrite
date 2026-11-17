@@ -112,7 +112,7 @@ describe("SheetTabs", () => {
     expect(menu?.getAttribute("aria-label")).toBe("Summary sheet options");
   });
 
-  it("offers Insert, Tab Color and Move or Copy in a sheet's menu, as Excel does", () => {
+  it("offers Insert, Tab Color and Move or Copy in a sheet's menu, as Excel does", async () => {
     const calls: string[] = [];
     tabs.destroy();
     tabs = new SheetTabs(host, {
@@ -142,17 +142,30 @@ describe("SheetTabs", () => {
     const choose = (label: string): void => {
       openMenu().querySelector<HTMLButtonElement>(`[aria-label="${label}"]`)!.click();
     };
+    // The Tab Color palette and the Move or Copy dialog load on first use.
+    const panel = async (role: string): Promise<HTMLElement> => {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        const found = host.querySelector<HTMLElement>(`.sheetwrite-tab-panel[role="${role}"]`);
+        if (found) return found;
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      throw new Error(`No ${role} opened`);
+    };
+    const color = async (name: string): Promise<HTMLElement> => {
+      choose("Tab color for Sales sheet");
+      const palette = await panel("menu");
+      palette.querySelector<HTMLButtonElement>(`[aria-label="${name}"]`)!.click();
+      return palette;
+    };
 
     choose("Insert a sheet before Sales");
-    choose("Dark Red");
-    choose("No Color");
-    const swatches = openMenu().querySelectorAll('[role="menuitemradio"]');
-    expect(swatches.length).toBe(11);
-    key(swatches[0]!, "Escape");
+    expect((await color("Dark Red")).querySelectorAll('[role="menuitemradio"]').length).toBe(11);
+    await color("No Color");
+    expect(host.querySelector(".sheetwrite-tab-panel")).toBeNull();
 
-    const moveOrCopy = (before: string, copy: boolean): void => {
+    const moveOrCopy = async (before: string, copy: boolean): Promise<void> => {
       choose("Move or copy Sales sheet");
-      const dialog = host.querySelector<HTMLElement>('[role="dialog"]')!;
+      const dialog = await panel("dialog");
       expect(dialog.getAttribute("aria-label")).toBe("Move or copy Sales sheet");
       const list = dialog.querySelector<HTMLSelectElement>('select[aria-label="Before sheet"]')!;
       list.value = [...list.options].find((option) => option.text === before)!.value;
@@ -160,9 +173,9 @@ describe("SheetTabs", () => {
       [...dialog.querySelectorAll("button")].find((button) => button.textContent === "OK")!.click();
       expect(host.querySelector('[role="dialog"]')).toBeNull();
     };
-    moveOrCopy("Summary", true);
-    moveOrCopy("(move to end)", false);
-    moveOrCopy("Sales", false);
+    await moveOrCopy("Summary", true);
+    await moveOrCopy("(move to end)", false);
+    await moveOrCopy("Sales", false);
 
     expect(calls).toEqual([
       "insert:b",

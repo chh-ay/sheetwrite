@@ -79,7 +79,6 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
-import { copySheet as copySheetSnapshot, copySheetName } from "./sheet-copy.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
@@ -1680,11 +1679,11 @@ export class GridImpl implements Grid {
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
-      onCopy: (id, index) => {
-        const result = this.copySheet(id, { index });
-        if (result.status === "applied") this.setActiveSheet(result.sheet);
-        return result;
-      },
+      onCopy: (id, index) =>
+        this.copySheet(id, { index }).then((result) => {
+          if (result.status === "applied") this.setActiveSheet(result.sheet);
+          return result;
+        }),
       onTabColor: (id, color) => this.setSheetTabColor(id, color),
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
@@ -3306,7 +3305,19 @@ export class GridImpl implements Grid {
     return { ...result, sheet: id };
   }
 
-  copySheet(id: SheetId, options: { index?: number; name?: string } = {}): SheetLifecycleResult {
+  copySheet(
+    id: SheetId,
+    options: { index?: number; name?: string } = {},
+  ): Promise<SheetLifecycleResult> {
+    // The copy's code loads the first time a sheet is copied.
+    return import("./sheet-copy.js").then((copies) => this.copySheetWith(copies, id, options));
+  }
+
+  private copySheetWith(
+    copies: typeof import("./sheet-copy.js"),
+    id: SheetId,
+    options: { index?: number; name?: string },
+  ): SheetLifecycleResult {
     const workbook = this.store.getWorkbook();
     const from = workbook.sheets.findIndex((sheet) => sheet.id === id);
     const source = from < 0 ? null : this.document.snapshotSheet(id);
@@ -3328,11 +3339,11 @@ export class GridImpl implements Grid {
     for (let suffix = 2; used.has(copyId); suffix++) copyId = `${id}-copy-${suffix}`;
     const name =
       options.name ??
-      copySheetName(
+      copies.copySheetName(
         source.name,
         workbook.sheets.map((sheet) => sheet.name),
       );
-    const copy = copySheetSnapshot(
+    const copy = copies.copySheet(
       source,
       { id: copyId, name, order: options.index ?? from + 1 },
       workbook,

@@ -282,11 +282,11 @@ export function createSpreadsheetShell(
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),
       onMove: (id, toIndex) => grid.moveSheet(id, toIndex),
-      onCopy: (id, index) => {
-        const result = grid.copySheet(id, { index });
-        if (result.status === "applied") grid.setActiveSheet(result.sheet);
-        return result;
-      },
+      onCopy: (id, index) =>
+        grid.copySheet(id, { index }).then((result) => {
+          if (result.status === "applied") grid.setActiveSheet(result.sheet);
+          return result;
+        }),
       onTabColor: (id, color) => grid.setSheetTabColor(id, color),
       onHide: (id) => grid.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => grid.setSheetVisibility(id, "visible"),
