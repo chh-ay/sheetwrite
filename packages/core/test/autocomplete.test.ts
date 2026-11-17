@@ -168,6 +168,8 @@ describe("AutoComplete", () => {
     key("Escape");
     await type("=SU");
     expect(editor().value).toBe("=SU");
+    // The first Escape closes the function list; the second cancels the edit.
+    key("Escape");
     key("Escape");
     // "12 a" is text, so it completes.
     await type("12 a");
