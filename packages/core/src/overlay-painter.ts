@@ -288,6 +288,8 @@ export class OverlayPainter {
   private presenceOverlays: readonly NormalizedPresenceOverlay[] = [];
   /** The cells of a cut that waits for a paste, in data rows. */
   private cutMark: Range | null = null;
+  /** The cells an undo or redo changed, in data rows, shown for a moment. */
+  private flash: readonly Range[] = [];
 
   // Reusable rect divs. `cursor` resets to 0 at the top of every paint pass;
   // `acquireRect` hands out `pool[cursor++]`, creating and appending a fresh
@@ -312,6 +314,7 @@ export class OverlayPainter {
   private highlightVersion = 0;
   private presenceVersion = 0;
   private cutVersion = 0;
+  private flashVersion = 0;
 
   // Repaints look up only the rows in the painted band. Each index rebuilds
   // when its items or the view order change, never on scroll.
@@ -340,6 +343,7 @@ export class OverlayPainter {
   private lastHighlightVersion = -1;
   private lastPresenceVersion = -1;
   private lastCutVersion = -1;
+  private lastFlashVersion = -1;
   private lastSearchVersion = -1;
   private lastGeometryVersion = -1;
   private lastPaintNotes: readonly CellNote[] | undefined;
@@ -410,6 +414,13 @@ export class OverlayPainter {
     this.deps.scheduleRender();
   }
 
+  /** Tint the cells an undo or redo changed, so the user sees them; `[]` removes the tint. */
+  setFlash(ranges: readonly Range[]): void {
+    this.flash = ranges;
+    this.flashVersion += 1;
+    this.deps.scheduleRender();
+  }
+
   private getPresenceColorContext(): CanvasRenderingContext2D | null {
     if (this.presenceColorContext !== undefined) return this.presenceColorContext;
     this.presenceColorContext = document.createElement("canvas").getContext("2d");
@@ -425,6 +436,7 @@ export class OverlayPainter {
     this.presenceLabelCursor = 0;
     this.presenceLabelBoundsCount = 0;
     this.paintHighlights(theme, sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintFlash(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintPresence(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintNotes(theme, sheet, contentTop, scrollLeft, clientW, clientH);
 
@@ -514,6 +526,7 @@ export class OverlayPainter {
       this.highlightVersion === this.lastHighlightVersion &&
       this.presenceVersion === this.lastPresenceVersion &&
       this.cutVersion === this.lastCutVersion &&
+      this.flashVersion === this.lastFlashVersion &&
       searchVersion === this.lastSearchVersion &&
       geometryVersion === this.lastGeometryVersion &&
       notes === this.lastPaintNotes &&
@@ -540,6 +553,7 @@ export class OverlayPainter {
     this.lastHighlightVersion = this.highlightVersion;
     this.lastPresenceVersion = this.presenceVersion;
     this.lastCutVersion = this.cutVersion;
+    this.lastFlashVersion = this.flashVersion;
     this.lastSearchVersion = searchVersion;
     this.lastGeometryVersion = geometryVersion;
     this.lastPaintNotes = notes;
@@ -1291,6 +1305,42 @@ export class OverlayPainter {
     sq.style.cursor = "crosshair";
   }
 
+  private paintFlash(
+    theme: Theme,
+    sheet: Sheet,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const activeSheet = this.deps.activeSheet();
+    const tint = `color-mix(in srgb, ${theme.searchActiveMatch} 45%, transparent)`;
+    for (const range of this.flash) {
+      if (range.sheet !== activeSheet) continue;
+      const first = this.deps.toViewRow(range.start.row);
+      const last = this.deps.toViewRow(range.end.row);
+      if (first === null || last === null) continue;
+      const before = this.cursor;
+      this.appendClampedRange(
+        Math.min(first, last),
+        Math.min(range.start.col, range.end.col),
+        Math.max(first, last),
+        Math.max(range.start.col, range.end.col),
+        tint,
+        "transparent",
+        theme,
+        sheet,
+        contentTop,
+        scrollLeft,
+        clientW,
+        clientH,
+      );
+      for (let index = before; index < this.cursor; index++) {
+        this.pool[index]?.setAttribute("data-sheetwrite-flash", "");
+      }
+    }
+  }
+
   /**
    * Draw the cut mark as dashes that run clockwise around the cells, the
    * "marching ants" of Excel; still dashes when the user asks for reduced
@@ -1428,6 +1478,7 @@ export class OverlayPainter {
     el.style.removeProperty("--sheetwrite-icon-size");
     el.textContent = "";
     el.removeAttribute("data-sheetwrite-presence");
+    el.removeAttribute("data-sheetwrite-flash");
     el.removeAttribute("data-sheetwrite-presence-range");
     el.removeAttribute("aria-hidden");
     el.removeAttribute("title");
@@ -1453,6 +1504,7 @@ export class OverlayPainter {
       const el = this.pool[i]!;
       if (el.hasAttribute("data-sheetwrite-cut")) endCutDashes(el);
       el.removeAttribute("data-sheetwrite-presence");
+      el.removeAttribute("data-sheetwrite-flash");
       // A hidden filter button must not stay one, for queries and styles alike.
       if (el.className) el.className = "";
       el.removeAttribute("data-filtered");
