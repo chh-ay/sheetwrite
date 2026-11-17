@@ -38,6 +38,14 @@ const DOCUMENT_FOLD = "M14 3v4.5h4.5";
 const LETTER_A = "M3 19 8 6l5 13";
 const LETTER_A_BAR = "M4.9 14.5h6.2";
 const FUNNEL = "M4 5h16l-6 7.5V19l-4 2v-8.5Z";
+/** The funnel beside a second mark: Clear and Reapply. */
+const SMALL_FUNNEL = "M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z";
+/** The dotted rows above and below the cells an Insert or Delete glyph tints. */
+const ROW_GUIDES = "M3 5h12M3 19h12";
+/** One cell between those rows: Insert Cells and Delete Cells. */
+const CELL_BOX = "M5.5 9.5h7v5h-7Z";
+/** The edge of the sheet that the sheet tabs hang from, as in the tab bar. */
+const TAB_EDGE = "M2.5 5h19";
 /** The value and category axes every cartesian chart glyph shares. */
 const AXES = "M4 4v16h16";
 /** Three rising columns; Insert › Chart uses them as the chart family's face. */
@@ -51,6 +59,32 @@ function frame(x: number, y: number, width: number, height: number): string {
   const w = width - 2 * r;
   const h = height - 2 * r;
   return `M${x + r} ${y}h${w}a${r} ${r} 0 0 1 ${r} ${r}v${h}a${r} ${r} 0 0 1-${r} ${r}h-${w}a${r} ${r} 0 0 1-${r}-${r}v-${h}a${r} ${r} 0 0 1 ${r}-${r}Z`;
+}
+
+/** A sheet tab hanging from `TAB_EDGE`, `width` wide from `x`, with rounded bottom corners. */
+function tab(x: number, width: number, bottom: number): string {
+  return `M${x} 5v${bottom - 6.5}a1.5 1.5 0 0 0 1.5 1.5h${width - 3}a1.5 1.5 0 0 0 1.5-1.5V5`;
+}
+
+/** A gear centred in the cell: `teeth` flat teeth from the `root` radius out to `outer`. */
+function gear(teeth: number, outer: number, root: number): string {
+  const step = 360 / teeth;
+  const point = (radius: number, degrees: number): string => {
+    const angle = (degrees * Math.PI) / 180;
+    return `${+(12 + radius * Math.sin(angle)).toFixed(1)} ${+(12 - radius * Math.cos(angle)).toFixed(1)}`;
+  };
+  const corners: string[] = [];
+  for (let tooth = 0; tooth < teeth; tooth++) {
+    const middle = tooth * step;
+    for (const [radius, side] of [
+      [root, -0.33],
+      [outer, -0.18],
+      [outer, 0.18],
+      [root, 0.33],
+    ] as const)
+      corners.push(point(radius, middle + side * step));
+  }
+  return `M${corners.join("L")}Z`;
 }
 
 export const ICON_ROWS: readonly (readonly Glyph[])[] = [
@@ -307,6 +341,21 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       "ungroupRows",
       ["M10 6h10M10 12h10M10 18h10", guide("M7.5 6H5v12h2.5"), "m2.5 10.5 3 3m0-3-3 3"],
     ],
+    // Insert Cells… and Delete Cells…: one cell between the dotted rows, not
+    // a whole row, with Insert's plus and Delete's cross.
+    ["insertCells", [guide(ROW_GUIDES), tint(CELL_BOX), CELL_BOX, "M19 9.5v5M16.5 12h5"]],
+    ["deleteCells", [guide(ROW_GUIDES), tint(CELL_BOX), CELL_BOX, "m16.5 9.5 5 5m0-5-5 5"]],
+    // Format Cells…: a block of cells, the selected one tinted, and a pencil.
+    // The block stops short of the pencil, so the two never cross.
+    [
+      "formatCells",
+      [
+        tint("M3 10V4.5A1.5 1.5 0 0 1 4.5 3H10v7Z"),
+        "M10 17H4.5A1.5 1.5 0 0 1 3 15.5v-11A1.5 1.5 0 0 1 4.5 3h11A1.5 1.5 0 0 1 17 4.5V10",
+        "M3 10h14M10 3v14",
+        "M18.5 12.5a1.77 1.77 0 0 1 2.5 2.5l-5.5 5.5-3.5 1 1-3.5Z",
+      ],
+    ],
   ],
   // Sorting and filtering.
   [
@@ -318,8 +367,10 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       "sortDesc",
       ["M6 4v16m-3-3 3 3 3-3", "M12.5 4.5h5l-5 6h5", "M12.5 20 15 13.5l2.5 6.5M13.3 18h3.4"],
     ],
-    ["sortFilter", [FUNNEL]],
-    ["clearFilter", ["M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z", "m15.5 14.5 5 5m0-5-5 5"]],
+    // Sort & Filter: the sort arrow beside a funnel, so the menu's glyph is
+    // not the same as its Filter item's.
+    ["sortFilter", ["M6 4v16m-3-3 3 3 3-3", "M10 5h11l-4.25 5v6.5l-2.5 1.25V10Z"]],
+    ["clearFilter", [SMALL_FUNNEL, "m15.5 14.5 5 5m0-5-5 5"]],
     // Custom Sort: sort levels of falling length beside the sort arrow.
     ["sortCustom", ["M18 4v16m-3-3 3 3 3-3", "M3 6h10M3 12h7.5M3 18h5"]],
     // Sort view only: an eye over a sort arrow; the cells stay where they are.
@@ -334,14 +385,11 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
     // Data › Filter turns the header buttons on and off.
     ["filter", [FUNNEL]],
     // Reapply: the funnel with a turning arrow beside it.
-    [
-      "reapplyFilter",
-      [
-        "M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z",
-        "M21 16.5a3.5 3.5 0 1 1-1.03-2.47",
-        "M20.5 11.5v2.6h-2.6",
-      ],
-    ],
+    ["reapplyFilter", [SMALL_FUNNEL, "M21 16.5a3.5 3.5 0 1 1-1.03-2.47", "M20.5 11.5v2.6h-2.6"]],
+    // An AutoFilter header cell's button, drawn to fill the button's square:
+    // a chevron, and a funnel beside it once the column is filtered, as in Excel.
+    ["filterArrow", ["m7.5 10 4.5 4.5 4.5-4.5"]],
+    ["filterActive", ["M3.5 6h10l-3.75 4.5v5.25l-2.5 1.25v-6.5Z", "m15.5 11 2.5 2.5 2.5-2.5"]],
   ],
   // Charts, one glyph per chart kind, and pivot tables.
   [
@@ -521,5 +569,35 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       ["M6.5 3h11A1.5 1.5 0 0 1 19 4.5V21l-7-4.5L5 21V4.5A1.5 1.5 0 0 1 6.5 3Z", "M12 7v6M9 10h6"],
     ],
   ],
-  [["importXlsx", [DOCUMENT, DOCUMENT_FOLD, "M2 12h10m-3-3 3 3-3 3", "M9 18h6"]]],
+  // The File tab: import and options.
+  [
+    ["importXlsx", [DOCUMENT, DOCUMENT_FOLD, "M2 12h10m-3-3 3 3-3 3", "M9 18h6"]],
+    ["settings", [gear(8, 9, 6.6), "M14.8 12a2.8 2.8 0 1 1-5.6 0 2.8 2.8 0 0 1 5.6 0Z"]],
+    // A keyboard: two rows of keys over the space bar.
+    [
+      "keyboardShortcuts",
+      [frame(2.5, 6, 19, 12), bold("M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01"), "M7.5 14h9"],
+    ],
+  ],
+  // Sheets: the tab menu. Tabs hang from the sheet's edge, as in the tab bar.
+  [
+    // Insert: a new tab, tinted, and Insert's plus.
+    [
+      "insertSheet",
+      [TAB_EDGE, tint(`${tab(4, 9.5, 17)}Z`), tab(4, 9.5, 17), "M18.5 9.5v5M16 12h5"],
+    ],
+    // Move or Copy…: a tab, an empty place for it, and the arrow between.
+    [
+      "moveCopySheet",
+      [
+        TAB_EDGE,
+        tint(`${tab(3.5, 7, 13)}Z`),
+        tab(3.5, 7, 13),
+        guide(tab(13.5, 7, 13)),
+        "M6.5 18h11m-2.5-2.5 2.5 2.5-2.5 2.5",
+      ],
+    ],
+    // Tab Color…: a tab with its colour bar under the name, as the tab bar shows it.
+    ["tabColor", [TAB_EDGE, tab(4, 16, 19), "M8 9h8", tint("M7 12.5h10v3H7Z"), "M7 12.5h10v3H7Z"]],
+  ],
 ];
