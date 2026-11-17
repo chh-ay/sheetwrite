@@ -269,6 +269,8 @@ describe("AutoComplete's list", () => {
     await type("Nor");
     key("Enter");
     expect(value(4)).toBe("Nor");
+  });
+});
 
 // https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f
 describe("Pick From Drop-down List", () => {
