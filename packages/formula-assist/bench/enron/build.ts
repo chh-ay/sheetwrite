@@ -7,7 +7,9 @@
 // The archive is https://ndownloader.figshare.com/files/3242531 (CC BY 4.0).
 // Needs `7z` on the PATH. The same archive gives the same sample: every
 // choice comes from a seeded generator. The held-out draw skips every
-// spreadsheet the development sets hold.
+// spreadsheet the development sets hold, and every spreadsheet of the burned
+// held-out draw, which is not committed: the script draws it again from its
+// seed to know them.
 
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -27,8 +29,17 @@ const ARCHIVE_MD5 = "188ec98d04c83a4725d9205cc75ce5a2";
 /** Seed of the development draw (#801); its workbooks alternate between dev.json and dev2.json. */
 const DEV_SEED = 801;
 const DEV_WORKBOOKS = 100;
-/** Seed of the held-out draw, from the spreadsheets the development draw did not take. */
-const HELD_OUT_SEED = 802;
+/**
+ * Seed of the burned held-out draw (see README.md), from the spreadsheets the
+ * development draw did not take. It is drawn again only to keep its
+ * spreadsheets out of the held-out draw.
+ */
+const BURNED_HELD_OUT_SEED = 802;
+/**
+ * Seed of the held-out draw, from the spreadsheets neither the development
+ * draw nor the burned draw took.
+ */
+const HELD_OUT_SEED = 803;
 const HELD_OUT_WORKBOOKS = 50;
 /** A workbook needs this many formulas to be sampled. */
 const MIN_FORMULAS = 10;
@@ -357,6 +368,13 @@ async function main(): Promise<void> {
   let report: { sampled: SampleWorkbook[]; refused: number };
   if (mode === "--held-out") {
     const exclude = new Set([...(await titlesIn("dev")), ...(await titlesIn("dev2"))]);
+    const burned = await draw(archive, scratch, {
+      seed: BURNED_HELD_OUT_SEED,
+      count: HELD_OUT_WORKBOOKS,
+      exclude,
+    });
+    process.stdout.write(`Burned draw (seed ${BURNED_HELD_OUT_SEED}): ${summary(burned)}\n`);
+    for (const workbook of burned.sampled) exclude.add(titleOf(workbook.file));
     report = await draw(archive, scratch, {
       seed: HELD_OUT_SEED,
       count: HELD_OUT_WORKBOOKS,
@@ -382,10 +400,13 @@ async function main(): Promise<void> {
     );
   }
 
+  process.stdout.write(`${summary(report)}\n`);
+}
+
+/** A draw's size: workbooks, formulas, and the files the reader refused. */
+function summary(report: { sampled: SampleWorkbook[]; refused: number }): string {
   const formulas = report.sampled.reduce((sum, workbook) => sum + workbook.targets.length, 0);
-  process.stdout.write(
-    `${report.sampled.length} workbooks, ${formulas} formulas; ${report.refused} files refused by the reader\n`,
-  );
+  return `${report.sampled.length} workbooks, ${formulas} formulas; ${report.refused} files refused by the reader`;
 }
 
 await main();

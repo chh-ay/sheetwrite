@@ -11,13 +11,14 @@ The corpus is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by
 - **Cells.** Only the cells near each of those formulas are kept: 25 rows above, 3 below, 6 columns to the left and 2 to the right, the top 3 rows of the same columns, and up to 60 × 12 cells of each range the formula reads, with the 3 rows above that range. Formula results are dropped, because the engine recalculates them, and text is cut to 40 characters.
 - **Defined names.** The workbook's defined names are kept, with formulas of up to 200 characters. The replay leaves out the names the engine refuses once the cells they read are gone.
 
-## The three sets
+## The sets
 
 | File | Draw | Use |
 | --- | --- | --- |
 | `dev.json` | Seed 801, 100 workbooks, the even draws | Development: tune on it |
 | `dev2.json` | Seed 801, the odd draws | Development. It was the first held-out set. It was run once, missed the wrong-suggestion bar (2.8% against under 2%), and is used for tuning since. |
-| `heldout.json` | Seed 802, 50 workbooks whose titles neither development set holds | The quality gate's alone (`test/replay.test.ts`). Nobody reads it while tuning. |
+| not committed | Seed 802, 50 workbooks (960 formulas) whose titles neither development set holds | Burned. It was the second held-out set, run once: 53.0% saved, 2.1% wrong (12 of 579 shown), against under 2%. The predictor was then limited to the strongest neighbour cases. `build.ts --held-out` draws it again from its seed, which gives the same workbooks, only to keep its titles out of the next draw; it is not kept, so the sample stays under 3 MB. |
+| `heldout.json` | Seed 803, 50 workbooks whose titles neither development set nor the seed-802 draw holds | The quality gate's alone (`test/replay.test.ts`). Nobody reads it while tuning. |
 
 To rebuild the sample, download the archive (MD5 `188ec98d04c83a4725d9205cc75ce5a2`) and run:
 

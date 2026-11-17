@@ -34,8 +34,9 @@ The row "Excel floor" uses no signal: only the function list, as Excel has it. `
 
 | Set | What | Use |
 | --- | --- | --- |
-| `enron-dev` | Half of the Enron sample (see `enron/README.md`) | Tune here |
-| `enron-heldout` | The other half | Gate only, never read while tuning |
+| `enron-dev` | 50 workbooks of the Enron sample (see `enron/README.md`) | Tune here |
+| `enron-dev2` | 50 more, a burned held-out set | Tune here |
+| `enron-heldout` | 50 workbooks neither development set nor a burned draw holds | Gate only, never read while tuning |
 | `conformance` | Every formula case of the conformance corpus | Regression floor |
 | `fixtures` | Every formula of the XLSX fixtures | Wrong-suggestion ceiling |
 
@@ -46,10 +47,10 @@ The row "Excel floor" uses no signal: only the function list, as Excel has it. `
 `calibrate.ts` asks every signal for its candidates at every key and counts how often each kind (signal and reason) is right:
 
 ```sh
-bun packages/formula-assist/bench/calibrate.ts --set enron-dev --set conformance --set fixtures
+bun packages/formula-assist/bench/calibrate.ts --write   # enron-dev, enron-dev2, conformance and fixtures
 ```
 
-The confidences in `src/signals/*.ts` are the 95% lower bounds this prints, from the development sets only.
+The confidences in `src/calibration.ts` are the 95% lower bounds this prints, from the development sets only. `--write` writes that file.
 
 ## Latency: 4 ms per key on 100,000 rows
 
