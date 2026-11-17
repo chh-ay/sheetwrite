@@ -111,6 +111,10 @@ As in Excel, typing a text entry completes it from the entries in the same colum
 
 Excel turns AutoComplete off with **Enable AutoComplete for cell values**. In Sheetwrite the host sets `config: { autoComplete: false }`; `setConfig` turns it on or off for the next edit.
 
+#### The list of matching entries
+
+Excel completes nothing while two or more entries begin the typed text: with `North` and `Northeast` in the column, `Nor` shows nothing until you type `Northe`. Sheetwrite then lists those entries under the editor, sorted A to Z, so you see the spellings the column already uses and can pick one. The list is extra and takes no key until you ask: Enter, Tab, Escape and the arrow keys do what Excel does. **Alt+Down** moves into the list; then the arrow keys, Page Up, Page Down, Home and End move in it, Enter or Tab puts the entry in the cell and commits as usual, Escape returns to the editor, and any other key types on. A click on an entry puts it in the cell. The list shows up to 50 entries; with more, it waits until typing narrows them. It reads nothing more than AutoComplete does, and `config: { autoComplete: false }` turns it off too.
+
 ### Pick From Drop-down List
 
 As in Excel, **Alt+Down** on a cell, or **Pick from drop-down list…** in its context menu, opens a list under the cell with AutoComplete's entries: the distinct text entries above and below it in the column, one per spelling that differs in more than letter case, sorted A to Z ([Keyboard shortcuts in Excel](https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f)). Arrow keys, Page Up, Page Down, Home and End move in the list and typing jumps to the first entry that begins with the typed letters. Enter or a click puts the entry in the cell, which stays active; Escape or a click away closes the list. A column without text entries opens nothing. On an AutoFilter header Alt+Down opens the filter dropdown, and on a cell with a list rule the rule's list. `grid.actions.pickFromList()` opens it on the focus cell. The list works whether or not AutoComplete is on, as in Excel.

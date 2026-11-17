@@ -1,5 +1,6 @@
 // Lists of a column's text entries under a cell: Excel's Pick From
-// Drop-down List (Alt+Down). Loads with AutoComplete's chunk.
+// Drop-down List (Alt+Down), and AutoComplete's list of the entries that
+// begin the typed text. Loads with AutoComplete's chunk.
 
 import type { EditNavigate, EditRect } from "./editor.js";
 import type { Theme } from "./types/render.js";
@@ -51,6 +52,11 @@ export class EntryList {
     return this.entries[this.activeIndex];
   }
 
+  /** The id of the selected option, for the owner's `aria-activedescendant`. */
+  get activeId(): string {
+    return `${this.id}-${this.activeIndex}`;
+  }
+
   /** Show `entries` with the one at `active` selected. */
   show(entries: readonly string[], active: number): void {
     this.entries = entries;
@@ -81,6 +87,13 @@ export class EntryList {
     if (active === undefined) return;
     this.element.setAttribute("aria-activedescendant", active.id);
     if (typeof active.scrollIntoView === "function") active.scrollIntoView({ block: "nearest" });
+  }
+
+  /** Show no entry as selected; a later move starts from the first. */
+  deselect(): void {
+    for (const option of this.element.children) option.setAttribute("aria-selected", "false");
+    this.element.removeAttribute("aria-activedescendant");
+    this.activeIndex = 0;
   }
 
   /**

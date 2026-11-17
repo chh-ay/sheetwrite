@@ -1121,14 +1121,14 @@ async function benchSheetwrite(
     let completed: string | null = "";
     queries["autocomplete-first-key"] = measure(
       () => {
-        completed = columnCompletions(sheet, 0, COL.customer)("c");
+        completed = columnCompletions(sheet, 0, COL.customer)("c").entry;
       },
       plan("autocomplete-first-key", rows),
     );
     const expected = ds.customer[rows - 1]!;
     const edit = columnCompletions(sheet, 0, COL.customer);
-    const first = edit("c");
-    const later = edit(expected.slice(0, -1).toLowerCase());
+    const first = edit("c").entry;
+    const later = edit(expected.slice(0, -1).toLowerCase()).entry;
     if (completed !== null || first !== null || later !== expected) {
       throw new Error(`autocomplete ${rows}: completed ${String(later)}, not ${expected}`);
     }

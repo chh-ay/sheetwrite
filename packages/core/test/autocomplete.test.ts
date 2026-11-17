@@ -235,6 +235,43 @@ describe("AutoComplete", () => {
   });
 });
 
+describe("AutoComplete's list", () => {
+  it("lists the entries when several match, and takes keys only after Alt+Down", async () => {
+    mount(["North", "Northeast", "Nordic"]);
+    at(3);
+    const options = () =>
+      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map((option) => [
+        option.textContent,
+        option.getAttribute("aria-selected"),
+      ]);
+    await type("Nor");
+    expect(shown()).toEqual(["Nor", ""]);
+    expect(options()).toEqual([
+      ["Nordic", "false"],
+      ["North", "false"],
+      ["Northeast", "false"],
+    ]);
+
+    await type("t");
+    expect(options().map(([entry]) => entry)).toEqual(["North", "Northeast"]);
+    key("ArrowDown", { altKey: true });
+    key("ArrowDown");
+    expect(options()).toEqual([
+      ["North", "false"],
+      ["Northeast", "true"],
+    ]);
+    key("Enter");
+    expect(value(3)).toBe("Northeast");
+    expect(host.querySelector(".sheetwrite-entry-list")).toBeNull();
+
+    // Without Alt+Down the keys stay Excel's: Enter stores what was typed.
+    at(4);
+    await type("Nor");
+    key("Enter");
+    expect(value(4)).toBe("Nor");
+  });
+});
+
 // https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f
 describe("Pick From Drop-down List", () => {
   it("lists the column's text entries, sorted, on Alt+Down; Enter puts one in the cell", async () => {

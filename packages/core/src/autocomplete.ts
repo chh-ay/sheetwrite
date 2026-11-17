@@ -6,11 +6,14 @@
  */
 
 import { parseCellLiteralInput, parseCurrencyInput } from "./cell-input.js";
+import type { EditCompletion } from "./editor.js";
+import { EntryList } from "./pick-list.js";
 import type { SheetwriteStore } from "./store.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
+import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 
 export { PickList } from "./pick-list.js";
@@ -20,6 +23,25 @@ export { PickList } from "./pick-list.js";
  * bounded however long the column's block of entries is.
  */
 const AUTOCOMPLETE_ROWS = 100_000;
+
+/**
+ * The most spellings AutoComplete's list shows. With more, it shows none
+ * until typing narrows them, and the scan stops counting there.
+ */
+const LIST_ENTRIES = 50;
+
+/** Entries sort A to Z ignoring letter case and accents, as Excel's lists do. */
+const ENTRY_ORDER = new Intl.Collator(undefined, { sensitivity: "base" });
+
+/** What the entries of a column make of a typed text. */
+export interface CompletionLookup {
+  /** The entry that completes the text inline: the only one it begins, and longer than it. */
+  readonly entry: string | null;
+  /** The entries the text begins when two to {@link LIST_ENTRIES} spellings do, sorted; else none. */
+  readonly matches: readonly string[];
+}
+
+const NO_MATCH: CompletionLookup = { entry: null, matches: [] };
 
 /** What AutoComplete reads of the sheet being edited, in view rows. */
 export interface CompletionSheet {
@@ -61,12 +83,13 @@ class ColumnCompletions {
   }
 
   /**
-   * The one entry that `typed` begins and that is longer than it, or null
-   * when no entry or more than one does. Entries that differ only in letter
-   * case count as one, the first seen. Non-text values are never entries.
+   * The entries that `typed` begins. Entries that differ only in letter case
+   * count as one spelling, the first seen. Excel completes inline only when
+   * one spelling begins the text; with more, they are listed instead.
+   * Non-text values are never entries.
    */
-  complete(typed: string): string | null {
-    if (typed === "") return null;
+  lookup(typed: string): CompletionLookup {
+    if (typed === "") return NO_MATCH;
     const prefix = typed.toLowerCase();
     const pool =
       this.matched !== null && prefix.startsWith(this.matchedPrefix) ? this.matched : this.load();
@@ -75,13 +98,20 @@ class ColumnCompletions {
     this.matched = matched;
     this.matchedPrefix = prefix;
 
-    const first = matched[0];
-    if (first === undefined) return null;
-    const key = first.toLowerCase();
-    for (let index = 1; index < matched.length; index++) {
-      if (matched[index]!.toLowerCase() !== key) return null;
+    const spellings = new Map<string, string>();
+    for (const entry of matched) {
+      const key = entry.toLowerCase();
+      if (spellings.has(key)) continue;
+      if (spellings.size === LIST_ENTRIES) return NO_MATCH;
+      spellings.set(key, entry);
     }
-    return key.length > prefix.length ? first : null;
+    if (spellings.size > 1) {
+      return { entry: null, matches: [...spellings.values()].sort(ENTRY_ORDER.compare) };
+    }
+    for (const [key, entry] of spellings) {
+      return { entry: key.length > prefix.length ? entry : null, matches: [] };
+    }
+    return NO_MATCH;
   }
 
   private load(): string[] {
@@ -145,20 +175,20 @@ function columnValues(sheet: CompletionSheet, row: number, col: number): CellSca
 
 /**
  * Excel's AutoComplete for an edit of view row `row` in `col`, from the
- * entries {@link columnValues} reads on the first typed character. Typed
- * numbers, dates, currency and TRUE or FALSE are not completed, whatever the
- * column's type.
+ * entries {@link columnValues} reads on the first lookup. Typed numbers,
+ * dates, currency and TRUE or FALSE are neither completed nor listed,
+ * whatever the column's type.
  */
 export function columnCompletions(
   sheet: CompletionSheet,
   row: number,
   col: number,
-): (typed: string) => string | null {
+): (typed: string) => CompletionLookup {
   const completions = new ColumnCompletions(() => columnValues(sheet, row, col));
   return (typed) =>
     typeof parseCellLiteralInput(typed, "date") === "string" && parseCurrencyInput(typed) === null
-      ? completions.complete(typed)
-      : null;
+      ? completions.lookup(typed)
+      : NO_MATCH;
 }
 
 /** What AutoComplete reads of the grid an edit is in. */
@@ -207,38 +237,140 @@ export function pickListEntries(host: CompletionHost, row: number, col: number):
     const key = value.toLowerCase();
     if (!entries.has(key)) entries.set(key, value);
   }
-  const collator = new Intl.Collator(undefined, { sensitivity: "base" });
-  return [...entries.values()].sort(collator.compare);
+  return [...entries.values()].sort(ENTRY_ORDER.compare);
 }
 
 /**
- * The cell editor's AutoComplete for an edit of view row `row` in `col`: it
- * completes the editor's text in place, with the added text selected after
- * the caret, and returns the entry it shows, or null. It completes only
- * while the caret is at the end of the text, and never a formula. A store
- * without an engine gets no completion.
+ * The cell editor's AutoComplete for one edit. Typing completes the text in
+ * place when one entry begins it, with the added text selected, as in Excel.
+ * When several do, they are listed under the editor instead. The list is
+ * extra: it takes no key until Alt+Down moves into it. Then arrows, Page Up,
+ * Page Down, Home and End move, Enter or Tab puts the entry in the editor
+ * for the editor to commit, Escape leaves the list, and any other key types
+ * on. A click on an entry puts it in the cell. Only while the caret is at
+ * the end of the text, and never a formula.
+ */
+class CellCompletion implements EditCompletion {
+  private readonly lookup: (typed: string) => CompletionLookup;
+  private readonly listHost: HTMLElement;
+  private readonly theme: Theme;
+  private readonly commit: () => void;
+  private list: EntryList | null = null;
+  /** Alt+Down moved into the list, so the list keys act on it. */
+  private inList = false;
+
+  constructor(
+    lookup: (typed: string) => CompletionLookup,
+    listHost: HTMLElement,
+    theme: Theme,
+    commit: () => void,
+  ) {
+    this.lookup = lookup;
+    this.listHost = listHost;
+    this.theme = theme;
+    this.commit = commit;
+  }
+
+  complete(field: HTMLTextAreaElement, typed: boolean): string | null {
+    const text = field.value;
+    const atEnd = field.selectionStart === text.length && field.selectionEnd === text.length;
+    const found = text.startsWith("=") || !atEnd ? NO_MATCH : this.lookup(text);
+    this.showList(field, found.matches);
+    const { entry } = found;
+    if (!typed || entry === null || entry.length <= text.length) return null;
+    field.value = text + entry.slice(text.length);
+    field.setSelectionRange(text.length, field.value.length);
+    return entry;
+  }
+
+  keyDown(event: KeyboardEvent, field: HTMLTextAreaElement): boolean {
+    const list = this.list;
+    if (list === null) return false;
+    if (!this.inList) {
+      if (event.key !== "ArrowDown" || !event.altKey || event.ctrlKey || event.metaKey) {
+        return false;
+      }
+      this.enterList(field, list, true);
+      list.select(0);
+      field.setAttribute("aria-activedescendant", list.activeId);
+      return true;
+    }
+    if (list.moveFor(event.key)) {
+      field.setAttribute("aria-activedescendant", list.activeId);
+      return true;
+    }
+    const entry = list.active;
+    this.enterList(field, list, false);
+    if (event.key === "Escape") return true;
+    if ((event.key === "Enter" || event.key === "Tab") && entry !== undefined) {
+      field.value = entry;
+      field.setSelectionRange(entry.length, entry.length);
+    }
+    return false;
+  }
+
+  reposition(field: HTMLTextAreaElement): void {
+    this.list?.position({
+      x: field.offsetLeft,
+      y: field.offsetTop,
+      w: field.offsetWidth,
+      h: field.offsetHeight,
+    });
+  }
+
+  close(): void {
+    this.list?.remove();
+    this.list = null;
+    this.inList = false;
+  }
+
+  /** Show `matches` under the field, with none selected; fewer than two close the list. */
+  private showList(field: HTMLTextAreaElement, matches: readonly string[]): void {
+    if (matches.length < 2) {
+      if (this.list !== null) field.removeAttribute("aria-controls");
+      this.close();
+      return;
+    }
+    const list = (this.list ??= new EntryList(
+      this.listHost,
+      "AutoComplete",
+      this.theme,
+      (entry) => {
+        field.value = entry;
+        this.commit();
+      },
+    ));
+    this.enterList(field, list, false);
+    list.show(matches, 0);
+    list.deselect();
+    field.setAttribute("aria-controls", list.element.id);
+    this.reposition(field);
+  }
+
+  /** Move the list keys into the list, or back to the editor. */
+  private enterList(field: HTMLTextAreaElement, list: EntryList, inList: boolean): void {
+    this.inList = inList;
+    if (inList) return;
+    list.deselect();
+    field.removeAttribute("aria-activedescendant");
+  }
+}
+
+/**
+ * The cell editor's AutoComplete for an edit of view row `row` in `col`,
+ * with its list in `listHost`; `commit` stores a clicked entry. Null for a
+ * store without an engine.
  */
 export function editCompletion(
   host: CompletionHost,
   row: number,
   col: number,
-): (field: HTMLTextAreaElement) => string | null {
+  listHost: HTMLElement,
+  theme: Theme,
+  commit: () => void,
+): EditCompletion | null {
   const engine = storeEngine(host.store);
-  if (engine === null) return () => null;
-  const complete = columnCompletions(completionSheet(host, engine), row, col);
-  return (field) => {
-    const typed = field.value;
-    if (
-      typed.startsWith("=") ||
-      field.selectionStart !== typed.length ||
-      field.selectionEnd !== typed.length
-    ) {
-      return null;
-    }
-    const entry = complete(typed);
-    if (entry === null || entry.length <= typed.length) return null;
-    field.value = typed + entry.slice(typed.length);
-    field.setSelectionRange(typed.length, field.value.length);
-    return entry;
-  };
+  if (engine === null) return null;
+  const lookup = columnCompletions(completionSheet(host, engine), row, col);
+  return new CellCompletion(lookup, listHost, theme, commit);
 }

@@ -7,7 +7,7 @@ import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
 import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
-import { EditController, type EditNavigate } from "./editor.js";
+import { type EditCompletion, EditController, type EditNavigate } from "./editor.js";
 import {
   detectFillSeries,
   type FillOptions,
@@ -371,11 +371,7 @@ export class InteractionSessions {
    * nothing is completed, and once it arrives the edit that a key opened is
    * completed at once. Hosts that turn AutoComplete off get no completion.
    */
-  private completion(
-    row: number,
-    col: number,
-    typed: boolean,
-  ): ((field: HTMLTextAreaElement) => string | null) | undefined {
+  private completion(row: number, col: number, typed: boolean): EditCompletion | undefined {
     if (!this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
@@ -383,9 +379,27 @@ export class InteractionSessions {
         if (typed && this.generation === generation) this.editor.completeNow();
       });
     }
-    let complete: ((field: HTMLTextAreaElement) => string | null) | undefined;
-    return (field) =>
-      (complete ??= this.autocomplete?.editCompletion(this.deps, row, col))?.(field) ?? null;
+    // Made on first use once the code is here; null for a store without an engine.
+    let made: EditCompletion | null | undefined;
+    const current = (): EditCompletion | null => {
+      if (made === undefined && this.autocomplete !== null) {
+        made = this.autocomplete.editCompletion(
+          this.deps,
+          row,
+          col,
+          this.deps.viewportEl,
+          this.deps.theme(),
+          () => this.editor.commit("down"),
+        );
+      }
+      return made ?? null;
+    };
+    return {
+      complete: (field, typedText) => current()?.complete(field, typedText) ?? null,
+      keyDown: (event, field) => current()?.keyDown(event, field) ?? false,
+      reposition: (field) => made?.reposition(field),
+      close: () => made?.close(),
+    };
   }
 
   /** AutoComplete's code, loaded once. */
