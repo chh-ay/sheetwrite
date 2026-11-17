@@ -99,6 +99,7 @@ import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
 import { mountSidePanel } from "./side-panel.js";
 import { currentRegion, looksLikeHeader } from "./sort-target.js";
 import { IncompleteDataError, SHEET_LIFECYCLE_MESSAGES, SheetwriteStore } from "./store.js";
+import { autoFilterBody } from "./store/autofilter.js";
 import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
   addRowGroup,
@@ -1236,6 +1237,11 @@ export class GridImpl implements Grid {
           numbers[index] = this.toDataRow(rows.start + index) + 1;
         }
         return numbers;
+      },
+      // A filtered list's row numbers are blue in Excel.
+      filteredRows: () => {
+        const { autoFilter, filters } = this.sheet();
+        return autoFilter && (filters?.length ?? 0) > 0 ? autoFilterBody(autoFilter) : undefined;
       },
       renderer: () => this.renderer,
       domOverlay: this.domOverlay,

@@ -2,7 +2,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test
 
 import { createGrid, initSheetwrite } from "../src/grid.js";
 import { installCanvasTestStubs } from "../src/testing.js";
-import type { CellChange, Grid } from "../src/types.js";
+import type { CellChange, DocumentOp, Grid } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
@@ -215,7 +215,7 @@ describe("StyleActions merge policy", () => {
       expect(title?.textContent).toBe("Merge Cells");
       const message = document.getElementById(dialog.getAttribute("aria-describedby") ?? "");
       expect(message?.textContent).toBe(
-        "Merging cells only keeps the upper-left value and discards other values.",
+        "Merging cells only keeps the upper-left value and discards other values. This value will be discarded: B6: 'm2'.",
       );
       expect(document.activeElement?.textContent).toBe("OK");
 
@@ -228,6 +228,43 @@ describe("StyleActions merge policy", () => {
       grid.actions.undo();
       expect(merges(grid)).toEqual([]);
       expect(grid.store.getCell(b6).resolved).toBe("m2");
+      grid.destroy();
+    });
+
+    it("names the values it would discard and their cells: the first five, then a count", async () => {
+      const host = mountHost();
+      const grid = makeGrid(10, host);
+      const longName = "A very long customer name indeed";
+      const patches: DocumentOp[] = [];
+      for (let row = 0; row < 5; row++) {
+        for (let col = 0; col < 3; col++) {
+          const value = row === 0 ? ["North", 0.5, longName][col]! : row * 3 + col;
+          patches.push({
+            op: "set",
+            addr: { sheet: "s1", row, col },
+            value: { kind: "literal", value },
+          });
+        }
+      }
+      const b1 = { sheet: "s1", row: 0, col: 1 };
+      patches.push({
+        op: "setRangeStyle",
+        range: { sheet: "s1", start: b1, end: b1 },
+        style: { numberFormat: "0%" },
+      });
+      grid.applyTransaction({ patches });
+      grid.setSelection({
+        kind: "range",
+        range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 4, col: 2 } },
+      });
+
+      grid.actions.merge({ ask: true });
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
+      const message = document.getElementById(dialog.getAttribute("aria-describedby") ?? "");
+      expect(message?.textContent).toBe(
+        "Merging cells only keeps the upper-left value and discards other values. These values will be discarded: B1: 50%, C1: 'A very long customer na…', A2: 3, B2: 4, C2: 5 and 9 more.",
+      );
+      await answerDialog(host, "Cancel");
       grid.destroy();
     });
 
