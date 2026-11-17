@@ -482,7 +482,8 @@ export interface RibbonConfig {
 /**
  * The `GridConfig` switches that choose built-in commands. They apply to every
  * renderer of the command model: the toolbar, the full ribbon and the compact
- * ribbon. Each defaults to true, except `export`.
+ * ribbon. Each defaults to true, except `export` and `keyboardSettings`, which
+ * a host turns on.
  */
 export type CommandFlags = Pick<
   GridConfig,
@@ -497,6 +498,7 @@ export type CommandFlags = Pick<
   | "merge"
   | "sort"
   | "export"
+  | "keyboardSettings"
 >;
 
 /** Built-in action names accepted by custom context-menu rows. */
@@ -602,6 +604,31 @@ export type KeyboardAction =
 export interface KeyboardOptions {
   /** Shortcut overrides by action name; actions you leave out keep their default keys. */
   bindings?: Partial<Record<KeyboardAction, KeyShortcut | readonly KeyShortcut[] | null>>;
+}
+
+/**
+ * The user's key bindings: the actions whose keys differ from Excel's
+ * defaults, as `KeyboardOptions.bindings` takes them. `null` means the user
+ * removed every key of that action.
+ */
+export type KeyBindings = NonNullable<KeyboardOptions["bindings"]>;
+
+/**
+ * The Keyboard shortcuts panel, where the user rebinds the built-in actions.
+ * Shortcuts are a user preference, not part of the workbook: the grid emits
+ * `key-bindings-change` after each change, and the host stores the bindings
+ * and passes them back through `config.keyboard.bindings`.
+ *
+ * @example
+ * ```ts
+ * import type { GridConfig } from "@sheetwrite/core";
+ *
+ * const config: GridConfig = { keyboardSettings: { locked: ["copy", "paste"] } };
+ * ```
+ */
+export interface KeyboardSettingsOptions {
+  /** Actions the panel shows read-only. A swap or a replace never changes them either. */
+  locked?: readonly KeyboardAction[];
 }
 
 /**
@@ -737,6 +764,13 @@ export interface GridConfig {
    * return true to consume it, false to let the built-in handler continue.
    */
   keyboard?: boolean | KeyboardOptions | ((e: KeyboardEvent, grid: Grid) => boolean);
+  /**
+   * Let the user change the built-in keys in a Keyboard shortcuts panel
+   * (default false). It opens from File › Options in the ribbon, from the gear
+   * of the compact ribbon, and from `grid.openKeyboardSettings()`. Pass an
+   * object to lock some actions. See {@link KeyboardSettingsOptions}.
+   */
+  keyboardSettings?: boolean | KeyboardSettingsOptions;
 }
 
 /** Per-grid add-on settings, keyed by add-on name. */
@@ -954,6 +988,12 @@ export interface GridEvents {
    * saved document.
    */
   "engine-failed": { error: SheetwriteError };
+  /**
+   * The user changed keys in the Keyboard shortcuts panel. `bindings` holds
+   * every action whose keys differ from Excel's defaults (`{}` after Reset
+   * all); store it and pass it back as `config.keyboard.bindings`.
+   */
+  "key-bindings-change": { bindings: KeyBindings };
 }
 
 /**
@@ -1026,6 +1066,12 @@ export interface Grid {
   getTheme(): Theme;
   /** Platform-aware label for a bound action, or an empty string when disabled. */
   getShortcutLabel(action: KeyboardAction): string;
+  /**
+   * Open the Keyboard shortcuts panel, for a host's own menu. Does nothing
+   * unless `config.keyboardSettings` is set. The panel's code loads on first
+   * use; focus returns to the element that had it when the panel closes.
+   */
+  openKeyboardSettings(): void;
   /** Imperative patch: merge `theme` into the accumulated base theme. */
   setTheme(theme: Partial<Theme>): void;
   /**

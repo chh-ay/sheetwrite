@@ -822,6 +822,42 @@ export function AutoFilterDiagram() {
   );
 }
 
+/** The Keyboard shortcuts panel: open it, record keys, settle a conflict; the host stores the result. */
+export function KeyboardShortcutsDiagram() {
+  return (
+    <FlowFigure
+      steps={[
+        {
+          title: "File › Options",
+          lines: ["Keyboard Shortcuts, or", "the compact ribbon's gear"],
+        },
+        {
+          title: "Press the new keys",
+          lines: ["Ctrl+I for Bold;", "Escape stops recording"],
+          tone: "accent",
+        },
+        {
+          title: "Ctrl+I is Italic's",
+          lines: ["Swap, Replace or Cancel;", "each is one change"],
+        },
+      ]}
+      outcome={{
+        from: 2,
+        step: {
+          title: "key-bindings-change",
+          lines: ["The host stores the bindings and passes them back as config.keyboard.bindings"],
+          tone: "muted",
+        },
+      }}
+      text={{
+        title: "How a user changes a command's keys",
+        description:
+          "File › Options › Keyboard Shortcuts, or the gear of the compact ribbon, opens the panel. The user clicks Bold's keys and presses Ctrl+I; Escape would stop recording instead. Ctrl+I belongs to Italic, so the panel offers Swap, Replace or Cancel, and each is one change that applies at once. The grid then emits key-bindings-change, and the host stores the bindings and passes them back as config.keyboard.bindings.",
+      }}
+    />
+  );
+}
+
 /** Feature diagrams by the name a placement uses. */
 export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "grid-handle": GridHandleDiagram,
@@ -849,4 +885,5 @@ export const FEATURE_DIAGRAMS: Readonly<Record<string, () => JSX.Element>> = {
   "formula-help": FormulaHelpPartsDiagram,
   "formulas-section": FormulasSectionDiagram,
   autofilter: AutoFilterDiagram,
+  "keyboard-shortcuts": KeyboardShortcutsDiagram,
 };

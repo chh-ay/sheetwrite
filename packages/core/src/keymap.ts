@@ -9,7 +9,8 @@ import type {
   KeyShortcut,
 } from "./types/grid.js";
 
-const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
+/** Excel's keys for each built-in action: the defaults a binding override replaces. */
+export const DEFAULT_BINDINGS: Readonly<Record<KeyboardAction, readonly KeyShortcut[]>> = {
   copy: ["Mod+C"],
   cut: ["Mod+X"],
   paste: ["Mod+V"],
@@ -90,7 +91,7 @@ export function isKeyboardAction(action: string): action is KeyboardAction {
   return Object.hasOwn(DEFAULT_BINDINGS, action);
 }
 
-function isMac(): boolean {
+export function isMac(): boolean {
   return APPLE_PLATFORM.test(navigator.platform) || APPLE_PLATFORM.test(navigator.userAgent);
 }
 
@@ -253,6 +254,13 @@ const PUNCTUATION_CODES: Readonly<Record<string, string>> = {
   Backquote: "`",
 };
 
+/** The unshifted US-layout key of a `KeyboardEvent.code`, for letters, digits and punctuation. */
+export function codeKey(code: string): string | undefined {
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
+  return PUNCTUATION_CODES[code];
+}
+
 /**
  * The key a shortcut names when Shift or Alt changed the typed character:
  * Shift+1 types "!" and Option+K types "˚", but "Mod+Shift+1" names the 1 key.
@@ -262,10 +270,7 @@ const PUNCTUATION_CODES: Readonly<Record<string, string>> = {
 function physicalKey(event: KeyboardEvent, typed: string): string | undefined {
   if (!event.shiftKey && !event.altKey) return undefined;
   if (typed.length !== 1 || /[\p{L}\p{N}]/u.test(typed)) return undefined;
-  const code = event.code;
-  if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
-  if (/^Digit[0-9]$/.test(code)) return code.slice(5);
-  return PUNCTUATION_CODES[code];
+  return codeKey(event.code);
 }
 
 function matchesShortcut(event: KeyboardEvent, key: string, shortcut: ParsedShortcut): boolean {
@@ -280,7 +285,7 @@ function matchesShortcut(event: KeyboardEvent, key: string, shortcut: ParsedShor
 }
 
 /** One identity per accepted key press, so `Mod+C` conflicts with `Ctrl+C`. */
-function bindingIdentities(shortcut: ParsedShortcut): string[] {
+export function bindingIdentities(shortcut: ParsedShortcut): string[] {
   return acceptedModifiers(shortcut).map(
     ([ctrl, meta]) =>
       `${Number(ctrl)}${Number(meta)}${Number(shortcut.shift)}${Number(shortcut.alt)}:${shortcut.key}`,

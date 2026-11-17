@@ -84,6 +84,8 @@ export class Ribbon {
   private readonly tabList: HTMLDivElement;
   private readonly minimizeButton: HTMLButtonElement;
   private readonly modeButton: HTMLButtonElement;
+  /** The compact ribbon's gear, which opens the Keyboard shortcuts panel; only with `keyboardSettings`. */
+  private readonly settingsButton: HTMLButtonElement | null = null;
   private readonly id: number;
   /** The ribbon's listeners, observer and pending fit frame; `destroy` closes it. */
   private readonly lifetime = new Scope();
@@ -146,7 +148,23 @@ export class Ribbon {
     this.minimizeButton.addEventListener("mousedown", (event) => event.preventDefault());
     this.minimizeButton.addEventListener("click", () => this.setMinimized(!this.minimized));
 
-    tabRow.append(this.tabList, this.modeButton, this.minimizeButton);
+    // A one-row ribbon has no room for File › Options, so a gear opens the
+    // Keyboard shortcuts panel there.
+    if (options.flags?.keyboardSettings) {
+      const settings = document.createElement("button");
+      settings.type = "button";
+      settings.className = "sheetwrite-ribbon-settings";
+      settings.dataset.command = "keyboardShortcuts";
+      settings.title = "Settings: keyboard shortcuts";
+      settings.setAttribute("aria-label", "Keyboard shortcuts");
+      settings.appendChild(iconNode("settings", options.icons));
+      settings.addEventListener("mousedown", (event) => event.preventDefault());
+      settings.addEventListener("click", () => grid.openKeyboardSettings());
+      this.settingsButton = settings;
+    }
+
+    tabRow.append(this.tabList, ...(this.settingsButton ? [this.settingsButton] : []));
+    tabRow.append(this.modeButton, this.minimizeButton);
     this.element.appendChild(tabRow);
     this.element.addEventListener("keydown", this.onKeydown);
     host.appendChild(this.element);
@@ -445,6 +463,7 @@ export class Ribbon {
   private updateLayout(): void {
     const compact = ribbonIsCompact(this.element.clientWidth, this.mode, this.options.compactWidth);
     this.modeButton.setAttribute("aria-pressed", String(compact));
+    if (this.settingsButton !== null) this.settingsButton.hidden = !compact;
     this.element.dataset.mode = compact ? "compact" : "full";
     if (compact === this.compact) return;
 

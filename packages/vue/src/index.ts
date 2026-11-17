@@ -154,6 +154,8 @@ export interface SheetwriteGridEmits<Id extends RowBridgeId = RowBridgeId> {
   "datasource-error": GridEvents["datasource-error"];
   /** A built-in XLSX export action failed. */
   "export-error": GridEvents["export-error"];
+  /** The user changed keys in the Keyboard shortcuts panel. */
+  "key-bindings-change": GridEvents["key-bindings-change"];
   /** The adapter published a ready Grid generation. */
   ready: GridReadyEvent;
   /** WASM initialization failed while the component stayed mounted. */
@@ -260,6 +262,7 @@ const gridEmits = {
   "renderer-fallback": (_event: GridEvents["renderer-fallback"]) => true,
   "datasource-error": (_event: GridEvents["datasource-error"]) => true,
   "export-error": (_event: GridEvents["export-error"]) => true,
+  "key-bindings-change": (_event: GridEvents["key-bindings-change"]) => true,
   ready: (_event: GridReadyEvent) => true,
   "initialization-error": (_error: SheetwriteError) => true,
 };
@@ -306,6 +309,7 @@ const SheetwriteGridComponent = defineComponent({
       onRendererFallback: (event) => emit("renderer-fallback", event),
       onDatasourceError: (event) => emit("datasource-error", event),
       onExportError: (event) => emit("export-error", event),
+      onKeyBindingsChange: (event) => emit("key-bindings-change", event),
       onReady(event) {
         // Vue's emit catches listener exceptions before the lifetime can retire
         // the Grid. Readiness is a publication transaction, so deliver it here.
