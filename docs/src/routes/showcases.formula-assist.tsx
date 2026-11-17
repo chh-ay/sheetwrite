@@ -49,7 +49,7 @@ function take(name: "wide" | "narrow", width: number, height: number): DemoTake 
 }
 
 /** Recorded by docs/src/figures/record-formula-assist.ts at 60 fps. */
-const WIDE = take("wide", 1280, 720);
+const WIDE = take("wide", 960, 540);
 const NARROW = take("narrow", 390, 700);
 const DEMO_LENGTH = "1:01";
 

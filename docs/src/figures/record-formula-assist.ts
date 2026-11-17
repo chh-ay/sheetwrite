@@ -46,9 +46,13 @@ function nextFrameTicks(): number {
   return frameTicks;
 }
 
-/** The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). */
+/**
+ * The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). Each is
+ * as wide in CSS pixels as the page shows it, so the formula bar reads at its
+ * own size, and is drawn at `scale` device pixels per CSS pixel.
+ */
 const TAKES = {
-  wide: { width: 1280, height: 720, scale: 1.5, mobile: false },
+  wide: { width: 960, height: 540, scale: 2, mobile: false },
   // A narrow window, not a phone emulation: the shell lays out the same as on a 390 px phone.
   narrow: { width: 390, height: 700, scale: 2, mobile: false },
 } as const;
@@ -280,7 +284,9 @@ async function dispatch(cdp: Cdp, sessionId: string, step: Step): Promise<void> 
       {
         expression: `(() => {
           const grid = window.__sheetwriteAssistGrid;
-          grid.setSelection({ kind: "cell", addr: { sheet: grid.getActiveSheet(), row: ${row}, col: ${col} } });
+          const addr = { sheet: grid.getActiveSheet(), row: ${row}, col: ${col} };
+          grid.scrollToCell(addr);
+          grid.setSelection({ kind: "cell", addr });
           document.querySelector('textarea[aria-label="Formula bar"]').focus();
         })()`,
       },
@@ -326,11 +332,21 @@ async function run(command: string[]): Promise<void> {
   if (status !== 0) throw new Error(`${command[0]} failed (${status}): ${stderr.slice(-2_000)}`);
 }
 
-/** Launch the headless shell and return its DevTools URL. */
-async function launch(): Promise<{ url: string; stop: () => void }> {
+/**
+ * Launch the headless shell at `scale` device pixels per CSS pixel and return
+ * its DevTools URL. BeginFrame screenshots ignore the emulated scale, so the
+ * shell's own scale sets the frames' size.
+ */
+async function launch(scale: number): Promise<{ url: string; stop: () => void }> {
   const profile = mkdtempSync(join(tmpdir(), "sheetwrite-record-profile-"));
   const child = Bun.spawn(
-    [headlessShell(), ...CHROME_FLAGS, `--user-data-dir=${profile}`, "about:blank"],
+    [
+      headlessShell(),
+      ...CHROME_FLAGS,
+      `--force-device-scale-factor=${scale}`,
+      `--user-data-dir=${profile}`,
+      "about:blank",
+    ],
     {
       stdout: "ignore",
       stderr: "pipe",
@@ -391,7 +407,7 @@ async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<vo
 /** Record one take into `scratch/<take>.mp4`, a near-lossless master; returns its frame count. */
 async function recordTake(name: TakeName, origin: string, scratch: string): Promise<number> {
   const take = TAKES[name];
-  const browser = await launch();
+  const browser = await launch(take.scale);
   const cdp = await Cdp.connect(browser.url);
   const master = join(scratch, `${name}.mp4`);
   try {
@@ -509,8 +525,8 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
   }
 }
 
-/** The number of frames in a video file, counted by decoding it. */
-async function countFrames(path: string): Promise<number> {
+/** A video file's frame count, counted by decoding it, and its size in pixels. */
+async function probeVideo(path: string): Promise<{ frames: number; width: number; height: number }> {
   const child = Bun.spawn(
     [
       "ffprobe",
@@ -520,14 +536,15 @@ async function countFrames(path: string): Promise<number> {
       "-select_streams",
       "v:0",
       "-show_entries",
-      "stream=nb_read_frames",
+      "stream=width,height,nb_read_frames",
       "-of",
       "csv=p=0",
       path,
     ],
     { stdout: "pipe" },
   );
-  return Number((await new Response(child.stdout).text()).trim());
+  const [width, height, frames] = (await new Response(child.stdout).text()).trim().split(",");
+  return { frames: Number(frames), width: Number(width), height: Number(height) };
 }
 
 /** The page's files from the master: MP4 and WebM of the demo and of the loop, and the poster. */
@@ -603,13 +620,20 @@ async function publish(name: TakeName, master: string, frames: number): Promise<
     out("poster.webp"),
   ]);
 
+  const take = TAKES[name];
+  const size = { width: take.width * take.scale, height: take.height * take.scale };
   for (const file of ["demo.mp4", "demo.webm"]) {
-    const written = await countFrames(out(file));
-    if (written !== frames)
-      throw new Error(`${name}-${file} has ${written} frames, not ${frames}: a frame was dropped`);
+    const written = await probeVideo(out(file));
+    if (written.frames !== frames)
+      throw new Error(`${name}-${file} has ${written.frames} frames, not ${frames}: a frame was dropped`);
+    if (written.width !== size.width || written.height !== size.height) {
+      throw new Error(
+        `${name}-${file} is ${written.width}×${written.height}, not ${size.width}×${size.height}`,
+      );
+    }
   }
   process.stdout.write(
-    `${name}: ${frames} frames (${(frames / FPS).toFixed(2)} s) at ${FPS} fps\n`,
+    `${name}: ${frames} frames (${(frames / FPS).toFixed(2)} s) at ${FPS} fps, ${size.width}×${size.height}\n`,
   );
 }
 

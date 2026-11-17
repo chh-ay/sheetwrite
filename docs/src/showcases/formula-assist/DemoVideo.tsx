@@ -12,7 +12,7 @@ export interface DemoTake {
 }
 
 export interface DemoVideoProps {
-  /** The take for wide screens, recorded at 1280 × 720 CSS pixels. */
+  /** The take for wide screens, recorded at 960 × 540 CSS pixels. */
   readonly wide: DemoTake;
   /** The take for phones, recorded at 390 CSS pixels wide; demo-video.css switches at the same width. */
   readonly narrow: DemoTake;

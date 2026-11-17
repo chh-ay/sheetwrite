@@ -25,7 +25,8 @@ async function mountStage(host: HTMLElement, params: URLSearchParams): Promise<v
   document.documentElement.dataset.theme = params.get("theme") === "dark" ? "dark" : "light";
   await initSheetwrite({ engine: formulas, addons: [formulaAssistAddon()] });
   const shell = createSpreadsheetShell(host, {
-    ribbon: { mode: "auto" },
+    // The compact ribbon leaves the grid room for every cell the demo fills.
+    ribbon: { mode: "compact" },
     grid: { workbook: budgetWorkbook(), theme: siteGridTheme() },
   });
   const result = shell.grid.applyRemoteOperations(budgetOperations());
