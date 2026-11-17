@@ -72,7 +72,11 @@ const DASHBOARD_SHARED_MARKERS = ["chart-data-", '["SUM","Sum"]'];
 const ADDON_REGISTRY_MARKER = "is listed more than once.";
 // The registry loads the XLSX slots, the query command seam and the formula suggester slot on
 // first use; webpack keeps the names of exports that a dynamic import reads.
-const ADDON_SEAM_MARKERS = ["setXlsxWorkbookBackend", "registerQueryCommands", "setFormulaSuggester"];
+const ADDON_SEAM_MARKERS = [
+  "setXlsxWorkbookBackend",
+  "registerQueryCommands",
+  "setFormulaSuggester",
+];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
