@@ -43,7 +43,9 @@ type NumberCategory =
   | "Date"
   | "Time"
   | "Percentage"
+  | "Fraction"
   | "Scientific"
+  | "Text"
   | "Custom";
 
 const CATEGORIES: readonly NumberCategory[] = [
@@ -54,13 +56,28 @@ const CATEGORIES: readonly NumberCategory[] = [
   "Date",
   "Time",
   "Percentage",
+  "Fraction",
   "Scientific",
+  "Text",
   "Custom",
 ];
 
 /** The Date and Time categories' types, as Excel lists them for en-US. */
 const DATE_TYPES = ["m/d/yyyy", "dddd, mmmm d, yyyy", "d-mmm-yy", "d-mmm", "mmm-yy", "yyyy-mm-dd"];
 const TIME_TYPES = ["h:mm AM/PM", "h:mm:ss AM/PM", "h:mm", "h:mm:ss", "m/d/yyyy h:mm"];
+/** The Fraction category's types and Excel's names for them. */
+const FRACTION_TYPES: readonly (readonly [code: string, label: string])[] = [
+  ["# ?/?", "Up to one digit (1/4)"],
+  ["# ??/??", "Up to two digits (21/25)"],
+  ["# ???/???", "Up to three digits (312/943)"],
+  ["# ?/2", "As halves (1/2)"],
+  ["# ?/4", "As quarters (2/4)"],
+  ["# ?/8", "As eighths (4/8)"],
+  ["# ??/16", "As sixteenths (8/16)"],
+  ["# ?/10", "As tenths (3/10)"],
+  ["# ??/100", "As hundredths (30/100)"],
+];
+const TEXT_FORMAT = "@";
 
 /** A category's settings. */
 export interface NumberFormatParts {
@@ -70,7 +87,7 @@ export interface NumberFormatParts {
   readonly thousands: boolean;
   /** Number and Currency: negatives in parentheses instead of a minus sign. */
   readonly parentheses: boolean;
-  /** Date and Time: the chosen type; Custom: the code. */
+  /** Date, Time and Fraction: the chosen type; Custom: the code. */
   readonly code: string;
 }
 
@@ -97,8 +114,11 @@ export function numberFormatCode(parts: NumberFormatParts): string {
       return `0${decimals}%`;
     case "Scientific":
       return `0${decimals}E+00`;
+    case "Text":
+      return TEXT_FORMAT;
     case "Date":
     case "Time":
+    case "Fraction":
     case "Custom":
       return parts.code;
   }
@@ -112,6 +132,8 @@ export function numberFormatParts(code: string | undefined): NumberFormatParts {
   }
   if (DATE_TYPES.includes(code)) return { ...base, category: "Date" };
   if (TIME_TYPES.includes(code)) return { ...base, category: "Time" };
+  if (FRACTION_TYPES.some(([type]) => type === code)) return { ...base, category: "Fraction" };
+  if (code === TEXT_FORMAT) return { ...base, category: "Text" };
   for (const category of [
     "Number",
     "Currency",
@@ -334,6 +356,10 @@ export function formatCellsDialog(
     TIME_TYPES.map((code) => [code, code] as const),
     startParts.category === "Time" ? startParts.code : TIME_TYPES[0]!,
   );
+  const fractionType = select(
+    FRACTION_TYPES,
+    startParts.category === "Fraction" ? startParts.code : FRACTION_TYPES[0]![0],
+  );
   const custom = document.createElement("input");
   custom.type = "text";
   custom.className = "sheetwrite-dialog-control";
@@ -346,6 +372,7 @@ export function formatCellsDialog(
   const negativeField = field("Negative numbers", negative);
   const dateField = field("Type", dateType);
   const timeField = field("Type", timeType);
+  const fractionField = field("Type", fractionType);
   const customField = field("Type", custom);
   const parts = (): NumberFormatParts => {
     const name = category.value as NumberCategory;
@@ -356,7 +383,13 @@ export function formatCellsDialog(
       thousands: thousands.input.checked,
       parentheses: negative.value === "parentheses",
       code:
-        name === "Date" ? dateType.value : name === "Time" ? timeType.value : custom.value.trim(),
+        name === "Date"
+          ? dateType.value
+          : name === "Time"
+            ? timeType.value
+            : name === "Fraction"
+              ? fractionType.value
+              : custom.value.trim(),
     };
   };
   const refreshNumber = (): void => {
@@ -372,6 +405,7 @@ export function formatCellsDialog(
     negativeField.hidden = name !== "Number" && name !== "Currency";
     dateField.hidden = name !== "Date";
     timeField.hidden = name !== "Time";
+    fractionField.hidden = name !== "Fraction";
     customField.hidden = name !== "Custom";
     const code = numberFormatCode(parts());
     custom.setAttribute("aria-invalid", String(name === "Custom" && code === ""));
@@ -393,7 +427,15 @@ export function formatCellsDialog(
     if (category.value === "Custom" && custom.value.trim() === "") custom.value = startCode;
     refreshNumber();
   });
-  for (const control of [decimals, thousands.input, negative, dateType, timeType, custom]) {
+  for (const control of [
+    decimals,
+    thousands.input,
+    negative,
+    dateType,
+    timeType,
+    fractionType,
+    custom,
+  ]) {
     control.addEventListener("input", refreshNumber);
     control.addEventListener("change", refreshNumber);
   }
@@ -405,6 +447,7 @@ export function formatCellsDialog(
     negativeField,
     dateField,
     timeField,
+    fractionField,
     customField,
   );
   refreshNumber();

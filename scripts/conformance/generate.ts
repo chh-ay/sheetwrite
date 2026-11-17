@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
 import { authoredAssertions } from "./formula-evidence.js";
@@ -1125,6 +1126,59 @@ function circularReferenceCases(inventory: FormulaInventory): ConformanceCase[] 
   ];
 }
 
+/** The number format cases both formatters' tests read. */
+const NUMBER_FORMAT_CASES_URL = new URL(
+  "../../test/fixtures/number-format-cases.json",
+  import.meta.url,
+);
+
+/**
+ * TEXT with the shared number format cases that no Excel capture has
+ * confirmed: those whose note starts with "unsure". An Excel capture of these
+ * cases settles them.
+ */
+function numberFormatCases(inventory: FormulaInventory): ConformanceCase[] {
+  const text = supportedInventorySubjects(inventory).find(
+    (entry) => entry.subject.kind === "function" && entry.subject.name === "TEXT",
+  );
+  if (!text) throw new Error("Subject function:TEXT is absent from the typed inventory");
+  const source = sourceWithChecksum({
+    title: "Number format codes",
+    section: "Display decimal places and significant digits; Include a text entry",
+    url: "https://support.microsoft.com/en-us/office/number-format-codes-5026bbd6-04bc-48cd-bf33-80f18b4eae68",
+    license: SPEC_LICENSE,
+    authorship: "spec-derived",
+  });
+  const fixture = JSON.parse(readFileSync(NUMBER_FORMAT_CASES_URL, "utf8")) as {
+    cases: [value: number, code: string, shown: string, note: string][];
+  };
+  return fixture.cases
+    .filter(([, , , note]) => note.startsWith("unsure"))
+    .map(([value, code, shown, note]) =>
+      finalizedCase({
+        id: `formula.text-format.${sha256([value, code]).slice(0, 12)}`,
+        area: "formula",
+        dialect: "excel",
+        category: "normal",
+        family: text.family,
+        kind: "formula",
+        subject: text.subject,
+        source,
+        evidence: {
+          kind: "property",
+          basis: "documented-semantics",
+          oracle: `TEXT(${value}, "${code}") is "${shown}" by the documented rules; ${note}.`,
+        },
+        tolerance: { kind: "exact" },
+        inputs: [],
+        formula: `=TEXT(${value},"${code.replaceAll('"', '""')}")`,
+        target: "A1",
+        expected: { type: "string", value: shown },
+        observations: [],
+      }),
+    );
+}
+
 export function supportedNamesChecksum(inventory: FormulaInventory): string {
   const names = supportedInventorySubjects(inventory)
     .map(({ subject }) => `${subject.kind}:${subject.name}`)
@@ -1140,16 +1194,24 @@ export function generateConformanceEvidence(inventory: FormulaInventory): {
   const formulaCanaries = canaries.filter((entry) => entry.area === "formula").length;
   const workbookCanaries = canaries.filter((entry) => entry.area === "workbook").length;
   const circular = circularReferenceCases(inventory);
+  const numberFormats = numberFormatCases(inventory);
   const generatedFormulas = generatedFormulaCases(
     inventory,
-    REQUIRED_COUNTS.formula - formulaCanaries - circular.length,
+    REQUIRED_COUNTS.formula - formulaCanaries - circular.length - numberFormats.length,
   );
   const mutations = generatedMutationCases(REQUIRED_COUNTS.mutation);
   const workbooks = generatedWorkbookCases(REQUIRED_COUNTS.workbook - workbookCanaries);
   const corpus: ConformanceCorpus = {
     protocol: 1,
     license: "MIT; original vectors derived independently from cited public specifications",
-    cases: [...canaries, ...circular, ...generatedFormulas, ...mutations, ...workbooks],
+    cases: [
+      ...canaries,
+      ...circular,
+      ...numberFormats,
+      ...generatedFormulas,
+      ...mutations,
+      ...workbooks,
+    ],
   };
   const operationShapes = corpus.cases
     .filter((entry) => entry.area === "mutation" || entry.area === "workbook")
