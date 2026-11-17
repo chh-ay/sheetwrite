@@ -21,8 +21,11 @@ export interface EditDraftChannel {
    * cannot be edited as text.
    */
   setText(text: string, selectionStart: number, selectionEnd: number): boolean;
-  /** Commit the open cell edit in place. */
-  commit(): void;
+  /**
+   * Commit the open cell edit in place. False when the edit stays open
+   * because its formula does not parse; the user is told why.
+   */
+  commit(): boolean;
   /** Cancel the open cell edit. */
   cancel(): void;
 }
