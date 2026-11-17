@@ -180,13 +180,23 @@ describe("Paste Special", () => {
     }
   });
 
-  it("pastes formats, notes or column widths alone", async () => {
+  it("pastes formats, notes, column widths or validation alone", async () => {
     const h = harness();
     try {
       h.set(0, 0, 7, { bold: true, numberFormat: "0.00" });
       h.apply([
         { op: "setNote", addr: h.at(0, 0), text: "Checked" },
         { op: "setColumn", sheet: "s1", col: 0, patch: { width: 150 } },
+        {
+          op: "setValidationRule",
+          sheet: "s1",
+          rule: {
+            id: "rule-1",
+            range: range("s1", 0, 0, 0, 0),
+            condition: { kind: "any" },
+            policy: "reject",
+          },
+        },
       ]);
       h.set(3, 2, 3);
       await h.copy(0, 0);
@@ -202,6 +212,11 @@ describe("Paste Special", () => {
       );
       expect(await h.pasteSpecial({ paste: "columnWidths" }, 3, 2)).toBe("done");
       expect(h.sheetMeta().columns[2]?.width).toBe(150);
+      expect(await h.pasteSpecial({ paste: "validation" }, 3, 2)).toBe("done");
+      expect(h.sheetMeta().validationRules?.map((rule) => rule.range)).toEqual([
+        range("s1", 0, 0, 0, 0),
+        range("s1", 3, 2, 3, 2),
+      ]);
       expect(h.value(3, 2)).toBe(3);
     } finally {
       h.close();
