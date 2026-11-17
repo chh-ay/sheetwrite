@@ -4219,6 +4219,10 @@ export class GridImpl implements Grid {
         const { address } = this.noteCell(focus.row, focus.col);
         if (this.getNote(address) !== null) this.setNote(address, null);
       },
+      pickFromList: () => {
+        const focus = this.selection.focusCell;
+        if (focus) this.interactions.pickFromList(focus.row, focus.col);
+      },
       showPivotFields: () => {
         // The field list edits the pivot, so a read-only grid does not open it.
         if (this.readOnly) return;

@@ -109,6 +109,10 @@ As in Excel, typing a text entry completes it from the entries in the same colum
 
 Excel turns AutoComplete off with **Enable AutoComplete for cell values**. In Sheetwrite the host sets `config: { autoComplete: false }`; `setConfig` turns it on or off for the next edit.
 
+### Pick From Drop-down List
+
+As in Excel, **Alt+Down** on a cell, or **Pick from drop-down list…** in its context menu, opens a list under the cell with AutoComplete's entries: the distinct text entries above and below it in the column, one per spelling that differs in more than letter case, sorted A to Z ([Keyboard shortcuts in Excel](https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f)). Arrow keys, Page Up, Page Down, Home and End move in the list and typing jumps to the first entry that begins with the typed letters. Enter or a click puts the entry in the cell, which stays active; Escape or a click away closes the list. A column without text entries opens nothing. On an AutoFilter header Alt+Down opens the filter dropdown, and on a cell with a list rule the rule's list. `grid.actions.pickFromList()` opens it on the focus cell. The list works whether or not AutoComplete is on, as in Excel.
+
 ### Event order
 
 `beginEdit` closes the previous editor. It selects the requested cell, or keeps the selection when the cell is inside it and makes the cell active. It emits `selection` when that changes the selection, then emits `edit-begin` before it opens the editor. A synchronous handler can replace or cancel the request without the old editor reopening.

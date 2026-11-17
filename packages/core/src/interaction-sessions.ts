@@ -17,6 +17,7 @@ import {
 import { FILL_HANDLE_HIT_RADIUS } from "./grid-constants.js";
 import type { Keymap } from "./keymap.js";
 import { filterButtonRect, listButtonRect } from "./overlay-painter.js";
+import type { PickList } from "./pick-list.js";
 import { MIN_COLUMN_WIDTH, MIN_ROW_HEIGHT, resizeTargetAt } from "./resize.js";
 import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetKey } from "./sheet-commands.js";
@@ -213,7 +214,14 @@ export class InteractionSessions {
   private pointAnchor: CellRef | null = null;
   private pointEnd: CellRef | null = null;
   private editingAddress: Readonly<CellAddress> | null = null;
-  private activeEditor: EditController | ValidationEditor | CustomEditorController | null = null;
+  private activeEditor:
+    | EditController
+    | ValidationEditor
+    | CustomEditorController
+    | PickList
+    | null = null;
+  /** Pick From Drop-down List, made when it first opens. */
+  private pickList: PickList | null = null;
   private generation = 0;
   private fillTarget: SelRect | null = null;
   /** Excel's End mode: End was the last key, so the next arrow jumps to a data edge. */
@@ -226,8 +234,8 @@ export class InteractionSessions {
     null;
   /** AutoComplete's code, once the first edit has loaded it. */
   private autocomplete: typeof import("./autocomplete.js") | null = null;
-  /** The load of AutoComplete's code, started by the first edit. */
-  private autocompleteLoad: Promise<void> | null = null;
+  /** The load of AutoComplete's code, started by the first edit or list. */
+  private autocompleteLoad: Promise<typeof import("./autocomplete.js")> | null = null;
   private dragMove: ((ev: PointerEvent) => void) | null = null;
   private dragUp: ((ev: PointerEvent) => void) | null = null;
   private dragCancel: ((ev: PointerEvent) => void) | null = null;
@@ -350,14 +358,74 @@ export class InteractionSessions {
     if (!this.deps.autoComplete()) return undefined;
     if (this.autocomplete === null) {
       const generation = this.generation;
-      this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
-        this.autocomplete = module;
+      void this.loadAutocomplete().then(() => {
         if (typed && this.generation === generation) this.editor.completeNow();
       });
     }
     let complete: ((field: HTMLTextAreaElement) => string | null) | undefined;
     return (field) =>
       (complete ??= this.autocomplete?.editCompletion(this.deps, row, col))?.(field) ?? null;
+  }
+
+  /** AutoComplete's code, loaded once. */
+  private loadAutocomplete(): Promise<typeof import("./autocomplete.js")> {
+    this.autocompleteLoad ??= import("./autocomplete.js").then((module) => {
+      this.autocomplete = module;
+      return module;
+    });
+    return this.autocompleteLoad;
+  }
+
+  /**
+   * Excel's Pick From Drop-down List (Alt+Down on a cell): the text entries
+   * that AutoComplete reads around the cell, sorted, in a list under it. Its
+   * code loads with AutoComplete's. A column without text entries shows
+   * nothing, and so does a read-only grid.
+   */
+  pickFromList(row: number, col: number): void {
+    if (this.deps.readOnly()) return;
+    const cell = this.deps.anchorCell(row, col);
+    const generation = this.generation;
+    void this.loadAutocomplete().then((module) => {
+      // An edit, a move or read-only since the key wins.
+      const focus = this.deps.selection().focusCell;
+      if (
+        generation !== this.generation ||
+        this.isEditing ||
+        this.deps.readOnly() ||
+        focus?.row !== cell.row ||
+        focus.col !== cell.col
+      ) {
+        return;
+      }
+      const entries = module.pickListEntries(this.deps, cell.row, cell.col);
+      if (entries.length === 0) return;
+
+      const address = {
+        sheet: this.deps.activeSheet(),
+        row: this.deps.toDataRow(cell.row),
+        col: cell.col,
+      };
+      const current = this.deps.store.getCell(address).resolved;
+      this.deps.onEditStart();
+      const list = (this.pickList ??= new module.PickList(this.deps.viewportEl));
+      this.editingAddress = address;
+      this.activeEditor = list;
+      list.begin({
+        entries,
+        current: typeof current === "string" ? current : "",
+        rect: this.deps.screenRect(
+          cell.row,
+          cell.col,
+          this.deps.contentTop(),
+          this.deps.scroller.scrollLeft,
+        ),
+        theme: this.deps.theme(),
+        onCommit: (entry, navigate) =>
+          this.finishEdit(address, { kind: "literal", value: entry }, navigate),
+        onCancel: () => this.endEditor(),
+      });
+    });
   }
 
   /**
@@ -899,6 +967,7 @@ export class InteractionSessions {
     this.editor.destroy();
     this.validationEditor.destroy();
     this.customEditor.destroy();
+    this.pickList?.destroy();
     this.contextMenu?.destroy();
     this.deps.scroller.removeEventListener("contextmenu", this.onContextMenu);
     this.deps.scroller.removeEventListener("pointerdown", this.onPointerDown);
@@ -1484,14 +1553,18 @@ export class InteractionSessions {
 
     switch (e.key) {
       case "ArrowDown":
-        // Alt+Down opens a header's AutoFilter dropdown, or a list rule's list,
-        // as in Excel and as on a combobox.
+        // Alt+Down opens a header's AutoFilter dropdown, a list rule's list, or
+        // else Pick From Drop-down List, as in Excel and as on a combobox.
         if (e.altKey && !mod && focus && this.isAutoFilterHeader(focus.row, focus.col)) {
           this.deps.openAutoFilter(focus.col);
           break;
         }
         if (e.altKey && !mod && focus && this.hasListRule(focus.row, focus.col)) {
           this.openList(focus.row, focus.col);
+          break;
+        }
+        if (e.altKey && !mod && focus) {
+          this.pickFromList(focus.row, focus.col);
           break;
         }
         this.navigate(

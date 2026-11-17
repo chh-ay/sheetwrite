@@ -1,6 +1,7 @@
 /**
- * Excel's AutoComplete for the cell editor. It loads with the first edit
- * that types, so the first load carries none of it.
+ * Excel's AutoComplete for the cell editor, and its Pick From Drop-down List
+ * (Alt+Down), which lists the same entries. It loads with the first edit that
+ * types or the first list, so the first load carries none of it.
  * https://support.microsoft.com/en-us/office/turn-automatic-completion-of-cell-entries-on-or-off-0f4aa749-b927-4ff3-a8e0-28d6e2e4d4b4
  */
 
@@ -11,6 +12,8 @@ import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar } from "./types/cell.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { Store } from "./types/store.js";
+
+export { PickList } from "./pick-list.js";
 
 /**
  * The most rows read each way from the edited cell, so one edit's read stays
@@ -103,49 +106,55 @@ function blockEdge(sheet: CompletionSheet, row: number, col: number, direction: 
 }
 
 /**
- * Excel's AutoComplete for an edit of view row `row` in `col`: the distinct
- * text entries of the column's filled cells directly above and below it, up
- * to the first empty cell and at most {@link AUTOCOMPLETE_ROWS} rows each
- * way, read from the engine on the first typed character. Typed numbers,
- * dates, currency and TRUE or FALSE are not completed, whatever the column's
- * type, and neither are sheets whose data is still loading.
+ * The distinct values of the column's filled cells directly above and below
+ * view row `row` in `col`, up to the first empty cell and at most
+ * {@link AUTOCOMPLETE_ROWS} rows each way: Excel's AutoComplete entries.
+ * Nothing while the sheet's data is still loading.
+ */
+function columnValues(sheet: CompletionSheet, row: number, col: number): CellScalar[] {
+  const { engine } = sheet;
+  if (engine.queryCapability(sheet.sheet).status === "incomplete") return [];
+  const top = Math.max(blockEdge(sheet, row, col, -1), row - AUTOCOMPLETE_ROWS);
+  const bottom = Math.min(blockEdge(sheet, row, col, 1), row + AUTOCOMPLETE_ROWS);
+  const values: CellScalar[] = [];
+  for (const [start, end] of [
+    [top, row],
+    [row + 1, bottom + 1],
+  ] as const) {
+    if (start >= end) continue;
+    let read: CellScalar[];
+    if (sheet.sorted) {
+      // A sort or filter view scatters the rows; read just those data rows.
+      const rows = new Uint32Array(end - start);
+      let low = Infinity;
+      let high = -1;
+      for (let index = 0; index < rows.length; index++) {
+        const dataRow = sheet.toDataRow(start + index);
+        rows[index] = dataRow;
+        low = Math.min(low, dataRow);
+        high = Math.max(high, dataRow);
+      }
+      read = engine.distinctValues(sheet.sheet, col, 0, { start: low, end: high + 1 }, rows);
+    } else {
+      read = engine.distinctValues(sheet.sheet, col, 0, { start, end });
+    }
+    for (const value of read) values.push(value);
+  }
+  return values;
+}
+
+/**
+ * Excel's AutoComplete for an edit of view row `row` in `col`, from the
+ * entries {@link columnValues} reads on the first typed character. Typed
+ * numbers, dates, currency and TRUE or FALSE are not completed, whatever the
+ * column's type.
  */
 export function columnCompletions(
   sheet: CompletionSheet,
   row: number,
   col: number,
 ): (typed: string) => string | null {
-  const { engine } = sheet;
-  const completions = new ColumnCompletions(() => {
-    if (engine.queryCapability(sheet.sheet).status === "incomplete") return [];
-    const top = Math.max(blockEdge(sheet, row, col, -1), row - AUTOCOMPLETE_ROWS);
-    const bottom = Math.min(blockEdge(sheet, row, col, 1), row + AUTOCOMPLETE_ROWS);
-    const values: CellScalar[] = [];
-    for (const [start, end] of [
-      [top, row],
-      [row + 1, bottom + 1],
-    ] as const) {
-      if (start >= end) continue;
-      let read: CellScalar[];
-      if (sheet.sorted) {
-        // A sort or filter view scatters the rows; read just those data rows.
-        const rows = new Uint32Array(end - start);
-        let low = Infinity;
-        let high = -1;
-        for (let index = 0; index < rows.length; index++) {
-          const dataRow = sheet.toDataRow(start + index);
-          rows[index] = dataRow;
-          low = Math.min(low, dataRow);
-          high = Math.max(high, dataRow);
-        }
-        read = engine.distinctValues(sheet.sheet, col, 0, { start: low, end: high + 1 }, rows);
-      } else {
-        read = engine.distinctValues(sheet.sheet, col, 0, { start, end });
-      }
-      for (const value of read) values.push(value);
-    }
-    return values;
-  });
+  const completions = new ColumnCompletions(() => columnValues(sheet, row, col));
   return (typed) =>
     typeof parseCellLiteralInput(typed, "date") === "string" && parseCurrencyInput(typed) === null
       ? completions.complete(typed)
@@ -162,6 +171,46 @@ export interface CompletionHost {
   dataEdge(viewRow: number, col: number, dRow: number, dCol: number): number | null;
 }
 
+/** What AutoComplete reads of the active sheet of `host`. */
+function completionSheet(host: CompletionHost, engine: StoreDataEngine): CompletionSheet {
+  const sheet = host.activeSheet();
+  return {
+    engine,
+    sheet,
+    sorted: host.loadable?.hasView(sheet) ?? false,
+    rowCount: host.rowCount(),
+    toDataRow: (viewRow) => host.toDataRow(viewRow),
+    filled: (viewRow, column) => {
+      const value = host.store.getCell({
+        sheet,
+        row: host.toDataRow(viewRow),
+        col: column,
+      }).resolved;
+      return value !== null && value !== "";
+    },
+    dataEdge: (viewRow, column, dRow, dCol) => host.dataEdge(viewRow, column, dRow, dCol),
+  };
+}
+
+/**
+ * The entries of Excel's Pick From Drop-down List for view row `row` in
+ * `col`: AutoComplete's text entries, one per spelling that differs in more
+ * than letter case, sorted A to Z ignoring case. Empty for a store without
+ * an engine.
+ */
+export function pickListEntries(host: CompletionHost, row: number, col: number): string[] {
+  const engine = storeEngine(host.store);
+  if (engine === null) return [];
+  const entries = new Map<string, string>();
+  for (const value of columnValues(completionSheet(host, engine), row, col)) {
+    if (typeof value !== "string" || value === "") continue;
+    const key = value.toLowerCase();
+    if (!entries.has(key)) entries.set(key, value);
+  }
+  const collator = new Intl.Collator(undefined, { sensitivity: "base" });
+  return [...entries.values()].sort(collator.compare);
+}
+
 /**
  * The cell editor's AutoComplete for an edit of view row `row` in `col`: it
  * completes the editor's text in place, with the added text selected after
@@ -176,27 +225,7 @@ export function editCompletion(
 ): (field: HTMLTextAreaElement) => string | null {
   const engine = storeEngine(host.store);
   if (engine === null) return () => null;
-  const sheet = host.activeSheet();
-  const complete = columnCompletions(
-    {
-      engine,
-      sheet,
-      sorted: host.loadable?.hasView(sheet) ?? false,
-      rowCount: host.rowCount(),
-      toDataRow: (viewRow) => host.toDataRow(viewRow),
-      filled: (viewRow, column) => {
-        const value = host.store.getCell({
-          sheet,
-          row: host.toDataRow(viewRow),
-          col: column,
-        }).resolved;
-        return value !== null && value !== "";
-      },
-      dataEdge: (viewRow, column, dRow, dCol) => host.dataEdge(viewRow, column, dRow, dCol),
-    },
-    row,
-    col,
-  );
+  const complete = columnCompletions(completionSheet(host, engine), row, col);
   return (field) => {
     const typed = field.value;
     if (

@@ -57,7 +57,7 @@ it("edits boolean cells using spreadsheet text", () => {
   store.dispose();
 });
 
-it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere", () => {
+it("opens a list rule's list on Alt+Down", () => {
   const workbook = makeWorkbook(4);
   workbook.sheets[0]!.validationRules = [
     {
@@ -80,11 +80,7 @@ it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere
       }),
     );
 
-  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-  altDown();
-  expect(host.querySelector('[role="listbox"]')).toBeNull();
-  expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
   altDown();
   expect(host.querySelector('[role="listbox"]')).not.toBeNull();
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });

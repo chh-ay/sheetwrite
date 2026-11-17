@@ -110,7 +110,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Space / Shift + Space | Select the active cell's column / row. |
 | Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
 | F2 | Edit the active cell, with the caret at the end. |
-| Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule. |
+| Alt + Down | Open the filter dropdown of an AutoFilter header cell, the list of a cell with a list validation rule, or else [Pick From Drop-down List](/docs/features/grid/editing-and-clipboard/#pick-from-drop-down-list). |
 | Delete | Clear the selected cells. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
 | A printable character | Start editing the active cell, replacing its content. A text entry may be completed from the column ([AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete)). |

@@ -367,6 +367,13 @@ export interface GridActions {
    */
   deleteNote(): void;
   /**
+   * Open Excel's Pick From Drop-down List on the focus cell, as Alt+Down
+   * does: the text entries of the column above and below it, sorted, in a
+   * list under the cell. Does nothing when there are none, or on a read-only
+   * grid.
+   */
+  pickFromList(): void;
+  /**
    * Open the field list of the pivot table whose output holds the focus cell.
    * Does nothing when the focus cell is outside every pivot. Does nothing on a
    * read-only grid.
@@ -554,6 +561,7 @@ export type ContextMenuActionName =
   | "insertCells"
   | "deleteCells"
   | "formatCells"
+  | "pickFromList"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
