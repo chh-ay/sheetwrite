@@ -42,7 +42,7 @@ import {
 import { compareCodeUnits, isPlainRecord, ownValue, type PlainRecord } from "./plain-data.js";
 import { ROW_ORDER_ENCODING } from "./row-order.js";
 import { validateSavedQueriesShape, validateSavedQueryShape } from "./saved-query.js";
-import { validFilterCondition } from "./store/autofilter.js";
+import { DYNAMIC_DATE_FILTERS, validFilterCondition } from "./store/autofilter.js";
 import { normalizeMerge } from "./store/ranges.js";
 import { preparedRestore } from "./transaction-preparation.js";
 import type { MergeRange, Range } from "./types/coordinates.js";
@@ -1144,6 +1144,37 @@ function validateCellStyle(value: unknown, path: string, errors: DocumentValidat
   }
 }
 
+/**
+ * A shifting `moveCells` (Insert or Delete with Shift cells) stays on its
+ * sheet and moves along one axis.
+ */
+function validateCellShift(
+  operation: PlainRecord,
+  path: string,
+  errors: DocumentValidationError[],
+): void {
+  const shift = ownValue(operation, "shift");
+  if (shift === undefined) return;
+  if (shift !== true) {
+    invalid(errors, `${path}.shift`, "shift must be true when present");
+    return;
+  }
+  const range = ownValue(operation, "range");
+  const to = ownValue(operation, "to");
+  if (!isPlainRecord(range) || !isPlainRecord(to)) return;
+  const start = ownValue(range, "start");
+  const end = ownValue(range, "end");
+  if (!isPlainRecord(start) || !isPlainRecord(end)) return;
+  const first = (key: string) => Math.min(Number(ownValue(start, key)), Number(ownValue(end, key)));
+  const sameSheet = ownValue(range, "sheet") === ownValue(to, "sheet");
+  if (
+    !sameSheet ||
+    (first("row") !== ownValue(to, "row") && first("col") !== ownValue(to, "col"))
+  ) {
+    invalid(errors, `${path}.shift`, "A shift moves cells along one row or column of their sheet");
+  }
+}
+
 function validateAddress(value: unknown, path: string, errors: DocumentValidationError[]): void {
   const address = recordAt(value, path, errors);
   if (!address) return;
@@ -1359,6 +1390,19 @@ function validateHyperlinkShape(
   }
 }
 
+/** The longest formula Excel takes in a data validation rule. */
+const MAX_VALIDATION_FORMULA_LENGTH = 255;
+
+/** Whether `value` is a validation formula: text with its leading `=`, within Excel's length. */
+function validationFormula(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.length > 1 &&
+    value.length <= MAX_VALIDATION_FORMULA_LENGTH &&
+    value.startsWith("=")
+  );
+}
+
 function validateValidationComparison(
   value: unknown,
   path: string,
@@ -1384,6 +1428,8 @@ function validateValidationComparison(
 
   const validateOperand = (key: "min" | "max" | "value"): number | undefined => {
     const operand = ownValue(comparison, key);
+    // A formula bound is checked when a value is, in its cell.
+    if (validationFormula(operand)) return undefined;
     if (textLength) {
       if (nonNegativeInteger(operand)) return operand;
     } else if (finiteNumber(operand)) {
@@ -1393,8 +1439,8 @@ function validateValidationComparison(
       errors,
       `${path}.${key}`,
       textLength
-        ? "Text length comparison operands must be non-negative integers"
-        : "Validation comparison operands must be finite",
+        ? "Text length comparison operands must be non-negative integers or formulas"
+        : "Validation comparison operands must be finite numbers or formulas",
     );
     return undefined;
   };
@@ -1425,7 +1471,28 @@ function validateValidationCondition(
   const condition = recordAt(value, path, errors);
   if (!condition) return;
   const kind = ownValue(condition, "kind");
+  if (kind === "any") return;
+  if (kind === "custom") {
+    if (!validationFormula(ownValue(condition, "formula"))) {
+      invalid(errors, `${path}.formula`, "A custom validation needs a formula that starts with =");
+    }
+    return;
+  }
   if (kind === "list") {
+    optionalBoolean(condition, "allowCustom", path, errors);
+    if (ownValue(condition, "source") !== undefined) {
+      if (
+        !validationFormula(ownValue(condition, "source")) ||
+        ownValue(condition, "values") !== undefined
+      ) {
+        invalid(
+          errors,
+          `${path}.source`,
+          "A list source is one formula that starts with =, without values",
+        );
+      }
+      return;
+    }
     const values = arrayAt(ownValue(condition, "values"), `${path}.values`, errors);
     if (values && values.length === 0) {
       invalid(errors, `${path}.values`, "List validation needs at least one value");
@@ -1437,11 +1504,10 @@ function validateValidationCondition(
       }
     });
 
-    optionalBoolean(condition, "allowCustom", path, errors);
     return;
   }
 
-  if (kind === "number" || kind === "date") {
+  if (kind === "number" || kind === "date" || kind === "time") {
     const min = ownValue(condition, "min");
     const max = ownValue(condition, "max");
     const comparison = ownValue(condition, "comparison");
@@ -1557,6 +1623,10 @@ function validateFilterShape(
         invalid(errors, conditionPath, "Filter condition operation or value is invalid");
       }
     });
+  } else if (kind === "dynamic") {
+    if (!DYNAMIC_DATE_FILTERS.has(String(ownValue(filter, "type")))) {
+      invalid(errors, `${path}.type`, "Dynamic date filter type is invalid");
+    }
   } else if (kind !== "empty" && kind !== "nonEmpty") {
     invalid(errors, `${path}.kind`, "Filter kind is invalid");
   }
@@ -1945,8 +2015,25 @@ function validateValidationRuleShape(
   if (!["reject", "warn", "allow"].includes(String(policy))) {
     invalid(errors, `${path}.policy`, "Validation policy is invalid");
   }
+  const errorStyle = ownValue(rule, "errorStyle");
+  if (errorStyle !== undefined) {
+    if (!["stop", "warning", "information"].includes(String(errorStyle))) {
+      invalid(errors, `${path}.errorStyle`, "Validation error style is invalid");
+    } else if ((policy === "reject") !== (errorStyle === "stop") && policy !== "allow") {
+      invalid(
+        errors,
+        `${path}.errorStyle`,
+        "A reject rule's error style is stop; a warn rule's is warning or information",
+      );
+    }
+  }
   optionalBoolean(rule, "allowBlank", path, errors);
+  optionalBoolean(rule, "inCellDropdown", path, errors);
   optionalString(rule, "helpText", path, errors);
+  optionalString(rule, "errorTitle", path, errors);
+  optionalBoolean(rule, "showInputMessage", path, errors);
+  optionalString(rule, "inputTitle", path, errors);
+  optionalString(rule, "inputMessage", path, errors);
 }
 
 function validateProtectedRangeShape(
@@ -2295,6 +2382,7 @@ export function validateDocumentOperationShape(
     case "moveCells":
       validateRangeShape(ownValue(operation, "range"), `${path}.range`, errors);
       validateAddress(ownValue(operation, "to"), `${path}.to`, errors);
+      validateCellShift(operation, path, errors);
       break;
 
     case "addRows":

@@ -167,6 +167,7 @@ import type {
 } from "../types/store.js";
 import type { WorkbookTable, WorkbookTableColumn } from "../types/table.js";
 import type { ChangeEvent } from "../types/transaction.js";
+import { mapValidationFormulas, type ValidationReads } from "../validation-rule.js";
 import {
   assertWorkbookTables,
   DEFAULT_WORKBOOK_TABLE_RESOURCE_LIMITS,
@@ -206,7 +207,7 @@ import {
   integerAt,
   mergeCrossesFreeze,
   mergesOverlap,
-  movedBlock,
+  movedCellBounds,
   moveRemap,
   normalizedRange,
   normalizeMerge,
@@ -233,6 +234,7 @@ import {
 } from "./ranges.js";
 import { SheetRegistry } from "./sheet-registry.js";
 import { StoreSnapshotCodec } from "./snapshot-codec.js";
+import { storeValidationReads } from "./validation-reads.js";
 import { StoreViewState } from "./view-state.js";
 import type { PivotOutputCells, RecomputingCellStore } from "./wasm-contract.js";
 import { StoreWindowReader } from "./window-reader.js";
@@ -579,6 +581,29 @@ function rebaseConditionalFormats(
     rebased.push({ ...rule, range, when });
   }
   return rebased;
+}
+
+/**
+ * Validation rules after a row or column edit on `editedSheet`: their ranges
+ * follow it, and so do the references of their formulas.
+ */
+function rebaseValidationRules(
+  rules: readonly DataValidationRule[],
+  editedSheet: SheetId,
+  axis: SheetAxis,
+  remap: (index: number) => number | null,
+  formulaEdit: FormulaAxisEdit,
+): DataValidationRule[] {
+  return rebaseRangeItems(rules, editedSheet, axis, remap).map((rule) =>
+    rule.range.sheet === editedSheet
+      ? {
+          ...rule,
+          condition: mapValidationFormulas(rule.condition, (formula) =>
+            remapFormulaA1Refs(formula, axis, formulaEdit),
+          ),
+        }
+      : rule,
+  );
 }
 
 /** A store failure caused by the workbook, options or call the host gave. */
@@ -1404,6 +1429,38 @@ export class StoreDataEngine {
     return decodePreview(fields, result);
   }
 
+  /**
+   * As {@link previewFormula}, as if `cell` held `trial`: the formulas that
+   * read the cell see `trial`, and the cell keeps its content. A data
+   * validation custom formula checks a typed value with it before it is stored.
+   */
+  previewFormulaWith(cell: CellAddress, text: string, trial: CellScalar): FormulaPreview {
+    const fields = new Float64Array(PREVIEW_FIELDS);
+    const target = Uint32Array.of(this.sheets.handleOf(cell.sheet), cell.row, cell.col);
+    const result = this.wasm.previewFormulaWith(
+      target,
+      text,
+      trialKind(trial),
+      typeof trial === "number" ? trial : trial === true ? 1 : 0,
+      typeof trial === "string" ? trial : "",
+      fields,
+    );
+    return decodePreview(fields, result);
+  }
+
+  private validationReadsCache: ValidationReads | undefined;
+
+  /** What data validation rules read from this store: formula results and list sources. */
+  get validationReads(): ValidationReads {
+    this.validationReadsCache ??= storeValidationReads({
+      workbook: () => this.workbook,
+      getCell: (addr) => this.getCell(addr),
+      previewFormula: (cell, text) => this.previewFormula(cell, text),
+      previewFormulaWith: (cell, text, trial) => this.previewFormulaWith(cell, text, trial),
+    });
+    return this.validationReadsCache;
+  }
+
   private sameNamedRange(
     namedRange: NamedRangeSnapshot,
     name: string,
@@ -1541,7 +1598,7 @@ export class StoreDataEngine {
 
   canApplyLocally(patch: DocumentOp): boolean {
     if (patch.op === "moveCells") {
-      return this.blockLoaded(patch.range) && this.blockLoaded(movedBlock(patch));
+      return movedCellBounds(patch).every((range) => this.blockLoaded(range));
     }
     const sheet = patchSheetId(patch);
     if (sheet === null || !this.sheets.handles.has(sheet) || !this.isPaged(sheet)) return true;
@@ -2189,7 +2246,35 @@ export class StoreDataEngine {
     only?: Uint32Array,
   ): CellScalar[] {
     this.requireCompleteQuery(sheet);
-    return this.view.distinctValues(sheet, col, limit, rows, only);
+    return this.view.distinctValues(sheet, col, limit, rows, only).values;
+  }
+
+  /**
+   * {@link distinctValues} with the number format each value shows with (its
+   * first cell's, or `undefined` when that cell has none) and how many rows
+   * hold it. The counts cover every row of `rows`, past `limit` values too.
+   */
+  distinctEntries(
+    sheet: SheetId,
+    col: number,
+    limit: number,
+    rows: { start: number; end: number },
+    only?: Uint32Array,
+  ): { values: CellScalar[]; formats: (string | undefined)[]; counts: Uint32Array } {
+    this.requireCompleteQuery(sheet);
+    const { values, styles, counts } = this.view.distinctValues(
+      sheet,
+      col,
+      limit,
+      rows,
+      only,
+      true,
+    );
+    const formats = new Array<string | undefined>(styles.length);
+    for (let index = 0; index < styles.length; index++) {
+      formats[index] = this.styles.get(styles[index] ?? 0).numberFormat;
+    }
+    return { values, formats, counts };
   }
 
   /** The data rows of `sheet` that every filter in `filters` keeps, ascending. */
@@ -2422,7 +2507,8 @@ export class StoreDataEngine {
    * range whose edge moved. History captures them before the move applies.
    */
   moveCellsLosses(patch: MoveCellsOperation): CellAddress[] {
-    const { from, to } = cellBlockMove(patch);
+    const move = cellBlockMove(patch);
+    const { from, to } = move;
     const handle = this.sheets.handles.get(from.sheet);
     const toHandle = this.sheets.handles.get(to.sheet);
     if (handle === undefined || toHandle === undefined) return [];
@@ -2436,6 +2522,7 @@ export class StoreDataEngine {
       toHandle,
       to.start.row,
       to.start.col,
+      move.shift,
     );
     const losses: CellAddress[] = [];
     for (let index = 0; index + 2 < triples.length; index += 3) {
@@ -4178,7 +4265,13 @@ export class StoreDataEngine {
       to: patch.to,
     };
 
-    sheet.validationRules = rebaseRangeItems(moved.validationRules, sheet.id, axis, moveAt);
+    sheet.validationRules = rebaseValidationRules(
+      moved.validationRules,
+      sheet.id,
+      axis,
+      moveAt,
+      formulaEdit,
+    );
     sheet.protectedRanges = rebaseRangeItems(moved.protectedRanges, sheet.id, axis, moveAt);
     sheet.notes = rebaseNotes(moved.notes, sheet.id, axis, moveAt);
     sheet.conditionalFormats = rebaseConditionalFormats(
@@ -4313,7 +4406,13 @@ export class StoreDataEngine {
       return true;
     }
 
-    if (this.blockMeetsOwnedCells(fromSheet, from) || this.blockMeetsOwnedCells(toSheet, to)) {
+    // A shift also moves the cells a deletion closes between the blocks.
+    const bounds = movedCellBounds(patch);
+    if (
+      bounds.some((block) =>
+        this.blockMeetsOwnedCells(block.sheet === from.sheet ? fromSheet : toSheet, block),
+      )
+    ) {
       return false;
     }
 
@@ -4324,9 +4423,13 @@ export class StoreDataEngine {
     const cols = from.end.col - from.start.col + 1;
     const before =
       changes && captureDetailedChanges
-        ? [from, to].map((bounds) => ({
-            bounds,
-            cells: this.captureBlockBeforeCells(bounds, rows, cols),
+        ? bounds.map((block) => ({
+            bounds: block,
+            cells: this.captureBlockBeforeCells(
+              block,
+              block.end.row - block.start.row + 1,
+              block.end.col - block.start.col + 1,
+            ),
           }))
         : null;
 
@@ -4340,6 +4443,7 @@ export class StoreDataEngine {
       this.sheets.handleOf(to.sheet),
       to.start.row,
       to.start.col,
+      move.shift,
     );
     if (status !== 0) return false;
 
@@ -4733,7 +4837,8 @@ export class StoreDataEngine {
 
     this.windowReader.conditionalRulesChanged(sheet);
     meta.validationRules =
-      meta.validationRules && rebaseRangeItems(meta.validationRules, sheet, axis, remap);
+      meta.validationRules &&
+      rebaseValidationRules(meta.validationRules, sheet, axis, remap, formulaEdit);
     meta.protectedRanges =
       meta.protectedRanges && rebaseRangeItems(meta.protectedRanges, sheet, axis, remap);
     meta.notes = meta.notes && rebaseNotes(meta.notes, sheet, axis, remap);
@@ -5417,4 +5522,11 @@ function columnarScalar(
     return columnarScalar(unwrapped.value, type);
   }
   return typeof unwrapped === "string" ? parseCellLiteralInput(unwrapped, type) : unwrapped;
+}
+
+/** The engine's number for the kind of a trial value: 0 blank, 1 number, 2 text, 3 logical. */
+function trialKind(trial: CellScalar): number {
+  if (trial === null) return 0;
+  if (typeof trial === "number") return 1;
+  return typeof trial === "string" ? 2 : 3;
 }

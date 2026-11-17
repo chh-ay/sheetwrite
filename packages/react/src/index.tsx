@@ -53,6 +53,7 @@ type GridAdapterEventHandlerName =
   | "onRendererFallback"
   | "onDatasourceError"
   | "onExportError"
+  | "onKeyBindingsChange"
   | "onReady"
   | "onInitializationError";
 type AssertNever<Value extends never> = Value;
@@ -84,6 +85,8 @@ export interface SheetwriteGridProps<Id extends RowBridgeId = RowBridgeId>
   onDatasourceError?: GridAdapterEventHandlers["onDatasourceError"];
   /** Receives failures from built-in XLSX export actions. */
   onExportError?: GridAdapterEventHandlers["onExportError"];
+  /** Receives the user's key bindings after each change in the Keyboard shortcuts panel. */
+  onKeyBindingsChange?: GridAdapterEventHandlers["onKeyBindingsChange"];
   /** Fires after the adapter publishes a ready Grid generation. */
   onReady?: GridAdapterEventHandlers["onReady"];
   /** Additional class appended to the required `sheetwrite` host class. */
@@ -120,6 +123,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
       onRendererFallback,
       onDatasourceError,
       onExportError,
+      onKeyBindingsChange,
       onReady,
       rowBridge,
       workbook,
@@ -170,6 +174,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
         onRendererFallback,
         onDatasourceError,
         onExportError,
+        onKeyBindingsChange,
         onReady,
         onInitializationError,
       };
@@ -191,6 +196,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
       onRendererFallback,
       onDatasourceError,
       onExportError,
+      onKeyBindingsChange,
       onReady,
       onInitializationError,
     ]);
@@ -228,6 +234,7 @@ const SheetwriteGridComponent = forwardRef<Grid, SheetwriteGridProps>(
           onRendererFallback: (event) => handlers.current?.onRendererFallback?.(event),
           onDatasourceError: (event) => handlers.current?.onDatasourceError?.(event),
           onExportError: (event) => handlers.current?.onExportError?.(event),
+          onKeyBindingsChange: (event) => handlers.current?.onKeyBindingsChange?.(event),
           onReady: (event) => handlers.current?.onReady?.(event),
           onInitializationError: (error) => handlers.current?.onInitializationError?.(error),
         },

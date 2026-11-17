@@ -1,8 +1,8 @@
 // Formula help in a formula editor: the function list as you type, the
-// argument guide, live errors and coloured references. This module is a chunk
-// of its own: formula-assist.ts loads it on the first formula edit, so a grid
-// that never edits a formula never downloads it or the function table. Every
-// feature reads one `analyzeFormula` result.
+// argument guide, live errors with their fixes and coloured references. This
+// module is a chunk of its own: formula-assist.ts loads it on the first
+// formula edit, so a grid that never edits a formula never downloads it or
+// the function table. Every feature reads one `analyzeFormula` result.
 
 import {
   analyzeFormula,
@@ -19,6 +19,7 @@ import { RANGE_FILL_ALPHA, referenceColor } from "./formula-colors.js";
 import { FormulaGhost } from "./formula-ghost.js";
 import { boxIn, layerParent, type MirrorMark, TextMirror } from "./formula-mirror.js";
 import type { FormulaReference } from "./formula-references.js";
+import { formulaEntry, formulaTokens } from "./formula-syntax.js";
 import { storeFunctions } from "./functions/registry.js";
 import { argumentLabel, signature } from "./functions/signature.js";
 import type { FormulaFunctionMetadata } from "./functions/types.js";
@@ -130,6 +131,143 @@ function sameMatches(
   );
 }
 
+/** A change that fixes a live error, offered under it in the guide. */
+interface FormulaFix {
+  /** The button's text, such as `Did you mean SUM?`. */
+  readonly label: string;
+  readonly from: number;
+  readonly to: number;
+  readonly insert: string;
+}
+
+/** Most edits between a typed name and a known name that a fix suggests. */
+const MAX_FIX_EDITS = 2;
+
+/**
+ * Edits that turn `left` into `right`: a character added, removed or
+ * changed, or two neighbours swapped. Stops counting past `limit`.
+ */
+function editDistance(left: string, right: string, limit: number): number {
+  if (Math.abs(left.length - right.length) > limit) return limit + 1;
+  let before: number[] = [];
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let row = 1; row <= left.length; row++) {
+    const current = [row];
+    let smallest = row;
+    for (let col = 1; col <= right.length; col++) {
+      const same = left[row - 1] === right[col - 1];
+      let cost = Math.min(
+        (previous[col] ?? 0) + 1,
+        (current[col - 1] ?? 0) + 1,
+        (previous[col - 1] ?? 0) + (same ? 0 : 1),
+      );
+      if (
+        row > 1 &&
+        col > 1 &&
+        left[row - 1] === right[col - 2] &&
+        left[row - 2] === right[col - 1]
+      ) {
+        cost = Math.min(cost, (before[col - 2] ?? 0) + 1);
+      }
+      current.push(cost);
+      smallest = Math.min(smallest, cost);
+    }
+    if (smallest > limit) return limit + 1;
+    before = previous;
+    previous = current;
+  }
+  return previous[right.length] ?? limit + 1;
+}
+
+/** The name in `candidates` nearest to `typed`, ignoring case, within {@link MAX_FIX_EDITS}; null when none. */
+function nearestName(typed: string, candidates: Iterable<string>): string | null {
+  const key = typed.toUpperCase();
+  let nearest: string | null = null;
+  let edits = MAX_FIX_EDITS + 1;
+  for (const candidate of candidates) {
+    const distance = editDistance(key, candidate.toUpperCase(), edits - 1);
+    if (distance < edits && distance > 0) {
+      nearest = candidate;
+      edits = distance;
+    }
+  }
+  // A one-letter name is too short to guess from.
+  return key.length > 1 ? nearest : null;
+}
+
+/**
+ * Bare names that no defined name or table has but one comes within two
+ * edits of, each a diagnostic with the fix that names the near one. A name
+ * that ends the text is still being typed, so it waits like a missing `)`.
+ * A formula with `LET` or `LAMBDA` names its own values, so it has none.
+ */
+function misspelledNames(
+  text: string,
+  analysis: FormulaAnalysis,
+  names: FormulaNames,
+): Map<FormulaDiagnostic, FormulaFix> {
+  const fixes = new Map<FormulaDiagnostic, FormulaFix>();
+  const known = [...names.names, ...names.tables.map((table) => table.name)];
+  if (known.length === 0) return fixes;
+  const keys = new Set(known.map((name) => name.toUpperCase()));
+  for (const token of analysis.tokens) {
+    if (token.kind !== "function") continue;
+    const called = text.slice(token.from, token.to).toUpperCase();
+    if (called === "LET" || called === "LAMBDA") return fixes;
+  }
+  for (const token of analysis.tokens) {
+    const name = text.slice(token.from, token.to);
+    if (token.kind !== "name" || keys.has(name.toUpperCase()) || text.charAt(token.to) === "[") {
+      continue;
+    }
+    const near = nearestName(name, known);
+    if (near === null) continue;
+    const diagnostic: FormulaDiagnostic = {
+      from: token.from,
+      to: token.to,
+      message: `${name} is not a defined name. The cell shows #NAME?.`,
+      incomplete: token.to === text.length,
+    };
+    fixes.set(diagnostic, { label: `Did you mean ${near}?`, ...token, insert: near });
+  }
+  return fixes;
+}
+
+/**
+ * The fix of a syntax error or an unknown function: the missing `)` at the
+ * end, as Enter adds them; a `)` that closes nothing removed; a function name
+ * within two edits of a known one. Null when the error has no one clear fix.
+ */
+function syntaxFix(
+  text: string,
+  diagnostic: FormulaDiagnostic,
+  functions: readonly FormulaFunctionMetadata[],
+): FormulaFix | null {
+  const { from, to } = diagnostic;
+  if (diagnostic.incomplete) {
+    const entry = formulaEntry(text);
+    if (typeof entry !== "string" || entry === text) return null;
+    const end = text.trimEnd().length;
+    const insert = entry.slice(end);
+    const label = insert.length === 1 ? "Add the missing )" : `Add the ${insert.length} missing )`;
+    return { label, from: end, to: text.length, insert };
+  }
+  if (text.slice(from, to) === ")") {
+    let open = 0;
+    for (const token of formulaTokens(text.slice(0, from))) {
+      if (token.kind === "lparen") open += 1;
+      else if (token.kind === "rparen") open -= 1;
+    }
+    return open === 0 ? { label: "Remove the extra )", from, to, insert: "" } : null;
+  }
+  if (text.charAt(to) !== "(") return null;
+  const near = nearestName(
+    text.slice(from, to),
+    functions.map((fn) => fn.name),
+  );
+  return near === null ? null : { label: `Did you mean ${near}?`, from, to, insert: near };
+}
+
 /**
  * The defined names a formula on `sheet` sees, the workbook's tables, and
  * the table that holds `cell`, for the completion list.
@@ -234,6 +372,8 @@ export class FormulaHelp {
   private ghostStatus: HTMLDivElement | null = null;
   private announceTimer: ReturnType<typeof setTimeout> | undefined;
   private announced = "";
+  /** The fix of the first error shown, which the guide offers and Tab applies. */
+  private fix: FormulaFix | null = null;
 
   constructor(deps: AssistDeps) {
     helpSerial += 1;
@@ -330,7 +470,12 @@ export class FormulaHelp {
     const cursor = field.selectionStart ?? text.length;
     const analysis = analyzeFormula(text, cursor, this.functions, this.names);
     this.analysis = analysis;
-    const diagnostics = shownDiagnostics(analysis.diagnostics, cursor, text.length);
+    const nameFixes = misspelledNames(text, analysis, this.names);
+    const diagnostics = shownDiagnostics(
+      [...analysis.diagnostics, ...nameFixes.keys()].sort((left, right) => left.from - right.from),
+      cursor,
+      text.length,
+    );
     if (this.dismissedText !== null && this.dismissedText !== text) this.dismissedText = null;
     const collapsed = field.selectionStart === field.selectionEnd;
     const ghost = this.ghost?.update(text, collapsed ? cursor : -1, analysis) ?? null;
@@ -349,6 +494,9 @@ export class FormulaHelp {
     }
     this.call = analysis.call;
     this.diagnostics = diagnostics;
+    const first = diagnostics[0];
+    this.fix =
+      first === undefined ? null : (nameFixes.get(first) ?? syntaxFix(text, first, this.functions));
     this.showGuide();
     this.schedulePreview(text, analysis.diagnostics.length === 0);
     field.setAttribute("aria-invalid", diagnostics.length > 0 ? "true" : "false");
@@ -356,12 +504,20 @@ export class FormulaHelp {
   }
 
   /**
-   * Keys that drive the open function list. Returns true only when the list
-   * used the key, so the editor's own Enter, Tab and Escape still work while
-   * the list is closed.
+   * Keys that drive the open function list; while it is closed, the ghost's
+   * keys, then Tab, which applies the fix the guide offers. A shown ghost
+   * takes Tab first, as the user sees it. Returns true only when help used
+   * the key, so the editor's own Enter, Tab and Escape still work.
    */
   handleKeyDown(event: KeyboardEvent): boolean {
-    if (this.completion === null) return this.ghostKey(event);
+    if (this.completion === null) {
+      if (this.ghostKey(event)) return true;
+      const fix = this.fix;
+      if (event.key !== "Tab" || event.shiftKey || fix === null) return false;
+      event.preventDefault();
+      this.applyFix(fix);
+      return true;
+    }
 
     switch (event.key) {
       case "ArrowDown":
@@ -664,9 +820,23 @@ export class FormulaHelp {
     field.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  /** Make the change `fix` names; the caret goes after the changed text. */
+  private applyFix(fix: FormulaFix): void {
+    const field = this.field;
+    if (field === null) return;
+
+    const text = field.value;
+    const caret = fix.from + fix.insert.length;
+    field.value = `${text.slice(0, fix.from)}${fix.insert}${text.slice(fix.to)}`;
+    field.setSelectionRange(caret, caret);
+    field.focus();
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
   /**
    * The guide shows the active function in the open list, else the call at
-   * the caret with its current argument in bold, then the first error.
+   * the caret with its current argument in bold, then the first error and
+   * the button that fixes it.
    */
   private showGuide(): void {
     const guide = this.guide;
@@ -677,6 +847,7 @@ export class FormulaHelp {
     const fn = listed ?? call?.function;
     const active = listed === undefined ? (call?.argumentIndex ?? null) : null;
     const error = this.diagnostics[0]?.message;
+    const fix = this.fix;
 
     const lines: HTMLElement[] = [];
     if (fn !== undefined) {
@@ -684,8 +855,21 @@ export class FormulaHelp {
       lines.push(textLine("sheetwrite-formula-description", fn.description));
     }
     if (error !== undefined) lines.push(textLine("sheetwrite-formula-error", error));
+    if (fix !== null) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "sheetwrite-formula-fix";
+      button.textContent = fix.label;
+      button.title = "Tab";
+      // mousedown, not click, so the fix lands before the field blurs.
+      button.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        this.applyFix(fix);
+      });
+      lines.push(button);
+    }
 
-    const key = `${fn === undefined ? "" : signature(fn)}|${active ?? ""}|${error ?? ""}`;
+    const key = `${fn === undefined ? "" : signature(fn)}|${active ?? ""}|${error ?? ""}|${fix === null ? "" : `${fix.label}@${fix.from}`}`;
     if (key === this.guideText) return;
 
     this.guideText = key;

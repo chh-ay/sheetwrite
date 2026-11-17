@@ -187,9 +187,10 @@ test("the dropdown is keyboard-usable: search, arrows, Space and Enter", async (
   await expect(list.getByRole("option")).toHaveText([
     "(Select All Search Results)",
     "Add current selection to filter",
-    "apple",
-    "Apricot",
-    "grape",
+    // Each value counts its rows.
+    "apple 1",
+    "Apricot 1",
+    "grape 1",
   ]);
   // Untick "apple", then apply: only the other search results stay.
   await page.keyboard.press("ArrowDown");

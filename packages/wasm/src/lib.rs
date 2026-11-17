@@ -78,6 +78,8 @@ mod window;
 #[cfg(all(test, feature = "formula-engine"))]
 mod cell_move_tests;
 #[cfg(all(test, feature = "formula-engine"))]
+mod cell_shift_tests;
+#[cfg(all(test, feature = "formula-engine"))]
 mod external_reference_tests;
 #[cfg(all(test, feature = "formula-engine"))]
 mod formula_rewrite_tests;

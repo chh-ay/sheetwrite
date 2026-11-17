@@ -14,7 +14,7 @@ export interface ImportGraphIssue {
 }
 
 const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
-  "autofilter.ts": ["../types/document.ts"],
+  "autofilter.ts": ["../date-serial.ts", "../types/document.ts"],
   "engine-hidden-rows.ts": ["../types/coordinates.ts", "../types/document.ts", "wasm-contract.ts"],
   "mutation-policy.ts": [
     "../restore-block.ts",
@@ -23,6 +23,8 @@ const STORE_EDGES: Readonly<Record<string, readonly string[]>> = {
     "../types/document.ts",
     "../types/pivot.ts",
     "ranges.ts",
+    // What a data validation rule accepts, shared with the grid's error alert.
+    "../validation-rule.ts",
   ],
   "ranges.ts": [
     "../types/cell.ts",
@@ -247,9 +249,11 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "CommitReason",
       "CustomColumnFilter",
       "DataValidationComparison",
+      "DataValidationOperand",
       "DataValidationCondition",
       "DataValidationRule",
       "DocumentOp",
+      "DynamicDateFilter",
       "FilterCondition",
       "MutationIssue",
       "MutationPolicyMode",
@@ -268,6 +272,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "SheetVisibility",
       "SnapshotCell",
       "SortKey",
+      "ValidationErrorStyle",
       "ValidationPolicy",
       "Workbook",
       "WorkbookSnapshot",
@@ -385,6 +390,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "CellEditorNavigation",
       "CellEditorRect",
       "CellInputSnapshot",
+      "CellMode",
       "ClipboardOutcome",
       "CommandFlags",
       "ContextMenuActionName",
@@ -402,9 +408,12 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "GridOptions",
       "GridPanel",
       "IconOverrides",
+      "KeyBindings",
       "KeyboardAction",
       "KeyboardOptions",
+      "KeyboardSettingsOptions",
       "KeyShortcut",
+      "ReplaceChange",
       "ReplaceResult",
       "RibbonConfig",
       "RibbonMode",

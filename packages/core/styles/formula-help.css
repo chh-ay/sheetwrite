@@ -54,6 +54,17 @@
   color: #c5221f;
 }
 
+.sheetwrite-formula-fix {
+  margin-top: 4px;
+  padding: 2px 8px;
+  border: 1px solid var(--sheetwrite-assist-border, currentColor);
+  border-radius: 4px;
+  color: inherit;
+  background: var(--sheetwrite-assist-selected, transparent);
+  font: inherit;
+  cursor: pointer;
+}
+
 .sheetwrite-assist {
   max-height: 220px;
   min-width: 160px;

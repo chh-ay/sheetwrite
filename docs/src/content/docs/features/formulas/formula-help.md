@@ -11,6 +11,12 @@ When a cell editor or the formula bar holds a formula (text that starts with `=`
   - where an argument takes one of a few values, those values with Excel's words for them: `TRUE - Approximate match` and `FALSE - Exact match` for the last argument of `VLOOKUP` and `HLOOKUP`, and the values of `CELL`'s `info_type`, the `type` of `FV`, `PMT` and `PV`, `MATCH`'s `match_type`, the `order` of `RANK`, `RANK.AVG` and `RANK.EQ`, `SUBTOTAL`'s `function_num`, and the `match_mode` and `search_mode` of `XLOOKUP` and `XMATCH`. The list closes once the argument holds a whole value.
 - **Argument guide.** The signature of the function around the caret with Excel's argument names, for example `ROUND(number, num_digits)` or `SUM(number1, [number2], …)`, with the current argument in bold, and the function's description.
 - **Live errors.** Syntax errors, unknown function names and wrong argument counts are underlined in the text, and the guide shows the first one. The syntax check is the parser of the active engine, so formula help marks exactly the formulas that the engine rejects. An error that only says the formula is not finished, such as a missing `)`, waits while the caret is at the end of the text. Enter never stores a formula with a syntax error; see [A formula with a problem](/docs/features/grid/editing-and-clipboard/#a-formula-with-a-problem).
+- **Fixes.** When the first error has one clear fix, a button under it offers the fix, and a click or **Tab** applies it while the edit stays open:
+  - **Add the missing )** for a formula that ends before its parentheses close;
+  - **Remove the extra )** for a `)` that closes nothing;
+  - **Did you mean SUM?** for an unknown function within two edits of a known one, such as `SUMM`;
+  - **Did you mean SalesUnits?** for a name that no defined name or table has but one comes within two edits of. Such a name is marked as an error too, because the cell would show `#NAME?`. A formula with `LET` or `LAMBDA` gets no name fixes, because it names its own values.
+  Excel offers a correction only after Enter, as a yes or no question about the whole formula. Here the fix shows while you type, says in words what it changes, and changes only the marked text. Without a fix to offer, Tab commits and moves right, as in Excel.
 - **Coloured references.** Each reference gets a colour in the text, and its range on the grid gets a fill in the same colour. Equal references share one colour.
 
 - **Result preview.** When you stop typing for a moment and the formula has no problem, a line under the guide shows its result, such as `= 0.99`, or the first value and size of an array, such as `= 5 … (2 × 3 array)`.
@@ -55,7 +61,7 @@ While the list is open:
 | Enter, Tab | Replace the text at the caret with the selected item. A function also types `(`. As in Excel, a table reference's `]` is yours to type. |
 | Escape | Close the list. The list stays closed until the text changes. |
 
-While the list is closed, the keys do what the editor does: Enter commits, Tab moves, and Escape cancels the edit. A click on a list item picks it.
+While the list is closed, the keys do what the editor does: Enter commits, Tab moves, and Escape cancels the edit. The one exception is Tab while the guide offers a fix: it applies the fix. A click on a list item picks it.
 
 ## Accessibility
 

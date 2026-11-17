@@ -384,18 +384,49 @@ fn resolve_commas(section: &mut Section<'_>) {
 /// number past the largest double is `#NUM!`, the error Excel gives a numeric
 /// result too large to hold.
 pub(super) fn format_number(number: f64, code: &str) -> Result<Option<String>, FormulaError> {
-    let parts = sections(code);
+    let mut parts = sections(code);
+    // A last section that holds `@` is the text section, which numbers skip.
+    // The Text format, `@` alone, shows a number as General would.
+    // `contains` is a fast byte search; most codes have no `@`.
+    if parts.len() < 4
+        && code.contains('@')
+        && parts.last().is_some_and(|last| has_text_placeholder(last))
+    {
+        if parts.len() == 1 {
+            return Ok(Some(general_text(number)));
+        }
+        parts.pop();
+    }
     let (part, magnitude_only) = match (parts.len(), number) {
         (1, _) => (parts[0], false),
         (_, value) if value < 0.0 => (parts[1], true),
         (2.., value) if value == 0.0 && parts.len() >= 3 => (parts[2], false),
         _ => (parts[0], false),
     };
+    let value = if magnitude_only { number.abs() } else { number };
+    if let Some(fraction) = Fraction::parse(part) {
+        return Ok(Some(fraction.render(value)));
+    }
     let Some(section) = parse_section(part) else {
         return Ok(None);
     };
-    let value = if magnitude_only { number.abs() } else { number };
     render(&section, value).map(Some)
+}
+
+/// Whether a section holds `@`, the text placeholder, outside quotes and escapes.
+fn has_text_placeholder(section: &str) -> bool {
+    let mut quoted = false;
+    let mut escaped = false;
+    section.chars().any(|ch| {
+        let text = !quoted && !escaped && ch == '@';
+        match ch {
+            _ if escaped => escaped = false,
+            '\\' if !quoted => escaped = true,
+            '"' => quoted = !quoted,
+            _ => {}
+        }
+        text
+    })
 }
 
 fn render(section: &Section<'_>, value: f64) -> Result<String, FormulaError> {
@@ -608,5 +639,286 @@ fn write_tokens(section: &Section<'_>, layout: &Layout, digits: &Digits<'_>, tex
                 text.push_str(literal_text(other))
             }
         }
+    }
+}
+
+/// The denominator of a fraction format: digit placeholders (`?/??` allows
+/// up to 99) or a fixed number (`?/16`).
+#[derive(Debug, PartialEq)]
+enum Denominator {
+    Digits(Vec<char>),
+    Fixed(u32),
+}
+
+/// A fraction section, such as `# ?/?`, `?/?`, `# ??/100` or `#,##0 ??/??`:
+/// literal text, an optional whole-number part, the numerator's and the
+/// denominator's placeholders, and literal text after them.
+#[derive(Debug)]
+struct Fraction {
+    prefix: String,
+    /// The whole-number part's placeholders, without its grouping commas.
+    integer: Option<Vec<char>>,
+    grouped: bool,
+    separator: String,
+    numerator: Vec<char>,
+    denominator: Denominator,
+    suffix: String,
+}
+
+/// The literal text of a stretch of a format code: quoted text, escapes,
+/// padding and colours resolved. `None` when it holds a placeholder or a date
+/// letter.
+fn literal_part(code: &str) -> Option<String> {
+    let section = parse_section(code)?;
+    let mut text = String::new();
+    for token in &section.tokens {
+        match token {
+            Token::Literal(literal) => text.push_str(literal),
+            Token::Point => text.push('.'),
+            Token::Percent | Token::Digit(_) | Token::Exponent { .. } | Token::General => {
+                return None;
+            }
+        }
+    }
+    Some(text)
+}
+
+/// The byte index of the fraction's `/` in `code`, outside quotes, escapes
+/// and brackets.
+fn fraction_slash(code: &str) -> Option<usize> {
+    let mut quoted = false;
+    let mut escaped = false;
+    let mut bracketed = false;
+    for (index, ch) in code.char_indices() {
+        match ch {
+            _ if escaped => escaped = false,
+            '\\' if !quoted => escaped = true,
+            '"' if !bracketed => quoted = !quoted,
+            '[' if !quoted => bracketed = true,
+            ']' if bracketed => bracketed = false,
+            '/' if !quoted && !bracketed => return Some(index),
+            _ => {}
+        }
+    }
+    None
+}
+
+const fn is_placeholder(ch: char) -> bool {
+    matches!(ch, '0' | '#' | '?')
+}
+
+impl Fraction {
+    /// The fraction layout of a section, or `None` when it is not one: a `/`
+    /// with digit placeholders right before it and placeholders or digits
+    /// right after it.
+    fn parse(code: &str) -> Option<Self> {
+        // A fast byte search first: most codes have no `/`.
+        if !code.contains('/') {
+            return None;
+        }
+        let slash = fraction_slash(code)?;
+        let (head, tail) = (&code[..slash], &code[slash + 1..]);
+
+        let denominator_len = tail
+            .find(|ch: char| !(ch.is_ascii_digit() || ch == '#' || ch == '?'))
+            .unwrap_or(tail.len());
+        let denominator_text = &tail[..denominator_len];
+        let denominator = if denominator_text.is_empty() {
+            return None;
+        } else if denominator_text.bytes().all(|byte| byte.is_ascii_digit())
+            && !denominator_text.starts_with('0')
+        {
+            Denominator::Fixed(denominator_text.parse().ok()?)
+        } else {
+            Denominator::Digits(denominator_text.chars().collect())
+        };
+
+        let numerator_start = head
+            .char_indices()
+            .rev()
+            .take_while(|&(_, ch)| is_placeholder(ch))
+            .last()
+            .map(|(index, _)| index)?;
+        let numerator = head[numerator_start..].chars().collect();
+        let before = &head[..numerator_start];
+
+        // The whole-number part: the last run of placeholders and grouping
+        // commas before the numerator, apart from it by literal text.
+        let integer_end = before
+            .char_indices()
+            .rev()
+            .find(|&(_, ch)| is_placeholder(ch))
+            .map(|(index, ch)| index + ch.len_utf8());
+        let (prefix, integer, grouped, separator) = match integer_end {
+            Some(end) => {
+                let start = before[..end]
+                    .char_indices()
+                    .rev()
+                    .take_while(|&(_, ch)| is_placeholder(ch) || ch == ',')
+                    .last()
+                    .map_or(end, |(index, _)| index);
+                let run = &before[start..end];
+                (
+                    &before[..start],
+                    Some(run.chars().filter(|&ch| ch != ',').collect()),
+                    run.contains(','),
+                    literal_part(&before[end..])?,
+                )
+            }
+            None => (before, None, false, String::new()),
+        };
+
+        Some(Self {
+            prefix: literal_part(prefix)?,
+            integer,
+            grouped,
+            separator,
+            numerator,
+            denominator,
+            suffix: literal_part(&tail[denominator_len..])?,
+        })
+    }
+
+    /// The value written as Excel shows it: an optional whole number, then the
+    /// closest fraction the denominator allows. A fraction that rounds to
+    /// zero leaves spaces in its place, and one that rounds to a whole
+    /// carries into the whole number.
+    fn render(&self, value: f64) -> String {
+        let magnitude = significant(value.abs());
+        let (mut whole, part) = if self.integer.is_some() {
+            let whole = magnitude.trunc();
+            (whole, significant(magnitude - whole))
+        } else {
+            (0.0, magnitude)
+        };
+        let (mut numerator, denominator) = match &self.denominator {
+            Denominator::Fixed(denominator) => (
+                round_decimal(part * f64::from(*denominator), 0, Rounding::Nearest),
+                f64::from(*denominator),
+            ),
+            Denominator::Digits(digits) => {
+                closest_fraction(part, 10_u32.pow(digits.len() as u32) - 1)
+            }
+        };
+        if self.integer.is_some() && numerator >= denominator {
+            whole += 1.0;
+            numerator = 0.0;
+        }
+
+        let mut text = String::new();
+        if value < 0.0 && (whole > 0.0 || numerator > 0.0) {
+            text.push('-');
+        }
+        text.push_str(&self.prefix);
+        if let Some(placeholders) = &self.integer {
+            // Zero has no integer digits.
+            let digits = Decimal::of(whole).integer_digits();
+            let mut integer = filled_left(&digits, placeholders);
+            if integer.trim().is_empty() && numerator == 0.0 {
+                integer = "0".into();
+            }
+            text.push_str(&if self.grouped {
+                grouped(&integer)
+            } else {
+                integer
+            });
+            text.push_str(&self.separator);
+            if numerator == 0.0 {
+                let denominator_width = match &self.denominator {
+                    Denominator::Digits(digits) => digits.len(),
+                    Denominator::Fixed(_) => 0,
+                };
+                push_spaces(&mut text, self.numerator.len() + 1 + denominator_width);
+                text.push_str(&self.suffix);
+                return text;
+            }
+        }
+        // Zero has no integer digits; an improper fraction of zero is `0/1`.
+        let numerator_digits = Decimal::of(numerator).integer_digits();
+        text.push_str(&filled_left(
+            if numerator_digits.is_empty() {
+                "0"
+            } else {
+                &numerator_digits
+            },
+            &self.numerator,
+        ));
+        text.push('/');
+        match &self.denominator {
+            Denominator::Fixed(denominator) => text.push_str(&denominator.to_string()),
+            Denominator::Digits(placeholders) => {
+                text.push_str(&filled_right(
+                    &Decimal::of(denominator).integer_digits(),
+                    placeholders,
+                ));
+            }
+        }
+        text.push_str(&self.suffix);
+        text
+    }
+}
+
+fn push_spaces(text: &mut String, count: usize) {
+    text.extend(std::iter::repeat_n(' ', count));
+}
+
+/// `digits` right-aligned in the placeholders: `0` pads with a zero, `?`
+/// with a space, `#` with nothing. Digits beyond the placeholders stay.
+fn filled_left(digits: &str, placeholders: &[char]) -> String {
+    let missing = placeholders.len().saturating_sub(digits.len());
+    let mut text: String = placeholders[..missing]
+        .iter()
+        .filter_map(|&placeholder| pad(placeholder))
+        .collect();
+    text.push_str(digits);
+    text
+}
+
+/// `digits` left-aligned in the placeholders, padded on the right.
+fn filled_right(digits: &str, placeholders: &[char]) -> String {
+    let mut text = digits.to_owned();
+    if let Some(rest) = placeholders.get(digits.len()..) {
+        text.extend(rest.iter().filter_map(|&placeholder| pad(placeholder)));
+    }
+    text
+}
+
+const fn pad(placeholder: char) -> Option<char> {
+    match placeholder {
+        '0' => Some('0'),
+        '?' => Some(' '),
+        _ => None,
+    }
+}
+
+/// The fraction closest to `value` whose denominator is at most
+/// `max_denominator`, as numerator and denominator. On a tie the smaller
+/// denominator wins. The closest fraction is the last convergent of
+/// `value`'s continued fraction within the bound, or the semiconvergent
+/// after it, so a few steps find it instead of trying every denominator.
+fn closest_fraction(value: f64, max_denominator: u32) -> (f64, f64) {
+    let max = f64::from(max_denominator);
+    // The two latest convergents, oldest first, starting from 0/1 and 1/0.
+    let (mut p0, mut q0, mut p1, mut q1) = (0.0, 1.0, 1.0, 0.0);
+    let mut rest = value;
+    loop {
+        let term = rest.floor();
+        let next_q = term * q1 + q0;
+        if next_q > max {
+            let steps = ((max - q0) / q1).floor();
+            let (p, q) = (steps * p1 + p0, steps * q1 + q0);
+            let (error, latest) = ((value - p / q).abs(), (value - p1 / q1).abs());
+            return if error < latest || (error == latest && q < q1) {
+                (p, q)
+            } else {
+                (p1, q1)
+            };
+        }
+        (p0, q0, p1, q1) = (p1, q1, term * p1 + p0, next_q);
+        let fraction = rest - term;
+        if fraction == 0.0 || p1 / q1 == value {
+            return (p1, q1);
+        }
+        rest = 1.0 / fraction;
     }
 }
