@@ -74,6 +74,47 @@ describe("analyzeFormula: completion", () => {
     expect(at("=A1:SU|").completion).toBeNull();
     expect(at("=ZZ|").completion).toBeNull();
   });
+
+  it("lists defined names and tables, table columns after [ and argument values", () => {
+    const vlookup: FormulaFunctionMetadata = {
+      name: "VLOOKUP",
+      description: "Looks up a value.",
+      arguments: [
+        value,
+        value,
+        value,
+        {
+          ...value,
+          choices: [
+            { value: "TRUE", description: "Approximate match" },
+            { value: "FALSE", description: "Exact match" },
+          ],
+        },
+      ],
+      returnKind: "scalar",
+    };
+    const names = {
+      names: ["SalesUnits"],
+      tables: [{ name: "Sales", columns: ["Region", "Amount"] }],
+      cellTable: "Sales",
+    };
+    const list = (marked: string) =>
+      analyzeFormula(
+        marked.replace("|", ""),
+        marked.indexOf("|"),
+        [vlookup],
+        names,
+      ).completion?.matches.map((item) => `${item.kind} ${item.insert}`) ?? null;
+
+    expect(list("=sal|")).toEqual(["table Sales", "name SalesUnits"]);
+    expect(list("=Sales[|")).toEqual(["column Region", "column Amount"]);
+    expect(list("=Sales[a|")).toEqual(["column Amount"]);
+    expect(list("=Sales[[|")).toEqual(["column #Headers", "column #Totals"]);
+    expect(list("=[R|")).toEqual(["column Region"]);
+    expect(list("=VLOOKUP(A1,A1:B3,2,|")).toEqual(["choice TRUE", "choice FALSE"]);
+    expect(list("=VLOOKUP(A1,A1:B3,2, f|")).toEqual(["choice FALSE"]);
+    expect(list("=VLOOKUP(A1,A1:B3,2,FALSE|")).toBeNull();
+  });
 });
 
 describe("analyzeFormula: references", () => {

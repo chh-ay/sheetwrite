@@ -92,6 +92,31 @@ describe("Insert", () => {
     expect(grid.addSheet({ name: "Q3", index: 1 }).status).toBe("applied");
     expect(names()).toEqual(["Sales", "Q3", "Costs", "Old", "Notes"]);
   });
+
+  it("adds Excel's empty SheetN after the active sheet from the add button", () => {
+    grid.setActiveSheet("b");
+    host.querySelector<HTMLButtonElement>(".sheetwrite-tab-add")!.click();
+
+    expect(names()).toEqual(["Sales", "Costs", "Sheet5", "Old", "Notes"]);
+    const added = store.getWorkbook().sheets[2]!;
+    expect(grid.getActiveSheet()).toBe(added.id);
+    expect(added.rowCount).toBe(1000);
+    expect(added.columns.map((column) => column.header).join("")).toBe(
+      "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    );
+
+    // The next free number: Sheet6 is taken, so Sheet7.
+    grid.renameSheet("d", "Sheet6");
+    host.querySelector<HTMLButtonElement>(".sheetwrite-tab-add")!.click();
+    expect(names()).toEqual(["Sales", "Costs", "Sheet5", "Sheet7", "Old", "Sheet6"]);
+  });
+
+  it("inserts a sheet before the active sheet with Shift+F11", () => {
+    grid.setActiveSheet("b");
+    press("F11", { shiftKey: true });
+    expect(names()).toEqual(["Sales", "Sheet5", "Costs", "Old", "Notes"]);
+    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet5");
+  });
 });
 
 describe("Tab Color", () => {
@@ -152,8 +177,8 @@ describe("the sheet menu", () => {
 
   it("inserts a sheet before the sheet and activates it", async () => {
     await choose("Insert a sheet before Sales");
-    expect(names()).toEqual(["Sheet 5", "Sales", "Costs", "Old", "Notes"]);
-    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet 5");
+    expect(names()).toEqual(["Sheet5", "Sales", "Costs", "Old", "Notes"]);
+    expect(sheetById(grid.getActiveSheet())?.name).toBe("Sheet5");
   });
 
   it("colors the tab from Excel's Tab Color palette", async () => {

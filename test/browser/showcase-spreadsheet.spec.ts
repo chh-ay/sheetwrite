@@ -61,7 +61,7 @@ test("the cell editor lists functions, picks one with the keyboard, and guides t
   await select(page, "G3");
   await page.keyboard.type("=ROU");
   const editor = page.locator("textarea.sheetwrite-editor");
-  const list = page.getByRole("listbox", { name: "Functions" });
+  const list = page.getByRole("listbox", { name: "Formula AutoComplete" });
   await expect(list.getByRole("option", { name: "ROUND", exact: true })).toBeVisible();
   await expect(editor).toHaveAttribute("aria-controls", (await list.getAttribute("id")) ?? "");
   await page.keyboard.press("Enter");
@@ -71,7 +71,7 @@ test("the cell editor lists functions, picks one with the keyboard, and guides t
   const guide = page.getByRole("status").filter({ hasText: "ROUND(" });
   await expect(guide.locator("strong")).toHaveText("number");
   await page.keyboard.type("A1:A3, ");
-  await expect(guide.locator("strong")).toHaveText("digits");
+  await expect(guide.locator("strong")).toHaveText("num_digits");
   await page.keyboard.type("2");
   await page.keyboard.press("Enter");
   await expect(editor).toHaveCount(0);
@@ -280,4 +280,36 @@ test("the ribbon runs the Data query commands by keyboard", async ({ page }) => 
   await page.evaluate(() => window.__sheetwriteSpreadsheetGrid?.setReadOnly(true));
   await refreshAll.click();
   await expect(status).not.toHaveText(/Queries refreshed\.|Refreshing queries/u);
+});
+
+test("Shift+F11 inserts Excel's SheetN before the active sheet, the add button after it @portability", async ({
+  page,
+}) => {
+  await open(page);
+  const sheets = () =>
+    page.evaluate(() => {
+      const grid = window.__sheetwriteSpreadsheetGrid!;
+      const workbook = grid.store.getWorkbook();
+      const active = workbook.sheets.find((sheet) => sheet.id === grid.getActiveSheet());
+      return { names: workbook.sheets.map((sheet) => sheet.name), active: active?.name };
+    });
+
+  // The name box gives the keyboard back to the grid.
+  await select(page, "A1");
+  await page.keyboard.press("Shift+F11");
+  await expect
+    .poll(sheets)
+    .toEqual({ names: ["Sheet4", "Sales", "Summary", "Targets"], active: "Sheet4" });
+
+  await page.getByRole("button", { name: "Add sheet", exact: true }).click();
+  await expect
+    .poll(sheets)
+    .toEqual({ names: ["Sheet4", "Sheet5", "Sales", "Summary", "Targets"], active: "Sheet5" });
+
+  // An empty sheet with columns A to Z: the name box takes Z1.
+  await select(page, "Z1");
+  await expect(page.getByRole("textbox", { name: "Cell reference" })).not.toHaveAttribute(
+    "aria-invalid",
+    "true",
+  );
 });

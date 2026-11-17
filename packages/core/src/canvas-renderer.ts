@@ -127,6 +127,7 @@ export class CanvasRenderer implements Renderer {
         rowTops: pane.rowTops,
         rowHeights: pane.rowHeights,
         rowNumbers: pane.rowNumbers,
+        filteredRows: pane.filteredRows,
       };
       paintFrame(
         ctx,
