@@ -38,21 +38,35 @@ export class StyleActions {
   setBorders(preset: BorderPreset): void {
     const selection = this.deps.selection();
     if (this.deps.readOnly() || selection.isEmpty) return;
+    this.deps.commit(this.borderPatches(preset));
+  }
+
+  /**
+   * Format Cells' OK: merge `style` into the selection's styles and apply the
+   * border `preset`, as one undoable step.
+   */
+  formatSelection(style: Partial<CellStyle>, preset: BorderPreset | null): void {
+    const selection = this.deps.selection();
+    if (this.deps.readOnly() || selection.isEmpty) return;
+    // Border runs merge into the styles the first patches leave.
+    const patches = Object.keys(style).length > 0 ? this.stylePatches(style) : [];
+    if (preset !== null) patches.push(...this.borderPatches(preset));
+    if (patches.length > 0) this.deps.commit(patches);
+  }
+
+  private borderPatches(preset: BorderPreset): DocumentOp[] {
     if (preset === "none" || preset === "all") {
-      this.applyStyle({
+      return this.stylePatches({
         border:
           preset === "none"
             ? undefined
             : { all: { color: this.deps.theme().fg, width: 1, style: "solid" } },
       });
-
-      return;
     }
 
     const rects: SelRect[] = [];
-    selection.forEachRect((rect) => rects.push(rect));
-
-    this.deps.commit(selectionBorderPatches(this.deps, rects, preset));
+    this.deps.selection().forEachRect((rect) => rects.push(rect));
+    return selectionBorderPatches(this.deps, rects, preset);
   }
 
   clearAll(): void {
@@ -121,7 +135,12 @@ export class StyleActions {
   applyStyle(patch: Partial<CellStyle> | null): void {
     const selection = this.deps.selection();
     if (this.deps.readOnly() || selection.isEmpty) return;
+    this.deps.commit(this.stylePatches(patch));
+  }
 
+  /** The operations that merge `patch` into the selection's styles, or clear them for null. */
+  private stylePatches(patch: Partial<CellStyle> | null): DocumentOp[] {
+    const selection = this.deps.selection();
     const sheet = this.deps.sheet();
     const activeSheet = this.deps.activeSheet();
     const rects: SelRect[] = [];
@@ -158,8 +177,7 @@ export class StyleActions {
         }
       }
 
-      this.deps.commit(patches);
-      return;
+      return patches;
     }
 
     const anchors: CellAddress[] = [];
@@ -226,7 +244,7 @@ export class StyleActions {
         cells,
       });
 
-    this.deps.commit(patches);
+    return patches;
   }
 
   unmergeSelection(): void {

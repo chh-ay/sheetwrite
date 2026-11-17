@@ -260,6 +260,28 @@ export interface GridActions {
   insertColumnRight(): void;
   /** Delete the focus cell's column. */
   deleteColumn(): void;
+  /**
+   * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
+   * them; with whole columns, as many columns to their left. For any other
+   * range an Insert dialog asks whether to insert entire rows or columns.
+   * Its Shift cells right and Shift cells down choices are shown but not
+   * available yet. The dialog is in its own chunk, loaded on first use.
+   */
+  insertCells(): void;
+  /**
+   * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
+   * any other range, ask in a Delete dialog whether to delete entire rows or
+   * columns.
+   */
+  deleteCells(): void;
+  /**
+   * Ctrl+1: open the Format Cells dialog for the selection, with Number,
+   * Alignment, Font, Border and Fill tabs, showing the active cell's format.
+   * OK applies what changed to every selected cell as one undoable step. The
+   * dialog is in its own chunk, loaded on first use. Does nothing on a
+   * read-only grid.
+   */
+  formatCells(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
@@ -507,6 +529,7 @@ export type ContextMenuActionName =
   | "editNote"
   | "deleteNote"
   | "pivotFields"
+  | "formatCells"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -557,7 +580,21 @@ export type KeyboardAction =
   | "selectAll"
   | "fillDown"
   | "fillRight"
-  | "toggleFilter";
+  | "toggleFilter"
+  | "formatGeneral"
+  | "formatNumber"
+  | "formatTime"
+  | "formatDate"
+  | "formatCurrency"
+  | "formatPercent"
+  | "formatScientific"
+  | "hideRows"
+  | "unhideRows"
+  | "hideColumns"
+  | "unhideColumns"
+  | "insertCells"
+  | "deleteCells"
+  | "formatCells";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {

@@ -57,6 +57,10 @@ const AUTOFILTER_MARKER = "Select a cell in a range of data to filter.";
 // warning; the warning's text and the dialog's backdrop class survive minifiers.
 const MERGE_MARKER = "Merging cells only keeps the upper-left value";
 const DIALOG_MARKER = "sheetwrite-dialog-backdrop";
+// Format Cells (Ctrl+1) loads on first use; its class names survive minifiers.
+// The Insert and Delete dialogs load the dialog shell alone, which webpack may
+// also copy into the merge and Format Cells chunks.
+const FORMAT_CELLS_MARKER = "sheetwrite-format-cells";
 // The dashboard view and the New Dashboard command load with the first dashboard.
 const DASHBOARD_MARKERS = ["sheetwrite-dashboard", 'kind:"dashboard"'];
 // Code that the dashboard view and the XLSX export share: the hidden-pivot IDs,
@@ -79,6 +83,8 @@ const functionTableChunks = [];
 const findChunks = [];
 const autoFilterChunks = [];
 const mergeChunks = [];
+const formatCellsChunks = [];
+const dialogChunks = [];
 const dashboardChunks = [];
 const workers = [];
 const addonRegistryChunks = [];
@@ -102,7 +108,9 @@ for (const file of lazyChunks) {
     chromeCode.push(code);
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(AUTOFILTER_MARKER)) autoFilterChunks.push(file);
+  else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
   else if (code.includes(MERGE_MARKER)) mergeChunks.push(file);
+  else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (DASHBOARD_MARKERS.some((marker) => code.includes(marker))) dashboardChunks.push(file);
   else if (
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
@@ -133,6 +141,10 @@ if (autoFilterChunks.length !== 1)
   throw new Error(`Expected one lazy webpack AutoFilter chunk, got ${autoFilterChunks.length}`);
 if (mergeChunks.length !== 1)
   throw new Error(`Expected one lazy webpack merge command chunk, got ${mergeChunks.length}`);
+if (formatCellsChunks.length !== 1)
+  throw new Error(`Expected one lazy webpack Format Cells chunk, got ${formatCellsChunks.length}`);
+if (dialogChunks.length > 1)
+  throw new Error(`Expected at most one lazy webpack dialog chunk, got ${dialogChunks.length}`);
 if (addonRegistryChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack add-on registry chunk, got ${addonRegistryChunks.length}`,
@@ -175,6 +187,9 @@ if (mainCode.includes(DIALOG_MARKER)) {
 }
 if (mainCode.includes(MERGE_MARKER)) {
   throw new Error("The merge command is in webpack's main.js; it must load lazily");
+}
+if (mainCode.includes(FORMAT_CELLS_MARKER)) {
+  throw new Error("Format Cells is in webpack's main.js; it must load lazily");
 }
 if (mainCode.includes(FUNCTION_TABLE_MARKER)) {
   throw new Error("The built-in function table is in webpack's main.js; it must load lazily");
@@ -226,6 +241,8 @@ const assets = publicFiles.map((file) => {
       findChunks,
       autoFilterChunks,
       mergeChunks,
+      formatCellsChunks,
+      dialogChunks,
       documentChunks,
       dashboardChunks,
       addonRegistryChunks,

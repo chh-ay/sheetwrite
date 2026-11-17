@@ -4,7 +4,13 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { Grid } from "../src/types.js";
-import { makeColumnarData, makeWorkbook, mountHost } from "./fixtures.js";
+import {
+  answerDialog,
+  elementAdded,
+  makeColumnarData,
+  makeWorkbook,
+  mountHost,
+} from "./fixtures.js";
 
 // Excel's default keys on a focused grid: the active cell, Enter and Tab,
 // Ctrl+Enter, End mode, Ctrl+End, Backspace, F2, F4 and Enter mode.
@@ -323,5 +329,118 @@ describe("formatting and date keys", () => {
       86_400_000;
     expect(cell.resolved).toBe(expected);
     expect(cell.style.numberFormat).toBe("m/d/yyyy");
+  });
+});
+
+describe("number-format keys", () => {
+  it("apply Excel's formats with Ctrl+Shift+~ ! @ # $ % ^", () => {
+    select(0, 1, 1, 1);
+    const keys = [
+      ["~", "Backquote", "General"],
+      ["!", "Digit1", "#,##0.00"],
+      ["@", "Digit2", "h:mm AM/PM"],
+      ["#", "Digit3", "d-mmm-yy"],
+      ["$", "Digit4", "$#,##0.00_);($#,##0.00)"],
+      ["%", "Digit5", "0%"],
+      ["^", "Digit6", "0.00E+00"],
+    ] as const;
+    for (const [key, code, format] of keys) {
+      const event = press(key, { ctrlKey: true, shiftKey: true, code });
+      expect(event.defaultPrevented).toBe(true);
+      expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).style.numberFormat).toBe(format);
+    }
+  });
+});
+
+describe("hide and unhide keys", () => {
+  it("hide the selected rows with Ctrl+9 and show them with Ctrl+Shift+9", () => {
+    select(2, 0, 3, 0);
+    press("9", { ctrlKey: true, code: "Digit9" });
+    expect(grid.hiddenRows()).toEqual([2, 3]);
+    // A range around the hidden rows shows them again.
+    select(1, 0, 4, 0);
+    press("(", { ctrlKey: true, shiftKey: true, code: "Digit9" });
+    expect(grid.hiddenRows()).toEqual([]);
+  });
+
+  it("hide the selected columns with Ctrl+0 and show them with Ctrl+Shift+0", () => {
+    select(0, 1);
+    press("0", { ctrlKey: true, code: "Digit0" });
+    expect(grid.hiddenColumns()).toEqual([1]);
+    select(0, 0, 0, 2);
+    press(")", { ctrlKey: true, shiftKey: true, code: "Digit0" });
+    expect(grid.hiddenColumns()).toEqual([]);
+  });
+});
+
+describe("insert and delete keys", () => {
+  const sheet = () => store.getWorkbook().sheets[0]!;
+
+  it("insert whole rows with Ctrl++ and delete them with Ctrl+-", () => {
+    grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
+    press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    expect(sheet().rowCount).toBe(11);
+    expect(value(2, 0)).toBeNull();
+    expect(value(3, 0)).toBe("Customer 2");
+    // The keypad + inserts too.
+    grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
+    press("+", { ctrlKey: true, code: "NumpadAdd" });
+    expect(sheet().rowCount).toBe(12);
+    // A range of a few columns is not a whole row; Shift+Space selects one.
+    grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
+    press("-", { ctrlKey: true, code: "Minus" });
+    grid.setSelection({ kind: "row", sheet: "s1", row: 2 });
+    press("-", { ctrlKey: true, code: "NumpadSubtract" });
+    expect(sheet().rowCount).toBe(10);
+    expect(value(2, 0)).toBe("Customer 2");
+  });
+
+  it("insert and delete whole columns", () => {
+    grid.setSelection({ kind: "column", sheet: "s1", col: 1 });
+    press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    expect(sheet().columns).toHaveLength(4);
+    expect(value(0, 2)).toBe(0.5);
+    press("-", { ctrlKey: true, code: "Minus" });
+    expect(sheet().columns).toHaveLength(3);
+    expect(value(0, 1)).toBe(0.5);
+  });
+
+  it("ask in Excel's Insert dialog for any other range", async () => {
+    select(1, 0, 1, 1);
+    press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    const title = document.getElementById(dialog.getAttribute("aria-labelledby") ?? "");
+    expect(title?.textContent).toBe("Insert");
+    const choices = [...dialog.querySelectorAll<HTMLInputElement>("input[type=radio]")];
+    expect(choices.map((radio) => [radio.parentElement?.textContent, radio.disabled])).toEqual([
+      ["Shift cells right", true],
+      ["Shift cells down", true],
+      ["Entire row", false],
+      ["Entire column", false],
+    ]);
+    // A wide range defaults to rows; the focus starts on the chosen option.
+    expect(document.activeElement).toBe(choices[2]!);
+    await answerDialog(host, "OK");
+    expect(sheet().rowCount).toBe(11);
+    expect(value(2, 0)).toBe("Customer 1");
+    expect(document.activeElement).toBe(host);
+
+    // A tall range defaults to columns, and Escape cancels.
+    select(0, 1, 3, 1);
+    press("-", { ctrlKey: true, code: "Minus" });
+    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const removeChoices = [...remove.querySelectorAll<HTMLInputElement>("input[type=radio]")];
+    expect(removeChoices.map((radio) => radio.parentElement?.textContent)).toEqual([
+      "Shift cells left",
+      "Shift cells up",
+      "Entire row",
+      "Entire column",
+    ]);
+    expect(removeChoices[3]?.checked).toBe(true);
+    remove.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(remove.isConnected).toBe(false);
+    expect(sheet().columns).toHaveLength(3);
   });
 });

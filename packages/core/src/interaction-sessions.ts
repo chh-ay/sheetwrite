@@ -43,6 +43,19 @@ const MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR;
 /** The formats Excel gives a date or time entered with Ctrl+; or Ctrl+Shift+; (en-US). */
 const SHORT_DATE_FORMAT = "m/d/yyyy";
 const SHORT_TIME_FORMAT = "h:mm AM/PM";
+/**
+ * Excel's number-format keys, Ctrl+Shift+~ ! @ # $ % ^, and the en-US formats
+ * they apply.
+ */
+const KEY_NUMBER_FORMATS = {
+  formatGeneral: "General",
+  formatNumber: "#,##0.00",
+  formatTime: SHORT_TIME_FORMAT,
+  formatDate: "d-mmm-yy",
+  formatCurrency: "$#,##0.00_);($#,##0.00)",
+  formatPercent: "0%",
+  formatScientific: "0.00E+00",
+} as const;
 const MODIFIER_KEYS: Readonly<Record<string, true>> = {
   Shift: true,
   Control: true,
@@ -1178,6 +1191,44 @@ export class InteractionSessions {
         case "toggleFilter":
           this.deps.grid.actions.toggleAutoFilter();
           break;
+
+        case "formatGeneral":
+        case "formatNumber":
+        case "formatTime":
+        case "formatDate":
+        case "formatCurrency":
+        case "formatPercent":
+        case "formatScientific":
+          this.deps.grid.actions.setNumberFormat(KEY_NUMBER_FORMATS[action]);
+          break;
+
+        case "hideRows":
+          this.deps.grid.actions.hideRows();
+          break;
+
+        case "unhideRows":
+          this.unhideInSelection(true);
+          break;
+
+        case "hideColumns":
+          this.deps.grid.actions.hideColumns();
+          break;
+
+        case "unhideColumns":
+          this.unhideInSelection(false);
+          break;
+
+        case "insertCells":
+          this.deps.grid.actions.insertCells();
+          break;
+
+        case "deleteCells":
+          this.deps.grid.actions.deleteCells();
+          break;
+
+        case "formatCells":
+          this.deps.grid.actions.formatCells();
+          break;
       }
 
       return;
@@ -1351,6 +1402,29 @@ export class InteractionSessions {
     this.deps.emitSelection();
     this.deps.scrollToCell({ sheet: this.deps.activeSheet(), row, col });
     this.deps.scheduleRender();
+  }
+
+  /**
+   * Ctrl+Shift+9 and Ctrl+Shift+0: show the hidden rows (or columns) inside
+   * the selected range, as Excel does. A range that starts at the first or
+   * ends at the last shown row also takes the hidden rows beyond it, so the
+   * whole sheet selected shows every hidden row.
+   */
+  private unhideInSelection(rows: boolean): void {
+    const rect = this.activeRect();
+    if (!rect || this.deps.readOnly()) return;
+    const grid = this.deps.grid;
+    if (rows) {
+      const first = rect.r0 === 0 ? 0 : this.deps.toDataRow(rect.r0);
+      const last = rect.r1 >= this.deps.rowCount() - 1 ? Infinity : this.deps.toDataRow(rect.r1);
+      const hidden = grid.hiddenRows().filter((row) => row >= first && row <= last);
+      if (hidden.length > 0) grid.actions.showRows(hidden);
+      return;
+    }
+    const first = rect.c0 <= this.deps.firstCol() ? 0 : rect.c0;
+    const last = rect.c1 >= this.deps.lastCol() ? Infinity : rect.c1;
+    const hidden = grid.hiddenColumns().filter((col) => col >= first && col <= last);
+    if (hidden.length > 0) grid.actions.showColumns(hidden);
   }
 
   /** The selected rectangle that holds the active cell, or null without a selection. */

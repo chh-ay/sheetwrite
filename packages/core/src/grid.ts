@@ -588,8 +588,8 @@ export class GridImpl implements Grid {
   private readonly autoFilterBuilds = new ScopeSlot(this.lifetime);
   /** The open dialog; opening another or destroying the grid closes it. */
   private readonly dialogs = new ScopeSlot(this.lifetime);
-  /** The merge command's build; a destroy closes it, so a chunk that loads late is dropped. */
-  private readonly mergeBuilds = new ScopeSlot(this.lifetime);
+  /** Builds of the commands that load on first use (merge, insert, Format Cells). */
+  private readonly commandBuilds = new ScopeSlot(this.lifetime);
   /** What the lazily loaded dialogs use; one is open at a time. */
   private readonly dialogHost: DialogHost;
   private readonly notes: NotePopover;
@@ -2848,18 +2848,107 @@ export class GridImpl implements Grid {
    * warning it may show, so the merge lands a moment after the call.
    */
   private mergeCells(center: boolean): void {
+    this.withChunk(
+      () => import("./merge-command.js"),
+      ({ mergeSelection }) => mergeSelection(this.styleDeps, center, this.dialogHost),
+    );
+  }
+
+  /**
+   * Run `use` with a command chunk that `load` imports on first use, as the
+   * find bar loads. A chunk that arrives after the grid is destroyed is
+   * dropped; a load error is shown and still reaches the host.
+   */
+  private withChunk<M>(load: () => Promise<M>, use: (chunk: M) => void): void {
     if (this.lifetime.closed) return;
-    const build = this.mergeBuilds.current();
-    void import("./merge-command.js").then(
-      ({ mergeSelection }) => {
-        if (build.closed) return;
-        mergeSelection(this.styleDeps, center, this.dialogHost);
+    const build = this.commandBuilds.current();
+    void load().then(
+      (chunk) => {
+        if (!build.closed) use(chunk);
       },
       (error: unknown) => {
         if (build.closed) return;
         // Tell the user; the load error still reaches the host.
-        this.actionFeedback.show(`Merge could not load: ${errorDetail(error)}`);
+        this.actionFeedback.show(`The command could not load: ${errorDetail(error)}`);
         throw error;
+      },
+    );
+  }
+
+  /**
+   * Ctrl++ and Ctrl+-: insert or delete as Excel does. Whole selected rows
+   * or columns go at once; for other ranges a dialog asks what to insert or
+   * delete, with Excel's choices and default.
+   */
+  private insertOrDelete(insert: boolean): void {
+    const rect = this.activeSelectionRect();
+    if (rect === null || this.readOnly) return;
+    const wholeRows = rect.c0 <= this.firstCol() && rect.c1 >= this.lastCol();
+    const wholeColumns = rect.r0 === 0 && rect.r1 >= this.geometry.rowCount - 1;
+    const run = (choice: string | null): void => {
+      if (choice === "entireRow") {
+        if (insert) this.actions.insertRowAbove();
+        else this.actions.deleteRow();
+      } else if (choice === "entireColumn") {
+        if (insert) this.actions.insertColumnLeft();
+        else this.actions.deleteColumn();
+      }
+    };
+    if (wholeRows || wholeColumns) {
+      run(wholeRows ? "entireRow" : "entireColumn");
+      return;
+    }
+
+    // Excel shifts a wide range down (up on delete) and a tall one right (left).
+    const wide = rect.c1 - rect.c0 >= rect.r1 - rect.r0;
+    // Shifting cells needs a reference-rewriting move of the cells beside the range.
+    const choices = [
+      {
+        value: "shiftRight",
+        label: insert ? "Shift cells right" : "Shift cells left",
+        disabled: true,
+      },
+      { value: "shiftDown", label: insert ? "Shift cells down" : "Shift cells up", disabled: true },
+      { value: "entireRow", label: "Entire row" },
+      { value: "entireColumn", label: "Entire column" },
+    ];
+    const preferred = wide ? "shiftDown" : "shiftRight";
+    const initial = choices.find((choice) => choice.value === preferred && !choice.disabled)
+      ? preferred
+      : wide
+        ? "entireRow"
+        : "entireColumn";
+    this.withChunk(
+      () => import("./dialog.js"),
+      ({ choiceDialog }) => {
+        const title = insert ? "Insert" : "Delete";
+        void choiceDialog(this.dialogHost, { title, choices, initial }).result.then(run);
+      },
+    );
+  }
+
+  /** Ctrl+1: the Format Cells dialog for the selection, from its own chunk. */
+  private openFormatCells(): void {
+    const focus = this.selection.focusCell;
+    if (focus === null || this.readOnly) return;
+    const anchor = this.anchorCell(focus.row, focus.col);
+    const cell = this.store.getCell({
+      sheet: this.activeSheet,
+      row: this.toDataRow(anchor.row),
+      col: anchor.col,
+    });
+    const columnFormat = this.sheet().columns[anchor.col]?.numberFormat;
+    const style =
+      cell.style.numberFormat === undefined && columnFormat !== undefined
+        ? { ...cell.style, numberFormat: columnFormat }
+        : cell.style;
+    this.withChunk(
+      () => import("./format-cells.js"),
+      ({ formatCellsDialog }) => {
+        const input = { style, sample: cell.resolved, font: this.theme.font };
+        void formatCellsDialog(this.dialogHost, input).result.then((change) => {
+          if (change !== null) this.styleActions.formatSelection(change.style, change.border);
+        });
       },
     );
   }
@@ -3745,6 +3834,9 @@ export class GridImpl implements Grid {
         const cols = this.selectedColumns();
         if (cols) this.removeColumns(cols.first, cols.count);
       },
+      insertCells: () => this.insertOrDelete(true),
+      deleteCells: () => this.insertOrDelete(false),
+      formatCells: () => this.openFormatCells(),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =

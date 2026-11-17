@@ -1,7 +1,8 @@
 /**
- * Modal dialogs over the grid, such as the merge warning. The module loads on
- * first use, like the find bar, so a grid that never opens a dialog pays
- * nothing for it.
+ * Modal dialogs over the grid: the merge warning, Excel's Insert and Delete
+ * choices, and the shell Format Cells uses. The module loads on first use,
+ * like the find bar, so a grid that never opens a dialog pays nothing for
+ * it.
  */
 
 import { checkStylePart } from "./style-parts.js";
@@ -30,6 +31,11 @@ interface DialogOptions {
   readonly cancel: string;
   /** The element focused on open; the default button otherwise. */
   readonly initialFocus?: HTMLElement;
+  /**
+   * Called before a button other than `cancel` closes the dialog; `false`
+   * keeps it open, for example while a field is invalid.
+   */
+  readonly accept?: (value: string) => boolean;
 }
 
 /** An open dialog. */
@@ -64,7 +70,7 @@ let dialogCount = 0;
  * dialog has focus. On close the dialog is removed and the grid gets its
  * focus back.
  */
-function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
+export function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
   const { host } = grid;
   seedWidgetTheme(host, grid.theme());
   const id = `sheetwrite-dialog-${++dialogCount}`;
@@ -122,7 +128,10 @@ function openDialog(grid: DialogHost, options: DialogOptions): Dialog {
       button.classList.add("sheetwrite-dialog-default");
       defaultButton = button;
     }
-    button.addEventListener("click", () => close(spec.value));
+    button.addEventListener("click", () => {
+      if (spec.value !== options.cancel && options.accept?.(spec.value) === false) return;
+      close(spec.value);
+    });
     row.append(button);
   }
 
@@ -198,4 +207,70 @@ export function confirmDialog(
     cancel: "cancel",
   });
   return { result: dialog.result.then((value) => value === "ok"), close: () => dialog.close() };
+}
+
+/** One option of {@link choiceDialog}. */
+interface DialogChoice {
+  readonly value: string;
+  readonly label: string;
+  /** Shown but not choosable. */
+  readonly disabled?: boolean;
+}
+
+/** What {@link choiceDialog} offers. */
+interface ChoiceOptions {
+  readonly title: string;
+  readonly choices: readonly DialogChoice[];
+  /** The choice selected on open. */
+  readonly initial: string;
+}
+
+/**
+ * Ask the user to pick one of `choices`, as Excel's Insert and Delete dialogs
+ * do: a group of radio buttons, OK (the default) and Cancel. Arrow keys move
+ * between the choices. `result` resolves to the chosen value on OK, and to
+ * `null` for Cancel, Escape or close.
+ */
+export function choiceDialog(
+  grid: DialogHost,
+  options: ChoiceOptions,
+): { readonly result: Promise<string | null>; close(): void } {
+  const group = document.createElement("fieldset");
+  group.className = "sheetwrite-dialog-choices";
+  const legend = document.createElement("legend");
+  legend.className = "sheetwrite-dialog-legend";
+  legend.textContent = options.title;
+  group.append(legend);
+  const name = `sheetwrite-dialog-choice-${++dialogCount}`;
+  const radios: HTMLInputElement[] = [];
+  for (const choice of options.choices) {
+    const label = document.createElement("label");
+    label.className = "sheetwrite-dialog-choice";
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    radio.name = name;
+    radio.value = choice.value;
+    radio.disabled = choice.disabled === true;
+    radio.checked = choice.value === options.initial;
+    label.append(radio, choice.label);
+    group.append(label);
+    radios.push(radio);
+  }
+
+  const dialog = openDialog(grid, {
+    title: options.title,
+    body: group,
+    buttons: [
+      { label: "OK", value: "ok", default: true },
+      { label: "Cancel", value: "cancel" },
+    ],
+    cancel: "cancel",
+    initialFocus: radios.find((radio) => radio.checked),
+  });
+  return {
+    result: dialog.result.then((value) =>
+      value === "ok" ? (radios.find((radio) => radio.checked)?.value ?? null) : null,
+    ),
+    close: () => dialog.close(),
+  };
 }
