@@ -1,5 +1,11 @@
 import { rangeA1, shiftA1Refs } from "./a1.js";
-import { cellEditText, parseCellInput } from "./cell-input.js";
+import { ColumnCompletions } from "./autocomplete.js";
+import {
+  cellEditText,
+  parseCellInput,
+  parseCellLiteralInput,
+  parseCurrencyInput,
+} from "./cell-input.js";
 import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
@@ -20,7 +26,7 @@ import type { CellRef, SelectionModel, SelRect } from "./selection.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
-import type { CellValue } from "./types/cell.js";
+import type { CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
 import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
@@ -278,6 +284,76 @@ export class InteractionSessions {
     }
   }
 
+  /**
+   * Excel's AutoComplete for an edit of view row `row` in `col`: the distinct
+   * text entries of the column's filled cells directly above and below it, up
+   * to the first empty cell each way. The engine reads them on the first
+   * typed character. Typed numbers, dates and logical values are not
+   * completed, and neither are sheets whose data is still loading.
+   */
+  private columnCompletions(
+    row: number,
+    col: number,
+  ): ((typed: string) => string | null) | undefined {
+    const engine = storeEngine(this.deps.store);
+    if (engine === null) return undefined;
+    const sheet = this.deps.activeSheet();
+    const completions = new ColumnCompletions(() => {
+      if (engine.queryCapability(sheet).status === "incomplete") return [];
+      const sorted = this.deps.loadable?.hasView(sheet) ?? false;
+      const top = this.blockEdge(row, col, -1);
+      const bottom = this.blockEdge(row, col, 1);
+      const values: CellScalar[] = [];
+      for (const [start, end] of [
+        [top, row],
+        [row + 1, bottom + 1],
+      ] as const) {
+        if (start >= end) continue;
+        let read: CellScalar[];
+        if (sorted) {
+          // A sort or filter view scatters the rows; read just those data rows.
+          const rows = new Uint32Array(end - start);
+          let low = Infinity;
+          let high = -1;
+          for (let index = 0; index < rows.length; index++) {
+            const dataRow = this.deps.toDataRow(start + index);
+            rows[index] = dataRow;
+            low = Math.min(low, dataRow);
+            high = Math.max(high, dataRow);
+          }
+          read = engine.distinctValues(sheet, col, 0, { start: low, end: high + 1 }, rows);
+        } else {
+          read = engine.distinctValues(sheet, col, 0, { start, end });
+        }
+        for (const value of read) values.push(value);
+      }
+      return values;
+    });
+    // Excel reads numbers, dates, currency and TRUE or FALSE whatever the column's type.
+    return (typed) =>
+      typeof parseCellLiteralInput(typed, "date") === "string" && parseCurrencyInput(typed) === null
+        ? completions.complete(typed)
+        : null;
+  }
+
+  /** The last filled view row of the block next to `row` in `col`, going `direction`; `row` when none. */
+  private blockEdge(row: number, col: number, direction: 1 | -1): number {
+    const next = row + direction;
+    if (next < 0 || next >= this.deps.rowCount()) return row;
+    const filled = (viewRow: number): boolean => {
+      const value = this.deps.store.getCell({
+        sheet: this.deps.activeSheet(),
+        row: this.deps.toDataRow(viewRow),
+        col,
+      }).resolved;
+      return value !== null && value !== "";
+    };
+    if (!filled(next)) return row;
+    const after = next + direction;
+    if (after < 0 || after >= this.deps.rowCount() || !filled(after)) return next;
+    return this.deps.dataEdge(next, col, direction, 0) ?? next;
+  }
+
   private editorLabel(row: number, col: number): string {
     return `Edit ${this.deps.columnHeader(col)}, row ${row + 1}`;
   }
@@ -497,9 +573,10 @@ export class InteractionSessions {
       onText: (value) => this.deps.editDraft.text(value),
       onShortcut: (event) => this.runCustomShortcut(event, true),
       onPoint: (dRow, dCol, extend) => this.pointBy(editCell, dRow, dCol, extend),
+      complete: this.columnCompletions(editCell.row, editCell.col),
     });
-    // A formula bar showing the draft starts from the opened text.
-    this.deps.editDraft.text(text);
+    // A formula bar showing the draft starts from the opened text, completed or not.
+    this.deps.editDraft.text(this.editor.value);
   }
 
   /**

@@ -43,6 +43,7 @@ import { dirname } from "node:path";
 import type { CellScalar, Column, ColumnarData, SortKey, Workbook } from "@sheetwrite/core";
 import type { CellValue, GridSettings, HotInstance } from "handsontable";
 
+import { ColumnCompletions } from "../../packages/core/src/autocomplete.js";
 import { autoFilterValues } from "../../packages/core/src/autofilter-actions.js";
 import { getEngine } from "../../packages/core/src/engine.js";
 import { initSheetwrite, SheetwriteStore } from "../../packages/core/src/index.js";
@@ -145,6 +146,7 @@ export const QUERY_SCENARIOS = [
   "filter-value-set-50000",
   "autofilter-dropdown",
   "autofilter-apply-values",
+  "autocomplete-first-key",
   "ingest-numeric-only",
 ] as const;
 export type QueryScenario = (typeof QUERY_SCENARIOS)[number];
@@ -177,6 +179,7 @@ const QUERY_LABELS: Record<QueryScenario, string> = {
   "filter-value-set-50000": "Filter customer by 50,000 picked values",
   "autofilter-dropdown": "Open the AutoFilter dropdown of city (filtered)",
   "autofilter-apply-values": "Apply an AutoFilter value filter to city",
+  "autocomplete-first-key": "AutoComplete's first typed key over the customer column",
   "ingest-numeric-only": "Ingest N rows (5 numeric columns)",
 };
 
@@ -194,6 +197,7 @@ export const QUERY_FIXTURES: Readonly<Record<QueryScenario, string>> = {
   "filter-value-set-50000": "seeded-dataset-v1",
   "autofilter-dropdown": "seeded-dataset-v1",
   "autofilter-apply-values": "seeded-dataset-v1",
+  "autocomplete-first-key": "seeded-dataset-v1",
   "ingest-numeric-only": "numeric-five-column-v1",
 };
 
@@ -209,6 +213,8 @@ const QUERY_SCENARIO_ROWS: Partial<Record<QueryScenario, readonly number[]>> = {
   // The AutoFilter rows cover the 100,000-row column of #735's acceptance.
   "autofilter-dropdown": [100_000],
   "autofilter-apply-values": [100_000],
+  // AutoComplete over a 100,000-row column of distinct entries (#759).
+  "autocomplete-first-key": [100_000],
 };
 
 function measuresQueryScenario(
@@ -287,6 +293,7 @@ function plan(workload: Workload | QueryScenario, rows: number): IterationPlan {
     case "filter-value-set-1000":
     case "autofilter-dropdown":
     case "autofilter-apply-values":
+    case "autocomplete-first-key":
       return atScale
         ? { workload, warmup: 1, iters: 5 }
         : { workload, warmup: rows >= 100_000 ? 1 : 2, iters: 15 };
@@ -1090,6 +1097,29 @@ async function benchSheetwrite(
 
   if (measures("autofilter-dropdown") || measures("autofilter-apply-values")) {
     measureAutoFilter(queryStore, ds, rows, queries, measures);
+  }
+
+  if (measures("autocomplete-first-key")) {
+    // The editor's first typed key: read the column's distinct entries from
+    // the engine, sort them and look the prefix up. Every customer is
+    // distinct, the worst case; only the last row's entry begins with the
+    // prefix, its text without the last digit.
+    const engine = storeEngine(queryStore);
+    if (!engine) throw new Error("autocomplete: the query store has no engine");
+    const expected = ds.customer[rows - 1]!;
+    const prefix = expected.slice(0, -1).toLowerCase();
+    let completed: string | null = null;
+    queries["autocomplete-first-key"] = measure(
+      () => {
+        completed = new ColumnCompletions(() =>
+          engine.distinctValues(SHEET, COL.customer, 0, { start: 0, end: rows }),
+        ).complete(prefix);
+      },
+      plan("autocomplete-first-key", rows),
+    );
+    if (completed !== expected) {
+      throw new Error(`autocomplete ${rows}: completed ${String(completed)}, not ${expected}`);
+    }
   }
 
   if (measures("ingest-numeric-only")) {
