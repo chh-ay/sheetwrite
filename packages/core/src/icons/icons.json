@@ -249,6 +249,10 @@
       "column": 12,
       "row": 5
     },
+    "autoFillOptions": {
+      "column": 13,
+      "row": 5
+    },
     "sortAsc": {
       "column": 0,
       "row": 6
