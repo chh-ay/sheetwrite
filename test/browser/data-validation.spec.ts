@@ -47,12 +47,10 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
 }) => {
   await open(page);
   await regionRule(page, { inputTitle: "Region", inputMessage: "Pick a sales region." });
-  await expect(page.locator(".sheetwrite-input-message")).toHaveText(
-    "RegionPick a sales region.",
-  );
+  await expect(page.locator(".sheetwrite-input-message")).toHaveText("RegionPick a sales region.");
   const before = await regionAt50(page);
 
-  await page.keyboard.type("=\"Nowhere\"");
+  await page.keyboard.type('="Nowhere"');
   await page.keyboard.press("Enter");
   const alert = page.getByRole("alertdialog", { name: "Data Validation" });
   await expect(alert).toContainText(
@@ -67,7 +65,7 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
   await expect(alert).toHaveCount(0);
   const editor = page.locator("textarea.sheetwrite-editor");
   await expect(editor).toBeFocused();
-  await expect(editor).toHaveValue("=\"Nowhere\"");
+  await expect(editor).toHaveValue('="Nowhere"');
 
   await page.keyboard.press("Enter");
   await expect(alert).toBeVisible();
@@ -106,7 +104,10 @@ test("a list cell's arrow opens its list, and typing filters it, from the keyboa
 }) => {
   await open(page);
   await regionRule(page, {
-    condition: { kind: "list", values: ["North", "South", "East", "West", "North-East", "South-West"] },
+    condition: {
+      kind: "list",
+      values: ["North", "South", "East", "West", "North-East", "South-West"],
+    },
   });
   const arrow = page.locator(".sheetwrite-list-button");
   await expect(arrow).toBeVisible();
@@ -190,6 +191,10 @@ test("Data › Data Validation creates a list from a range, from the keyboard @p
   });
   await page.locator(".sheetwrite").first().focus();
   await page.keyboard.press("Alt+ArrowDown");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveText(["North", "South", "East"]);
+  await expect(page.getByRole("listbox").getByRole("option")).toHaveText([
+    "North",
+    "South",
+    "East",
+  ]);
   await page.keyboard.press("Escape");
 });

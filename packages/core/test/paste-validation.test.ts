@@ -30,7 +30,10 @@ beforeEach(() => {
   restoreStubs = installCanvasTestStubs();
   let items: FakeClipboardItem[] = [];
   let text = "";
-  Object.defineProperty(globalThis, "ClipboardItem", { configurable: true, value: FakeClipboardItem });
+  Object.defineProperty(globalThis, "ClipboardItem", {
+    configurable: true,
+    value: FakeClipboardItem,
+  });
   Object.defineProperty(navigator, "clipboard", {
     configurable: true,
     value: {
@@ -141,12 +144,20 @@ describe("validationPastePatches", () => {
   it("repeats the copied rules over a multiple of the block and transposes them", () => {
     const sheet = { ...makeWorkbook(10).sheets[0]!, validationRules: [] };
     const pieces = [
-      { rule: { condition: { kind: "any" as const }, policy: "reject" as const }, rows: [0, 0], cols: [0, 1] },
+      {
+        rule: { condition: { kind: "any" as const }, policy: "reject" as const },
+        rows: [0, 0],
+        cols: [0, 1],
+      },
     ] as const;
     const placed = (options?: { transpose?: boolean }) =>
-      validationPastePatches(sheet, pieces, { rows: 1, cols: 2 }, { row: 2, col: 0, rows: 2, cols: 2 }, options).map(
-        (patch) => (patch.op === "setValidationRule" ? patch.rule.range : null),
-      );
+      validationPastePatches(
+        sheet,
+        pieces,
+        { rows: 1, cols: 2 },
+        { row: 2, col: 0, rows: 2, cols: 2 },
+        options,
+      ).map((patch) => (patch.op === "setValidationRule" ? patch.rule.range : null));
     expect(placed()).toEqual([range(2, 0, 2, 1), range(3, 0, 3, 1)]);
     expect(placed({ transpose: true })).toEqual([range(2, 0, 3, 0), range(2, 1, 3, 1)]);
   });

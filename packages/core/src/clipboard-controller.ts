@@ -784,23 +784,23 @@ export class ClipboardController {
       : [
           ...(this.deps.keepValidation() ? [] : this.validationPatches(snapshot, focus)),
           ...snapshot.hyperlinks.map((source) => ({
-          op: "setHyperlink" as const,
-          sheet: this.deps.activeSheet(),
-          hyperlink: {
-            ...cloneCellHyperlink(source),
-            id: createHyperlinkId(),
-            range: {
-              sheet: this.deps.activeSheet(),
-              start: {
-                row: source.range.start.row + deltaRow,
-                col: source.range.start.col + deltaCol,
-              },
-              end: {
-                row: source.range.end.row + deltaRow,
-                col: source.range.end.col + deltaCol,
+            op: "setHyperlink" as const,
+            sheet: this.deps.activeSheet(),
+            hyperlink: {
+              ...cloneCellHyperlink(source),
+              id: createHyperlinkId(),
+              range: {
+                sheet: this.deps.activeSheet(),
+                start: {
+                  row: source.range.start.row + deltaRow,
+                  col: source.range.start.col + deltaCol,
+                },
+                end: {
+                  row: source.range.end.row + deltaRow,
+                  col: source.range.end.col + deltaCol,
+                },
               },
             },
-          },
           })),
         ];
 
@@ -949,7 +949,11 @@ export class ClipboardController {
     const writeAt = check
       ? (r: number, c: number, targetCol: number): CellWrite | null => {
           const write = cellAt(r, c, targetCol);
-          const addr = { sheet: activeSheet, row: this.deps.toDataRow(focus.row + r), col: targetCol };
+          const addr = {
+            sheet: activeSheet,
+            row: this.deps.toDataRow(focus.row + r),
+            col: targetCol,
+          };
           return write && check.admits(write, addr) ? write : null;
         }
       : cellAt;

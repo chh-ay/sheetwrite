@@ -75,7 +75,10 @@ export function validationIdSource(rules: readonly DataValidationRule[]): () => 
 }
 
 /** `rule`'s settings with its formulas anchored at `cell` instead of its range's top-left. */
-function reanchored(rule: DataValidationRule, cell: { row: number; col: number }): ValidationSettings {
+function reanchored(
+  rule: DataValidationRule,
+  cell: { row: number; col: number },
+): ValidationSettings {
   const origin = normalizedRange(rule.range).start;
   const { id: _id, range: _range, ...settings } = rule;
   const rows = cell.row - origin.row;
@@ -187,7 +190,11 @@ export function validationPastePatches(
           start: { row: top + r0, col: left + c0 },
           end: { row: top + r1, col: left + c1 },
         };
-        patches.push({ op: "setValidationRule", sheet: sheet.id, rule: { ...piece.rule, id: newId(), range } });
+        patches.push({
+          op: "setValidationRule",
+          sheet: sheet.id,
+          rule: { ...piece.rule, id: newId(), range },
+        });
       }
     }
   }

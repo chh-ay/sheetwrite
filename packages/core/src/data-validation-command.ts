@@ -141,7 +141,13 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
     rule = undefined;
   } else if (
     rule &&
-    areas.some((area) => subtractRanges(area, touching.map((item) => item.range)).length > 0)
+    areas.some(
+      (area) =>
+        subtractRanges(
+          area,
+          touching.map((item) => item.range),
+        ).length > 0,
+    )
   ) {
     const extend = await askYesNo(
       host.dialogs,
@@ -151,9 +157,7 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
   }
 
   const canApplyToAll =
-    rule !== undefined &&
-    touching.length === 1 &&
-    subtractRanges(rule.range, areas).length > 0;
+    rule !== undefined && touching.length === 1 && subtractRanges(rule.range, areas).length > 0;
   const change = await dataValidationDialog(host.dialogs, {
     settings: rule ?? null,
     canApplyToAll,
