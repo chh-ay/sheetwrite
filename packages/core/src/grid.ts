@@ -2642,6 +2642,11 @@ export class GridImpl implements Grid {
         ? { kind: "cell" as const, addr: { sheet: id, row: 0, col: this.firstCol() } }
         : null;
     this.selection.set(view ? view.selection : firstCell);
+    // Rows or columns removed while the sheet was away can leave the old active cell outside it.
+    const focus = this.selection.focusCell;
+    if (focus && (focus.row >= this.geometry.rowCount || focus.col > this.lastCol())) {
+      this.selection.set(firstCell);
+    }
     this.scroller.scrollTop = view?.top ?? 0;
     this.scroller.scrollLeft = view?.left ?? 0;
 
