@@ -235,11 +235,19 @@ async function* enronWorkbooks(half: "dev" | "heldout"): AsyncGenerator<ReplayWo
       }
       return { cell: { sheet: `s${sheet}`, row, col }, formula };
     });
-    const names: NamedRangeSnapshot[] = workbook.names.map((named) =>
-      "formula" in named
-        ? { name: named.name, formula: named.formula }
-        : { name: named.name, range: { sheet: `s${named.sheet}`, start: named.start, end: named.end } },
-    );
+    // The sample keeps only cells near the formulas, so a name's range is clipped to its sheet.
+    const clip = (sheet: number, cell: { row: number; col: number }) => {
+      const size = workbook.sheets[sheet];
+      return {
+        row: Math.min(cell.row, (size?.rows ?? 1) - 1),
+        col: Math.min(cell.col, (size?.cols ?? 1) - 1),
+      };
+    };
+    const names: NamedRangeSnapshot[] = workbook.names.map((named) => {
+      if ("formula" in named) return { name: named.name, formula: named.formula };
+      const range = { start: clip(named.sheet, named.start), end: clip(named.sheet, named.end) };
+      return { name: named.name, range: { sheet: `s${named.sheet}`, ...range } };
+    });
     yield { id: workbook.file, snapshot: workbookSnapshot(sheets, names), targets };
   }
 }

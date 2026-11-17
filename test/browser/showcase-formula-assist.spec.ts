@@ -10,12 +10,12 @@ const MEDIA = /\/media\/formula-assist\/.+\.(mp4|webm)$/;
 async function openShowcase(page: Page, width: number, height: number): Promise<void> {
   await page.setViewportSize({ width, height });
   await page.goto("/showcases/formula-assist/");
-  await expect(page.getByRole("button", { name: "Legal's total" })).toBeEnabled();
+  await expect(page.getByRole("button", { name: "Finance's total" })).toBeEnabled();
 }
 
 test("suggests a row total from its neighbours and Tab takes it @portability", async ({ page }) => {
   await openShowcase(page, 1440, 900);
-  await page.getByRole("button", { name: "Legal's total" }).click();
+  await page.getByRole("button", { name: "Finance's total" }).click();
   const bar = page.getByRole("textbox", { name: "Formula bar" });
   await expect(bar).toBeFocused();
 

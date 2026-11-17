@@ -36,6 +36,16 @@ const READY_TIMEOUT_MS = 60_000;
 const LOOP = { start: 1, length: 7 } as const;
 /** The poster: the frame at this second, a suggestion on screen. */
 const POSTER_AT = 3.2;
+/** A recording must change its picture in at least this share of frames, or the page did not respond. */
+const MIN_CHANGED_FRAMES = 0.02;
+
+/** The compositor's clock: every frame, also the warm-up ones, one interval later than the last. */
+let frameTicks = 0;
+function nextFrameTicks(): number {
+  frameTicks += FRAME_MS;
+  return frameTicks;
+}
+
 
 /** The two takes: wide for desktops, narrow for phones (DemoVideo.tsx). */
 const TAKES = {
@@ -178,74 +188,75 @@ function session(): { at: number; step: Step }[] {
     steps.push({ at: time, step: { kind: "key", key, ctrl } });
   };
 
-  wait(1_200);
-  // Legal's total: the totals above and below agree, so `=` is enough.
-  select("H6");
-  wait(900);
-  type("=");
-  wait(1_800);
-  press("Tab");
-  wait(900);
-  press("Enter");
-  wait(1_200);
-  // Legal's share, one word at a time with Ctrl+→, then the rest with Tab.
+  /** How long a suggestion stays on screen before it is taken, so a viewer can read it. */
+  const READ_MS = 2_400;
+  /** The pause after a commit, before the next cell. */
+  const SETTLE_MS = 1_600;
+  const accept = (cell: string): void => {
+    select(cell);
+    wait(1_000);
+    type("=");
+    wait(READ_MS);
+    press("Tab");
+    wait(900);
+    press("Enter");
+    wait(SETTLE_MS);
+  };
+
+  wait(2_000);
+  // Finance's total: the totals above and below agree, so `=` is enough.
+  accept("H6");
+  // Finance's share, one word at a time with Ctrl+→, then the rest with Tab.
   select("I6");
-  wait(900);
-  type("=");
-  wait(1_500);
-  press("ArrowRight", true);
-  wait(700);
-  press("ArrowRight", true);
-  wait(700);
-  press("Tab");
-  wait(900);
-  press("Enter");
-  wait(1_200);
-  // March's total, from the totals left and right of it.
-  select("D13");
-  wait(900);
-  type("=");
-  wait(1_600);
-  press("Tab");
-  wait(900);
-  press("Enter");
-  wait(1_200);
-  // Facilities: dismiss the suggestion and type an average yourself; Excel's list still completes AVERAGE.
-  select("H9");
-  wait(900);
-  type("=");
-  wait(1_400);
-  press("Escape");
-  wait(900);
-  type("AVER");
-  wait(900);
-  press("Tab");
-  wait(600);
-  type("B9:G9)");
   wait(1_000);
+  type("=");
+  wait(READ_MS);
+  press("ArrowRight", true);
+  wait(900);
+  press("ArrowRight", true);
+  wait(900);
+  press("Tab");
+  wait(900);
   press("Enter");
+  wait(SETTLE_MS);
+  // March's total, from the totals left and right of it.
+  accept("D13");
+  // People's total: take the function with Ctrl+→, hide the rest with Esc, and type the range yourself.
+  select("H9");
+  wait(1_000);
+  type("=");
+  wait(READ_MS);
+  press("ArrowRight", true);
+  wait(900);
+  press("Escape");
   wait(1_200);
+  type("B9:G9)");
+  wait(1_200);
+  press("Enter");
+  wait(SETTLE_MS);
+  // People's share, from the shares above and below.
+  accept("I9");
   // A lookup: the function name completes, and Tab moves to the next argument.
   select("J2");
-  wait(900);
+  wait(1_000);
   type("=VLO");
-  wait(1_300);
+  wait(READ_MS);
   press("Tab");
-  wait(500);
+  wait(600);
   type("A2");
-  wait(800);
+  wait(1_000);
   press("Tab");
-  wait(500);
+  wait(600);
   type("Rates!A1:B10");
-  wait(800);
+  wait(1_000);
   press("Tab");
-  wait(500);
+  wait(600);
   type("2,FALSE)");
-  wait(1_200);
+  wait(1_400);
   press("Enter");
-  wait(2_500);
+  wait(3_000);
   select("A1");
-  wait(1_500);
+  wait(2_000);
   return steps;
 }
 
@@ -351,7 +362,7 @@ async function pumpUntil(cdp: Cdp, sessionId: string, ready: string): Promise<vo
   for (;;) {
     await cdp.send(
       "HeadlessExperimental.beginFrame",
-      { interval: FRAME_MS, noDisplayUpdates: false },
+      { frameTimeTicks: nextFrameTicks(), interval: FRAME_MS, noDisplayUpdates: false },
       sessionId,
     );
     const result = await cdp.send(
@@ -454,6 +465,7 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
     );
     let next = 0;
     let previous: Uint8Array | null = null;
+    let changed = 0;
     for (let frame = 0; frame < frames; frame++) {
       const now = frame * FRAME_MS;
       while (next < steps.length && (steps[next]?.at ?? Number.POSITIVE_INFINITY) <= now) {
@@ -470,7 +482,7 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       await expired;
       const result = await cdp.send(
         "HeadlessExperimental.beginFrame",
-        { frameTimeTicks: 10_000 + now, interval: FRAME_MS, screenshot: { format: "png" } },
+        { frameTimeTicks: nextFrameTicks(), interval: FRAME_MS, screenshot: { format: "png" } },
         sessionId,
       );
       const data = field(result, "screenshotData");
@@ -479,9 +491,13 @@ async function recordTake(name: TakeName, origin: string, scratch: string): Prom
       if (image === null) throw new Error("The first recorded frame has no picture");
       encoder.stdin.write(image);
       previous = image;
+      if (typeof data === "string") changed++;
     }
     await encoder.stdin.end();
     if ((await encoder.exited) !== 0) throw new Error(`Encoding ${name} failed`);
+    if (changed < frames * MIN_CHANGED_FRAMES) {
+      throw new Error(`${name}: only ${changed} of ${frames} frames changed; the page did not follow the session`);
+    }
     return frames;
   } finally {
     cdp.close();

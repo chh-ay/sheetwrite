@@ -35,8 +35,8 @@ const LAST_ROW = FIRST_ROW + DEPARTMENTS.length - 1;
 export const TOTALS_ROW = LAST_ROW + 2;
 
 /**
- * Cells left empty for the reader (and the demo) to type: two row totals, a
- * share and a month total. Each has neighbours that agree, so the formula bar
+ * Cells left empty for the reader (and the demo) to type: two row totals, two
+ * shares and a month total. Each has neighbours that agree, so the formula bar
  * suggests the formula as soon as `=` is typed.
  */
 export const OPEN_CELLS = {
@@ -44,6 +44,7 @@ export const OPEN_CELLS = {
   share: { row: FIRST_ROW + 4, col: SHARE_COL },
   monthTotal: { row: TOTALS_ROW, col: 3 },
   secondRowTotal: { row: FIRST_ROW + 7, col: TOTAL_COL },
+  secondShare: { row: FIRST_ROW + 7, col: SHARE_COL },
 } as const;
 
 /** The 1-based row of a 0-based one, as formulas write it. */

@@ -23,10 +23,11 @@ export interface FormulaAssistStageProps {
 
 /** The cells the controls jump to, with their labels. */
 const TARGETS: readonly { readonly id: keyof typeof OPEN_CELLS; readonly label: string }[] = [
-  { id: "rowTotal", label: "Legal's total" },
-  { id: "share", label: "Legal's share" },
+  { id: "rowTotal", label: "Finance's total" },
+  { id: "share", label: "Finance's share" },
   { id: "monthTotal", label: "March's total" },
-  { id: "secondRowTotal", label: "Facilities' total" },
+  { id: "secondRowTotal", label: "People's total" },
+  { id: "secondShare", label: "People's share" },
 ];
 
 /** The keys, as the side panel lists them. */
