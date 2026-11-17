@@ -43,7 +43,7 @@ const SMALL_FUNNEL = "M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z";
 /** The dotted rows above and below the cells an Insert or Delete glyph tints. */
 const ROW_GUIDES = "M3 5h12M3 19h12";
 /** One cell between those rows: Insert Cells and Delete Cells. */
-const CELL_BOX = "M5.5 9.5h7v5h-7Z";
+const CELL_BOX = "M5 9h8v6H5Z";
 /** The edge of the sheet that the sheet tabs hang from, as in the tab bar. */
 const TAB_EDGE = "M2.5 5h19";
 /** The value and category axes every cartesian chart glyph shares. */
@@ -84,7 +84,8 @@ function gear(teeth: number, outer: number, root: number): string {
     ] as const)
       corners.push(point(radius, middle + side * step));
   }
-  return `M${corners.join("L")}Z`;
+  // Points after the first are implicit line-tos.
+  return `M${corners.join(" ")}Z`;
 }
 
 export const ICON_ROWS: readonly (readonly Glyph[])[] = [
@@ -598,6 +599,15 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       ],
     ],
     // Tab Color…: a tab with its colour bar under the name, as the tab bar shows it.
-    ["tabColor", [TAB_EDGE, tab(4, 16, 19), "M8 9h8", tint("M7 12.5h10v3H7Z"), "M7 12.5h10v3H7Z"]],
+    [
+      "tabColor",
+      [
+        TAB_EDGE,
+        tint("M4 14h16v3.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"),
+        tab(4, 16, 19),
+        "M8 9.5h8",
+        "M4 14h16",
+      ],
+    ],
   ],
 ];
