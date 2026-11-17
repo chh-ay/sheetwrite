@@ -44,7 +44,7 @@ export interface SheetTabsOptions {
   onRemove?: (id: SheetId) => SheetLifecycleResult;
   onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
-  /** Open a panel of `sheet-commands.ts` for sheet `id`; it shows itself with `showPanel`. */
+  /** Open a panel of `sheet-tab-panels.ts` for sheet `id`; it shows itself with `showPanel`. */
   onCommand?: (command: SheetTabCommand, id: SheetId) => void;
   onHide?: (id: SheetId) => SheetLifecycleResult;
   onUnhide?: (id: SheetId) => SheetLifecycleResult;
@@ -848,7 +848,7 @@ export class SheetTabs {
 
   /**
    * Show `panel` in place of the items of sheet `id`'s open menu; it closes as
-   * the menu does. `sheet-commands.ts` builds the panels.
+   * the menu does. `sheet-tab-panels.ts` builds the panels.
    */
   showPanel(id: SheetId, panel: HTMLElement): void {
     if (this.menuSheetId !== id) return;
