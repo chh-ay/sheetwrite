@@ -118,7 +118,11 @@ export class StoreMutationPolicy {
             protectionsFor(sheetId),
             resolver,
           ),
-          ...this.validationIssues(patch, operationIndex, rulesFor(sheetId)),
+          // A paste lands its values as in Excel, whose validation checks
+          // typed entries only; `paste.keepValidation` checks in the grid.
+          ...(commitReason === "paste"
+            ? []
+            : this.validationIssues(patch, operationIndex, rulesFor(sheetId))),
           ...this.pivotOutputIssues(
             patch,
             operationIndex,

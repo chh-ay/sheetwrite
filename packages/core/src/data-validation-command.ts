@@ -4,12 +4,18 @@
  * module and the dialog load on first use.
  */
 
-import { dataValidationDialog, type ValidationSettings } from "./data-validation-dialog.js";
+import { dataValidationDialog } from "./data-validation-dialog.js";
 import { type DialogHost, openDialog } from "./dialog.js";
-import { normalizedRange, rangesIntersect } from "./store/ranges.js";
+import { rangesIntersect } from "./store/ranges.js";
 import type { StyleActionsDeps } from "./style-actions.js";
 import type { Range, SheetId } from "./types/coordinates.js";
 import type { DataValidationRule, DocumentOp } from "./types/document.js";
+import {
+  clearedValidationPatches,
+  subtractRanges,
+  validationIdSource,
+  type ValidationSettings,
+} from "./validation-transfer.js";
 
 /** What the command reads and changes in the grid that runs it. */
 export interface DataValidationHost {
@@ -51,32 +57,6 @@ function selectedAreas(deps: StyleActionsDeps): Range[] {
   return areas;
 }
 
-/** `range` without the cells of `cut`: up to four rectangles around it. */
-function subtract(range: Range, cut: Range): Range[] {
-  const outer = normalizedRange(range);
-  if (!rangesIntersect(outer, cut)) return [outer];
-  const inner = normalizedRange(cut);
-  const top = Math.max(outer.start.row, inner.start.row);
-  const bottom = Math.min(outer.end.row, inner.end.row);
-  const pieces: Range[] = [];
-  const piece = (r0: number, c0: number, r1: number, c1: number): void => {
-    if (r0 <= r1 && c0 <= c1) {
-      pieces.push({ sheet: outer.sheet, start: { row: r0, col: c0 }, end: { row: r1, col: c1 } });
-    }
-  };
-  piece(outer.start.row, outer.start.col, inner.start.row - 1, outer.end.col);
-  piece(inner.end.row + 1, outer.start.col, outer.end.row, outer.end.col);
-  piece(top, outer.start.col, bottom, inner.start.col - 1);
-  piece(top, inner.end.col + 1, bottom, outer.end.col);
-  return pieces;
-}
-
-function subtractAll(range: Range, cuts: readonly Range[]): Range[] {
-  let pieces = [normalizedRange(range)];
-  for (const cut of cuts) pieces = pieces.flatMap((piece) => subtract(piece, cut));
-  return pieces;
-}
-
 /** A rule's settings as text, so rules with the same settings compare equal. */
 function settingsKey(rule: DataValidationRule): string {
   return JSON.stringify({ ...rule, id: "", range: null });
@@ -112,38 +92,28 @@ export function validationPatches(
   everywhere: DataValidationRule | undefined,
 ): DocumentOp[] {
   const patches: DocumentOp[] = [];
-  const ids = new Set(rules.map((rule) => rule.id));
-  let next = 1;
-  const newId = (): string => {
-    while (ids.has(`validation-${next}`)) next++;
-    const id = `validation-${next}`;
-    ids.add(id);
-    return id;
-  };
-
+  const newId = validationIdSource(rules);
   let targets = areas;
   if (everywhere) {
     patches.push(
       settings
-        ? { op: "setValidationRule", sheet, rule: { ...settings, id: everywhere.id, range: everywhere.range } }
+        ? {
+            op: "setValidationRule",
+            sheet,
+            rule: { ...settings, id: everywhere.id, range: everywhere.range },
+          }
         : { op: "removeValidationRule", sheet, id: everywhere.id },
     );
-    targets = areas.flatMap((area) => subtract(area, everywhere.range));
+    targets = areas.flatMap((area) => subtractRanges(area, [everywhere.range]));
   }
-
-  for (const rule of rules) {
-    if (rule === everywhere || !targets.some((area) => rangesIntersect(rule.range, area))) continue;
-    const [kept, ...split] = subtractAll(rule.range, targets);
-    patches.push(
-      kept
-        ? { op: "setValidationRule", sheet, rule: { ...rule, range: kept } }
-        : { op: "removeValidationRule", sheet, id: rule.id },
-    );
-    for (const range of split) {
-      patches.push({ op: "setValidationRule", sheet, rule: { ...rule, id: newId(), range } });
-    }
-  }
-
+  patches.push(
+    ...clearedValidationPatches(
+      sheet,
+      rules.filter((rule) => rule !== everywhere),
+      targets,
+      newId,
+    ),
+  );
   if (settings) {
     for (const range of targets) {
       patches.push({ op: "setValidationRule", sheet, rule: { ...settings, id: newId(), range } });
@@ -171,7 +141,7 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
     rule = undefined;
   } else if (
     rule &&
-    areas.some((area) => subtractAll(area, touching.map((item) => item.range)).length > 0)
+    areas.some((area) => subtractRanges(area, touching.map((item) => item.range)).length > 0)
   ) {
     const extend = await askYesNo(
       host.dialogs,
@@ -183,7 +153,7 @@ export async function dataValidationCommand(host: DataValidationHost): Promise<v
   const canApplyToAll =
     rule !== undefined &&
     touching.length === 1 &&
-    subtractAll(rule.range, areas).length > 0;
+    subtractRanges(rule.range, areas).length > 0;
   const change = await dataValidationDialog(host.dialogs, {
     settings: rule ?? null,
     canApplyToAll,

@@ -15,9 +15,7 @@ import type {
   ValidationErrorStyle,
 } from "./types/document.js";
 import { validationErrorStyle } from "./validation-rule.js";
-
-/** A rule's fields without its ID and range: what the dialog edits. */
-export type ValidationSettings = Omit<DataValidationRule, "id" | "range">;
+import type { ValidationSettings } from "./validation-transfer.js";
 
 /** What the dialog starts from. */
 export interface DataValidationInput {
