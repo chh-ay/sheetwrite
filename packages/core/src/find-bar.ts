@@ -582,7 +582,12 @@ export class FindBar {
     label.className = "sheetwrite-find-option";
     const select = document.createElement("select");
     select.setAttribute("aria-keyshortcuts", `Alt+${accessKey}`);
-    for (const [value, name] of choices) select.add(new Option(name, value));
+    for (const [value, name] of choices) {
+      const option = document.createElement("option");
+      option.value = value;
+      option.textContent = name;
+      select.appendChild(option);
+    }
     label.append(text, select);
     panel.appendChild(label);
     return select;
