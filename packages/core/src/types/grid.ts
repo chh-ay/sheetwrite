@@ -596,6 +596,7 @@ export type KeyboardAction =
   | "fillRight"
   | "nextSheet"
   | "previousSheet"
+  | "insertSheet"
   | "toggleFilter"
   | "formatGeneral"
   | "formatNumber"

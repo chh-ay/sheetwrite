@@ -71,7 +71,6 @@ import { InteractionSessions } from "./interaction-sessions.js";
 import { Keymap } from "./keymap.js";
 import { mergeSelection } from "./merge-command.js";
 import { MutationRevisionIndex, type MutationRevisionStats } from "./mutation-revision-index.js";
-import { sheetNameKey } from "./name-key.js";
 import { type NoteCell, NotePopover } from "./note-popover.js";
 import { trimNumberFormatCaches } from "./number-format.js";
 import { ObjectLayer } from "./object-layer.js";
@@ -93,7 +92,7 @@ import type { Ribbon } from "./ribbon/ribbon.js";
 import { FirstFailure, scheduleFrame, Scope, ScopeSlot } from "./scope.js";
 import { SearchController } from "./search-controller.js";
 import { type CellRef, SelectionModel, type SelRect } from "./selection.js";
-import { stepSheet } from "./sheet-commands.js";
+import { insertSheet, runSheetKey } from "./sheet-commands.js";
 import { planSheetCopy } from "./sheet-copy.js";
 import { validateSheetName } from "./sheet-name.js";
 import { changesSheetTabs, SheetTabs } from "./sheet-tabs.js";
@@ -656,7 +655,14 @@ export class GridImpl implements Grid {
   private dashboardView: DashboardViewHook | null = null;
   /** Pre-change worksheet state retained for deterministic session fallback through remote batches. */
   private sessionSheets: Array<{ id: SheetId; visibility?: SheetVisibility }> = [];
+  /**
+   * The columns each sheet shows: its own and the empty ones that fill the
+   * width. It never shrinks, so deleting a column keeps the sheet as wide. A
+   * sheet gets its entry when the grid first reads it.
+   */
   private readonly virtualColumnTargets = new Map<SheetId, number>();
+  /** The `minColumns` option, as constructed or last set. */
+  private minColumns: number | undefined;
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
   /** The open side panel; closing it runs the panel's cleanup. */
@@ -762,10 +768,7 @@ export class GridImpl implements Grid {
     this.engineGeneration = storeGeneration(this.store) ?? engineGeneration();
     this.store.setProtectionResolver?.(opts.protectionResolver, opts.mutationPolicy);
     this.ownsStore = ownsStore;
-    const virtualTarget = padTarget(host, opts.minColumns, this.presentation);
-    for (const sheet of workbook.sheets) {
-      this.virtualColumnTargets.set(sheet.id, Math.max(sheet.columns.length, virtualTarget));
-    }
+    this.minColumns = opts.minColumns;
 
     const datasource = opts.datasource;
     this.hasDatasource = datasource !== undefined;
@@ -1025,7 +1028,8 @@ export class GridImpl implements Grid {
       },
       openFind: (options) => this.openFindBar(options),
       keyCommand: (command) => {
-        if (command === "nextSheet" || command === "previousSheet") stepSheet(this, command);
+        if (command === "nextSheet" || command === "previousSheet" || command === "insertSheet")
+          runSheetKey(this, command);
         else runCellCommand(this.cellCommands(), command);
       },
       openAutoFilter: (col) =>
@@ -1679,7 +1683,15 @@ export class GridImpl implements Grid {
 
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === id);
     if (!stored) throw unknownSheetError(id);
-    const target = this.virtualColumnTargets.get(id) ?? stored.columns.length;
+    let target = this.virtualColumnTargets.get(id);
+    if (target === undefined) {
+      target = Math.max(
+        stored.columns.length,
+        padTarget(this.host, this.minColumns, this.presentation),
+      );
+      this.virtualColumnTargets.set(id, target);
+    }
+
     const sheet =
       target > stored.columns.length ? { ...stored, columns: [...stored.columns] } : stored;
     if (sheet !== stored) appendPadColumns(sheet.columns, target);
@@ -1693,13 +1705,6 @@ export class GridImpl implements Grid {
 
   private viewportH(): number {
     return this.viewportEl.clientHeight;
-  }
-
-  private nextDefaultSheetName(): string {
-    const names = new Set(this.store.getWorkbook().sheets.map((sheet) => sheetNameKey(sheet.name)));
-    let number = this.store.getWorkbook().sheets.length + 1;
-    while (names.has(sheetNameKey(`Sheet ${number}`))) number += 1;
-    return `Sheet ${number}`;
   }
 
   private buildTabBar(): void {
@@ -1717,11 +1722,7 @@ export class GridImpl implements Grid {
     this.tabBar = bar;
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
-      onAdd: (index) => {
-        const result = this.addSheet({ name: this.nextDefaultSheetName(), index });
-        if (result.status === "applied") this.setActiveSheet(result.sheet);
-        return result;
-      },
+      onAdd: (index) => insertSheet(this, index),
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
@@ -2526,6 +2527,7 @@ export class GridImpl implements Grid {
   }
 
   setMinColumns(minColumns?: number): void {
+    this.minColumns = minColumns;
     const stored = this.store.getWorkbook().sheets.find((sheet) => sheet.id === this.activeSheet);
     if (!stored) return;
     const target = Math.max(
