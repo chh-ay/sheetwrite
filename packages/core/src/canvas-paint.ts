@@ -586,7 +586,8 @@ export function paintFrame(
   damage?: PaintDamage,
   pane?: PaintDamage,
 ): void {
-  const { width, height, scrollTop, scrollLeft, rowTops, rowHeights, rowNumbers } = viewport;
+  const { width, height, scrollTop, scrollLeft, rowTops, rowHeights, rowNumbers, filteredRows } =
+    viewport;
   const { rowHeight, headerHeight } = theme;
   const colX = columnEdges(layout);
   const g = theme.rowHeaderWidth;
@@ -841,7 +842,6 @@ export function paintFrame(
     ctx.beginPath();
     ctx.rect(0, headerHeight, g, Math.max(0, height - headerHeight));
     ctx.clip();
-    applyFill(ctx, state, theme.headerFg);
     applyFont(ctx, state, theme.font);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -858,7 +858,13 @@ export function paintFrame(
       // the strip's background erase that half and slice the digits.
       if (bandTop + bandHeight < paintTop || bandTop > paintBottom) continue;
       const cy = bandTop + bandHeight / 2;
-      ctx.fillText(String(rowNumbers?.[ri] ?? row + 1), g / 2, cy);
+      const number = rowNumbers?.[ri] ?? row + 1;
+      const listed =
+        filteredRows !== undefined &&
+        number - 1 >= filteredRows.start &&
+        number - 1 <= filteredRows.end;
+      applyFill(ctx, state, listed ? theme.selectionBorder : theme.headerFg);
+      ctx.fillText(String(number), g / 2, cy);
     }
 
     ctx.restore();
