@@ -205,11 +205,18 @@ export function validValidationRules(sheet: Sheet, rules: readonly DataValidatio
     }
     const condition = rule.condition;
     if (condition.kind === "list") {
-      const items = "source" in condition ? null : condition.values;
-      if (items ? !Array.isArray(items) || items.length === 0 : !isValidationFormula(condition.source)) {
+      const valid =
+        "source" in condition
+          ? isValidationFormula(condition.source)
+          : Array.isArray(condition.values) && condition.values.length > 0;
+      if (!valid) {
         return false;
       }
-    } else if (condition.kind === "number" || condition.kind === "date" || condition.kind === "time") {
+    } else if (
+      condition.kind === "number" ||
+      condition.kind === "date" ||
+      condition.kind === "time"
+    ) {
       if (
         (condition.min !== undefined && !Number.isFinite(condition.min)) ||
         (condition.max !== undefined && !Number.isFinite(condition.max)) ||
