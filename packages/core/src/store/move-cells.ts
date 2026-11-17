@@ -1,13 +1,15 @@
 /**
  * Sheet metadata that moves with a block of cells in a `moveCells`
  * operation, as Excel's Cut and Paste moves it: the block's notes,
- * hyperlinks and merged cells go with it and replace those of the cells it
- * lands on. A range elsewhere follows the block by the rule the engine uses
- * for formula references (`moveCellRange`).
+ * hyperlinks, validation and conditional-format rules and merged cells go
+ * with it and replace those of the cells it lands on. A range elsewhere
+ * follows the block by the rule the engine uses for formula references
+ * (`moveCellRange`).
  */
-import type { CellHyperlink } from "../types/cell.js";
+import { moveFormulaCellRefs } from "../a1.js";
+import type { CellHyperlink, ConditionalFormatRule } from "../types/cell.js";
 import type { MergeRange, Range, SheetId } from "../types/coordinates.js";
-import type { CellNote, DocumentOp, Sheet } from "../types/document.js";
+import type { CellNote, DataValidationRule, DocumentOp, Sheet } from "../types/document.js";
 import { cellRange, movedBlock, normalizedRange } from "./ranges.js";
 
 export type MoveCellsOperation = Extract<DocumentOp, { op: "moveCells" }>;
@@ -84,20 +86,19 @@ const AXES = [
   ["col", "row"],
 ] as const;
 
+/** The last row and column of every sheet: a range that reaches one from the first keeps spanning its axis. */
+const SHEET_LAST = { row: 1_048_575, col: 16_383 } as const;
+
 /**
  * Where `range` is after `move`, as the engine moves a reference. A range
  * inside the source block moves with it. A range inside the cells the block
  * lands on is lost: `null`, which a formula shows as `#REF!`. A range the
  * block covers only in part moves the edge the block holds when the block
  * moves along it, so `A1:A10` becomes `A1:A15` when A10 moves to A15. Any
- * other range keeps its place. `last` is the last row and column of the
- * source sheet: a range that spans its sheet on an axis keeps spanning it.
+ * other range keeps its place, and a whole row or column keeps spanning its
+ * sheet.
  */
-export function moveCellRange(
-  range: Range,
-  move: CellBlockMove,
-  last: { row: number; col: number },
-): Range | null {
+export function moveCellRange(range: Range, move: CellBlockMove): Range | null {
   const bounds = normalizedRange(range);
   const { from, to } = move;
   if (holdsRange(from, bounds)) return shifted(bounds, move);
@@ -110,7 +111,7 @@ export function moveCellRange(
       from.start[across] === to.start[across] &&
       from.start[across] <= start[across] &&
       end[across] <= from.end[across] &&
-      !(start[axis] === 0 && end[axis] >= last[axis]);
+      !(start[axis] === 0 && end[axis] >= SHEET_LAST[axis]);
     if (!along) continue;
     const count = from.end[axis] - from.start[axis] + 1;
     const span = movedEdge(start[axis], end[axis], from.start[axis], count, to.start[axis]);
@@ -124,32 +125,85 @@ export function moveCellRange(
   return range;
 }
 
+/** The lists of a sheet that hold items on ranges of cells, which a block move carries. */
+export type MovedSheetItems = "notes" | "hyperlinks" | "validationRules" | "conditionalFormats";
+
+/** How `movedItems` reads and moves one kind of item. */
+interface ItemKind<T> {
+  readonly rangeOf: (item: T) => Range;
+  readonly placed: (item: T, range: Range, move: CellBlockMove) => T;
+  /**
+   * Whether an item that stays goes because the block lands on it. A note
+   * or link goes when the block covers any of its cells. A rule goes only
+   * when the block covers all of its range: a rule cannot keep part of it.
+   */
+  readonly replaced: (target: Range, range: Range) => boolean;
+}
+
 /**
- * Items of both sheets that sit on a range of cells, after the move: an item
- * inside the block moves with it, and one on the cells it lands on goes. For
- * a move on one sheet, `fromItems` and `toItems` are the same list.
+ * Items of both sheets after the move: an item inside the block moves with
+ * it, and an item on the cells it lands on goes. For a move on one sheet,
+ * `fromItems` and `toItems` are the same list.
  */
 function movedItems<T>(
   fromItems: readonly T[],
   toItems: readonly T[],
   move: CellBlockMove,
-  rangeOf: (item: T) => Range,
-  placed: (item: T, range: Range) => T,
+  kind: ItemKind<T>,
 ): { from: T[]; to: T[] } {
   const moving: T[] = [];
   const keptFrom: T[] = [];
   for (const item of fromItems) {
-    const range = rangeOf(item);
-    if (holdsRange(move.from, range)) moving.push(placed(item, shifted(range, move)));
-    else if (!meets(move.to, range)) keptFrom.push(item);
+    const range = kind.rangeOf(item);
+    if (holdsRange(move.from, range)) moving.push(kind.placed(item, shifted(range, move), move));
+    else if (!kind.replaced(move.to, range)) keptFrom.push(item);
   }
   if (move.from.sheet === move.to.sheet) {
     const items = [...keptFrom, ...moving];
     return { from: items, to: items };
   }
-  const keptTo = toItems.filter((item) => !meets(move.to, rangeOf(item)));
+  const keptTo = toItems.filter((item) => !kind.replaced(move.to, kind.rangeOf(item)));
   return { from: keptFrom, to: [...keptTo, ...moving] };
 }
+
+const NOTES: ItemKind<CellNote> = {
+  rangeOf: (note) => cellRange(note.addr),
+  placed: (note, range) => ({ ...note, addr: { sheet: range.sheet, ...range.start } }),
+  replaced: meets,
+};
+
+const HYPERLINKS: ItemKind<CellHyperlink> = {
+  rangeOf: (link) => normalizedRange(link.range),
+  placed: (link, range) => ({ ...link, range }),
+  replaced: meets,
+};
+
+const VALIDATION_RULES: ItemKind<DataValidationRule> = {
+  rangeOf: (rule) => normalizedRange(rule.range),
+  placed: (rule, range) => ({ ...rule, range }),
+  replaced: holdsRange,
+};
+
+/**
+ * A formula rule is anchored at its range's top-left cell, which moves with
+ * the block, so its references follow the engine's cut rules as a moved
+ * cell's formula does.
+ */
+const CONDITIONAL_FORMATS: ItemKind<ConditionalFormatRule> = {
+  rangeOf: (rule) => normalizedRange(rule.range),
+  placed: (rule, range, { from, to }) => {
+    if (rule.when.kind !== "formula") return { ...rule, range };
+    const block = {
+      row: from.start.row,
+      col: from.start.col,
+      rows: from.end.row - from.start.row + 1,
+      cols: from.end.col - from.start.col + 1,
+    };
+    const source = moveFormulaCellRefs(rule.when.source, block, to.start);
+    return { ...rule, range, when: { kind: "formula", source } };
+  },
+  replaced: holdsRange,
+};
 
 /** Notes of both sheets after the move; see `movedItems`. */
 export function movedNotes(
@@ -157,13 +211,7 @@ export function movedNotes(
   toNotes: readonly CellNote[],
   move: CellBlockMove,
 ): { from: CellNote[]; to: CellNote[] } {
-  return movedItems(
-    fromNotes,
-    toNotes,
-    move,
-    (note) => cellRange(note.addr),
-    (note, range) => ({ ...note, addr: { sheet: range.sheet, ...range.start } }),
-  );
+  return movedItems(fromNotes, toNotes, move, NOTES);
 }
 
 /** Hyperlinks of both sheets after the move; see `movedItems`. */
@@ -172,13 +220,25 @@ export function movedHyperlinks(
   toLinks: readonly CellHyperlink[],
   move: CellBlockMove,
 ): { from: CellHyperlink[]; to: CellHyperlink[] } {
-  return movedItems(
-    fromLinks,
-    toLinks,
-    move,
-    (link) => normalizedRange(link.range),
-    (link, range) => ({ ...link, range }),
-  );
+  return movedItems(fromLinks, toLinks, move, HYPERLINKS);
+}
+
+/** Validation rules of both sheets after the move; see `movedItems`. */
+export function movedValidationRules(
+  fromRules: readonly DataValidationRule[],
+  toRules: readonly DataValidationRule[],
+  move: CellBlockMove,
+): { from: DataValidationRule[]; to: DataValidationRule[] } {
+  return movedItems(fromRules, toRules, move, VALIDATION_RULES);
+}
+
+/** Conditional-format rules of both sheets after the move; see `movedItems`. */
+export function movedConditionalFormats(
+  fromRules: readonly ConditionalFormatRule[],
+  toRules: readonly ConditionalFormatRule[],
+  move: CellBlockMove,
+): { from: ConditionalFormatRule[]; to: ConditionalFormatRule[] } {
+  return movedItems(fromRules, toRules, move, CONDITIONAL_FORMATS);
 }
 
 function mergeRange(sheet: SheetId, merge: MergeRange): Range {
