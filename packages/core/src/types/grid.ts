@@ -443,7 +443,7 @@ export type ToolbarIcon = string | Node | (() => Node);
 /**
  * Per-glyph icon overrides, keyed by the names on the command icon sheet
  * (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
- * toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+ * toolbar, the ribbon and ribbon menus, the context menu and the sheet tab menu. Strings render
  * as plain text; DOM nodes and node factories support SVG or HTML icons. To
  * replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
  * to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
@@ -717,7 +717,7 @@ export interface GridConfig {
    * toolbar instead.
    */
   ribbon?: boolean | RibbonConfig;
-  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
+  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus, context menu and sheet tab menu. See {@link IconOverrides}. */
   icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
   contextMenu?: boolean | ContextMenuItems;

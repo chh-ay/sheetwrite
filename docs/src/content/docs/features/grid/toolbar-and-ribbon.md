@@ -139,6 +139,7 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 The same glyphs show outside the ribbon:
 
 - The cell context menu shows `insertCells`, `deleteCells` and `formatCells` beside **Cells…** in its Insert and Delete submenus and beside **Format cells…**.
+- The sheet tab menu shows `insertSheet` beside **Insert**, `moveCopySheet` beside **Move or Copy…** and `tabColor` beside **Tab Color…**.
 - Each AutoFilter header button draws `filterArrow`, or `filterActive` (a funnel beside the arrow) once its column is filtered. They come from the icon sheet, so a replacement sheet changes them too; a node in `IconOverrides` does not.
 - The **Sort & Filter** menu's own glyph, `sortFilter`, is the sort arrow beside a funnel, so it differs from its **Filter** item.
 
@@ -364,7 +365,7 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | `find` | `boolean` | `true` | Built-in **Ctrl+F** search box, next/previous controls, and live match count. See [Search](/docs/features/grid/search/). |
 | `autoComplete` | `boolean` | `true` | Excel's AutoComplete for cell values: typing a text entry completes it from the column. `false` turns it off. See [AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete). |
 | `contextMenu` | `boolean \| ContextMenuItems` | `true` | Built-in right-click menu, disabled menu, static readonly rows, or a context-aware row factory. See [Context menu](/docs/features/grid/context-menu/). |
-| `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus and context menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
+| `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus, context menu and sheet tab menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
 | `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. A right-click on a tab, or its options button, opens Excel's sheet menu: Insert, Rename, Move or Copy…, Tab color, Hide and Remove. |
 | `keyboard` | `boolean \| KeyboardOptions \| function` | `true` | Built-in key bindings. See [Interaction → Keyboard navigation](/docs/features/grid/selection-and-keyboard/#keyboard-navigation). |
 
