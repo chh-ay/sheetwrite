@@ -348,8 +348,8 @@ it("explains the formula in the focus cell from metadata and follows the selecti
 
   const text = panel()?.textContent ?? "";
   expect(text).toContain("Formula in D1");
-  expect(text).toContain("ROUND(number, digits)");
-  expect(text).toContain("digits: 1");
+  expect(text).toContain("ROUND(number, num_digits)");
+  expect(text).toContain("num_digits: 1");
   expect(text).toContain("B2:C3: 4 cells on this sheet");
   expect(text).toContain("NOPE is not a known function. The cell shows #NAME?.");
 

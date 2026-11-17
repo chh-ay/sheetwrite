@@ -61,7 +61,7 @@ test("the cell editor lists functions, picks one with the keyboard, and guides t
   await select(page, "G3");
   await page.keyboard.type("=ROU");
   const editor = page.locator("textarea.sheetwrite-editor");
-  const list = page.getByRole("listbox", { name: "Functions" });
+  const list = page.getByRole("listbox", { name: "Formula AutoComplete" });
   await expect(list.getByRole("option", { name: "ROUND", exact: true })).toBeVisible();
   await expect(editor).toHaveAttribute("aria-controls", (await list.getAttribute("id")) ?? "");
   await page.keyboard.press("Enter");
@@ -71,7 +71,7 @@ test("the cell editor lists functions, picks one with the keyboard, and guides t
   const guide = page.getByRole("status").filter({ hasText: "ROUND(" });
   await expect(guide.locator("strong")).toHaveText("number");
   await page.keyboard.type("A1:A3, ");
-  await expect(guide.locator("strong")).toHaveText("digits");
+  await expect(guide.locator("strong")).toHaveText("num_digits");
   await page.keyboard.type("2");
   await page.keyboard.press("Enter");
   await expect(editor).toHaveCount(0);
