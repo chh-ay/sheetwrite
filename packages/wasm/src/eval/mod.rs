@@ -103,11 +103,14 @@ use value::{bool_from_value, cached_formula_value, compare_values, text_from_val
 const LET_BINDING_LIMIT: usize = 126;
 const LET_EXPANDED_NODE_LIMIT: usize = 16_384;
 
-thread_local! {
-    /// The cell whose formula is being evaluated. Each evaluation sets it and
-    /// its guard restores the enclosing value, so nested evaluations keep a
-    /// stack on the native stack without a heap list.
-    static FORMULA_ORIGIN: Cell<Option<(u32, u32)>> = const { Cell::new(None) };
+/// Where the expression being evaluated reads its cells from. One
+/// thread-local holds both parts, so a positional name's read finds the cell
+/// and sets the shift with one lookup: on some targets each lookup is a call.
+struct EvaluationPlace {
+    /// The cell whose formula is being evaluated. Each evaluation sets it
+    /// and its guard restores the enclosing value, so nested evaluations keep
+    /// a stack on the native stack without a heap list.
+    origin: Cell<Option<(u32, u32)>>,
     /// Rows and columns that relative references of the expression being
     /// evaluated move by. A conditional-format rule's one parsed expression
     /// is written for the rule range's top-left cell; at every other cell it
@@ -115,7 +118,16 @@ thread_local! {
     /// written for A1 and reads with the reading cell's row and column. Only
     /// [`read_shifted`] sets it, and the evaluation of a formula cell reads
     /// (0, 0) under any enclosing shift.
-    static REFERENCE_SHIFT: Cell<(u32, u32)> = const { Cell::new((0, 0)) };
+    shift: Cell<(u32, u32)>,
+}
+
+thread_local! {
+    static EVALUATION_PLACE: EvaluationPlace = const {
+        EvaluationPlace {
+            origin: Cell::new(None),
+            shift: Cell::new((0, 0)),
+        }
+    };
 }
 
 #[cfg(test)]
@@ -133,7 +145,7 @@ pub(crate) struct FormulaOriginGuard {
 
 impl FormulaOriginGuard {
     pub(crate) fn push(origin: (u32, u32)) -> Self {
-        let enclosing = FORMULA_ORIGIN.with(|current| current.replace(Some(origin)));
+        let enclosing = EVALUATION_PLACE.with(|place| place.origin.replace(Some(origin)));
         Self { enclosing }
     }
 }
@@ -141,13 +153,13 @@ impl FormulaOriginGuard {
 impl Drop for FormulaOriginGuard {
     fn drop(&mut self) {
         let enclosing = self.enclosing;
-        FORMULA_ORIGIN.with(|current| current.set(enclosing));
+        EVALUATION_PLACE.with(|place| place.origin.set(enclosing));
     }
 }
 
 /// The cell whose formula is being evaluated, or nothing outside a formula.
 pub(crate) fn current_formula_origin() -> Option<(u32, u32)> {
-    FORMULA_ORIGIN.with(Cell::get)
+    EVALUATION_PLACE.with(|place| place.origin.get())
 }
 
 /// Run `bind` as the formula at `origin`, for work on a formula outside
@@ -163,21 +175,22 @@ pub(crate) fn with_formula_origin<R>(origin: (u32, u32), bind: impl FnOnce() -> 
 /// itself, such as INDIRECT's text: it is placed for the target cell already,
 /// so a conditional-format shift must not move it again.
 pub(crate) fn read_shifted<T>(shift: (u32, u32), read: impl FnOnce() -> T) -> T {
-    // One thread-local lookup for both writes: on some targets each lookup
-    // is a call.
-    REFERENCE_SHIFT.with(|current| {
-        let enclosing = current.replace(shift);
-        let value = read();
-        current.set(enclosing);
-        value
-    })
+    // The read runs outside the thread-local's access, so its value goes
+    // straight to the caller instead of through the access's result. The
+    // two accesses, and a positional name's read of the origin, share one
+    // thread-local, so the compiler looks it up once where it sees them
+    // together: on some targets each lookup is a call.
+    let enclosing = EVALUATION_PLACE.with(|place| place.shift.replace(shift));
+    let value = read();
+    EVALUATION_PLACE.with(|place| place.shift.set(enclosing));
+    value
 }
 
 /// The rows and columns relative references move by in this evaluation;
-/// see `REFERENCE_SHIFT`.
+/// see [`EvaluationPlace::shift`].
 #[inline]
 pub(crate) fn reference_shift() -> (u32, u32) {
-    REFERENCE_SHIFT.with(Cell::get)
+    EVALUATION_PLACE.with(|place| place.shift.get())
 }
 
 /// The cell at (`row`, `col`) with its relative axes moved by `shift` and
