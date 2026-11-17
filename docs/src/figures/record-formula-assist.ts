@@ -29,7 +29,7 @@ const FRAME_MS = 1000 / FPS;
 /** Seed of the typing rhythm, so a new recording types at the same pace. */
 const SEED = 801;
 /** Shortest and longest pause between two typed keys, as a person types. */
-const KEY_MS = { min: 90, max: 190 } as const;
+const KEY_MS = { min: 110, max: 220 } as const;
 /** How long the page may take to draw its first frame. */
 const READY_TIMEOUT_MS = 60_000;
 /** The loop on the page: this slice of the demo, in seconds. */
@@ -189,9 +189,9 @@ function session(): { at: number; step: Step }[] {
   };
 
   /** How long a suggestion stays on screen before it is taken, so a viewer can read it. */
-  const READ_MS = 2_400;
+  const READ_MS = 3_000;
   /** The pause after a commit, before the next cell. */
-  const SETTLE_MS = 1_600;
+  const SETTLE_MS = 2_200;
   const accept = (cell: string): void => {
     select(cell);
     wait(1_000);
@@ -203,7 +203,7 @@ function session(): { at: number; step: Step }[] {
     wait(SETTLE_MS);
   };
 
-  wait(2_000);
+  wait(2_500);
   // Finance's total: the totals above and below agree, so `=` is enough.
   accept("H6");
   // Finance's share, one word at a time with Ctrl+→, then the rest with Tab.
@@ -254,9 +254,9 @@ function session(): { at: number; step: Step }[] {
   type("2,FALSE)");
   wait(1_400);
   press("Enter");
-  wait(3_000);
+  wait(4_000);
   select("A1");
-  wait(2_000);
+  wait(2_500);
   return steps;
 }
 
