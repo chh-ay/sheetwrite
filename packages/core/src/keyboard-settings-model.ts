@@ -87,6 +87,13 @@ export const COMMAND_GROUPS: readonly {
     ],
   },
   { label: "Data", commands: [["toggleFilter", "Filter"]] },
+  {
+    label: "Sheets",
+    commands: [
+      ["nextSheet", "Next Sheet"],
+      ["previousSheet", "Previous Sheet"],
+    ],
+  },
 ];
 
 const LABELS = new Map(COMMAND_GROUPS.flatMap((group) => group.commands));
@@ -342,7 +349,10 @@ export function refusedKeys(
   environment = currentEnvironment(),
 ): string | null {
   const parsed = parseShortcut(shortcut);
-  if (SHEET_KEYS.has(parsed.key)) {
+  // With Ctrl or Alt, Page Up and Page Down switch sheets, as in Excel, so they can be assigned.
+  const switchesSheets =
+    (parsed.key === "pageup" || parsed.key === "pagedown") && (parsed.ctrl || parsed.alt);
+  if (SHEET_KEYS.has(parsed.key) && !switchesSheets) {
     return `${keysLabel(shortcut)} moves or edits in the sheet, as in Excel, so it can't be assigned.`;
   }
   const bare = !parsed.ctrl && !parsed.meta && !parsed.alt;

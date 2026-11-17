@@ -142,6 +142,14 @@ export async function parseSheet(
   const frozen = pane && (paneState === "frozen" || paneState === "frozenSplit");
   const frozenRows = frozen ? Number(xmlAttribute(pane, "ySplit") ?? 0) : 0;
   const frozenCols = frozen ? Number(xmlAttribute(pane, "xSplit") ?? 0) : 0;
+  // Excel's Tab Color, as an ARGB `rgb`; theme and indexed colors are not read.
+  const sheetProperties = xmlChild(root, "sheetPr");
+  const tabColorElement = sheetProperties ? xmlChild(sheetProperties, "tabColor") : undefined;
+  const tabColorArgb = tabColorElement ? xmlAttribute(tabColorElement, "rgb") : undefined;
+  const tabColor =
+    tabColorArgb && /^[\dA-Fa-f]{8}$/u.test(tabColorArgb)
+      ? `#${tabColorArgb.slice(2).toUpperCase()}`
+      : undefined;
   if (view && xmlBoolean(xmlAttribute(view, "rightToLeft"))) {
     emitWarning(context, {
       code: "unsupported-feature",
@@ -268,6 +276,7 @@ export async function parseSheet(
     rowGroups,
     ...(Number.isInteger(frozenRows) && frozenRows > 0 ? { frozenRows } : {}),
     ...(Number.isInteger(frozenCols) && frozenCols > 0 ? { frozenCols } : {}),
+    ...(tabColor ? { tabColor } : {}),
     validations,
     conditionalFormats,
     ...(sortState ? { sortState } : {}),

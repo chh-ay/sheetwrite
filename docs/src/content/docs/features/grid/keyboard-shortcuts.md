@@ -48,7 +48,7 @@ Excel has no general shortcut editor. Each of these sits on top of Excel's keys 
 - **Press keys to search:** answers "what does Ctrl+Shift+L do?" with one key press, without knowing the command's name.
 - **Excel's default beside each binding:** the user can always see what they changed, and Reset is one click away.
 - **Undo after every change:** a wrong key press costs nothing, so trying keys out is safe.
-- **Show changed only:** reviewing a setup, or sharing it, means reading a short list instead of 34 rows.
+- **Show changed only:** reviewing a setup, or sharing it, means reading a short list instead of every command.
 - **Export and import:** the user's keys move between machines, and a team can share one setup.
 
 ## When the keys are taken
