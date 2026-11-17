@@ -157,6 +157,8 @@ function textLine(className: string, text: string): HTMLElement {
 
 /** Fill alpha of the ranges a suggestion names: fainter than typed references until it is taken. */
 const GHOST_FILL_ALPHA = "22";
+/** A suggestion is announced to screen readers once it has held this long, not on every key. */
+const ANNOUNCE_DELAY_MS = 400;
 
 /** Formula help bound to one editor field at a time. */
 export class FormulaHelp {
@@ -185,6 +187,10 @@ export class FormulaHelp {
   private ghost: FormulaGhost | null = null;
   /** The analysis of the field's text at its last update, which the ghost's keys read. */
   private analysis: FormulaAnalysis | null = null;
+  /** Tells screen readers about a suggestion once it has held for `ANNOUNCE_DELAY_MS`. */
+  private ghostStatus: HTMLDivElement | null = null;
+  private announceTimer: ReturnType<typeof setTimeout> | undefined;
+  private announced = "";
 
   constructor(deps: AssistDeps) {
     helpSerial += 1;
@@ -207,6 +213,11 @@ export class FormulaHelp {
         cell: this.deps.cell,
         functions: () => this.functions,
       });
+      const status = document.createElement("div");
+      status.className = "sheetwrite-formula-ghost-status";
+      status.setAttribute("role", "status");
+      this.layer?.append(status);
+      this.ghostStatus = status;
     }
     field.setAttribute("aria-autocomplete", "list");
     if (field instanceof HTMLInputElement) {
@@ -254,6 +265,9 @@ export class FormulaHelp {
     this.completion = null;
     this.dismissedText = null;
     this.ghost?.close();
+    clearTimeout(this.announceTimer);
+    this.ghostStatus = null;
+    this.announced = "";
     this.ghost = null;
     this.analysis = null;
   }
@@ -277,6 +291,7 @@ export class FormulaHelp {
     const collapsed = field.selectionStart === field.selectionEnd;
     const ghost = this.ghost?.update(text, collapsed ? cursor : -1, analysis) ?? null;
 
+    this.announce(ghost?.text ?? "");
     const painted =
       ghost === null ? analysis : analyzeFormula(text + ghost.text, text.length, this.functions);
     this.paintReferences(painted.references, text.length);
@@ -349,6 +364,22 @@ export class FormulaHelp {
 
   /** Follow the field after it moves (scroll, resize). */
   reposition(): void {
+  /** Announce `ghost` once it has held for a moment; a cleared ghost clears the status at once. */
+  private announce(ghost: string): void {
+    clearTimeout(this.announceTimer);
+    const status = this.ghostStatus;
+    if (status === null || ghost === this.announced) return;
+    if (ghost === "") {
+      this.announced = "";
+      status.textContent = "";
+      return;
+    }
+    this.announceTimer = setTimeout(() => {
+      this.announced = ghost;
+      status.textContent = `Suggestion: ${ghost}. Tab to accept.`;
+    }, ANNOUNCE_DELAY_MS);
+  }
+
     const field = this.field;
     const layer = this.layer;
     if (field === null || layer === null) return;

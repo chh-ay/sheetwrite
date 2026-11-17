@@ -156,6 +156,26 @@ interface EnronSample {
   }[];
 }
 
+/** Whether `value` has the sample's shape down to its workbooks' fields; the cells are trusted. */
+function isEnronSample(value: unknown): value is EnronSample {
+  if (typeof value !== "object" || value === null || !("workbooks" in value)) return false;
+  const { workbooks } = value;
+  return (
+    Array.isArray(workbooks) &&
+    workbooks.every(
+      (workbook: unknown) =>
+        typeof workbook === "object" &&
+        workbook !== null &&
+        "file" in workbook &&
+        typeof workbook.file === "string" &&
+        "sheets" in workbook &&
+        Array.isArray(workbook.sheets) &&
+        "targets" in workbook &&
+        Array.isArray(workbook.targets),
+    )
+  );
+}
+
 function enronValue(value: CellScalar): CellValue {
   return typeof value === "string" && value.startsWith("=")
     ? { kind: "formula", src: value }
@@ -165,8 +185,9 @@ function enronValue(value: CellScalar): CellValue {
 /** One half of the Enron sample: `dev` to tune on, `heldout` for the gate only. */
 async function* enronWorkbooks(half: "dev" | "heldout"): AsyncGenerator<ReplayWorkbook> {
   const path = new URL(`./enron/${half}.json`, import.meta.url);
-  // The file is written by enron/build.ts in this folder; it is not outside input.
-  const sample = JSON.parse(await readFile(path, "utf8")) as EnronSample;
+  const sample: unknown = JSON.parse(await readFile(path, "utf8"));
+  if (!isEnronSample(sample)) throw new Error(`${path.pathname} is not an Enron sample file`);
+
   for (const workbook of sample.workbooks) {
     const sheets = workbook.sheets.map((sheet, index) =>
       sheetSnapshot(

@@ -106,3 +106,14 @@
   opacity: var(--sheetwrite-formula-ghost-opacity, 0.45);
   font-style: normal;
 }
+
+/* Read by screen readers only: the suggestion, once it holds for a moment. */
+.sheetwrite-formula-ghost-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
