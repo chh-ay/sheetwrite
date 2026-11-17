@@ -18,6 +18,7 @@ import {
 } from "./candidates.js";
 import { openNeighbours } from "./signals/neighbours.js";
 import { openPatterns } from "./signals/patterns.js";
+import { openRoles } from "./signals/roles.js";
 import { openShape } from "./signals/shape.js";
 import { openSyntax } from "./signals/syntax.js";
 
@@ -44,6 +45,7 @@ export interface PredictorOptions {
 const OPEN_SIGNAL: Partial<Record<SignalName, OpenSignal>> = {
   neighbours: openNeighbours,
   patterns: openPatterns,
+  roles: openRoles,
   shape: openShape,
   syntax: openSyntax,
 };
