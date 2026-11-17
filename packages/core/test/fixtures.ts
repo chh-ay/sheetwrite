@@ -165,7 +165,7 @@ export function elementAdded<T extends Element>(
  * the button labelled `label`, and let the action that asked finish.
  */
 export async function answerDialog(host: HTMLElement, label: string): Promise<void> {
-  const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+  const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
   const button = [...dialog.querySelectorAll("button")].find(
     (candidate) => candidate.textContent === label,
   );

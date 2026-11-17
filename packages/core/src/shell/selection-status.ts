@@ -1,5 +1,6 @@
-// Status line in the spirit of Excel's: the selection's shape plus Average,
-// Count and Sum, and after an undo or redo the step it applied. Geometry is
+// Status line in the spirit of Excel's: how many records an AutoFilter keeps
+// right after it filters, then the selection's shape plus Average, Count and
+// Sum, and after an undo or redo the step it applied. Geometry is
 // constant-time per selection event; the totals come from
 // Grid.summarizeSelection, which reads in bounded chunks between frames, so
 // this piece stays safe next to any selection size.
@@ -7,8 +8,12 @@
 import { colToA1 } from "../a1.js";
 import { formatNumber } from "../number-format.js";
 import { isAbortError, Scope, ScopeSlot } from "../scope.js";
+import { autoFilterBody } from "../store/autofilter.js";
+import { storeEngine } from "../store/engine-registry.js";
 import type { Range, Selection } from "../types/coordinates.js";
+import type { DocumentOp } from "../types/document.js";
 import type { Grid, GridEvents, SelectionSummary } from "../types/grid.js";
+import type { ChangeEvent } from "../types/transaction.js";
 import type { ShellPiece } from "./formula-controls.js";
 
 /**
@@ -61,10 +66,39 @@ function describeHistoryStep({ direction, step, range }: GridEvents["history-ste
   return `${direction === "undo" ? "Undo" : "Redo"}: ${step}${place}`;
 }
 
+/** Whether `patch` turns the AutoFilter of `sheet` on or off, or changes its filters. */
+function changesFilter(patch: DocumentOp, sheet: string): boolean {
+  return (
+    patch.op === "setSheetMeta" &&
+    patch.sheet === sheet &&
+    (patch.patch.filters !== undefined || patch.patch.autoFilter !== undefined)
+  );
+}
+
+/**
+ * Excel's "12 of 48 records found": how many rows below the header of the
+ * active sheet's AutoFilter its filters keep. Empty without an AutoFilter or
+ * a filter.
+ */
+function describeRecords(grid: Grid): string {
+  const autoFilter = grid.getAutoFilter();
+  const filters = grid.getColumnFilters();
+  const engine = storeEngine(grid.store);
+  if (!autoFilter || filters.size === 0 || !engine) return "";
+  const body = autoFilterBody(autoFilter);
+  let found = 0;
+  for (const row of engine.filteredRows(grid.getActiveSheet(), filters)) {
+    if (row >= body.start && row <= body.end) found++;
+  }
+  return `${found} of ${body.end - body.start + 1} records found`;
+}
+
 /**
  * `<output role="status">` that follows the grid's selection and its values.
- * Text nodes only; polite live region so screen readers announce changes
- * without interrupting.
+ * After a change to the AutoFilter's filters it starts with "12 of 48
+ * records found", as Excel's status bar does, until the next other change or
+ * sheet switch. Text nodes only; polite live region so screen readers
+ * announce changes without interrupting.
  *
  * @param host - Element the status is appended to.
  */
@@ -74,6 +108,7 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   output.setAttribute("role", "status");
   output.setAttribute("aria-live", "polite");
 
+  let records = "";
   let geometry = "";
   let totals = "";
   // The last undo or redo, shown until the selection changes again.
@@ -82,7 +117,7 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   const summaries = new ScopeSlot(lifetime);
 
   const show = (): void => {
-    const text = [historyStep, totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
+    const text = [historyStep, records, totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
     output.textContent = text;
     output.hidden = text === "";
     host.hidden = output.hidden && host.childElementCount === 1;
@@ -115,10 +150,27 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
     show();
     summarize();
   };
+
+  // Like Excel, the count shows after the filter changes and goes with the
+  // next edit, as edits do not filter again.
+  const onChange = (event: ChangeEvent): void => {
+    const sheet = grid.getActiveSheet();
+    records = event.transaction.patches.some((patch) => changesFilter(patch, sheet))
+      ? describeRecords(grid)
+      : "";
+    show();
+    summarize();
+  };
   host.appendChild(output);
   lifetime.add(() => output.remove());
   lifetime.add(grid.on("selection", (event) => onSelection(event.selection)));
-  lifetime.add(grid.on("change", summarize));
+  lifetime.add(grid.on("change", onChange));
+  lifetime.add(
+    grid.on("active-sheet", () => {
+      records = "";
+      show();
+    }),
+  );
   // Undo and redo select what they changed first, so the step outlives that selection event.
   lifetime.add(
     grid.on("history-step", (event) => {
