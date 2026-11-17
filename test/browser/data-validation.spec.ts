@@ -18,7 +18,7 @@ async function open(page: Page): Promise<void> {
   await expect(page.getByRole("button", { name: "Narrow" })).toBeEnabled();
 }
 
-/** Give B2:B50 a list rule with `fields`, select B50 and focus the grid. */
+/** Give B2:B50 a list rule with `fields`, select B10, which shows on screen, and focus the grid. */
 async function regionRule(page: Page, fields: Record<string, unknown>): Promise<void> {
   await page.evaluate((extra) => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
@@ -30,15 +30,15 @@ async function regionRule(page: Page, fields: Record<string, unknown>): Promise<
       policy: "reject",
       ...extra,
     });
-    grid.setSelection({ kind: "cell", addr: { sheet, row: 49, col: 1 } });
+    grid.setSelection({ kind: "cell", addr: { sheet, row: 9, col: 1 } });
   }, fields);
   await page.locator(".sheetwrite").first().focus();
 }
 
-function regionAt50(page: Page): Promise<unknown> {
+function regionAtB10(page: Page): Promise<unknown> {
   return page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
-    return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 49, col: 1 }).resolved;
+    return grid.store.getCell({ sheet: grid.getActiveSheet(), row: 9, col: 1 }).resolved;
   });
 }
 
@@ -48,7 +48,7 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
   await open(page);
   await regionRule(page, { inputTitle: "Region", inputMessage: "Pick a sales region." });
   await expect(page.locator(".sheetwrite-input-message")).toHaveText("RegionPick a sales region.");
-  const before = await regionAt50(page);
+  const before = await regionAtB10(page);
 
   await page.keyboard.type('="Nowhere"');
   await page.keyboard.press("Enter");
@@ -72,7 +72,7 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
   await page.keyboard.press("Escape");
   await expect(alert).toHaveCount(0);
   await expect(page.locator(".sheetwrite").first()).toBeFocused();
-  expect(await regionAt50(page)).toEqual(before);
+  expect(await regionAtB10(page)).toEqual(before);
 });
 
 test("a Warning alert keeps the entry on Yes and an Information alert on OK @portability", async ({
@@ -87,7 +87,7 @@ test("a Warning alert keeps the entry on Yes and an Information alert on OK @por
   await expect(warning.getByRole("button", { name: "No" })).toBeFocused();
   await warning.getByRole("button", { name: "Yes" }).click();
   await expect(warning).toHaveCount(0);
-  expect(await regionAt50(page)).toBe("Nowhere");
+  expect(await regionAtB10(page)).toBe("Nowhere");
 
   await regionRule(page, { policy: "warn", errorStyle: "information" });
   await page.keyboard.type("Elsewhere");
@@ -96,7 +96,7 @@ test("a Warning alert keeps the entry on Yes and an Information alert on OK @por
   await expect(information.getByRole("button", { name: "OK" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(information).toHaveCount(0);
-  expect(await regionAt50(page)).toBe("Elsewhere");
+  expect(await regionAtB10(page)).toBe("Elsewhere");
 });
 
 test("a list cell's arrow opens its list, and typing filters it, from the keyboard @portability", async ({
@@ -129,7 +129,7 @@ test("a list cell's arrow opens its list, and typing filters it, from the keyboa
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
   await expect(list).toHaveCount(0);
-  expect(await regionAt50(page)).toBe("South-West");
+  expect(await regionAtB10(page)).toBe("South-West");
 
   await page.keyboard.press("ArrowUp");
   await page.keyboard.press("Alt+ArrowDown");
@@ -138,20 +138,13 @@ test("a list cell's arrow opens its list, and typing filters it, from the keyboa
   await expect(list).toHaveCount(0);
 });
 
-test("Data › Data Validation creates a list from a range, from the keyboard @portability", async ({
+test("Data › Data Validation creates a list from another sheet, from the keyboard @portability", async ({
   page,
 }) => {
   await open(page);
   await page.evaluate(() => {
     const grid = window.__sheetwriteSpreadsheetGrid!;
     const sheet = grid.getActiveSheet();
-    grid.applyTransaction({
-      patches: ["North", "South", "East"].map((value, row) => ({
-        op: "set" as const,
-        addr: { sheet, row: 60 + row, col: 7 },
-        value: { kind: "literal" as const, value },
-      })),
-    });
     grid.setSelection({
       kind: "range",
       range: { sheet, start: { row: 1, col: 1 }, end: { row: 49, col: 1 } },
@@ -164,7 +157,8 @@ test("Data › Data Validation creates a list from a range, from the keyboard @p
   const allow = dialog.getByLabel("Allow");
   await expect(allow).toBeFocused();
   await allow.selectOption("list");
-  await dialog.getByLabel("Source").fill("=$H$61:$H$63");
+  // The Targets sheet lists the four regions in A2:A5.
+  await dialog.getByLabel("Source").fill("=Targets!$A$2:$A$5");
   await dialog.getByRole("tab", { name: "Settings" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(dialog.getByRole("tab", { name: "Input Message" })).toBeFocused();
@@ -181,7 +175,7 @@ test("Data › Data Validation creates a list from a range, from the keyboard @p
   });
   expect(rules).toEqual([
     expect.objectContaining({
-      condition: { kind: "list", source: "=$H$61:$H$63" },
+      condition: { kind: "list", source: "=Targets!$A$2:$A$5" },
       inputTitle: "Region",
     }),
   ]);
@@ -195,6 +189,7 @@ test("Data › Data Validation creates a list from a range, from the keyboard @p
     "North",
     "South",
     "East",
+    "West",
   ]);
   await page.keyboard.press("Escape");
 });
