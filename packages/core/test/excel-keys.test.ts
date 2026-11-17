@@ -240,6 +240,28 @@ describe("the cell editor", () => {
       "=SUM(A1:B2)+A1",
     ]);
   });
+
+  // https://support.microsoft.com/en-us/excel/how-to-avoid-broken-formulas-in-excel
+  it("refuses a formula that does not parse and adds missing closing parentheses", async () => {
+    select(3, 2);
+    type("=SUM(A1:A3))+");
+    press("Enter");
+    expect(editor()?.value).toBe("=SUM(A1:A3))+");
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    expect(dialog.textContent).toContain("There's a problem with this formula.");
+    await answerDialog(host, "OK");
+    const field = editor();
+    expect(value(3, 2)).toBe("Berlin");
+    expect(document.activeElement).toBe(field);
+    expect([field?.selectionStart, field?.selectionEnd]).toEqual([11, 12]);
+    press("Escape");
+
+    select(4, 2);
+    type("=SUMM(A1:A3");
+    press("Enter");
+    expect(formula(4, 2)).toBe("=SUMM(A1:A3)");
+    expect(active()).toEqual({ sheet: "s1", row: 5, col: 2 });
+  });
 });
 
 describe("Ctrl+A", () => {
