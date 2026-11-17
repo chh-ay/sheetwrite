@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { GridImpl, initSheetwrite } from "../src/grid.js";
+import { DEFAULT_THEME, GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellEditor, CellEditorContext, Workbook } from "../src/types.js";
@@ -86,16 +86,88 @@ it("opens a list rule's list on Alt+Down and keeps Alt+Down navigation elsewhere
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
 
   altDown();
-  const list = host.querySelector<HTMLElement>('[role="listbox"]');
-  expect(list).not.toBeNull();
+  expect(host.querySelector('[role="listbox"]')).not.toBeNull();
   expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
-  list?.dispatchEvent(
-    new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }),
-  );
+  // B2 holds none of the items, so none is highlighted until Down.
+  const box = host.querySelector('[role="combobox"]');
+  for (const key of ["ArrowDown", "Enter"]) {
+    box?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  }
   expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("Open");
 
   grid.destroy();
   store.dispose();
+});
+
+it("shows a list cell's dropdown arrow, opens the list from it or by typing, and edits text on F2", () => {
+  const requestFrame = globalThis.requestAnimationFrame;
+  // Paint at once, so the test reads the state that the next frame shows.
+  globalThis.requestAnimationFrame = (callback: FrameRequestCallback): number => {
+    callback(0);
+    return 0;
+  };
+  const workbook = makeWorkbook(4);
+  workbook.sheets[0]!.validationRules = [
+    {
+      id: "region",
+      range: { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 2, col: 1 } },
+      condition: { kind: "list", values: ["North", "South", "West", "South-West"] },
+      policy: "reject",
+    },
+  ];
+  const store = new SheetwriteStore(workbook, makeColumnarData(4));
+  const host = mountHost();
+  const grid = new GridImpl(host, { workbook }, store);
+  const press = (target: Element | null, key: string) =>
+    target?.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  const options = () =>
+    [...host.querySelectorAll('[role="option"]')].map((item) => item.textContent);
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+  expect(host.querySelector(".sheetwrite-list-button")).toBeNull();
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  const button = host.querySelector<HTMLElement>(".sheetwrite-list-button");
+  expect(button).not.toBeNull();
+  // The arrow sits just right of B2, as in Excel.
+  const cellRight = DEFAULT_THEME.rowHeaderWidth + 160 + 120;
+  expect(button?.style.left).toBe(`${cellRight}px`);
+
+  const scroller = host.querySelector(".sheetwrite-scroller");
+  const click = new PointerEvent("pointerdown", {
+    // The middle of the arrow, clear of the fill handle at the cell's corner.
+    clientX: cellRight + 9,
+    clientY: DEFAULT_THEME.headerHeight + 2 * DEFAULT_THEME.rowHeight - 9,
+    button: 0,
+    pointerType: "mouse",
+    bubbles: true,
+    cancelable: true,
+  });
+  scroller?.dispatchEvent(click);
+  expect(options()).toEqual(["North", "South", "West", "South-West"]);
+  expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  press(host.querySelector('[role="combobox"]'), "Escape");
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+
+  press(host, "w");
+  const box = host.querySelector<HTMLInputElement>('[role="combobox"]');
+  expect(box?.value).toBe("w");
+  if (box) {
+    box.value = "we";
+    box.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  expect(options()).toEqual(["West", "South-West"]);
+  press(box, "ArrowDown");
+  press(box, "Enter");
+  expect(store.getCell({ sheet: "s1", row: 1, col: 1 }).resolved).toBe("West");
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+  press(host, "F2");
+  expect(host.querySelector('[role="listbox"]')).toBeNull();
+  expect(host.querySelector<HTMLTextAreaElement>("textarea.sheetwrite-editor")?.value).toBe("West");
+
+  grid.destroy();
+  store.dispose();
+  globalThis.requestAnimationFrame = requestFrame;
 });
 
 it("removes grid DOM when disposing its owned store fails", () => {
@@ -471,6 +543,32 @@ describe("custom editor canonical lifecycle", () => {
     }
   });
 
+  /** Press `key` on `target`, as a user does. */
+  const press = (target: HTMLElement, key: string): void => {
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+  };
+
+  /**
+   * Open the editor of the cell at view row 0, column A: a list rule's list
+   * opens on Alt+Down, as in Excel; F2 would edit its text.
+   */
+  const openEditor = (grid: GridImpl, host: HTMLElement, kind: string): void => {
+    if (kind !== "list") {
+      grid.beginEdit(0, 0);
+      return;
+    }
+    // The selection, like `beginEdit`, takes the row as shown.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+    host.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowDown",
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+      }),
+    );
+  };
+
   for (const editorKind of ["stock", "list", "checkbox"] as const) {
     for (const viewChange of ["sort", "clearView", "filter"] as const) {
       it(`commits the ${editorKind} editor to its canonical row after ${viewChange}`, () => {
@@ -498,12 +596,12 @@ describe("custom editor canonical lifecycle", () => {
         const host = mountHost();
         const grid = new GridImpl(host, { workbook }, store);
         if (viewChange !== "sort") grid.setViewSort([{ col: 1, ascending: false }]);
-        grid.beginEdit(0, 0);
+        openEditor(grid, host, editorKind);
         const selector =
           editorKind === "stock"
             ? "textarea.sheetwrite-editor"
             : editorKind === "list"
-              ? '[role="listbox"]'
+              ? '[role="combobox"]'
               : '[role="checkbox"]';
         const editor = host.querySelector<HTMLElement>(selector);
         if (!editor) throw new Error(`${editorKind} editor missing`);
@@ -515,13 +613,8 @@ describe("custom editor canonical lifecycle", () => {
         else if (viewChange === "filter") grid.filterBy(0, "Customer 2");
         else grid.setViewSort([{ col: 1, ascending: false }]);
         expect(host.querySelector(selector)).toBe(editor);
-        editor.dispatchEvent(
-          new KeyboardEvent("keydown", {
-            key: editorKind === "checkbox" ? " " : "Enter",
-            bubbles: true,
-            cancelable: true,
-          }),
-        );
+        if (editorKind === "list") press(editor, "ArrowDown");
+        press(editor, editorKind === "checkbox" ? " " : "Enter");
 
         const canonicalRow = viewChange === "sort" ? 0 : 2;
         const otherRow = viewChange === "sort" ? 2 : 0;
@@ -587,12 +680,12 @@ describe("custom editor canonical lifecycle", () => {
       );
       const committed: unknown[] = [];
       grid.on("edit-commit", (event) => committed.push(event));
-      grid.beginEdit(0, 0);
+      openEditor(grid, host, editorKind);
       const selector =
         editorKind === "stock"
           ? "textarea.sheetwrite-editor"
           : editorKind === "list"
-            ? '[role="listbox"]'
+            ? '[role="combobox"]'
             : editorKind === "checkbox"
               ? '[role="checkbox"]'
               : ".sheetwrite-custom-editor input";
@@ -611,13 +704,8 @@ describe("custom editor canonical lifecycle", () => {
 
       grid.filterBy(0, "Customer 2");
       expect(host.querySelector(selector)).toBeNull();
-      editor.dispatchEvent(
-        new KeyboardEvent("keydown", {
-          key: editorKind === "checkbox" ? " " : "Enter",
-          bubbles: true,
-          cancelable: true,
-        }),
-      );
+      if (editorKind === "list") press(editor, "ArrowDown");
+      press(editor, editorKind === "checkbox" ? " " : "Enter");
       pending.resolve("Stale choice");
       await pending.promise;
       await Promise.resolve();
