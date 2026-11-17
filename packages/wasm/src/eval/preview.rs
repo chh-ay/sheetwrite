@@ -214,6 +214,10 @@ impl CellStore {
     /// as a preview's kind does: 0 blank, 1 the number `number`, 2 the text
     /// `text`, 3 the logical `number != 0`.
     #[wasm_bindgen(js_name = previewFormulaWith)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "wasm-bindgen export: JS passes flat scalars and typed arrays"
+    )]
     #[must_use]
     pub fn preview_formula_with_fields(
         &mut self,
@@ -233,7 +237,7 @@ impl CellStore {
             3 => TrialValue::Boolean(number != 0.0),
             _ => TrialValue::Blank,
         };
-        let preview = self.preview_formula_with(sheet as usize, row, col, source, value);
+        let preview = self.preview_formula_with((sheet as usize, row, col), source, value);
         for (slot, field) in out.iter_mut().zip(preview.fields()) {
             *slot = field;
         }
@@ -242,15 +246,13 @@ impl CellStore {
 }
 
 impl CellStore {
-    /// The result `source` would have in the cell at `row` and `col` of
-    /// `sheet` if the cell held `value`. Formulas that read the cell see
-    /// `value`; every other formula keeps its stored result, as in
+    /// The result `source` would have in `cell` (sheet, row, column) if the
+    /// cell held `value`. Formulas that read the cell see `value`; every
+    /// other formula keeps its stored result, as in
     /// [`Self::preview_formula`]. A paged sheet gives no preview (`Loading`).
     pub(crate) fn preview_formula_with(
         &mut self,
-        sheet: usize,
-        row: u32,
-        col: u32,
+        (sheet, row, col): (usize, u32, u32),
         source: &str,
         value: TrialValue<'_>,
     ) -> FormulaPreview {
