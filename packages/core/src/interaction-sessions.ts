@@ -5,6 +5,7 @@ import { ContextMenu } from "./context-menu.js";
 import { CustomEditorController } from "./custom-editor.js";
 import { isDashboard } from "./dashboard.js";
 import { dateToSerial } from "./date-serial.js";
+import type { DialogHost } from "./dialog.js";
 import type { EditDraftSink } from "./edit-draft.js";
 import { EditController, type EditNavigate } from "./editor.js";
 import {
@@ -22,9 +23,15 @@ import type { SheetKey } from "./sheet-commands.js";
 import type { SheetwriteStore } from "./store.js";
 import { storeEngine } from "./store/engine-registry.js";
 import { rangeContains } from "./store/ranges.js";
-import type { CellValue } from "./types/cell.js";
+import type { CellFormat, CellScalar, CellValue } from "./types/cell.js";
 import type { CellAddress, HighlightRange, SheetId } from "./types/coordinates.js";
-import type { CommitReason, DocumentOp, Sheet, SnapshotCell } from "./types/document.js";
+import type {
+  CommitReason,
+  DataValidationRule,
+  DocumentOp,
+  Sheet,
+  SnapshotCell,
+} from "./types/document.js";
 import type { KeyboardOptions } from "./types/grid.js";
 import type {
   CellEditor,
@@ -38,6 +45,7 @@ import type { Theme } from "./types/render.js";
 import type { Store } from "./types/store.js";
 import type { ApplyTransactionResult } from "./types/transaction.js";
 import { ValidationEditor } from "./validation-editor.js";
+import { failingValidationRule } from "./validation-rule.js";
 
 const PRINTABLE = /^.$/u;
 const MINUTES_PER_HOUR = 60;
@@ -57,6 +65,15 @@ function showsDate(format: string | undefined): boolean {
   if (format === undefined) return false;
   const visible = format.replace(/"[^"]*"|\[[^\]]*\]|\\./g, "");
   return /[dy]/i.test(visible) && !/[#0?]/.test(visible);
+}
+
+/** A finished cell entry and the operations that store it. */
+interface CellEntry {
+  readonly address: Readonly<CellAddress>;
+  readonly value: CellValue;
+  /** One `set` for the cell, or one per selected cell for Ctrl+Enter. */
+  readonly patches: DocumentOp[];
+  readonly navigate: EditNavigate;
 }
 
 interface InteractionDependencies {
@@ -156,6 +173,8 @@ interface InteractionDependencies {
   cut: () => void;
   paste: () => void;
   pasteValues: () => void;
+  /** What the lazily loaded validation error alert opens over. */
+  dialogs: DialogHost;
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Runs before a cell editor opens; hides the note card that would cover it. */
   onEditStart: () => void;
@@ -389,10 +408,99 @@ export class InteractionSessions {
       const column = this.deps.sheet().columns[address.col];
       const value =
         typeof input === "string" ? parseCellInput(input, column?.type ?? "text") : input;
-      this.commitCellEditAt(address, viewRow, value, navigate);
+      const patches: DocumentOp[] =
+        navigate === "stay"
+          ? this.selectionFill(address, viewRow, value)
+          : [{ op: "set", addr: { ...address }, value }];
+      const entry: CellEntry = { address, value, patches, navigate };
+      const rule = this.brokenRule(patches);
+      if (rule) {
+        const text =
+          typeof input === "string" ? input : this.entryText(value, column?.type ?? "text");
+        this.alertEntry(rule, entry, text);
+        return;
+      }
+      this.commitCellEditAt(entry, viewRow);
     } finally {
       this.deps.editDraft.end();
     }
+  }
+
+  /**
+   * The rule an entry breaks, checked before it is stored, as Excel does. A
+   * Stop rule comes first, so Yes on a Warning never meets a Stop afterwards.
+   * A formula is checked by the result it would have in its cell.
+   */
+  private brokenRule(patches: readonly DocumentOp[]): DataValidationRule | undefined {
+    const rules = this.deps.sheet().validationRules;
+    if (!rules?.length) return undefined;
+    let broken: DataValidationRule | undefined;
+    for (const patch of patches) {
+      if (patch.op !== "set") continue;
+      const covering = rules.filter(
+        (rule) => rule.policy !== "allow" && rangeContains(rule.range, patch.addr),
+      );
+      if (covering.length === 0) continue;
+      const value = this.enteredScalar(patch.addr, patch.value);
+      if (value === undefined) continue;
+      const rule = failingValidationRule(covering, patch.addr, value);
+      if (rule?.policy === "reject") return rule;
+      broken ??= rule;
+    }
+    return broken;
+  }
+
+  /** The value `value` gives the cell at `addr`: a formula's result; undefined when unknown. */
+  private enteredScalar(addr: Readonly<CellAddress>, value: CellValue): CellScalar | undefined {
+    if (value.kind === "literal") return value.value;
+    if (value.kind !== "formula") return undefined;
+    const preview = storeEngine(this.deps.store)?.previewFormula(addr, value.src);
+    if (preview?.status !== "value") return undefined;
+    const result = preview.value;
+    return typeof result === "object" && result !== null ? result.error : result;
+  }
+
+  private entryText(value: CellValue, type: CellFormat): string {
+    if (value.kind === "formula") return value.src;
+    return value.kind === "literal" ? cellEditText(value.value, type) : "";
+  }
+
+  /**
+   * Excel's error alert for an entry `rule` refuses. The entry stays in its
+   * cell behind the alert as `text`; Retry and No return to it with the text
+   * selected, Yes and OK store it, and Cancel drops it.
+   */
+  private alertEntry(rule: DataValidationRule, entry: CellEntry, text: string): void {
+    const generation = this.generation;
+    const { address } = entry;
+    const current = (): number | null =>
+      generation === this.generation && address.sheet === this.deps.activeSheet()
+        ? this.deps.toViewRow(address.row)
+        : null;
+    void import("./validation-alert.js").then(
+      async ({ validationAlert }) => {
+        let viewRow = current();
+        if (viewRow === null || this.isEditing) return;
+        this.beginEdit(viewRow, address.col, text, false, false);
+        const shown = this.generation;
+        const answer = await validationAlert(this.deps.dialogs, rule).result;
+        if (shown !== this.generation) return;
+        this.cancelEditor();
+        viewRow = this.deps.toViewRow(address.row);
+        if (viewRow === null || address.sheet !== this.deps.activeSheet()) return;
+        if (answer === "retry" || answer === "no") {
+          this.beginEdit(viewRow, address.col, text, true);
+        } else if (answer === "yes" || answer === "ok") {
+          this.commitCellEditAt(entry, viewRow);
+        }
+      },
+      (error: unknown) => {
+        // Without its alert the entry would vanish unexplained: hand it back to the editor.
+        const viewRow = current();
+        if (viewRow !== null && !this.isEditing) this.beginEdit(viewRow, address.col, text);
+        reportError(error);
+      },
+    );
   }
 
   private cancelPointer(): void {
@@ -571,22 +679,15 @@ export class InteractionSessions {
     if (this.isEditing) this.cancelEditor();
   }
 
-  private commitCellEditAt(
-    address: Readonly<CellAddress>,
-    viewRow: number,
-    value: CellValue,
-    navigate: EditNavigate,
-  ): void {
+  /** Store `entry`, whose cell shows at `viewRow`, then move as its key asks. */
+  private commitCellEditAt(entry: CellEntry, viewRow: number): void {
+    const { address, value, patches, navigate } = entry;
     const reason: CommitReason =
       navigate === "none"
         ? "edit-blur"
         : navigate === "right" || navigate === "left"
           ? "edit-tab"
           : "edit-enter";
-    const patches: DocumentOp[] =
-      navigate === "stay"
-        ? this.selectionFill(address, viewRow, value)
-        : [{ op: "set", addr: { ...address }, value }];
     const outcome = this.deps.commit(patches, reason);
 
     if (outcome.status === "applied") {

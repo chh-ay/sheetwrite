@@ -5,8 +5,9 @@ import type { SearchMatchSet } from "./search-controller.js";
 import type { SelectionModel, SelRect } from "./selection.js";
 import { checkStylePart } from "./style-parts.js";
 import type { HighlightRange, PresenceOverlay, Range, SheetId } from "./types/coordinates.js";
-import type { AutoFilter, CellNote, Sheet } from "./types/document.js";
+import type { AutoFilter, CellNote, DataValidationRule, Sheet } from "./types/document.js";
 import type { Theme } from "./types/render.js";
+import { hasInputMessage } from "./validation-rule.js";
 
 const PRESENCE_LABEL_HEIGHT = 18;
 const PRESENCE_LABEL_MAX_WIDTH = 160;
@@ -17,6 +18,9 @@ const NOTE_INDICATOR_COLOR = "#f59e0b";
 
 /** Edge of an AutoFilter header cell's filter button, in CSS pixels at zoom 1. */
 const FILTER_BUTTON_SIZE = 16;
+
+/** Gap between a selected cell and its validation input message. */
+const INPUT_MESSAGE_GAP = 4;
 
 /**
  * Where an AutoFilter header cell's filter button sits: a square at the
@@ -264,6 +268,8 @@ export interface OverlayPainterDeps {
   freeze: () => { fr: number; frozenH: number; frozenW: number; firstBodyCol: number };
   /** Content zoom factor (column base widths scale by it). */
   zoom: () => number;
+  /** The validation rule over the cell at view `row`, `col`, if any. */
+  validationRuleAt: (row: number, col: number) => DataValidationRule | undefined;
   scheduleRender: () => void;
 }
 
@@ -300,6 +306,8 @@ export class OverlayPainter {
   private presenceLabelCursor = 0;
   private presenceLabelBoundsCount = 0;
   private presenceColorContext: CanvasRenderingContext2D | null | undefined;
+  /** The active cell's validation input message; built when one first shows. */
+  private inputMessage: HTMLDivElement | null = null;
 
   // Threaded into the `forEachRect` selection callback, which cannot take args.
   private paintContentTop = 0;
@@ -344,6 +352,7 @@ export class OverlayPainter {
   private lastGeometryVersion = -1;
   private lastPaintNotes: readonly CellNote[] | undefined;
   private lastAutoFilter: AutoFilter | undefined;
+  private lastValidationRules: Sheet["validationRules"];
   private lastFilters: Sheet["filters"];
   private lastSearchActive = -1;
   private lastEditing = false;
@@ -448,6 +457,7 @@ export class OverlayPainter {
     // As in Excel, the moving border of a cut shows over the selection.
     this.paintCutMark(theme, sheet, contentTop, scrollLeft, clientW, clientH);
     this.paintFilterButtons(sheet, contentTop, scrollLeft, clientW, clientH);
+    this.paintInputMessage(theme, contentTop, scrollLeft, clientW, clientH);
     this.hideSurplus();
     this.hideSurplusPresenceLabels();
   }
@@ -495,6 +505,7 @@ export class OverlayPainter {
     const notes = sheet.notes;
     const autoFilter = sheet.autoFilter;
     const filters = sheet.filters;
+    const validationRules = sheet.validationRules;
     const searchActive = this.deps.searchActive();
     const editing = this.deps.isEditing();
     const fillPresent = fill !== null;
@@ -518,6 +529,7 @@ export class OverlayPainter {
       geometryVersion === this.lastGeometryVersion &&
       notes === this.lastPaintNotes &&
       autoFilter === this.lastAutoFilter &&
+      validationRules === this.lastValidationRules &&
       filters === this.lastFilters &&
       searchActive === this.lastSearchActive &&
       editing === this.lastEditing &&
@@ -544,6 +556,7 @@ export class OverlayPainter {
     this.lastGeometryVersion = geometryVersion;
     this.lastPaintNotes = notes;
     this.lastAutoFilter = autoFilter;
+    this.lastValidationRules = validationRules;
     this.lastFilters = filters;
     this.lastSearchActive = searchActive;
     this.lastEditing = editing;
@@ -1389,6 +1402,56 @@ export class OverlayPainter {
       glyph.dataset.icon = filtered.has(col) ? "filterActive" : "filterArrow";
       checkStylePart(glyph, "icons", "The filter buttons");
     }
+  }
+
+  /**
+   * The input message of the active cell's validation rule, as Excel shows it
+   * while the cell is selected: a box below the cell, starting at its middle.
+   * Screen readers hear it as the cell's description (`aria-mirror.ts`).
+   */
+  private paintInputMessage(
+    theme: Theme,
+    contentTop: number,
+    scrollLeft: number,
+    clientW: number,
+    clientH: number,
+  ): void {
+    const focus = this.deps.selection().focusCell;
+    const rule = focus ? this.deps.validationRuleAt(focus.row, focus.col) : undefined;
+    const cell =
+      focus && rule && hasInputMessage(rule)
+        ? this.deps.screenRect(focus.row, focus.col, contentTop, scrollLeft)
+        : null;
+    if (
+      !rule ||
+      !cell ||
+      cell.y + cell.h <= theme.headerHeight ||
+      cell.y >= clientH ||
+      cell.x + cell.w <= theme.rowHeaderWidth ||
+      cell.x >= clientW
+    ) {
+      this.inputMessage?.remove();
+      return;
+    }
+
+    let card = this.inputMessage;
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "sheetwrite-input-message";
+      card.setAttribute("aria-hidden", "true");
+      card.style.position = "absolute";
+      card.style.pointerEvents = "none";
+      this.inputMessage = card;
+    }
+    const title = document.createElement("strong");
+    title.textContent = rule.inputTitle ?? "";
+    title.hidden = !rule.inputTitle;
+    const message = document.createElement("span");
+    message.textContent = rule.inputMessage ?? "";
+    card.replaceChildren(title, message);
+    card.style.left = `${Math.round(cell.x + cell.w / 2)}px`;
+    card.style.top = `${Math.round(cell.y + cell.h + INPUT_MESSAGE_GAP)}px`;
+    if (!card.isConnected) this.overlay.appendChild(card);
   }
 
   /**

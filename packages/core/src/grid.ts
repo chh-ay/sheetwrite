@@ -91,6 +91,7 @@ import {
   addRowGroup,
   collapseRowGroup,
   movedBlock,
+  rangeContains,
   removeRowGroup,
   visibleSheetNeighbor,
 } from "./store/ranges.js";
@@ -174,6 +175,7 @@ import type {
   RemoteOperationOptions,
   TransactionResourceLimits,
 } from "./types/transaction.js";
+import { hasInputMessage } from "./validation-rule.js";
 import { seedWidgetTheme } from "./widget-theme.js";
 import { WorkerRenderer } from "./worker-renderer.js";
 
@@ -1086,6 +1088,7 @@ export class GridImpl implements Grid {
       cut: () => this.runKeyboardClipboard(this.clipboard.cut()),
       paste: () => this.runKeyboardClipboard(this.clipboard.paste()),
       pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
+      dialogs: this.dialogHost,
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
       onEditStart: () => {
@@ -1142,6 +1145,7 @@ export class GridImpl implements Grid {
       searchActive: () => this.searchController.active,
       searchVersion: () => this.searchController.version,
       geometryVersion: () => this.readWindows.geometryVersion,
+      validationRuleAt: (row, col) => this.validationRuleAt(row, col),
       scheduleRender: () => this.scheduleRender(),
     });
 
@@ -1200,8 +1204,7 @@ export class GridImpl implements Grid {
       presentation: this.presentation,
       columnHeader: (col) => this.columnHeader(col),
       focusCell: () => this.selection.focusCell,
-      noteAt: (row, col) =>
-        this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col }),
+      descriptionAt: (row, col) => this.cellDescription(row, col),
       selection: () => this.selection.toSelection(this.activeSheet),
     });
 
@@ -1993,6 +1996,29 @@ export class GridImpl implements Grid {
   private anchorCell(row: number, col: number): CellRef {
     const merge = this.mergeAnchorAt(row, col);
     return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
+  }
+
+  /**
+   * What a screen reader hears after the cell at view `row`, `col`: its note,
+   * and the input message of its validation rule, which Excel shows beside it.
+   */
+  private cellDescription(row: number, col: number): string | null {
+    const note = this.getNote({ sheet: this.activeSheet, row: this.toDataRow(row), col });
+    const rule = this.validationRuleAt(row, col);
+    const input =
+      rule && hasInputMessage(rule)
+        ? [rule.inputTitle, rule.inputMessage].filter(Boolean).join(": ")
+        : "";
+    return [note ? `Note: ${note}` : "", input].filter(Boolean).join(". ") || null;
+  }
+
+  /** The validation rule over the cell at view `row`, `col`, if any; a merge answers for its anchor. */
+  private validationRuleAt(row: number, col: number): DataValidationRule | undefined {
+    const rules = this.sheet().validationRules;
+    if (!rules?.length) return undefined;
+    const cell = this.anchorCell(row, col);
+    const addr = { sheet: this.activeSheet, row: this.toDataRow(cell.row), col: cell.col };
+    return rules.find((rule) => rangeContains(rule.range, addr));
   }
 
   private scheduleRender(): void {

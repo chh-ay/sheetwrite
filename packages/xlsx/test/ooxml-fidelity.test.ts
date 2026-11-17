@@ -328,6 +328,39 @@ describe("raw spec-authored OOXML fidelity", () => {
     expect(warnings).toContainEqual(expect.objectContaining({ code: "validation-loss" }));
   });
 
+  it("round-trips the error alert and the input message of a validation rule", async () => {
+    const { warnings, onWarning } = collectWarnings();
+    const imported = await backend.fromXlsxWorkbook(
+      oneSheet(
+        `<dimension ref="A1:B1"/><sheetData/><dataValidations count="2"><dataValidation type="whole" operator="greaterThan" allowBlank="1" showInputMessage="1" showErrorMessage="1" errorStyle="information" errorTitle="Too small" error="Enter more than 0." promptTitle="Quantity" prompt="Units ordered." sqref="A1"><formula1>0</formula1></dataValidation><dataValidation type="whole" operator="greaterThan" showInputMessage="0" showErrorMessage="0" errorStyle="warning" prompt="Hidden." sqref="B1"><formula1>0</formula1></dataValidation></dataValidations>`,
+      ),
+      { onWarning },
+    );
+    expect(warnings).toEqual([]);
+    const expected = [
+      {
+        policy: "warn",
+        errorStyle: "information",
+        errorTitle: "Too small",
+        helpText: "Enter more than 0.",
+        inputTitle: "Quantity",
+        inputMessage: "Units ordered.",
+      },
+      { policy: "allow", errorStyle: "warning", showInputMessage: false, inputMessage: "Hidden." },
+    ];
+    expect(sheetAt(imported).validationRules).toMatchObject(expected);
+    expect(sheetAt(imported).validationRules?.[0]?.showInputMessage).toBeUndefined();
+
+    const exported = await backend.toXlsxWorkbook(imported);
+    const xml = partText(exported, "xl/worksheets/sheet1.xml");
+    expect(xml).toContain('errorStyle="information"');
+    expect(xml).toContain('promptTitle="Quantity"');
+    expect(xml).toContain('showInputMessage="0"');
+    expect(sheetAt(await backend.fromXlsxWorkbook(exported)).validationRules).toMatchObject(
+      expected,
+    );
+  });
+
   it("maps every native validation comparison operator without broadening", async () => {
     const comparisons: DataValidationComparison[] = [
       { operator: "between", min: 2, max: 4 },

@@ -134,6 +134,26 @@ it("mirrors the painted window with its header, rows, values, notes and focus", 
   expect(gridCell(host, 1, 0)?.hasAttribute("aria-description")).toBe(false);
 });
 
+it("shows a validation rule's input message beside its selected cell and in its description", () => {
+  const { grid, host } = mount();
+  grid.setValidationRule({
+    id: "qty",
+    range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 9, col: 1 } },
+    condition: { kind: "number", min: 0 },
+    policy: "reject",
+    inputTitle: "Quantity",
+    inputMessage: "Units ordered.",
+  });
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
+  flushFrames();
+  expect(host.querySelector(".sheetwrite-input-message")?.textContent).toBe("QuantityUnits ordered.");
+  expect(gridCell(host, 0, 1)?.getAttribute("aria-description")).toBe("Quantity: Units ordered.");
+
+  grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 0 } });
+  flushFrames();
+  expect(host.querySelector(".sheetwrite-input-message")).toBeNull();
+});
+
 it("marks a selected column's header and a selected row", () => {
   const { grid, host } = mount();
   grid.setSelection({ kind: "column", sheet: "s1", col: 1 });

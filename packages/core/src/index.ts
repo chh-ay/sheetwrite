@@ -432,6 +432,7 @@ export type {
   Transaction,
   TransactionApplicationOptions,
   TransactionResourceLimits,
+  ValidationErrorStyle,
   ValidationPolicy,
   VersionBatchMember,
   VersionedOperation,
