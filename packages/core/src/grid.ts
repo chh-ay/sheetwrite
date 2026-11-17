@@ -899,6 +899,7 @@ export class GridImpl implements Grid {
       store: this.store,
       loadable: this.loadable,
       activeSheet: () => this.activeSheet,
+      activateSheet: (sheet) => this.setActiveSheet(sheet),
       sheet: (id) => this.sheet(id),
       toViewRow: (dataRow) => this.toViewRow(dataRow),
       viewportAnchor: () =>
@@ -2133,6 +2134,10 @@ export class GridImpl implements Grid {
 
   findPrev(): SearchResult {
     return this.searchController.findPrev();
+  }
+
+  selectMatch(index: number): SearchResult {
+    return this.searchController.selectMatch(index);
   }
 
   clearSearch(): void {

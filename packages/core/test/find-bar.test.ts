@@ -104,3 +104,71 @@ describe("FindBar", () => {
     grid.destroy();
   });
 });
+
+describe("FindBar options and Find All", () => {
+  it("searches the workbook from Options and lists every match", () => {
+    const host = mountHost();
+    const base = makeWorkbook(3);
+    const [first] = base.sheets;
+    if (!first) throw new Error("makeWorkbook gives one sheet");
+    const grid = createGrid(host, {
+      workbook: { ...base, sheets: [first, { ...first, id: "s2", name: "Sheet 2" }] },
+      config: { find: false, contextMenu: false, toolbar: false },
+    });
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: "Ada" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s2", row: 1, col: 2 },
+          value: { kind: "formula", src: '="ada"' },
+        },
+      ],
+    });
+    const bar = new FindBar(host, DEFAULT_THEME, grid);
+    bar.open();
+    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
+    const options = host.querySelector<HTMLElement>(".sheetwrite-find-options")!;
+    const [within, , lookIn] = options.querySelectorAll("select");
+
+    // Alt+C, Excel's Match case key, opens the options and ticks the box.
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", altKey: true, bubbles: true }));
+    expect(options.hidden).toBe(false);
+    expect(options.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked).toBe(true);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", altKey: true, bubbles: true }));
+
+    within!.value = "workbook";
+    within!.dispatchEvent(new Event("change"));
+    lookIn!.value = "values";
+    lookIn!.dispatchEvent(new Event("change"));
+    expect(input.getAttribute("aria-label")).toBe("Find in workbook");
+    input.value = "ada";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-all")!.click();
+    const rows = [
+      ...host.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
+    ];
+    expect(rows.map((row) => [...row.children].map((cell) => cell.textContent))).toEqual([
+      ["Sheet 1", "$A$1", "Ada", ""],
+      ["Sheet 2", "$C$2", "ada", '="ada"'],
+    ]);
+    expect(host.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
+      "2 cells found",
+    );
+
+    (rows[1] as HTMLElement).click();
+    expect(grid.getActiveSheet()).toBe("s2");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s2", row: 1, col: 2 } });
+    expect(
+      host.querySelector(".sheetwrite-find-result[aria-selected=true] span")!.textContent,
+    ).toBe("Sheet 2");
+
+    bar.destroy();
+    grid.destroy();
+  });
+});
