@@ -1350,13 +1350,9 @@ export interface Grid {
    * names. The copy is named like `Sales (2)` unless `name` is given, and goes
    * to tab position `index` (default: right after the sheet). In the copy,
    * references to the sheet itself refer to the copy, and its tables get new
-   * names. `sheet` in the result is the copy's ID. The copy's code loads the
-   * first time a sheet is copied, so the result is a promise.
+   * names. `sheet` in the result is the copy's ID.
    */
-  copySheet(
-    id: SheetId,
-    options?: { index?: number; name?: string },
-  ): Promise<SheetLifecycleResult>;
+  copySheet(id: SheetId, options?: { index?: number; name?: string }): SheetLifecycleResult;
   /**
    * Color a sheet's tab with `#RRGGBB`, or restore the default tab with
    * `null`, as Excel's Tab Color does.
