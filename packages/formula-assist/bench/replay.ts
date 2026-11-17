@@ -332,6 +332,20 @@ class TypedFormula {
   }
 }
 
+/** The most cells dense storage holds; a larger workbook opens paged, as a large file does. */
+const MAX_DENSE_CELLS = 5_000_000;
+
+/** A store of `snapshot`, dense unless its sheets hold more cells than dense storage can. */
+export function openReplayStore(snapshot: WorkbookSnapshot): SheetwriteStore {
+  const cells = snapshot.sheets.reduce(
+    (sum, sheet) => sum + sheet.rowCount * sheet.columns.length,
+    0,
+  );
+  return SheetwriteStore.fromSnapshot(snapshot, {
+    storage: cells > MAX_DENSE_CELLS ? "paged" : "dense",
+  });
+}
+
 /** Clear or restore one cell. */
 function setCell(store: SheetwriteStore, cell: CellAddress, formula: string | null): void {
   store.applyTransaction({
@@ -355,7 +369,7 @@ export async function replayWorkbook(
   open: OpenReplaySession,
   counts: ReplayCounts,
 ): Promise<void> {
-  const store = SheetwriteStore.fromSnapshot(workbook.snapshot);
+  const store = openReplayStore(workbook.snapshot);
   try {
     for (const target of workbook.targets) {
       setCell(store, target.cell, null);

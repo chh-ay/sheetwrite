@@ -13,7 +13,6 @@ import {
   fromXlsxWorkbook,
   labelToCol,
   SheetwriteError,
-  SheetwriteStore,
   type SheetSnapshot,
   type WorkbookSnapshot,
 } from "@sheetwrite/core";
@@ -22,7 +21,7 @@ import {
   generateConformanceEvidence,
   readFormulaInventory,
 } from "../../../scripts/conformance/generate.js";
-import type { ReplayTarget, ReplayWorkbook } from "./replay.js";
+import { openReplayStore, type ReplayTarget, type ReplayWorkbook } from "./replay.js";
 
 /** The sets the replay knows, by name. */
 export const REPLAY_SETS = ["conformance", "fixtures", "enron-dev", "enron-heldout"] as const;
@@ -209,7 +208,7 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
   for (;;) {
     const candidate = { ...snapshot, workbook: { ...snapshot.workbook, namedRanges: names } };
     try {
-      SheetwriteStore.fromSnapshot(candidate).dispose();
+      openReplayStore(candidate).dispose();
       return candidate;
     } catch (error) {
       const refused =
