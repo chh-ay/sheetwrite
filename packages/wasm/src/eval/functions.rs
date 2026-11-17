@@ -552,6 +552,15 @@ impl ReductionFold {
         Ok(())
     }
 
+    /// Folds `cells` empty cells, as many [`Self::push_blank`] calls would.
+    pub(super) const fn push_blanks(&mut self, cells: u64) -> Result<(), FormulaError> {
+        if self.cells.saturating_add(cells) > RANGE_CELL_LIMIT {
+            return Err(FormulaError::Num);
+        }
+        self.cells += cells;
+        Ok(())
+    }
+
     /// Folds a column of numbers and empty cells in row order, as
     /// [`Self::push_number`] and [`Self::push_blank`] would cell by cell.
     /// Returns `None`, having folded nothing, when a cell holds anything else

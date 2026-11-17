@@ -32,8 +32,12 @@ const GATE_FAMILIES = [
 ] as const;
 type GateFamily = (typeof GATE_FAMILIES)[number];
 
+/** Lines of a smoke's stderr that a missing-artifact error quotes. */
+const STDERR_TAIL_LINES = 40;
+
 interface CommandResult {
-  readonly exitCode: number;
+  readonly exitCode: number | null;
+  readonly signalCode: Bun.Subprocess["signalCode"];
   readonly stdout: string;
   readonly stderr: string;
 }
@@ -44,16 +48,27 @@ async function command(args: readonly string[]): Promise<CommandResult> {
     stdout: "pipe",
     stderr: "pipe",
   });
-  const [stdout, stderr, exitCode] = await Promise.all([
+  const [stdout, stderr] = await Promise.all([
     new Response(child.stdout).text(),
     new Response(child.stderr).text(),
     child.exited,
   ]);
-  return { stdout, stderr, exitCode };
+  return { stdout, stderr, exitCode: child.exitCode, signalCode: child.signalCode };
 }
 
-function commandArtifact(stdout: string, family: GateFamily): unknown {
-  const trimmed = stdout.trim();
+/** How a command ended: its exit code, or the signal that stopped it. */
+function ending(result: CommandResult): string {
+  return result.signalCode === null
+    ? `exited ${String(result.exitCode)}`
+    : `was killed by ${String(result.signalCode)}`;
+}
+
+/**
+ * The JSON artifact a smoke printed last. Without one, the error says how the
+ * smoke ended and quotes the end of its stderr, where the smoke's own error is.
+ */
+export function commandArtifact(result: CommandResult, family: GateFamily): unknown {
+  const trimmed = result.stdout.trim();
   try {
     return JSON.parse(trimmed) as unknown;
   } catch {
@@ -61,8 +76,13 @@ function commandArtifact(stdout: string, family: GateFamily): unknown {
       .split("\n")
       .filter((candidate) => candidate.trim().startsWith("{"))
       .at(-1);
-    if (!line) throw new Error(`${family} smoke returned no JSON artifact`);
-    return JSON.parse(line) as unknown;
+    if (line) return JSON.parse(line) as unknown;
+    const stderr = result.stderr.trim();
+    const quoted =
+      stderr === ""
+        ? "its stderr is empty"
+        : `its stderr ends:\n${stderr.split("\n").slice(-STDERR_TAIL_LINES).join("\n")}`;
+    throw new Error(`${family} smoke ${ending(result)} without a JSON artifact; ${quoted}`);
   }
 }
 
@@ -163,10 +183,10 @@ async function verifyCommandFamily(
   ]);
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.stdout`), result.stdout);
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.stderr`), result.stderr);
-  const value = commandArtifact(result.stdout, family);
+  const value = commandArtifact(result, family);
   writeFileSync(resolve(ARTIFACT_ROOT, `${family}.json`), `${JSON.stringify(value, null, 2)}\n`);
   validateFamily(family, value);
-  if (result.exitCode !== 0) throw new Error(`${family} smoke exited ${result.exitCode}`);
+  if (result.exitCode !== 0) throw new Error(`${family} smoke ${ending(result)}`);
 }
 
 async function verifyRender(): Promise<void> {
@@ -187,7 +207,7 @@ async function verifyRender(): Promise<void> {
   writeFileSync(resolve(ARTIFACT_ROOT, "render.stdout"), result.stdout);
   writeFileSync(resolve(ARTIFACT_ROOT, "render.stderr"), result.stderr);
   if (!(await Bun.file(jsonPath).exists())) {
-    throw new Error(`render smoke exited ${result.exitCode} without a structured artifact`);
+    throw new Error(`render smoke ${ending(result)} without a structured artifact`);
   }
   const raw = readFileSync(jsonPath, "utf8");
   const artifact = validateRenderGateArtifact(JSON.parse(raw) as unknown, "smoke", {
@@ -198,7 +218,7 @@ async function verifyRender(): Promise<void> {
   if (markdown !== renderBenchmarkMarkdown(artifact)) {
     throw new Error("render smoke Markdown is not the byte-stable view of its raw artifact");
   }
-  if (result.exitCode !== 0) throw new Error(`render smoke exited ${result.exitCode}`);
+  if (result.exitCode !== 0) throw new Error(`render smoke ${ending(result)}`);
 }
 
 async function verifyFixture(specification: string): Promise<void> {
