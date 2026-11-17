@@ -86,8 +86,8 @@ The ribbon has these tabs, with Excel's group names, labels and order:
 
 | Tab | Groups and controls |
 | --- | --- |
-| Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert, Delete, Format. **Editing**: AutoSum, Clear, Sort & Filter, Find. |
-| Insert | **Rows & Columns**: Insert (rows above or below, columns left or right), Delete (rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
+| Home | **Undo**. **Clipboard**: Paste split button. **Font**: font name and size boxes, grow and shrink, bold, italic, underline, strikethrough, Borders, Fill Color and Font Color palettes. **Alignment**: top, middle, bottom, wrap, left, center, right, Merge & Center. **Number**: format box, currency, percent, comma, more and fewer decimals. **Cells**: Insert (Insert Cells…, rows and columns), Delete (Delete Cells…, rows and columns), Format (AutoFit, hide and unhide, Format Cells…). **Editing**: AutoSum, Clear, Sort & Filter, Find. |
+| Insert | **Rows & Columns**: Insert (Insert Cells…, rows above or below, columns left or right), Delete (Delete Cells…, rows or columns). **Tables**: PivotTable. **Charts**: Chart split button (column, bar, line, area, pie, doughnut, scatter). **Links**: link form. **Notes**: note form. |
 | Formulas | **Function Library**: Insert Function. Shows only while the store has [custom functions](/docs/features/formulas/custom-functions/), which need the full engine. **Formula Auditing**: Explain Formula. |
 | Data | **Sort & Filter**: Sort A to Z and Sort Z to A (sort the cells in place, as Excel does), Custom Sort (the Sort panel), Sort View A to Z and Sort View Z to A (sort the view only), Clear Filter. **Outline**: Group and Ungroup rows. **Show/Hide**: Hide Rows, Unhide Rows, Hide Columns, Unhide Columns. **Export**: Export CSV, Export XLSX (with the `export` flag). |
 | View | **Window**: Freeze Panes, Freeze Top Row, Freeze First Column, Unfreeze Panes. **Zoom**: zoom out, current percent, zoom in. |
@@ -112,7 +112,13 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 
 | Tab | Group | Command | Glyph | Feature |
 | --- | --- | --- | --- | --- |
-| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="chart" aria-hidden="true"></span> `chart` | Dashboards |
+| Home | Cells | Insert › Insert Cells… | <span class="sheetwrite-icon" data-icon="insertCells" aria-hidden="true"></span> `insertCells` | Excel's keys and dialogs |
+| Home | Cells | Delete › Delete Cells… | <span class="sheetwrite-icon" data-icon="deleteCells" aria-hidden="true"></span> `deleteCells` | Excel's keys and dialogs |
+| Home | Cells | Format › Format Cells… | <span class="sheetwrite-icon" data-icon="formatCells" aria-hidden="true"></span> `formatCells` | Excel's keys and dialogs |
+| Data | Sort & Filter | Filter | <span class="sheetwrite-icon" data-icon="filter" aria-hidden="true"></span> `filter` | AutoFilter |
+| Data | Sort & Filter | Clear | <span class="sheetwrite-icon" data-icon="clearFilter" aria-hidden="true"></span> `clearFilter` | AutoFilter |
+| Data | Sort & Filter | Reapply | <span class="sheetwrite-icon" data-icon="reapplyFilter" aria-hidden="true"></span> `reapplyFilter` | AutoFilter |
+| Insert | Charts | PivotChart | <span class="sheetwrite-icon" data-icon="pivotChart" aria-hidden="true"></span> `pivotChart` | Dashboards |
 | Insert | Dashboard | New Dashboard | <span class="sheetwrite-icon" data-icon="dashboard" aria-hidden="true"></span> `dashboard` | Dashboards |
 | Insert | Dashboard | KPI Card | <span class="sheetwrite-icon" data-icon="kpiCard" aria-hidden="true"></span> `kpiCard` | Dashboards |
 | Insert | Filters | Slicer | <span class="sheetwrite-icon" data-icon="slicer" aria-hidden="true"></span> `slicer` | Dashboards |
@@ -129,6 +135,13 @@ Two tabs are new, in Excel's order: **Formulas** goes after Insert, and **Review
 | Data | Data Tools | Measures | <span class="sheetwrite-icon" data-icon="measure" aria-hidden="true"></span> `measure` | Measures |
 | Review | Version History | Version History | <span class="sheetwrite-icon" data-icon="versionHistory" aria-hidden="true"></span> `versionHistory` | Version history |
 | Review | Version History | Save Version | <span class="sheetwrite-icon" data-icon="saveVersion" aria-hidden="true"></span> `saveVersion` | Version history |
+
+The same glyphs show outside the ribbon:
+
+- The cell context menu shows `insertCells`, `deleteCells` and `formatCells` beside **Cells…** in its Insert and Delete submenus and beside **Format cells…**.
+- The sheet tab menu shows `insertSheet` beside **Insert**, `moveCopySheet` beside **Move or Copy…** and `tabColor` beside **Tab Color…**.
+- Each AutoFilter header button draws `filterArrow`, or `filterActive` (a funnel beside the arrow) once its column is filtered. They come from the icon sheet, so a replacement sheet changes them too; a node in `IconOverrides` does not.
+- The **Sort & Filter** menu's own glyph, `sortFilter`, is the sort arrow beside a funnel, so it differs from its **Filter** item.
 
 | Tab | Group order, left to right | Folds first to last |
 | --- | --- | --- |
@@ -350,9 +363,10 @@ These `GridConfig` fields enable behavior outside the toolbar row:
 | Field | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `find` | `boolean` | `true` | Built-in **Ctrl+F** search box, next/previous controls, and live match count. See [Search](/docs/features/grid/search/). |
+| `autoComplete` | `boolean` | `true` | Excel's AutoComplete for cell values: typing a text entry completes it from the column. `false` turns it off. See [AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete). |
 | `contextMenu` | `boolean \| ContextMenuItems` | `true` | Built-in right-click menu, disabled menu, static readonly rows, or a context-aware row factory. See [Context menu](/docs/features/grid/context-menu/). |
-| `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus and context menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
-| `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. |
+| `icons` | `IconOverrides` | `undefined` | Built-in command glyph overrides, in the toolbar, ribbon, ribbon menus, context menu and sheet tab menu. Strings render as text; a DOM `Node` or `() => Node` supports SVG/HTML without `innerHTML`. |
+| `tabs` | `boolean` | `true` | Bottom sheet-tab bar for multi-sheet workbooks. A right-click on a tab, or its options button, opens Excel's sheet menu: Insert, Rename, Move or Copy…, Tab color, Hide and Remove. |
 | `keyboard` | `boolean \| KeyboardOptions \| function` | `true` | Built-in key bindings. See [Interaction → Keyboard navigation](/docs/features/grid/selection-and-keyboard/#keyboard-navigation). |
 
 Undo, redo and find are keyboard-driven and work without the toolbar: **Ctrl+Z** undoes the last edit, **Ctrl+Shift+Z** redoes it, and **Ctrl+F** opens the find widget (unless `find: false`).

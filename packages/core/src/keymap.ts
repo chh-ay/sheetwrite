@@ -35,8 +35,32 @@ const DEFAULT_BINDINGS: Record<KeyboardAction, readonly KeyShortcut[]> = {
   // Excel's Fill Down and Fill Right.
   fillDown: ["Mod+D"],
   fillRight: ["Mod+R"],
+  // Excel switches sheets with Ctrl+PageDown and Ctrl+PageUp. Browsers keep
+  // those keys for their own tabs, so Excel for the web's Ctrl+Alt+PageDown
+  // and Ctrl+Alt+PageUp work too.
+  nextSheet: ["Ctrl+PageDown", "Ctrl+Alt+PageDown"],
+  previousSheet: ["Ctrl+PageUp", "Ctrl+Alt+PageUp"],
   // Excel turns filters on and off with Ctrl+Shift+L.
   toggleFilter: ["Mod+Shift+L"],
+  // Excel's number-format keys, Ctrl+Shift+~ ! @ # $ % ^, named by their unshifted keys.
+  formatGeneral: ["Mod+Shift+`"],
+  formatNumber: ["Mod+Shift+1"],
+  formatTime: ["Mod+Shift+2"],
+  formatDate: ["Mod+Shift+3"],
+  formatCurrency: ["Mod+Shift+4"],
+  formatPercent: ["Mod+Shift+5"],
+  formatScientific: ["Mod+Shift+6"],
+  // Ctrl+9 and Ctrl+0 hide the selected rows and columns; with Shift they show them again.
+  hideRows: ["Mod+9"],
+  unhideRows: ["Mod+Shift+9"],
+  hideColumns: ["Mod+0"],
+  unhideColumns: ["Mod+Shift+0"],
+  // Ctrl++ inserts: Ctrl+Shift+= on a US keyboard, the keypad + or a + key of its own.
+  // Ctrl+- (or the keypad -) deletes.
+  insertCells: ["Mod+Shift+=", { key: "+", mod: true }],
+  deleteCells: ["Mod+-"],
+  // Ctrl+1 opens Format Cells.
+  formatCells: ["Mod+1"],
 };
 const ACTIONS = Object.keys(DEFAULT_BINDINGS) as KeyboardAction[];
 const APPLE_PLATFORM = /Mac|iPhone|iPad|iPod/i;

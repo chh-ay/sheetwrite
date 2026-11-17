@@ -121,27 +121,12 @@ impl CellStore {
         to: u32,
     ) -> Vec<u32> {
         let edited = sheet as u32;
-        let mut losses = Vec::new();
-        for (formula_sheet, data) in self.sheets.iter().enumerate() {
-            if !self.sheet_alive[formula_sheet] {
-                continue;
+        self.formula_losses(&|_, _, _| false, &|ast, formula_sheet| {
+            move_refs(ast, edited, formula_sheet, columns, (from, count, to)) && {
+                move_refs(ast, edited, formula_sheet, columns, (to, count, from));
+                true
             }
-            let sheet_id = formula_sheet as u32;
-            for ((row, col), entry) in data.formulas.iter(&self.formula_slots) {
-                let Some(ast) = entry.ast.as_ref().filter(|_| entry.is_formula()) else {
-                    continue;
-                };
-                let mut moved = ast.clone();
-                if !move_refs(&mut moved, edited, sheet_id, columns, (from, count, to)) {
-                    continue;
-                }
-                move_refs(&mut moved, edited, sheet_id, columns, (to, count, from));
-                if moved != *ast {
-                    losses.extend_from_slice(&[sheet_id, row, col]);
-                }
-            }
-        }
-        losses
+        })
     }
 
     /// Offsets, row-major in the rectangle before the move, of the formula
@@ -367,9 +352,9 @@ impl CellStore {
     }
 
     /// Write the moved cells of one column from `top`: `slots` holds their
-    /// storage and `sources` their formulas. One writer serves row and column
-    /// moves, so the block writer is compiled once for them.
-    fn write_moved_column(
+    /// storage and `sources` their formulas. One writer serves row, column and
+    /// cell moves, so the block writer is compiled once for them.
+    pub(crate) fn write_moved_column(
         &mut self,
         sheet: usize,
         top: (usize, usize),

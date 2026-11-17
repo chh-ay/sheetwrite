@@ -13,6 +13,7 @@ import type {
   CellStyle,
   CellValue,
   DocumentOp,
+  Range,
   Sheet,
   Store,
 } from "../src/types.js";
@@ -150,6 +151,29 @@ class FakeStore {
           }
         }
       }
+      if (patch.op === "moveCells") {
+        // Moves each cell verbatim; reference rewriting is the engine's.
+        const r0 = Math.min(patch.range.start.row, patch.range.end.row);
+        const r1 = Math.max(patch.range.start.row, patch.range.end.row);
+        const c0 = Math.min(patch.range.start.col, patch.range.end.col);
+        const c1 = Math.max(patch.range.start.col, patch.range.end.col);
+        const moved: Array<
+          [CellAddress, { value: CellValue; resolved: CellScalar; style: CellStyle }]
+        > = [];
+        for (let row = r0; row <= r1; row++) {
+          for (let col = c0; col <= c1; col++) {
+            const key = this.key({ sheet: patch.range.sheet, row, col });
+            const cell = this.cells.get(key);
+            this.cells.delete(key);
+            if (!cell) continue;
+            moved.push([
+              { sheet: patch.to.sheet, row: patch.to.row + row - r0, col: patch.to.col + col - c0 },
+              cell,
+            ]);
+          }
+        }
+        for (const [addr, cell] of moved) this.cells.set(this.key(addr), cell);
+      }
     }
   }
 }
@@ -179,6 +203,8 @@ interface Harness {
   select: (row: number, col: number) => void;
   setSystemClipboard: (text: string) => void;
   setReadOnly: (value: boolean) => void;
+  /** The cut marks the controller reported, in order. */
+  cutMarks: Array<Range | null>;
 }
 
 function makeHarness(
@@ -223,6 +249,7 @@ function makeHarness(
   let readOnly = false;
 
   const commitReasons: string[] = [];
+  const cutMarks: Array<Range | null> = [];
   const controller = new ClipboardController({
     lifetime,
     store: store as unknown as Store,
@@ -251,6 +278,7 @@ function makeHarness(
         }
       }
     },
+    onCutChange: (range) => cutMarks.push(range),
   });
 
   return {
@@ -260,6 +288,7 @@ function makeHarness(
     sheet,
     selection,
     commitReasons,
+    cutMarks,
     select: (row, col) => selection.selectCell(row, col),
     setReadOnly: (value) => {
       readOnly = value;
@@ -304,21 +333,23 @@ describe("ClipboardController", () => {
     expect(h.store.getFormula({ sheet: "s1", row: 4, col: 2 })).toBe("=B5");
   });
 
-  it("cut + paste preserves the formula verbatim and clears the source", async () => {
+  it("cut marks the source and paste moves it with one moveCells operation", async () => {
     h.store.seed(1, 1, { kind: "formula", src: "=A1+B$2" }, 0);
     h.select(1, 1);
     await h.controller.cut();
 
-    // Source clearing commits only after the system clipboard accepts the payload.
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
+    // As in Excel, a cut changes nothing until the paste.
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
+    expect(h.cutMarks).toEqual([
+      { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
+    ]);
 
     h.select(3, 1);
     await h.controller.paste();
 
-    // Cut-paste does NOT shift refs (Sheets shifts on copy, not cut).
     expect(h.store.getFormula({ sheet: "s1", row: 3, col: 1 })).toBe("=A1+B$2");
-    // Cut-clear committed as "cut"; the paste block as "paste".
-    expect(h.commitReasons).toEqual(["cut", "paste"]);
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
+    expect(h.commitReasons).toEqual(["paste"]);
   });
 
   it("keeps the source intact when the clipboard rejects a cut", async () => {
@@ -337,7 +368,7 @@ describe("ClipboardController", () => {
     expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
   });
 
-  it("clears the captured source when selection changes during the clipboard write", async () => {
+  it("marks the captured source when selection changes during the clipboard write", async () => {
     const { promise: pendingWrite, resolve: finishWrite } = Promise.withResolvers<void>();
     Object.defineProperty(navigator, "clipboard", {
       configurable: true,
@@ -355,8 +386,12 @@ describe("ClipboardController", () => {
     finishWrite();
     await cut;
 
-    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBeNull();
+    expect(h.cutMarks).toEqual([
+      { sheet: "s1", start: { row: 1, col: 1 }, end: { row: 1, col: 1 } },
+    ]);
+    expect(h.store.getFormula({ sheet: "s1", row: 1, col: 1 })).toBe("=A1+B$2");
     expect(h.store.getCell({ sheet: "s1", row: 3, col: 1 }).resolved).toBe("keep");
+    expect(h.commitReasons).toEqual([]);
   });
 
   it("lets a newer paste stop an older one that is still reading", async () => {
@@ -849,13 +884,16 @@ describe("spill clipboard commands", () => {
       commit: (patches, reason) => {
         document.commit(patches, reason);
       },
+      onCutChange: () => {},
     });
+    const stopListening = store.on("change", (event) => clipboard.storeChanged(event));
     return {
       store,
       document,
       clipboard,
       selection,
       close: () => {
+        stopListening();
         lifetime.close();
         document.destroy();
         store.dispose();
@@ -878,25 +916,23 @@ describe("spill clipboard commands", () => {
     }
   });
 
-  it("cuts the anchor and moves its formula, with undo and redo for both commands", async () => {
+  it("moves the anchor's formula on paste, with undo and redo", async () => {
     const harness = spillHarness();
     const anchor = { sheet: "s1", row: 1, col: 1 };
     const destination = { ...anchor, row: 6 };
     try {
       harness.selection.selectCell(1, 1);
       expect(await harness.clipboard.cut()).toBe("done");
-      expect(harness.store.getCell(anchor).resolved).toBeNull();
-      expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBeNull();
-      harness.document.undo();
       expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBe(2);
-      harness.document.redo();
-      expect(harness.store.getCell(anchor).resolved).toBeNull();
+      expect(harness.document.canUndo).toBe(false);
       harness.selection.selectCell(6, 1);
       expect(await harness.clipboard.paste()).toBe("done");
       expect(harness.store.getFormula(destination)).toBe("=SEQUENCE(3)");
       expect(harness.store.getCell({ ...destination, row: 8 }).resolved).toBe(3);
+      expect(harness.store.getCell(anchor).resolved).toBeNull();
       harness.document.undo();
       expect(harness.store.getCell(destination).resolved).toBeNull();
+      expect(harness.store.getCell({ ...anchor, row: 2 }).resolved).toBe(2);
       harness.document.redo();
       expect(harness.store.getCell({ ...destination, row: 8 }).resolved).toBe(3);
     } finally {

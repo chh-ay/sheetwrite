@@ -12,6 +12,7 @@ import {
   prepareMergeIndex,
 } from "./canvas-paint.js";
 import { CanvasRenderer } from "./canvas-renderer.js";
+import type { CellCommand, CellCommandsHost } from "./cell-commands.js";
 import { cellDisplayText, cellScalarToText } from "./cell-input.js";
 import { EMPTY_STYLE } from "./cell-style-fields.js";
 import { ClipboardController } from "./clipboard-controller.js";
@@ -89,6 +90,7 @@ import { storeEngine, storeGeneration } from "./store/engine-registry.js";
 import {
   addRowGroup,
   collapseRowGroup,
+  movedBlock,
   removeRowGroup,
   visibleSheetNeighbor,
 } from "./store/ranges.js";
@@ -590,6 +592,8 @@ export class GridImpl implements Grid {
   private readonly dialogs = new ScopeSlot(this.lifetime);
   /** What the lazily loaded dialogs use; one is open at a time. */
   private readonly dialogHost: DialogHost;
+  /** What the lazily loaded cell commands use; built on their first use. */
+  private cellCommandsHost: CellCommandsHost | null = null;
   /** Commands whose code is loading on first use. */
   private commandLoads = 0;
   /** Keys pressed on the grid while they load, in order. */
@@ -923,6 +927,7 @@ export class GridImpl implements Grid {
       mergeAnchorAt: (row, col) => this.mergeAnchorAt(row, col),
       toDataRow: (viewRow) => this.toDataRow(viewRow),
       commit: (patches, reason) => this.document.commit(patches, reason),
+      onCutChange: (range) => this.overlayPainter.setCutMark(range),
     });
 
     this.styleDeps = {
@@ -1005,9 +1010,19 @@ export class GridImpl implements Grid {
         },
       },
       openFind: (options) => this.openFindBar(options),
+      keyCommand: (command) => {
+        if (command !== "nextSheet" && command !== "previousSheet") {
+          this.cellCommand(command);
+          return;
+        }
+        void this.sheetCommand((commands) => {
+          if (!this.lifetime.closed) commands.stepSheet(this, command);
+        });
+      },
       openAutoFilter: (col) =>
         this.withAutoFilter((filters, host) => filters.openAutoFilterMenu(host, col)),
       holdKey: (key) => this.commandLoads > 0 && this.heldKeys.push(key) > 0,
+      autoComplete: () => this.config?.autoComplete !== false,
       store: this.store,
       loadable: this.loadable,
       selection: () => this.selection,
@@ -1073,7 +1088,12 @@ export class GridImpl implements Grid {
       pasteValues: () => this.runKeyboardClipboard(this.clipboard.pasteValues()),
       commit: (patches, reason) => this.document.commit(patches, reason),
       readOnly: () => this.readOnly,
-      onEditStart: () => this.notes.hideCard(),
+      onEditStart: () => {
+        this.notes.hideCard();
+        // As in Excel, a new edit ends the cut that waits for a paste.
+        this.clipboard.cancelCut();
+      },
+      cancelCut: () => this.clipboard.cancelCut(),
     });
 
     this.interactions.configureMenu(config, this.theme);
@@ -1302,6 +1322,7 @@ export class GridImpl implements Grid {
     this.cancelAutoFit();
     this.mutationRevisions.record(event.transaction.patches, this.storeEpoch);
     this.activeSheetCache = null;
+    this.clipboard.storeChanged(event);
 
     // Presence learned during this change describes the state after it, which
     // cannot vouch for cells it just stopped computing (e.g. a removed spill).
@@ -1384,6 +1405,13 @@ export class GridImpl implements Grid {
 
     for (const patch of patches) {
       if (changesSheetTabs(patch)) effects |= SHEETS_CHANGED;
+      // A block move carries merged cells along.
+      if (
+        patch.op === "moveCells" &&
+        (patch.range.sheet === this.activeSheet || patch.to.sheet === this.activeSheet)
+      ) {
+        effects |= APPLY_LAYOUT;
+      }
       if (!("sheet" in patch) || patch.sheet !== this.activeSheet) continue;
 
       if (!annotatesSheet(patch)) effects |= GEOMETRY_CHANGED;
@@ -1680,17 +1708,22 @@ export class GridImpl implements Grid {
     this.tabBar = bar;
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
-      onAdd: () => {
-        const result = this.addSheet({ name: this.nextDefaultSheetName() });
+      onAdd: (index) => {
+        const result = this.addSheet({ name: this.nextDefaultSheetName(), index });
         if (result.status === "applied") this.setActiveSheet(result.sheet);
         return result;
       },
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
       onMove: (id, toIndex) => this.moveSheet(id, toIndex),
+      onCommand: (command, id) =>
+        void this.sheetCommand((commands) => {
+          if (this.sheetTabs) commands.openTabPanel(this, this.sheetTabs, command, id);
+        }),
       onHide: (id) => this.setSheetVisibility(id, "hidden"),
       onUnhide: (id) => this.setSheetVisibility(id, "visible"),
       readOnly: this.readOnly,
+      icons: () => this.config?.icons,
     });
     this.syncTabBarTheme();
     this.renderTabs();
@@ -1924,7 +1957,9 @@ export class GridImpl implements Grid {
               patch.op === "clearRange" ||
               patch.op === "permuteRows"
             ? patch.range
-            : null;
+            : patch.op === "moveCells"
+              ? movedBlock(patch)
+              : null;
       if (range?.sheet !== this.activeSheet) continue;
       const first = this.toViewRow(range.start.row);
       const last = this.toViewRow(range.end.row);
@@ -2892,6 +2927,41 @@ export class GridImpl implements Grid {
     for (const key of this.heldKeys.splice(0)) this.interactions.replayKey(key);
   }
 
+  /** Run a command of `cell-commands.ts`, which loads on first use. */
+  private cellCommand(command: CellCommand): void {
+    this.loadCommand(import("./cell-commands.js"), ({ runCellCommand }) => {
+      if (this.lifetime.closed) return;
+      this.cellCommandsHost ??= {
+        grid: this,
+        dialogs: this.dialogHost,
+        style: this.styleDeps,
+        bounds: () => [this.geometry.rowCount, this.firstCol(), this.lastCol()],
+        font: () => this.theme.font,
+      };
+      runCellCommand(this.cellCommandsHost, command);
+    });
+  }
+
+  /**
+   * Run a command of `sheet-commands.ts`, which loads on first use, as
+   * `loadCommand` runs one; the promise settles with the command's result.
+   */
+  private sheetCommand<T>(run: (commands: typeof import("./sheet-commands.js")) => T): Promise<T> {
+    return new Promise((resolve, reject) => {
+      this.loadCommand(
+        import("./sheet-commands.js"),
+        (commands) => {
+          try {
+            resolve(run(commands));
+          } catch (error) {
+            reject(error);
+          }
+        },
+        reject,
+      );
+    });
+  }
+
   /** Drop the find bar, so the next open builds it for the current config and read-only state. */
   private resetFindBar(): void {
     this.findBarBuilds.close();
@@ -3283,7 +3353,7 @@ export class GridImpl implements Grid {
     const snapshot: SheetSnapshot = {
       id,
       name: name.name,
-      order: this.store.getWorkbook().sheets.length,
+      order: input.index ?? this.store.getWorkbook().sheets.length,
       ...(dashboard ? { kind: "dashboard", dashboard: { items: [] } } : {}),
       rowCount: dashboard ? 0 : (input.rowCount ?? 100),
       columns: dashboard ? [] : columns,
@@ -3309,16 +3379,7 @@ export class GridImpl implements Grid {
     // Excel refuses History only when a user names a sheet; operations, undo
     // and version restore may give the name back.
     if (!validation.ok && validation.code === "reserved") {
-      const issue: MutationIssue = {
-        kind: "sheet-lifecycle",
-        severity: "error",
-        code: "reserved",
-        sheet: id,
-        operationIndex: 0,
-        message: SHEET_LIFECYCLE_MESSAGES.reserved,
-      };
-      for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
-      return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
+      return this.rejectSheet(id, "reserved");
     }
     const result = this.document.commit(
       [{ op: "renameSheet", sheet: id, name: validation.name }],
@@ -3329,6 +3390,39 @@ export class GridImpl implements Grid {
 
   moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult {
     const result = this.document.commit([{ op: "moveSheet", sheet: id, to: toIndex }], "structure");
+    return { ...result, sheet: id };
+  }
+
+  copySheet(
+    id: SheetId,
+    options: { index?: number; name?: string } = {},
+  ): Promise<SheetLifecycleResult> {
+    // The copy's code loads the first time a sheet is copied.
+    return this.sheetCommand(
+      (commands) =>
+        commands.copySheet(this.document, this.store.getWorkbook(), id, options) ??
+        this.rejectSheet(id, "sheet-not-found"),
+    );
+  }
+
+  private rejectSheet(id: SheetId, code: "reserved" | "sheet-not-found"): SheetLifecycleResult {
+    const issue: MutationIssue = {
+      kind: "sheet-lifecycle",
+      severity: "error",
+      code,
+      sheet: id,
+      operationIndex: 0,
+      message: SHEET_LIFECYCLE_MESSAGES[code],
+    };
+    for (const fn of this.listeners["mutation-rejected"]) fn({ issues: [issue] });
+    return { status: "rejected", epoch: this.storeEpoch, issues: [issue], sheet: id };
+  }
+
+  setSheetTabColor(id: SheetId, color: string | null): SheetLifecycleResult {
+    const result = this.document.commit(
+      [{ op: "setSheetMeta", sheet: id, patch: { tabColor: color } }],
+      "structure",
+    );
     return { ...result, sheet: id };
   }
 
@@ -3787,6 +3881,9 @@ export class GridImpl implements Grid {
         const cols = this.selectedColumns();
         if (cols) this.removeColumns(cols.first, cols.count);
       },
+      insertCells: () => this.cellCommand("insertCells"),
+      deleteCells: () => this.cellCommand("deleteCells"),
+      formatCells: () => this.cellCommand("formatCells"),
       hideRows: (rows) => {
         const span = this.selectedRows();
         const targets =

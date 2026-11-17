@@ -108,6 +108,10 @@ export const SHOT_SIZES = {
   tablet: { width: 560, height: 632 },
   /** The phone layout of a dashboard, cropped to its items: shown near its own width. */
   phone: { width: 320, height: 800 },
+  /** A section page's opening capture, cropped for tablets: shown near its own width. */
+  sectionTablet: { width: 560, height: 360 },
+  /** A section page's opening capture, cropped for phones: shown near its own width. */
+  sectionPhone: { width: 320, height: 320 },
   /** A card's crop of one panel or control, 2:1 like the card's frame: shown near its own width. */
   highlight: { width: 400, height: 200 },
 } as const;
@@ -436,20 +440,70 @@ export interface FramedShot {
   readonly alt: string;
   readonly caption: string;
   readonly size?: ShotSize;
+  /** Crops of the same view for tablets and phones, each with its own alt text and caption. */
+  readonly narrow?: {
+    readonly tablet: FramedCrop;
+    readonly phone: FramedCrop;
+  };
+}
+
+/** A tablet or phone crop of a framed screenshot. */
+export interface FramedCrop {
+  readonly name: string;
+  readonly alt: string;
+  readonly caption: string;
 }
 
 /**
  * The markup of `<Frame caption><Screenshot name alt size /></Frame>`, for the
  * placement table (art/docs-pictures.ts), which puts screenshots into Markdown pages.
+ * With `narrow` crops, each width shows its own crop and caption, as
+ * `<Screenshot tablet phone>` in a `<Frame>` with three captions does.
  */
 export function framedShot(shot: FramedShot): HastNode {
+  const { narrow } = shot;
+  const size = shot.size ?? "app";
+  const media =
+    narrow === undefined
+      ? themedShots(shot.name, shot.alt, size, PAGE_SHOT_SIZES)
+      : element(
+          "span",
+          [
+            themedShots(shot.name, shot.alt, size, PAGE_SHOT_SIZES, "wide"),
+            themedShots(
+              narrow.tablet.name,
+              narrow.tablet.alt,
+              "sectionTablet",
+              NARROW_SHOT_SIZES,
+              "tablet",
+            ),
+            themedShots(
+              narrow.phone.name,
+              narrow.phone.alt,
+              "sectionPhone",
+              NARROW_SHOT_SIZES,
+              "narrow",
+            ),
+          ],
+          { className: ["sw-shots-set"] },
+        );
+  const caption =
+    narrow === undefined
+      ? [text(shot.caption)]
+      : [
+          element("span", [text(shot.caption)], { className: ["sw-frame__caption--wide"] }),
+          element("span", [text(narrow.tablet.caption)], {
+            className: ["sw-frame__caption--tablet"],
+          }),
+          element("span", [text(narrow.phone.caption)], {
+            className: ["sw-frame__caption--narrow"],
+          }),
+        ];
   return element(
     "figure",
     [
-      element("div", [themedShots(shot.name, shot.alt, shot.size ?? "app", PAGE_SHOT_SIZES)], {
-        className: ["sw-frame__media"],
-      }),
-      element("figcaption", [text(shot.caption)], {}),
+      element("div", [media], { className: ["sw-frame__media"] }),
+      element("figcaption", caption, {}),
     ],
     { className: ["sw-frame"] },
   );

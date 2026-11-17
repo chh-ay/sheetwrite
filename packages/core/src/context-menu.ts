@@ -40,6 +40,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       label: "Insert",
       icon: "insert",
       items: [
+        { action: "insertCells", label: "Cells…" },
+        { action: "separator" },
         { action: "insertRowAbove", label: "Row above" },
         { action: "insertRowBelow", label: "Row below" },
         { action: "separator" },
@@ -52,6 +54,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       label: "Delete",
       icon: "delete",
       items: [
+        { action: "deleteCells", label: "Cells…" },
+        { action: "separator" },
         { action: "deleteRow", label: "Row" },
         { action: "deleteColumn", label: "Column" },
       ],
@@ -106,6 +110,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       ],
     },
     { action: "separator" },
+    { action: "formatCells" },
+    { action: "separator" },
     { action: "pivotFields", visible: inPivot },
     { action: "separator" },
     { action: "editNote", label: "New note", visible: (context) => !hasNote(context) },
@@ -128,6 +134,8 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   insertColumnRight: "insert",
   deleteRow: "delete",
   deleteColumn: "delete",
+  insertCells: "insertCells",
+  deleteCells: "deleteCells",
   hideRow: "hideRows",
   showAllRows: "unhideRows",
   autoFitRow: "format",
@@ -146,6 +154,7 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   editNote: "note",
   deleteNote: "note",
   pivotFields: "pivotTable",
+  formatCells: "formatCells",
 };
 
 /** Drops hidden rows, then leading, trailing and doubled separators. */
@@ -198,6 +207,9 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   editNote: "Edit note",
   deleteNote: "Delete note",
   pivotFields: "PivotTable Fields",
+  insertCells: "Insert cells…",
+  deleteCells: "Delete cells…",
+  formatCells: "Format cells…",
 };
 
 function actionHandler(
@@ -250,6 +262,12 @@ function actionHandler(
     case "deleteColumn":
       return () => actions.deleteColumn();
 
+    case "insertCells":
+      return () => actions.insertCells();
+
+    case "deleteCells":
+      return () => actions.deleteCells();
+
     case "hideColumn":
       return () => actions.hideColumns();
 
@@ -294,6 +312,9 @@ function actionHandler(
 
     case "pivotFields":
       return () => actions.showPivotFields();
+
+    case "formatCells":
+      return () => actions.formatCells();
 
     default:
       return () => {};

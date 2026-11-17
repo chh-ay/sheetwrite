@@ -260,6 +260,30 @@ export interface GridActions {
   insertColumnRight(): void;
   /** Delete the focus cell's column. */
   deleteColumn(): void;
+  /**
+   * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
+   * them; with whole columns, as many columns to their left. For any other
+   * range an Insert dialog asks whether to insert entire rows or columns.
+   * Its Shift cells right and Shift cells down choices are shown but not
+   * available yet. The command loads on first use, so the change lands a
+   * moment after the call; a host can wait for the grid's `change` event.
+   */
+  insertCells(): void;
+  /**
+   * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
+   * any other range, ask in a Delete dialog whether to delete entire rows or
+   * columns. Like {@link GridActions.insertCells}, it loads on first use and
+   * lands a moment after the call.
+   */
+  deleteCells(): void;
+  /**
+   * Ctrl+1: open the Format Cells dialog for the selection, with Number,
+   * Alignment, Font, Border and Fill tabs, showing the active cell's format.
+   * OK applies what changed to every selected cell as one undoable step. The
+   * command and the dialog load on first use, so the dialog opens a moment
+   * after the call. Does nothing on a read-only grid.
+   */
+  formatCells(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
@@ -296,7 +320,11 @@ export interface GridActions {
   filterBySelection(): void;
   /** Copy the focused rectangle to the system clipboard. Never rejects. */
   copy(): Promise<ClipboardOutcome>;
-  /** Copy + clear the source (after the clipboard accepted). Never rejects. */
+  /**
+   * Copy the focused rectangle and mark it with a moving border; the next
+   * paste moves its cells, as in Excel. Esc or another edit ends the cut.
+   * Never rejects.
+   */
   cut(): Promise<ClipboardOutcome>;
   /** Paste at the focus cell. Never rejects. */
   paste(): Promise<ClipboardOutcome>;
@@ -419,10 +447,12 @@ export type ToolbarIcon = string | Node | (() => Node);
 /**
  * Per-glyph icon overrides, keyed by the names on the command icon sheet
  * (`ICON_NAMES`). One override applies wherever the glyph shows: the flat
- * toolbar, the ribbon and ribbon menus, and the context menu. Strings render
+ * toolbar, the ribbon and ribbon menus, the context menu and the sheet tab menu. Strings render
  * as plain text; DOM nodes and node factories support SVG or HTML icons. To
  * replace every glyph at once, set the `--sheetwrite-icon-sheet` CSS property
  * to a sheet drawn on the layout in `@sheetwrite/core/icons.json`.
+ * The AutoFilter header buttons draw `filterArrow` and `filterActive` from the
+ * sheet itself, so only a replacement sheet changes them.
  */
 export type IconOverrides = Partial<Record<IconName, ToolbarIcon>>;
 
@@ -507,6 +537,9 @@ export type ContextMenuActionName =
   | "editNote"
   | "deleteNote"
   | "pivotFields"
+  | "insertCells"
+  | "deleteCells"
+  | "formatCells"
   | "separator";
 
 /** Cell and viewport coordinates resolved for one bundled context-menu opening. */
@@ -557,7 +590,23 @@ export type KeyboardAction =
   | "selectAll"
   | "fillDown"
   | "fillRight"
-  | "toggleFilter";
+  | "nextSheet"
+  | "previousSheet"
+  | "toggleFilter"
+  | "formatGeneral"
+  | "formatNumber"
+  | "formatTime"
+  | "formatDate"
+  | "formatCurrency"
+  | "formatPercent"
+  | "formatScientific"
+  | "hideRows"
+  | "unhideRows"
+  | "hideColumns"
+  | "unhideColumns"
+  | "insertCells"
+  | "deleteCells"
+  | "formatCells";
 
 /** Overrides replace all default keys for an action; null disables that action's keys. */
 export interface KeyboardOptions {
@@ -672,7 +721,7 @@ export interface GridConfig {
    * toolbar instead.
    */
   ribbon?: boolean | RibbonConfig;
-  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus and context menu. See {@link IconOverrides}. */
+  /** Replace built-in command icons by glyph name, in the toolbar, ribbon, ribbon menus, context menu and sheet tab menu. See {@link IconOverrides}. */
   icons?: IconOverrides;
   /** Built-in menu, disabled menu, static rows, or a request-aware row factory. */
   contextMenu?: boolean | ContextMenuItems;
@@ -680,6 +729,12 @@ export interface GridConfig {
   undo?: boolean;
   /** Built-in Ctrl+F find widget: enabled (true, default) or disabled (false). */
   find?: boolean;
+  /**
+   * Excel's AutoComplete for cell values (default true): typing a text entry
+   * completes it from the entries above and below in the column. `false`
+   * turns it off, as Excel's "Enable AutoComplete for cell values" does.
+   */
+  autoComplete?: boolean;
   /** Bottom sheet-tab bar for multi-sheet workbooks (default true). */
   tabs?: boolean;
   /**
@@ -791,12 +846,18 @@ export interface GridOptions {
   addons?: SheetwriteAddonSettings;
 }
 
-/** Case, whole-cell, sheet, and column constraints for grid search. */
+/** Case, whole-cell, Look in, sheet, and column constraints for grid search. */
 export interface SearchOptions {
   /** Case-sensitive match (default false). */
   matchCase?: boolean;
   /** Match only when the whole cell text equals the query (default false: substring). */
   wholeCell?: boolean;
+  /**
+   * What a formula cell is searched by, as in Excel's "Look in": its formula
+   * text (`"formulas"`, the default) or its result (`"values"`). Replace
+   * rewrites formula text only when looking in formulas.
+   */
+  lookIn?: "formulas" | "values";
   /** Restrict to a sheet (defaults to the active sheet). */
   sheet?: SheetId;
   /** Restrict to these column indices (defaults to all columns). */
@@ -1238,7 +1299,10 @@ export interface Grid {
     source: WorkbookSnapshot | ((signal: AbortSignal) => Promise<WorkbookSnapshot>),
     options?: { signal?: AbortSignal },
   ): Promise<void>;
-  /** Find cells matching `query`; highlights matches, emits `search`, returns the result. */
+  /**
+   * Find cells matching `query`, which takes Excel's wildcards (`*`, `?`,
+   * `~`); highlights matches, selects the first, emits `search`, returns the result.
+   */
   search(query: string, opts?: SearchOptions): SearchResult;
   /** Move the active match to the next match and scroll it into view. */
   findNext(): SearchResult;
@@ -1280,6 +1344,24 @@ export interface Grid {
   renameSheet(id: SheetId, name: string): SheetLifecycleResult;
   /** Move a sheet to position `toIndex` in the sheet order. */
   moveSheet(id: SheetId, toIndex: number): SheetLifecycleResult;
+  /**
+   * Copy a sheet, as Excel's Move or Copy with "Create a copy" does: its
+   * cells, formats, rules, tables, charts and pivots, and its sheet-scoped
+   * names. The copy is named like `Sales (2)` unless `name` is given, and goes
+   * to tab position `index` (default: right after the sheet). In the copy,
+   * references to the sheet itself refer to the copy, and its tables get new
+   * names. `sheet` in the result is the copy's ID. The copy's code loads the
+   * first time a sheet is copied, so the result is a promise.
+   */
+  copySheet(
+    id: SheetId,
+    options?: { index?: number; name?: string },
+  ): Promise<SheetLifecycleResult>;
+  /**
+   * Color a sheet's tab with `#RRGGBB`, or restore the default tab with
+   * `null`, as Excel's Tab Color does.
+   */
+  setSheetTabColor(id: SheetId, color: string | null): SheetLifecycleResult;
   /** Set host-visible worksheet state; stock UI never offers `veryHidden`. */
   setSheetVisibility(id: SheetId, visibility: SheetVisibility): SheetLifecycleResult;
   /** Replace every conditional format rule of the active sheet with `rules`, as one undo step. */

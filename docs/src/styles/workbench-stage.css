@@ -104,3 +104,170 @@
     transition-duration: 0s;
   }
 }
+
+/* The panels of a workbench that renders in the browser, described in the
+   page's static HTML (FrameworkPage.tsx): a card per panel, two across from
+   48rem. */
+.sw-workbench-panels {
+  display: grid;
+  gap: var(--sw-space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sw-workbench-panels > li {
+  display: grid;
+  gap: var(--sw-space-2);
+  align-content: start;
+  margin: 0;
+  padding: var(--sw-space-5);
+  border: var(--sw-border-width) solid var(--sw-border);
+  border-radius: var(--sw-radius-lg);
+  background: var(--sw-surface-1);
+  font-size: var(--sw-text-small);
+  line-height: var(--sw-leading-body);
+}
+
+.sw-workbench-panels > li::marker,
+.sw-workbench-panels > li::before {
+  content: none;
+}
+
+.sw-workbench-panels h3 {
+  margin: 0;
+  color: var(--sw-fg-strong);
+  font: var(--sw-weight-semibold) var(--sw-text-h4) / 1.3 var(--sw-font-display);
+}
+
+.sw-workbench-panels p {
+  margin: 0;
+  color: var(--sw-fg-muted);
+}
+
+.sw-workbench-panels__controls > span {
+  margin-right: var(--sw-space-1);
+  color: var(--sw-fg);
+  font-weight: var(--sw-weight-semibold);
+}
+
+@media (min-width: 48rem) {
+  .sw-workbench-panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* The code behind the workbench, between its panels and its proof. */
+.sw-showcase-page > .sw-showcase__code-row {
+  padding-top: clamp(var(--sw-space-8), 3vw, var(--sw-space-10));
+}
+
+/* The stage keeps the height each React, Vue and Svelte workbench takes once
+   it mounts: the tallest mounted stage in each band of widths, measured in
+   Chromium every 16 px from 320 to 1920 px. The workbench mounts when its code
+   arrives, seconds after the page paints, so a shorter stage would push the
+   rest of the page down. Measure again when a workbench's layout changes. */
+.sw-showcase-page:is([data-framework="react"], [data-framework="vue"], [data-framework="svelte"])
+  .sw-showcase-stage__viewport {
+  min-height: var(--sw-workbench-height);
+}
+
+.sw-showcase-page[data-framework="react"] {
+  --sw-workbench-height: 77.5rem;
+}
+
+.sw-showcase-page[data-framework="vue"] {
+  --sw-workbench-height: 101.25rem;
+}
+
+.sw-showcase-page[data-framework="svelte"] {
+  --sw-workbench-height: 74.75rem;
+}
+
+@media (min-width: 25rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 68.75rem;
+  }
+}
+
+@media (min-width: 28rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 94.25rem;
+  }
+}
+
+@media (min-width: 35rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 69.75rem;
+  }
+}
+
+@media (min-width: 38rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 59rem;
+  }
+}
+
+@media (min-width: 43rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 87rem;
+  }
+}
+
+@media (min-width: 48rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 81.75rem;
+  }
+
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 63.25rem;
+  }
+}
+
+@media (min-width: 49rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 85.25rem;
+  }
+}
+
+@media (min-width: 52rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 63.75rem;
+  }
+}
+
+@media (min-width: 58rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 60.75rem;
+  }
+}
+
+@media (min-width: 60rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 59.25rem;
+  }
+}
+
+@media (min-width: 71rem) {
+  .sw-showcase-page[data-framework="vue"] {
+    --sw-workbench-height: 82.5rem;
+  }
+}
+
+@media (min-width: 75rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 57.25rem;
+  }
+}
+
+@media (min-width: 98rem) {
+  .sw-showcase-page[data-framework="react"] {
+    --sw-workbench-height: 56rem;
+  }
+}
+
+@media (min-width: 107rem) {
+  .sw-showcase-page[data-framework="svelte"] {
+    --sw-workbench-height: 53.25rem;
+  }
+}
