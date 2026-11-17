@@ -37,11 +37,12 @@ export function validateSheetName(
 }
 
 /**
- * Whether an added sheet may take the validated name. Undo, version restore
- * and copied workbooks add sheets back, and a file from another program can
- * hold a History sheet, so only a rename refuses the reserved name.
+ * Whether a document operation may give a sheet the validated name. Only a
+ * user's rename refuses History, as Excel does (`Grid.renameSheet` checks
+ * it): added and copied sheets, undo, version restore, remote operations and
+ * files from other programs keep the name.
  */
-export function canAddSheetName(result: SheetNameValidationResult): boolean {
+export function operationAcceptsSheetName(result: SheetNameValidationResult): boolean {
   return result.ok || result.code === "reserved";
 }
 

@@ -31,6 +31,7 @@ import {
 } from "./engine.js";
 import { SheetwriteError } from "./errors.js";
 import { DEFAULT_DISTINCT_VALUES_LIMIT } from "./grid-constants.js";
+import { releaseOwnedArrays } from "./json-bytes.js";
 import { clonePivots, pivotOwner, withoutSavedOutput } from "./pivot.js";
 import type {
   RuntimeMemoryObservation,
@@ -120,7 +121,8 @@ export interface SheetwriteStoreOptions extends StoreDataEngineOptions {
 }
 
 type ChangeListener = (event: ChangeEvent) => void;
-const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
+/** The message of each sheet lifecycle issue code. */
+export const SHEET_LIFECYCLE_MESSAGES: Readonly<Record<SheetLifecycleIssueCode, string>> = {
   blank: "Sheet name cannot be blank",
   "too-long": "Sheet name exceeds 31 UTF-16 code units",
   "forbidden-character": "Sheet name contains a forbidden character",
@@ -932,6 +934,8 @@ export class SheetwriteStore implements Store {
         !this.protectionResolver,
       replayPivotSources: source === "remote" || commitReason === "undo" || commitReason === "redo",
     });
+    // Listeners and the result hand the operations to callers.
+    releaseOwnedArrays();
 
     if (effects.appliedPatches.length === 0) {
       return {
@@ -995,6 +999,8 @@ export class SheetwriteStore implements Store {
     limits: Readonly<TransactionResourceLimits>,
     preparation: TransactionPreparation,
   ): LocalPolicyOutcome | ApplyTransactionResult {
+    // Permission callbacks receive the operations; the re-check below must not trust them.
+    releaseOwnedArrays();
     const policy = this.policy.evaluate(
       tx.patches,
       commitReason,
