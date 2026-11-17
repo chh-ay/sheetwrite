@@ -16,6 +16,10 @@ Single-context: one root `GLOSSARY.md`. Design decisions are tracked as GitHub i
 
 Before changing any Rust crate (`packages/wasm`, `packages/wasm/history`, `packages/queries/engine`), read `docs/contributing/rust.md`: the lint policy and the performance conventions. Check with `bun run lint:rust`.
 
+### Command glyphs
+
+A command that the toolbar, the ribbon, the context menu or the sheet tab menu shows needs its own glyph on the icon sheet, in the sheet's style. See "Adding a glyph" in `CONTRIBUTING.md`.
+
 ### Tests
 
 Do not add a unit test the change does not need.
