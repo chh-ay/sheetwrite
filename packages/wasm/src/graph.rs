@@ -4,7 +4,7 @@
 //! [`FormulaGraph`] owns the workbook dependency index and keeps it in step
 //! with entry replacements, dropping it for rewrites it cannot patch.
 
-use crate::eval::{build_dep_index, DepIndex};
+use crate::eval::{build_dep_index, DepIndex, FormulaOriginGuard};
 use crate::formula_slots::{FormulaId, FormulaStore};
 use crate::memory::{
     StoreMemoryStats, DEPENDENCY_EDGES, DEPENDENCY_NODES, FORMULAS, SHEET_INDEXES_METADATA,
@@ -606,8 +606,8 @@ impl SheetFormulas {
     }
 
     /// Refresh source metadata without replacing surviving ids. Each entry
-    /// is rewritten as the formula at its cell, so a defined name placed by
-    /// the cell that reads it is read there.
+    /// that uses a defined name is rewritten as the formula at its cell, so
+    /// a name placed by the cell that reads it is read there.
     pub(crate) fn rewrite_entries(
         &mut self,
         slots: &mut FormulaStore,
@@ -616,11 +616,18 @@ impl SheetFormulas {
         let mut volatile_count = 0;
         let mut subtotal_count = 0;
         for id in self.ids() {
-            let origin = slots.location(id).map(|at| (at.row, at.col));
             let Some(entry) = slots.get_mut(id) else {
                 continue;
             };
-            crate::eval::with_formula_origin(origin.unwrap_or_default(), || rewrite(entry));
+            if entry.uses_names() {
+                let origin = slots.location(id).map(|at| (at.row, at.col));
+                let _origin = FormulaOriginGuard::push(origin.unwrap_or_default());
+                if let Some(entry) = slots.get_mut(id) {
+                    rewrite(entry);
+                }
+            } else {
+                rewrite(entry);
+            }
             slots.refresh_flags(id);
             volatile_count += usize::from(slots.is_volatile(id));
             subtotal_count += usize::from(slots.is_subtotal(id));
@@ -631,7 +638,8 @@ impl SheetFormulas {
 
     /// Moves entries at or below `at` down by `count` rows on this sheet
     /// (`names.sheet`), rewriting their same-sheet references, and dirties
-    /// the whole sheet.
+    /// the whole sheet. Only a formula that uses a defined name is moved as
+    /// the formula at its new cell, to place a name relative to the cell.
     pub(crate) fn insert_rows(
         &mut self,
         names: NameScope<'_>,
@@ -645,9 +653,10 @@ impl SheetFormulas {
             } else {
                 row
             };
-            crate::eval::with_formula_origin((moved_row, col), || {
-                entry.shift_rows(at, i64::from(count), names, names.sheet)
-            });
+            let _origin = entry
+                .uses_names()
+                .then(|| FormulaOriginGuard::push((moved_row, col)));
+            entry.shift_rows(at, i64::from(count), names, names.sheet);
             Some((moved_row, col))
         });
     }
@@ -667,9 +676,10 @@ impl SheetFormulas {
                 return None;
             }
             let moved_row = if row >= end { row - count } else { row };
-            crate::eval::with_formula_origin((moved_row, col), || {
-                entry.shift_rows(at, -i64::from(count), names, names.sheet)
-            });
+            let _origin = entry
+                .uses_names()
+                .then(|| FormulaOriginGuard::push((moved_row, col)));
+            entry.shift_rows(at, -i64::from(count), names, names.sheet);
             Some((moved_row, col))
         });
     }
@@ -688,9 +698,10 @@ impl SheetFormulas {
             } else {
                 col
             };
-            crate::eval::with_formula_origin((row, moved_col), || {
-                entry.shift_cols(at, i64::from(count), names, names.sheet)
-            });
+            let _origin = entry
+                .uses_names()
+                .then(|| FormulaOriginGuard::push((row, moved_col)));
+            entry.shift_cols(at, i64::from(count), names, names.sheet);
             Some((row, moved_col))
         });
     }
@@ -709,9 +720,10 @@ impl SheetFormulas {
                 return None;
             }
             let moved_col = if col >= end { col - count } else { col };
-            crate::eval::with_formula_origin((row, moved_col), || {
-                entry.shift_cols(at, -i64::from(count), names, names.sheet)
-            });
+            let _origin = entry
+                .uses_names()
+                .then(|| FormulaOriginGuard::push((row, moved_col)));
+            entry.shift_cols(at, -i64::from(count), names, names.sheet);
             Some((row, moved_col))
         });
     }
