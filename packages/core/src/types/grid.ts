@@ -1298,6 +1298,8 @@ export interface Grid {
   /**
    * Find cells matching `query`, which takes Excel's wildcards (`*`, `?`,
    * `~`); highlights matches, selects the first, emits `search`, returns the result.
+   * On the active sheet a selection of more than one cell limits the search to
+   * it, as in Excel; the selection stays and the active cell moves to the match.
    */
   search(query: string, opts?: SearchOptions): SearchResult;
   /** Move the active match to the next match and scroll it into view. */

@@ -196,6 +196,31 @@ describe("find", () => {
 
     grid.destroy();
   });
+
+  it("searches and replaces only a selection of more than one cell, as Excel does", () => {
+    const workbook = makeWorkbook(10);
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    // makeColumnarData puts Tokyo in column 2 of rows 1, 4 and 7.
+    const range = { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 5, col: 2 } };
+    grid.setSelection({ kind: "range", range });
+
+    expect(grid.search("Tokyo").matches).toEqual([A(1, 2), A(4, 2)]);
+    // The selection stays; Find Next moves the active cell inside it.
+    expect(grid.getSelection()).toEqual({ kind: "range", range, active: A(1, 2) });
+    grid.findNext();
+    expect(grid.getSelection()).toEqual({ kind: "range", range, active: A(4, 2) });
+    // Typing more of the query searches the same selection.
+    expect(grid.search("Toky").matches).toEqual([A(1, 2), A(4, 2)]);
+
+    expect(grid.replaceAll("Kyoto").replaced).toBe(2);
+    expect(store.getCell(A(1, 2)).resolved).toBe("Kyoto");
+    expect(store.getCell(A(4, 2)).resolved).toBe("Kyoto");
+    expect(store.getCell(A(7, 2)).resolved).toBe("Tokyo");
+    expect(grid.getSelection()).toMatchObject({ kind: "range", range });
+
+    grid.destroy();
+  });
 });
 
 describe("find with Excel's wildcards and Look in", () => {
