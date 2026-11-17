@@ -922,6 +922,12 @@ export class GridImpl implements Grid {
         ),
       scrollToCell: (addr) => this.scrollToCell(addr),
       selectCell: (addr) => this.setSelection({ kind: "cell", addr }),
+      setActiveCell: (addr) => {
+        this.selection.setActiveCell(addr.row, addr.col);
+        this.emitSelection();
+        this.scheduleRender();
+      },
+      selectionScope: () => this.findScope(),
       scheduleRender: () => this.scheduleRender(),
       emit: (result) => {
         for (const fn of this.listeners.search) fn(result);
@@ -2003,6 +2009,23 @@ export class GridImpl implements Grid {
   private anchorCell(row: number, col: number): CellRef {
     const merge = this.mergeAnchorAt(row, col);
     return merge ? { row: merge.r0, col: merge.c0 } : { row, col };
+  }
+
+  /**
+   * The selected rectangles when they hold more than one cell: Excel's Find
+   * and Replace search only those. One cell, or one merged cell, gives null.
+   */
+  private findScope(): SelRect[] | null {
+    const rects: SelRect[] = [];
+    this.selection.forEachRect((rect) => rects.push({ ...rect }));
+    const [first] = rects;
+    if (first === undefined) return null;
+    if (rects.length > 1) return rects;
+
+    const cell = this.mergeAnchorAt(first.r0, first.c0) ?? { ...first, r1: first.r0, c1: first.c0 };
+    const isOneCell =
+      cell.r0 === first.r0 && cell.c0 === first.c0 && cell.r1 === first.r1 && cell.c1 === first.c1;
+    return isOneCell ? null : rects;
   }
 
   private scheduleRender(): void {
