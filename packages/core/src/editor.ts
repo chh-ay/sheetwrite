@@ -42,6 +42,27 @@ const ARROW_STEPS: Readonly<Record<string, readonly [number, number, EditNavigat
 /** Text before the caret after which an arrow key points at a cell, as in Excel. */
 const POINTABLE = /[=(,;+\-*/^&<>:]$/;
 
+/** Excel's AutoComplete for one edit (`autocomplete.ts`), with its list of matching entries. */
+export interface EditCompletion {
+  /**
+   * After each change to the text, list the entries that begin it. When
+   * `typed` (a typed character, the key that opened the editor, or an IME
+   * composition that ended), also complete the text in place with the added
+   * text selected. Returns the entry the text then shows, or null.
+   */
+  complete(field: HTMLTextAreaElement, typed: boolean): string | null;
+  /**
+   * A key pressed in the editor; true when the list used it. Enter and Tab
+   * in the list put its entry in the field and return false, so the editor
+   * commits the entry as usual.
+   */
+  keyDown(event: KeyboardEvent, field: HTMLTextAreaElement): boolean;
+  /** Follow the field after it moves. */
+  reposition(field: HTMLTextAreaElement): void;
+  /** Remove the list: the edit ended. */
+  close(): void;
+}
+
 export interface EditRect {
   x: number;
   y: number;
@@ -81,12 +102,10 @@ export interface BeginEditOptions {
   /** An arrow key in Enter mode points from the last pointed cell by (`dRow`, `dCol`); Shift extends. */
   onPoint?: (dRow: number, dCol: number, extend: boolean) => void;
   /**
-   * Excel's AutoComplete: completes the field's text in place, with the added
-   * text selected, and returns the entry it shows, or null. Asked after each
-   * typed character, after the key that opened the editor and after an IME
-   * composition ends.
+   * Excel's AutoComplete, asked after each change to the text, and given the
+   * keys first.
    */
-  complete?: (field: HTMLTextAreaElement) => string | null;
+  complete?: EditCompletion;
 }
 
 /** What the textarea's last sizing depended on; equal inputs give the same height. */
@@ -236,6 +255,7 @@ export class EditController {
       this.size(rect.h);
     }
     this.assist?.reposition();
+    this.opts?.complete?.reposition(ta);
   }
 
   get value(): string {
@@ -301,7 +321,10 @@ export class EditController {
     if (!ta) return;
     this.refStart = -1;
     this.completion = null;
-    if (!this.composing && typedText(event)) this.autoComplete(ta);
+    if (!this.composing) {
+      if (typedText(event)) this.autoComplete(ta);
+      else this.opts?.complete?.complete(ta, false);
+    }
     this.resize();
     if (this.assistAttached) this.assist?.update();
     this.opts?.onText(ta.value);
@@ -309,7 +332,7 @@ export class EditController {
 
   /** AutoComplete (`autocomplete.ts`): complete the text, with the added text selected. */
   private autoComplete(ta: HTMLTextAreaElement): void {
-    this.completion = this.opts?.complete?.(ta) ?? null;
+    this.completion = this.opts?.complete?.complete(ta, true) ?? null;
   }
 
   /** The user moved into the cell editor: formula help follows the caret here. */
@@ -399,6 +422,12 @@ export class EditController {
       e.stopPropagation();
       return;
     }
+    // AutoComplete's list takes its keys once Alt+Down moved into it.
+    if (this.textarea && this.opts?.complete?.keyDown(e, this.textarea)) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (this.textarea && insertEditorLineBreak(e, this.textarea)) {
       e.stopPropagation();
       return;
@@ -458,6 +487,7 @@ export class EditController {
     if (!ta) return;
     this.tearingDown = true;
     this.detachAssist();
+    this.opts?.complete?.close();
     ta.removeEventListener("compositionstart", this.onCompositionStart);
     ta.removeEventListener("compositionend", this.onCompositionEnd);
     ta.removeEventListener("keydown", this.onKeyDown);

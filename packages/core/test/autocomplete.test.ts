@@ -234,3 +234,40 @@ describe("AutoComplete", () => {
     expect(shown()).toEqual(["Tokyo", "kyo"]);
   });
 });
+
+describe("AutoComplete's list", () => {
+  it("lists the entries when several match, and takes keys only after Alt+Down", async () => {
+    mount(["North", "Northeast", "Nordic"]);
+    at(3);
+    const options = () =>
+      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map((option) => [
+        option.textContent,
+        option.getAttribute("aria-selected"),
+      ]);
+    await type("Nor");
+    expect(shown()).toEqual(["Nor", ""]);
+    expect(options()).toEqual([
+      ["Nordic", "false"],
+      ["North", "false"],
+      ["Northeast", "false"],
+    ]);
+
+    await type("t");
+    expect(options().map(([entry]) => entry)).toEqual(["North", "Northeast"]);
+    key("ArrowDown", { altKey: true });
+    key("ArrowDown");
+    expect(options()).toEqual([
+      ["North", "false"],
+      ["Northeast", "true"],
+    ]);
+    key("Enter");
+    expect(value(3)).toBe("Northeast");
+    expect(host.querySelector(".sheetwrite-entry-list")).toBeNull();
+
+    // Without Alt+Down the keys stay Excel's: Enter stores what was typed.
+    at(4);
+    await type("Nor");
+    key("Enter");
+    expect(value(4)).toBe("Nor");
+  });
+});
