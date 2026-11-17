@@ -1,6 +1,7 @@
 // The panels a sheet tab's menu opens: Excel's Move or Copy dialog and its
 // Tab Color palette. They show in place of the menu's items and close as the
-// menu does (Escape, a press outside, or focus leaving them).
+// menu does (Escape, a press outside, or focus leaving them). They load on
+// first use.
 
 import type { SheetTabCommand, SheetTabs } from "./sheet-tabs.js";
 import type { SheetId } from "./types/coordinates.js";
@@ -149,10 +150,9 @@ function createMoveCopyDialog(grid: Grid, tabs: SheetTabs, sheet: Sheet): HTMLEl
   const ok = (): void => {
     const before = Number(list.value);
     if (copy.checked) {
-      void grid.copySheet(sheet.id, { index: before }).then((result) => {
-        if (result.status === "applied") grid.setActiveSheet(result.sheet);
-        tabs.performLifecycle(sheet.id, () => result);
-      });
+      const result = grid.copySheet(sheet.id, { index: before });
+      if (result.status === "applied") grid.setActiveSheet(result.sheet);
+      tabs.performLifecycle(sheet.id, () => result);
       return;
     }
     const from = sheets.findIndex((candidate) => candidate.id === sheet.id);

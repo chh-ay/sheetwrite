@@ -185,7 +185,9 @@
 }
 
 .sheetwrite-tab-menu-item {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   min-height: 28px;
   border: 1px solid transparent;
@@ -197,6 +199,13 @@
   font: inherit;
   text-align: start;
   white-space: nowrap;
+}
+
+/* The icon column: a glyph from icons.css, or an empty slot that keeps labels aligned. */
+.sheetwrite-tab-menu-icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
 }
 
 .sheetwrite-tab-menu-item:hover,

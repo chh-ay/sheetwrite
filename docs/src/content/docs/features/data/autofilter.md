@@ -27,7 +27,7 @@ Click a header button, or press **Alt+Down** on a header cell, to open the colum
 - A search box narrows the value list. With a search, **OK** keeps only the ticked results.
 - The value list ticks the values to show, with **(Select All)** and **(Blanks)**. As in Excel, it lists only the values of the rows that the other columns' filters keep, up to 10,000 of them.
 
-A filtered column's button shows a funnel. While rows are hidden, the row headers show each row's number in the sheet.
+A filtered column's button shows a funnel beside its arrow. While rows are hidden, the row headers show each row's number in the sheet.
 
 The dropdown is a dialog named for its column. Tab moves between its parts and stays inside it. In the value list, the arrow keys, Home, End, Page Up and Page Down move, Space ticks or unticks, and Enter applies. Escape closes the dropdown and gives the focus back to the cell.
 
