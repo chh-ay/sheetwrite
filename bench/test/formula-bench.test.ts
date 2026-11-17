@@ -270,6 +270,7 @@ describe("formula regression gate", () => {
       "row-insert-names",
       "table-append-row",
       "sort-formula-column",
+      "cell-move-refs",
       "parse-load-qualified",
       "parse-load-table",
       "memory-import",

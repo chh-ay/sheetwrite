@@ -7,6 +7,7 @@ import { restoreBlockFacts } from "../restore-block.js";
 import { applySheetLifecycleOperation, createSheetLifecycleState } from "../sheet-lifecycle.js";
 import type { CellAddress, SheetId } from "../types/coordinates.js";
 import type { DocumentOp, MutationIssue } from "../types/document.js";
+import { cellBlockMove } from "./move-cells.js";
 import {
   deleteRemap,
   insertRemap,
@@ -741,6 +742,17 @@ export class PagedDirtyPreflight {
             range.start.col,
             range.end.row - range.start.row + 1,
             range.end.col - range.start.col + 1,
+          );
+        }
+      } else if (patch.op === "moveCells") {
+        // A block move writes the cells it leaves and the cells it lands on.
+        for (const block of Object.values(cellBlockMove(patch))) {
+          rejection ??= addRectangle(
+            block.sheet,
+            block.start.row,
+            block.start.col,
+            block.end.row - block.start.row + 1,
+            block.end.col - block.start.col + 1,
           );
         }
       }
