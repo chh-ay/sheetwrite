@@ -37,6 +37,12 @@ export type SheetTabCommand = "moveCopy" | "tabColor";
 export interface SheetTabsOptions {
   onActivate: (id: SheetId) => void;
   /**
+   * Give the keyboard to the active sheet. Called after a tab is clicked, so
+   * keys act on the sheet, as in Excel; a tab chosen from the keyboard keeps
+   * the focus.
+   */
+  focusSheet?: () => void;
+  /**
    * Add a sheet at workbook position `index`, or after the last one. The add
    * button and Shift+F11 add at the end; the sheet menu's Insert, before its sheet.
    */
@@ -136,6 +142,7 @@ export class SheetTabs {
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
   private readonly label: string;
   private readonly icons: (() => IconOverrides | undefined) | undefined;
+  private readonly focusSheet: (() => void) | undefined;
   private readonly errorId = `sheetwrite-sheet-error-${++nextErrorId}`;
   private readonly menuId = `${this.errorId}-options`;
 
@@ -171,6 +178,7 @@ export class SheetTabs {
     this.readOnly = options.readOnly ?? false;
     this.label = options.label ?? "Sheets";
     this.icons = options.icons;
+    this.focusSheet = options.focusSheet;
     host.setAttribute("role", "group");
     host.setAttribute("aria-label", `${this.label} controls`);
     host.addEventListener("keydown", this.onKeydown);
@@ -412,10 +420,12 @@ export class SheetTabs {
       this.scrollIntoView(tab);
     });
 
-    tab.addEventListener("click", () => {
+    tab.addEventListener("click", (event) => {
       this.focusedId = sheet.id;
       this.feedback = null;
       this.onActivate(sheet.id);
+      // A keyboard press of the tab makes a click with no pointer presses.
+      if (event.detail > 0) this.focusSheet?.();
     });
 
     if (!this.readOnly) {

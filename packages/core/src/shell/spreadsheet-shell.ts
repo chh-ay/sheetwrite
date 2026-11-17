@@ -268,6 +268,7 @@ export function createSpreadsheetShell(
     bottomRow.prepend(tabHost);
     tabs = new SheetTabs(tabHost, {
       onActivate: (id) => grid.setActiveSheet(id),
+      focusSheet: focusGrid,
       onAdd: (index) => {
         const result = grid.addSheet({ name: nextSheetName(), index });
         if (result.status === "applied") grid.setActiveSheet(result.sheet);

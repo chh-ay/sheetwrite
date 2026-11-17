@@ -281,3 +281,38 @@ test("the ribbon runs the Data query commands by keyboard", async ({ page }) => 
   await refreshAll.click();
   await expect(status).not.toHaveText(/Queries refreshed\.|Refreshing queries/u);
 });
+
+test("undo and redo of a change on another sheet show that sheet, after a tab click @portability", async ({
+  page,
+}) => {
+  await open(page);
+  const nameBox = page.getByRole("textbox", { name: "Cell reference" });
+  const shown = () =>
+    page.evaluate(() => {
+      const grid = window.__sheetwriteSpreadsheetGrid!;
+      const workbook = grid.store.getWorkbook();
+      const sheet = workbook.sheets.find((candidate) => candidate.id === grid.getActiveSheet());
+      const sales = workbook.sheets.find((candidate) => candidate.name === "Sales")!;
+      return {
+        sheet: sheet?.name,
+        c5: grid.store.getCell({ sheet: sales.id, row: 4, col: 2 }).resolved,
+      };
+    });
+
+  await select(page, "C5");
+  await page.keyboard.type("Zed");
+  await page.keyboard.press("Enter");
+  await expect.poll(shown).toEqual({ sheet: "Sales", c5: "Zed" });
+
+  // The clicked sheet shows A1 and takes the keys, as in Excel.
+  await page.getByRole("tab", { name: "Summary sheet" }).click();
+  await expect(nameBox).toHaveValue("A1");
+  await page.keyboard.press("Control+Z");
+  await expect.poll(shown).toEqual({ sheet: "Sales", c5: "Devon" });
+  await expect(nameBox).toHaveValue("C5");
+
+  await page.getByRole("tab", { name: "Summary sheet" }).click();
+  await page.keyboard.press("Control+Y");
+  await expect.poll(shown).toEqual({ sheet: "Sales", c5: "Zed" });
+  await expect(nameBox).toHaveValue("C5");
+});

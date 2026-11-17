@@ -162,7 +162,9 @@ Custom UI can show the outcome without tripping global error monitoring.
 
 ## Undo and redo
 
-`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step through the recorded transactions. As in Excel, each step selects the cells it changes on the active sheet and scrolls to them; undoing a row, column or object edit keeps the selection. Remote operations from a `SyncCoordinator` do not create undo entries.
+`grid.undo()` and `grid.redo()` (and Ctrl/Cmd + Z, Ctrl/Cmd + Shift + Z) step through the recorded transactions. As in Excel, each step selects the cells it changes and scrolls to them. A step that changes cells only on another sheet makes that sheet active first, so the change is in view; undoing a row, column or object edit keeps the selection. Remote operations from a `SyncCoordinator` do not create undo entries.
+
+Each sheet keeps its selection and scroll position: going back to a sheet shows them again, and a sheet shown for the first time has A1 selected, as in Excel. Clicking a sheet tab gives the keyboard to the sheet, so Ctrl/Cmd + Z and the other keys act on it at once.
 
 History keeps at most 200 entries and 256 MiB of retained range snapshots, about twenty million-cell clears. When it passes either limit, it drops its oldest entries. The newest entry always stays undoable. The 256 MiB limit counts the snapshot bytes that the engine reports. It is not a limit on total process memory: it excludes cloned formula ASTs and JavaScript patch and redo payloads, which only the 200-entry limit bounds.
 
