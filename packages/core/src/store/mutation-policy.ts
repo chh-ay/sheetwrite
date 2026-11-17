@@ -17,6 +17,7 @@ import type { PivotDefinition } from "../types/pivot.js";
 import {
   cellRange,
   fullSheetRange,
+  movedBlock,
   normalizedRange,
   patchSheetId,
   pivotWrittenRange,
@@ -275,6 +276,9 @@ export class StoreMutationPolicy {
       case "clearRange":
       case "permuteRows":
         return [normalizedRange(patch.range)];
+
+      case "moveCells":
+        return [normalizedRange(patch.range), movedBlock(patch)];
 
       case "addMerge":
       case "removeMerge":

@@ -79,10 +79,10 @@ interface InteractionDependencies {
   openAutoFilter: (col: number) => void;
   /**
    * Run a key's command from `cell-commands.ts` or, for the keys that switch
-   * sheets, `sheet-commands.ts`; both load on first use.
+   * sheets, `sheet-commands.ts`.
    */
   keyCommand: (command: CellCommand | SheetKey) => void;
-  /** Hold a key pressed while a command's code loads; false when none loads. */
+  /** Hold a key pressed while lazily loaded UI's code loads; false when none loads. */
   holdKey: (e: KeyboardEvent) => boolean;
   /** Whether the host leaves AutoComplete on (`GridConfig.autoComplete`), read per edit. */
   autoComplete: () => boolean;
@@ -159,6 +159,8 @@ interface InteractionDependencies {
   commit: (patches: DocumentOp[], reason: CommitReason) => ApplyTransactionResult;
   /** Runs before a cell editor opens; hides the note card that would cover it. */
   onEditStart: () => void;
+  /** Ends the cut that waits for a paste; returns whether there was one. */
+  cancelCut: () => boolean;
   readOnly: () => boolean;
 }
 
@@ -1270,7 +1272,7 @@ export class InteractionSessions {
           break;
 
         default:
-          // The format, hide, insert, Format Cells and sheet keys run from chunks.
+          // The format, hide, insert, Format Cells and sheet keys.
           this.deps.keyCommand(action);
       }
 
@@ -1390,6 +1392,11 @@ export class InteractionSessions {
         // Excel clears the active cell and opens it for typing; Esc restores it.
         if (mod || e.altKey || !focus) return;
         this.beginEdit(focus.row, focus.col, "");
+        break;
+
+      case "Escape":
+        // Esc ends a cut's moving border, as in Excel.
+        if (!this.deps.cancelCut()) return;
         break;
 
       default:

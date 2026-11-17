@@ -21,6 +21,7 @@ import {
   TIME_TYPES,
 } from "./format-presets.js";
 import { formatNumber } from "./number-format.js";
+import type { StyleActionsDeps } from "./style-actions.js";
 import type { CellAlign, CellScalar, CellStyle, CellVerticalAlign } from "./types/cell.js";
 import type { BorderPreset } from "./types/grid.js";
 
@@ -128,6 +129,29 @@ function colorInputValue(color: string | undefined): string {
 }
 
 let dialogCount = 0;
+
+/**
+ * Open Format Cells for the selection behind `deps`, showing its active
+ * cell's format, with its column's number format when it has none of its
+ * own. Resolves to the changes on OK, or to `null`.
+ */
+export function formatSelectionDialog(
+  grid: DialogHost,
+  deps: StyleActionsDeps,
+  font: string,
+): Promise<FormatCellsChange | null> {
+  const focus = deps.selection().focusCell;
+  if (focus === null) return Promise.resolve(null);
+  const anchor = deps.anchorCell(focus.row, focus.col);
+  const cell = deps.store.getCell({
+    sheet: deps.activeSheet(),
+    row: deps.toDataRow(anchor.row),
+    col: anchor.col,
+  });
+  const numberFormat = cell.style.numberFormat ?? deps.sheet().columns[anchor.col]?.numberFormat;
+  const input = { style: { ...cell.style, numberFormat }, sample: cell.resolved, font };
+  return formatCellsDialog(grid, input).result;
+}
 
 /**
  * Open Format Cells over `host`. `result` resolves to the changes on OK, or

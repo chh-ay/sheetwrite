@@ -1,8 +1,10 @@
+import type { IconName } from "./icons/icon-names.js";
+import { iconNode } from "./icons/resolve.js";
 import { type PopupPlacement, popupPosition } from "./menu-surface.js";
-import { checkStylePart } from "./style-parts.js";
+import { checkIconStyles, checkStylePart } from "./style-parts.js";
 import type { SheetId } from "./types/coordinates.js";
 import type { DocumentOp } from "./types/document.js";
-import type { SheetLifecycleResult } from "./types/grid.js";
+import type { IconOverrides, SheetLifecycleResult } from "./types/grid.js";
 
 /** One selectable sheet record; activation is by `id`, never by display name. */
 export interface SheetTabRecord {
@@ -42,7 +44,7 @@ export interface SheetTabsOptions {
   onRemove?: (id: SheetId) => SheetLifecycleResult;
   onRename?: (id: SheetId, name: string) => SheetLifecycleResult;
   onMove?: (id: SheetId, toIndex: number) => SheetLifecycleResult;
-  /** Open a panel of `sheet-commands.ts` for sheet `id`; it shows itself with `showPanel`. */
+  /** Open a panel of `sheet-tab-panels.ts` for sheet `id`; it shows itself with `showPanel`. */
   onCommand?: (command: SheetTabCommand, id: SheetId) => void;
   onHide?: (id: SheetId) => SheetLifecycleResult;
   onUnhide?: (id: SheetId) => SheetLifecycleResult;
@@ -50,6 +52,8 @@ export interface SheetTabsOptions {
   label?: string;
   /** Suppresses document lifecycle affordances while retaining navigation. */
   readOnly?: boolean;
+  /** The host's glyph overrides (`config.icons`), read each time the sheet menu opens. */
+  icons?: () => IconOverrides | undefined;
 }
 
 interface VisibleSheet {
@@ -80,7 +84,11 @@ const MENU_PLACEMENT: PopupPlacement = { side: "below", gap: 0 };
 /** The hidden-sheet choices open over the tab bar, which sits at the bottom of the grid. */
 const CHOICES_PLACEMENT: PopupPlacement = { side: "above", gap: 4 };
 
-function createTabIcon(pathData: string): SVGSVGElement {
+/**
+ * A tab bar glyph on a 20-unit grid; `strokeWidth` 1.33 matches the command
+ * icon sheet's 1.6 on 24 units.
+ */
+function createTabIcon(pathData: string, strokeWidth = "2"): SVGSVGElement {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   svg.classList.add("sheetwrite-tab-icon");
   svg.setAttribute("viewBox", "0 0 20 20");
@@ -91,7 +99,7 @@ function createTabIcon(pathData: string): SVGSVGElement {
   path.setAttribute("fill", "none");
   path.setAttribute("stroke", "currentColor");
   path.setAttribute("stroke-linecap", "round");
-  path.setAttribute("stroke-width", "2");
+  path.setAttribute("stroke-width", strokeWidth);
   svg.appendChild(path);
   return svg;
 }
@@ -127,6 +135,7 @@ export class SheetTabs {
   private readonly onHide?: (id: SheetId) => SheetLifecycleResult;
   private readonly onUnhide?: (id: SheetId) => SheetLifecycleResult;
   private readonly label: string;
+  private readonly icons: (() => IconOverrides | undefined) | undefined;
   private readonly errorId = `sheetwrite-sheet-error-${++nextErrorId}`;
   private readonly menuId = `${this.errorId}-options`;
 
@@ -161,6 +170,7 @@ export class SheetTabs {
     this.onUnhide = options.onUnhide;
     this.readOnly = options.readOnly ?? false;
     this.label = options.label ?? "Sheets";
+    this.icons = options.icons;
     host.setAttribute("role", "group");
     host.setAttribute("aria-label", `${this.label} controls`);
     host.addEventListener("keydown", this.onKeydown);
@@ -564,8 +574,12 @@ export class SheetTabs {
         // Excel's Insert adds a sheet before this one.
         const index = this.sheets.indexOf(sheet);
         menu.appendChild(
-          this.createMenuItem("Insert", `Insert a sheet before ${sheet.name}`, "", () =>
-            this.performLifecycle(sheet.id, () => onAdd(index)),
+          this.createMenuItem(
+            "Insert",
+            `Insert a sheet before ${sheet.name}`,
+            "",
+            () => this.performLifecycle(sheet.id, () => onAdd(index)),
+            { icon: "insertSheet" },
           ),
         );
       }
@@ -582,11 +596,19 @@ export class SheetTabs {
       const onCommand = this.onCommand;
       if (onCommand) {
         menu.append(
-          this.createMenuItem("Move or Copy…", `Move or copy ${sheet.name} sheet`, "", () =>
-            onCommand("moveCopy", sheet.id),
+          this.createMenuItem(
+            "Move or Copy…",
+            `Move or copy ${sheet.name} sheet`,
+            "",
+            () => onCommand("moveCopy", sheet.id),
+            { icon: "moveCopySheet" },
           ),
-          this.createMenuItem("Tab Color…", `Tab color for ${sheet.name} sheet`, "", () =>
-            onCommand("tabColor", sheet.id),
+          this.createMenuItem(
+            "Tab Color…",
+            `Tab color for ${sheet.name} sheet`,
+            "",
+            () => onCommand("tabColor", sheet.id),
+            { icon: "tabColor" },
           ),
         );
       }
@@ -614,7 +636,7 @@ export class SheetTabs {
               this.focusedId = sheet.id;
               this.performLifecycle(sheet.id, () => onRemove(sheet.id), true);
             },
-            true,
+            { destructive: true },
           ),
         );
       }
@@ -625,19 +647,26 @@ export class SheetTabs {
     return options;
   }
 
+  /**
+   * One row of the sheet menu. Every row keeps the icon column, so labels line
+   * up with or without a glyph from the command icon sheet.
+   */
   private createMenuItem(
     text: string,
     label: string,
     shortcut: string,
     action: () => void,
-    destructive = false,
+    { destructive = false, icon }: { destructive?: boolean; icon?: IconName } = {},
   ): HTMLButtonElement {
     const button = document.createElement("button");
     button.type = "button";
     button.className = destructive
       ? "sheetwrite-tab-menu-item sheetwrite-tab-menu-item-destructive"
       : "sheetwrite-tab-menu-item";
-    button.textContent = text;
+    const iconSlot = document.createElement("span");
+    iconSlot.className = "sheetwrite-tab-menu-icon";
+    if (icon) iconSlot.append(iconNode(icon, this.icons?.()));
+    button.append(iconSlot, text);
     button.tabIndex = -1;
     button.setAttribute("role", "menuitem");
     button.setAttribute("aria-label", label);
@@ -650,7 +679,7 @@ export class SheetTabs {
     const button = document.createElement("button");
     button.type = "button";
     button.className = "sheetwrite-tab-add";
-    button.appendChild(createTabIcon("M10 4v12M4 10h12"));
+    button.appendChild(createTabIcon("M10 4v12M4 10h12", "1.33"));
     button.setAttribute("aria-label", "Add sheet");
     button.title = "Add sheet";
     button.setAttribute("aria-keyshortcuts", "Shift+F11");
@@ -819,7 +848,7 @@ export class SheetTabs {
 
   /**
    * Show `panel` in place of the items of sheet `id`'s open menu; it closes as
-   * the menu does. `sheet-commands.ts` builds the panels.
+   * the menu does. `sheet-tab-panels.ts` builds the panels.
    */
   showPanel(id: SheetId, panel: HTMLElement): void {
     if (this.menuSheetId !== id) return;
@@ -867,6 +896,7 @@ export class SheetTabs {
     const { left, top } = popupPosition(triggerRect, menu.getBoundingClientRect(), MENU_PLACEMENT);
     menu.style.left = `${left}px`;
     menu.style.top = `${top}px`;
+    checkIconStyles(menu, "The sheet tab menu");
   }
 
   private addMenuDismissListeners(): void {

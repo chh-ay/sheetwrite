@@ -109,6 +109,8 @@ export function expectedFormulaOutput(id: string, size: number): FormulaOutput {
       return ((size + 1) * (size + 2)) / 2;
     case "sort-formula-column":
       return 2 * (sortedSourceRow(size, size - 1) + 1);
+    case "cell-move-refs":
+      return size * CELL_MOVE_SCALE;
     case "parse-load-qualified":
       return size;
     case "parse-load-table":
@@ -1894,6 +1896,44 @@ function sortedSourceRow(rows: number, row: number): number {
   return (row * SORT_STRIDE) % rows;
 }
 
+/** The value of the cell that every formula of `cell-move-refs` multiplies by. */
+const CELL_MOVE_SCALE = 2;
+
+/**
+ * Column A holds 1…count and column B `=A{r}*$D$1`. The timed run moves D1 to
+ * D2, as a cut and paste does, so every formula's reference follows it.
+ */
+function cellMoveRefsFixture(count: number): TimedFixture {
+  const store = new CellStore();
+  const sheet = store.addSheet(4, count);
+  writeNumberColumn(
+    store,
+    sheet,
+    0,
+    0,
+    numericColumn(count, (row) => row + 1),
+    0,
+  );
+  store.setNumber(sheet, 0, 3, CELL_MOVE_SCALE, 0);
+  for (let row = 0; row < count; row++) {
+    store.setFormula(sheet, row, 1, `=A${row + 1}*$D$1`, 0);
+  }
+  store.recompute(sheet);
+  return {
+    store,
+    run: () => {
+      assert(store.moveCells(sheet, 0, 3, 1, 1, sheet, 1, 3) === 0, "cell moved");
+      store.recompute(sheet);
+    },
+    check: () => numberAt(store, sheet, count - 1, 1),
+    dispose: () => store.free(),
+    restore: () => {
+      assert(store.moveCells(sheet, 1, 3, 1, 1, sheet, 0, 3) === 0, "cell moved back");
+      store.recompute(sheet);
+    },
+  };
+}
+
 /** Column A holds 1…count and column B `=A{r}*2`. The timed run sorts A:B by a fixed shuffle. */
 function sortFormulaColumnFixture(count: number): TimedFixture {
   const store = new CellStore();
@@ -2051,6 +2091,8 @@ function bindingRowFixture(id: string, count: number): TimedFixture {
       return tableAppendRowFixture(count);
     case "sort-formula-column":
       return sortFormulaColumnFixture(count);
+    case "cell-move-refs":
+      return cellMoveRefsFixture(count);
     case "parse-load-qualified":
       return parseLoadQualifiedFixture(count);
     case "parse-load-table":
@@ -3601,6 +3643,7 @@ export function createFormulaFixture(id: string, size: number, rangeSize?: numbe
     case "row-insert-names":
     case "table-append-row":
     case "sort-formula-column":
+    case "cell-move-refs":
     case "parse-load-qualified":
     case "parse-load-table":
     case "memory-import":

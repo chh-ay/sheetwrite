@@ -40,6 +40,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       label: "Insert",
       icon: "insert",
       items: [
+        { action: "insertCells", label: "Cells…" },
+        { action: "separator" },
         { action: "insertRowAbove", label: "Row above" },
         { action: "insertRowBelow", label: "Row below" },
         { action: "separator" },
@@ -52,6 +54,8 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
       label: "Delete",
       icon: "delete",
       items: [
+        { action: "deleteCells", label: "Cells…" },
+        { action: "separator" },
         { action: "deleteRow", label: "Row" },
         { action: "deleteColumn", label: "Column" },
       ],
@@ -130,6 +134,8 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   insertColumnRight: "insert",
   deleteRow: "delete",
   deleteColumn: "delete",
+  insertCells: "insertCells",
+  deleteCells: "deleteCells",
   hideRow: "hideRows",
   showAllRows: "unhideRows",
   autoFitRow: "format",
@@ -148,7 +154,7 @@ const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName>
   editNote: "note",
   deleteNote: "note",
   pivotFields: "pivotTable",
-  formatCells: "format",
+  formatCells: "formatCells",
 };
 
 /** Drops hidden rows, then leading, trailing and doubled separators. */
@@ -201,6 +207,8 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   editNote: "Edit note",
   deleteNote: "Delete note",
   pivotFields: "PivotTable Fields",
+  insertCells: "Insert cells…",
+  deleteCells: "Delete cells…",
   formatCells: "Format cells…",
 };
 
@@ -222,7 +230,7 @@ function actionHandler(
       return () => actions.clearContents();
 
     case "merge":
-      return () => actions.merge();
+      return () => actions.merge({ ask: true });
 
     case "unmerge":
       return () => actions.unmerge();
@@ -253,6 +261,12 @@ function actionHandler(
 
     case "deleteColumn":
       return () => actions.deleteColumn();
+
+    case "insertCells":
+      return () => actions.insertCells({ ask: true });
+
+    case "deleteCells":
+      return () => actions.deleteCells({ ask: true });
 
     case "hideColumn":
       return () => actions.hideColumns();

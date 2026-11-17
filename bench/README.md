@@ -288,6 +288,9 @@ defined names and tables, which the other rows never change after load:
   table grown by one row, and the column's formula in the new row.
 - `sort-formula-column`: `=A1*2` in every row; the timed run sorts A:B by a
   fixed shuffle with `permuteRows`.
+- `cell-move-refs`: `=A1*$D$1` in every row; the timed run moves D1 to D2
+  with `moveCells`, as a cut and paste does, so every formula's reference
+  follows the moved cell.
 - `parse-load-qualified` and `parse-load-table`: `independent-parse-load` with
   `=Data!A1+Data!B1` on a second sheet, and with `=[@Amount]*2` in a table.
 - `memory-import`: `importMemoryState` of a released engine whose formulas

@@ -35,9 +35,8 @@ function makeGrid(rowCount = 10, host = mountHost()): Grid {
 }
 
 describe("StyleActions merge policy", () => {
-  it("restores formula and reference sources and styles when undoing a merge", async () => {
-    const host = mountHost();
-    const grid = makeGrid(4, host);
+  it("restores formula and reference sources and styles when undoing a merge", () => {
+    const grid = makeGrid(4);
     const anchor = { sheet: "s1", row: 1, col: 0 };
     const covered = { ...anchor, row: 2, col: 1 };
     const target = { ...anchor, row: 0, col: 1 };
@@ -59,7 +58,6 @@ describe("StyleActions merge policy", () => {
     });
 
     grid.actions.merge();
-    await answerDialog(host, "OK");
     expect(grid.store.getCell(covered).resolved).toBeNull();
     grid.actions.undo();
     expect(grid.store.getFormula(anchor)).toBe("=B1*2");
@@ -139,9 +137,8 @@ describe("StyleActions merge policy", () => {
     grid.destroy();
   });
 
-  it("keeps anchor content, clears covered cells, and restores the merge with one undo", async () => {
-    const host = mountHost();
-    const grid = makeGrid(4, host);
+  it("keeps anchor content, clears covered cells, and restores the merge with one undo", () => {
+    const grid = makeGrid(4);
     const addresses = [
       { sheet: "s1", row: 1, col: 0 },
       { sheet: "s1", row: 1, col: 1 },
@@ -165,7 +162,6 @@ describe("StyleActions merge policy", () => {
     });
 
     grid.actions.merge();
-    await answerDialog(host, "OK");
 
     expect(grid.store.getWorkbook().sheets[0]!.merges).toEqual([{ r0: 1, c0: 0, r1: 2, c1: 1 }]);
     expect(addresses.map((addr) => grid.store.getCell(addr).resolved)).toEqual([
@@ -206,9 +202,9 @@ describe("StyleActions merge policy", () => {
 
     const merges = (grid: Grid) => grid.store.getWorkbook().sheets[0]!.merges ?? [];
 
-    it("asks first, in a labelled alert dialog, and merges after OK", async () => {
+    it("asks first with `ask`, in a labelled alert dialog, and merges after OK", async () => {
       const { host, grid } = twoValues();
-      grid.actions.mergeAndCenter();
+      grid.actions.mergeAndCenter({ ask: true });
       const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
 
       expect(merges(grid)).toEqual([]);
@@ -237,7 +233,7 @@ describe("StyleActions merge policy", () => {
 
     it("keeps every value on Cancel or Escape, and keeps grid keys out", async () => {
       const { host, grid } = twoValues();
-      grid.actions.merge();
+      grid.actions.merge({ ask: true });
       const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
       // Delete would clear the selection if it reached the grid.
       document.activeElement?.dispatchEvent(
@@ -250,7 +246,7 @@ describe("StyleActions merge policy", () => {
       expect(document.activeElement).toBe(host);
       expect(dialog.isConnected).toBe(false);
 
-      grid.actions.merge();
+      grid.actions.merge({ ask: true });
       const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
       again.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -262,7 +258,7 @@ describe("StyleActions merge policy", () => {
 
     it("keeps Tab inside the dialog, and Enter chooses OK", async () => {
       const { host, grid } = twoValues();
-      grid.actions.merge();
+      grid.actions.merge({ ask: true });
       const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
       const [ok, cancel] = dialog.querySelectorAll("button");
       cancel!.focus();
