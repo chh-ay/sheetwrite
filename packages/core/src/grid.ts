@@ -2106,7 +2106,11 @@ export class GridImpl implements Grid {
       this.objectLayer.select(null);
     }
 
-    for (const listener of this.listeners.selection) listener({ selection });
+    const focus = this.selection.focusCell;
+    const sheetFocus = focus
+      ? { sheet: this.activeSheet, row: this.toDataRow(focus.row), col: focus.col }
+      : null;
+    for (const listener of this.listeners.selection) listener({ selection, sheetFocus });
     this.emitCommandStateChange();
   }
 

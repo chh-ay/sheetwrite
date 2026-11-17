@@ -916,8 +916,13 @@ interface HyperlinkActivationEvent {
 export interface GridEvents {
   /** A transaction committed, from a user edit, the API, undo, or a remote source. */
   change: ChangeEvent;
-  /** The selection changed; `null` when nothing is selected. */
-  selection: { selection: Selection | null };
+  /**
+   * The selection changed; `null` when nothing is selected. `selection` is in
+   * view rows; `sheetFocus` is its focus cell in sheet rows, which differ
+   * under a filter, hidden rows or a view sort. Use the sheet address to
+   * store or look up data.
+   */
+  selection: { selection: Selection | null; sheetFocus: CellAddress | null };
   /** The grid scrolled; reports the scroll offsets in CSS pixels and the visible rows and columns. */
   scroll: {
     scrollTop: number;
@@ -927,10 +932,16 @@ export interface GridEvents {
     firstVisibleColumn: number | null;
     lastVisibleColumn: number | null;
   };
-  /** A cell editor is about to open on `addr`. */
-  "edit-begin": { addr: CellAddress };
-  /** An in-cell edit wrote `value` to `addr`. */
-  "edit-commit": { addr: CellAddress; value: CellValue };
+  /**
+   * A cell editor is about to open on `addr`, in view rows; `sheetAddress` is
+   * the same cell in sheet rows. Use the sheet address to store or look up data.
+   */
+  "edit-begin": { addr: CellAddress; sheetAddress: CellAddress };
+  /**
+   * An in-cell edit wrote `value` to `addr`, in view rows; `sheetAddress` is
+   * the same cell in sheet rows. Use the sheet address to store or look up data.
+   */
+  "edit-commit": { addr: CellAddress; sheetAddress: CellAddress; value: CellValue };
   /** A search ran or moved to another match. */
   search: SearchResult;
   /** Command availability or formatting activity changed. */

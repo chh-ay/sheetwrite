@@ -463,7 +463,10 @@ export class InteractionSessions {
     if (selectionChanged) this.deps.emitSelection();
     if (generation !== this.generation || this.deps.readOnly()) return;
     for (const listener of this.deps.editListeners["edit-begin"]) {
-      listener({ addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col } });
+      listener({
+        addr: { sheet: dataAddr.sheet, row: editCell.row, col: editCell.col },
+        sheetAddress: { ...dataAddr },
+      });
     }
 
     // edit-begin remains a before-open notification. Reentrant callbacks can
@@ -608,6 +611,7 @@ export class InteractionSessions {
       for (const listener of this.deps.editListeners["edit-commit"]) {
         listener({
           addr: { sheet: address.sheet, row: viewRow, col: address.col },
+          sheetAddress: { ...address },
           value,
         });
       }

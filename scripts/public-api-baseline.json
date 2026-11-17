@@ -144,7 +144,7 @@
     "@sheetwrite/core#.#GridCommandState": "b3e9ffd9ad57",
     "@sheetwrite/core#.#GridCommandStateChangeEvent": "2ec89d97ba22",
     "@sheetwrite/core#.#GridConfig": "f8d4ff9f7e28",
-    "@sheetwrite/core#.#GridEvents": "3e48d6b3404a",
+    "@sheetwrite/core#.#GridEvents": "da395c28a39c",
     "@sheetwrite/core#.#GridOptions": "0544bbdf7ef6",
     "@sheetwrite/core#.#GridPanel": "9dc817559867",
     "@sheetwrite/core#.#GridPresentation": "6f2b2b914dd9",
