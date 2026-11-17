@@ -70,9 +70,7 @@ export function createNameBox(
 
   const jump = (): void => {
     const match = A1_CELL_OR_RANGE.exec(input.value.trim());
-    const sheetId = grid.getActiveSheet();
-    const sheet = grid.store.getWorkbook().sheets.find((candidate) => candidate.id === sheetId);
-    if (!match || !sheet) {
+    if (!match) {
       input.setAttribute("aria-invalid", "true");
       return;
     }
@@ -85,13 +83,17 @@ export function createNameBox(
     });
     const start = corner(startCol, startRow);
     const end = corner(endCol, endRow);
-    const inBounds = ({ row, col }: { row: number; col: number }) =>
-      col >= 0 && col < sheet.columns.length && row >= 0 && row < sheet.rowCount;
-    if (!inBounds(start) || !inBounds(end)) {
+    // The cells the grid shows and edits: the sheet's columns and the empty
+    // ones past them that fill the grid's width.
+    if (
+      grid.getCellInput(start.row, start.col) === null ||
+      grid.getCellInput(end.row, end.col) === null
+    ) {
       input.setAttribute("aria-invalid", "true");
       return;
     }
 
+    const sheetId = grid.getActiveSheet();
     const addr = { sheet: sheetId, ...start };
     if (start.row === end.row && start.col === end.col) {
       grid.setSelection({ kind: "cell", addr });

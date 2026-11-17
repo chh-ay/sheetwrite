@@ -211,6 +211,27 @@ describe("createNameBox", () => {
     store.dispose();
   });
 
+  it("takes a cell right of the sheet's columns that the grid shows", () => {
+    const { grid, store, host } = makeGrid();
+    const piece = createNameBox(host, grid, {});
+    const input = piece.element;
+    if (!(input instanceof HTMLInputElement)) throw new Error("name box must be an input");
+
+    // The sheet has columns A to C; the test host's width shows empty columns up to I.
+    input.value = "H2";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(input.hasAttribute("aria-invalid")).toBe(false);
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 1, col: 7 } });
+
+    input.value = "J2";
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+
+    piece.destroy();
+    grid.destroy();
+    store.dispose();
+  });
+
   it("marks invalid or out-of-bounds references without touching the grid", () => {
     const { grid, store, host } = makeGrid();
     const piece = createNameBox(host, grid, {});
