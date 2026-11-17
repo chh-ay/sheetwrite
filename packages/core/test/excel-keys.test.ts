@@ -254,7 +254,7 @@ describe("the cell editor", () => {
     type("=SUM(A1:A3))+");
     press("Enter");
     expect(editor()?.value).toBe("=SUM(A1:A3))+");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.textContent).toContain("There's a problem with this formula.");
     await answerDialog(host, "OK");
     const field = editor();
