@@ -157,8 +157,8 @@ test("Data › Data Validation creates a list from another sheet, from the keybo
   const allow = dialog.getByLabel("Allow");
   await expect(allow).toBeFocused();
   await allow.selectOption("list");
-  // The Targets sheet lists the four regions in A2:A5.
-  await dialog.getByLabel("Source").fill("=Targets!$A$2:$A$5");
+  // The Summary sheet lists the four regions in A2:A5.
+  await dialog.getByLabel("Source").fill("=Summary!$A$2:$A$5");
   await dialog.getByRole("tab", { name: "Settings" }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(dialog.getByRole("tab", { name: "Input Message" })).toBeFocused();
@@ -175,7 +175,7 @@ test("Data › Data Validation creates a list from another sheet, from the keybo
   });
   expect(rules).toEqual([
     expect.objectContaining({
-      condition: { kind: "list", source: "=Targets!$A$2:$A$5" },
+      condition: { kind: "list", source: "=Summary!$A$2:$A$5" },
       inputTitle: "Region",
     }),
   ]);
