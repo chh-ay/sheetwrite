@@ -269,5 +269,23 @@ describe("AutoComplete's list", () => {
     await type("Nor");
     key("Enter");
     expect(value(4)).toBe("Nor");
+
+// https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f
+describe("Pick From Drop-down List", () => {
+  it("lists the column's text entries, sorted, on Alt+Down; Enter puts one in the cell", async () => {
+    mount(["West", "North", "south", "South", 42, "East"]);
+    at(6);
+    key("ArrowDown", { altKey: true });
+    const list = await elementAdded(host, ".sheetwrite-entry-list", HTMLDivElement);
+    const options = [...list.querySelectorAll("[role=option]")].map((option) => option.textContent);
+    expect(options).toEqual(["East", "North", "south", "West"]);
+    expect(document.activeElement).toBe(list);
+
+    for (const name of ["ArrowDown", "Enter"]) {
+      list.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }));
+    }
+    expect(value(6)).toBe("North");
+    expect(list.isConnected).toBe(false);
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 6, col: 0 } });
   });
 });
