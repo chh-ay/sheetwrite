@@ -239,6 +239,59 @@ describe("AutoFilter in the grid", () => {
     expect(store.viewRowCount("s1")).toBe(8);
   });
 
+  it("cuts a filtered range as Excel does: the rows the filter hides move too", async () => {
+    // The clipboard's rich format carries the cut's token, as a browser's does.
+    class ClipItem {
+      readonly types: string[];
+      constructor(private readonly entries: Record<string, Blob>) {
+        this.types = Object.keys(entries);
+      }
+      getType(type: string): Promise<Blob> {
+        const blob = this.entries[type];
+        return blob ? Promise.resolve(blob) : Promise.reject(new Error(`No ${type}`));
+      }
+    }
+    let items: ClipItem[] = [];
+    Object.defineProperty(globalThis, "ClipboardItem", { configurable: true, value: ClipItem });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: {
+        write: (written: ClipItem[]) => {
+          items = written;
+          return Promise.resolve();
+        },
+        read: () => Promise.resolve(items),
+      },
+    });
+    const { grid, store } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    // A2:A4 shows apple and fig; banana, between them, is hidden.
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+    // Paste on A7: view row 5 is sheet row 7 below the filtered range.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 5, col: 0 } });
+    expect(await grid.actions.paste()).toBe("done");
+    const item = (row: number) => store.getCell({ sheet: "s1", row, col: 0 }).resolved;
+    expect([1, 2, 3, 6, 7, 8].map(item)).toEqual([null, null, null, "apple", "banana", "fig"]);
+
+    // Pasted in the filtered list, the cut lands on the sheet rows from B2
+    // down, the hidden B3 included, as in Excel.
+    grid.undo();
+    grid.setSelection({
+      kind: "range",
+      range: { sheet: "s1", start: { row: 1, col: 0 }, end: { row: 2, col: 0 } },
+    });
+    expect(await grid.actions.cut()).toBe("done");
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 1, col: 1 } });
+    expect(await grid.actions.paste()).toBe("done");
+    const qty = (row: number) => store.getCell({ sheet: "s1", row, col: 1 }).resolved;
+    expect([1, 2, 3].map(qty)).toEqual(["apple", "banana", "fig"]);
+  });
+
   it("maps view rows to sheet rows and back under a filter", () => {
     const { grid } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });

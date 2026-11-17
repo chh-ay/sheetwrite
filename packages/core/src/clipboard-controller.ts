@@ -64,7 +64,11 @@ interface PasteTarget extends CellRef {
 }
 
 interface CapturedClipboard extends ClipboardSnapshot {
-  /** The selected cells as one block of data rows; `null` when a sorted view splits them. */
+  /**
+   * The data rows a cut moves: every row from the first selected one to the
+   * last, rows a filter or the user hides included, as in Excel. `null` when
+   * a sorted view puts the selected rows out of data order.
+   */
   source: Range | null;
 }
 
@@ -733,20 +737,24 @@ export class ClipboardController {
 
   /**
    * Move the pending cut so that its top-left cell lands on the paste target's,
-   * as Excel's Cut and Paste does. Paste Values is not available after a cut,
+   * as Excel's Cut and Paste does: on the sheet rows from the target's down,
+   * rows a filter hides included. Paste Values is not available after a cut,
    * and a target that a sorted view splits takes no move; the cut stays.
    */
   private pasteCut(cut: PendingCut, target: PasteTarget, valuesOnly: boolean): ClipboardOutcome {
     const rows = cut.range.end.row - cut.range.start.row + 1;
     const cols = cut.range.end.col - cut.range.start.col + 1;
     const firstRow = this.deps.toDataRow(target.row);
+    const sheet = this.deps.sheet();
+    const sorted = (sheet.sortKeys?.length ?? 0) > 0;
     const fits =
       !valuesOnly &&
-      target.row + rows <= this.deps.store.viewRowCount(this.deps.activeSheet()) &&
-      target.col + cols <= this.deps.sheet().columns.length &&
-      Array.from({ length: rows }, (_, row) => row).every(
-        (row) => this.deps.toDataRow(target.row + row) === firstRow + row,
-      );
+      firstRow + rows <= sheet.rowCount &&
+      target.col + cols <= sheet.columns.length &&
+      (!sorted ||
+        Array.from({ length: rows }, (_, row) => row).every(
+          (row) => this.deps.toDataRow(target.row + row) === firstRow + row,
+        ));
     if (!fits) return "empty";
 
     this.movingCut = true;
@@ -1135,12 +1143,21 @@ export class ClipboardController {
     if (!focus) return null;
     const rects: SelRect[] = [];
     this.deps.selection().forEachRect((r) => rects.push(r));
-    const rect = rects.find(
+    const selected = rects.find(
       (r) => r.r0 <= focus.row && focus.row <= r.r1 && r.c0 <= focus.col && focus.col <= r.c1,
     );
-    if (!rect) return null;
+    if (!selected) return null;
 
+    // Rows past the view's last row hold nothing: under a filter the view has
+    // fewer rows than the sheet, and a selection made from sheet rows can
+    // reach past it.
     const activeSheet = this.deps.activeSheet();
+    const rect = {
+      ...selected,
+      r1: Math.min(selected.r1, this.deps.store.viewRowCount(activeSheet) - 1),
+    };
+    if (rect.r1 < rect.r0) return null;
+
     const selectedColumns = Array.from(
       { length: rect.c1 - rect.c0 + 1 },
       (_, index) => rect.c0 + index,
@@ -1179,19 +1196,26 @@ export class ClipboardController {
     const cells: ClipboardCell[][] = [];
     const values: CellScalar[][] = [];
     const firstDataRow = this.deps.toDataRow(rect.r0);
+    // A filter or hidden rows leave gaps between the selected data rows; a
+    // view sort puts them out of order.
     let contiguous = true;
+    let ascending = true;
+    let lastDataRow = firstDataRow;
     let merged = false;
-    for (let row = rect.r0; row <= rect.r1 && contiguous; row++) {
-      contiguous = this.deps.toDataRow(row) === firstDataRow + row - rect.r0;
+    for (let row = rect.r0; row <= rect.r1; row++) {
+      const dataRow = this.deps.toDataRow(row);
+      contiguous &&= dataRow === firstDataRow + row - rect.r0;
+      ascending &&= row === rect.r0 || dataRow > lastDataRow;
+      lastDataRow = dataRow;
       for (let col = rect.c0; col <= rect.c1 && !merged; col++) {
         merged = this.deps.mergeAnchorAt(row, col) !== null;
       }
     }
-    const source: Range | null = contiguous
+    const source: Range | null = ascending
       ? {
           sheet: activeSheet,
           start: { row: firstDataRow, col: rect.c0 },
-          end: { row: firstDataRow + rect.r1 - rect.r0, col: rect.c1 },
+          end: { row: lastDataRow, col: rect.c1 },
         }
       : null;
 

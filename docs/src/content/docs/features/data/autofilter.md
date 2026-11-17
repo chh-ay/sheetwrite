@@ -76,6 +76,10 @@ grid.setColumnFilter(0, { kind: "dynamic", type: "M3" });
 
 As in Excel, edits don't filter again on their own. A row whose value no longer matches stays until you choose **Data › Reapply** or call `grid.reapplyFilter()`. **Data › Clear** (`grid.actions.clearFilters()`) removes every column filter and keeps the buttons. The cell menu's **Filter** submenu filters by the selected cell's value, reapplies the filter, or clears the column's filter.
 
+## Copy, cut and fill in a filtered list
+
+As in Excel, copy, delete, formatting and the fill handle act on the rows the filter shows and skip the rows it hides. Cut is the exception, as in Excel: it moves every row from the first selected row to the last, the hidden ones too, so their data stays with the rows around it.
+
 ## Undo, collaboration and XLSX files
 
 Turning the AutoFilter on or off is one undo step, and so is each filter change. Collaborators receive each step. The range follows inserted and deleted rows and columns. Deleting the header row removes the AutoFilter. It saves with the sheet's snapshot.
