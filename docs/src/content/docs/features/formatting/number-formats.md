@@ -132,6 +132,8 @@ As in Excel ([Keyboard shortcuts in Excel](https://support.microsoft.com/en-us/o
 | Ctrl/Cmd + Shift + % | Percentage, no decimals | `0%` |
 | Ctrl/Cmd + Shift + ^ | Scientific, two decimals | `0.00E+00` |
 
+The ribbon's Number Format box then names the format as Excel does: a preset's name such as Short Date, or else the Format Cells category that makes the code, so the keys above show General, Number, Time, Date, Currency, Percentage and Scientific. Only a code no category makes shows Custom.
+
 Ctrl/Cmd + 1, the context menu's Format cells… or `grid.actions.formatCells()` opens the **Format Cells** dialog over the selection. It shows the active cell's format on five tabs:
 
 - **Number**: General, Number (decimal places, 1000 separator, negative numbers), Currency (decimal places, negative numbers), Accounting, Date and Time (a list of types), Percentage, Fraction (up to one, two or three digits, or as halves, quarters, eighths, sixteenths, tenths or hundredths), Scientific (decimal places), Text and Custom (any format code), with a sample of the active cell's value.

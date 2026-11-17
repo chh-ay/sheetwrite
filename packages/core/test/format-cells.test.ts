@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { numberFormatCode, numberFormatParts } from "../src/format-cells.js";
+import { numberFormatCode, numberFormatLabel, numberFormatParts } from "../src/format-presets.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
@@ -190,5 +190,30 @@ describe("Number tab categories", () => {
     }
     expect(numberFormatParts(undefined).category).toBe("General");
     expect(numberFormatParts('0.0 "kg"').category).toBe("Custom");
+  });
+
+  it("name the Number Format box for the number-format keys and the % and comma buttons, as Excel does", () => {
+    const labels = [
+      "$#,##0.00_);($#,##0.00)",
+      "0%",
+      "#,##0.00",
+      "d-mmm-yy",
+      "h:mm AM/PM",
+      "0.00E+00",
+      "General",
+      "m/d/yyyy",
+      '0.0 "kg"',
+    ].map(numberFormatLabel);
+    expect(labels).toEqual([
+      "Currency",
+      "Percentage",
+      "Number",
+      "Date",
+      "Time",
+      "Scientific",
+      "General",
+      "Short Date",
+      "Custom",
+    ]);
   });
 });
