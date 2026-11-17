@@ -883,31 +883,34 @@ const fn pad(placeholder: char) -> Option<char> {
     }
 }
 
-const fn greatest_common_divisor(mut a: u64, mut b: u64) -> u64 {
-    while b != 0 {
-        (a, b) = (b, a % b);
-    }
-    a
-}
-
 /// The fraction closest to `value` whose denominator is at most
 /// `max_denominator`, as numerator and denominator. On a tie the smaller
-/// denominator wins.
+/// denominator wins. The closest fraction is the last convergent of
+/// `value`'s continued fraction within the bound, or the semiconvergent
+/// after it, so a few steps find it instead of trying every denominator.
 fn closest_fraction(value: f64, max_denominator: u32) -> (f64, f64) {
-    let mut best = (value.round(), 1.0);
-    let mut best_error = (value - best.0).abs();
-    for candidate in 2..=max_denominator {
-        let denominator = f64::from(candidate);
-        let numerator = (value * denominator).round();
-        // A reducible fraction is a smaller denominator's, already tried.
-        if greatest_common_divisor(numerator as u64, denominator as u64) != 1 {
-            continue;
+    let max = f64::from(max_denominator);
+    // The two latest convergents, oldest first, starting from 0/1 and 1/0.
+    let (mut p0, mut q0, mut p1, mut q1) = (0.0, 1.0, 1.0, 0.0);
+    let mut rest = value;
+    loop {
+        let term = rest.floor();
+        let next_q = term * q1 + q0;
+        if next_q > max {
+            let steps = ((max - q0) / q1).floor();
+            let (p, q) = (steps * p1 + p0, steps * q1 + q0);
+            let (error, latest) = ((value - p / q).abs(), (value - p1 / q1).abs());
+            return if error < latest || (error == latest && q < q1) {
+                (p, q)
+            } else {
+                (p1, q1)
+            };
         }
-        let error = (value - numerator / denominator).abs();
-        if error < best_error {
-            best = (numerator, denominator);
-            best_error = error;
+        (p0, q0, p1, q1) = (p1, q1, term * p1 + p0, next_q);
+        let fraction = rest - term;
+        if fraction == 0.0 || p1 / q1 == value {
+            return (p1, q1);
         }
+        rest = 1.0 / fraction;
     }
-    best
 }
