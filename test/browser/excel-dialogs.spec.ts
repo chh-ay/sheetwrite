@@ -53,7 +53,10 @@ test("merging cells that hold two values warns first, from the keyboard @portabi
 }) => {
   await open(page);
   await twoValues(page);
-  await page.evaluate(() => window.__sheetwriteSpreadsheetGrid!.actions.mergeAndCenter());
+  // `ask` gives the toolbar's Merge & Center: the warning first.
+  await page.evaluate(() =>
+    window.__sheetwriteSpreadsheetGrid!.actions.mergeAndCenter({ ask: true }),
+  );
 
   const dialog = page.getByRole("alertdialog", { name: "Merge Cells" });
   await expect(dialog).toBeVisible();
@@ -75,7 +78,9 @@ test("merging cells that hold two values warns first, from the keyboard @portabi
   await expect(page.locator(".sheetwrite").first()).toBeFocused();
   expect(await merged(page)).toEqual({ merges: 0, covered: "m2" });
 
-  await page.evaluate(() => window.__sheetwriteSpreadsheetGrid!.actions.mergeAndCenter());
+  await page.evaluate(() =>
+    window.__sheetwriteSpreadsheetGrid!.actions.mergeAndCenter({ ask: true }),
+  );
   await expect(ok).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(dialog).toHaveCount(0);
