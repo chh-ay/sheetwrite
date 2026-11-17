@@ -5,6 +5,7 @@ import type {
   ConditionalFormatRule,
   DataValidationComparison,
   DataValidationCondition,
+  DataValidationOperand,
   DataValidationRule,
   ValidationErrorStyle,
 } from "@sheetwrite/core";
@@ -39,68 +40,33 @@ export function parseValidation(
   const formula1 = xmlChild(element, "formula1")?.text;
   const formula2 = xmlChild(element, "formula2")?.text;
   let condition: DataValidationCondition | undefined;
-  if (type === "list" && formula1?.startsWith('"') && formula1.endsWith('"')) {
-    const body = formula1.slice(1, -1);
-    const values: CellScalar[] = [];
-    let value = "";
-    for (let index = 0; index <= body.length; index++) {
-      const character = body[index];
-      if (character === '"' && body[index + 1] === '"') {
-        value += '"';
-        index += 1;
-      } else if (character === "," || index === body.length) {
-        const decoded = decodeXstring(value);
-        values.push(decoded === "TRUE" ? true : decoded === "FALSE" ? false : decoded);
-        value = "";
-      } else {
-        value += character ?? "";
-      }
-    }
-    condition = { kind: "list", values };
-  } else if (type === "decimal" || type === "whole" || type === "date" || type === "textLength") {
-    let first = formula1 === undefined ? undefined : Number(formula1);
-    let second = formula2 === undefined ? undefined : Number(formula2);
-    if (
-      (first !== undefined && !Number.isFinite(first)) ||
-      (second !== undefined && !Number.isFinite(second))
-    ) {
-      emitWarning(context, {
-        code: "validation-loss",
-        message: "Formula-based Excel validation was dropped",
-        sheet,
-      });
-      return [];
-    }
-    if (type === "date" && date1904) {
-      if (first !== undefined) first += 1462;
-      if (second !== undefined) second += 1462;
-    }
+  if (type === "none") {
+    condition = { kind: "any" };
+  } else if (type === "list" && formula1 !== undefined) {
+    condition =
+      formula1.startsWith('"') && formula1.endsWith('"')
+        ? { kind: "list", values: quotedListValues(formula1.slice(1, -1)) }
+        : { kind: "list", source: `=${decodeXstring(formula1)}` };
+  } else if (type === "custom" && formula1 !== undefined) {
+    condition = { kind: "custom", formula: `=${decodeXstring(formula1)}` };
+  } else if (
+    type === "decimal" ||
+    type === "whole" ||
+    type === "date" ||
+    type === "time" ||
+    type === "textLength"
+  ) {
+    const serialShift = type === "date" && date1904 ? DATE_1904_OFFSET : 0;
+    const operand = (formula: string | undefined): DataValidationOperand | undefined => {
+      if (formula === undefined) return undefined;
+      const number = Number(formula);
+      return formula.trim() !== "" && Number.isFinite(number)
+        ? number + serialShift
+        : `=${decodeXstring(formula)}`;
+    };
     const operator = xmlAttribute(element, "operator") ?? "between";
-    const bounds: { min?: number; max?: number } = {};
-    let comparison: DataValidationComparison | undefined;
-    if (operator === "between" && first !== undefined && second !== undefined && first <= second) {
-      bounds.min = first;
-      bounds.max = second;
-    } else if (
-      operator === "notBetween" &&
-      first !== undefined &&
-      second !== undefined &&
-      first <= second
-    ) {
-      comparison = { operator, min: first, max: second };
-    } else if (operator === "equal" && first !== undefined) {
-      bounds.min = first;
-      bounds.max = first;
-    } else if (operator === "greaterThanOrEqual" && first !== undefined) {
-      bounds.min = first;
-    } else if (operator === "lessThanOrEqual" && first !== undefined) {
-      bounds.max = first;
-    } else if (
-      (operator === "notEqual" || operator === "greaterThan" || operator === "lessThan") &&
-      first !== undefined
-    ) {
-      comparison = { operator, value: first };
-    } else {
+    const comparison = validationComparison(operator, operand(formula1), operand(formula2));
+    if (!comparison) {
       emitWarning(context, {
         code: "validation-loss",
         message: `Excel validation operator ${operator} could not be represented without broadening and was dropped`,
@@ -108,17 +74,13 @@ export function parseValidation(
       });
       return [];
     }
-    const textLengthOperandValid =
-      comparison === undefined
-        ? (bounds.min === undefined || (Number.isSafeInteger(bounds.min) && bounds.min >= 0)) &&
-          (bounds.max === undefined || (Number.isSafeInteger(bounds.max) && bounds.max >= 0))
-        : "value" in comparison
-          ? Number.isSafeInteger(comparison.value) && comparison.value >= 0
-          : Number.isSafeInteger(comparison.min) &&
-            comparison.min >= 0 &&
-            Number.isSafeInteger(comparison.max) &&
-            comparison.max >= 0;
-    if (type === "textLength" && !textLengthOperandValid) {
+    const operands = "value" in comparison ? [comparison.value] : [comparison.min, comparison.max];
+    if (
+      type === "textLength" &&
+      operands.some(
+        (value) => typeof value === "number" && !(Number.isSafeInteger(value) && value >= 0),
+      )
+    ) {
       emitWarning(context, {
         code: "validation-loss",
         message: "Non-integer or negative text-length validation was dropped",
@@ -126,17 +88,11 @@ export function parseValidation(
       });
       return [];
     }
-    const comparisonFields = comparison === undefined ? bounds : { comparison };
+    const bounds = comparisonBounds(comparison);
     condition =
-      type === "date"
-        ? { kind: "date", ...comparisonFields }
-        : type === "textLength"
-          ? { kind: "textLength", ...comparisonFields }
-          : {
-              kind: "number",
-              ...comparisonFields,
-              ...(type === "whole" ? { integer: true } : {}),
-            };
+      type === "date" || type === "time" || type === "textLength"
+        ? { kind: type, ...bounds }
+        : { kind: "number", ...bounds, ...(type === "whole" ? { integer: true } : {}) };
   }
   if (!condition || ranges.length === 0) {
     emitWarning(context, {
@@ -165,6 +121,9 @@ export function parseValidation(
   const showInputMessage = xmlAttribute(element, "showInputMessage");
   const fields = {
     policy,
+    ...(type === "list" && xmlBoolean(xmlAttribute(element, "showDropDown"))
+      ? { inCellDropdown: false }
+      : {}),
     ...(errorStyle === impliedStyle ? {} : { errorStyle }),
     ...(showInputMessage !== undefined && !xmlBoolean(showInputMessage)
       ? { showInputMessage: false }
@@ -183,6 +142,84 @@ export function parseValidation(
       allowBlank: xmlBoolean(xmlAttribute(element, "allowBlank")),
     };
   });
+}
+
+/** Days from 1900-01-00 to 1904-01-01: a 1904 workbook's serial plus this is a 1900 serial. */
+const DATE_1904_OFFSET = 1462;
+
+/** The items of a typed list, the text between the quotes of `"North,South"`. */
+function quotedListValues(body: string): CellScalar[] {
+  const values: CellScalar[] = [];
+  let value = "";
+  for (let index = 0; index <= body.length; index++) {
+    const character = body[index];
+    if (character === '"' && body[index + 1] === '"') {
+      value += '"';
+      index += 1;
+    } else if (character === "," || index === body.length) {
+      const decoded = decodeXstring(value);
+      values.push(decoded === "TRUE" ? true : decoded === "FALSE" ? false : decoded);
+      value = "";
+    } else {
+      value += character ?? "";
+    }
+  }
+  return values;
+}
+
+const SINGLE_OPERATORS = new Set([
+  "equal",
+  "notEqual",
+  "greaterThan",
+  "lessThan",
+  "greaterThanOrEqual",
+  "lessThanOrEqual",
+] as const);
+
+function isSingleOperator(
+  operator: string,
+): operator is Extract<DataValidationComparison, { value: unknown }>["operator"] {
+  return (SINGLE_OPERATORS as ReadonlySet<string>).has(operator);
+}
+
+/** Excel's operator and operands as a comparison; undefined when they make none. */
+function validationComparison(
+  operator: string,
+  first: DataValidationOperand | undefined,
+  second: DataValidationOperand | undefined,
+): DataValidationComparison | undefined {
+  if (operator === "between" || operator === "notBetween") {
+    if (first === undefined || second === undefined) return undefined;
+    if (typeof first === "number" && typeof second === "number" && first > second) {
+      return undefined;
+    }
+    return { operator, min: first, max: second };
+  }
+  return isSingleOperator(operator) && first !== undefined
+    ? { operator, value: first }
+    : undefined;
+}
+
+/**
+ * A comparison as the condition keeps it: number bounds that an inclusive
+ * minimum and maximum say exactly stay `min` and `max`; the rest, and every
+ * formula bound, stay a `comparison`.
+ */
+function comparisonBounds(
+  comparison: DataValidationComparison,
+): { min?: number; max?: number } | { comparison: DataValidationComparison } {
+  if ("value" in comparison) {
+    const { operator, value } = comparison;
+    if (typeof value !== "number") return { comparison };
+    if (operator === "equal") return { min: value, max: value };
+    if (operator === "greaterThanOrEqual") return { min: value };
+    if (operator === "lessThanOrEqual") return { max: value };
+    return { comparison };
+  }
+  const { operator, min, max } = comparison;
+  return operator === "between" && typeof min === "number" && typeof max === "number"
+    ? { min, max }
+    : { comparison };
 }
 
 /** A validation title or message attribute; one longer than Excel allows is dropped with a warning. */

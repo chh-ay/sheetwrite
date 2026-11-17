@@ -474,6 +474,12 @@ select.sheetwrite-dialog-control[size] {
   height: auto;
 }
 
+/* Data Validation's input and error messages (src/data-validation-dialog.ts). */
+textarea.sheetwrite-dialog-control {
+  height: 64px;
+  resize: vertical;
+}
+
 .sheetwrite-dialog-control[aria-invalid="true"] {
   border-color: var(
     --sheetwrite-widget-error,

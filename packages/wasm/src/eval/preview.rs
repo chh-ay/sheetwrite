@@ -9,13 +9,18 @@
 //! (RAND, RANDBETWEEN) and host functions. During evaluation the existing
 //! range, array, text and LAMBDA checks apply the smaller limits of
 //! `preview_limits`, so a preview stays within its time budget.
+//!
+//! A trial preview (`previewFormulaWith`) first puts a value in its cell, as
+//! a data validation custom formula checks a typed value before it is
+//! stored, and puts the cell's own content back afterwards.
 
 use wasm_bindgen::prelude::*;
 
 use crate::calc::{Ast, Func};
+use crate::cells::{encode_num, encode_str_id};
 use crate::formula_slots::{FormulaResults, FormulaWork};
 use crate::store::CellStore;
-use crate::types::{FormulaError, Value};
+use crate::types::{FormulaError, Value, KIND_BOOL, KIND_EMPTY, KIND_NUMBER, KIND_STRING};
 
 use super::preview_limits::PreviewScope;
 use super::{ast_produces_array, EvalPass, FormulaOriginGuard};
@@ -190,6 +195,85 @@ impl CellStore {
             *slot = field;
         }
         preview.text
+    }
+}
+
+/// A value a trial preview puts in its cell.
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum TrialValue<'a> {
+    Blank,
+    Number(f64),
+    Text(&'a str),
+    Boolean(bool),
+}
+
+#[wasm_bindgen]
+impl CellStore {
+    /// As [`Self::preview_formula_fields`], with a value in the cell
+    /// `[sheet, row, col]` instead of its content. `kind` numbers the value
+    /// as a preview's kind does: 0 blank, 1 the number `number`, 2 the text
+    /// `text`, 3 the logical `number != 0`.
+    #[wasm_bindgen(js_name = previewFormulaWith)]
+    #[must_use]
+    pub fn preview_formula_with_fields(
+        &mut self,
+        cell: &[u32],
+        source: &str,
+        kind: u8,
+        number: f64,
+        text: &str,
+        out: &mut [f64],
+    ) -> Option<String> {
+        let &[sheet, row, col] = cell else {
+            return None;
+        };
+        let value = match kind {
+            1 => TrialValue::Number(number),
+            2 => TrialValue::Text(text),
+            3 => TrialValue::Boolean(number != 0.0),
+            _ => TrialValue::Blank,
+        };
+        let preview = self.preview_formula_with(sheet as usize, row, col, source, value);
+        for (slot, field) in out.iter_mut().zip(preview.fields()) {
+            *slot = field;
+        }
+        preview.text
+    }
+}
+
+impl CellStore {
+    /// The result `source` would have in the cell at `row` and `col` of
+    /// `sheet` if the cell held `value`. Formulas that read the cell see
+    /// `value`; every other formula keeps its stored result, as in
+    /// [`Self::preview_formula`]. A paged sheet gives no preview (`Loading`).
+    pub(crate) fn preview_formula_with(
+        &mut self,
+        sheet: usize,
+        row: u32,
+        col: u32,
+        source: &str,
+        value: TrialValue<'_>,
+    ) -> FormulaPreview {
+        let (kind, payload) = match value {
+            TrialValue::Blank => (KIND_EMPTY, 0),
+            TrialValue::Number(number) => (KIND_NUMBER, encode_num(number)),
+            TrialValue::Boolean(flag) => (KIND_BOOL, encode_num(f64::from(u8::from(flag)))),
+            TrialValue::Text(text) => (KIND_STRING, encode_str_id(self.intern(text))),
+        };
+        let (cell_row, cell_col) = (row as usize, col as usize);
+        let Some((saved_kind, saved_payload)) = self
+            .sheets
+            .get_mut(sheet)
+            .and_then(|data| data.cells.swap_dense_slot(cell_row, cell_col, kind, payload))
+        else {
+            return FormulaPreview::unavailable(FormulaPreviewStatus::Loading);
+        };
+        let preview = self.preview_formula(sheet, row, col, source);
+        if let Some(data) = self.sheets.get_mut(sheet) {
+            data.cells
+                .swap_dense_slot(cell_row, cell_col, saved_kind, saved_payload);
+        }
+        preview
     }
 }
 

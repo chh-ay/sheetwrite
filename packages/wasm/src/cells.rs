@@ -741,6 +741,29 @@ impl CellStorage {
         col * self.row_count + row
     }
 
+    /// Puts `kind` and `payload` straight into a dense cell's slot, leaving
+    /// its formula, spill and dependents as they are, and returns what the
+    /// slot held; a second call with that returned pair puts it back. `None`
+    /// for paged storage or a cell outside the sheet, which stay unchanged.
+    pub(crate) fn swap_dense_slot(
+        &mut self,
+        row: usize,
+        col: usize,
+        kind: u8,
+        payload: u64,
+    ) -> Option<(u8, u64)> {
+        if self.paged.is_some() || !self.contains_cell(row, col) {
+            return None;
+        }
+        let index = self.idx(row, col);
+        let slot_kind = self.kind.get_mut(index)?;
+        let slot_payload = self.payload.get_mut(index)?;
+        Some((
+            std::mem::replace(slot_kind, kind),
+            std::mem::replace(slot_payload, payload),
+        ))
+    }
+
     /// The logical cells this sheet counts toward the store's local-cell
     /// limit: all of them for a local sheet, none otherwise.
     pub(crate) fn local_paged_cells(&self) -> usize {

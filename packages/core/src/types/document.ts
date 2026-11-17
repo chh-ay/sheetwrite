@@ -270,11 +270,24 @@ export type ValidationPolicy = "reject" | "warn" | "allow";
 export type ValidationErrorStyle = "stop" | "warning" | "information";
 
 /**
+ * One bound of a validation comparison: a number, or a formula with its
+ * leading `=`, such as `"=B1"` or `"=TODAY()"`, as Excel's Minimum and
+ * Maximum boxes take. A formula's relative references are relative to the
+ * top-left cell of the rule's range; each checked cell reads them shifted to
+ * itself, as Excel does.
+ */
+export type DataValidationOperand = number | string;
+
+/**
  * Native comparison semantics for numeric, date-serial, and text-length validation.
  * Interval operands are inclusive; `notBetween` accepts values outside that interval.
  */
 export type DataValidationComparison =
-  | { operator: "between" | "notBetween"; min: number; max: number }
+  | {
+      operator: "between" | "notBetween";
+      min: DataValidationOperand;
+      max: DataValidationOperand;
+    }
   | {
       operator:
         | "equal"
@@ -283,7 +296,7 @@ export type DataValidationComparison =
         | "lessThan"
         | "greaterThanOrEqual"
         | "lessThanOrEqual";
-      value: number;
+      value: DataValidationOperand;
     };
 
 /**
@@ -291,9 +304,19 @@ export type DataValidationComparison =
  *
  * `min` and `max` remain inclusive legacy bounds. Use `comparison` when the
  * operator itself is significant; comparison and legacy bounds are mutually exclusive.
+ * Formulas (`source`, `formula`, formula operands) are relative to the
+ * top-left cell of the rule's range, as in Excel.
  */
 export type DataValidationCondition =
+  /** Excel's "Any value": every value passes; the rule carries an input message. */
+  | { kind: "any" }
   | { kind: "list"; values: readonly CellScalar[]; allowCustom?: boolean }
+  /**
+   * A list whose items are the cells of a range or a defined name, written
+   * as Excel's Source box takes it: `"=$H$2:$H$5"`, `"=Lists!$A$1:$A$9"` or
+   * `"=Regions"`. The list follows edits to those cells.
+   */
+  | { kind: "list"; source: string; allowCustom?: boolean }
   | {
       kind: "number";
       min?: number;
@@ -302,7 +325,15 @@ export type DataValidationCondition =
       comparison?: DataValidationComparison;
     }
   | { kind: "date"; min?: number; max?: number; comparison?: DataValidationComparison }
+  /** A time of day as a fraction of a day: 0.5 is 12:00. */
+  | { kind: "time"; min?: number; max?: number; comparison?: DataValidationComparison }
   | { kind: "textLength"; min?: number; max?: number; comparison?: DataValidationComparison }
+  /**
+   * Excel's Custom: a value passes when `formula` (with its leading `=`) is
+   * TRUE or a non-zero number in its cell with the value in it, as in
+   * `"=COUNTIF($A:$A,A1)=1"`.
+   */
+  | { kind: "custom"; formula: string }
   | {
       kind: "checkbox";
       checkedValue?: CellScalar;
@@ -326,6 +357,11 @@ export interface DataValidationRule {
   policy: ValidationPolicy;
   /** Whether clearing a cell passes the rule; defaults to `true`. */
   allowBlank?: boolean;
+  /**
+   * Whether a list rule shows its dropdown arrow and list (Excel's "In-cell
+   * dropdown"); defaults to `true`. Other kinds ignore it.
+   */
+  inCellDropdown?: boolean;
   /**
    * The error alert's message, shown when a value fails; without it, the grid
    * shows Excel's default text and `MutationIssue.message` is built from the

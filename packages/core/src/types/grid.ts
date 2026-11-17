@@ -284,6 +284,16 @@ export interface GridActions {
    * after the call. Does nothing on a read-only grid.
    */
   formatCells(): void;
+  /**
+   * Data › Data Validation: open Excel's Data Validation dialog for the
+   * selection, with Settings, Input Message and Error Alert tabs showing the
+   * active cell's rule. OK gives the selected cells the rule, or removes it
+   * after Clear All, as one undoable step. When the selection holds several
+   * kinds of rule, or cells with and without one, Excel's question comes
+   * first. The command and the dialog load on first use. Does nothing on a
+   * read-only grid.
+   */
+  dataValidation(): void;
   /** Hide the given zero-based rows, or the focus cell's row when none are given. */
   hideRows(rows?: readonly number[]): void;
   /** Show the given zero-based rows again, or every hidden row when none are given. */
