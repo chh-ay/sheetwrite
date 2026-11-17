@@ -47,12 +47,10 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
 }) => {
   await open(page);
   await regionRule(page, { inputTitle: "Region", inputMessage: "Pick a sales region." });
-  await expect(page.locator(".sheetwrite-input-message")).toHaveText(
-    "RegionPick a sales region.",
-  );
+  await expect(page.locator(".sheetwrite-input-message")).toHaveText("RegionPick a sales region.");
   const before = await regionAt50(page);
 
-  await page.keyboard.type("=\"Nowhere\"");
+  await page.keyboard.type('="Nowhere"');
   await page.keyboard.press("Enter");
   const alert = page.getByRole("alertdialog", { name: "Data Validation" });
   await expect(alert).toContainText(
@@ -67,7 +65,7 @@ test("a refused entry shows Excel's Stop alert, from the keyboard @portability",
   await expect(alert).toHaveCount(0);
   const editor = page.locator("textarea.sheetwrite-editor");
   await expect(editor).toBeFocused();
-  await expect(editor).toHaveValue("=\"Nowhere\"");
+  await expect(editor).toHaveValue('="Nowhere"');
 
   await page.keyboard.press("Enter");
   await expect(alert).toBeVisible();
