@@ -262,6 +262,7 @@ export function createSpreadsheetShell(
     bottomRow.prepend(tabHost);
     tabs = new SheetTabs(tabHost, {
       onActivate: (id) => grid.setActiveSheet(id),
+      focusSheet: focusGrid,
       onAdd: (index) => insertSheet(grid, index),
       onRemove: (id) => grid.removeSheet(id),
       onRename: (id, name) => grid.renameSheet(id, name),

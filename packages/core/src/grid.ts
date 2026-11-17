@@ -667,6 +667,11 @@ export class GridImpl implements Grid {
   private readonly virtualColumnTargets = new Map<SheetId, number>();
   /** The `minColumns` option, as constructed or last set. */
   private minColumns: number | undefined;
+  /** Each sheet's selection and scroll when another sheet became active. */
+  private readonly sheetViews = new Map<
+    SheetId,
+    { selection: Selection | null; top: number; left: number }
+  >();
   private selection: SelectionModel;
   private readonly mutationRevisions = new MutationRevisionIndex();
   /** The open side panel; closing it runs the panel's cleanup. */
@@ -1755,6 +1760,7 @@ export class GridImpl implements Grid {
     this.tabBar = bar;
     this.sheetTabs = new SheetTabs(bar, {
       onActivate: (id) => this.setActiveSheet(id),
+      focusSheet: () => this.host.focus({ preventScroll: true }),
       onAdd: (index) => insertSheet(this, index),
       onRemove: (id) => this.removeSheet(id),
       onRename: (id, name) => this.renameSheet(id, name),
@@ -1980,30 +1986,34 @@ export class GridImpl implements Grid {
   }
 
   /**
-   * Select the cells that `patches` change on the active sheet and scroll to
-   * them, as Excel's undo and redo do. Row, column and object edits leave the
-   * selection alone.
+   * Select the cells that `patches` change and scroll to them, as Excel's
+   * undo and redo do. When they change no cell of the active sheet, the
+   * sheet of the first changed cell becomes active first, so the change is
+   * never out of sight. Row, column and object edits leave the selection
+   * alone.
    */
   private selectChangedCells(patches: readonly DocumentOp[]): void {
+    let target: SheetId | null = null;
+    for (const patch of patches) {
+      const sheet = changedCells(patch)?.sheet;
+      if (sheet === this.activeSheet) {
+        target = sheet;
+        break;
+      }
+      target ??= sheet ?? null;
+    }
+    if (target === null) return;
+    // A hidden sheet cannot become active, so its change stays out of view.
+    if (target !== this.activeSheet) this.setActiveSheet(target);
+    if (target !== this.activeSheet) return;
+
     let top = Number.POSITIVE_INFINITY;
     let left = Number.POSITIVE_INFINITY;
     let bottom = -1;
     let right = -1;
     for (const patch of patches) {
-      const range =
-        patch.op === "set" || patch.op === "setNote"
-          ? { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr }
-          : patch.op === "setRange" ||
-              patch.op === "setBlock" ||
-              patch.op === "restoreBlock" ||
-              patch.op === "setRangeStyle" ||
-              patch.op === "clearRange" ||
-              patch.op === "permuteRows"
-            ? patch.range
-            : patch.op === "moveCells"
-              ? movedBlock(patch)
-              : null;
-      if (range?.sheet !== this.activeSheet) continue;
+      const range = changedCells(patch);
+      if (range?.sheet !== target) continue;
       const first = this.toViewRow(range.start.row);
       const last = this.toViewRow(range.end.row);
       if (first === null || last === null) continue;
@@ -2717,6 +2727,15 @@ export class GridImpl implements Grid {
     )
       return;
 
+    if (reset) this.sheetViews.clear();
+    else {
+      this.sheetViews.set(this.activeSheet, {
+        selection: this.getSelection(),
+        top: this.scroller.scrollTop,
+        left: this.scroller.scrollLeft,
+      });
+    }
+
     this.interactions.reconcile("sheet");
     this.notes.dismiss();
     this.cancelAutoFit();
@@ -2732,8 +2751,22 @@ export class GridImpl implements Grid {
     this.geometry.rebuildRows(this.loadable?.viewRowCount(id) ?? sheet.rowCount);
     this.selection = new SelectionModel(this.geometry.rowCount, this.firstCol(), this.lastCol());
     this.datasourceController.reset(sheet.rowCount);
-    this.scroller.scrollTop = 0;
-    this.scroller.scrollLeft = 0;
+
+    // As in Excel, a sheet shows the selection and scroll it was left with;
+    // a spreadsheet's sheet shown for the first time has A1 selected.
+    const view = this.sheetViews.get(id);
+    const firstCell =
+      this.presentation === "spreadsheet" && !isDashboard(sheet) && this.geometry.rowCount > 0
+        ? { kind: "cell" as const, addr: { sheet: id, row: 0, col: this.firstCol() } }
+        : null;
+    this.selection.set(view ? view.selection : firstCell);
+    // Rows or columns removed while the sheet was away can leave the old active cell outside it.
+    const focus = this.selection.focusCell;
+    if (focus && (focus.row >= this.geometry.rowCount || focus.col > this.lastCol())) {
+      this.selection.set(firstCell);
+    }
+    this.scroller.scrollTop = view?.top ?? 0;
+    this.scroller.scrollLeft = view?.left ?? 0;
 
     this.objectLayer.sync();
     this.applyLayout();
@@ -4786,6 +4819,29 @@ export class GridImpl implements Grid {
     // string it paints, and the same cells paint the same output.
     this.readWindows.invalidateData();
     this.scheduleRender();
+  }
+}
+
+/** The cells whose contents or style `patch` writes; null for row, column, sheet and object edits. */
+function changedCells(patch: DocumentOp): Range | null {
+  switch (patch.op) {
+    case "set":
+    case "setNote":
+      return { sheet: patch.addr.sheet, start: patch.addr, end: patch.addr };
+
+    case "setRange":
+    case "setBlock":
+    case "restoreBlock":
+    case "setRangeStyle":
+    case "clearRange":
+    case "permuteRows":
+      return patch.range;
+
+    case "moveCells":
+      return movedBlock(patch);
+
+    default:
+      return null;
   }
 }
 
