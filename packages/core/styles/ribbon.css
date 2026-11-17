@@ -191,6 +191,32 @@
   padding: 0 8px;
 }
 
+/* The compact ribbon's gear: it opens the Keyboard shortcuts panel. */
+.sheetwrite-ribbon-settings {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 6px;
+  border: none;
+  border-radius: 4px 4px 0 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sheetwrite-ribbon-settings[hidden] {
+  display: none;
+}
+
+.sheetwrite-ribbon-settings:hover {
+  background: var(--sheetwrite-ribbon-hover);
+}
+
+.sheetwrite-ribbon-settings:not([hidden]) + .sheetwrite-ribbon-mode {
+  margin-left: 0;
+}
+
 .sheetwrite-ribbon-minimize::before {
   content: "";
   display: block;

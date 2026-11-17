@@ -3,7 +3,7 @@ import { chartTouchesSheet } from "./chart-definition.js";
 import { boxesOverlap } from "./dashboard.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
-import { cellRange, movedBlock, rangesIntersect } from "./store/ranges.js";
+import { cellRange, movedCellBounds, rangesIntersect } from "./store/ranges.js";
 import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
@@ -1213,7 +1213,7 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.range];
 
     case "moveCells":
-      return [operation.range, movedBlock(operation)];
+      return movedCellBounds(operation);
 
     case "addMerge":
     case "removeMerge":

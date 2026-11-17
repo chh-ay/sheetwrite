@@ -130,7 +130,50 @@ export type ColumnFilter =
   | { kind: "compare"; op: "gt" | "gte" | "lt" | "lte" | "eq" | "neq"; value: number }
   | { kind: "empty" }
   | { kind: "nonEmpty" }
-  | CustomColumnFilter;
+  | CustomColumnFilter
+  | { kind: "dynamic"; type: DynamicDateFilter };
+
+/**
+ * One of Excel's Date Filters that has no value: dates relative to today, as
+ * the computer's clock gives it when the filter applies (`today`,
+ * `thisMonth`, `lastQuarter`, `yearToDate` and the others), or the dates
+ * in a quarter (`Q1` to `Q4`) or month (`M1` to `M12`) of any year, as
+ * All Dates in the Period. Weeks start on Sunday. The names are those of
+ * Excel's XLSX `dynamicFilter`.
+ */
+export type DynamicDateFilter =
+  | "tomorrow"
+  | "today"
+  | "yesterday"
+  | "nextWeek"
+  | "thisWeek"
+  | "lastWeek"
+  | "nextMonth"
+  | "thisMonth"
+  | "lastMonth"
+  | "nextQuarter"
+  | "thisQuarter"
+  | "lastQuarter"
+  | "nextYear"
+  | "thisYear"
+  | "lastYear"
+  | "yearToDate"
+  | "Q1"
+  | "Q2"
+  | "Q3"
+  | "Q4"
+  | "M1"
+  | "M2"
+  | "M3"
+  | "M4"
+  | "M5"
+  | "M6"
+  | "M7"
+  | "M8"
+  | "M9"
+  | "M10"
+  | "M11"
+  | "M12";
 
 /**
  * Excel's custom AutoFilter: one or two conditions joined by AND or OR. A
@@ -788,8 +831,16 @@ export type DocumentOp =
    * may be on another sheet, as Excel's Cut and Paste does. The cells it
    * lands on are replaced, the cells it leaves are emptied, and every
    * reference to a moved cell follows it.
+   *
+   * With `shift`, it is Excel's Insert or Delete with Shift cells instead:
+   * `range` moves along one axis of its sheet, and references to every cell
+   * of its columns (rows, for a move along a row) from where it starts or
+   * lands to the sheet's edge follow the rule of inserted and deleted rows.
+   * Moving down or right inserts the cells it leaves; moving up or left
+   * deletes the cells between where it lands and where it started, so
+   * references to them become `#REF!`.
    */
-  | { op: "moveCells"; range: Range; to: CellAddress }
+  | { op: "moveCells"; range: Range; to: CellAddress; shift?: true }
   | { op: "setColumn"; sheet: SheetId; col: number; patch: Partial<Column> }
   | { op: "setRowMeta"; sheet: SheetId; row: number; meta: RowMetadata | null }
   | { op: "addMerge"; sheet: SheetId; merge: MergeRange }

@@ -125,6 +125,7 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
     },
     { action: "separator" },
     { action: "formatCells" },
+    { action: "pickFromList", visible: (context) => context.cell !== null },
     { action: "separator" },
     { action: "pivotFields", visible: inPivot },
     { action: "separator" },
@@ -134,8 +135,14 @@ function defaultItems(grid: Grid): ContextMenuItem[] {
   ];
 }
 
-/** The glyph a built-in action shows when its row names no icon. */
-const ACTION_ICON: Record<Exclude<ContextMenuActionName, "separator">, IconName> = {
+/**
+ * The glyph a built-in action shows when its row names no icon. Pick From
+ * Drop-down List has none, as in Excel.
+ */
+const ACTION_ICON: Record<
+  Exclude<ContextMenuActionName, "separator" | "pickFromList">,
+  IconName
+> = {
   cut: "cut",
   copy: "copy",
   paste: "paste",
@@ -236,6 +243,7 @@ const DEFAULT_LABEL: Record<Exclude<ContextMenuActionName, "separator">, string>
   insertCells: "Insert cells…",
   deleteCells: "Delete cells…",
   formatCells: "Format cells…",
+  pickFromList: "Pick from drop-down list…",
 };
 
 function actionHandler(
@@ -359,6 +367,9 @@ function actionHandler(
 
     case "formatCells":
       return () => actions.formatCells();
+
+    case "pickFromList":
+      return () => actions.pickFromList();
 
     default:
       return () => {};
@@ -596,7 +607,9 @@ export class ContextMenu {
     const iconSlot = document.createElement("span");
     iconSlot.className = "sheetwrite-context-menu-icon";
     iconSlot.setAttribute("aria-hidden", "true");
-    const iconName = item.icon ?? (builtIn ? ACTION_ICON[builtIn] : undefined);
+    const iconName =
+      item.icon ??
+      (builtIn !== undefined && builtIn !== "pickFromList" ? ACTION_ICON[builtIn] : undefined);
     if (iconName) iconSlot.append(iconNode(iconName, this.config.icons));
     row.appendChild(iconSlot);
 

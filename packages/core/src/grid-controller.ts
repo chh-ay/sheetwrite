@@ -50,6 +50,9 @@ export interface GridControllerHandlers<Id extends RowBridgeId = RowBridgeId> {
 
   /** Forwarded when a built-in XLSX export action fails. */
   onExportError?(event: GridEvents["export-error"]): void;
+
+  /** Forwarded after the user changes keys in the Keyboard shortcuts panel. */
+  onKeyBindingsChange?(event: GridEvents["key-bindings-change"]): void;
 }
 
 /**
@@ -181,6 +184,7 @@ export function createGridController<Id extends RowBridgeId = RowBridgeId>(
     grid.on("renderer-fallback", (event) => handlers.onRendererFallback?.(event)),
     grid.on("datasource-error", (event) => handlers.onDatasourceError?.(event)),
     grid.on("export-error", (event) => handlers.onExportError?.(event)),
+    grid.on("key-bindings-change", (event) => handlers.onKeyBindingsChange?.(event)),
   ];
 
   syncCommandStateSubscription();

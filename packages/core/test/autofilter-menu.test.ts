@@ -20,7 +20,10 @@ function open(overrides: Partial<AutoFilterMenuRequest> = {}) {
     header: "Item",
     kind: "text",
     values: ["pear", 3, null, 1, "apple"],
+    counts: [1, 1, 1, 1, 1],
     kept: null,
+    rows: 5,
+    total: 5,
     filter: undefined,
     format: (value) => String(value),
     parse: (text) => (Number.isFinite(Number(text)) ? Number(text) : text),
@@ -41,7 +44,7 @@ function open(overrides: Partial<AutoFilterMenuRequest> = {}) {
     );
   const options = () =>
     [...list.querySelectorAll<HTMLElement>('[role="option"]')].map((option) => [
-      option.textContent,
+      option.querySelector(".sheetwrite-autofilter-label")?.textContent,
       option.getAttribute("aria-checked") ?? option.getAttribute("aria-selected"),
     ]);
   return { menu, dialog, list, applied, sorted, key, options, closed: () => closed };
@@ -187,6 +190,29 @@ describe("AutoFilter dropdown", () => {
         ],
       },
     ]);
+  });
+
+  it("counts each value's rows, and the rows OK keeps as values are ticked", () => {
+    const { list, key } = open({
+      values: ["North", "South", "Noth"],
+      counts: [12, 1_200, 1],
+      rows: 1_213,
+      total: 1_500,
+    });
+    const tallies = [...list.querySelectorAll(".sheetwrite-autofilter-tally")].map(
+      (tally) => tally.textContent,
+    );
+    // In the list's order: North, Noth, South.
+    expect(tallies).toEqual([" 12", " 1", " 1,200"]);
+    const ok = document.querySelector<HTMLButtonElement>(".sheetwrite-autofilter-ok");
+    expect(ok?.textContent).toBe("OK (1,213 of 1,500 rows)");
+    expect(ok?.getAttribute("aria-label")).toBe("OK");
+
+    // Untick South, the last value in the list's order.
+    list.focus();
+    key(list, "End");
+    key(list, " ");
+    expect(ok?.textContent).toBe("OK (13 of 1,500 rows)");
   });
 
   it("sorts from its first commands", () => {

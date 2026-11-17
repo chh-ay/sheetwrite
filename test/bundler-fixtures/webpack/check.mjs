@@ -66,6 +66,9 @@ const DATA_VALIDATION_MARKER = "sheetwrite-data-validation";
 // Paste Special's choices and dialog load on first use; their class names
 // survive minifiers. Webpack may copy the dialog shell into the chunk.
 const PASTE_SPECIAL_MARKER = "sheetwrite-paste-special";
+// The Keyboard shortcuts panel loads on first use; its dialog class survives
+// minifiers. Like Format Cells, its chunk may hold a copy of the dialog shell.
+const KEYBOARD_SETTINGS_MARKER = "sheetwrite-keyboard-settings";
 // The sheet menu's Move or Copy dialog and Tab Color palette load on first
 // use, together; the dialog's last list entry survives minifiers.
 const SHEET_TAB_PANELS_MARKER = "(move to end)";
@@ -82,6 +85,10 @@ const ADDON_SEAM_MARKERS = ["setXlsxWorkbookBackend", "registerQueryCommands"];
 const IMPORT_MARKER = "Import XLSX";
 const SUMMARY_MARKER = "numericCount";
 const REPLACEMENT_MARKER = "Disconnect collaboration before import";
+// The number formatter, which the grid, Format Cells and the AutoFilter share;
+// webpack may give it a chunk of its own. Its formatter cache key survives
+// minifiers.
+const NUMBER_FORMAT_MARKER = "fixed:";
 const chromeChunks = [];
 const panelChunks = [];
 const sortPanelChunks = [];
@@ -92,6 +99,7 @@ const findChunks = [];
 const autoFilterChunks = [];
 const formatCellsChunks = [];
 const dataValidationChunks = [];
+const keyboardSettingsChunks = [];
 const pasteSpecialChunks = [];
 const dialogChunks = [];
 const sheetTabPanelChunks = [];
@@ -100,6 +108,7 @@ const workers = [];
 const addonRegistryChunks = [];
 const addonSeamChunks = [];
 const documentChunks = [];
+const numberFormatChunks = [];
 const chromeCode = [];
 for (const file of lazyChunks) {
   const code = await readFile(resolve(root, file), "utf8");
@@ -121,6 +130,7 @@ for (const file of lazyChunks) {
   } else if (code.includes(FIND_MARKER)) findChunks.push(file);
   else if (code.includes(DATA_VALIDATION_MARKER)) dataValidationChunks.push(file);
   else if (code.includes(FORMAT_CELLS_MARKER)) formatCellsChunks.push(file);
+  else if (code.includes(KEYBOARD_SETTINGS_MARKER)) keyboardSettingsChunks.push(file);
   else if (code.includes(PASTE_SPECIAL_MARKER)) pasteSpecialChunks.push(file);
   else if (code.includes(DIALOG_MARKER)) dialogChunks.push(file);
   else if (code.includes(SHEET_TAB_PANELS_MARKER)) sheetTabPanelChunks.push(file);
@@ -129,6 +139,7 @@ for (const file of lazyChunks) {
     [IMPORT_MARKER, SUMMARY_MARKER, REPLACEMENT_MARKER].some((marker) => code.includes(marker))
   )
     documentChunks.push(file);
+  else if (code.includes(NUMBER_FORMAT_MARKER)) numberFormatChunks.push(file);
   else workers.push(file);
 }
 if (workers.length !== 1)
@@ -139,6 +150,11 @@ for (const marker of [RIBBON_MARKER, TOOLBAR_MARKER]) {
 }
 if (panelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack panel chunk, got ${panelChunks.length}`);
+if (numberFormatChunks.length > 1) {
+  throw new Error(
+    `Expected at most one webpack number format chunk, got ${numberFormatChunks.length}`,
+  );
+}
 if (sortPanelChunks.length !== 1)
   throw new Error(`Expected one lazy webpack Sort panel chunk, got ${sortPanelChunks.length}`);
 if (queryPanelChunks.length !== 1)
@@ -159,6 +175,10 @@ if (dataValidationChunks.length !== 1) {
     `Expected one lazy webpack Data Validation chunk, got ${dataValidationChunks.length}`,
   );
 }
+if (keyboardSettingsChunks.length !== 1)
+  throw new Error(
+    `Expected one lazy webpack Keyboard shortcuts chunk, got ${keyboardSettingsChunks.length}`,
+  );
 if (pasteSpecialChunks.length !== 1) {
   throw new Error(
     `Expected one lazy webpack Paste Special chunk, got ${pasteSpecialChunks.length}`,
@@ -274,10 +294,12 @@ const assets = publicFiles.map((file) => {
       autoFilterChunks,
       formatCellsChunks,
       dataValidationChunks,
+      keyboardSettingsChunks,
       pasteSpecialChunks,
       dialogChunks,
       sheetTabPanelChunks,
       documentChunks,
+      numberFormatChunks,
       dashboardChunks,
       addonRegistryChunks,
       addonSeamChunks,

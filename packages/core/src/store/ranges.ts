@@ -11,7 +11,7 @@ import type {
   SheetVisibility,
   SortKey,
 } from "../types/document.js";
-import { validCustomFilter } from "./autofilter.js";
+import { DYNAMIC_DATE_FILTERS, validCustomFilter } from "./autofilter.js";
 
 export function integerAt(value: number): boolean {
   return Number.isInteger(value) && value >= 0;
@@ -330,6 +330,8 @@ function validColumnFilter(filter: ColumnFilter): boolean {
     case "empty":
     case "nonEmpty":
       return true;
+    case "dynamic":
+      return DYNAMIC_DATE_FILTERS.has(filter.type);
     default:
       return false;
   }
@@ -403,6 +405,27 @@ export function movedBlock(patch: Extract<DocumentOp, { op: "moveCells" }>): Ran
       col: patch.to.col + from.end.col - from.start.col,
     },
   };
+}
+
+/**
+ * The cells a `moveCells` operation reads or writes: the block and where it
+ * lands, or for a shift one range from the first of them to the last, which
+ * also holds the cells a deletion closes between them.
+ */
+export function movedCellBounds(patch: Extract<DocumentOp, { op: "moveCells" }>): Range[] {
+  const from = normalizedRange(patch.range);
+  const to = movedBlock(patch);
+  if (patch.shift !== true) return [from, to];
+  return [
+    {
+      sheet: from.sheet,
+      start: {
+        row: Math.min(from.start.row, to.start.row),
+        col: Math.min(from.start.col, to.start.col),
+      },
+      end: { row: Math.max(from.end.row, to.end.row), col: Math.max(from.end.col, to.end.col) },
+    },
+  ];
 }
 
 /**

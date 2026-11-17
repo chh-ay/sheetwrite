@@ -110,7 +110,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Space / Shift + Space | Select the active cell's column / row. |
 | Ctrl/Cmd + A | Select the current region around the active cell; press again for the whole sheet. |
 | F2 | Edit the active cell, with the caret at the end. |
-| Alt + Down | Open the filter dropdown of an AutoFilter header cell, or the list of a cell with a list validation rule. |
+| Alt + Down | Open the filter dropdown of an AutoFilter header cell, the list of a cell with a list validation rule, or else [Pick From Drop-down List](/docs/features/grid/editing-and-clipboard/#pick-from-drop-down-list). |
 | Delete | Clear the selected cells. |
 | Backspace | Clear the active cell and start editing it; Escape restores it. |
 | A printable character | Start editing the active cell, replacing its content. A text entry may be completed from the column ([AutoComplete](/docs/features/grid/editing-and-clipboard/#autocomplete)). |
@@ -131,7 +131,7 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 | Ctrl/Cmd + Shift + ^ | Apply the Scientific format, `0.00E+00`. |
 | Ctrl/Cmd + 9 / Ctrl/Cmd + Shift + 9 | Hide the selected rows / show the hidden rows inside the selection. |
 | Ctrl/Cmd + 0 / Ctrl/Cmd + Shift + 0 | Hide the selected columns / show the hidden columns inside the selection. |
-| Ctrl/Cmd + + (Ctrl/Cmd + Shift + = or the keypad +) / Ctrl/Cmd + - | Insert / delete. Whole selected rows or columns are inserted above or left, or deleted, at once; for any other range a dialog asks for entire rows or entire columns. |
+| Ctrl/Cmd + + (Ctrl/Cmd + Shift + = or the keypad +) / Ctrl/Cmd + - | Insert / delete. Whole selected rows or columns are inserted above or left, or deleted, at once. For any other range a dialog asks, as Excel's does: Shift cells right or down (left or up on delete), Entire row or Entire column. It starts on Shift cells down (up) for a wide range and Shift cells right (left) for a tall one. Shifting moves the cells after the range in its columns (rows), with their formats, notes, links and merged cells, and formulas that refer to them follow, as they do for inserted and deleted rows; a reference to a deleted cell becomes `#REF!`. An insert that would push cells that are not blank off the sheet does nothing and says so. |
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 
@@ -142,6 +142,8 @@ In a dialog the grid opens, such as the merge warning, Tab and Shift + Tab move 
 ## Rebind an action
 
 Use `config.keyboard.bindings` to replace the keys for one action. Omitted actions keep their defaults. Use `null` to remove an action's keys, or an array for multiple bindings. These bindings apply when the grid has focus and is not editing.
+
+To let users change the keys themselves, turn on the [Keyboard shortcuts panel](/docs/features/grid/keyboard-shortcuts/) and store the bindings it emits.
 
 ```ts prelude="core" partial="requires surrounding host state" title="Rebind copy and keep its menu label in sync"
 grid.setConfig({

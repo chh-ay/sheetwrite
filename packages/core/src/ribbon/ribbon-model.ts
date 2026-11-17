@@ -470,7 +470,7 @@ export function steppedZoom(zoom: number, direction: 1 | -1): number {
 export const RIBBON_TABS: readonly RibbonTabSpec[] = [
   {
     label: "File",
-    reduceOrder: ["import"],
+    reduceOrder: ["options", "import"],
     groups: [
       {
         id: "import",
@@ -478,6 +478,23 @@ export const RIBBON_TABS: readonly RibbonTabSpec[] = [
         icon: "importXlsx",
         layout: "flow",
         controls: [xlsxImportCommand],
+      },
+      // Excel keeps its settings under File › Options; the host turns the
+      // Keyboard shortcuts panel on with `keyboardSettings`.
+      {
+        id: "options",
+        label: "Options",
+        icon: "keyboardShortcuts",
+        layout: "flow",
+        controls: [
+          button(
+            "Keyboard Shortcuts",
+            "keyboardShortcuts",
+            (grid) => grid.openKeyboardSettings(),
+            "view",
+            { large: true, flags: ["keyboardSettings"] },
+          ),
+        ],
       },
     ],
   },

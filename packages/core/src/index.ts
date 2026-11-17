@@ -226,6 +226,7 @@ export {
 } from "./sheet-name.js";
 
 export { IncompleteDataError, SheetwriteStore, type SheetwriteStoreOptions } from "./store.js";
+export { isDynamicDateFilter } from "./store/autofilter.js";
 
 export {
   type PendingCommitLoadOptions,
@@ -270,6 +271,7 @@ export type {
   CellHyperlink,
   CellInputSnapshot,
   CellLoadState,
+  CellMode,
   CellNote,
   CellPaintContext,
   CellRenderer,
@@ -329,6 +331,7 @@ export type {
   DataValidationOperand,
   DataValidationRule,
   DocumentOp,
+  DynamicDateFilter,
   ExternalLink,
   ExternalLinkCell,
   ExternalLinkName,
@@ -349,8 +352,10 @@ export type {
   HighlightRange,
   HyperlinkTarget,
   IconOverrides,
+  KeyBindings,
   KeyboardAction,
   KeyboardOptions,
+  KeyboardSettingsOptions,
   KeyShortcut,
   MergeRange,
   MountedChart,
@@ -396,6 +401,7 @@ export type {
   RelationshipStatus,
   RemoteOperationOptions,
   RemoteOperationSource,
+  ReplaceChange,
   ReplaceResult,
   ResolvedCell,
   ResourceOwnerBytes,

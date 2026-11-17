@@ -152,6 +152,44 @@ describe("pointer input: mouse parity", () => {
     grid.destroy();
     store.dispose();
   });
+
+  it("keeps what is typed into a Text-formatted cell as text, as Excel does", () => {
+    const workbook = makeWorkbook(10);
+    workbook.sheets[0]!.columns[1]!.type = "number";
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const text = { sheet: "s1", row: 0, col: 1 };
+    const number = { sheet: "s1", row: 1, col: 1 };
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: text,
+          value: { kind: "literal", value: null },
+          style: { numberFormat: "@" },
+        },
+      ],
+    });
+    const type = (row: number, input: string): void => {
+      grid.beginEdit(row, 1, input);
+      host
+        .querySelector("textarea.sheetwrite-editor")
+        ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    };
+
+    type(0, "0123");
+    expect(store.getCell(text).resolved).toBe("0123");
+    // The entry keeps the cell's format, as in Excel, so the next one is text too.
+    expect(store.getCell(text).style).toEqual({ numberFormat: "@" });
+    type(0, "=1+2");
+    expect(store.getCell(text).resolved).toBe("=1+2");
+    type(1, "0123");
+    expect(store.getCell(number).resolved).toBe(123);
+
+    grid.destroy();
+    store.dispose();
+  });
 });
 
 describe("pointer input: touch policy", () => {

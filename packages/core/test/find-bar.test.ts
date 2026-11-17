@@ -104,3 +104,135 @@ describe("FindBar", () => {
     grid.destroy();
   });
 });
+
+describe("FindBar options and Find All", () => {
+  it("searches the workbook from Options and lists every match", () => {
+    const host = mountHost();
+    const base = makeWorkbook(3);
+    const [first] = base.sheets;
+    if (!first) throw new Error("makeWorkbook gives one sheet");
+    const grid = createGrid(host, {
+      workbook: { ...base, sheets: [first, { ...first, id: "s2", name: "Sheet 2" }] },
+      config: { find: false, contextMenu: false, toolbar: false },
+    });
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 0, col: 0 },
+          value: { kind: "literal", value: "Ada" },
+        },
+        {
+          op: "set",
+          addr: { sheet: "s2", row: 1, col: 2 },
+          value: { kind: "formula", src: '="ada"' },
+        },
+      ],
+    });
+    const bar = new FindBar(host, DEFAULT_THEME, grid);
+    bar.open();
+    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
+    const options = host.querySelector<HTMLElement>(".sheetwrite-find-options")!;
+    const [within, , lookIn] = options.querySelectorAll("select");
+
+    // Alt+C, Excel's Match case key, opens the options and ticks the box.
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", altKey: true, bubbles: true }));
+    expect(options.hidden).toBe(false);
+    expect(options.querySelector<HTMLInputElement>("input[type=checkbox]")!.checked).toBe(true);
+    input.dispatchEvent(new KeyboardEvent("keydown", { key: "c", altKey: true, bubbles: true }));
+
+    within!.value = "workbook";
+    within!.dispatchEvent(new Event("change"));
+    lookIn!.value = "values";
+    lookIn!.dispatchEvent(new Event("change"));
+    expect(input.getAttribute("aria-label")).toBe("Find in workbook");
+    input.value = "ada";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-all")!.click();
+    const findAll = host.querySelector<HTMLElement>(".sheetwrite-find-all-results")!;
+    const rows = [
+      ...findAll.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
+    ];
+    expect(rows.map((row) => [...row.children].map((cell) => cell.textContent))).toEqual([
+      ["Sheet 1", "$A$1", "Ada", ""],
+      ["Sheet 2", "$C$2", "ada", '="ada"'],
+    ]);
+    expect(findAll.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
+      "2 cells found",
+    );
+
+    (rows[1] as HTMLElement).click();
+    expect(grid.getActiveSheet()).toBe("s2");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s2", row: 1, col: 2 } });
+    expect(
+      findAll.querySelector(".sheetwrite-find-result[aria-selected=true] span")!.textContent,
+    ).toBe("Sheet 2");
+
+    bar.destroy();
+    grid.destroy();
+  });
+});
+
+describe("FindBar Replace all preview", () => {
+  it("shows what Replace all will change before it applies, as one undo step", () => {
+    const host = mountHost();
+    const grid = createGrid(host, {
+      workbook: makeWorkbook(3),
+      data: {
+        rowCount: 3,
+        columns: {
+          name: ["Ada", "Bob", "Ada"],
+          amount: [1, 2, 3],
+          city: ["London", "Paris", "Rome"],
+        },
+      },
+      config: { find: false, contextMenu: false, toolbar: false },
+    });
+    grid.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: { sheet: "s1", row: 1, col: 2 },
+          value: { kind: "formula", src: '="Ada"' },
+        },
+      ],
+    });
+    const bar = new FindBar(host, DEFAULT_THEME, grid);
+    bar.open({ replace: true });
+    const input = host.querySelector<HTMLInputElement>(".sheetwrite-find-input")!;
+    const replacement = host.querySelector<HTMLInputElement>(".sheetwrite-find-replace-input")!;
+    const preview = host.querySelector<HTMLElement>(".sheetwrite-find-preview")!;
+    input.value = "Ada";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    replacement.value = "Grace";
+    replacement.dispatchEvent(new Event("input", { bubbles: true }));
+
+    expect(preview.hidden).toBe(false);
+    expect(preview.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
+      "3 cells, 1 of them a formula",
+    );
+    const rows = [
+      ...preview.querySelectorAll(".sheetwrite-find-results-list .sheetwrite-find-result"),
+    ];
+    expect(rows.map((row) => [...row.children].map((cell) => cell.textContent))).toEqual([
+      ["Sheet 1", "$A$1", "Ada", "Grace"],
+      ["Sheet 1", "$C$2", '="Ada"', '="Grace"'],
+      ["Sheet 1", "$A$3", "Ada", "Grace"],
+    ]);
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
+
+    host.querySelector<HTMLButtonElement>(".sheetwrite-find-replace-all")!.click();
+    expect(grid.store.getCell({ sheet: "s1", row: 2, col: 0 }).resolved).toBe("Grace");
+    expect(grid.store.getFormula({ sheet: "s1", row: 1, col: 2 })).toBe('="Grace"');
+    expect(preview.querySelector(".sheetwrite-find-results-status")!.textContent).toBe(
+      "Nothing to replace",
+    );
+    grid.actions.undo();
+    expect(grid.store.getCell({ sheet: "s1", row: 0, col: 0 }).resolved).toBe("Ada");
+    expect(grid.store.getFormula({ sheet: "s1", row: 1, col: 2 })).toBe('="Ada"');
+
+    bar.destroy();
+    grid.destroy();
+  });
+});

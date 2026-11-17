@@ -132,15 +132,19 @@ As in Excel ([Keyboard shortcuts in Excel](https://support.microsoft.com/en-us/o
 | Ctrl/Cmd + Shift + % | Percentage, no decimals | `0%` |
 | Ctrl/Cmd + Shift + ^ | Scientific, two decimals | `0.00E+00` |
 
+The ribbon's Number Format box then names the format as Excel does: a preset's name such as Short Date, or else the Format Cells category that makes the code, so the keys above show General, Number, Time, Date, Currency, Percentage and Scientific. Only a code no category makes shows Custom.
+
 Ctrl/Cmd + 1, the context menu's Format cells… or `grid.actions.formatCells()` opens the **Format Cells** dialog over the selection. It shows the active cell's format on five tabs:
 
-- **Number**: General, Number (decimal places, 1000 separator, negative numbers), Currency (decimal places, negative numbers), Accounting, Date and Time (a list of types), Percentage, Scientific (decimal places) and Custom (any format code), with a sample of the active cell's value.
+- **Number**: General, Number (decimal places, 1000 separator, negative numbers), Currency (decimal places, negative numbers), Accounting, Date and Time (a list of types), Percentage, Fraction (up to one, two or three digits, or as halves, quarters, eighths, sixteenths, tenths or hundredths), Scientific (decimal places), Text and Custom (any format code), with a sample of the active cell's value.
 - **Alignment**: horizontal and vertical alignment, and wrap text.
 - **Font**: font, size, bold, italic, underline, strikethrough and color.
 - **Border**: None, Outline, All borders, Thick outline, Top, Bottom, Left or Right.
 - **Fill**: no fill or a color.
 
-OK applies only what you changed, to every selected cell, as one undoable step; the cells keep their other formatting. Cancel and Escape change nothing. Arrow keys move between the tabs, Tab moves into the shown tab, and Enter chooses OK. The dialog is in its own chunk, loaded on first use; keys pressed meanwhile reach it. Excel's Fraction and Text categories are not offered, because the formatter does not support them.
+OK applies only what you changed, to every selected cell, as one undoable step; the cells keep their other formatting. Cancel and Escape change nothing. Arrow keys move between the tabs, Tab moves into the shown tab, and Enter chooses OK. The dialog is in its own chunk, loaded on first use; keys pressed meanwhile reach it.
+
+While the dialog is open, the selected cells show the format it would apply, as you change each setting: negative numbers, zeros, `####` in a narrow column and borders show on the whole selection, not only on the dialog's one sample. The preview changes only what the grid draws: nothing reaches the document, the undo history or collaborators before OK, and Cancel or Escape puts the cells back as they were.
 
 From code, `grid.actions.formatCells({ style, border })` applies a format to the selection without the dialog, as OK does: `style` merges into each cell's style and `border` is a border preset such as `"all"` or `"outside"`, as one undoable step that is in place when the call returns.
 
@@ -159,6 +163,9 @@ These examples use `"en-US"`, the formatter's default locale. Set `numberLocale`
 | `0%` | `0.5` → <sw-format value="0.5" code="0%" locale="en-US"></sw-format> |
 | `$#,##0.00` | `1234.5` → <sw-format value="1234.5" code="$#,##0.00" locale="en-US"></sw-format> |
 | `0.00E+00` | `12345` → <sw-format value="12345" code="0.00E+00" locale="en-US"></sw-format> |
+| `# ?/?` | `5.25` → <sw-format value="5.25" code="# ?/?" locale="en-US"></sw-format> |
+| `# ??/100` | `5.3` → <sw-format value="5.3" code="# ??/100" locale="en-US"></sw-format> |
+| `@` | `1234.5` → <sw-format value="1234.5" code="@" locale="en-US"></sw-format> (shown as General) |
 | `yyyy-mm-dd` | serial `45351` → <sw-format value="45351" code="yyyy-mm-dd" locale="en-US"></sw-format> |
 | `mmm d, yyyy h:mm:ss AM/PM` | UTC serial `45477.62924768519` (2024-07-04 15:06:07 UTC) → <sw-format value="45477.62924768519" code="mmm d, yyyy h:mm:ss AM/PM" locale="en-US"></sw-format> |
 | `0.00;[Red](0.00);"none";"value: "@` | Positive `2.5` → <sw-format value="2.5" code="0.00;&#91;Red&#93;(0.00);&quot;none&quot;;&quot;value: &quot;@" locale="en-US"></sw-format>; negative `-2.5` → <sw-format value="-2.5" code="0.00;&#91;Red&#93;(0.00);&quot;none&quot;;&quot;value: &quot;@" locale="en-US"></sw-format>; zero `0` → <sw-format value="0" code="0.00;&#91;Red&#93;(0.00);&quot;none&quot;;&quot;value: &quot;@" locale="en-US"></sw-format>; text `"draft"` → <sw-format value="draft" code="0.00;&#91;Red&#93;(0.00);&quot;none&quot;;&quot;value: &quot;@" locale="en-US"></sw-format> |
@@ -169,6 +176,12 @@ Numeric formats support fixed decimals, optional grouping, percent scaling, scie
 
 Up to four semicolon sections select the positive, negative, zero and text output. Sheetwrite accepts color directives such as `[Red]` as formatting metadata, but they do not change the canvas text color.
 
+### Fractions and Text
+
+A fraction code such as `# ?/?`, `# ??/??` or `# ???/???` shows the closest fraction whose denominator has at most that many digits; a fixed denominator such as `# ?/4`, `# ??/16` or `# ??/100` rounds to that many parts and is not reduced. The `#` part is the whole number; without it the fraction is improper (`?/?` shows `1.25` as `5/4`). The numerator is right-aligned and the denominator left-aligned in their `?` places, and a fraction that rounds to zero leaves spaces, so a column of fractions lines up. `TEXT()` in formulas follows the same rules.
+
+The Text format `@` shows a number as General would. What you type into a cell formatted as Text stays text exactly as typed, as in Excel: `0123` keeps its zero, and `=A1` is not a formula.
+
 ### Date and time codes
 
 Date and time formats support numeric and named month and day fields, 12-hour and 24-hour time, minutes, seconds, and AM/PM. Neighboring time tokens decide whether `m` means month or minute.
@@ -177,7 +190,7 @@ UTC fields make date rendering the same in every host timezone. Locale-specific 
 
 ## Edge cases and limits
 
-- Fractions, elapsed-time bracket tokens and fractional seconds are not supported.
+- Elapsed-time bracket tokens and fractional seconds are not supported.
 - Formula errors are explicit values such as `#DIV/0!` and `#CYCLE!`. They are not non-finite numbers that the formatter hides. See [Formulas](/docs/features/formulas/authoring-and-references/#scalars-coercion-and-errors).
 - Native boolean values use the normal cell style model and render as uppercase `TRUE` or `FALSE`. They are centered unless `CellStyle.align` overrides it.
 

@@ -1,9 +1,10 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "bun:test";
 
-import { numberFormatCode, numberFormatParts } from "../src/format-cells.js";
+import { numberFormatCode, numberFormatLabel, numberFormatParts } from "../src/format-presets.js";
 import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
+import type { CellStyle, Renderer } from "../src/types.js";
 import {
   answerDialog,
   elementAdded,
@@ -148,6 +149,60 @@ describe("Format Cells", () => {
     await answerDialog(host, "OK");
     expect(cell(0, 1).style.numberFormat).toBe('0.0 "kg"');
   });
+
+  it("offers Excel's Fraction types and the Text category", async () => {
+    let dialog = await openFormatCells();
+    setValue(control(dialog, "Category", HTMLSelectElement), "Fraction");
+    const type = [...dialog.querySelectorAll("select")].find((select) =>
+      [...select.options].some((option) => option.value === "# ?/4"),
+    )!;
+    expect(type.closest("label")!.hidden).toBe(false);
+    expect([...type.options].map((option) => option.textContent)).toContain("As quarters (2/4)");
+    setValue(type, "# ?/4");
+    expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe(" 2/4");
+    await answerDialog(host, "OK");
+    expect(cell(0, 1).style.numberFormat).toBe("# ?/4");
+
+    dialog = await openFormatCells();
+    expect(control(dialog, "Category", HTMLSelectElement).value).toBe("Fraction");
+    setValue(control(dialog, "Category", HTMLSelectElement), "Text");
+    expect(control(dialog, "Sample", HTMLOutputElement).textContent).toBe("0.5");
+    await answerDialog(host, "OK");
+    expect(cell(1, 1).style.numberFormat).toBe("@");
+  });
+
+  it("previews a change on the selected cells while it is open, and Cancel puts them back", async () => {
+    // The style the grid paints for B1 in each frame.
+    const painted: Array<CellStyle | undefined> = [];
+    const recorder: Renderer = {
+      mount() {},
+      setLayout() {},
+      setViewport() {},
+      paint(view) {
+        const index = (0 - view.rows.start) * view.cols.length + view.cols.indexOf(1);
+        painted.push(view.styles[view.styleIds[index] ?? 0]);
+      },
+      setTheme() {},
+      setRenderers() {},
+      destroy() {},
+    };
+    expect(Reflect.set(grid, "renderer", recorder)).toBe(true);
+    let changes = 0;
+    grid.on("change", () => changes++);
+
+    const dialog = await openFormatCells();
+    const bold = control(dialog, "Bold", HTMLInputElement);
+    bold.checked = true;
+    bold.dispatchEvent(new Event("change", { bubbles: true }));
+    grid.refresh();
+    expect(painted.at(-1)?.bold).toBe(true);
+    expect(cell(0, 1).style.bold).toBeUndefined();
+
+    await answerDialog(host, "Cancel");
+    grid.refresh();
+    expect(painted.at(-1)?.bold).toBeUndefined();
+    expect(changes).toBe(0);
+  });
 });
 
 describe("Number tab categories", () => {
@@ -160,6 +215,8 @@ describe("Number tab categories", () => {
       [{ ...base, category: "Percentage", decimals: 0 }, "0%"],
       [{ ...base, category: "Scientific" }, "0.00E+00"],
       [{ ...base, category: "Date", code: "d-mmm-yy" }, "d-mmm-yy"],
+      [{ ...base, category: "Fraction", code: "# ??/16" }, "# ??/16"],
+      [{ ...base, category: "Text", code: "@" }, "@"],
     ] as const;
     for (const [parts, code] of cases) {
       expect(numberFormatCode(parts)).toBe(code);
@@ -167,5 +224,30 @@ describe("Number tab categories", () => {
     }
     expect(numberFormatParts(undefined).category).toBe("General");
     expect(numberFormatParts('0.0 "kg"').category).toBe("Custom");
+  });
+
+  it("name the Number Format box for the number-format keys and the % and comma buttons, as Excel does", () => {
+    const labels = [
+      "$#,##0.00_);($#,##0.00)",
+      "0%",
+      "#,##0.00",
+      "d-mmm-yy",
+      "h:mm AM/PM",
+      "0.00E+00",
+      "General",
+      "m/d/yyyy",
+      '0.0 "kg"',
+    ].map(numberFormatLabel);
+    expect(labels).toEqual([
+      "Currency",
+      "Percentage",
+      "Number",
+      "Date",
+      "Time",
+      "Scientific",
+      "General",
+      "Short Date",
+      "Custom",
+    ]);
   });
 });

@@ -1878,6 +1878,53 @@ describe("undo and redo selection", () => {
 
     grid.destroy();
   });
+
+  it("shows the sheet of a change undone or redone on another sheet", () => {
+    const workbook = makeWorkbook(20);
+    workbook.sheets.push({ ...structuredClone(workbook.sheets[0]!), id: "s2", name: "Summary" });
+    const store = new SheetwriteStore(workbook);
+    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const changed = { kind: "cell" as const, addr: { sheet: "s1", row: 4, col: 2 } };
+    grid.applyTransaction({
+      patches: [{ op: "set", addr: changed.addr, value: { kind: "literal", value: "Zed" } }],
+    });
+
+    grid.setActiveSheet("s2");
+    grid.undo();
+    expect(grid.getActiveSheet()).toBe("s1");
+    expect(grid.getSelection()).toEqual(changed);
+
+    grid.setActiveSheet("s2");
+    grid.redo();
+    expect(grid.getActiveSheet()).toBe("s1");
+    expect(grid.getSelection()).toEqual(changed);
+
+    grid.destroy();
+    store.dispose();
+  });
+
+  it("selects a sheet's last cell, or A1, and gives the keyboard to a clicked tab's sheet", () => {
+    const workbook = makeWorkbook(20);
+    workbook.sheets.push({ ...structuredClone(workbook.sheets[0]!), id: "s2", name: "Summary" });
+    const store = new SheetwriteStore(workbook);
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const b3 = { kind: "cell" as const, addr: { sheet: "s1", row: 2, col: 1 } };
+    grid.setSelection(b3);
+
+    const tab = host.querySelector<HTMLElement>('[role="tab"][data-sheet-id="s2"]');
+    if (!tab) throw new Error("the Summary tab must render");
+    tab.dispatchEvent(new MouseEvent("click", { bubbles: true, detail: 1 }));
+    expect(grid.getActiveSheet()).toBe("s2");
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s2", row: 0, col: 0 } });
+    expect(document.activeElement).toBe(host);
+
+    grid.setActiveSheet("s1");
+    expect(grid.getSelection()).toEqual(b3);
+
+    grid.destroy();
+    store.dispose();
+  });
 });
 
 describe("a sheet named History", () => {

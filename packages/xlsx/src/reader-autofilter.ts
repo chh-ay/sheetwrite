@@ -10,7 +10,7 @@ import type {
   SheetSnapshot,
   SnapshotCell,
 } from "@sheetwrite/core";
-import { formatNumber } from "@sheetwrite/core";
+import { formatNumber, isDynamicDateFilter } from "@sheetwrite/core";
 
 import { type CellRect, parseCellRect } from "./cell-reference.js";
 import { checkAbort, emitWarning, type XlsxCodecContext } from "./resources.js";
@@ -121,6 +121,14 @@ function parseFilterColumn(element: XmlElement, col: number): ParsedFilterColumn
     };
   }
 
+  // Excel's relative date filters and All Dates in the Period; above and
+  // below average have no Sheetwrite equivalent.
+  const dynamic = xmlChild(element, "dynamicFilter");
+  const type = dynamic ? xmlAttribute(dynamic, "type") : undefined;
+  if (type !== undefined && isDynamicDateFilter(type)) {
+    return { col, kind: "filter", filter: { kind: "dynamic", type } };
+  }
+
   const custom = xmlChild(element, "customFilters");
   const filter = custom ? parseCustomFilters(custom) : null;
   return filter ? { col, kind: "filter", filter } : null;
@@ -128,8 +136,8 @@ function parseFilterColumn(element: XmlElement, col: number): ParsedFilterColumn
 
 /**
  * The worksheet's AutoFilter, or `undefined` without one. A column whose
- * filter has no Sheetwrite equivalent (colours, icons, top 10, dynamic dates,
- * date groups) is left unfiltered, with a warning.
+ * filter has no Sheetwrite equivalent (colours, icons, top 10, above or below
+ * average, date groups) is left unfiltered, with a warning.
  */
 export function parseAutoFilter(
   root: XmlElement,
