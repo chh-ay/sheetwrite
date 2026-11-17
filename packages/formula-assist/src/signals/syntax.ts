@@ -2,36 +2,28 @@
 // letters leave only one, a sheet name with its `!`, and the brackets that
 // close calls which have all the arguments they can take.
 
+import type { FormulaEdit } from "@sheetwrite/core";
 import type {
   FormulaAnalysis,
-  FormulaEdit,
   FormulaFunctionMetadata,
   FormulaToken,
-} from "@sheetwrite/core";
+} from "@sheetwrite/core/functions";
 
-import type { Candidate, Signal } from "../candidates.js";
-
-/** Measured on the development sets (see bench/README.md). */
-const CONFIDENCE = {
-  /** The only function whose name starts with the typed letters. */
-  functionName: 0.95,
-  /** The only sheet whose name starts with the typed letters. */
-  sheetName: 0.92,
-  /** Closing brackets after a token that can't grow: `)` or a closed string. */
-  closeAfterEnd: 0.95,
-  /** Closing brackets after a number or reference, which the user may still be typing. */
-  closeAfterValue: 0.7,
-} as const;
+import type { Proposal, Signal } from "../candidates.js";
 
 /** Fewer inserted characters save no key: Tab costs one too. */
 const MIN_INSERT = 2;
 /** One to three letters can be a column name, as in `AB` of `AB12`. */
 const COLUMN_LETTERS = /^[A-Z]{1,3}$/i;
-const CONSTANTS = ["TRUE", "FALSE"];
+/** Sheet names a formula can name without quotes; others need the `'` the user types first. */
+const PLAIN_NAME = /^[A-Z_][A-Z0-9_.]*$/i;
+const LETTERS = 26;
+/** Char code before `A`, so `A` counts as 1. */
+const BEFORE_A = 64;
 
 function columnIndex(letters: string): number {
   let index = 0;
-  for (const letter of letters.toUpperCase()) index = index * 26 + letter.charCodeAt(0) - 64;
+  for (const letter of letters.toUpperCase()) index = index * LETTERS + letter.charCodeAt(0) - BEFORE_A;
   return index - 1;
 }
 
@@ -83,7 +75,7 @@ function closers(calls: readonly OpenCall[]): string {
   let closing = "";
   for (let index = calls.length - 1; index >= 0; index--) {
     const call = calls[index];
-    if (call?.fn === null || call === undefined || !call.filled) break;
+    if (call === undefined || call.fn === null || !call.filled) break;
     if (call.arguments < maxArguments(call.fn)) break;
     closing += ")";
   }
@@ -96,7 +88,7 @@ class Syntax implements Signal {
 
   constructor(private readonly edit: FormulaEdit) {}
 
-  candidates(text: string, analysis: FormulaAnalysis): Candidate[] {
+  proposals(text: string, analysis: FormulaAnalysis): Proposal[] {
     const functions = this.edit.functions();
     if (functions !== this.listed) {
       this.listed = functions;
@@ -106,69 +98,54 @@ class Syntax implements Signal {
     const last = analysis.tokens.at(-1);
     if (last === undefined || last.to !== text.length) return [];
 
-    const candidates: Candidate[] = [];
-    if (last.kind === "name") this.names(text, analysis, last, candidates);
-    this.closing(text, analysis, last, candidates);
-    return candidates;
+    const proposals: Proposal[] = [];
+    const add = (formula: string, reason: string): void => {
+      if (formula.length - text.length >= MIN_INSERT) {
+        proposals.push({ formula, signal: "syntax", reason });
+      }
+    };
+    if (last.kind === "name") {
+      const name = this.name(text, analysis, last);
+      if (name !== null) add(`${text.slice(0, last.from)}${name.text}`, name.reason);
+    }
+
+    const closing = closers(openCalls(analysis.tokens, text, this.byName));
+    const ends = last.kind === "paren" || (last.kind === "string" && text.endsWith('"'));
+    if (closing.length > 0) add(text + closing, ends ? "closeAfterEnd" : "closeAfterValue");
+    return proposals;
   }
 
-  /** The function, constant or sheet whose name the typed letters start, when only one does. */
-  private names(
+  /** The function or sheet whose name the typed letters start, when only one does. */
+  private name(
     text: string,
     analysis: FormulaAnalysis,
     last: FormulaToken,
-    candidates: Candidate[],
-  ): void {
+  ): { text: string; reason: string } | null {
     const typed = text.slice(last.from).toUpperCase();
     const workbook = this.edit.reads.workbook();
     const sheet = workbook.sheets.find((entry) => entry.id === this.edit.cell.sheet);
     // Letters that name a column in use are as likely the start of a reference.
-    if (COLUMN_LETTERS.test(typed) && columnIndex(typed) < (sheet?.columns.length ?? 0)) return;
+    if (COLUMN_LETTERS.test(typed) && columnIndex(typed) < (sheet?.columns.length ?? 0)) return null;
 
     const names = [
-      ...(workbook.namedRanges ?? []).map((named) => named.name.toUpperCase()),
-      ...(workbook.tables ?? []).map((table) => table.name.toUpperCase()),
-    ].filter((name) => name.startsWith(typed));
-    const sheets = workbook.sheets.filter((entry) => entry.name.toUpperCase().startsWith(typed));
-    const matches = analysis.completion?.matches ?? [];
-    const constants = CONSTANTS.filter((constant) => constant.startsWith(typed));
-    if (names.length > 0) return;
+      ...(workbook.namedRanges ?? []).map((named) => named.name),
+      ...workbook.sheets.flatMap((entry) => (entry.tables ?? []).map((table) => table.name)),
+    ];
+    if (names.some((name) => name.toUpperCase().startsWith(typed))) return null;
 
+    const sheets = workbook.sheets.filter(
+      (entry) => PLAIN_NAME.test(entry.name) && entry.name.toUpperCase().startsWith(typed),
+    );
+    const matches = analysis.completion?.matches ?? [];
     const [fn] = matches;
     if (matches.length === 1 && sheets.length === 0 && fn !== undefined) {
-      const constant = constants.find((name) => name === fn.name.toUpperCase());
-      const rest = constant ?? `${fn.name}(`;
-      this.add(candidates, `${text.slice(0, last.from)}${rest}`, text, "functionName");
-      return;
+      return { text: `${fn.name}(`, reason: "functionName" };
     }
-
     const [only] = sheets;
     if (sheets.length === 1 && matches.length === 0 && only !== undefined) {
-      this.add(candidates, `${text.slice(0, last.from)}${only.name}!`, text, "sheetName");
+      return { text: `${only.name}!`, reason: "sheetName" };
     }
-  }
-
-  private closing(
-    text: string,
-    analysis: FormulaAnalysis,
-    last: FormulaToken,
-    candidates: Candidate[],
-  ): void {
-    const closing = closers(openCalls(analysis.tokens, text, this.byName));
-    if (closing.length === 0) return;
-
-    const ends = last.kind === "paren" || (last.kind === "string" && text.endsWith('"'));
-    this.add(candidates, text + closing, text, ends ? "closeAfterEnd" : "closeAfterValue");
-  }
-
-  private add(
-    candidates: Candidate[],
-    formula: string,
-    text: string,
-    reason: keyof typeof CONFIDENCE,
-  ): void {
-    if (formula.length - text.length < MIN_INSERT) return;
-    candidates.push({ formula, confidence: CONFIDENCE[reason], signal: "syntax", reason });
+    return null;
   }
 }
 

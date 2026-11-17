@@ -4,7 +4,7 @@
 
 import type { FormulaEdit } from "@sheetwrite/core";
 
-import type { Candidate, Signal } from "../candidates.js";
+import type { Proposal, Signal } from "../candidates.js";
 
 /** Where a neighbour sits, relative to the edited cell. */
 type Side = "above" | "below" | "left" | "right" | "furtherAbove";
@@ -22,40 +22,27 @@ const NEIGHBOURS: readonly { readonly side: Side; readonly dRow: number; readonl
 /** Rows searched upward for the nearest formula of the column, when the two above hold none. */
 const SEARCH_ABOVE = 12;
 
-/** Measured on the development sets (see bench/README.md). */
-const CONFIDENCE = {
-  /** The formulas above and below, moved here, are the same. */
-  aboveAndBelow: 0.97,
-  /** The two formulas above, moved here, are the same. */
-  twoAbove: 0.95,
-  /** The formulas left and right, moved here, are the same. */
-  leftAndRight: 0.93,
-  above: 0.9,
-  below: 0.86,
-  /** The nearest formula higher up the column, past empty or literal cells. */
-  furtherAbove: 0.8,
-  left: 0.8,
-  right: 0.75,
-} as const;
-/** A candidate that another neighbour contradicts keeps this share of its confidence. */
-const CONTRADICTED = 0.8;
-
-/** The situation a moved formula was found in, strongest first. */
-function reasonOf(sides: ReadonlySet<Side>, count: number): keyof typeof CONFIDENCE {
-  if (sides.has("above") && sides.has("below")) return "aboveAndBelow";
-  if (sides.has("left") && sides.has("right")) return "leftAndRight";
-  if (sides.has("above")) return count > 1 ? "twoAbove" : "above";
-  if (sides.has("below")) return "below";
-  if (sides.has("left")) return "left";
-  if (sides.has("right")) return "right";
-  return "furtherAbove";
+/**
+ * The situation a moved formula was found in, strongest first: which sides
+ * gave it, and whether another neighbour gave a different formula.
+ */
+function reasonOf(sides: ReadonlySet<Side>, count: number, contradicted: boolean): string {
+  let reason: string;
+  if (sides.has("above") && sides.has("below")) reason = "aboveAndBelow";
+  else if (sides.has("left") && sides.has("right")) reason = "leftAndRight";
+  else if (sides.has("above")) reason = count > 1 ? "twoAbove" : "above";
+  else if (sides.has("below")) reason = "below";
+  else if (sides.has("left")) reason = "left";
+  else if (sides.has("right")) reason = "right";
+  else reason = "furtherAbove";
+  return contradicted ? `${reason}, contradicted` : reason;
 }
 
-/** The formulas next to the edited cell, moved to it, with their confidence. */
-function neighbourCandidates(edit: FormulaEdit): Candidate[] {
+/** The formulas next to the edited cell, moved to it. */
+function neighbourProposals(edit: FormulaEdit): Proposal[] {
   const { cell, reads } = edit;
   const moved = new Map<string, { formula: string; sides: Set<Side>; count: number }>();
-  /** Whether the cell holds a formula; one that moves off the sheet is no candidate. */
+  /** Whether the cell holds a formula; one that moves off the sheet is no proposal. */
   const read = (side: Side, row: number, col: number): boolean => {
     if (row < 0 || col < 0) return false;
     const source = reads.formula(cell.sheet, row, col);
@@ -81,19 +68,15 @@ function neighbourCandidates(edit: FormulaEdit): Candidate[] {
   }
 
   const contradicted = moved.size > 1;
-  return [...moved.values()].map(({ formula, sides, count }) => {
-    const reason = reasonOf(sides, count);
-    return {
-      formula,
-      confidence: CONFIDENCE[reason] * (contradicted ? CONTRADICTED : 1),
-      signal: "neighbours",
-      reason: contradicted ? `${reason}, contradicted` : reason,
-    };
-  });
+  return [...moved.values()].map(({ formula, sides, count }) => ({
+    formula,
+    signal: "neighbours",
+    reason: reasonOf(sides, count, contradicted),
+  }));
 }
 
 /** Open the neighbouring-formulas signal of one edit; it reads the neighbours once. */
 export function openNeighbours(edit: FormulaEdit): Signal {
-  const candidates = neighbourCandidates(edit);
-  return { candidates: () => candidates };
+  const proposals = neighbourProposals(edit);
+  return { proposals: () => proposals };
 }

@@ -1,13 +1,15 @@
 // Signal 3 of #801, argument roles: what an argument of a lookup or
 // conditional sum usually is, read from the sheet. The value looked up is the
-// row's key (the first cell of the row's block); VLOOKUP's column number is
-// the position, in the table, of the header the edited column carries.
+// row's key (the first cell of the row's block) or the cell to the left;
+// VLOOKUP's column number is the position, in the table, of the header the
+// edited column carries.
 
-import { cellA1, type FormulaAnalysis, type FormulaEdit } from "@sheetwrite/core";
+import { cellA1, type FormulaEdit } from "@sheetwrite/core";
+import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
-import type { Candidate, Signal } from "../candidates.js";
+import type { Proposal, Signal } from "../candidates.js";
 
-/** Functions whose first argument is the value looked up, and those whose criteria argument it is. */
+/** The argument that holds the value looked up, or the criteria, by function. */
 const KEY_ARGUMENT: Readonly<Record<string, number>> = {
   VLOOKUP: 0,
   HLOOKUP: 0,
@@ -20,20 +22,6 @@ const KEY_ARGUMENT: Readonly<Record<string, number>> = {
   AVERAGEIF: 1,
 };
 
-/** Measured on the development sets (see bench/README.md). */
-const CONFIDENCE = {
-  /** The first cell of the edited row's block, as the value looked up. */
-  rowKey: 0.6,
-  /** The cell right left of the edited one, as the value looked up. */
-  leftCell: 0.6,
-  /** VLOOKUP's column number: where the edited column's header sits in the table's first row. */
-  columnFromHeader: 0.9,
-} as const;
-
-function candidate(formula: string, reason: keyof typeof CONFIDENCE): Candidate {
-  return { formula, confidence: CONFIDENCE[reason], signal: "roles", reason };
-}
-
 /** Text of a cell, as headers are compared: trimmed, letter case aside. */
 function headerKey(value: unknown): string | null {
   return typeof value === "string" && value.trim() !== "" ? value.trim().toUpperCase() : null;
@@ -43,7 +31,7 @@ class Roles implements Signal {
   /** A1 text of the row's key and of the cell to the left; null when the cell starts its row. */
   private readonly rowKey: string | null;
   private readonly leftCell: string | null;
-  /** The header over the edited column: the first text at the top of its block. */
+  /** The header over the edited column: the text at the top of its block. */
   private readonly header: string | null;
 
   constructor(private readonly edit: FormulaEdit) {
@@ -59,23 +47,24 @@ class Roles implements Signal {
     this.header = top < cell.row ? headerKey(reads.value(cell.sheet, top, cell.col)) : null;
   }
 
-  candidates(text: string, analysis: FormulaAnalysis): Candidate[] {
+  proposals(text: string, analysis: FormulaAnalysis): Proposal[] {
     const call = analysis.call;
     if (call === null || !(text.endsWith("(") || text.endsWith(","))) return [];
 
     const name = call.name.toUpperCase();
-    const candidates: Candidate[] = [];
+    const proposals: Proposal[] = [];
+    const add = (insert: string, reason: string): void => {
+      proposals.push({ formula: `${text}${insert},`, signal: "roles", reason });
+    };
     if (KEY_ARGUMENT[name] === call.argumentIndex) {
-      if (this.rowKey !== null) candidates.push(candidate(`${text}${this.rowKey},`, "rowKey"));
-      if (this.leftCell !== null && this.leftCell !== this.rowKey) {
-        candidates.push(candidate(`${text}${this.leftCell},`, "leftCell"));
-      }
+      if (this.rowKey !== null) add(this.rowKey, "rowKey");
+      if (this.leftCell !== null && this.leftCell !== this.rowKey) add(this.leftCell, "leftCell");
     }
     if (name === "VLOOKUP" && call.argumentIndex === 2) {
       const column = this.columnFromHeader(analysis);
-      if (column !== null) candidates.push(candidate(`${text}${column},`, "columnFromHeader"));
+      if (column !== null) add(String(column), "columnFromHeader");
     }
-    return candidates;
+    return proposals;
   }
 
   /** The 1-based column of the table (the call's last reference) whose first row holds this column's header. */
@@ -85,12 +74,11 @@ class Roles implements Signal {
     if (header === null || table === undefined) return null;
 
     const { reads, cell } = this.edit;
-    const sheetName = table.sheet;
+    const sheetName = table.sheet?.toUpperCase();
     const sheet =
-      sheetName === null
+      sheetName === undefined
         ? cell.sheet
-        : reads.workbook().sheets.find((entry) => entry.name.toUpperCase() === sheetName.toUpperCase())
-            ?.id;
+        : reads.workbook().sheets.find((entry) => entry.name.toUpperCase() === sheetName)?.id;
     if (sheet === undefined) return null;
 
     for (let col = table.start.col; col <= table.end.col; col++) {

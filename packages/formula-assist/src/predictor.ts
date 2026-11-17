@@ -1,10 +1,13 @@
 // The predictor: opens each signal for one formula edit and, on every key,
-// ranks their candidates into at most one suggestion. This module is the
+// ranks their proposals into at most one suggestion. This module is the
 // add-on's lazy chunk; the add-on entry loads it on the first formula edit.
 
-import type { FormulaAnalysis, FormulaEdit, FormulaSuggestion } from "@sheetwrite/core";
+import type { FormulaEdit, FormulaSuggestion } from "@sheetwrite/core";
+import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
+import { CALIBRATION } from "./calibration.js";
 import {
+  calibrationKey,
   type Candidate,
   type Choice,
   choose,
@@ -86,8 +89,11 @@ class Session implements PredictionSession {
 
     const candidates: Candidate[] = [];
     for (const signal of this.signals) {
-      for (const candidate of signal.candidates(text, analysis)) {
-        if (!this.dismissed.has(formulaKey(candidate.formula))) candidates.push(candidate);
+      for (const proposal of signal.proposals(text, analysis)) {
+        if (this.dismissed.has(formulaKey(proposal.formula))) continue;
+        // A reason the development sets never saw has no measured chance, so it never shows.
+        const confidence = CALIBRATION[calibrationKey(proposal, text)] ?? 0;
+        candidates.push({ ...proposal, confidence });
       }
     }
     const choice = this.steady(text, choose(rank(text, candidates)));

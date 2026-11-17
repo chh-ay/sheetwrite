@@ -125,7 +125,7 @@ describe("ghost text", () => {
   it("hides the suggestion on Esc until the text changes, and tells the suggester", async () => {
     const { textarea, type } = await field(true);
     answers.set("=B4*", "C4");
-    answers.set("=B4*C", "4");
+    answers.set("=B4+", "C4");
     type("=B4*");
 
     textarea.dispatchEvent(keydown("Escape"));
@@ -133,8 +133,8 @@ describe("ghost text", () => {
     expect(feedback).toEqual(["dismiss"]);
     expect(textarea.value).toBe("=B4*");
 
-    type("=B4*C");
-    expect(ghostText()).toBe("4");
+    type("=B4+");
+    expect(ghostText()).toBe("C4");
   });
 
   it("shows nothing while the function list is open unless an entry inserts the same text", async () => {

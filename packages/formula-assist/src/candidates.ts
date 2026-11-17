@@ -1,9 +1,10 @@
-// Candidates and their ranking into one suggestion. A candidate is a whole
-// formula a signal expects, with the measured chance that it is what the
-// user is typing; ranking keeps those that continue the typed text and shows
-// one only when it is clearly the likeliest.
+// Proposals, candidates and their ranking into one suggestion. A signal
+// proposes whole formulas, each with the reason it has for it; the predictor
+// turns a proposal into a candidate with the measured chance that its reason
+// is right, and ranking shows one only when it is clearly the likeliest.
 
-import type { FormulaAnalysis, FormulaEdit } from "@sheetwrite/core";
+import type { FormulaEdit } from "@sheetwrite/core";
+import type { FormulaAnalysis } from "@sheetwrite/core/functions";
 
 /** The signals, strongest first, as #801 lists them. */
 export const SIGNALS = ["neighbours", "shape", "roles", "patterns", "syntax"] as const;
@@ -11,28 +12,46 @@ export const SIGNALS = ["neighbours", "shape", "roles", "patterns", "syntax"] as
 /** One signal's name. */
 export type SignalName = (typeof SIGNALS)[number];
 
-/** A formula a signal expects in the edited cell. */
-export interface Candidate {
+/** A formula a signal expects in the edited cell, and why. */
+export interface Proposal {
   /** The whole formula, starting with `=`. */
   readonly formula: string;
-  /**
-   * The chance that the user is typing this formula, from the share of such
-   * candidates that were right on the benchmark's development sets.
-   */
-  readonly confidence: number;
   readonly signal: SignalName;
-  /** Why the signal proposed it: the situation its confidence was measured in. */
+  /** The situation that made the signal propose it, such as `aboveAndBelow`; calibration is per reason. */
   readonly reason: string;
 }
 
-/** One signal's view of one edit: candidates for the text typed so far. */
+/** A proposal with the chance that the user is typing it. */
+export interface Candidate extends Proposal {
+  readonly confidence: number;
+}
+
+/** One signal's view of one edit: proposals for the text typed so far. */
 export interface Signal {
   /** Runs on every key, so it does its reads when the edit opens and only filters here. */
-  candidates(text: string, analysis: FormulaAnalysis): readonly Candidate[];
+  proposals(text: string, analysis: FormulaAnalysis): readonly Proposal[];
 }
 
 /** Opens a signal for one edit. */
 export type OpenSignal = (edit: FormulaEdit) => Signal;
+
+/** Characters typed after the `=` at most counted apart; more count as this many. */
+const MOST_TYPED = 3;
+
+/**
+ * How much the user has typed, for calibration: the characters after the
+ * `=`, as `0`, `1`, `2` or `3+`. A formula that keeps agreeing with what the
+ * user types gets likelier with every character.
+ */
+export function typedBucket(text: string): string {
+  const typed = text.length - 1;
+  return typed >= MOST_TYPED ? `${MOST_TYPED}+` : String(typed);
+}
+
+/** The calibration key of a proposal after `text`. */
+export function calibrationKey(proposal: Proposal, text: string): string {
+  return `${proposal.signal}|${proposal.reason}|${typedBucket(text)}`;
+}
 
 /** A suggestion is shown only at this confidence or above… */
 export const SHOW_AT = 0.9;
@@ -41,7 +60,7 @@ export const LEAD = 0.15;
 /** A shared start of disagreeing candidates is shown only from this many characters. */
 const MIN_SHARED = 2;
 
-/** Whether `formula` starts with `text`, where letters outside strings may differ in case. */
+/** Whether `formula` starts with `text` and goes on, where letters outside strings may differ in case. */
 export function continues(formula: string, text: string): boolean {
   if (formula.length <= text.length) return false;
 
@@ -67,7 +86,6 @@ function continuationKey(continuation: string): string {
 /** Candidates that insert the same text, merged. */
 interface Ranked {
   readonly continuation: string;
-  readonly key: string;
   confidence: number;
   signal: SignalName;
   /** The highest confidence of one member, whose signal the group reports. */
@@ -76,7 +94,7 @@ interface Ranked {
 
 /**
  * The candidates that continue `text`, merged by what they insert and sorted
- * by confidence, highest first. Independent signals that agree make a merged
+ * by confidence, highest first. Independent reasons that agree make a merged
  * candidate likelier: 1 − ∏(1 − pᵢ).
  */
 export function rank(text: string, candidates: Iterable<Candidate>): Ranked[] {
@@ -90,7 +108,6 @@ export function rank(text: string, candidates: Iterable<Candidate>): Ranked[] {
     if (group === undefined) {
       groups.set(key, {
         continuation,
-        key,
         confidence: candidate.confidence,
         signal: candidate.signal,
         best: candidate.confidence,

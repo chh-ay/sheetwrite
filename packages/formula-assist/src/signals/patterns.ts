@@ -4,20 +4,14 @@
 // earlier in the formula, what followed it then likely follows it again, up
 // to the end of that argument.
 
-import type { FormulaAnalysis, FormulaToken } from "@sheetwrite/core";
+import type { FormulaAnalysis, FormulaToken } from "@sheetwrite/core/functions";
 
-import type { Candidate, Signal } from "../candidates.js";
+import type { Proposal, Signal } from "../candidates.js";
 
 /** The repeated text must be at least this long to count. */
 const MIN_REPEAT = 4;
 /** Longest repeated text searched for, in characters. */
 const MAX_REPEAT = 40;
-
-/** Measured on the development sets (see bench/README.md). */
-const CONFIDENCE = {
-  /** What followed an earlier copy of the typed text, to the end of its argument. */
-  repeatInFormula: 0.8,
-} as const;
 
 /** The end of the argument that starts at `from`: after its `,` or its call's `)`. */
 function argumentEnd(tokens: readonly FormulaToken[], text: string, from: number): number | null {
@@ -35,7 +29,7 @@ function argumentEnd(tokens: readonly FormulaToken[], text: string, from: number
 }
 
 class Patterns implements Signal {
-  candidates(text: string, analysis: FormulaAnalysis): Candidate[] {
+  proposals(text: string, analysis: FormulaAnalysis): Proposal[] {
     const starts = new Set(analysis.tokens.map((token) => token.from));
     const longest = Math.min(MAX_REPEAT, Math.floor((text.length - 1) / 2));
     for (let length = longest; length >= MIN_REPEAT; length--) {
@@ -47,15 +41,8 @@ class Patterns implements Signal {
       const end = argumentEnd(analysis.tokens, text, earlier + length);
       if (end === null || end > from) continue;
 
-      const continuation = text.slice(earlier + length, end);
-      return [
-        {
-          formula: text + continuation,
-          confidence: CONFIDENCE.repeatInFormula,
-          signal: "patterns",
-          reason: "repeatInFormula",
-        },
-      ];
+      const formula = text + text.slice(earlier + length, end);
+      return [{ formula, signal: "patterns", reason: "repeatInFormula" }];
     }
     return [];
   }

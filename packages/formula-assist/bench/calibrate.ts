@@ -1,24 +1,30 @@
-// Measures how often each kind of candidate is right, to set the confidences
-// in src/signals. Types each formula with no suggestion taken and, at every
-// key, asks every signal for its candidates; a candidate is right when the
-// formula starts with it.
+// Measures how often each kind of proposal is right, and writes the
+// predictor's confidences (src/calibration.ts) from it. Types each formula
+// with no suggestion taken and, at every key, asks every signal for its
+// proposals; a proposal is right when the formula starts with it.
 //
-//   bun packages/formula-assist/bench/calibrate.ts [--set <name>]...
+//   bun packages/formula-assist/bench/calibrate.ts [--set <name>]... [--write]
 //
-// It refuses the held-out half: confidences are set on the development sets only.
+// It refuses the held-out half: confidences come from the development sets only.
 
+import { writeFile } from "node:fs/promises";
 import { parseArgs } from "node:util";
 
 import { initSheetwrite } from "@sheetwrite/core";
 import { xlsxAddon } from "@sheetwrite/xlsx";
 
-import { continues, type Signal } from "../src/candidates.js";
+import { calibrationKey, continues, type Signal } from "../src/candidates.js";
 import { openSignals, SIGNALS } from "../src/predictor.js";
 import { percent } from "./bar.js";
 import { REPLAY_SETS, type ReplaySetName, replayWorkbooks } from "./corpora.js";
 import { agrees, emptyCounts, type ReplaySession, replayWorkbook } from "./replay.js";
 
-const { values } = parseArgs({ options: { set: { type: "string", multiple: true } } });
+const { values } = parseArgs({
+  options: {
+    set: { type: "string", multiple: true },
+    write: { type: "boolean", default: false },
+  },
+});
 
 function isDevelopmentSet(name: string): name is ReplaySetName {
   return name !== "enron-heldout" && REPLAY_SETS.some((set) => set === name);
@@ -29,26 +35,26 @@ const sets = (values.set ?? ["enron-dev", "conformance", "fixtures"]).map((name)
   return name;
 });
 
-/** Candidates of one signal and reason, and how many were right. */
-const tallies = new Map<string, { candidates: number; right: number }>();
+/** Proposals of one calibration key, and how many were right. */
+const tallies = new Map<string, { proposals: number; right: number }>();
 
-/** A session that suggests nothing and scores every candidate against `formula`. */
+/** A session that suggests nothing and scores every proposal against `formula`. */
 function scoring(signals: readonly Signal[], formula: string): ReplaySession {
   const seen = new Set<string>();
   return {
     suggest(text, analysis) {
       for (const signal of signals) {
-        for (const candidate of signal.candidates(text, analysis)) {
-          if (!continues(candidate.formula, text)) continue;
-          const key = `${candidate.signal}\u0000${candidate.reason}\u0000${candidate.formula.toUpperCase()}`;
-          if (seen.has(key)) continue;
-          seen.add(key);
+        for (const proposal of signal.proposals(text, analysis)) {
+          if (!continues(proposal.formula, text)) continue;
+          const key = calibrationKey(proposal, text);
+          const once = `${key}\u0000${proposal.formula.toUpperCase()}`;
+          if (seen.has(once)) continue;
+          seen.add(once);
 
-          const tallyKey = `${candidate.signal} | ${candidate.reason}`;
-          const tally = tallies.get(tallyKey) ?? { candidates: 0, right: 0 };
-          tally.candidates++;
-          if (agrees(formula, 0, candidate.formula)) tally.right++;
-          tallies.set(tallyKey, tally);
+          const tally = tallies.get(key) ?? { proposals: 0, right: 0 };
+          tally.proposals++;
+          if (agrees(formula, 0, proposal.formula)) tally.right++;
+          tallies.set(key, tally);
         }
       }
       return null;
@@ -59,6 +65,7 @@ function scoring(signals: readonly Signal[], formula: string): ReplaySession {
 
 /** z for a one-sided 95% Wilson bound. */
 const Z = 1.645;
+const DIGITS = 3;
 
 /** The lower bound of the Wilson interval: a precision the sample size supports. */
 function wilsonLower(right: number, total: number): number {
@@ -90,11 +97,31 @@ for (const set of sets) {
   }
 }
 
+const rows = [...tallies].sort(([left], [right]) => left.localeCompare(right));
 process.stdout.write(
-  `Sets: ${sets.join(", ")}\n\n| Signal | Reason | Candidates | Right | Precision | 95% lower bound |\n| --- | --- | ---: | ---: | ---: | ---: |\n`,
+  `Sets: ${sets.join(", ")}\n\n| Signal | Reason | Typed | Proposals | Right | Precision | 95% lower bound |\n| --- | --- | --- | ---: | ---: | ---: | ---: |\n`,
 );
-for (const [key, tally] of [...tallies].sort(([left], [right]) => left.localeCompare(right))) {
-  const precision = percent(tally.right / tally.candidates);
-  const lower = percent(wilsonLower(tally.right, tally.candidates));
-  process.stdout.write(`| ${key} | ${tally.candidates} | ${tally.right} | ${precision} | ${lower} |\n`);
+for (const [key, tally] of rows) {
+  const [signal, reason, typed] = key.split("|");
+  const precision = percent(tally.right / tally.proposals);
+  const lower = percent(wilsonLower(tally.right, tally.proposals));
+  process.stdout.write(
+    `| ${signal} | ${reason} | ${typed} | ${tally.proposals} | ${tally.right} | ${precision} | ${lower} |\n`,
+  );
+}
+
+if (values.write) {
+  const entries = rows.map(
+    ([key, tally]) => `  ${JSON.stringify(key)}: ${wilsonLower(tally.right, tally.proposals).toFixed(DIGITS)},`,
+  );
+  const source = `// Generated by bench/calibrate.ts --write from ${sets.join(", ")}; do not edit.
+// Each value is the 95% lower bound (Wilson) of the share of proposals that
+// were right, by signal, reason and characters typed after the \`=\`.
+
+/** The predictor's confidence in a proposal, by \`signal|reason|typed\`. */
+export const CALIBRATION: Readonly<Record<string, number>> = {
+${entries.join("\n")}
+};
+`;
+  await writeFile(new URL("../src/calibration.ts", import.meta.url), source);
 }
