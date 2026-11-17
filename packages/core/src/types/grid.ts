@@ -81,6 +81,15 @@ export interface GridPanel {
 /** Selection movement applied after a successful editor commit. */
 export type CellEditorNavigation = "down" | "right" | "left" | "none";
 
+/**
+ * Excel's cell mode, which its status bar names: `ready` while no cell is
+ * edited, `enter` when typing opened the cell editor (arrow keys commit),
+ * `edit` after F2 or a double-click (arrow keys move the caret), and `point`
+ * while an arrow key or the pointer has just picked a reference for a
+ * formula. A host-supplied editor is `edit`; a list rule's list is `ready`.
+ */
+export type CellMode = "ready" | "enter" | "edit" | "point";
+
 /** Viewport-relative geometry of the cell currently owned by an editor. */
 export interface CellEditorRect {
   /** Left edge of the cell in CSS pixels, from the grid's left edge. */
@@ -997,6 +1006,8 @@ export interface GridEvents {
    * the same cell in sheet rows. Use the sheet address to store or look up data.
    */
   "edit-commit": { addr: CellAddress; sheetAddress: CellAddress; value: CellValue };
+  /** The cell mode changed, for example from `ready` to `enter` when typing opens the editor. */
+  "cell-mode": { mode: CellMode };
   /** A search ran or moved to another match. */
   search: SearchResult;
   /** Command availability or formatting activity changed. */
@@ -1112,6 +1123,8 @@ export interface Grid {
   getCellText(addr: CellAddress): string;
   /** The current selection, or null when nothing is selected. */
   getSelection(): Selection | null;
+  /** Excel's cell mode now: `ready`, `enter`, `edit` or `point`. See {@link CellMode}. */
+  getCellMode(): CellMode;
   /** Select `sel`, or clear the selection with null. */
   setSelection(sel: Selection | null): void;
   /** Resolved base theme, before zoom scaling. The returned object is a copy. */

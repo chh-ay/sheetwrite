@@ -390,6 +390,7 @@ export const PUBLIC_TYPE_DOMAINS: Readonly<Record<string, PublicTypeDomain>> = {
       "CellEditorNavigation",
       "CellEditorRect",
       "CellInputSnapshot",
+      "CellMode",
       "ClipboardOutcome",
       "CommandFlags",
       "ContextMenuActionName",

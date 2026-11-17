@@ -163,6 +163,7 @@ import type { ContextMenuItem, KeyboardAction, KeyboardOptions } from "./types/g
 import type {
   CellEditor,
   CellInputSnapshot,
+  CellMode,
   ClipboardOutcome,
   Grid,
   GridActions,
@@ -638,6 +639,7 @@ export class GridImpl implements Grid {
     scroll: new Set(),
     "edit-begin": new Set(),
     "edit-commit": new Set(),
+    "cell-mode": new Set(),
     search: new Set(),
     "command-state-change": new Set(),
     "active-sheet": new Set(),
@@ -2912,6 +2914,10 @@ export class GridImpl implements Grid {
 
   getSelection(): Selection | null {
     return this.selection.toSelection(this.activeSheet);
+  }
+
+  getCellMode(): CellMode {
+    return this.interactions.cellMode;
   }
 
   setSelection(sel: Selection | null): void {

@@ -1,7 +1,7 @@
-// Status line in the spirit of Excel's: how many records an AutoFilter keeps
-// right after it filters, then the selection's shape plus Average, Count and
-// Sum, and after an undo or redo the step it applied. Geometry is
-// constant-time per selection event; the totals come from
+// Status line in the spirit of Excel's: the cell mode, how many records an
+// AutoFilter keeps right after it filters, then the selection's shape plus
+// Average, Count and Sum, and after an undo or redo the step it applied.
+// Geometry is constant-time per selection event; the totals come from
 // Grid.summarizeSelection, which reads in bounded chunks between frames, so
 // this piece stays safe next to any selection size.
 
@@ -12,9 +12,17 @@ import { autoFilterBody } from "../store/autofilter.js";
 import { storeEngine } from "../store/engine-registry.js";
 import type { Range, Selection } from "../types/coordinates.js";
 import type { DocumentOp } from "../types/document.js";
-import type { Grid, GridEvents, SelectionSummary } from "../types/grid.js";
+import type { CellMode, Grid, GridEvents, SelectionSummary } from "../types/grid.js";
 import type { ChangeEvent } from "../types/transaction.js";
 import type { ShellPiece } from "./formula-controls.js";
+
+/** The words Excel's status bar shows for each cell mode. */
+const MODE_LABELS: Readonly<Record<CellMode, string>> = {
+  ready: "Ready",
+  enter: "Enter",
+  edit: "Edit",
+  point: "Point",
+};
 
 /**
  * Human phrase for a selection's geometry; blank for null/single-cell.
@@ -100,11 +108,12 @@ function describeRecords(grid: Grid): string {
 }
 
 /**
- * `<output role="status">` that follows the grid's selection and its values.
- * After a change to the AutoFilter's filters it starts with "12 of 48
- * records found", as Excel's status bar does, until the next other change or
- * sheet switch. Text nodes only; polite live region so screen readers
- * announce changes without interrupting.
+ * `<output role="status">` that names Excel's cell mode (Ready, Enter, Edit
+ * or Point) and follows the grid's selection and its values. After a change
+ * to the AutoFilter's filters it shows "12 of 48 records found", as Excel's
+ * status bar does, until the next other change or sheet switch. Text only; a
+ * polite live region, so screen readers announce changes without
+ * interrupting.
  *
  * @param host - Element the status is appended to.
  */
@@ -113,6 +122,11 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   output.className = "sheetwrite-shell-status";
   output.setAttribute("role", "status");
   output.setAttribute("aria-live", "polite");
+  // Excel names the cell mode first, so the user knows what an arrow key does.
+  const mode = document.createElement("span");
+  mode.className = "sheetwrite-shell-mode";
+  const summary = document.createElement("span");
+  output.append(mode, summary);
 
   let records = "";
   let geometry = "";
@@ -122,11 +136,13 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
   const lifetime = new Scope();
   const summaries = new ScopeSlot(lifetime);
 
+  const showMode = (cellMode: CellMode): void => {
+    mode.textContent = MODE_LABELS[cellMode];
+  };
   const show = (): void => {
     const text = [historyStep, records, totals, geometry].filter(Boolean).join(STATUS_SEPARATOR);
-    output.textContent = text;
-    output.hidden = text === "";
-    host.hidden = output.hidden && host.childElementCount === 1;
+    summary.textContent = text;
+    summary.hidden = text === "";
   };
 
   // A newer selection or edit makes an unfinished summary stale: the next
@@ -184,6 +200,8 @@ export function createSelectionStatus(host: HTMLElement, grid: Grid): ShellPiece
       show();
     }),
   );
+  lifetime.add(grid.on("cell-mode", (event) => showMode(event.mode)));
+  showMode(grid.getCellMode());
   onSelection(grid.getSelection());
 
   return {

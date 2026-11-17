@@ -72,6 +72,8 @@ Editing happens in a single real `<textarea>` on top of the active cell. The gri
 
 As in Excel, typing opens the editor in **Enter mode** and F2 or double-click opens it in **Edit mode**. F2 switches between the two.
 
+The [status bar](/docs/features/grid/status-bar/) names the mode, as Excel's does: **Ready** with no edit open, **Enter**, **Edit**, and **Point** while an arrow key or a click has just picked a reference for a formula. Typing ends Point mode. Hosts read the mode with `grid.getCellMode()` (`"ready"`, `"enter"`, `"edit"` or `"point"`) and hear changes with the `cell-mode` event. A [host-supplied editor](/docs/features/grid/custom-editors/) counts as Edit mode, and a list rule's list as Ready.
+
 Commit and navigation keys:
 
 | Key | Result |
