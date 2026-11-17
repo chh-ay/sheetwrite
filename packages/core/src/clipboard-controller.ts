@@ -49,6 +49,11 @@ export interface ClipboardControllerDeps {
   onValidationRefused?: (refused: readonly CellAddress[], warned: readonly CellAddress[]) => void;
   /** Formula results and list sources for the rules a kept paste checks. */
   validationReads?: () => ValidationReads | undefined;
+  /**
+   * Called when a cut, then its paste, moves `count` rows that a filter or
+   * the user hides, which the selection did not show.
+   */
+  onHiddenRowsMoved?: (count: number, step: "cut" | "paste") => void;
 }
 
 /** What a single paste target cell should become, or `null` to skip it. */
@@ -82,6 +87,8 @@ interface TrustedClipboard {
 interface PendingCut {
   range: Range;
   token: string;
+  /** How many of its rows the selection did not show. */
+  hidden: number;
 }
 
 /** Private-format MIME type used for rich Sheetwrite clipboard payloads. */
@@ -554,8 +561,11 @@ export class ClipboardController {
       this.endCut();
       // A read-only grid copies: nothing can move.
       if (this.deps.readOnly()) return "done";
-      this.pendingCut = { range: source, token };
+      // The snapshot holds the selected rows, which are the ones shown.
+      const hidden = source.end.row - source.start.row + 1 - snapshot.cells.length;
+      this.pendingCut = { range: source, token, hidden };
       this.deps.onCutChange(source);
+      if (hidden > 0) this.deps.onHiddenRowsMoved?.(hidden, "cut");
       return "done";
     } finally {
       write.close();
@@ -772,6 +782,7 @@ export class ClipboardController {
     } finally {
       this.movingCut = false;
     }
+    if (cut.hidden > 0) this.deps.onHiddenRowsMoved?.(cut.hidden, "paste");
     return "done";
   }
 
