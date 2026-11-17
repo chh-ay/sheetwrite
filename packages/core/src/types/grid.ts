@@ -266,23 +266,35 @@ export interface GridActions {
    * Ctrl++, as in Excel: with whole rows selected, insert as many rows above
    * them; with whole columns, as many columns to their left. For any other
    * range it inserts the entire rows (`entire: "row"`) or columns
-   * (`entire: "column"`) of the range; without `entire`, rows for a range at
-   * least as wide as it is tall and columns for a taller one, the choice
-   * Excel's Insert dialog starts on. The change applies before the call
-   * returns. With `ask: true` and no `entire`, as the Ctrl++ key passes,
-   * Excel's Insert dialog asks first, and the rows or columns go in after OK.
-   * Its Shift cells right and Shift cells down choices are shown but not
-   * available yet.
+   * (`entire: "column"`) of the range, or shifts the cells from the range on
+   * right (`shift: "right"`) or down (`shift: "down"`), with the references
+   * to them following, as Excel's Shift cells does. An insert that would
+   * push cells that are not blank off the sheet does nothing and says so.
+   * Without either, it inserts rows for a range at least as wide as it is
+   * tall and columns for a taller one. The change applies before the call
+   * returns. With `ask: true` and neither, as the Ctrl++ key passes, Excel's
+   * Insert dialog asks first, starting on Shift cells down for a wide range
+   * and Shift cells right for a tall one.
    */
-  insertCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
+  insertCells(options?: {
+    entire?: "row" | "column";
+    shift?: "right" | "down";
+    ask?: boolean;
+  }): void;
   /**
    * Ctrl+-, as in Excel: delete the selected whole rows or columns, or, for
-   * any other range, its entire rows or columns, chosen as
-   * {@link GridActions.insertCells} chooses them. The change applies before
-   * the call returns; with `ask: true` and no `entire`, as the Ctrl+- key
-   * passes, Excel's Delete dialog asks first.
+   * any other range, its entire rows or columns, or the range's cells with
+   * the cells right of it (`shift: "right"`) or below it (`shift: "down"`)
+   * moving left or up over them; references to deleted cells become
+   * `#REF!`. The choice without options is as {@link GridActions.insertCells}
+   * makes it. The change applies before the call returns; with `ask: true`
+   * and neither, as the Ctrl+- key passes, Excel's Delete dialog asks first.
    */
-  deleteCells(options?: { entire?: "row" | "column"; ask?: boolean }): void;
+  deleteCells(options?: {
+    entire?: "row" | "column";
+    shift?: "right" | "down";
+    ask?: boolean;
+  }): void;
   /**
    * Ctrl+1, Format Cells. With `format`, merge `format.style` into the style
    * of every selected cell and apply the border preset `format.border`, as
