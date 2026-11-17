@@ -61,7 +61,7 @@ test("merging cells that hold two values warns first, from the keyboard @portabi
   const dialog = page.getByRole("alertdialog", { name: "Merge Cells" });
   await expect(dialog).toBeVisible();
   await expect(dialog).toContainText(
-    "Merging cells only keeps the upper-left value and discards other values.",
+    "Merging cells only keeps the upper-left value and discards other values. This value will be discarded: B6: 'm2'.",
   );
   const ok = dialog.getByRole("button", { name: "OK" });
   const cancel = dialog.getByRole("button", { name: "Cancel" });
@@ -165,3 +165,40 @@ test("Excel's format, hide, insert, delete and Format Cells keys reach the grid 
     await expect(grid).toBeFocused();
   }
 });
+
+// Format Cells opens centred in the window, as Excel's does, and fits it: a
+// short window scrolls the dialog's body, and OK and Cancel stay in view.
+for (const viewport of [
+  { width: 1_280, height: 720 },
+  { width: 390, height: 844 },
+  { width: 1_280, height: 400 },
+]) {
+  test(`Format Cells fits a ${viewport.width} × ${viewport.height} window with OK and Cancel in view @portability`, async ({
+    page,
+  }) => {
+    await open(page);
+    await page.setViewportSize(viewport);
+    await selectRange(page, 1, 6);
+    await page.keyboard.press("Control+Digit1");
+
+    const dialog = page.getByRole("dialog", { name: "Format Cells", exact: true });
+    await expect(dialog).toBeVisible();
+    const box = await dialog.boundingBox();
+    if (!box) throw new Error("Format Cells must have a box");
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+    expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+
+    for (const name of ["OK", "Cancel"]) {
+      const button = dialog.getByRole("button", { name, exact: true });
+      await expect(button).toBeInViewport({ ratio: 1 });
+      const buttonBox = await button.boundingBox();
+      if (!buttonBox) throw new Error(`${name} must have a box`);
+      expect(buttonBox.y + buttonBox.height).toBeLessThanOrEqual(box.y + box.height);
+    }
+
+    await dialog.getByRole("button", { name: "OK", exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+  });
+}
