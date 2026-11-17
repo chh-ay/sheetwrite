@@ -221,11 +221,13 @@ pub(crate) struct ReadSet {
 }
 
 impl ReadSet {
-    /// The reads of the formula `ast` on `names.sheet`; its defined names are
-    /// read through `names` for the cell being bound.
+    /// The reads of the formula `ast` on `names.sheet` at its own cell; its
+    /// defined names are read through `names` for the cell being bound.
+    /// The formula is read as written, under no enclosing shift: a
+    /// conditional format's shift moves only the trees it evaluates.
     pub(crate) fn from_ast(ast: &Ast, names: NameScope<'_>) -> Self {
         let mut out = Self::default();
-        out.collect(ast, names, reference_shift());
+        out.collect(ast, names, (0, 0));
         out
     }
 
@@ -423,7 +425,9 @@ fn ast_is_plain(ast: &Ast) -> bool {
 
 /// Whether `ast` calls a volatile function, in a formula that uses no
 /// defined name. It passes itself to `any_child` as a plain function: with
-/// no name scope to capture, the walk keeps no closure in memory.
+/// no name scope to capture, the walk keeps no closure in memory. Inline,
+/// so the check of the top node costs no call in each rewrite of a formula.
+#[inline]
 fn ast_is_volatile(ast: &Ast) -> bool {
     calls_volatile(ast) || ast.any_child(&mut ast_is_volatile)
 }
@@ -489,11 +493,13 @@ fn any_with_names(
 }
 
 /// Whether the formula's own tree has a LET. A defined name's LET is in the
-/// name's formula, which evaluates it there.
+/// name's formula, which evaluates it there. Inline, as
+/// [`ast_is_volatile`] is: each rewrite of a formula asks.
 #[allow(
     clippy::wildcard_enum_match_arm,
     reason = "Ast has variants that exist only with the analysis feature, so a full list differs between builds; every other node is checked through its children"
 )]
+#[inline]
 fn ast_contains_let(ast: &Ast) -> bool {
     match ast {
         Ast::Func(Func::Let, _) => true,
