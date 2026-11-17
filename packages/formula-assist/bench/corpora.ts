@@ -197,6 +197,22 @@ function enronValue(value: CellScalar): CellValue {
     : { kind: "literal", value };
 }
 
+/** Causes followed before giving up: snapshot errors wrap the engine's in two or three. */
+const MAX_CAUSES = 8;
+
+/** The defined name the engine refused, found along `error`'s causes; null for any other failure. */
+function refusedName(error: unknown): string | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < MAX_CAUSES && current instanceof Error; depth++) {
+    if (current instanceof SheetwriteError && current.message.startsWith("invalid named range")) {
+      const name = current.context?.name;
+      return typeof name === "string" ? name : null;
+    }
+    current = current.cause;
+  }
+  return null;
+}
+
 /**
  * `snapshot` without the defined names the engine refuses. The sample keeps
  * only the cells near its formulas, so a name whose definition read cells
@@ -211,11 +227,8 @@ function withAcceptedNames(snapshot: WorkbookSnapshot): WorkbookSnapshot {
       openReplayStore(candidate).dispose();
       return candidate;
     } catch (error) {
-      const refused =
-        error instanceof SheetwriteError && error.code === "invalid-snapshot"
-          ? error.context?.name
-          : undefined;
-      if (typeof refused !== "string") throw error;
+      const refused = refusedName(error);
+      if (refused === null) throw error;
       const remaining = names.filter((named) => named.name !== refused);
       if (remaining.length === names.length) throw error;
       names = remaining;
