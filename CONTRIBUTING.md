@@ -88,6 +88,50 @@ they cannot check:
   ordering, partial failure) or measures slower, and say why in a comment.
   A faster engine path that TypeScript does not call does not make the
   product faster.
+## Adding a glyph
+
+Every command the toolbar, the ribbon, the context menu or the sheet tab menu
+shows gets its own glyph on the command icon sheet. Reuse a glyph only for the
+same action, such as Sort View A to Z and Z to A. Two different commands next
+to each other must not look the same.
+
+1. Draw it in `scripts/icon-glyphs.ts`. Each row of `ICON_ROWS` is one command
+   family. Add the glyph in a free cell of its family's row, or start a new row
+   at the end. The layout is public, so a published glyph never moves or
+   disappears; the generator fails if one does.
+2. Run `bun run icons:generate` (`bun scripts/icon-sheet.ts`). It writes
+   `icons.svg`, `icons.css`, `icons.json` and `icon-names.ts`; never edit
+   those by hand. `bun run lint` fails while they are stale.
+3. Show it with `icon: "<name>"` on the command (`ribbon-model.ts`,
+   `context-menu.ts`) or with `iconNode(name, overrides)`, so a host's
+   `config.icons` override applies. Then run `bun run api:baseline`, because
+   `ICON_NAMES` is public API.
+
+Draw in the sheet's style, so the set reads as one family:
+
+- **Grid.** A 24-unit cell, drawn for 16 and 20 px. Keep the drawing between
+  about 2.5 and 21.5 units, centred, and leave the cell's edge empty.
+- **Stroke.** Plain path strings use the 1.6 stroke with round caps and joins.
+  Never fill a shape solid. The tones are `tint(d)` (a 24 % fill that marks
+  the cells or thing the command affects), `guide(d)` (dotted context, such as
+  neighbouring rows or an empty place) and `bold(d)` (2.6, only where weight
+  is the meaning; a zero-length bold stroke such as `M6 13h.01` draws a dot).
+- **Corners.** Frames use the 1.5-unit radius: use `frame(x, y, w, h)`, or
+  `tab()` for sheet tabs.
+- **Grammar.** Reuse the family's parts instead of inventing new ones. Rows are
+  horizontal lines and columns vertical lines with no outer frame. Insert adds
+  `M19 9.5v5M16.5 12h5` (a plus), and Delete adds `m16.5 9.5 5 5m0-5-5 5`
+  (a cross). Arrow heads are 2 to 3 units. Funnels, documents, the lens and the
+  chart axes are constants at the top of the file.
+- **Size.** `icons.svg` loads with the first icon, so keep each path tight:
+  the shorter of absolute and relative commands, at most two decimals, and implicit line-tos.
+
+Check the result at real size before you open the pull request. Render every
+glyph at 16 and 20 px in light and dark through `icons.css`, the way the UI
+draws it, and compare the new glyph with its row neighbours. Put that contact
+sheet, before and after, in the pull request body. A glyph that looks right at
+3× can still blur or crowd at 16 px.
+
 
 ## Documentation deployment
 
