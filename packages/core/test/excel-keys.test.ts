@@ -254,7 +254,7 @@ describe("the cell editor", () => {
     type("=SUM(A1:A3))+");
     press("Enter");
     expect(editor()?.value).toBe("=SUM(A1:A3))+");
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.textContent).toContain("There's a problem with this formula.");
     await answerDialog(host, "OK");
     const field = editor();
@@ -444,7 +444,7 @@ describe("insert and delete keys", () => {
   it("ask in Excel's Insert dialog for any other range", async () => {
     select(1, 0, 1, 1);
     press("+", { ctrlKey: true, shiftKey: true, code: "Equal" });
-    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     expect(dialog.getAttribute("role")).toBe("dialog");
     const title = document.getElementById(dialog.getAttribute("aria-labelledby") ?? "");
     expect(title?.textContent).toBe("Insert");
@@ -465,7 +465,7 @@ describe("insert and delete keys", () => {
     // A tall range defaults to columns, and Escape cancels.
     select(0, 1, 3, 1);
     press("-", { ctrlKey: true, code: "Minus" });
-    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+    const remove = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
     const removeChoices = [...remove.querySelectorAll<HTMLInputElement>("input[type=radio]")];
     expect(removeChoices.map((radio) => radio.parentElement?.textContent)).toEqual([
       "Shift cells left",

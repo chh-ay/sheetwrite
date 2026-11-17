@@ -205,7 +205,7 @@ describe("StyleActions merge policy", () => {
     it("asks first with `ask`, in a labelled alert dialog, and merges after OK", async () => {
       const { host, grid } = twoValues();
       grid.actions.mergeAndCenter({ ask: true });
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
 
       expect(merges(grid)).toEqual([]);
       expect(grid.store.getCell(b6).resolved).toBe("m2");
@@ -271,7 +271,7 @@ describe("StyleActions merge policy", () => {
     it("keeps every value on Cancel or Escape, and keeps grid keys out", async () => {
       const { host, grid } = twoValues();
       grid.actions.merge({ ask: true });
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       // Delete would clear the selection if it reached the grid.
       document.activeElement?.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
@@ -284,7 +284,7 @@ describe("StyleActions merge policy", () => {
       expect(dialog.isConnected).toBe(false);
 
       grid.actions.merge({ ask: true });
-      const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const again = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       again.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(again.isConnected).toBe(false);
@@ -296,7 +296,7 @@ describe("StyleActions merge policy", () => {
     it("keeps Tab inside the dialog, and Enter chooses OK", async () => {
       const { host, grid } = twoValues();
       grid.actions.merge({ ask: true });
-      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDivElement);
+      const dialog = await elementAdded(host, ".sheetwrite-dialog", HTMLDialogElement);
       const [ok, cancel] = dialog.querySelectorAll("button");
       cancel!.focus();
       cancel!.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
