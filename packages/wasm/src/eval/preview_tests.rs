@@ -175,6 +175,48 @@ fn typed_range_reads_reach_a_million_cells_and_no_further() {
     }
 }
 
+/// Kind entries the typed scans of one preview of `source` read.
+fn kinds_scanned(store: &CellStore, sheet: usize, source: &str) -> (FormulaPreviewStatus, usize) {
+    let scanned = &super::preview_limits::KINDS_SCANNED;
+    scanned.with(|count| count.set(0));
+    let status = preview(store, sheet, source).status();
+    (status, scanned.with(std::cell::Cell::get))
+}
+
+#[test]
+fn a_refused_preview_scans_no_more_cells() {
+    use super::preview_limits::PREVIEW_TYPED_CELLS;
+
+    let mut store = CellStore::new();
+    let sheet = store.add_sheet(3, PREVIEW_TYPED_CELLS);
+    crate::tests::support::write_number_column(
+        &mut store,
+        sheet,
+        0,
+        0,
+        &vec![1.0; PREVIEW_TYPED_CELLS],
+    );
+    store.commit_sources();
+
+    // The first whole-column read spends the typed budget; IFERROR catches
+    // each later refusal, and none of them scans the column again.
+    let caught = "IFERROR(SUM(A:A),0)";
+    let source = format!("=SUM({caught},{caught},{caught})");
+    assert_eq!(
+        kinds_scanned(&store, sheet, &source),
+        (FormulaPreviewStatus::CostLimit, PREVIEW_TYPED_CELLS)
+    );
+    // A read after a refusal elsewhere scans nothing either.
+    assert_eq!(
+        kinds_scanned(
+            &store,
+            sheet,
+            "=IFERROR(ROWS(SEQUENCE(20000)),0)+SUM(A1:A10)"
+        ),
+        (FormulaPreviewStatus::CostLimit, 0)
+    );
+}
+
 #[test]
 fn cell_by_cell_reads_and_arrays_have_smaller_limits() {
     let mut store = CellStore::new();

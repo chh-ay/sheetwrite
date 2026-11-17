@@ -27,6 +27,7 @@ import type {
 } from "../src/types.js";
 import { setXlsxTableExportBackend } from "../src/xlsx-slots.js";
 import {
+  answerDialog,
   coveredPage,
   keepXlsxSlots,
   makeColumnarData,
@@ -1345,10 +1346,11 @@ describe("transactional document metadata", () => {
     }
   });
 
-  it("emits and histories merge, row height, freeze, conditional, and group operations", () => {
+  it("emits and histories merge, row height, freeze, conditional, and group operations", async () => {
     const workbook = makeWorkbook(10);
     const store = new SheetwriteStore(workbook, makeColumnarData(10));
-    const grid = new GridImpl(mountHost(), { workbook }, store);
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
     const events: ChangeEvent[] = [];
     grid.on("change", (event) => events.push(event));
 
@@ -1357,6 +1359,7 @@ describe("transactional document metadata", () => {
       range: { sheet: "s1", start: { row: 0, col: 0 }, end: { row: 1, col: 1 } },
     });
     grid.actions.merge();
+    await answerDialog(host, "OK");
     const mergeEvent = events.at(-1);
     if (!mergeEvent) throw new Error("expected merge to emit a transaction");
     const replayWorkbook = makeWorkbook(10);
