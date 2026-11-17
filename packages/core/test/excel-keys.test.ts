@@ -215,6 +215,20 @@ describe("the cell editor", () => {
     expect(editor()?.value).toBe("=B2:B3+B4");
   });
 
+  it("points at sheet rows under a filter, as Excel does", () => {
+    // Rows 4 to 10 stay visible: the amounts from 30.5.
+    grid.setColumnFilter(1, { kind: "compare", op: "gte", value: 30 });
+    // View row 4 is sheet row 8.
+    select(4, 2);
+    type("=");
+    // The editor names the row as the row header shows it.
+    expect(editor()?.getAttribute("aria-label")).toBe("Edit C, row 8");
+    press("ArrowUp");
+    expect(editor()?.value).toBe("=C7");
+    press("ArrowUp", { shiftKey: true });
+    expect(editor()?.value).toBe("=C6:C7");
+  });
+
   it("cycles the reference at the caret with F4", () => {
     select(3, 2);
     type("=SUM(A1:B2)+A1");
