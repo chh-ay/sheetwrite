@@ -113,7 +113,7 @@ Excel turns AutoComplete off with **Enable AutoComplete for cell values**. In Sh
 
 `beginEdit` closes the previous editor. It selects the requested cell, or keeps the selection when the cell is inside it and makes the cell active. It emits `selection` when that changes the selection, then emits `edit-begin` before it opens the editor. A synchronous handler can replace or cancel the request without the old editor reopening.
 
-Successful completion emits `change`, then `edit-commit`, then the navigation's `selection` event. Rejected completion does not emit `edit-commit` or navigate. Event addresses remain view coordinates.
+Successful completion emits `change`, then `edit-commit`, then the navigation's `selection` event. Rejected completion does not emit `edit-commit` or navigate. Event addresses remain view coordinates: under a filter, hidden rows or a view sort, `addr` counts the rows the view shows. Each event also carries the cell in sheet rows, `sheetAddress` on `edit-begin` and `edit-commit` and `sheetFocus` on `selection`; use the sheet address to store or look up data.
 
 ### Formula bar
 

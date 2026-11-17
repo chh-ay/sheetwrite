@@ -301,6 +301,21 @@ describe("AutoFilter in the grid", () => {
     expect(notice()?.hidden).toBe(true);
   });
 
+  it("reports the sheet address of edited and selected cells under a filter", () => {
+    const { grid } = mount();
+    grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
+    grid.setColumnFilter(0, { kind: "values", values: ["apple", "fig"] });
+    const begins: unknown[] = [];
+    const focuses: unknown[] = [];
+    grid.on("edit-begin", ({ addr, sheetAddress }) => begins.push([addr.row, sheetAddress.row]));
+    grid.on("selection", ({ sheetFocus }) => focuses.push(sheetFocus?.row));
+    // View row 2 shows fig, on sheet row 3.
+    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 2, col: 0 } });
+    grid.beginEdit(2, 0);
+    expect(focuses).toEqual([3]);
+    expect(begins).toEqual([[2, 3]]);
+  });
+
   it("maps view rows to sheet rows and back under a filter", () => {
     const { grid } = mount();
     grid.setAutoFilter({ sheet: "s1", start: { row: 0, col: 0 }, end: { row: 3, col: 1 } });
