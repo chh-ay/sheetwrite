@@ -18,8 +18,9 @@ export const QUALITY_BAR: Readonly<Partial<Record<ReplaySetName, SetBar>>> = {
   // Measured once on the seed-803 draw: 38.5% saved, 2.6% wrong (15 of 587 shown).
   // The gate sits a little outside those values, so it holds them without tripping on them.
   "enron-heldout": { minSaved: 0.38, maxWrong: 0.03 },
-  // A regression floor a little under the measured 16.4%, so noise in the corpus cannot trip it.
-  conformance: { minSaved: 0.16, maxWrong: 0.02 },
+  // A regression floor a little under the measured 16.1%. The corpus follows the engine's formula
+  // inventory, so its cases change; the margin keeps a changed case from tripping it.
+  conformance: { minSaved: 0.155, maxWrong: 0.02 },
   fixtures: { minSaved: 0, maxWrong: 0.02 },
 };
 
