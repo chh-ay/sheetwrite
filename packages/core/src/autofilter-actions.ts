@@ -5,7 +5,7 @@ import { colToA1 } from "./a1.js";
 import { AutoFilterMenu, type AutoFilterMenuRequest } from "./autofilter-menu.js";
 import { parseCellInput } from "./cell-input.js";
 import { formatNumber } from "./number-format.js";
-import { autoFilterBody } from "./store/autofilter.js";
+import { autoFilterBody, lowerBound } from "./store/autofilter.js";
 import type { StoreDataEngine } from "./store/data-engine.js";
 import { storeEngine } from "./store/engine-registry.js";
 import type { CellScalar, Column } from "./types/cell.js";
@@ -176,11 +176,8 @@ export function autoFilterValues(
   const own = filters.get(col);
   filters.delete(col);
   const only = filters.size > 0 ? engine.filteredRows(sheet.id, filters) : undefined;
-  let rows = total;
-  if (only) {
-    rows = 0;
-    for (const row of only) if (row >= body.start && row <= body.end) rows++;
-  }
+  // `only` is ascending, so the rows of the list are one slice of it.
+  const rows = only ? lowerBound(only, body.end + 1) - lowerBound(only, body.start) : total;
   const { values, formats, counts } = engine.distinctEntries(
     sheet.id,
     col,
@@ -192,9 +189,8 @@ export function autoFilterValues(
 
   // A value list keeps the listed values it names, which needs no second scan.
   if (own.kind === "values") {
-    const keyOf = (value: CellScalar) => `${typeof value}:${String(value)}`;
-    const named = new Set(own.values.map(keyOf));
-    const kept = values.filter((value) => named.has(keyOf(value)));
+    const named = new Set(own.values);
+    const kept = values.filter((value) => named.has(value));
     return { values, formats, counts, kept, rows, total };
   }
   // Any other filter: the values of the rows every filter keeps, its own included.

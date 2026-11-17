@@ -200,8 +200,6 @@ type ListItem =
       readonly open: boolean;
     };
 
-const valueKey = (value: CellScalar): string => `${typeof value}:${String(value)}`;
-
 /** Nesting of a date list: a year, a month and a day group, as Excel's. */
 const DAY_LEVEL = 2;
 /** Indent of each nesting level of a date list, in CSS pixels. */
@@ -227,17 +225,17 @@ interface Session {
   /** Whether the list groups dates by year, month and day. */
   readonly dated: boolean;
   /** How many rows hold each value, by value key. */
-  readonly counts: ReadonlyMap<string, number>;
+  readonly counts: ReadonlyMap<CellScalar, number>;
   /** The years and months a date list shows open, by group key. */
   readonly expanded: Set<string>;
   /** The values checked in the whole list. */
-  readonly checked: Set<string>;
+  readonly checked: Set<CellScalar>;
   /** The search the list shows, trimmed and in lower case; empty without one. */
   query: string;
   /** The values the search leaves; all of them without a search. */
   shown: CellScalar[];
   /** The search results checked; each new search checks all of them, as in Excel. */
-  found: Set<string>;
+  found: Set<CellScalar>;
   /** Whether OK adds the checked search results to the values `checked` keeps. */
   addCurrent: boolean;
   /** The rows the search leaves, (Select All) first. */
@@ -272,9 +270,9 @@ export class AutoFilterMenu {
     this.dismiss();
     const idPrefix = `sheetwrite-autofilter-${nextId++}`;
     const values = [...request.values].sort(blanksLast);
-    const counts = new Map<string, number>();
+    const counts = new Map<CellScalar, number>();
     for (const [index, value] of request.values.entries()) {
-      counts.set(valueKey(value), request.counts[index] ?? 0);
+      counts.set(value, request.counts[index] ?? 0);
     }
     const kept = request.kept === null ? values : request.kept;
     const root = document.createElement("div");
@@ -360,7 +358,7 @@ export class AutoFilterMenu {
       dated: request.kind === "date",
       counts,
       expanded: new Set(),
-      checked: new Set(kept.map(valueKey)),
+      checked: new Set(kept),
       query: "",
       shown: [],
       found: new Set(),
@@ -656,7 +654,7 @@ export class AutoFilterMenu {
     );
     if (query !== session.query) {
       session.query = query;
-      session.found = new Set(matches.map(valueKey));
+      session.found = new Set(matches);
       session.addCurrent = false;
     }
     session.shown = matches;
@@ -700,7 +698,7 @@ export class AutoFilterMenu {
     const years: DateGroup[] = [];
     for (const value of dates) {
       const date = serialToDate(Math.floor(value));
-      const rows = session.counts.get(valueKey(value)) ?? 0;
+      const rows = session.counts.get(value) ?? 0;
       let siblings = years;
       let key = "";
       for (const label of [
@@ -738,7 +736,7 @@ export class AutoFilterMenu {
   }
 
   /** The checks the list shows: the search results' while searching, else the whole list's. */
-  private shownChecks(session: Session): Set<string> {
+  private shownChecks(session: Session): Set<CellScalar> {
     return session.query === "" ? session.checked : session.found;
   }
 
@@ -746,7 +744,7 @@ export class AutoFilterMenu {
   private stateOf(session: Session, values: readonly CellScalar[]): "true" | "false" | "mixed" {
     const checks = this.shownChecks(session);
     let checked = 0;
-    for (const value of values) if (checks.has(valueKey(value))) checked++;
+    for (const value of values) if (checks.has(value)) checked++;
     return checked === 0 ? "false" : checked === values.length ? "true" : "mixed";
   }
 
@@ -784,7 +782,7 @@ export class AutoFilterMenu {
     if (item.kind === "all") state = this.stateOf(session, session.shown);
     else if (item.kind === "group") state = this.stateOf(session, item.values);
     else if (item.kind === "add") state = session.addCurrent ? "true" : "false";
-    else state = this.shownChecks(session).has(valueKey(item.value)) ? "true" : "false";
+    else state = this.shownChecks(session).has(item.value) ? "true" : "false";
     option.setAttribute("aria-selected", String(state === "true"));
     if (state === "mixed") option.setAttribute("aria-checked", "mixed");
     option.classList.toggle("sheetwrite-autofilter-active", index === session.active);
@@ -823,7 +821,7 @@ export class AutoFilterMenu {
       item.kind === "group"
         ? item.rows
         : item.kind === "value"
-          ? session.counts.get(valueKey(item.value))
+          ? session.counts.get(item.value)
           : undefined;
     if (rows !== undefined) {
       const tally = document.createElement("span");
@@ -859,7 +857,7 @@ export class AutoFilterMenu {
     if (item.kind === "add") {
       session.addCurrent = !session.addCurrent;
     } else if (item.kind === "value") {
-      const key = valueKey(item.value);
+      const key = item.value;
       if (!checks.delete(key)) checks.add(key);
     } else {
       // (Select All), or a year, month or day: check all of it, or uncheck it
@@ -867,8 +865,8 @@ export class AutoFilterMenu {
       const values = item.kind === "all" ? session.shown : item.values;
       const check = this.stateOf(session, values) !== "true";
       for (const value of values) {
-        if (check) checks.add(valueKey(value));
-        else checks.delete(valueKey(value));
+        if (check) checks.add(value);
+        else checks.delete(value);
       }
     }
     this.renderRows();
@@ -911,7 +909,7 @@ export class AutoFilterMenu {
     let rows = session.request.rows;
     if (keep.length < session.values.length) {
       rows = 0;
-      for (const value of keep) rows += session.counts.get(valueKey(value)) ?? 0;
+      for (const value of keep) rows += session.counts.get(value) ?? 0;
     }
     const { total } = session.request;
     session.ok.disabled = keep.length === 0;
@@ -926,10 +924,10 @@ export class AutoFilterMenu {
    */
   private keptValues(session: Session): CellScalar[] {
     if (session.query === "") {
-      return session.values.filter((value) => session.checked.has(valueKey(value)));
+      return session.values.filter((value) => session.checked.has(value));
     }
     return session.values.filter((value) => {
-      const key = valueKey(value);
+      const key = value;
       return session.found.has(key) || (session.addCurrent && session.checked.has(key));
     });
   }

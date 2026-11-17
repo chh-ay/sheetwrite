@@ -206,7 +206,7 @@ export function autoFilterBody(autoFilter: AutoFilter): { start: number; end: nu
 }
 
 /** The first index in ascending `rows` whose row is at least `row`. */
-function lowerBound(rows: Uint32Array, row: number): number {
+export function lowerBound(rows: Uint32Array, row: number): number {
   let low = 0;
   let high = rows.length;
   while (low < high) {
