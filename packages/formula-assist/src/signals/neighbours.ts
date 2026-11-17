@@ -1,6 +1,7 @@
 // Signal 1 of #801, neighbouring formulas: the formulas next to the edited
-// cell, moved to it as a fill or paste would move them. When the formulas
-// above and below agree, the cell almost surely continues their pattern.
+// cell, moved to it as a fill or paste would move them. Only a formula the
+// cells above and below, or left and right, agree on is proposed: then the
+// cell almost surely continues their pattern.
 
 import type { FormulaEdit } from "@sheetwrite/core";
 

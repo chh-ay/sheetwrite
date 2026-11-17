@@ -81,9 +81,9 @@ function FormulaAssistShowcase() {
             <ShowcaseSection id="formula-assist-how" title="How it predicts">
               <ul>
                 <li>
-                  The formulas above, below, left and right of the cell, moved to it as a fill would
-                  move them. When the formulas above and below agree, the cell almost surely
-                  continues them.
+                  The formulas above and below the cell, or left and right of it, moved to it as a
+                  fill would move them. When both sides agree on one, the cell almost surely
+                  continues it; a formula only one side gives is not suggested.
                 </li>
                 <li>
                   The one function or sheet name the typed letters can start, and the brackets that

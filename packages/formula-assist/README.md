@@ -32,7 +32,7 @@ While the function list is open, Tab takes the list's entry, as in Excel. A sugg
 
 Predictions are deterministic. They use no network and no AI, only the workbook. In order of strength:
 
-1. **Neighbouring formulas.** The formulas next to the cell, moved to it as a fill would move them.
+1. **Neighbouring formulas.** A formula the cells above and below, or left and right, agree on once it is moved to the cell as a fill would move it. A formula only one side gives is not suggested.
 2. **Syntax.** Closing brackets, the one function or sheet name the typed letters can start.
 
 Argument roles, repeats within a formula, the AutoSum range and range ends were measured too, and saved nothing, so they are not part of it.

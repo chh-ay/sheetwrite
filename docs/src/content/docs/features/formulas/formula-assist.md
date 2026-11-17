@@ -38,7 +38,7 @@ While the function list is open, Tab takes the list's entry, as in Excel. A sugg
 
 Predictions are deterministic. They use the workbook only: no network, no AI. Two signals each propose whole formulas, strongest first:
 
-1. **Neighbouring formulas.** The formulas two cells up, down, left and right of the cell, moved to it as a fill would move them. When the formulas above and below agree, the cell almost surely continues them.
+1. **Neighbouring formulas.** The formulas up to two cells up, down, left and right of the cell, moved to it as a fill would move them. A formula is proposed only when the cells above and below, or left and right, agree on it: then the cell almost surely continues them. A formula only one side gives was wrong too often on real workbooks, so it is not suggested.
 2. **Syntax.** The one function or sheet name that the typed letters can start, and the brackets that close calls which have all the arguments they can take.
 
 The benchmark also measured argument roles (the row's key as a lookup value), text the formula repeats, the range AutoSum would sum, and the end of the block a typed range starts. None was right often enough to show, so none ships.
