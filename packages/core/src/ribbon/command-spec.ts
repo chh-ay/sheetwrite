@@ -179,12 +179,14 @@ export interface RibbonTabSpec {
   readonly reduceOrder: readonly string[];
 }
 
-/** Whether `flags` show a command. `export` is opt-in; every other switch is opt-out. */
+/** Whether `flags` show a command. `export` and `keyboardSettings` are opt-in; every other switch is opt-out. */
 function commandShown(spec: RibbonControlSpec, flags: CommandFlags): boolean {
   if (spec.flags === undefined) return true;
 
   return spec.flags.some((flag) =>
-    flag === "export" ? flags.export === true : flags[flag] !== false,
+    flag === "export" || flag === "keyboardSettings"
+      ? flags[flag] !== undefined && flags[flag] !== false
+      : flags[flag] !== false,
   );
 }
 

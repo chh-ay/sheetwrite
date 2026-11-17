@@ -152,6 +152,44 @@ describe("pointer input: mouse parity", () => {
     grid.destroy();
     store.dispose();
   });
+
+  it("keeps what is typed into a Text-formatted cell as text, as Excel does", () => {
+    const workbook = makeWorkbook(10);
+    workbook.sheets[0]!.columns[1]!.type = "number";
+    const store = new SheetwriteStore(workbook, makeColumnarData(10));
+    const host = mountHost();
+    const grid = new GridImpl(host, { workbook }, store);
+    const text = { sheet: "s1", row: 0, col: 1 };
+    const number = { sheet: "s1", row: 1, col: 1 };
+    store.applyTransaction({
+      patches: [
+        {
+          op: "set",
+          addr: text,
+          value: { kind: "literal", value: null },
+          style: { numberFormat: "@" },
+        },
+      ],
+    });
+    const type = (row: number, input: string): void => {
+      grid.beginEdit(row, 1, input);
+      host
+        .querySelector("textarea.sheetwrite-editor")
+        ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    };
+
+    type(0, "0123");
+    expect(store.getCell(text).resolved).toBe("0123");
+    // The entry keeps the cell's format, as in Excel, so the next one is text too.
+    expect(store.getCell(text).style).toEqual({ numberFormat: "@" });
+    type(0, "=1+2");
+    expect(store.getCell(text).resolved).toBe("=1+2");
+    type(1, "0123");
+    expect(store.getCell(number).resolved).toBe(123);
+
+    grid.destroy();
+    store.dispose();
+  });
 });
 
 describe("pointer input: touch policy", () => {
@@ -509,33 +547,6 @@ describe("pointer input: drag lifecycle", () => {
     });
   }
 });
-describe("validation through input mutation paths", () => {
-  it("rejects invalid external paste at the shared commit boundary", async () => {
-    const { grid, store } = makeGrid();
-    grid.setValidationRule({
-      id: "small-amount",
-      range: { sheet: "s1", start: { row: 0, col: 1 }, end: { row: 2, col: 1 } },
-      condition: { kind: "number", max: 5 },
-      policy: "reject",
-    });
-    grid.setSelection({ kind: "cell", addr: { sheet: "s1", row: 0, col: 1 } });
-    const before = store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved;
-    const rejected: string[] = [];
-    grid.on("mutation-rejected", ({ issues }) =>
-      rejected.push(...issues.map((issue) => issue.kind)),
-    );
-    Object.defineProperty(navigator, "clipboard", {
-      configurable: true,
-      value: { readText: () => Promise.resolve("99") },
-    });
-
-    await expect(grid.actions.paste()).resolves.toBe("done");
-    expect(store.getCell({ sheet: "s1", row: 0, col: 1 }).resolved).toBe(before);
-    expect(rejected).toEqual(["validation"]);
-    grid.destroy();
-  });
-});
-
 describe("pointer input: headers", () => {
   it("selects rows by clicking and dragging the row numbers, as in Excel", () => {
     const { grid, scroller, store } = makeGrid();

@@ -17,6 +17,14 @@ describe("parseCellInput", () => {
     });
   });
 
+  it("keeps input in a Text-formatted (@) cell as text, formulas and booleans too", () => {
+    expect(parseCellInput("0123", "number", "@")).toEqual({ kind: "literal", value: "0123" });
+    expect(parseCellInput("=A1", "number", "@")).toEqual({ kind: "literal", value: "=A1" });
+    expect(parseCellInput("TRUE", "text", "@")).toEqual({ kind: "literal", value: "TRUE" });
+    expect(parseCellInput(" ", "number", "@")).toEqual({ kind: "literal", value: null });
+    expect(parseCellInput("0123", "number", "0.00")).toEqual({ kind: "literal", value: 123 });
+  });
+
   it("parses and formats native boolean literals using spreadsheet casing", () => {
     expect(parseCellInput("true", "text")).toEqual({ kind: "literal", value: true });
     expect(parseCellInput("FALSE", "number")).toEqual({ kind: "literal", value: false });

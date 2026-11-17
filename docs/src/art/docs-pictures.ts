@@ -402,6 +402,7 @@ export const DOCS_PICTURE_PLACEMENTS: Readonly<Record<string, readonly PicturePl
     },
   ],
   "/docs/features/data/autofilter/": [{ after: AFTER_LEAD, picture: "autofilter" }],
+  "/docs/features/grid/keyboard-shortcuts/": [{ after: AFTER_LEAD, picture: "keyboard-shortcuts" }],
   "/docs/features/data/validation-protection-and-notes/": [
     { after: "validation", picture: "write-checks" },
     {

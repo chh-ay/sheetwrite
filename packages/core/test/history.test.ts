@@ -54,6 +54,7 @@ describe("UndoManager rejection recovery", () => {
         },
       ],
       [setOperation],
+      "Typing",
     );
     expect(history.getResourceStats()).toEqual({
       undoEntries: 1,
@@ -82,6 +83,7 @@ describe("UndoManager rejection recovery", () => {
       history.push(
         snapshotAction(millionCellSnapshotBytes, () => (disposals += 1)),
         [setOperation],
+        "Typing",
       );
     }
     const kept = Math.floor(historyBudgetBytes / millionCellSnapshotBytes);
@@ -97,6 +99,7 @@ describe("UndoManager rejection recovery", () => {
     history.push(
       snapshotAction(historyBudgetBytes * 2, () => (disposals += 1)),
       [setOperation],
+      "Typing",
     );
     expect(history.getResourceStats().undoEntries).toBe(1);
     expect(disposals).toBe(edits);

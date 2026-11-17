@@ -4,7 +4,7 @@ import { GridImpl, initSheetwrite } from "../src/grid.js";
 import { SheetwriteStore } from "../src/store.js";
 import { installCanvasTestStubs } from "../src/testing.js";
 import type { CellScalar, GridConfig, Workbook } from "../src/types.js";
-import { mountHost } from "./fixtures.js";
+import { elementAdded, mountHost } from "./fixtures.js";
 
 // Excel's AutoComplete: typing a text entry completes it from the entries
 // above and below in the column.
@@ -232,5 +232,64 @@ describe("AutoComplete", () => {
     field.dispatchEvent(new CompositionEvent("compositionend", { data: "o", bubbles: true }));
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(shown()).toEqual(["Tokyo", "kyo"]);
+  });
+});
+
+describe("AutoComplete's list", () => {
+  it("lists the entries when several match, and takes keys only after Alt+Down", async () => {
+    mount(["North", "Northeast", "Nordic"]);
+    at(3);
+    const options = () =>
+      [...host.querySelectorAll(".sheetwrite-entry-list [role=option]")].map((option) => [
+        option.textContent,
+        option.getAttribute("aria-selected"),
+      ]);
+    await type("Nor");
+    expect(shown()).toEqual(["Nor", ""]);
+    expect(options()).toEqual([
+      ["Nordic", "false"],
+      ["North", "false"],
+      ["Northeast", "false"],
+    ]);
+
+    await type("t");
+    expect(options().map(([entry]) => entry)).toEqual(["North", "Northeast"]);
+    key("ArrowDown", { altKey: true });
+    key("ArrowDown");
+    expect(options()).toEqual([
+      ["North", "false"],
+      ["Northeast", "true"],
+    ]);
+    key("Enter");
+    expect(value(3)).toBe("Northeast");
+    expect(host.querySelector(".sheetwrite-entry-list")).toBeNull();
+
+    // Without Alt+Down the keys stay Excel's: Enter stores what was typed.
+    at(4);
+    await type("Nor");
+    key("Enter");
+    expect(value(4)).toBe("Nor");
+  });
+});
+
+// https://support.microsoft.com/en-us/office/keyboard-shortcuts-in-excel-1798d9d5-842a-42b8-9c99-9b7213f0040f
+describe("Pick From Drop-down List", () => {
+  it("lists the column's text entries, sorted, on Alt+Down; Enter puts one in the cell", async () => {
+    mount(["West", "North", "south", "South", 42, "East"]);
+    at(6);
+    key("ArrowDown", { altKey: true });
+    const list = await elementAdded(host, ".sheetwrite-entry-list", HTMLDivElement);
+    const options = [...list.querySelectorAll("[role=option]")].map((option) => option.textContent);
+    expect(options).toEqual(["East", "North", "south", "West"]);
+    expect(document.activeElement).toBe(list);
+
+    for (const name of ["ArrowDown", "Enter"]) {
+      list.dispatchEvent(
+        new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true }),
+      );
+    }
+    expect(value(6)).toBe("North");
+    expect(list.isConnected).toBe(false);
+    expect(grid.getSelection()).toEqual({ kind: "cell", addr: { sheet: "s1", row: 6, col: 0 } });
   });
 });

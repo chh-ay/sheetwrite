@@ -3,12 +3,13 @@ import { chartTouchesSheet } from "./chart-definition.js";
 import { boxesOverlap } from "./dashboard.js";
 import { cloneJsonValue } from "./plain-data.js";
 import { decodeRestoreBlock, encodeRestoreBlock } from "./restore-block.js";
-import { cellRange, movedBlock, rangesIntersect } from "./store/ranges.js";
+import { cellRange, movedCellBounds, rangesIntersect } from "./store/ranges.js";
 import type { CellValue } from "./types/cell.js";
 import type { ChartDefinition, ChartRange } from "./types/chart.js";
 import type { CellAddress, Range, SheetId } from "./types/coordinates.js";
 import type { DocumentOp, PackedCellBlock, SheetSnapshot, SnapshotCell } from "./types/document.js";
 import type { PivotDefinition } from "./types/pivot.js";
+import { mapValidationFormulas } from "./validation-rule.js";
 
 /** Stable conservative-rebase conflict category. */
 export type RebaseConflictCode =
@@ -563,12 +564,24 @@ function transformDirectTarget(
     }
 
     case "setValidationRule": {
-      const mapped = transformRange(operation.rule.range, change);
-      if (!mapped && operation.rule.range.sheet === change.sheet) {
+      const { rule } = operation;
+      const originalSheet = rule.range.sheet;
+      const mapped = transformRange(rule.range, change);
+      if (!mapped && originalSheet === change.sheet) {
         return overlappingStructure(operation.op);
       }
 
-      if (mapped) operation.rule.range = mapped;
+      if (mapped) rule.range = mapped;
+      if (originalSheet === change.sheet) {
+        const formulaEdit = {
+          kind: "shift",
+          at: change.at,
+          delta: change.kind === "insert" ? change.count : -change.count,
+        } as const;
+        rule.condition = mapValidationFormulas(rule.condition, (formula) =>
+          remapFormulaA1Refs(formula, change.axis, formulaEdit),
+        );
+      }
       return null;
     }
 
@@ -1200,7 +1213,7 @@ function mutationRanges(operation: DocumentOp): Range[] {
       return [operation.range];
 
     case "moveCells":
-      return [operation.range, movedBlock(operation)];
+      return movedCellBounds(operation);
 
     case "addMerge":
     case "removeMerge":

@@ -27,7 +27,8 @@ export interface AriaMirrorDeps {
   presentation: "spreadsheet" | "data-grid";
   columnHeader: (col: number) => string;
   focusCell: () => CellRef | null;
-  noteAt: (row: number, col: number) => string | null;
+  /** The description of the cell at view `row`, `col`: its note and input message. */
+  descriptionAt: (row: number, col: number) => string | null;
   selection: () => Selection | null;
 }
 
@@ -44,7 +45,7 @@ export class AriaMirror {
   private readonly host: HTMLElement;
   private readonly aria: HTMLDivElement;
   private readonly focusCell: () => CellRef | null;
-  private readonly noteAt: (row: number, col: number) => string | null;
+  private readonly descriptionAt: (row: number, col: number) => string | null;
   private readonly columnHeader: (col: number) => string;
   private readonly selection: () => Selection | null;
   private key = "";
@@ -82,7 +83,7 @@ export class AriaMirror {
   constructor(deps: AriaMirrorDeps) {
     this.host = deps.host;
     this.focusCell = deps.focusCell;
-    this.noteAt = deps.noteAt;
+    this.descriptionAt = deps.descriptionAt;
     this.columnHeader = deps.columnHeader;
     this.selection = deps.selection;
 
@@ -162,8 +163,7 @@ export class AriaMirror {
         const index = rowIndex * nCols + columnIndex;
         const value = view.values[index] ?? null;
         this.cellTexts[index] = value !== null ? String(value) : "";
-        const note = this.noteAt(row, this.cols[columnIndex] ?? -1);
-        this.cellDescriptions[index] = note ? `Note: ${note}` : null;
+        this.cellDescriptions[index] = this.descriptionAt(row, this.cols[columnIndex] ?? -1);
       }
     }
     this.contentPending = true;

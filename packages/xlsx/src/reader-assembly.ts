@@ -127,22 +127,21 @@ function styleSnapshotCells(source: ParsedSheet, columns: readonly Column[], sty
 function snapshotValidations(source: ParsedSheet, meta: SheetSnapshot | undefined, id: string) {
   const nativeValidations = source.validations.map((validation, index) => {
     const sidecar = meta?.validationRules?.[index];
+    const { range, allowBlank, ...fields } = validation;
     const sameBlankDefault =
       sidecar !== undefined &&
-      validation.allowBlank === (sidecar.allowBlank === undefined ? true : sidecar.allowBlank);
+      allowBlank === (sidecar.allowBlank === undefined ? true : sidecar.allowBlank);
     return {
       id: sidecar?.id ?? `xlsx-validation-${index + 1}`,
-      range: { sheet: id, ...structuredClone(validation.range) },
-      condition: structuredClone(validation.condition),
-      policy: validation.policy,
+      range: { sheet: id, ...structuredClone(range) },
+      ...structuredClone(fields),
       ...(sameBlankDefault
         ? sidecar?.allowBlank !== undefined
           ? { allowBlank: sidecar.allowBlank }
           : {}
-        : validation.allowBlank !== undefined
-          ? { allowBlank: validation.allowBlank }
+        : allowBlank !== undefined
+          ? { allowBlank }
           : {}),
-      ...(validation.helpText ? { helpText: validation.helpText } : {}),
     };
   });
   const validations = source.hasValidationCollection

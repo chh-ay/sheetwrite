@@ -3,12 +3,12 @@
 use std::cell::Cell;
 use std::cmp::Ordering;
 
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use wasm_bindgen::prelude::*;
 
 use crate::cells::{dense_resolved, payload_num, payload_str_id, source_kind, CellRun};
-use crate::eval::{Criterion, Wildcard};
+use crate::eval::{excel_date_parts, Criterion, Wildcard};
 use crate::float_text::NumberText;
 use crate::formula_slots::FormulaStore;
 use crate::sheet::{formula_error_at, SheetData};
@@ -28,37 +28,40 @@ enum DistinctKey<'a> {
     Text(&'a str),
 }
 
-const STAMP_WORD_BITS: usize = 64;
-const STAMP_WORDS_INITIAL: usize = 64;
+const SLOTS_INITIAL: usize = 4_096;
 
-/// One bit per string-pool id, so text that is already dictionary-encoded
-/// dedupes without hashing or comparing a single character.
+/// Each string-pool id's slot in a distinct scan's output, so text that is
+/// already dictionary-encoded dedupes and counts without hashing or comparing
+/// a single character. 0 marks an id the scan has not met; slot `s` is
+/// stored as `s + 1`.
 ///
-/// Words are zero-filled when the marks grow. Growth doubles the current word
-/// count (with an initial floor) or reaches the requested id, whichever is larger.
-struct PoolIdStamps {
-    words: Vec<u64>,
+/// Slots are zero-filled when they grow. Growth doubles the current length
+/// (with an initial floor) or reaches the requested id, whichever is larger.
+struct PoolIdSlots {
+    slots: Vec<u32>,
 }
 
-impl PoolIdStamps {
+impl PoolIdSlots {
     const fn new() -> Self {
-        Self { words: Vec::new() }
+        Self { slots: Vec::new() }
     }
 
-    fn insert(&mut self, id: u32) -> bool {
+    /// The slot of `id`. A new id takes `next` unless `full`, when it has none.
+    fn slot(&mut self, id: u32, next: usize, full: bool) -> Option<usize> {
         let index = id as usize;
-        let word = index / STAMP_WORD_BITS;
-
-        if word >= self.words.len() {
-            let doubled = self.words.len().max(STAMP_WORDS_INITIAL) * 2;
-            self.words.resize(doubled.max(word + 1), 0);
+        if index >= self.slots.len() {
+            let doubled = self.slots.len().max(SLOTS_INITIAL) * 2;
+            self.slots.resize(doubled.max(index + 1), 0);
         }
-
-        let mask = 1u64 << (index % STAMP_WORD_BITS);
-        let fresh = self.words[word] & mask == 0;
-        self.words[word] |= mask;
-
-        fresh
+        let stored = self.slots.get_mut(index)?;
+        if *stored != 0 {
+            return Some(*stored as usize - 1);
+        }
+        if full {
+            return None;
+        }
+        *stored = u32::try_from(next + 1).ok()?;
+        Some(next)
     }
 }
 
@@ -729,6 +732,10 @@ impl CellStore {
     /// - 5, Excel's custom filter: its next `text_counts[i]` texts in
     ///   `value_texts` are COUNTIF criteria (`">5"`, `"=ab*"`); bit 1 of
     ///   `flags[i]` keeps a row that meets any of them, else it must meet all.
+    /// - 6, dates in some months of any year, as Excel's "All Dates in the
+    ///   Period": its next `num_counts[i]` numbers in `value_nums` are the
+    ///   months it keeps, 1 to 12. Numbers that are not dates and other
+    ///   cells do not match.
     ///
     /// Empty when the sheet or a column does not exist.
     #[wasm_bindgen(js_name = filterRowsMulti)]
@@ -942,6 +949,16 @@ impl CellStore {
                     }
                     3 => kind == 0,
                     4 => kind != 0,
+                    6 => numeric_cell_value(data, index, &self.formula_slots)
+                        .and_then(excel_date_parts)
+                        .and_then(|(_, month, _)| i32::try_from(month).ok())
+                        .is_some_and(|month| {
+                            let count = num_counts.get(i).copied().unwrap_or_default() as usize;
+                            value_nums
+                                .get(num_offsets[i]..num_offsets[i] + count)
+                                .unwrap_or_default()
+                                .contains(&f64::from(month))
+                        }),
                     _ => false,
                 };
                 if !matches {
@@ -956,7 +973,7 @@ impl CellStore {
     /// Distinct resolved values of a whole column, in first-seen order.
     #[wasm_bindgen(js_name = distinctValues)]
     pub fn distinct_values(&self, sheet: usize, col: usize, limit: usize) -> DistinctColumn {
-        self.distinct_values_in_rows(sheet, col, 0, usize::MAX, limit, None)
+        self.distinct_values_in_rows(sheet, col, 0, usize::MAX, limit, None, false)
     }
 
     /// Distinct resolved values of one column over the canonical data rows
@@ -964,7 +981,9 @@ impl CellStore {
     /// sheet. With `rows`, only those rows are read, in the order given, and
     /// those outside the range are skipped: an `AutoFilter` lists the rows the
     /// other column filters keep. A zero `limit` returns every value;
-    /// otherwise the scan stops at `limit` values.
+    /// otherwise the scan stops at `limit` values. With `counted` it reads on
+    /// past them, so each listed value's count covers every row, as the
+    /// `AutoFilter` dropdown shows it.
     #[wasm_bindgen(js_name = distinctValuesInRows)]
     #[expect(
         clippy::too_many_arguments,
@@ -978,6 +997,7 @@ impl CellStore {
         end_row: usize,
         limit: usize,
         rows: Option<Vec<u32>>,
+        counted: bool,
     ) -> DistinctColumn {
         let out = DistinctColumn::default();
         let Some(data) = self.sheets.get(sheet) else {
@@ -988,15 +1008,19 @@ impl CellStore {
         }
         let row_count = data.cells.row_count();
         let range = start_row.min(row_count)..end_row.min(row_count);
+        let reach = DistinctLimit {
+            values: limit,
+            counted,
+        };
         match rows {
             Some(listed) => {
                 let in_range = listed
                     .iter()
                     .map(|&row| row as usize)
                     .filter(|row| range.contains(row));
-                distinct_over(self, data, col, in_range, limit)
+                distinct_over(self, data, col, in_range, reach)
             }
-            None => distinct_over(self, data, col, range, limit),
+            None => distinct_over(self, data, col, range, reach),
         }
     }
 
@@ -1043,21 +1067,38 @@ impl CellStore {
     }
 }
 
-/// The distinct resolved values of `col` over `rows`, in first-seen order;
-/// a zero `limit` keeps every value.
+/// A value a distinct scan meets: a pooled text by its id, or any other value
+/// by its key.
+enum Met<'a> {
+    Id(u32),
+    Key(DistinctKey<'a>),
+}
+
+/// How far a distinct scan reads: it lists at most `values` values (0 lists
+/// them all), and with `counted` it reads on past them so each listed value's
+/// count covers every row.
+#[derive(Clone, Copy)]
+struct DistinctLimit {
+    values: usize,
+    counted: bool,
+}
+
+/// The distinct resolved values of `col` over `rows`, in first-seen order,
+/// with the style of each one's first cell and how many of the rows read hold
+/// it.
 fn distinct_over(
     store: &CellStore,
     data: &SheetData,
     col: usize,
     rows: impl Iterator<Item = usize> + Clone,
-    limit: usize,
+    limit: DistinctLimit,
 ) -> DistinctColumn {
     let mut out;
     let text_at = |index: usize| {
         resolved_text(data, &store.strings, index, &store.formula_slots).unwrap_or_default()
     };
     // Stored text carries a pool id that stands for its value, so the scan
-    // dedupes it through one bit per id instead of hashing the characters.
+    // dedupes it through one slot per id instead of hashing the characters.
     // Text without an id — the sentinel a formula error reports reads back as
     // plain text — still has to meet pooled text by content, so the first
     // such cell restarts the scan on content hashing. The restart is rare and
@@ -1065,14 +1106,19 @@ fn distinct_over(
     let mut pooled = true;
     loop {
         out = DistinctColumn::default();
-        let mut stamps = PoolIdStamps::new();
-        let mut seen: FxHashSet<DistinctKey<'_>> = FxHashSet::default();
+        let mut id_slots = PoolIdSlots::new();
+        let mut key_slots: FxHashMap<DistinctKey<'_>, usize> = FxHashMap::default();
         let mut needs_content = false;
         for row in rows.clone() {
+            let next = out.kinds.len();
+            let full = limit.values != 0 && next >= limit.values;
+            if full && !limit.counted {
+                break;
+            }
             let index = col * data.cells.row_count() + row;
             let kind = resolved_kind(data, index, &store.formula_slots);
-            let fresh = match kind {
-                1 => seen.insert(DistinctKey::Number(
+            let met = match kind {
+                1 => Met::Key(DistinctKey::Number(
                     numeric_cell_value(data, index, &store.formula_slots)
                         .unwrap_or_default()
                         .to_bits(),
@@ -1082,35 +1128,28 @@ fn distinct_over(
                         needs_content = true;
                         break;
                     }
-                    id => stamps.insert(id),
+                    id => Met::Id(id),
                 },
-                2 => seen.insert(DistinctKey::Text(text_at(index))),
-                3 => seen.insert(DistinctKey::Bool(
+                2 => Met::Key(DistinctKey::Text(text_at(index))),
+                3 => Met::Key(DistinctKey::Bool(
                     boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default(),
                 )),
-                _ => seen.insert(DistinctKey::Blank),
+                _ => Met::Key(DistinctKey::Blank),
             };
-            if !fresh {
-                continue;
-            }
-            out.kinds.push(kind);
-            if kind == 1 {
-                out.numbers.push(
-                    numeric_cell_value(data, index, &store.formula_slots).unwrap_or_default(),
-                );
-            } else if kind == 3 {
-                out.numbers.push(
-                    if boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default() {
-                        1.0
-                    } else {
-                        0.0
-                    },
-                );
-            } else if kind == 2 {
-                out.texts.push(text_at(index).to_owned());
-            }
-            if limit != 0 && out.kinds.len() >= limit {
-                break;
+            let found = match met {
+                Met::Id(id) => id_slots.slot(id, next, full),
+                Met::Key(key) if full => key_slots.get(&key).copied(),
+                Met::Key(key) => Some(*key_slots.entry(key).or_insert(next)),
+            };
+            // A value first met once the list is full is not listed.
+            match found {
+                Some(slot) if slot < next => {
+                    if let Some(count) = out.counts.get_mut(slot) {
+                        *count = count.saturating_add(1);
+                    }
+                }
+                Some(_) => push_entry(&mut out, store, data, index, kind),
+                None => {}
             }
         }
         if !needs_content {
@@ -1124,6 +1163,38 @@ fn distinct_over(
         stats.set(current);
     });
     out
+}
+
+/// Lists the value of the cell at `index`, of resolved `kind`, as a new entry
+/// held by one row so far.
+fn push_entry(
+    out: &mut DistinctColumn,
+    store: &CellStore,
+    data: &SheetData,
+    index: usize,
+    kind: u8,
+) {
+    out.kinds.push(kind);
+    out.styles.push(data.cells.style_at(index));
+    out.counts.push(1);
+    match kind {
+        1 => out
+            .numbers
+            .push(numeric_cell_value(data, index, &store.formula_slots).unwrap_or_default()),
+        3 => out.numbers.push(
+            if boolean_cell_value(data, index, &store.formula_slots).unwrap_or_default() {
+                1.0
+            } else {
+                0.0
+            },
+        ),
+        2 => out.texts.push(
+            resolved_text(data, &store.strings, index, &store.formula_slots)
+                .unwrap_or_default()
+                .to_owned(),
+        ),
+        _ => {}
+    }
 }
 
 /// Whether the cell at `index`, of resolved `kind`, meets a COUNTIF criterion.
@@ -1221,13 +1292,16 @@ fn resolved_text<'a>(
 }
 
 /// Distinct-value scan result for one column: parallel kind/number/text
-/// arrays whose buffers are surrendered once through the `take*` accessors.
+/// arrays, and the style of each value's first cell, whose buffers are
+/// surrendered once through the `take*` accessors.
 #[derive(Debug, Default)]
 #[wasm_bindgen]
 pub struct DistinctColumn {
     kinds: Vec<u8>,
     numbers: Vec<f64>,
     texts: Vec<String>,
+    styles: Vec<u32>,
+    counts: Vec<u32>,
 }
 
 #[wasm_bindgen]
@@ -1249,6 +1323,19 @@ impl DistinctColumn {
     #[wasm_bindgen(js_name = takeTexts)]
     pub fn take_texts(&mut self) -> Vec<String> {
         std::mem::take(&mut self.texts)
+    }
+
+    /// Surrenders the style id of each value's first cell, one per kind tag,
+    /// which gives the number format the value shows with.
+    #[wasm_bindgen(js_name = takeStyles)]
+    pub fn take_styles(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.styles)
+    }
+
+    /// Surrenders how many of the scanned rows hold each value, one per kind tag.
+    #[wasm_bindgen(js_name = takeCounts)]
+    pub fn take_counts(&mut self) -> Vec<u32> {
+        std::mem::take(&mut self.counts)
     }
 }
 
