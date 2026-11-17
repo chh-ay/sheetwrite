@@ -354,6 +354,10 @@
   --sheetwrite-icon-x: -12;
   --sheetwrite-icon-y: -10.5;
 }
+.sheetwrite-icon[data-icon="pivotChart"] {
+  --sheetwrite-icon-x: -13.5;
+  --sheetwrite-icon-y: -10.5;
+}
 .sheetwrite-icon[data-icon="insertFunction"] {
   --sheetwrite-icon-x: 0;
   --sheetwrite-icon-y: -12;

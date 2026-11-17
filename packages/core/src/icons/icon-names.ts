@@ -82,6 +82,7 @@ export const ICON_NAMES = [
   "chartDoughnut",
   "chartScatter",
   "pivotTable",
+  "pivotChart",
   "insertFunction",
   "defineName",
   "nameManager",

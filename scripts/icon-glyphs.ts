@@ -43,7 +43,7 @@ const SMALL_FUNNEL = "M3 5h12l-4.5 5.5v6.5l-3 1.5v-8Z";
 /** The dotted rows above and below the cells an Insert or Delete glyph tints. */
 const ROW_GUIDES = "M3 5h12M3 19h12";
 /** One cell between those rows: Insert Cells and Delete Cells. */
-const CELL_BOX = "M5.5 9.5h7v5h-7Z";
+const CELL_BOX = "M5 9h8v6H5Z";
 /** The edge of the sheet that the sheet tabs hang from, as in the tab bar. */
 const TAB_EDGE = "M2.5 5h19";
 /** The value and category axes every cartesian chart glyph shares. */
@@ -84,7 +84,8 @@ function gear(teeth: number, outer: number, root: number): string {
     ] as const)
       corners.push(point(radius, middle + side * step));
   }
-  return `M${corners.join("L")}Z`;
+  // Points after the first are implicit line-tos.
+  return `M${corners.join(" ")}Z`;
 }
 
 export const ICON_ROWS: readonly (readonly Glyph[])[] = [
@@ -389,7 +390,7 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
     // An AutoFilter header cell's button, drawn to fill the button's square:
     // a chevron, and a funnel beside it once the column is filtered, as in Excel.
     ["filterArrow", ["m7.5 10 4.5 4.5 4.5-4.5"]],
-    ["filterActive", ["M3.5 6h10l-3.75 4.5v5.25l-2.5 1.25v-6.5Z", "m15.5 11 2.5 2.5 2.5-2.5"]],
+    ["filterActive", ["M4.5 6.5H13l-3.15 4v5l-2.2 1.1v-6.1Z", "m15 11 2.25 2.25L19.5 11"]],
   ],
   // Charts, one glyph per chart kind, and pivot tables.
   [
@@ -427,6 +428,18 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
         "M4 9h16M9 4v16",
         "M17 11.5V13a4 4 0 0 1-4 4h-1.5",
         "m13.5 15-2 2 2 2",
+      ],
+    ],
+    // PivotChart: the chart's columns with the pivot's turning arrow where the
+    // third column would be, so it differs from Chart beside it.
+    [
+      "pivotChart",
+      [
+        AXES,
+        tint("M7 13h2.5v7H7ZM11.5 9H14v11h-2.5Z"),
+        "M7 20v-7h2.5v7M11.5 20V9H14v11",
+        "M14.5 4H17a2.5 2.5 0 0 1 2.5 2.5V9",
+        "m17.5 7 2 2 2-2",
       ],
     ],
   ],
@@ -598,6 +611,15 @@ export const ICON_ROWS: readonly (readonly Glyph[])[] = [
       ],
     ],
     // Tab Color…: a tab with its colour bar under the name, as the tab bar shows it.
-    ["tabColor", [TAB_EDGE, tab(4, 16, 19), "M8 9h8", tint("M7 12.5h10v3H7Z"), "M7 12.5h10v3H7Z"]],
+    [
+      "tabColor",
+      [
+        TAB_EDGE,
+        tint("M4 14h16v3.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5Z"),
+        tab(4, 16, 19),
+        "M8 9.5h8",
+        "M4 14h16",
+      ],
+    ],
   ],
 ];

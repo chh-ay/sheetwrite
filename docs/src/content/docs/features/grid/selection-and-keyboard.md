@@ -134,6 +134,8 @@ When the grid has focus and is not editing, the keys follow Excel's defaults. Th
 
 The keys inside the inline editor are on [Editing and clipboard](/docs/features/grid/editing-and-clipboard/#inline-editing).
 
+From code, `grid.actions.insertCells()` and `grid.actions.deleteCells()` insert or delete before they return, without a dialog, as Excel's `Range.Insert` and `Range.Delete` do in a macro. For a range that is neither whole rows nor whole columns, `{ entire: "row" }` or `{ entire: "column" }` chooses; without it, a range at least as wide as it is tall takes entire rows and a taller one entire columns, the choice Excel's dialog starts on. `{ ask: true }` opens the dialog, as the keys do.
+
 In a dialog the grid opens, such as the merge warning, Tab and Shift + Tab move between its controls and stay inside it, Enter chooses OK, and Escape cancels. The grid has focus again when the dialog closes.
 
 ## Rebind an action
